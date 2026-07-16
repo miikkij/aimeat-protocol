@@ -6,6 +6,7 @@
  *   listStorageFiles omits the bytes.
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 5: storage files on Postgres+Kysely.
+ *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive.
  */
 import { sql } from 'kysely';
 import type { ChunkedUploadRecord, StorageFileRecord } from '../../../interface.js';
@@ -44,6 +45,24 @@ export const fileMethods = {
       size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
       createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
     }));
+  },
+
+  async listStorageFilesForOwners(this: PostgresKyselyStorage, ownerGaiis: string[]): Promise<Record<string, StorageFileRecord[]>> {
+    const out: Record<string, StorageFileRecord[]> = {};
+    for (const g of ownerGaiis) out[g] = [];
+    if (ownerGaiis.length === 0) return out;
+    const rows = await this.db.selectFrom('StorageFile')
+      .select(['key', 'ownerGaii', 'visibility', 'groupId', 'workspaceRef', 'mimeType', 'size', 'tags', 'federate', 'createdAt'])
+      .where('ownerGaii', 'in', ownerGaiis).execute();
+    for (const r of rows) {
+      (out[r.ownerGaii] ??= []).push({
+        key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility as StorageFileRecord['visibility'],
+        groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType,
+        size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false,
+        createdAt: (r.createdAt instanceof Date ? r.createdAt : new Date(r.createdAt)).toISOString(),
+      });
+    }
+    return out;
   },
 
   async sumStorageBytesForOwners(this: PostgresKyselyStorage, ownerGaiis: string[]): Promise<{ bytes: number; count: number }> {

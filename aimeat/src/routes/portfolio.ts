@@ -5,6 +5,8 @@
  *   portfolio-data endpoint consumed by the SPA viewer.
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  * @version-history
+ *   v1.3.0 — 2026-07-16 — catalog builds file lists via listStorageFilesForOwners (one IN
+ *     query for all agents, was listStorageFiles per agent twice).
  *   v1.2.0 — 2026-07-03 — data/:username returns owner_gaiis (bridge allowlist for the
  *     viewer's fetch proxy); viewer_authenticated no longer counts the anonymous-mode
  *     shared identity as authenticated.
@@ -85,10 +87,13 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
 
+    // One IN query for all agents' file metadata (was listStorageFiles per agent, twice over).
+    const filesByAgent = await storage.listStorageFilesForOwners(agents.map(a => a.gaii));
+
     // Gather images from storage files
     const images: Array<{ key: string; gaii: string; mimeType: string; size: number; url: string; tags: string[] }> = [];
     for (const agent of agents) {
-      const files = await storage.listStorageFiles(agent.gaii);
+      const files = filesByAgent[agent.gaii] ?? [];
       for (const f of files) {
         if (f.mimeType.startsWith('image/')) {
           images.push({
@@ -106,7 +111,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     // Gather apps
     const apps: Array<{ owner: string; filename: string; size: number; url: string }> = [];
     for (const agent of agents) {
-      const files = await storage.listStorageFiles(agent.gaii);
+      const files = filesByAgent[agent.gaii] ?? [];
       for (const f of files) {
         if (f.key.startsWith('apps/') && !f.key.startsWith('apps/screenshots/') && f.visibility === 'public') {
           apps.push({

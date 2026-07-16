@@ -3,6 +3,7 @@
  * @description Storage files, peering, GHII, chat instances, personal nodes, mailbox, and schema-locking methods. Extracted from mongodb/index.ts (PrismaStorage) to satisfy max-file-lines; method bodies verbatim, bound to PrismaStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/mongodb/index.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive.
  */
 import type {
   OwnerRecord, AgentRecord, MemoryRecord, ActionRecord, WorkRecord, BoardRecord, BoardPostRecord, DisputeRecord, StorageFileRecord, PeeringRequestRecord, ChunkedUploadRecord, GHIIRecord, ChatInstanceRecord, PersonalNodeRecord, MailboxItemRecord, SchemaRecord
@@ -67,6 +68,23 @@ export const identityMethods = {
         return rows.map((r: PrismaRow) => ({
             key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility, groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType, size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false, createdAt: r.createdAt.toISOString(),
         }));
+    },
+
+    async listStorageFilesForOwners(this: PrismaStorage, ownerGaiis: string[]): Promise<Record<string, StorageFileRecord[]>> {
+        this.ensureReady();
+        const out: Record<string, StorageFileRecord[]> = {};
+        for (const g of ownerGaiis) out[g] = [];
+        if (ownerGaiis.length === 0) return out;
+        const rows = await this.prisma.storageFile.findMany({
+            where: { ownerGaii: { in: ownerGaiis } },
+            select: { key: true, ownerGaii: true, visibility: true, groupId: true, workspaceRef: true, mimeType: true, size: true, tags: true, federate: true, createdAt: true },
+        });
+        for (const r of rows as PrismaRow[]) {
+            (out[r.ownerGaii] ??= []).push({
+                key: r.key, ownerGaii: r.ownerGaii, visibility: r.visibility, groupId: r.groupId ?? undefined, workspaceRef: r.workspaceRef ?? undefined, mimeType: r.mimeType, size: r.size, data: Buffer.alloc(0), tags: r.tags || [], federate: r.federate ?? false, createdAt: r.createdAt.toISOString(),
+            });
+        }
+        return out;
     },
 
     async sumStorageBytesForOwners(this: PrismaStorage, ownerGaiis: string[]): Promise<{ bytes: number; count: number }> {
