@@ -340,7 +340,7 @@ This document lists every feature and capability provided by the AIMEAT protocol
 
 | Feature | Source | Description |
 |---------|--------|-------------|
-| **Three Storage Backends** | AIMEAT.io | In-memory (development, zero config), SQLite (single-server production, file-based), and MongoDB (distributed production, replicated). All implement the same Storage interface. |
+| **Two Storage Backends** | AIMEAT.io | PostgreSQL via Kysely (production; schema migrates on boot) and SQLite (single-server / personal, file-based; `:memory:` for ephemeral). Both implement the same Storage interface. |
 | **Repository Pattern** | AIMEAT.io | 38 domain-specific repositories covering every data domain. Provides consistent data access patterns regardless of storage backend. |
 | **Response Envelope** | RFC | Every API response uses a standard envelope with `ok`, `node`, `data`/`error`, `hints` (HATEOAS-style next actions for AI agents), and `meta` (timestamp, request ID, pagination). |
 

@@ -67,7 +67,7 @@ Confirm 1–3 before proceeding.
 ```
 cd aimeat
 pnpm install
-pnpm approve-builds   # approve native builds: better-sqlite3, Prisma, esbuild
+pnpm approve-builds   # approve native builds: better-sqlite3, esbuild
 pnpm install          # second pass after approving builds
 ```
 

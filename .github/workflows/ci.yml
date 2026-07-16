@@ -46,10 +46,6 @@ jobs:
         working-directory: aimeat
         run: pnpm install --frozen-lockfile
 
-      - name: Generate Prisma client
-        working-directory: aimeat
-        run: npx prisma generate
-
       - name: Lint
         working-directory: aimeat
         run: pnpm lint

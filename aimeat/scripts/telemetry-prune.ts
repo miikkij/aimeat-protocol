@@ -5,7 +5,7 @@
  *   telemetry_events table). Raw telemetry is no longer written by the server (see
  *   services/telemetry-buffer.ts), so any existing rows are legacy backlog that only takes
  *   up space — this script reports the size and lets you clear it or trim by age.
- *   Detects the configured storage provider from .env (sqlite / mongodb). Read-only by
+ *   Detects the configured storage provider from .env (sqlite). Read-only by
  *   default: it prints stats and mutates ONLY when given --clear or --older-than.
  * @usage
  *   pnpm telemetry:stats                  # report count + size only (no changes)
@@ -14,6 +14,7 @@
  *   pnpm telemetry:prune --clear --force  # skip the confirmation prompt
  *   (sqlite only) add --vacuum to reclaim file space after a delete
  * @version-history
+ *   v2.0.0 -- 2026-07-16 -- Drop the MongoDB path (backend removed); sqlite only
  *   v1.0.0 -- 2026-06-21 -- Initial: stats + clear/older-than prune for sqlite & mongodb.
  */
 
@@ -68,57 +69,6 @@ async function confirm(message: string): Promise<boolean> {
   const answer = await new Promise<string>(r => rl.question(message, r));
   rl.close();
   return answer.trim().toLowerCase() === 'y';
-}
-
-// ─── MongoDB ─────────────────────────────────────────────────
-
-async function runMongodb() {
-  const dbUrl = env.DATABASE_URL;
-  if (!dbUrl) { console.error('  x No DATABASE_URL in .env'); process.exit(1); }
-
-  const dbName = (() => {
-    try { return new URL(dbUrl).pathname.replace(/^\//, '').split('?')[0] || '(unknown)'; }
-    catch { return '(unknown)'; }
-  })();
-
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient({ datasourceUrl: dbUrl });
-  await prisma.$connect();
-
-  try {
-    // collStats gives count + logical size + on-disk storageSize + index size.
-    let count = 0, size = 0, storageSize = 0, totalIndexSize = 0;
-    try {
-      const s = await prisma.$runCommandRaw({ collStats: 'TelemetryEvent' }) as Record<string, number>;
-      count = s.count ?? 0; size = s.size ?? 0; storageSize = s.storageSize ?? 0; totalIndexSize = s.totalIndexSize ?? 0;
-    } catch {
-      count = await prisma.telemetryEvent.count();
-    }
-
-    console.log(`  Storage:        mongodb (${dbName})`);
-    console.log(`  Collection:     TelemetryEvent`);
-    console.log(`  Documents:      ${count.toLocaleString()}`);
-    console.log(`  Data size:      ${fmtBytes(size)}`);
-    console.log(`  On disk:        ${fmtBytes(storageSize)} (+ ${fmtBytes(totalIndexSize)} indexes)`);
-    console.log('');
-
-    if (!willMutate) {
-      console.log('  Read-only. Pass --clear or --older-than=<days> to prune.');
-      return;
-    }
-
-    const where = olderThanDays !== null ? { createdAt: { lt: new Date(cutoffIso(olderThanDays)) } } : {};
-    const label = olderThanDays !== null ? `older than ${olderThanDays} day(s)` : 'ALL';
-    if (!await confirm(`  Delete ${label} telemetry events from "${dbName}"? [y/N] `)) {
-      console.log('  Aborted.'); return;
-    }
-
-    const { count: deleted } = await prisma.telemetryEvent.deleteMany({ where });
-    console.log(`  Deleted ${deleted.toLocaleString()} document(s).`);
-    console.log('  Note: MongoDB does not shrink files automatically; storage is reused for new data.');
-  } finally {
-    await prisma.$disconnect();
-  }
 }
 
 // ─── SQLite ──────────────────────────────────────────────────
@@ -184,7 +134,12 @@ console.log('  ═════════════════════�
 
 switch (provider) {
   case 'sqlite': await runSqlite(); break;
-  case 'mongodb': await runMongodb(); break;
+  case 'postgres':
+  case 'postgresql':
+  case 'postgres-kysely':
+    console.log('  Storage: postgres-kysely — prune directly via SQL, e.g.');
+    console.log("  psql \"$DATABASE_URL\" -c \"DELETE FROM telemetry_events WHERE created_at < now() - interval '7 days'\"");
+    break;
   default:
     console.log('  Storage: memory (in-memory) — telemetry is never persisted; nothing to prune.');
     break;

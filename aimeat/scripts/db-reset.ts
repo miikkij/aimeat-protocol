@@ -3,9 +3,9 @@
  * AIMEAT Database Reset Script
  *
  * Detects the configured storage provider and wipes all data:
- *   - sqlite:  deletes the .db file
- *   - mongodb: drops all AIMEAT collections
- *   - memory:  nothing to do (ephemeral)
+ *   - sqlite:          deletes the .db file
+ *   - postgres-kysely: drops and recreates the public schema (migrations re-run on next boot)
+ *   - memory:          nothing to do (ephemeral)
  *
  * Usage:
  *   pnpm db:reset            # interactive confirmation
@@ -75,47 +75,9 @@ async function resetSqlite() {
   console.log('  Database file deleted.');
 }
 
-// ─── MongoDB reset ───────────────────────────────────────────
+// ─── PostgreSQL (Kysely) reset ───────────────────────────────
 
-// All Prisma model names — each becomes a MongoDB collection.
-// Keep in sync with prisma/schema.prisma when adding new models.
-const AIMEAT_COLLECTIONS = [
-  // Core identity & auth
-  'Owner', 'Agent', 'Ghii', 'Session', 'RevokedToken', 'Otk',
-  'DeviceAuth', 'OAuthClient', 'OAuthRefreshToken', 'OAuthApproval',
-  // Data storage
-  'Memory', 'MicroMemory', 'StorageFile', 'SchemaLock',
-  // Economy
-  'Transaction', 'EscrowHold',
-  // Work & actions
-  'Action', 'Work', 'Dispute', 'DisputeAudit',
-  // Social
-  'Board', 'BoardPost', 'BoardSubscription',
-  'Organism', 'OrganismMembership', 'OrganismReputation', 'JoinRequest',
-  // Consent & moderation
-  'Consent', 'ConsentAudit', 'Flag', 'Appeal',
-  // Federation & nodes
-  'PeeringRequest', 'NodeKey', 'GenesisPeer',
-  'PersonalNode', 'MailboxItem', 'PersonalPushSubscription',
-  // Services & marketplace
-  'Csm', 'Msm', 'Listing', 'Purchase', 'Match',
-  'App', 'AppDownload', 'AppPurchase',
-  // Extensions & cortex
-  'Extension', 'ExtensionInstance', 'CortexExtension', 'CortexLibFile',
-  // Knowledge & packages
-  'KnowledgeLink', 'KnowledgeReview',
-  'Package', 'PackageInstance', 'TemplateListing', 'TemplateReview', 'TemplateDiscussion',
-  // Notifications & push
-  'PushSubscription', 'NotificationTemplate', 'NotificationPreference',
-  // Chat & realtime
-  'ChatInstance', 'RealtimeRoom',
-  // System
-  'SystemSetting', 'SystemPrompt', 'SystemPromptVersion',
-  'SiteChangeLog', 'EmailVerification', 'TrustedIssuer',
-  'ScheduledJob', 'ExecutionLog',
-];
-
-async function resetMongodb() {
+async function resetPostgresKysely() {
   const dbUrl = env.DATABASE_URL;
   if (!dbUrl) {
     console.error('  x No DATABASE_URL found. Set it in .env');
@@ -127,33 +89,25 @@ async function resetMongodb() {
     catch { return '(unknown)'; }
   })();
 
-  console.log(`  Storage:      mongodb`);
+  console.log(`  Storage:      postgres-kysely`);
   console.log(`  Database:     ${dbName}`);
-  console.log(`  Collections:  ${AIMEAT_COLLECTIONS.length}`);
   console.log('');
 
-  if (!await confirm(`  Drop all ${AIMEAT_COLLECTIONS.length} collections in "${dbName}"? [y/N] `)) {
+  if (!await confirm(`  Drop and recreate the public schema in "${dbName}"? [y/N] `)) {
     console.log('  Aborted.');
     return;
   }
 
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient({ datasourceUrl: dbUrl });
-  await prisma.$connect();
-
-  let dropped = 0;
-  for (const name of AIMEAT_COLLECTIONS) {
-    try {
-      await prisma.$runCommandRaw({ drop: name });
-      console.log(`  - Dropped: ${name}`);
-      dropped++;
-    } catch {
-      // Collection might not exist — that's fine
-    }
+  const { default: pg } = await import('pg');
+  const client = new pg.Client({ connectionString: dbUrl });
+  await client.connect();
+  try {
+    await client.query('DROP SCHEMA public CASCADE');
+    await client.query('CREATE SCHEMA public');
+    console.log('  Schema dropped and recreated — migrations re-run on next server boot.');
+  } finally {
+    await client.end();
   }
-
-  await prisma.$disconnect();
-  console.log(`\n  Dropped ${dropped}/${AIMEAT_COLLECTIONS.length} collections.`);
 }
 
 // ─── Main ────────────────────────────────────────────────────
@@ -166,8 +120,10 @@ switch (provider) {
   case 'sqlite':
     await resetSqlite();
     break;
-  case 'mongodb':
-    await resetMongodb();
+  case 'postgres':
+  case 'postgresql':
+  case 'postgres-kysely':
+    await resetPostgresKysely();
     break;
   default:
     console.log(`  Storage: memory (in-memory)`);

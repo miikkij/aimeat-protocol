@@ -185,46 +185,6 @@ async function runSqlite() {
   }
 }
 
-// ─── MongoDB ─────────────────────────────────────────────────
-async function runMongodb() {
-  const dbUrl = env.DATABASE_URL;
-  if (!dbUrl) { console.error('  x No DATABASE_URL in .env'); process.exit(1); }
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient({ datasourceUrl: dbUrl });
-  await prisma.$connect();
-  try {
-    console.log('  Storage:        mongodb');
-    console.log('');
-
-    if (unarchive) {
-      const n = await prisma.memory.count({ where: { archivedRoot: ARCHIVE_ROOT } });
-      console.log(`  Archived batch "${ARCHIVE_ROOT}": ${n.toLocaleString()} row(s).`);
-      if (!apply) { console.log('  Read-only. Add --apply to restore them.'); return; }
-      if (!await confirm(`  Restore ${n.toLocaleString()} archived version row(s)? [y/N] `)) { console.log('  Aborted.'); return; }
-      const res = await prisma.memory.updateMany({ where: { archivedRoot: ARCHIVE_ROOT }, data: { archived: false, archivedAt: null, archivedBy: null, archivedRoot: null } });
-      console.log(`  Restored ${res.count.toLocaleString()} row(s).`);
-      return;
-    }
-
-    const rows = await prisma.memory.findMany({ where: { key: { contains: '.version.' }, archived: false }, select: { key: true, ownerGaii: true, value: true } });
-    const redundant = planRedundant(rows.map(r => ({ key: r.key, ownerGaii: r.ownerGaii, value: r.value })));
-    report(redundant, rows.length);
-
-    if (!apply) { console.log('  Read-only. Re-run with --apply (pnpm versions:archive) to soft-archive them.'); return; }
-    if (redundant.length === 0) { console.log('  Nothing to archive.'); return; }
-    if (!await confirm(`  Soft-archive ${redundant.length.toLocaleString()} redundant version row(s)? Reversible via --unarchive. [y/N] `)) { console.log('  Aborted.'); return; }
-    const at = new Date();
-    let done = 0;
-    for (const r of redundant) {
-      await prisma.memory.update({ where: { ownerGaii_key: { ownerGaii: r.ownerGaii!, key: r.key } }, data: { archived: true, archivedAt: at, archivedBy: ARCHIVED_BY, archivedRoot: ARCHIVE_ROOT } });
-      done++;
-    }
-    console.log(`  Archived ${done.toLocaleString()} row(s) under archivedRoot="${ARCHIVE_ROOT}". Restore with: pnpm versions:archive -- --unarchive --force`);
-  } finally {
-    await prisma.$disconnect();
-  }
-}
-
 // ─── Main ────────────────────────────────────────────────────
 console.log('');
 console.log('  AIMEAT Stale-Version Archive (reversible)');
@@ -235,8 +195,7 @@ if (fromExport) {
 } else {
   switch (provider) {
     case 'sqlite': await runSqlite(); break;
-    case 'mongodb': await runMongodb(); break;
-    default: console.log('  Storage: memory (in-memory) — nothing persisted. Use --from-export=<json> to analyse a dump.'); break;
+    default: console.log('  Storage not supported by this script — use --from-export=<json> to analyse a dump.'); break;
   }
 }
 console.log('');

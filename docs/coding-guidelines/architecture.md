@@ -107,16 +107,17 @@ Every API response includes `hints.next_actions` — telling AI agents what they
 │  ┌────────────────────────────────────────┐  │
 │  │          Storage Interface             │  │
 │  │     src/storage/interface.ts           │  │
-│  ├──────────┬─────────────┬─────────────────┤  │
-│  │  SQLite  │  MongoDB    │  PostgreSQL     │  │
-│  │(personal)│ (Prisma)    │  (Prisma)       │  │
-│  └──────────┴─────────────┴─────────────────┘  │
+│  ├──────────────────┬─────────────────────┤  │
+│  │  PostgreSQL      │  SQLite             │  │
+│  │  (Kysely; prod)  │  (better-sqlite3)   │  │
+│  └──────────────────┴─────────────────────┘  │
 └──────────────────────────────────────────────┘
                                                 
-Valid backends: SQLite, MongoDB, PostgreSQL (all persistent). SQLite =
-better-sqlite3; MongoDB + PostgreSQL = Prisma (separate schemas +
-generated clients). "In-memory" = SQLite with AIMEAT_DB_PATH=:memory:
-(same code path); the old pure in-memory provider is deprecated.
+Valid backends: PostgreSQL+Kysely (primary / production) and SQLite
+(personal + fast iteration). "In-memory" = SQLite with
+AIMEAT_DB_PATH=:memory: (same code path); the old pure in-memory
+provider is deprecated. The Prisma backends (MongoDB + legacy
+Prisma-PG) were removed 2026-07-16.
 ```
 
 ---
@@ -293,7 +294,6 @@ aimeat-protocol/                  pnpm workspace (root package.json proxies to a
 ├── aimeat/                       ★ the reference implementation (Node 24 / TS / Express 5)
 │   ├── src/                      backend (see tables below) — ~132 routes, ~184 services
 │   ├── public/                   Preact + HTM SPA, no build step
-│   ├── prisma/                   schema.prisma (Mongo) + schema.postgres.prisma
 │   ├── locales/                  en.json / fi.json (Rule 4: keep in sync)
 │   ├── test/                     E2E suites + run-e2e-ci.ts orchestrator
 │   ├── tools/                    dev tools (synthtraces self-play harness)
@@ -327,7 +327,7 @@ The agent **runtime** (fleet daemon + 40+ crew templates) is the sibling repo `m
 | `services/` | Business logic (~184 files) |
 | `static/` | Static assets served directly |
 | `storage/` | Data layer abstraction + implementations |
-| `storage/providers/` | Database adapters (SQLite, MongoDB) |
+| `storage/providers/` | Database adapters (postgres-kysely, SQLite) |
 | `storage/repositories/` | Record-specific data access (36 repositories) |
 | `types/` | TypeScript type definitions |
 | `utils/` | Utilities (logger, GAII, env config, env validator) |
@@ -384,19 +384,17 @@ Storage Interface (interface.ts)
     │   ├── memory.repository.ts
     │   └── ... (33 more)
     └── Providers (database adapters, src/storage/providers/)
-        ├── SQLite (better-sqlite3; personal + fast iteration, incl. :memory:)
-        ├── MongoDB (Prisma; production)
-        └── Postgres (Prisma; production — separate schema.postgres.prisma + generated client)
+        ├── postgres-kysely (pg + Kysely; PRIMARY / production, SQL migrations on boot)
+        └── SQLite (better-sqlite3; personal + fast iteration, incl. :memory:)
 ```
 
 ### Storage Factory
 
 `src/storage/storage-factory.ts` creates the appropriate provider based on config:
 - `AIMEAT_STORAGE=sqlite` → Better-sqlite3 (use `AIMEAT_DB_PATH=:memory:` for ephemeral, same code path)
-- `AIMEAT_STORAGE=mongodb` → MongoDB via Prisma
-- `AIMEAT_STORAGE=postgresql` (alias `postgres`) → PostgreSQL via Prisma, `DATABASE_URL=postgresql://…`
+- `AIMEAT_STORAGE=postgres-kysely` (aliases `postgres`, `postgresql`) → PostgreSQL via Kysely, `DATABASE_URL=postgresql://…`; SQL migrations run on boot
 
-> The old pure in-memory provider is **deprecated** — SQLite `:memory:` covers the fast/ephemeral role using the real SQL code path. Valid backends: **SQLite, MongoDB, PostgreSQL**. Note MongoDB and PostgreSQL are distinct Prisma backends (`schema.prisma` vs `schema.postgres.prisma`) — a data-model change must update both schemas + regenerate both clients.
+> The old pure in-memory provider is **deprecated** — SQLite `:memory:` covers the fast/ephemeral role using the real SQL code path. Valid backends: **PostgreSQL+Kysely and SQLite**; a data-model change updates both in the same commit (see storage-sync.md). `AIMEAT_STORAGE=mongodb` fails fast with migration guidance — the Prisma backends were removed 2026-07-16.
 
 ---
 
@@ -449,7 +447,7 @@ Nodes can federate to form a decentralized network. The default config ships **p
 
 Configuration comes from multiple sources (in priority order):
 
-1. CLI arguments (`--db mongodb`, `--port 40050`)
+1. CLI arguments (`--db postgres-kysely`, `--port 40050`)
 2. Config file (`--config production.ini`)
 3. Environment variables (`AIMEAT_*`)
 4. Consul (centralized config management)

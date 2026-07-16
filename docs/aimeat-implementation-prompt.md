@@ -2,7 +2,7 @@
 
 ## What You're Building
 
-> **Note (2026-07-12):** this is the *original from-scratch bootstrapping prompt*, kept for historical context. The reference implementation now exists. The current specification is **`AIMEAT-RFC-v4.0-Core-full.md` + `AIMEAT-RFC-v4.0-Platform-full.md`** and the canonical API contract is **`openapi.yaml`** — use those, not the removed v1.2 RFC. Valid storage backends are SQLite, MongoDB, and PostgreSQL (the old in-memory-first framing below is obsolete).
+> **Note (updated 2026-07-16):** this is the *original from-scratch bootstrapping prompt*, kept for historical context. The reference implementation now exists. The current specification is **`AIMEAT-RFC-v4.0-Core-full.md` + `AIMEAT-RFC-v4.0-Platform-full.md`** and the canonical API contract is **`openapi.yaml`** — use those, not the removed v1.2 RFC. Valid storage backends are PostgreSQL (Kysely) and SQLite — the MongoDB/Prisma framing below is historical (those backends were removed in July 2026), as is the old in-memory-first framing.
 
 Implement the AIMEAT Protocol (AI Memory, Economy, Actions, Trust) as a Node.js reference implementation. The complete protocol specification is in `AIMEAT-RFC-v4.0-Core-full.md` + `AIMEAT-RFC-v4.0-Platform-full.md` (with `openapi.yaml` as the canonical schema contract) — that is your source of truth. Read it fully before writing any code.
 

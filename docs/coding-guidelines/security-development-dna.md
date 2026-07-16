@@ -93,7 +93,7 @@ also lets an app redirect your AI key), fix the boundary (Invariant 2) — don't
 ### 9. Prove multi-tenant isolation with a test, every time
 Every feature touching identity ships with two E2E checks (Rule 1): **cross-owner** ("B touches A's
 object → 403") and **cross-scope** ("token with only scope X attempts scope Y → 403"). A feature isn't
-done until both pass on SQLite **and** MongoDB.
+done until both pass on PostgreSQL+Kysely **and** SQLite.
 
 ### 10. Security-relevant differences are posture config, not code forks
 If a safe value differs local vs public, add it to `.env.example` with a safe **public** default and a
@@ -145,7 +145,7 @@ credentials, or `AIMEAT_STATS_ACCESS=public`. Make insecure-on-the-internet a co
 Before merging any change to `src/routes/`, `src/auth/`, `src/services/`, `src/storage/`, federation, extensions, or an AI path:
 
 - [ ] **Identity:** uses `resolveIdentity()`; authorizes against it before every read/mutate; no client id trusted (Inv. 1).
-- [ ] **Ownership test:** added a cross-owner "→403" E2E and a cross-scope "→403" E2E (Inv. 9); both green on SQLite + MongoDB.
+- [ ] **Ownership test:** added a cross-owner "→403" E2E and a cross-scope "→403" E2E (Inv. 9); both green on PostgreSQL+Kysely + SQLite.
 - [ ] **Scope/role:** every mutating handler has `requireScope`/`requireRole` (Inv. 4).
 - [ ] **Reserved keys:** if the server reads-and-trusts any memory key you introduced, it's system-namespaced or denylisted (Inv. 2).
 - [ ] **Egress:** any non-constant outbound URL uses `safeFetch`; private-egress respects posture (Inv. 3).

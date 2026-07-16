@@ -78,56 +78,6 @@ function printBreakdown(rows: Array<{ action: string; allowed: boolean; count: n
   console.log('');
 }
 
-// ─── MongoDB ─────────────────────────────────────────────────
-
-async function runMongodb() {
-  const dbUrl = env.DATABASE_URL;
-  if (!dbUrl) { console.error('  x No DATABASE_URL in .env'); process.exit(1); }
-  const dbName = (() => {
-    try { return new URL(dbUrl).pathname.replace(/^\//, '').split('?')[0] || '(unknown)'; }
-    catch { return '(unknown)'; }
-  })();
-
-  const { PrismaClient } = await import('@prisma/client');
-  const prisma = new PrismaClient({ datasourceUrl: dbUrl });
-  await prisma.$connect();
-
-  try {
-    let count = 0, size = 0, storageSize = 0, totalIndexSize = 0;
-    try {
-      const s = await prisma.$runCommandRaw({ collStats: 'ConsentAudit' }) as Record<string, number>;
-      count = s.count ?? 0; size = s.size ?? 0; storageSize = s.storageSize ?? 0; totalIndexSize = s.totalIndexSize ?? 0;
-    } catch {
-      count = await prisma.consentAudit.count();
-    }
-
-    console.log(`  Storage:        mongodb (${dbName})`);
-    console.log(`  Collection:     ConsentAudit`);
-    console.log(`  Documents:      ${count.toLocaleString()}`);
-    console.log(`  Data size:      ${fmtBytes(size)}`);
-    console.log(`  On disk:        ${fmtBytes(storageSize)} (+ ${fmtBytes(totalIndexSize)} indexes)`);
-    console.log('');
-
-    if (!willMutate) {
-      const grouped = await prisma.consentAudit.groupBy({ by: ['action', 'allowed'], _count: { _all: true } });
-      printBreakdown(grouped.map(g => ({ action: g.action, allowed: g.allowed, count: g._count._all })));
-      console.log('  Read-only. Pass --clear or --older-than=<days> to prune.');
-      return;
-    }
-
-    const where = olderThanDays !== null ? { timestamp: { lt: new Date(cutoffIso(olderThanDays)) } } : {};
-    const label = olderThanDays !== null ? `older than ${olderThanDays} day(s)` : 'ALL';
-    if (!await confirm(`  Delete ${label} consent-audit entries from "${dbName}"? [y/N] `)) {
-      console.log('  Aborted.'); return;
-    }
-    const { count: deleted } = await prisma.consentAudit.deleteMany({ where });
-    console.log(`  Deleted ${deleted.toLocaleString()} document(s).`);
-    console.log('  Note: MongoDB does not shrink files automatically; storage is reused for new data.');
-  } finally {
-    await prisma.$disconnect();
-  }
-}
-
 // ─── SQLite ──────────────────────────────────────────────────
 
 async function runSqlite() {
@@ -185,7 +135,12 @@ console.log('  ═════════════════════�
 
 switch (provider) {
   case 'sqlite': await runSqlite(); break;
-  case 'mongodb': await runMongodb(); break;
+  case 'postgres':
+  case 'postgresql':
+  case 'postgres-kysely':
+    console.log('  Storage: postgres-kysely — prune directly via SQL, e.g.');
+    console.log("  psql \"$DATABASE_URL\" -c \"DELETE FROM consent_audits WHERE timestamp < now() - interval '30 days'\"");
+    break;
   default:
     console.log('  Storage: memory (in-memory) — nothing persisted to prune.');
     break;

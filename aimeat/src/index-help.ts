@@ -44,8 +44,8 @@ USAGE
   aimeat restore <FILE>          Import data from JSON backup
 
 START OPTIONS
-  --db <type>              Storage type: mongodb, postgresql, sqlite, memory
-  --db-url <url>           Database connection URL (MongoDB)
+  --db <type>              Storage type: postgres-kysely, sqlite, memory
+  --db-url <url>           Database connection URL (PostgreSQL)
   --db-path <path>         SQLite database file path
   -p, --port <port>        HTTP port (default: 40050)
   --node-id <id>           Node identity string
@@ -70,7 +70,7 @@ QUICK START
   3. Run "aimeat start" to launch the node
 
 MIGRATION: .env to database
-  1. aimeat start --db mongodb --db-url mongodb://localhost:27017/aimeat
+  1. aimeat start --db postgres-kysely --db-url postgresql://localhost:5432/aimeat
   2. aimeat config import --file .env
   3. Manage config via admin dashboard (changes persist to database)
 

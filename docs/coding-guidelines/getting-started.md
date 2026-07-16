@@ -7,7 +7,7 @@
 | Node.js | 24.x | Runtime |
 | pnpm | 10.x | Package manager |
 | Git | Latest | Version control |
-| MongoDB | 7.x+ | Production storage (optional for dev) |
+| PostgreSQL | 16+ | Production storage (optional for dev) |
 
 ---
 
@@ -35,7 +35,7 @@ The server starts on port 40050 by default. Visit `http://localhost:40050/v1/por
 ## Configuration
 
 Configuration comes from (in priority order):
-1. CLI arguments (`--db mongodb`, `--port 40050`)
+1. CLI arguments (`--db postgres-kysely`, `--port 40050`)
 2. Config file (`--config production.ini`)
 3. Environment variables (`AIMEAT_*`)
 4. Consul (centralized config)
@@ -53,13 +53,12 @@ AIMEAT_ADMIN_PASSWORD=your-admin-password
 
 ### Storage Backends
 
-Valid backends are **SQLite, MongoDB, and PostgreSQL.** The old pure in-memory provider is deprecated; use SQLite with `AIMEAT_DB_PATH=:memory:` for a fast, ephemeral store on the real code path.
+Valid backends are **PostgreSQL+Kysely and SQLite.** The old pure in-memory provider is deprecated; use SQLite with `AIMEAT_DB_PATH=:memory:` for a fast, ephemeral store on the real code path. (The Prisma-era MongoDB and legacy Prisma-PG backends were removed 2026-07-16.)
 
 | Backend | When to Use | Config |
 |---------|------------|--------|
 | `sqlite` | Dev, personal nodes, single-user, fast iteration | `AIMEAT_STORAGE=sqlite`, `AIMEAT_DB_PATH=./data/aimeat.db` (or `:memory:`) |
-| `mongodb` | Production, multi-user | `AIMEAT_STORAGE=mongodb`, `DATABASE_URL=mongodb://...` |
-| `postgresql` | Production, multi-user (alias `postgres`) | `AIMEAT_STORAGE=postgresql`, `DATABASE_URL=postgresql://...` |
+| `postgres-kysely` | Production, multi-user (aliases `postgres`, `postgresql`) | `AIMEAT_STORAGE=postgres-kysely`, `DATABASE_URL=postgresql://...` (schema migrates on boot) |
 
 ---
 
@@ -180,7 +179,7 @@ See CLAUDE.md — section "Init Wizard Maintenance".
 
 | Type | Use Case | Storage | Federation |
 |------|----------|---------|------------|
-| `full` | Production multi-user node | MongoDB | Full peering |
+| `full` | Production multi-user node | PostgreSQL | Full peering |
 | `relay` | Message relay | Memory/SQLite | Relay only |
 | `mirror` | Read replica | SQLite | Sync only |
 | `personal` | Single-user personal node | SQLite | Limited |
@@ -197,10 +196,10 @@ pnpm build
 pnpm start
 ```
 
-### With MongoDB
+### With PostgreSQL
 
 ```bash
-pnpm start -- --db mongodb --db-url mongodb://localhost:27017/aimeat
+pnpm start -- --db postgres-kysely --db-url postgresql://localhost:5432/aimeat
 ```
 
 ### With SQLite

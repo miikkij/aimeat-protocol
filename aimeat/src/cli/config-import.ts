@@ -72,8 +72,8 @@ export async function runConfigImport(
 ): Promise<void> {
   // Verify persistent storage
   if (config.storageProvider === 'memory') {
-    console.error(`Error: Config import requires a persistent database (MongoDB or SQLite). Current storage: ${config.storageProvider}`);
-    console.error('Tip: Start with --db sqlite or --db mongodb to enable config persistence.');
+    console.error(`Error: Config import requires a persistent database (PostgreSQL or SQLite). Current storage: ${config.storageProvider}`);
+    console.error('Tip: Start with --db sqlite or --db postgres-kysely to enable config persistence.');
     process.exit(1);
   }
 

@@ -16,7 +16,7 @@
  *            e2e-b2b-sales-hub-template) and the AIMEAT_SECRETARY_ENABLED env pin.
  */
 
-import { spawn, execSync, type ChildProcess } from 'node:child_process';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve, basename } from 'node:path';
 
@@ -211,7 +211,7 @@ interface SyncCommandError {
     stderr?: Buffer | string;
 }
 
-function redactMongoCredentials(text: string): string {
+function redactDbCredentials(text: string): string {
     return text
         .replace(/(mongodb(?:\+srv)?:\/\/)([^@\s/]+)@/gi, '$1<credentials>@')
         .replace(/(postgres(?:ql)?:\/\/)([^@\s/]+)@/gi, '$1<credentials>@');
@@ -222,32 +222,18 @@ function commandOutputText(value: unknown): string {
     return typeof value === 'string' ? value : '';
 }
 
-function warnMongoCleanupFailure(error: unknown): void {
-    const commandError = error as SyncCommandError;
-    const message = redactMongoCredentials(commandError.message ?? String(error));
-    const stderr = redactMongoCredentials(commandOutputText(commandError.stderr).trim());
-    const stdout = redactMongoCredentials(commandOutputText(commandError.stdout).trim());
-
-    console.warn('Could not drop MongoDB test database. Tests may fail if stale data exists.');
-    console.warn(`MongoDB cleanup error: ${message}`);
-    if (commandError.status !== undefined && commandError.status !== null) console.warn(`MongoDB cleanup exit status: ${commandError.status}`);
-    if (commandError.signal) console.warn(`MongoDB cleanup signal: ${commandError.signal}`);
-    if (stderr) console.warn(`mongosh stderr:\n${stderr}`);
-    if (stdout) console.warn(`mongosh stdout:\n${stdout}`);
-}
-
 function warnPostgresCleanupFailure(error: unknown): void {
     const commandError = error as SyncCommandError;
-    const message = redactMongoCredentials(commandError.message ?? String(error));
-    const stderr = redactMongoCredentials(commandOutputText(commandError.stderr).trim());
-    const stdout = redactMongoCredentials(commandOutputText(commandError.stdout).trim());
+    const message = redactDbCredentials(commandError.message ?? String(error));
+    const stderr = redactDbCredentials(commandOutputText(commandError.stderr).trim());
+    const stdout = redactDbCredentials(commandOutputText(commandError.stdout).trim());
 
     console.warn('Could not reset PostgreSQL test database. Tests may fail if stale data exists.');
     console.warn(`PostgreSQL cleanup error: ${message}`);
     if (commandError.status !== undefined && commandError.status !== null) console.warn(`PostgreSQL cleanup exit status: ${commandError.status}`);
     if (commandError.signal) console.warn(`PostgreSQL cleanup signal: ${commandError.signal}`);
-    if (stderr) console.warn(`prisma stderr:\n${stderr}`);
-    if (stdout) console.warn(`prisma stdout:\n${stdout}`);
+    if (stderr) console.warn(`pg stderr:\n${stderr}`);
+    if (stdout) console.warn(`pg stdout:\n${stdout}`);
 }
 
 // ── Parse CLI args ──
@@ -325,7 +311,7 @@ async function startServer(): Promise<ChildProcess> {
     if (DB_TYPE === 'sqlite') {
         const dbPath = process.env.AIMEAT_DB_PATH ?? resolve(process.cwd(), 'test/.test-e2e.db');
         serverArgs.push('--db-path', dbPath);
-    } else if (DB_TYPE === 'mongodb' || DB_TYPE === 'postgresql' || DB_TYPE === 'postgres-kysely') {
+    } else if (DB_TYPE === 'postgres-kysely') {
         const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
         if (dbUrl) serverArgs.push('--db-url', dbUrl);
     }
@@ -362,26 +348,6 @@ function killServer(child: ChildProcess): void {
 }
 
 // ── Clean database between suites ──
-// Reset PostgreSQL by truncating every table in the public schema. Fast, keeps the
-// schema the server already syncs on startup, needs no psql/pg client, and — unlike
-// `prisma db push --force-reset` — is NOT blocked by Prisma's AI-agent guard. The
-// Postgres client must be generated first (pnpm db:generate:postgres / pnpm build).
-async function resetPostgresTables(dbUrl: string): Promise<void> {
-    const { PrismaClient } = await import('../src/generated/prisma-postgres/index.js');
-    const prisma = new PrismaClient({ datasourceUrl: dbUrl });
-    try {
-        await prisma.$executeRawUnsafe(`DO $$
-DECLARE r RECORD;
-BEGIN
-  FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public') LOOP
-    EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
-  END LOOP;
-END $$;`);
-    } finally {
-        await prisma.$disconnect();
-    }
-}
-
 /** Empty every table for the Postgres+Kysely backend EXCEPT `_kysely_migrations` — so the schema and the
  *  applied-migration ledger survive (the server's runMigrations skips them) while all data is cleared.
  *  Uses the raw `pg` client (no Prisma). A no-op on a fresh DB where no tables exist yet. */
@@ -409,27 +375,6 @@ async function cleanDatabase(): Promise<void> {
         for (const suffix of ['', '-shm', '-wal']) {
             const f = resolved + suffix;
             if (existsSync(f)) unlinkSync(f);
-        }
-    } else if (DB_TYPE === 'mongodb') {
-        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
-        if (dbUrl) {
-            try {
-                execSync(`mongosh "${dbUrl}" --eval "db.dropDatabase()" --quiet`, {
-                    cwd: process.cwd(),
-                    stdio: ['pipe', 'pipe', 'pipe'],
-                });
-            } catch (error) {
-                warnMongoCleanupFailure(error);
-            }
-        }
-    } else if (DB_TYPE === 'postgresql') {
-        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
-        if (dbUrl) {
-            try {
-                await resetPostgresTables(dbUrl);
-            } catch (error) {
-                warnPostgresCleanupFailure(error);
-            }
         }
     } else if (DB_TYPE === 'postgres-kysely') {
         const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
@@ -515,40 +460,6 @@ async function main() {
         if (existsSync(resolved)) {
             unlinkSync(resolved);
             console.log(`Deleted stale test DB: ${resolved}`);
-        }
-    } else if (DB_TYPE === 'mongodb') {
-        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
-        if (dbUrl) {
-            // Extract database name from connection URL
-            const dbName = new URL(dbUrl).pathname.replace('/', '');
-            console.log(`Dropping MongoDB test database "${dbName}"...`);
-            try {
-                execSync(`mongosh "${dbUrl}" --eval "db.dropDatabase()" --quiet`, {
-                    cwd: process.cwd(),
-                    stdio: ['pipe', 'pipe', 'pipe'],
-                });
-                console.log('MongoDB test database dropped.');
-            } catch (error) {
-                warnMongoCleanupFailure(error);
-            }
-        }
-    } else if (DB_TYPE === 'postgresql') {
-        const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
-        if (dbUrl) {
-            const dbName = new URL(dbUrl).pathname.replace('/', '');
-            console.log(`Resetting PostgreSQL test database "${dbName}"...`);
-            try {
-                // Ensure the schema exists (first run / fresh DB), then truncate all tables.
-                execSync('npx prisma db push --skip-generate --schema prisma/schema.postgres.prisma', {
-                    cwd: process.cwd(),
-                    env: { ...process.env, DATABASE_URL: dbUrl },
-                    stdio: ['pipe', 'pipe', 'pipe'],
-                });
-                await resetPostgresTables(dbUrl);
-                console.log('PostgreSQL test database reset.');
-            } catch (error) {
-                warnPostgresCleanupFailure(error);
-            }
         }
     } else if (DB_TYPE === 'postgres-kysely') {
         const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';

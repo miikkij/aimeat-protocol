@@ -488,7 +488,7 @@ export function adminRouter(
         res.json(success(config.nodeId, {
             node_id: config.nodeId,
             uptime_seconds: Math.floor(process.uptime()),
-            storage_type: config.dbUrl ? 'mongodb' : 'in-memory',
+            storage_type: config.storageProvider,
             health: {
                 status: overallHealth,
                 burn_mint_ratio: { value: burnMintRatio, zone: bmrZone },

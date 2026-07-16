@@ -134,7 +134,7 @@ router.post('/v1/endpoint', requireAuth(), requireRole('agent'), async (req, res
 
 ## Storage Layer
 
-All data access goes through the `Storage` interface (`src/storage/interface.ts`). Supported backends are **SQLite (better-sqlite3)**, **MongoDB (Prisma)**, and **PostgreSQL (Prisma)**; use SQLite with `AIMEAT_DB_PATH=:memory:` for ephemeral runs. (The old pure in-memory provider is deprecated.) MongoDB and PostgreSQL are distinct Prisma backends — a data-model change updates both schemas (`schema.prisma`, `schema.postgres.prisma`).
+All data access goes through the `Storage` interface (`src/storage/interface.ts`). Supported backends are **PostgreSQL + Kysely** (primary / production) and **SQLite (better-sqlite3)**; use SQLite with `AIMEAT_DB_PATH=:memory:` for ephemeral runs. (The old pure in-memory provider is deprecated; the Prisma-era MongoDB and legacy Prisma-PG backends were removed 2026-07-16.) A data-model change updates both backends in the same commit — see `storage-sync.md`.
 
 ### Adding New Data Types
 

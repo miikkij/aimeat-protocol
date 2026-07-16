@@ -104,7 +104,7 @@ export function adminConfigRouter(
         // In-memory guard — config editing requires persistent storage
         if (!storage.supportsConfigPersistence()) {
             res.status(403).json(error(config.nodeId, 'READONLY_CONFIG',
-                'Config editing requires a persistent database (MongoDB or SQLite). Use .env or aimeat.ini created with "aimeat init".'));
+                'Config editing requires a persistent database (PostgreSQL or SQLite). Use .env or aimeat.ini created with "aimeat init".'));
             return;
         }
 

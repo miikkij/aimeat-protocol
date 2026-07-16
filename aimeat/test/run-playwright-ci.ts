@@ -4,7 +4,7 @@
  *   Starts the AIMEAT server on port 40251 (same as E2E), runs Playwright
  *   browser tests, then shuts down the server.
  * @usage
- *   node --env-file=.env.test.mongodb --import tsx test/run-playwright-ci.ts
+ *   node --env-file=.env.test.sqlite --import tsx test/run-playwright-ci.ts
  * @version-history
  *   v1.0.0 — 2026-03-17 — Initial Playwright CI runner (mirrors run-e2e-ci.ts server lifecycle)
  */
@@ -41,7 +41,7 @@ async function startServer(): Promise<ChildProcess> {
     if (DB_TYPE === 'sqlite') {
         const dbPath = process.env.AIMEAT_DB_PATH ?? resolve(process.cwd(), 'test/.test-e2e.db');
         serverArgs.push('--db-path', dbPath);
-    } else if (DB_TYPE === 'mongodb') {
+    } else if (DB_TYPE === 'postgres-kysely') {
         const dbUrl = process.env.DATABASE_URL ?? process.env.AIMEAT_DB_URL ?? '';
         if (dbUrl) serverArgs.push('--db-url', dbUrl);
     }

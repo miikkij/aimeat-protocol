@@ -76,12 +76,15 @@ export function validateEnv(): ValidationResult[] {
     results.push({ level: 'info', variable: 'AIMEAT_BASE_URL', message: 'Not set. Default: http://localhost:<port>' });
   }
 
-  // ── Storage Provider ── ('postgres' is accepted as an alias for 'postgresql')
-  const storageProvider = env.AIMEAT_STORAGE === 'postgres' ? 'postgresql' : env.AIMEAT_STORAGE;
-  if (storageProvider && !['memory', 'sqlite', 'mongodb', 'postgresql', 'postgres-kysely'].includes(storageProvider)) {
-    results.push({ level: 'error', variable: 'AIMEAT_STORAGE', message: `Invalid value "${env.AIMEAT_STORAGE}". Must be one of: memory, sqlite, mongodb, postgresql, postgres-kysely` });
+  // ── Storage Provider ── ('postgres' / 'postgresql' are accepted as aliases for 'postgres-kysely')
+  const storageProvider = (env.AIMEAT_STORAGE === 'postgres' || env.AIMEAT_STORAGE === 'postgresql')
+    ? 'postgres-kysely' : env.AIMEAT_STORAGE;
+  if (storageProvider === 'mongodb') {
+    results.push({ level: 'error', variable: 'AIMEAT_STORAGE', message: 'The MongoDB backend has been removed. Use postgres-kysely (production) or sqlite; migrate data with the last release that ships migrate:to-postgres-kysely.' });
+  } else if (storageProvider && !['memory', 'sqlite', 'postgres-kysely'].includes(storageProvider)) {
+    results.push({ level: 'error', variable: 'AIMEAT_STORAGE', message: `Invalid value "${env.AIMEAT_STORAGE}". Must be one of: memory, sqlite, postgres-kysely` });
   } else if (storageProvider === 'memory') {
-    results.push({ level: 'warning', variable: 'AIMEAT_STORAGE', message: 'Using in-memory storage — all data will be lost on restart. Use sqlite or mongodb for production.' });
+    results.push({ level: 'warning', variable: 'AIMEAT_STORAGE', message: 'Using in-memory storage — all data will be lost on restart. Use sqlite or postgres-kysely for production.' });
   } else if (!storageProvider) {
     results.push({ level: 'warning', variable: 'AIMEAT_STORAGE', message: 'Not set. Defaults to memory — all data will be lost on restart. Set AIMEAT_STORAGE=sqlite for persistence.' });
   }
@@ -93,7 +96,7 @@ export function validateEnv(): ValidationResult[] {
 
   // ── Database URL ──
   const dbUrl = env.DATABASE_URL;
-  if ((storageProvider === 'mongodb' || storageProvider === 'postgresql' || storageProvider === 'postgres-kysely') && !dbUrl) {
+  if (storageProvider === 'postgres-kysely' && !dbUrl) {
     results.push({ level: 'error', variable: 'DATABASE_URL', message: `Required when AIMEAT_STORAGE=${storageProvider}` });
   } else if (!storageProvider && !dbUrl) {
     results.push({ level: 'warning', variable: 'DATABASE_URL', message: 'Not set. Using in-memory storage — data will not persist across restarts.' });
