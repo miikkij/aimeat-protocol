@@ -306,6 +306,40 @@ await test('9. Thread listing', async () => {
     assert(thread.messageCount >= 3, `thread should have >=3 messages, got ${thread.messageCount}`);
 });
 
+await test('9b. GET /messages/overview folds commands + threads + messages', async () => {
+    // Seed the command palette (agent-authored, under the agent's own GAII).
+    await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: `agents.${agentName}.commands`, value: [{ id: 'greet', label: 'Greet' }], visibility: 'public' }),
+    });
+
+    const { status, body } = await json(`/v1/agents/${agentName}/messages/overview`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `overview status ${status}: ${JSON.stringify(body)}`);
+    const d = body.data;
+    // commands
+    assert(Array.isArray(d.commands) && d.commands.some((c: any) => c.id === 'greet'), 'command palette surfaced');
+    // threads mirror GET /messages/threads (incl. task-title enrichment fields)
+    const threadsSingle = await json(`/v1/agents/${agentName}/messages/threads`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(d.threads.length === threadsSingle.body.data.threads.length, `threads count matches /messages/threads: ${d.threads.length} vs ${threadsSingle.body.data.threads.length}`);
+    // messages mirror GET /messages (page 1)
+    const msgSingle = await json(`/v1/agents/${agentName}/messages`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(d.messages.messages.length === msgSingle.body.data.messages.length, `messages count matches /messages: ${d.messages.messages.length} vs ${msgSingle.body.data.messages.length}`);
+    assert(d.messages.page === 1, 'messages page is 1');
+});
+
+await test('9c. messages/overview owner-or-self: a sibling agent gets 403', async () => {
+    const r = await json('/v1/agents', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'msgbot2', owner: ownerName, capabilities: ['memory'] }),
+    });
+    assert(r.status === 201, `register agent2 ${r.status}: ${JSON.stringify(r.body)}`);
+    const a2 = await getToken(r.body.data.agent.gaii, r.body.data.private_key, true);
+    const { status } = await json(`/v1/agents/${agentName}/messages/overview`, { headers: { Authorization: `Bearer ${a2}` } });
+    assert(status === 403, `sibling agent should get 403, got ${status}`);
+});
+
 // ─── Phase 4: Consolidated Inbox ───
 console.log('\nPhase 4 -- Consolidated Inbox');
 
