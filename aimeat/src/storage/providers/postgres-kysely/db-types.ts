@@ -731,6 +731,19 @@ export interface Flag {
   targetType: string;
 }
 
+export interface Feedback {
+  body: string;
+  category: string;
+  context: Json | null;
+  createdAt: Generated<Timestamp>;
+  id: Generated<string>;
+  messages: Generated<Json>;
+  sender: string;
+  status: Generated<string>;
+  title: string;
+  updatedAt: Generated<Timestamp>;
+}
+
 export interface GenesisPeer {
   catalogueHash: string;
   createdAt: Generated<Timestamp>;
@@ -1572,6 +1585,7 @@ export interface DB {
   Extension: Extension;
   ExtensionInstance: ExtensionInstance;
   FederationPeer: FederationPeer;
+  Feedback: Feedback;
   Flag: Flag;
   GenesisPeer: GenesisPeer;
   Ghii: Ghii;

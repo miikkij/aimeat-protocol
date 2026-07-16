@@ -424,6 +424,8 @@ export function bootstrapRouter(
                 aimeat_app_list: `GET ${base}/v1/apps`,
                 aimeat_storage_upload: `POST ${base}/v1/storage/upload`,
                 aimeat_storage_download: `GET ${base}/v1/storage/{fileId}`,
+                aimeat_feedback_send: `POST ${base}/v1/feedback with body { "category": "bug|blocker|idea|ux|question|other", "title": ..., "body": ..., "context": {...}? } (follow-up: POST ${base}/v1/feedback/{id}/reply)`,
+                aimeat_feedback_inbox: `GET ${base}/v1/feedback/mine`,
               },
               important_notes: [
                 'owner_scope=true on /v1/memory returns data from your owner (GHII) AND all their agents. Without it you only see your own agent memory.',
@@ -571,6 +573,7 @@ export function bootstrapRouter(
           push: { method: 'POST/DELETE', url: '/v1/push/subscribe', description: 'Web Push notification subscriptions (VAPID)', tier: 1, vapid_key: '/v1/push/vapid-key' },
           matches: { method: 'GET/POST', url: '/v1/matches', description: 'AI-generated match suggestions between profiles with consent checks', tier: 1 },
           flags: { method: 'POST', url: '/v1/flags', description: 'Content moderation — flag inappropriate content, file appeals', tier: 1, appeals: '/v1/appeals' },
+          feedback: { method: 'POST/GET', url: '/v1/feedback', description: 'Platform feedback to the node operator — report bugs, blockers, and ideas about the PLATFORM itself; the operator triages and replies (read replies at /v1/feedback/mine). Blockers notify the operator immediately.', tier: 1, mine: '/v1/feedback/mine' },
         },
       },
 

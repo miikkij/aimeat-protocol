@@ -80,6 +80,7 @@ import type { AgentActivityRepository } from './repositories/agent-activity.repo
 import type { AgentUsageRepository } from './repositories/agent-usage.repository.js';
 import type { AgentMessageRepository } from './repositories/agent-message.repository.js';
 import type { DirectMessageRepository } from './repositories/direct-message.repository.js';
+import type { FeedbackRepository } from './repositories/feedback.repository.js';
 import type { AgentTelemetryRepository, AgentWebhookRepository } from './repositories/agent-webhook.repository.js';
 import type { AgentOnboardingRepository } from './repositories/agent-onboarding.repository.js';
 import type { InvitationRepository } from './repositories/invitation.repository.js';
@@ -106,6 +107,7 @@ export interface Storage extends
   AgentUsageRepository,
   AgentMessageRepository,
   DirectMessageRepository,
+  FeedbackRepository,
   AgentTelemetryRepository, AgentWebhookRepository,
   AgentOnboardingRepository,
   InvitationRepository,

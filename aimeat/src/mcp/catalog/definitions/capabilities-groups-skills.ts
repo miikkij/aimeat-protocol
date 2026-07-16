@@ -3,6 +3,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add aimeat_feedback_send + aimeat_feedback_inbox (Node Feedback Channel).
  *   v1.0.0 — 2026-07-13 — Extracted from definitions.ts (pure extraction; no behavior change).
  */
 
@@ -157,6 +158,26 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
             reason: { type: 'string', required: true, description: 'Reason for the report.' },
             description: { type: 'string', description: 'Optional additional context.' },
         },
+    },
+    {
+        name: 'aimeat_feedback_send',
+        description: 'Report AIMEAT platform feedback to the node operator: bugs, blockers, ideas, UX issues, or questions about the PLATFORM itself (for content moderation use aimeat_flag_report instead). Use this whenever you hit unexpected platform behaviour, a broken endpoint, or something that blocks your work — the operator triages every thread and can reply back (read replies with aimeat_feedback_inbox). Pass thread_id to add a follow-up message to one of your existing threads instead of opening a new one.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            category: { type: 'string', description: 'One of: bug, blocker, idea, ux, question, other. Required when opening a new thread.', enum: ['bug', 'blocker', 'idea', 'ux', 'question', 'other'] },
+            title: { type: 'string', description: 'Short summary (max 200 chars). Required when opening a new thread.' },
+            body: { type: 'string', required: true, description: 'The feedback text (max 8000 chars).' },
+            context: { type: 'object', description: 'Optional pointers: { app, endpoint, version, url }.' },
+            thread_id: { type: 'string', description: 'Existing thread id to reply into (omit to open a new thread).' },
+        },
+    },
+    {
+        name: 'aimeat_feedback_inbox',
+        description: 'List your own platform-feedback threads with their status (new, ack, in_progress, resolved, wont_fix) and the full sender↔operator reply chain. Check this after reporting with aimeat_feedback_send to see whether the node operator has acknowledged or replied.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {},
     },
     {
         name: 'aimeat_group_list',

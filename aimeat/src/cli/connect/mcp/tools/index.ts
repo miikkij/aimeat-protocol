@@ -38,6 +38,7 @@ import { registerInstancesTools } from './instances.js';
 import { registerMemoryExtTools } from './memory-ext.js';
 import { registerWalletExtTools } from './wallet-ext.js';
 import { registerFlagsTools } from './flags.js';
+import { registerFeedbackTools } from './feedback.js';
 import { registerHandbookTools } from './handbook.js';
 import { registerOnboardingTools } from './onboarding.js';
 
@@ -67,6 +68,7 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerMemoryExtTools(mcp, registry);
   registerWalletExtTools(mcp, registry);
   registerFlagsTools(mcp, registry);
+  registerFeedbackTools(mcp, registry);
   registerHandbookTools(mcp, registry);
   registerOnboardingTools(mcp, registry);
 }

@@ -77,6 +77,7 @@ const ALL_SUITES = [
     'test/e2e-owner-home.ts',
     'test/e2e-ai-usage-history.ts',
     'test/e2e-notifications.ts',
+    'test/e2e-feedback.ts',
     'test/e2e-hooks.ts',
     'test/e2e-knowledge.ts',
     'test/e2e-libs.ts',

@@ -256,6 +256,10 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // ── Flags / moderation ──
     aimeat_flag_report: { title: 'Report Content for Moderation', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 
+    // ── Node Feedback Channel (platform feedback → operator) ──
+    aimeat_feedback_send: { title: 'Send Platform Feedback to Operator', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_feedback_inbox: { title: 'My Feedback Threads + Operator Replies', readOnlyHint: true },
+
     // ── Admin (operator-only) ──
     aimeat_admin_stats: { title: 'Admin: Node Stats', readOnlyHint: true },
     aimeat_admin_agents: { title: 'Admin: List Agents', readOnlyHint: true },

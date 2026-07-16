@@ -53,6 +53,7 @@ import { registerCommerceTools } from './commerce.js';
 import { registerEnterpriseMcpTools } from './enterprise-tools.js';
 import { registerChatInstancesTools } from './chat-instances.js';
 import { registerFlagsTools } from './flags.js';
+import { registerFeedbackTools } from './feedback.js';
 import { registerPromptsTools } from './prompts.js';
 import { registerCapabilitiesTools } from './capabilities.js';
 import { registerCortexTools } from './cortex.js';
@@ -153,6 +154,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerEnterpriseMcpTools(mcp, storage, config, () => agentGaii);
         registerChatInstancesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerFlagsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerFeedbackTools(mcp, storage, config, () => agentGaii);
         registerPromptsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerCapabilitiesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerCortexTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

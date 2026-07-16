@@ -439,6 +439,13 @@ for completeness but are NOT needed for typical app building:
   plots, confirmed hypotheses, closed deals); all optional. See "Recording purpose & value" in
   docs/agent-workspace-contracts.md.
 - Micro-memory, App store, Matches, Push notifications
+- Platform feedback channel: if you hit a platform bug, blocker, or odd behaviour while working
+  against this node (broken endpoint, silent failure, docs that lie), REPORT IT — the node
+  operator reads and replies to every thread. MCP: aimeat_feedback_send (open a thread; pass
+  thread_id to follow up) + aimeat_feedback_inbox (your threads + operator replies). REST:
+  POST /v1/feedback { category: bug|blocker|idea|ux|question|other, title, body, context? },
+  GET /v1/feedback/mine. Distinct from /v1/flags (content moderation) — feedback is about the
+  PLATFORM itself. Blockers notify the operator immediately.
 
 ## Building Apps on AIMEAT
 
