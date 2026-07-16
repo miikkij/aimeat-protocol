@@ -36,6 +36,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, PackageRecord, PackageComponent, PackageComponentType, TemplateListingRecord } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { createPackagesTabService } from '../services/db/packages-tab-db-service.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveGhii } from '../utils/ghii-resolver.js';
 import { buildZip, parseZip, ZipValidationError } from '../services/package-zip.js';
@@ -70,6 +71,16 @@ export function packagesRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   // ── Static routes FIRST (before parameterized :groupId) ──────────
+
+  // GET /v1/packages/tab — the Packages tab mount's THREE local reads (installed instances + owner's
+  // packages + newest templates) in one read scope (PackagesTabService). The cross-node
+  // federation-templates call stays separate (best-effort outbound). Owner-scope: requires 'owner' role.
+  // MUST be registered before GET /v1/packages/:groupId. The individual endpoints stay for re-fetches.
+  const packagesTabDb = createPackagesTabService(storage);
+  router.get('/v1/packages/tab', requireAuth(), requireRole('owner'), async (req, res) => {
+    const data = await packagesTabDb.overview(req.auth!.owner as string);
+    res.json(success(config.nodeId, data));
+  });
 
   // POST /v1/packages/import — import from ZIP bundle
   router.post('/v1/packages/import', requireAuth(), async (req, res) => {

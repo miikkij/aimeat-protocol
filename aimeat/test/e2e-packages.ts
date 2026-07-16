@@ -1317,5 +1317,19 @@ await json(`/v1/owners/${ownerName}?cascade=true`, {
   headers: authed(ownerToken),
 });
 
+await test('Packages tab overview composite folds the 3 local reads (Phase 4 DbService)', async () => {
+  const { body } = await json('/v1/packages/tab', { headers: authed(ownerToken) });
+  assert(body.ok === true, `packages/tab: ${JSON.stringify(body.error)}`);
+  const d = body.data;
+  assert(Array.isArray(d.instances?.instances), 'instances is an array');
+  assert(Array.isArray(d.packages?.packages), 'packages is an array');
+  assert(Array.isArray(d.templates?.templates), 'templates is an array');
+  // The instances section matches the standalone endpoint (both owner-scoped, installed).
+  const { body: inst } = await json('/v1/instances?status=installed', { headers: authed(ownerToken) });
+  assert(d.instances.total === inst.data.total, `overview instances (${d.instances.total}) == /v1/instances (${inst.data.total})`);
+});
+
+// (Owner-only requireRole('owner') gating is proven in the access-tokens suite — same middleware.)
+
 console.log(`\n📊 Results: ${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);
