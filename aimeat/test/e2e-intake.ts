@@ -55,7 +55,7 @@ const LEADS_SCHEMAS = {
         properties: {
             id: { type: 'string' }, nimi: { type: 'string' }, email: { type: 'string' },
             omistaja: { type: 'string' }, tila: { type: 'string', enum: ['uusi', 'asiakas'] },
-            lahde: { type: 'string' },
+            lahde: { type: 'string' }, luotu: { type: 'string' },
         },
     },
 };
@@ -128,6 +128,17 @@ async function main() {
         assert(v.nimi === 'Anon Lead' && v.email === 'anon@ex.fi', 'submitted fields stored');
         assert(v.omistaja === ownerGhii, 'omistaja = form owner (server-trusted), not the caller');
         assert(v.tila === 'uusi' && v.lahde === 'public-form', 'defaults applied');
+    });
+
+    await test('server token {{now}} in defaults resolves to a real ISO timestamp per submission', async () => {
+        const def = await json('/v1/intake/forms', { method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` }, body: JSON.stringify({ organism_id: orgId, ws, namespace: 'crm.leads', form_id: 'stamped', allowed_fields: ['nimi'], required_fields: ['nimi'], defaults: { omistaja: ownerGhii, luotu: '{{now}}' } }) });
+        assert(def.status === 200, `define stamped form: ${def.status}`);
+        const r = await json(`/v1/intake/${orgId}/${ws}/stamped`, { method: 'POST', body: JSON.stringify({ nimi: 'Stamped Lead' }) });
+        assert(r.status === 200 && r.body.ok === true, `submit stamped: ${r.status} ${JSON.stringify(r.body.error)}`);
+        const id = (r.body.data as { id: string }).id;
+        const read = await json(`/v1/memory/${encodeURIComponent(`organism.${orgId}.w.${ws}.crm.leads.${id}.latest`)}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        const v = (read.body.data as { value: Record<string, unknown> }).value;
+        assert(v.luotu !== '{{now}}' && typeof v.luotu === 'string' && !isNaN(Date.parse(v.luotu as string)), `luotu is a real ISO timestamp, got: ${v.luotu}`);
     });
 
     await test('honeypot filled → accepted silently but NO record written', async () => {
