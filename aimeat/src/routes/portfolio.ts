@@ -150,24 +150,23 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     // record's owning identity — the builder needs it to compose the anonymous
     // public-read URL (/v1/memory/:gaii/:key) for the generated portfolio.
     const memories: Array<{ key: string; gaii: string; visibility: string; tags: string[]; preview: string }> = [];
-    for (const agent of agents) {
-      const mems = await storage.listMemory(agent.gaii);
-      for (const m of mems) {
-        if (m.visibility !== 'private' && !m.key.startsWith('_sys.')) {
-          // Extract a short text preview from the value
-          let preview = '';
-          if (typeof m.value === 'string') {
-            preview = m.value.slice(0, 120);
-          } else if (m.value && typeof m.value === 'object') {
-            const v = m.value as Record<string, unknown>;
-            // Try common text fields: description, summary, title, text, content
-            for (const f of ['description', 'summary', 'title', 'text', 'content', 'name']) {
-              if (typeof v[f] === 'string' && v[f]) { preview = (v[f] as string).slice(0, 120); break; }
-            }
-            if (!preview) preview = JSON.stringify(m.value).slice(0, 120);
+    // One IN query for all agents' memory (was listMemory per agent). Records carry ownerGaii.
+    const mems = await storage.listMemoryForOwners(agents.map(a => a.gaii));
+    for (const m of mems) {
+      if (m.visibility !== 'private' && !m.key.startsWith('_sys.')) {
+        // Extract a short text preview from the value
+        let preview = '';
+        if (typeof m.value === 'string') {
+          preview = m.value.slice(0, 120);
+        } else if (m.value && typeof m.value === 'object') {
+          const v = m.value as Record<string, unknown>;
+          // Try common text fields: description, summary, title, text, content
+          for (const f of ['description', 'summary', 'title', 'text', 'content', 'name']) {
+            if (typeof v[f] === 'string' && v[f]) { preview = (v[f] as string).slice(0, 120); break; }
           }
-          memories.push({ key: m.key, gaii: agent.gaii, visibility: m.visibility, tags: m.tags || [], preview });
+          if (!preview) preview = JSON.stringify(m.value).slice(0, 120);
         }
+        memories.push({ key: m.key, gaii: m.ownerGaii, visibility: m.visibility, tags: m.tags || [], preview });
       }
     }
 
