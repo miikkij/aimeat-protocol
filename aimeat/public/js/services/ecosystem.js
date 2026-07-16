@@ -81,6 +81,20 @@ export async function getAutomationRecipe(app) {
   return data?.data?.recipe ?? null;
 }
 
+/**
+ * Composite mount for the automation card: this app's schedules + recipe + organisms + pending advisories
+ * in ONE call. Returns { schedules, recipe, organisms, advisories } or null on error so the caller can fall
+ * back to the individual reads. The agent list stays a separate GET /v1/agents.
+ */
+export async function getAutomationOverview(app) {
+  try {
+    const data = await apiGet(`/v1/ecosystem-apps/${encodeURIComponent(app)}/automation`);
+    const d = data?.data;
+    if (!d) return null;
+    return { schedules: d.schedules || [], recipe: d.recipe ?? null, organisms: d.organisms || [], advisories: d.advisories || [] };
+  } catch { return null; }
+}
+
 /** Upsert the automation recipe for an app. body: { agents, organism?, email?, requireApproval?, enabled, trigger? }. */
 export async function putAutomationRecipe(app, body) {
   return apiPut(`/v1/ecosystem-apps/${encodeURIComponent(app)}/automation/recipe`, body);

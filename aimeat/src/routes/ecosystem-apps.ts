@@ -20,6 +20,8 @@
  *     eco-capability schedules/pending advisories cleaned up; deposited data preserved)
  * @usage app.use(ecosystemAppsRouter(config, storage, scheduler));
  * @version-history
+ *   v1.2.0 — 2026-07-16 — Add GET /:app/automation composite (schedules + recipe + organisms + advisories)
+ *     folding the automation card mount; the agent list stays a separate GET /v1/agents.
  *   v1.0.0 — 2026-06-14 — Created for ecosystem-apps foundation (chunk 1).
  *   v1.1.0 — 2026-06-15 — Add GET /v1/ecosystem-apps/:app/data — owner-scoped listing of the memory
  *     entries an ecosystem app wrote into its own eco: namespace (profile "Ecosystem apps" tab).
@@ -516,6 +518,43 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
     }
     return `eco.${appRecord.app}.*`;
   }
+
+  // ── GET /v1/ecosystem-apps/:app/automation — the automation card mount in ONE call: this app's
+  // eco-capability schedules + the recipe + the owner's organisms (deploy target) + pending advisories.
+  // Folds four of the card's five reads in one read scope; the agent list stays a separate GET /v1/agents
+  // (its `domain_capabilities` shape drives recipe-agent selection). Owner. Registered before
+  // /automation/recipe (a more-specific literal path — no shadow, 3 segments vs 4).
+  router.get('/v1/ecosystem-apps/:app/automation', requireAuth(), requireRole('owner'), async (req, res) => {
+    const app = req.params.app as string;
+    const owner = req.auth!.owner as string;
+    const ownerGhii = `${owner}@${config.nodeId}`;
+
+    const record = await storage.getEcosystemAppByOwnerAndApp(owner, app);
+    if (!record) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Ecosystem app "${app}" not found under owner "${owner}"`));
+      return;
+    }
+
+    const [recipe, advItems, organisms, schedJobs] = await Promise.all([
+      storage.getAutomationRecipe(owner, app),
+      storage.listMemory(ownerGhii, { prefix: pendingPrefix(app) }),
+      storage.listOrganisms({ member: owner }),
+      storage.listScheduledJobs({ ownerScope: ownerGhii }),
+    ]);
+
+    const advisories = advItems
+      .map((r) => r.value as PendingAdvisoryRecord)
+      .filter((v) => v && v.type === PENDING_TYPE && v.status === 'pending')
+      .map((v) => ({ id: v.id, app: v.app, recipe_id: v.recipeId ?? null, advisory: v.advisory, status: v.status, created_at: v.createdAt }));
+    const schedules = schedJobs.filter((j) => j.type === 'eco-capability' && (j.input as { app?: string })?.app === app);
+
+    res.json(success(config.nodeId, {
+      schedules,
+      recipe: recipe ? recipeToApi(recipe) : null,
+      organisms,
+      advisories,
+    }));
+  });
 
   // ── GET /v1/ecosystem-apps/:app/automation/recipe — the recipe (or null) ──
   router.get('/v1/ecosystem-apps/:app/automation/recipe', requireAuth(), requireRole('owner'), async (req, res) => {
