@@ -17,6 +17,7 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 | `three.min.js` | `three` (r128 UMD) | r128 | `three` | `https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js` | MIT |
 | `p5@1.min.js` | `p5` | 1.11.13 | `p5` | `https://cdn.jsdelivr.net/npm/p5@1/lib/p5.min.js` | LGPL-2.1 (owner-approved 2026-07-16) |
 | `pixi@8.min.js` | `pixi.js` | 8.19.0 | `pixi` | `https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js` | MIT |
+| `pixi-unsafe-eval@8.min.js` | `pixi.js` (unsafe-eval companion — REQUIRED after pixi under the app CSP) | 8.19.0 | `pixi` | `https://cdn.jsdelivr.net/npm/pixi.js@8/dist/packages/unsafe-eval.min.js` | MIT |
 | `phaser@3.min.js` | `phaser` | 3.90.0 | `phaser` | `https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js` | MIT |
 | `drawflow@0.min.js` + `.min.css` | `drawflow` (engine INSIDE the aimeat-flow cortex — apps use AIMEAT.flow, never Drawflow directly) | 0.0.60 | `aimeat-flow` | `https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/` | MIT |
 | `realtime.js` | AIMEAT-local (WS/WebRTC/Yjs client) | 1 | `realtime` | this repo | MIT |
