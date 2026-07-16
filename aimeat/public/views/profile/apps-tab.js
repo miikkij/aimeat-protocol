@@ -524,7 +524,7 @@ export default function AppsTab({ session, showToast, onStats }) {
             <div class="pf-edit-panel">
               <label class="text-meta mb-half">\u{1F916} ${t('profile.apps.agentJsonLabel') || 'Bundled agents (crew-def JSON array)'}</label>
               <div class="text-meta-sm mb-half">${t('profile.apps.agentEditorHint') || 'A crew-def can hold a whole TEAM: up to 10 crew members per definition (process "hierarchical" adds an orchestrator over them), up to 5 definitions per app. Use "Copy AI prompt" to have your AI write or extend this JSON, then paste the result here and Save — the node validates it strictly.'}</div>
-              <textarea class="input-field pf-flex-fill mb-half pf-code-textarea" rows="14" spellcheck="false" value=${agentsJson} onInput=${e => setAgentsJson(e.target.value)}></textarea>
+              <textarea class="prompt-box mb-half" rows="14" spellcheck="false" value=${agentsJson} onInput=${e => setAgentsJson(e.target.value)}></textarea>
               <div class="flex-row-wrap">
                 <button class="btn-primary btn-sm" onClick=${() => handleSaveAgents(a.filename)}>${t('profile.apps.save') || 'Save'}</button>
                 <button class="btn-info btn-sm" onClick=${() => handleCopyAgentPrompt(a)}>\u{1F4CB} ${t('profile.apps.agentCopyPrompt') || 'Copy AI prompt'}</button>
