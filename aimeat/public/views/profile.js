@@ -131,6 +131,10 @@ export default function Profile({ navigate, locale }) {
     services: '-', work: '-', apps: '-', files: '-', nodes: '-',
   });
   const [toast, setToast] = useState(null);
+  // The home composite (/v1/owner/home) already returns the full usage summary + agent list the Usage and
+  // Agents cards render — thread them so those cards skip their own duplicate /v1/owner/usage + /v1/agents
+  // mount fetch (they still re-fetch on live-update for freshness).
+  const [homeExtras, setHomeExtras] = useState(null);
   const toastTimer = useRef(null);
 
   // NOTE: this is a toast pathway alongside /components/Toast.js's useToast()
@@ -198,7 +202,8 @@ export default function Profile({ navigate, locale }) {
     ]).then(([home, nodes]) => {
       const s = {};
       if (home.status === 'fulfilled') {
-        const st = home.value?.data?.stats || {};
+        const d = home.value?.data || {};
+        const st = d.stats || {};
         s.agents = st.agents ?? 0;
         s.chatSessions = st.chatSessions ?? 0;
         s.balance = st.balance ?? '-';
@@ -207,6 +212,7 @@ export default function Profile({ navigate, locale }) {
         s.services = st.services ?? 0;
         s.work = st.work ?? 0;
         s.apps = st.apps ?? 0;
+        setHomeExtras({ usage: d.usage ?? null, agents: Array.isArray(d.agents) ? d.agents : null });
       }
       if (nodes.status === 'fulfilled') {
         const list = nodes.value;
@@ -270,6 +276,8 @@ export default function Profile({ navigate, locale }) {
       <${LandingPage}
         tier=${tier}
         stats=${stats}
+        homeUsage=${homeExtras?.usage}
+        homeAgents=${homeExtras?.agents}
         session=${session}
         navigate=${navigate}
         showToast=${showToast}
