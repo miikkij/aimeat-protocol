@@ -9,6 +9,7 @@
  *   - PendingApproval methods: create/get/list/update plus listOverduePendingApprovals
  *
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add listPendingApprovalsForOrgs batch primitive (Phase 3 fan-out→IN).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { ArchiveFilter, OrganismRecord, OrganismMembershipRecord, JoinRequestRecord, OrganismReputationRecord, PendingApprovalRecord } from '../interface.js';
@@ -35,6 +36,13 @@ export interface OrganismRepository {
   createPendingApproval(record: PendingApprovalRecord): Promise<PendingApprovalRecord>;
   getPendingApproval(id: string): Promise<PendingApprovalRecord | null>;
   listPendingApprovals(organismId: string, opts?: { status?: string }): Promise<PendingApprovalRecord[]>;
+  /**
+   * BULK PRIMITIVE (Phase 3) — pending approvals for MANY organisms in ONE `organismId IN (…)` query,
+   * grouped by organism. Backs the "Waiting for you" home aggregate, which called listPendingApprovals
+   * once per member organism. Keyed by organismId (an org with none is absent). Optional — a backend
+   * without it falls back to a per-organism loop.
+   */
+  listPendingApprovalsForOrgs?(organismIds: string[], opts?: { status?: string }): Promise<Record<string, PendingApprovalRecord[]>>;
   updatePendingApproval(id: string, updates: Partial<PendingApprovalRecord>): Promise<PendingApprovalRecord | null>;
   listOverduePendingApprovals(nowIso: string): Promise<PendingApprovalRecord[]>;
 }

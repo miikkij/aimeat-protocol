@@ -4,6 +4,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-07-16 — /waiting batches pending approvals (listPendingApprovalsForOrgs) + ws-name lookups
+ *     (workspaceNamesByOrg) across all member orgs, instead of a per-org query loop.
  *   v1.1.0 — 2026-07-16 — ?include=counts uses workspaceCountsByOrg (ONE batched registry read) instead of
  *     a listAllMemory scan per organism.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
@@ -25,7 +27,7 @@ import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import type { OrganismHelpers } from './shared.js';
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
-  const { wsRegPrefix, workspaceCountsByOrg } = H;
+  const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
 
   /* ── POST /v1/organisms — Create a new organism (agents/owners by role; published apps via the
      organism:write scope, so an app can provision its own structured data space for its owner). ── */
@@ -175,26 +177,28 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const orgs = await storage.listOrganisms({ member: owner });
     const reviews: Array<{ kind: 'review'; n: number; orgId: string; orgName: string; wsId: string; wsName: string }> = [];
     const joinRequests: Array<{ kind: 'join'; n: number; orgId: string; orgName: string }> = [];
-    await Promise.all(orgs.map(async (org) => {
-      const aps = await storage.listPendingApprovals(org.id, { status: 'pending' });
+
+    // Pending approvals for EVERY member org in one batched read (was listPendingApprovals per org), then
+    // the ws-name registry lookup for just the orgs that have approvals in one batched cross-owner read.
+    const orgIds = orgs.map(o => o.id);
+    const apsByOrg = storage.listPendingApprovalsForOrgs
+      ? await storage.listPendingApprovalsForOrgs(orgIds, { status: 'pending' })
+      : Object.fromEntries(await Promise.all(orgs.map(async o => [o.id, await storage.listPendingApprovals(o.id, { status: 'pending' })] as const)));
+    const namesByOrg = await workspaceNamesByOrg(orgs.filter(o => (apsByOrg[o.id]?.length)).map(o => o.id));
+    for (const org of orgs) {
+      const aps = apsByOrg[org.id] ?? [];
       if (aps.length) {
         const byWs: Record<string, number> = {};
         for (const a of aps) { const w = (a.arguments as { ws?: string } | undefined)?.ws ?? ''; byWs[w] = (byWs[w] ?? 0) + 1; }
-        const names: Record<string, string> = {};   // ws id → name from the registry (names only, one scan/org)
-        const { items } = await storage.listAllMemory({ prefix: wsRegPrefix(org.id), limit: 1000 });
-        for (const rec of items) {
-          if (rec.key !== wsRegPrefix(org.id)) continue;
-          for (const w of ((rec.value as { workspaces?: Array<{ id: string; name?: string }> } | null)?.workspaces ?? [])) {
-            if (w.id && !(w.id in names)) names[w.id] = w.name ?? w.id;
-          }
-        }
-        for (const [wsId, n] of Object.entries(byWs)) reviews.push({ kind: 'review', n, orgId: org.id, orgName: org.name, wsId, wsName: names[wsId] || wsId });
+        const names = namesByOrg.get(org.id);
+        for (const [wsId, n] of Object.entries(byWs)) reviews.push({ kind: 'review', n, orgId: org.id, orgName: org.name, wsId, wsName: names?.get(wsId) || wsId });
       }
-      const canManage = org.creatorGhii === owner || (org.admins ?? []).includes(owner);
-      if (canManage) {
-        const jr = await storage.listJoinRequests(org.id, { status: 'pending' });
-        if (jr.length) joinRequests.push({ kind: 'join', n: jr.length, orgId: org.id, orgName: org.name });
-      }
+    }
+    // Join requests only for orgs the caller manages (creator/admin) — kept per-org (typically few managed).
+    const managed = orgs.filter(org => org.creatorGhii === owner || (org.admins ?? []).includes(owner));
+    await Promise.all(managed.map(async (org) => {
+      const jr = await storage.listJoinRequests(org.id, { status: 'pending' });
+      if (jr.length) joinRequests.push({ kind: 'join', n: jr.length, orgId: org.id, orgName: org.name });
     }));
     const invited = (await storage.listMembershipsByGhii(owner)).filter(m => m.status === 'invited');
     const invitations: Array<{ kind: 'invite'; orgName: string; organismId: string }> = [];
