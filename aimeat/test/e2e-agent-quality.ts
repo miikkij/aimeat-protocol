@@ -287,6 +287,37 @@ await test('11. Custom metric under agents.<name>.statistics.custom.* surfaces i
     assert(entry.value?.rounds === 7, `custom value round-trip: ${JSON.stringify(entry.value)}`);
 });
 
+// ─── Phase: Quality subtab composite (mount fold) ───
+console.log('\nPhase -- GET /quality/overview composite');
+
+await test('12. GET /quality/overview folds statistics (perf+reviews+custom) + done tasks', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/quality/overview`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'response ok');
+    const d = body.data;
+
+    // statistics mirror GET /statistics — performance + reviews + custom (incl. the internal_score metric)
+    const single = await json(`/v1/agents/${agentName}/statistics`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(d.statistics.performance.tasks.total === single.body.data.performance.tasks.total, 'performance matches /statistics');
+    assert(!!d.statistics.reviews.byContext.factual, 'reviews carried');
+    const entry = (d.statistics.custom || []).find((c: any) => c.key === 'internal_score');
+    assert(entry && entry.value?.rounds === 7, `custom metric surfaced: ${JSON.stringify(d.statistics.custom)}`);
+
+    // done_tasks mirror GET /tasks?status=done — our two done tasks present
+    assert(Array.isArray(d.done_tasks) && d.done_tasks.length >= 2, `done_tasks >= 2, got ${d.done_tasks?.length}`);
+    assert(d.done_tasks.every((tk: any) => tk.status === 'done'), 'all done_tasks are status=done');
+});
+
+await test('13. quality/overview owner-or-self: a sibling agent gets 403', async () => {
+    // parentToken is the orchestrator agent — a different agent under the same owner.
+    const { status } = await json(`/v1/agents/${agentName}/quality/overview`, {
+        headers: { Authorization: `Bearer ${parentToken}` },
+    });
+    assert(status === 403, `sibling agent should get 403, got ${status}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

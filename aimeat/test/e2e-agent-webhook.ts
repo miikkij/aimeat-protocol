@@ -240,6 +240,43 @@ await test('6. GET webhook log returns deliveries', async () => {
         'has latency field');
 });
 
+// ─── Phase 6b: Integration subtab composite (mount fold) ───
+console.log('\nPhase 6b -- GET /integration/overview composite');
+
+await test('6b. GET /integration/overview folds webhook + delivery log + onboarding checklist', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/integration/overview`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'response ok');
+    const d = body.data;
+    // webhook mirrors GET /webhook — configured (tests 1/3 set it), url present
+    assert(d.webhook && d.webhook.configured === true, `webhook should be configured, got ${JSON.stringify(d.webhook)}`);
+    assert(typeof d.webhook.url === 'string', 'webhook has url');
+    // deliveries mirror GET /webhook/log — array with the earlier test delivery
+    assert(Array.isArray(d.deliveries.deliveries) && d.deliveries.deliveries.length >= 1, `deliveries >= 1, got ${d.deliveries.deliveries?.length}`);
+    // onboarding checklist mirrors GET /onboarding's post_onboarding_checklist exactly (null when
+    // not-started; the computed object otherwise).
+    const ob = await json(`/v1/agents/${agentName}/onboarding`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    const expected = ob.body?.data?.post_onboarding_checklist ?? null;
+    assert(JSON.stringify(d.onboarding.post_onboarding_checklist) === JSON.stringify(expected),
+        `checklist should match GET /onboarding: got ${JSON.stringify(d.onboarding.post_onboarding_checklist)} vs ${JSON.stringify(expected)}`);
+});
+
+await test('6c. integration/overview owner-or-self: a sibling agent gets 403', async () => {
+    const { status: rStatus, body: rBody } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'whkbot2', owner: ownerName, capabilities: ['memory'] }),
+    });
+    assert(rStatus === 201, `register agent2 ${rStatus}: ${JSON.stringify(rBody)}`);
+    const a2Token = await getToken(rBody.data.agent.gaii, rBody.data.private_key, true);
+    const { status } = await json(`/v1/agents/${agentName}/integration/overview`, {
+        headers: { Authorization: `Bearer ${a2Token}` },
+    });
+    assert(status === 403, `sibling agent should get 403, got ${status}`);
+});
+
 // ─── Phase 7: Delete webhook ───
 console.log('\nPhase 7 -- Delete Webhook');
 

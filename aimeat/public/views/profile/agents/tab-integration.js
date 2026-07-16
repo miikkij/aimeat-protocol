@@ -4,6 +4,9 @@
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.
  * @version-history
+ *   v1.9.0 -- 2026-07-16 -- Mount folds webhook + delivery-log + onboarding-checklist into GET
+ *     /v1/agents/:name/integration/overview (getIntegrationOverview); skill-bundle version stays a
+ *     separate request; individual reads kept as fallback.
  *   v1.8.0 -- 2026-06-30 -- Onboarding checklist step labels use tOr() so a missing
  *     agentOnboarding.steps.* key falls back to the server-provided step.title (which carries
  *     the howTo-enriched onboarding payload) instead of rendering the raw i18n key.
@@ -37,7 +40,7 @@ import { timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { detectAgentState } from './state-detector.js';
 import {
-  getOnboarding, startOnboarding,
+  getOnboarding, startOnboarding, getIntegrationOverview,
   getWebhookConfig, testWebhook, updateWebhook,
   getSkillBundleVersion, getSkillBundleUrl, updateSkillBundle,
   getDeliveryLog
@@ -64,16 +67,28 @@ export default function TabIntegration({ agent, onboarding, showToast, agentName
   const loadData = useCallback(async ({ showSpinner = true } = {}) => {
     if (showSpinner) setLoading(true);
     try {
-      const [whResp, sbResp, dlResp, obResp] = await Promise.all([
-        getWebhookConfig(agentName).catch(() => null),
+      // Mount fold: ONE composite (webhook + delivery log + onboarding checklist) plus the skill-bundle
+      // version, which stays separate (bundle-generation pipeline, not a read). On composite failure, fall
+      // back to the individual reads. Each composite sub-object mirrors the matching endpoint's `.data`.
+      const [ov, sbResp] = await Promise.all([
+        getIntegrationOverview(agentName),
         getSkillBundleVersion(agentName).catch(() => null),
-        getDeliveryLog(agentName, 10).catch(() => null),
-        getOnboarding(agentName).catch(() => null),
       ]);
-      setWebhook(whResp?.data || null);
       setBundleVersion(sbResp?.data || null);
-      setDeliveries(dlResp?.data?.deliveries || []);
-      setPostChecklist(obResp?.data?.post_onboarding_checklist || null);
+      if (ov) {
+        setWebhook(ov.webhook || null);
+        setDeliveries(ov.deliveries?.deliveries || []);
+        setPostChecklist(ov.onboarding?.post_onboarding_checklist || null);
+      } else {
+        const [whResp, dlResp, obResp] = await Promise.all([
+          getWebhookConfig(agentName).catch(() => null),
+          getDeliveryLog(agentName, 10).catch(() => null),
+          getOnboarding(agentName).catch(() => null),
+        ]);
+        setWebhook(whResp?.data || null);
+        setDeliveries(dlResp?.data?.deliveries || []);
+        setPostChecklist(obResp?.data?.post_onboarding_checklist || null);
+      }
     } catch { /* silent */ }
     if (showSpinner) setLoading(false);
   }, [agentName]);

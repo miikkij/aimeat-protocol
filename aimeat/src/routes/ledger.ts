@@ -13,6 +13,7 @@
  * @structure
  *   - GET /v1/ledger/usage       — daily aggregates grouped by day|agent|model|provider|organism|workspace|scope
  *   - GET /v1/ledger/usage/runs  — raw events grouped by run_id (drill to a deliverable)
+ *   - GET /v1/ledger/usage/overview — Usage subtab composite (model groups + totals + runs in one call)
  *   - GET /v1/ledger/usage/capabilities — events grouped by capability, consumer/producer (TARGET-018)
  *   - GET /v1/ledger/budget      — spend vs daily budget + per-agent breakdown (TARGET-017)
  *   - GET /v1/ledger/billing     — owner monthly rollup, self-host/hosted split, CSV/JSON (TARGET-019)
@@ -26,14 +27,19 @@
  *   v1.3.0 -- 2026-07-11 -- Add GET /v1/ledger/billing (TARGET-019 monthly rollup + CSV export)
  *   v1.4.0 -- 2026-07-11 -- FLEET reads scope by req.auth.owner (app-grant accessible for AGENCY);
  *                            billing export stays requireRole('owner').
+ *   v1.5.0 -- 2026-07-16 -- Add GET /v1/ledger/usage/overview (Usage subtab mount fold: model groups +
+ *                            totals + runs in one read scope); extract aggregateUsageGroups/aggregateRunGroups
+ *                            shared by /usage, /usage/runs, and the composite (behavior unchanged).
  */
 
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentUsageDailyRecord } from '../storage/interface.js';
+import type { AgentUsageEvent } from '../storage/types/agents-messaging.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
+import { runInReadScope } from '../storage/uow/unit-of-work.js';
 import { getOwnerBudgetStatus } from '../services/ledger-budget.js';
 import { getOwnerMonthlyBilling, billingToCsv } from '../services/ledger-billing.js';
 import { getAdminLedger } from '../services/ledger-admin.js';
@@ -79,6 +85,76 @@ function dateNDaysAgo(days: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+interface UsageGroup extends Totals { key: string; providers: string[] }
+
+/** Bucket daily usage rows by the given dimension → sorted groups (with distinct providers) + grand totals.
+ *  Shared by GET /v1/ledger/usage and the /usage/overview composite (identical semantics). */
+function aggregateUsageGroups(rows: AgentUsageDailyRecord[], groupBy: GroupDim): { groups: UsageGroup[]; totals: Totals } {
+  const keyOf = GROUP_KEYS[groupBy];
+  const buckets = new Map<string, Totals>();
+  const bucketProviders = new Map<string, Set<string>>();
+  const totals = emptyTotals();
+  for (const r of rows) {
+    const k = keyOf(r);
+    let b = buckets.get(k);
+    if (!b) { b = emptyTotals(); buckets.set(k, b); }
+    addDaily(b, r);
+    addDaily(totals, r);
+    // Track the distinct providers behind each group so the UI can show WHERE a model ran
+    // (openrouter / nvidia / openai / anthropic / local …) — helps explain unpriced $0 rows.
+    if (r.provider && r.provider !== 'unknown') {
+      let ps = bucketProviders.get(k);
+      if (!ps) { ps = new Set(); bucketProviders.set(k, ps); }
+      ps.add(r.provider);
+    }
+  }
+  const groups = [...buckets.entries()]
+    .map(([key, t]) => ({ key, ...t, providers: [...(bucketProviders.get(key) ?? [])].sort() }))
+    .sort((a, b) => (groupBy === 'day' ? a.key.localeCompare(b.key) : b.cost_usd - a.cost_usd));
+  return { groups, totals };
+}
+
+interface RunGroup {
+  run_id: string;
+  prompt_tokens: number;
+  completion_tokens: number;
+  total_tokens: number;
+  cost_usd: number;
+  unpriced_calls: number;
+  calls: number;
+  models: string[];
+  first_ts: string;
+  last_ts: string;
+}
+
+/** Group raw usage events by run_id → per-run token/cost rollups, newest run first. Shared by
+ *  GET /v1/ledger/usage/runs and the /usage/overview composite (identical semantics). */
+function aggregateRunGroups(events: AgentUsageEvent[]): RunGroup[] {
+  const runs = new Map<string, RunGroup>();
+  for (const e of events) {
+    const key = e.runId ?? '(no run)';
+    let g = runs.get(key);
+    if (!g) {
+      g = {
+        run_id: key,
+        prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost_usd: 0,
+        unpriced_calls: 0, calls: 0, models: [], first_ts: e.ts, last_ts: e.ts,
+      };
+      runs.set(key, g);
+    }
+    g.prompt_tokens += e.promptTokens;
+    g.completion_tokens += e.completionTokens;
+    g.total_tokens += e.promptTokens + e.completionTokens;
+    g.cost_usd += e.costUsd ?? 0;
+    g.unpriced_calls += e.costUsd === null ? 1 : 0;
+    g.calls += 1;
+    if (!g.models.includes(e.model)) g.models.push(e.model);
+    if (e.ts < g.first_ts) g.first_ts = e.ts;
+    if (e.ts > g.last_ts) g.last_ts = e.ts;
+  }
+  return [...runs.values()].sort((a, b) => b.last_ts.localeCompare(a.last_ts));
+}
+
 export function ledgerRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   // The ledger is keyed by the human owner GHII (the payer). req.auth!.owner is the
@@ -103,29 +179,7 @@ export function ledgerRouter(config: AimeatConfig, storage: Storage): Router {
       const groupBy = groupParam as GroupDim;
 
       const rows = await storage.queryUsageDaily({ ownerGhii, agentGaii, from, to });
-
-      const keyOf = GROUP_KEYS[groupBy];
-      const buckets = new Map<string, Totals>();
-      const bucketProviders = new Map<string, Set<string>>();
-      const totals = emptyTotals();
-      for (const r of rows) {
-        const k = keyOf(r);
-        let b = buckets.get(k);
-        if (!b) { b = emptyTotals(); buckets.set(k, b); }
-        addDaily(b, r);
-        addDaily(totals, r);
-        // Track the distinct providers behind each group so the UI can show WHERE a model ran
-        // (openrouter / nvidia / openai / anthropic / local …) — helps explain unpriced $0 rows.
-        if (r.provider && r.provider !== 'unknown') {
-          let ps = bucketProviders.get(k);
-          if (!ps) { ps = new Set(); bucketProviders.set(k, ps); }
-          ps.add(r.provider);
-        }
-      }
-
-      const groups = [...buckets.entries()]
-        .map(([key, t]) => ({ key, ...t, providers: [...(bucketProviders.get(key) ?? [])].sort() }))
-        .sort((a, b) => (groupBy === 'day' ? a.key.localeCompare(b.key) : b.cost_usd - a.cost_usd));
+      const { groups, totals } = aggregateUsageGroups(rows, groupBy);
 
       res.json(success(config.nodeId, {
         from, to, group_by: groupBy,
@@ -151,43 +205,38 @@ export function ledgerRouter(config: AimeatConfig, storage: Storage): Router {
         limit: Number.isFinite(limit) ? limit : 200,
       });
 
-      interface RunGroup {
-        run_id: string;
-        prompt_tokens: number;
-        completion_tokens: number;
-        total_tokens: number;
-        cost_usd: number;
-        unpriced_calls: number;
-        calls: number;
-        models: string[];
-        first_ts: string;
-        last_ts: string;
-      }
-      const runs = new Map<string, RunGroup>();
-      for (const e of events) {
-        const key = e.runId ?? '(no run)';
-        let g = runs.get(key);
-        if (!g) {
-          g = {
-            run_id: key,
-            prompt_tokens: 0, completion_tokens: 0, total_tokens: 0, cost_usd: 0,
-            unpriced_calls: 0, calls: 0, models: [], first_ts: e.ts, last_ts: e.ts,
-          };
-          runs.set(key, g);
-        }
-        g.prompt_tokens += e.promptTokens;
-        g.completion_tokens += e.completionTokens;
-        g.total_tokens += e.promptTokens + e.completionTokens;
-        g.cost_usd += e.costUsd ?? 0;
-        g.unpriced_calls += e.costUsd === null ? 1 : 0;
-        g.calls += 1;
-        if (!g.models.includes(e.model)) g.models.push(e.model);
-        if (e.ts < g.first_ts) g.first_ts = e.ts;
-        if (e.ts > g.last_ts) g.last_ts = e.ts;
-      }
-
-      const groups = [...runs.values()].sort((a, b) => b.last_ts.localeCompare(a.last_ts));
+      const groups = aggregateRunGroups(events);
       res.json(success(config.nodeId, { count: events.length, runs: groups }));
+    });
+
+  // ── GET /v1/ledger/usage/overview ── the agent-card Usage subtab mount in ONE call: the model-grouped
+  // aggregates + grand totals AND the per-run rollups, from a single read scope (folds the tab's two
+  // requests GET /usage?group_by=model + GET /usage/runs). Owner-scoped like the rest of the ledger
+  // (req.auth.owner GHII, app-grant accessible). Reuses the same aggregation as the individual routes.
+  router.get('/v1/ledger/usage/overview',
+    requireAuth(),
+    async (req: Request, res: Response) => {
+      const ownerGhii = resolve(req);
+      const agentGaii = typeof req.query.agent === 'string' ? req.query.agent : undefined;
+      const from = typeof req.query.from === 'string' ? req.query.from : dateNDaysAgo(30);
+      const to = typeof req.query.to === 'string' ? req.query.to : dateNDaysAgo(0);
+      const runsLimit = Number(req.query.runs_limit);
+
+      // Daily aggregates honor the from/to window (date-keyed rows); the per-run drill reads raw events
+      // WITHOUT from/to — mirroring GET /usage/runs, whose ts-based filter would otherwise drop same-day
+      // events (a bare `to` date sorts before any `to`T..Z timestamp). The tab passes neither, only a limit.
+      const [dailyRows, events] = await runInReadScope(() => Promise.all([
+        storage.queryUsageDaily({ ownerGhii, agentGaii, from, to }),
+        storage.listUsageEvents({ ownerGhii, agentGaii, limit: Number.isFinite(runsLimit) ? runsLimit : 50 }),
+      ]));
+
+      const { groups, totals } = aggregateUsageGroups(dailyRows, 'model');
+      const runs = aggregateRunGroups(events);
+
+      res.json(success(config.nodeId, {
+        from, to, agent: agentGaii ?? null,
+        group_by: 'model', groups, totals, runs,
+      }));
     });
 
   // ── GET /v1/ledger/usage/capabilities ── raw events with a capabilityId, grouped by

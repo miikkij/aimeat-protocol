@@ -16,6 +16,8 @@
  *   v1.8.0 -- 2026-07-07 -- Stored Memory Keys: expanded entries whose value contains image
  *     URLs (e.g. crews.<agent>.images.* records from the image-maker crew) now render the
  *     image(s) inline as a preview above the raw value, each linking to the full-size file.
+ *   v1.9.0 -- 2026-07-16 -- Mount folds 3 reads into GET /v1/agents/:name/data-access/overview
+ *     (getDataAccessOverview; memory keys metadata-only); individual fan-out kept as fallback.
  */
 
 import { h } from 'preact';
@@ -25,7 +27,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
-import { getDirectives, upsertDirectives } from '/js/services/agent-directives.js';
+import { getDirectives, getDataAccessOverview, upsertDirectives } from '/js/services/agent-directives.js';
 import { updateMemoryFull, deleteMemory, createMemory } from '/js/services/memory.js';
 import * as skillsService from '/js/services/skills.js';
 import { useConfirm } from '/components/Modal.js';
@@ -117,18 +119,30 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
   async function loadData({ showSpinner = true } = {}) {
     if (showSpinner) setLoading(true);
     try {
-      const [dirResp, memResp, links] = await Promise.all([
-        getDirectives(agentName).catch(() => null),
-        apiGet(`/v1/memory?prefix=&per_page=100&agent=${encodeURIComponent(agent.gaii || agentName)}`).catch(() => null),
-        skillsService.getAgentSkillLinks(agentName).catch(() => []),
-      ]);
-      const data = dirResp?.data || {};
-      setMemoryAreas(data.memory_areas || []);
-      setResources(data.resources || []);
-      setSkillLinks(links);
-      const items = memResp?.data?.items || memResp?.data || [];
-      const keys = (Array.isArray(items) ? items : [])
-        .map(item => ({ key: item.key, visibility: item.visibility, version: item.version, createdAt: item.created_at ?? item.createdAt, updatedAt: item.updated_at ?? item.updatedAt }));
+      // Mount fold: ONE composite (directives memory areas + resources + agent memory metadata + skill
+      // links). On failure, fall back to the individual three-request fan-out. The composite returns
+      // memory keys already in the rendered shape (metadata only — no values loaded).
+      const ov = await getDataAccessOverview(agentName);
+      let keys;
+      if (ov) {
+        setMemoryAreas(ov.directives?.memory_areas || []);
+        setResources(ov.directives?.resources || []);
+        setSkillLinks(ov.skill_links || []);
+        keys = (ov.memory_keys || []).map(k => ({ key: k.key, visibility: k.visibility, version: k.version, createdAt: k.created_at, updatedAt: k.updated_at }));
+      } else {
+        const [dirResp, memResp, links] = await Promise.all([
+          getDirectives(agentName).catch(() => null),
+          apiGet(`/v1/memory?prefix=&per_page=100&agent=${encodeURIComponent(agent.gaii || agentName)}`).catch(() => null),
+          skillsService.getAgentSkillLinks(agentName).catch(() => []),
+        ]);
+        const data = dirResp?.data || {};
+        setMemoryAreas(data.memory_areas || []);
+        setResources(data.resources || []);
+        setSkillLinks(links);
+        const items = memResp?.data?.items || memResp?.data || [];
+        keys = (Array.isArray(items) ? items : [])
+          .map(item => ({ key: item.key, visibility: item.visibility, version: item.version, createdAt: item.created_at ?? item.createdAt, updatedAt: item.updated_at ?? item.updatedAt }));
+      }
       setMemoryKeys(keys);
 
       // If the user has a memory entry expanded, re-fetch its value too so

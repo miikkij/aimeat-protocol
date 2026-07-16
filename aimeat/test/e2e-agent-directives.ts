@@ -225,6 +225,54 @@ await test('5. System rules appear in merged view', async () => {
     assert(firstOwnerIndex < firstAgentIndex, `owner rules (${firstOwnerIndex}) should come before agent rules (${firstAgentIndex})`);
 });
 
+// ─── Phase 2b: Data Access subtab composite (mount fold) ───
+console.log('\nPhase 2b -- GET /data-access/overview composite');
+
+await test('5b. GET /data-access/overview folds directives + memory keys (meta) + skill links', async () => {
+    // Write an agent-scoped memory key so memory_keys has content; the composite returns metadata only.
+    const wr = await json('/v1/memory', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ key: 'dataaccess.probe', value: { hello: 'world' }, visibility: 'private' }),
+    });
+    assert(wr.status === 200 || wr.status === 201, `write agent memory ${wr.status}: ${JSON.stringify(wr.body)}`);
+
+    const { status, body } = await json(`/v1/agents/${agentName}/data-access/overview`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'response ok');
+    const d = body.data;
+
+    // directives: the agent's 2 memory_areas (first key_prefix 'research.') + 1 resource, matching GET /directives
+    assert(Array.isArray(d.directives.memory_areas) && d.directives.memory_areas.length === 2, `memory_areas 2, got ${d.directives.memory_areas?.length}`);
+    assert(d.directives.memory_areas[0].key_prefix === 'research.', `first prefix research., got ${d.directives.memory_areas[0].key_prefix}`);
+    assert(Array.isArray(d.directives.resources) && d.directives.resources.length === 1, `resources 1, got ${d.directives.resources?.length}`);
+
+    // memory_keys: metadata only — our probe key present with metadata, NO value leaked
+    const probe = (d.memory_keys || []).find((k: any) => k.key === 'dataaccess.probe');
+    assert(probe, 'probe key present in memory_keys');
+    assert(typeof probe.visibility === 'string' && typeof probe.version === 'number', 'probe carries metadata');
+    assert(!('value' in probe), 'memory_keys must NOT leak the value');
+
+    // skill_links: array (none linked for this agent)
+    assert(Array.isArray(d.skill_links), 'skill_links is an array');
+});
+
+await test('5c. data-access/overview owner-or-self: a sibling agent gets 403', async () => {
+    const { status: rStatus, body: rBody } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'dabot2', owner: ownerName, capabilities: ['memory'] }),
+    });
+    assert(rStatus === 201, `register agent2 ${rStatus}: ${JSON.stringify(rBody)}`);
+    const a2Token = await getToken(rBody.data.agent.gaii, rBody.data.private_key, true);
+    const { status } = await json(`/v1/agents/${agentName}/data-access/overview`, {
+        headers: { Authorization: `Bearer ${a2Token}` },
+    });
+    assert(status === 403, `sibling agent should get 403, got ${status}`);
+});
+
 await test('6. Update agent directives', async () => {
     const { status, body } = await json(`/v1/agents/${agentName}/directives`, {
         method: 'PUT',

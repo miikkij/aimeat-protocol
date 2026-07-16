@@ -194,6 +194,39 @@ await test('8. runs grouped by run_id; run-alpha holds sonnet+opus', async () =>
     assert(beta && beta.unpriced_calls === 1, `run-beta unpriced: ${JSON.stringify(beta)}`);
 });
 
+// ─── Phase 3b: Usage subtab composite (mount fold) ───
+console.log('\nPhase 3b -- /v1/ledger/usage/overview composite');
+
+await test('8b. /usage/overview == GET /usage?group_by=model (totals+groups) + GET /usage/runs (runs)', async () => {
+    const { status, body } = await json(`/v1/ledger/usage/overview?agent=${encodeURIComponent(a.agentGaii)}`, {
+        headers: { Authorization: `Bearer ${a.ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const d = body.data;
+    assert(d.group_by === 'model', `group_by should be model, got ${d.group_by}`);
+
+    const usage = await json(`/v1/ledger/usage?agent=${encodeURIComponent(a.agentGaii)}&group_by=model`, {
+        headers: { Authorization: `Bearer ${a.ownerToken}` },
+    });
+    assert(JSON.stringify(d.totals) === JSON.stringify(usage.body.data.totals), 'totals match /usage?group_by=model');
+    assert(JSON.stringify(d.groups) === JSON.stringify(usage.body.data.groups), 'groups match /usage?group_by=model');
+
+    const runs = await json(`/v1/ledger/usage/runs?agent=${encodeURIComponent(a.agentGaii)}&limit=50`, {
+        headers: { Authorization: `Bearer ${a.ownerToken}` },
+    });
+    assert(JSON.stringify(d.runs) === JSON.stringify(runs.body.data.runs), 'runs match /usage/runs');
+});
+
+await test('8c. usage/overview cross-owner isolation: a different owner sees ZERO', async () => {
+    const b = await registerOwnerAndAgent('ledgerother2');
+    const { status, body } = await json('/v1/ledger/usage/overview', {
+        headers: { Authorization: `Bearer ${b.ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    assert(body.data.totals.calls === 0, `cross-owner leak: calls=${body.data.totals.calls}`);
+    assert(body.data.groups.length === 0 && body.data.runs.length === 0, `cross-owner leak: ${body.data.groups.length} groups / ${body.data.runs.length} runs`);
+});
+
 // ─── Phase 4: Owner isolation + auth ───
 console.log('\nPhase 4 -- Owner isolation & auth gating');
 

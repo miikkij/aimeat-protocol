@@ -8,7 +8,10 @@
  *   - DELETE /v1/agents/:name/webhook       -- Remove webhook
  *   - POST   /v1/agents/:name/webhook/test  -- Send a test event to the webhook
  *   - GET    /v1/agents/:name/webhook/log   -- Get delivery log
+ *   - GET    /v1/agents/:name/integration/overview -- Integration subtab composite (webhook + delivery log + onboarding checklist)
  * @version-history
+ *   v1.1.0 -- 2026-07-16 -- Add GET /integration/overview composite folding the Integration subtab's
+ *     webhook + delivery-log + onboarding-checklist mount reads (skill-bundle/version stays separate).
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Dashboard webhook management
  */
 
@@ -22,6 +25,7 @@ import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
 import { validateOutboundUrl, safeFetch } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
+import { createAgentIntegrationOverviewService } from '../services/db/agent-integration-overview-db-service.js';
 
 /* ── Zod validation schema ── */
 const WebhookPutSchema = z.object({
@@ -31,6 +35,7 @@ const WebhookPutSchema = z.object({
 
 export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  const integrationDb = createAgentIntegrationOverviewService(storage);
 
   /** Build GAII for the named agent under the authenticated owner */
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
@@ -48,6 +53,30 @@ export function agentWebhookRouter(config: AimeatConfig, storage: Storage): Rout
     }
     return false;
   }
+
+  /* ── GET /v1/agents/:name/integration/overview -- Integration subtab composite (mount fold) ──
+   *
+   * The whole Integration subtab mount in ONE call: webhook config + delivery log + post-onboarding
+   * checklist. Folds three of the four reads the subtab fired in parallel; the fourth,
+   * skill-bundle/version, stays a separate request (it runs the bundle-generation pipeline, not a read).
+   * Each sub-object mirrors the exact `.data` of the endpoint it replaces. Owner-or-self via
+   * canAccessAgent, identical to the folded /webhook, /webhook/log gates.
+   */
+  router.get('/v1/agents/:name/integration/overview', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+    if (!canAccessAgent(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+    const agentGaii = resolveAgentGaii(req, agentName);
+    const agent = await storage.getAgent(agentGaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      return;
+    }
+    const data = await integrationDb.overview(agentGaii, agent, agentName);
+    res.json(success(config.nodeId, data));
+  });
 
   /* ── PUT /v1/agents/:name/webhook -- Register or update webhook ── */
   router.put('/v1/agents/:name/webhook', requireAuth(), async (req, res) => {

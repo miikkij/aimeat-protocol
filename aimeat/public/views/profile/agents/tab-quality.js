@@ -10,6 +10,8 @@
  * @structure default export TabQuality({ agentName })
  * @usage rendered by agent-card.js renderTabContent() for the 'quality' tab
  * @version-history
+ *   v1.4.0 -- 2026-07-16 -- Mount folds statistics + done-tasks into GET /v1/agents/:name/quality/overview
+ *     (getQualityOverview); individual statistics + done-tasks reads kept as fallback.
  *   v1.3.0 -- 2026-06-10 -- Deliverable rows show date+time (identical titles must be
  *     tellable apart) and unrated rows rate via INLINE stars (click submits immediately);
  *     the modal remains for re-rates (context/comment).
@@ -27,7 +29,7 @@ import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
-import { getAgentStatistics, listTasks, rateTask } from '/js/services/agent-tasks.js';
+import { getAgentStatistics, getQualityOverview, listTasks, rateTask } from '/js/services/agent-tasks.js';
 import RateModal from './rate-modal.js';
 
 const html = htm.bind(h);
@@ -85,12 +87,20 @@ export default function TabQuality({ agentName, showToast }) {
     // live-update refetches -- swaps in fresh data in place without flashing an
     // empty tab. A transient error keeps the last good data rather than clearing.
     try {
-      const [statsResp, tasksResp] = await Promise.all([
-        getAgentStatistics(agentName),
-        listTasks(agentName, { status: 'done', per_page: 100 }).catch(() => null),
-      ]);
-      if (statsResp?.data) setData(statsResp.data);
-      setDoneTasks(tasksResp?.data?.tasks || []);
+      // Mount fold: ONE composite (recomputed statistics + done tasks). On failure, fall back to the
+      // individual two-request fan-out.
+      const ov = await getQualityOverview(agentName);
+      if (ov) {
+        if (ov.statistics) setData(ov.statistics);
+        setDoneTasks(ov.done_tasks || []);
+      } else {
+        const [statsResp, tasksResp] = await Promise.all([
+          getAgentStatistics(agentName),
+          listTasks(agentName, { status: 'done', per_page: 100 }).catch(() => null),
+        ]);
+        if (statsResp?.data) setData(statsResp.data);
+        setDoneTasks(tasksResp?.data?.tasks || []);
+      }
     } catch { /* keep showing the last good data on a transient error */ }
     setLoading(false);
   }, [agentName]);

@@ -6,10 +6,12 @@
  * @structure
  *   - getLedgerUsage(agentName, opts)  -> GET /v1/ledger/usage  (grouped aggregates + totals)
  *   - getLedgerRuns(agentName, opts)   -> GET /v1/ledger/usage/runs  (per run_id)
+ *   - getLedgerUsageOverview(agentName) -> GET /v1/ledger/usage/overview (Usage tab mount: model groups + totals + runs)
  * @usage
  *   import { getLedgerUsage, getLedgerRuns } from '/js/services/ledger.js';
  * @version-history
  *   v1.0.0 -- 2026-07-11 -- Initial: back the agent Usage tab (first consumer of the ledger).
+ *   v1.1.0 -- 2026-07-16 -- Add getLedgerUsageOverview folding the Usage tab's two mount reads into one.
  */
 import { apiGet } from '/js/api.js';
 
@@ -40,4 +42,20 @@ export async function getLedgerRuns(agentName, { limit = 50, runId } = {}) {
   if (runId) p.set('run_id', runId);
   if (limit) p.set('limit', String(limit));
   return apiGet(`/v1/ledger/usage/runs?${p.toString()}`);
+}
+
+/**
+ * Composite mount for the Usage tab: model-grouped aggregates + grand totals + per-run rollups in ONE
+ * call (folds getLedgerUsage({groupBy:'model'}) + getLedgerRuns). Returns null on error so the caller can
+ * fall back to the individual two-request fan-out.
+ * @param {string} [agentName]
+ */
+export async function getLedgerUsageOverview(agentName, { runsLimit = 50 } = {}) {
+  const p = new URLSearchParams();
+  if (agentName) p.set('agent', agentName);
+  if (runsLimit) p.set('runs_limit', String(runsLimit));
+  try {
+    const resp = await apiGet(`/v1/ledger/usage/overview?${p.toString()}`);
+    return resp?.data ?? null;
+  } catch { return null; }
 }
