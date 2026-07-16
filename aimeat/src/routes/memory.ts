@@ -38,6 +38,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success } from '../middleware/envelope.js';
 import { createMemoryTabService } from '../services/db/memory-tab-db-service.js';
+import { createNotebookService } from '../services/db/notebook-db-service.js';
 import { createMemoryDbService } from '../services/db/index.js';
 import type { StatsCollector } from '../services/stats.js';
 import type { MemoryRouteCtx } from './memory/shared.js';
@@ -71,6 +72,16 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   router.get('/v1/memory/tab', requireAuth(), requireRole('owner'), async (req, res) => {
     const owner = req.auth!.owner as string;
     const data = await memoryTabDb.overview(owner, `${owner}@${config.nodeId}`);
+    res.json(success(config.nodeId, data));
+  });
+
+  // GET /v1/notebook — the Notebook tab mount in one call: inbox notes (server-side notebook.inbox.
+  // prefix scan) + settings + organism names (NotebookService). Owner-scope: requires 'owner' role. The
+  // individual reads stay for interactive re-fetches (post-capture, post-delete).
+  const notebookDb = createNotebookService(storage);
+  router.get('/v1/notebook', requireAuth(), requireRole('owner'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    const data = await notebookDb.overview(owner, `${owner}@${config.nodeId}`);
     res.json(success(config.nodeId, data));
   });
 

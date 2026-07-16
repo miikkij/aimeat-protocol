@@ -737,6 +737,21 @@ await test('Matches — list handler runs the batched enrichment (owner with no 
     // even with no matched profiles to enrich (empty maps → nothing to redact).
 });
 
+await test('Notebook overview composite folds inbox + settings + organisms (Phase 4 DbService)', async () => {
+    // Capture an inbox note, then confirm the composite returns it (server-side prefix scan).
+    await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: 'notebook.inbox.' + Date.now(), value: { text: 'test note' }, visibility: 'private' }),
+    });
+    const { body } = await json('/v1/notebook', { method: 'GET', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(body.ok === true, `notebook: ${JSON.stringify(body.error)}`);
+    const d = body.data;
+    assert(Array.isArray(d.inbox) && d.inbox.length >= 1, 'inbox has the captured note');
+    assert(d.inbox.every((n: any) => typeof n.key === 'string' && n.key.startsWith('notebook.inbox.')), 'inbox only has notebook.inbox. keys');
+    assert(d.settings && typeof d.settings === 'object', 'settings is an object');
+    assert(Array.isArray(d.organisms?.organisms), 'organisms is an array');
+});
+
 await test('Validate endpoint', async () => {
     const { body } = await json('/v1/validate', {
         method: 'POST',
