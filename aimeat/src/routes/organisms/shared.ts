@@ -86,16 +86,41 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     return items.find(r => r.key === key)?.value ?? null;
   };
 
-  // Append a signed-by-convention decision-log entry (the audit/Prove trail).
+  // Append a signed-by-convention decision-log entry (the audit/Prove trail), then bound the log so it
+  // can't grow without limit. Every gate action (publish/batch-publish/auto-approve/gate-approval) writes
+  // one of these `meta.decisions.<uuid>` rows; left uncapped a busy app (e.g. a CRM publishing hundreds of
+  // records a day) fills the organism owner's memory quota with immortal audit rows that a record delete
+  // never touches. We keep the most recent `organismDecisionLogCap` entries per organism (0 = unlimited).
   const writeDecision = async (organismId: string, by: string, summary: string, refs: string[]): Promise<void> => {
     const did = uuidv4();
     const now = new Date().toISOString();
+    const prefix = `organism.${organismId}.meta.decisions.`;
     await storage.setMemory({
-      key: `organism.${organismId}.meta.decisions.${did}`,
+      key: `${prefix}${did}`,
       ownerGaii: by,
       value: { ts: now, kind: 'decision', by, summary, refs },
       visibility: 'private', tags: ['gate'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });
+    await pruneDecisionLog(organismId, prefix);
+  };
+
+  // Keep the organism's gate-audit log at or below the configured cap. Cheap common case: one value-free
+  // key scan (the log is bounded, so ~cap rows). Only when over cap do we load the tiny values to order by
+  // recency and bulk-delete the oldest — pruning back below the cap by a margin so this runs about once per
+  // (cap/10) writes, not on every write once the cap is reached.
+  const pruneDecisionLog = async (organismId: string, prefix: string): Promise<void> => {
+    const cap = config.organismDecisionLogCap;
+    if (cap <= 0 || !storage.listMemoryKeysByPrefix || !storage.bulkDeleteMemory) return;
+    try {
+      const keys = await storage.listMemoryKeysByPrefix(prefix);
+      if (keys.length <= cap) return;
+      const margin = Math.max(1, Math.floor(cap / 10));
+      const target = cap - margin;                         // prune down to here
+      const { items } = await storage.listAllMemory({ prefix, limit: keys.length });
+      items.sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
+      const toRemove = items.slice(0, Math.max(0, items.length - target)).map(r => ({ ownerGaii: r.ownerGaii, key: r.key }));
+      if (toRemove.length) await storage.bulkDeleteMemory(toRemove);
+    } catch { /* best-effort: the audit write already succeeded; a prune failure must not fail the gate */ }
   };
 
   // Read the organism's runtime config entry (organism.{id}.meta.config) — UI-editable; absent = defaults.

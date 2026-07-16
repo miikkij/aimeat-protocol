@@ -176,6 +176,8 @@ export interface AimeatConfig {
   memoryQuotaMb: number;
   memoryMaxValueSizeKb: number;
   memoryMaxKeysPerAgent: number;
+  /** Max retained gate-audit (`meta.decisions.*`) entries per organism; oldest pruned on write. 0 = unlimited. */
+  organismDecisionLogCap: number;
   storageQuotaMb: number;
   storageMaxFileSizeMb: number;
   storageMaxChunkedFileSizeGb: number;
