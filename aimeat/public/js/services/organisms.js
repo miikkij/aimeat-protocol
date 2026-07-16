@@ -64,6 +64,20 @@ export async function listOrganisms(opts = {}) {
   return apiGet(`/v1/organisms?${params.toString()}`);
 }
 
+/**
+ * Composite mount for the Organisms tab: the owner's organisms (with workspace counts) + the public
+ * discovery list + saved list-order prefs in ONE call. Returns { mine, public, uiPrefs } or null on error
+ * so the caller can fall back to the individual reads.
+ */
+export async function getOrganismsTab() {
+  try {
+    const data = await apiGet('/v1/organisms/tab');
+    const d = data?.data;
+    if (!d) return null;
+    return { mine: d.mine || [], public: d.public || [], uiPrefs: d.uiPrefs ?? null };
+  } catch { return null; }
+}
+
 /** Get organism detail. */
 export async function getOrganism(id) {
   return apiGet(`/v1/organisms/${encodeURIComponent(id)}`);
