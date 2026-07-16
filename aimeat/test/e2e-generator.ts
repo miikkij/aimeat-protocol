@@ -367,6 +367,42 @@ await test('List components by prefix', async () => {
     assert(comp.value?.status === 'done', `component status: ${comp.value?.status}`);
 });
 
+// ─── Generator dashboard state composite (mount fold) ───
+console.log('\nGenerator — GET /:projectId/state composite');
+
+await test('GET /:projectId/state folds project + interview-spec + components + specs + pending-edit', async () => {
+    // Populate the remaining partitions (written by the same agent that wrote the project + component).
+    await json('/v1/memory', { method: 'POST', headers: auth(), body: JSON.stringify({ key: `generator.${projectId}.interview-spec`, value: { locale: 'en', goal: 'test' }, visibility: 'owner' }) });
+    await json('/v1/memory', { method: 'POST', headers: auth(), body: JSON.stringify({ key: `generator.${projectId}.spec.${compId}`, value: { fields: ['a', 'b'] }, visibility: 'owner' }) });
+    await json('/v1/memory', { method: 'POST', headers: auth(), body: JSON.stringify({ key: `generator.${projectId}.pending-edit`, value: { componentId: compId, draft: 'x' }, visibility: 'owner' }) });
+
+    // Composite read with the generator-scoped token; owner-scope catches data the (sibling) agent wrote.
+    const { status, body } = await json(`/v1/generator/${projectId}/state`, {
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+    });
+    assert(status === 200, `state status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'state ok');
+    const d = body.data;
+    // project (with version for optimistic-lock writes)
+    assert(d.project && d.project.key === `generator.${projectId}.project`, 'project record present');
+    assert(typeof d.project.version === 'number', 'project carries version');
+    // interview-spec + pending-edit partitions
+    assert(d.interviewSpec && d.interviewSpec.key === `generator.${projectId}.interview-spec`, 'interview-spec present');
+    assert(d.pendingEdit && d.pendingEdit.key === `generator.${projectId}.pending-edit`, 'pending-edit present');
+    // component + spec items, partitioned and disjoint
+    assert(Array.isArray(d.componentItems) && d.componentItems.some((i: any) => i.key === compKey), 'component item present');
+    assert(Array.isArray(d.specItems) && d.specItems.some((i: any) => i.key === `generator.${projectId}.spec.${compId}`), 'spec item present');
+    assert(d.componentItems.every((i: any) => i.key.startsWith(`generator.${projectId}.component.`)), 'componentItems hold only component keys');
+    assert(d.specItems.every((i: any) => i.key.startsWith(`generator.${projectId}.spec.`)), 'specItems hold only spec keys');
+});
+
+await test('GET /:projectId/state returns 404 for an unknown project', async () => {
+    const { status } = await json('/v1/generator/prj-does-not-exist-xyz/state', {
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+    });
+    assert(status === 404, `expected 404, got ${status}`);
+});
+
 // ─── Generator Task Queue ───
 console.log('\nGenerator — Task Queue');
 

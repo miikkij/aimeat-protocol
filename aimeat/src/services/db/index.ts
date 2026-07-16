@@ -38,6 +38,7 @@ export { AgentActivityOverviewService, createAgentActivityOverviewService, type 
 export { AgentDataAccessOverviewService, createAgentDataAccessOverviewService, type AgentDataAccessOverview } from './agent-data-access-overview-db-service.js';
 export { AgentIntegrationOverviewService, createAgentIntegrationOverviewService, type AgentIntegrationOverview } from './agent-integration-overview-db-service.js';
 export { AgentQualityOverviewService, createAgentQualityOverviewService, type AgentQualityOverview } from './agent-quality-overview-db-service.js';
+export { GeneratorStateService, createGeneratorStateService, type GeneratorState } from './generator-state-db-service.js';
 export { loadOwnerAgents, loadOwnerEcoApps, resolveOwnerIdentities } from './owner-identity.js';
 
 /** Assemble the memory Application-DB-Service over the given storage (Phase 0: LegacyMemoryAdapter). Its
