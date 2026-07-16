@@ -8,6 +8,10 @@
  *   v1.2.0 — 2026-05-22 — Show info message for federated users instead of infinite spinner
  *   v1.3.0 — 2026-06-02 — Component unification (#1): copy buttons use canonical
  *     <CopyButton>; delete local copyToClipboard helper + dead copied-state/handlers.
+ *   v1.4.0 — 2026-07-16 — Mount folds the tab's wallet+transactions AND MoneyActivity's checkout+orders
+ *     into ONE GET /v1/wallet/overview (WalletTabService); MoneyActivity seeds from `initial` + skips its
+ *     own mount fetch. The Enterprise PSP section keeps its own /v1/me/psp call. Falls back to the
+ *     individual endpoints if the composite is unavailable. (Phase 4 slice 3 — frontend half.)
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -77,8 +81,13 @@ function PspSection() {
 /* "Money purchases & sales" — real-money (EUR/USD) checkout activity, separate from morsels.
  * Purchases come from the buyer's checkout sessions, sales from received orders; both filtered to
  * money currencies (minor units → major). Renders nothing when there is no money activity. */
-function MoneyActivity() {
-  const [data, setData] = useState(null);
+function MoneyActivity({ initial }) {
+  // Seeded from GET /v1/wallet/overview (checkoutSessions + orders, money currencies only); else self-loads.
+  const [data, setData] = useState(() => {
+    if (!initial) return null;
+    const m = (x) => x.currency && x.currency !== 'morsel';
+    return { purchases: (initial.checkoutSessions?.sessions ?? []).filter(m), sales: (initial.orders?.orders ?? []).filter(m) };
+  });
   const load = useCallback(async () => {
     try {
       const [s, o] = await Promise.all([
@@ -91,7 +100,7 @@ function MoneyActivity() {
       setData({ purchases, sales });
     } catch { setData({ purchases: [], sales: [] }); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (!initial) load(); }, [load]);   // eslint-disable-line react-hooks/exhaustive-deps -- seed once from `initial`; fetch only when unseeded
   if (!data || (!data.purchases.length && !data.sales.length)) return null;
   const money = (amt, cur) => fmtMoney(amt, cur);
   const row = (x, isSale) => html`
@@ -115,6 +124,7 @@ export default function WalletTab({ session, showToast, onStats }) {
   const [walletData, setWalletData] = useState(null);
   const [walletTx, setWalletTx] = useState(null);
   const [expandedTx, setExpandedTx] = useState(null);
+  const [moneyInitial, setMoneyInitial] = useState(null);   // seeds MoneyActivity from the composite
 
   // Request form state
   const [reqAmount, setReqAmount] = useState('');
@@ -137,6 +147,18 @@ export default function WalletTab({ session, showToast, onStats }) {
 
   async function loadData() {
     try {
+      // Mount: ONE composite call (GET /v1/wallet/overview) seeds wallet + recent transactions AND the
+      // MoneyActivity section (checkout-sessions + orders). The Enterprise PSP section stays on its own
+      // /v1/me/psp call. Falls back to the individual wallet endpoints if the composite is unavailable.
+      const ov = await apiGet('/v1/wallet/overview').then(r => r?.data).catch(() => null);
+      if (ov?.wallet) {
+        setWalletData(ov.wallet);
+        onStats?.({ balance: ov.wallet.balance ?? '-' });
+        setWalletTx(ov.transactions?.transactions || []);
+        setMoneyInitial(ov);
+        return;
+      }
+      // Fallback — the tab's own two reads (MoneyActivity self-loads when moneyInitial stays null).
       const resp = await getWallet();
       const w = resp?.data || resp || {};
       setWalletData(w);
@@ -222,7 +244,7 @@ export default function WalletTab({ session, showToast, onStats }) {
     <${PspSection} />
 
     <!-- Real-money (EUR/USD) purchases & sales, separate from the morsel ledger -->
-    <${MoneyActivity} />
+    <${MoneyActivity} initial=${moneyInitial} />
 
     <!-- Copy balance button -->
     <div class="mb-1">
