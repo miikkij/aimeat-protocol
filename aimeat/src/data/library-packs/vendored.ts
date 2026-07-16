@@ -115,12 +115,13 @@ export const VENDORED_PACKS: LibraryPack[] = [
     ].join('\n'),
     changelog: [
       { version: '11.15.0', date: '2026-06-08', summary: 'Initial vendoring of mermaid 11.15.0 UMD at /lib/mermaid/mermaid.min.js (previously lazy-loaded only by aimeat-markdown renderRich). Promoted to a first-class pack 2026-07-16 — no API change, apps may now load it directly.' },
+      { version: '11.15.0', date: '2026-07-17', summary: 'Promoted to stable: AEB-3 run aeb3-mermaid-001 (diagram notebook task) — treatment passed 5/5 vs control 4/5 (control missed theme-following) at flat token cost, using the documented initialize/render idioms.' },
     ],
     demoTemplateId: 'comp-mermaid-diagram',
     tierHint: 'T1',
     interviewTriggers: ['diagram', 'flowchart', 'sequence', 'gantt', 'mindmap', 'kaavio', 'vuokaavio'],
     sizeEstimate: '~3.2MB',
-    status: 'preview',
+    status: 'stable',
   },
   {
     id: 'three',
@@ -203,7 +204,10 @@ export const VENDORED_PACKS: LibraryPack[] = [
     title: 'PixiJS 8 (2D WebGL)',
     description: 'PixiJS v8 (window.PIXI) self-hosted — fast WebGL/WebGPU 2D rendering: sprites, particles, filters, thousands of moving objects at 60fps.',
     url: '/lib/pixi@8.min.js',
-    include: ['<script src="{{BASE_URL}}/lib/pixi@8.min.js"></script>'],
+    include: [
+      '<script src="{{BASE_URL}}/lib/pixi@8.min.js"></script>',
+      '<script src="{{BASE_URL}}/lib/pixi-unsafe-eval@8.min.js"></script>',
+    ],
     requires: [],
     version: '8.19.0',
     majorPin: 'pixi@8',
@@ -212,6 +216,9 @@ export const VENDORED_PACKS: LibraryPack[] = [
     apiSurface: 'window.PIXI',
     aiDoc: [
       'PixiJS v8 as the window.PIXI global (self-hosted — never load pixi from a CDN).',
+      'Load BOTH files in order: pixi@8.min.js THEN pixi-unsafe-eval@8.min.js. The second is',
+      'REQUIRED: published AIMEAT apps run under a CSP without unsafe-eval, and PixiJS v8 refuses',
+      'to start without this companion ("Current environment does not allow unsafe-eval").',
       'CRITICAL — v8 API, NOT the v7 idioms you likely know:',
       '  const app = new PIXI.Application();            // no options in the constructor',
       '  await app.init({ background: "#14141c", resizeTo: container });  // async init (v8)',
@@ -226,6 +233,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
     ].join('\n'),
     changelog: [
       { version: '8.19.0', date: '2026-07-16', summary: 'Initial vendoring of pixi.js 8.19.0 at /lib/pixi@8.min.js. v8 has a breaking API vs the v7 most examples show (async app.init, app.canvas, Graphics chain, Assets.load) — the pack doc carries the v8 idioms. A future v9 ships as a NEW pixi@9.min.js.' },
+      { version: '8.19.0', date: '2026-07-17', summary: 'ADDED REQUIRED include: /lib/pixi-unsafe-eval@8.min.js (load after pixi). AEB-3 run aeb3-pixi-001 found PixiJS v8 cannot start under the published-app CSP (no unsafe-eval) without this companion — existing apps that load only pixi@8.min.js show a startup error and should add the second script tag.' },
     ],
     demoTemplateId: 'comp-pixi-stage',
     tierHint: 'T1',
