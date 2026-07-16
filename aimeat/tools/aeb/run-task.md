@@ -15,6 +15,28 @@ gated on the developer's explicit go-ahead (Rule 11)**; this file is only the pr
   prior runs. One task = one session.
 - Browser checks: Playwright MCP against the dev server.
 
+## PROTOCOL v2 (2026-07-17) — measure budget allocation, not engine capability
+
+Round 2 exposed a design flaw: the fixed tasks were SO SMALL that the engine WAS the whole
+app — a frontier model hand-rolls a working engine within one build's budget, so A ties B
+(ceiling effect) and the measurement says nothing about what packs are FOR. The product
+hypothesis is: **packs hand the commodity parts over ready-made so one build's budget goes
+into domain complexity** — business rules, multi-feature depth, the "kimurantit jutut".
+
+Corrected task design rules:
+1. The engine/visual element is a COMPONENT of the task, never the task itself.
+2. The task carries REAL business logic: rules with interactions (constraints, penalties,
+   capacities, reporting), persistence across sessions, and a cross-user feature.
+3. The functional checklist is ≥70% DOMAIN checks (rules behave correctly, report numbers
+   consistent, persistence round-trips) — engine plumbing gets at most 2–3 checks.
+4. Both arms get the identical spec and ONE shot. The verdict metric is **domain checks
+   passed at comparable budget** (tokens are recorded but secondary); plumbing-vs-domain
+   code share is noted qualitatively.
+5. B beats A when B passes MORE domain checks, or equal checks with ≥20% less budget.
+
+The single-purpose tasks below remain useful as smoke tests of a pack's ai_doc (does the AI
+load and use it correctly at all) but MUST NOT be used for stable/preview verdicts anymore.
+
 ## The A/B pair
 
 Each pack has ONE fixed task (below). Run it twice in separate fresh sessions:
