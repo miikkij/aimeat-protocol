@@ -6,6 +6,9 @@ build/
 .env.developer.override
 .env.test.*
 !.env.test.*.example
+# Local rollback snapshots of .env (contain secrets) — never commit.
+.env.*-backup
+.env.*.bak
 package-lock.json
 yarn.lock
 .DS_Store
