@@ -6,6 +6,7 @@
  * @structure deserialize helpers + message CRUD/list + contact-consent CRUD; all keyed by ownerGhii.
  * @usage import * as directMessageRepo from './repos/direct-message.js'; (wired in sqlite/index.ts)
  * @version-history
+ *   v1.2.0 -- 2026-07-16 -- Add getDirectMessagesByIds batch (Phase 3): many messages by id under one owner.
  *   v1.1.0 -- 2026-07-16 -- Add listConversationsForOwners batch (Phase 3): the conversations list for many
  *     owners in 3 window-function queries, collapsing the route's owner + per-agent fan-out.
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 1: storage).
@@ -92,6 +93,14 @@ export function createDirectMessage(db: Database.Database, record: DirectMessage
 export function getDirectMessage(db: Database.Database, id: string, ownerGhii: string): DirectMessageRecord | null {
   const row = db.prepare('SELECT * FROM direct_messages WHERE id = ? AND ownerGhii = ?').get(id, ownerGhii) as Record<string, unknown> | undefined;
   return row ? deserializeMessage(row) : null;
+}
+
+/** BULK (Phase 3) — many messages by id under one owner mailbox in ONE `IN (…)` query (sqlite `id` = mid). */
+export function getDirectMessagesByIds(db: Database.Database, ids: string[], ownerGhii: string): DirectMessageRecord[] {
+  if (ids.length === 0) return [];
+  const ph = ids.map(() => '?').join(',');
+  const rows = db.prepare(`SELECT * FROM direct_messages WHERE ownerGhii = ? AND id IN (${ph})`).all(ownerGhii, ...ids) as Record<string, unknown>[];
+  return rows.map(deserializeMessage);
 }
 
 export function listInbox(

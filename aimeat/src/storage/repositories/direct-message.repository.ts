@@ -5,6 +5,7 @@
  * @structure DirectMessageRepository — message + contact-consent methods, mirrored across SQLite + Mongo.
  * @usage import type { DirectMessageRepository } from '../interface.js'; (composed into Storage)
  * @version-history
+ *   v1.2.0 -- 2026-07-16 -- Add getDirectMessagesByIds batch (Phase 3): many messages by id under one owner.
  *   v1.1.0 -- 2026-07-16 -- Add ConversationSummary type + listConversationsForOwners batch (Phase 3 fan-out→IN).
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 1: storage).
  */
@@ -28,6 +29,12 @@ export interface DirectMessageRepository {
   // ── Messages ──
   createDirectMessage(record: DirectMessageRecord): Promise<DirectMessageRecord>;
   getDirectMessage(id: string, ownerGhii: string): Promise<DirectMessageRecord | null>;
+  /**
+   * BULK PRIMITIVE (Phase 3) — many messages by id under ONE owner mailbox in one `IN (…)` query. Backs
+   * the pending first-contact requests list (was getDirectMessage per pending contact). Returns the rows
+   * that exist; the caller indexes by `record.id` (the message id). Optional — falls back to a per-id loop.
+   */
+  getDirectMessagesByIds?(ids: string[], ownerGhii: string): Promise<DirectMessageRecord[]>;
   /** List a mailbox's inbound messages, newest first; returns total + unread count. */
   listInbox(ownerGhii: string, opts?: {
     unreadOnly?: boolean;
