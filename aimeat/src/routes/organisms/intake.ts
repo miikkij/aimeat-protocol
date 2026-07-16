@@ -18,6 +18,8 @@
  *   POST   /v1/intake/:org/:ws/:formId   (PUBLIC, no-auth, rate-limited) — submit → one validated record
  * @version-history
  *   v1.0.0 — 2026-07-16 — Initial: generic Public Intake capability (forms CRUD + anon submit).
+ *   v1.1.0 — 2026-07-16 — Server-computed default tokens ({{now}}/{{today}}/{{uuid}}) resolved per
+ *     submission, so a form can stamp a schema-required created-at/id without the node knowing field names.
  */
 import type { Router, Request, Response } from 'express';
 import { randomUUID, randomBytes } from 'node:crypto';
@@ -44,6 +46,22 @@ interface IntakeFormConfig {
 const FORM_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/; // human slug rules (a token uses the frm_ prefix, also matches)
 const MAX_BODY_FIELDS = 60;
 const MAX_VALUE_LEN = 8000;
+
+/** Interpolate server-computed tokens in a form's `defaults` at submission time, so a form can stamp a
+ *  created-at / id per submission without the node knowing any field names: `{{now}}` → ISO timestamp,
+ *  `{{today}}` → YYYY-MM-DD, `{{uuid}}` → a fresh uuid. Generic — feedback / quiz / RSVP forms use it too. */
+function resolveDefaultTokens(defaults: Record<string, unknown>): Record<string, unknown> {
+  const now = new Date();
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(defaults)) {
+    const v = defaults[k];
+    if (v === '{{now}}') out[k] = now.toISOString();
+    else if (v === '{{today}}') out[k] = now.toISOString().slice(0, 10);
+    else if (v === '{{uuid}}') out[k] = randomUUID();
+    else out[k] = v;
+  }
+  return out;
+}
 
 export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { memberRole, findWsEntry, bareOwner, readConfig, publishDraftsBatch } = H;
@@ -185,8 +203,9 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
       }
       if (Object.keys(body).length > MAX_BODY_FIELDS) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Too many fields')); return; }
 
-      // Build the record from the ALLOW-LIST only (defaults first, then permitted submitter values).
-      const record: Record<string, unknown> = { ...cfg.defaults };
+      // Build the record from the ALLOW-LIST only (defaults first — with server tokens resolved — then
+      // the permitted submitter values).
+      const record: Record<string, unknown> = { ...resolveDefaultTokens(cfg.defaults) };
       for (const f of cfg.allowedFields) {
         if (Object.prototype.hasOwnProperty.call(body, f) && body[f] != null) {
           const val = body[f];
