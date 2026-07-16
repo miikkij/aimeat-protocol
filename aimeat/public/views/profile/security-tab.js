@@ -2,6 +2,8 @@
  * @file security-tab.js
  * @description Profile tab for CORS origin management (GHII + per-agent) and session revocation.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Mount folds GHII CORS + per-agent CORS + sessions into GET /v1/security/overview
+ *     (getSecurityOverview) — kills the CORS-per-agent fan-out; individual reads kept as fallback.
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes (card-h3, flex-between, etc.)
  */
 import { h } from 'preact';
@@ -28,13 +30,21 @@ export default function SecurityTab({ session, showToast }) {
   const loadData = useCallback(async () => {
     setLoading(true);
     try {
-      const [agents, sessionsList] = await Promise.all([
-        listAgents(session.owner),
-        securityService.listSessions(),
-      ]);
-      const result = await securityService.loadAll(agents);
-      setSecurityData(result);
-      setSessions(sessionsList);
+      // Mount fold: ONE composite (GHII CORS + per-agent CORS resolved server-side + sessions). On failure,
+      // fall back to listAgents + the per-agent CORS fan-out + listSessions.
+      const ov = await securityService.getSecurityOverview();
+      if (ov) {
+        setSecurityData({ ghii: ov.ghii, agents: ov.agents });
+        setSessions(ov.sessions);
+      } else {
+        const [agents, sessionsList] = await Promise.all([
+          listAgents(session.owner),
+          securityService.listSessions(),
+        ]);
+        const result = await securityService.loadAll(agents);
+        setSecurityData(result);
+        setSessions(sessionsList);
+      }
     } catch { setSecurityData({ ghii: {}, agents: [] }); }
     setLoading(false);
   }, [session]);
