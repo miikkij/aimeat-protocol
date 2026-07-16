@@ -5,6 +5,7 @@
  *   satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — clone + export manifest lookups batch the per-identity scan (listMemoryForOwners)
  */
 import type { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -159,19 +160,11 @@ export function registerSharingRoutes(
 
     const sourceManifestKey = `packages/${sourcePackageId}/manifest`;
 
-    // Find the source manifest (search across all agents for public memory)
+    // Find the source manifest across all agents in ONE IN query (was getMemory per agent).
     const allAgents = await storage.listAgents();
-    let sourceManifest: MemoryRecord | null = null;
-    let sourceOwnerGaii = '';
-
-    for (const agent of allAgents) {
-      const mem = await storage.getMemory(agent.gaii, sourceManifestKey);
-      if (mem && mem.visibility === 'public') {
-        sourceManifest = mem;
-        sourceOwnerGaii = agent.gaii;
-        break;
-      }
-    }
+    const rows = await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: sourceManifestKey, visibility: 'public' });
+    const sourceManifest: MemoryRecord | null = rows.find(r => r.key === sourceManifestKey) ?? null;
+    const sourceOwnerGaii = sourceManifest?.ownerGaii ?? '';
 
     if (!sourceManifest || !sourceManifest.value) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Source package not found or not public'));
@@ -281,31 +274,19 @@ export function registerSharingRoutes(
       ? (req.query.entries as string).split(',').map(e => e.trim())
       : null;
 
-    // Find public manifest — check owners (GHIIs) first, then agents
-    let sourceManifest: MemoryRecord | null = null;
-    let sourceOwnerGaii = '';
-
+    // Find public manifest — one IN query over all owner GHIIs, then (only if none) one over all
+    // agents. Owners keep priority. (Was listMemory per owner AND getMemory per agent = node-scan.)
     const allOwners = await storage.listOwners();
-    for (const owner of allOwners) {
-      const ghii = `${owner.name}@${config.nodeId}`;
-      const hits = await storage.listMemory(ghii, { prefix: manifestKey, visibility: 'public' });
-      if (hits.length > 0) {
-        sourceManifest = hits[0];
-        sourceOwnerGaii = ghii;
-        break;
-      }
-    }
+    const ownerRows = await storage.listMemoryForOwners(
+      allOwners.map(o => `${o.name}@${config.nodeId}`), { prefix: manifestKey, visibility: 'public' },
+    );
+    let sourceManifest: MemoryRecord | null = ownerRows.find(r => r.key === manifestKey) ?? null;
     if (!sourceManifest) {
       const allAgents = await storage.listAgents();
-      for (const agent of allAgents) {
-        const mem = await storage.getMemory(agent.gaii, manifestKey);
-        if (mem && mem.visibility === 'public') {
-          sourceManifest = mem;
-          sourceOwnerGaii = agent.gaii;
-          break;
-        }
-      }
+      const agentRows = await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey, visibility: 'public' });
+      sourceManifest = agentRows.find(r => r.key === manifestKey) ?? null;
     }
+    const sourceOwnerGaii = sourceManifest?.ownerGaii ?? '';
 
     if (!sourceManifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found or not public'));
