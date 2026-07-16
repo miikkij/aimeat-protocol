@@ -7,6 +7,7 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add getMemoryByKeysAnyOwner (Phase 2 N×M): many keys across ALL owners in one query.
  *   v1.0.0 — 2026-07-15 — Phase 5: memory domain on Postgres+Kysely.
  */
 import { sql } from 'kysely';
@@ -134,6 +135,15 @@ export const memoryMethods = {
   async getMemoryByKeys(this: PostgresKyselyStorage, ownerGaii: string, keys: string[]): Promise<MemoryRecord[]> {
     if (keys.length === 0) return [];
     const rows = await this.db.selectFrom('Memory').selectAll().where('ownerGaii', '=', ownerGaii).where('key', 'in', keys).execute();
+    return rows.filter(isLive).map(rowToRecord);
+  },
+
+  // BULK PRIMITIVE (Phase 2) — many keys across ALL owners in ONE `key IN (…)` query (no owner filter).
+  // Live rows only. Backs the organism discovery list's batched workspace-manifest read (N canReadWs
+  // manifest scans → 1). A key forked across owners returns >1 row; the caller dedupes.
+  async getMemoryByKeysAnyOwner(this: PostgresKyselyStorage, keys: string[]): Promise<MemoryRecord[]> {
+    if (keys.length === 0) return [];
+    const rows = await this.db.selectFrom('Memory').selectAll().where('key', 'in', keys).execute();
     return rows.filter(isLive).map(rowToRecord);
   },
 

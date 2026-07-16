@@ -7,6 +7,8 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  *   v1.1.0 — 2026-07-15 — Discovery list marks a workspace 'granted' for org managers (creator/admin),
  *     matching their automatic read access (isOrgManager).
+ *   v1.2.0 — 2026-07-16 — Discovery access-probe batches every workspace-manifest read into ONE cross-owner
+ *     key-IN query (readWsManifests + canReadWsManifest) instead of one canReadWs scan per workspace (N×M).
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -32,7 +34,7 @@ import type { OrganismHelpers } from './shared.js';
 
 export function registerOrganismWorkspaceAccessRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
-    memberRole, wsRegPrefix, bareOwner, canReadWs, findWsEntry, ensureConsent,
+    memberRole, wsRegPrefix, bareOwner, canReadWsManifest, readWsManifests, findWsEntry, ensureConsent,
     memberRolesForWs, setWorkspaceRole, revokeWorkspaceRole,
     requireWsManager, requireOrgAdmin, requireOrgMember, codeInviteGuards,
   } = H;
@@ -58,10 +60,23 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       for (const w of list) {
         if (!w.id || seen.has(w.id)) continue;
         const createdBy = w.createdBy ?? bareOwner(rec.ownerGaii);
-        let access: 'owner' | 'granted' | 'none' = 'none';
-        if (createdBy === ownerName) access = 'owner';
-        else if (manager || await canReadWs(id, w.id, callerGaii)) access = 'granted';
-        seen.set(w.id, { id: w.id, name: w.name ?? w.id, created_by: createdBy, created_at: w.createdAt, access, archived: w.archived === true });
+        // access resolved in a second pass: owner rows are known now; the rest need a manifest probe,
+        // batched into ONE cross-owner read below instead of one canReadWs scan per workspace.
+        seen.set(w.id, { id: w.id, name: w.name ?? w.id, created_by: createdBy, created_at: w.createdAt, access: createdBy === ownerName ? 'owner' : 'none', archived: w.archived === true });
+      }
+    }
+    // Non-owner workspaces: a manager reads all (→ 'granted'); everyone else gets a real read-authz probe.
+    // Batch the probes' manifest reads into ONE key-IN query, then decide each from its pre-fetched
+    // manifest (authorizeRead/eco checks unchanged — identical semantics to per-ws canReadWs).
+    const toProbe = manager ? [] : [...seen.values()].filter(w => w.access === 'none').map(w => w.id);
+    if (manager) {
+      for (const w of seen.values()) if (w.access === 'none') w.access = 'granted';
+    } else if (toProbe.length) {
+      const manifests = await readWsManifests(id, toProbe);
+      for (const wsId of toProbe) {
+        if (await canReadWsManifest(callerGaii, `organism.${id}.w.${wsId}.meta.manifest`, manifests.get(wsId) ?? null)) {
+          seen.get(wsId)!.access = 'granted';
+        }
       }
     }
 
