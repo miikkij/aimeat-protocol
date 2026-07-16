@@ -35,6 +35,7 @@
     "test": "cd aimeat && pnpm test",
     "test:unit": "cd aimeat && pnpm test",
     "test:e2e": "cd aimeat && node --import tsx test/run-e2e-ci.ts",
+    "test:e2e:postgres-kysely": "cd aimeat && pnpm test:e2e:postgres-kysely",
     "test:e2e:sqlite": "cd aimeat && pnpm test:e2e:sqlite",
     "test:e2e:mongodb": "cd aimeat && pnpm test:e2e:mongodb",
     "test:e2e:postgresql": "cd aimeat && pnpm test:e2e:postgresql",

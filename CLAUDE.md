@@ -6,7 +6,12 @@ These rules MUST be followed at all times. They override any conflicting default
 
 ### Rule 1: E2E Tests Must Pass After Major Changes
 
-**Valid backends: SQLite, MongoDB, and PostgreSQL** (all persistent; SQLite = better-sqlite3, MongoDB + PostgreSQL = Prisma). The in-memory backend (`pnpm test:e2e`, `pnpm test:e2e:memory`) is deprecated — do not use it for verification or report its failures.
+**Backend priority (post Phase 5 — the Postgres+Kysely cutover; prod runs Kysely):**
+- **PostgreSQL + Kysely** — `postgres-kysely` (`.env.test.postgres-kysely`, `src/storage/providers/postgres-kysely/`, SQL migrations run on boot; **no Prisma at runtime**). **THE primary production backend. It MUST always pass** — every change verifies here.
+- **SQLite** — better-sqlite3 (`.env.test.sqlite`, `src/storage/providers/sqlite/`). **Important**: the fast local-iteration backend and a first-class supported target. **It MUST always pass.**
+- **MongoDB** — Prisma (`.env.test.mongodb`, `src/storage/providers/mongodb/`). **DEPRECATED — being removed before AIMEAT v2.0** (it's only a drag now). Keep it compiling when you touch the shared Prisma path, but do **not** gate work on it and do **not** invest in it; treat its failures as informational, not blocking. The old **Prisma-based `postgres`** provider (`.env.test.postgres`, `schema.postgres.prisma`, `src/storage/providers/postgres/`) is likewise **legacy** — the Kysely backend supersedes it; don't confuse the two.
+
+The in-memory backend (`pnpm test:e2e`, `pnpm test:e2e:memory`) is deprecated — do not use it for verification or report its failures.
 
 1. **Run only the suites your change can plausibly affect**, not the whole sweep. Filter runner (must `cd aimeat` first — relative paths):
    ```bash
@@ -14,7 +19,7 @@ These rules MUST be followed at all times. They override any conflicting default
    pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding [--test=...]
    ```
    For CLI-only changes (`src/cli/`), server suites don't exercise CLI code — say so instead of running them to fill a report.
-2. **End of a multi-step plan: full sweep on the two primary persistent backends** (from root): `pnpm test:e2e:sqlite` then `pnpm test:e2e:mongodb`. PostgreSQL is a sibling Prisma backend with its own suite (`pnpm test:e2e:postgresql`, or `pnpm test:e2e:all-backends` for all three) — run it too when your change touches the Prisma schema / PG-specific storage (`schema.postgres.prisma`, `src/storage/providers/postgres/`).
+2. **End of a multi-step plan: full sweep on the two primary backends** — **PostgreSQL+Kysely and SQLite, both must be green**: `pnpm test:e2e:postgres-kysely` and `pnpm test:e2e:sqlite` (both proxied from root; the Kysely suite wants a fresh schema — recreate the `postgres-kysely` test DB before a full run). **MongoDB is deprecating** (removed before v2.0): run `pnpm test:e2e:mongodb` ONLY when your change touches the shared Prisma path (`schema.prisma`), and treat any failures as informational, not blocking. (`pnpm test:e2e:postgresql` = the legacy Prisma-PG suite; not the primary.)
 3. **Target: 0 failures in suites you ran.** Failure in an area you touched → not done, fix it. Failure in an unrelated suite → confirm it pre-exists on `main` (check `git status`/`git log -1`); mention but don't "fix" it. Ambiguous → ask.
 4. **New features must include E2E tests** (happy path + at least one failure mode).
 5. **Never claim work is done without running tests.** Evidence before assertions.
@@ -208,11 +213,12 @@ pnpm typecheck           # tsc --noEmit (backend: src/, bin/, scripts/)
 pnpm typecheck:frontend  # tsc --noEmit -p tsconfig.frontend.json (checkJs over public/)
 pnpm check:importmap     # verify spa.html importmap ↔ absolute /js|/components|/views imports
 pnpm lint                # eslint src/ public/
-pnpm test:e2e:sqlite     # E2E, SQLite (fast iteration, default)
-pnpm test:e2e:mongodb    # E2E, MongoDB (run before end-of-plan)
+pnpm test:e2e:postgres-kysely  # E2E, PostgreSQL+Kysely (PRIMARY / prod backend — must pass)
+pnpm test:e2e:sqlite     # E2E, SQLite (fast local iteration — must pass)
+pnpm test:e2e:mongodb    # E2E, MongoDB (DEPRECATED, removed before v2.0 — only if touching Prisma path)
 pnpm build && pnpm start
+pnpm start -- --db postgres-kysely --db-url postgresql://localhost:5432/aimeat
 pnpm start -- --db sqlite --db-path ./data/aimeat.db
-pnpm start -- --db mongodb --db-url mongodb://localhost:27017/aimeat
 ```
 
 Single suite (preferred during iteration): `cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding`. Memory-backend test commands are **deprecated** — don't use them.
@@ -231,7 +237,7 @@ res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Resource not found'));
 
 **Route registration** — routers follow `export function myRouter(config, storage): Router { ... }`, mounted via `app.use(myRouter(config, storage))` in `mountRoutes()` (`src/server-bootstrap/routes-loader.ts`).
 
-**Storage** — all access through the `Storage` interface (`src/storage/interface.ts`); **three supported backends**: SQLite (better-sqlite3), MongoDB (Prisma), PostgreSQL (Prisma, `schema.postgres.prisma` + `src/storage/providers/postgres/`). New data types/fields must update ALL backends (incl. both Prisma schemas) — see `docs/coding-guidelines/storage-sync.md`.
+**Storage** — all access through the `Storage` interface (`src/storage/interface.ts`); **four provider dirs**, in priority order: **`postgres-kysely`** (pg + Kysely, SQL migrations in `providers/postgres-kysely/migrations/*.sql` run on boot — **the primary prod backend, no Prisma**), **`sqlite`** (better-sqlite3 — first-class), **`mongodb`** (Prisma — **deprecating, out before v2.0**), and the legacy Prisma **`postgres`** (`schema.postgres.prisma` — superseded by Kysely). New data types/fields must be added to **postgres-kysely + sqlite first** (they must always pass), then the Prisma path (`schema.prisma` mongo + `schema.postgres.prisma`) only while those legacy backends still exist — see `docs/coding-guidelines/storage-sync.md`. Providers share code by prototype-merge (`Object.assign`); `postgres` (Prisma) extends the mongodb `PrismaStorage`, discriminated by `this.backendKind()`.
 
 **Imports** — always use `.js` extensions (ESM): `import { foo } from '../services/foo.js';`
 
