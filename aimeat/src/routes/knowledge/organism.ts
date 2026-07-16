@@ -5,6 +5,7 @@
  *   Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — organism-packages + reputation batch the per-agent scans (listConsentsForAgents / listMemoryForOwners)
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -101,12 +102,16 @@ export function registerOrganismRoutes(
       return;
     }
 
-    // Find consents granted to this organism for package data
+    // Find consents granted to this organism for package data — one IN query for every agent's
+    // consents (was listConsents PER agent = O(agents) node-scan).
     const allAgents = await storage.listAgents();
+    const consentsByAgent = await storage.listConsentsForAgents(
+      allAgents.map(a => a.gaii), { recipient: `organism.${organismId}`, status: 'active' },
+    );
     const packages: Array<{ key: string; manifest: unknown; ownerGaii: string; contributed_at: string }> = [];
 
     for (const agent of allAgents) {
-      const consents = await storage.listConsents(agent.gaii, { recipient: `organism.${organismId}`, status: 'active' });
+      const consents = consentsByAgent[agent.gaii] ?? [];
       for (const consent of consents) {
         if (consent.dataPattern.startsWith('packages/') && consent.dataPattern.endsWith('/*')) {
           const prefix = consent.dataPattern.replace('/*', '/manifest');
@@ -131,14 +136,10 @@ export function registerOrganismRoutes(
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 
-    // Find the manifest
+    // Find the manifest across all agents in ONE IN query (was getMemory per agent = node-scan).
     const allAgents = await storage.listAgents();
-    let manifest: MemoryRecord | null = null;
-
-    for (const agent of allAgents) {
-      const mem = await storage.getMemory(agent.gaii, manifestKey);
-      if (mem) { manifest = mem; break; }
-    }
+    const rows = await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey });
+    const manifest: MemoryRecord | null = rows.find(r => r.key === manifestKey) ?? null;
 
     if (!manifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));
