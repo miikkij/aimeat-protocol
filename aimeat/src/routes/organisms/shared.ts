@@ -6,6 +6,8 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.3.0 — 2026-07-16 — workspaceNamesByOrg (id→name registry map per org, same batched read) for the
+ *     /waiting aggregate (Phase 3).
  *   v1.2.0 — 2026-07-16 — workspaceCountsByOrg batches the ?include=counts list view's per-organism
  *     registry scan into ONE cross-owner key-IN read (Phase 3).
  *   v1.1.0 — 2026-07-16 — canReadWs split into pure canReadWsManifest + a scan; readWsManifests batches
@@ -455,6 +457,28 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     return counts;
   };
 
+  /** workspace-id → name map per organism, batched with the SAME ONE cross-owner key-IN registry read as
+   *  {@link workspaceCountsByOrg}. Backs the "Waiting for you" aggregate's ws-name lookup (was a registry
+   *  scan per organism-with-approvals). Returns orgId → Map(wsId → name); an org with no registry is absent. */
+  const workspaceNamesByOrg = async (orgIds: string[]): Promise<Map<string, Map<string, string>>> => {
+    const out = new Map<string, Map<string, string>>();
+    if (orgIds.length === 0) return out;
+    const keyToOrg = new Map(orgIds.map(id => [wsRegPrefix(id), id]));
+    const recs: MemoryRecord[] = storage.getMemoryByKeysAnyOwner
+      ? await storage.getMemoryByKeysAnyOwner([...keyToOrg.keys()])
+      : (await Promise.all(orgIds.map(id => storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 }).then(r => r.items)))).flat();
+    for (const rec of recs) {
+      const orgId = keyToOrg.get(rec.key);   // exact-key match
+      if (!orgId) continue;
+      let names = out.get(orgId);
+      if (!names) { names = new Map<string, string>(); out.set(orgId, names); }
+      for (const w of ((rec.value as { workspaces?: Array<{ id?: string; name?: string }> } | null)?.workspaces ?? [])) {
+        if (w.id && !names.has(w.id)) names.set(w.id, w.name ?? w.id);
+      }
+    }
+    return out;
+  };
+
   /** Create a consent grant if an equivalent active one doesn't already exist (idempotent). */
   const ensureConsent = async (ownerGaii: string, dataPattern: string, recipient: string, purpose: string): Promise<void> => {
     const existing = await storage.listConsents(ownerGaii, { status: 'active' });
@@ -662,7 +686,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
 
   return {
     memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft,
-    wsRegPrefix, bareOwner, findWsEntry, canReadWs, canReadWsManifest, readWsManifests, workspaceCountsByOrg, ensureConsent,
+    wsRegPrefix, bareOwner, findWsEntry, canReadWs, canReadWsManifest, readWsManifests, workspaceCountsByOrg, workspaceNamesByOrg, ensureConsent,
     setWorkspaceRole, revokeWorkspaceRole, memberRolesForWs,
     readShareMeta, redactShare, shareGateDenied, isDocPublic, readWsManifestValue, collectPublicDocs, docsToMarkdown,
     requireWsManager, requireOrgAdmin, codeInviteGuards, requireOrgMember, toAgentGaii,

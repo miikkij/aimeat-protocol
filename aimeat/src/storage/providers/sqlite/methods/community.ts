@@ -2,6 +2,8 @@
  * @file src/storage/providers/sqlite/methods/community.ts
  * @description Membership, Join-request, Approval, Appeal, Marketplace, Push, Issuer, Nonce, Genesis-peer, Reputation, Realtime-room methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add listPendingApprovalsForOrgs batch (Phase 3): pending approvals for many orgs
+ *     in one organismId-IN query.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
 import type {
@@ -164,6 +166,20 @@ export const communityMethods = {
     sql += ' ORDER BY createdAt DESC';
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     return rows.map(r => this.deserializePendingApproval(r));
+  },
+
+  // BULK (Phase 3) — pending approvals for MANY organisms in ONE `organismId IN (…)` query, grouped by org.
+  async listPendingApprovalsForOrgs(this: SqliteStorage, organismIds: string[], opts?: { status?: string }): Promise<Record<string, PendingApprovalRecord[]>> {
+    if (organismIds.length === 0) return {};
+    const ph = organismIds.map(() => '?').join(',');
+    let sql = `SELECT * FROM pending_approvals WHERE organismId IN (${ph})`;
+    const params: unknown[] = [...organismIds];
+    if (opts?.status) { sql += ' AND status = ?'; params.push(opts.status); }
+    sql += ' ORDER BY createdAt DESC';
+    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    const out: Record<string, PendingApprovalRecord[]> = {};
+    for (const r of rows) { const rec = this.deserializePendingApproval(r); (out[rec.organismId] ??= []).push(rec); }
+    return out;
   },
 
   async updatePendingApproval(this: SqliteStorage, id: string, updates: Partial<PendingApprovalRecord>): Promise<PendingApprovalRecord | null> {

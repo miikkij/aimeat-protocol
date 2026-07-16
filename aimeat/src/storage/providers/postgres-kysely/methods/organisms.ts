@@ -5,6 +5,8 @@
  *   from the Prisma implementation against the same tables. deleteOrganism cascades to memberships /
  *   join-requests / reputation / board rows / all `organism.{id}.*` memory + versions + schema locks.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add listPendingApprovalsForOrgs batch (Phase 3): pending approvals for many orgs
+ *     in one organismId-IN query.
  *   v1.0.0 — 2026-07-15 — Phase 5: organism governance on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -191,6 +193,15 @@ export const organismMethods = {
     let q = this.db.selectFrom('PendingApproval').selectAll().where('organismId', '=', organismId);
     if (opts?.status) q = q.where('status', '=', opts.status);
     return (await q.orderBy('createdAt', 'desc').execute()).map(toApproval);
+  },
+  // BULK (Phase 3) — pending approvals for MANY organisms in ONE `organismId IN (…)` query, grouped by org.
+  async listPendingApprovalsForOrgs(this: PostgresKyselyStorage, organismIds: string[], opts?: { status?: string }): Promise<Record<string, PendingApprovalRecord[]>> {
+    if (organismIds.length === 0) return {};
+    let q = this.db.selectFrom('PendingApproval').selectAll().where('organismId', 'in', organismIds);
+    if (opts?.status) q = q.where('status', '=', opts.status);
+    const out: Record<string, PendingApprovalRecord[]> = {};
+    for (const r of await q.orderBy('createdAt', 'desc').execute()) (out[r.organismId] ??= []).push(toApproval(r));
+    return out;
   },
   async updatePendingApproval(this: PostgresKyselyStorage, id: string, updates: Partial<PendingApprovalRecord>): Promise<PendingApprovalRecord | null> {
     const data: Record<string, unknown> = {};
