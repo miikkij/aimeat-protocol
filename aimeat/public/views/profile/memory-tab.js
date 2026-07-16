@@ -67,6 +67,10 @@
  *     (/v1/pub/:owner/:key, served when visibility==='public') instead of the authenticated,
  *     owner-scoped /v1/memory/files/:key — so a public file's link actually loads in a browser /
  *     <img>. Requires owner_gaii from the files list (added to GET /v1/memory/files).
+ *   v2.5.0 — 2026-07-16 — Mount folds the 6-request fan-out into ONE GET /v1/memory/tab (MemoryTabService;
+ *     memory section metadata-only). loadTab seeds all six sections; the agent/archived filter effect
+ *     skips its initial run so loadMemories only re-fetches the dynamic memory list on change. Falls back
+ *     to the individual loaders if the composite is unavailable. (Phase 4 slice 5 — frontend half.)
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -76,6 +80,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import * as memoryService from '/js/services/memory.js';
+import { apiGet } from '/js/api.js';
 import { listAgents } from '/js/services/agents.js';
 import { getKeyPermissions, listConsents, grantConsent, revokeConsent } from '/js/services/consent.js';
 import { getNodeUrl } from '/js/services/auth.js';
@@ -153,7 +158,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const [expandedDiscover, setExpandedDiscover] = useState(null);
 
   useEffect(() => {
-    if (session) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); loadOrgNames(); }
+    if (session) loadTab();   // ONE composite call seeds all six sections (loadMemories owns later filter changes)
     // The loaders are plain functions re-created every render and closing over component state; this
     // effect intentionally runs them only when the session changes — including them would re-run on
     // every render (infinite loop).
@@ -206,11 +211,12 @@ export default function MemoryTab({ session, showToast, onStats }) {
     });
   }
 
+  const memFilterMounted = useRef(false);
   useEffect(() => {
+    // Skip the initial run — loadTab() already seeded the default memory view from the composite. Only
+    // an actual agent-selection / archived-toggle change re-fetches the (dynamic) memory list.
+    if (!memFilterMounted.current) { memFilterMounted.current = true; return; }
     if (session) { loadMemories(); }
-    // loadMemories is re-created each render; this effect intentionally reloads only when the agent
-    // selection or archived filter changes. Adding it (or session) would loop / double-load — session
-    // is already covered by the mount effect above.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedAgent, memArchived]);
 
@@ -291,6 +297,41 @@ export default function MemoryTab({ session, showToast, onStats }) {
       if (resp?.data?.groups) setGroups(resp.data.groups);
       else if (Array.isArray(resp?.data)) setGroups(resp.data);
     } catch { /* ignore */ }
+  }
+
+  // Mount composite: ONE GET /v1/memory/tab seeds all six sections — agents + owner-scope memory
+  // (metadata-only) + files + consent + sharing-groups + organism names. loadMemories owns later
+  // (dynamic) memory re-fetches on agent/archived change; on failure we fall back to the six loaders.
+  async function loadTab() {
+    const ov = await apiGet('/v1/memory/tab').then(r => r?.data).catch(() => null);
+    if (!ov) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); loadOrgNames(); return; }
+    setAgents(Array.isArray(ov.agents) ? ov.agents : []);
+    // memory (metadata-only default view — mirrors loadMemories meta path)
+    const items = ov.memory?.items || [];
+    setMemories(items);
+    setMemQuota(ov.memory?.quota || null);
+    setValueCache({});
+    if (!memArchived) onStats?.({ memory: items.length });
+    // files
+    const fileList = ov.files?.files || [];
+    setFiles(fileList);
+    onStats?.({ files: fileList.length });
+    // federation consents + the active-consent set (mirrors loadFedConsents)
+    const consents = ov.consents?.consents || [];
+    const fedMap = {};
+    for (const c of consents) {
+      if (c.scope === 'federation') { const pat = c.data_pattern || c.pattern || ''; if (pat && !pat.includes('*')) fedMap[pat] = c.id || c.consent_id; }
+    }
+    setFedConsents(fedMap);
+    setAllConsents(consents.filter(c => !c.status || c.status === 'active'));
+    // sharing groups
+    setGroups(ov.groups?.groups || []);
+    // organism names (mirrors loadOrgNames)
+    const orgs = ov.organisms?.organisms || [];
+    const nameMap = {};
+    for (const o of orgs) nameMap[o.id] = o.name;
+    setOrgNames(nameMap);
+    setCartOrgs(orgs.map(o => ({ id: o.id, name: o.name })));
   }
 
   // Refresh the list in whatever mode is active: metadata-only by default (fast for thousands of
