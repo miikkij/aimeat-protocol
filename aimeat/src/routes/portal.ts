@@ -154,7 +154,7 @@ export function serveSpa(res: import('express').Response, spaPath: string, appOr
   }
 
   // Inject window.__B for dynamic import() cache-busting in spa.html scripts, PLUS a tiny
-  // auto-reload watchdog: it polls /v1/build (on focus, on tab-visible, and every 20s) and, the
+  // auto-reload watchdog: it polls /v1/build (on tab-visible and every 60s) and, the
   // moment the server reports a different BUILD_ID (i.e. it restarted with new code), reloads the
   // page so fresh ES modules are fetched. This kills the recurring "restarted the server but the
   // open tab still runs old code until a manual hard refresh" problem — no F5 ever needed.
@@ -169,7 +169,7 @@ export function serveSpa(res: import('express').Response, spaPath: string, appOr
     `function chk(){fetch("/v1/build",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;})` +
     `.then(function(d){if(d&&d.build&&d.build!==c){location.reload();}}).catch(function(){});}` +
     `document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});` +
-    `window.addEventListener("focus",chk);setInterval(chk,20000);})();`;
+    `setInterval(chk,60000);})();`;
   html = html.replace('</head>', `<script${nonceAttr}>${bootScript}</script>\n</head>`);
 
   // Make the running AIMEAT version visible from the page itself — a view-source comment plus a

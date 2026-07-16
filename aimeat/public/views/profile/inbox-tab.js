@@ -383,8 +383,18 @@ export default function InboxTab({ showToast }) {
     return [...map.entries()].map(([id, label]) => ({ id, label }));
   })();
 
+  // True when the user is actively composing (an editable is focused). While composing we skip the
+  // open-thread reload so a live-update's full setThread can't re-render the message list and yank scroll
+  // mid-typing (the "jerks while I write" symptom). loadLists still runs (unread badges), and the next
+  // send/thread-open reloads the thread, so nothing is permanently missed — just deferred past the keystroke.
+  const isComposingInThread = () => {
+    const ae = typeof document !== 'undefined' ? document.activeElement : null;
+    if (!ae) return false;
+    if (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT') return true;
+    return ae instanceof HTMLElement && ae.isContentEditable;
+  };
   const liveRef = useRef(null);
-  liveRef.current = () => { loadLists(); if (activeConv) loadThread(activeConv); };
+  liveRef.current = () => { loadLists(); if (activeConv && !isComposingInThread()) loadThread(activeConv); };
   // Selective live refresh. `e.detail.domains` is a Set<string> (or null = "everything changed",
   // e.g. a reconnect catch-up). IMPORTANT: it is a Set, not an Array — an earlier `Array.isArray`
   // check silently never matched, so the inbox re-fetched on EVERY change (memory/organism/task
@@ -414,9 +424,20 @@ export default function InboxTab({ showToast }) {
     return () => { window.removeEventListener('aimeat-live-update', handler); if (liveTimerRef.current) clearTimeout(liveTimerRef.current); };
   }, [loadTrackedOnly]);
 
+  // Auto-scroll policy: jump to the latest message when a thread is OPENED, but on live content updates
+  // only follow to the bottom if the reader is ALREADY near it — never yank someone who has scrolled up
+  // (or is typing) back down. lastScrolledConvRef distinguishes a fresh open from an in-place update, and
+  // we wait for content (thread.length) so an async load still lands at the bottom on open.
+  const lastScrolledConvRef = useRef(null);
   useEffect(() => {
-    if (mode === 'thread' && msgsRef.current) msgsRef.current.scrollTop = msgsRef.current.scrollHeight;
-  }, [thread, mode]);
+    const el = msgsRef.current;
+    if (mode !== 'thread' || !el || thread.length === 0) return;
+    const convKey = activeConv?.peerGhii ?? activeConv?.id ?? null;
+    const isNewOpen = lastScrolledConvRef.current !== convKey;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
+    if (isNewOpen || nearBottom) el.scrollTop = el.scrollHeight;
+    lastScrolledConvRef.current = convKey;
+  }, [thread, mode, activeConv]);
 
   const openConversation = async (conv) => {
     setActiveConv(conv); setMode('thread');
