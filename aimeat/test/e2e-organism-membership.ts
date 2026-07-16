@@ -71,6 +71,21 @@ await test('A creates an approval_required organism', async () => {
     orgId = o.body.data.organism.id;
 });
 
+await test('0b. GET /v1/organisms/tab folds my orgs (+counts) + public + prefs', async () => {
+    const { status, body } = await json('/v1/organisms/tab', { headers: auth(A.token) });
+    assert(status === 200, `tab status ${status}: ${JSON.stringify(body)}`);
+    const d = body.data;
+    // mine — A's org present, with the include=counts workspace_count field
+    assert(Array.isArray(d.mine) && d.mine.some((o: any) => o.id === orgId), `A's org in mine: ${JSON.stringify(d.mine?.map((o: any) => o.id))}`);
+    assert(d.mine.every((o: any) => typeof o.workspace_count === 'number'), 'mine carries workspace_count (include=counts)');
+    // mine mirrors GET /v1/organisms?member=A&include=counts (the folded read)
+    const single = await json(`/v1/organisms?member=${encodeURIComponent(A.name)}&include=counts`, { headers: auth(A.token) });
+    assert(d.mine.length === single.body.data.organisms.length, `mine count matches /v1/organisms?member: ${d.mine.length} vs ${single.body.data.organisms.length}`);
+    // public + prefs partitions
+    assert(Array.isArray(d.public), 'public is an array');
+    assert(d.uiPrefs === null || typeof d.uiPrefs === 'object', 'uiPrefs is null or an object');
+});
+
 await test('1. B requests to join → pending (202)', async () => {
     const r = await json(`/v1/organisms/${orgId}/join`, { method: 'POST', headers: auth(B.token), body: JSON.stringify({ message: 'let me in' }) });
     assert(r.status === 202, `join ${r.status}: ${JSON.stringify(r.body.error)}`);

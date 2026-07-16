@@ -4,6 +4,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-07-16 — Add GET /v1/organisms/tab composite (my orgs + counts + public + list-order prefs);
+ *     extracted buildOrganismList shared with GET /v1/organisms (redaction chain unchanged, Rule 10 preserved).
  *   v1.2.0 — 2026-07-16 — /waiting batches pending approvals (listPendingApprovalsForOrgs) + ws-name lookups
  *     (workspaceNamesByOrg) across all member orgs, instead of a per-org query loop.
  *   v1.1.0 — 2026-07-16 — ?include=counts uses workspaceCountsByOrg (ONE batched registry read) instead of
@@ -117,52 +119,77 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
   });
 
   /* ── GET /v1/organisms — List organisms ── */
-  router.get('/v1/organisms', optionalAuth(), async (req, res) => {
-    const { type, city, interest, visibility, member, page, per_page } = req.query;
-    // ?member=<owner> lists that owner's organisms INCLUDING private ones — which must only be
-    // enumerable by the member themself (their agents share the bare owner name) or an operator.
-    // Anyone else asking about someone's memberships degrades to public-only instead of leaking
-    // private organisms. Memberships are keyed by the BARE owner name, so normalize GHII/GAII.
-    const memberBare = member ? ((member as string).includes('#') ? (member as string).split('#')[1] : (member as string)).split('@')[0] : undefined;
-    const selfOrOperator = !!req.auth && (req.auth.owner === memberBare || req.auth.roles.includes('operator'));
+  // Shared list builder for GET /v1/organisms and the /v1/organisms/tab composite — applies the member
+  // privacy rule (a member's private orgs are enumerable only by the member or an operator), the optional
+  // ?include=counts workspace count, and the per-organism roster redaction. Semantics identical to the
+  // original inline handler (Rule 10 preserved: same selfOrOperator gate + rosterCallerFromAuth +
+  // canSeeMembers + redactOrganism).
+  async function buildOrganismList(
+    auth: Express.Request['auth'],
+    params: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number; include?: string },
+  ): Promise<{ organisms: unknown[]; total: number }> {
+    const memberBare = params.member ? (params.member.includes('#') ? params.member.split('#')[1] : params.member).split('@')[0] : undefined;
+    const selfOrOperator = !!auth && (auth.owner === memberBare || auth.roles.includes('operator'));
     const organisms = await storage.listOrganisms({
-      type: type as string,
-      city: city as string,
-      interest: interest as string,
+      type: params.type,
+      city: params.city,
+      interest: params.interest,
       member: memberBare,
-      visibility: member ? (selfOrOperator ? (visibility as string) : 'public') : ((visibility as string) || 'public'),
-      page: page ? Number(page) : 1,
-      perPage: per_page ? Number(per_page) : 20,
+      visibility: params.member ? (selfOrOperator ? params.visibility : 'public') : (params.visibility || 'public'),
+      page: params.page ?? 1,
+      perPage: params.perPage ?? 20,
       // The owner's OWN list includes archived (the client splits them into an "Archived" section);
-      // browsing/discovery (anyone else, or no member filter) excludes archived — retired organisms
-      // are read-only and not discoverable.
-      archived: (member && selfOrOperator) ? 'include' : 'exclude',
+      // browsing/discovery excludes archived — retired organisms are read-only and not discoverable.
+      archived: (params.member && selfOrOperator) ? 'include' : 'exclude',
     });
 
-    // ?include=counts — attach workspace_count per org (distinct ids in the registry across all
-    // members' registry records), so the list view doesn't fan out one discoverWorkspaces per org.
-    const include = String(req.query.include ?? '').split(',').map(s => s.trim());
+    // ?include=counts — attach workspace_count per org via ONE batched registry read.
+    const include = String(params.include ?? '').split(',').map(s => s.trim());
     let payload: unknown[] = organisms;
     if (include.includes('counts')) {
-      // ONE cross-owner key-IN read of every org's registry record → distinct workspace count per org,
-      // instead of a listAllMemory scan per organism.
       const counts = await workspaceCountsByOrg(organisms.map(o => o.id));
       payload = organisms.map(o => ({ ...o, workspace_count: counts.get(o.id) ?? 0 }));
     }
 
-    // Roster privacy: per-organism memberVisibility decides whether THIS caller gets the
-    // members[]/agentGaiis fields. member_count is computed pre-redaction (a count is not an
-    // identity) so list cards keep working when the roster itself is hidden. The shared anonymous
+    // Roster privacy: per-organism memberVisibility decides whether THIS caller gets the members[]/
+    // agentGaiis fields. member_count is pre-redaction (a count is not an identity). The shared anonymous
     // identity is treated as unauthenticated (rosterCallerFromAuth).
-    const listCaller = rosterCallerFromAuth(req.auth);
+    const listCaller = rosterCallerFromAuth(auth);
     payload = await Promise.all((payload as Array<OrganismRecord & { workspace_count?: number }>).map(async (o) => {
       const canSee = await canSeeMembers(storage, o, listCaller);
       return { ...redactOrganism(o, canSee), member_count: o.members.length, members_hidden: !canSee };
     }));
 
+    return { organisms: payload, total: payload.length };
+  }
+
+  router.get('/v1/organisms', optionalAuth(), async (req, res) => {
+    const { type, city, interest, visibility, member, page, per_page } = req.query;
+    const result = await buildOrganismList(req.auth, {
+      type: type as string, city: city as string, interest: interest as string,
+      visibility: visibility as string, member: member as string,
+      page: page ? Number(page) : undefined, perPage: per_page ? Number(per_page) : undefined,
+      include: req.query.include as string,
+    });
+    res.json(success(config.nodeId, result));
+  });
+
+  // GET /v1/organisms/tab — the Organisms tab mount in ONE call: the owner's organisms (with workspace
+  // counts) + the public discovery list + the saved list-order prefs. Folds the two GET /v1/organisms
+  // reads (member+counts, public) + GET /v1/memory/organisms.ui. Owner. MUST be registered before the
+  // /v1/organisms/:id captures (a literal 'tab' would otherwise match :id).
+  router.get('/v1/organisms/tab', requireAuth(), requireRole('owner'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    const ownerGhii = `${owner}@${config.nodeId}`;
+    const [mine, pub, uiRec] = await Promise.all([
+      buildOrganismList(req.auth, { member: owner, include: 'counts' }),
+      buildOrganismList(req.auth, { visibility: 'public' }),
+      storage.getMemory(ownerGhii, 'organisms.ui'),
+    ]);
     res.json(success(config.nodeId, {
-      organisms: payload,
-      total: payload.length,
+      mine: mine.organisms,
+      public: pub.organisms,
+      uiPrefs: uiRec?.value ?? null,
     }));
   });
 

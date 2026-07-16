@@ -17,6 +17,8 @@
  *   import OrganismsTab from '/views/profile/organisms-tab.js';
  *   <OrganismsTab session={session} showToast={showToast} onStats={onStats} />
  * @version-history
+ *   v2.4.0 — 2026-07-16 — Mount folds my-orgs + public + list-order prefs into GET /v1/organisms/tab
+ *     (getOrganismsTab); individual reads kept as fallback.
  *   v2.3.0 — 2026-06-23 — Thread an `openSpace` deep-link from the organism mindmap through onOpenWs
  *     into the Workspace (keyed remount + initialSpace), so a space node opens its tab; cleared on the
  *     Cmd-K and cross-organism-search jump paths so it never goes stale.
@@ -91,19 +93,37 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [wsCounts, setWsCounts] = useState({});   // orgId → workspace count (own orgs)
 
   const loadData = useCallback(async () => {
+    // Apply the saved list-order prefs (organisms.ui) whether they came from the composite or a fallback read.
+    const applyPrefs = (v) => {
+      if (v && typeof v === 'object') {
+        if (Array.isArray(v.order)) setCustomOrder(v.order.filter(x => typeof x === 'string'));
+        if (['custom', 'name', 'newest'].includes(v.sort)) setSortMode(v.sort);
+      }
+    };
     try {
+      // Mount fold: ONE composite (my organisms + counts + public discovery + list-order prefs). On
+      // failure, fall back to the two listOrganisms reads + a separate organisms.ui prefs read.
+      const ov = await orgService.getOrganismsTab();
+      if (ov) {
+        const mineIds = new Set(ov.mine.map(o => o.id));
+        setMyOrganisms(ov.mine);
+        setPublicOrganisms(ov.public.filter(o => !mineIds.has(o.id)));
+        onStats?.({ organisms: ov.mine.length });
+        setWsCounts(Object.fromEntries(ov.mine.map(o => [o.id, o.workspace_count ?? 0])));
+        applyPrefs(ov.uiPrefs);
+        return;
+      }
       const [myResp, pubResp] = await Promise.all([
         ghii ? orgService.listOrganisms({ member: ghii, include: 'counts' }) : Promise.resolve({ data: { organisms: [] } }),
         orgService.listOrganisms({ visibility: 'public' }),
       ]);
       const mine = myResp?.data?.organisms || [];
       const mineIds = new Set(mine.map(o => o.id));
-      const discover = (pubResp?.data?.organisms || []).filter(o => !mineIds.has(o.id));
       setMyOrganisms(mine);
-      setPublicOrganisms(discover);
+      setPublicOrganisms((pubResp?.data?.organisms || []).filter(o => !mineIds.has(o.id)));
       onStats?.({ organisms: mine.length });
-      // Workspace counts for the 📁 row stat come inline via ?include=counts (no per-org fan-out).
       setWsCounts(Object.fromEntries(mine.map(o => [o.id, o.workspace_count ?? 0])));
+      try { const r = await memoryService.getMemory('organisms.ui', { soft: true }); applyPrefs(r?.data?.value); } catch { /* no saved prefs */ }
     } catch {
       setMyOrganisms([]);
       setPublicOrganisms([]);
@@ -115,20 +135,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   }, [session, loadData]);
 
   // ── List-order preferences (user memory key `organisms.ui`: { order: [ids], sort: mode }) ──
+  // Read as part of loadData's mount composite (above); this key backs savePrefs.
   const UI_PREFS_KEY = 'organisms.ui';
-  useEffect(() => {
-    if (!session) return;
-    (async () => {
-      try {
-        const r = await memoryService.getMemory(UI_PREFS_KEY, { soft: true });
-        const v = r?.data?.value;
-        if (v && typeof v === 'object') {
-          if (Array.isArray(v.order)) setCustomOrder(v.order.filter(x => typeof x === 'string'));
-          if (['custom', 'name', 'newest'].includes(v.sort)) setSortMode(v.sort);
-        }
-      } catch { /* no saved prefs yet */ }
-    })();
-  }, [session]);
   const savePrefs = useCallback((order, sort) => {
     memoryService.createMemory(UI_PREFS_KEY, { order, sort }, 'private').catch(() => {});
   }, []);
