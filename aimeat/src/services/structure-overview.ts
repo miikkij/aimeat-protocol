@@ -42,6 +42,9 @@
  *     lists EVERY instance id (uncapped) so a big space exposes all ids for a targeted batch read
  *     (the SHALLOW organism overview keeps the MAX_ITEMS cap). entryTitle exported for the
  *     aimeat_workspace_read index to title instances the same way.
+ *   v1.7.0 — 2026-07-16 — collectWorkspaceSummary's scan excludes `.version.N` rows in SQL
+ *     (excludeVersionRows): the overview never renders history, so its full-copy values were loaded
+ *     only to be skipped by the role filter.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -165,7 +168,9 @@ export async function collectWorkspaceSummary(
   const { orgId, ws, viewerGaii } = opts;
   const itemLimit = opts.itemLimit ?? MAX_ITEMS;
   const root = `organism.${orgId}.w.${ws}`;
-  const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000 });
+  // excludeVersionRows: the overview collapses instances to `.latest`/bare and ignores `.version.N`
+  // history — dropping those rows in SQL avoids loading every historic full-copy value.
+  const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000, excludeVersionRows: true });
 
   const manRec = items.find(r => r.key === `${root}.meta.manifest`);
   const summary: WorkspaceSummary = {

@@ -7,6 +7,8 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  *   v1.1.0 — 2026-07-15 — Org managers (creator/admin) pass the workspace read gate automatically —
  *     an org admin reads every workspace under the organism without a per-workspace grant.
+ *   v1.2.0 — 2026-07-16 — Workspace read scans exclude `.version.N` rows in SQL (excludeVersionRows):
+ *     the read never surfaces history, so loading every historic full-copy value was pure waste.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -85,9 +87,12 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     // So: include everything, then filter CONTENT by the requested view using each record's own flag
     // while always keeping the workspace's own meta.* (manifest/readme). Default (active) keeps the
     // efficient storage-level exclude.
+    // excludeVersionRows: this read collapses each instance to `.latest`/`.draft`/bare and never
+    // surfaces `.version.N` history — dropping those rows in SQL avoids loading every historic
+    // full-copy value only to skip it in the role loop below.
     let items: MemoryRecord[];
     if (archived === 'only' || archived === 'include') {
-      const all = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, archived: 'include' })).items;
+      const all = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, archived: 'include', excludeVersionRows: true })).items;
       // Keep ONLY the manifest + readme (so the workspace shell renders) plus the archived content.
       // NB: must match the manifest/readme EXACTLY, not a `meta.` prefix — an objectType namespace can
       // itself start with `meta.` (e.g. `meta.goals`), and a prefix filter would leak ACTIVE content
@@ -96,7 +101,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
         ? all.filter(r => r.archived || r.key === `${nsRoot}meta.manifest` || r.key === `${nsRoot}meta.readme`)
         : all;
     } else {
-      items = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000 })).items;
+      items = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, excludeVersionRows: true })).items;
     }
     const manRec = items.find(r => r.key === `${nsRoot}meta.manifest`);
     let canReadWorkspace = false;

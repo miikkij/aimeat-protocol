@@ -221,7 +221,7 @@ export function listMemory(db: Database.Database, ownerGaii: string, opts?: { pr
   return results;
 }
 
-export function listAllMemory(db: Database.Database, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter }): { items: MemoryRecord[]; total: number } {
+export function listAllMemory(db: Database.Database, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean }): { items: MemoryRecord[]; total: number } {
   let whereClauses = '';
   const params: unknown[] = [];
 
@@ -236,6 +236,10 @@ export function listAllMemory(db: Database.Database, opts?: { prefix?: string; o
   if (opts?.visibility) {
     whereClauses += ' AND visibility = ?';
     params.push(opts.visibility);
+  }
+  // Drop `.version.N` workspace history rows in SQL (hot read paths always discard them).
+  if (opts?.excludeVersionRows) {
+    whereClauses += " AND key NOT LIKE '%.version.%'";
   }
   whereClauses += archivedSql(opts?.archived);
 

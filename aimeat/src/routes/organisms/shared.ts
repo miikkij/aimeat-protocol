@@ -6,6 +6,9 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.4.0 — 2026-07-16 — Version-bloat perf: publish/batch-publish/revert scans exclude `.version.N`
+ *     rows in SQL (excludeVersionRows) and compute maxN value-free (workspace-versions) — historic
+ *     full-copy values were loaded on every publish just to parse N out of the key names.
  *   v1.3.0 — 2026-07-16 — workspaceNamesByOrg (id→name registry map per org, same batched read) for the
  *     /waiting aggregate (Phase 3).
  *   v1.2.0 — 2026-07-16 — workspaceCountsByOrg batches the ?include=counts list view's per-organism
@@ -29,6 +32,7 @@ import { ecoMayReadKey } from '../../services/ecosystem-access.js';
 import { validateMemoryWrite, validateValueAgainstSchema } from '../../services/schema-validator.js';
 import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../../services/archive.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../../services/workspace-roles.js';
+import { listVersionRefs, versionRefsByBase, maxVersionOf } from '../../services/workspace-versions.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
@@ -151,7 +155,9 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
     const base = `${wsRoot}.${namespace}.${instance}`;
     const ownerGhii = ownerGhiiOf(publisher);
-    const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
+    // Value-free version handling: skip `.version.N` rows in the scan (their full values were loaded
+    // just to find maxN) — the version numbers come from the key names alone (listVersionRefs below).
+    const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000, excludeVersionRows: true });
     const draft = items.filter(r => r.key === `${base}.draft`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
     if (!draft) return { ok: false, code: 'NO_DRAFT' };
 
@@ -162,14 +168,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const validation = await validateMemoryWrite(`${base}.latest`, draftValue, storage, { viaPublish: true, expectedVersion });
     if (!validation.valid) return { ok: false, code: 'INVALID', violations: validation.errors };
 
-    let maxN = 0;
-    const vPrefix = `${base}.version.`;
-    for (const r of items) {
-      if (r.key.startsWith(vPrefix)) {
-        const suffix = r.key.slice(vPrefix.length);
-        if (/^\d+$/.test(suffix)) maxN = Math.max(maxN, parseInt(suffix, 10));
-      }
-    }
+    const versionRefs = await listVersionRefs(storage, base);
+    const maxN = maxVersionOf(versionRefs);
     const now = new Date().toISOString();
     const vis = draft.visibility;
     const tags = draft.tags ?? [];
@@ -238,7 +238,10 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const ownerGhii = ownerGhiiOf(publisher);
     const nsPrefix = `${wsRoot}.${namespace}.`;
     // ONE scan of the whole namespace + ONE manifest read (the `versioned` flag) for the entire batch.
-    const { items: allRows } = await storage.listAllMemory({ prefix: nsPrefix, limit: 100000 });
+    // excludeVersionRows: the batch needs each record's .draft/.latest VALUES but only the version
+    // NUMBERS — those come from ONE value-free key scan (versionRefsByBase below).
+    const { items: allRows } = await storage.listAllMemory({ prefix: nsPrefix, limit: 100000, excludeVersionRows: true });
+    const versionsByBase = await versionRefsByBase(storage, nsPrefix);
     const mkey = `${wsRoot}.meta.manifest`;
     const manRec = (await storage.listAllMemory({ prefix: mkey, limit: 10 })).items.find(r => r.key === mkey);
     const pubOt = ((manRec?.value as { objectTypes?: Array<{ namespace?: string; versioned?: boolean; create_only?: boolean; requires_expected_version?: boolean }> } | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
@@ -277,11 +280,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerGhii.split('@')[0], ws ? `${organismId}/${ws}` : undefined);
       const expectedVersion = expectedVersions?.[instance] ?? null;
 
-      let maxN = 0;
-      const vPrefix = `${base}.version.`;
-      for (const r of items) {
-        if (r.key.startsWith(vPrefix)) { const s = r.key.slice(vPrefix.length); if (/^\d+$/.test(s)) maxN = Math.max(maxN, parseInt(s, 10)); }
-      }
+      const maxN = maxVersionOf(versionsByBase.get(base) ?? []);
       const existingLatest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresherRec(best, r), null);
       const vis = draft.visibility;
       const tags = draft.tags ?? [];
@@ -346,7 +345,8 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
   ): Promise<{ ok: true } | { ok: false; code: 'NO_LATEST' | 'DRAFT_EXISTS' }> => {
     const wsRoot = ws ? `organism.${organismId}.w.${ws}` : `organism.${organismId}`;
     const base = `${wsRoot}.${namespace}.${instance}`;
-    const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
+    // Reopening needs only .draft/.latest/bare — never the `.version.N` history values.
+    const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000, excludeVersionRows: true });
     if (items.find(r => r.key === `${base}.draft`)) return { ok: false, code: 'DRAFT_EXISTS' };
     // Mirror the workspace read: the published current state is .latest, or the bare key as fallback.
     const latest = items.find(r => r.key === `${base}.latest`) ?? items.find(r => r.key === base);
