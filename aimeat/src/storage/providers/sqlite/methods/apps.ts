@@ -249,6 +249,19 @@ export const appsMethods = {
     ).run(ownerGaii, filename);
   },
 
+  async getAppDownloadsForApps(this: SqliteStorage, refs: Array<{ ownerGaii: string; filename: string }>): Promise<Record<string, number>> {
+    const out: Record<string, number> = {};
+    for (const r of refs) out[`${r.ownerGaii} ${r.filename}`] = 0;
+    if (refs.length === 0) return out;
+    const values = refs.map(() => '(?,?)').join(',');
+    const params = refs.flatMap(r => [r.ownerGaii, r.filename]);
+    const rows = this.db.prepare(
+      `SELECT ownerGaii, filename, downloads FROM app_downloads WHERE (ownerGaii, filename) IN (VALUES ${values})`,
+    ).all(...params) as Array<{ ownerGaii: string; filename: string; downloads: number }>;
+    for (const row of rows) out[`${row.ownerGaii} ${row.filename}`] = row.downloads ?? 0;
+    return out;
+  },
+
   async recordAppFork(this: SqliteStorage, record: AppForkRecord): Promise<void> {
     this.db.prepare(
       `INSERT INTO app_forks (id, sourceOwnerGaii, sourceOwnerName, sourceFilename, sourceVersion, childOwnerGaii, childOwnerName, childFilename, forkedByGaii, forkedAt)
@@ -264,6 +277,21 @@ export const appsMethods = {
     const row = this.db.prepare('SELECT COUNT(*) as c FROM app_forks WHERE sourceOwnerGaii = ? AND sourceFilename = ?')
       .get(sourceOwnerGaii, sourceFilename) as { c: number } | undefined;
     return row?.c ?? 0;
+  },
+
+  async countAppForksForApps(this: SqliteStorage, refs: Array<{ ownerGaii: string; filename: string }>): Promise<Record<string, number>> {
+    const out: Record<string, number> = {};
+    for (const r of refs) out[`${r.ownerGaii} ${r.filename}`] = 0;
+    if (refs.length === 0) return out;
+    const values = refs.map(() => '(?,?)').join(',');
+    const params = refs.flatMap(r => [r.ownerGaii, r.filename]);
+    const rows = this.db.prepare(
+      `SELECT sourceOwnerGaii, sourceFilename, COUNT(*) as c FROM app_forks
+       WHERE (sourceOwnerGaii, sourceFilename) IN (VALUES ${values})
+       GROUP BY sourceOwnerGaii, sourceFilename`,
+    ).all(...params) as Array<{ sourceOwnerGaii: string; sourceFilename: string; c: number }>;
+    for (const row of rows) out[`${row.sourceOwnerGaii} ${row.sourceFilename}`] = row.c ?? 0;
+    return out;
   },
 
   async listAppForks(this: SqliteStorage, sourceOwnerGaii: string, sourceFilename: string): Promise<AppForkRecord[]> {

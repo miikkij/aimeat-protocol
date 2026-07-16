@@ -241,6 +241,16 @@ export const appMethods = {
       .onConflict(oc => oc.columns(['ownerGaii', 'filename']).doUpdateSet({ count: sql`"AppDownload"."count" + 1` } as any)).execute();
   },
 
+  async getAppDownloadsForApps(this: PostgresKyselyStorage, refs: Array<{ ownerGaii: string; filename: string }>): Promise<Record<string, number>> {
+    const out: Record<string, number> = {};
+    for (const r of refs) out[`${r.ownerGaii} ${r.filename}`] = 0;
+    if (refs.length === 0) return out;
+    const rows = await this.db.selectFrom('AppDownload').select(['ownerGaii', 'filename', 'count'])
+      .where(eb => eb.or(refs.map(r => eb.and([eb('ownerGaii', '=', r.ownerGaii), eb('filename', '=', r.filename)])))).execute();
+    for (const row of rows) out[`${row.ownerGaii} ${row.filename}`] = row.count ?? 0;
+    return out;
+  },
+
   // ── Fork lineage (append-only) ──
   async recordAppFork(this: PostgresKyselyStorage, record: AppForkRecord): Promise<void> {
     await this.db.insertInto('AppFork').values({
@@ -254,6 +264,18 @@ export const appMethods = {
   async countAppForks(this: PostgresKyselyStorage, sourceOwnerGaii: string, sourceFilename: string): Promise<number> {
     const r = await this.db.selectFrom('AppFork').select(sql<number>`count(*)`.as('n')).where('sourceOwnerGaii', '=', sourceOwnerGaii).where('sourceFilename', '=', sourceFilename).executeTakeFirst();
     return Number(r?.n ?? 0);
+  },
+
+  async countAppForksForApps(this: PostgresKyselyStorage, refs: Array<{ ownerGaii: string; filename: string }>): Promise<Record<string, number>> {
+    const out: Record<string, number> = {};
+    for (const r of refs) out[`${r.ownerGaii} ${r.filename}`] = 0;
+    if (refs.length === 0) return out;
+    const rows = await this.db.selectFrom('AppFork')
+      .select(['sourceOwnerGaii', 'sourceFilename', sql<number>`count(*)`.as('n')])
+      .where(eb => eb.or(refs.map(r => eb.and([eb('sourceOwnerGaii', '=', r.ownerGaii), eb('sourceFilename', '=', r.filename)]))))
+      .groupBy(['sourceOwnerGaii', 'sourceFilename']).execute();
+    for (const row of rows) out[`${row.sourceOwnerGaii} ${row.sourceFilename}`] = Number(row.n ?? 0);
+    return out;
   },
 
   async listAppForks(this: PostgresKyselyStorage, sourceOwnerGaii: string, sourceFilename: string): Promise<AppForkRecord[]> {

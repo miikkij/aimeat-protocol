@@ -306,6 +306,21 @@ export const appsMethods = {
         });
     },
 
+    async getAppDownloadsForApps(this: PrismaStorage, refs: Array<{ ownerGaii: string; filename: string }>): Promise<Record<string, number>> {
+        this.ensureReady();
+        const out: Record<string, number> = {};
+        for (const r of refs) out[`${r.ownerGaii} ${r.filename}`] = 0;
+        if (refs.length === 0) return out;
+        const rows = await this.prisma.appDownload.findMany({
+            where: { OR: refs.map(r => ({ ownerGaii: r.ownerGaii, filename: r.filename })) },
+            select: { ownerGaii: true, filename: true, count: true },
+        });
+        for (const row of rows as Array<{ ownerGaii: string; filename: string; count: number }>) {
+            out[`${row.ownerGaii} ${row.filename}`] = row.count ?? 0;
+        }
+        return out;
+    },
+
     async recordAppFork(this: PrismaStorage, record: AppForkRecord): Promise<void> {
         this.ensureReady();
         await this.prisma.appFork.create({
@@ -327,6 +342,22 @@ export const appsMethods = {
     async countAppForks(this: PrismaStorage, sourceOwnerGaii: string, sourceFilename: string): Promise<number> {
         this.ensureReady();
         return this.prisma.appFork.count({ where: { sourceOwnerGaii, sourceFilename } });
+    },
+
+    async countAppForksForApps(this: PrismaStorage, refs: Array<{ ownerGaii: string; filename: string }>): Promise<Record<string, number>> {
+        this.ensureReady();
+        const out: Record<string, number> = {};
+        for (const r of refs) out[`${r.ownerGaii} ${r.filename}`] = 0;
+        if (refs.length === 0) return out;
+        const groups = await this.prisma.appFork.groupBy({
+            by: ['sourceOwnerGaii', 'sourceFilename'],
+            where: { OR: refs.map(r => ({ sourceOwnerGaii: r.ownerGaii, sourceFilename: r.filename })) },
+            _count: true,
+        });
+        for (const g of groups as Array<{ sourceOwnerGaii: string; sourceFilename: string; _count: number }>) {
+            out[`${g.sourceOwnerGaii} ${g.sourceFilename}`] = g._count ?? 0;
+        }
+        return out;
     },
 
     async listAppForks(this: PrismaStorage, sourceOwnerGaii: string, sourceFilename: string): Promise<AppForkRecord[]> {
