@@ -16,6 +16,8 @@
  *     checkConsentForRead (previously matchesRecipient returned false with no resolver).
  *   v1.2.0 -- 2026-06-21 -- auditDataAccess now enqueues into the in-memory consent-audit
  *     buffer (batched off the request path) instead of a synchronous per-read DB write.
+ *   v1.3.0 -- 2026-07-16 -- organism-grant resolution reads the accessor's memberships ONCE
+ *     (listMembershipsByGhii) instead of getMembership per org grant (Phase 3).
  */
 import { v4 as uuidv4 } from 'uuid';
 import type { Storage, ConsentAuditEntry } from '../storage/interface.js';
@@ -166,10 +168,15 @@ export async function checkConsentForRead(
   if (orgGrants.length > 0) {
     const accessorOwner = parseGaiiLoose(accessorGaii).owner;
     if (accessorOwner) {
+      // The accessor's active organism memberships in ONE query (was getMembership per org grant), then
+      // honour the first grant whose organism the accessor actively belongs to — same result, same order.
+      const activeOrgIds = new Set(
+        (await storage.listMembershipsByGhii(accessorOwner))
+          .filter(m => m.status === 'active')
+          .map(m => m.organismId),
+      );
       for (const c of orgGrants) {
-        const orgId = c.recipient.slice('organism.'.length);
-        const membership = await storage.getMembership(orgId, accessorOwner);
-        if (membership && membership.status === 'active') {
+        if (activeOrgIds.has(c.recipient.slice('organism.'.length))) {
           return { allowed: true, consentId: c.id, reason: 'organism_member_consent' };
         }
       }
