@@ -35,6 +35,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
+import { success } from '../middleware/envelope.js';
+import { createMemoryTabService } from '../services/db/memory-tab-db-service.js';
 import { createMemoryDbService } from '../services/db/index.js';
 import type { StatsCollector } from '../services/stats.js';
 import type { MemoryRouteCtx } from './memory/shared.js';
@@ -58,6 +61,18 @@ export function memoryRouter(config: AimeatConfig, storage: Storage, stats?: Sta
   const memoryDb = createMemoryDbService(storage, config);
 
   const ctx: MemoryRouteCtx = { config, storage, memoryDb, stats, onDirectoryChange, peers, resolve, workspaceAccess };
+
+  // GET /v1/memory/tab — the whole Memory tab mount in ONE call (agents + owner-scope memory METADATA +
+  // files + consent + sharing-groups + organisms), composed in one read scope by MemoryTabService. The
+  // memory section is metadata-only (no values loaded). Owner-scope: requires 'owner' role — the Memory
+  // tab is an owner view, stricter than the folded endpoints. MUST be registered before the /:key
+  // captures below. The individual endpoints stay for interactive re-fetches (agent filter, archived).
+  const memoryTabDb = createMemoryTabService(config, storage);
+  router.get('/v1/memory/tab', requireAuth(), requireRole('owner'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    const data = await memoryTabDb.overview(owner, `${owner}@${config.nodeId}`);
+    res.json(success(config.nodeId, data));
+  });
 
   // Registration order is load-bearing (Express matches top-to-bottom): more-specific literal paths
   // (/v1/memory/search, /export, /files, ...) MUST be registered before the /:key and /:gaii/:key

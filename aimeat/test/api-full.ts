@@ -713,6 +713,22 @@ await test('Wallet — overview composite (Phase 4 DbService)', async () => {
     // (Owner-only requireRole('owner') gating is proven in the access-tokens suite — same middleware.)
 });
 
+await test('Memory — tab overview composite (Phase 4 DbService, meta-only)', async () => {
+    const { body } = await json('/v1/memory/tab', { method: 'GET', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(body.ok === true, `memory/tab: ${JSON.stringify(body.error)}`);
+    const d = body.data;
+    assert(Array.isArray(d.agents), 'agents is an array');
+    assert(d.memory && Array.isArray(d.memory.items) && d.memory.quota, 'memory has items + quota');
+    assert(d.memory.items.every((i: any) => !('value' in i)), 'memory items are metadata-only (no value loaded)');
+    assert(Array.isArray(d.files?.files), 'files is an array');
+    assert(Array.isArray(d.consents?.consents), 'consents is an array');
+    assert(Array.isArray(d.groups?.groups), 'groups is an array');
+    assert(Array.isArray(d.organisms?.organisms), 'organisms is an array');
+    // The memory section matches the standalone meta endpoint's total (same owner-scope, one read scope).
+    const { body: mem } = await json('/v1/memory?include=meta', { method: 'GET', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(d.memory.total === mem.data.total, `overview memory total (${d.memory.total}) == /v1/memory?include=meta (${mem.data.total})`);
+});
+
 await test('Validate endpoint', async () => {
     const { body } = await json('/v1/validate', {
         method: 'POST',
