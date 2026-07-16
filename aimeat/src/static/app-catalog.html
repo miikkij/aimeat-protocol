@@ -2116,6 +2116,33 @@
 .pb-pack-item:hover { border-color: var(--accent); }
 .pb-pack-item input { accent-color: var(--accent); margin: 0; }
 .pb-pack-item:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+
+/* ── Bundled-agents modal (Agent-Bundled Apps) — inspector, hosted instances, deploy form ── */
+.aga-app-ref { font-size: .78rem; color: var(--text-muted); font-weight: normal; margin-left: 6px; }
+.aga-body { max-height: 62vh; overflow-y: auto; font-size: .88rem; }
+.aga-intro { font-size: .82rem; color: var(--text-muted); margin-bottom: 10px; }
+.aga-def { border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-bottom: 12px; background: var(--card); }
+.aga-def h3 { margin: 0 0 8px; font-size: 1rem; }
+.aga-label { font-weight: 600; font-size: .8rem; margin: 10px 0 4px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em; }
+.aga-goal { color: var(--text-muted); font-size: .82rem; }
+.aga-crew-row { margin: 4px 0; }
+.aga-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 3px; }
+.aga-chip { display: inline-block; padding: 1px 8px; border: 1px solid var(--border); border-radius: 999px; font-size: .72rem; color: var(--text-muted); background: var(--card); }
+.aga-chip-skill { border-color: var(--accent); color: var(--accent); }
+.aga-tasks { margin: 4px 0 0 18px; padding: 0; }
+.aga-tasks li { margin: 3px 0; }
+.aga-inst { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 6px 0; }
+.aga-inst-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.aga-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); flex: none; }
+.aga-dot-on { background: #22c55e; }
+.aga-offer { display: flex; justify-content: space-between; gap: 10px; margin-top: 4px; font-size: .84rem; flex-wrap: wrap; }
+.aga-price { color: var(--accent); font-weight: 600; white-space: nowrap; }
+.aga-deploy-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; margin: 6px 0; }
+.aga-deploy-row label { display: flex; flex-direction: column; gap: 3px; font-size: .78rem; color: var(--text-muted); }
+.aga-select { min-width: 160px; padding: 5px 8px; }
+.aga-deploy-btn { white-space: nowrap; }
+.aga-btn-sm { padding: 2px 10px; font-size: .75rem; margin-left: auto; }
+.published-card-badgerow .pcb-agent { cursor: default; }
 </style>
 </head>
 <body data-active-view="library">
@@ -2584,6 +2611,18 @@
     </div>
   </div>
 
+  <!-- Bundled-agents modal (Agent-Bundled Apps): crew-def inspector + hosted instances with
+       public offer prices + "deploy your own" (runner/organism pickers) onto the owner's fleet -->
+  <div id="agents-overlay" hidden>
+    <div class="modal" id="agents-modal">
+      <h2>&#x1F916; <span data-i18n="agents.title">Bundled agents</span> <span id="agents-modal-app" class="aga-app-ref"></span></h2>
+      <div id="agents-modal-body" class="aga-body"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('agents-overlay').hidden = true" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Copy-protection modal: opt-in per-app flags applied to the runnable HTML at serve time -->
   <div id="protection-overlay" hidden>
     <div class="modal" id="protection-modal">
@@ -2836,6 +2875,37 @@
       "fork.failed": "Fork failed",
       "detail.forkedFrom": "⑂ Forked from",
       "card.forksHint": "View the fork lineage (who forked this, and where it came from)",
+      "card.agent": "🤖 Agent",
+      "card.agentHint": "This app ships its own agent - inspect it, use a hosted instance, or deploy your own",
+      "agents.title": "Bundled agents",
+      "agents.manage": "Inspect & deploy",
+      "agents.none": "This app declares no bundled agents.",
+      "agents.declares": "This app ships its own agent as a declarative crew definition. Use an instance someone already hosts (their prices below), or deploy your own copy onto your own fleet.",
+      "agents.crew": "Crew",
+      "agents.tasks": "Tasks",
+      "agents.hostedTitle": "Hosted instances",
+      "agents.hostedNone": "Nobody hosts this agent yet - deploy your own below and be the first.",
+      "agents.hostedError": "Could not load hosted instances.",
+      "agents.loading": "Loading…",
+      "agents.you": "you",
+      "agents.author": "author",
+      "agents.trust": "trust",
+      "agents.noOffers": "No public offers - contact the host to ask.",
+      "agents.askPrice": "ask for price",
+      "agents.instant": "instant",
+      "agents.undeploy": "Undeploy",
+      "agents.deployTitle": "Deploy your own",
+      "agents.deployDesc": "Creates a deploy task on YOUR own runner agent (crew-forge). The fleet reads the crew definition from the app manifest and starts the agent under your account - it never runs on anyone else’s fleet.",
+      "agents.runner": "Runner",
+      "agents.organism": "Organism",
+      "agents.deployBtn": "Deploy to my fleet",
+      "agents.needLogin": "Sign in to deploy this agent onto your own fleet.",
+      "agents.noRunner": "You have no runner agent yet. Connect a crew-forge (crewaimeat) from Profile → Agents first, then deploy.",
+      "agents.noRunnerOption": "no agents - connect one first",
+      "agents.deployFailed": "Deploy failed",
+      "agents.deployStarted": "Deploy task started on your fleet",
+      "agents.deployQueued": "Deploy task queued - start it from your agent’s Tasks",
+      "agents.undeployQueued": "Undeploy task sent to your fleet",
       "lineage.title": "Fork lineage",
       "lineage.help": "Every app forked from this one (and where this one came from), with each fork's current status. The chain survives a fork being parked or deleted.",
       "lineage.loading": "Loading lineage…",
@@ -3235,6 +3305,37 @@
       "fork.failed": "Haaroitus epäonnistui",
       "detail.forkedFrom": "⑂ Haaroitettu kohteesta",
       "card.forksHint": "Näytä haaroitushistoria (kuka haaroitti ja mistä tämä on peräisin)",
+      "card.agent": "🤖 Agentti",
+      "card.agentHint": "Tämä sovellus tuo mukanaan oman agentin - tutki sitä, käytä valmiiksi ylläpidettyä tai ota käyttöön oma",
+      "agents.title": "Mukana tulevat agentit",
+      "agents.manage": "Tutki ja ota käyttöön",
+      "agents.none": "Tämä sovellus ei määrittele mukana tulevia agentteja.",
+      "agents.declares": "Sovellus tuo mukanaan oman agentin deklaratiivisena crew-määrityksenä. Käytä jonkun jo ylläpitämää instanssia (hinnat alla) tai ota oma kopio käyttöön omaan laivueeseesi.",
+      "agents.crew": "Työryhmä",
+      "agents.tasks": "Tehtävät",
+      "agents.hostedTitle": "Ylläpidetyt instanssit",
+      "agents.hostedNone": "Kukaan ei vielä ylläpidä tätä agenttia - ota omasi käyttöön alta ensimmäisenä.",
+      "agents.hostedError": "Instanssien lataus epäonnistui.",
+      "agents.loading": "Ladataan…",
+      "agents.you": "sinä",
+      "agents.author": "tekijä",
+      "agents.trust": "luottamus",
+      "agents.noOffers": "Ei julkisia tarjoomia - kysy ylläpitäjältä.",
+      "agents.askPrice": "kysy hintaa",
+      "agents.instant": "välitön",
+      "agents.undeploy": "Poista käytöstä",
+      "agents.deployTitle": "Ota oma käyttöön",
+      "agents.deployDesc": "Luo käyttöönottotehtävän OMALLE ajoagentillesi (crew-forge). Laivue lukee crew-määrityksen sovelluksen manifestista ja käynnistää agentin sinun tilisi alle - se ei koskaan aja kenenkään muun laivueessa.",
+      "agents.runner": "Ajoagentti",
+      "agents.organism": "Organismi",
+      "agents.deployBtn": "Ota käyttöön laivueeseeni",
+      "agents.needLogin": "Kirjaudu sisään ottaaksesi agentin käyttöön omaan laivueeseesi.",
+      "agents.noRunner": "Sinulla ei ole vielä ajoagenttia. Yhdistä crew-forge (crewaimeat) ensin: Profiili → Agentit.",
+      "agents.noRunnerOption": "ei agentteja - yhdistä ensin",
+      "agents.deployFailed": "Käyttöönotto epäonnistui",
+      "agents.deployStarted": "Käyttöönottotehtävä käynnistyi laivueessasi",
+      "agents.deployQueued": "Käyttöönottotehtävä jonossa - käynnistä se agentin Tehtävistä",
+      "agents.undeployQueued": "Käytöstäpoistotehtävä lähetetty laivueellesi",
       "lineage.title": "Haaroitushistoria",
       "lineage.help": "Kaikki tästä haaroitetut sovellukset (ja mistä tämä on peräisin), kunkin haaran nykyinen tila. Ketju säilyy, vaikka haara parkitaan tai poistetaan.",
       "lineage.loading": "Ladataan historiaa…",
@@ -4781,6 +4882,176 @@
     });
   }
 
+  // src/static/app-catalog/js/app-agents.js
+  var getServerManifests;
+  function initAppAgents(deps) {
+    ({ getServerManifests } = deps);
+  }
+  function aimeatBase() {
+    var config = loadConfig();
+    return config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
+  }
+  function appManifestAgents(owner, filename) {
+    var m = getServerManifests ? getServerManifests()[(owner || "") + "\n" + (filename || "")] : null;
+    return m && m.cortex && Array.isArray(m.cortex.agents) ? m.cortex.agents : [];
+  }
+  function fmtOfferPrice(o) {
+    var parts = [];
+    if (o.price && typeof o.price.morsels === "number") {
+      parts.push(o.price.morsels + " 🥩" + (o.price.unit ? "/" + escapeHtml(o.price.unit) : ""));
+    }
+    if (o.price_money && typeof o.price_money.amount === "number") {
+      parts.push((o.price_money.amount / 1e6).toFixed(2) + " " + escapeHtml(o.price_money.currency || "EUR"));
+    }
+    return parts.length ? parts.join(" · ") : t("agents.askPrice");
+  }
+  function inspectorHtml(def) {
+    var crew = (def.agents || []).map(function(a) {
+      var tools = (a.tools || []).map(function(x) {
+        return '<span class="aga-chip">' + escapeHtml(x) + "</span>";
+      }).join("");
+      var skills = (a.skills || []).map(function(x) {
+        return '<span class="aga-chip aga-chip-skill">' + escapeHtml(x) + "</span>";
+      }).join("");
+      return '<div class="aga-crew-row"><strong>' + escapeHtml(a.role || "") + "</strong>" + (a.goal ? ' — <span class="aga-goal">' + escapeHtml(a.goal) + "</span>" : "") + (tools || skills ? '<div class="aga-chips">' + tools + skills + "</div>" : "") + "</div>";
+    }).join("");
+    var tasks = (def.tasks || []).map(function(tk) {
+      var desc = String(tk.description || "");
+      if (desc.length > 140) desc = desc.slice(0, 140) + "…";
+      return "<li>" + escapeHtml(desc) + (tk.expected_output ? ' <span class="aga-goal">→ ' + escapeHtml(String(tk.expected_output).slice(0, 80)) + "</span>" : "") + "</li>";
+    }).join("");
+    return '<div class="aga-inspector"><div class="aga-label">' + t("agents.crew") + (def.llm_profile ? ' <span class="aga-chip">' + escapeHtml(def.llm_profile) + "</span>" : "") + (def.process ? ' <span class="aga-chip">' + escapeHtml(def.process) + "</span>" : "") + "</div>" + crew + '<div class="aga-label">' + t("agents.tasks") + '</div><ul class="aga-tasks">' + tasks + "</ul></div>";
+  }
+  function instanceHtml(inst, appOwner, appFilename, agentName) {
+    var dot = inst.online ? '<span class="aga-dot aga-dot-on"></span>' : '<span class="aga-dot"></span>';
+    var who = escapeHtml(inst.owner) + (inst.is_yours ? ' <span class="aga-chip">' + t("agents.you") + "</span>" : "") + (inst.source === "author" ? ' <span class="aga-chip">' + t("agents.author") + "</span>" : "");
+    var offers = (inst.offers || []).map(function(o) {
+      return '<div class="aga-offer"><span class="aga-offer-title">' + escapeHtml(o.title || o.id) + '</span><span class="aga-price">' + fmtOfferPrice(o) + (o.callable ? " · " + t("agents.instant") : "") + "</span></div>";
+    }).join("");
+    var undeploy = inst.is_yours && inst.source === "deployed" ? `<button class="modal-btn secondary aga-btn-sm" onclick="window._launcher.agentsUndeploy('` + jsArg(appOwner) + "', '" + jsArg(appFilename) + "', '" + jsArg(agentName) + `')">` + t("agents.undeploy") + "</button>" : "";
+    return '<div class="aga-inst"><div class="aga-inst-head">' + dot + "<strong>" + who + '</strong><span class="aga-goal">' + t("agents.trust") + " " + (inst.trust_score != null ? inst.trust_score : "—") + "</span>" + undeploy + "</div>" + (offers || '<div class="aga-goal">' + t("agents.noOffers") + "</div>") + "</div>";
+  }
+  function showAppAgentsModal(owner, filename) {
+    var defs = appManifestAgents(owner, filename);
+    if (!defs.length) {
+      showNotice(t("agents.none"));
+      return;
+    }
+    var base = aimeatBase();
+    if (!base) {
+      showNotice("Set AIMEAT server URL in Settings first");
+      return;
+    }
+    var token = getCortexOwnerToken();
+    document.getElementById("agents-modal-app").textContent = owner + "/" + filename;
+    var body = document.getElementById("agents-modal-body");
+    var html = '<div class="aga-intro">' + t("agents.declares") + "</div>";
+    for (var i = 0; i < defs.length; i++) {
+      var def = defs[i];
+      html += '<div class="aga-def"><h3>🤖 ' + escapeHtml(def.agent_name || "") + "</h3>" + inspectorHtml(def) + '<div class="aga-label">' + t("agents.hostedTitle") + '</div><div id="aga-instances-' + i + '" class="aga-goal">' + t("agents.loading") + '</div><div class="aga-label">' + t("agents.deployTitle") + "</div>" + (token ? '<div class="aga-deploy-row"><label>' + t("agents.runner") + ' <select id="aga-runner-' + i + '" class="modal-input aga-select"><option value="">' + t("agents.loading") + "</option></select></label><label>" + t("agents.organism") + ' <select id="aga-organism-' + i + `" class="modal-input aga-select"><option value="">—</option></select></label><button class="modal-btn aga-deploy-btn" onclick="window._launcher.agentsDeploy('` + jsArg(owner) + "', '" + jsArg(filename) + "', '" + jsArg(def.agent_name) + "', " + i + ')">' + t("agents.deployBtn") + '</button></div><div class="aga-goal">' + t("agents.deployDesc") + "</div>" : '<div class="aga-goal">' + t("agents.needLogin") + "</div>") + "</div>";
+    }
+    body.innerHTML = html;
+    document.getElementById("agents-overlay").hidden = false;
+    defs.forEach(function(def2, i2) {
+      var headers = token ? { "Authorization": "Bearer " + token } : {};
+      fetch(base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/agents/" + encodeURIComponent(def2.agent_name) + "/instances", { headers }).then(function(r) {
+        return r.json();
+      }).then(function(json) {
+        var el = document.getElementById("aga-instances-" + i2);
+        if (!el) return;
+        var list = json.data && json.data.instances || [];
+        el.className = "";
+        el.innerHTML = list.length ? list.map(function(inst) {
+          return instanceHtml(inst, owner, filename, def2.agent_name);
+        }).join("") : '<div class="aga-goal">' + t("agents.hostedNone") + "</div>";
+      }).catch(function() {
+        var el = document.getElementById("aga-instances-" + i2);
+        if (el) el.textContent = t("agents.hostedError");
+      });
+    });
+    if (token) {
+      fetch(base + "/v1/agents", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+        return r.json();
+      }).then(function(json) {
+        var agents = json.data && json.data.agents || [];
+        agents.sort(function(a, b) {
+          var rank = function(m) {
+            return m === "task-runner" ? 0 : m === "autonomous" ? 1 : 2;
+          };
+          return rank(a.mode) - rank(b.mode);
+        });
+        var opts = agents.length ? agents.map(function(a) {
+          var label = a.name + (a.mode === "task-runner" ? " · task-runner" : a.mode ? " · " + a.mode : "");
+          var sel = a.name === "crew-forge" ? " selected" : "";
+          return '<option value="' + escapeHtml(a.name) + '"' + sel + ">" + escapeHtml(label) + "</option>";
+        }).join("") : '<option value="">' + t("agents.noRunnerOption") + "</option>";
+        defs.forEach(function(_, i2) {
+          var el = document.getElementById("aga-runner-" + i2);
+          if (el) el.innerHTML = opts;
+        });
+      }).catch(function() {
+      });
+      var me = null;
+      try {
+        me = JSON.parse(localStorage.getItem("aimeat_session")).owner || null;
+      } catch (e) {
+      }
+      if (me) {
+        fetch(base + "/v1/organisms?member=" + encodeURIComponent(me), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+          return r.json();
+        }).then(function(json) {
+          var orgs = json.data && json.data.organisms || [];
+          var opts = '<option value="">—</option>' + orgs.map(function(o) {
+            return '<option value="' + escapeHtml(o.id) + '">' + escapeHtml(o.name || o.id) + "</option>";
+          }).join("");
+          defs.forEach(function(_, i2) {
+            var el = document.getElementById("aga-organism-" + i2);
+            if (el) el.innerHTML = opts;
+          });
+        }).catch(function() {
+        });
+      }
+    }
+  }
+  function postAction(owner, filename, agentName, action, bodyObj, doneMsgFor) {
+    var token = getCortexOwnerToken();
+    if (!token) {
+      showNotice(t("agents.needLogin"));
+      return;
+    }
+    fetch(aimeatBase() + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/agents/" + encodeURIComponent(agentName) + "/" + action, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify(bodyObj)
+    }).then(function(r) {
+      return r.json();
+    }).then(function(json) {
+      if (json.ok) {
+        showNotice(doneMsgFor(json.data || {}));
+      } else {
+        var code = json.error && json.error.code;
+        showNotice(code === "RUNNER_NOT_FOUND" ? t("agents.noRunner") : json.error && json.error.message || t("agents.deployFailed"));
+      }
+    }).catch(function(err) {
+      showNotice(t("agents.deployFailed") + ": " + err.message);
+    });
+  }
+  function agentsDeploy(owner, filename, agentName, idx) {
+    var runnerEl = document.getElementById("aga-runner-" + idx);
+    var orgEl = document.getElementById("aga-organism-" + idx);
+    var body = {};
+    if (runnerEl && runnerEl.value) body.runner_agent = runnerEl.value;
+    if (orgEl && orgEl.value) body.organism_id = orgEl.value;
+    postAction(owner, filename, agentName, "deploy", body, function(d) {
+      return d.auto_activated ? t("agents.deployStarted") : t("agents.deployQueued");
+    });
+  }
+  function agentsUndeploy(owner, filename, agentName) {
+    postAction(owner, filename, agentName, "undeploy", {}, function() {
+      return t("agents.undeployQueued");
+    });
+  }
+
   // src/static/app-catalog/js/detail.js
   var refreshAll;
   var loadPublishedApps;
@@ -4796,12 +5067,12 @@
   var showPublishModal;
   var getMainApps;
   var getServerState;
-  var getServerManifests;
+  var getServerManifests2;
   var getOwnProtection;
   var setIframeUrl;
   var isOperatorSession;
   function initDetail(deps) {
-    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken: getCortexOwnerToken2, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder: openPromptBuilder2, showPublishModal, getMainApps, getServerState, getServerManifests, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
+    ({ refreshAll, loadPublishedApps, renderApps, updateModeToggle, getCortexOwnerToken: getCortexOwnerToken2, launchApp, viewPublished, viewSource, generateId: generateId2, generateSharePrompt, openPromptBuilder: openPromptBuilder2, showPublishModal, getMainApps, getServerState, getServerManifests: getServerManifests2, getOwnProtection, setIframeUrl, isOperatorSession } = deps);
   }
   var detailAppId = null;
   var detailDraftBlob = null;
@@ -5010,10 +5281,10 @@
       syncClass = "ok";
       syncText = t("detail.inSync");
     }
-    var aimeatBase = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
+    var aimeatBase2 = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
     var shotOwner = detailServerOwner(app);
     var shotFile = app.publishedFilename || "";
-    var shotUrl = app.published && shotOwner && shotFile && aimeatBase ? aimeatBase + "/v1/apps/" + encodeURIComponent(shotOwner) + "/" + encodeURIComponent(shotFile) + "/screenshot?t=" + Date.now() : "";
+    var shotUrl = app.published && shotOwner && shotFile && aimeatBase2 ? aimeatBase2 + "/v1/apps/" + encodeURIComponent(shotOwner) + "/" + encodeURIComponent(shotFile) + "/screenshot?t=" + Date.now() : "";
     var shotImg = shotUrl ? '<img src="' + escapeHtml(shotUrl) + `" alt="App screenshot" loading="lazy" onerror="this.style.display='none'" style="max-width:260px;max-height:160px;border-radius:8px;border:1px solid var(--border-subtle);object-fit:cover;object-position:top center;flex:none" />` : "";
     var statusHtml = '<div class="dtl-section"><h3>' + t("detail.status") + '</h3><div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div class="dtl-status-row"><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusLocal") + '</span><span class="dtl-stat-val">' + (app.blob ? fmtSize(localBytes) : isUrlApp ? "URL" : "—") + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusPublished") + '</span><span class="dtl-stat-val">' + escapeHtml(publishedV) + '</span></div></div><span class="dtl-sync ' + syncClass + '">' + escapeHtml(syncText) + "</span></div>" + shotImg + "</div></div>";
     var tags = app.tags && app.tags.length ? app.tags.join(", ") : "—";
@@ -5051,7 +5322,21 @@
       (ownPub ? '<div id="detail-skill-attach" style="margin-top:8px">' + detailSkillAttachInner() + "</div>" : "") + "</div>";
     }
     var monetizeHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + "</div>" : "";
-    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + monetizeHtml + mgmtHtml + actionsHtml;
+    var agentsHtml = "";
+    if (app.published) {
+      var agOwner = detailServerOwner(app);
+      var agFile = app.publishedFilename || "";
+      var agDefs = appManifestAgents(agOwner, agFile);
+      if (agDefs.length) {
+        agentsHtml = '<div class="dtl-section"><h3>🤖 ' + (t("agents.title") || "Bundled agents") + '</h3><div style="font-size:.85rem;color:var(--text-muted);margin-bottom:6px">' + (t("agents.declares") || "") + '</div><div style="margin-bottom:8px">' + agDefs.map(function(d) {
+          return '<span class="aga-chip">' + escapeHtml(d.agent_name || "") + "</span>";
+        }).join(" ") + "</div>" + dtlBtn(
+          "🤖 " + (t("agents.manage") || "Inspect & deploy"),
+          "window._launcher.showAppAgentsModal('" + jsArg(agOwner) + "', '" + jsArg(agFile) + "')"
+        ) + "</div>";
+      }
+    }
+    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + mgmtHtml + actionsHtml;
   }
   function detailLoadSkills(owner, filename) {
     var config = loadConfig();
@@ -5396,9 +5681,9 @@
     }).then(function(res) {
       if (res.ok && res.j && res.j.ok !== false) {
         var key = owner + "\n" + filename;
-        getServerManifests()[key] = getServerManifests()[key] || {};
-        getServerManifests()[key].name = newName;
-        getServerManifests()[key].description = newDesc;
+        getServerManifests2()[key] = getServerManifests2()[key] || {};
+        getServerManifests2()[key].name = newName;
+        getServerManifests2()[key].description = newDesc;
         finishLocal();
       } else {
         showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "Unknown error"));
@@ -5885,7 +6170,7 @@
       return;
     }
     var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    var meta = getServerManifests()[owner + "\n" + filename] || {};
+    var meta = getServerManifests2()[owner + "\n" + filename] || {};
     fetchAppContentBase64(aimeatUrl, owner, filename).then(function(b64) {
       var app = {
         id: generateId2(),
@@ -6116,7 +6401,7 @@
     var statusEl = document.getElementById("versions-status");
     statusEl.textContent = "Restoring version " + version + "…";
     statusEl.style.color = "#34d399";
-    var meta = getServerManifests()[owner + "\n" + filename] || {};
+    var meta = getServerManifests2()[owner + "\n" + filename] || {};
     fetchAppContentBase64(aimeatUrl, owner, filename, version).then(function(b64) {
       var body = {
         filename,
@@ -6822,7 +7107,7 @@
   // src/static/app-catalog/js/server-io.js
   var getMainApps3;
   var getServerState2;
-  var getServerManifests2;
+  var getServerManifests3;
   var setServerManifests;
   var getOwnServerApps;
   var setOwnServerApps;
@@ -6832,7 +7117,7 @@
   var renderApps4;
   var refreshAll2;
   function initServerIo(deps) {
-    ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests2, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId: generateId5, renderApps: renderApps4, refreshAll: refreshAll2 } = deps);
+    ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests3, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId: generateId5, renderApps: renderApps4, refreshAll: refreshAll2 } = deps);
   }
   var aimeatAppsCache = [];
   function formatFileSize(bytes) {
@@ -7611,7 +7896,7 @@
         setServerManifests({});
         for (var mi = 0; mi < serverApps.length; mi++) {
           var msa = serverApps[mi];
-          getServerManifests2()[(msa.owner || "") + "\n" + (msa.filename || "")] = msa.manifest || {};
+          getServerManifests3()[(msa.owner || "") + "\n" + (msa.filename || "")] = msa.manifest || {};
         }
         var ownApps = currentOwner ? serverApps.filter(function(a) {
           return sameOwner(a.owner, currentOwner);
@@ -7676,9 +7961,10 @@
       var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : "";
       var author = sa.manifest && sa.manifest.authorDisplay ? sa.manifest.authorDisplay : sa.owner || "";
       var viewUrl = aimeatUrl + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(sa.filename || "");
+      var shipsAgent = !!(sa.manifest && sa.manifest.cortex && sa.manifest.cortex.agents && sa.manifest.cortex.agents.length);
       html += '<div class="published-card"' + filterAttr(name, sa.manifest && sa.manifest.tags || []) + '><div class="published-card-name">' + escapeHtml(name) + "</div>" + (description ? '<div class="published-card-desc">' + escapeHtml(description) + "</div>" : "") + '<div class="published-card-footer"><div class="published-card-metaline"><span class="pcm-main" style="color:var(--accent)">&#x1F464; ' + escapeHtml(author) + "</span>" + (date ? '<span class="pcm-date">' + date + "</span>" : "") + `</div><div class="published-card-actions"><button onclick="window._launcher.viewPublished('` + escapeHtml(viewUrl) + "?mode=inline', '" + jsArg(name) + `')">` + t("card.view") + "</button>" + // Fork is offered on a community (someone else's) app only when its owner
       // marked it forkable; otherwise the server would reject the fork (403).
-      (sa.forkable ? `<button onclick="window._launcher.forkVersion('` + escapeHtml(sa.owner || "") + "', '" + escapeHtml(sa.filename || "") + "', " + (sa.version_number || 0) + ')" title="' + escapeHtml(t("card.forkHint")) + '">' + t("card.fork") + "</button>" : "") + "</div>" + (version || sa.forks && sa.forks > 0 ? '<div class="published-card-badgerow">' + (sa.forks && sa.forks > 0 ? '<span class="pcb-forks" title="' + escapeHtml(t("card.forksHint")) + `" onclick="window._launcher.showLineageModal('` + escapeHtml(sa.owner || "") + "', '" + escapeHtml(sa.filename || "") + `')">⑂ ` + sa.forks + "</span>" : "") + (version ? '<span class="pcb-version">' + escapeHtml(version) + "</span>" : "") + "</div>" : "") + "</div></div>";
+      (sa.forkable ? `<button onclick="window._launcher.forkVersion('` + escapeHtml(sa.owner || "") + "', '" + escapeHtml(sa.filename || "") + "', " + (sa.version_number || 0) + ')" title="' + escapeHtml(t("card.forkHint")) + '">' + t("card.fork") + "</button>" : "") + (shipsAgent ? `<button onclick="window._launcher.showAppAgentsModal('` + jsArg(sa.owner || "") + "', '" + jsArg(sa.filename || "") + `')" title="` + escapeHtml(t("card.agentHint")) + '">' + t("card.agent") + "</button>" : "") + "</div>" + (version || sa.forks && sa.forks > 0 || shipsAgent ? '<div class="published-card-badgerow">' + (shipsAgent ? '<span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">&#x1F916;</span>' : "") + (sa.forks && sa.forks > 0 ? '<span class="pcb-forks" title="' + escapeHtml(t("card.forksHint")) + `" onclick="window._launcher.showLineageModal('` + escapeHtml(sa.owner || "") + "', '" + escapeHtml(sa.filename || "") + `')">⑂ ` + sa.forks + "</span>" : "") + (version ? '<span class="pcb-version">' + escapeHtml(version) + "</span>" : "") + "</div>" : "") + "</div></div>";
     }
     grid.innerHTML = html;
     updateCommunityEmpty();
@@ -7967,6 +8253,7 @@
       var sa = serverApps[s];
       var fn = sa.filename || "";
       var prot = sa.manifest && sa.manifest.protection || {};
+      var shipsAgent = !!(sa.manifest && sa.manifest.cortex && sa.manifest.cortex.agents && sa.manifest.cortex.agents.length);
       var m = fn ? byFilename[fn] : null;
       if (m) {
         m.parked = !!sa.parked;
@@ -7976,6 +8263,7 @@
         m.forkable = !!sa.forkable;
         m.forks = sa.forks || 0;
         m.hasDraft = !!sa.has_draft;
+        m.hasAgents = shipsAgent;
         m.protection = prot;
         m.viewUrl = base + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn);
         if (!m.description && sa.manifest && sa.manifest.description) m.description = sa.manifest.description;
@@ -8004,7 +8292,8 @@
           viewUrl: base && fn ? base + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn) : "",
           forkable: !!sa.forkable,
           forks: sa.forks || 0,
-          protection: prot
+          protection: prot,
+          hasAgents: shipsAgent
         };
         entries.push(se);
         if (fn) byFilename[fn] = se;
@@ -8107,7 +8396,7 @@
     var st = libStatus(e);
     var dragAttrs = e.hasLocal ? ' draggable="true" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)"' : "";
     var menuBtn = e.hasLocal ? `<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')" title="` + escapeHtml(t("common.menu")) + '">⋮</button>' : "";
-    return '<div class="app-card' + (e.hasLocal ? "" : " server-only") + '" data-id="' + idAttr + '"' + dragAttrs + filterAttr(e.name, e.tags) + ' onclick="' + detailCall + '"' + (e.hasLocal ? ` oncontextmenu="window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')"` : "") + ' style="animation-delay:' + i * 0.04 + 's"><span class="app-status-badge st-' + st + '">' + escapeHtml(libStatusLabel(e)) + "</span>" + (e.hasDraft ? '<span class="app-staging-badge" title="' + escapeHtml(t("card.stagingHint")) + '">' + escapeHtml(t("card.stagingBadge")) + "</span>" : "") + menuBtn + '<div class="app-icon">' + escapeHtml(e.icon || "📝") + '</div><div class="app-name">' + escapeHtml(e.name) + (e.origin === "ai-published" ? ' <span class="ai-origin-badge">AI</span>' : "") + "</div>" + (e.description ? '<div class="app-source">' + escapeHtml(e.description) + "</div>" : '<div class="app-source">' + sourceLabel(e.source) + "</div>") + '<div class="app-actions">' + openBtns + '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t("ctx.details")) + "</button></div>" + (e.favorite ? '<span class="fav-star visible">⭐</span>' : "") + "</div>";
+    return '<div class="app-card' + (e.hasLocal ? "" : " server-only") + '" data-id="' + idAttr + '"' + dragAttrs + filterAttr(e.name, e.tags) + ' onclick="' + detailCall + '"' + (e.hasLocal ? ` oncontextmenu="window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')"` : "") + ' style="animation-delay:' + i * 0.04 + 's"><span class="app-status-badge st-' + st + '">' + escapeHtml(libStatusLabel(e)) + "</span>" + (e.hasDraft ? '<span class="app-staging-badge" title="' + escapeHtml(t("card.stagingHint")) + '">' + escapeHtml(t("card.stagingBadge")) + "</span>" : "") + menuBtn + '<div class="app-icon">' + escapeHtml(e.icon || "📝") + '</div><div class="app-name">' + escapeHtml(e.name) + (e.origin === "ai-published" ? ' <span class="ai-origin-badge">AI</span>' : "") + (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">🤖</span>' : "") + "</div>" + (e.description ? '<div class="app-source">' + escapeHtml(e.description) + "</div>" : '<div class="app-source">' + sourceLabel(e.source) + "</div>") + '<div class="app-actions">' + openBtns + '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t("ctx.details")) + "</button></div>" + (e.favorite ? '<span class="fav-star visible">⭐</span>' : "") + "</div>";
   }
   function renderRecentlyOpened() {
     var section = document.getElementById("recent-section");
@@ -8516,6 +8805,9 @@
     submitBackupRestore,
     showVersionsModal,
     showLineageModal,
+    showAppAgentsModal,
+    agentsDeploy,
+    agentsUndeploy,
     showProtectionModal,
     saveProtection,
     restoreVersion,
@@ -8596,6 +8888,9 @@
       setIframeUrl: setIframeUrl2,
       isOperatorSession: isOperatorSession2
     });
+    initAppAgents({ getServerManifests: function() {
+      return serverAppManifests;
+    } });
     initSettings({ generateId, renderApps: renderApps5, loadPublishedApps: loadPublishedApps3 });
     initAppsIo({ generateId, readFileAsText, renderApps: renderApps5, getMainApps: function() {
       return allApps;

@@ -227,6 +227,8 @@ function buildLibraryEntries(localApps, serverApps) {
     var sa = serverApps[s];
     var fn = sa.filename || '';
     var prot = (sa.manifest && sa.manifest.protection) || {};
+    // Agent-Bundled Apps: the card gets a 🤖 marker when the manifest declares crew-defs.
+    var shipsAgent = !!(sa.manifest && sa.manifest.cortex && sa.manifest.cortex.agents && sa.manifest.cortex.agents.length);
     var m = fn ? byFilename[fn] : null;
     if (m) {
       m.parked = !!sa.parked;
@@ -235,6 +237,7 @@ function buildLibraryEntries(localApps, serverApps) {
       m.versionNumber = sa.version_number || m.versionNumber;
       m.forkable = !!sa.forkable; m.forks = sa.forks || 0;
       m.hasDraft = !!sa.has_draft;
+      m.hasAgents = shipsAgent;
       m.protection = prot;
       // EXACTLY what the old "View" used: the CONSTRUCTED served URL (aimeatUrl/v1/apps/<owner>/<file>),
       // NOT the local publishedUrl — so Open opens the app top-level on its origin (and it SSOs)
@@ -255,7 +258,7 @@ function buildLibraryEntries(localApps, serverApps) {
         filename: fn, owner: sa.owner || '',
         versionNumber: sa.version_number || null,
         viewUrl: (base && fn) ? (base + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(fn)) : '',
-        forkable: !!sa.forkable, forks: sa.forks || 0, protection: prot
+        forkable: !!sa.forkable, forks: sa.forks || 0, protection: prot, hasAgents: shipsAgent
       };
       entries.push(se);
       if (fn) byFilename[fn] = se;
@@ -414,7 +417,8 @@ function libraryCardHtml(e, i) {
       menuBtn +
       '<div class="app-icon">' + escapeHtml(e.icon || '\u{1F4DD}') + '</div>' +
       '<div class="app-name">' + escapeHtml(e.name) +
-        (e.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') + '</div>' +
+        (e.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') +
+        (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') + '</div>' +
       (e.description
         ? '<div class="app-source">' + escapeHtml(e.description) + '</div>'
         : '<div class="app-source">' + sourceLabel(e.source) + '</div>') +

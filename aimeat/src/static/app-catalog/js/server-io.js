@@ -1045,6 +1045,9 @@ function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, curr
     var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '';
     var author = (sa.manifest && sa.manifest.authorDisplay) ? sa.manifest.authorDisplay : (sa.owner || '');
     var viewUrl = aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename || '');
+    // Agent-Bundled Apps: this app ships its own agent(s) — badge it and offer the
+    // Bundled-agents modal (inspect the crew-def, use a hosted instance, or deploy your own).
+    var shipsAgent = !!(sa.manifest && sa.manifest.cortex && sa.manifest.cortex.agents && sa.manifest.cortex.agents.length);
     html +=
       '<div class="published-card"' + filterAttr(name, (sa.manifest && sa.manifest.tags) || []) + '>' +
         '<div class="published-card-name">' + escapeHtml(name) + '</div>' +
@@ -1061,9 +1064,15 @@ function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, curr
             (sa.forkable
               ? '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', ' + (sa.version_number || 0) + ')" title="' + escapeHtml(t('card.forkHint')) + '">' + t('card.fork') + '</button>'
               : '') +
+            (shipsAgent
+              ? '<button onclick="window._launcher.showAppAgentsModal(\'' + jsArg(sa.owner || '') + '\', \'' + jsArg(sa.filename || '') + '\')" title="' + escapeHtml(t('card.agentHint')) + '">' + t('card.agent') + '</button>'
+              : '') +
           '</div>' +
-          ((version || (sa.forks && sa.forks > 0))
+          ((version || (sa.forks && sa.forks > 0) || shipsAgent)
             ? '<div class="published-card-badgerow">'
+              + (shipsAgent
+                ? '<span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">&#x1F916;</span>'
+                : '')
               + ((sa.forks && sa.forks > 0)
                 ? '<span class="pcb-forks" title="' + escapeHtml(t('card.forksHint')) + '" onclick="window._launcher.showLineageModal(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\')">⑂ ' + sa.forks + '</span>'
                 : '')

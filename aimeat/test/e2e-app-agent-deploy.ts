@@ -9,6 +9,8 @@
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-app-agent-deploy
  * @version-history
+ *   v1.1.0 — 2026-07-17 — Slice 2: hosted-instance discovery (instances endpoint, public-offer
+ *     pricing, is_yours, cross-owner private-offer filter on GET /offers).
  *   v1.0.0 — 2026-07-16 — Initial (Agent-Bundled Apps Slice 1, node side).
  */
 import * as ed from '@noble/ed25519';
@@ -320,6 +322,83 @@ async function main() {
             body: JSON.stringify({ owner: owner1, agent_name: 'foreign-agent' }),
         });
         assert(r.status === 200 && r.body.data.auto_approved !== true, `cross-owner: ${r.status} ${JSON.stringify(r.body.data)}`);
+    });
+
+    console.log('\nPhase 5: Hosted-instance discovery (use it hosted vs deploy your own)');
+    const offersDoc = (visibility: string | undefined) => ({
+        offers: [
+            {
+                id: 'joke-daily', title: 'Daily joke', ask: 'Ask me for one excellent joke on your topic',
+                cost: 'cheap', deliverable: { format: 'document', location: { key: 'jokes.latest' } },
+                price: { morsels: 5, unit: 'per-call' }, ...(visibility ? { visibility } : {}),
+            },
+            {
+                id: 'joke-secret', title: 'Secret internal joke', ask: 'Owner-only tuning run',
+                deliverable: { format: 'document', location: { key: 'jokes.secret' } },
+                price: { morsels: 999 }, visibility: 'private',
+            },
+        ],
+    });
+
+    await test('setup: owner2 hosts the DEPLOYED instance; owner1 runs the AUTHOR original', async () => {
+        // owner2 "deployed" the app's agent → registers under the shared deployed-name convention.
+        const dep = await registerAgent(owner2Token, owner2, DEPLOYED(), 'task-runner', ['memory:read', 'memory:write']);
+        // owner1 (the author) also runs the original under the plain agent_name.
+        await registerAgent(owner1Token, owner1, 'demo-joker', 'interactive', ['memory:read']);
+        // The host publishes offers on its instance: one PUBLIC (priced), one PRIVATE.
+        const put = await json(`/v1/agents/${DEPLOYED()}/offers`, {
+            method: 'PUT', headers: { Authorization: `Bearer ${dep.token}` },
+            body: JSON.stringify(offersDoc('public')),
+        });
+        assert(put.status === 200 && put.body.ok, `offers put: ${put.status} ${JSON.stringify(put.body)}`);
+    });
+
+    await test('instances endpoint (UNAUTHENTICATED) lists deployed host + author with sources', async () => {
+        const r = await json(`/v1/apps/${owner1}/${FILENAME}/agents/demo-joker/instances`);
+        assert(r.status === 200, `instances: ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.body.data.deployed_agent_name === DEPLOYED(), 'deployed name');
+        const list = r.body.data.instances;
+        const dep = list.find((x: any) => x.source === 'deployed');
+        const auth = list.find((x: any) => x.source === 'author');
+        assert(!!dep && dep.owner === owner2 && dep.name === DEPLOYED(), `deployed instance: ${JSON.stringify(dep)}`);
+        assert(!!auth && auth.owner === owner1 && auth.name === 'demo-joker', `author instance: ${JSON.stringify(auth)}`);
+    });
+
+    await test('instances carry ONLY public offers, with prices; private never leaks', async () => {
+        const r = await json(`/v1/apps/${owner1}/${FILENAME}/agents/demo-joker/instances`);
+        const dep = r.body.data.instances.find((x: any) => x.source === 'deployed');
+        assert(dep.offers.length === 1 && dep.offers[0].id === 'joke-daily', `offers: ${JSON.stringify(dep.offers)}`);
+        assert(dep.offers[0].price?.morsels === 5 && dep.offers[0].price?.unit === 'per-call', 'price surfaced');
+        assert(!dep.offers.some((o: any) => o.id === 'joke-secret'), 'private offer never listed');
+    });
+
+    await test('is_yours marks the viewer\'s own instance (authenticated view)', async () => {
+        const r = await json(`/v1/apps/${owner1}/${FILENAME}/agents/demo-joker/instances`, {
+            headers: { Authorization: `Bearer ${owner2Token}` },
+        });
+        const dep = r.body.data.instances.find((x: any) => x.source === 'deployed');
+        const auth = r.body.data.instances.find((x: any) => x.source === 'author');
+        assert(dep.is_yours === true, 'owner2 sees their instance flagged');
+        assert(auth.is_yours === false, 'author instance not theirs');
+    });
+
+    await test('SECURITY: cross-owner GET /offers filters private (owner still sees all)', async () => {
+        const gaii = `${DEPLOYED()}#${owner2}@${NODE_ID}`;
+        const cross = await json(`/v1/agents/${encodeURIComponent(gaii)}/offers`, {
+            headers: { Authorization: `Bearer ${owner1Token}` },
+        });
+        assert(cross.status === 200, `cross read: ${cross.status}`);
+        assert(cross.body.data.offers.length === 1 && cross.body.data.offers[0].id === 'joke-daily',
+            `cross-owner must see only public: ${JSON.stringify(cross.body.data.offers.map((o: any) => o.id))}`);
+        const own = await json(`/v1/agents/${encodeURIComponent(gaii)}/offers`, {
+            headers: { Authorization: `Bearer ${owner2Token}` },
+        });
+        assert(own.body.data.offers.length === 2, `owner sees all: ${own.body.data.offers.length}`);
+    });
+
+    await test('instances 404s for an undeclared agent (no directory scraping via app routes)', async () => {
+        const r = await json(`/v1/apps/${owner1}/${FILENAME}/agents/not-declared/instances`);
+        assert(r.status === 404 && r.body.error?.code === 'AGENT_NOT_DECLARED', `${r.status} ${r.body.error?.code}`);
     });
 
     console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
