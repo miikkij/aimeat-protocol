@@ -5,6 +5,7 @@
  *   DELETE /v1/admin/apps/:owner/:filename. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — catalogue listing metrics via 3 batch queries (downloads/forks/screenshots), was 3N
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -52,11 +53,22 @@ export function registerCatalogueAdminRoutes(
 
         const { apps, total } = await storage.listApps(opts);
 
-        const result = await Promise.all(apps.map(async (app) => {
-            const downloads = await storage.getAppDownloads(app.ownerGaii, app.filename);
-            const forks = await storage.countAppForks(app.ownerGaii, app.filename);
-            const screenshotFile = await storage.getStorageFile(app.ownerGaii, `apps/screenshots/${app.filename}`);
-            const hasScreenshot = !!screenshotFile;
+        // Per-app metrics in THREE batch queries (was getAppDownloads + countAppForks +
+        // getStorageFile PER app = 3N, up to ~600 for a full page).
+        const refs = apps.map(a => ({ ownerGaii: a.ownerGaii, filename: a.filename }));
+        const downloadsByApp = await storage.getAppDownloadsForApps(refs);
+        const forksByApp = await storage.countAppForksForApps(refs);
+        const filesByOwner = await storage.listStorageFilesForOwners([...new Set(apps.map(a => a.ownerGaii))]);
+        const screenshotKeys = new Set<string>();
+        for (const [gaii, files] of Object.entries(filesByOwner)) {
+            for (const f of files) if (f.key.startsWith('apps/screenshots/')) screenshotKeys.add(`${gaii} ${f.key}`);
+        }
+
+        const result = apps.map((app) => {
+            const metricKey = `${app.ownerGaii} ${app.filename}`;
+            const downloads = downloadsByApp[metricKey] ?? 0;
+            const forks = forksByApp[metricKey] ?? 0;
+            const hasScreenshot = screenshotKeys.has(`${app.ownerGaii} apps/screenshots/${app.filename}`);
             return {
                 owner: app.ownerName,
                 filename: app.filename,
@@ -76,7 +88,7 @@ export function registerCatalogueAdminRoutes(
                 screenshot_url: hasScreenshot ? `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}/screenshot` : null,
                 created_at: app.createdAt,
             };
-        }));
+        });
 
         // Federated peer apps (H1 + H2)
         const peerApps: Record<string, unknown>[] = [];
