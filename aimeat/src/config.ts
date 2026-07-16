@@ -458,6 +458,13 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // Scoped Agent Capabilities (REQ-006)
     defaultAgentScopes: (process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? 'memory:read,memory:write,memory:delete,catalogue:read').split(',').map(s => s.trim()),
     maxAgentScopes: (process.env.AIMEAT_MAX_AGENT_SCOPES ?? '*').split(',').map(s => s.trim()),
+    // Same-owner device-auth auto-approval (Agent-Bundled Apps): a device-authorize call
+    // authenticated as the SAME owner it registers for (owner session, or one of that owner's
+    // agents — e.g. crew-forge spawning a deployed sibling) is approved without the manual
+    // consent step. Cannot cross owners; an agent approver cannot grant scopes beyond its own
+    // (no escalation); approvedBy is recorded. Public-safe default ON — set false to force
+    // every registration through the manual consent page.
+    sameOwnerAutoApprove: process.env.AIMEAT_SAME_OWNER_AUTO_APPROVE !== 'false',
     // MCP audit Phase 3 (F1): enforce per-agent scopes on the public /v1/mcp tool surface
     // (mirrors the REST requireScope gates). Default true — closes the least-privilege hole.
     // Set false for a warn-only rollout: tools are still registered, but would-be-filtered

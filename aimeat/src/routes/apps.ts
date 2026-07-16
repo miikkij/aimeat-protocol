@@ -92,6 +92,8 @@
  *     manifest to category 'utility' + empty cortex refs + no icon (TARGET-021 Aalto 1).
  *   v1.19.0 -- 2026-07-13 -- Split route handlers into sibling modules under ./apps/ (max-file-lines);
  *     pure extraction, registration order + behavior preserved.
+ *   v1.20.0 -- 2026-07-16 -- Agent-Bundled Apps Slice 1: apps/agents-deploy.ts — deploy/undeploy/
+ *     status for crew-defs declared under manifest.cortex.agents (owner-scoped pointer tasks).
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -104,6 +106,7 @@ import { registerReadRoutes } from './apps/read.js';
 import { registerPublishRoutes } from './apps/publish.js';
 import { registerDraftRoutes } from './apps/drafts.js';
 import { registerForkManageRoutes } from './apps/fork-manage.js';
+import { registerAppAgentRoutes } from './apps/agents-deploy.js';
 
 export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
     const router = Router();
@@ -128,6 +131,7 @@ export function appsRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     registerPublishRoutes(router, config, storage, canonicalOwner);
     registerDraftRoutes(router, config, storage, canonicalOwner);
     registerForkManageRoutes(router, config, storage, canonicalOwner);
+    registerAppAgentRoutes(router, config, storage);
 
     return router;
 }

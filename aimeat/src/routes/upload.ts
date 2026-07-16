@@ -22,6 +22,8 @@
  *     and published into the skills registry.
  *   v1.3.0 — 2026-07-11 — handleStorageUpload response carries owner_gaii + embed_url/embed_markdown
  *     (the owner-addressed /v1/pub embed form; see services/doc-images).
+ *   v1.4.0 — 2026-07-16 — handleAppUpload carries usesCortex + cortex.agents forward on update
+ *     (presigned meta cannot express them; a re-upload never strips cortex deps / bundled agents).
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -149,11 +151,15 @@ async function handleAppUpload(
     if (meta.icon) manifest.icon = meta.icon as string;
 
     // Carry the parked state forward across re-publishes (a parked app stays hidden
-    // when updated). Mirrors POST /v1/apps.
+    // when updated). Mirrors POST /v1/apps. The presigned meta cannot carry cortex refs
+    // or crew-defs, so usesCortex + cortex.agents are ALWAYS carried from the live app —
+    // a presigned re-upload never silently strips the app's cortex deps or bundled agents.
     let parkedState = false;
     if (isUpdate) {
         const existingApp = await storage.getApp(ownerGaii, filename);
         parkedState = !!existingApp?.parked;
+        if (existingApp?.manifest?.usesCortex?.length) manifest.usesCortex = existingApp.manifest.usesCortex;
+        if (existingApp?.manifest?.cortex?.agents?.length) manifest.cortex = existingApp.manifest.cortex;
     }
 
     await storage.createApp({
