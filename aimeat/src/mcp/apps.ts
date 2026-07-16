@@ -20,6 +20,9 @@
  *     forked_from.
  *   v1.5.0 -- 2026-07-16 -- aimeat_app_list metrics via 2 batch queries (getAppDownloadsForApps +
  *     countAppForksForApps), was getAppDownloads + countAppForks PER app (Phase 3).
+ *   v1.6.0 -- 2026-07-16 -- Agent-Bundled Apps Slice 1: aimeat_app_publish accepts cortex_agents
+ *     (declarative crew-defs → manifest.cortex.agents), validated fail-loud; carried forward on
+ *     update + draft save when omitted.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -30,6 +33,7 @@ import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { generateDraftToken } from '../services/draft-token.js';
+import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 
@@ -55,9 +59,11 @@ export function registerAppsTools(
             tags: z.array(z.string()).optional().describe('Array of tags for search/filtering'),
             icon: z.string().optional().describe('Emoji icon for the app'),
             version: z.string().optional().describe('Semver display version (e.g. "1.0.0"). Auto-generated if omitted.'),
+            cortex_agents: z.array(z.record(z.string(), z.unknown())).optional().describe(
+                'Declarative crew-defs this app ships (Agent-Bundled Apps). Each entry is a crewaimeat crew_def JSON document (agent_name, agents[], tasks[], ...) validated at publish — DATA the owner\'s own fleet interprets, never code. Stored as manifest.cortex.agents. Omit on update to carry the existing list forward; send [] to clear.'),
         },
         annotationsFor('aimeat_app_publish'),
-        async ({ filename, content_base64, name, description, category, tags, icon, version }) => {
+        async ({ filename, content_base64, name, description, category, tags, icon, version, cortex_agents }) => {
             const agentGaii = getAgentGaii();
             const parsed = parseGAII(agentGaii);
             if (!parsed) {
@@ -131,6 +137,17 @@ export function registerAppsTools(
                 }
             }
 
+            // Agent-Bundled Apps: validate declared crew-defs fail-loud — a malformed
+            // agents[] rejects the publish so it never reaches a fleet. Mirrors POST /v1/apps.
+            let cortexAgents: Record<string, unknown>[] | undefined;
+            if (cortex_agents !== undefined) {
+                const check = validateCortexAgents(cortex_agents);
+                if (!check.ok) {
+                    return { content: [{ type: 'text' as const, text: `Invalid cortex_agents (crew-def validation failed):\n${check.errors.join('\n')}` }], isError: true };
+                }
+                cortexAgents = check.agents as unknown as Record<string, unknown>[];
+            }
+
             const manifest: AppManifest = {
                 name,
                 description: effectiveDescription,
@@ -141,6 +158,7 @@ export function registerAppsTools(
                 usesCortex: [],
             };
             if (icon) manifest.icon = icon;
+            if (cortexAgents !== undefined && cortexAgents.length > 0) manifest.cortex = { agents: cortexAgents };
 
             // Carry the parked + forkable + copy-protection state forward across
             // re-publishes (an update never silently re-exposes a parked app, flips fork
@@ -152,6 +170,11 @@ export function registerAppsTools(
                 parkedState = !!existingApp?.parked;
                 forkableState = !!existingApp?.forkable;
                 if (existingApp?.manifest?.protection) manifest.protection = existingApp.manifest.protection;
+                // cortex.agents carried forward when omitted (an update never silently drops
+                // the app's bundled agents); an explicit [] clears the section.
+                if (cortex_agents === undefined && existingApp?.manifest?.cortex?.agents?.length) {
+                    manifest.cortex = existingApp.manifest.cortex;
+                }
             }
 
             try {
@@ -238,6 +261,7 @@ export function registerAppsTools(
             };
             if (icon ?? base?.icon) manifest.icon = icon ?? base?.icon;
             if (base?.protection) manifest.protection = base.protection;
+            if (base?.cortex?.agents?.length) manifest.cortex = base.cortex;
             try {
                 await storage.saveAppDraft({
                     ownerGaii, ownerName: parsed.owner, filename, manifest,

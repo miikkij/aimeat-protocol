@@ -8,8 +8,11 @@
  *   - uploadApp(filename, contentBase64, mimeType, opts): POST a new app + optional screenshot
  *   - deleteApp(filename): DELETE an app by filename
  *   - patchApp(filename, updates): PATCH app metadata (name/description/access_code/parked)
+ *   - deployAppAgent / undeployAppAgent / appAgentStatus: Agent-Bundled Apps — deploy the
+ *     crew-defs an app declares (manifest.cortex.agents) onto YOUR OWN fleet + read liveness
  *
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Agent-Bundled Apps Slice 1: deploy/undeploy/status service calls
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, apiDelete, apiPatch, api } from '/js/api.js';
@@ -45,4 +48,29 @@ export async function deleteApp(filename) {
 /** Update app metadata (name, description, access_code, parked). The URL never changes. */
 export async function patchApp(filename, updates) {
   return apiPatch('/v1/apps/' + encodeURIComponent(filename), updates);
+}
+
+const appAgentUrl = (owner, filename, agentName, tail) =>
+  '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(filename)
+  + '/agents/' + encodeURIComponent(agentName) + '/' + tail;
+
+/** Deploy an app's bundled agent onto YOUR OWN fleet (creates a deploy-app-agent task). */
+export async function deployAppAgent(owner, filename, agentName, opts = {}) {
+  return api(appAgentUrl(owner, filename, agentName, 'deploy'), {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+/** Signal your fleet to stop + deregister an app's deployed agent. */
+export async function undeployAppAgent(owner, filename, agentName, opts = {}) {
+  return api(appAgentUrl(owner, filename, agentName, 'undeploy'), {
+    method: 'POST',
+    body: JSON.stringify(opts),
+  });
+}
+
+/** Liveness of an app's bundled agent on your fleet (registration + deploy memory key). */
+export async function appAgentStatus(owner, filename, agentName) {
+  return apiGet(appAgentUrl(owner, filename, agentName, 'status'));
 }

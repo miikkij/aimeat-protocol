@@ -3,8 +3,22 @@
  * @description App, subdomain, CSM/MSM/schema, system-prompt, and package/template record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — AppManifest gains `cortex.agents` (Agent-Bundled Apps Slice 1):
+ *     declarative crew-defs an app ships, validated at publish (crew-def-schemas.ts).
  */
 import type { SemanticAnnotation, SemanticContext } from './common.js';
+
+/**
+ * The `cortex` section of an app manifest. `agents` carries the DECLARATIVE crew-defs
+ * the app ships (crewaimeat crew_def shape) — validated against CrewDefSchema at
+ * publish, stored as data, NEVER executed by the node. The owner's own fleet reads
+ * them back via app_get (`manifest.cortex.agents`) on a deploy-app-agent task.
+ * Stored loosely typed so the storage layer stays decoupled from the Zod model.
+ */
+export interface AppManifestCortex {
+  agents?: Record<string, unknown>[];
+}
+
 export interface AppManifest {
   name: string;
   description: string;
@@ -14,6 +28,7 @@ export interface AppManifest {
   icon?: string;
   authorDisplay: string;
   usesCortex: string[];         // cortex extension names used
+  cortex?: AppManifestCortex;   // agent-bundled apps: declarative crew-defs (see above)
   priceMorsels?: number;        // 0 or absent = free
   licenseType?: 'single' | 'lifetime';
   // Provenance: when this app was created by forking another app, this records the

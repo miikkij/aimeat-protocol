@@ -2420,6 +2420,71 @@ components:
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
+    CrewDef:
+      type: object
+      description: |
+        Agent-Bundled Apps: one DECLARATIVE crew-def (the crewaimeat crew_def JSON shape) an
+        app ships under manifest.cortex.agents. Pure data - the node validates it at publish
+        and the OWNER's own fleet interprets it against vetted building blocks; neither ever
+        executes app-supplied code. Unknown extra top-level keys are allowed (forward compat);
+        all listed fields are validated strictly. At least one task description must inject
+        the literal placeholder {{ctx.prompt}}.
+      required: [agent_name, agents, tasks]
+      properties:
+        agent_name:
+          type: string
+          pattern: '^[a-z0-9][a-z0-9-]{2,31}$'
+          description: 3-32 chars, so the fleet's deployed name (<agent_name>-<slug(app_id)>) fits the node's 64-char agent-name cap
+        readme_md: { type: string, maxLength: 20000 }
+        temperature: { type: number, minimum: 0, maximum: 2 }
+        llm_profile: { type: string, description: Fleet LLM profile name (e.g. content | coding | content-free) }
+        tags: { type: array, maxItems: 20, items: { type: string } }
+        capabilities: { type: object }
+        offers: { type: array, maxItems: 20, items: {} }
+        skills:
+          type: array
+          maxItems: 20
+          items: { type: string }
+          description: Skill names that must already exist in the fleet's local skills dir (Slice 1 - not auto-pulled)
+        agents:
+          type: array
+          minItems: 1
+          maxItems: 10
+          items:
+            type: object
+            required: [role, goal]
+            properties:
+              role: { type: string, maxLength: 256 }
+              goal: { type: string, maxLength: 4000 }
+              backstory: { type: string, maxLength: 8000 }
+              tools:
+                type: array
+                maxItems: 16
+                items: { type: string, pattern: '^[a-z0-9_-]{1,64}$' }
+                description: Tool NAMES resolved fleet-side against the vetted forge_catalog (unknown tool = fleet rejects)
+              skills: { type: array, maxItems: 20, items: { type: string } }
+              allow_delegation: { type: boolean }
+        tasks:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: object
+            required: [description, expected_output, agent]
+            properties:
+              id: { type: string, maxLength: 128 }
+              description: { type: string, maxLength: 10000 }
+              expected_output: { type: string, maxLength: 4000 }
+              agent: { type: string, description: "Must equal a declared agents[].role" }
+              context:
+                type: array
+                maxItems: 20
+                items: { type: string }
+                description: ids of EARLIER tasks only (a DAG; forward/unknown refs are rejected)
+              async: { type: boolean }
+        process: { type: string, enum: [sequential, hierarchical] }
+        signals: { type: object, description: crewaimeat workflow signal shape (required_to_function / success_signal / deliverable_location) }
+
     AppSummary:
       type: object
       description: Catalogue/publish view of an app (latest version), as returned by the apps endpoints.
@@ -5572,6 +5637,14 @@ paths:
       description: |
         Initiate device authorization flow (RFC 8628). Returns a device code and
         user code. The user visits the verification URI to approve the agent.
+
+        SAME-OWNER AUTO-APPROVAL: when the call carries a valid Authorization header of the
+        SAME owner it registers for (the owner session, or one of that owner's agents — e.g.
+        a crew-forge registering an agent it just deployed), the request is approved
+        immediately (`auto_approved: true`) and the first device-token poll returns the
+        credentials — no manual consent step. Never cross-owner; an agent approver cannot
+        grant scopes beyond its own token's (such requests stay pending for manual consent).
+        Operators can disable with AIMEAT_SAME_OWNER_AUTO_APPROVE=false.
       tags: [Identity]
       requestBody:
         required: true
@@ -5591,6 +5664,13 @@ paths:
                   type: string
                 description:
                   type: string
+                scopes:
+                  type: array
+                  items: { type: string }
+                  description: |
+                    Requested scopes — honored ONLY on the same-owner auto-approval path
+                    (defaults to the node's default agent scopes). The manual consent flow
+                    keeps scope selection with the owner on the consent page.
       responses:
         '200':
           description: Device authorization initiated
@@ -5618,6 +5698,12 @@ paths:
                           interval:
                             type: integer
                             example: 5
+                          status:
+                            type: string
+                            enum: [pending, approved]
+                            description: approved = same-owner auto-approval fired; poll device-token once for credentials
+                          auto_approved:
+                            type: boolean
         '400':
           $ref: '#/components/responses/BadRequest'
         '429':
@@ -13206,6 +13292,24 @@ paths:
                 screenshot_mime_type: { type: string }
                 price_morsels: { type: number }
                 license_type: { type: string, enum: [single, lifetime] }
+                uses_cortex:
+                  type: array
+                  items: { type: string }
+                  description: Cortex extension names the app uses (carried forward on update when omitted)
+                cortex:
+                  type: object
+                  description: |
+                    Agent-Bundled Apps: `cortex.agents` carries the DECLARATIVE crew-defs this app
+                    ships (crewaimeat crew_def JSON - agent_name, agents[], tasks[], optional
+                    llm_profile/skills/signals). Validated fail-loud at publish (error code
+                    INVALID_CREW_DEF); a non-conforming agents[] REJECTS the publish. Stored as
+                    manifest.cortex.agents - data the OWNER's own fleet interprets, never code.
+                    Omitted on update = carried forward; send { "agents": [] } to clear.
+                  properties:
+                    agents:
+                      type: array
+                      maxItems: 5
+                      items: { $ref: '#/components/schemas/CrewDef' }
       responses:
         '201':
           description: App published or updated
@@ -13926,6 +14030,137 @@ paths:
                                 from: { type: string }
                                 to: { type: string }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/apps/{owner}/{filename}/agents/{agentName}/deploy:
+    post:
+      operationId: deployAppAgent
+      summary: Deploy an app's bundled agent onto YOUR OWN fleet
+      description: |
+        Agent-Bundled Apps (Slice 1, single-tenant): creates a pointer task (scope kind
+        `deploy-app-agent` with app_id/agent_name/owner) on the AUTHENTICATED owner's own
+        runner agent (default `crew-forge`). The fleet reads the crew-def back via app_get
+        (manifest.cortex.agents) and instantiates the agent itself - the node never executes
+        a crew-def. HARD GUARD: the target owner is ALWAYS the requester; a supplied
+        owner/target_owner naming anyone else is 403 CROSS_OWNER_FORBIDDEN. If the runner is
+        in task-runner mode the task auto-activates (one-click deploy).
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: agentName, in: path, required: true, schema: { type: string }, description: crew-def agent_name declared in manifest.cortex.agents }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                runner_agent: { type: string, description: "Your runner agent's name (default: crew-forge)" }
+                organism_id: { type: string, description: Optional organism the deployed agent should serve }
+      responses:
+        '201':
+          description: Deploy task created on the owner's own fleet
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task_id: { type: string }
+                          task_status: { type: string, enum: [queued, active] }
+                          auto_activated: { type: boolean }
+                          kind: { type: string, enum: [deploy-app-agent] }
+                          app_id: { type: string, description: "<owner>/<filename> pointer the fleet resolves via app_get" }
+                          agent_name: { type: string }
+                          deployed_agent_name: { type: string, description: "<agent_name>-<slug(app_id)> (shared derivation, max 64 chars)" }
+                          runner_agent: { type: string }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403': { description: CROSS_OWNER_FORBIDDEN (foreign target owner) or missing task:write app-grant scope }
+        '404': { description: App not found, agent not declared in manifest.cortex.agents, or RUNNER_NOT_FOUND }
+
+  /v1/apps/{owner}/{filename}/agents/{agentName}/undeploy:
+    post:
+      operationId: undeployAppAgent
+      summary: Undeploy an app's bundled agent from YOUR OWN fleet
+      description: |
+        Mirror of deploy with scope kind `undeploy-app-agent`: signals the owner's own fleet to
+        stop the deployed agent's daemon, deregister its materialized files, and flip the
+        `agents.<deployed_agent_name>.deploy` memory key to status `undeployed`. Reversible -
+        a later deploy task re-installs. Same guards as deploy.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: agentName, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                runner_agent: { type: string, description: "Your runner agent's name (default: crew-forge)" }
+      responses:
+        '201':
+          description: Undeploy task created on the owner's own fleet
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403': { description: CROSS_OWNER_FORBIDDEN (foreign target owner) }
+        '404': { description: App not found, agent not declared, or RUNNER_NOT_FOUND }
+
+  /v1/apps/{owner}/{filename}/agents/{agentName}/status:
+    get:
+      operationId: appAgentDeployStatus
+      summary: Liveness of an app's bundled agent on YOUR OWN fleet
+      description: |
+        Derives the fleet's deployed name (`<agent_name>-<slug(app_id)>`) and reports the
+        deployment state as the app UI reads it: whether that agent identity is registered
+        (+ last_seen) and the value of the `agents.<deployed_agent_name>.deploy` memory key
+        the fleet writes on success (checked under the deployed agent's, the runner's and the
+        owner's namespaces - all the requester's own). `live` is true when the key reports
+        status "live" (or, when no key exists yet, when the identity is registered).
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: agentName, in: path, required: true, schema: { type: string } }
+        - { name: runner_agent, in: query, schema: { type: string }, description: "Runner whose namespace to also check (default: crew-forge)" }
+      responses:
+        '200':
+          description: Deployment status
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          app_id: { type: string }
+                          agent_name: { type: string }
+                          deployed_agent_name: { type: string }
+                          registered: { type: boolean }
+                          last_seen: { type: string, nullable: true }
+                          deploy_state: { description: "Raw value of agents.<name>.deploy (null when the fleet has not written it)" }
+                          live: { type: boolean }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404': { description: App not found or agent not declared }
 
   /v1/apps/{owner}/{filename}/screenshot:
     parameters:

@@ -3,27 +3,209 @@
  * @description RFC 8628 device authorization flow routes (authorize, token poll, consent info, verify submit). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from agents.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — Same-owner auto-approval (Agent-Bundled Apps): a device-authorize call
+ *     authenticated as the SAME owner (owner session or that owner's agent, e.g. crew-forge
+ *     spawning a deployed sibling) is approved immediately — no manual consent step. Guards:
+ *     never cross-owner, an agent approver cannot grant scopes beyond its own token's, and the
+ *     approval is attributed (approvedBy). Config gate: sameOwnerAutoApprove (default on).
+ *     Approve flow extracted to approveDeviceAuth(), shared with the /verify consent path.
  */
-import type { Router } from 'express';
+import type { Router, Request } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
-import type { Storage } from '../../storage/interface.js';
+import type { Storage, DeviceAuthorizationRecord } from '../../storage/interface.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
 import { validateAgentName, buildGAII, generateUserCode } from '../../utils/gaii.js';
 import { executeHooks } from '../../services/hooks.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { verifyJWT, issueJWT, generateSessionId } from '../../auth/jwt.js';
+import { optionalAuth } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { emitChange } from '../../services/event-bus.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { detectPlatform } from '../../services/platform-detector.js';
 import { DEVICE_AUTH_EXPIRY_MS, VALID_MODES } from './constants.js';
 
+/** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
+function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
+  if (config.maxAgentScopes.includes('*')) return [];
+  return finalScopes.filter((s: string) => {
+    if (s === '*') return true; // only operator can have global wildcard
+    const [domain] = s.split(':');
+    return !config.maxAgentScopes.includes(s) && !config.maxAgentScopes.includes(`${domain}:*`);
+  });
+}
+
+/**
+ * The APPROVE flow shared by the /verify consent submission and same-owner auto-approval:
+ * registration hooks → create agent (or rotate keys on an existing one) → issue the agent
+ * JWT → stash credentials on the device-auth record for the poll → auto-start onboarding.
+ * Scope validation happens BEFORE this is called (the two callers differ in how).
+ */
+async function approveDeviceAuth(
+  config: AimeatConfig,
+  storage: Storage,
+  request: DeviceAuthorizationRecord,
+  approvedBy: string,
+  finalScopes: string[],
+  userAgent: string | undefined,
+): Promise<{ ok: true; gaii: string; existing: boolean } | { ok: false; status: number; code: string; message: string }> {
+  // Pre-registration hook
+  const hookResult = await executeHooks(config, storage, 'pre_agent_registration', {
+    name: request.agentName,
+    owner: request.ownerName,
+    display_name: request.displayName,
+  });
+  if (!hookResult.allowed) {
+    return { ok: false, status: 403, code: 'HOOK_REJECTED', message: hookResult.reason ?? 'Agent registration denied by extension hook' };
+  }
+
+  // Check if agent already exists — if so, issue new JWT for existing agent
+  const gaii = buildGAII(request.agentName, request.ownerName, config.nodeId);
+  const existing = await storage.getAgent(gaii);
+  let keyPair: { privateKey: string; publicKey: string };
+  const now = new Date().toISOString();
+
+  if (existing) {
+    // Existing agent: generate new keypair (rotate keys) and issue JWT
+    keyPair = await generateKeyPair();
+    await storage.updateAgent(gaii, {
+      publicKey: keyPair.publicKey,
+      defaultScopes: finalScopes,
+      lastSeen: now,
+    });
+  } else {
+    // New agent: create from scratch
+    keyPair = await generateKeyPair();
+
+    await storage.createAgent({
+      name: request.agentName,
+      owner: request.ownerName,
+      gaii,
+      displayName: request.displayName ?? request.agentName,
+      description: request.description,
+      capabilities: [],
+      defaultScopes: finalScopes,
+      publicKey: keyPair.publicKey,
+      trustScore: 50,
+      morselBalance: 0,
+      createdAt: now,
+      lastSeen: now,
+      mode: request.mode ?? 'interactive',
+    });
+
+    // Post-registration hook
+    fireHook(config, storage, 'post_agent_registration', { gaii, owner: request.ownerName });
+  }
+
+  // Issue long-lived JWT for the agent
+  const sessionId = generateSessionId();
+  const agentJwt = await issueJWT({
+    sub: gaii,
+    owner: request.ownerName,
+    node: config.nodeId,
+    roles: ['agent'],
+    scopes: finalScopes,
+  }, config.agentJwtTtlSeconds, sessionId);
+
+  const expiresAt = new Date(Date.now() + config.agentJwtTtlSeconds * 1000).toISOString();
+
+  // Store credentials + JWT for agent to poll
+  await storage.updateDeviceAuth(request.deviceCode, {
+    status: 'approved',
+    scopes: finalScopes,
+    approvedBy,
+    agentCredentials: {
+      gaii,
+      privateKey: keyPair.privateKey,
+      publicKey: keyPair.publicKey,
+      token: agentJwt,
+      expires_at: expiresAt,
+    },
+  });
+  emitChange('agents');
+
+  // ── Auto-start Hello Integration onboarding ──
+  const onboardingSteps = createDefaultSteps(request.mode ?? 'interactive');
+  onboardingSteps[0].status = 'passed';
+  onboardingSteps[0].validatedAt = now;
+  onboardingSteps[0].validationMethod = 'automatic';
+  onboardingSteps[0].details = { createdAt: existing?.createdAt ?? now };
+
+  const detectedPlatform = detectPlatform(userAgent);
+  const platformStepDA = onboardingSteps.find(s => s.id === 'identify_platform');
+  if (detectedPlatform && platformStepDA) {
+    platformStepDA.status = 'passed';
+    platformStepDA.validatedAt = now;
+    platformStepDA.validationMethod = 'automatic';
+    platformStepDA.details = { platform: detectedPlatform.id, version: detectedPlatform.version };
+    await storage.updateAgent(gaii, {
+      platform: detectedPlatform.id,
+      platformVersion: detectedPlatform.version,
+      platformDetectedBy: detectedPlatform.detectedBy,
+    });
+  }
+
+  const existingOnboarding = await storage.getOnboarding(gaii);
+  if (!existingOnboarding) {
+    // Test task only when the agent's Hello Integration includes accept_test_task
+    const acceptStepDA = onboardingSteps.find(s => s.id === 'accept_test_task');
+    if (acceptStepDA) {
+      const testTaskId = randomUUID();
+      await storage.createAgentTask({
+        id: testTaskId,
+        agentGaii: gaii,
+        ownerGaii: `${request.ownerName}@${config.nodeId}`,
+        title: 'Onboarding verification',
+        description: 'This is a test task created during Hello Integration. Propose todos, get approval, execute, and complete.',
+        status: 'queued',
+        scope: [],
+        rules: [],
+        todos: [],
+        verification: { userExpects: 'Agent completes the onboarding test task successfully', technicalChecks: [] },
+        createdAt: now,
+        updatedAt: now,
+      });
+      acceptStepDA.details = { testTaskId };
+    }
+    await storage.createOnboarding({
+      agentGaii: gaii,
+      status: 'in_progress',
+      startedAt: now,
+      steps: onboardingSteps,
+      detectedPlatform: detectedPlatform?.id,
+    });
+    emitChange('agent-onboarding');
+  }
+
+  return { ok: true, gaii, existing: !!existing };
+}
+
+/**
+ * Same-owner auto-approval eligibility: the request must be authenticated (never anonymous)
+ * as the SAME owner the registration is for — either the owner session itself, or one of
+ * that owner's agents. App grants and ecosystem principals never qualify. An agent approver
+ * additionally may not grant scopes beyond its own token's (checked by the caller).
+ */
+function autoApprovePrincipal(req: Request, owner: string): { kind: 'owner' | 'agent'; scopes: string[] } | null {
+  const auth = req.auth;
+  if (!auth || auth.anonymous) return null;
+  const roles = auth.roles as string[];
+  if (roles.includes('app') || roles.includes('ecosystem')) return null;
+  const bare = auth.owner.includes('@') ? auth.owner.split('@')[0] : auth.owner;
+  if (bare !== owner) return null;
+  if (roles.includes('agent')) return { kind: 'agent', scopes: (auth.scopes ?? []) as string[] };
+  if (roles.includes('owner')) return { kind: 'owner', scopes: [] };
+  return null;
+}
+
 export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
-  // POST /v1/agents/device-authorize — start device authorization flow (RFC 8628)
-  router.post('/v1/agents/device-authorize', async (req, res) => {
-    const { agent_name, display_name, description, owner, mode } = req.body ?? {};
+  // POST /v1/agents/device-authorize — start device authorization flow (RFC 8628).
+  // optionalAuth: an UNAUTHENTICATED call gets the standard pending flow (owner approves in
+  // the profile Agents tab); a call authenticated as the SAME owner is auto-approved below.
+  router.post('/v1/agents/device-authorize', optionalAuth(), async (req, res) => {
+    const { agent_name, display_name, description, owner, mode, scopes } = req.body ?? {};
 
     if (!owner) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'owner is required'));
@@ -69,7 +251,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     const now = new Date();
     const expiresAt = new Date(now.getTime() + DEVICE_AUTH_EXPIRY_MS);
 
-    await storage.createDeviceAuth({
+    const authRequest: DeviceAuthorizationRecord = {
       deviceCode,
       userCode,
       ownerName: owner,
@@ -81,7 +263,52 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       expiresAt: expiresAt.toISOString(),
       pollInterval: 5,
       mode: mode ?? 'interactive',
-    });
+    };
+    await storage.createDeviceAuth(authRequest);
+
+    // ── Same-owner auto-approval (Agent-Bundled Apps friction-killer) ──
+    // A request authenticated as the owner it registers FOR — the owner session, or one of
+    // that owner's already-approved agents (crew-forge registering the agent it just
+    // deployed) — skips the manual consent step: the agent is created and the credentials
+    // are staged so the very first device-token poll returns them. Hard limits: never
+    // cross-owner (a foreign or anonymous caller falls through to the normal pending flow),
+    // an AGENT approver can only grant scopes its own token already holds (no escalation),
+    // and approvedBy records who approved. The cross-owner case keeps RFC 8628 semantics
+    // untouched — Slice 1 forbids it anyway.
+    let autoApproved = false;
+    let autoApproveNote: string | undefined;
+    const requestedScopes: string[] = Array.isArray(scopes)
+      ? scopes.filter((s: unknown) => typeof s === 'string')
+      : config.defaultAgentScopes;
+    const principal = config.sameOwnerAutoApprove ? autoApprovePrincipal(req, owner) : null;
+    if (principal) {
+      const invalid = scopesExceedNodeMax(config, requestedScopes);
+      if (invalid.length > 0) {
+        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Scopes exceed node maximum: ${invalid.join(', ')}`));
+        return;
+      }
+      const escalating = principal.kind === 'agent' && !principal.scopes.includes('*')
+        ? requestedScopes.filter(s =>
+            !principal.scopes.includes(s) && !principal.scopes.includes(`${s.split(':')[0]}:*`))
+        : [];
+      if (escalating.length > 0) {
+        // No escalation via a sibling: fall through to the manual consent flow where the
+        // OWNER decides — the request stays pending rather than failing the registration.
+        autoApproveNote = `Scopes beyond the approving agent's own (${escalating.join(', ')}) need the owner's manual approval.`;
+      } else {
+        const approvedByGaii = principal.kind === 'agent' ? req.auth!.sub : owner;
+        const result = await approveDeviceAuth(
+          config, storage, authRequest, approvedByGaii, requestedScopes,
+          req.headers['user-agent'] as string | undefined,
+        );
+        if (!result.ok) {
+          await storage.updateDeviceAuth(deviceCode, { status: 'denied' });
+          res.status(result.status).json(error(config.nodeId, result.code, result.message));
+          return;
+        }
+        autoApproved = true;
+      }
+    }
 
     const baseUrl = `${req.protocol}://${req.get('host')}`;
     const verificationUri = `${baseUrl}/v1/agents/verify`;
@@ -96,9 +323,13 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       verification_uri_complete: verificationUriComplete,
       expires_in: 1800,
       interval: 5,
-      user_instructions: `Tell your owner to approve this request. They can find it in their AIMEAT profile under Agents (${baseUrl}/v1/profile -> Agents tab). The verification code is: ${userCode}. Once approved, poll POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } every 5 seconds until you receive your token.`,
+      status: autoApproved ? 'approved' : 'pending',
+      auto_approved: autoApproved,
+      user_instructions: autoApproved
+        ? `Auto-approved (same-owner registration). Fetch your credentials now: POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } — the first poll returns your token.`
+        : `Tell your owner to approve this request. They can find it in their AIMEAT profile under Agents (${baseUrl}/v1/profile -> Agents tab). The verification code is: ${userCode}. Once approved, poll POST /v1/agents/device-token with { "device_code": "${deviceCode}", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } every 5 seconds until you receive your token.${autoApproveNote ? ` NOTE: ${autoApproveNote}` : ''}`,
     }, [
-      { description: 'Owner approves in AIMEAT profile -> Agents tab', method: 'GET', url: `${baseUrl}/v1/profile` },
+      ...(autoApproved ? [] : [{ description: 'Owner approves in AIMEAT profile -> Agents tab', method: 'GET' as const, url: `${baseUrl}/v1/profile` }]),
       { description: 'Poll for authorization result', method: 'POST', url: '/v1/agents/device-token' },
     ]));
     emitChange('agents');
@@ -294,152 +525,26 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
 
     // Validate scopes against config.maxAgentScopes (same pattern as POST /v1/agents)
     const finalScopes = scopes ?? config.defaultAgentScopes;
-    if (!config.maxAgentScopes.includes('*')) {
-      const invalid = finalScopes.filter((s: string) => {
-        if (s === '*') return true; // only operator can have global wildcard
-        const [domain] = s.split(':');
-        return !config.maxAgentScopes.includes(s) && !config.maxAgentScopes.includes(`${domain}:*`);
-      });
-      if (invalid.length > 0) {
-        res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Scopes exceed node maximum: ${invalid.join(', ')}`));
-        return;
-      }
-    }
-
-    // Pre-registration hook
-    const hookResult = await executeHooks(config, storage, 'pre_agent_registration', {
-      name: request.agentName,
-      owner: request.ownerName,
-      display_name: request.displayName,
-    });
-    if (!hookResult.allowed) {
-      res.status(403).json(error(config.nodeId, 'HOOK_REJECTED', hookResult.reason ?? 'Agent registration denied by extension hook'));
+    const invalid = scopesExceedNodeMax(config, finalScopes);
+    if (invalid.length > 0) {
+      res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Scopes exceed node maximum: ${invalid.join(', ')}`));
       return;
     }
 
-    // Check if agent already exists — if so, issue new JWT for existing agent
-    const gaii = buildGAII(request.agentName, request.ownerName, config.nodeId);
-    const existing = await storage.getAgent(gaii);
-    let keyPair: { privateKey: string; publicKey: string };
-    const now = new Date().toISOString();
-
-    if (existing) {
-      // Existing agent: generate new keypair (rotate keys) and issue JWT
-      keyPair = await generateKeyPair();
-      await storage.updateAgent(gaii, {
-        publicKey: keyPair.publicKey,
-        defaultScopes: finalScopes,
-        lastSeen: now,
-      });
-    } else {
-      // New agent: create from scratch
-      keyPair = await generateKeyPair();
-
-      await storage.createAgent({
-        name: request.agentName,
-        owner: request.ownerName,
-        gaii,
-        displayName: request.displayName ?? request.agentName,
-        description: request.description,
-        capabilities: [],
-        defaultScopes: finalScopes,
-        publicKey: keyPair.publicKey,
-        trustScore: 50,
-        morselBalance: 0,
-        createdAt: now,
-        lastSeen: now,
-        mode: request.mode ?? 'interactive',
-      });
-
-      // Post-registration hook
-      fireHook(config, storage, 'post_agent_registration', { gaii, owner: request.ownerName });
+    const result = await approveDeviceAuth(
+      config, storage, request, ownerPayload.owner, finalScopes,
+      req.headers['user-agent'] as string | undefined,
+    );
+    if (!result.ok) {
+      res.status(result.status).json(error(config.nodeId, result.code, result.message));
+      return;
     }
-
-    // Issue long-lived JWT for the agent
-    const sessionId = generateSessionId();
-    const agentJwt = await issueJWT({
-      sub: gaii,
-      owner: request.ownerName,
-      node: config.nodeId,
-      roles: ['agent'],
-      scopes: finalScopes,
-    }, config.agentJwtTtlSeconds, sessionId);
-
-    const expiresAt = new Date(Date.now() + config.agentJwtTtlSeconds * 1000).toISOString();
-
-    // Store credentials + JWT for agent to poll
-    await storage.updateDeviceAuth(request.deviceCode, {
-      status: 'approved',
-      scopes: finalScopes,
-      approvedBy: ownerPayload.owner,
-      agentCredentials: {
-        gaii,
-        privateKey: keyPair.privateKey,
-        publicKey: keyPair.publicKey,
-        token: agentJwt,
-        expires_at: expiresAt,
-      },
-    });
 
     res.json(success(config.nodeId, {
       status: 'approved',
-      gaii,
+      gaii: result.gaii,
       agent_name: request.agentName,
-      existing_agent: !!existing,
+      existing_agent: result.existing,
     }));
-    emitChange('agents');
-
-    // ── Auto-start Hello Integration onboarding ──
-    const onboardingSteps = createDefaultSteps(request.mode ?? 'interactive');
-    onboardingSteps[0].status = 'passed';
-    onboardingSteps[0].validatedAt = now;
-    onboardingSteps[0].validationMethod = 'automatic';
-    onboardingSteps[0].details = { createdAt: existing?.createdAt ?? now };
-
-    const detectedPlatform = detectPlatform(req.headers['user-agent'] as string | undefined);
-    const platformStepDA = onboardingSteps.find(s => s.id === 'identify_platform');
-    if (detectedPlatform && platformStepDA) {
-      platformStepDA.status = 'passed';
-      platformStepDA.validatedAt = now;
-      platformStepDA.validationMethod = 'automatic';
-      platformStepDA.details = { platform: detectedPlatform.id, version: detectedPlatform.version };
-      await storage.updateAgent(gaii, {
-        platform: detectedPlatform.id,
-        platformVersion: detectedPlatform.version,
-        platformDetectedBy: detectedPlatform.detectedBy,
-      });
-    }
-
-    const existingOnboarding = await storage.getOnboarding(gaii);
-    if (!existingOnboarding) {
-      // Test task only when the agent's Hello Integration includes accept_test_task
-      const acceptStepDA = onboardingSteps.find(s => s.id === 'accept_test_task');
-      if (acceptStepDA) {
-        const testTaskId = randomUUID();
-        await storage.createAgentTask({
-          id: testTaskId,
-          agentGaii: gaii,
-          ownerGaii: `${ownerPayload.owner}@${config.nodeId}`,
-          title: 'Onboarding verification',
-          description: 'This is a test task created during Hello Integration. Propose todos, get approval, execute, and complete.',
-          status: 'queued',
-          scope: [],
-          rules: [],
-          todos: [],
-          verification: { userExpects: 'Agent completes the onboarding test task successfully', technicalChecks: [] },
-          createdAt: now,
-          updatedAt: now,
-        });
-        acceptStepDA.details = { testTaskId };
-      }
-      await storage.createOnboarding({
-        agentGaii: gaii,
-        status: 'in_progress',
-        startedAt: now,
-        steps: onboardingSteps,
-        detectedPlatform: detectedPlatform?.id,
-      });
-      emitChange('agent-onboarding');
-    }
   });
 }
