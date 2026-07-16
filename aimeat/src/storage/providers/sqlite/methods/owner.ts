@@ -242,6 +242,16 @@ export const ownerMethods = {
     return rows.map(r => this.deserializeAgent(r));
   },
 
+  async getAgentsByOwners(this: SqliteStorage, owners: string[]): Promise<Record<string, AgentRecord[]>> {
+    const out: Record<string, AgentRecord[]> = {};
+    if (owners.length === 0) return out;
+    for (const o of owners) out[o] = [];
+    const p = owners.map(() => '?').join(',');
+    const rows = this.db.prepare(`SELECT * FROM agents WHERE owner IN (${p})`).all(...owners) as Record<string, unknown>[];
+    for (const r of rows) { const a = this.deserializeAgent(r); (out[a.owner] ??= []).push(a); }
+    return out;
+  },
+
   async updateAgent(this: SqliteStorage, gaii: string, updates: Partial<AgentRecord>): Promise<AgentRecord | null> {
     const existing = await this.getAgent(gaii);
     if (!existing) return null;
