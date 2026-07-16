@@ -13,6 +13,9 @@
  *   ./inbox-tab/components.js) · pure helpers (./inbox-tab/helpers.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.19.0 -- 2026-07-16 -- Mount folds the 6-request fan-out into ONE GET /v1/messages/overview
+ *     (MessagesInboxService composite); interactive refreshes keep the individual loaders. Falls back to
+ *     the per-endpoint loaders if the composite fails. (Phase 4 slice 1 — frontend half.)
  *   v1.18.0 -- 2026-07-13 -- Split for max-file-lines: pure helpers → ./inbox-tab/helpers.js, presentational
  *     sub-components → ./inbox-tab/components.js, and the render panels (list/thread/tracked/results) →
  *     ./inbox-tab/panels.js as prop-driven components. Behavior/hooks unchanged; InboxTab keeps all state.
@@ -182,6 +185,27 @@ export default function InboxTab({ showToast }) {
     setTrackedList(trs.filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
   }, []);
 
+  // Inbox mount: ONE composite call (GET /v1/messages/overview) seeds all six sections — requests +
+  // conversations + important flags + tracked responses + the owner's agents + share groups — instead of
+  // the 6-request fan-out. Interactive refreshes (live-update, post-send) keep using loadLists (the 4
+  // lists); a composite failure falls back to the individual loaders so the inbox still populates.
+  const loadOverview = useCallback(async () => {
+    const r = await apiGet('/v1/messages/overview').catch(() => null);
+    const d = r?.data;
+    if (!d) {
+      loadLists();
+      agentsSvc.listAgents().then(a => setMyAgents(a || [])).catch(() => {});
+      apiGet('/v1/groups').then(gr => setMyGroups(gr?.data?.groups || [])).catch(() => {});
+      return;
+    }
+    setRequests(d.requests || []);
+    setConversations(d.conversations || []);
+    setImportant(new Set(d.important || []));
+    setTrackedList((d.tracked || []).filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
+    setMyAgents(d.agents || []);
+    setMyGroups(d.groups || []);
+  }, [loadLists]);
+
   // Cheap, single-request refresh of ONLY the Tracked Responses list. Used for 'agent-messages'
   // live events: on a busy node 40+ agents emit agent-message changes every second, and those only
   // affect tracked responses — reloading the whole inbox (conversations + flags + open thread +
@@ -319,9 +343,8 @@ export default function InboxTab({ showToast }) {
     if (markRead && !conv.viaAgent) await messages.markConversationRead(conv.conversationId).catch(() => {});
   }, []);
 
-  useEffect(() => { loadLists(); }, [loadLists]);
-  // The owner's own agents — recipient suggestions when composing (so you don't retype long GAIIs).
-  useEffect(() => { agentsSvc.listAgents().then(a => setMyAgents(a || [])).catch(() => {}); }, []);
+  // Mount: one composite call seeds all six sections (requests/conversations/important/tracked/agents/groups).
+  useEffect(() => { loadOverview(); }, [loadOverview]);
 
   // Phase A: when the active thread is with an AGENT, read its public `chat.commands` so the composer can
   // offer fill-in command chips. Absent/empty key → no chips (graceful). Reset per-thread UI on switch.
@@ -339,8 +362,6 @@ export default function InboxTab({ showToast }) {
       .catch(() => { /* no commands published — fine */ });
     return () => { cancelled = true; };
   }, [activePeer]);
-  // The owner's Share Groups — reusable broadcast audiences (distribution lists).
-  useEffect(() => { apiGet('/v1/groups').then(r => setMyGroups(r?.data?.groups || [])).catch(() => {}); }, []);
 
   // Recent broadcasts/polls the user sent — tracked in localStorage so results stay re-accessible.
   const BC_STORE = 'aimeat.inbox.broadcasts';
