@@ -24,6 +24,8 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-organism.js"></script>
  *   then  const ws = await AIMEAT.organism.read(orgId); ws.spaces[0].items[0].value
  * @version-history
+ *   v1.1.0 — 2026-07-17 — create() unwraps the { organism } route envelope so it returns
+ *     { id, name, ... } as documented (createWorkspace previously got orgId=undefined).
  *   v1.0.0 — 2026-07-02 — initial: normalized workspace read (objects+drafts merge, value.id
  *     convention, _meta handling), draft/publish/revert/delete/readme/search, extracted from the
  *     AIMEAT Pages app where the raw contract had to be reverse-engineered.
@@ -222,7 +224,10 @@ var organism = {
         join_policy: opts.join_policy || 'invite_only', description: opts.description })
     });
     if (res.ok === false) throw fail(res, 'Failed to create organism');
-    return res.data !== undefined ? res.data : res;
+    // The route envelope is { organism: record } — unwrap so this returns { id, name, ... }
+    // as documented (found by the PIPELINE flagship app: createWorkspace got orgId=undefined).
+    var d = res.data !== undefined ? res.data : res;
+    return (d && d.organism) ? d.organism : d;
   },
 
   // Create a NEW schema-locked workspace inside an organism from a manifest + per-namespace JSON schemas.
