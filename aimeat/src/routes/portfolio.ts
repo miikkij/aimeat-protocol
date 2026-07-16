@@ -193,16 +193,26 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
     const ghiis = await storage.listGHIIs();
+    // Batch: owner→agents in one IN query, then the portfolio.config key across every first-agent
+    // gaii in one IN query (was getAgentsByOwner + getMemory PER owner = O(2·owners)).
+    const agentsByOwner = await storage.getAgentsByOwners(ghiis.map(g => g.username));
+    const firstByOwner = new Map<string, string>();
+    for (const g of ghiis) {
+      const a = agentsByOwner[g.username];
+      if (a?.length) firstByOwner.set(g.username, a[0].gaii);
+    }
+    const cfgRows = await storage.listMemoryForOwners([...firstByOwner.values()], { prefix: 'portfolio.config' });
+    const enabledGaiis = new Set(
+      cfgRows
+        .filter(m => m.key === 'portfolio.config' && (m.value as Record<string, unknown> | null)?.enabled)
+        .map(m => m.ownerGaii),
+    );
     const members: Array<Record<string, unknown>> = [];
     for (const g of ghiis) {
-      try {
-        const agents = await storage.getAgentsByOwner(g.username);
-        if (!agents.length) continue;
-        const cfg = await storage.getMemory(agents[0].gaii, 'portfolio.config');
-        if (cfg?.value && (cfg.value as Record<string, unknown>).enabled) {
-          members.push({ username: g.username, display_name: g.displayName, avatar: g.avatar, bio: g.bio });
-        }
-      } catch { /* skip a bad owner record */ }
+      const gaii = firstByOwner.get(g.username);
+      if (gaii && enabledGaiis.has(gaii)) {
+        members.push({ username: g.username, display_name: g.displayName, avatar: g.avatar, bio: g.bio });
+      }
     }
     membersCache = { at: Date.now(), data: members };
     res.json(success(config.nodeId, { members, total: members.length }));
