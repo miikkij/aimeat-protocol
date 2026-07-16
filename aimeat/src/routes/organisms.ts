@@ -104,6 +104,7 @@ import { registerOrganismWorkspaceReadRoutes } from './organisms/workspace-read.
 import { registerOrganismWorkspaceAccessRoutes } from './organisms/workspace-access.js';
 import { registerOrganismWorkspaceOpsRoutes } from './organisms/workspace-ops.js';
 import { registerOrganismGateRoutes } from './organisms/gates.js';
+import { registerOrganismIntakeRoutes } from './organisms/intake.js';
 
 export function organismsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -117,6 +118,7 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   registerOrganismWorkspaceAccessRoutes(router, config, storage, H);
   registerOrganismWorkspaceOpsRoutes(router, config, storage, H);
   registerOrganismGateRoutes(router, config, storage, H);
+  registerOrganismIntakeRoutes(router, config, storage, H);
 
   return router;
 }

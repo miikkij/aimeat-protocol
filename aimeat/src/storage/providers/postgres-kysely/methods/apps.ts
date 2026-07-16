@@ -112,6 +112,11 @@ export const appMethods = {
     return Number(r.numDeletedRows ?? 0) > 0;
   },
 
+  async listAppDraftFilenames(this: PostgresKyselyStorage, ownerGaii: string): Promise<string[]> {
+    const rows = await this.db.selectFrom('AppDraft').select('filename').where('ownerGaii', '=', ownerGaii).execute();
+    return rows.map(r => r.filename);
+  },
+
   async getApp(this: PostgresKyselyStorage, ownerGaii: string, filename: string, version?: number): Promise<AppRecord | null> {
     let q = this.db.selectFrom('App').selectAll().where('ownerGaii', '=', ownerGaii).where('filename', '=', filename);
     if (version !== undefined) q = q.where('versionNumber', '=', version);

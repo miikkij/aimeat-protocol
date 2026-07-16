@@ -588,6 +588,12 @@ export const appsMethods = {
     return result.changes > 0;
   },
 
+  async listAppDraftFilenames(this: SqliteStorage, ownerGaii: string): Promise<string[]> {
+    const rows = this.db.prepare('SELECT filename FROM app_drafts WHERE ownerGaii = ?')
+      .all(ownerGaii) as Array<{ filename: string }>;
+    return rows.map(r => r.filename);
+  },
+
   // ── App Marketplace (purchase receipts) ──
 
   async createAppPurchase(this: SqliteStorage, record: AppPurchaseRecord): Promise<AppPurchaseRecord> {

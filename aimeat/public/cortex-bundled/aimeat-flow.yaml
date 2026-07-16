@@ -1,0 +1,101 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-flow
+  namespace: aimeat
+  description: "Editable flow, process and mindmap diagrams for your apps. Configuration-first: one create() call gives a drag-and-drop node editor with presets, zoom, rename-on-dblclick, and save/load to AIMEAT memory. The rendering engine is internal — apps only ever talk to AIMEAT.flow."
+  author: AIMEAT
+  tags: [flow, diagram, mindmap, process, editor, ui]
+  labels:
+    domain: diagrams
+
+spec:
+  version: "1.0.1"
+  license: MIT
+  components:
+    - type: schema
+      name: flow-data
+      key_pattern: "flow:*"
+      apply_to: prefix
+      schema:
+        type: object
+        required: [format, graph]
+        properties:
+          format:
+            type: string
+            description: "Engine format tag written by AIMEAT.flow.export() (e.g. drawflow@0). Lets a future engine swap migrate old graphs."
+          graph:
+            type: object
+            description: "The engine's exported graph."
+
+    - type: prompt
+      name: flow-assistant
+      content: |
+        You are a flow-editor assistant for an AIMEAT app. The user's node is at {{node_url}}.
+
+        The aimeat-flow extension provides editable flow / process / mindmap diagrams.
+        Apps talk ONLY to AIMEAT.flow — never to the underlying engine directly.
+
+        IMPORTANT: when creating apps that use flows, include ALL THREE tags in order:
+        1. <link rel="stylesheet" href="{{node_url}}/lib/drawflow@0.min.css">
+        2. <script src="{{node_url}}/lib/drawflow@0.min.js"></script>
+        3. <script src="{{node_url}}/v1/cortex/aimeat-flow/libs/aimeat-flow.js"></script>
+
+        API:
+
+        AIMEAT.flow.create(elOrSelector, { preset?, data?, onChange?, toolbar? }) -> flow
+          - preset: 'process' (default; nodes get 1 input + 1 output) | 'mindmap' | 'orgchart'
+          - onChange(envelope) fires debounced after any node/connection change
+          - the host element must have a size (e.g. style="height:420px")
+
+        flow.addNode({ label, x, y, inputs?, outputs?, data? }) -> nodeId
+        flow.connect(fromId, toId)                 // first output -> first input
+        flow.addChild(parentId, label) -> nodeId   // mindmap helper: place near parent + connect
+        flow.export() -> { format, graph }         // engine-agnostic envelope
+        flow.import(envelope)
+        flow.save('flow:my-graph')                 // AIMEAT.data, visibility private, tag 'flow'
+        flow.load('flow:my-graph')                 // requires aimeat-auth + aimeat-data + login
+        flow.clear(); flow.destroy()
+
+        Users drag nodes, draw connections between ports, and DOUBLE-CLICK a node to rename it.
+        Save flows under flow:* keys (schema-locked): "flow:order-process", "flow:ideas-map".
+
+        Rendering STATIC diagrams from text (no editing)? Use the mermaid pack instead.
+        For live co-editing by several users, broadcast export() envelopes over the realtime
+        pack (AimeatRealtime) and import() on receive — last-writer-wins; true CRDT merge is
+        not provided yet.
+
+        When the user asks for a flow app:
+        1. Ask what the nodes represent and whether they want process (left-to-right) or mindmap.
+        2. Create the editor with the matching preset and seed example nodes with addNode/connect.
+        3. Wire Save/Load buttons to flow.save/flow.load with a stable flow:* key.
+        4. Persist on onChange only if the user asked for autosave; otherwise keep an explicit button.
+      variables:
+        - "{{node_url}}"
+
+    - type: seed-data
+      entries:
+        - key: "flow:example-process"
+          value:
+            format: "drawflow@0"
+            graph:
+              drawflow:
+                Home:
+                  data: {}
+
+    - type: lib
+      name: aimeat-flow
+      filename: aimeat-flow.js
+      exports:
+        - create
+        - PRESETS
+      api_surface: |
+        AIMEAT.flow.create(elOrSelector, { preset?: 'process'|'mindmap'|'orgchart', data?, onChange?, toolbar? })
+          -> { addNode({label,x,y,inputs?,outputs?,data?}), connect(from,to), addChild(parent,label),
+               export(), import(envelope), save(key), load(key), clear(), destroy() }
+
+        Graphs save as flow:* memory records: { format: 'drawflow@0', graph: {...} }.
+
+        Requires (in order, BEFORE this lib):
+          <link rel="stylesheet" href="/lib/drawflow@0.min.css">
+          <script src="/lib/drawflow@0.min.js"></script>

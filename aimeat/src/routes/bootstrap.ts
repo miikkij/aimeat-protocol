@@ -15,6 +15,9 @@
  *     money formatting, x402-style 402 accepts)
  *   v1.4.0 -- 2026-07-14 -- Markdown for Agents: GET / negotiates Accept: text/markdown (or
  *     ?format=md) — custom template converted, else the authored landing markdown; Vary: Accept
+ *   v1.5.0 -- 2026-07-16 -- sdk_libraries derived from the library-pack registry (drift kill,
+ *     Library Acceleration Program Phase 1) + library_packs_endpoint; /llms.txt substitutes the
+ *     {{LIBRARY_PACKS_TABLE}} token from the same registry
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -29,6 +32,7 @@ import { success } from '../middleware/envelope.js';
 import { getSiteSyncState } from '../services/site-sync.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
+import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -86,6 +90,9 @@ export function bootstrapRouter(
 
   router.get('/llms.txt', (_req, res) => {
     const content = LLMS_TEMPLATE
+      // Library table first — generated from the library-pack registry (drift kill); its
+      // cells may carry {{BASE_URL}} placeholders, so substitute the token before BASE_URL.
+      .replaceAll('{{LIBRARY_PACKS_TABLE}}', buildLlmsPacksTable())
       .replaceAll('{{BASE_URL}}', config.baseUrl)
       .replaceAll('{{NODE_ID}}', config.nodeId);
     res.type('text/plain; charset=utf-8').send(content);
@@ -216,19 +223,10 @@ export function bootstrapRouter(
               note: 'When building an app, always use the standard template with the AIMEAT login bar. FIRST fetch the canonical build prompt: GET /v1/prompts/build-app (?format=txt for raw text, ?idea=<what to build>) — the same battle-tested prompt the app-catalog Create-new-app button copies. Starter skeletons: GET /v1/app-templates. See the "Building Apps on AIMEAT" section in /llms.txt for the full SDK documentation.',
               build_prompt: `${base}/v1/prompts/build-app`,
               starter_templates_endpoint: `${base}/v1/app-templates`,
-              sdk_libraries: [
-                `${base}/v1/libs/aimeat-auth.js - login UI, session management (required for all apps)`,
-                `${base}/v1/libs/aimeat-data.js - memory API: get, set, search`,
-                `${base}/v1/libs/aimeat-storage.js - file upload/download`,
-                `${base}/v1/libs/aimeat-social.js - boards: create, post, react`,
-                `${base}/v1/libs/aimeat-wallet.js - morsel balance, transactions`,
-                `${base}/v1/libs/aimeat-work.js - actions, work requests`,
-                `${base}/v1/libs/aimeat-markdown.js - markdown rendering: AIMEAT.md.render(text, target) renders INTO an element (returns an Element - use the target param or renderToString, never innerHTML = render(...)); renderRich adds task lists, footnotes, code highlighting, Mermaid`,
-                `${base}/v1/libs/aimeat-organism.js - organisms & workspaces: normalized read (published + drafts merged per item), writeDraft, publish, README, search`,
-                `${base}/v1/libs/aimeat-editor.js - markdown editor: CodeMirror 6 + toolbar + live-preview split (pairs with aimeat-markdown)`,
-                `${base}/v1/libs/aimeat-commerce.js - commerce: buy/sell agent offers via checkout sessions (buyOffer/openCheckout/completeCheckout), public priced-offer feed, offer + app-tool price reading, money formatting in 6-decimal micro-units (fmtMoney(1500000,'EUR') -> "1.50 EUR"); 402 errors carry the x402-style accepts block`,
-                `${base}/lib/realtime.js - WebSocket P2P rooms, WebRTC, Yjs CRDT`,
-              ],
+              // Derived from the library-pack registry (src/data/library-packs.ts) — the
+              // pre-registry hardcoded copy of this list had drifted from the build prompt.
+              sdk_libraries: buildSdkLibrariesList(base),
+              library_packs_endpoint: `${base}/v1/library-packs`,
               starter_templates: {
                 standard: 'Login bar + aimeat-auth.js + aimeat-data.js. For most apps.',
                 realtime: 'Standard + /lib/realtime.js. For multiplayer games, live collaboration, chat.',

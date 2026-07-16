@@ -91,6 +91,7 @@ import { chatInstancesRouter } from '../routes/chat-instances.js';
 import { totpRouter } from '../routes/totp.js';
 import { libsRouter } from '../routes/libs.js';
 import { appTemplatesRouter } from '../routes/app-templates.js';
+import { libraryPacksRouter } from '../routes/library-packs.js';
 import { appsRouter } from '../routes/apps.js';
 import { appStoreRouter } from '../routes/app-store.js';
 import { flagsRouter } from '../routes/flags.js';
@@ -555,6 +556,7 @@ export async function mountRoutes(
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
   app.use(appTemplatesRouter(config, storage));
+  app.use(libraryPacksRouter(config, storage));
   // Backup routes BEFORE appsRouter so /v1/apps/backup/* never collides with
   // the parameterized /v1/apps/:owner/:filename routes.
   app.use(appsBackupRouter(config, storage));

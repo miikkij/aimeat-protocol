@@ -372,6 +372,8 @@ function openPromptBuilder(app) {
 
   // Load authoring templates (booster-kit) into the "Start from a template" picker
   loadPbTemplates();
+  // Load capability packs (charts/flows/games/3D…) into the pack picker
+  loadPbPacks();
   // Load the canonical platform-instructions core from the node (single source of truth)
   loadPbCore();
 
@@ -441,6 +443,93 @@ function loadPbTemplates() {
     .catch(function () { /* templates are optional */ });
 }
 
+// Capability packs (library-pack registry): vendored/bundled engines + wrapper cortexes
+// (charts, editable flows, games, 3D, creative canvas…). The picker inlines each SELECTED
+// pack's ai_doc into the composed prompt — chat AIs can't fetch, so the doc must travel
+// with the prompt. Idea text pre-selects packs via their interviewTriggers.
+var pbPacks = [];              // capability-pack index entries
+var pbPackDocs = {};           // id -> { include: [...], ai_doc: '...' } (lazy, cached)
+var pbPackTouched = {};        // id -> true once the user manually (un)checks it
+var PB_PACK_CATEGORIES = ['visualization', 'diagrams', 'canvas', 'game', '3d', 'realtime'];
+
+function pbSelectedPackIds() {
+  return Array.prototype.slice.call(document.querySelectorAll('.pb-pack-cb:checked'))
+    .map(function (cb) { return cb.value; });
+}
+
+function loadPbPacks() {
+  var wrap = document.getElementById('pb-packs');
+  if (!wrap) return;
+  var config = loadConfig();
+  if (!config.aimeatUrl) return;
+  var base = config.aimeatUrl.replace(/\/+$/, '');
+  fetch(base + '/v1/library-packs?lang=' + encodeURIComponent(getLang()))
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var all = (d.data && d.data.packs) || [];
+      pbPacks = all.filter(function (p) {
+        if (p.status === 'deprecated') return false;
+        if (p.kind === 'vendored' || p.kind === 'bundle') return PB_PACK_CATEGORIES.indexOf(p.category) !== -1;
+        if (p.kind === 'cortex') return PB_PACK_CATEGORIES.indexOf(p.category) !== -1 && p.id !== 'aimeat-charts';
+        return false;
+      });
+      wrap.innerHTML = '';
+      pbPacks.forEach(function (p) {
+        var label = document.createElement('label');
+        label.className = 'pb-pack-item';
+        label.title = p.description || '';
+        var cb = document.createElement('input');
+        cb.type = 'checkbox'; cb.className = 'pb-pack-cb'; cb.value = p.id;
+        cb.onchange = function () {
+          pbPackTouched[p.id] = true;
+          if (cb.checked) loadPbPackDoc(base, p.id); else updatePbPreview();
+        };
+        var span = document.createElement('span');
+        span.textContent = p.title;
+        label.appendChild(cb); label.appendChild(span);
+        wrap.appendChild(label);
+      });
+      // Pre-select from the idea text as the user types (never override a manual choice).
+      var desc = document.getElementById('pb-description');
+      if (desc && !desc._pbPackListener) {
+        desc._pbPackListener = true;
+        desc.addEventListener('input', function () { pbMatchPacksToIdea(base); });
+      }
+      pbMatchPacksToIdea(base);
+    })
+    .catch(function () { /* older node without the endpoint — picker stays empty */ });
+}
+
+function pbMatchPacksToIdea(base) {
+  var desc = document.getElementById('pb-description');
+  var text = ((desc && desc.value) || '').toLowerCase();
+  pbPacks.forEach(function (p) {
+    if (pbPackTouched[p.id]) return;
+    var cb = document.querySelector('.pb-pack-cb[value="' + p.id + '"]');
+    if (!cb) return;
+    // Word-start matching: a trigger must begin at a word boundary ('flow' matches
+    // "flowchart", but 'art' would not match "chart"). Suffixes are allowed on purpose
+    // (Finnish inflections: 'kaavio' matches "kaaviot").
+    var hit = (p.interviewTriggers || []).some(function (t) {
+      var esc = String(t).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      return new RegExp('(^|[^a-zà-öø-ÿ])' + esc).test(text);
+    });
+    if (hit && !cb.checked) { cb.checked = true; loadPbPackDoc(base, p.id); }
+    else if (!hit && cb.checked) { cb.checked = false; updatePbPreview(); }
+  });
+}
+
+function loadPbPackDoc(base, id) {
+  if (pbPackDocs[id]) { updatePbPreview(); return; }
+  fetch(base + '/v1/library-packs/' + encodeURIComponent(id))
+    .then(function (r) { return r.json(); })
+    .then(function (d) {
+      var pack = d.data && d.data.pack;
+      if (pack) { pbPackDocs[id] = pack; updatePbPreview(); }
+    })
+    .catch(function () { /* pack doc optional — the core prompt still indexes packs */ });
+}
+
 function buildPromptFromBuilder() {
   var config = loadConfig();
   var nodeUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, '') : 'https://your-aimeat-node.example';
@@ -471,6 +560,7 @@ function buildPromptFromBuilder() {
     prompt += '3. How should it look and feel? (e.g. dark neon · cozy · sleek minimal · fun colorful) — it must support BOTH light and dark.\n';
     prompt += '4. Data: SHARED (a community space others can see and add to) or PRIVATE (only mine)?\n';
     prompt += '5. Should it use AI features (summaries, suggestions, generation)? If yes I can enable them via aimeat-ai.\n';
+    prompt += '6. Does it need any special capabilities? (charts/graphs · editable flow or mindmap diagrams · static text-defined diagrams · a game or heavy 2D animation · generative art / creative canvas · 3D · live multi-user/realtime) — each maps to a capability pack in Step 2; include only what I pick.\n';
     prompt += 'Skip any question I already answered in my idea above. Use my answers to customise everything in Step 2.\n\n';
   }
 
@@ -629,6 +719,18 @@ function buildPromptFromBuilder() {
   // Booster-kit: if the user picked a starting template, hand the AI the skeleton to copy from.
   if (window.pbTemplate && window.pbTemplate.content) {
     prompt += '\n## Starting template (copy from this)\nUse this skeleton as your base — keep its boot, login pill, and self-hosted theme wiring intact; fill the {{...}} slots; build your views inside <main>. Return the COMPLETE single HTML file based on it.\n```html\n' + window.pbTemplate.content + '\n```\n';
+  }
+
+  // Capability packs: inline each SELECTED pack's usage doc — a chat AI can't fetch the
+  // pack endpoint, so the doc travels with the prompt (agentic coders get the same text).
+  var selectedPacks = pbSelectedPackIds().map(function (id) { return pbPackDocs[id]; }).filter(Boolean);
+  if (selectedPacks.length > 0) {
+    prompt += '\n## Selected capability packs (self-hosted on my node — use these, never a CDN)\n';
+    selectedPacks.forEach(function (pack) {
+      prompt += '\n### Pack: ' + pack.id + ' — ' + (pack.title || '') + '\n';
+      prompt += 'Include (in order):\n' + (pack.include || []).map(function (l) { return l; }).join('\n') + '\n';
+      if (pack.ai_doc) prompt += 'Usage:\n' + pack.ai_doc + '\n';
+    });
   }
 
   return prompt;
