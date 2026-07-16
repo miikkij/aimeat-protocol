@@ -9,6 +9,9 @@
  *   - GET /v1/agents/:name/activity      -- stats + history + scheduled jobs
  *   - GET /v1/agents/:name/statistics    -- Quality tab: recomputed performance + per-context review rollups
  * @version-history
+ *   v1.2.0 -- 2026-07-16 -- Add GET /activity/overview composite (activity_stats + event log + directives
+ *     budget + webhook + telemetry in one call) folding the Activity subtab's 5 agent-domain mount reads;
+ *     ledger stays separate (different auth model). Owner-or-self via canAccess, registered before /activity.
  *   v1.1.1 -- 2026-05-31 -- /statistics: read custom metrics from the agent's GAII namespace (agent-authored) instead of the owner GHII
  *   v1.1.0 -- 2026-05-31 -- Add GET /statistics (Quality tab): recompute performance + per-context review rollups from tasks; writes public cache keys
  *   v1.0.0 -- 2026-05-20 -- Initial creation for Agent Dashboard Phase 2
@@ -21,9 +24,11 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
+import { createAgentActivityOverviewService } from '../services/db/agent-activity-overview-db-service.js';
 
 export function agentActivityRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  const activityOverviewDb = createAgentActivityOverviewService(storage);
 
   /** Build GAII for the named agent under the authenticated owner */
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
@@ -124,6 +129,35 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
     }, [
       { description: 'Activity stats', method: 'GET', url: `/v1/agents/${agentName}/activity` },
     ]));
+  });
+
+  /* ── GET /v1/agents/:name/activity/overview -- Activity subtab composite (mount fold) ──
+   *
+   * The whole Activity subtab mount in ONE call: activity_stats + event log (page 1 × 50) + directives
+   * budget + webhook + telemetry. Folds the five agent-domain reads the subtab fired in parallel (each
+   * re-resolving + re-loading the agent); the sixth, ledger usage, stays a separate request (different
+   * auth model — owner-GHII scoped / app-grant accessible). Each sub-object mirrors the exact `.data`
+   * shape of the endpoint it replaces so the subtab seeds it as a drop-in. Owner-or-self via canAccess,
+   * identical to the folded /activity, /webhook, /telemetry gates. Registered before /activity (a
+   * 2-segment path — no shadow, mirroring the /activity/log ordering note above).
+   */
+  router.get('/v1/agents/:name/activity/overview', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+    const agentGaii = resolveAgentGaii(req, agentName);
+
+    if (!canAccess(req, agentGaii)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+
+    const agent = await storage.getAgent(agentGaii);
+    if (!agent) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent '${agentName}' not found`));
+      return;
+    }
+
+    const data = await activityOverviewDb.overview(agentGaii, agent);
+    res.json(success(config.nodeId, data));
   });
 
   /* ── GET /v1/agents/:name/activity -- Stats + history + scheduled jobs ── */

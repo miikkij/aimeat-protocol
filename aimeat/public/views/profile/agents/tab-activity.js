@@ -3,6 +3,8 @@
  * @description Enhanced Activity tab with governance filter and category badges.
  *   Wraps the existing activity subtab with additional filter pills.
  * @version-history
+ *   v1.7.0 -- 2026-07-16 -- Mount folds 5 agent-domain reads into GET /v1/agents/:name/activity/overview
+ *     (getActivityOverview); ledger stays separate. Individual six-request fan-out kept as fallback.
  *   v1.6.0 -- 2026-06-10 -- Event log strictly newest-first (pages interleaved lifecycle events);
  *     "Tokens used (30d)" shows "—/not reported" when telemetry isn't wired (0 claimed no usage);
  *     delivery health shows a neutral "Delivery: polling" line when neither MCP nor webhook is
@@ -20,7 +22,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
-import { getActivity, getActivityLog } from '/js/services/agent-activity.js';
+import { getActivity, getActivityLog, getActivityOverview } from '/js/services/agent-activity.js';
 import { getDirectives } from '/js/services/agent-directives.js';
 import { getWebhookConfig, getTelemetry } from '/js/services/agent-integration.js';
 import { getLedgerUsage } from '/js/services/ledger.js';
@@ -62,16 +64,32 @@ export default function TabActivity({ agent, agentName }) {
   async function loadData({ showSpinner = true } = {}) {
     if (showSpinner) setLoading(true);
     try {
-      const [actResp, logResp, dirResp, whResp, telResp, ledgerResp] = await Promise.all([
-        getActivity(agentName, 30).catch(() => null),
-        getActivityLog(agentName, 1, 50).catch(() => null),
-        getDirectives(agentName).catch(() => null),
-        getWebhookConfig(agentName).catch(() => null),
-        getTelemetry(agentName, { days: 1 }).catch(() => null),
-        // The usage ledger is the accurate token source (per-LLM-call). Keyed by the agent's
-        // full GAII, not the bare name — filtering by the name matches nothing.
+      // Mount fold: ONE composite (activity_stats + event log + directives budget + webhook + telemetry)
+      // plus the ledger, which stays separate (different auth model — owner-GHII scoped). On composite
+      // failure, fall back to the individual five-request fan-out. Each composite sub-object mirrors the
+      // matching endpoint's `.data`, so the downstream field access below is unchanged.
+      // The usage ledger is the accurate token source (per-LLM-call). Keyed by the agent's full GAII,
+      // not the bare name — filtering by the name matches nothing.
+      const [overview, ledgerResp] = await Promise.all([
+        getActivityOverview(agentName),
         getLedgerUsage(agent?.gaii || agentName, { groupBy: 'day' }).catch(() => null),
       ]);
+      let actResp, logResp, dirResp, whResp, telResp;
+      if (overview) {
+        actResp = { data: overview.activity };
+        logResp = { data: overview.log };
+        dirResp = { data: overview.directives };
+        whResp = { data: overview.webhook };
+        telResp = { data: overview.telemetry };
+      } else {
+        [actResp, logResp, dirResp, whResp, telResp] = await Promise.all([
+          getActivity(agentName, 30).catch(() => null),
+          getActivityLog(agentName, 1, 50).catch(() => null),
+          getDirectives(agentName).catch(() => null),
+          getWebhookConfig(agentName).catch(() => null),
+          getTelemetry(agentName, { days: 1 }).catch(() => null),
+        ]);
+      }
       setStats(actResp?.data?.activity_stats || null);
       setLedgerTotals(ledgerResp?.data?.totals || null);
       setEvents(logResp?.data?.events || []);
