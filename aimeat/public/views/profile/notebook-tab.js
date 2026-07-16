@@ -12,6 +12,9 @@
  *   v1.0.0 — 2026-06-19 — Initial: capture + librarian search (slice A).
  *   v1.1.0 — 2026-06-21 — Enrich stage (Phase 1) + delegate (Phase 2) + distribute & trust toggles (Phase 3).
  *   v1.2.0 — 2026-06-21 — Split per-note organize workflow into NoteCard; tab keeps capture/search/inbox.
+ *   v1.3.0 — 2026-07-16 — Mount folds the 3 reads (inbox + organism names + settings) into ONE
+ *     GET /v1/notebook (NotebookService; inbox is a server-side prefix scan). Interactive re-fetches keep
+ *     the individual loaders; falls back to them if the composite is unavailable. (Phase 4 slice 7.)
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -23,6 +26,7 @@ import { Spinner } from './shared.js';
 import * as memoryService from '/js/services/memory.js';
 import { getNotebookSettings, saveNotebookSettings } from '/js/services/notebook.js';
 import { listOrganisms } from '/js/services/organisms.js';
+import { apiGet } from '/js/api.js';
 import { useConfirm } from '/components/Modal.js';
 import NoteCard from './notebook-card.js';
 import { INBOX_PREFIX, noteText } from './notebook-helpers.js';
@@ -44,8 +48,23 @@ export default function NotebookTab({ session, showToast, onStats }) {
   const [settings, setSettings] = useState({ autoDetectIntent: false, autoRunPlan: false, autoDistribute: false });
   const [autoEnrichKey, setAutoEnrichKey] = useState(null); // the just-captured note to auto-enrich (trust mode)
 
+  // Mount: ONE composite (GET /v1/notebook) seeds the inbox + settings + organism names. Interactive
+  // re-fetches (post-capture/delete, live-update) keep using the individual loaders; a composite failure
+  // falls back to them too.
+  async function loadTab() {
+    const ov = await apiGet('/v1/notebook').then(r => r?.data).catch(() => null);
+    if (!ov) { loadInbox(); loadOrgNames(); loadSettings(); return; }
+    setInbox(ov.inbox || []);
+    onStats?.({ notebook: (ov.inbox || []).length });
+    const map = {};
+    for (const o of (ov.organisms?.organisms || [])) map[o.id] = o.name;
+    setOrgNames(map);
+    const s = ov.settings || {};
+    setSettings({ autoDetectIntent: !!s.autoDetectIntent, autoRunPlan: !!s.autoRunPlan, autoDistribute: !!s.autoDistribute });
+  }
+
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Initial load once the session is available; the loaders close over session/onStats/setters and are intentionally keyed to session.
-  useEffect(() => { if (session) { loadInbox(); loadOrgNames(); loadSettings(); } }, [session]);
+  useEffect(() => { if (session) loadTab(); }, [session]);
 
   async function loadSettings() {
     try {
