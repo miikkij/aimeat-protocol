@@ -19,4 +19,7 @@ export interface WorkRepository {
   listWorkByProvider(gaii: string): Promise<WorkRecord[]>;
   listWorkByRequester(gaii: string): Promise<WorkRecord[]>;
   listAllWork(limit?: number): Promise<WorkRecord[]>;
+  /** Count work rows across MANY providers whose status is in `statuses`, in ONE query — batches the
+   *  owner-agents fan-out the Home dashboard / work inbox would otherwise run as one query per agent. */
+  countPendingWorkByProviders(providerGaiis: string[], statuses: string[]): Promise<number>;
 }

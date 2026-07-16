@@ -183,6 +183,12 @@ export const workMethods = {
         return rows.map((r: PrismaRow) => this.toWorkRecord(r));
     },
 
+    async countPendingWorkByProviders(this: PrismaStorage, providerGaiis: string[], statuses: string[]): Promise<number> {
+        this.ensureReady();
+        if (providerGaiis.length === 0 || statuses.length === 0) return 0;
+        return this.prisma.work.count({ where: { providerGaii: { in: providerGaiis }, status: { in: statuses } } });
+    },
+
     async listWorkByRequester(this: PrismaStorage, gaii: string): Promise<WorkRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.work.findMany({ where: { requesterGaii: gaii } });

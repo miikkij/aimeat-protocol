@@ -184,6 +184,15 @@ export const workMethods = {
     return rows.map(r => this.deserializeWork(r));
   },
 
+  async countPendingWorkByProviders(this: SqliteStorage, providerGaiis: string[], statuses: string[]): Promise<number> {
+    if (providerGaiis.length === 0 || statuses.length === 0) return 0;
+    const pP = providerGaiis.map(() => '?').join(',');
+    const pS = statuses.map(() => '?').join(',');
+    const row = this.db.prepare(`SELECT count(*) AS n FROM work WHERE providerGaii IN (${pP}) AND status IN (${pS})`)
+      .get(...providerGaiis, ...statuses) as { n: number };
+    return row.n;
+  },
+
   async listAllWork(this: SqliteStorage, limit = 10000): Promise<WorkRecord[]> {
     const rows = this.db.prepare('SELECT * FROM work ORDER BY createdAt DESC LIMIT ?').all(Math.min(limit, 10000)) as Record<string, unknown>[];
     return rows.map(r => this.deserializeWork(r));
