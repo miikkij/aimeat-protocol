@@ -39,6 +39,8 @@ export { AgentDataAccessOverviewService, createAgentDataAccessOverviewService, t
 export { AgentIntegrationOverviewService, createAgentIntegrationOverviewService, type AgentIntegrationOverview } from './agent-integration-overview-db-service.js';
 export { AgentQualityOverviewService, createAgentQualityOverviewService, type AgentQualityOverview } from './agent-quality-overview-db-service.js';
 export { GeneratorStateService, createGeneratorStateService, type GeneratorState } from './generator-state-db-service.js';
+export { WorkTabService, createWorkTabService, type WorkOverview } from './work-tab-db-service.js';
+export { DataWalletService, createDataWalletService, type DataWalletOverview } from './data-wallet-db-service.js';
 export { loadOwnerAgents, loadOwnerEcoApps, resolveOwnerIdentities } from './owner-identity.js';
 
 /** Assemble the memory Application-DB-Service over the given storage (Phase 0: LegacyMemoryAdapter). Its

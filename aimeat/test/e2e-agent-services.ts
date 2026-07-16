@@ -263,6 +263,27 @@ await test('4. Provider accepts work', async () => {
     assert(body.data.status === 'accepted', `status: ${body.data.status}`);
 });
 
+// ─── Phase 3b: Work tab composite (mount fold) ───
+console.log('\nPhase 3b -- GET /v1/work/overview composite');
+
+await test('4b. GET /v1/work/overview == inbox + sent (owner session, batched)', async () => {
+    // Provider owner: the just-accepted work item is in the inbox; sent is empty.
+    const prov = await json('/v1/work/overview', { headers: { Authorization: `Bearer ${providerOwnerToken}` } });
+    assert(prov.status === 200, `provider overview status ${prov.status}: ${JSON.stringify(prov.body)}`);
+    const pd = prov.body.data;
+    assert(Array.isArray(pd.inbox) && pd.inbox.some((w: any) => w.tracking_code === trackingCode), 'provider inbox has the accepted work item');
+    const provInbox = await json('/v1/work/inbox', { headers: { Authorization: `Bearer ${providerOwnerToken}` } });
+    assert(pd.inbox.length === provInbox.body.data.items.length, `inbox count matches /v1/work/inbox: ${pd.inbox.length} vs ${provInbox.body.data.items.length}`);
+
+    // Requester owner: the work item is in sent.
+    const reqOv = await json('/v1/work/overview', { headers: { Authorization: `Bearer ${requesterOwnerToken}` } });
+    assert(reqOv.status === 200, `requester overview status ${reqOv.status}: ${JSON.stringify(reqOv.body)}`);
+    const rd = reqOv.body.data;
+    assert(Array.isArray(rd.sent) && rd.sent.some((w: any) => w.tracking_code === trackingCode), 'requester sent has the work item');
+    const reqSent = await json('/v1/work/sent', { headers: { Authorization: `Bearer ${requesterOwnerToken}` } });
+    assert(rd.sent.length === reqSent.body.data.items.length, `sent count matches /v1/work/sent: ${rd.sent.length} vs ${reqSent.body.data.items.length}`);
+});
+
 // ─── Phase 4: Verify Task Auto-Created ───
 console.log('\nPhase 4 -- Verify Task Bridge');
 

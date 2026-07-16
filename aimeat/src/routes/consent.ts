@@ -25,6 +25,7 @@ import { ConsentCreateSchema, validateBody } from '../models/schemas.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { auditDataAccess } from '../services/consent.js';
 import { getPendingConsentAudit } from '../services/consent-audit-buffer.js';
+import { createDataWalletService } from '../services/db/data-wallet-db-service.js';
 
 export function consentRouter(config: AimeatConfig, storage: Storage, stats?: StatsCollector, onDirectoryChange?: () => void): Router {
     const router = Router();
@@ -117,6 +118,16 @@ export function consentRouter(config: AimeatConfig, storage: Storage, stats?: St
     });
 
     // GET /v1/consent — List own consents
+    // GET /v1/data-wallet — the Data Wallet tab mount in ONE call: consents + audit (incl. pending buffer)
+    // + permission summary. Folds GET /v1/consent + /v1/consent/audit + /v1/permissions/summary, reading
+    // the consent list once and counting memory via metadata only. Same gate as the folded reads.
+    const dataWalletDb = createDataWalletService(storage);
+    router.get('/v1/data-wallet', requireAuth(), requireScope('consent:manage'), async (req, res) => {
+        const days = req.query.days ? parseInt(req.query.days as string, 10) : 30;
+        const data = await dataWalletDb.overview(resolve(req), days);
+        res.json(success(config.nodeId, data));
+    });
+
     router.get('/v1/consent', requireAuth(), requireScope('consent:manage'), async (req, res) => {
         const ownerGaii = resolve(req);
         const opts: { status?: 'active' | 'revoked' | 'expired'; recipient?: string } = {};
