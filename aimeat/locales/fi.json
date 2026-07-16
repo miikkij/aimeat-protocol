@@ -2793,7 +2793,19 @@
       "agentRunnerLabel": "Ajoagentti",
       "agentOrganismLabel": "Organismi (valinnainen)",
       "agentNoRunners": "ei agentteja - yhdistä ensin",
-      "agentDeployHint": "Luo käyttöönottotehtävän OMALLE ajoagentillesi. Laivue lukee crew-määrityksen manifestista ja käynnistää agentin sinun tilisi alle."
+      "agentDeployHint": "Luo käyttöönottotehtävän OMALLE ajoagentillesi. Laivue lukee crew-määrityksen manifestista ja käynnistää agentin sinun tilisi alle.",
+      "agentEdit": "Muokkaa agentteja",
+      "agentAdd": "Lisää agentteja",
+      "agentJsonLabel": "Mukana tulevat agentit (crew-def JSON-taulukko)",
+      "agentEditorHint": "Yksi crew-def voi sisältää kokonaisen TIIMIN: enintään 10 jäsentä per määritys (process \"hierarchical\" lisää orkestroijan niiden ylle), enintään 5 määritystä per sovellus. Käytä \"Kopioi AI-kehote\" -nappia, anna AI:si kirjoittaa tai laajentaa JSON, liitä tulos tähän ja tallenna - node validoi sen tiukasti.",
+      "agentCopyPrompt": "Kopioi AI-kehote",
+      "agentPromptCopied": "Kehote kopioitu - liitä se AI-chattiisi ja tuo JSON-tulos takaisin tähän",
+      "agentPromptCopyFailed": "Kopiointi epäonnistui - leikepöytä ei käytettävissä",
+      "agentJsonInvalid": "Ei kelvollista JSONia",
+      "agentJsonNotArray": "Odotettiin JSON-TAULUKKOA crew-def-objekteja",
+      "agentEditSaved": "Mukana tulevat agentit tallennettu",
+      "agentEditCleared": "Mukana tulevat agentit poistettu",
+      "agentClearHint": "Tallenna tyhjä taulukko [] poistaaksesi kaikki mukana tulevat agentit."
     },
     "v8ext": {
       "title": "Palvelinlaajennukset",

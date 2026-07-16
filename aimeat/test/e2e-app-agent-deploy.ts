@@ -401,6 +401,58 @@ async function main() {
         assert(r.status === 404 && r.body.error?.code === 'AGENT_NOT_DECLARED', `${r.status} ${r.body.error?.code}`);
     });
 
+    console.log('\nPhase 6: Editing bundled agents in place (PATCH cortex — no re-upload)');
+    await test('PATCH cortex replaces the crew-defs (multi-agent, multi-def)', async () => {
+        const orchestra = {
+            agent_name: 'joke-orchestra',
+            llm_profile: 'content', process: 'hierarchical',
+            agents: [
+                { role: 'Editor-in-chief', goal: 'Coordinate and pick the best joke', allow_delegation: true },
+                { role: 'Punster', goal: 'Write pun-based jokes', tools: ['memory'] },
+                { role: 'Storyteller', goal: 'Write narrative jokes', tools: ['memory', 'web'] },
+            ],
+            tasks: [
+                { id: 'brief', description: 'Break down the topic: {{ctx.prompt}}', expected_output: 'A brief', agent: 'Editor-in-chief' },
+                { id: 'write', description: 'Write candidate jokes from the brief', expected_output: 'Three candidates', agent: 'Punster', context: ['brief'] },
+                { id: 'pick', description: 'Pick and polish the best candidate', expected_output: 'One joke', agent: 'Editor-in-chief', context: ['write'] },
+            ],
+        };
+        const r = await json(`/v1/apps/${FILENAME}`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: JSON.stringify({ cortex: { agents: [crewDef(), orchestra] } }),
+        });
+        assert(r.status === 200, `patch: ${r.status} ${JSON.stringify(r.body)}`);
+        const list = await json('/v1/apps?limit=200', { headers: { Authorization: `Bearer ${owner1Token}` } });
+        const app = list.body.data.apps.find((x: any) => x.filename === FILENAME && x.owner === owner1);
+        assert(app.manifest.cortex.agents.length === 2, `defs: ${app.manifest.cortex.agents.length}`);
+        assert(app.manifest.cortex.agents[1].agents.length === 3, 'multi-member crew persisted');
+        assert(app.manifest.cortex.agents[1].process === 'hierarchical', 'orchestrator process persisted');
+    });
+
+    await test('PATCH cortex rejects a malformed edit fail-loud (INVALID_CREW_DEF)', async () => {
+        const bad = crewDef(); bad.tasks[0].description = 'no injection here';
+        const r = await json(`/v1/apps/${FILENAME}`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: JSON.stringify({ cortex: { agents: [bad] } }),
+        });
+        assert(r.status === 400 && r.body.error?.code === 'INVALID_CREW_DEF', `${r.status} ${r.body.error?.code}`);
+        // The stored manifest is untouched by the rejected edit.
+        const list = await json('/v1/apps?limit=200', { headers: { Authorization: `Bearer ${owner1Token}` } });
+        const app = list.body.data.apps.find((x: any) => x.filename === FILENAME && x.owner === owner1);
+        assert(app.manifest.cortex.agents.length === 2, 'rejected edit changed nothing');
+    });
+
+    await test('PATCH cortex { agents: [] } clears the section; a re-publish does NOT resurrect it', async () => {
+        const r = await json(`/v1/apps/${FILENAME}`, {
+            method: 'PATCH', headers: { Authorization: `Bearer ${owner1Token}` },
+            body: JSON.stringify({ cortex: { agents: [] } }),
+        });
+        assert(r.status === 200, `clear: ${r.status}`);
+        const list = await json('/v1/apps?limit=200', { headers: { Authorization: `Bearer ${owner1Token}` } });
+        const app = list.body.data.apps.find((x: any) => x.filename === FILENAME && x.owner === owner1);
+        assert(!app.manifest.cortex, `section removed: ${JSON.stringify(app.manifest.cortex)}`);
+    });
+
     console.log(`\n=== Results: ${passed} passed, ${failed} failed ===\n`);
     if (failed > 0) process.exit(1);
 }

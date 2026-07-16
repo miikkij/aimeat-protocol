@@ -5,7 +5,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
 import type {
-  AppRecord, AppDraftRecord, AppManifest, AppListOptions, AppPurchaseRecord, AppForkRecord,
+  AppRecord, AppDraftRecord, AppManifest, AppManifestCortex, AppListOptions, AppPurchaseRecord, AppForkRecord,
   AppProtection, SubdomainSiteRecord, AppGrantRecord, MemoryLinkRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
@@ -178,10 +178,10 @@ export const appsMethods = {
     return result.changes > 0;
   },
 
-  async updateAppMeta(this: SqliteStorage, 
+  async updateAppMeta(this: SqliteStorage,
     ownerGaii: string,
     filename: string,
-    meta: { name?: string; description?: string; protection?: AppProtection },
+    meta: { name?: string; description?: string; protection?: AppProtection; cortex?: AppManifestCortex | null },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue
     // shows). Read the current manifest, merge only the supplied fields, write
@@ -195,6 +195,11 @@ export const appsMethods = {
     if (meta.name !== undefined) manifest.name = meta.name;
     if (meta.description !== undefined) manifest.description = meta.description;
     if (meta.protection !== undefined) manifest.protection = meta.protection;
+    // Agent-Bundled Apps: replace the crew-def section in place (null clears it).
+    if (meta.cortex !== undefined) {
+      if (meta.cortex === null || !meta.cortex.agents?.length) delete manifest.cortex;
+      else manifest.cortex = meta.cortex;
+    }
     const result = this.db.prepare(
       'UPDATE apps SET manifest = ? WHERE ownerGaii = ? AND filename = ? AND versionNumber = ?'
     ).run(JSON.stringify(manifest), ownerGaii, filename, row.versionNumber);
