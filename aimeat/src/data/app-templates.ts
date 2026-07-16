@@ -23,6 +23,8 @@
  *   v1.8.0 — 2026-07-13 — template bodies extracted to ./app-templates/{shells,components,use-cases}.ts (max-file-lines).
  *   v1.9.0 — 2026-07-16 — packs?: string[] field (library-pack deps, Library Acceleration
  *     Program); components: mermaid-diagram + three-scene (demos for the mermaid/three packs).
+ *   v1.10.0 — 2026-07-16 — component: public-intake (aimeat-intake) — the anonymous-submission path
+ *     (lead/contact/feedback/RSVP/quiz forms) so AI app-builders discover the Public Intake capability.
  */
 
 import { SHELL_PURE_CLIENT, SHELL_CORTEX, SHELL_EXTENSION } from './app-templates/shells.js';
@@ -30,6 +32,7 @@ import {
   COMP_AUTH_GATED,
   COMP_PRIVATE_STORE,
   COMP_SHARED_FEED,
+  COMP_PUBLIC_INTAKE,
   COMP_AI_ACTION,
   COMP_DATA_TABLE,
   COMP_SETTINGS,
@@ -98,6 +101,7 @@ const TEMPLATES: AppTemplate[] = [
   { id: 'comp-auth-gated', kind: 'component', title: 'Auth-gated section', description: 'Show/hide a section based on login state.', libs: ['aimeat-auth'], content: COMP_AUTH_GATED },
   { id: 'comp-private-store', kind: 'component', title: 'Private store', description: 'Save / list / remove a per-owner private collection.', libs: ['aimeat-data'], content: COMP_PRIVATE_STORE },
   { id: 'comp-shared-feed', kind: 'component', title: 'Shared feed', description: 'A public community feed — each user writes their own key, everyone reads.', libs: ['aimeat-data'], content: COMP_SHARED_FEED },
+  { id: 'comp-public-intake', kind: 'component', title: 'Public form (anonymous submissions)', description: 'Let not-logged-in visitors submit a lead / contact / feedback / RSVP / quiz form into your workspace — the owner defines the form once, anyone submits with no account. The ONLY anonymous-write path.', libs: ['aimeat-intake'], content: COMP_PUBLIC_INTAKE },
   { id: 'comp-ai-action', kind: 'component', title: 'AI action button', description: "Run the user's own LLM on demand, render into an editable field.", libs: ['aimeat-auth', 'aimeat-ai'], content: COMP_AI_ACTION },
   { id: 'comp-data-table', kind: 'component', title: 'Data table', description: 'Sortable / filterable / paginated table via the viewers cortex.', libs: ['aimeat-ui-viewers'], content: COMP_DATA_TABLE },
   { id: 'comp-settings', kind: 'component', title: 'Settings panel', description: "Read / write the app's settings from memory.", libs: ['aimeat-data'], content: COMP_SETTINGS },

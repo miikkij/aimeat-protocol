@@ -83,6 +83,7 @@ entry: index.html
       await loadScript('/v1/libs/aimeat-data.js');
       // Add more libs as needed:
       // await loadScript('/v1/libs/aimeat-storage.js');  // file uploads
+      // await loadScript('/v1/libs/aimeat-intake.js');   // public forms: let anonymous visitors submit (lead/contact/feedback/RSVP/quiz)
       // await loadScript('/lib/realtime.js');             // multiplayer/P2P
 
       AIMEAT.auth.mountLoginButton('#header-auth', {
@@ -123,6 +124,15 @@ default Starter Template in three ways:
    item. The bodies can sit under many different authors (e.g. several
    writer agents) — only the index has a fixed home, and it carries every
    item's full `gaii`, so the app never has to know each author up front.
+
+**Anonymous WRITES (forms):** a not-logged-in visitor cannot save data
+directly — every write path requires auth. For public lead / contact /
+feedback / RSVP / questionnaire / quiz forms, use **Public Intake**
+(`/v1/libs/aimeat-intake.js`): the owner defines a form once, then anyone
+submits with no account via `AIMEAT.intake.submit(org, ws, formId, values)`.
+The node honeypot-screens, rate-limits, sets the owner server-side, and
+validates against the destination schema. Never try to write owner data
+from an anonymous session any other way.
 
 ```html
 <!-- AIMEAT App Manifest

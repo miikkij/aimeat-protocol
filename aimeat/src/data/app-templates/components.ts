@@ -54,6 +54,29 @@ async function loadFeed() {
   return results.sort(function (a, b) { return (b.at || '').localeCompare(a.at || ''); });
 }`;
 
+export const COMP_PUBLIC_INTAKE = `// public-intake — let ANYONE (not logged in) submit into your workspace: lead / contact / feedback / RSVP / quiz forms.
+// Load: <script src="/v1/libs/aimeat-intake.js"></script>
+// Every normal write needs auth, so anonymous submissions ONLY work through Public Intake.
+// 1) OWNER (once, logged in) defines a form → gets a shareable link:
+async function setupForm(orgId, ws) {
+  var r = await AIMEAT.intake.defineForm({
+    organism_id: orgId, ws: ws, namespace: 'crm.contacts',       // a schema-locked workspace namespace (records land here)
+    form_id: 'contact-us',                                       // omit → node mints an unguessable token (private link)
+    allowed_fields: ['nimi', 'email', 'viesti'], required_fields: ['email'],
+    defaults: { tila: 'uusi', lahde: 'public-form' },            // server-applied (must be valid schema fields)
+    honeypot_field: 'company_url', mode: 'publish',              // 'draft' = you review before it goes live
+    title: 'Contact us', fields: [{ key: 'nimi', label: 'Name' }, { key: 'email', label: 'Email' }, { key: 'viesti', label: 'Message', type: 'textarea' }] });
+  return '/f/' + orgId + '/' + ws + '/' + r.form_id;             // share this link
+}
+// 2) PUBLIC form page (NO login): render from the descriptor, then submit anonymously.
+async function renderAndSubmit(orgId, ws, formId, values) {
+  var form = await AIMEAT.intake.getForm(orgId, ws, formId);     // { title, fields, honeypot_field } — draw these
+  // Render form.fields + a HIDDEN input named form.honeypot_field (leave it empty), then on submit:
+  return await AIMEAT.intake.submit(orgId, ws, formId, values);  // { ok, id } — works with no session
+}
+// The node honeypot-screens, rate-limits per IP, sets the owner server-side, allow-lists fields, and
+// validates against the namespace schema — write only the allowed fields; extras are dropped.`;
+
 export const COMP_AI_ACTION = `// ai-action — run the user's own LLM on demand (aimeat-ai; load it + aimeat-auth).
 async function aiSuggest(promptText, outEl) {
   if (!(await AIMEAT.ai.isAvailable())) { outEl.value = 'Log in and add an OpenRouter key to enable AI.'; return; }
