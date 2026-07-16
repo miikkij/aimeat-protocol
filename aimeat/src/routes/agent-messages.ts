@@ -8,6 +8,8 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   v1.3.0 -- 2026-07-16 -- Add GET /:name/messages/overview composite (commands + enriched threads +
+ *     page-1 messages) folding the Messages subtab mount (AgentMessagesOverviewService).
  *   v1.2.0 -- 2026-06-06 -- Task-based threads: threadId defaults to linked_task_id when no
  *     thread_id is given (a task's whole conversation stays in one thread). The threads list now
  *     resolves the linked task's title so the UI can label threads by task name, not "Thread".
@@ -25,6 +27,7 @@ import { resolveIdentity, buildGAII } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentMessageCreateSchema, AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
+import { createAgentMessagesOverviewService } from '../services/db/agent-messages-overview-db-service.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
@@ -170,6 +173,22 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
   });
 
   /* ── GET /v1/agents/:name/messages/threads -- List conversation threads ── */
+  // GET /v1/agents/:name/messages/overview — the Messages subtab mount in ONE call: command palette
+  // (memory) + enriched threads + message history (page 1). Folds getAgentCommands + /messages/threads +
+  // /messages. Owner-or-self via canAccessAgent. Registered before /messages/threads and /messages (a more
+  // specific literal path, no shadow).
+  const messagesOverviewDb = createAgentMessagesOverviewService(storage);
+  router.get('/v1/agents/:name/messages/overview', requireAuth(), async (req, res) => {
+    const agentName = req.params.name as string;
+    if (!canAccessAgent(req, agentName)) {
+      res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Access denied'));
+      return;
+    }
+    const agentGaii = resolveAgentGaii(req, agentName);
+    const data = await messagesOverviewDb.overview(agentGaii, agentName);
+    res.json(success(config.nodeId, data));
+  });
+
   router.get('/v1/agents/:name/messages/threads', requireAuth(), async (req, res) => {
     const agentName = req.params.name as string;
 

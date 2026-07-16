@@ -3,6 +3,9 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
+ *   v1.7.0 -- 2026-07-16 -- Mount folds commands + threads + messages into GET /v1/agents/:name/messages/overview
+ *     (getMessagesOverview); the [activeThread] effect skips its first run so the composite is the only
+ *     initial load; individual reads kept as fallback.
  *   v1.6.0 -- 2026-06-10 -- Empty command palette is one quiet line ("Agent commands — none
  *     registered"), not an expandable empty box.
  *   v1.5.0 -- 2026-06-06 -- Thread buttons: fix field-name mismatch (use threadId/lastMessage from the
@@ -27,7 +30,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
-import { sendMessage, listMessages, listThreads } from '/js/services/agent-messages.js';
+import { sendMessage, listMessages, listThreads, getMessagesOverview } from '/js/services/agent-messages.js';
 import { getAgentCommands } from '/js/services/agent-integration.js';
 import { Markdown } from '/components/Markdown.js';
 
@@ -113,6 +116,15 @@ export default function TabMessages({ agent, agentName, showToast }) {
   const [pendingPrompt, setPendingPrompt] = useState(null); // { promptId, threadId } | null
   const historyRef = useRef(null);
   const inputRef = useRef(null);
+  // The [activeThread] effect below also fires on mount; skip its first run so the mount composite is the
+  // only thing that loads messages initially (it would otherwise double-load the page-1 history).
+  const threadMounted = useRef(false);
+
+  function applyCommands(value) {
+    if (Array.isArray(value)) setCommands(value);
+    else if (typeof value === 'string') { try { setCommands(JSON.parse(value)); } catch { setCommands([]); } }
+    else setCommands([]);
+  }
 
   async function loadCommands() {
     try {
@@ -145,14 +157,33 @@ export default function TabMessages({ agent, agentName, showToast }) {
   }
 
   useEffect(() => {
-    loadCommands();
-    loadThreads();
-    loadMessages();
+    // Mount fold: ONE composite (commands + enriched threads + page-1 messages). On failure, fall back to
+    // the individual reads. Reset the thread-mounted guard so the [activeThread] effect skips its first run
+    // for this agent (the composite already seeded the messages).
+    threadMounted.current = false;
+    (async () => {
+      const ov = await getMessagesOverview(agentName);
+      if (ov) {
+        applyCommands(ov.commands);
+        setThreads(ov.threads || []);
+        setMessages(ov.messages?.messages || []);
+        setLoading(false);
+        return;
+      }
+      loadCommands();
+      loadThreads();
+      loadMessages();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- Full initial load on mount and when the agent changes; the loaders also close over activeThread, but re-keying on it would double-fetch (activeThread is handled by the effect below).
   }, [agentName]);
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- Reload messages when the active thread changes; loadMessages also depends on agentName, which the mount effect above already handles.
-  useEffect(() => { loadMessages(); }, [activeThread]);
+  useEffect(() => {
+    // Reload messages when the active thread CHANGES; the first run (mount) is skipped because the mount
+    // composite already loaded the page-1 history.
+    if (!threadMounted.current) { threadMounted.current = true; return; }
+    loadMessages();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeThread]);
 
   // eslint-disable-next-line react-hooks/exhaustive-deps -- Re-subscribe when the agent or active thread changes; the callback reads the current loaders via closure (fresh for these deps).
   useEffect(() => onLiveUpdate(['agent-messages'], () => { loadMessages(); loadThreads(); loadCommands(); }), [agentName, activeThread]);
