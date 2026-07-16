@@ -14,6 +14,8 @@
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.3.0 — 2026-07-16 — listOwnerScopeMemory aggregates GHII+agents in one listMemoryForOwners (was N+1)
+ *   v1.4.0 — 2026-07-16 — aimeat_knowledge_get uses the values listMemory already returns (SELECT *) instead
+ *     of a redundant getMemory per package entry (Phase 3)
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -178,20 +180,17 @@ export function registerKnowledgeTools(
                     isError: true,
                 };
             }
+            // listMemory returns FULL records (SELECT *), so each entry already carries its value —
+            // no getMemory per entry needed (was a redundant re-fetch of data already in hand).
             const entries = await storage.listMemory(agentGaii, { prefix: `packages/${package_id}/` });
-            const entryDetails = await Promise.all(
-                entries
-                    .filter(e => !e.key.endsWith('/manifest'))
-                    .map(async e => {
-                        const data = await storage.getMemory(agentGaii, e.key);
-                        return {
-                            key: e.key,
-                            visibility: e.visibility,
-                            value: data?.value ?? null,
-                            tags: e.tags,
-                        };
-                    }),
-            );
+            const entryDetails = entries
+                .filter(e => !e.key.endsWith('/manifest'))
+                .map(e => ({
+                    key: e.key,
+                    visibility: e.visibility,
+                    value: e.value ?? null,
+                    tags: e.tags,
+                }));
             return {
                 content: [{
                     type: 'text' as const,
