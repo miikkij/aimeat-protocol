@@ -19,7 +19,7 @@
   "scripts": {
     "dev": "tsx scripts/kill-port.ts && tsx scripts/build-app-catalog.ts && node --env-file=.env --import tsx src/index.ts start",
     "dev:watch": "tsx watch src/index.ts",
-    "build": "prisma generate && prisma generate --schema prisma/schema.postgres.prisma && tsc && node --input-type=module -e \"import fs from 'fs';fs.cpSync('locales','dist/locales',{recursive:true});fs.cpSync('public','dist/public',{recursive:true});fs.cpSync('src/static','dist/static',{recursive:true});fs.cpSync('.env.example','dist/.env.example');fs.cpSync('src/generated/prisma-postgres','dist/src/generated/prisma-postgres',{recursive:true});\"",
+    "build": "prisma generate && prisma generate --schema prisma/schema.postgres.prisma && tsc && node --input-type=module -e \"import fs from 'fs';fs.cpSync('locales','dist/locales',{recursive:true});fs.cpSync('public','dist/public',{recursive:true});fs.cpSync('src/static','dist/static',{recursive:true});fs.cpSync('.env.example','dist/.env.example');fs.cpSync('src/generated/prisma-postgres','dist/src/generated/prisma-postgres',{recursive:true});fs.cpSync('src/storage/providers/postgres-kysely/migrations','dist/src/storage/providers/postgres-kysely/migrations',{recursive:true});\"",
     "build:app-catalog": "tsx scripts/build-app-catalog.ts",
     "check:app-catalog": "tsx scripts/build-app-catalog.ts --check",
     "start": "node --env-file=.env dist/src/index.js start",
