@@ -1514,6 +1514,15 @@ model StatsDailyHistory {
   @@unique([date, key])
 }
 
+model StorageStatsSnapshot {
+  id         String   @id @map("_id")
+  capturedAt DateTime
+  counts     Json
+  totalRows  Int      @default(0)
+
+  @@index([capturedAt])
+}
+
 model AgentTask {
   id               String    @id @map("_id")
   agentGaii        String
