@@ -1565,7 +1565,6 @@
 .pf .pf-inline-block  { display: inline-block; }
 .pf .pf-badge-gap     { margin-right: .3rem; }
 .pf .pf-code-break    { word-break: break-all; }
-.pf .pf-code-textarea { font-family: var(--font-mono, monospace); font-size: .8rem; line-height: 1.4; }
 .pf .pf-label-inline  { margin: 0; }
 .pf .pf-select-inline { display: inline-block; width: auto; min-width: 12rem; }
 .pf .pf-select-narrow { max-width: 200px; }
