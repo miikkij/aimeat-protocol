@@ -5,6 +5,7 @@
  *   list. Extracted from src/routes/knowledge.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — review-list / delete / find batch the per-agent scans (listMemoryForOwners)
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -45,26 +46,24 @@ export function registerAdminRoutes(
     };
     let manifests: AdminManifestRow[] = [];
 
-    // Collect from all agents
-    for (const agent of allAgents) {
-      const agentManifests = await storage.listMemory(agent.gaii, {
-        prefix: 'packages/',
-        tags: ['knowledge-package'],
-      });
-      for (const m of agentManifests) {
-        if (m.key.endsWith('/manifest') && (m.value as { type?: string })?.type === 'knowledge-package' && !seenKeys.has(m.key)) {
-          seenKeys.add(m.key);
-          manifests.push({
-            key: m.key,
-            value: m.value as KnowledgeManifest,
-            ownerGaii: m.ownerGaii,
-            visibility: m.visibility,
-            flagCount: m.flagCount ?? 0,
-            createdAt: m.createdAt,
-            updatedAt: m.updatedAt,
-            isSystem: (m.tags || []).includes('system-knowledge'),
-          });
-        }
+    // Collect from all agents in ONE IN query (was listMemory per agent).
+    const agentManifests = await storage.listMemoryForOwners(allAgents.map(a => a.gaii), {
+      prefix: 'packages/',
+      tags: ['knowledge-package'],
+    });
+    for (const m of agentManifests) {
+      if (m.key.endsWith('/manifest') && (m.value as { type?: string })?.type === 'knowledge-package' && !seenKeys.has(m.key)) {
+        seenKeys.add(m.key);
+        manifests.push({
+          key: m.key,
+          value: m.value as KnowledgeManifest,
+          ownerGaii: m.ownerGaii,
+          visibility: m.visibility,
+          flagCount: m.flagCount ?? 0,
+          createdAt: m.createdAt,
+          updatedAt: m.updatedAt,
+          isSystem: (m.tags || []).includes('system-knowledge'),
+        });
       }
     }
 
@@ -225,21 +224,19 @@ export function registerAdminRoutes(
     const packageId = req.params.id as string;
     const manifestKey = `packages/${packageId}/manifest`;
 
-    // Find the package across all agents
+    // Find the package across all agents in ONE IN query (was getMemory per agent).
     const allAgents = await storage.listAgents();
+    const hit = (await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey }))
+      .find(r => r.key === manifestKey) ?? null;
     let found = false;
 
-    for (const agent of allAgents) {
-      const mem = await storage.getMemory(agent.gaii, manifestKey);
-      if (mem) {
-        // Delete manifest and all entries
-        const allEntries = await storage.listMemory(agent.gaii, { prefix: `packages/${packageId}/` });
-        for (const entry of allEntries) {
-          await storage.deleteMemory(agent.gaii, entry.key);
-        }
-        found = true;
-        break;
+    if (hit) {
+      // Delete manifest and all entries under the owning identity
+      const allEntries = await storage.listMemory(hit.ownerGaii, { prefix: `packages/${packageId}/` });
+      for (const entry of allEntries) {
+        await storage.deleteMemory(hit.ownerGaii, entry.key);
       }
+      found = true;
     }
 
     // Also try operator's own GAII for system packages
@@ -284,14 +281,10 @@ export function registerAdminRoutes(
 
     const manifestKey = `packages/${packageId}/manifest`;
 
-    // Find the package (search all agents)
+    // Find the package across all agents in ONE IN query (was getMemory per agent).
     const allAgents = await storage.listAgents();
-    let manifest: MemoryRecord | null = null;
-
-    for (const agent of allAgents) {
-      const mem = await storage.getMemory(agent.gaii, manifestKey);
-      if (mem) { manifest = mem; break; }
-    }
+    const manifest: MemoryRecord | null = (await storage.listMemoryForOwners(allAgents.map(a => a.gaii), { prefix: manifestKey }))
+      .find(r => r.key === manifestKey) ?? null;
 
     if (!manifest) {
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Package not found'));
