@@ -71,7 +71,7 @@ requireRole('operator')          // Operator (first registered owner)
 ### SQL Injection
 
 - SQLite queries use parameterized statements (better-sqlite3 prepared statements).
-- MongoDB uses Prisma ORM which parameterizes queries.
+- PostgreSQL queries go through Kysely, which parameterizes all values.
 - Never interpolate user input into query strings.
 
 ---

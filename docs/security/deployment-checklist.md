@@ -3,7 +3,7 @@
 ## Pre-Deployment
 
 - [ ] Set `AIMEAT_DEV_MODE=false` (never enable in production)
-- [ ] Set `AIMEAT_STORAGE=sqlite` or `AIMEAT_STORAGE=mongodb` (never use `memory` in production)
+- [ ] Set `AIMEAT_STORAGE=postgres-kysely` or `AIMEAT_STORAGE=sqlite` (never use `memory` in production)
 - [ ] Set a strong `AIMEAT_ADMIN_PASSWORD` (minimum 8 chars, mixed case + numbers)
 - [ ] Set `AIMEAT_BASE_URL` to your HTTPS URL
 - [ ] Set `AIMEAT_TOTP_ENCRYPTION_KEY` (64 hex chars = 32 bytes for AES-256-GCM)
@@ -26,7 +26,7 @@
 - [ ] Private keys are shown only once during registration - store securely
 - [ ] Enable TOTP for operator accounts
 - [ ] Set `AIMEAT_JWT_TTL` to appropriate value (default: 3600s)
-- [ ] Token revocation persists across restarts (requires sqlite/mongodb)
+- [ ] Token revocation persists across restarts (requires sqlite/postgres-kysely)
 
 ## Federation
 

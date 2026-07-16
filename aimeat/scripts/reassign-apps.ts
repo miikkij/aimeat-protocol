@@ -12,7 +12,7 @@
  *   re-point subdomain mappings. Dry-run by default; pass --apply to execute.
  * @usage cd aimeat && pnpm exec node --import tsx scripts/reassign-apps.ts \
  *          --to happydude500001 [--from anonymous] [--filename graph.html] \
- *          --db mongodb --db-url "$DATABASE_URL" [--apply]
+ *          --db postgres-kysely --db-url "$DATABASE_URL" [--apply]
  *        AIMEAT_NODE_ID must match the node (e.g. aimeat-finland-001-genesis) so the
  *        target app bucket key resolves correctly when the owner is not yet in the
  *        identity table (a registered owner resolves regardless).

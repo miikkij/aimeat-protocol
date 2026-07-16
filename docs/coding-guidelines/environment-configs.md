@@ -17,9 +17,9 @@ AIMEAT_PORT=40050
 AIMEAT_NODE_TYPE=full
 AIMEAT_BASE_URL=https://my-node.example.com
 
-# Storage: MongoDB required
-AIMEAT_STORAGE=mongodb
-DATABASE_URL=mongodb://user:pass@localhost:27017/aimeat
+# Storage: PostgreSQL required
+AIMEAT_STORAGE=postgres-kysely
+DATABASE_URL=postgresql://user:pass@localhost:5432/aimeat
 
 # Auth
 AIMEAT_ADMIN_PASSWORD=<strong-random-password>
@@ -60,10 +60,10 @@ AIMEAT_TOTP_ISSUER=MyNode
 ```
 
 **Requirements:**
-- MongoDB 7.x+ running
+- PostgreSQL 16+ running
 - Reverse proxy (nginx/caddy) with TLS termination
 - Sufficient RAM for concurrent users (recommended: 2GB+)
-- Persistent disk for MongoDB data
+- Persistent disk for PostgreSQL data
 
 ---
 
@@ -242,7 +242,7 @@ Full list of all 80+ environment variables: see `.env.example` in the `aimeat/` 
 Complete schema documentation: see `docs/b-config.md`.
 
 Configuration priority (highest to lowest):
-1. CLI arguments (`--db mongodb`)
+1. CLI arguments (`--db postgres-kysely`)
 2. Config file (`--config production.ini`)
 3. Environment variables (`AIMEAT_*`)
 4. Consul (centralized config)

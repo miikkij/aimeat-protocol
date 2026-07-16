@@ -512,7 +512,7 @@ All configuration is via environment variables. Set them in your `.env` file or 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `DATABASE_URL` | *(empty — in-memory)* | MongoDB connection string. Leave empty for in-memory storage |
+| `DATABASE_URL` | *(empty — in-memory)* | PostgreSQL connection string (when `AIMEAT_STORAGE=postgres-kysely`). Leave empty for in-memory storage |
 
 ### Features
 

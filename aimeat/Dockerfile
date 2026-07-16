@@ -2,13 +2,9 @@ FROM node:24-alpine AS base
 RUN corepack enable && corepack prepare pnpm@10.27.0 --activate
 WORKDIR /app
 
-# Build: install all deps, then compile TypeScript. `pnpm build` no longer runs
-# `prisma generate` (MongoDB + legacy Prisma-PG are deprecated); prisma/ is copied
-# BEFORE install so the @prisma/client postinstall generates the MongoDB client —
-# tsc still compiles the deprecated Prisma providers until they are removed.
+# Build: install all deps, then compile TypeScript.
 FROM base AS build
 COPY package.json pnpm-lock.yaml ./
-COPY prisma/ prisma/
 RUN pnpm install --frozen-lockfile
 COPY tsconfig.json ./
 COPY src/ src/
@@ -16,15 +12,12 @@ COPY bin/ bin/
 COPY scripts/ scripts/
 RUN pnpm run build
 
-# Production image. Carries the full node_modules from the build stage. The primary
-# backends (postgres-kysely, sqlite) need nothing Prisma-related at runtime; prisma/
-# and the prisma CLI ride along only so the DEPRECATED MongoDB backend (startup
-# `prisma db push` via findPrismaSchema()) keeps limping until it is removed.
+# Production image. Carries the full node_modules from the build stage (better-sqlite3
+# native bindings + the pg client for postgres-kysely).
 FROM node:24-alpine
 WORKDIR /app
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-COPY --from=build /app/prisma ./prisma
 COPY package.json pnpm-lock.yaml ./
 
 # Default SQLite data dir, owned by the runtime user so a mounted named volume

@@ -92,10 +92,9 @@ export async function askCoreSettings(
       options: [
         { value: 'memory', label: t('init.storage_memory') },
         { value: 'sqlite', label: t('init.storage_sqlite') },
-        { value: 'mongodb', label: t('init.storage_mongodb') },
-        { value: 'postgresql', label: t('init.storage_postgresql') },
+        { value: 'postgres-kysely', label: t('init.storage_postgresql') },
       ],
-      initialValue: useCase === 'dev' ? 'memory' : useCase === 'personal' ? 'sqlite' : 'mongodb',
+      initialValue: useCase === 'dev' ? 'memory' : useCase === 'personal' ? 'sqlite' : 'postgres-kysely',
     }),
     t,
   );
@@ -114,12 +113,9 @@ export async function askCoreSettings(
     settings.AIMEAT_SQLITE_PATH = sqlitePath;
   }
 
-  // DATABASE_URL — when mongodb or postgresql storage is selected
-  if (storageBackend === 'mongodb' || storageBackend === 'postgresql') {
-    const dbBackend = storageBackend as 'mongodb' | 'postgresql';
-    const samplePlaceholder = dbBackend === 'postgresql'
-      ? 'postgresql://user:pass@localhost:5432/aimeat'
-      : 'mongodb://user:pass@localhost:27017/aimeat';
+  // DATABASE_URL — when PostgreSQL storage is selected
+  if (storageBackend === 'postgres-kysely') {
+    const samplePlaceholder = 'postgresql://user:pass@localhost:5432/aimeat';
     if (useCase === 'public') {
       const dbDefault = env.DATABASE_URL || preset.dbUrl || '';
       const dbUrl = checkCancel(
@@ -129,7 +125,7 @@ export async function askCoreSettings(
           ...(dbDefault ? { defaultValue: dbDefault } : {}),
           validate: val => {
             if (!val) return undefined;
-            return validateDbUrl(val, t, dbBackend);
+            return validateDbUrl(val, t);
           },
         }),
         t,
@@ -142,7 +138,7 @@ export async function askCoreSettings(
           message: t('init.dbUrl'),
           placeholder: dbDefault || samplePlaceholder,
           defaultValue: dbDefault,
-          validate: val => validateDbUrl(val, t, dbBackend),
+          validate: val => validateDbUrl(val, t),
         }),
         t,
       );

@@ -49,10 +49,9 @@ export async function initializeConfig(
   const storageLabels: Record<string, string> = {
     memory: 'in-memory (data will not persist across restarts)',
     sqlite: `SQLite (${config.sqlitePath})`,
-    mongodb: `MongoDB (${config.dbUrl?.replace(/\/\/.*@/, '//<credentials>@') ?? 'no URL'})`,
-    postgresql: `PostgreSQL (${config.dbUrl?.replace(/\/\/.*@/, '//<credentials>@') ?? 'no URL'})`,
+    'postgres-kysely': `PostgreSQL (${config.dbUrl?.replace(/\/\/.*@/, '//<credentials>@') ?? 'no URL'})`,
   };
-  logger.info(`Using ${storageLabels[config.storageProvider]} storage`);
+  logger.info(`Using ${storageLabels[config.storageProvider] ?? config.storageProvider} storage`);
 
   // ── Config Provenance & DB Overrides ──
   // Build provenance registry tracking where each config value originated.

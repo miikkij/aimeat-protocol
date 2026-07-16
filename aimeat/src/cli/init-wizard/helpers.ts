@@ -72,12 +72,9 @@ export function validateUrl(val: string | undefined, t: TFunction): string | und
   }
 }
 
-export function validateDbUrl(val: string | undefined, t: TFunction, backend: 'mongodb' | 'postgresql' = 'mongodb'): string | undefined {
+export function validateDbUrl(val: string | undefined, t: TFunction): string | undefined {
   if (!val) return;
-  const ok = backend === 'postgresql'
-    ? (val.startsWith('postgresql://') || val.startsWith('postgres://'))
-    : (val.startsWith('mongodb://') || val.startsWith('mongodb+srv://'));
-  if (!ok) {
+  if (!val.startsWith('postgresql://') && !val.startsWith('postgres://')) {
     return t('init.dbUrlInvalid');
   }
 }

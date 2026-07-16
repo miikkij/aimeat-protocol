@@ -130,7 +130,7 @@ export interface AimeatConfig {
   nodeId: string;
   nodeType: NodeType;
   dbUrl: string | null;
-  storageProvider: 'memory' | 'sqlite' | 'mongodb' | 'postgresql' | 'postgres-kysely';
+  storageProvider: 'memory' | 'sqlite' | 'postgres-kysely';
   sqlitePath: string;
   adminPassword: string | null;
   devMode: boolean;

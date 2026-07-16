@@ -213,12 +213,12 @@ A Core-compliant node MUST implement Identity, Data, and Authorization. Economy,
 
 | Type | Storage | Hosts Agents | Federation | Use Case |
 |------|---------|--------------|------------|----------|
-| **full** | Persistent (SQLite / MongoDB) | Yes | Full | Primary node. The default. |
+| **full** | Persistent (PostgreSQL / SQLite) | Yes | Full | Primary node. The default. |
 | **relay** | In-memory | No | Routing only | Stateless router. |
 | **mirror** | Read-replica | Read-only | Receive only | Redundancy/geo cache. |
 | **personal** | Local (SQLite) | Yes | Via parent tunnel | User-owned lightweight node behind a home connection. |
 
-The reference implementation supports three valid persistent backends: SQLite (better-sqlite3), MongoDB (Prisma), and PostgreSQL (Prisma, separate schema + generated client). Port 40050 by convention.
+The reference implementation supports two valid persistent backends: PostgreSQL (via Kysely; SQL migrations run on boot) and SQLite (better-sqlite3). Port 40050 by convention.
 
 ### 3.3 API Versioning
 

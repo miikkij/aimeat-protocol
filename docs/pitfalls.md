@@ -77,11 +77,11 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **App-grant tokens are role `app`, strictly** — they never pass `requireRole('agent')` gates (organism create/join, workspace structure ops), regardless of scopes. Published apps needing server-side rules use an extension (`ext:` namespace + action checks), not organism primitives.
 
 ## 7. Storage & multi-backend
-*Symptoms: a field that works on SQLite but not Mongo, an upgrade crash-loop, a stale badge on a record.*
+*Symptoms: a field that works on SQLite but not Postgres (or vice versa), an upgrade crash-loop, a stale badge on a record.*
 
-- **New data type/field → update ALL backends** (SQLite better-sqlite3 + MongoDB Prisma) via the `Storage` interface. See `docs/coding-guidelines/storage-sync.md`.
+- **New data type/field → update BOTH backends** (postgres-kysely + SQLite better-sqlite3) via the `Storage` interface. See `docs/coding-guidelines/storage-sync.md`. (The Prisma backends were removed 2026-07-16 — do not re-add Prisma.)
 - **SQLite migrations: add indexes on ALTER-added columns AFTER `safeAddColumn`**, or the upgrade crash-loops.
-- **Prisma is pinned** (`prisma` + `@prisma/client` must match; do not bump to 7.x on a whim — verify the current pin in `aimeat/package.json`).
+- **PG jsonb does not preserve key order** — don't rely on `JSON.stringify` equality for dedup across backends.
 - **Record owner-forks → stale badge:** the same key can fork into duplicate-owner copies (a GHII `.latest` vs a legacy agent GAII `.latest`); read paths must keep the freshest, or a stale lower-version copy surfaces.
 
 ## 8. Extensions / Cortex / Memory namespaces
@@ -130,9 +130,9 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **The pre-commit hook runs over the whole working tree** (not just staged files), so your commit passes only if the other session's in-flight code also compiles. If the hook fails on code you didn't write, the other session is mid-edit.
 
 ## 14. Environment & tooling (Windows)
-*Symptoms: login 500s, a Mongo/Prisma EPERM, a hung command.*
+*Symptoms: login 500s, a native-DLL EPERM, a hung command.*
 
 - **ABSOLUTE ban on `wsl` / `docker` commands** — ask the user to run infra ops; never touch them yourself.
-- **Stop `pnpm dev` before a MongoDB E2E run or `prisma generate`** — a running dev server holds the native DLLs and you get an EPERM on Windows.
-- **Login 500s on the dev node** usually mean the WSL docker (Mongo) died — ask the user to restart it, then restart `pnpm dev`.
+- **Stop `pnpm dev` before `pnpm install` touching native deps** — a running dev server holds the native DLLs (better-sqlite3) and you get an EPERM on Windows.
+- **Login 500s on the dev node** usually mean the WSL docker (the database container) died — ask the user to restart it, then restart `pnpm dev`.
 - **`pnpm dev` is not a full watcher** — backend `src/` edits need a restart; `src/static/*` + `public/*` are served fresh on F5.

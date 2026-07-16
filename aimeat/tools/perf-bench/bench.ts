@@ -6,10 +6,10 @@
  *   per chain, the DB query COUNT + wall time, at several data/agent scales. It is meant to answer
  *   "how does operation X scale with data and agent count, and how many round-trips does it really do",
  *   so structural fixes can target whole chains instead of one op at a time. Runs on localhost against
- *   SQLite (default) or MongoDB — no HTTP, no prod — so we can iterate fast.
+ *   SQLite (default) or PostgreSQL+Kysely — no HTTP, no prod — so we can iterate fast.
  * @usage
  *   cd aimeat && pnpm perf:bench                 # SQLite in-memory, default scales
- *   AIMEAT_BENCH_DB=mongodb AIMEAT_BENCH_URL=mongodb://localhost:27017/aimeat_bench pnpm perf:bench
+ *   AIMEAT_BENCH_DB=postgres-kysely AIMEAT_BENCH_URL=postgresql://localhost:5432/aimeat_bench pnpm perf:bench
  *   AIMEAT_BENCH_SCALES=agents=10,memories=2000,records=200,versions=3 pnpm perf:bench
  * @version-history
  *   v1.0.0 — 2026-07-15 — Initial harness (write/read/search/usage/publish/delete chains, scaled).
@@ -94,23 +94,25 @@ const config = { ...loadConfig(), nodeId: NODE } as ReturnType<typeof loadConfig
  *  a prior run's) rows don't collide on the owner unique-constraint or pollute owner-scoped timings.
  *  Deletes rows only (indexes are kept, so timings stay realistic). No-op for SQLite (:memory: is
  *  already fresh each scale). Best-effort — a clear failure is warned, never fatal. */
-async function resetPersistentData(storage: Storage): Promise<void> {
+async function resetPersistentData(_storage: Storage): Promise<void> {
   const provider = process.env.AIMEAT_BENCH_DB;
-  if (provider !== 'mongodb' && provider !== 'postgresql') return;
-  // Both persistent backends are PrismaStorage; the raw client is reachable for a full-collection wipe.
-  const prisma = (storage as unknown as { prisma?: unknown }).prisma as {
-    $runCommandRaw?: (cmd: Record<string, unknown>) => Promise<unknown>;
-    $executeRawUnsafe?: (sql: string) => Promise<unknown>;
-  } | undefined;
-  if (!prisma) return;
-  const tables = ['Memory', 'MemoryVersion', 'Agent', 'Owner'];
+  if (provider !== 'postgres-kysely') return;
+  const dbUrl = process.env.AIMEAT_BENCH_URL;
+  if (!dbUrl) return;
   try {
-    if (provider === 'mongodb' && prisma.$runCommandRaw) {
-      for (const t of tables) {
-        await prisma.$runCommandRaw({ delete: t, deletes: [{ q: {}, limit: 0 }] }).catch(() => { /* collection may not exist yet */ });
-      }
-    } else if (provider === 'postgresql' && prisma.$executeRawUnsafe) {
-      await prisma.$executeRawUnsafe(`TRUNCATE ${tables.map(t => `"${t}"`).join(', ')} RESTART IDENTITY CASCADE`).catch(() => { /* tables may not exist yet */ });
+    const { default: pg } = await import('pg');
+    const client = new pg.Client({ connectionString: dbUrl });
+    await client.connect();
+    try {
+      await client.query(`DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN (SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_kysely_migrations') LOOP
+    EXECUTE 'TRUNCATE TABLE ' || quote_ident(r.tablename) || ' RESTART IDENTITY CASCADE';
+  END LOOP;
+END $$;`);
+    } finally {
+      await client.end();
     }
   } catch (err) {
     console.warn(`  (reset skipped: ${(err as { message?: string })?.message ?? err})`);
@@ -125,7 +127,7 @@ async function bench(label: string, fn: () => Promise<unknown>): Promise<void> {
 async function runScale(sc: Scale): Promise<void> {
   console.log(`\n════ scale: ${sc.agents} agents · ${sc.memories} memories · ${sc.records} records×${sc.versions} versions ════`);
   const storage = instrumentStorage(
-    await createStorage({ provider: (process.env.AIMEAT_BENCH_DB as 'sqlite' | 'mongodb') ?? 'memory', sqlitePath: ':memory:', dbUrl: process.env.AIMEAT_BENCH_URL }),
+    await createStorage({ provider: (process.env.AIMEAT_BENCH_DB as 'sqlite' | 'postgres-kysely') ?? 'memory', sqlitePath: ':memory:', dbUrl: process.env.AIMEAT_BENCH_URL }),
     true,
   );
   await resetPersistentData(storage);

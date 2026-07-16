@@ -202,10 +202,12 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     dbUrl: process.env.DATABASE_URL ?? null,
-    // Accept `postgres` as an alias for `postgresql`.
-    storageProvider: ((process.env.AIMEAT_STORAGE ?? 'memory') === 'postgres'
-      ? 'postgresql'
-      : (process.env.AIMEAT_STORAGE ?? 'memory')) as 'memory' | 'sqlite' | 'mongodb' | 'postgresql' | 'postgres-kysely',
+    // Accept `postgres` / `postgresql` as aliases for `postgres-kysely` (the only Postgres
+    // backend since the Prisma providers were removed). `mongodb` is passed through so the
+    // storage factory can fail fast with migration guidance.
+    storageProvider: (['postgres', 'postgresql'].includes(process.env.AIMEAT_STORAGE ?? '')
+      ? 'postgres-kysely'
+      : (process.env.AIMEAT_STORAGE ?? 'memory')) as 'memory' | 'sqlite' | 'postgres-kysely',
     sqlitePath: process.env.AIMEAT_SQLITE_PATH ?? './data/aimeat.db',
     adminPassword: process.env.AIMEAT_ADMIN_PASSWORD ?? null,
     devMode: process.env.AIMEAT_DEV_MODE === 'true',

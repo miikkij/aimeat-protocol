@@ -12,7 +12,6 @@
   },
   "files": [
     "dist/",
-    "prisma/",
     "docs/AIMEAT_Help_Prompt.md",
     "docs/csm-examples/"
   ],
@@ -88,13 +87,7 @@
     "check:no-max-tokens": "tsx scripts/check-no-max-tokens.ts",
     "screenshot:worker": "tsx scripts/screenshot-worker.ts",
     "generate:types": "openapi-typescript ../openapi.yaml -o src/generated/api-types.ts",
-    "db:generate": "prisma generate",
-    "db:generate:postgres": "prisma generate --schema prisma/schema.postgres.prisma",
-    "db:push": "prisma db push",
-    "db:push:postgres": "prisma db push --schema prisma/schema.postgres.prisma",
-    "db:init": "node --env-file=.env --import tsx scripts/db-init.ts",
     "db:reset": "node --env-file=.env --import tsx scripts/db-reset.ts",
-    "migrate:to-postgres-kysely": "node --env-file=.env --import tsx scripts/migrate-to-postgres-kysely.ts",
     "telemetry:stats": "node --env-file=.env --import tsx scripts/telemetry-prune.ts",
     "telemetry:prune": "node --env-file=.env --import tsx scripts/telemetry-prune.ts",
     "consent-audit:stats": "node --env-file=.env --import tsx scripts/consent-audit-prune.ts",
@@ -193,22 +186,15 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "kysely-codegen": "^0.20.0",
     "openapi-typescript": "^7.8.0",
-    "prisma": "^6.9.0",
     "tsx": "^4.22.4",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.61.0",
     "vitest": "^4.1.8"
   },
-  "optionalDependencies": {
-    "@prisma/client": "^6.19.2"
-  },
   "pnpm": {
     "onlyBuiltDependencies": [
-      "@prisma/client",
-      "@prisma/engines",
       "better-sqlite3",
-      "esbuild",
-      "prisma"
+      "esbuild"
     ],
     "overrides": {
       "hono": ">=4.12.14",

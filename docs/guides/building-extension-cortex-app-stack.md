@@ -92,7 +92,7 @@ data and logic live one layer down.
                        ▼
 ┌──────────────────────────────────────────────────────────────────┐
 │  AIMEAT NODE STORAGE                                              │
-│  Memory (SQLite or MongoDB) — key-value with visibility flag      │
+│  Memory (PostgreSQL or SQLite) — key-value with visibility flag   │
 │  Storage (file blobs)                                             │
 │  Agents (registered AI identities with GAII)                      │
 └──────────────────────────────────────────────────────────────────┘

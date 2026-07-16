@@ -30,9 +30,9 @@ export function generateEnvContent(settings: Record<string, string>): string {
     {
       title: 'Storage Backend',
       vars: [
-        { key: 'AIMEAT_STORAGE', comment: 'Storage backend: memory (default), sqlite (file-based), mongodb (production)' },
+        { key: 'AIMEAT_STORAGE', comment: 'Storage backend: memory (default), sqlite (file-based), postgres-kysely (production)' },
         { key: 'AIMEAT_SQLITE_PATH', comment: 'SQLite database file path (when AIMEAT_STORAGE=sqlite)' },
-        { key: 'DATABASE_URL', comment: 'MongoDB connection URL (when AIMEAT_STORAGE=mongodb)' },
+        { key: 'DATABASE_URL', comment: 'PostgreSQL connection URL (when AIMEAT_STORAGE=postgres-kysely)' },
       ],
     },
     {

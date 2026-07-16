@@ -367,7 +367,7 @@ git clone https://github.com/miikkij/aimeat-protocol.git
 cd aimeat-protocol/aimeat
 
 pnpm install
-pnpm approve-builds   # for Prisma & esbuild
+pnpm approve-builds   # for better-sqlite3 & esbuild
 pnpm install
 ```
 
@@ -428,7 +428,7 @@ CI). Developer docs: [aimeat-desktop/README.md](aimeat-desktop/README.md).
 
 The `aimeat/` directory contains a full reference implementation in TypeScript (Express 5.2, Node 24). It implements the Core protocol and the Platform on top: GHII/GEAI identities + TOTP 2FA, organisms/workspaces, the app platform with scoped grants and origin isolation, the agent fleet plane, **QuickJS-WASM sandboxed extensions** + cortex, skills/capabilities, a package marketplace, push notifications, WebRTC, and a comprehensive operator admin dashboard.
 
-Two storage backends: **PostgreSQL + Kysely** (production — plain SQL migrations run on boot, no ORM at runtime) and **SQLite** (personal nodes, local dev; run `:memory:` for true in-RAM speed). The legacy Prisma-based MongoDB and PostgreSQL providers are deprecated and being removed before v2.0; the pure in-memory backend is likewise deprecated — SQLite `:memory:` covers the fast-iteration role using the actual production code path.
+Two storage backends: **PostgreSQL + Kysely** (production — plain SQL migrations run on boot, no ORM at runtime) and **SQLite** (personal nodes, local dev; run `:memory:` for true in-RAM speed). The legacy Prisma-based MongoDB and PostgreSQL providers were removed in July 2026; the pure in-memory backend is deprecated — SQLite `:memory:` covers the fast-iteration role using the actual production code path.
 
 See the [v4.0 Platform spec](docs/AIMEAT-RFC-v4.0-Platform-full.md) for everything built on the Core.
 
@@ -441,10 +441,9 @@ aimeat-protocol/
 ├── aimeat/                   ★ the reference implementation (Node 24 / TypeScript / Express 5)
 │   ├── src/routes/           ~132 route handlers (one per domain)
 │   ├── src/services/         ~184 business-logic services
-│   ├── src/storage/          Storage interface + PostgreSQL(Kysely) / SQLite providers (+ deprecated Prisma Mongo/PG)
+│   ├── src/storage/          Storage interface + PostgreSQL(Kysely) / SQLite providers
 │   ├── src/auth/  mcp/  middleware/  models/  server-bootstrap/  cli/  enterprise/
 │   ├── public/               Preact + HTM SPA, no build (views, components, js, css, lib)
-│   ├── prisma/               deprecated Prisma schemas (Mongo + legacy PG; removed before v2.0)
 │   ├── locales/  test/  tools/   i18n · E2E suites · dev tools (synthtraces)
 │   └── docs/                  implementation-local docs (integrations, …)
 ├── python/aimeat-crewai/     ★ pip-installable CrewAI liaison/connector (own PyPI line)

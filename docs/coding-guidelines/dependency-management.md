@@ -77,17 +77,10 @@ pnpm audit --fix
 | `@playwright/test` | ^1.58.2 | Browser E2E testing | Apache-2.0 |
 | `eslint` | ^10.0.2 | Code linting | MIT |
 | `openapi-typescript` | ^7.8.0 | Generate types from OpenAPI spec | MIT |
-| `prisma` | ^6.9.0 | MongoDB ORM (schema + client generation) | Apache-2.0 |
 | `tsx` | ^4.21.0 | TypeScript execution (tests, scripts) | MIT |
 | `typescript` | ^5.9.3 | TypeScript compiler | Apache-2.0 |
 | `typescript-eslint` | ^8.56.1 | TypeScript ESLint integration | MIT |
 | `vitest` | ^4.0.18 | Unit test framework | MIT |
-
-### Optional Dependencies
-
-| Package | Version | Purpose |
-|---------|---------|---------|
-| `@prisma/client` | ^6.19.2 | MongoDB client (only needed for MongoDB backend) |
 
 ---
 

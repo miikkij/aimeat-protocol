@@ -45,7 +45,7 @@ export function nodeSections(config: AimeatConfig): ConfigSection[] {
       entries: [
         {
           envVar: 'AIMEAT_STORAGE',
-          description: 'Storage backend (memory | sqlite | mongodb | postgresql)',
+          description: 'Storage backend (memory | sqlite | postgres-kysely)',
           value: config.storageProvider,
           defaultVal: 'memory',
         },
@@ -57,10 +57,10 @@ export function nodeSections(config: AimeatConfig): ConfigSection[] {
         },
         {
           envVar: 'DATABASE_URL',
-          description: 'MongoDB / PostgreSQL connection URL (when mongodb or postgresql)',
-          value: (config.storageProvider === 'mongodb' || config.storageProvider === 'postgresql')
+          description: 'PostgreSQL connection URL (when postgres-kysely)',
+          value: config.storageProvider === 'postgres-kysely'
             ? (config.dbUrl ? maskUrl(config.dbUrl) : `(not set — required for ${config.storageProvider})`)
-            : '(n/a — not using mongodb/postgresql)',
+            : '(n/a — not using postgres-kysely)',
           defaultVal: '(none)',
           secret: true,
         },

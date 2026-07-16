@@ -118,7 +118,7 @@ export function registerCoreAdminTools(
                     type: 'text' as const,
                     text: JSON.stringify({
                         node_id: config.nodeId, port: config.port,
-                        storage_type: config.dbUrl ? 'mongodb' : 'in-memory',
+                        storage_type: config.storageProvider,
                         jwt_ttl_seconds: config.jwtTtlSeconds,
                         welcome_bonus: config.welcomeBonus, daily_allowance: config.dailyAllowance,
                         burn_rate: config.burnRate, max_operator_mint_per_day: config.maxOperatorMintPerDay,
