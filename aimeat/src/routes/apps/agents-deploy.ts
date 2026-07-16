@@ -8,18 +8,23 @@
  *   Status derives the fleet's deployed name (<agent_name>-<slug(app_id)>) and reads liveness
  *   from the agent registration + the agents.<name>.deploy memory key the fleet writes.
  * @structure
- *   - registerAppAgentRoutes() — POST .../agents/:agentName/deploy | /undeploy, GET .../status
+ *   - registerAppAgentRoutes() — POST .../agents/:agentName/deploy | /undeploy, GET .../status,
+ *     GET .../instances (hosted instances of the agent + their PUBLIC offers/prices)
  * @usage registered from appsRouter() in src/routes/apps.ts
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Slice 2: GET .../instances — discover already-hosted instances of an
+ *     app's bundled agent (deployed-name convention + the author's original) with their public
+ *     offers + prices, so the catalog can show "use a hosted one" vs "deploy your own".
  *   v1.0.0 — 2026-07-16 — Initial creation (Agent-Bundled Apps Slice 1, node side)
  */
 import type { Router, Request, Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppRecord } from '../../storage/interface.js';
-import { requireAuth } from '../../auth/middleware.js';
+import { requireAuth, optionalAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { buildGAII, validateAgentName } from '../../utils/gaii.js';
 import { deployedAgentName } from '../../models/crew-def-schemas.js';
+import type { Offer } from '../../models/offer-schemas.js';
 import { createAppAgentTask } from '../../services/app-agent-deploy.js';
 
 /** Default runner-agent name: crewaimeat's crew-forge daemon registers under this name. */
@@ -151,6 +156,78 @@ export function registerAppAgentRoutes(router: Router, config: AimeatConfig, sto
 
     // POST /v1/apps/:owner/:filename/agents/:agentName/undeploy
     router.post('/v1/apps/:owner/:filename/agents/:agentName/undeploy', requireAuth(), (req, res) => void handleAction(req, res, 'undeploy-app-agent'));
+
+    // GET /v1/apps/:owner/:filename/agents/:agentName/instances — hosted instances of an app's
+    // bundled agent on THIS node, with their PUBLIC offers + prices. This is the "buy it hosted
+    // vs deploy your own" discovery surface: instances are found by the shared deployed-name
+    // convention (<agent_name>-<slug(app_id)>, any owner) plus the app AUTHOR's original agent
+    // running under the plain agent_name (source: 'author'). Read-only, optionalAuth — it exposes
+    // nothing beyond the public agents directory + offers each host explicitly marked public.
+    router.get('/v1/apps/:owner/:filename/agents/:agentName/instances', optionalAuth(), async (req, res) => {
+        const appOwnerParam = req.params.owner as string;
+        const filename = req.params.filename as string;
+        const agentName = req.params.agentName as string;
+        const viewer = req.auth && !req.auth.anonymous ? bareOwner(req) : null;
+        const app = await storage.getAppByOwnerName(
+            appOwnerParam.includes('@') ? appOwnerParam.split('@')[0] : appOwnerParam, filename);
+        if (!app || (app.ownerName !== viewer && (app.parked || app.operatorHidden || app.accessCode))) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'App not found'));
+            return;
+        }
+        const declared = (app.manifest?.cortex?.agents ?? [])
+            .find(a => (a as { agent_name?: unknown }).agent_name === agentName);
+        if (!declared) {
+            res.status(404).json(error(config.nodeId, 'AGENT_NOT_DECLARED',
+                `App "${app.ownerName}/${app.filename}" does not declare an agent named "${agentName}" in manifest.cortex.agents`));
+            return;
+        }
+
+        const appId = `${app.ownerName}/${app.filename}`;
+        const deployedName = deployedAgentName(agentName, appId);
+        const all = await storage.listAgents();
+        const now = Date.now();
+        const candidates = all.filter(a =>
+            (a.name === deployedName || (a.name === agentName && a.owner === app.ownerName))
+            && !(a.tags ?? []).includes('unlisted'));
+
+        const instances = await Promise.all(candidates.map(async (a) => {
+            const rec = await storage.getMemory(a.gaii, `agents.${a.name}.offers`);
+            const offers = (((rec?.value as { offers?: Offer[] } | undefined)?.offers) ?? [])
+                .filter(o => o.visibility === 'public')
+                .map(o => ({
+                    id: o.id,
+                    title: o.title,
+                    ask: o.ask,
+                    cost: o.cost,
+                    deliverable: o.deliverable,
+                    price: o.price ?? null,
+                    price_money: o.priceMoney ?? null,
+                    callable: !!o.callable,
+                }));
+            return {
+                gaii: a.gaii,
+                name: a.name,
+                owner: a.owner,
+                display_name: a.displayName ?? a.name,
+                trust_score: a.trustScore,
+                last_seen: a.lastSeen ?? null,
+                online: !!(a.lastSeen && (now - new Date(a.lastSeen).getTime()) < 10 * 60 * 1000),
+                source: a.name === deployedName ? 'deployed' as const : 'author' as const,
+                is_yours: viewer !== null && a.owner === viewer,
+                offers,
+            };
+        }));
+        // Live, offer-bearing hosts first — that's the "buy it here" shelf.
+        instances.sort((x, y) => Number(y.online) - Number(x.online) || y.offers.length - x.offers.length);
+
+        res.json(success(config.nodeId, {
+            app_id: appId,
+            agent_name: agentName,
+            deployed_agent_name: deployedName,
+            instances,
+            total: instances.length,
+        }));
+    });
 
     // GET /v1/apps/:owner/:filename/agents/:agentName/status — liveness as the app UI reads it:
     // the deployed agent's registration + the agents.<name>.deploy key the fleet writes. The key

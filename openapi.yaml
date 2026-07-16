@@ -14119,6 +14119,83 @@ paths:
         '403': { description: CROSS_OWNER_FORBIDDEN (foreign target owner) }
         '404': { description: App not found, agent not declared, or RUNNER_NOT_FOUND }
 
+  /v1/apps/{owner}/{filename}/agents/{agentName}/instances:
+    get:
+      operationId: appAgentInstances
+      summary: Hosted instances of an app's bundled agent (with public offer prices)
+      description: |
+        The "use it hosted vs deploy your own" discovery surface: every agent on THIS node that
+        runs this app's bundled agent - found by the shared deployed-name convention
+        (`<agent_name>-<slug(app_id)>`, any owner; source `deployed`) plus the app AUTHOR's
+        original agent under the plain agent_name (source `author`). Each instance carries its
+        owner, liveness (last_seen / online), trust score, and the offers that host explicitly
+        marked `visibility: public` - with their morsel and/or money prices. Sorted live +
+        offer-bearing first. optionalAuth: exposes nothing beyond the public agents directory
+        plus explicitly-public offers; `is_yours` marks the viewer's own instances when
+        authenticated. Ordering/checkout of a hosted offer uses the existing offers surfaces
+        (callable offers: POST /v1/agents/{gaii}/offers/{offerId}/invoke).
+      tags: [Apps]
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: agentName, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Hosted instances
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          app_id: { type: string }
+                          agent_name: { type: string }
+                          deployed_agent_name: { type: string }
+                          total: { type: integer }
+                          instances:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                gaii: { type: string }
+                                name: { type: string }
+                                owner: { type: string }
+                                display_name: { type: string }
+                                trust_score: { type: number }
+                                last_seen: { type: string, nullable: true }
+                                online: { type: boolean }
+                                source: { type: string, enum: [deployed, author] }
+                                is_yours: { type: boolean }
+                                offers:
+                                  type: array
+                                  description: ONLY offers the host marked visibility public
+                                  items:
+                                    type: object
+                                    properties:
+                                      id: { type: string }
+                                      title: { type: string }
+                                      ask: { type: string }
+                                      cost: { type: string }
+                                      deliverable: { type: string }
+                                      price:
+                                        type: object
+                                        nullable: true
+                                        properties:
+                                          morsels: { type: integer }
+                                          unit: { type: string }
+                                      price_money:
+                                        type: object
+                                        nullable: true
+                                        properties:
+                                          amount: { type: integer, description: micros (1 EUR = 1000000) }
+                                          currency: { type: string }
+                                      callable: { type: boolean, description: machine-invocable via the offers invoke endpoint }
+        '404': { description: App not found or agent not declared }
+
   /v1/apps/{owner}/{filename}/agents/{agentName}/status:
     get:
       operationId: appAgentDeployStatus

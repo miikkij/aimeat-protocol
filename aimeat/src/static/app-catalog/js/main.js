@@ -20,6 +20,7 @@ import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref,
 import { initAppsIo, setEditingAppId, addAppFromZip, addAppFromUrl, addAppFromFile, addAppFromSource, showModal, requireSignInThen, parseAppMeta, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
 import { initServerIo, isOperatorSession, importFromAimeat, processAimeatImport, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
 import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, renderRecentlyOpened, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt, onCardDragStart, onCardDragEnd, onCardDragOver, onCardDrop } from './render.js';
+import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from './app-agents.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -188,6 +189,9 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
     submitBackupRestore: submitBackupRestore,
     showVersionsModal: showVersionsModal,
     showLineageModal: showLineageModal,
+    showAppAgentsModal: showAppAgentsModal,
+    agentsDeploy: agentsDeploy,
+    agentsUndeploy: agentsUndeploy,
     showProtectionModal: showProtectionModal,
     saveProtection: saveProtection,
     restoreVersion: restoreVersion,
@@ -260,6 +264,7 @@ import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverS
       getOwnProtection: function () { return ownAppProtection; },
       setIframeUrl: setIframeUrl, isOperatorSession: isOperatorSession
     });
+    initAppAgents({ getServerManifests: function () { return serverAppManifests; } });
     initSettings({ generateId: generateId, renderApps: renderApps, loadPublishedApps: loadPublishedApps });
     initAppsIo({ generateId: generateId, readFileAsText: readFileAsText, renderApps: renderApps, getMainApps: function () { return allApps; } });
     initServerIo({

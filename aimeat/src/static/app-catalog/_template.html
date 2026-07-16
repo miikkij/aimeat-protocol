@@ -472,6 +472,18 @@
     </div>
   </div>
 
+  <!-- Bundled-agents modal (Agent-Bundled Apps): crew-def inspector + hosted instances with
+       public offer prices + "deploy your own" (runner/organism pickers) onto the owner's fleet -->
+  <div id="agents-overlay" hidden>
+    <div class="modal" id="agents-modal">
+      <h2>&#x1F916; <span data-i18n="agents.title">Bundled agents</span> <span id="agents-modal-app" class="aga-app-ref"></span></h2>
+      <div id="agents-modal-body" class="aga-body"></div>
+      <div class="modal-actions">
+        <button type="button" class="modal-btn secondary" onclick="document.getElementById('agents-overlay').hidden = true" data-i18n="common.close">Close</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Copy-protection modal: opt-in per-app flags applied to the runnable HTML at serve time -->
   <div id="protection-overlay" hidden>
     <div class="modal" id="protection-modal">
