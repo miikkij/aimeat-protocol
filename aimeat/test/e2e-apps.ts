@@ -38,6 +38,8 @@
  *   v1.9.0 — 2026-07-14 — add Phase 12 aimeat-agentface served library: served as JS, carries the
  *     convention key + public-visibility write + the unauthenticated/missing-auth errors, and is
  *     listed in the /v1/libs catalogue.
+ *   v1.10.0 — 2026-07-16 — Phase 10 regression: badge injection must survive '</body>' inside app
+ *     JavaScript (last-match injection; first-match silently broke such apps).
  */
 
 import * as ed from '@noble/ed25519';
@@ -593,6 +595,28 @@ await test('GET ?mode=inline appends the AIMEAT badge', async () => {
     assert(text.includes('id="aimeat-app-badge"'), 'inline body carries the badge element');
     assert(text.includes('Publish your own app'), 'badge shows the publish CTA');
     assert(/<\/body\s*>\s*$/i.test(text.trim()) === false || text.indexOf('aimeat-app-badge') < text.lastIndexOf('</body>'), 'badge injected before </body>');
+});
+
+// Regression: apps whose JS contains the literal string '</body>' (e.g. building/exporting
+// HTML in template strings) were killed by first-match badge injection — the badge markup
+// landed inside the JS string, a silent SyntaxError. Injection must target the LAST </body>.
+const TRAP_FILE = 'body-trap-demo.html';
+const TRAP_JS_STRING = 'var doc = "<html><body>hi</body></html>";';
+const TRAP_HTML = '<!DOCTYPE html><html><body><h1>trap</h1><script>' + TRAP_JS_STRING + 'console.log(doc);</script></body></html>';
+
+await test("Badge injection survives '</body>' inside app JavaScript (last-match)", async () => {
+    const pub = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: TRAP_FILE, content: b64(TRAP_HTML), name: 'Body Trap Demo', description: 'JS contains </body>', category: 'utility', tags: [] }),
+    }));
+    assert(pub.status === 201 || pub.status === 200, `publish status ${pub.status}: ${JSON.stringify(pub.body)}`);
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${TRAP_FILE}?mode=inline`, { redirect: 'manual' });
+    if (res.status === 301) { console.log('    (app origin on — inline 301s; badge covered by app-origin serving)'); return; }
+    assert(res.status === 200, `inline status ${res.status}`);
+    const text = await res.text();
+    assert(text.includes(TRAP_JS_STRING), 'the JS string containing </body> is byte-intact (badge not injected into it)');
+    assert(text.includes('id="aimeat-app-badge"'), 'badge element present');
+    assert(text.indexOf('id="aimeat-app-badge"') > text.indexOf(TRAP_JS_STRING), 'badge lands after the script, at the real closing tag');
 });
 
 await test('Raw download (no mode) stays byte-exact — no badge', async () => {
