@@ -801,3 +801,16 @@
 .adm-skills-detail { margin-top: 0.5rem; }
 .adm-skills-frontmatter { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.6rem; font-size: 0.74rem; color: var(--muted); white-space: pre-wrap; margin-bottom: 0.5rem; }
 .adm-skills-body-md { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 0.86rem; max-height: 32rem; overflow: auto; }
+
+/* ── Feedback tab (Node Feedback Channel operator inbox) ── */
+.adm-fb-filters { display: flex; gap: 0.5rem; margin: 0.75rem 0; flex-wrap: wrap; }
+.adm-fb-row { cursor: pointer; }
+.adm-fb-row:hover td { background: var(--bg-dim); }
+.adm-fb-thread-head { display: flex; align-items: center; gap: 0.6rem; margin-top: 0.75rem; flex-wrap: wrap; }
+.adm-fb-status { margin-left: auto; }
+.adm-fb-msg { border: 1px solid var(--border); border-radius: var(--radius); background: var(--card); padding: 0.6rem 0.8rem; margin-top: 0.5rem; white-space: pre-wrap; font-size: 0.88rem; }
+.adm-fb-msg-operator { background: var(--bg-dim); margin-left: 2rem; }
+.adm-fb-msg-sender { margin-right: 2rem; }
+.adm-fb-context { font-size: 0.76rem; color: var(--muted); margin-top: 0.4rem; }
+.adm-fb-replybox { margin-top: 0.75rem; display: flex; flex-direction: column; gap: 0.5rem; align-items: flex-start; }
+.adm-fb-replybox textarea { width: 100%; resize: vertical; }

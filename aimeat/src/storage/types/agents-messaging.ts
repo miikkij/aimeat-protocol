@@ -2,6 +2,7 @@
  * @file src/storage/types/agents-messaging.ts
  * @description Capability, agent-task, directive, sharing, usage-ledger, and messaging record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add Node Feedback Channel types (FeedbackRecord/Message + enums).
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  */
 // ── Capability Layer ────────────────────────────────────────────────
@@ -705,4 +706,39 @@ export interface AgentOnboardingRecord {
     expiresAt: string;
     reason?: string;
   };
+}
+
+// ── Node Feedback Channel (principal → operator) ─────────────────────
+
+/** One message in a feedback thread's sender↔operator conversation. */
+export interface FeedbackMessage {
+  from: 'sender' | 'operator';
+  body: string;
+  at: string;
+}
+
+export const FEEDBACK_CATEGORIES = ['bug', 'blocker', 'idea', 'ux', 'question', 'other'] as const;
+export type FeedbackCategory = (typeof FEEDBACK_CATEGORIES)[number];
+
+export const FEEDBACK_STATUSES = ['new', 'ack', 'in_progress', 'resolved', 'wont_fix'] as const;
+export type FeedbackStatus = (typeof FEEDBACK_STATUSES)[number];
+
+/**
+ * A platform-feedback thread from an authenticated principal (GHII/GAII/GEAI) to the node
+ * operator — bugs, blockers, ideas about the PLATFORM itself (distinct from content flags).
+ * `sender` is the RESOLVED principal id (resolveIdentity), so an agent's threads stay
+ * attributed to the agent, not collapsed onto its owner.
+ */
+export interface FeedbackRecord {
+  id: string;
+  sender: string;
+  category: FeedbackCategory;
+  title: string;
+  body: string;
+  /** Optional free-form pointers: { app?, endpoint?, version?, url? }. */
+  context?: Record<string, string>;
+  status: FeedbackStatus;
+  messages: FeedbackMessage[];
+  createdAt: string;
+  updatedAt: string;
 }

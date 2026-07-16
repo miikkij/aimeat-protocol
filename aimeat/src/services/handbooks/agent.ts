@@ -17,6 +17,7 @@
  *     _object_delete) + viewer/contributor access note + pointer to docs/agent-workspace-contracts.md.
  *   v1.1.0 -- 2026-06-06 -- Messaging guidance: steer agents to pass linked_task_id so task-related
  *     messages group into one thread per task (not a new thread per question).
+ *   v1.1.0 -- 2026-07-16 -- Add Platform feedback section (aimeat_feedback_send/inbox).
  *   v1.0.0 -- 2026-05-30 -- Initial agent-surface handbook
  */
 
@@ -104,6 +105,13 @@ belongs to the service surface).
 **Self & onboarding.** \`aimeat_agent_profile\` · \`aimeat_agent_activity\` ·
 \`aimeat_agent_capabilities_report\` · \`aimeat_agent_telemetry_report\` · \`aimeat_agents_list\`
 (your owner's agents — for delegation via task) · the \`aimeat_onboarding_*\` steps · \`aimeat_handbook_get\`.
+
+**Platform feedback.** If you hit a PLATFORM bug, blocker, or odd behaviour (broken endpoint,
+silent failure, docs that lie), report it with \`aimeat_feedback_send\` — the node operator
+triages every thread and can reply back; check replies with \`aimeat_feedback_inbox\`, and pass
+\`thread_id\` to \`aimeat_feedback_send\` to follow up. Use category \`blocker\` when the problem
+stops your work (notifies the operator immediately). Content moderation stays on
+\`aimeat_flag_report\` — feedback is about the platform itself.
 
 ## Boot sequence
 1. \`aimeat_onboarding_status\` → follow next_step.

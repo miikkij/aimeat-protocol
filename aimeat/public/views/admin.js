@@ -43,6 +43,7 @@ import ChatInstancesTab from './admin/chat-instances-tab.js';
 import RealtimeTab     from './admin/realtime-tab.js';
 import WorkTab         from './admin/work-tab.js';
 import MessagesAdminTab from './admin/messages-tab.js';
+import FeedbackAdminTab from './admin/feedback-tab.js';
 import EmailTab        from './admin/email-tab.js';
 import PushTab         from './admin/push-tab.js';
 import DirectoryTab    from './admin/directory-tab.js';
@@ -98,6 +99,7 @@ const NAV_GROUPS = [
     { id: 'realtime',      icon: '\u{1F4E1}',  key: 'dashboard.realtime',      component: RealtimeTab,       count: 'rooms' },
     { id: 'work',          icon: '\u{1F4E6}',  key: 'dashboard.work',          component: WorkTab,           count: 'work' },
     { id: 'messages',      icon: '\u{1F4EC}',  key: 'admin.messages.title',    component: MessagesAdminTab },
+    { id: 'feedback',      icon: '\u{1F4E3}',  key: 'admin.feedback.title',    component: FeedbackAdminTab },
     { id: 'memory-admin',  icon: '\u{1F5C4}',  key: 'dashboard.memoryAdmin',   component: MemoryAdminTab },
     { id: 'agent-tasks',  icon: '\u{1F4CB}',  key: 'dashboard.agentTasksTab', component: AgentTasksAdminTab },
     { id: 'sharing-groups', icon: '\u{1F465}', key: 'dashboard.sharingGroupsTab', component: SharingGroupsAdminTab },

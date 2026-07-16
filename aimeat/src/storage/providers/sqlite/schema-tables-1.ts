@@ -4,6 +4,7 @@
  *   to satisfy max-file-lines. Idempotent (IF NOT EXISTS); applied in numeric order so
  *   the on-disk DDL order is byte-for-byte unchanged from the original single exec block.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add feedback table (Node Feedback Channel).
  *   v1.0.0 — 2026-07-13 — Extracted from sqlite/schema.ts (max-file-lines)
  */
 import type Database from 'better-sqlite3';
@@ -430,6 +431,20 @@ export function applySchemaTables1(db: Database.Database): void {
       reviewedBy     TEXT,
       reviewedAt     TEXT,
       createdAt      TEXT NOT NULL
+    );
+
+    -- ── Feedback (Node Feedback Channel: principal → operator) ──
+    CREATE TABLE IF NOT EXISTS feedback (
+      id             TEXT PRIMARY KEY,
+      sender         TEXT NOT NULL,
+      category       TEXT NOT NULL,
+      title          TEXT NOT NULL,
+      body           TEXT NOT NULL,
+      context        TEXT,
+      status         TEXT NOT NULL DEFAULT 'new',
+      messages       TEXT NOT NULL DEFAULT '[]',
+      createdAt      TEXT NOT NULL,
+      updatedAt      TEXT NOT NULL
     );
 
     -- ── Appeals (Advanced Moderation) ──
