@@ -2,13 +2,16 @@
 
 ## Overview
 
-AIMEAT has **three** storage implementations that MUST stay in sync:
+AIMEAT has **four** storage provider dirs that MUST stay in sync, listed in **priority order** (post Phase 5 — the Postgres+Kysely cutover):
 
-| Backend | Implementation | Files |
-|---------|---------------|-------|
-| **SQLite** | `better-sqlite3` (sync API) | `src/storage/providers/sqlite/` |
-| **MongoDB** | Prisma ORM (async API) | `src/storage/providers/mongodb/` + `prisma/schema.prisma` |
-| **PostgreSQL** | Prisma ORM (async API) | `src/storage/providers/postgres/` + `prisma/schema.postgres.prisma` (separate generated client `src/generated/prisma-postgres/`) |
+| Backend | Priority | Implementation | Files |
+|---------|----------|---------------|-------|
+| **PostgreSQL + Kysely** | **PRIMARY (prod)** — must always pass | `pg` + Kysely (async, raw SQL) | `src/storage/providers/postgres-kysely/` + SQL migrations in `providers/postgres-kysely/migrations/*.sql` (run on boot; **no Prisma**) + `providers/postgres-kysely/db-types.ts` (Kysely `DB` interface) |
+| **SQLite** | first-class — must always pass | `better-sqlite3` (sync API) | `src/storage/providers/sqlite/` |
+| **MongoDB** | **DEPRECATED — removed before v2.0** | Prisma ORM (async API) | `src/storage/providers/mongodb/` + `prisma/schema.prisma` |
+| **PostgreSQL (Prisma)** | **legacy — superseded by Kysely** | Prisma ORM (async API) | `src/storage/providers/postgres/` + `prisma/schema.postgres.prisma` (separate client `src/generated/prisma-postgres/`) |
+
+> **⚠️ The primary backend is `postgres-kysely` (Kysely, not Prisma).** When you add a field/table, do **postgres-kysely + sqlite FIRST** — both must always pass. The Prisma path (mongodb + the legacy Prisma `postgres`) is winding down: keep it compiling while it exists, but it is not the source of truth and its failures are not blocking. **Do not confuse `postgres-kysely` (primary, Kysely) with `postgres` (legacy, Prisma).**
 
 The in-memory mode is SQLite with `:memory:` path — same code, no persistence. (The old pure in-memory provider is deprecated.)
 
@@ -58,9 +61,21 @@ Update ALL SQL queries that touch the table:
 - `UPDATE` — include if mutable
 - Deserialization — map from DB row to TypeScript record
 
-### Step 4: Update BOTH Prisma Schemas
+### Step 4: Update the PRIMARY backend — PostgreSQL + Kysely (do this, not Prisma-first)
 
-Files: `prisma/schema.prisma` (MongoDB) **and** `prisma/schema.postgres.prisma` (PostgreSQL). Both Prisma backends must carry the field or PostgreSQL drifts.
+Files: `src/storage/providers/postgres-kysely/`.
+1. **Migration** — add a new numbered SQL file `migrations/NNNN_<desc>.sql` with the `ALTER TABLE ... ADD COLUMN` (idempotent; applied on boot, tracked in `_kysely_migrations`). For a brand-new column on an existing table:
+   ```sql
+   ALTER TABLE "Memory" ADD COLUMN IF NOT EXISTS "myNewField" text;
+   ```
+2. **`db-types.ts`** — add the column to the table's Kysely interface (`myNewField: string | null`).
+3. **Methods** — update the method group under `providers/postgres-kysely/methods/*.ts` that touches the table: `insertInto(...).values(...)`, `selectAll()`/select column, `updateTable(...).set(...)`, and the `row → record` mapper. jsonb columns wrap via the `jsonb()` helper; remember **PG jsonb does not preserve key order** (don't rely on `JSON.stringify` order for dedup).
+
+### Step 5 (legacy, while they still exist): Update BOTH Prisma Schemas
+
+> MongoDB is deprecating (removed before v2.0) and the Prisma `postgres` provider is superseded by Kysely. Keep them compiling, but they are **not** the source of truth. Skip only if the model no longer exists in the Prisma schemas.
+
+Files: `prisma/schema.prisma` (MongoDB) **and** `prisma/schema.postgres.prisma` (legacy Prisma-PG).
 
 ```prisma
 model Memory {
@@ -73,20 +88,16 @@ Then regenerate BOTH Prisma clients:
 ```bash
 cd aimeat
 pnpm db:generate            # MongoDB client
-pnpm db:generate:postgres   # PostgreSQL client (src/generated/prisma-postgres/)
+pnpm db:generate:postgres   # legacy Prisma-PG client (src/generated/prisma-postgres/)
 ```
 
-### Step 5: Update the MongoDB and PostgreSQL Implementations
+### Step 6 (legacy): Update the MongoDB and Prisma-PostgreSQL Implementations
 
-Files: `src/storage/providers/mongodb/index.ts` **and** `src/storage/providers/postgres/index.ts`
+Files: `src/storage/providers/mongodb/index.ts` **and** `src/storage/providers/postgres/index.ts` (the Prisma-PG provider extends the mongodb `PrismaStorage`).
 
-Update all Prisma queries that touch the model in **both** providers:
-- `create()` — include new field
-- `findUnique()` / `findMany()` — include in select if needed
-- `update()` — include if mutable
-- Record mapping — convert Prisma model to TypeScript record
+Update all Prisma queries that touch the model in **both** providers (create/find/update/record-mapping).
 
-### Step 6: Type-Check and Test
+### Step 7: Type-Check and Test
 
 ```bash
 cd aimeat
@@ -94,10 +105,11 @@ cd aimeat
 # Verify compilation
 npx tsc --noEmit
 
-# Test the persistent backends (in-memory backend is deprecated — do not use)
+# PRIMARY backends — both must be green:
+pnpm test:e2e:postgres-kysely   # recreate the postgres-kysely test DB first for a full run
 pnpm test:e2e:sqlite
+# Legacy (only if you touched the Prisma path; failures informational):
 pnpm test:e2e:mongodb
-pnpm test:e2e:postgresql   # or: pnpm test:e2e:all-backends
 ```
 
 ---
@@ -161,9 +173,17 @@ CREATE TABLE IF NOT EXISTS my_new (
 
 Implementation: Add all CRUD methods to `src/storage/providers/sqlite/index.ts`
 
-### Step 5: Prisma — Add Model + Implementation (BOTH Prisma backends)
+### Step 5: PostgreSQL + Kysely — Add Table + Implementation (PRIMARY)
 
-Schema files: `prisma/schema.prisma` (MongoDB) **and** `prisma/schema.postgres.prisma` (PostgreSQL). Note the id/attribute mapping differs per backend (Mongo `@map("_id") @db.ObjectId`; Postgres a plain `@id` string/uuid) — mirror the model in both, using each backend's conventions.
+1. **Migration** — new `providers/postgres-kysely/migrations/NNNN_<desc>.sql` with `CREATE TABLE IF NOT EXISTS "MyNew" (...)` (+ any indexes; applied on boot). **Also add the SQL migrations copy step to the build** — `providers/postgres-kysely/migrations` must be copied into `dist/` or `pnpm start` can't find them.
+2. **`db-types.ts`** — add the `MyNew` table interface + register it on the `DB` interface.
+3. **Methods** — add the CRUD method group under `providers/postgres-kysely/methods/*.ts`, bound to `PostgresKyselyStorage` via the prototype merge in `providers/postgres-kysely/index.ts`.
+
+### Step 6 (legacy, while they still exist): Prisma — Add Model + Implementation
+
+> MongoDB is deprecating (out before v2.0); the Prisma `postgres` provider is superseded by Kysely. Do this only while those models still exist.
+
+Schema files: `prisma/schema.prisma` (MongoDB) **and** `prisma/schema.postgres.prisma` (legacy Prisma-PG). Id/attribute mapping differs (Mongo `@map("_id") @db.ObjectId`; Prisma-PG a plain `@id` string/uuid).
 ```prisma
 // schema.prisma (MongoDB)
 model MyNew {
@@ -173,11 +193,9 @@ model MyNew {
 }
 ```
 
-Regenerate both clients: `pnpm db:generate` **and** `pnpm db:generate:postgres`
+Regenerate both clients: `pnpm db:generate` **and** `pnpm db:generate:postgres`. Implementation: CRUD methods in `src/storage/providers/mongodb/index.ts` **and** `src/storage/providers/postgres/index.ts`.
 
-Implementation: Add all CRUD methods to `src/storage/providers/mongodb/index.ts` **and** `src/storage/providers/postgres/index.ts`
-
-### Step 6: Type-Check and Test All Backends (SQLite + MongoDB + PostgreSQL)
+### Step 7: Type-Check and Test the PRIMARY backends (PostgreSQL+Kysely + SQLite)
 
 ---
 
