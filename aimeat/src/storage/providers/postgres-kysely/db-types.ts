@@ -1337,6 +1337,13 @@ export interface StatsDailyHistory {
   value: Generated<number>;
 }
 
+export interface StorageStatsSnapshot {
+  id: string;
+  capturedAt: Timestamp;
+  counts: Json;
+  totalRows: Generated<number>;
+}
+
 export interface StorageFile {
   createdAt: Generated<Timestamp>;
   data: Buffer;
@@ -1610,6 +1617,7 @@ export interface DB {
   StatsCounter: StatsCounter;
   StatsDailyHistory: StatsDailyHistory;
   StorageFile: StorageFile;
+  StorageStatsSnapshot: StorageStatsSnapshot;
   SubdomainSite: SubdomainSite;
   SystemPrompt: SystemPrompt;
   SystemPromptVersion: SystemPromptVersion;

@@ -72,6 +72,7 @@ import type { TemplateListingRepository } from './repositories/template-listing.
 import type { PackageInstanceRepository } from './repositories/package-instance.repository.js';
 import type { CapabilityRepository } from './repositories/capability.repository.js';
 import type { StatsRepository } from './repositories/stats.repository.js';
+export type { StorageStatsSnapshot } from './repositories/stats.repository.js';
 import type { AgentTaskRepository } from './repositories/agent-task.repository.js';
 import type { AgentDirectivesRepository } from './repositories/agent-directives.repository.js';
 import type { SharingGroupRepository } from './repositories/sharing-group.repository.js';

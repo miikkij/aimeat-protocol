@@ -60,6 +60,21 @@ export function registerCoreHandlers(
     const { scanAllDue } = await import('./living-pulse.js');
     await scanAllDue(storage, config, scheduler.getNotifyServices());
   });
+  // Operator storage-growth telemetry: hourly per-table row-count snapshot (admin DB tab).
+  scheduler.registerCoreHandler('storage-stats-snapshot', () => runStorageStatsSnapshotJob(storage));
+  // Seed one snapshot at startup so the tab is never empty on a fresh boot (non-blocking).
+  runStorageStatsSnapshotJob(storage).catch(err => logger.error('Startup storage-stats snapshot failed', { error: String(err) }));
+}
+
+/** Capture one storage-size snapshot (per-table row counts + total) and prune snapshots older than 30 days. */
+export async function runStorageStatsSnapshotJob(storage: Storage): Promise<void> {
+  const counts = await storage.getTableRowCounts();
+  const totalRows = Object.values(counts).reduce((a, b) => a + b, 0);
+  const now = new Date().toISOString();
+  await storage.saveStorageStatsSnapshot({ id: `storagestats-${now}`, capturedAt: now, counts, totalRows });
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);   // keep ~30 days of hourly snapshots
+  await storage.pruneStorageStatsSnapshots(cutoff.toISOString());
+  logger.info(`Storage-stats snapshot captured: ${Object.keys(counts).length} tables, ${totalRows} rows`);
 }
 
 // ── Core Job Handlers (pure async, no setInterval) ─────────────────

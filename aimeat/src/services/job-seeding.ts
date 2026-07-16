@@ -35,6 +35,8 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     { id: 'core:execution-log-prune', name: 'Execution Log Prune', coreHandler: 'execution-log-prune', cron: '0 3 * * *' },
     // Mark still-pending email invitations expired once their TTL passes (lazy checks also enforce this).
     { id: 'core:invitation-expiry', name: 'Invitation Expiry', coreHandler: 'invitation-expiry', cron: '*/10 * * * *' },
+    // Operator storage-growth telemetry: capture a per-table row-count snapshot every hour.
+    { id: 'core:storage-stats-snapshot', name: 'Storage Stats Snapshot', coreHandler: 'storage-stats-snapshot', cron: '0 * * * *' },
   ];
 
   if (config.consentEnabled) {

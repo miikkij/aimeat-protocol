@@ -7,7 +7,7 @@
 import type {
   CapabilityRecord, CapabilityLogEntry, CapabilityStats, AgentTaskRecord, AgentTaskEventRecord, AgentDirectivesRecord,
   OwnerAgentDefaults, SharingGroupRecord, AgentActivityRecord, AgentUsageEvent, AgentUsageDailyRecord, UsageDailyFilter,
-  UsageEventFilter, AdminUsageDailyFilter
+  UsageEventFilter, AdminUsageDailyFilter, StorageStatsSnapshot
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
 import * as agentTaskRepo from '../repos/agent-task.js';
@@ -325,6 +325,38 @@ export const capabilityAgentsMethods = {
       result[row.date][row.key] = row.value;
     }
     return result;
+  },
+
+  // ── Storage-size telemetry (operator DB tab) ──
+  async getTableRowCounts(this: SqliteStorage): Promise<Record<string, number>> {
+    const tables = this.db.prepare(
+      "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'"
+    ).all() as Array<{ name: string }>;
+    const counts: Record<string, number> = {};
+    for (const { name } of tables) {
+      // Table names come from sqlite_master (not user input); quote defensively for odd names.
+      const row = this.db.prepare(`SELECT count(*) AS n FROM "${name.replace(/"/g, '""')}"`).get() as { n: number };
+      counts[name] = row.n;
+    }
+    return counts;
+  },
+  async saveStorageStatsSnapshot(this: SqliteStorage, s: StorageStatsSnapshot): Promise<void> {
+    this.db.prepare(
+      `INSERT INTO storage_stats_snapshots (id, capturedAt, counts, totalRows) VALUES (?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET capturedAt = excluded.capturedAt, counts = excluded.counts, totalRows = excluded.totalRows`
+    ).run(s.id, s.capturedAt, JSON.stringify(s.counts), s.totalRows);
+  },
+  async listStorageStatsSnapshots(this: SqliteStorage, opts?: { limit?: number; sinceIso?: string }): Promise<StorageStatsSnapshot[]> {
+    let sql = 'SELECT id, capturedAt, counts, totalRows FROM storage_stats_snapshots';
+    const params: unknown[] = [];
+    if (opts?.sinceIso) { sql += ' WHERE capturedAt >= ?'; params.push(opts.sinceIso); }
+    sql += ' ORDER BY capturedAt DESC';
+    if (opts?.limit) { sql += ' LIMIT ?'; params.push(opts.limit); }
+    const rows = this.db.prepare(sql).all(...params) as Array<{ id: string; capturedAt: string; counts: string; totalRows: number }>;
+    return rows.map(r => ({ id: r.id, capturedAt: r.capturedAt, counts: JSON.parse(r.counts) as Record<string, number>, totalRows: r.totalRows }));
+  },
+  async pruneStorageStatsSnapshots(this: SqliteStorage, beforeIso: string): Promise<number> {
+    return this.db.prepare('DELETE FROM storage_stats_snapshots WHERE capturedAt < ?').run(beforeIso).changes;
   },
 
   // ══════════════════════════════════════════════════════════

@@ -131,6 +131,7 @@ import { workflowsRouter } from '../routes/workflows.js';
 import { agentIntegrationRouter } from '../routes/agent-integration.js';
 import { agentDirectivesRouter } from '../routes/agent-directives.js';
 import { adminAgentTasksRouter } from '../routes/admin-agent-tasks.js';
+import { adminStorageStatsRouter } from '../routes/admin-storage-stats.js';
 import { adminAgentIntegrationRouter } from '../routes/admin-agent-integration.js';
 import { adminSharingGroupsRouter } from '../routes/admin-sharing-groups.js';
 import { agentCapabilitiesRouter } from '../routes/agent-capabilities.js';
@@ -596,6 +597,7 @@ export async function mountRoutes(
 
   // Agent tasks + sharing groups admin routes (Phase 1 Agent Dashboard)
   app.use(adminAgentTasksRouter(config, storage));
+  app.use(adminStorageStatsRouter(config, storage));
   app.use(adminAgentIntegrationRouter(config, storage));
   app.use(adminSharingGroupsRouter(config, storage));
 
