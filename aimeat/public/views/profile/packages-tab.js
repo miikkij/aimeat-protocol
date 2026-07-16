@@ -17,6 +17,9 @@
  *   v1.3.0 — 2026-03-20 — add ZIP upload/download and template proposal buttons
  *   v1.4.0 — 2026-03-20 — add remote templates section with federation sync
  *   v1.5.0 — 2026-05-05 — add intro section, i18n for categories/featured, fix status badge label
+ *   v1.6.0 — 2026-07-16 — Mount folds the 3 LOCAL reads (instances + packages + templates) into ONE
+ *     GET /v1/packages/tab (PackagesTabService); the cross-node federation-templates call stays separate.
+ *     Falls back to the individual reads if the composite is unavailable. (Phase 4 slice 6 — frontend.)
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -28,6 +31,7 @@ import { escHtml, copyToClipboard } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as pkgService from '/js/services/packages.js';
+import { apiGet } from '/js/api.js';
 import { importPackageToGenerator } from '/js/services/generator-packaging.js';
 
 // ─── InstanceCard ───────────────────────────────────────────────────────────
@@ -161,14 +165,24 @@ export default function PackagesTab({ session, showToast, navigate }) {
   const loadData = useCallback(async ({ showSpinner = true } = {}) => {
     if (showSpinner) setLoading(true);
     try {
-      const [instRes, pkgRes, tplRes] = await Promise.all([
-        pkgService.listInstances({ status: 'installed' }),
-        pkgService.listPackages({ author: session?.owner }),
-        pkgService.listTemplates({ sort: 'newest' }),
-      ]);
-      if (instRes.ok) setInstances(instRes.data?.instances ?? []);
-      if (pkgRes.ok) setPackages(pkgRes.data?.packages ?? []);
-      if (tplRes.ok) setTemplates(tplRes.data?.templates ?? []);
+      // Mount: ONE composite (GET /v1/packages/tab) seeds the three LOCAL sections (installed instances +
+      // owner's packages + newest templates). Falls back to the three individual reads on failure. The
+      // cross-node federation-templates call below stays separate (best-effort outbound).
+      const ov = await apiGet('/v1/packages/tab').then(r => r?.data).catch(() => null);
+      if (ov) {
+        setInstances(ov.instances?.instances ?? []);
+        setPackages(ov.packages?.packages ?? []);
+        setTemplates(ov.templates?.templates ?? []);
+      } else {
+        const [instRes, pkgRes, tplRes] = await Promise.all([
+          pkgService.listInstances({ status: 'installed' }),
+          pkgService.listPackages({ author: session?.owner }),
+          pkgService.listTemplates({ sort: 'newest' }),
+        ]);
+        if (instRes.ok) setInstances(instRes.data?.instances ?? []);
+        if (pkgRes.ok) setPackages(pkgRes.data?.packages ?? []);
+        if (tplRes.ok) setTemplates(tplRes.data?.templates ?? []);
+      }
       // Load remote/federated templates (best-effort)
       try {
         const fedRes = await pkgService.listFederationTemplates({ limit: 50 });
