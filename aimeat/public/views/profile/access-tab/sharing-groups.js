@@ -14,9 +14,9 @@ import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import * as groupsApi from '/js/services/sharing-groups.js';
 
-export function SharingGroupsSection({ showToast }) {
+export function SharingGroupsSection({ showToast, initial }) {
   const { confirm, ConfirmUI } = useConfirm();
-  const [groups, setGroups] = useState(null);
+  const [groups, setGroups] = useState(initial?.groups ?? null);   // seeded from /v1/access/overview; else self-loads
   const [expandedId, setExpandedId] = useState(null);
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -49,7 +49,7 @@ export function SharingGroupsSection({ showToast }) {
     }
   }, []);
 
-  useEffect(() => { loadGroups(); }, [loadGroups]);
+  useEffect(() => { if (!initial) loadGroups(); }, [loadGroups]);   // eslint-disable-line react-hooks/exhaustive-deps -- seed once from `initial`; fetch only when unseeded
 
   // Deep link from the Memory tab's "Create a group →": scroll here and open the form.
   useEffect(() => {
