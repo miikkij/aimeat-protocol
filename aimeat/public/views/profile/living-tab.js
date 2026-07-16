@@ -9,6 +9,8 @@
  * @structure LivingTab (default export) — templates list/editor + deploy + instances list/viewer
  * @usage html`<${LivingTab} session=${session} showToast=${showToast} />`
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Mount folds templates + instances + organisms into GET /v1/living-docs
+ *     (getLivingOverview); individual reads (two full memory scans) kept as fallback.
  *   v1.0.0 — 2026-06-21 — Phase 0: template management + deploy + manual derive + render.
  */
 import { h } from 'preact';
@@ -49,6 +51,15 @@ export default function LivingTab({ session, showToast }) {
 
   async function loadAll() {
     try {
+      // Mount fold: ONE composite (templates + instances partitioned server-side from a single owner-memory
+      // scan + organisms). On failure, fall back to the individual reads (two full scans + listOrganisms).
+      const ov = await living.getLivingOverview();
+      if (ov) {
+        setTemplates(ov.templates);
+        setInstances(ov.instances);
+        setOrgs(ov.organisms);
+        return;
+      }
       const [tpls, insts, orgResp] = await Promise.all([
         living.listTemplates(), living.listInstances(), listOrganisms({ member: session.owner }),
       ]);

@@ -11,6 +11,8 @@
  *   - jumpToSchedule — scroll to + flash a schedule's card/row when its calendar event is clicked
  * @usage Registered in profile.js TABS as { id:'scheduler', component: SchedulerTab }.
  * @version-history
+ *   v1.1.0 -- 2026-07-16 -- Mount folds schedules + agents into GET /v1/scheduler/tab (getSchedulerTab);
+ *     occurrences stay a range-driven request; individual reads kept as fallback.
  *   v1.0.0 -- 2026-06-03 -- Initial master scheduler view
  *   v1.0.1 -- 2026-06-03 -- Extension cron "Next run" uses formatUntil (was timeAgo → negative "ago")
  *   v1.1.0 -- 2026-07-03 -- Add SchedulerCalendar (day/week/month cadence view) at the top; clicking a
@@ -24,7 +26,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { listAgents } from '/js/services/agents.js';
-import { listAllSchedules, createSchedule } from '/js/services/schedules.js';
+import { listAllSchedules, getSchedulerTab, createSchedule } from '/js/services/schedules.js';
 import ScheduleItem, { formatUntil } from './schedule-item.js';
 import SchedulerCalendar from './scheduler-calendar.js';
 
@@ -64,9 +66,17 @@ export default function SchedulerTab({ showToast }) {
 
   const loadData = useCallback(async () => {
     try {
-      const [schedRes, agentsRes] = await Promise.all([listAllSchedules(), listAgents().catch(() => null)]);
-      setData(schedRes?.data || { managed: [], extensions: [], agentInternal: [] });
-      setAgents(agentsRes?.data?.agents || []);
+      // Mount fold: ONE composite (schedule aggregate + agent names). On failure, fall back to the
+      // individual reads. The calendar's occurrence projection stays a separate (range-driven) request.
+      const ov = await getSchedulerTab();
+      if (ov) {
+        setData(ov.schedules);
+        setAgents(ov.agents);
+      } else {
+        const [schedRes, agentsRes] = await Promise.all([listAllSchedules(), listAgents().catch(() => null)]);
+        setData(schedRes?.data || { managed: [], extensions: [], agentInternal: [] });
+        setAgents(agentsRes?.data?.agents || []);
+      }
       setError(null);
       setReloadTick((n) => n + 1);
     } catch (e) {

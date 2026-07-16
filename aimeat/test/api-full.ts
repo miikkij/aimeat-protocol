@@ -777,6 +777,32 @@ await test('Data Wallet composite folds consents + audit + permission summary (P
     assert(d.permSummary.total_storage_files === perm.body.data.total_storage_files, 'storage-file count matches');
 });
 
+await test('Living Docs composite partitions templates from one memory scan (Phase 4 DbService)', async () => {
+    // Seed two template keys (owner memory); assert the composite surfaces them, sorted by title, and
+    // returns the instances + organisms partitions in the right shape. (The instance partition — an
+    // organism.*.living.*.latest namespaced key — needs a real workspace to write and is browser-verified.)
+    await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: 'living.template.tpl-apifull-b', value: { id: 'tpl-apifull-b', title: 'ZZZ Api-full Template B' }, visibility: 'private' }),
+    });
+    await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ key: 'living.template.tpl-apifull-a', value: { id: 'tpl-apifull-a', title: 'AAA Api-full Template A' }, visibility: 'private' }),
+    });
+
+    const { status, body } = await json('/v1/living-docs', { method: 'GET', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `living-docs status ${status}: ${JSON.stringify(body)}`);
+    const d = body.data;
+    // template partition — both surfaced, sorted by title (A before B)
+    const ids = (d.templates || []).map((t: any) => t.id);
+    assert(ids.includes('tpl-apifull-a') && ids.includes('tpl-apifull-b'), `templates surfaced: ${JSON.stringify(ids)}`);
+    const ai = ids.indexOf('tpl-apifull-a'), bi = ids.indexOf('tpl-apifull-b');
+    assert(ai < bi, 'templates sorted by title (A before B)');
+    // instances + organisms partitions present in the right shape
+    assert(Array.isArray(d.instances), 'instances is an array');
+    assert(Array.isArray(d.organisms), 'organisms is an array');
+});
+
 await test('Validate endpoint', async () => {
     const { body } = await json('/v1/validate', {
         method: 'POST',

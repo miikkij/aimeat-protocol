@@ -9,6 +9,8 @@
  * @structure POST /v1/living/author — requireAuth + requireRole('owner'); returns { template, model }
  * @usage app.use(livingRouter(config, storage))
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add GET /v1/living-docs composite (templates + instances partitioned from one
+ *     owner-memory scan + organisms), folding the tab's two duplicate memory scans (LivingDocsService).
  *   v1.0.0 — 2026-06-21 — Phase 1: AI template author.
  */
 import { Router } from 'express';
@@ -20,9 +22,20 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { NotebookAiError } from '../services/notebook-ai.js';
 import { authorLivingTemplate } from '../services/living-author.js';
 import { scanOwnerDue } from '../services/living-pulse.js';
+import { createLivingDocsService } from '../services/db/living-docs-db-service.js';
 
 export function livingRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  const livingDocsDb = createLivingDocsService(storage);
+
+  // GET /v1/living-docs — the Living Docs tab mount in ONE call: templates + deployed instances (both
+  // partitioned server-side from a single owner-memory scan, replacing two identical full scans) + the
+  // owner's organisms (deploy-target picker). Owner-scoped read.
+  router.get('/v1/living-docs', requireAuth(), requireRole('owner'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    const data = await livingDocsDb.overview(owner, resolveIdentity(req.auth!, config.nodeId));
+    res.json(success(config.nodeId, data));
+  });
 
   // POST /v1/living/author — design a living-document template from a description (owner-scoped: it
   // decrypts the caller's own OpenRouter key). No writes happen here; the client saves the template.

@@ -58,6 +58,20 @@ export async function listTemplates() {
     .sort((a, b) => String(a.title || '').localeCompare(String(b.title || '')));
 }
 
+/**
+ * Composite mount for the Living Docs tab: templates + deployed instances + organisms in ONE call (folds
+ * two identical owner-memory scans + listOrganisms). Returns { templates, instances, organisms } or null
+ * on error so the caller can fall back to the individual reads.
+ */
+export async function getLivingOverview() {
+  try {
+    const r = await api('/v1/living-docs', { method: 'GET' });
+    const d = r?.data;
+    if (!d) return null;
+    return { templates: d.templates || [], instances: d.instances || [], organisms: d.organisms || [] };
+  } catch { return null; }
+}
+
 export async function getTemplate(id) {
   const r = await getMemory(TEMPLATE_PREFIX + id);
   return r?.data?.value || null;

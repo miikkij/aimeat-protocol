@@ -25,6 +25,8 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   v1.2.0 — 2026-07-16 — Add GET /v1/scheduler/tab composite (schedule aggregate + agent names) folding
+ *     the Scheduler mount; extracted aggregateSchedules shared with GET /v1/schedules (behavior unchanged).
  *   v1.1.0 — 2026-07-16 — buildRecordFromBody reuses the loaded agent record (was getAgent twice)
  *   v1.0.0 — 2026-06-03 — Initial: agent/profile recurring schedules
  *   v1.1.0 — 2026-06-15 — Add the `eco-capability` kind: schedule a connected ecosystem app's
@@ -288,42 +290,67 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     emitChange('scheduler');
   }
 
-  // ── GET /v1/schedules — master aggregate ──
-  router.get('/v1/schedules', requireAuth(), async (req, res) => {
-    try {
-      const owner = ownerGhii(req);
-      const ownerName = req.auth!.owner as string;
+  // Master schedule aggregate — managed jobs + the owner's extension cron jobs + each agent's
+  // self-reported internal scheduler. Also returns the resolved agents so a caller can reuse them without
+  // a second getAgentsByOwner. Shared by GET /v1/schedules and the /v1/scheduler/tab composite.
+  async function aggregateSchedules(owner: string, ownerName: string) {
+    const managed = await storage.listScheduledJobs({ ownerScope: owner });
+    const managedIds = new Set(managed.map(j => j.id));
 
-      const managed = await storage.listScheduledJobs({ ownerScope: owner });
-      const managedIds = new Set(managed.map(j => j.id));
+    // Owner's extension cron jobs not already captured as managed schedules.
+    const allExtJobs = await storage.listScheduledJobs({ type: 'extension' });
+    const extensions: ScheduledJobRecord[] = [];
+    for (const job of allExtJobs) {
+      if (managedIds.has(job.id)) continue;
+      if (job.ownerScope === owner) { extensions.push(job); continue; }
+      if (!job.extensionName) continue;
+      const ext = await storage.getExtension(job.extensionName);
+      if (ext?.installedBy === ownerName) extensions.push(job);
+    }
 
-      // Owner's extension cron jobs not already captured as managed schedules.
-      const allExtJobs = await storage.listScheduledJobs({ type: 'extension' });
-      const extensions: ScheduledJobRecord[] = [];
-      for (const job of allExtJobs) {
-        if (managedIds.has(job.id)) continue;
-        if (job.ownerScope === owner) { extensions.push(job); continue; }
-        if (!job.extensionName) continue;
-        const ext = await storage.getExtension(job.extensionName);
-        if (ext?.installedBy === ownerName) extensions.push(job);
-      }
+    // Each agent's self-reported internal scheduler (display-only mirror).
+    const agents = await storage.getAgentsByOwner(ownerName);
+    const agentInternal = await Promise.all(agents.map(async a => ({
+      agentName: a.name,
+      gaii: a.gaii,
+      entries: await readAgentInternal(a.name, a.gaii),
+    })));
 
-      // Each agent's self-reported internal scheduler (display-only mirror).
-      const agents = await storage.getAgentsByOwner(ownerName);
-      const agentInternal = await Promise.all(agents.map(async a => ({
-        agentName: a.name,
-        gaii: a.gaii,
-        entries: await readAgentInternal(a.name, a.gaii),
-      })));
-
-      res.json(success(config.nodeId, {
+    return {
+      agents,
+      schedules: {
         managed,
         extensions,
         agentInternal: agentInternal.filter(a => a.entries.length > 0),
-      }));
+      },
+    };
+  }
+
+  // ── GET /v1/schedules — master aggregate ──
+  router.get('/v1/schedules', requireAuth(), async (req, res) => {
+    try {
+      const { schedules } = await aggregateSchedules(ownerGhii(req), req.auth!.owner as string);
+      res.json(success(config.nodeId, schedules));
     } catch (err) {
       logger.error('Failed to aggregate schedules', { error: (err as Error).message });
       res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to load schedules'));
+    }
+  });
+
+  // ── GET /v1/scheduler/tab — the Scheduler tab mount in ONE call: the schedule aggregate + the owner's
+  // agent list (names, for the create-schedule dropdown). Folds GET /v1/schedules + GET /v1/agents,
+  // resolving the owner's agents once. The calendar's occurrence projection stays a separate request (it
+  // is range-driven — re-fetched as the user navigates day/week/month).
+  router.get('/v1/scheduler/tab', requireAuth(), async (req, res) => {
+    try {
+      const { schedules, agents } = await aggregateSchedules(ownerGhii(req), req.auth!.owner as string);
+      res.json(success(config.nodeId, {
+        schedules,
+        agents: agents.map(a => ({ name: a.name, gaii: a.gaii })),
+      }));
+    } catch (err) {
+      logger.error('Failed to load scheduler tab', { error: (err as Error).message });
+      res.status(500).json(error(config.nodeId, 'INTERNAL_ERROR', 'Failed to load scheduler tab'));
     }
   });
 

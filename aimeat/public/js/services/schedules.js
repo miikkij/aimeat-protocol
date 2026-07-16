@@ -25,6 +25,20 @@ export async function listAllSchedules() {
 }
 
 /**
+ * Composite mount for the Scheduler tab: the schedule aggregate + the owner's agent list (names) in ONE
+ * call. Returns { schedules, agents } or null on error so the caller can fall back to the individual
+ * listAllSchedules + listAgents reads. The calendar occurrences stay a separate (range-driven) request.
+ */
+export async function getSchedulerTab() {
+  try {
+    const res = await apiGet('/v1/scheduler/tab');
+    const d = res?.data;
+    if (!d) return null;
+    return { schedules: d.schedules || { managed: [], extensions: [], agentInternal: [] }, agents: d.agents || [] };
+  } catch { return null; }
+}
+
+/**
  * Projected cron fire-times for the owner's enabled schedules within [from, to]
  * (Date objects). Returns the envelope; `res.data` = { occurrences:[{ scheduleId,
  * at }], from, to, truncated }. Join scheduleId back to listAllSchedules() records
