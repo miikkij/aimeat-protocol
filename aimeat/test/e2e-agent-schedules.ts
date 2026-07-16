@@ -137,6 +137,22 @@ await test('6. Per-agent list filters to that agent', async () => {
     assert(ids.includes(agentTaskScheduleId), 'agent_task schedule present in agent view');
 });
 
+await test('6b. GET /v1/scheduler/tab folds schedule aggregate + agent names', async () => {
+    const { status, body } = await json('/v1/scheduler/tab', { headers: auth1 });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    const d = body.data;
+    // schedules mirror GET /v1/schedules
+    const single = await json('/v1/schedules', { headers: auth1 });
+    const compIds = d.schedules.managed.map((s: any) => s.id).sort();
+    const singleIds = single.body.data.managed.map((s: any) => s.id).sort();
+    assert(JSON.stringify(compIds) === JSON.stringify(singleIds), 'managed schedules match /v1/schedules');
+    assert(compIds.includes(agentTaskScheduleId) && compIds.includes(aiScheduleId), 'both managed schedules present in composite');
+    assert(Array.isArray(d.schedules.extensions) && Array.isArray(d.schedules.agentInternal), 'extensions + agentInternal are arrays');
+    // agents = the owner's agent names (create-schedule dropdown)
+    assert(Array.isArray(d.agents) && d.agents.some((a: any) => a.name === o1.agentName), 'agent list includes the test agent');
+    assert(d.agents.every((a: any) => typeof a.name === 'string'), 'agents carry names');
+});
+
 console.log('\nPhase 3 -- Trigger + agent_task materialization');
 
 async function listOccurrences(status?: string): Promise<any[]> {
