@@ -277,6 +277,15 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('invitations', 'provisionedOwner', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_invitations_invitedBy ON invitations(invitedBy)');
 
+  // Name-invite parity with email invites — workspace grants chosen at invite time, applied on
+  // accept (JSON array [{ws, role}]). Additive/nullable; existing memberships read back unchanged.
+  safeAddColumn('organism_memberships', 'invitedWorkspaces', 'TEXT');
+
+  // Contacts (address book) — provenance of a contact row: 'message' = created reactively by the
+  // first-contact DM gate; 'saved' = explicitly added via the contacts API. Existing rows read
+  // back as 'message' (they all came from the gate).
+  safeAddColumn('contact_consents', 'origin', "TEXT NOT NULL DEFAULT 'message'");
+
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
   // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the
   // searchable text of every memory row (key + JSON value + tags), keyed by memory.rowid. AFTER

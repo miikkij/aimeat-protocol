@@ -707,6 +707,8 @@ export const extensionsNotifyMethods = {
     if (updates.status !== undefined) { fields.push('status = ?'); values.push(updates.status); }
     if (updates.acceptedAt !== undefined) { fields.push('acceptedAt = ?'); values.push(updates.acceptedAt); }
     if (updates.acceptedBy !== undefined) { fields.push('acceptedBy = ?'); values.push(updates.acceptedBy); }
+    if (updates.orgRole !== undefined) { fields.push('orgRole = ?'); values.push(updates.orgRole); }
+    if (updates.workspaces !== undefined) { fields.push('workspaces = ?'); values.push(JSON.stringify(updates.workspaces ?? [])); }
     if (fields.length) {
       values.push(id);
       this.db.prepare(`UPDATE invitations SET ${fields.join(', ')} WHERE id = ?`).run(...values);

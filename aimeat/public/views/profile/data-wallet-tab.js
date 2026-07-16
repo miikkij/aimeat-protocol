@@ -8,9 +8,11 @@
  *     audit log with day-range selector, GDPR export button
  * @usage Loaded by profile.js route as a lazy tab component.
  * @version-history
- *   v1.0.0 — 2026-03-10 — Initial data wallet tab implementation
- *   v1.1.0 — 2026-03-17 — Refactor: replace all inline styles with CSS classes
+ *   v1.2.0 — 2026-07-16 — Consent-grant recipient input is the shared ContactPicker (contacts +
+ *     directory suggestions + email resolve, full-id mode).
  *   v1.1.1 — 2026-06-19 — lint fixes (misleading-char-class/unused-expression/empty-block)
+ *   v1.1.0 — 2026-03-17 — Refactor: replace all inline styles with CSS classes
+ *   v1.0.0 — 2026-03-10 — Initial data wallet tab implementation
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -20,6 +22,7 @@ import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner, recipientBadge, isExpiringSoon } from './shared.js';
 import * as consentService from '/js/services/consent.js';
+import { ContactPicker } from '/components/ContactPicker.js';
 
 export default function DataWalletTab({ session, showToast }) {
   const [consents, setConsents] = useState(null);
@@ -30,6 +33,7 @@ export default function DataWalletTab({ session, showToast }) {
   const [consentFilter, setConsentFilter] = useState('');
   const [scopeFilter, setScopeFilter] = useState('all');
   const [selectedConsents, setSelectedConsents] = useState(new Set());
+  const [recipientValue, setRecipientValue] = useState('');
 
   useEffect(() => {
     if (session) { loadConsents(); loadAudit(30); loadPermSummary(); }
@@ -164,7 +168,7 @@ export default function DataWalletTab({ session, showToast }) {
           e.preventDefault();
           const fd = new FormData(e.target);
           const rType = fd.get('recipientType');
-          let recipVal = fd.get('recipientValue');
+          let recipVal = recipientValue.trim();
           if (rType === 'wildcard') recipVal = '*';
           else if (rType === 'ghii') recipVal = 'ghii:' + recipVal;
           else if (rType === 'domain') recipVal = 'domain:' + recipVal;
@@ -196,7 +200,8 @@ export default function DataWalletTab({ session, showToast }) {
             </div>
             <div>
               <label class="dw-label">${t('permissions.recipient')}</label>
-              <input name="recipientValue" class="input-field w-full" placeholder="agent#owner@node" />
+              <${ContactPicker} value=${recipientValue} onChange=${setRecipientValue} valueMode="full"
+                placeholder="agent#owner@node" />
             </div>
             <div>
               <label class="dw-label">${t('permissions.purpose')}</label>

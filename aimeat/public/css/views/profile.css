@@ -2800,6 +2800,22 @@
 .pj-eminvite-pending-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; font-size: 0.83rem; color: var(--text); border-bottom: 1px solid var(--border); }
 .pj-eminvite-pending-meta { color: var(--muted); font-size: 0.76rem; }
 .pj-eminvite-pending-cancel { margin-left: auto; }
+/* Unified add/invite panel + pending-invite inline editor + per-member access editor */
+.pj-invpanel-accept { display: flex; align-items: center; gap: 0.4rem; font-size: 0.83rem; color: var(--text); margin-top: 0.5rem; cursor: pointer; }
+.pj-pinv-editor { margin: 0.3rem 0 0.5rem 1.2rem; }
+.pj-member-access { margin: 0.2rem 0 0.6rem 2.6rem; }
+
+/* ── Contacts tab (address book) ── */
+.pf-ct-addrow { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0.7rem 0; }
+.pf-ct-filter { max-width: 180px; margin-left: auto; }
+.pf-ct-row { display: flex; align-items: center; gap: 0.6rem; padding: 0.45rem 0; border-bottom: 1px solid var(--border); }
+.pf-ct-avatar { flex: 0 0 auto; width: 2rem; height: 2rem; border-radius: 50%; display: flex; align-items: center; justify-content: center; background: var(--bg-dim); color: var(--text); font-size: 0.78rem; font-weight: 600; }
+.pf-ct-main { min-width: 0; flex: 1; }
+.pf-ct-name { font-size: 0.88rem; font-weight: 500; color: var(--text); display: flex; align-items: center; gap: 0.35rem; }
+.pf-ct-id { font-size: 0.74rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-ct-count { color: var(--muted); font-weight: 400; }
+.pf-ct-miss { border: 1px dashed var(--border); border-radius: 8px; padding: 0.4rem 0.6rem; background: var(--bg-dim); }
+.pf-ct-blocked { margin-top: 0.8rem; }
 .pj-orgsearch { margin: 0 0 0.6rem; }
 .pj-orgsearch-input { min-width: 220px; }
 .pj-board-post { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.5rem 0.7rem; margin-bottom: 0.5rem; }

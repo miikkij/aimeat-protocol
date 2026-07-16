@@ -58,6 +58,7 @@ function toContactRecord(r: Selectable<ContactConsent>): ContactConsentRecord {
     ownerGhii: r.ownerGhii,
     contactId: r.contactId,
     state: r.state as ContactConsentRecord['state'],
+    origin: r.origin === 'saved' ? 'saved' : 'message',
     createdAt: iso(r.createdAt),
     updatedAt: iso(r.updatedAt),
   };
@@ -336,13 +337,14 @@ export const directMessageMethods = {
     return r ? toContactRecord(r) : null;
   },
 
-  async setContactState(this: PostgresKyselyStorage, ownerGhii: string, contactId: string, state: ContactConsentRecord['state'], firstMessageId?: string): Promise<ContactConsentRecord> {
+  async setContactState(this: PostgresKyselyStorage, ownerGhii: string, contactId: string, state: ContactConsentRecord['state'], firstMessageId?: string, origin?: ContactConsentRecord['origin']): Promise<ContactConsentRecord> {
     const now = new Date();
     const id = contactDocId(ownerGhii, contactId);
+    // Omitted origin keeps an existing row's origin — the DM gate must never downgrade a saved contact.
     const rows = await this.db.insertInto('ContactConsent').values({
-      id, ownerGhii, contactId, state, firstMessageId: firstMessageId ?? null, createdAt: now, updatedAt: now,
+      id, ownerGhii, contactId, state, firstMessageId: firstMessageId ?? null, origin: origin ?? 'message', createdAt: now, updatedAt: now,
     }).onConflict(oc => oc.column('id').doUpdateSet({
-      state, updatedAt: now, ...(firstMessageId ? { firstMessageId } : {}),
+      state, updatedAt: now, ...(firstMessageId ? { firstMessageId } : {}), ...(origin ? { origin } : {}),
     })).returningAll().execute();
     return toContactRecord(rows[0]);
   },
@@ -351,5 +353,10 @@ export const directMessageMethods = {
     let q = this.db.selectFrom('ContactConsent').selectAll().where('ownerGhii', '=', ownerGhii);
     if (opts?.state) q = q.where('state', '=', opts.state);
     return (await q.orderBy('updatedAt', 'desc').execute()).map(toContactRecord);
+  },
+
+  async deleteContact(this: PostgresKyselyStorage, ownerGhii: string, contactId: string): Promise<boolean> {
+    const r = await this.db.deleteFrom('ContactConsent').where('id', '=', contactDocId(ownerGhii, contactId)).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0) > 0;
   },
 };

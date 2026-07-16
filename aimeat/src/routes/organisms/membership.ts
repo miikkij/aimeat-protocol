@@ -1,12 +1,15 @@
 /**
  * @file src/routes/organisms/membership.ts
  * @description Organism membership + roster routes: members listing, join-request review, admin
- *   promote/demote, member removal/ban/unban, ownership transfer, name-based invitations, and agent
+ *   promote/demote, member removal/ban/unban, ownership transfer, name-based invitations (with
+ *   invite-time role + workspace grants, pending-invite edit/cancel), DIRECT member add, and agent
  *   attach/detach. Extracted from src/routes/organisms.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Name-invites carry role + workspaces (services/invitations.ts core); new
+ *     POST /members (direct add), PATCH + DELETE /invitations/:ghii (edit/cancel pending).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  */
-import type { Router } from 'express';
+import type { Router, Request, Response } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
@@ -16,7 +19,10 @@ import { parseGaiiLoose } from '../../utils/gaii.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { canSeeMembers, rosterCallerFromAuth } from '../../services/organism-privacy.js';
-import { normalizeInviteeName } from '../../services/invitations.js';
+import {
+  InvitationError, createNameInvitation, updateNameInvitation, cancelNameInvitation,
+  acceptNameInvitation, addOrganismMember,
+} from '../../services/invitations.js';
 
 export function registerOrganismMembershipRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   /* ── GET /v1/organisms/:id/members — List members ── */
@@ -394,68 +400,97 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
    * A creator/admin invites an owner by bare name. The invite is a membership row with
    * status `invited` + `invitedBy`. The invitee is notified and accepts/declines. */
 
-  /* POST /v1/organisms/:id/invitations — invite an owner */
-  router.post('/v1/organisms/:id/invitations', requireAuth(), requireRole('agent'), async (req, res) => {
+  /** Creator/admin gate shared by the invite/add/edit routes — the organism, or null (responded). */
+  const requireInviteAdmin = async (req: Request, res: Response) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
-    const { invitee: inviteeRaw } = req.body ?? {};
-    if (!inviteeRaw || typeof inviteeRaw !== 'string') {
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return null; }
+    if (organism.creatorGhii !== callerGhii && !organism.admins.includes(callerGhii)) {
+      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can manage members and invitations'));
+      return null;
+    }
+    return organism;
+  };
+
+  /* POST /v1/organisms/:id/invitations — invite an owner, optionally with an org role and
+   * invite-time workspace grants applied when they accept.
+   * Body: { invitee, role?: 'member'|'admin', workspaces?: [{ws, role: 'viewer'|'contributor'}] } */
+  router.post('/v1/organisms/:id/invitations', requireAuth(), requireRole('agent'), async (req, res) => {
+    const { invitee, role, workspaces } = req.body ?? {};
+    if (!invitee || typeof invitee !== 'string') {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Body field "invitee" (an owner name) is required'));
       return;
     }
-    const invitee = normalizeInviteeName(inviteeRaw, config.nodeId);
-    if (!invitee) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Invitee belongs to another node — name-invites work for local owners only'));
-      return;
+    const organism = await requireInviteAdmin(req, res);
+    if (!organism) return;
+    try {
+      const membership = await createNameInvitation(storage, config, {
+        organism, inviterGhii: req.auth!.owner as string, inviteeRaw: invitee, role, workspaces,
+      });
+      res.status(201).json(success(config.nodeId, { invitation: membership, status: 'invited' }));
+    } catch (e) {
+      if (e instanceof InvitationError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      throw e;
     }
+  });
 
-    const organism = await storage.getOrganism(id);
-    if (!organism) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found'));
+  /* POST /v1/organisms/:id/members — DIRECT ADD: creator/admin adds an existing local owner as an
+   * ACTIVE member, role + workspace grants applied immediately (no accept round-trip; the invitee is
+   * notified and can leave). Body: { ghii, role?, workspaces? } */
+  router.post('/v1/organisms/:id/members', requireAuth(), requireRole('agent'), async (req, res) => {
+    const { ghii, role, workspaces } = req.body ?? {};
+    if (!ghii || typeof ghii !== 'string') {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Body field "ghii" (an owner name) is required'));
       return;
     }
-    if (organism.creatorGhii !== callerGhii && !organism.admins.includes(callerGhii)) {
-      res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Only the creator or an admin can invite members'));
-      return;
+    const organism = await requireInviteAdmin(req, res);
+    if (!organism) return;
+    try {
+      const { membership, grantedWorkspaces } = await addOrganismMember(storage, config, {
+        organism, inviterGhii: req.auth!.owner as string, inviteeRaw: ghii, role, workspaces,
+      });
+      res.status(201).json(success(config.nodeId, { member: membership, workspaces: grantedWorkspaces, status: 'added' }));
+    } catch (e) {
+      if (e instanceof InvitationError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      throw e;
     }
-    if (!(await storage.getOwner(invitee))) {
-      res.status(404).json(error(config.nodeId, 'OWNER_NOT_FOUND', `No owner named "${invitee}" on this node`));
-      return;
-    }
+  });
 
-    const existing = await storage.getMembership(id, invitee);
-    if (existing && existing.status === 'active') {
-      res.status(409).json(error(config.nodeId, 'ALREADY_MEMBER', 'That owner is already a member'));
+  /* PATCH /v1/organisms/:id/invitations/:ghii — edit a PENDING invitation's role/workspace grants
+   * (rights stay editable until the invitee accepts). Body: { role?, workspaces? } */
+  router.patch('/v1/organisms/:id/invitations/:ghii', requireAuth(), requireRole('agent'), async (req, res) => {
+    const organism = await requireInviteAdmin(req, res);
+    if (!organism) return;
+    const { role, workspaces } = req.body ?? {};
+    if (role === undefined && workspaces === undefined) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide "role" and/or "workspaces" to update'));
       return;
     }
-    if (existing && existing.status === 'invited') {
-      res.status(409).json(error(config.nodeId, 'ALREADY_INVITED', 'That owner already has a pending invitation'));
-      return;
+    try {
+      const membership = await updateNameInvitation(storage, config, {
+        organism, inviteeRaw: req.params.ghii as string, role, workspaces,
+      });
+      res.json(success(config.nodeId, { invitation: membership }));
+    } catch (e) {
+      if (e instanceof InvitationError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      throw e;
     }
-    if (existing && existing.status === 'banned') {
-      res.status(409).json(error(config.nodeId, 'BANNED', 'That owner is blocked — lift the block before inviting'));
-      return;
-    }
+  });
 
-    const now = new Date().toISOString();
-    const membership = await storage.createMembership({
-      id: uuidv4(),
-      organismId: id,
-      ghii: invitee,
-      role: 'member',
-      status: 'invited',
-      invitedBy: callerGhii,
-      joinedAt: now,
-    });
-    await notify(storage, `${invitee}@${config.nodeId}`, {
-      type: 'organism_invitation',
-      title: `${callerGhii} invited you to join "${organism.name}"`,
-      link: '/v1/profile#organisms',
-    });
-    emitChange('notifications', `${invitee}@${config.nodeId}`);
-
-    res.status(201).json(success(config.nodeId, { invitation: membership, status: 'invited' }));
-    emitChange('organisms');
+  /* DELETE /v1/organisms/:id/invitations/:ghii — cancel a PENDING name invitation (creator/admin). */
+  router.delete('/v1/organisms/:id/invitations/:ghii', requireAuth(), requireRole('agent'), async (req, res) => {
+    const organism = await requireInviteAdmin(req, res);
+    if (!organism) return;
+    try {
+      await cancelNameInvitation(storage, config, {
+        organism, cancellerGhii: req.auth!.owner as string, inviteeRaw: req.params.ghii as string,
+      });
+      res.json(success(config.nodeId, { status: 'cancelled' }));
+    } catch (e) {
+      if (e instanceof InvitationError) { res.status(e.status).json(error(config.nodeId, e.code, e.message)); return; }
+      throw e;
+    }
   });
 
   /* GET /v1/organisms/:id/invitations — list outstanding invitations (creator/admin) */
@@ -501,20 +536,9 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
       res.status(404).json(error(config.nodeId, 'NO_INVITATION', 'You have no pending invitation to this organism'));
       return;
     }
-    const now = new Date().toISOString();
-    await storage.updateMembership(membership.id, { status: 'active', joinedAt: now });
-    await storage.updateOrganism(id, { members: [...new Set([...organism.members, callerGhii])], updatedAt: now });
-    // Notify the inviter that the invitation was accepted.
-    if (membership.invitedBy) {
-      await notify(storage, `${membership.invitedBy}@${config.nodeId}`, {
-        type: 'organism_invitation_accepted',
-        title: `${callerGhii} accepted your invitation to "${organism.name}"`,
-        link: '/v1/profile#organisms',
-      });
-      emitChange('notifications');
-    }
-    res.json(success(config.nodeId, { status: 'joined' }));
-    emitChange('organisms');
+    // Shared accept core: activates the row, syncs members/admins, applies invite-time ws grants.
+    const workspaces = await acceptNameInvitation(storage, config, { organism, membership });
+    res.json(success(config.nodeId, { status: 'joined', role: membership.role, workspaces }));
   });
 
   /* POST /v1/organisms/:id/invitations/decline — the invitee declines */

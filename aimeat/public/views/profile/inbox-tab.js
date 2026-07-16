@@ -13,6 +13,8 @@
  *   ./inbox-tab/components.js) · pure helpers (./inbox-tab/helpers.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.20.0 -- 2026-07-16 -- Compose "to" field is the shared ContactPicker (contacts + directory
+ *     suggestions + email resolve, valueMode 'full'); the datalist remains for the broadcast picker.
  *   v1.19.0 -- 2026-07-16 -- Mount folds the 6-request fan-out into ONE GET /v1/messages/overview
  *     (MessagesInboxService composite); interactive refreshes keep the individual loaders. Falls back to
  *     the per-endpoint loaders if the composite fails. (Phase 4 slice 1 — frontend half.)
@@ -126,6 +128,7 @@ import { buildConversationReplyPrompt, buildMessageReplyPrompt, peerLabel } from
 import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary } from './inbox-tab/helpers.js';
 import { Composer, PollBuilder, MarkdownViewer, ReplyWithAiPopover } from './inbox-tab/components.js';
 import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel } from './inbox-tab/panels.js';
+import { ContactPicker } from '/components/ContactPicker.js';
 
 export default function InboxTab({ showToast }) {
   const [requests, setRequests] = useState([]);
@@ -705,8 +708,8 @@ export default function InboxTab({ showToast }) {
           <div class="inbox-panel">
             <div class="inbox-thread-head"><div class="inbox-name">${t('inbox.new')}</div></div>
             <div class="inbox-compose-fields">
-              <input class="inbox-input" type="text" placeholder=${t('inbox.toPlaceholder')}
-                list="inbox-contact-suggest" value=${to} onInput=${(e) => setTo(e.target.value)} />
+              <${ContactPicker} value=${to} onChange=${setTo} valueMode="full"
+                placeholder=${t('inbox.toPlaceholder')} />
               <input class="inbox-input" type="text" placeholder=${t('inbox.subjectPlaceholder')}
                 value=${composeSubject} onInput=${(e) => setComposeSubject(e.target.value)} />
             </div>

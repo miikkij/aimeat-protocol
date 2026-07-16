@@ -10,6 +10,7 @@
  *   - setOrganismReputation / getOrganismReputation: reputation persistence
  *
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Memberships carry invitedWorkspaces (JSON column): ws grants chosen at invite time.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type Database from 'better-sqlite3';
@@ -52,6 +53,9 @@ function deserializeMembership(row: Record<string, unknown>): OrganismMembership
     joinedAt: row.joinedAt as string,
   };
   if (row.invitedBy) record.invitedBy = row.invitedBy as string;
+  if (row.invitedWorkspaces) {
+    try { record.invitedWorkspaces = JSON.parse(row.invitedWorkspaces as string); } catch { /* ignore malformed JSON */ }
+  }
   return record;
 }
 
@@ -161,11 +165,12 @@ export function deleteOrganism(db: Database.Database, id: string): boolean {
 
 export function createMembership(db: Database.Database, record: OrganismMembershipRecord): OrganismMembershipRecord {
   db.prepare(
-    `INSERT INTO organism_memberships (id, organismId, ghii, role, status, joinedAt, invitedBy)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO organism_memberships (id, organismId, ghii, role, status, joinedAt, invitedBy, invitedWorkspaces)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id, record.organismId, record.ghii, record.role,
     record.status, record.joinedAt, record.invitedBy ?? null,
+    record.invitedWorkspaces?.length ? JSON.stringify(record.invitedWorkspaces) : null,
   );
   return record;
 }
@@ -195,10 +200,11 @@ export function updateMembership(db: Database.Database, id: string, updates: Par
   const existing = deserializeMembership(row);
   const updated = { ...existing, ...updates, id: existing.id };
   db.prepare(
-    `UPDATE organism_memberships SET organismId = ?, ghii = ?, role = ?, status = ?, joinedAt = ?, invitedBy = ? WHERE id = ?`
+    `UPDATE organism_memberships SET organismId = ?, ghii = ?, role = ?, status = ?, joinedAt = ?, invitedBy = ?, invitedWorkspaces = ? WHERE id = ?`
   ).run(
     updated.organismId, updated.ghii, updated.role, updated.status,
-    updated.joinedAt, updated.invitedBy ?? null, id,
+    updated.joinedAt, updated.invitedBy ?? null,
+    updated.invitedWorkspaces?.length ? JSON.stringify(updated.invitedWorkspaces) : null, id,
   );
   return updated;
 }

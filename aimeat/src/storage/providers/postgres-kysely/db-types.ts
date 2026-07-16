@@ -442,6 +442,7 @@ export interface ContactConsent {
   createdAt: Generated<Timestamp>;
   firstMessageId: string | null;
   id: Generated<string>;
+  origin: Generated<string>;
   ownerGhii: string;
   state: Generated<string>;
   updatedAt: Generated<Timestamp>;
@@ -1035,6 +1036,7 @@ export interface OrganismMembership {
   ghii: string;
   id: Generated<string>;
   invitedBy: string | null;
+  invitedWorkspaces: Json | null;
   joinedAt: Generated<Timestamp>;
   organismId: string;
   role: string;

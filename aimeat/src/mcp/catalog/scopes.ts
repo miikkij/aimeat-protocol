@@ -103,6 +103,14 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_dm_inbox: 'messages:read',
     aimeat_dm_thread: 'messages:read',
 
+    // Contacts (address book) — the owner's messaging graph, so the messaging scopes gate it:
+    // reading the list / resolving an email rides messages:read; editing the book (save/remove)
+    // rides messages:send (the same trust level as opening conversations on the owner's behalf).
+    aimeat_contact_list: 'messages:read',
+    aimeat_contact_resolve_email: 'messages:read',
+    aimeat_contact_add: 'messages:send',
+    aimeat_contact_remove: 'messages:send',
+
     // Commerce (TARGET-033/034 over MCP). NOTE: the REST commerce routes are requireAuth-only
     // today — these MCP tools are gated STRICTER than REST on purpose (selling config touches
     // PSP secrets; buying spends the owner's balance). commerce:sell = seller-side config (PSP,

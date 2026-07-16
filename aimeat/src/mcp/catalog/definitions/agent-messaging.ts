@@ -216,6 +216,44 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
         },
     },
     {
+        // ── Contacts (address book) — server MCP only, like the email-invite tools. ──
+        name: 'aimeat_contact_list',
+        description: "The owner's merged contact list (address book): explicitly saved contacts ∪ everyone they have exchanged direct messages with, each with kind (ghii/gaii/geai), display name, consent state, and origin ('saved' vs 'message'). Use it as the identity source when granting access — pair a contact with aimeat_organism_invite, aimeat_organism_member_add, or aimeat_workspace_member_grant.",
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            q: { type: 'string', description: 'Filter by id/display name (case-insensitive substring).' },
+            state: { type: 'string', enum: ['pending', 'accepted', 'blocked'], description: 'Narrow to one consent state (default hides blocked).' },
+        },
+    },
+    {
+        name: 'aimeat_contact_add',
+        description: "Save an identity to the owner's contact list (address book). Accepts a bare local owner name, a GHII, a GAII, or a GEAI. A blocked contact stays blocked (unblock via the Messages flow first).",
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            contact_id: { type: 'string', required: true, description: 'Bare local owner name, owner@node, agent#owner@node, or eco:app#owner@node.' },
+        },
+    },
+    {
+        name: 'aimeat_contact_remove',
+        description: "Remove a contact from the owner's address book WITHOUT disturbing the direct-message first-contact gate: a contact with message history keeps its messaging state (only the 'saved' mark is dropped); a pure saved contact is deleted.",
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            contact_id: { type: 'string', required: true, description: 'The contact id to remove (from aimeat_contact_list).' },
+        },
+    },
+    {
+        name: 'aimeat_contact_resolve_email',
+        description: 'Look up a LOCAL owner by email — EXACT match only (privacy-preserving hash; no enumeration or substring search). Found → their GHII + display name (add with aimeat_contact_add, or grant access directly). Not found → can_invite signals whether an email invitation could be sent instead (aimeat_organism_invite_email).',
+        caller: 'agent',
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            email: { type: 'string', required: true, description: 'Email address to look up (exact match).' },
+        },
+    },
+    {
         name: 'aimeat_agents_list',
         description: "List the calling owner's agents on the node (name, mode, capabilities, tags, last_seen, etc.). Use this to discover which agents you can delegate to via aimeat_task_create.",
         caller: 'agent',

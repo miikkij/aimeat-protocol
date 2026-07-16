@@ -142,12 +142,16 @@ export const messagingMethods = {
     return directMessageRepo.getContact(this.db, ownerGhii, contactId);
   },
 
-  async setContactState(this: SqliteStorage, ownerGhii: string, contactId: string, state: ContactConsentRecord['state'], firstMessageId?: string): Promise<ContactConsentRecord> {
-    return directMessageRepo.setContactState(this.db, ownerGhii, contactId, state, firstMessageId);
+  async setContactState(this: SqliteStorage, ownerGhii: string, contactId: string, state: ContactConsentRecord['state'], firstMessageId?: string, origin?: ContactConsentRecord['origin']): Promise<ContactConsentRecord> {
+    return directMessageRepo.setContactState(this.db, ownerGhii, contactId, state, firstMessageId, origin);
   },
 
   async listContacts(this: SqliteStorage, ownerGhii: string, opts?: { state?: ContactConsentRecord['state'] }): Promise<ContactConsentRecord[]> {
     return directMessageRepo.listContacts(this.db, ownerGhii, opts);
+  },
+
+  async deleteContact(this: SqliteStorage, ownerGhii: string, contactId: string): Promise<boolean> {
+    return directMessageRepo.deleteContact(this.db, ownerGhii, contactId);
   },
 
   // ══════════════════════════════════════════════════════════

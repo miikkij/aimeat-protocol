@@ -98,8 +98,13 @@ export interface DirectMessageRepository {
   getMessageDeliveryStats(): Promise<MessageDeliveryStats>;
   pruneMessageDeliveryLogs(keep?: number): Promise<number>;
 
-  // ── Contact consent (first-contact gate) ──
+  // ── Contact consent (first-contact gate + the owner's address book) ──
   getContact(ownerGhii: string, contactId: string): Promise<ContactConsentRecord | null>;
-  setContactState(ownerGhii: string, contactId: string, state: ContactConsentRecord['state'], firstMessageId?: string): Promise<ContactConsentRecord>;
+  /** Upsert a contact's state. `origin` marks an explicit address-book save ('saved'); when
+   *  omitted an EXISTING row keeps its origin (the DM gate must never downgrade a saved contact)
+   *  and a new row defaults to 'message'. */
+  setContactState(ownerGhii: string, contactId: string, state: ContactConsentRecord['state'], firstMessageId?: string, origin?: ContactConsentRecord['origin']): Promise<ContactConsentRecord>;
   listContacts(ownerGhii: string, opts?: { state?: ContactConsentRecord['state'] }): Promise<ContactConsentRecord[]>;
+  /** Remove a contact row (address-book delete). Returns false when no row existed. */
+  deleteContact(ownerGhii: string, contactId: string): Promise<boolean>;
 }

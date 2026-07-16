@@ -380,11 +380,12 @@ export function applySchemaTables3(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_direct_messages_convo ON direct_messages(ownerGhii, conversationId, createdAt);
     CREATE INDEX IF NOT EXISTS idx_direct_messages_status ON direct_messages(status, origin);
 
-    -- ── Contact consent (first-contact gate for direct messages) ──
+    -- ── Contact consent (first-contact gate for direct messages + the owner's address book) ──
     CREATE TABLE IF NOT EXISTS contact_consents (
       ownerGhii      TEXT NOT NULL,
       contactId      TEXT NOT NULL,
       state          TEXT NOT NULL DEFAULT 'pending',
+      origin         TEXT NOT NULL DEFAULT 'message',
       firstMessageId TEXT,
       createdAt      TEXT NOT NULL,
       updatedAt      TEXT NOT NULL,

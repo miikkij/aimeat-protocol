@@ -9,6 +9,8 @@
  *   import { registerOrganismsTools } from './organisms.js';
  *   registerOrganismsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.6.0 — 2026-07-16 — invite carries role + workspace grants (shared services/invitations.ts core);
+ *     new member_add (direct add), invitation_update, invitation_cancel tools; respond-accept applies grants.
  *   v1.2.0 — 2026-07-16 — members roster rosters agents via getAgentsByOwners (one IN, was per-member)
  *   v1.x -- 2026-07-02 -- readme param description mentions aimeat-memory live-data blocks (with mermaid).
  *   v1.0.0 — 2026-03-21 — Initial creation: 5 tools + 1 resource for organism management via MCP
@@ -34,8 +36,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { exportOrganism } from '../services/organism-export.js';
 import { importOrganism } from '../services/organism-import.js';
-import { notify } from '../services/notify.js';
-import { normalizeInviteeName } from '../services/invitations.js';
+import { registerOrganismNameInviteTools } from './organisms-name-invites.js';
 import { registerOrganismEmailInviteTools } from './organisms-email-invites.js';
 import { searchOrganismContent } from '../services/organism-search.js';
 import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../services/archive.js';
@@ -414,98 +415,10 @@ export function registerOrganismsTools(
         },
     );
 
-    // ── Tool: aimeat_organism_invite ──
-    // Mirrors POST /v1/organisms/:id/invitations. Creator/admin invites an owner by bare name;
-    // creates a membership row with status 'invited' + invitedBy and notifies the invitee.
-    mcp.tool(
-        'aimeat_organism_invite',
-        descriptionFor('aimeat_organism_invite'),
-        {
-            organism_id: z.string().describe('The organism ID'),
-            invitee: z.string().describe('Bare owner name to invite'),
-        },
-        annotationsFor('aimeat_organism_invite'),
-        async ({ organism_id, invitee: inviteeRaw }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-            const ownerName = getOwnerName();
-            if (organism.creatorGhii !== ownerName && !organism.admins.includes(ownerName)) {
-                return { content: [{ type: 'text' as const, text: 'Only the creator or an admin can invite members' }], isError: true };
-            }
-            const invitee = normalizeInviteeName(inviteeRaw, config.nodeId);
-            if (!invitee) return { content: [{ type: 'text' as const, text: 'Invitee belongs to another node — name-invites work for local owners only' }], isError: true };
-            if (!(await storage.getOwner(invitee))) return { content: [{ type: 'text' as const, text: `No owner named "${invitee}" on this node` }], isError: true };
-            const existing = await storage.getMembership(organism_id, invitee);
-            if (existing && existing.status === 'active') return { content: [{ type: 'text' as const, text: 'That owner is already a member' }], isError: true };
-            if (existing && existing.status === 'invited') return { content: [{ type: 'text' as const, text: 'That owner already has a pending invitation' }], isError: true };
-            if (existing && existing.status === 'banned') return { content: [{ type: 'text' as const, text: 'That owner is blocked — lift the block before inviting' }], isError: true };
-
-            const now = new Date().toISOString();
-            await storage.createMembership({ id: uuidv4(), organismId: organism_id, ghii: invitee, role: 'member', status: 'invited', invitedBy: ownerName, joinedAt: now });
-            await notify(storage, `${invitee}@${config.nodeId}`, {
-                type: 'organism_invitation',
-                title: `${ownerName} invited you to join "${organism.name}"`,
-                link: '/v1/profile#organisms',
-            });
-            emitChange('notifications', `${invitee}@${config.nodeId}`);
-            emitChange('organisms');
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'invited', organism_id, invitee }, null, 2) }] };
-        },
-    );
-
-    // ── Tool: aimeat_organism_invitations ── (your own pending invitations across organisms)
-    mcp.tool(
-        'aimeat_organism_invitations',
-        descriptionFor('aimeat_organism_invitations'),
-        {},
-        annotationsFor('aimeat_organism_invitations'),
-        async () => {
-            const ownerName = getOwnerName();
-            const memberships = (await storage.listMembershipsByGhii(ownerName)).filter(m => m.status === 'invited');
-            const out = [];
-            for (const m of memberships) {
-                const org = await storage.getOrganism(m.organismId);
-                if (org) out.push({ organism_id: org.id, name: org.name, type: org.type, invited_by: m.invitedBy });
-            }
-            return { content: [{ type: 'text' as const, text: JSON.stringify(out, null, 2) }] };
-        },
-    );
-
-    // ── Tool: aimeat_organism_invitation_respond ── (accept | decline your invitation)
-    mcp.tool(
-        'aimeat_organism_invitation_respond',
-        descriptionFor('aimeat_organism_invitation_respond'),
-        {
-            organism_id: z.string().describe('The organism ID you were invited to'),
-            decision: z.enum(['accept', 'decline']).describe('accept or decline'),
-        },
-        annotationsFor('aimeat_organism_invitation_respond'),
-        async ({ organism_id, decision }) => {
-            const organism = await storage.getOrganism(organism_id);
-            if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
-            const ownerName = getOwnerName();
-            const membership = await storage.getMembership(organism_id, ownerName);
-            if (!membership || membership.status !== 'invited') {
-                return { content: [{ type: 'text' as const, text: 'You have no pending invitation to this organism' }], isError: true };
-            }
-            const now = new Date().toISOString();
-            if (decision === 'decline') {
-                await storage.deleteMembership(membership.id);
-                return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'declined', organism_id }, null, 2) }] };
-            }
-            await storage.updateMembership(membership.id, { status: 'active', joinedAt: now });
-            await storage.updateOrganism(organism_id, { members: [...new Set([...organism.members, ownerName])], updatedAt: now });
-            if (membership.invitedBy) {
-                await notify(storage, `${membership.invitedBy}@${config.nodeId}`, {
-                    type: 'organism_invitation_accepted',
-                    title: `${ownerName} accepted your invitation to "${organism.name}"`,
-                    link: '/v1/profile#organisms',
-                });
-            }
-            emitResourceUpdated(agentGaii, `aimeat://organisms/${encodeURIComponent(organism_id)}`);
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ status: 'joined', organism_id }, null, 2) }] };
-        },
-    );
+    // ── Name-invitation + direct-add tools (invite, member_add, invitation_update,
+    // invitation_cancel, invitations, invitation_respond) — extracted to organisms-name-invites.ts;
+    // registered here to preserve tool order.
+    registerOrganismNameInviteTools(mcp, storage, config, getOwnerName, agentGaii, emitResourceUpdated);
 
     // ── Email-invitation tools (invite_email, invitations_email, invitation_email_cancel) ──
     // Extracted to organisms-email-invites.ts; registered here to preserve tool order.

@@ -112,6 +112,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_organism_update: { title: 'Update Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_organism_archive: { title: 'Archive / Unarchive Organism Content', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_organism_invite: { title: 'Invite to Organism', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_organism_member_add: { title: 'Add Organism Member', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_organism_invitation_update: { title: 'Edit Pending Invitation', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_organism_invitation_cancel: { title: 'Withdraw Invitation', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
     aimeat_organism_invitations: { title: 'List My Invitations', readOnlyHint: true },
     aimeat_organism_invitation_respond: { title: 'Respond to Invitation', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_organism_invite_email: { title: 'Invite to Organism by Email', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
@@ -236,6 +239,12 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_dm_ask: { title: 'Ask a Structured Question (Federated)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_dm_inbox: { title: 'Read Federated DM Inbox', readOnlyHint: true },
     aimeat_dm_thread: { title: 'Read Federated DM Thread', readOnlyHint: true },
+
+    // ── Contacts (address book) ──
+    aimeat_contact_list: { title: 'List Contacts', readOnlyHint: true },
+    aimeat_contact_add: { title: 'Add Contact', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_contact_remove: { title: 'Remove Contact', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_contact_resolve_email: { title: 'Resolve Email to Owner', readOnlyHint: true },
 
     // ── Consent ──
     aimeat_consent_list: { title: 'List Consents', readOnlyHint: true },

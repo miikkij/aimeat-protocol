@@ -2,6 +2,7 @@
  * @file src/storage/providers/sqlite/methods/community.ts
  * @description Membership, Join-request, Approval, Appeal, Marketplace, Push, Issuer, Nonce, Genesis-peer, Reputation, Realtime-room methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.2.0 — 2026-07-16 — Memberships carry invitedWorkspaces (JSON column): workspace grants chosen at invite time.
  *   v1.1.0 — 2026-07-16 — Add listPendingApprovalsForOrgs batch (Phase 3): pending approvals for many orgs
  *     in one organismId-IN query.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
@@ -18,11 +19,12 @@ export const communityMethods = {
 
   async createMembership(this: SqliteStorage, record: OrganismMembershipRecord): Promise<OrganismMembershipRecord> {
     this.db.prepare(
-      `INSERT INTO organism_memberships (id, organismId, ghii, role, status, joinedAt, invitedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO organism_memberships (id, organismId, ghii, role, status, joinedAt, invitedBy, invitedWorkspaces)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.id, record.organismId, record.ghii, record.role,
       record.status, record.joinedAt, record.invitedBy ?? null,
+      record.invitedWorkspaces?.length ? JSON.stringify(record.invitedWorkspaces) : null,
     );
     return record;
   },
@@ -52,10 +54,11 @@ export const communityMethods = {
     const existing = this.deserializeMembership(row);
     const updated = { ...existing, ...updates, id: existing.id };
     this.db.prepare(
-      `UPDATE organism_memberships SET organismId = ?, ghii = ?, role = ?, status = ?, joinedAt = ?, invitedBy = ? WHERE id = ?`
+      `UPDATE organism_memberships SET organismId = ?, ghii = ?, role = ?, status = ?, joinedAt = ?, invitedBy = ?, invitedWorkspaces = ? WHERE id = ?`
     ).run(
       updated.organismId, updated.ghii, updated.role, updated.status,
-      updated.joinedAt, updated.invitedBy ?? null, id,
+      updated.joinedAt, updated.invitedBy ?? null,
+      updated.invitedWorkspaces?.length ? JSON.stringify(updated.invitedWorkspaces) : null, id,
     );
     return updated;
   },
@@ -75,6 +78,9 @@ export const communityMethods = {
       joinedAt: row.joinedAt as string,
     };
     if (row.invitedBy) record.invitedBy = row.invitedBy as string;
+    if (row.invitedWorkspaces) {
+      try { record.invitedWorkspaces = JSON.parse(row.invitedWorkspaces as string); } catch { /* ignore malformed JSON */ }
+    }
     return record;
   },
 

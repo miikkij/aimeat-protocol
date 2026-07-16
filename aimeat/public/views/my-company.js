@@ -24,6 +24,8 @@
  *     (describe → generate in-app / copy-prompt → review → apply) for departments/roles/people/reporting (GET/PUT /v1/orgs/:slug/model).
  *   v0.8.0 — 2026-07-01 — Company Secretary subtab hidden unless the node enables the Secretary feature
  *     (AIMEAT_SECRETARY_ENABLED, read from /v1/site/header-nav `features.secretary`). Governance + model unaffected.
+ *   v0.9.0 — 2026-07-16 — Member-add input is the shared ContactPicker (contacts + directory
+ *     suggestions + email resolve).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -36,6 +38,7 @@ import { useViewCSS } from '/components/useViewCSS.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
 import { OfferCardView } from '/components/offer-card-view.js';
 import { THEMES, buildPortfolioData } from '/views/portfolio-themes.js';
+import { ContactPicker } from '/components/ContactPicker.js';
 
 const html = htm.bind(h);
 
@@ -108,7 +111,9 @@ function MembersPanel({ slug, creatorOwner, viewerRole }) {
   const load = useCallback(async () => { try { const r = await apiGet(`/v1/orgs/${encodeURIComponent(slug)}/members`); setMembers(r.data?.members ?? []); } catch { setMembers([]); } }, [slug]);
   useEffect(() => { load(); }, [load]);
   async function add(e) {
-    e.preventDefault(); setBusy(true); setErr('');
+    e.preventDefault();
+    if (!owner.trim()) return;   // the picker input carries no `required` attribute
+    setBusy(true); setErr('');
     try { await apiPost(`/v1/orgs/${encodeURIComponent(slug)}/members`, { owner: owner.trim().toLowerCase(), role }); setOwner(''); await load(); }
     catch (e) { setErr(e.message || 'Failed'); } finally { setBusy(false); }
   }
@@ -138,7 +143,7 @@ function MembersPanel({ slug, creatorOwner, viewerRole }) {
       <form class="mc-form" onSubmit=${add}>
         <h3 class="mc-form-title">${t('myCompany.addMember')}</h3>
         <div class="flex-row-wrap mc-manage-row">
-          <input class="input-field input-sm" placeholder=${t('myCompany.memberUsername')} value=${owner} onInput=${(e) => setOwner(e.target.value)} required />
+          <${ContactPicker} value=${owner} onChange=${setOwner} placeholder=${t('myCompany.memberUsername')} />
           <select class="input-field input-sm" value=${role} onChange=${(e) => setRole(e.target.value)}>${roleOpts}</select>
           <button class="btn-primary btn-sm" type="submit" disabled=${busy}>${t('myCompany.addMemberBtn')}</button>
         </div>

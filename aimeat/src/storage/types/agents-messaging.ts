@@ -631,6 +631,9 @@ export interface ContactConsentRecord {
   /** The other party: GHII | GAII | GEAI. */
   contactId: string;
   state: 'pending' | 'accepted' | 'blocked';
+  /** How the row came to exist: 'message' = created reactively by the first-contact DM gate
+   *  (default); 'saved' = explicitly added to the owner's address book via the contacts API. */
+  origin?: 'message' | 'saved';
   /** The request message that opened the relationship, if any. */
   firstMessageId?: string;
   createdAt: string;

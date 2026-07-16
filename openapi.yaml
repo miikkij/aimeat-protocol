@@ -1734,15 +1734,27 @@ components:
           description: Owner GHII of the member
         role:
           type: string
-          enum: [admin, moderator, member]
+          enum: [creator, admin, member]
           default: member
         status:
           type: string
-          enum: [active, suspended, left]
+          enum: [active, pending, invited, banned]
           default: active
         joinedAt:
           type: string
           format: date-time
+        invitedBy:
+          type: string
+          description: Bare owner name of the inviter (invited/added memberships)
+        invitedWorkspaces:
+          type: array
+          description: Workspace grants chosen at invite time (status 'invited' only) — applied on accept, then cleared.
+          items:
+            type: object
+            required: [ws, role]
+            properties:
+              ws: { type: string }
+              role: { type: string, enum: [viewer, contributor] }
 
     JoinRequestRecord:
       type: object
@@ -3195,13 +3207,17 @@ components:
 
     ContactConsentRecord:
       type: object
-      description: Per-pair first-contact consent state (the messaging gate).
+      description: Per-pair first-contact consent state (the messaging gate + the owner's address book).
       properties:
         ownerGhii: { type: string }
         contactId: { type: string }
         state:
           type: string
           enum: [pending, accepted, blocked]
+        origin:
+          type: string
+          enum: [message, saved]
+          description: "'message' = created reactively by the DM first-contact gate; 'saved' = explicitly added via the contacts API."
         firstMessageId: { type: string, format: uuid }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
@@ -17156,6 +17172,46 @@ paths:
                             type: integer
         '404':
           $ref: '#/components/responses/NotFound'
+    post:
+      operationId: addOrganismMember
+      summary: Directly add a member to an organism
+      description: >-
+        Creator/admin DIRECTLY adds an already-registered local owner as an ACTIVE member — no
+        invitation round-trip. The organism role and any per-workspace grants are applied
+        immediately; the new member is notified and can leave at any time. A pending name
+        invitation for the same owner is upgraded in place. Use POST
+        /v1/organisms/{id}/invitations instead when the person should approve joining first.
+        409 ALREADY_MEMBER / BANNED on a conflicting membership state.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ghii]
+              properties:
+                ghii: { type: string, description: Bare owner name to add as an active member }
+                role: { type: string, enum: [member, admin], description: 'Organism role (default: member)' }
+                workspaces:
+                  type: array
+                  description: Optional per-workspace grants applied immediately.
+                  items:
+                    type: object
+                    required: [ws, role]
+                    properties:
+                      ws: { type: string }
+                      role: { type: string, enum: [viewer, contributor] }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /v1/organisms/{id}/workspace:
     get:
@@ -22641,7 +22697,14 @@ paths:
     post:
       operationId: inviteOrganismMember
       summary: Invite an owner to an organism
-      description: Creator/admin invites an owner by bare name (normalized like registration — trimmed, lowercased, a matching '@node-id' suffix stripped; a remote identity is a 400, an unknown owner a 404 OWNER_NOT_FOUND). Creates a membership with status 'invited' + invitedBy, and notifies the invitee. Works for any join policy (the path to populate invite_only organisms).
+      description: >-
+        Creator/admin invites an owner by bare name (normalized like registration — trimmed,
+        lowercased, a matching '@node-id' suffix stripped; a remote identity is a 400, an unknown
+        owner a 404 OWNER_NOT_FOUND). Creates a membership with status 'invited' + invitedBy plus
+        the chosen organism role and invite-time workspace grants (applied when the invitee
+        accepts; editable while pending via PATCH), and notifies the invitee. Works for any join
+        policy (the path to populate invite_only organisms). To add an existing owner IMMEDIATELY
+        without the accept step use POST /v1/organisms/{id}/members.
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -22656,6 +22719,16 @@ paths:
               required: [invitee]
               properties:
                 invitee: { type: string, description: Bare owner name to invite }
+                role: { type: string, enum: [member, admin], description: 'Organism role granted on accept (default: member)' }
+                workspaces:
+                  type: array
+                  description: Optional per-workspace grants applied when the invitee accepts.
+                  items:
+                    type: object
+                    required: [ws, role]
+                    properties:
+                      ws: { type: string }
+                      role: { type: string, enum: [viewer, contributor] }
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -22665,12 +22738,63 @@ paths:
     get:
       operationId: listOrganismInvitations
       summary: List outstanding invitations
-      description: Creator/admin lists pending (status 'invited') memberships for the organism.
+      description: Creator/admin lists pending (status 'invited') memberships for the organism — each row carries the invite-time role + invitedWorkspaces grants.
       tags: [Organisms]
       security:
         - BearerAuth: []
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/invitations/{ghii}:
+    patch:
+      operationId: updateOrganismInvitation
+      summary: Edit a pending name invitation
+      description: >-
+        Creator/admin edits a PENDING name invitation's organism role and/or workspace grants
+        before the invitee accepts — the invitee lands with the edited rights the moment they
+        accept. 404 NO_INVITATION when the owner has no pending invitation.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: ghii, in: path, required: true, schema: { type: string }, description: Bare owner name of the invitee }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                role: { type: string, enum: [member, admin], description: New organism role }
+                workspaces:
+                  type: array
+                  description: Replacement per-workspace grants.
+                  items:
+                    type: object
+                    required: [ws, role]
+                    properties:
+                      ws: { type: string }
+                      role: { type: string, enum: [viewer, contributor] }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: cancelOrganismInvitation
+      summary: Withdraw a pending name invitation
+      description: Creator/admin withdraws a PENDING name invitation; the invitee is notified. 404 NO_INVITATION when none exists.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: ghii, in: path, required: true, schema: { type: string }, description: Bare owner name of the invitee }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '403': { $ref: '#/components/responses/Forbidden' }
@@ -22768,6 +22892,44 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/organisms/{id}/invitations/email/{invId}:
+    patch:
+      operationId: updateOrganismEmailInvitation
+      summary: Edit a pending email invitation
+      description: >-
+        Creator/admin edits a PENDING email invitation's organism role and/or workspace grants
+        before it is accepted — mirroring PATCH /v1/organisms/{id}/invitations/{ghii} for name
+        invites. 409 INVALID_STATE when the invitation is no longer pending.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: invId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                orgRole: { type: string, enum: [member, admin], description: New organism role granted on accept }
+                workspaces:
+                  type: array
+                  description: Replacement per-workspace grants.
+                  items:
+                    type: object
+                    required: [ws, role]
+                    properties:
+                      ws: { type: string }
+                      role: { type: string, enum: [viewer, contributor] }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
 
   /v1/organisms/{id}/invitations/email/{invId}/cancel:
     post:
@@ -28271,6 +28433,143 @@ paths:
                               $ref: '#/components/schemas/ContactConsentRecord'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /v1/contacts:
+    get:
+      operationId: listAddressBook
+      summary: The owner's merged contact list (address book)
+      description: >-
+        Explicitly saved contacts ∪ everyone the owner has exchanged direct messages with, each
+        with kind (ghii/gaii/geai), display name (resolved at read time), consent state, and
+        origin ('saved' vs 'message'). Blocked contacts are hidden unless ?state=blocked. Feeds
+        identity pickers on every grant surface (organism invites, workspace grants, app grants).
+      tags: [Contacts]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string }
+          description: Filter by id/display name (case-insensitive substring)
+        - name: state
+          in: query
+          schema: { type: string, enum: [pending, accepted, blocked] }
+          description: Narrow to one consent state (default hides blocked)
+      responses:
+        '200':
+          description: Contacts
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          contacts:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                contact_id: { type: string }
+                                kind: { type: string, enum: [ghii, gaii, geai] }
+                                display_name: { type: string, nullable: true }
+                                state: { type: string, nullable: true, enum: [pending, accepted, blocked, null] }
+                                origin: { type: string, enum: [message, saved] }
+                                has_messages: { type: boolean }
+                                created_at: { type: string, nullable: true }
+                                updated_at: { type: string, nullable: true }
+                          total: { type: integer }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: addContact
+      summary: Save a contact to the address book
+      description: >-
+        Save an identity to the owner's contact list (state accepted, origin 'saved'). Accepts a
+        bare local owner name, a GHII, a GAII, or a GEAI. 409 BLOCKED when the contact is blocked
+        (lift the block via the Messages flow first); 404 OWNER_NOT_FOUND for an unknown local owner.
+      tags: [Contacts]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact_id]
+              properties:
+                contact_id: { type: string, description: Bare local owner name, owner@node, agent#owner@node, or eco:app#owner@node }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/contacts/{contactId}:
+    delete:
+      operationId: removeContact
+      summary: Remove a contact from the address book
+      description: >-
+        Removes the 'saved' mark WITHOUT resetting the direct-message first-contact gate — a
+        contact with message history keeps its messaging state (origin flips back to 'message');
+        a pure saved contact with no history is deleted. Blocked contacts are managed in Messages (409).
+      tags: [Contacts]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: contactId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  /v1/contacts/resolve:
+    post:
+      operationId: resolveContactEmail
+      summary: Look up a local owner by email (exact match)
+      description: >-
+        EXACT-match email → local owner, via the same privacy-preserving hash the invite flow
+        uses (no enumeration or substring search). Authenticated + rate-limited. Found → the
+        owner's GHII + display name; not found → can_invite signals whether an email invitation
+        could be sent instead.
+      tags: [Contacts]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email]
+              properties:
+                email: { type: string, format: email }
+      responses:
+        '200':
+          description: Resolution result
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          found: { type: boolean }
+                          ghii: { type: string }
+                          owner: { type: string }
+                          display_name: { type: string, nullable: true }
+                          can_invite: { type: boolean }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '429': { $ref: '#/components/responses/BadRequest' }
 
   /v1/federation/message:
     post:

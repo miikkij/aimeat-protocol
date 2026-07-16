@@ -9,6 +9,9 @@
  *     matching their automatic read access (isOrgManager).
  *   v1.2.0 — 2026-07-16 — Discovery access-probe batches every workspace-manifest read into ONE cross-owner
  *     key-IN query (readWsManifests + canReadWsManifest) instead of one canReadWs scan per workspace (N×M).
+ *   v1.3.0 — 2026-07-16 — ?all=1 rosters ALL workspaces for an org creator/admin (was caller-owned only);
+ *     PATCH email invitation (edit pending orgRole/workspaces); grant-apply loops moved to the shared
+ *     applyInvitationWorkspaceGrants core (services/invitations.ts).
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -28,7 +31,7 @@ import { establishOwnerSession } from '../../services/owner-session.js';
 import { getActiveEmailService } from '../../services/email.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
 import { isOrgManager } from '../../services/workspace-access.js';
-import { createEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
+import { createEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
 
@@ -196,32 +199,35 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const role = await memberRole(req, organism, id);
     if (!role) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
 
-    // ?all=1 (no ws) — access rosters for ALL of the caller's OWNED workspaces in one request
-    // (replaces the Members tab's per-owned-workspace getWorkspaceAccess fan-out). Only own workspaces,
-    // so the creator gate is satisfied by construction.
+    // ?all=1 (no ws) — access rosters in one request (replaces the Members tab's per-workspace
+    // getWorkspaceAccess fan-out). An org creator/admin manages EVERY workspace (requireWsManager
+    // grants them any single ws), so they get every workspace's roster; a plain member still gets
+    // only the workspaces they created.
     if (!ws && (req.query.all === '1' || req.query.all === 'true')) {
       const ownerName = req.auth!.owner as string;
-      const creatorGhii = `${ownerName}@${config.nodeId}`;
+      const manager = role === 'creator' || role === 'admin';
       const reg = await storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 });
-      const owned: Array<{ id: string; name: string }> = [];
+      const manageable: Array<{ id: string; name: string; createdBy: string }> = [];
       const seenWs = new Set<string>();
       for (const rec of reg.items) {
         if (rec.key !== wsRegPrefix(id)) continue;
         for (const w of ((rec.value as { workspaces?: Array<{ id?: string; name?: string; createdBy?: string }> } | null)?.workspaces ?? [])) {
           if (!w.id || seenWs.has(w.id)) continue;
           seenWs.add(w.id);
-          if ((w.createdBy ?? bareOwner(rec.ownerGaii)) === ownerName) owned.push({ id: w.id, name: w.name ?? w.id });
+          const createdBy = w.createdBy ?? bareOwner(rec.ownerGaii);
+          if (manager || createdBy === ownerName) manageable.push({ id: w.id, name: w.name ?? w.id, createdBy });
         }
       }
-      const workspaces = await Promise.all(owned.map(async (w) => {
-        const roles = await memberRolesForWs(creatorGhii, id, w.id);
+      const workspaces = await Promise.all(manageable.map(async (w) => {
+        // Grants are OWNED by each workspace's creator — resolve roles via that creator, not the caller.
+        const roles = await memberRolesForWs(`${w.createdBy}@${config.nodeId}`, id, w.id);
         const { items } = await storage.listAllMemory({ prefix: `organism.${id}.w.${w.id}.access.request.`, limit: 1000 });
         const requests = items.map(r => {
           const v = r.value as { requester?: string; message?: string; createdAt?: string };
           const requester = v.requester ?? bareOwner(r.ownerGaii);
           return { requester, message: v.message ?? '', created_at: v.createdAt, status: roles.has(requester) ? 'approved' : 'pending', role: roles.get(requester)?.role ?? null };
         });
-        return { ws: w.id, name: w.name, requests, members: [...roles.values()].map(m => ({ owner: m.owner, role: m.role, source: m.source ?? null, granted_by: m.grantedBy ?? null })) };
+        return { ws: w.id, name: w.name, created_by: w.createdBy, requests, members: [...roles.values()].map(m => ({ owner: m.owner, role: m.role, source: m.source ?? null, granted_by: m.grantedBy ?? null })) };
       }));
       res.json(success(config.nodeId, { workspaces }));
       return;
@@ -384,6 +390,35 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     res.json(success(config.nodeId, { invitations, total: invitations.length }));
   });
 
+  /* PATCH /v1/organisms/:id/invitations/email/:invId — edit a PENDING email invite's role/workspace
+   * grants (rights stay editable until accepted, mirroring the name-invite PATCH). Body: { orgRole?, workspaces? } */
+  router.patch('/v1/organisms/:id/invitations/email/:invId', requireAuth(), requireRole('agent'), async (req, res) => {
+    const id = req.params.id as string;
+    const invId = req.params.invId as string;
+    const organism = await requireOrgAdmin(req, res, id);
+    if (!organism) return;
+    const inv = await storage.getInvitation(invId);
+    if (!inv || inv.organismId !== id) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
+    if (inv.status !== 'pending') { res.status(409).json(error(config.nodeId, 'INVALID_STATE', `Invitation is already ${inv.status}`)); return; }
+    const { orgRole, workspaces } = req.body ?? {};
+    if (orgRole === undefined && workspaces === undefined) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide "orgRole" and/or "workspaces" to update')); return;
+    }
+    const updates: Partial<InvitationRecord> = {};
+    if (orgRole !== undefined) updates.orgRole = normalizeOrgRole(orgRole);
+    if (workspaces !== undefined) {
+      const wsGrants = normalizeWorkspaceGrants(workspaces);
+      for (const g of wsGrants) {
+        const createdBy = await requireWsManager(req, res, id, g.ws);
+        if (!createdBy) return; // requireWsManager already responded (ws missing / not permitted)
+      }
+      updates.workspaces = wsGrants;
+    }
+    const updated = await storage.updateInvitation(invId, updates);
+    res.json(success(config.nodeId, { invitation: invitePublic(updated ?? { ...inv, ...updates }) }));
+    emitChange('organisms');
+  });
+
   /* POST /v1/organisms/:id/invitations/email/:invId/cancel — cancel a pending email invite (creator/admin) */
   router.post('/v1/organisms/:id/invitations/email/:invId/cancel', requireAuth(), requireRole('agent'), async (req, res) => {
     const id = req.params.id as string;
@@ -456,17 +491,9 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       updatedAt: nowIso,
     });
 
-    // Grant the selected workspaces (creator-owned viewer/contributor consents).
+    // Grant the selected workspaces (creator-owned viewer/contributor consents — shared core).
     const wsGrants = normalizeWorkspaceGrants(workspaces);
-    const grantedWs: string[] = [];
-    for (const g of wsGrants) {
-      const entry = await findWsEntry(id, g.ws);
-      if (!entry) continue;
-      const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
-      if (createdBy === uname) continue;
-      await setWorkspaceRole(`${createdBy}@${config.nodeId}`, id, g.ws, uname, g.role, 'invite', inviter);
-      grantedWs.push(g.ws);
-    }
+    const grantedWs = await applyInvitationWorkspaceGrants(storage, config, { orgId: id, grants: wsGrants, grantee: uname, invitedBy: inviter });
 
     // Record the invitation (type 'code'; the token is unused — the provisioned account is the artifact).
     // expiresAt is retained for the record but NOT auto-swept: a code key is reclaimed only by an
@@ -673,16 +700,8 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const nextAdmins = inv.orgRole === 'admin' ? [...new Set([...organism.admins, ownerName])] : organism.admins;
     await storage.updateOrganism(inv.organismId, { members: nextMembers, admins: nextAdmins, updatedAt: nowIso });
 
-    // Apply the workspace grants (resolve each workspace's creator = the consent owner).
-    const grantedWs: string[] = [];
-    for (const g of inv.workspaces) {
-      const entry = await findWsEntry(inv.organismId, g.ws);
-      if (!entry) continue; // workspace deleted since the invite — skip
-      const createdBy = entry.createdBy ?? bareOwner(entry.ownerGaii);
-      if (createdBy === ownerName) continue; // creator already has full access to their workspace
-      await setWorkspaceRole(`${createdBy}@${config.nodeId}`, inv.organismId, g.ws, ownerName, g.role, 'invite', inv.invitedBy);
-      grantedWs.push(g.ws);
-    }
+    // Apply the workspace grants (resolve each workspace's creator = the consent owner — shared core).
+    const grantedWs = await applyInvitationWorkspaceGrants(storage, config, { orgId: inv.organismId, grants: inv.workspaces, grantee: ownerName, invitedBy: inv.invitedBy });
 
     // Consume the invite (single-use) + tell the inviter.
     await storage.updateInvitation(inv.id, { status: 'accepted', acceptedAt: nowIso, acceptedBy: ownerName });
