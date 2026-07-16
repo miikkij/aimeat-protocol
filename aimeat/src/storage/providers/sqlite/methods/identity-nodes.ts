@@ -3,6 +3,7 @@
  * @description File, Peering, Chunked-upload, GHII, Chat-instance, Email-verify, Personal-node, Mailbox, Maintenance methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
+ *   v1.2.0 — 2026-07-16 — Add getGHIIsByGhiis batch (Phase 3): many GHII records by ghii in one query.
  *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive.
  */
 import type {
@@ -268,6 +269,15 @@ export const identityNodesMethods = {
       if (err instanceof Error && err.message?.includes('UNIQUE constraint failed')) throw new Error('GHII_TAKEN', { cause: err });
       throw err;
     }
+  },
+
+  async getGHIIsByGhiis(this: SqliteStorage, ghiis: string[]): Promise<Record<string, GHIIRecord>> {
+    if (ghiis.length === 0) return {};
+    const placeholders = ghiis.map(() => '?').join(',');
+    const rows = this.db.prepare(`SELECT * FROM ghiis WHERE ghii IN (${placeholders})`).all(...ghiis) as Record<string, unknown>[];
+    const out: Record<string, GHIIRecord> = {};
+    for (const row of rows) { const rec = this.deserializeGHII(row); out[rec.ghii] = rec; }
+    return out;
   },
 
   async getGHII(this: SqliteStorage, ghii: string): Promise<GHIIRecord | null> {

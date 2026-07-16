@@ -729,6 +729,14 @@ await test('Memory — tab overview composite (Phase 4 DbService, meta-only)', a
     assert(d.memory.total === mem.data.total, `overview memory total (${d.memory.total}) == /v1/memory?include=meta (${mem.data.total})`);
 });
 
+await test('Matches — list handler runs the batched enrichment (owner with no matches)', async () => {
+    const { body } = await json('/v1/matches', { method: 'GET', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(body.ok === true, `matches: ${JSON.stringify(body.error)}`);
+    assert(Array.isArray(body.data?.matches), 'matches is an array');
+    // The batched enrichment (getGHIIsByGhiis + getAgentsByOwners + listConsentsForAgents) runs cleanly
+    // even with no matched profiles to enrich (empty maps → nothing to redact).
+});
+
 await test('Validate endpoint', async () => {
     const { body } = await json('/v1/validate', {
         method: 'POST',
