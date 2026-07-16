@@ -22,6 +22,10 @@
  *     sharing-groups section accepts the Memory tab's deep link (aimeat.access.focus).
  *   v1.5.0 -- 2026-06-20 -- Add Connected Apps section (H-2 app grants): list + revoke the
  *     scoped, user-approved access tokens published apps hold (GET/DELETE /v1/app-grants).
+ *   v1.6.0 -- 2026-07-16 -- Mount folds the 6-request fan-out into ONE GET /v1/access/overview
+ *     (AccessTabService); parent seeds consent+public-key, the four child sections seed from their
+ *     `initial` slice and skip their own mount fetch (live-update still self-refreshes). Falls back to
+ *     the individual endpoints if the composite is unavailable. (Phase 4 slice 2 — frontend half.)
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -61,13 +65,23 @@ export default function AccessTab({ session, showToast }) {
   // undefined = loading, null = no keypair stored, string = the key
   const [pubKey, setPubKey] = useState(undefined);
 
-  // Load auth consents + own GHII profile (public key) on mount
+  // Mount: ONE composite call (GET /v1/access/overview) seeds the parent (auth consents + public key)
+  // AND the four child sections (app-grants / access-tokens / groups / agent-defaults), which receive
+  // their slice as `initial` and skip their own mount fetch. undefined = loading, null = composite
+  // unavailable → parent + children fall back to the individual endpoints.
+  const [overview, setOverview] = useState(undefined);
   useEffect(() => {
-    apiGet('/v1/consent').then(data => {
-      const all = data.data?.consents || [];
-      setAuthConsents(all.filter(c => c.scope === 'auth' && c.status === 'active'));
-    }).catch(() => {});
-    apiGet('/v1/ghii/me').then(r => setPubKey(r?.data?.public_key ?? null)).catch(() => setPubKey(null));
+    apiGet('/v1/access/overview').then(r => {
+      const d = r?.data;
+      if (!d) throw new Error('no overview');
+      setAuthConsents((d.consent?.consents || []).filter(c => c.scope === 'auth' && c.status === 'active'));
+      setPubKey(d.publicKey ?? null);
+      setOverview(d);
+    }).catch(() => {
+      setOverview(null);   // children self-load; parent falls back to its own two reads
+      apiGet('/v1/consent').then(data => setAuthConsents((data.data?.consents || []).filter(c => c.scope === 'auth' && c.status === 'active'))).catch(() => {});
+      apiGet('/v1/ghii/me').then(r => setPubKey(r?.data?.public_key ?? null)).catch(() => setPubKey(null));
+    });
   }, []);
 
   async function addAuthNode() {
@@ -233,9 +247,11 @@ export default function AccessTab({ session, showToast }) {
     </div>`;
     })()}
 
-    <${ConnectedAppsSection} showToast=${showToast} />
-    <${AccessTokensSection} session=${session} showToast=${showToast} />
-    <${SharingGroupsSection} showToast=${showToast} />
-    <${AgentDefaultsSection} showToast=${showToast} />
+    ${overview !== undefined ? html`
+      <${ConnectedAppsSection} showToast=${showToast} initial=${overview?.appGrants} />
+      <${AccessTokensSection} session=${session} showToast=${showToast} initial=${overview?.accessTokens} />
+      <${SharingGroupsSection} showToast=${showToast} initial=${overview?.groups} />
+      <${AgentDefaultsSection} showToast=${showToast} initial=${overview?.agentDefaults} />
+    ` : null}
   `;
 }

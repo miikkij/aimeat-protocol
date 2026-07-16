@@ -13,8 +13,8 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { getOwnerDefaults, upsertOwnerDefaults } from '/js/services/agent-directives.js';
 
-export function AgentDefaultsSection({ showToast }) {
-  const [defaults, setDefaults] = useState(null);
+export function AgentDefaultsSection({ showToast, initial }) {
+  const [defaults, setDefaults] = useState(initial?.defaults ?? null);   // seeded from /v1/access/overview; else self-loads
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
 
@@ -32,7 +32,7 @@ export function AgentDefaultsSection({ showToast }) {
     }
   }, []);
 
-  useEffect(() => { loadDefaults(); }, [loadDefaults]);
+  useEffect(() => { if (!initial) loadDefaults(); }, [loadDefaults]);   // eslint-disable-line react-hooks/exhaustive-deps -- seed once from `initial`; fetch only when unseeded
 
   // Live update listener
   const liveRef = useRef(loadDefaults);

@@ -17,15 +17,17 @@ import { apiGet, apiDelete } from '/js/api.js';
 
 // Apps the owner has explicitly granted scoped access to (the H-2 app-grant flow). Each
 // holds its OWN revocable token bound to a narrow scope set — never the login session.
-export function ConnectedAppsSection({ showToast }) {
+export function ConnectedAppsSection({ showToast, initial }) {
   const { confirm, ConfirmUI } = useConfirm();
-  const [grants, setGrants] = useState(null);
+  // `initial` (the app-grants slice of GET /v1/access/overview) seeds us so the mount does no fetch of
+  // its own; live-update + post-revoke still reload via the individual endpoint. Absent → self-load.
+  const [grants, setGrants] = useState(initial?.grants ?? null);
 
   const load = useCallback(async () => {
     try { const r = await apiGet('/v1/app-grants'); setGrants(r.data?.grants || []); }
     catch { setGrants([]); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (!initial) load(); }, [load]);   // eslint-disable-line react-hooks/exhaustive-deps -- seed once from `initial`; fetch only when unseeded
 
   const liveRef = useRef(load);
   liveRef.current = load;

@@ -44,11 +44,11 @@ Use it by adding this HTTP header to your requests (and, for browser testing, se
 The server recognizes the token and treats every request as if I'm logged in — no extra login step. Open the app, click through it, read/write via it, and confirm it behaves correctly. Tell me what you find.`;
 }
 
-export function AccessTokensSection({ session, showToast }) {
+export function AccessTokensSection({ session, showToast, initial }) {
   const { confirm, ConfirmUI } = useConfirm();
   const isOperator = (session.roles || []).includes('operator');
 
-  const [tokens, setTokens] = useState(null);
+  const [tokens, setTokens] = useState(initial?.tokens ?? null);   // seeded from /v1/access/overview; else self-loads
   const [showCreate, setShowCreate] = useState(false);
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState(null); // { token, prompt }
@@ -67,7 +67,7 @@ export function AccessTokensSection({ session, showToast }) {
     try { const r = await apiGet('/v1/access/tokens'); setTokens(r.data?.tokens || []); }
     catch { setTokens([]); }
   }, []);
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (!initial) load(); }, [load]);   // eslint-disable-line react-hooks/exhaustive-deps -- seed once from `initial`; fetch only when unseeded
 
   const liveRef = useRef(load);
   liveRef.current = load;
