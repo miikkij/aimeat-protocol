@@ -11,6 +11,7 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-07-16 — batch owner-agents + consents in the matchable-profile pre-pass
  */
 
 import { randomBytes } from 'node:crypto';
@@ -182,32 +183,42 @@ export function createMatchingEngine(
       // Filter to profiles with matching consent
       const matchableProfiles: Array<{ entry: DirectoryEntry; agentGaii: string }> = [];
 
+      // Pre-resolve each entry's owner, then batch the owner-agents + consents fan-out into
+      // two IN queries (was O(entries×agents) listConsents calls).
+      const ownerByGhii = new Map<string, string>();
       for (const entry of allEntries) {
         try {
-          const ghiiRecord = await storage.getGHII(entry.ghii);
-          if (!ghiiRecord) continue;
+          const rec = await storage.getGHII(entry.ghii);
+          if (rec) ownerByGhii.set(entry.ghii, rec.ownerName);
+        } catch { /* skip profiles we can't resolve */ }
+      }
+      const agentsByOwner = await storage.getAgentsByOwners([...new Set(ownerByGhii.values())]);
+      const consentsByAgent = await storage.listConsentsForAgents(
+        Object.values(agentsByOwner).flat().map(a => a.gaii), { status: 'active' },
+      );
 
-          const agents = await storage.getAgentsByOwner(ghiiRecord.ownerName);
-          let hasMatchingConsent = false;
-          let consentAgentGaii = '';
+      for (const entry of allEntries) {
+        const ownerName = ownerByGhii.get(entry.ghii);
+        if (!ownerName) continue;
 
-          for (const agent of agents) {
-            const consents = await storage.listConsents(agent.gaii, { status: 'active' });
-            const matchConsent = consents.find(
-              c => c.purpose === 'matching' && c.status === 'active',
-            );
-            if (matchConsent) {
-              hasMatchingConsent = true;
-              consentAgentGaii = agent.gaii;
-              break;
-            }
+        const agents = agentsByOwner[ownerName] ?? [];
+        let hasMatchingConsent = false;
+        let consentAgentGaii = '';
+
+        for (const agent of agents) {
+          const consents = consentsByAgent[agent.gaii] ?? [];
+          const matchConsent = consents.find(
+            c => c.purpose === 'matching' && c.status === 'active',
+          );
+          if (matchConsent) {
+            hasMatchingConsent = true;
+            consentAgentGaii = agent.gaii;
+            break;
           }
+        }
 
-          if (hasMatchingConsent) {
-            matchableProfiles.push({ entry, agentGaii: consentAgentGaii });
-          }
-        } catch {
-          // Skip profiles we can't check consent for
+        if (hasMatchingConsent) {
+          matchableProfiles.push({ entry, agentGaii: consentAgentGaii });
         }
       }
 

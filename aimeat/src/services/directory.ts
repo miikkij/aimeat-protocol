@@ -10,6 +10,7 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-07-16 — rebuildIndex batches owner-agents + consents (was O(owners×agents))
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
@@ -153,17 +154,22 @@ export class DirectoryService {
 
     const ghiis = await this.storage.listGHIIs();
 
+    // Batch the per-GHII agent + consent fan-out into two IN queries (was O(owners×agents)).
+    const agentsByOwner = await this.storage.getAgentsByOwners([...new Set(ghiis.map(g => g.ownerName))]);
+    const allAgentGaiis = Object.values(agentsByOwner).flat().map(a => a.gaii);
+    const consentsByAgent = await this.storage.listConsentsForAgents(allAgentGaiis, { status: 'active' });
+
     for (const ghii of ghiis) {
       try {
         // Check that this GHII has an owner with an agent that has federation consent
-        const agents = await this.storage.getAgentsByOwner(ghii.ownerName);
+        const agents = agentsByOwner[ghii.ownerName] ?? [];
         if (agents.length === 0) continue;
 
         // Check for federation consent on any of the owner's agents
         let hasFederationConsent = false;
         let consentAgentGaii = '';
         for (const agent of agents) {
-          const consents = await this.storage.listConsents(agent.gaii, { status: 'active' });
+          const consents = consentsByAgent[agent.gaii] ?? [];
           const federationConsent = consents.find(
             c => c.scope === 'federation' && c.status === 'active',
           );

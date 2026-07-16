@@ -3,6 +3,7 @@
  * @description Consent, Schema, CSM, MSM, Flag, Match, Organism methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — listConsentsForAgents batch primitive.
  */
 import type {
   ArchiveFilter, SchemaRecord, ConsentRecord, ConsentAuditEntry, CsmRecord, MsmRecord,
@@ -46,6 +47,26 @@ export const governanceMethods = {
     if (opts?.recipient) { sql += ' AND recipient = ?'; params.push(opts.recipient); }
     const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
     return rows.map(r => this.deserializeConsent(r));
+  },
+
+  async listConsentsForAgents(this: SqliteStorage, ownerGaiis: string[], opts?: {
+    status?: 'active' | 'revoked' | 'expired';
+    recipient?: string;
+  }): Promise<Record<string, ConsentRecord[]>> {
+    const out: Record<string, ConsentRecord[]> = {};
+    for (const g of ownerGaiis) out[g] = [];
+    if (ownerGaiis.length === 0) return out;
+    const placeholders = ownerGaiis.map(() => '?').join(',');
+    let sql = `SELECT * FROM consents WHERE ownerGaii IN (${placeholders})`;
+    const params: unknown[] = [...ownerGaiis];
+    if (opts?.status) { sql += ' AND status = ?'; params.push(opts.status); }
+    if (opts?.recipient) { sql += ' AND recipient = ?'; params.push(opts.recipient); }
+    const rows = this.db.prepare(sql).all(...params) as Record<string, unknown>[];
+    for (const r of rows) {
+      const c = this.deserializeConsent(r);
+      (out[c.ownerGaii] ??= []).push(c);
+    }
+    return out;
   },
 
   async updateConsent(this: SqliteStorage, id: string, updates: Partial<ConsentRecord>): Promise<ConsentRecord | null> {

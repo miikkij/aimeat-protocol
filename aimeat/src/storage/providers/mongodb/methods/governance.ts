@@ -3,6 +3,7 @@
  * @description Consent, CSM/MSM, email verification, flags, matches, organisms, approvals, and appeals methods. Extracted from mongodb/index.ts (PrismaStorage) to satisfy max-file-lines; method bodies verbatim, bound to PrismaStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/mongodb/index.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — listConsentsForAgents batch primitive.
  */
 import type {
   ConsentRecord, ConsentAuditEntry, CsmRecord, MsmRecord, EmailVerificationRecord
@@ -36,6 +37,22 @@ export const governanceMethods = {
         if (opts?.recipient) where.recipient = opts.recipient;
         const rows = await this.prisma.consent.findMany({ where });
         return rows.map((r: PrismaRow) => this.toConsentRecord(r));
+    },
+
+    async listConsentsForAgents(this: PrismaStorage, ownerGaiis: string[], opts?: { status?: 'active' | 'revoked' | 'expired'; recipient?: string }): Promise<Record<string, ConsentRecord[]>> {
+        this.ensureReady();
+        const out: Record<string, ConsentRecord[]> = {};
+        for (const g of ownerGaiis) out[g] = [];
+        if (ownerGaiis.length === 0) return out;
+        const where: Record<string, unknown> = { ownerGaii: { in: ownerGaiis } };
+        if (opts?.status) where.status = opts.status;
+        if (opts?.recipient) where.recipient = opts.recipient;
+        const rows = await this.prisma.consent.findMany({ where });
+        for (const r of rows) {
+            const c = this.toConsentRecord(r);
+            (out[c.ownerGaii] ??= []).push(c);
+        }
+        return out;
     },
 
     async updateConsent(this: PrismaStorage, id: string, updates: Partial<ConsentRecord>): Promise<ConsentRecord | null> {
