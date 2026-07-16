@@ -34,6 +34,7 @@ export { MemoryTabService, createMemoryTabService, type MemoryTabOverview } from
 export { PackagesTabService, createPackagesTabService, type PackagesOverview } from './packages-tab-db-service.js';
 export { NotebookService, createNotebookService, type NotebookOverview } from './notebook-db-service.js';
 export { CalibratorDetailService, createCalibratorDetailService, type CalibratorDetail } from './calibrator-detail-db-service.js';
+export { AgentActivityOverviewService, createAgentActivityOverviewService, type AgentActivityOverview } from './agent-activity-overview-db-service.js';
 export { loadOwnerAgents, loadOwnerEcoApps, resolveOwnerIdentities } from './owner-identity.js';
 
 /** Assemble the memory Application-DB-Service over the given storage (Phase 0: LegacyMemoryAdapter). Its

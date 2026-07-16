@@ -320,6 +320,65 @@ await test('5. GET /activity/log returns paginated events from tasks', async () 
     assert(pagination.total >= 2, `total should be >= 2, got ${pagination.total}`);
 });
 
+// ─── Phase 5b: GET /activity/overview composite (mount fold) ───
+console.log('\nPhase 5b -- GET /activity/overview composite');
+
+await test('5b. GET /activity/overview folds activity + log + directives + webhook + telemetry', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/activity/overview`, {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.ok === true, 'response ok');
+    const d = body.data;
+
+    // activity_stats matches GET /activity
+    const single = await json(`/v1/agents/${agentName}/activity`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(d.activity && typeof d.activity === 'object', 'has activity sub-object');
+    assert(d.activity.activity_stats?.tasksCompleted === single.body.data.activity_stats?.tasksCompleted,
+        'activity_stats matches GET /activity');
+
+    // log events mirror GET /activity/log — same shape, >= 2 lifecycle events, per_page 50
+    assert(Array.isArray(d.log.events) && d.log.events.length >= 2, `log events >= 2, got ${d.log.events?.length}`);
+    assert(d.log.pagination.per_page === 50, `per_page should be 50, got ${d.log.pagination.per_page}`);
+    for (const evt of d.log.events) {
+        assert(typeof evt.id === 'string' && typeof evt.taskTitle === 'string' && typeof evt.timestamp === 'string', 'event shape');
+    }
+
+    // directives sub-object present (budget_limits absent — this agent has no directives set)
+    assert(d.directives && typeof d.directives === 'object', 'has directives sub-object');
+
+    // webhook mirrors GET /webhook .data — not configured for this agent
+    assert(d.webhook && d.webhook.configured === false, `webhook should be not-configured, got ${JSON.stringify(d.webhook)}`);
+
+    // telemetry mirrors GET /telemetry .data shape
+    assert(Array.isArray(d.telemetry.events) && d.telemetry.per_page === 50, 'telemetry has events array + per_page');
+});
+
+await test('5c. owner-or-self gate: a sibling agent gets 403, self gets 200', async () => {
+    // Register a second agent under the SAME owner
+    const { status: rStatus, body: rBody } = await json('/v1/agents', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ name: 'actbot2', owner: ownerName, capabilities: ['memory'] }),
+    });
+    assert(rStatus === 201, `register agent2 status ${rStatus}: ${JSON.stringify(rBody)}`);
+    const agent2Gaii = rBody.data.agent.gaii;
+    const agent2Token = await getToken(agent2Gaii, rBody.data.private_key, true);
+
+    // agent2 → agent1's overview: resolveAgentGaii builds actbot#owner (agent1); canAccess sees a non-self
+    // agent session → 403 (the exact gate the folded /activity, /webhook, /telemetry endpoints enforce).
+    const { status: crossStatus } = await json(`/v1/agents/${agentName}/activity/overview`, {
+        headers: { Authorization: `Bearer ${agent2Token}` },
+    });
+    assert(crossStatus === 403, `sibling agent should get 403, got ${crossStatus}`);
+
+    // agent2 → its OWN overview: self-access allowed.
+    const { status: selfStatus } = await json('/v1/agents/actbot2/activity/overview', {
+        headers: { Authorization: `Bearer ${agent2Token}` },
+    });
+    assert(selfStatus === 200, `self overview should be 200, got ${selfStatus}`);
+});
+
 // ─── Phase 6: GET /v1/agents?include=stats bulk overview ───
 console.log('\nPhase 6 -- GET /v1/agents?include=stats');
 
