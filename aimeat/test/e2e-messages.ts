@@ -328,5 +328,31 @@ await test('19. Continuing a subject thread by conversation_id stays in that thr
     assert(thread.body.data.messages.length >= 2, `subject thread should have >=2 messages, got ${thread.body.data.messages.length}`);
 });
 
+console.log('\nPhase 5 -- Inbox overview composite (Phase 4 DbService)');
+await test('20. GET /v1/messages/overview folds the inbox mount into one call, equal to its parts', async () => {
+    const ov = await json('/v1/messages/overview', { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(ov.status === 200, `overview status ${ov.status}: ${JSON.stringify(ov.body)}`);
+    const d = ov.body.data;
+    // All six sections present as arrays.
+    for (const k of ['requests', 'conversations', 'important', 'tracked', 'agents', 'groups']) {
+        assert(Array.isArray(d[k]), `overview.${k} is an array (got ${typeof d[k]})`);
+    }
+    // conversations section equals the standalone endpoint (same composition, one read scope).
+    const convs = await json('/v1/messages/conversations', { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(d.conversations.length === convs.body.data.conversations.length,
+        `overview conversations (${d.conversations.length}) == /conversations (${convs.body.data.conversations.length})`);
+    const ovIds = new Set(d.conversations.map((c: any) => c.conversationId));
+    assert(convs.body.data.conversations.every((c: any) => ovIds.has(c.conversationId)), 'same conversation set');
+    // requests section equals the standalone endpoint.
+    const reqs = await json('/v1/messages/requests', { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(d.requests.length === reqs.body.data.requests.length,
+        `overview requests (${d.requests.length}) == /requests (${reqs.body.data.requests.length})`);
+});
+
+await test('21. /v1/messages/overview requires an owner session (agent/anon rejected)', async () => {
+    const anon = await json('/v1/messages/overview');
+    assert(anon.status === 401 || anon.status === 403, `anon overview should be 401/403, got ${anon.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total\n`);
 if (failed > 0) process.exit(1);

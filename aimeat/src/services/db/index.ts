@@ -27,6 +27,7 @@ export { LegacyMemoryAdapter } from '../../storage/adapter/legacy-memory-adapter
 export { AgentDbService, createAgentDbService } from './agent-db-service.js';
 export { HomeDashboardService, createHomeDashboardService } from './home-dashboard-service.js';
 export { MessagingDbService, createMessagingDbService, type OwnerConversation } from './messaging-db-service.js';
+export { MessagesInboxService, createMessagesInboxService, type InboxOverview } from './messages-inbox-db-service.js';
 export { loadOwnerAgents, loadOwnerEcoApps, resolveOwnerIdentities } from './owner-identity.js';
 
 /** Assemble the memory Application-DB-Service over the given storage (Phase 0: LegacyMemoryAdapter). Its
