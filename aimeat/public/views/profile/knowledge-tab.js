@@ -13,6 +13,8 @@
  *   import KnowledgeTab from './knowledge-tab.js';
  *   html`<${KnowledgeTab} session=${session} showToast=${showToast} onStats=${onStats} />`
  * @version-history
+ *   v1.2.0 — 2026-07-16 — Owner-scoped mount folds packages + consents into GET /v1/knowledge/tab
+ *     (getKnowledgeTab); discovery + organism packages stay separate; individual reads kept as fallback.
  *   v1.1.0 — 2026-06-22 — Drop the per-package /v1/memory/{key} hydration fallback — the memory list
  *     already returns each package's full value inline.
  *   v1.0.0 — 2026-03-17 — Refactor: remove all inline style="" attributes, use CSS
@@ -34,6 +36,7 @@ import { listConsents, grantConsent, revokeConsent } from '/js/services/consent.
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as knowledgeService from '/js/services/knowledge.js';
+import { extractFedConsents } from './knowledge-tab.helpers.js';
 
 export default function KnowledgeTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -77,28 +80,27 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     finally { setLoading(false); }
   }, [onStats]);
 
-  useEffect(() => { loadPackages(); }, [loadPackages]);
+  // Mount fold: ONE composite for the owner-scoped data (packages + consents→fedConsents); on failure fall
+  // back to the individual loaders. Discover + organism packages stay separate.
+  useEffect(() => {
+    (async () => {
+      const ov = await knowledgeService.getKnowledgeTab();
+      if (!ov) { loadPackages(); loadFedConsents(); return; }
+      setPackages(ov.packages);
+      onStats?.({ knowledge: ov.packages.length });
+      setFedConsents(extractFedConsents(ov.consents));
+      setLoading(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   /* ── Load federation consents for knowledge packages ── */
   const loadFedConsents = useCallback(async () => {
     try {
-      const allConsents = await listConsents();
-      const map = {};
-      for (const c of allConsents) {
-        if (c.scope === 'federation' && (c.data_pattern || c.pattern || '').startsWith('packages/')) {
-          const pat = c.data_pattern || c.pattern || '';
-          // Extract package name from pattern like "packages/{name}/*"
-          const match = pat.match(/^packages\/([^/]+)\//);
-          if (match) {
-            map[match[1]] = c.id || c.consent_id;
-          }
-        }
-      }
-      setFedConsents(map);
+      setFedConsents(extractFedConsents(await listConsents()));
     } catch { /* ignore */ }
   }, []);
 
-  useEffect(() => { loadFedConsents(); }, [loadFedConsents]);
 
   /* ── Toggle federation consent for a package ── */
   const toggleFederation = useCallback(async (pkg) => {

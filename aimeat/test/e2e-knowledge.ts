@@ -148,6 +148,33 @@ await test('Import a valid knowledge package', async () => {
   firstPackageId = body.data.package_id;
 });
 
+await test('GET /v1/knowledge/tab folds owner packages + consents', async () => {
+  // Import a package as the OWNER so it lands under the owner GHII the composite reads.
+  const imp = await json('/v1/knowledge/import', {
+    method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({
+      package: {
+        type: 'knowledge-package', name: 'Owner Composite Pkg', version: '1.0.0', author: ownerName,
+        content_type: 'research', tags: ['owner-composite'], language: 'en', maturity: 'published',
+        synthesis: { level: 'assisted', description: 'x' }, references: [],
+        entries: [{ key: 'e1', title: 'E1', visibility: 'public' }], links: [],
+        sharing: { catalog_listed: false, allow_clone: false, morsel_price: 0 },
+      },
+      entry_data: { e1: { title: 'E1', body: 'x' } },
+    }),
+  });
+  assert(imp.status === 201, `owner import ${imp.status}: ${JSON.stringify(imp.body)}`);
+  const ownerPkgId = imp.body.data.package_id;
+
+  const { status, body } = await json('/v1/knowledge/tab', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(status === 200, `tab status ${status}: ${JSON.stringify(body)}`);
+  const d = body.data;
+  assert(Array.isArray(d.packages), 'packages is an array');
+  assert(d.packages.some((p: any) => (p.value?.id === ownerPkgId) || (p.key || '').includes(ownerPkgId)),
+    `owner package present in composite: ${JSON.stringify(d.packages.map((p: any) => p.key))}`);
+  assert(Array.isArray(d.consents), 'consents is an array');
+});
+
 await test('Reject invalid package (missing required fields)', async () => {
   const { status } = await json('/v1/knowledge/import', {
     method: 'POST',
