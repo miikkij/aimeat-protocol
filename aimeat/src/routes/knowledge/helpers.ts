@@ -5,6 +5,7 @@
  *   split route-group modules can share them. Extracted to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — findOwnerScopeMemory batches the agent scan into one listMemoryForOwners
  */
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
@@ -34,8 +35,12 @@ export function makeKnowledgeHelpers(config: AimeatConfig, storage: Storage): Kn
 
     const ownerName = req.auth!.owner as string;
     const agents = await storage.getAgentsByOwner(ownerName);
+    // One IN query for `key` across every owner agent (was getMemory per agent); same isLive
+    // semantics as getMemory. Return the first agent (original order) that has it.
+    const rows = await storage.listMemoryForOwners(agents.map(a => a.gaii), { prefix: key });
+    const byGaii = new Map(rows.filter(r => r.key === key).map(r => [r.ownerGaii, r]));
     for (const agent of agents) {
-      const agentRecord = await storage.getMemory(agent.gaii, key);
+      const agentRecord = byGaii.get(agent.gaii);
       if (agentRecord) return { record: agentRecord, ownerGaii: agent.gaii };
     }
     return null;

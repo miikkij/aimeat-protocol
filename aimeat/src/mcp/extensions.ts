@@ -15,6 +15,7 @@
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.3.1 -- 2026-06-19 -- Security (CR-1): ctx.wallet.consume rejects non-positive/non-finite amounts before debiting.
+ *   v1.4.0 — 2026-07-16 — ctx.memory.getPublic owner-agent fallback batches into one listMemoryForOwners
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -220,9 +221,13 @@ export function registerExtensionsTools(
                         let record = await storage.getMemory(namespace, key);
                         if (!record && !namespace.includes('@') && !namespace.includes('#') && !namespace.startsWith('ext:')) {
                             const agents = await storage.getAgentsByOwner(namespace);
+                            // One IN query for `key` across the owner's agents (was getMemory per
+                            // agent). First agent (original order) with the key; visibility checked after.
+                            const rows = await storage.listMemoryForOwners(agents.map(a => a.gaii), { prefix: key });
+                            const byGaii = new Map(rows.filter(r => r.key === key).map(r => [r.ownerGaii, r]));
                             for (const agent of agents) {
-                                record = await storage.getMemory(agent.gaii, key);
-                                if (record) break;
+                                const r = byGaii.get(agent.gaii);
+                                if (r) { record = r; break; }
                             }
                         }
                         return (record && record.visibility === 'public') ? record.value : null;
