@@ -460,9 +460,8 @@ The agent **runtime** (fleet daemon + 40+ crew templates) lives in the sibling r
 ### Testing
 
 ```bash
-pnpm test:e2e:sqlite        # fast iteration default
-pnpm test:e2e:mongodb       # most realistic; run before a PR
-pnpm test:e2e:postgresql    # PostgreSQL backend (needs a running Postgres)
+pnpm test:e2e:sqlite            # fast iteration default
+pnpm test:e2e:postgres-kysely   # primary / prod backend; run before a PR (needs a running Postgres)
 pnpm test:playwright:sqlite # browser tests, scoped
 pnpm test                   # unit tests
 pnpm typecheck && pnpm lint
@@ -471,7 +470,7 @@ pnpm typecheck && pnpm lint
 cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=<suite>
 ```
 
-> The legacy `pnpm test:e2e` (in-memory backend) is deprecated and produces stale failures. Use the SQLite or MongoDB commands instead.
+> The legacy `pnpm test:e2e` (in-memory backend) is deprecated and produces stale failures. Use the SQLite or PostgreSQL+Kysely commands instead.
 
 ### Synthetic agent traces (dev tool)
 
@@ -511,7 +510,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Before opening a PR:
 pnpm typecheck
 pnpm lint
 pnpm test:e2e:sqlite
-pnpm test:e2e:mongodb
+pnpm test:e2e:postgres-kysely
 ```
 
 ## License

@@ -6,7 +6,7 @@ Central reference for all development standards, conventions, and practices in t
 
 These are enforced via CLAUDE.md and ESLint. See CLAUDE.md for the authoritative list.
 
-1. **E2E tests must pass** after major changes (`pnpm test:e2e:mongodb` + `pnpm test:e2e:sqlite`)
+1. **E2E tests must pass** after major changes (`pnpm test:e2e:postgres-kysely` + `pnpm test:e2e:sqlite`)
 2. **Playwright tests must pass** after frontend changes (`npx playwright test`)
 3. **Source file headers required** on all `.ts`, `.js`, `.css` files
 4. **OpenAPI spec must stay in sync** with implementation
@@ -34,7 +34,7 @@ These are enforced via CLAUDE.md and ESLint. See CLAUDE.md for the authoritative
 |------|---------------|---------|
 | ESLint + custom rules | File headers, file size, TS conventions | `pnpm lint` |
 | TypeScript compiler | Type safety | `npx tsc --noEmit` |
-| E2E test runner | API correctness on all backends | `pnpm test:e2e:mongodb` |
+| E2E test runner | API correctness on all backends | `pnpm test:e2e:postgres-kysely` |
 | Playwright | Frontend rendering, navigation, CSP | `npx playwright test` |
 | Pre-commit script | Headers, file size, i18n sync, lint, typecheck | `bash scripts/pre-commit-checks.sh` |
 

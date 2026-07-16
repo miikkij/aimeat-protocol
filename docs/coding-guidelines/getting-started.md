@@ -97,7 +97,7 @@ pnpm lint
 
 # E2E on multiple backends
 pnpm test:e2e:sqlite
-pnpm test:e2e:mongodb
+pnpm test:e2e:postgres-kysely
 
 # Build to verify production compilation
 pnpm build
