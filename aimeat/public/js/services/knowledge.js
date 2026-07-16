@@ -31,6 +31,20 @@ export async function listMyPackages() {
   return Array.isArray(items) ? items : [];
 }
 
+/**
+ * Composite mount for the Knowledge tab's owner-scoped data: the owner's packages + consents in ONE call.
+ * Returns { packages, consents } or null on error so the caller can fall back to the individual reads.
+ * Public discovery and per-organism shared packages stay separate calls.
+ */
+export async function getKnowledgeTab() {
+  try {
+    const data = await apiGet('/v1/knowledge/tab');
+    const d = data?.data;
+    if (!d) return null;
+    return { packages: d.packages || [], consents: d.consents || [] };
+  } catch { return null; }
+}
+
 export async function getPackage(packageId) {
   return apiGet(`/v1/knowledge/${encodeURIComponent(packageId)}`);
 }

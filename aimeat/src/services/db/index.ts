@@ -44,6 +44,7 @@ export { DataWalletService, createDataWalletService, type DataWalletOverview } f
 export { LivingDocsService, createLivingDocsService, type LivingDocsOverview } from './living-docs-db-service.js';
 export { AgentMessagesOverviewService, createAgentMessagesOverviewService, type AgentMessagesOverview } from './agent-messages-overview-db-service.js';
 export { SecurityTabService, createSecurityTabService, type SecurityOverview } from './security-tab-db-service.js';
+export { KnowledgeTabService, createKnowledgeTabService, type KnowledgeOverview } from './knowledge-tab-db-service.js';
 export { loadOwnerAgents, loadOwnerEcoApps, resolveOwnerIdentities } from './owner-identity.js';
 
 /** Assemble the memory Application-DB-Service over the given storage (Phase 0: LegacyMemoryAdapter). Its

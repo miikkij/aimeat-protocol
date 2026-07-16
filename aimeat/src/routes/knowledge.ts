@@ -17,6 +17,8 @@
  *   import { knowledgeRouter } from '../routes/knowledge.js';
  *   app.use(knowledgeRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-07-16 — Add GET /v1/knowledge/tab composite (owner packages + consents) folding the
+ *     Knowledge tab's owner-scoped mount; discovery + per-organism packages stay separate (KnowledgeTabService).
  *   v1.0.0 — 2026-03-07 — initial knowledge package system
  *   v1.1.0 — 2026-03-18 — rename routes from /v1/packages/* to /v1/knowledge/*
  *   v1.2.0 — 2026-06-16 — Record a public-activity-feed event when a package becomes
@@ -28,6 +30,10 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
+import { success } from '../middleware/envelope.js';
+import { resolveIdentity } from '../utils/gaii.js';
+import { createKnowledgeTabService } from '../services/db/knowledge-tab-db-service.js';
 import { makeKnowledgeHelpers } from './knowledge/helpers.js';
 import { registerPackagesCoreRoutes } from './knowledge/packages-core.js';
 import { registerTemplateRoutes } from './knowledge/templates.js';
@@ -38,6 +44,16 @@ import { registerAdminRoutes } from './knowledge/admin.js';
 export function knowledgeRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const helpers = makeKnowledgeHelpers(config, storage);
+
+  // GET /v1/knowledge/tab — the Knowledge tab's OWNER-scoped mount in one call: the owner's knowledge
+  // packages + consents (the tab derives federated packages from the consents). Public discovery and the
+  // per-organism shared-package scan stay separate (cross-user / heavy node-wide scan). MUST be registered
+  // before the /v1/knowledge/:id captures below (a literal 'tab' would otherwise match :id).
+  const knowledgeTabDb = createKnowledgeTabService(storage);
+  router.get('/v1/knowledge/tab', requireAuth(), requireRole('owner'), async (req, res) => {
+    const data = await knowledgeTabDb.overview(resolveIdentity(req.auth!, config.nodeId));
+    res.json(success(config.nodeId, data));
+  });
 
   // Register handler groups IN ORIGINAL DECLARATION ORDER (Express matches top-to-bottom).
   registerPackagesCoreRoutes(router, config, storage, helpers);
