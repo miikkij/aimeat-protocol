@@ -12,6 +12,9 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   v1.4.0 — 2026-07-16 — Auth Pattern path 3: AIMEAT.auth.on('login'/'logout') — async logins
+ *     (app-subdomain silent SSO, consent-popup return) fire neither onLogin nor a pending
+ *     login(); AEB-3 finding aeb3-flow-001 (a 5/5 app stayed hidden after grant on app origin).
  *   v1.3.0 — 2026-07-16 — Library sections generated from the library-pack registry
  *     (src/data/library-packs.ts): SDK groups + Ready-made UI + the NEW "Optional capability
  *     packs" index (vendored libs with fetch-on-demand docs at GET /v1/library-packs/:id).
@@ -87,6 +90,12 @@ export function buildAppPrompt(
   body += '// Path 2 — already signed in when the page loads. Restore the stored session\n';
   body += '// explicitly; login() returns the session (or null if not signed in).\n';
   body += 'AIMEAT.auth.login().then(function (session) { if (session) showApp(session); });\n';
+  body += '\n';
+  body += '// Path 3 — ASYNC logins (app-subdomain silent SSO, consent-popup return): these\n';
+  body += '// fire neither onLogin nor the login() promise above. The login EVENT covers every\n';
+  body += "// path — always add it, or a published app stays hidden after the user grants access.\n";
+  body += "AIMEAT.auth.on('login', showApp);\n";
+  body += "AIMEAT.auth.on('logout', hideApp);\n";
   body += '</' + 'script>\n';
   body += '```\n\n';
 

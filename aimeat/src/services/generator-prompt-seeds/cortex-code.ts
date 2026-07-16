@@ -5,6 +5,11 @@
  *   Variables use {{name}} syntax, resolved by resolvers.ts at runtime.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from generator-prompt-seeds.ts (pure extraction, no logic change)
+ *   v1.1.0 — 2026-07-17 — "Existing capability packs" section in every generator seed: check
+ *     GET /v1/library-packs before writing new library code (no duplication of charts/flow/etc.),
+ *     and write the type:prompt component as a real pack-grade ai_doc — generated cortexes are
+ *     themselves listed as community packs once active+public. NOTE: the prompt seeder does not
+ *     overwrite existing DB content — live nodes pick this up only for fresh installs / re-seeds.
  */
 
 import type { PromptSeedEntry } from '../prompt-defaults.js';
@@ -43,6 +48,18 @@ Other cortex components will use this library to get and modify data.
 {{methods_to_export}}
 
 {{extension_section}}
+
+## Existing capability packs (do NOT rebuild these)
+
+The node already serves ready, AI-documented library packs — charts, editable flow/mindmap
+diagrams, drawing canvas, 2D/3D engines, styling, realtime and more. BEFORE writing new
+library code, check the live index on the target node: GET /v1/library-packs (per-pack usage
+doc: GET /v1/library-packs/<id>, the ai_doc field — same node base URL as the script tags in
+this prompt). If a pack covers the need, LOAD it
+(its include lines) and wrap/extend it instead of reimplementing. Your generated cortex will
+itself be listed there for build-time AIs once installed as active+public — which is why the
+type:prompt component below must be a real usage doc (include lines + API idioms + gotchas),
+not marketing text.
 
 ## AIMEAT Platform Libraries Available
 
@@ -180,6 +197,15 @@ Create a Feature Cortex component for: {{label}}
 ## View
 {{view_section}}
 
+## Existing capability packs (do NOT rebuild these)
+
+The node already serves ready, AI-documented library packs — charts, editable flow/mindmap
+diagrams, drawing canvas, 2D/3D engines, styling, realtime and more. BEFORE writing new
+library code, check the live index on the target node: GET /v1/library-packs (per-pack usage
+doc: GET /v1/library-packs/<id>, the ai_doc field — same node base URL as the script tags in
+this prompt). If a pack covers the need, LOAD it
+(its include lines) and wrap/extend it instead of reimplementing.
+
 ## Goal
 
 Build a self-contained feature module (data + UI) as a cortex IIFE.
@@ -299,6 +325,15 @@ Create an App-Domain Cortex for: {{label}}
 Project: {{project_description}}
 
 {{spec_section}}
+
+## Existing capability packs (do NOT rebuild these)
+
+The node already serves ready, AI-documented library packs — charts, editable flow/mindmap
+diagrams, drawing canvas, 2D/3D engines, styling, realtime and more. BEFORE writing new
+library code, check the live index on the target node: GET /v1/library-packs (per-pack usage
+doc: GET /v1/library-packs/<id>, the ai_doc field — same node base URL as the script tags in
+this prompt). If a pack covers the need, LOAD it
+(its include lines) and wrap/extend it instead of reimplementing.
 
 ## Goal
 
@@ -424,6 +459,15 @@ Use ONLY the EXACT translation keys from the Translation Keys section. Do NOT in
 Create an AIMEAT App (HTML page) for: {{label}}
 
 {{project_context}}
+
+## Existing capability packs (do NOT rebuild these)
+
+The node already serves ready, AI-documented library packs — charts, editable flow/mindmap
+diagrams, drawing canvas, 2D/3D engines, styling, realtime and more. BEFORE writing new
+library code, check the live index on the target node: GET /v1/library-packs (per-pack usage
+doc: GET /v1/library-packs/<id>, the ai_doc field — same node base URL as the script tags in
+this prompt). If a pack covers the need, LOAD it
+(its include lines) and wrap/extend it instead of reimplementing.
 
 ## Architecture
 

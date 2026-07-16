@@ -175,6 +175,102 @@ await test('cortex pack versions match the bundled cortex YAML spec.version', as
   assert(mismatches.length === 0, mismatches.join(', '));
 });
 
+// ── Community packs: an ACTIVE + PUBLIC user cortex with a lib component appears in the
+// index (scope 'community') and serves its type:prompt content as the ai_doc. ──
+await test('community pack: active+public user cortex appears with ai_doc', async () => {
+  // Register + login a throwaway owner
+  const uname = 'packcomm' + Date.now().toString().slice(-6);
+  await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: uname, password: 'PackComm1!', display_name: 'Pack Comm' }) });
+  const { body: login } = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: uname, password: 'PackComm1!' }) });
+  const tok = login.data?.token || login.data?.jwt;
+  assert(!!tok, 'owner login failed');
+  const auth = { Authorization: `Bearer ${tok}` };
+
+  const extName = uname + '-greeter';
+  const manifest = [
+    'apiVersion: cortex.aimeat.org/v1',
+    'kind: Extension',
+    'metadata:',
+    `  name: ${extName}`,
+    `  namespace: ${uname}`,
+    '  description: "Tiny community greeter lib for the pack test"',
+    '  author: e2e',
+    '  visibility: public',
+    '  tags: [ui]',
+    'spec:',
+    '  version: "1.0.0"',
+    '  license: MIT',
+    '  components:',
+    '    - type: prompt',
+    '      name: greeter-doc',
+    '      content: |',
+    '        Include: <script src="{{node_url}}/v1/cortex/' + extName + '/libs/' + extName + '.js"></' + 'script>',
+    '        API: AIMEAT.greeter.hello(name) -> string greeting.',
+    '    - type: lib',
+    `      name: ${extName}`,
+    `      filename: ${extName}.js`,
+    '      exports: [hello]',
+    '      api_surface: |',
+    '        AIMEAT.greeter.hello(name) -> string',
+  ].join('\n');
+  const libJs = '(function(A){A.greeter={hello:function(n){return "hello "+n;}};})(window.AIMEAT=window.AIMEAT||{});';
+
+  const { status: inst, body: instBody } = await json('/v1/cortex', {
+    method: 'POST', headers: auth,
+    body: JSON.stringify({ manifest, libs: { [extName + '.js']: libJs } }),
+  });
+  assert(inst === 201, `install expected 201, got ${inst}: ${JSON.stringify(instBody.error || instBody).slice(0, 150)}`);
+  const { status: act, body: actBody } = await json(`/v1/cortex/${extName}/activate`, { method: 'POST', headers: auth });
+  assert(act === 200 || act === 201, `activate expected 200, got ${act}: ${JSON.stringify(actBody.error || actBody).slice(0, 150)}`);
+
+  // Appears in the index with scope community
+  const { body: idx } = await json('/v1/library-packs?scope=community');
+  const entry = (idx.data?.packs || []).find((p: any) => p.id === extName);
+  assert(!!entry, 'community pack missing from index');
+  assert(entry.scope === 'community' && entry.status === 'preview', `bad scope/status: ${entry.scope}/${entry.status}`);
+  assert(entry.include[0].includes(`/v1/cortex/${extName}/libs/${extName}.js`), 'include line wrong');
+
+  // Detail serves the type:prompt content as ai_doc, with {{node_url}} rendered
+  const { status: ds, body: det } = await json(`/v1/library-packs/${extName}`);
+  assert(ds === 200, `detail expected 200, got ${ds}`);
+  const doc = det.data?.pack?.ai_doc || '';
+  assert(doc.includes('AIMEAT.greeter.hello'), 'ai_doc missing prompt content');
+  assert(!doc.includes('{{node_url}}'), 'ai_doc not rendered');
+  // Node packs unaffected + carry scope node
+  const { body: chart } = await json('/v1/library-packs/chartjs');
+  assert(chart.data?.pack?.scope === 'node', 'static pack missing scope node');
+
+  // Cleanup so repeated runs stay clean
+  await json(`/v1/cortex/${extName}`, { method: 'DELETE', headers: auth });
+});
+
+await test('community pack: PRIVATE user cortex does NOT leak into the public index', async () => {
+  const uname = 'packpriv' + Date.now().toString().slice(-6);
+  await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: uname, password: 'PackPriv1!', display_name: 'Pack Priv' }) });
+  const { body: login } = await json('/v1/ghii/login', { method: 'POST', body: JSON.stringify({ username: uname, password: 'PackPriv1!' }) });
+  const tok = login.data?.token || login.data?.jwt;
+  const auth = { Authorization: `Bearer ${tok}` };
+  const extName = uname + '-secret';
+  const manifest = [
+    'apiVersion: cortex.aimeat.org/v1', 'kind: Extension', 'metadata:', `  name: ${extName}`,
+    `  namespace: ${uname}`, '  description: "private lib"', '  author: e2e', '  visibility: private',
+    'spec:', '  version: "1.0.0"', '  license: MIT', '  components:',
+    '    - type: lib', `      name: ${extName}`, `      filename: ${extName}.js`,
+    '      exports: [x]', '      api_surface: |', '        x()',
+  ].join('\n');
+  const { status: inst } = await json('/v1/cortex', {
+    method: 'POST', headers: auth,
+    body: JSON.stringify({ manifest, libs: { [extName + '.js']: '(function(){})();' } }),
+  });
+  assert(inst === 201, `install expected 201, got ${inst}`);
+  await json(`/v1/cortex/${extName}/activate`, { method: 'POST', headers: auth });
+  const { body: idx } = await json('/v1/library-packs');
+  assert(!(idx.data?.packs || []).some((p: any) => p.id === extName), 'PRIVATE cortex leaked into the public pack index');
+  const { status: ds } = await json(`/v1/library-packs/${extName}`);
+  assert(ds === 404, `private cortex detail should 404, got ${ds}`);
+  await json(`/v1/cortex/${extName}`, { method: 'DELETE', headers: auth });
+});
+
 console.log('\n' + '─'.repeat(40));
 console.log(`Library packs E2E: ${passed} passed, ${failed} failed of ${passed + failed}`);
 if (failed > 0) process.exit(1);

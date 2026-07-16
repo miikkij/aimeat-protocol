@@ -6973,9 +6973,11 @@ paths:
         SDK wrappers (/v1/libs), node-bundled cortex libs (/v1/cortex/<n>/libs) and vendored
         third-party capability packs (/lib). Compact index (no ai_doc/changelog): id, kind,
         category, description, rendered include line(s), requires, version, license, apiSurface,
-        demoTemplateId, tierHint, interviewTriggers, sizeEstimate, status. Every AI-facing
-        library list (build-app prompt, GET /v1/libs, bootstrap, llms.txt) derives from this
-        registry. Public (CORS *).
+        demoTemplateId, tierHint, interviewTriggers, sizeEstimate, status, scope. Two sources
+        merge: scope "node" (the curated registry — every AI-facing library list derives from
+        it: build-app prompt, GET /v1/libs, bootstrap, llms.txt) and scope "community"
+        (active + public user-installed cortex extensions that ship a lib component; always
+        status "preview" — unvetted by the node). Public (CORS *).
       tags:
         - Discovery
       parameters:
@@ -6988,6 +6990,9 @@ paths:
         - name: status
           in: query
           schema: { type: string, enum: [preview, stable, deprecated] }
+        - name: scope
+          in: query
+          schema: { type: string, enum: [node, community] }
         - name: lang
           in: query
           schema: { type: string }
