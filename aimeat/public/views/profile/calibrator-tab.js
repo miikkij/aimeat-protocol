@@ -10,6 +10,8 @@
  *   v1.0.0 — 2026-03-29 — Initial implementation
  *   v1.1.0 — 2026-03-29 — Extract LlmConfigEditor and CalibrationChart into separate files
  *   v2.0.0 — 2026-03-29 — V2 redesign: batch-based 4-step flow, score bars, template sections
+ *   v2.1.0 — 2026-07-16 — Detail-view mount folds its 4-request waterfall into one GET /v1/calibrator/:id/detail
+ *     (getProjectDetail); individual loaders kept as fallback + interactive re-fetch.
  */
 
 import { h } from 'preact';
@@ -23,7 +25,7 @@ import LlmConfigEditor from '/views/profile/calibrator-llm-editor.js';
 import CalibrationChart from '/views/profile/calibrator-chart.js';
 import BatchCard from '/views/profile/calibrator-batch.js';
 import {
-  listProjects, createProject, getProject, updateProject, deleteProject,
+  listProjects, createProject, getProject, getProjectDetail, updateProject, deleteProject,
   listVersions, getVersion, createVersion,
   listBatches, createBatch,
   getTemplateDefaults,
@@ -153,39 +155,65 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  function applyProject(proj) {
+    setProject(proj);
+    setTemplates({
+      analysis: proj.analysisPromptTemplate || '',
+      reflection: proj.reflectionPromptTemplate || '',
+      selfReflection: proj.selfReflectionPromptTemplate || '',
+      synthesis: proj.synthesisPromptTemplate || '',
+    });
+  }
+
+  // Data migration: clean up old V1 run keys (silently). One-time legacy cleanup, kept out of the mount
+  // composite because it deletes.
+  async function cleanupLegacyRuns() {
+    try {
+      const resp = await apiGet(`/v1/memory?prefix=calibrator.${projectId}.run.&tags=calibrator,run`);
+      const oldRuns = resp?.data?.entries || [];
+      for (const r of oldRuns) {
+        try { await apiDelete(`/v1/memory/${encodeURIComponent(r.key)}`); } catch { /* ignore */ }
+      }
+    } catch { /* ignore migration errors */ }
+  }
+
+  // Fallback path: the individual four-request waterfall, used when the composite is unavailable.
+  async function loadProjectIndividually() {
+    const { project: proj, dimensions: dims } = await getProject(projectId);
+    applyProject(proj);
+    setDimensions(dims || []);
+    const vers = await listVersions(projectId);
+    setVersions(vers);
+    if (proj.currentVersion > 0) {
+      const ver = await getVersion(projectId, proj.currentVersion);
+      setCurrentVersion(ver);
+      setPrompt(ver.prompt || '');
+      setTargetOutput(ver.targetOutput || '');
+      setSelectedVersion(ver.version);
+    }
+    setBatches(await listBatches(projectId));
+  }
+
   async function loadProject() {
     try {
-      const { project: proj, dimensions: dims } = await getProject(projectId);
-      setProject(proj);
-      setDimensions(dims || []);
-      setTemplates({
-        analysis: proj.analysisPromptTemplate || '',
-        reflection: proj.reflectionPromptTemplate || '',
-        selfReflection: proj.selfReflectionPromptTemplate || '',
-        synthesis: proj.synthesisPromptTemplate || '',
-      });
-
-      const vers = await listVersions(projectId);
-      setVersions(vers);
-
-      if (proj.currentVersion > 0) {
-        const ver = await getVersion(projectId, proj.currentVersion);
-        setCurrentVersion(ver);
-        setPrompt(ver.prompt || '');
-        setTargetOutput(ver.targetOutput || '');
-        setSelectedVersion(ver.version);
-      }
-
-      setBatches(await listBatches(projectId));
-
-      // Data migration: clean up old V1 run keys (silently)
-      try {
-        const resp = await apiGet(`/v1/memory?prefix=calibrator.${projectId}.run.&tags=calibrator,run`);
-        const oldRuns = resp?.data?.entries || [];
-        for (const r of oldRuns) {
-          try { await apiDelete(`/v1/memory/${encodeURIComponent(r.key)}`); } catch { /* ignore */ }
+      // Composite mount: project + dimensions + versions + current version + batches in one call.
+      const detail = await getProjectDetail(projectId);
+      if (detail?.project) {
+        applyProject(detail.project);
+        setDimensions(detail.dimensions || []);
+        setVersions(detail.versions || []);
+        if (detail.project.currentVersion > 0 && detail.currentVersion) {
+          const ver = detail.currentVersion;
+          setCurrentVersion(ver);
+          setPrompt(ver.prompt || '');
+          setTargetOutput(ver.targetOutput || '');
+          setSelectedVersion(ver.version);
         }
-      } catch { /* ignore migration errors */ }
+        setBatches(detail.batches || []);
+      } else {
+        await loadProjectIndividually();
+      }
+      await cleanupLegacyRuns();
     } catch (e) {
       showToast?.(e.message, true);
     }
