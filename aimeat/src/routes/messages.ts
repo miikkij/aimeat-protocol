@@ -25,6 +25,8 @@
  *     their OWN agents had with external people (an agent DM'd a user from its own inbox), tagged
  *     `viaAgent`. GET conversations/:id accepts `?agent=<gaii>` to read such a thread read-only under the
  *     (ownership-verified) agent. Only this owner's agents — server-derived, no cross-owner leak.
+ *   v1.3.0 -- 2026-07-16 -- GET /conversations moved onto MessagingDbService: the owner + per-agent
+ *     conversations fan-out is now ONE batched read (listConversationsForOwners), behaviour unchanged.
  */
 
 import { Router } from 'express';
@@ -41,10 +43,12 @@ import { propagateReadReceipt } from '../services/message-delivery.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
 import { resolveAudience, sendBroadcast, broadcastToFederation } from '../services/message-broadcast.js';
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
+import { createMessagingDbService } from '../services/db/messaging-db-service.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
   const deliveryCtx = { config, storage, peers };
+  const messagingDb = createMessagingDbService(storage);
 
   /** Resolve the caller's effective identity (owner→GHII, agent/eco→sub). */
   const resolve = (req: Express.Request) => resolveIdentity(req.auth!, config.nodeId);
@@ -228,30 +232,14 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     res.json(success(config.nodeId, { messages: visible, total, unread, page, per_page: perPage }));
   });
 
-  /* ── GET /v1/messages/conversations — thread list (accepted) ── */
+  /* ── GET /v1/messages/conversations — thread list (accepted) ──
+   * Owner-aggregation (own accepted threads + agents' EXTERNAL threads tagged `viaAgent`, pending/blocked
+   * contacts hidden, internal own-owner peers skipped) is composed in MessagingDbService, which resolves
+   * the agent fleet once and batches the owner + per-agent conversations read into ONE call (was one
+   * listConversations per agent). Owner is server-derived → only this owner's agents (no cross-owner leak). */
   router.get('/v1/messages/conversations', requireAuth(), requireRole('owner'), async (req, res) => {
-    const ghii = resolve(req);
-    const ownerName = req.auth!.owner;
-    const contacts = await storage.listContacts(ghii);
-    const hidden = new Set(contacts.filter(c => c.state === 'pending' || c.state === 'blocked').map(c => c.contactId));
-    const own = (await storage.listConversations(ghii)).filter(c => !hidden.has(c.peerGhii));
-
-    // Owner-aggregation: also surface conversations OWNED BY THIS OWNER'S OWN AGENTS with EXTERNAL peers
-    // — i.e. a DM an agent sent to someone from its own inbox. The owner owns their agents' data, so these
-    // roll up into the owner's list (tagged `viaAgent` so the client can label them "via <agent>" and open
-    // them read-only under that agent). Owner is server-derived → only this owner's agents (no cross-owner
-    // leak). Internal threads (an agent talking to the owner or a sibling agent) are skipped: the owner↔
-    // agent thread is already visible from the owner's own side, and sibling chatter isn't "sent to a user".
-    const agents = await storage.getAgentsByOwner(ownerName).catch(() => []);
-    const agentConvs = [];
-    for (const a of agents) {
-      const convs = await storage.listConversations(a.gaii).catch(() => []);
-      for (const c of convs) {
-        if (parseGaiiLoose(c.peerGhii).owner === ownerName) continue;   // skip internal (own owner) peers
-        agentConvs.push({ ...c, viaAgent: a.gaii });
-      }
-    }
-    res.json(success(config.nodeId, { conversations: [...own, ...agentConvs] }));
+    const { conversations } = await messagingDb.ownerConversations(resolve(req), req.auth!.owner as string);
+    res.json(success(config.nodeId, { conversations }));
   });
 
   /* ── GET /v1/messages/conversations/:conversationId — full thread ── */

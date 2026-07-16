@@ -6,11 +6,14 @@
  * @structure deserialize helpers + message CRUD/list + contact-consent CRUD; all keyed by ownerGhii.
  * @usage import * as directMessageRepo from './repos/direct-message.js'; (wired in sqlite/index.ts)
  * @version-history
+ *   v1.1.0 -- 2026-07-16 -- Add listConversationsForOwners batch (Phase 3): the conversations list for many
+ *     owners in 3 window-function queries, collapsing the route's owner + per-agent fan-out.
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 1: storage).
  */
 
 import type Database from 'better-sqlite3';
 import type { DirectMessageRecord, ContactConsentRecord, MessageDeliveryLog, MessageDeliveryStats } from '../../../interface.js';
+import type { ConversationSummary } from '../../../repositories/direct-message.repository.js';
 
 // ── Helpers ──
 
@@ -229,6 +232,64 @@ export function listConversations(
       updatedAt: row.updatedAt,
     };
   });
+}
+
+/** BULK (Phase 3) — the conversations list for MANY owners in ONE grouped aggregate + ONE last-message +
+ *  ONE subject query (window functions), regardless of owner count. Byte-for-byte the per-thread shape of
+ *  {@link listConversations} — the same peer/subject/unread/last rules — but keyed by ownerGhii so the
+ *  route's owner + per-agent fan-out collapses to this one call. */
+export function listConversationsForOwners(
+  db: Database.Database,
+  ownerGhiis: string[],
+): Record<string, ConversationSummary[]> {
+  if (ownerGhiis.length === 0) return {};
+  const ph = ownerGhiis.map(() => '?').join(',');
+  const groups = db.prepare(
+    `SELECT ownerGhii, conversationId, COUNT(*) as messageCount, MAX(createdAt) as updatedAt,
+       SUM(CASE WHEN direction = 'inbound' AND readAt IS NULL THEN 1 ELSE 0 END) as unread
+     FROM direct_messages WHERE ownerGhii IN (${ph})
+     GROUP BY ownerGhii, conversationId`,
+  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; messageCount: number; updatedAt: string; unread: number }>;
+  if (groups.length === 0) return {};
+
+  // Last message per (owner, conversation): newest row — the row that fixes peer + lastMessage + direction.
+  const lasts = db.prepare(
+    `SELECT ownerGhii, conversationId, body, direction, senderGhii, recipientGhii FROM (
+        SELECT ownerGhii, conversationId, body, direction, senderGhii, recipientGhii,
+               ROW_NUMBER() OVER (PARTITION BY ownerGhii, conversationId ORDER BY createdAt DESC, id DESC) rn
+        FROM direct_messages WHERE ownerGhii IN (${ph})
+     ) WHERE rn = 1`,
+  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string }>;
+  // Thread subject: the earliest non-null subject (the message that opened it).
+  const subjects = db.prepare(
+    `SELECT ownerGhii, conversationId, subject FROM (
+        SELECT ownerGhii, conversationId, subject,
+               ROW_NUMBER() OVER (PARTITION BY ownerGhii, conversationId ORDER BY createdAt ASC, id ASC) rn
+        FROM direct_messages WHERE ownerGhii IN (${ph}) AND subject IS NOT NULL
+     ) WHERE rn = 1`,
+  ).all(...ownerGhiis) as Array<{ ownerGhii: string; conversationId: string; subject: string }>;
+
+  const ck = (o: string, c: string) => `${o} ${c}`;
+  const lastBy = new Map(lasts.map(l => [ck(l.ownerGhii, l.conversationId), l]));
+  const subjBy = new Map(subjects.map(s => [ck(s.ownerGhii, s.conversationId), s.subject]));
+
+  const out: Record<string, ConversationSummary[]> = {};
+  for (const g of groups) {
+    const last = lastBy.get(ck(g.ownerGhii, g.conversationId));
+    const lastDirection = (last?.direction ?? 'inbound') as 'inbound' | 'outbound';
+    (out[g.ownerGhii] ??= []).push({
+      conversationId: g.conversationId,
+      peerGhii: last ? (lastDirection === 'inbound' ? last.senderGhii : last.recipientGhii) : '',
+      subject: subjBy.get(ck(g.ownerGhii, g.conversationId)),
+      lastMessage: last?.body ?? '',
+      lastDirection,
+      messageCount: g.messageCount,
+      unread: g.unread,
+      updatedAt: g.updatedAt,
+    });
+  }
+  for (const arr of Object.values(out)) arr.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return out;
 }
 
 export function markMessageRead(db: Database.Database, id: string, ownerGhii: string): DirectMessageRecord | null {
