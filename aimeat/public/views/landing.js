@@ -11,6 +11,9 @@
  * @structure default export Landing({ navigate }) + BuildHero/Gallery(live wall)/StatsPanel/BuildAppPrompt/BuildAgentPrompt/AskYourAI
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v2.2.0 — 2026-07-16 — Build-app prompt fetched from the canonical GET /v1/prompts/build-app
+ *     (registry-generated libraries + capability packs; kills the landing's 5th drifting copy);
+ *     the hand-built text remains only as the offline fallback. Template block via shared helper.
  *   v1.0.0 — 2026-06-10 — Initial: landing/portal split (owner spec).
  *   v1.1.0 — 2026-06-16 — Add BuildAppPrompt section: copyable Generate App Prompt from app-catalog.
  *   v1.2.0 — 2026-06-16 — Embed PublicActivityFeed (3 real-time tabs) after the proof gallery.
@@ -175,6 +178,27 @@ hosting is the only subscription.`;
 
 // Mirrors buildPromptFromBuilder() in app-catalog.html for the "new app / no description" case,
 // with the current node URL injected. If no idea is given the prompt explicitly tells the AI to ask.
+// Canonical build prompt from the node (GET /v1/prompts/build-app - the single source of
+// truth the app-catalog + agentic coders use; includes the registry-generated library
+// sections and capability packs). Cached per locale. The hand-built text below is ONLY the
+// offline / older-node fallback and may lag behind the node's.
+const _canonicalPromptCache = {};
+async function fetchCanonicalBuildPrompt(locale) {
+  const key = locale || 'en';
+  if (_canonicalPromptCache[key]) return _canonicalPromptCache[key];
+  const d = await (await fetch('/v1/prompts/build-app?mode=new&lang=' + encodeURIComponent(key))).json();
+  const full = d && d.data && d.data.prompt;
+  if (typeof full === 'string' && full.length > 500) { _canonicalPromptCache[key] = full; return full; }
+  throw new Error('no canonical prompt');
+}
+
+// Appended to whichever prompt body is in use (canonical or fallback).
+function appendTemplateBlock(p, templateContent) {
+  if (!templateContent) return p;
+  return p + '\n## Starting template (copy from this)\nUse this skeleton as your base — keep its boot, login pill, and self-hosted theme wiring; fill the {{...}} slots; build your views inside <main>. Return the COMPLETE single HTML file based on it.\n```html\n' + templateContent + '\n```\n';
+}
+
+// FALLBACK ONLY - used until the canonical fetch resolves (first paint) or when it fails.
 function buildLandingAppPrompt(nodeUrl, templateContent) {
   const base = (nodeUrl || '').replace(/\/+$/, '') || window.location.origin;
   const LANGS = { en: 'English', fi: 'Finnish (Suomi)' };
@@ -294,10 +318,7 @@ function buildLandingAppPrompt(nodeUrl, templateContent) {
   p += '3. Click Publish.\n';
   p += 'I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n';
   p += 'What I get: once published, the app is LIVE on my own AIMEAT node and PUBLIC — anyone can find it in the community catalogue and use it, and I get a link to share. From my catalogue I can launch it, publish updates (older versions are always kept), park it (hide it), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n';
-  if (templateContent) {
-    p += '\n## Starting template (copy from this)\nUse this skeleton as your base — keep its boot, login pill, and self-hosted theme wiring; fill the {{...}} slots; build your views inside <main>. Return the COMPLETE single HTML file based on it.\n```html\n' + templateContent + '\n```\n';
-  }
-  return p;
+  return appendTemplateBlock(p, templateContent);
 }
 
 function BuildAppPrompt() {
@@ -319,7 +340,9 @@ function BuildAppPrompt() {
     try { const d = await (await fetch('/v1/app-templates/' + encodeURIComponent(id))).json(); setTplContent((d.data && d.data.template && d.data.template.content) || ''); }
     catch { setTplContent(''); }
   };
-  const prompt = buildLandingAppPrompt(window.location.origin, tplContent);
+  const [canonical, setCanonical] = useState('');
+  useEffect(() => { fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(() => {}); }, []);
+  const prompt = appendTemplateBlock(canonical || buildLandingAppPrompt(window.location.origin), tplContent);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(prompt);
@@ -463,7 +486,9 @@ function AskYourAI() {
    proof that your creation lands on the same shelf as everyone else's. ── */
 function BuildHero() {
   const [copied, setCopied] = useState(false);
-  const prompt = buildLandingAppPrompt(window.location.origin);
+  const [canonical, setCanonical] = useState('');
+  useEffect(() => { fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(() => {}); }, []);
+  const prompt = canonical || buildLandingAppPrompt(window.location.origin);
   const copy = async () => {
     try { await navigator.clipboard.writeText(prompt); setCopied(true); setTimeout(() => setCopied(false), 2000); }
     catch { /* the full prompt is also visible lower on the page */ }

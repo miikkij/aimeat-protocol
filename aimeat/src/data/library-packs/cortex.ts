@@ -203,12 +203,14 @@ export const CORTEX_PACKS: LibraryPack[] = [
     changelog: [
       { version: '1.0.0', date: '2026-07-16', summary: 'Initial release. Engine: vendored Drawflow 0.0.60 (an internal detail behind AIMEAT.flow — apps that stick to the wrapper API survive an engine swap). Graph envelopes carry a format tag for future migration.' },
       { version: '1.0.1', date: '2026-07-16', summary: 'Fix: the engine mount now fills the host element — previously the editor container was 0-high and node drag/rename pointer events never landed. No API change; existing apps pick the fix up automatically (the wrapper is served live).' },
+      { version: '1.0.1', date: '2026-07-16', summary: 'Promoted to stable: AEB-3 A/B run aeb3-flow-001 (order-fulfillment designer task) — treatment matched control 5/5 on the functional checklist with 27.5% fewer tokens, 30% less wall time and 31% less app code, using the wrapper idiomatically (presets, save/load, never flow.engine).' },
     ],
     demoTemplateId: 'comp-flow-editor',
     tierHint: 'T2',
     interviewTriggers: ['flow', 'mindmap', 'process', 'workflow editor', 'node editor', 'prosessi', 'vuokaavio', 'miellekartta'],
     sizeEstimate: '~10KB (+46KB engine)',
-    status: 'preview',
+    status: 'stable',
+    promptLine: '- aimeat-flow — EDITABLE drag-and-drop flow / process / mindmap diagrams (`AIMEAT.flow`; fetch its pack doc for the 3 include tags + API)',
   },
   {
     id: 'aimeat-dag',
