@@ -176,6 +176,17 @@
 .adm-stat.red    { color: var(--danger); }
 .adm-stat-label { color: var(--text-muted); font-size: .69rem; margin-top: 2px; }
 
+/* Storage/Database tab — per-table growth deltas + the counts table. */
+.adm-delta-up   { color: var(--success); }
+.adm-delta-down { color: var(--danger); }
+.adm-delta-zero { color: var(--text-muted); }
+.adm-db-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+.adm-db-table th, .adm-db-table td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); }
+.adm-db-table th { color: var(--text-muted); font-weight: 600; }
+.adm-db-table td.num, .adm-db-table th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.adm-db-bar { height: 6px; border-radius: 3px; background: var(--blue); min-width: 2px; }
+.adm-db-bar-track { background: var(--bg-dim); border-radius: 3px; width: 100%; }
+
 /* Badges */
 .adm-badge {
   display: inline-block;

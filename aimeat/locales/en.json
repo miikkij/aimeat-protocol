@@ -4931,6 +4931,7 @@
     "corsSelectAgent": "Select agent...",
     "stats": "Statistics",
     "statsNotAvailable": "Statistics are disabled on this node.",
+    "database": "Database",
     "aiUsage": "AI Apps Usage",
     "aiMetricCost": "Cost",
     "aiMetricTokens": "Tokens",
@@ -7774,6 +7775,27 @@
     }
   },
   "admin": {
+    "database": {
+      "title": "Database",
+      "desc": "Live row counts per table and how storage is growing over time. Snapshots are captured hourly; the deltas show change over the last hour, day, and week.",
+      "loading": "Loading storage stats…",
+      "empty": "No storage stats yet.",
+      "captureNow": "Capture now",
+      "capturing": "Capturing…",
+      "captured": "Snapshot captured.",
+      "totalRows": "Total rows",
+      "tables": "tables",
+      "lastHour": "Last hour",
+      "last24h": "Last 24h",
+      "last7d": "Last 7 days",
+      "rowsDelta": "rows changed",
+      "noBaseline": "no baseline yet",
+      "snapshots": "snapshots",
+      "table": "Table",
+      "rows": "Rows",
+      "delta24h": "Δ 24h",
+      "relSize": "Relative size"
+    },
     "subdomains": {
       "title": "Subdomains",
       "desc": "Map subdomains to published apps or external redirects. A mapped subdomain serves the app's HTML at its root (e.g. sanomat.aimeat.io). Management is operator-only.",

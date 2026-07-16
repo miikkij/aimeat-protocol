@@ -22,6 +22,8 @@ export const saveConfig      = (changes)=> apiPut('/v1/admin/config', { changes 
 export const deleteConfig    = (path)   => apiDelete(`/v1/admin/config/${encodeURIComponent(path)}`);
 
 // ── Consul ──
+export const getStorageStats       = (limit = 168) => apiGet(`/v1/admin/storage-stats?limit=${limit}`);
+export const captureStorageSnapshot = ()            => apiPost('/v1/admin/storage-stats/snapshot');
 export const getConsulStatus = ()       => apiGet('/v1/admin/consul');
 export const consulExport    = ()       => apiPost('/v1/admin/consul/export');
 export const consulImport    = ()       => apiPost('/v1/admin/consul/import');
