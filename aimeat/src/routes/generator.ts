@@ -32,6 +32,8 @@
  *   v5.2.0 — 2026-03-21 — Add test execution endpoint, screenshot serving, and screenshot cleanup on delete (Task 16)
  *   v5.3.0 — 2026-06-06 — prompts/:componentId now merges stored specs (generator.<project>.spec.<id>) onto completedComponents, matching the browser's loadAllComponents merge — so dependency specs reach the prompt from their canonical key, not just from the component record
  *   v5.4.0 — 2026-07-13 — Split into generator/ sibling modules (projects/stages/testing/components/prompts) to satisfy max-file-lines; pure extraction, registration order + behavior preserved.
+ *   v5.5.0 — 2026-07-16 — Add GET /v1/generator/:projectId/state (dashboard mount composite, GeneratorStateService):
+ *     one owner-scope prefix scan replaces the 8 memory reads the dashboard fired; live registries stay separate.
  */
 
 import { Router } from 'express';

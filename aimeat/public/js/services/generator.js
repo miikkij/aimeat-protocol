@@ -14,6 +14,9 @@
  *   - Activity Logging (writeProjectLog)
  * @usage import { listProjects, createProject, registerComponent } from '/js/services/generator.js';
  * @version-history
+ *   v1.2.0 — 2026-07-16 — Add getProjectState (GET /v1/generator/:id/state mount composite) + extract pure
+ *     buildComponentsFromItems/computeStatuses so the composite and the individual-fetch path share one
+ *     transform; getComponentStatuses takes optional pre-loaded components to skip the redundant scan.
  *   v1.0.0 — 2026-03-10 — Initial generator service
  *   v1.1.0 — 2026-03-14 — Rewritten buildAgentSetupPrompt with SSE, GAII docs, full HTTP examples
  *   v1.1.1 — 2026-03-14 — getListeners now queries /v1/agents instead of memory; heartbeat uses /v1/checkin
@@ -316,17 +319,17 @@ export async function saveComponent(projectId, component) {
   return { ...data, _version: version + 1 };
 }
 
-export async function loadAllComponents(projectId) {
-  const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.component.&owner_scope=true`);
-  const items = resp?.data?.items || resp?.data?.entries || [];
-
-  // Load specs separately — they're stored in their own keys so they survive component state overwrites
-  const specResp = await apiGet(`/v1/memory?prefix=generator.${projectId}.spec.&owner_scope=true`);
-  const specItems = specResp?.data?.items || specResp?.data?.entries || [];
+/**
+ * Pure transform: build the dashboard's component list from raw memory items + spec items. Extracted from
+ * loadAllComponents so both the individual-fetch path AND the /state composite (which seeds the same raw
+ * items) share ONE transform — id backfill, content→result mapping, cortex markdown reconstruction, and
+ * spec merge from the separate spec.* keys. Items carry {key, value, version}.
+ */
+export function buildComponentsFromItems(items, specItems, projectId) {
   const specMap = {};
-  for (const si of specItems) {
-    const specPrefix = `generator.${projectId}.spec.`;
-    const compId = si.key.startsWith(specPrefix) ? si.key.slice(specPrefix.length) : null;
+  const specPrefix = `generator.${projectId}.spec.`;
+  for (const si of (specItems || [])) {
+    const compId = si.key?.startsWith(specPrefix) ? si.key.slice(specPrefix.length) : null;
     if (compId) {
       try {
         specMap[compId] = typeof si.value === 'string' ? JSON.parse(si.value) : si.value;
@@ -334,7 +337,7 @@ export async function loadAllComponents(projectId) {
     }
   }
 
-  return items.map(i => {
+  return (items || []).map(i => {
     const val = typeof i.value === 'string' ? JSON.parse(i.value) : i.value;
     // Ensure id is present — extract from memory key if missing (backend submit may omit it)
     if (!val.id && i.key) {
@@ -360,6 +363,38 @@ export async function loadAllComponents(projectId) {
     }
     return { ...val, _version: i.version };
   });
+}
+
+export async function loadAllComponents(projectId) {
+  const resp = await apiGet(`/v1/memory?prefix=generator.${projectId}.component.&owner_scope=true`);
+  const items = resp?.data?.items || resp?.data?.entries || [];
+  // Load specs separately — they're stored in their own keys so they survive component state overwrites
+  const specResp = await apiGet(`/v1/memory?prefix=generator.${projectId}.spec.&owner_scope=true`);
+  const specItems = specResp?.data?.items || specResp?.data?.entries || [];
+  return buildComponentsFromItems(items, specItems, projectId);
+}
+
+/**
+ * The Generator dashboard mount composite: project + interview-spec + components (built from the same
+ * transform) + pending-edit from ONE server-side prefix scan (GET /v1/generator/:id/state). Returns null
+ * on 404/error so the caller falls back to the individual reads. The live extension/cortex/apps status
+ * reads stay separate (see getComponentStatuses).
+ */
+export async function getProjectState(projectId) {
+  try {
+    const resp = await apiGet(`/v1/generator/${projectId}/state`);
+    const d = resp?.data;
+    if (!d?.project) return null;
+    const parse = (item) => (item && item.value != null)
+      ? (typeof item.value === 'string' ? JSON.parse(item.value) : item.value)
+      : null;
+    return {
+      project: { ...parse(d.project), _version: d.project.version },
+      interviewSpec: parse(d.interviewSpec),
+      pendingEdit: parse(d.pendingEdit),
+      components: buildComponentsFromItems(d.componentItems || [], d.specItems || [], projectId),
+    };
+  } catch { return null; }
 }
 
 /**
@@ -464,31 +499,13 @@ export async function cleanupOldEntries(projectId) {
  * Get live status for all registered components in a project.
  * Checks extensions, cortex, and apps APIs for current state.
  */
-export async function getComponentStatuses(projectId) {
-  const components = await loadAllComponents(projectId);
+/**
+ * Pure transform: derive each component's install/registration status by matching comp.registeredAs
+ * against the live extension / cortex / apps lists. Extracted so the composite mount can reuse the
+ * already-loaded components (no second component scan). Behavior identical to the inline loop.
+ */
+export function computeStatuses(components, liveExtensions, liveCortexes, liveApps) {
   const statuses = {};
-
-  // Fetch live extension list
-  let liveExtensions = [];
-  try {
-    const resp = await apiGet('/v1/extensions');
-    liveExtensions = resp?.data?.extensions || resp?.data || [];
-  } catch { /* extensions API may not exist */ }
-
-  // Fetch live cortex list
-  let liveCortexes = [];
-  try {
-    const resp = await apiGet('/v1/cortex');
-    liveCortexes = resp?.data?.extensions || resp?.data || [];
-  } catch { /* cortex API may not exist */ }
-
-  // Fetch live apps list
-  let liveApps = [];
-  try {
-    const resp = await apiGet('/v1/apps');
-    liveApps = resp?.data?.apps || resp?.data || [];
-  } catch { /* apps API may not exist */ }
-
   for (const comp of components) {
     const name = comp.registeredAs;
     if (!name) {
@@ -518,6 +535,25 @@ export async function getComponentStatuses(projectId) {
   }
 
   return statuses;
+}
+
+/**
+ * Live install/registration status for a project's components. Fetches the three live registries
+ * (extensions / cortex / apps) in parallel and matches them against the components. Pass `components` to
+ * reuse an already-loaded list (the dashboard mount does this after the /state composite) and skip the
+ * redundant component scan; omit it to load them here.
+ */
+export async function getComponentStatuses(projectId, components) {
+  const comps = components || await loadAllComponents(projectId);
+  const [extResp, ctxResp, appsResp] = await Promise.all([
+    apiGet('/v1/extensions').catch(() => null),
+    apiGet('/v1/cortex').catch(() => null),
+    apiGet('/v1/apps').catch(() => null),
+  ]);
+  const liveExtensions = extResp?.data?.extensions || extResp?.data || [];
+  const liveCortexes = ctxResp?.data?.extensions || ctxResp?.data || [];
+  const liveApps = appsResp?.data?.apps || appsResp?.data || [];
+  return computeStatuses(comps, liveExtensions, liveCortexes, liveApps);
 }
 
 /**

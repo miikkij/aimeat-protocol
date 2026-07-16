@@ -12,6 +12,7 @@ import { requireAuth, requireRole, requireScope } from '../../auth/middleware.js
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { cleanupScreenshots } from '../../services/generator-testing.js';
+import { createGeneratorStateService } from '../../services/db/generator-state-db-service.js';
 
 export function registerProjectRoutes(
   router: Router,
@@ -19,6 +20,7 @@ export function registerProjectRoutes(
   storage: Storage,
   ownerGhii: (req: Express.Request) => string,
 ): void {
+  const generatorStateDb = createGeneratorStateService(storage);
   // POST /v1/generator/projects — create a new generator project
   router.post('/v1/generator/projects',
     requireAuth(),
@@ -118,6 +120,28 @@ export function registerProjectRoutes(
   );
 
   // GET /v1/generator/:projectId — get full project state
+  // GET /v1/generator/:projectId/state — the dashboard mount composite. Folds the EIGHT owner-scope memory
+  // scans the dashboard fired (project + interview-spec + component.* + spec.* + pending-edit, twice over
+  // for the status recompute + a cleanup scan) into ONE prefix scan, partitioned. The live-registry reads
+  // (extensions/cortex/apps) the status check needs stay separate (different subsystem). Raw records are
+  // returned so the dashboard's existing parse/merge logic is unchanged. 2-segment path — registered before
+  // /:projectId (which matches one segment), no shadow.
+  router.get('/v1/generator/:projectId/state',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:read'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const projectId = req.params['projectId'] as string;
+      const data = await generatorStateDb.state(req.auth!.owner as string, gaii, projectId);
+      if (!data) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+      res.json(success(config.nodeId, data));
+    }
+  );
+
   router.get('/v1/generator/:projectId',
     requireAuth(),
     requireRole('agent'),
