@@ -5,10 +5,24 @@
  * @structure DirectMessageRepository — message + contact-consent methods, mirrored across SQLite + Mongo.
  * @usage import type { DirectMessageRepository } from '../interface.js'; (composed into Storage)
  * @version-history
+ *   v1.1.0 -- 2026-07-16 -- Add ConversationSummary type + listConversationsForOwners batch (Phase 3 fan-out→IN).
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 1: storage).
  */
 
 import type { DirectMessageRecord, ContactConsentRecord, MessageDeliveryLog, MessageDeliveryStats } from '../interface.js';
+
+/** One row of the conversations list — the per-thread summary {@link DirectMessageRepository.listConversations}
+ *  (and its batched sibling {@link DirectMessageRepository.listConversationsForOwners}) return. */
+export type ConversationSummary = {
+  conversationId: string;
+  peerGhii: string;
+  subject?: string;
+  lastMessage: string;
+  lastDirection: 'inbound' | 'outbound';
+  messageCount: number;
+  unread: number;
+  updatedAt: string;
+};
 
 export interface DirectMessageRepository {
   // ── Messages ──
@@ -42,16 +56,16 @@ export interface DirectMessageRepository {
    *  that inherited the broadcastId — for the results/aggregation view. */
   listDmsByBroadcast(broadcastId: string, ownerGhii: string): Promise<DirectMessageRecord[]>;
   /** One entry per conversation: peer, last message preview, unread count, updatedAt. */
-  listConversations(ownerGhii: string): Promise<Array<{
-    conversationId: string;
-    peerGhii: string;
-    subject?: string;
-    lastMessage: string;
-    lastDirection: 'inbound' | 'outbound';
-    messageCount: number;
-    unread: number;
-    updatedAt: string;
-  }>>;
+  listConversations(ownerGhii: string): Promise<ConversationSummary[]>;
+  /**
+   * BULK PRIMITIVE (Phase 3) — the conversations list for MANY mailbox owners in ONE pass (fan-out→IN):
+   * batches the owner + per-agent {@link listConversations} fan-out the conversations view runs (an owner
+   * with a fleet paid one listConversations per agent). Same per-thread shape and semantics as
+   * {@link listConversations}; keyed by ownerGhii (an owner with no threads is absent from the map).
+   * Implemented as ONE grouped aggregate + ONE last-message + ONE subject query (window functions),
+   * independent of the owner count. Optional — a backend without it falls back to a per-owner loop.
+   */
+  listConversationsForOwners?(ownerGhiis: string[]): Promise<Record<string, ConversationSummary[]>>;
   /** Mark a single message read (sets readAt + status='read'). Returns the updated row. */
   markMessageRead(id: string, ownerGhii: string): Promise<DirectMessageRecord | null>;
   /** Mark every inbound message in a conversation read. Returns count updated. */

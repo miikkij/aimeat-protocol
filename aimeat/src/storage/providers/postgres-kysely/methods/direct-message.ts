@@ -7,11 +7,14 @@
  *   telemetry. Translated 1:1 from the Prisma implementation (providers/mongodb/methods/messaging.ts):
  *   `id` is the composite mailbox-copy key `${mid}::${ownerGhii}`, `mid` the message uuid.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add listConversationsForOwners batch (Phase 3): conversations list for many owners
+ *     in 3 window-function queries, collapsing the route's owner + per-agent fan-out.
  *   v1.0.0 — 2026-07-15 — Phase 5: direct messages on Postgres+Kysely.
  */
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type { DirectMessageRecord, ContactConsentRecord, MessageDeliveryLog, MessageDeliveryStats } from '../../../interface.js';
+import type { ConversationSummary } from '../../../repositories/direct-message.repository.js';
 import type { DirectMessage, ContactConsent, MessageDeliveryLog as MessageDeliveryLogRow } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
@@ -168,6 +171,59 @@ export const directMessageMethods = {
     }
     results.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
     return results;
+  },
+
+  // BULK (Phase 3) — the conversations list for MANY owners in ONE grouped aggregate + ONE last-message +
+  // ONE subject query (window functions), independent of owner count. Same per-thread rules as
+  // listConversations (peer from the newest row's direction, earliest non-null subject, inbound-unread
+  // count), keyed by ownerGhii so the route's owner + per-agent fan-out collapses to this one call.
+  async listConversationsForOwners(this: PostgresKyselyStorage, ownerGhiis: string[]): Promise<Record<string, ConversationSummary[]>> {
+    if (ownerGhiis.length === 0) return {};
+    const owners = sql.join(ownerGhiis);
+    const groups = await sql<{ ownerGhii: string; conversationId: string; messageCount: string | number; updatedAt: Date | string | null; unread: string | number }>`
+      SELECT "ownerGhii", "conversationId", COUNT(*) AS "messageCount", MAX("createdAt") AS "updatedAt",
+             SUM(CASE WHEN "direction" = 'inbound' AND "readAt" IS NULL THEN 1 ELSE 0 END) AS "unread"
+      FROM "DirectMessage" WHERE "ownerGhii" IN (${owners})
+      GROUP BY "ownerGhii", "conversationId"
+    `.execute(this.db);
+    if (groups.rows.length === 0) return {};
+
+    const lasts = await sql<{ ownerGhii: string; conversationId: string; body: string; direction: 'inbound' | 'outbound'; senderGhii: string; recipientGhii: string }>`
+      SELECT "ownerGhii", "conversationId", "body", "direction", "senderGhii", "recipientGhii" FROM (
+        SELECT "ownerGhii", "conversationId", "body", "direction", "senderGhii", "recipientGhii",
+               ROW_NUMBER() OVER (PARTITION BY "ownerGhii", "conversationId" ORDER BY "createdAt" DESC, "id" DESC) AS rn
+        FROM "DirectMessage" WHERE "ownerGhii" IN (${owners})
+      ) t WHERE rn = 1
+    `.execute(this.db);
+    const subjects = await sql<{ ownerGhii: string; conversationId: string; subject: string }>`
+      SELECT "ownerGhii", "conversationId", "subject" FROM (
+        SELECT "ownerGhii", "conversationId", "subject",
+               ROW_NUMBER() OVER (PARTITION BY "ownerGhii", "conversationId" ORDER BY "createdAt" ASC, "id" ASC) AS rn
+        FROM "DirectMessage" WHERE "ownerGhii" IN (${owners}) AND "subject" IS NOT NULL
+      ) t WHERE rn = 1
+    `.execute(this.db);
+
+    const ck = (o: string, c: string) => `${o} ${c}`;
+    const lastBy = new Map(lasts.rows.map(l => [ck(l.ownerGhii, l.conversationId), l]));
+    const subjBy = new Map(subjects.rows.map(s => [ck(s.ownerGhii, s.conversationId), s.subject]));
+
+    const out: Record<string, ConversationSummary[]> = {};
+    for (const g of groups.rows) {
+      const last = lastBy.get(ck(g.ownerGhii, g.conversationId));
+      const lastDirection = (last?.direction ?? 'inbound') as 'inbound' | 'outbound';
+      (out[g.ownerGhii] ??= []).push({
+        conversationId: g.conversationId,
+        peerGhii: last ? (lastDirection === 'inbound' ? last.senderGhii : last.recipientGhii) : '',
+        subject: subjBy.get(ck(g.ownerGhii, g.conversationId)),
+        lastMessage: last?.body ?? '',
+        lastDirection,
+        messageCount: Number(g.messageCount ?? 0),
+        unread: Number(g.unread ?? 0),
+        updatedAt: g.updatedAt ? iso(g.updatedAt) : '',
+      });
+    }
+    for (const arr of Object.values(out)) arr.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+    return out;
   },
 
   async markMessageRead(this: PostgresKyselyStorage, id: string, ownerGhii: string): Promise<DirectMessageRecord | null> {
