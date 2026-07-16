@@ -178,6 +178,10 @@ export interface AimeatConfig {
   memoryMaxKeysPerAgent: number;
   /** Max retained gate-audit (`meta.decisions.*`) entries per organism; oldest pruned on write. 0 = unlimited. */
   organismDecisionLogCap: number;
+  /** Max retained `.version.N` history snapshots per workspace record; older pruned on publish (a
+   *  manifest objectType's `maxVersions` overrides per space; append-only `create_only` spaces are
+   *  NEVER pruned). 0 = keep all history. */
+  workspaceMaxVersions: number;
   storageQuotaMb: number;
   storageMaxFileSizeMb: number;
   storageMaxChunkedFileSizeGb: number;

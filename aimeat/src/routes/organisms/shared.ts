@@ -32,7 +32,7 @@ import { ecoMayReadKey } from '../../services/ecosystem-access.js';
 import { validateMemoryWrite, validateValueAgainstSchema } from '../../services/schema-validator.js';
 import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../../services/archive.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../../services/workspace-roles.js';
-import { listVersionRefs, versionRefsByBase, maxVersionOf } from '../../services/workspace-versions.js';
+import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../../services/workspace-versions.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
@@ -186,14 +186,18 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     // queue) keeps only .latest — no immutable per-publish history.
     const mkey = `${wsRoot}.meta.manifest`;
     const manRec = (await storage.listAllMemory({ prefix: mkey, limit: 10 })).items.find(r => r.key === mkey);
-    const pubOt = ((manRec?.value as { objectTypes?: Array<{ namespace?: string; versioned?: boolean }> } | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
+    const pubOt = ((manRec?.value as { objectTypes?: Array<{ namespace?: string; versioned?: boolean; create_only?: boolean; maxVersions?: number }> } | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
     const versioned = pubOt?.versioned !== false;
     const n = maxN + 1;
 
-    if (versioned) await storage.setMemory({
-      key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue,
-      visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now,
-    });
+    if (versioned) {
+      await storage.setMemory({
+        key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue,
+        visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+      });
+      // Retention: prune history beyond the space's window (append-only spaces never pruned).
+      await pruneVersionsAfterPublish(storage, config, { refs: versionRefs, publishedN: n, ot: pubOt });
+    }
     // .latest (current state) is owned by a member's GHII — ONE owner per key, so it never forks into
     // per-agent duplicates a read then has to disambiguate. Preserve the record's existing owner
     // (normalised to their GHII — never a raw agent GAII); a brand-new record is owned by the publisher's
@@ -244,8 +248,10 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const versionsByBase = await versionRefsByBase(storage, nsPrefix);
     const mkey = `${wsRoot}.meta.manifest`;
     const manRec = (await storage.listAllMemory({ prefix: mkey, limit: 10 })).items.find(r => r.key === mkey);
-    const pubOt = ((manRec?.value as { objectTypes?: Array<{ namespace?: string; versioned?: boolean; create_only?: boolean; requires_expected_version?: boolean }> } | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
+    const pubOt = ((manRec?.value as { objectTypes?: Array<{ namespace?: string; versioned?: boolean; create_only?: boolean; requires_expected_version?: boolean; maxVersions?: number }> } | undefined)?.objectTypes ?? []).find(o => o.namespace === namespace);
     const versioned = pubOt?.versioned !== false;
+    // Retention window for this namespace (0 = keep all; append-only spaces resolve to 0).
+    const pruneWindow = effectiveMaxVersions(config, pubOt);
 
     // AMORTISE the per-record validation: the write-guard policy and the applicable schema are the SAME
     // for every record in one namespace, so resolve them ONCE (was a manifest read + a .latest read + a
@@ -315,7 +321,11 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
         if (!sv.ok) { results.push({ instance, ok: false, code: 'INVALID', violations: (sv.errors ?? []).map(m => ({ message: m })) }); continue; }
       }
       const n = maxN + 1;
-      if (versioned) toUpsert.push({ key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue, visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+      if (versioned) {
+        toUpsert.push({ key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue, visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+        // Retention: history rows beyond the window ride the batch's ONE bulk delete.
+        for (const r of versionRefsToPrune(versionsByBase.get(base) ?? [], n, pruneWindow)) toDelete.push({ ownerGaii: r.ownerGaii, key: r.key });
+      }
       // .latest is owned by a member GHII (never a raw agent GAII) — ONE owner per key. A brand-new
       // record is owned by the publisher's GHII; an existing one keeps its (GHII-normalised) owner. The
       // explicit version is what setMemory INSERTs; on an in-place UPDATE setMemory recomputes it — same

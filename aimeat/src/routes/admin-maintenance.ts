@@ -8,8 +8,11 @@
  *   - adminMaintenanceRouter(config, storage, maintenanceCache?): Router
  *   - GET/PUT/DELETE /v1/admin/hooks[/:hookName]: manage extension hook actions
  *   - GET/POST /v1/admin/maintenance: read/toggle maintenance mode
+ *   - POST /v1/admin/maintenance/compact-workspace-versions: one-shot version-history compaction
  *
  * @version-history
+ *   v1.1.0 — 2026-07-16 — compact-workspace-versions: operator-triggered one-shot sweep applying the
+ *     workspace version-retention window to existing `.version.N` bloat (P2).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -92,6 +95,23 @@ export function adminMaintenanceRouter(
             cleared: true,
         }));
         emitChange('config');
+    });
+
+    // POST /v1/admin/maintenance/compact-workspace-versions — one-shot workspace version-history
+    // compaction (operator only). Applies the retention window (AIMEAT_WS_MAX_VERSIONS / manifest
+    // maxVersions; append-only spaces never pruned) to EXISTING `.version.N` bloat — the publish
+    // path prunes incrementally from now on, this cleans what accumulated before. Optional body
+    // { organism_id } scopes the sweep to one organism. Registered before GET/POST /maintenance
+    // so Express matches the literal sub-path first.
+    router.post('/v1/admin/maintenance/compact-workspace-versions', requireAuth(), requireRole('operator'), async (req, res) => {
+        try {
+            const organismId = typeof req.body?.organism_id === 'string' && req.body.organism_id.trim() ? req.body.organism_id.trim() : undefined;
+            const { compactWorkspaceVersions } = await import('../services/workspace-versions.js');
+            const result = await compactWorkspaceVersions(storage, config, organismId ? { organismId } : undefined);
+            res.json(success(config.nodeId, result));
+        } catch (err) {
+            res.status(500).json(error(config.nodeId, 'COMPACTION_FAILED', `Workspace version compaction failed: ${(err as Error).message}`));
+        }
     });
 
     // GET /v1/admin/maintenance — get maintenance mode status (operator only)
