@@ -23,6 +23,8 @@
  *   v1.0.0 -- 2026-07-11 -- Initial (TARGET-023): read-only dangling-reference scan shared by the
  *     REST route GET /v1/organisms/:id/workspace/dangling-refs. Same manifest read gate as the
  *     workspace read; structured-field + fence-stripped prose detectors; same-workspace resolution.
+ *   v1.1.0 -- 2026-07-16 -- Scans exclude `.version.N` rows in SQL (excludeVersionRows) — history
+ *     rows were loaded with full values then dropped by the role filter.
  */
 import type { Storage, MemoryRecord, OrganismRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -148,7 +150,8 @@ async function scanWorkspace(
   const nsRoot = `organism.${orgId}.w.${ws}.`;
 
   // Live rows (archived excluded by default) + archived-only rows, in two bounded scans.
-  const live = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000 })).items;
+  // excludeVersionRows: the scan skips `.version.N` rows in SQL (they were loaded then discarded).
+  const live = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, excludeVersionRows: true })).items;
   const manRec = live.find(r => r.key === `${nsRoot}meta.manifest`);
   if (!manRec) return { readable: false, findings: [] };
 
@@ -163,7 +166,7 @@ async function scanWorkspace(
   }
   if (!canRead) return { readable: false, findings: [] };
 
-  const archived = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, archived: 'only' })).items;
+  const archived = (await storage.listAllMemory({ prefix: nsRoot, limit: 5000, archived: 'only', excludeVersionRows: true })).items;
   const types = manifestTypes(manRec);
 
   // Existence sets, keyed by instance id across ALL declared namespaces (an id resolves if it exists

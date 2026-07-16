@@ -73,6 +73,10 @@
  *   v1.14.0 -- 2026-07-11 -- _write + _publish normalize embedded document image URLs (raw /v1/storage
  *     → owner-addressed /v1/pub) and scope those files to the workspace (members-only) via
  *     services/doc-images — MCP-authored docs no longer store images that load for nobody.
+ *   v1.16.0 -- 2026-07-16 -- Version-bloat perf: _read/_revert scans exclude `.version.N` rows in SQL
+ *     (they were loaded with full values then discarded), _publish computes maxN value-free
+ *     (workspace-versions) and prunes history beyond the retention window (workspace-retention;
+ *     append-only spaces are never pruned).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -95,6 +99,7 @@ import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { normalizeDocValueImages } from '../services/doc-images.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole } from '../services/workspace-roles.js';
+import { listVersionRefs, maxVersionOf } from '../services/workspace-versions.js';
 import { registerWorkspaceMemberTools } from './workspace-members.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean };
@@ -280,7 +285,9 @@ export function registerWorkspaceTools(
             // can read the manifest (creator / same-owner agent / a viewer|contributor grant), they see ALL
             // of the workspace's content whoever wrote it — so a contributor's writes are visible to the
             // creator + other members. Otherwise nothing (org membership alone is discovery-only).
-            const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000, archived: include_archived ? 'include' : undefined });
+            // excludeVersionRows: this read never surfaces `.version.N` history — dropping those rows in
+            // SQL avoids loading every historic full-copy value only to discard it below.
+            const { items } = await storage.listAllMemory({ prefix: `${root}.`, limit: 5000, archived: include_archived ? 'include' : undefined, excludeVersionRows: true });
             const manRec = items.find(r => r.key === `${root}.meta.manifest`);
             let canRead = false;
             if (manRec) {
@@ -449,7 +456,9 @@ export function registerWorkspaceTools(
             const gate = (cfg?.value as { gates?: { publish?: { enabled?: boolean } } } | undefined)?.gates?.publish?.enabled;
             if (gate) return fail('Publishing requires human approval (the publish gate is on). Leave it as a draft for the owner to review and publish.');
             const base = `${wsRoot(organism_id, ws)}.${namespace}.${id}`;
-            const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
+            // Value-free version handling: the scan skips `.version.N` rows (their full values were
+            // loaded just to find maxN); the version numbers come from the key names alone below.
+            const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000, excludeVersionRows: true });
             // The draft may have been written by a sibling agent of the same owner (shell/REST path
             // stores under the agent's own GAII), so accept any same-owner draft, not just ownerGhii's.
             const draft = items.filter(r => r.key === `${base}.draft` && (r.ownerGaii === ownerGhii || isSameOwner(r.ownerGaii, ownerGhii)))
@@ -460,8 +469,8 @@ export function registerWorkspaceTools(
             const draftValue = await normalizeDocValueImages(storage, config, draft.value, ownerName, `${organism_id}/${ws}`);
             const valid = await validateMemoryWrite(`${base}.latest`, draftValue, storage, { viaPublish: true, expectedVersion: expected_version ?? null });
             if (!valid.valid) return fail('Publish refused: ' + JSON.stringify(valid.errors));
-            let maxN = 0;
-            for (const r of items) { if (r.key.startsWith(`${base}.version.`)) { const s = r.key.slice(`${base}.version.`.length); if (/^\d+$/.test(s)) maxN = Math.max(maxN, parseInt(s, 10)); } }
+            const versionRefs = await listVersionRefs(storage, base);
+            const maxN = maxVersionOf(versionRefs);
             const now = new Date().toISOString();
             const tags = draft.tags ?? [];
             const existingLatest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresher(best, r), null);
@@ -503,7 +512,8 @@ export function registerWorkspaceTools(
         async ({ organism_id, ws, namespace, id }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             const base = `${wsRoot(organism_id, ws)}.${namespace}.${id}`;
-            const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000 });
+            // Reopening needs only .draft/.latest/bare — never the `.version.N` history values.
+            const { items } = await storage.listAllMemory({ prefix: `${base}.`, limit: 2000, excludeVersionRows: true });
             if (items.find(r => r.key === `${base}.draft`)) return fail(`A draft already exists at ${base}.draft — edit it directly instead of reopening.`);
             // The published current state is the FRESHEST .latest (guarding a forked key), or the bare key.
             const latest = items.filter(r => r.key === `${base}.latest`).reduce<MemoryRecord | null>((best, r) => fresher(best, r), null)

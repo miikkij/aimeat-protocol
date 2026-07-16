@@ -60,6 +60,8 @@ export interface KeyPrefixOpts {
   limit?: number;
   offset?: number;
   archived?: ArchiveFilter;
+  /** Drop `.version.N` workspace history rows in SQL (hot reads always discard them). */
+  excludeVersionRows?: boolean;
 }
 
 /** A (ownerGaii, key) pair — the address of one memory row, used by the bulk-delete primitive. */

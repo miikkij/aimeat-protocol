@@ -286,11 +286,13 @@ export const memoryMethods = {
     return rows.filter(isLive).map(r => ({ record: rowToRecord(r), score: Number((r as { score: number }).score) }));
   },
 
-  async listAllMemory(this: PostgresKyselyStorage, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter }): Promise<{ items: MemoryRecord[]; total: number }> {
+  async listAllMemory(this: PostgresKyselyStorage, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean }): Promise<{ items: MemoryRecord[]; total: number }> {
     let q = this.db.selectFrom('Memory').selectAll();
     if (opts?.prefix) q = q.where('key', 'like', opts.prefix + '%');
     if (opts?.ownerPrefix) q = q.where('ownerGaii', 'like', opts.ownerPrefix + '%');
     if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
+    // Drop `.version.N` workspace history rows in SQL (hot read paths always discard them).
+    if (opts?.excludeVersionRows) q = q.where('key', 'not like', '%.version.%');
     q = applyArchive(q, opts?.archived);
     const all = (await q.orderBy('key').execute()).filter(isLive);
     const total = all.length;

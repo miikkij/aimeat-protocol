@@ -19,6 +19,10 @@
  *     (keeps indexes → realistic timings) before each scale's seed.
  *   v1.2.0 — 2026-07-15 — Add the Phase-1 bulk-write comparison chains (import N keys OLD per-item vs NEW
  *     MemoryDbService.writeMany) + the subtree-delete primitive, to quantify the round-trip reduction.
+ *   v1.3.0 — 2026-07-16 — Version-bloat chains: seed a workspace MANIFEST + an `archived` fraction knob
+ *     (AIMEAT_BENCH_SCALES=…,archivedPct=30), and bench the hot workspace READ (collectWorkspaceSummary —
+ *     the index/overview path that used to load every .version.N value) + a single publish over a
+ *     version-heavy record (the maxN scan). Quantifies the excludeVersionRows / value-free-maxN fixes.
  */
 process.env.AIMEAT_PERF_TRACE = '1';
 
@@ -31,6 +35,7 @@ import { checkMemoryQuota } from '../../src/services/quota.js';
 import { validateMemoryWrite } from '../../src/services/schema-validator.js';
 import { createMemoryDbService, createHomeDashboardService } from '../../src/services/db/index.js';
 import { createOrganismHelpers } from '../../src/routes/organisms/shared.js';
+import { collectWorkspaceSummary } from '../../src/services/structure-overview.js';
 import { loadConfig } from '../../src/config.js';
 
 const NODE = 'bench-node';
@@ -39,20 +44,20 @@ const GHII = `${OWNER}@${NODE}`;
 const ORG = 'org-bench-0001';
 const WS = 'ws-bench';
 
-interface Scale { agents: number; memories: number; records: number; versions: number; }
+interface Scale { agents: number; memories: number; records: number; versions: number; archivedPct: number; }
 
 function parseScales(): Scale[] {
   const raw = process.env.AIMEAT_BENCH_SCALES;
   if (raw) {
     const s: Record<string, number> = {};
     for (const kv of raw.split(',')) { const [k, v] = kv.split('='); s[k.trim()] = parseInt(v, 10); }
-    return [{ agents: s.agents ?? 10, memories: s.memories ?? 1000, records: s.records ?? 100, versions: s.versions ?? 2 }];
+    return [{ agents: s.agents ?? 10, memories: s.memories ?? 1000, records: s.records ?? 100, versions: s.versions ?? 2, archivedPct: s.archivedPct ?? 0 }];
   }
   // Default: three scales to expose growth (small → prod-like → large).
   return [
-    { agents: 5, memories: 500, records: 50, versions: 2 },
-    { agents: 50, memories: 5000, records: 200, versions: 3 },
-    { agents: 100, memories: 12000, records: 500, versions: 3 },
+    { agents: 5, memories: 500, records: 50, versions: 2, archivedPct: 0 },
+    { agents: 50, memories: 5000, records: 200, versions: 3, archivedPct: 0 },
+    { agents: 100, memories: 12000, records: 500, versions: 3, archivedPct: 0 },
   ];
 }
 
@@ -79,12 +84,30 @@ async function seed(storage: Storage, sc: Scale): Promise<void> {
     const owner = i % 7 === 0 && sc.agents > 0 ? `agent${i % sc.agents}#${OWNER}@${NODE}` : GHII;
     await storage.setMemory(mem(owner, `data.item.${i}`, { name: `Item ${i}`, note: 'seeded row for the perf bench', n: i }));
   }
-  // Workspace records with published versions (the CADENCE shape: .latest + .version.1..V).
+  // Workspace records with published versions (the CADENCE shape: .latest + .version.1..V), under a
+  // real manifest so the structure-overview / index read paths treat the space as memory-backed records.
   const wsRoot = `organism.${ORG}.w.${WS}`;
+  await storage.setMemory(mem(GHII, `${wsRoot}.meta.manifest`, {
+    name: 'Bench workspace',
+    objectTypes: [{ name: 'contacts', namespace: 'crm.contacts', mode: 'records' }],
+  }));
+  // ~2 KB body per row — the realistic record/document shape (a tiny value would hide the cost of
+  // loading + JSON.parsing every .version.N value on the read paths).
+  const body = 'sisältöä '.repeat(220);
   for (let r = 0; r < sc.records; r++) {
     const base = `${wsRoot}.crm.contacts.rec${r}`;
-    for (let v = 1; v <= sc.versions; v++) await storage.setMemory(mem(GHII, `${base}.version.${v}`, { etunimi: `C${r}`, v }));
-    await storage.setMemory(mem(GHII, `${base}.latest`, { etunimi: `C${r}`, sukunimi: `L${r}` }));
+    for (let v = 1; v <= sc.versions; v++) await storage.setMemory(mem(GHII, `${base}.version.${v}`, { etunimi: `C${r}`, v, body }));
+    await storage.setMemory(mem(GHII, `${base}.latest`, { etunimi: `C${r}`, sukunimi: `L${r}`, body }));
+  }
+  // Archive a fraction of the record families (rows stay in the table flagged archived=1 — the
+  // real-node shape where reads must skip them, not a shrunken table).
+  if (sc.archivedPct > 0) {
+    const every = Math.max(1, Math.round(100 / sc.archivedPct));
+    for (let r = 0; r < sc.records; r += every) {
+      await storage.archiveMemoryByKey(`${wsRoot}.crm.contacts.rec${r}`, {
+        archivedRoot: `${wsRoot}.crm.contacts.rec${r}`, archivedBy: GHII, archivedAt: new Date().toISOString(), match: 'subtree',
+      });
+    }
   }
 }
 
@@ -194,6 +217,16 @@ async function runScale(sc: Scale): Promise<void> {
   const H = createOrganismHelpers(config, storage);
   const K = 50;
   const wsRoot = `organism.${ORG}.w.${WS}`;
+
+  // ── Version-bloat chains: the hot WORKSPACE READ (index/overview — collapses every instance to its
+  // current value, versions are pure overhead) and ONE publish over a record that already carries V
+  // versions (the maxN scan). Both scale with records×versions when version rows are loaded with values. ──
+  await bench(`workspace INDEX read (${sc.records} rec × ${sc.versions} ver)`, () =>
+    collectWorkspaceSummary(storage, config, { orgId: ORG, ws: WS, viewerGaii: GHII }));
+  await storage.setMemory(mem(GHII, `${wsRoot}.crm.contacts.rec2.draft`, { etunimi: 'C2', muokattu: true }));
+  await bench(`publish 1 draft over ${sc.versions}-version record`, async () => {
+    await H.publishDraft(ORG, WS, 'crm.contacts', 'rec2', GHII);
+  });
   const seedDrafts = async (ns: string, tag: string): Promise<void> => {
     for (let i = 0; i < K; i++) await storage.setMemory(mem(GHII, `${wsRoot}.${ns}.${tag}${i}.draft`, { id: `${tag}${i}`, title: `Task ${i}`, body: 'cadence record draft' }));
   };

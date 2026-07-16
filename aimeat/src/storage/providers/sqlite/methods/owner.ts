@@ -586,7 +586,7 @@ export const ownerMethods = {
     return sumMemoryBytesForOwnersRepo(this.db, ownerGaiis);
   },
 
-  async listAllMemory(this: SqliteStorage, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter }): Promise<{ items: MemoryRecord[]; total: number }> {
+  async listAllMemory(this: SqliteStorage, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean }): Promise<{ items: MemoryRecord[]; total: number }> {
     let whereClauses = '';
     const params: unknown[] = [];
 
@@ -601,6 +601,11 @@ export const ownerMethods = {
     if (opts?.visibility) {
       whereClauses += ' AND visibility = ?';
       params.push(opts.visibility);
+    }
+    // Workspace `.version.N` history rows are dropped IN SQL so the hot read paths never load
+    // (or JSON.parse) the historic full-copy values they always discard. See memory.repository.ts.
+    if (opts?.excludeVersionRows) {
+      whereClauses += " AND key NOT LIKE '%.version.%'";
     }
     whereClauses += archivedSql(opts?.archived);
 

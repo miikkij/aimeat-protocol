@@ -177,8 +177,16 @@ export interface MemoryRepository {
    * substring scan) this is the cross-owner primitive the librarian fans across organisms with.
    */
   searchText(query: string, opts?: MemoryTextSearchOpts): Promise<MemoryTextHit[]>;
-  /** List all memory across all owners with optional filtering and pagination (admin). */
-  listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter }): Promise<{ items: MemoryRecord[]; total: number }>;
+  /**
+   * List all memory across all owners with optional filtering and pagination (admin).
+   *
+   * `excludeVersionRows` drops `.version.N` workspace history rows IN SQL (`key NOT LIKE '%.version.%'`)
+   * — the hot workspace read paths (index/overview/REST read/publish) collapse instances to
+   * `.latest`/`.draft` and always DISCARD version rows, so loading + JSON.parsing every historic
+   * full-copy value was pure waste that grew with publish count. Callers that genuinely consume
+   * history (activity feed, object delete, export) must NOT set it.
+   */
+  listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean }): Promise<{ items: MemoryRecord[]; total: number }>;
   /**
    * List archived prior versions of a TRACKABLE memory key, newest version first. Only keys marked
    * `trackable` accumulate history (the latest value always lives in `getMemory`). Empty for keys that
