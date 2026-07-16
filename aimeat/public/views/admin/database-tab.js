@@ -10,6 +10,8 @@
  *   - Delta                       -- +N / -N with up/down colour
  *   - DatabaseTab (default)       -- summary cards + capture button + per-table counts table
  * @version-history
+ *   v1.1.0 -- 2026-07-16 -- Total-rows card sub-line shows the memory-table composition
+ *     (version-history + archived row counts) when the server reports them.
  *   v1.0.0 -- 2026-07-16 -- Initial: live counts, hour/24h/7d totals, per-table 24h growth.
  */
 import { h } from 'preact';
@@ -93,7 +95,10 @@ export default function DatabaseTab() {
     </div>
 
     <div class="adm-grid adm-grid-4">
-      <${StatCard} label=${t('admin.database.totalRows')} value=${current.totalRows} sub=${`${num(current.tableCount)} ${t('admin.database.tables')}`} />
+      <${StatCard} label=${t('admin.database.totalRows')} value=${current.totalRows}
+        sub=${`${num(current.tableCount)} ${t('admin.database.tables')}`
+          + (current.memoryVersionRows !== undefined ? ` · ${num(current.memoryVersionRows)} ${t('admin.database.memoryVersionRows')}` : '')
+          + (current.memoryArchivedRows !== undefined ? ` · ${num(current.memoryArchivedRows)} ${t('admin.database.memoryArchivedRows')}` : '')} />
       <div class="adm-card">
         <h2>${t('admin.database.lastHour')}</h2>
         <div class="adm-stat"><${Delta} value=${totalDelta(base1h)} /></div>

@@ -7814,6 +7814,8 @@
       "captured": "Tilannekuva otettu.",
       "totalRows": "Rivejä yhteensä",
       "tables": "taulua",
+      "memoryVersionRows": "versiohistoriariviä",
+      "memoryArchivedRows": "arkistoitua riviä",
       "lastHour": "Viimeinen tunti",
       "last24h": "Viimeiset 24 h",
       "last7d": "Viimeiset 7 vrk",

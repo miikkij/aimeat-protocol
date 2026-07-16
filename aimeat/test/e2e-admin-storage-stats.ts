@@ -4,6 +4,7 @@
  *   per-table row counts (backend-specific: pg_stat on Postgres, count(*) on SQLite, collection counts on
  *   Mongo), the manual snapshot capture, that snapshots persist + list newest-first, and operator-only auth.
  * @version-history
+ *   v1.1.0 -- 2026-07-16 -- Assert the memory-table composition fields (memoryVersionRows/-ArchivedRows).
  *   v1.0.0 -- 2026-07-16 -- Initial: live counts + capture + list + auth gate.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-admin-storage-stats
@@ -67,6 +68,9 @@ await test('GET /v1/admin/storage-stats returns live per-table counts', async ()
     const sum = Object.values(cur.counts as Record<string, number>).reduce((a, b) => a + b, 0);
     assert(sum === cur.totalRows, `counts sum ${sum} === totalRows ${cur.totalRows}`);
     assert(Array.isArray(body.data.snapshots), 'snapshots is an array');
+    // Memory-table composition (P3): version-history + archived row counts are reported.
+    assert(typeof cur.memoryVersionRows === 'number' && cur.memoryVersionRows >= 0, `memoryVersionRows number, got ${cur.memoryVersionRows}`);
+    assert(typeof cur.memoryArchivedRows === 'number' && cur.memoryArchivedRows >= 0, `memoryArchivedRows number, got ${cur.memoryArchivedRows}`);
 });
 
 await test('POST snapshot captures + persists a snapshot', async () => {

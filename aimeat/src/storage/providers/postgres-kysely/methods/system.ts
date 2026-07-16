@@ -114,6 +114,16 @@ export const systemMethods = {
     for (const r of res.rows) counts[r.t] = Number(r.n);
     return counts;
   },
+  async getMemoryRowBreakdown(this: PostgresKyselyStorage): Promise<{ versionRows: number; archivedRows: number }> {
+    // One aggregate over the Memory table — no values loaded. `.version.N` history + archived rows
+    // both inflate the table invisibly; the admin DB tab shows the composition.
+    const res = await sql<{ v: string | null; a: string | null }>`
+      SELECT count(*) FILTER (WHERE "key" LIKE '%.version.%')::bigint AS v,
+             count(*) FILTER (WHERE "archived")::bigint AS a
+      FROM "Memory"`.execute(this.db);
+    const r = res.rows[0];
+    return { versionRows: Number(r?.v ?? 0), archivedRows: Number(r?.a ?? 0) };
+  },
   async saveStorageStatsSnapshot(this: PostgresKyselyStorage, s: StorageStatsSnapshot): Promise<void> {
     await this.db.insertInto('StorageStatsSnapshot').values({
       id: s.id, capturedAt: new Date(s.capturedAt), counts: jsonb(s.counts), totalRows: s.totalRows,
