@@ -340,6 +340,17 @@ export const capabilityAgentsMethods = {
     }
     return counts;
   },
+  async getMemoryRowBreakdown(this: SqliteStorage): Promise<{ versionRows: number; archivedRows: number }> {
+    // One aggregate over the memory table — no values loaded. `.version.N` history + archived rows
+    // both inflate the table invisibly; the admin DB tab shows the composition.
+    const row = this.db.prepare(
+      `SELECT
+         SUM(CASE WHEN key LIKE '%.version.%' THEN 1 ELSE 0 END) AS v,
+         SUM(CASE WHEN archived = 1 THEN 1 ELSE 0 END) AS a
+       FROM memory`
+    ).get() as { v: number | null; a: number | null };
+    return { versionRows: row.v ?? 0, archivedRows: row.a ?? 0 };
+  },
   async saveStorageStatsSnapshot(this: SqliteStorage, s: StorageStatsSnapshot): Promise<void> {
     this.db.prepare(
       `INSERT INTO storage_stats_snapshots (id, capturedAt, counts, totalRows) VALUES (?, ?, ?, ?)

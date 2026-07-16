@@ -6,6 +6,8 @@
  *   per-table count is backend-specific (pg_stat estimate on Postgres, count(*) on SQLite, collection
  *   counts on Mongo) — this route only reads the generic Storage surface. Operator-only.
  * @version-history
+ *   v1.1.0 -- 2026-07-16 -- current gains memoryVersionRows + memoryArchivedRows (memory-table
+ *     composition: workspace `.version.N` history + archived rows — the invisible inflators).
  *   v1.0.0 -- 2026-07-16 -- Initial: GET /v1/admin/storage-stats (live counts + snapshot timeline).
  */
 import { Router } from 'express';
@@ -21,13 +23,19 @@ export function adminStorageStatsRouter(config: AimeatConfig, storage: Storage):
   router.get('/v1/admin/storage-stats', requireAuth(), requireRole('operator'), async (req, res) => {
     const limit = Math.min(Math.max(parseInt((req.query.limit as string) || '168', 10) || 168, 1), 1000);
     try {
-      const [counts, snapshots] = await Promise.all([
+      const [counts, snapshots, memory] = await Promise.all([
         storage.getTableRowCounts(),
         storage.listStorageStatsSnapshots({ limit }),
+        // Composition of the memory table: `.version.N` workspace history + archived rows — the two
+        // invisible inflators the retention window / archive flags produce.
+        storage.getMemoryRowBreakdown(),
       ]);
       const totalRows = Object.values(counts).reduce((a, b) => a + b, 0);
       res.json(success(config.nodeId, {
-        current: { capturedAt: new Date().toISOString(), counts, totalRows, tableCount: Object.keys(counts).length },
+        current: {
+          capturedAt: new Date().toISOString(), counts, totalRows, tableCount: Object.keys(counts).length,
+          memoryVersionRows: memory.versionRows, memoryArchivedRows: memory.archivedRows,
+        },
         snapshots,   // newest first: [{ id, capturedAt, counts, totalRows }]
       }));
     } catch (err) {

@@ -7814,6 +7814,8 @@
       "captured": "Snapshot captured.",
       "totalRows": "Total rows",
       "tables": "tables",
+      "memoryVersionRows": "version history rows",
+      "memoryArchivedRows": "archived rows",
       "lastHour": "Last hour",
       "last24h": "Last 24h",
       "last7d": "Last 7 days",

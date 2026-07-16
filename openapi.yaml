@@ -30605,6 +30605,12 @@ paths:
                               counts: { type: object, additionalProperties: { type: integer } }
                               totalRows: { type: integer }
                               tableCount: { type: integer }
+                              memoryVersionRows:
+                                type: integer
+                                description: Memory rows that are workspace `.version.N` history snapshots
+                              memoryArchivedRows:
+                                type: integer
+                                description: Memory rows flagged archived (hidden from the working set, still stored)
                           snapshots:
                             type: array
                             items:
