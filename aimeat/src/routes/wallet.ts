@@ -12,20 +12,37 @@
  *   v1.0.0 — 2026-03-17 — Simplify to single GHII-based balance (remove dual agent/owner paths)
  *   v1.1.0 — 2026-06-22 — Cache the per-owner escrow sum (services/cache.ts, 60s): it scans every
  *     agent's work items, so the wallet poll re-scanned on each load. Invalidated on work/wallet changes.
+ *   v1.2.0 — 2026-07-16 — Add GET /v1/wallet/overview: the Wallet tab's 4 core reads (wallet + transactions
+ *     + commerce sessions + orders) folded into one composite (WalletTabService, Phase 4). Owner-gated;
+ *     EE PSP stays separate; individual endpoints stay for interactive refresh.
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, WalletTransaction } from '../storage/interface.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { calculateEscrow } from '../services/morsel.js';
 import { MorselRequestSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
 import { cached, TTL } from '../services/cache.js';
+import { createWalletTabService } from '../services/db/wallet-tab-db-service.js';
 
 export function walletRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  const walletDb = createWalletTabService(config, storage);
+
+  /* ── GET /v1/wallet/overview — the whole Wallet tab mount in ONE call: wallet (balance/escrow/lifetime)
+   * + recent transactions + commerce checkout-sessions + orders, composed in one read scope by
+   * WalletTabService (the ledger is read once for both stats and the list). Owner-scope: requires 'owner'
+   * role — the Wallet tab is an owner view, and this is stricter than the folded endpoints, so no section
+   * is exposed more widely. The Enterprise PSP section stays on its own /v1/me/psp call (ee/, conditional).
+   * The individual endpoints stay for interactive re-fetches. ── */
+  router.get('/v1/wallet/overview', requireAuth(), requireRole('owner'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    const data = await walletDb.overview(owner, `${owner}@${config.nodeId}`);
+    res.json(success(config.nodeId, data));
+  });
 
   // GET /v1/wallet — check balance (single GHII-based balance)
   router.get('/v1/wallet', requireAuth(), requireScope('wallet:read'), async (req, res) => {
