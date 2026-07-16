@@ -4,6 +4,8 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — ?include=counts uses workspaceCountsByOrg (ONE batched registry read) instead of
+ *     a listAllMemory scan per organism.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  */
 import type { Router } from 'express';
@@ -23,7 +25,7 @@ import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import type { OrganismHelpers } from './shared.js';
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
-  const { wsRegPrefix } = H;
+  const { wsRegPrefix, workspaceCountsByOrg } = H;
 
   /* ── POST /v1/organisms — Create a new organism (agents/owners by role; published apps via the
      organism:write scope, so an app can provision its own structured data space for its owner). ── */
@@ -140,17 +142,10 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
     const include = String(req.query.include ?? '').split(',').map(s => s.trim());
     let payload: unknown[] = organisms;
     if (include.includes('counts')) {
-      payload = await Promise.all(organisms.map(async (o) => {
-        const { items } = await storage.listAllMemory({ prefix: wsRegPrefix(o.id), limit: 1000 });
-        const ids = new Set<string>();
-        for (const rec of items) {
-          if (rec.key !== wsRegPrefix(o.id)) continue;
-          for (const w of ((rec.value as { workspaces?: Array<{ id?: string }> } | null)?.workspaces ?? [])) {
-            if (w.id) ids.add(w.id);
-          }
-        }
-        return { ...o, workspace_count: ids.size };
-      }));
+      // ONE cross-owner key-IN read of every org's registry record → distinct workspace count per org,
+      // instead of a listAllMemory scan per organism.
+      const counts = await workspaceCountsByOrg(organisms.map(o => o.id));
+      payload = organisms.map(o => ({ ...o, workspace_count: counts.get(o.id) ?? 0 }));
     }
 
     // Roster privacy: per-organism memberVisibility decides whether THIS caller gets the
