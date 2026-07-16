@@ -8,6 +8,8 @@
  * @structure accessTokensRouter() — POST/GET/DELETE /v1/access/tokens (owner) + POST /v1/auth/token/exchange (token is the auth).
  * @usage app.use(accessTokensRouter(config, storage));
  * @version-history
+ * v1.1.0 - 2026-07-16 - Add GET /v1/access/overview: the Access tab's 6-request mount folded into one
+ *   composite (AccessTabService, Phase 4). Owner-gated; individual endpoints stay for interactive refresh.
  * v1.0.0 - 2026-06-03 - Initial (plan 2026-06-03-agent-access-tokens).
  */
 import { Router } from 'express';
@@ -21,9 +23,23 @@ import { issueJWT } from '../auth/jwt.js';
 import { buildGAII } from '../utils/gaii.js';
 import { hashToken } from '../services/owner-session.js';
 import { resolvePat } from '../services/access-token.js';
+import { createAccessTabService } from '../services/db/access-tab-db-service.js';
 
 export function accessTokensRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  const accessDb = createAccessTabService(storage);
+
+  /* ── GET /v1/access/overview — the whole Access tab mount in ONE call (consent + ghii public key +
+   * app-grants + access-tokens + sharing-groups + agent-defaults), composed in one read scope by
+   * AccessTabService. Owner-scope: requires 'owner' role — stricter than the six folded endpoints
+   * (some of which agents may reach with a scope), so no section is exposed more widely. Each section is
+   * returned in its source endpoint's payload shape; the individual endpoints stay for interactive
+   * re-fetches. ── */
+  router.get('/v1/access/overview', requireAuth(), requireRole('owner'), async (req, res) => {
+    const owner = req.auth!.owner as string;
+    const data = await accessDb.overview(owner, `${owner}@${config.nodeId}`);
+    res.json(success(config.nodeId, data));
+  });
 
   // POST /v1/access/tokens — create a personal access token (owner only)
   router.post('/v1/access/tokens', requireAuth(), requireRole('owner'), async (req, res) => {

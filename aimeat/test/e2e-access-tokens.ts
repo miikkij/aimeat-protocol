@@ -205,6 +205,28 @@ async function main() {
     assert(!r.setRt, 'scoped token must NOT set a browser session cookie');
   });
 
+  console.log('\nPhase 5 — Access tab overview composite (Phase 4 DbService)');
+  await test('GET /v1/access/overview folds the Access tab mount into one call', async () => {
+    const ov = await api('/v1/access/overview', { method: 'GET', bearer: jwtB });
+    assert(ov.status === 200 && ov.data?.ok, `overview ${ov.status}: ${JSON.stringify(ov.data?.error)}`);
+    const d = ov.data.data;
+    assert(Array.isArray(d.consent?.consents), 'consent.consents is an array');
+    assert('publicKey' in d, 'publicKey present');
+    assert(Array.isArray(d.appGrants?.grants), 'appGrants.grants is an array');
+    assert(Array.isArray(d.accessTokens?.tokens), 'accessTokens.tokens is an array');
+    assert(Array.isArray(d.groups?.groups), 'groups.groups is an array');
+    assert(d.agentDefaults?.defaults && typeof d.agentDefaults.defaults === 'object', 'agentDefaults.defaults is an object');
+    // The tokens section equals the standalone endpoint (same composition, one read scope).
+    const toks = await api('/v1/access/tokens', { method: 'GET', bearer: jwtB });
+    assert(d.accessTokens.tokens.length === toks.data.data.tokens.length,
+      `overview tokens (${d.accessTokens.tokens.length}) == /access/tokens (${toks.data.data.tokens.length})`);
+  });
+
+  await test('GET /v1/access/overview is owner-only (agent/scoped session → 403)', async () => {
+    const ag = await api('/v1/access/overview', { method: 'GET', bearer: scopedJwt });
+    assert(ag.status === 403, `agent overview should be 403 (owner-only), got ${ag.status}`);
+  });
+
   console.log('\n─────────────────────────────────────');
   console.log(`Results: ${passed} passed, ${failed} failed, ${passed + failed} total`);
   if (failed === 0) console.log('✅ All tests passed!');
