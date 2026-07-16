@@ -4,6 +4,8 @@
  *   get/put, GET /v1/ghii/me, GET /v1/ghii/:ghii, PUT /v1/ghii, DELETE /v1/ghii. Extracted from
  *   src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — GET /v1/ghii/list resolves the directory opt-in with ONE cross-owner key-IN read
+ *     (getMemoryByKeysAnyOwner) instead of a getMemory per listed user (Phase 3).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/ghii.ts (max-file-lines)
  */
 import type { Router } from 'express';
@@ -36,15 +38,22 @@ export function registerProfileRoutes(
             level: level !== undefined && !isNaN(level) ? level : undefined,
         });
 
-        // Keep only members who opted in. Best-effort per-profile read of the opt-in key; a caller
-        // always sees THEIR OWN entry regardless (so they can confirm their listing took effect).
+        // Keep only members who opted in. The opt-in key profile.{username}.directory_listed is unique per
+        // user and owned by that user's GHII, so ONE cross-owner key-IN read replaces the per-profile
+        // getMemory scan over every listed user. A caller always sees THEIR OWN entry regardless (so they
+        // can confirm their listing took effect). Only a record OWNED BY a user's GHII opts that user in —
+        // a forged copy under another owner self-lists at most the forger, never its subject.
         const callerOwner = req.auth!.owner;
-        const listed = [];
-        for (const r of all) {
-            if (r.ownerName === callerOwner) { listed.push(r); continue; }
-            const optIn = await storage.getMemory(r.ghii, `profile.${r.username}.directory_listed`);
-            if (optIn?.value === true) listed.push(r);
+        const others = all.filter(r => r.ownerName !== callerOwner);
+        const optInGaiis = new Set<string>();
+        if (others.length) {
+            const keys = others.map(r => `profile.${r.username}.directory_listed`);
+            const recs = storage.getMemoryByKeysAnyOwner
+                ? await storage.getMemoryByKeysAnyOwner(keys)
+                : (await Promise.all(others.map(r => storage.getMemory(r.ghii, `profile.${r.username}.directory_listed`)))).filter((m): m is NonNullable<typeof m> => !!m);
+            for (const m of recs) if (m.value === true) optInGaiis.add(m.ownerGaii);
         }
+        const listed = all.filter(r => r.ownerName === callerOwner || optInGaiis.has(r.ghii));
 
         res.json(success(config.nodeId, {
             humans: listed.map(r => ({
