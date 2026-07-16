@@ -189,6 +189,7 @@ const ALL_SUITES = [
     'test/e2e-ecosystem-validation.ts',
     'test/e2e-agent-governance.ts',
     'test/e2e-workflows.ts',
+    'test/e2e-workflows-human.ts',
     'test/e2e-public-activity.ts',
     'test/e2e-public-totals.ts',
 ];

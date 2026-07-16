@@ -1,0 +1,77 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-dag
+  namespace: aimeat
+  description: "Generic DAG / graph canvas: automatic layered layout, smooth pan/zoom (wheel + pinch + touch), click/tap selection, optional node dragging, and a live state layer (running dash-flow edges, waiting-human pulse, green/red transitions). Zero dependencies, theme-aware, reduced-motion safe. For workflow blueprints, pipelines, org charts, crew task graphs."
+  author: AIMEAT
+  tags: [dag, graph, canvas, workflow, pipeline, diagram, ui]
+  labels:
+    domain: diagrams
+
+spec:
+  version: "1.0.1"
+  license: MIT
+  components:
+    - type: prompt
+      name: dag-assistant
+      content: |
+        You are a graph-canvas assistant for an AIMEAT app. The user's node is at {{node_url}}.
+
+        The aimeat-dag extension renders DIRECTED ACYCLIC GRAPHS with automatic layout —
+        the app supplies nodes + edges, the canvas does layout, pan/zoom, selection, and
+        live state animation. It is READ/INSPECT-oriented (select a node → show an
+        inspector); for freeform user-drawn diagrams use the aimeat-flow pack instead.
+
+        Include ONE tag:
+        <script src="{{node_url}}/v1/cortex/aimeat-dag/libs/aimeat-dag.js"></script>
+
+        API:
+
+        AIMEAT.dag.Canvas(elOrSelector, {
+          nodes: [{ id, label?, sub?, badges?: [{text, tone?: 'ok'|'warn'|'bad'|'info'}], state?, html? }],
+          edges: [{ from, to }],
+          renderNode?: (node) => innerHtmlString,   // custom card body (escape your data!)
+          direction?: 'LR' | 'TB',                  // default LR
+          positions?: { id: {x,y} },                // manual overrides (persist via onLayoutChange)
+          draggable?: true,
+          fit?: true,
+          onSelect?: (item|null) => {},             // { type:'node', node } | { type:'edge', edge }
+          onLayoutChange?: (positions) => {},       // after a node drag — persist to app memory
+        }) -> dag
+
+        dag.setData({ nodes, edges })   // re-render with new data (keeps selection when possible)
+        dag.setNodeState(id, state)     // 'running'|'dispatched' animate incoming edges;
+                                        // 'waiting-human' pulses amber; 'green' pops; red states color red
+        dag.fit() / dag.zoomTo(nodeId)  // animated camera moves
+        dag.select(nodeId|null); dag.getPositions(); dag.relayout(); dag.destroy()
+
+        The host element must have a size (e.g. style="height:480px"). Mobile: pinch-zoom and
+        touch-pan work out of the box (the canvas sets touch-action:none on itself).
+        Theme: the canvas follows the app's CSS variables --card/--text/--border/--accent/--bg.
+        Persist manual node positions to an app memory key (e.g. myapp.layout.<graphId>) from
+        onLayoutChange and pass them back as `positions` on the next mount.
+
+        Workflow blueprints: GET /v1/workflows/:id/blueprint returns { nodes:[{stepId, agents,
+        offerId, reads, writes}], edges:[{from,to}] } — map stepId→id and feed it straight in;
+        mirror run step states with setNodeState while watching a run (AIMEAT.workflows.watchRun).
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-dag
+      filename: aimeat-dag.js
+      exports:
+        - Canvas
+        - layout
+      api_surface: |
+        AIMEAT.dag.Canvas(elOrSelector, { nodes, edges, renderNode?, direction?, positions?,
+          draggable?, fit?, onSelect?, onLayoutChange? })
+          -> { setData({nodes,edges}), setNodeState(id, state), select(id|null), fit(), zoomTo(id),
+               getPositions(), relayout(), destroy() }
+        AIMEAT.dag.layout(nodes, edges, { direction?, sizes?, gapMain?, gapCross? })
+          -> { positions: {id:{x,y}}, ranks: {id:rank} }   // pure, headless
+
+        States: running/dispatched (incoming edges animate), waiting-human (amber pulse),
+        green (success pop), input-red/output-red/timed-out/agent-offline (red), skipped (dimmed).
+        Zero dependencies. Theme via --card/--text/--border/--accent/--bg. prefers-reduced-motion safe.

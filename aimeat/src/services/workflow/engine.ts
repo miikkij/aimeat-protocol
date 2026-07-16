@@ -43,6 +43,13 @@
  *     tick fires a heads-up notification when it dispatches to an offline agent; the sweep fast-fails a
  *     no-progress step whose agent is unreachable at the offline grace (AGENT_OFFLINE_GRACE_MS) into the
  *     new `agent-offline` state — instead of waiting the full timeout_min for a generic timed-out.
+ *   v1.6.0 — 2026-07-16 — human-input steps. tick parks a reached human-input step in 'waiting-human'
+ *     (askHumanInput delivers the question; the run stays 'waiting-step'); onHumanAnswer (the analog of
+ *     onPushTerminal, called from the answer route) validates picks against the PINNED question, writes
+ *     the answer JSON to answer_to_key (keyPrefix-honoring — sandbox-safe), greens the step, and ticks.
+ *     The sweep applies the on_timeout policy (fail | skip | default) after timeout_min (default 24h
+ *     for human steps); cancelRun skips parked human steps. Restart-safe by construction — the parked
+ *     state lives in the persisted run record.
  */
 import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../../config.js';
@@ -59,8 +66,9 @@ import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcil
 import { template } from './engine-util.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
 import {
-  dispatchStep, maybeAlertAgentOffline, onStepFail, onRunFinished, clearRunOutputs, type StepDeps,
+  dispatchStep, askHumanInput, maybeAlertAgentOffline, onStepFail, onRunFinished, clearRunOutputs, type StepDeps,
 } from './engine-steps.js';
+import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
 import type {
   WorkflowDef, WorkflowRun, WorkflowRunStep, WorkflowStep, Signal,
 } from '../../models/workflow-schemas.js';
@@ -74,6 +82,9 @@ export function setActiveWorkflowEngine(e: WorkflowEngine): void { _active = e; 
 export function getActiveWorkflowEngine(): WorkflowEngine | null { return _active; }
 
 const TERMINAL_STEP_STATES = new Set<WorkflowRunStep['state']>(['green', 'input-red', 'output-red', 'timed-out', 'skipped', 'agent-offline']);
+
+/** Default wait for a human-input step's answer — humans sleep; 24h, not the agent-step 60 min. */
+export const HUMAN_TIMEOUT_MIN_DEFAULT = 1440;
 
 /**
  * The steps that may start now: pending, past any retry backoff, and their `after` deps satisfied.
@@ -288,6 +299,14 @@ export class WorkflowEngine {
             continue;
           }
         }
+        // human-input: ask the owner and PARK — no dispatch, no task. Advances via onHumanAnswer
+        // (the answer route) or the sweep's on_timeout policy. Non-terminal, so the run stays open.
+        if (step.action?.kind === 'human-input') {
+          rs.human = await askHumanInput(this.stepDeps(), ownerGhii, run, step, step.action);
+          rs.state = 'waiting-human'; rs.startedAt = now; rs.notBefore = undefined;
+          mutated = true;
+          continue;
+        }
         // dispatch (fresh-mode output clearing happens ONCE at run start — see clearRunOutputs)
         const taskIds = await dispatchStep(this.stepDeps(), ownerGhii, run, step, r, (o, w, rid, s, ok) => this.onPushTerminal(o, w, rid, s, ok));
         rs.state = 'dispatched'; rs.taskIds = taskIds; rs.startedAt = now; rs.notBefore = undefined;
@@ -303,7 +322,7 @@ export class WorkflowEngine {
     if (outcome !== 'running') {
       run.status = outcome; run.endedAt = new Date().toISOString();
     } else {
-      run.status = Object.values(run.steps).some(s => s.state === 'dispatched') ? 'waiting-step' : 'running';
+      run.status = Object.values(run.steps).some(s => s.state === 'dispatched' || s.state === 'waiting-human') ? 'waiting-step' : 'running';
     }
     await this.persist(ownerGhii, run);
     if (mutated || dispatchedAny || outcome !== 'running') emitChange('workflows');
@@ -388,6 +407,29 @@ export class WorkflowEngine {
 
       for (const step of r.defSnapshot.steps) {
         const rs = r.steps[step.id];
+
+        // waiting-human: no progress tracking, no offline logic — just the on_timeout policy once
+        // timeout_min (default 24h for human steps) has elapsed since the question was asked.
+        if (rs.state === 'waiting-human' && rs.human) {
+          const action = step.action?.kind === 'human-input' ? step.action : undefined;
+          const deadline = new Date(rs.human.askedAt).getTime() + (step.timeout_min ?? HUMAN_TIMEOUT_MIN_DEFAULT) * 60_000;
+          if (now < deadline) continue;
+          const policy = action?.on_timeout ?? 'fail';
+          if (policy === 'default' && action?.default_option) {
+            await applyHumanAnswer(this.storage, ownerGhii, r, step.id, {
+              picks: [action.default_option], pick: action.default_option, by: 'timeout-default',
+            });
+          } else if (policy === 'skip') {
+            rs.state = 'skipped'; rs.endedAt = nowIso;
+          } else {
+            rs.state = 'timed-out'; rs.endedAt = nowIso;
+            this.failDownstream(r, step.id);
+            await this.onStepFail(ownerGhii, r, step.id, 'timed-out');
+          }
+          changed = true;
+          continue;
+        }
+
         if (rs.state !== 'dispatched' || !rs.startedAt) continue;
 
         // Re-evaluate the success signal against CURRENT memory. The task-runner crew runs on its own
@@ -536,7 +578,7 @@ export class WorkflowEngine {
       if (run.status !== 'running' && run.status !== 'waiting-step') return false;
       const now = new Date().toISOString();
       for (const rs of Object.values(run.steps)) {
-        if (rs.state === 'pending' || rs.state === 'dispatched') { rs.state = 'skipped'; rs.endedAt = now; }
+        if (rs.state === 'pending' || rs.state === 'dispatched' || rs.state === 'waiting-human') { rs.state = 'skipped'; rs.endedAt = now; }
       }
       run.status = 'cancelled';
       run.endedAt = now;
@@ -693,6 +735,36 @@ export class WorkflowEngine {
         await this.onStepFail(ownerGhii, run, stepId, 'output-red');
       }
       await this.tick(ownerGhii, run);
+    });
+  }
+
+  /**
+   * The human completion path for human-input steps — the parallel of onTaskTerminal/onPushTerminal,
+   * called from the answer route (or an MCP relay). Validates the picks against the question PINNED
+   * at ask time, applies the answer (memory write + green — engine-human.ts), and ticks the run
+   * forward. Approve/decline branching happens downstream via deterministic json_field gates on the
+   * answer key — ANY valid answer greens the human step itself.
+   */
+  async onHumanAnswer(
+    ownerGhii: string, workflowId: string, runId: string, stepId: string,
+    answer: { picks: string[]; other?: string; by: string },
+  ): Promise<{ ok: true } | { ok: false; code: 'NOT_FOUND' | 'NOT_WAITING' | 'BAD_ANSWER'; error: string }> {
+    return this.withLock(runId, async () => {
+      const rec = await this.storage.getMemory(ownerGhii, runKey(workflowId, runId));
+      if (!rec) return { ok: false as const, code: 'NOT_FOUND' as const, error: `run "${runId}" not found` };
+      const run = rec.value as WorkflowRun;
+      const rs = run.steps[stepId];
+      if (!rs || rs.state !== 'waiting-human' || !rs.human) {
+        return { ok: false as const, code: 'NOT_WAITING' as const, error: `step "${stepId}" is not waiting for human input` };
+      }
+      const bad = validateHumanAnswer(rs.human.question, answer);
+      if (bad) return { ok: false as const, code: 'BAD_ANSWER' as const, error: bad };
+      await applyHumanAnswer(this.storage, ownerGhii, run, stepId, {
+        picks: answer.picks, pick: answer.picks[0] ?? '', other: answer.other, by: answer.by,
+      });
+      await this.tick(ownerGhii, run);
+      logger.info(`workflow ${workflowId} run ${runId}: step "${stepId}" answered by ${answer.by}`);
+      return { ok: true as const };
     });
   }
 

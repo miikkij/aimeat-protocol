@@ -9,6 +9,8 @@
  * @usage import { registerWorkflowTools } from './workflows.js';
  *   registerWorkflowTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.2.0 — 2026-07-16 — Human-in-the-loop: aimeat_workflow_pending_inputs (waiting-human roster) +
+ *     aimeat_workflow_answer (relay the owner's decision to a parked step).
  *   v1.1.0 — 2026-07-06 — aimeat_workflow_save gains opt-in propose-then-confirm (propose:true →
  *     diff + single-use payload-bound confirm_token; plain saves unchanged). Server MCP only.
  *   v1.0.0 — 2026-06-13 — Phase 8: tight MCP surface (save/get/run) for agent-authored workflows.
@@ -21,11 +23,11 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGAII } from '../utils/gaii.js';
 import { getActiveScheduler } from '../services/scheduler.js';
-import { getActiveWorkflowEngine } from '../services/workflow/engine.js';
+import { getActiveWorkflowEngine, HUMAN_TIMEOUT_MIN_DEFAULT } from '../services/workflow/engine.js';
 import {
-  saveWorkflow, getWorkflow, listWorkflows, listRuns, validateWorkflow, buildBlueprint,
+  saveWorkflow, getWorkflow, listWorkflows, listRuns, getRun, validateWorkflow, buildBlueprint,
 } from '../services/workflow/store.js';
-import { syncWorkflowTriggers } from '../services/workflow/lifecycle.js';
+import { syncWorkflowTriggers, readActiveRuns } from '../services/workflow/lifecycle.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 
 export function registerWorkflowTools(
@@ -140,6 +142,56 @@ export function registerWorkflowTools(
         return text({ runId: result.runId, status: run?.status, steps });
       }
       return text({ runId: result.runId, mode: 'full', note: 'Dispatched; poll aimeat_workflow_get for run status.' });
+    },
+  );
+
+  // ── aimeat_workflow_pending_inputs ──
+  mcp.tool(
+    'aimeat_workflow_pending_inputs',
+    descriptionFor('aimeat_workflow_pending_inputs'),
+    {},
+    annotationsFor('aimeat_workflow_pending_inputs'),
+    async () => {
+      const active = (await readActiveRuns(storage, config.nodeId)).filter(a => a.ownerGhii === ownerGhii);
+      const inputs: Array<Record<string, unknown>> = [];
+      for (const a of active) {
+        const run = await getRun(storage, ownerGhii, a.workflowId, a.runId);
+        if (!run) continue;
+        for (const step of run.defSnapshot.steps) {
+          const rs = run.steps[step.id];
+          if (rs?.state !== 'waiting-human' || !rs.human) continue;
+          const deadline = new Date(new Date(rs.human.askedAt).getTime()
+            + (step.timeout_min ?? HUMAN_TIMEOUT_MIN_DEFAULT) * 60_000).toISOString();
+          inputs.push({
+            workflow_id: a.workflowId, run_id: a.runId, step_id: step.id,
+            question: rs.human.question, asked_at: rs.human.askedAt, deadline,
+          });
+        }
+      }
+      return text({ inputs, count: inputs.length });
+    },
+  );
+
+  // ── aimeat_workflow_answer ──
+  mcp.tool(
+    'aimeat_workflow_answer',
+    descriptionFor('aimeat_workflow_answer'),
+    {
+      workflow_id: z.string().describe('The workflow id.'),
+      run_id: z.string().describe('The run id (from aimeat_workflow_pending_inputs).'),
+      step_id: z.string().describe('The waiting step id.'),
+      picks: z.array(z.string()).describe('Option ids from the pinned question (may be empty when answering with `other` alone).'),
+      other: z.string().optional().describe('Free-text answer; only when the question allows it.'),
+    },
+    annotationsFor('aimeat_workflow_answer'),
+    async (a) => {
+      const engine = getActiveWorkflowEngine();
+      if (!engine) return err('Workflow engine not started');
+      const result = await engine.onHumanAnswer(ownerGhii, a.workflow_id, a.run_id, a.step_id, {
+        picks: a.picks, other: a.other, by: agentGaii,
+      });
+      if (!result.ok) return err(`${result.code}: ${result.error}`);
+      return text({ answered: a.step_id, run_id: a.run_id, note: 'Step green; the run advanced. Poll aimeat_workflow_get for status.' });
     },
   );
 }

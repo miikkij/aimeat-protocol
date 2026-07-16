@@ -27,6 +27,10 @@
  *     dispatching the crew) and continues from the not-yet-done ones.
  *   v1.6.0 — 2026-07-06 — StepState 'agent-offline': a dispatched step whose agent is unreachable and
  *     produced nothing fails fast (offline grace) with a distinct state, not a slow timed-out.
+ *   v1.7.0 — 2026-07-16 — Human-in-the-loop: step action kind 'human-input' (structured question to
+ *     the owner, AskUserQuestion-shaped), StepState 'waiting-human', WorkflowRunStep.human (pinned
+ *     question + answer), WorkflowHumanAnswerSchema (the answer POST body). The answer is written to
+ *     `answer_to_key` so downstream steps gate on it with plain deterministic signals (json_field).
  */
 import { z } from 'zod';
 
@@ -110,10 +114,30 @@ export interface WorkflowVar {
   example?: string;
 }
 
+/**
+ * A structured question posed to the owner when a human-input step is reached. Shape is aligned
+ * with InteractiveQuestionSchema (message-schemas.ts) / Claude's AskUserQuestion so inbox UIs can
+ * render it with the answer UX they already have. `prompt` is {var}-templated at ask time.
+ */
+export interface WorkflowHumanQuestion {
+  header?: string;
+  prompt: string;
+  options: Array<{ id: string; label: string }>;
+  multiSelect?: boolean;
+  allowOther?: boolean;
+}
+
 export type WorkflowStepAction =
   | { kind: 'agent' }
   | { kind: 'export-out'; geai: string; capability?: string; from: string }
-  | { kind: 'trigger-geai'; geai: string; capability: string; input?: Record<string, unknown> };
+  | { kind: 'trigger-geai'; geai: string; capability: string; input?: Record<string, unknown> }
+  // human-input: park the run (StepState 'waiting-human') until the owner answers via
+  // POST /v1/workflows/:id/runs/:runId/steps/:stepId/answer. The answer JSON ({picks, pick, other,
+  // answeredAt, by}) is written to `answer_to_key` (templated, keyPrefix-honoring) so downstream
+  // steps branch on it with deterministic json_field gates. on_timeout: what the watchdog does when
+  // timeout_min (default 1440 = 24h for human steps) elapses unanswered — 'fail' (default, timed-out),
+  // 'skip', or 'default' (synthesize the answer `default_option`, by:'timeout-default').
+  | { kind: 'human-input'; question: WorkflowHumanQuestion; answer_to_key?: string; on_timeout?: 'fail' | 'skip' | 'default'; default_option?: string };
 
 export interface WorkflowStep {
   id: string;                         // stable; marks "what happened where" per run
@@ -200,7 +224,10 @@ export type StepState =
   // agent-offline: the step's agent was unreachable (no working webhook + stale lastSeen) and produced
   // nothing within the offline grace — a connectivity failure, distinct from a productive-but-slow
   // timed-out. Terminal + counts as a failure (partial run).
-  | 'agent-offline';
+  | 'agent-offline'
+  // waiting-human: a human-input step has asked its question and the run is parked until the owner
+  // answers (or the timeout policy fires). Non-terminal — the run stays 'waiting-step'.
+  | 'waiting-human';
 
 export interface WorkflowRunStep {
   state: StepState;
@@ -223,6 +250,18 @@ export interface WorkflowRunStep {
    * Also surfaced to the dashboard as "leaves N/M, still increasing".
    */
   progress?: { count: number; min: number; increasing: boolean; lastProgressAt: string };
+  /**
+   * Human-input bookkeeping. `question` is the {var}-TEMPLATED snapshot pinned at ask time (same
+   * pinning philosophy as `resolved` — editing the def mid-run can't change what was asked). The
+   * answer keeps both `picks` (array) and flat `pick` (first pick) so a downstream json_field gate
+   * needs no array indexing: `{op:'json_field', path:'pick', equals:'approve'}`.
+   */
+  human?: {
+    question: WorkflowHumanQuestion;
+    askedAt: string;
+    answeredAt?: string;
+    answer?: { picks: string[]; pick: string; other?: string; by: string };
+  };
 }
 
 /**
@@ -291,6 +330,22 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
     capability: z.string().min(1).max(120),           // the GEAI capability to invoke
     input: z.record(z.string().max(120), z.unknown()).optional(),
   }),
+  z.object({
+    kind: z.literal('human-input'),
+    question: z.object({
+      header: z.string().min(1).max(80).optional(),
+      prompt: z.string().min(1).max(2000),            // {var}-templated at ask time
+      options: z.array(z.object({
+        id: z.string().min(1).max(64),
+        label: z.string().min(1).max(500),
+      })).min(1).max(20),
+      multiSelect: z.boolean().optional(),
+      allowOther: z.boolean().optional(),
+    }),
+    answer_to_key: z.string().min(1).max(400).optional(),
+    on_timeout: z.enum(['fail', 'skip', 'default']).optional(),
+    default_option: z.string().min(1).max(64).optional(),
+  }),
 ]);
 
 const WorkflowStepSchema = z.object({
@@ -337,6 +392,14 @@ export const WorkflowDefInputSchema = z.object({
 });
 
 export type WorkflowDefInput = z.infer<typeof WorkflowDefInputSchema>;
+
+/** POST body for answering a waiting-human step. Picks are validated against the PINNED question
+ *  (ids must exist; single pick unless multiSelect; `other` only when allowOther). */
+export const WorkflowHumanAnswerSchema = z.object({
+  picks: z.array(z.string().min(1).max(64)).max(20),
+  other: z.string().max(2000).optional(),
+});
+export type WorkflowHumanAnswer = z.infer<typeof WorkflowHumanAnswerSchema>;
 
 /** Workflow id: lowercase slug, used directly in the memory key `workflows.def.<id>`. */
 export const WORKFLOW_ID_RE = /^[a-z0-9][a-z0-9-]{0,98}[a-z0-9]$/;

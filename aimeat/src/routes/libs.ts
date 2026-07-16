@@ -4,6 +4,11 @@
  * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v1.38.0 - 2026-07-16 - New library aimeat-workflows.js: the Agent Workflows client
+ *   (list/get/save/remove defs, run signals|full + sandbox, runs/health/blueprint, cancel) incl.
+ *   the human-in-the-loop surface (pendingInputs + answer + watchRun over the aimeat-live
+ *   'workflows' domain, polling fallback). Registered as a route, in the pack registry
+ *   (library-packs/sdk.ts), and in the dev test-harness.
  * v1.37.0 - 2026-07-16 - /v1/libs catalogue is now DERIVED from the library-pack registry
  *   (src/data/library-packs.ts, Library Acceleration Program Phase 1) instead of a hardcoded
  *   list — same fields (name/url/description/size_estimate/include/requires), plus a
@@ -140,6 +145,7 @@ import { aimeatStorageLib } from './lib-storage.js';
 import { aimeatMarkdownLib } from './lib-markdown.js';
 import { aimeatSocialLib } from './lib-social.js';
 import { aimeatWalletLib } from './lib-wallet.js';
+import { aimeatWorkflowsLib } from './lib-workflows.js';
 import { aimeatWorkLib } from './lib-work.js';
 import { aimeatTunnelLib } from './lib-tunnel.js';
 import { aimeatAudioLib } from './lib-audio.js';
@@ -227,6 +233,11 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, aimeatWalletLib(config));
   });
 
+  // GET /v1/libs/aimeat-workflows.js — Agent Workflows client (incl. human-input answer loop)
+  router.get('/v1/libs/aimeat-workflows.js', (_req, res) => {
+    sendJavascriptLibrary(res, aimeatWorkflowsLib(config));
+  });
+
   // GET /v1/libs/aimeat-work.js — Actions & work exchange library
   router.get('/v1/libs/aimeat-work.js', (_req, res) => {
     sendJavascriptLibrary(res, aimeatWorkLib(config));
@@ -312,6 +323,7 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
 <script src="/v1/libs/aimeat-storage.js"></script>
 <script src="/v1/libs/aimeat-social.js"></script>
 <script src="/v1/libs/aimeat-wallet.js"></script>
+<script src="/v1/libs/aimeat-workflows.js"></script>
 <script src="/v1/libs/aimeat-work.js"></script>
 <script src="/v1/libs/aimeat-tunnel.js"></script>
 <script src="/v1/libs/aimeat-audio.js"></script>
