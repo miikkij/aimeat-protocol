@@ -75,3 +75,17 @@ export async function loadAll(agents) {
   }
   return { ghii, agents: agentsCors };
 }
+
+/**
+ * Composite mount for the Security tab: GHII CORS + per-agent CORS (resolved server-side, no per-agent
+ * fan-out) + active sessions in ONE call. Returns { ghii, agents, sessions } or null on error so the
+ * caller can fall back to the individual listAgents + loadAll + listSessions reads.
+ */
+export async function getSecurityOverview() {
+  try {
+    const data = await apiGet('/v1/security/overview');
+    const d = data?.data;
+    if (!d) return null;
+    return { ghii: d.ghii ?? null, agents: d.agents || [], sessions: d.sessions || [] };
+  } catch { return null; }
+}

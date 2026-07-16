@@ -616,6 +616,29 @@ await test('10d. Idempotency key: Replayed UUID returns cached response', async 
     assert(b2.data?.version === b1.data?.version, 'replayed request returns cached version');
 });
 
+await test('11. GET /v1/security/overview folds GHII CORS + per-agent CORS + sessions', async () => {
+    // Set a GHII-level CORS origin so the ghii partition (and agents inheriting it) has a custom value.
+    const put = await json('/v1/ghii/cors', {
+        method: 'PUT', headers: { Authorization: `Bearer ${ownerAToken}` },
+        body: JSON.stringify({ allowed_origins: ['https://example.test'] }),
+    });
+    assert(put.status === 200, `set ghii cors ${put.status}: ${JSON.stringify(put.body)}`);
+
+    const { status, body } = await json('/v1/security/overview', { headers: { Authorization: `Bearer ${ownerAToken}` } });
+    assert(status === 200, `overview status ${status}: ${JSON.stringify(body)}`);
+    const d = body.data;
+    // ghii partition mirrors GET /v1/ghii/cors
+    assert(d.ghii && Array.isArray(d.ghii.allowed_origins) && d.ghii.allowed_origins.includes('https://example.test'), `ghii cors: ${JSON.stringify(d.ghii)}`);
+    const ghiiSingle = await json('/v1/ghii/cors', { headers: { Authorization: `Bearer ${ownerAToken}` } });
+    assert(JSON.stringify(d.ghii.allowed_origins) === JSON.stringify(ghiiSingle.body.data.allowed_origins), 'ghii matches /v1/ghii/cors');
+    // agents partition — Owner A's agent A present, inheriting the GHII origins (no per-agent read)
+    const agA = (d.agents || []).find((a: any) => a.gaii === agentAGaii);
+    assert(agA, `agent A present in agents: ${JSON.stringify((d.agents || []).map((a: any) => a.gaii))}`);
+    assert(agA.inherited_from === 'ghii' && agA.effective.includes('https://example.test'), `agent A inherits ghii cors: ${JSON.stringify(agA)}`);
+    // sessions partition — array flagging the caller's own session
+    assert(Array.isArray(d.sessions) && d.sessions.some((s: any) => s.current === true), 'sessions include the current session');
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

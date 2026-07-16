@@ -10,6 +10,8 @@
  *   app.use(authRouter(config, storage));
  * @version-history
  *   v1.0.0 -- 2026-02-25 -- Initial authentication routes
+ *   v1.2.0 -- 2026-07-16 -- Add GET /v1/security/overview composite (GHII + per-agent CORS + sessions)
+ *     folding the Security tab's CORS-per-agent fan-out (SecurityTabService).
  *   v1.1.0 -- 2026-05-28 -- Preserve agent identity and scopes during JWT refresh
  *   v1.1.1 -- 2026-06-29 -- SECURITY: legacy Bearer refresh no longer merges the
  *     owner's owner/operator roles onto an agent session (intra-owner scope collapse /
@@ -25,6 +27,7 @@ import { success, error } from '../middleware/envelope.js';
 import { readRefreshCookie, refreshOwnerSession, hashToken, clearRefreshCookie } from '../services/owner-session.js';
 import { resolvePat, PAT_PREFIX } from '../services/access-token.js';
 import { parseGAII, validateAgentName, buildGAII } from '../utils/gaii.js';
+import { createSecurityTabService } from '../services/db/security-tab-db-service.js';
 import { randomBytes } from 'node:crypto';
 import { generateOtk } from '../utils/otk.js';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
@@ -56,6 +59,15 @@ export async function checkOtkSession(otk: { sessionId: string | null }, storage
 
 export function authRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  // GET /v1/security/overview — the Security tab mount in ONE call: GHII CORS + per-agent CORS (resolved
+  // from the agent records + one shared GHII read + node default, replacing the GET /agents/:name/cors
+  // fan-out) + active sessions. Owner view.
+  const securityTabDb = createSecurityTabService(storage, config);
+  router.get('/v1/security/overview', requireAuth(), requireRole('owner'), async (req, res) => {
+    const data = await securityTabDb.overview(req.auth!.owner as string, req.auth!.sessionId);
+    res.json(success(config.nodeId, data));
+  });
 
   // POST /v1/auth/anonymous — get a JWT for anonymous access (when anonymous mode is enabled)
   router.post('/v1/auth/anonymous', async (req, res) => {
