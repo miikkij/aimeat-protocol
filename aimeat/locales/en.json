@@ -2775,7 +2775,19 @@
       "parked": "App parked",
       "unparked": "App published",
       "operatorHiddenBadge": "Moderated by operator: hidden",
-      "operatorHiddenHint": "An operator has hidden this app from public view. Only you can still see it. Contact the operator to appeal."
+      "operatorHiddenHint": "An operator has hidden this app from public view. Only you can still see it. Contact the operator to appeal.",
+      "agentBadge": "Ships an agent",
+      "agentBadgeHint": "This app ships its own agent - deploy it onto your fleet below",
+      "agentsLabel": "Bundled agents",
+      "agentDeploy": "Deploy to my fleet",
+      "agentUndeploy": "Undeploy",
+      "agentLive": "live",
+      "agentOffline": "not deployed",
+      "agentDeployStarted": "Deploy task started on your fleet",
+      "agentDeployQueued": "Deploy task queued - start it from the Tasks tab",
+      "agentUndeployQueued": "Undeploy task sent to your fleet",
+      "agentDeployFailed": "Deploy failed",
+      "agentRefresh": "Refresh status"
     },
     "v8ext": {
       "title": "Server Extensions",

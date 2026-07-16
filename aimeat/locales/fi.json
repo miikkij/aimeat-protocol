@@ -2775,7 +2775,19 @@
       "parked": "Sovellus parkissa",
       "unparked": "Sovellus julkaistu",
       "operatorHiddenBadge": "Moderoitu operaattorin toimesta: piilotettu",
-      "operatorHiddenHint": "Operaattori on piilottanut tämän sovelluksen julkisesta näkymästä. Vain sinä näet sen edelleen. Ota yhteyttä operaattoriin valittaaksesi."
+      "operatorHiddenHint": "Operaattori on piilottanut tämän sovelluksen julkisesta näkymästä. Vain sinä näet sen edelleen. Ota yhteyttä operaattoriin valittaaksesi.",
+      "agentBadge": "Sisältää agentin",
+      "agentBadgeHint": "Tämä sovellus tuo mukanaan oman agentin - ota se käyttöön omaan laivueeseesi alta",
+      "agentsLabel": "Mukana tulevat agentit",
+      "agentDeploy": "Ota käyttöön laivueeseeni",
+      "agentUndeploy": "Poista käytöstä",
+      "agentLive": "käynnissä",
+      "agentOffline": "ei käytössä",
+      "agentDeployStarted": "Käyttöönottotehtävä käynnistyi laivueessasi",
+      "agentDeployQueued": "Käyttöönottotehtävä jonossa - käynnistä se Tehtävät-välilehdeltä",
+      "agentUndeployQueued": "Käytöstäpoistotehtävä lähetetty laivueellesi",
+      "agentDeployFailed": "Käyttöönotto epäonnistui",
+      "agentRefresh": "Päivitä tila"
     },
     "v8ext": {
       "title": "Palvelinlaajennukset",
