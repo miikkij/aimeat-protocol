@@ -697,6 +697,22 @@ await test('Wallet — transactions + request', async () => {
     assert(typeof reqBody.data?.granted === 'number', 'has granted');
 });
 
+await test('Wallet — overview composite (Phase 4 DbService)', async () => {
+    const { body } = await json('/v1/wallet/overview', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(body.ok === true, `overview: ${JSON.stringify(body.error)}`);
+    const d = body.data;
+    assert(d.wallet && typeof d.wallet.balance === 'number', 'wallet.balance present');
+    assert(Array.isArray(d.transactions?.transactions), 'transactions is an array');
+    assert(Array.isArray(d.checkoutSessions?.sessions), 'checkoutSessions is an array');
+    assert(Array.isArray(d.orders?.orders), 'orders is an array');
+    // The transactions section matches the standalone endpoint's total (same ledger, one read scope).
+    const { body: tx } = await json('/v1/wallet/transactions?per_page=20', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(d.transactions.total === tx.data.total, `overview tx total (${d.transactions.total}) == /transactions total (${tx.data.total})`);
+    // (Owner-only requireRole('owner') gating is proven in the access-tokens suite — same middleware.)
+});
+
 await test('Validate endpoint', async () => {
     const { body } = await json('/v1/validate', {
         method: 'POST',
