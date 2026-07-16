@@ -1,14 +1,17 @@
 /**
  * @file src/routes/apps/fork-manage.ts
  * @description App-catalog fork + owner-management routes: POST /v1/apps/:owner/:filename/fork,
- *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection), DELETE /v1/apps/:filename.
+ *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-17 — Agent-Bundled Apps: PATCH accepts `cortex` — edit/clear the bundled
+ *     crew-defs in place (validated fail-loud like publish) without re-uploading the HTML.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppManifest, AppProtection } from '../../storage/interface.js';
+import { validateCortexAgents } from '../../models/crew-def-schemas.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -266,6 +269,31 @@ export function registerForkManageRoutes(
                 notes.push('Name updated. The app link is unchanged.');
             } else {
                 notes.push('Description updated.');
+            }
+        }
+
+        // Agent-Bundled Apps: edit the bundled crew-defs in place, without re-publishing the
+        // HTML. Same fail-loud gate as publish (a malformed agents[] never lands in a manifest);
+        // `cortex: null` or `{ "agents": [] }` removes the section entirely.
+        if ('cortex' in body) {
+            if (body.cortex === null || (typeof body.cortex === 'object' && !Array.isArray(body.cortex)
+                && Array.isArray(body.cortex.agents) && body.cortex.agents.length === 0)) {
+                await storage.updateAppMeta(effectiveGaii, filename, { cortex: null });
+                notes.push('Bundled agents removed from the manifest.');
+            } else {
+                if (typeof body.cortex !== 'object' || Array.isArray(body.cortex)) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'cortex must be an object (e.g. { "agents": [ ... ] }) or null to clear'));
+                    return;
+                }
+                const check = validateCortexAgents((body.cortex as Record<string, unknown>).agents);
+                if (!check.ok) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_CREW_DEF', check.errors.join('; ')));
+                    return;
+                }
+                await storage.updateAppMeta(effectiveGaii, filename, {
+                    cortex: { agents: check.agents as unknown as Record<string, unknown>[] },
+                });
+                notes.push(`Bundled agents updated (${check.agents.length} crew-def${check.agents.length === 1 ? '' : 's'}).`);
             }
         }
 

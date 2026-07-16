@@ -13,7 +13,7 @@
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type {
-  AppRecord, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppProtection,
+  AppRecord, AppDraftRecord, AppListOptions, AppForkRecord, AppManifest, AppManifestCortex, AppProtection,
 } from '../../../interface.js';
 import type { App, AppDraft, AppFork } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -189,7 +189,7 @@ export const appMethods = {
 
   async updateAppMeta(
     this: PostgresKyselyStorage, ownerGaii: string, filename: string,
-    meta: { name?: string; description?: string; protection?: AppProtection },
+    meta: { name?: string; description?: string; protection?: AppProtection; cortex?: AppManifestCortex | null },
   ): Promise<boolean> {
     // Rename/re-describe in place on the LATEST version (the one the catalogue shows). Read the current
     // manifest, merge only the supplied fields, write it back — the URL (owner/filename) is untouched.
@@ -199,6 +199,11 @@ export const appMethods = {
     if (meta.name !== undefined) manifest.name = meta.name;
     if (meta.description !== undefined) manifest.description = meta.description;
     if (meta.protection !== undefined) manifest.protection = meta.protection;
+    // Agent-Bundled Apps: replace the crew-def section in place (null clears it).
+    if (meta.cortex !== undefined) {
+      if (meta.cortex === null || !meta.cortex.agents?.length) delete manifest.cortex;
+      else manifest.cortex = meta.cortex;
+    }
     await this.db.updateTable('App')
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       .set({ manifest: jsonb(manifest) } as any)
