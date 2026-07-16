@@ -3,6 +3,7 @@
  * @description File, Peering, Chunked-upload, GHII, Chat-instance, Email-verify, Personal-node, Mailbox, Maintenance methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-16 — listStorageFilesForOwners batch primitive.
  */
 import type {
   StorageFileRecord, PeeringRequestRecord, ChunkedUploadRecord, GHIIRecord, PersonalNodeRecord, MailboxItemRecord,
@@ -71,6 +72,36 @@ export const identityNodesMethods = {
       record.federate = r.federate === 1;
       return record;
     });
+  },
+
+  async listStorageFilesForOwners(this: SqliteStorage, ownerGaiis: string[]): Promise<Record<string, StorageFileRecord[]>> {
+    const out: Record<string, StorageFileRecord[]> = {};
+    for (const g of ownerGaiis) out[g] = [];
+    if (ownerGaiis.length === 0) return out;
+    const placeholders = ownerGaiis.map(() => '?').join(',');
+    // Metadata only (no `data` bytes) — mirrors the PG/Prisma batch variant.
+    const rows = this.db.prepare(
+      `SELECT key, ownerGaii, visibility, mimeType, size, tags, accessCode, groupId, workspaceRef, federate, createdAt
+       FROM storage_files WHERE ownerGaii IN (${placeholders})`,
+    ).all(...ownerGaiis) as Record<string, unknown>[];
+    for (const r of rows) {
+      const record: StorageFileRecord = {
+        key: r.key as string,
+        ownerGaii: r.ownerGaii as string,
+        visibility: r.visibility as StorageFileRecord['visibility'],
+        mimeType: r.mimeType as string,
+        size: r.size as number,
+        data: Buffer.alloc(0),
+        tags: r.tags ? JSON.parse(r.tags as string) : [],
+        createdAt: r.createdAt as string,
+      };
+      if (r.accessCode) record.accessCode = r.accessCode as string;
+      if (r.groupId) record.groupId = r.groupId as string;
+      if (r.workspaceRef) record.workspaceRef = r.workspaceRef as string;
+      record.federate = r.federate === 1;
+      (out[record.ownerGaii] ??= []).push(record);
+    }
+    return out;
   },
 
   async deleteStorageFile(this: SqliteStorage, ownerGaii: string, key: string): Promise<boolean> {
