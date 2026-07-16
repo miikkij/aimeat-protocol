@@ -74,9 +74,9 @@
  *     → owner-addressed /v1/pub) and scope those files to the workspace (members-only) via
  *     services/doc-images — MCP-authored docs no longer store images that load for nobody.
  *   v1.16.0 -- 2026-07-16 -- Version-bloat perf: _read/_revert scans exclude `.version.N` rows in SQL
- *     (they were loaded with full values then discarded), _publish computes maxN value-free
- *     (workspace-versions) and prunes history beyond the retention window (workspace-retention;
- *     append-only spaces are never pruned).
+ *     (they were loaded with full values then discarded), _publish computes maxN value-free and
+ *     prunes history beyond the retention window (services/workspace-versions; append-only spaces
+ *     are never pruned).
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -99,10 +99,10 @@ import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { normalizeDocValueImages } from '../services/doc-images.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole } from '../services/workspace-roles.js';
-import { listVersionRefs, maxVersionOf } from '../services/workspace-versions.js';
+import { listVersionRefs, maxVersionOf, pruneVersionsAfterPublish } from '../services/workspace-versions.js';
 import { registerWorkspaceMemberTools } from './workspace-members.js';
 
-type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean };
+type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean; create_only?: boolean; maxVersions?: number };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
 type TextResult = { content: { type: 'text'; text: string }[]; isError?: boolean };
 
@@ -493,7 +493,11 @@ export function registerWorkspaceTools(
             // record's existing owner (normalised to their GHII — never a raw agent GAII); a brand-new
             // record is owned by the caller's GHII. collapseTo removes any copy left under another identity.
             const latestOwner = existingLatest ? `${bareOwner(existingLatest.ownerGaii)}@${config.nodeId}` : ownerGhii;
-            if (versioned) await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: writerGaii, value: draftValue, visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+            if (versioned) {
+                await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: writerGaii, value: draftValue, visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+                // Retention: prune history beyond the space's window (append-only spaces never pruned).
+                await pruneVersionsAfterPublish(storage, config, { refs: versionRefs, publishedN: n, ot: publishOt });
+            }
             await storage.setMemory({ key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
             await collapseTo(`${base}.latest`, latestOwner);
             await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);

@@ -126,6 +126,7 @@ const ALL_SUITES = [
     'test/e2e-workspace-kpi.ts',
     'test/e2e-workspace-revert.ts',
     'test/e2e-workspace-publish-guard.ts',
+    'test/e2e-workspace-retention.ts',
     'test/e2e-workspace-backing-gate.ts',
     'test/e2e-workspace-public-sharing.ts',
     'test/e2e-signage-agent-faced.ts',

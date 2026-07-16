@@ -111,7 +111,10 @@ async function seed(storage: Storage, sc: Scale): Promise<void> {
   }
 }
 
-const config = { ...loadConfig(), nodeId: NODE } as ReturnType<typeof loadConfig>;
+// NB: loadConfig() returns a { config, …provenance } wrapper — spread the CONFIG, not the wrapper
+// (spreading the wrapper left every config field undefined, silently disabling config-gated
+// behaviour like quotas and the workspace version-retention window in bench chains).
+const config = { ...loadConfig().config, nodeId: NODE };
 
 /** Empty the bench's collections on a PERSISTENT backend before a scale seeds, so a prior scale's (or
  *  a prior run's) rows don't collide on the owner unique-constraint or pollute owner-scoped timings.

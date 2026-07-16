@@ -9,6 +9,8 @@
  *   - runDailyAllowanceJob / runWorkTimeoutJob / runMemoryTtlCleanupJob / runDisputeTimeoutJob / ...: the handlers
  *
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Register the workspace-version-compaction handler (retention P2; not
+ *     seeded as a scheduled job — one-shot via the admin maintenance route, schedulable by operators).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { AimeatConfig } from '../config.js';
@@ -59,6 +61,14 @@ export function registerCoreHandlers(
   scheduler.registerCoreHandler('living-pulse', async () => {
     const { scanAllDue } = await import('./living-pulse.js');
     await scanAllDue(storage, config, scheduler.getNotifyServices());
+  });
+  // Workspace version-history compaction: applies the retention window (AIMEAT_WS_MAX_VERSIONS /
+  // manifest maxVersions) to EXISTING `.version.N` bloat. The publish path prunes incrementally;
+  // this handler exists for the one-shot cleanup (admin maintenance route) or an operator-scheduled
+  // sweep. Append-only spaces + workspaces without a readable manifest are never touched.
+  scheduler.registerCoreHandler('workspace-version-compaction', async () => {
+    const { compactWorkspaceVersions } = await import('./workspace-versions.js');
+    await compactWorkspaceVersions(storage, config);
   });
   // Operator storage-growth telemetry: hourly per-table row-count snapshot (admin DB tab).
   scheduler.registerCoreHandler('storage-stats-snapshot', () => runStorageStatsSnapshotJob(storage));

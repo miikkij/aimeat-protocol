@@ -103,6 +103,7 @@ export const MANIFEST_FORMAT_SCHEMA: Record<string, unknown> = {
           mode: { enum: ['records', 'document'] },  // 'records' (schema-locked form, default) | 'document' (free-form markdown pages)
           append: { type: 'boolean' },
           versioned: { type: 'boolean' },  // draft → publish → .version.N + .latest history (default true)
+          maxVersions: { type: 'number' },  // per-space history retention window (overrides AIMEAT_WS_MAX_VERSIONS; 0 = keep all; create_only spaces never pruned)
           contract: { type: 'string' },  // optional contract id a provisioning agent stamps; the workspace UI groups all spaces sharing a contract into one unit
           servesObjective: { type: 'string' },  // optional: id of an objectives[] entry this space feeds (measurability convention)
         },
