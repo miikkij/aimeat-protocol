@@ -173,6 +173,16 @@ export const ownerMethods = {
         return rows.map((r: PrismaRow) => this.toAgentRecord(r));
     },
 
+    async getAgentsByOwners(this: PrismaStorage, owners: string[]): Promise<Record<string, AgentRecord[]>> {
+        this.ensureReady();
+        const out: Record<string, AgentRecord[]> = {};
+        if (owners.length === 0) return out;
+        for (const o of owners) out[o] = [];
+        const rows = await this.prisma.agent.findMany({ where: { owner: { in: owners } } });
+        for (const r of rows) { const a = this.toAgentRecord(r); (out[a.owner] ??= []).push(a); }
+        return out;
+    },
+
     async updateAgent(this: PrismaStorage, gaii: string, updates: Partial<AgentRecord>): Promise<AgentRecord | null> {
         this.ensureReady();
         try {

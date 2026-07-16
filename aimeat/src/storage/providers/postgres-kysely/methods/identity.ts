@@ -131,6 +131,14 @@ export const identityMethods = {
   async getAgentsByOwner(this: PostgresKyselyStorage, owner: string): Promise<AgentRecord[]> {
     return (await this.db.selectFrom('Agent').selectAll().where('owner', '=', owner).execute()).map(toAgentRecord);
   },
+  async getAgentsByOwners(this: PostgresKyselyStorage, owners: string[]): Promise<Record<string, AgentRecord[]>> {
+    const out: Record<string, AgentRecord[]> = {};
+    if (owners.length === 0) return out;
+    for (const o of owners) out[o] = [];
+    const rows = (await this.db.selectFrom('Agent').selectAll().where('owner', 'in', owners).execute()).map(toAgentRecord);
+    for (const a of rows) (out[a.owner] ??= []).push(a);
+    return out;
+  },
   async listAgents(this: PostgresKyselyStorage): Promise<AgentRecord[]> {
     return (await this.db.selectFrom('Agent').selectAll().execute()).map(toAgentRecord);
   },

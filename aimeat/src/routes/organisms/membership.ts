@@ -56,10 +56,12 @@ export function registerOrganismMembershipRoutes(router: Router, config: AimeatC
     const callerMembership = callerOwner ? await storage.getMembership(id, callerOwner) : null;
     const canSeeAgents = (callerMembership?.status === 'active') || !!req.auth?.roles.includes('operator');
     if (canSeeAgents) {
-      const enriched = await Promise.all(members.map(async m => {
-        const ownerName = (m.ghii.includes('#') ? m.ghii.split('#')[1] : m.ghii).split('@')[0];
-        const agents = await storage.getAgentsByOwner(ownerName);
-        return { ...m, agents: agents.map(a => ({ gaii: a.gaii, name: a.name })) };
+      // ONE `owner IN (…)` query for every member's agents, not one getAgentsByOwner per member.
+      const ownerNames = members.map(m => (m.ghii.includes('#') ? m.ghii.split('#')[1] : m.ghii).split('@')[0]);
+      const agentsByOwner = await storage.getAgentsByOwners([...new Set(ownerNames)]);
+      const enriched = members.map((m, i) => ({
+        ...m,
+        agents: (agentsByOwner[ownerNames[i]] || []).map(a => ({ gaii: a.gaii, name: a.name })),
       }));
       res.json(success(config.nodeId, { members: enriched, total: enriched.length, agents_included: true }));
       return;

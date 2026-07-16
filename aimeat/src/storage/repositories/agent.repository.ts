@@ -18,6 +18,9 @@ export interface AgentRepository {
   getAgent(gaii: string): Promise<AgentRecord | null>;
   getAgentByName(name: string, nodeId: string): Promise<AgentRecord | null>;
   getAgentsByOwner(owner: string): Promise<AgentRecord[]>;
+  /** Agents for MANY owners in ONE `owner IN (…)` query, grouped by owner name (every requested owner is
+   *  a key, empty array if none). Batches the members-roster fan-out (getAgentsByOwner per member). */
+  getAgentsByOwners(owners: string[]): Promise<Record<string, AgentRecord[]>>;
   updateAgent(gaii: string, updates: Partial<AgentRecord>): Promise<AgentRecord | null>;
   deleteAgent(gaii: string): Promise<boolean>;
   listAgents(): Promise<AgentRecord[]>;
