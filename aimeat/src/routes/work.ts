@@ -371,12 +371,9 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     let items: Awaited<ReturnType<typeof storage.listWorkByProvider>>;
     if (isOwnerSession) {
-      // Owner sees work across all their agents
+      // Owner sees work across all their agents — ONE providerGaii IN (…) query, not one per agent.
       const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
-      items = [];
-      for (const agent of agents) {
-        items.push(...await storage.listWorkByProvider(agent.gaii));
-      }
+      items = agents.length ? await storage.listWorkByProviders(agents.map(a => a.gaii)) : [];
     } else {
       items = await storage.listWorkByProvider(req.auth!.sub);
     }
@@ -401,11 +398,9 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
     let items: Awaited<ReturnType<typeof storage.listWorkByRequester>>;
     if (isOwnerSession) {
+      // ONE requesterGaii IN (…) query across the owner's agents, not one per agent.
       const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
-      items = [];
-      for (const agent of agents) {
-        items.push(...await storage.listWorkByRequester(agent.gaii));
-      }
+      items = agents.length ? await storage.listWorkByRequesters(agents.map(a => a.gaii)) : [];
     } else {
       items = await storage.listWorkByRequester(req.auth!.sub);
     }

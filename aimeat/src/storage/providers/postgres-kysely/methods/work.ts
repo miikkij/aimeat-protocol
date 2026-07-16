@@ -62,6 +62,14 @@ export const workMethods = {
       .where('providerGaii', 'in', providerGaiis).where('status', 'in', statuses).executeTakeFirst();
     return Number(r?.n ?? 0);
   },
+  async listWorkByProviders(this: PostgresKyselyStorage, gaiis: string[]): Promise<WorkRecord[]> {
+    if (gaiis.length === 0) return [];
+    return (await this.db.selectFrom('Work').selectAll().where('providerGaii', 'in', gaiis).execute()).map(toWork);
+  },
+  async listWorkByRequesters(this: PostgresKyselyStorage, gaiis: string[]): Promise<WorkRecord[]> {
+    if (gaiis.length === 0) return [];
+    return (await this.db.selectFrom('Work').selectAll().where('requesterGaii', 'in', gaiis).execute()).map(toWork);
+  },
   async listAllWork(this: PostgresKyselyStorage, limit = 10000): Promise<WorkRecord[]> {
     return (await this.db.selectFrom('Work').selectAll().orderBy('createdAt', 'desc').limit(Math.min(limit, 10000)).execute()).map(toWork);
   },

@@ -193,6 +193,20 @@ export const workMethods = {
     return row.n;
   },
 
+  async listWorkByProviders(this: SqliteStorage, gaiis: string[]): Promise<WorkRecord[]> {
+    if (gaiis.length === 0) return [];
+    const p = gaiis.map(() => '?').join(',');
+    const rows = this.db.prepare(`SELECT * FROM work WHERE providerGaii IN (${p})`).all(...gaiis) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeWork(r));
+  },
+
+  async listWorkByRequesters(this: SqliteStorage, gaiis: string[]): Promise<WorkRecord[]> {
+    if (gaiis.length === 0) return [];
+    const p = gaiis.map(() => '?').join(',');
+    const rows = this.db.prepare(`SELECT * FROM work WHERE requesterGaii IN (${p})`).all(...gaiis) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeWork(r));
+  },
+
   async listAllWork(this: SqliteStorage, limit = 10000): Promise<WorkRecord[]> {
     const rows = this.db.prepare('SELECT * FROM work ORDER BY createdAt DESC LIMIT ?').all(Math.min(limit, 10000)) as Record<string, unknown>[];
     return rows.map(r => this.deserializeWork(r));

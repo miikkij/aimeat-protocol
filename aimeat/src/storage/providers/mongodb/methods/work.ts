@@ -189,6 +189,20 @@ export const workMethods = {
         return this.prisma.work.count({ where: { providerGaii: { in: providerGaiis }, status: { in: statuses } } });
     },
 
+    async listWorkByProviders(this: PrismaStorage, gaiis: string[]): Promise<WorkRecord[]> {
+        this.ensureReady();
+        if (gaiis.length === 0) return [];
+        const rows = await this.prisma.work.findMany({ where: { providerGaii: { in: gaiis } } });
+        return rows.map((r: PrismaRow) => this.toWorkRecord(r));
+    },
+
+    async listWorkByRequesters(this: PrismaStorage, gaiis: string[]): Promise<WorkRecord[]> {
+        this.ensureReady();
+        if (gaiis.length === 0) return [];
+        const rows = await this.prisma.work.findMany({ where: { requesterGaii: { in: gaiis } } });
+        return rows.map((r: PrismaRow) => this.toWorkRecord(r));
+    },
+
     async listWorkByRequester(this: PrismaStorage, gaii: string): Promise<WorkRecord[]> {
         this.ensureReady();
         const rows = await this.prisma.work.findMany({ where: { requesterGaii: gaii } });
