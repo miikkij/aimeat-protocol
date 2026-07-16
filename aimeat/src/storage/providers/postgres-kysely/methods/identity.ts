@@ -5,6 +5,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add getGHIIsByGhiis batch (Phase 3): many GHII records by ghii in one query.
  *   v1.0.0 — 2026-07-15 — Phase 5: owner/agent/ghii/auth-revoke on Postgres+Kysely.
  */
 import { sql } from 'kysely';
@@ -191,6 +192,14 @@ export const identityMethods = {
       throw e;
     }
   },
+  async getGHIIsByGhiis(this: PostgresKyselyStorage, ghiis: string[]): Promise<Record<string, GHIIRecord>> {
+    if (ghiis.length === 0) return {};
+    const rows = await this.db.selectFrom('Ghii').selectAll().where('ghii', 'in', ghiis).execute();
+    const out: Record<string, GHIIRecord> = {};
+    for (const r of rows) { const rec = toGHIIRecord(r); out[rec.ghii] = rec; }
+    return out;
+  },
+
   async getGHII(this: PostgresKyselyStorage, ghii: string): Promise<GHIIRecord | null> {
     const r = await this.db.selectFrom('Ghii').selectAll().where('ghii', '=', ghii).executeTakeFirst();
     return r ? toGHIIRecord(r) : null;

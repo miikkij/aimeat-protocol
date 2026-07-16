@@ -8,6 +8,7 @@
  *   - IdentityRepository: interface for GHII CRUD + lookups, chat-instance CRUD, and email-verification lifecycle
  *
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add getGHIIsByGhiis batch primitive (Phase 3 fan-out→IN; matches list).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { GHIIRecord, ChatInstanceRecord, EmailVerificationRecord } from '../interface.js';
@@ -15,6 +16,12 @@ import type { GHIIRecord, ChatInstanceRecord, EmailVerificationRecord } from '..
 export interface IdentityRepository {
   createGHII(record: GHIIRecord): Promise<GHIIRecord>;
   getGHII(ghii: string): Promise<GHIIRecord | null>;
+  /**
+   * BULK PRIMITIVE — read MANY GHII records by their `ghii` id in one `ghii IN (…)` query (fan-out→IN).
+   * Backs the matches list (was getGHII per match, twice — once for the consent owner, once for the
+   * display name). Keyed by ghii; a missing ghii is absent. Optional — falls back to a per-ghii loop.
+   */
+  getGHIIsByGhiis?(ghiis: string[]): Promise<Record<string, GHIIRecord>>;
   getGHIIByOwner(ownerName: string): Promise<GHIIRecord | null>;
   updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null>;
   getGHIIByEmailHash(emailHash: string): Promise<GHIIRecord | null>;

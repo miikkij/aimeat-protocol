@@ -11,6 +11,9 @@
  *   - param: helper normalizing string | string[] route params
  *
  * @version-history
+ *   v1.1.0 — 2026-07-16 — GET /v1/matches enrichment batched (Phase 3 fan-out→IN): the per-match
+ *     getGHII×2 + getAgentsByOwner + listConsents N+1 → one getGHIIsByGhiis + getAgentsByOwners +
+ *     listConsentsForAgents. Same consent-gated redaction; a batch failure redacts all (safety).
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 
@@ -50,50 +53,49 @@ export function matchesRouter(config: AimeatConfig, storage: Storage): Router {
 
     const matches = await storage.listMatchesByProfile(ghii, { status, page, perPage });
 
-    // Build the response with formatted match data, checking consent for each partner
-    const formatted: Array<Record<string, unknown>> = [];
-
-    for (const m of matches) {
-      const isProfileA = m.profileA === ghii;
-      const matchedGhii = isProfileA ? m.profileB : m.profileA;
-
-      // Consent check: verify matched partner still has active matching consent
-      // before revealing their profile details
-      let partnerConsentActive = true;
+    // Batch the per-match enrichment that was an N+1 (getGHII TWICE + getAgentsByOwner + listConsents per
+    // match): ONE GHII-by-ghii read → ONE agents-by-owners read → ONE consents-by-agents read, all shared
+    // across the loop. A batch failure leaves the maps empty so every partner is redacted (the same
+    // "can't verify consent → redact for safety" the per-match try/catch enforced).
+    const matchedGhiis = [...new Set(matches.map(m => (m.profileA === ghii ? m.profileB : m.profileA)))];
+    let ghiiRecords: Record<string, import('../storage/interface.js').GHIIRecord> = {};
+    let agentsByOwner: Record<string, import('../storage/interface.js').AgentRecord[]> = {};
+    let consentsByAgent: Record<string, Awaited<ReturnType<typeof storage.listConsents>>> = {};
+    try {
+      ghiiRecords = storage.getGHIIsByGhiis
+        ? await storage.getGHIIsByGhiis(matchedGhiis)
+        : Object.fromEntries((await Promise.all(matchedGhiis.map(g => storage.getGHII(g)))).filter((r): r is NonNullable<typeof r> => !!r).map(r => [r.ghii, r]));
       if (config.consentEnabled) {
-        try {
-          const matchedGhiiRecord = await storage.getGHII(matchedGhii);
-          if (matchedGhiiRecord) {
-            const agents = await storage.getAgentsByOwner(matchedGhiiRecord.ownerName);
-            partnerConsentActive = false;
-            for (const agent of agents) {
-              const consents = await storage.listConsents(agent.gaii, { status: 'active' });
-              const matchConsent = consents.find(
-                c => c.purpose === 'matching' && c.status === 'active',
-              );
-              if (matchConsent) {
-                partnerConsentActive = true;
-                // Allowed reads are no longer audited (only denials + consent mutations).
-                break;
-              }
-            }
-          }
-        } catch {
-          // If we can't verify consent, redact partner details for safety
-          partnerConsentActive = false;
-        }
+        const owners = [...new Set(Object.values(ghiiRecords).map(r => r.ownerName))];
+        agentsByOwner = await storage.getAgentsByOwners(owners);
+        const allAgentGaiis = Object.values(agentsByOwner).flat().map(a => a.gaii);
+        if (allAgentGaiis.length) consentsByAgent = await storage.listConsentsForAgents(allAgentGaiis, { status: 'active' });
       }
+    } catch {
+      ghiiRecords = {}; agentsByOwner = {}; consentsByAgent = {};
+    }
 
-      if (!partnerConsentActive) {
-        // Partner revoked matching consent — redact their details
+    // Whether a matched profile still has active matching consent (via any of its agents).
+    const partnerConsentActiveFor = (matchedGhii: string): boolean => {
+      if (!config.consentEnabled) return true;
+      const rec = ghiiRecords[matchedGhii];
+      if (!rec) return false;
+      for (const a of (agentsByOwner[rec.ownerName] ?? [])) {
+        if ((consentsByAgent[a.gaii] ?? []).some(c => c.purpose === 'matching' && c.status === 'active')) return true;
+      }
+      return false;
+    };
+
+    // Build the response with formatted match data, gating each partner's details on their consent.
+    const formatted: Array<Record<string, unknown>> = [];
+    for (const m of matches) {
+      const matchedGhii = m.profileA === ghii ? m.profileB : m.profileA;
+
+      if (!partnerConsentActiveFor(matchedGhii)) {
+        // Partner revoked matching consent (or is unverifiable) — redact their details.
         formatted.push({
           id: m.id,
-          matchedProfile: {
-            ghii: '[redacted]',
-            sharedInterests: [],
-            distanceKm: null,
-            consentRevoked: true,
-          },
+          matchedProfile: { ghii: '[redacted]', sharedInterests: [], distanceKm: null, consentRevoked: true },
           score: m.score,
           status: m.status,
           expiresAt: m.expiresAt,
@@ -108,6 +110,7 @@ export function matchesRouter(config: AimeatConfig, storage: Storage): Router {
           ghii: matchedGhii,
           sharedInterests: m.breakdown.sharedInterests,
           distanceKm: m.breakdown.distanceKm,
+          displayName: ghiiRecords[matchedGhii]?.displayName,
         },
         score: m.score,
         breakdown: m.breakdown,
@@ -121,20 +124,6 @@ export function matchesRouter(config: AimeatConfig, storage: Storage): Router {
         expiresAt: m.expiresAt,
         createdAt: m.createdAt,
       });
-    }
-
-    // Try to enrich with display names and city (only for non-redacted matches)
-    for (const match of formatted) {
-      const mp = match.matchedProfile as Record<string, unknown>;
-      if (mp.consentRevoked) continue;
-      try {
-        const ghiiRecord = await storage.getGHII(mp.ghii as string);
-        if (ghiiRecord) {
-          mp.displayName = ghiiRecord.displayName;
-        }
-      } catch {
-        // Skip enrichment on failure
-      }
     }
 
     res.json(success(config.nodeId, {
