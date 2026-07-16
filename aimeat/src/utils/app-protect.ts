@@ -20,11 +20,14 @@
  * @usage routes/apps.ts (apex inline serve) + routes/subdomains.ts (app-origin serve)
  * @version-history
  *   v1.0.0 — 2026-07-07 — Initial: domainLock, watermark, obfuscate (Phase 3).
+ *   v1.1.0 — 2026-07-16 — domainLock/watermark inject before the LAST closing tag (shared
+ *     html-inject helper), not the first — first-match landed inside app JS containing '</body>'.
  */
 import type { AimeatConfig } from '../config.js';
 import type { AppProtection } from '../storage/interface.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { obfuscateInlineScripts } from './app-obfuscate.js';
+import { injectBeforeClosingTag } from './html-inject.js';
 
 const PROTECTION_KEYS = ['obfuscate', 'domainLock', 'watermark', 'noRawDownload'] as const;
 const WM_MARKER = 'aimeat-wm';
@@ -96,12 +99,6 @@ export function decodeWatermark(token: string, config: AimeatConfig): DecodedWat
   }
 }
 
-function injectBeforeBodyEnd(html: string, snippet: string): string {
-  if (/<\/body\s*>/i.test(html)) return html.replace(/<\/body\s*>/i, snippet + '</body>');
-  if (/<\/html\s*>/i.test(html)) return html.replace(/<\/html\s*>/i, snippet + '</html>');
-  return html + snippet;
-}
-
 /**
  * Client-side guard so the app only runs on this node's app origin (config.appHost)
  * or a per-app subdomain of it; a rehosted copy blanks itself and redirects home.
@@ -130,7 +127,7 @@ export function applyAppProtection(html: Buffer, ctx: ProtectContext): Buffer {
     if (base === undefined) {
       let text = html.toString('utf8');
       if (p.obfuscate) text = obfuscateInlineScripts(text);
-      if (p.domainLock) text = injectBeforeBodyEnd(text, domainLockScript(ctx.config));
+      if (p.domainLock) text = injectBeforeClosingTag(text, domainLockScript(ctx.config));
       base = text;
       if (baseCache.size >= BASE_CACHE_MAX) baseCache.clear();
       baseCache.set(cacheKey, base);
@@ -138,7 +135,7 @@ export function applyAppProtection(html: Buffer, ctx: ProtectContext): Buffer {
     let out = base;
     if (p.watermark) {
       const wm = makeWatermark(ctx);
-      if (wm) out = injectBeforeBodyEnd(out, wm);
+      if (wm) out = injectBeforeClosingTag(out, wm);
     }
     return Buffer.from(out, 'utf8');
   } catch {

@@ -14,14 +14,18 @@
  *   v1.0.0 — 2026-06-24 — Initial: node-branded, idempotent, HTML-only badge injection.
  *   v1.1.0 — 2026-06-24 — Make the badge a permanent aimeat.io attribution mark: label + link
  *     hardcoded to aimeat.io (was node-derived); dropped the baseUrl param.
+ *   v1.2.0 — 2026-07-16 — Inject before the LAST closing tag (shared html-inject helper), not the
+ *     first: a first-match replace landed the badge inside app JS that contains the literal
+ *     '</body>' string, silently killing the whole app.
  */
+import { injectBeforeClosingTag } from './html-inject.js';
 
 /** Permanent attribution target — the project home, not the serving node. */
 const AIMEAT_HOME = 'https://aimeat.io/';
 const AIMEAT_LABEL = 'aimeat.io';
 
 /**
- * Append the badge before `</body>` (fallback `</html>`, else end). The label + link are the fixed
+ * Append the badge before the LAST `</body>` (fallback last `</html>`, else end). The label + link are the fixed
  * aimeat.io attribution (deliberate, since publishing/hosting is free). Pure static markup + inline
  * styles — no script, so it needs nothing the inline CSP doesn't already allow (style-src
  * 'unsafe-inline'). Returns the input unchanged when the payload isn't an HTML document or already
@@ -50,7 +54,5 @@ export function injectAimeatBadge(data: Buffer | Uint8Array | string): Buffer {
         + '<span style="opacity:.7!important;font-weight:500!important">· Publish your own app — free</span>'
         + '</a>';
 
-    if (/<\/body\s*>/i.test(text)) return Buffer.from(text.replace(/<\/body\s*>/i, badge + '</body>'), 'utf-8');
-    if (/<\/html\s*>/i.test(text)) return Buffer.from(text.replace(/<\/html\s*>/i, badge + '</html>'), 'utf-8');
-    return Buffer.from(text + badge, 'utf-8');
+    return Buffer.from(injectBeforeClosingTag(text, badge), 'utf-8');
 }
