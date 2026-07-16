@@ -139,6 +139,7 @@ import { agentCapabilitiesRouter } from '../routes/agent-capabilities.js';
 import { agentActivityRouter } from '../routes/agent-activity.js';
 import { agentMessagesRouter } from '../routes/agent-messages.js';
 import { messagesRouter } from '../routes/messages.js';
+import { contactsRouter } from '../routes/contacts.js';
 import { trackedResponsesRouter } from '../routes/tracked-responses.js';
 import { agentWebhookRouter } from '../routes/agent-webhook.js';
 import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
@@ -369,6 +370,7 @@ export async function mountRoutes(
   app.use(agentActivityRouter(config, storage));
   app.use(agentMessagesRouter(config, storage, webhookDispatcher));
   app.use(messagesRouter(config, storage, peers));
+  app.use(contactsRouter(config, storage));       // Contacts (address book) — generic identity picker source
   app.use(trackedResponsesRouter(config, storage, peers));   // Memory Contracts — Tracked Responses
   app.use(agentWebhookRouter(config, storage));
   app.use(agentTelemetryRouter(config, storage));

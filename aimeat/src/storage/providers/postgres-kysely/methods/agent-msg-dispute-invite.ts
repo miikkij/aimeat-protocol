@@ -233,6 +233,8 @@ export const invitationMethods = {
     if (updates.status !== undefined) data.status = updates.status;
     if (updates.acceptedAt !== undefined) data.acceptedAt = updates.acceptedAt ? new Date(updates.acceptedAt) : null;
     if (updates.acceptedBy !== undefined) data.acceptedBy = updates.acceptedBy;
+    if (updates.orgRole !== undefined) data.orgRole = updates.orgRole;
+    if (updates.workspaces !== undefined) data.workspaces = jsonb(updates.workspaces ?? []);
     if (Object.keys(data).length === 0) return this.getInvitation(id);
     const rows = await this.db.updateTable('Invitation').set(data as never).where('id', '=', id).returningAll().execute();
     return rows[0] ? toInvitation(rows[0]) : null;

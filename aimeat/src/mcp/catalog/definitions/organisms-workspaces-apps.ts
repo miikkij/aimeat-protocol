@@ -64,12 +64,48 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_organism_invite',
-        description: 'Invite an owner to an organism by their bare owner name. Creator/admin only. Creates a pending invitation and notifies the invitee, who accepts or declines (aimeat_organism_invitation_respond). This is the way to bring members into an invite-only organism. Distinct from aimeat_organism_join (which the joiner calls).',
+        description: 'Invite an owner to an organism by their bare owner name, optionally with an organism role (member/admin) and per-workspace grants applied when they accept. Creator/admin only. Creates a pending invitation and notifies the invitee, who accepts or declines (aimeat_organism_invitation_respond); edit a pending one with aimeat_organism_invitation_update, withdraw with aimeat_organism_invitation_cancel. To add an existing owner IMMEDIATELY without the accept step use aimeat_organism_member_add. Distinct from aimeat_organism_join (which the joiner calls).',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             invitee: { type: 'string', required: true, description: 'Bare owner name to invite (e.g. "alice").' },
+            role: { type: 'string', enum: ['member', 'admin'], description: 'Organism role granted on accept (default "member").' },
+            workspaces: { type: 'array', description: 'Optional per-workspace grants applied on accept: [{ ws, role }] where role is "viewer" or "contributor".' },
+        },
+    },
+    {
+        name: 'aimeat_organism_member_add',
+        description: 'DIRECTLY add an already-registered local owner to an organism as an ACTIVE member — no invitation round-trip. Creator/admin only. Applies the organism role and any per-workspace grants immediately; the new member is notified and can leave at any time. Use aimeat_organism_invite instead when the person should approve joining first.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            ghii: { type: 'string', required: true, description: 'Bare owner name to add (e.g. "alice").' },
+            role: { type: 'string', enum: ['member', 'admin'], description: 'Organism role (default "member").' },
+            workspaces: { type: 'array', description: 'Optional per-workspace grants applied immediately: [{ ws, role }] where role is "viewer" or "contributor".' },
+        },
+    },
+    {
+        name: 'aimeat_organism_invitation_update',
+        description: 'Edit a PENDING name invitation\'s organism role and/or workspace grants before the invitee accepts (creator/admin only). The invitee lands with the edited rights the moment they accept.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            invitee: { type: 'string', required: true, description: 'Bare owner name whose pending invitation to edit.' },
+            role: { type: 'string', enum: ['member', 'admin'], description: 'New organism role.' },
+            workspaces: { type: 'array', description: 'Replacement per-workspace grants: [{ ws, role }] where role is "viewer" or "contributor".' },
+        },
+    },
+    {
+        name: 'aimeat_organism_invitation_cancel',
+        description: 'Withdraw a PENDING name invitation before it is accepted (creator/admin only). The invitee is notified that the invitation was withdrawn.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
+            invitee: { type: 'string', required: true, description: 'Bare owner name whose pending invitation to withdraw.' },
         },
     },
     {

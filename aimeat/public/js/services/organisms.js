@@ -6,6 +6,8 @@
  *   resolve gate approvals.
  * @usage import * as orgService from '/js/services/organisms.js';
  * @version-history
+ *   v1.8.0 — 2026-07-16 — Name-invites carry role + workspace grants; addMemberDirect (direct add),
+ *     updateInvitation/cancelInvitation (pending name-invites), updateEmailInvitation.
  *   v1.7.0 — 2026-07-13 — Split for max-file-lines: extracted the workspace generator/validation
  *     (organisms.workspace-gen.js), AI access/contract prompts (organisms.prompts.js), Mermaid
  *     charts (organisms.charts.js), image/storage helpers (organisms.images.js), and shared leaf
@@ -31,7 +33,7 @@
  *     fields, and a manifest "i18n" block (en + request language) with flat "{ns}.{field}",
  *     "{ns}.{field}.hint" and "type.{name}" labels the workspace UI renders.
  */
-import { api, apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
+import { api, apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
 import { decodeEntities } from '/js/utils.js';
 import { wsRoot, isMemorySpace, isDocSpace } from './organisms.shared.js';
 import { mlbl } from './organisms.charts.js';
@@ -182,9 +184,37 @@ export async function transferOwnership(id, toGhii) {
   return apiPost(`/v1/organisms/${encodeURIComponent(id)}/transfer`, { to: toGhii });
 }
 
-/** Invite an owner by bare name. Creator/admin only. */
-export async function inviteMember(id, invitee) {
-  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/invitations`, { invitee });
+/** Invite an owner by bare name, optionally with an org role + invite-time workspace grants
+ *  ({ role: 'member'|'admin', workspaces: [{ws, role: 'viewer'|'contributor'}] }). Creator/admin only. */
+export async function inviteMember(id, invitee, opts = {}) {
+  const body = { invitee };
+  if (opts.role) body.role = opts.role;
+  if (Array.isArray(opts.workspaces) && opts.workspaces.length) body.workspaces = opts.workspaces;
+  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/invitations`, body);
+}
+
+/** DIRECT ADD: make an existing local owner an ACTIVE member immediately (role + workspace grants
+ *  applied, no accept round-trip; the member is notified and can leave). Creator/admin only. */
+export async function addMemberDirect(id, ghii, opts = {}) {
+  const body = { ghii };
+  if (opts.role) body.role = opts.role;
+  if (Array.isArray(opts.workspaces) && opts.workspaces.length) body.workspaces = opts.workspaces;
+  return apiPost(`/v1/organisms/${encodeURIComponent(id)}/members`, body);
+}
+
+/** Edit a PENDING name invitation's role/workspace grants. Creator/admin only. */
+export async function updateInvitation(id, invitee, updates) {
+  return apiPatch(`/v1/organisms/${encodeURIComponent(id)}/invitations/${encodeURIComponent(invitee)}`, updates);
+}
+
+/** Withdraw a PENDING name invitation. Creator/admin only. */
+export async function cancelInvitation(id, invitee) {
+  return apiDelete(`/v1/organisms/${encodeURIComponent(id)}/invitations/${encodeURIComponent(invitee)}`);
+}
+
+/** Edit a PENDING email invitation's role/workspace grants. Creator/admin only. */
+export async function updateEmailInvitation(id, invId, updates) {
+  return apiPatch(`/v1/organisms/${encodeURIComponent(id)}/invitations/email/${encodeURIComponent(invId)}`, updates);
 }
 
 /** List outstanding (pending) invitations for an organism. Creator/admin only. */

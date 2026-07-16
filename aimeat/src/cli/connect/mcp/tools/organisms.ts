@@ -13,6 +13,8 @@
  *     agent could not find its home). Mirrors the server-MCP tool; rows carry is_member.
  *   v1.4.0 -- 2026-06-30 -- MCP drift fix: add `archived` enum (exclude/include/only) to
  *     organism_search to match the server MCP surface; maps to the REST ?archived/?includeArchived flags.
+ *   v1.5.0 -- 2026-07-16 -- invite carries role + workspaces; add member_add / invitation_update /
+ *     invitation_cancel tools (name-invite parity with the server MCP).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -137,11 +139,55 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 
+  const wsGrantShape = z.array(z.object({
+    ws: z.string().describe('Workspace id'),
+    role: z.enum(['viewer', 'contributor']).describe('viewer = read only; contributor = read + write'),
+  })).optional().describe('Optional per-workspace grants applied when the invitee joins');
+
   mcp.tool('aimeat_organism_invite', descriptionFor('aimeat_organism_invite'), {
     organism_id: z.string().describe('Organism identifier'),
     invitee: z.string().describe('Bare owner name to invite'),
-  }, annotationsFor('aimeat_organism_invite'), async ({ organism_id, invitee }) => {
-    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations`, { invitee });
+    role: z.enum(['member', 'admin']).optional().describe('Organism role granted on accept (default "member")'),
+    workspaces: wsGrantShape,
+  }, annotationsFor('aimeat_organism_invite'), async ({ organism_id, invitee, role, workspaces }) => {
+    const body: Record<string, unknown> = { invitee };
+    if (role) body.role = role;
+    if (workspaces) body.workspaces = workspaces;
+    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations`, body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  mcp.tool('aimeat_organism_member_add', descriptionFor('aimeat_organism_member_add'), {
+    organism_id: z.string().describe('Organism identifier'),
+    ghii: z.string().describe('Bare owner name to add as an active member'),
+    role: z.enum(['member', 'admin']).optional().describe('Organism role (default "member")'),
+    workspaces: wsGrantShape,
+  }, annotationsFor('aimeat_organism_member_add'), async ({ organism_id, ghii, role, workspaces }) => {
+    const body: Record<string, unknown> = { ghii };
+    if (role) body.role = role;
+    if (workspaces) body.workspaces = workspaces;
+    const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/members`, body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  mcp.tool('aimeat_organism_invitation_update', descriptionFor('aimeat_organism_invitation_update'), {
+    organism_id: z.string().describe('Organism identifier'),
+    invitee: z.string().describe('Bare owner name whose pending invitation to edit'),
+    role: z.enum(['member', 'admin']).optional().describe('New organism role'),
+    workspaces: wsGrantShape,
+  }, annotationsFor('aimeat_organism_invitation_update'), async ({ organism_id, invitee, role, workspaces }) => {
+    const body: Record<string, unknown> = {};
+    if (role) body.role = role;
+    if (workspaces) body.workspaces = workspaces;
+    const resp = await client.patch(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/${encodeURIComponent(invitee)}`, body);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
+
+  mcp.tool('aimeat_organism_invitation_cancel', descriptionFor('aimeat_organism_invitation_cancel'), {
+    organism_id: z.string().describe('Organism identifier'),
+    invitee: z.string().describe('Bare owner name whose pending invitation to withdraw'),
+  }, annotationsFor('aimeat_organism_invitation_cancel'), async ({ organism_id, invitee }) => {
+    const resp = await client.delete(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/${encodeURIComponent(invitee)}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
   });
 

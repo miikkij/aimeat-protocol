@@ -77,6 +77,15 @@ export interface OrganismMembershipRecord {
   status: 'active' | 'pending' | 'invited' | 'banned';
   joinedAt: string;
   invitedBy?: string;
+  /** Workspace grants selected at invite time (status `invited` only). Applied via
+   *  `applyInvitationWorkspaceGrants` when the invitee accepts, then cleared. */
+  invitedWorkspaces?: InvitedWorkspaceGrant[];
+}
+
+/** A per-workspace role chosen at invite/direct-add time (same shape as the email-invite grants). */
+export interface InvitedWorkspaceGrant {
+  ws: string;
+  role: 'viewer' | 'contributor';
 }
 
 export interface JoinRequestRecord {

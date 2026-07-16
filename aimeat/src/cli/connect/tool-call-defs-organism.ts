@@ -2,6 +2,8 @@
  * @file cli/connect/tool-call-defs-organism.ts
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 -- 2026-07-16 -- invite passes role + workspaces; add member_add / invitation_update /
+ *     invitation_cancel handlers (name-invite parity with the server MCP).
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import { randomUUID } from 'node:crypto';
@@ -89,7 +91,34 @@ export const organismTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_organism_invite',
-        handler: ({ client }, input) => client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/invitations`, { invitee: requiredString(input, 'invitee') }),
+        handler: ({ client }, input) => {
+            const body: JsonObject = { invitee: requiredString(input, 'invitee') };
+            const role = optionalString(input, 'role'); if (role) body.role = role;
+            const workspaces = optionalArray(input, 'workspaces'); if (workspaces) body.workspaces = workspaces;
+            return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/invitations`, body);
+        },
+    },
+    {
+        name: 'aimeat_organism_member_add',
+        handler: ({ client }, input) => {
+            const body: JsonObject = { ghii: requiredString(input, 'ghii') };
+            const role = optionalString(input, 'role'); if (role) body.role = role;
+            const workspaces = optionalArray(input, 'workspaces'); if (workspaces) body.workspaces = workspaces;
+            return client.post(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/members`, body);
+        },
+    },
+    {
+        name: 'aimeat_organism_invitation_update',
+        handler: ({ client }, input) => {
+            const body: JsonObject = {};
+            const role = optionalString(input, 'role'); if (role) body.role = role;
+            const workspaces = optionalArray(input, 'workspaces'); if (workspaces) body.workspaces = workspaces;
+            return client.patch(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/invitations/${encodeURIComponent(requiredString(input, 'invitee'))}`, body);
+        },
+    },
+    {
+        name: 'aimeat_organism_invitation_cancel',
+        handler: ({ client }, input) => client.delete(`/v1/organisms/${encodeURIComponent(requiredString(input, 'organism_id'))}/invitations/${encodeURIComponent(requiredString(input, 'invitee'))}`),
     },
     {
         name: 'aimeat_organism_invitations',

@@ -6,6 +6,8 @@
  * @structure ParticipantsPanel
  * @usage import { ParticipantsPanel } from '/views/profile/organisms/participants-panel.js';
  * @version-history
+ *   v1.3.0 — 2026-07-16 — The access-manager grantee input is a ContactPicker (contacts + directory
+ *     suggestions + email resolve) instead of a bare text field.
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  *   v1.1.0 — 2026-07-03 — Contract engagements: active/retired lifecycle chips (Adopt writes an active
  *     engagement, Retire flips it to retired), a legacy-agent one-click Retire, and re-adopt.
@@ -28,6 +30,7 @@ function fmtDay(iso) {
 import * as orgService from '/js/services/organisms.js';
 import { listAgents, offersWorkspaceContract, contractNamesOf, adoptContractTask } from '/js/services/agents.js';
 import { Mermaid } from '/components/Mermaid.js';
+import { ContactPicker } from '/components/ContactPicker.js';
 
 /* Participants panel — who takes part in this workspace, as a node → owner → agents chart plus a
  * listing. Built from the records' identity traces (humans + their agents) + organism membership.
@@ -245,8 +248,8 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
                 </span>
               </div>`)}
               <div class="pj-access-add">
-                <input class="pj-access-input" placeholder=${t('organisms.addMemberPlaceholder') || 'owner name (or owner@node / agent#owner@node)'} value=${grantee}
-                  onInput=${e => setGrantee(e.target.value)} onKeyDown=${e => { if (e.key === 'Enter') doGrant(grantee, role); }} />
+                <${ContactPicker} value=${grantee} onChange=${setGrantee} onSubmit=${(v) => doGrant(v, role)}
+                  placeholder=${t('organisms.addMemberPlaceholder') || 'owner name (or owner@node / agent#owner@node)'} disabled=${busy} />
                 <select class="pj-access-role" value=${role} onChange=${e => setRole(e.target.value)}>
                   <option value="contributor">${t('organisms.roleContributor') || 'contributor (read + write)'}</option>
                   <option value="viewer">${t('organisms.roleViewer') || 'viewer (read only)'}</option>

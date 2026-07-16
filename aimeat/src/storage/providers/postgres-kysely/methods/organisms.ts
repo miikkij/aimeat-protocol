@@ -5,6 +5,7 @@
  *   from the Prisma implementation against the same tables. deleteOrganism cascades to memberships /
  *   join-requests / reputation / board rows / all `organism.{id}.*` memory + versions + schema locks.
  * @version-history
+ *   v1.2.0 — 2026-07-16 — Memberships carry invitedWorkspaces (jsonb, migration 0006): ws grants chosen at invite time.
  *   v1.1.0 — 2026-07-16 — Add listPendingApprovalsForOrgs batch (Phase 3): pending approvals for many orgs
  *     in one organismId-IN query.
  *   v1.0.0 — 2026-07-15 — Phase 5: organism governance on Postgres+Kysely.
@@ -33,7 +34,10 @@ function toOrg(r: Selectable<Organism>): OrganismRecord {
   };
 }
 function toMember(r: Selectable<OrganismMembership>): OrganismMembershipRecord {
-  return { id: r.id, organismId: r.organismId, ghii: r.ghii, role: r.role as OrganismMembershipRecord['role'], status: r.status as OrganismMembershipRecord['status'], joinedAt: iso(r.joinedAt), invitedBy: r.invitedBy ?? undefined };
+  return {
+    id: r.id, organismId: r.organismId, ghii: r.ghii, role: r.role as OrganismMembershipRecord['role'], status: r.status as OrganismMembershipRecord['status'], joinedAt: iso(r.joinedAt), invitedBy: r.invitedBy ?? undefined,
+    invitedWorkspaces: (r.invitedWorkspaces ?? undefined) as OrganismMembershipRecord['invitedWorkspaces'],
+  };
 }
 function toJoin(r: Selectable<JoinRequest>): JoinRequestRecord {
   return { id: r.id, organismId: r.organismId, ghii: r.ghii, message: r.message ?? undefined, status: r.status as JoinRequestRecord['status'], reviewedBy: r.reviewedBy ?? undefined, createdAt: iso(r.createdAt), reviewedAt: isoOpt(r.reviewedAt) };
@@ -111,7 +115,7 @@ export const organismMethods = {
   },
 
   async createMembership(this: PostgresKyselyStorage, r: OrganismMembershipRecord): Promise<OrganismMembershipRecord> {
-    await this.db.insertInto('OrganismMembership').values({ id: r.id, organismId: r.organismId, ghii: r.ghii, role: r.role, status: r.status, joinedAt: new Date(r.joinedAt), invitedBy: r.invitedBy ?? null }).execute();
+    await this.db.insertInto('OrganismMembership').values({ id: r.id, organismId: r.organismId, ghii: r.ghii, role: r.role, status: r.status, joinedAt: new Date(r.joinedAt), invitedBy: r.invitedBy ?? null, invitedWorkspaces: jsonb(r.invitedWorkspaces?.length ? r.invitedWorkspaces : null) as never }).execute();
     return r;
   },
   async getMembership(this: PostgresKyselyStorage, organismId: string, ghii: string): Promise<OrganismMembershipRecord | null> {
@@ -131,6 +135,7 @@ export const organismMethods = {
     const data: Record<string, unknown> = {};
     if (updates.role) data.role = updates.role;
     if (updates.status) data.status = updates.status;
+    if ('invitedWorkspaces' in updates) data.invitedWorkspaces = jsonb(updates.invitedWorkspaces?.length ? updates.invitedWorkspaces : null);
     if (Object.keys(data).length === 0) { const r = await this.db.selectFrom('OrganismMembership').selectAll().where('id', '=', id).executeTakeFirst(); return r ? toMember(r) : null; }
     const rows = await this.db.updateTable('OrganismMembership').set(data as never).where('id', '=', id).returningAll().execute();
     return rows[0] ? toMember(rows[0]) : null;

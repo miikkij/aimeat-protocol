@@ -1,0 +1,26 @@
+/**
+ * @file public/css/components/contact-picker.css
+ * @description Shared ContactPicker component — input + suggestion dropdown (contacts, directory
+ *   hits, email-resolve action). Theme-variable driven; loaded globally from spa.html.
+ * @version-history
+ *   v1.0.0 — 2026-07-16 — Initial.
+ */
+.cp-root { position: relative; display: inline-block; min-width: 240px; }
+.cp-input { width: 100%; }
+.cp-drop {
+  position: absolute; top: calc(100% + 2px); left: 0; right: 0; z-index: 60;
+  background: var(--card); border: 1px solid var(--border); border-radius: 8px;
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.18); overflow: hidden; max-height: 280px; overflow-y: auto;
+}
+.cp-item {
+  display: flex; align-items: center; gap: 0.45rem; width: 100%; text-align: left;
+  padding: 0.4rem 0.6rem; border: 0; background: transparent; cursor: pointer;
+  font-size: 0.83rem; color: var(--text);
+}
+.cp-item:hover, .cp-item-hi { background: var(--bg-dim); }
+.cp-item-icon { flex: 0 0 auto; }
+.cp-item-label { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.cp-item-id { color: var(--muted); font-size: 0.74rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-left: auto; }
+.cp-item-src { color: var(--muted); font-size: 0.7rem; border: 1px solid var(--border); border-radius: 999px; padding: 0 0.35rem; }
+.cp-item-resolve { border-top: 1px solid var(--border); color: var(--accent); }
+.cp-item-miss { cursor: default; color: var(--muted); font-size: 0.76rem; border-top: 1px solid var(--border); }

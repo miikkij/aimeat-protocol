@@ -496,7 +496,8 @@ export function applySchemaTables1(db: Database.Database): void {
       role           TEXT NOT NULL DEFAULT 'member',
       status         TEXT NOT NULL DEFAULT 'active',
       joinedAt       TEXT NOT NULL,
-      invitedBy      TEXT
+      invitedBy      TEXT,
+      invitedWorkspaces TEXT
     );
 
     -- ── Join Requests ──

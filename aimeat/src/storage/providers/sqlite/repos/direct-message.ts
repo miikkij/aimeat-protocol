@@ -53,6 +53,7 @@ function deserializeContact(row: Record<string, unknown>): ContactConsentRecord 
     updatedAt: row.updatedAt as string,
   };
   if (row.firstMessageId) record.firstMessageId = row.firstMessageId as string;
+  record.origin = (row.origin === 'saved' ? 'saved' : 'message');
   return record;
 }
 
@@ -444,17 +445,24 @@ export function setContactState(
   contactId: string,
   state: ContactConsentRecord['state'],
   firstMessageId?: string,
+  origin?: ContactConsentRecord['origin'],
 ): ContactConsentRecord {
   const now = new Date().toISOString();
   const existing = getContact(db, ownerGhii, contactId);
   if (existing) {
-    db.prepare('UPDATE contact_consents SET state = ?, firstMessageId = COALESCE(?, firstMessageId), updatedAt = ? WHERE ownerGhii = ? AND contactId = ?')
-      .run(state, firstMessageId ?? null, now, ownerGhii, contactId);
+    // Omitted origin keeps the row's origin — the DM gate must never downgrade a saved contact.
+    db.prepare('UPDATE contact_consents SET state = ?, firstMessageId = COALESCE(?, firstMessageId), origin = COALESCE(?, origin), updatedAt = ? WHERE ownerGhii = ? AND contactId = ?')
+      .run(state, firstMessageId ?? null, origin ?? null, now, ownerGhii, contactId);
   } else {
-    db.prepare('INSERT INTO contact_consents (ownerGhii, contactId, state, firstMessageId, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)')
-      .run(ownerGhii, contactId, state, firstMessageId ?? null, now, now);
+    db.prepare('INSERT INTO contact_consents (ownerGhii, contactId, state, firstMessageId, origin, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(ownerGhii, contactId, state, firstMessageId ?? null, origin ?? 'message', now, now);
   }
   return getContact(db, ownerGhii, contactId)!;
+}
+
+export function deleteContact(db: Database.Database, ownerGhii: string, contactId: string): boolean {
+  const result = db.prepare('DELETE FROM contact_consents WHERE ownerGhii = ? AND contactId = ?').run(ownerGhii, contactId);
+  return result.changes > 0;
 }
 
 export function listContacts(

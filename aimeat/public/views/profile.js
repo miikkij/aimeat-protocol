@@ -69,6 +69,7 @@ import CapabilitiesTab from './profile/capabilities-tab.js';
 import SchedulerTab from './profile/scheduler-tab.js';
 import WorkflowsTab from './profile/workflows-tab.js';
 import InboxTab from './profile/inbox-tab.js';
+import ContactsTab from './profile/contacts-tab.js';
 import NotebookTab from './profile/notebook-tab.js';
 import LivingTab from './profile/living-tab.js';
 import DiscoverTab from './profile/discover-tab.js';
@@ -78,6 +79,7 @@ import DiscoverTab from './profile/discover-tab.js';
 // Deep links (?tab=X) bypass tier filtering.
 const TABS = [
   { id: 'messages',      key: 'profile.tabs.inbox',          component: InboxTab,          minTier: 'new' },
+  { id: 'contacts',      key: 'contacts.tabLabel',           component: ContactsTab,       minTier: 'new' },
   { id: 'discover',      key: 'discover.tabLabel',           component: DiscoverTab,       minTier: 'new' },
   { id: 'portfolio',     key: 'portfolio.tabLabel',          component: PortfolioTab,      minTier: 'active' },
   { id: 'agents',        key: 'profile.tabs.agents',         component: AgentsTab,         minTier: 'active' },

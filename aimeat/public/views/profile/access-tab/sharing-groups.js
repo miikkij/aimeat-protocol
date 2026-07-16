@@ -3,6 +3,8 @@
  * @description Sharing Groups section — CRUD for sharing groups with expandable
  *   member lists. Extracted from access-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Member-add identifier input is the shared ContactPicker (contacts +
+ *     directory suggestions, full-id mode).
  *   v1.0.0 — 2026-07-13 — Extracted from access-tab.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -12,6 +14,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
+import { ContactPicker } from '/components/ContactPicker.js';
 import * as groupsApi from '/js/services/sharing-groups.js';
 
 export function SharingGroupsSection({ showToast, initial }) {
@@ -238,10 +241,8 @@ export function SharingGroupsSection({ showToast, initial }) {
               <div class="create-form">
                 <div class="form-row">
                   <label>${t('profile.access.sgMemberIdentifier') || 'Identifier (GHII or GAII)'}</label>
-                  <input type="text" class="input-field input-sm"
-                    placeholder=${'alice@node-id'}
-                    value=${memberIdent} onInput=${e => setMemberIdent(e.target.value)}
-                    onKeyDown=${e => e.key === 'Enter' && handleAddMember(group.id)} />
+                  <${ContactPicker} value=${memberIdent} onChange=${setMemberIdent} valueMode="full"
+                    placeholder=${'alice@node-id'} onSubmit=${() => handleAddMember(group.id)} />
                 </div>
                 <div class="form-row">
                   <label>${t('profile.access.sgMemberType') || 'Type'}</label>
