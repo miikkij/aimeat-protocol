@@ -17,6 +17,9 @@
  *   v1.2.0 — 2026-07-16 — Inject before the LAST closing tag (shared html-inject helper), not the
  *     first: a first-match replace landed the badge inside app JS that contains the literal
  *     '</body>' string, silently killing the whole app.
+ *   v1.3.0 — 2026-07-16 — Mobile: collapse to a small round ⚡ button that expands the full pill
+ *     on tap (CSS-only checkbox toggle + media query — still zero script, covered by the same
+ *     style-src 'unsafe-inline' the inline styles already need). Desktop look unchanged.
  */
 import { injectBeforeClosingTag } from './html-inject.js';
 
@@ -26,10 +29,12 @@ const AIMEAT_LABEL = 'aimeat.io';
 
 /**
  * Append the badge before the LAST `</body>` (fallback last `</html>`, else end). The label + link are the fixed
- * aimeat.io attribution (deliberate, since publishing/hosting is free). Pure static markup + inline
- * styles — no script, so it needs nothing the inline CSP doesn't already allow (style-src
- * 'unsafe-inline'). Returns the input unchanged when the payload isn't an HTML document or already
- * carries the badge (idempotent).
+ * aimeat.io attribution (deliberate, since publishing/hosting is free). Pure static markup + a scoped
+ * `<style>` block — no script, so it needs nothing the inline CSP doesn't already allow (style-src
+ * 'unsafe-inline' governs `<style>` elements and style attributes alike). On narrow viewports the pill
+ * collapses to a small round ⚡ button so it doesn't cover app UI; tapping toggles the full pill via a
+ * hidden-checkbox CSS toggle (the only way to get tap-to-expand without a script). Returns the input
+ * unchanged when the payload isn't an HTML document or already carries the badge (idempotent).
  */
 export function injectAimeatBadge(data: Buffer | Uint8Array | string): Buffer {
     const text = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
@@ -38,21 +43,55 @@ export function injectAimeatBadge(data: Buffer | Uint8Array | string): Buffer {
     // Idempotent: don't double-inject if a badged document is ever re-served.
     if (text.includes('id="aimeat-app-badge"')) return Buffer.from(text, 'utf-8');
 
-    const badge =
-        '<a id="aimeat-app-badge" href="' + AIMEAT_HOME + '" target="_blank" rel="noopener noreferrer" '
-        + 'aria-label="' + AIMEAT_LABEL + ' — publish your own app" '
-        + 'style="position:fixed!important;right:12px!important;bottom:12px!important;z-index:2147483647!important;'
-        + 'display:inline-flex!important;align-items:center!important;gap:8px!important;'
-        + 'padding:7px 12px!important;border-radius:9999px!important;'
-        + 'background:rgba(20,20,28,.92)!important;color:#fff!important;'
-        + 'font:600 12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif!important;'
-        + 'text-decoration:none!important;box-shadow:0 4px 16px rgba(0,0,0,.28)!important;'
+    // Shared surface look for both the pill and the collapsed ⚡ button. Everything is !important
+    // so arbitrary app CSS (resets, `a{...}`, `label{...}`) can't restyle the badge.
+    const surface =
+        'background:rgba(20,20,28,.92)!important;box-shadow:0 4px 16px rgba(0,0,0,.28)!important;'
         + 'border:1px solid rgba(255,255,255,.14)!important;backdrop-filter:blur(8px)!important;'
-        + '-webkit-backdrop-filter:blur(8px)!important;letter-spacing:.1px!important;">'
-        + '<span style="color:#E8564A!important">⚡</span>'
+        + '-webkit-backdrop-filter:blur(8px)!important;';
+    const css =
+        // display:contents — the wrapper adds no box of its own, children position:fixed themselves.
+        '#aimeat-app-badge{display:contents!important}'
+        // The toggle checkbox: visually hidden but focusable (never display:none — keyboard a11y).
+        + '#aimeat-app-badge input{position:fixed!important;right:20px!important;bottom:20px!important;'
+        + 'width:1px!important;height:1px!important;margin:0!important;opacity:0!important;'
+        + 'pointer-events:none!important;z-index:2147483647!important}'
+        // Collapsed ⚡ button — hidden on wide viewports, shown on narrow ones.
+        + '#aimeat-app-badge label{display:none!important;position:fixed!important;right:12px!important;'
+        + 'bottom:12px!important;z-index:2147483647!important;width:34px!important;height:34px!important;'
+        + 'align-items:center!important;justify-content:center!important;border-radius:50%!important;'
+        + 'color:#E8564A!important;font:600 16px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif!important;'
+        + 'cursor:pointer!important;user-select:none!important;-webkit-user-select:none!important;' + surface + '}'
+        // The full pill — the desktop default, unchanged look.
+        + '#aimeat-app-badge a{position:fixed!important;right:12px!important;bottom:12px!important;'
+        + 'z-index:2147483647!important;display:inline-flex!important;align-items:center!important;'
+        + 'gap:8px!important;padding:7px 12px!important;border-radius:9999px!important;color:#fff!important;'
+        + 'font:600 12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif!important;'
+        + 'text-decoration:none!important;letter-spacing:.1px!important;' + surface + '}'
+        + '#aimeat-app-badge a>span:first-child{color:#E8564A!important}'
+        + '#aimeat-app-badge a>span:last-child{opacity:.7!important;font-weight:500!important}'
+        + '#aimeat-app-badge input:focus-visible~label{outline:2px solid #E8564A!important;outline-offset:2px!important}'
+        // Narrow viewports: only the ⚡ button by default; checking the toggle reveals the pill
+        // beside it (the button stays visible to collapse again; the pill drops its own ⚡).
+        + '@media (max-width:640px){'
+        + '#aimeat-app-badge label{display:flex!important}'
+        + '#aimeat-app-badge a{display:none!important}'
+        + '#aimeat-app-badge input:checked~a{display:inline-flex!important;right:56px!important}'
+        + '#aimeat-app-badge a>span:first-child{display:none!important}'
+        + '}';
+
+    const badge =
+        '<div id="aimeat-app-badge">'
+        + '<style>' + css + '</style>'
+        + '<input type="checkbox" id="aimeat-app-badge-open">'
+        + '<label for="aimeat-app-badge-open" aria-label="' + AIMEAT_LABEL + ' — publish your own app">⚡</label>'
+        + '<a href="' + AIMEAT_HOME + '" target="_blank" rel="noopener noreferrer" '
+        + 'aria-label="' + AIMEAT_LABEL + ' — publish your own app">'
+        + '<span>⚡</span>'
         + '<span>' + AIMEAT_LABEL + '</span>'
-        + '<span style="opacity:.7!important;font-weight:500!important">· Publish your own app — free</span>'
-        + '</a>';
+        + '<span>· Publish your own app — free</span>'
+        + '</a>'
+        + '</div>';
 
     return Buffer.from(injectBeforeClosingTag(text, badge), 'utf-8');
 }
