@@ -31,6 +31,7 @@ export { MessagesInboxService, createMessagesInboxService, type InboxOverview } 
 export { AccessTabService, createAccessTabService, type AccessOverview } from './access-tab-db-service.js';
 export { WalletTabService, createWalletTabService, type WalletOverview } from './wallet-tab-db-service.js';
 export { MemoryTabService, createMemoryTabService, type MemoryTabOverview } from './memory-tab-db-service.js';
+export { PackagesTabService, createPackagesTabService, type PackagesOverview } from './packages-tab-db-service.js';
 export { loadOwnerAgents, loadOwnerEcoApps, resolveOwnerIdentities } from './owner-identity.js';
 
 /** Assemble the memory Application-DB-Service over the given storage (Phase 0: LegacyMemoryAdapter). Its
