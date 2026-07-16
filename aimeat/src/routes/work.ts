@@ -23,6 +23,7 @@ import { success, error } from '../middleware/envelope.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
 import { logger } from '../utils/logger.js';
+import { createWorkTabService } from '../services/db/work-tab-db-service.js';
 import { executeHooks } from '../services/hooks.js';
 import { fireHook } from '../utils/fire-hook.js';
 import { WorkRequestSchema, WorkBatchSchema, WorkDeliverySchema, WorkRatingSchema, validateBody } from '../models/schemas.js';
@@ -418,6 +419,16 @@ export function workRouter(config: AimeatConfig, storage: Storage, peers: Map<st
       })),
       total: items.length,
     }));
+  });
+
+  // GET /v1/work/overview — the Work tab mount in ONE call: inbox (provider) + sent (requester). Folds
+  // GET /v1/work/inbox + /v1/work/sent, resolving the owner's agents once. Same gate as the folded reads.
+  // MUST be registered before /v1/work/:tc (a literal 'overview' would otherwise match the :tc capture).
+  const workTabDb = createWorkTabService(storage);
+  router.get('/v1/work/overview', requireAuth(), requireRole('agent'), requireScope('work:read'), async (req, res) => {
+    const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const data = await workTabDb.overview(isOwnerSession, req.auth!.owner as string, req.auth!.sub as string);
+    res.json(success(config.nodeId, data));
   });
 
   // GET /v1/work/:tc — work status (agent auth)

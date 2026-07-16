@@ -8,6 +8,8 @@
  *     audit log with day-range selector, GDPR export button
  * @usage Loaded by profile.js route as a lazy tab component.
  * @version-history
+ *   v1.3.0 — 2026-07-16 — Mount folds consents + audit + permission-summary into GET /v1/data-wallet
+ *     (getDataWalletOverview); individual reads kept as fallback + interactive re-fetch.
  *   v1.2.0 — 2026-07-16 — Consent-grant recipient input is the shared ContactPicker (contacts +
  *     directory suggestions + email resolve, full-id mode).
  *   v1.1.1 — 2026-06-19 — lint fixes (misleading-char-class/unused-expression/empty-block)
@@ -36,7 +38,19 @@ export default function DataWalletTab({ session, showToast }) {
   const [recipientValue, setRecipientValue] = useState('');
 
   useEffect(() => {
-    if (session) { loadConsents(); loadAudit(30); loadPermSummary(); }
+    if (!session) return;
+    // Mount fold: ONE composite (consents + audit + permission summary). On failure, fall back to the
+    // three individual reads. Interactive re-fetches (grant/revoke, audit day-range) keep the individuals.
+    (async () => {
+      const ov = await consentService.getDataWalletOverview(30);
+      if (ov) {
+        setConsents(Array.isArray(ov.consents) ? ov.consents : []);
+        setAuditEntries(Array.isArray(ov.audit) ? ov.audit : []);
+        setPermSummary(ov.permSummary || null);
+        return;
+      }
+      loadConsents(); loadAudit(30); loadPermSummary();
+    })();
   }, [session]);
 
   async function loadConsents() {

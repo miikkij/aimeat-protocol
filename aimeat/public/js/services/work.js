@@ -9,6 +9,7 @@
  *   - submitRating: rate a completed work item
  *
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add getWorkOverview (GET /v1/work/overview) folding the inbox + sent mount reads.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
@@ -23,6 +24,19 @@ export async function listInbox() {
 export async function listSent() {
   const data = await apiGet('/v1/work/sent');
   return data?.data?.items || data?.data || [];
+}
+
+/**
+ * Composite mount for the Work tab: inbox + sent in ONE call. Returns { inbox, sent } (arrays) or null on
+ * error so the caller can fall back to the individual listInbox/listSent reads.
+ */
+export async function getWorkOverview() {
+  try {
+    const data = await apiGet('/v1/work/overview');
+    const d = data?.data;
+    if (!d) return null;
+    return { inbox: d.inbox || [], sent: d.sent || [] };
+  } catch { return null; }
 }
 
 /** Submit a rating for a completed work item. */

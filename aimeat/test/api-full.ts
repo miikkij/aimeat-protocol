@@ -752,6 +752,31 @@ await test('Notebook overview composite folds inbox + settings + organisms (Phas
     assert(Array.isArray(d.organisms?.organisms), 'organisms is an array');
 });
 
+await test('Data Wallet composite folds consents + audit + permission summary (Phase 4 DbService)', async () => {
+    // Grant a consent so the wallet has data (owner session bypasses the consent:manage scope).
+    const g = await json('/v1/consent', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ data_pattern: 'notes.*', recipient: '*', purpose: 'data-wallet composite test', scope: 'federation' }),
+    });
+    assert(g.status === 201 || g.status === 200, `grant status ${g.status}: ${JSON.stringify(g.body)}`);
+
+    const { status, body } = await json('/v1/data-wallet', { method: 'GET', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(status === 200, `data-wallet status ${status}: ${JSON.stringify(body)}`);
+    const d = body.data;
+
+    // consents mirror GET /v1/consent
+    const single = await json('/v1/consent', { method: 'GET', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(d.consents.total === single.body.data.total, `consents total matches /v1/consent: ${d.consents.total} vs ${single.body.data.total}`);
+    assert(d.consents.consents.some((c: any) => c.data_pattern === 'notes.*'), 'granted consent present in composite');
+    // audit carries entries[] + the 30-day period
+    assert(Array.isArray(d.audit.entries) && d.audit.period_days === 30, 'audit carries entries[] + period_days');
+    // permSummary mirrors GET /v1/permissions/summary
+    const perm = await json('/v1/permissions/summary', { method: 'GET', headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(d.permSummary.active_consents === perm.body.data.active_consents, `active_consents matches: ${d.permSummary.active_consents} vs ${perm.body.data.active_consents}`);
+    assert(d.permSummary.total_memory_keys === perm.body.data.total_memory_keys, `memory-key count matches: ${d.permSummary.total_memory_keys} vs ${perm.body.data.total_memory_keys}`);
+    assert(d.permSummary.total_storage_files === perm.body.data.total_storage_files, 'storage-file count matches');
+});
+
 await test('Validate endpoint', async () => {
     const { body } = await json('/v1/validate', {
         method: 'POST',

@@ -4,6 +4,7 @@
  *   Displays inbox (received) and sent work items with accept/decline/deliver actions
  *   and a rating modal for completed deliveries.
  * @version-history
+ *   v1.3.0 — 2026-07-16 — Mount folds inbox + sent into GET /v1/work/overview (getWorkOverview); individual reads kept as fallback.
  *   v1.0.0 — 2026-03-16 — Initial work tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes; i18n for action labels
  *   v1.2.0 — 2026-06-02 — Component unification (#2): Rate + Deliver modals use the
@@ -18,7 +19,7 @@ import { t } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
-import { listInbox, listSent, submitRating, acceptWork, rejectWork, deliverWork } from '/js/services/work.js';
+import { listInbox, listSent, getWorkOverview, submitRating, acceptWork, rejectWork, deliverWork } from '/js/services/work.js';
 
 export default function WorkTab({ session, showToast, onStats }) {
   const [workInbox, setWorkInbox] = useState(null);
@@ -29,6 +30,14 @@ export default function WorkTab({ session, showToast, onStats }) {
   const [actionLoading, setActionLoading] = useState(null);
 
   const loadData = useCallback(async () => {
+    // Mount fold: ONE composite (inbox + sent). On failure, fall back to the individual reads.
+    const ov = await getWorkOverview();
+    if (ov) {
+      setWorkInbox(ov.inbox);
+      onStats?.({ work: ov.inbox.length });
+      setWorkSent(ov.sent);
+      return;
+    }
     try {
       const inbox = await listInbox();
       setWorkInbox(inbox);

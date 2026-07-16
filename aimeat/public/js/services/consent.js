@@ -52,6 +52,23 @@ export async function getPermissionSummary() {
   return data?.data || null;
 }
 
+/**
+ * Composite mount for the Data Wallet tab: consents + audit + permission summary in ONE call. Returns
+ * { consents, audit, permSummary } or null on error so the caller can fall back to the individual reads.
+ */
+export async function getDataWalletOverview(days) {
+  try {
+    const data = await apiGet('/v1/data-wallet' + (days ? '?days=' + days : ''));
+    const d = data?.data;
+    if (!d) return null;
+    return {
+      consents: d.consents?.consents || [],
+      audit: d.audit?.entries || [],
+      permSummary: d.permSummary || null,
+    };
+  } catch { return null; }
+}
+
 /** Load effective permission rules for a specific memory key. */
 export async function getKeyPermissions(key) {
   const data = await apiGet('/v1/permissions/memory/' + encodeURIComponent(key));
