@@ -6,6 +6,8 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — canReadWs split into pure canReadWsManifest + a scan; readWsManifests batches
+ *     the discovery list's per-workspace manifest scans into ONE cross-owner key-IN read (Phase 2 N×M).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  */
 import { v4 as uuidv4 } from 'uuid';
@@ -371,13 +373,13 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     return null;
   };
 
-  /** Can this accessor read the workspace's content (i.e. its manifest)? For a GEAI (callerGaii is the
-   *  eco: sub, unchanged by resolveIdentity) a matching 'read' data-area grant is also required — model
-   *  A / strict, so a GEAI riding its owner's membership honours the owner-selected read scope. */
-  const canReadWs = async (id: string, ws: string, callerGaii: string): Promise<boolean> => {
-    const mkey = `organism.${id}.w.${ws}.meta.manifest`;
-    const { items } = await storage.listAllMemory({ prefix: mkey, limit: 10 });
-    const man = items.find(r => r.key === mkey);
+  /** The read-authz decision for a workspace given its ALREADY-FETCHED manifest record (or null when the
+   *  workspace has no manifest). Factored out of {@link canReadWs} so a batch caller resolving N
+   *  workspaces from ONE cross-owner multi-key read and the single-ws caller share ONE authz code path —
+   *  no drift. For a GEAI (callerGaii is the eco: sub, unchanged by resolveIdentity) a matching 'read'
+   *  data-area grant is also required — model A / strict, so a GEAI riding its owner's membership honours
+   *  the owner-selected read scope. */
+  const canReadWsManifest = async (callerGaii: string, manKey: string, man: MemoryRecord | null): Promise<boolean> => {
     if (!man) return false;
     let allowed: boolean;
     if (man.ownerGaii === callerGaii || isSameOwner(man.ownerGaii, callerGaii)) {
@@ -386,8 +388,45 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       const d = await authorizeRead(storage, config, { ownerGaii: man.ownerGaii, accessorGaii: callerGaii, resourceKey: man.key, visibility: man.visibility, groupId: man.groupId, action: 'read' });
       allowed = d.allowed;
     }
-    if (allowed && isGEAI(callerGaii)) allowed = await ecoMayReadKey(storage, callerGaii, mkey);
+    if (allowed && isGEAI(callerGaii)) allowed = await ecoMayReadKey(storage, callerGaii, manKey);
     return allowed;
+  };
+
+  /** Can this accessor read the workspace's content (i.e. its manifest)? One manifest scan, then the
+   *  shared {@link canReadWsManifest} decision. */
+  const canReadWs = async (id: string, ws: string, callerGaii: string): Promise<boolean> => {
+    const mkey = `organism.${id}.w.${ws}.meta.manifest`;
+    const { items } = await storage.listAllMemory({ prefix: mkey, limit: 10 });
+    return canReadWsManifest(callerGaii, mkey, items.find(r => r.key === mkey) ?? null);
+  };
+
+  /** Batch-fetch the manifest record of MANY workspaces in ONE cross-owner `key IN (…)` read (falls back
+   *  to a per-ws scan when the backend lacks the primitive). Returns wsId → freshest manifest record —
+   *  collapses the discovery list's per-workspace canReadWs manifest scans (N → 1). Pair with
+   *  {@link canReadWsManifest} to resolve each workspace's access from the pre-fetched manifest without a
+   *  second round-trip. */
+  const readWsManifests = async (id: string, wsIds: string[]): Promise<Map<string, MemoryRecord>> => {
+    const out = new Map<string, MemoryRecord>();
+    if (wsIds.length === 0) return out;
+    const keyOf = (ws: string) => `organism.${id}.w.${ws}.meta.manifest`;
+    const wsOfKey = new Map(wsIds.map(ws => [keyOf(ws), ws]));
+    let recs: MemoryRecord[];
+    if (storage.getMemoryByKeysAnyOwner) {
+      recs = await storage.getMemoryByKeysAnyOwner([...wsOfKey.keys()]);
+    } else {
+      recs = [];
+      for (const ws of wsIds) {
+        const mkey = keyOf(ws);
+        const { items } = await storage.listAllMemory({ prefix: mkey, limit: 10 });
+        const m = items.find(r => r.key === mkey);
+        if (m) recs.push(m);
+      }
+    }
+    for (const r of recs) {
+      const ws = wsOfKey.get(r.key);
+      if (ws) out.set(ws, fresherRec(out.get(ws), r));   // dedupe forked-owner copies → freshest
+    }
+    return out;
   };
 
   /** Create a consent grant if an equivalent active one doesn't already exist (idempotent). */
@@ -597,7 +636,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
 
   return {
     memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft,
-    wsRegPrefix, bareOwner, findWsEntry, canReadWs, ensureConsent,
+    wsRegPrefix, bareOwner, findWsEntry, canReadWs, canReadWsManifest, readWsManifests, ensureConsent,
     setWorkspaceRole, revokeWorkspaceRole, memberRolesForWs,
     readShareMeta, redactShare, shareGateDenied, isDocPublic, readWsManifestValue, collectPublicDocs, docsToMarkdown,
     requireWsManager, requireOrgAdmin, codeInviteGuards, requireOrgMember, toAgentGaii,

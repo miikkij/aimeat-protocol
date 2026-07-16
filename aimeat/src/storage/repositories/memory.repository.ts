@@ -85,6 +85,17 @@ export interface MemoryRepository {
    */
   getMemoryByKeys?(ownerGaii: string, keys: string[]): Promise<MemoryRecord[]>;
   /**
+   * BULK PRIMITIVE — read MANY keys ACROSS ALL owners in one `key IN (…)` query (Phase 2). Unlike
+   * {@link getMemoryByKeys} (single owner), this fetches every live row whose key is in the set no matter
+   * which owner holds it — for a fixed, caller-known key list whose owners are NOT known up front (e.g.
+   * the `…meta.manifest` key of each workspace in an organism: one owner per workspace, but a different
+   * member may own each). Collapses a per-key `listAllMemory` probe loop (the discovery list's
+   * per-workspace canReadWs manifest scan) into ONE query. Returns only existing (live, non-expired) rows;
+   * order is not guaranteed and a key forked across owners may return more than one row (the caller
+   * dedupes, e.g. by freshest). Optional — a backend without it falls back to a per-key any-owner loop.
+   */
+  getMemoryByKeysAnyOwner?(keys: string[]): Promise<MemoryRecord[]>;
+  /**
    * BULK PRIMITIVE — upsert MANY rows as ONE unit (Phase 1). Same per-row semantics as
    * {@link setMemory} (version bump, trackable-history archive, byteSize), but committed together
    * (SQLite: one transaction) so a bulk import pays one commit instead of N. Optional; the adapter

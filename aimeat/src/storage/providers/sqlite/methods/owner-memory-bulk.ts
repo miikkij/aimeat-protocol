@@ -5,6 +5,7 @@
  *   to keep that file ≤800 lines (max-file-lines); method bodies are verbatim, bound to SqliteStorage via
  *   the same prototype merge. Each is workload-shaped so the higher layers compose them without SQL.
  * @version-history
+ *   v1.1.0 — 2026-07-16 — Add getMemoryByKeysAnyOwner (Phase 2 N×M): many keys across ALL owners in one query.
  *   v1.0.0 — 2026-07-15 — Extracted from owner.ts (Phase 1/2 bulk primitives).
  */
 import type { MemoryRecord } from '../../../interface.js';
@@ -17,6 +18,26 @@ export const ownerMemoryBulkMethods = {
     if (keys.length === 0) return [];
     const placeholders = keys.map(() => '?').join(',');
     const rows = this.db.prepare(`SELECT * FROM memory WHERE ownerGaii = ? AND key IN (${placeholders})`).all(ownerGaii, ...keys) as Record<string, unknown>[];
+    const out: MemoryRecord[] = [];
+    for (const row of rows) {
+      const record = this.deserializeMemory(row);
+      if (this.isMemoryExpired(record)) {
+        this.db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key);
+        continue;
+      }
+      out.push(record);
+    }
+    return out;
+  },
+
+  // BULK PRIMITIVE (Phase 2) — many keys across ALL owners in ONE `key IN (…)` query (no owner filter).
+  // Live rows only (TTL-expired rows pruned lazily, mirroring getMemoryByKeys). Backs the organism
+  // discovery list's batched workspace-manifest read (N canReadWs manifest scans → 1). A key forked
+  // across owners returns >1 row; the caller dedupes.
+  async getMemoryByKeysAnyOwner(this: SqliteStorage, keys: string[]): Promise<MemoryRecord[]> {
+    if (keys.length === 0) return [];
+    const placeholders = keys.map(() => '?').join(',');
+    const rows = this.db.prepare(`SELECT * FROM memory WHERE key IN (${placeholders})`).all(...keys) as Record<string, unknown>[];
     const out: MemoryRecord[] = [];
     for (const row of rows) {
       const record = this.deserializeMemory(row);

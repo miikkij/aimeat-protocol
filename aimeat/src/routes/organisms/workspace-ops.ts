@@ -8,6 +8,8 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/organisms.ts (max-file-lines)
  *   v1.1.0 — 2026-07-15 — Org managers (creator/admin) see every workspace in the agents/activity feed
  *     (isOrgManager), matching their automatic workspace read access.
+ *   v1.2.0 — 2026-07-16 — agents/activity readable-workspace resolution batches every manifest read into
+ *     ONE cross-owner key-IN query (readWsManifests + canReadWsManifest), not one canReadWs scan per ws.
  */
 import { raw, type Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -39,7 +41,7 @@ import type { OrganismHelpers, ShareMeta, ResolvedShare } from './shared.js';
 
 export function registerOrganismWorkspaceOpsRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
-    memberRole, toAgentGaii, findWsEntry, bareOwner, wsRegPrefix, canReadWs,
+    memberRole, toAgentGaii, findWsEntry, bareOwner, wsRegPrefix, canReadWsManifest, readWsManifests,
     readShareMeta, collectPublicDocs, shareGateDenied, docsToMarkdown, redactShare, archiveHandler,
   } = H;
 
@@ -157,16 +159,25 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     const manager = await isOrgManager(storage, id, ownerName);
     // Registry → readable workspaces + names.
     const reg = await storage.listAllMemory({ prefix: wsRegPrefix(id), limit: 1000 });
-    const wss: Array<{ id: string; name: string }> = [];
+    const candidates: Array<{ id: string; name: string; createdBy: string }> = [];
     const seenWs = new Set<string>();
     for (const rec of reg.items) {
       if (rec.key !== wsRegPrefix(id)) continue;
       for (const w of ((rec.value as { workspaces?: Array<{ id?: string; name?: string; createdBy?: string }> } | null)?.workspaces ?? [])) {
         if (!w.id || seenWs.has(w.id)) continue;
         seenWs.add(w.id);
-        const createdBy = w.createdBy ?? bareOwner(rec.ownerGaii);
-        if (createdBy === ownerName || manager || await canReadWs(id, w.id, callerGaii)) wss.push({ id: w.id, name: w.name ?? w.id });
+        candidates.push({ id: w.id, name: w.name ?? w.id, createdBy: w.createdBy ?? bareOwner(rec.ownerGaii) });
       }
+    }
+    // Readable workspaces: own + (manager ? all : per-ws read-authz). Batch the non-owner probes' manifest
+    // reads into ONE cross-owner key-IN query, then decide each from its pre-fetched manifest (identical
+    // semantics to per-ws canReadWs).
+    const wss: Array<{ id: string; name: string }> = [];
+    const toProbe = candidates.filter(w => w.createdBy !== ownerName && !manager);
+    const manifests: Map<string, MemoryRecord> = toProbe.length ? await readWsManifests(id, toProbe.map(w => w.id)) : new Map();
+    for (const w of candidates) {
+      if (w.createdBy === ownerName || manager) { wss.push({ id: w.id, name: w.name }); continue; }
+      if (await canReadWsManifest(callerGaii, `organism.${id}.w.${w.id}.meta.manifest`, manifests.get(w.id) ?? null)) wss.push({ id: w.id, name: w.name });
     }
     // Single scan of organism.{id}.w. → bucket by ws (per-ws fallback above the cap).
     const wRoot = `organism.${id}.w.`;
