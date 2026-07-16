@@ -382,8 +382,7 @@ pnpm dev                     # development with auto-reload
 pnpm build && pnpm start     # production
 
 # Docker — one compose file per backend (run from the aimeat/ directory)
-docker compose up                                      # MongoDB (default)
-docker compose -f docker-compose.postgres.yml up --build   # PostgreSQL
+docker compose up --build                                  # PostgreSQL + Kysely (default, prod backend)
 docker compose -f docker-compose.sqlite.yml up --build     # SQLite (no external DB)
 ```
 

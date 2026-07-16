@@ -299,7 +299,7 @@ aimeat-protocol/                  pnpm workspace (root package.json proxies to a
 │   ├── tools/                    dev tools (synthtraces self-play harness)
 │   ├── scripts/  bin/            build/ops scripts, `aimeat` CLI entry
 │   ├── eslint-rules/             custom lint rules (file headers, no-max-tokens)
-│   ├── Dockerfile  docker-compose.{,postgres,sqlite}.yml
+│   ├── Dockerfile  docker-compose.{,sqlite}.yml  (default = Postgres+Kysely)
 │   └── docs/                     implementation-local docs (integrations/…)
 ├── python/aimeat-crewai/         ★ pip-installable CrewAI liaison/connector (own PyPI line)
 │   └── src/aimeat_crewai/        liaison.py, mcp_client.py, daemon.py, offers.py, cli.py
