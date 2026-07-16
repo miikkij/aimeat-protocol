@@ -25,14 +25,13 @@ Before submitting a PR, run:
 cd aimeat
 pnpm lint          # ESLint must pass
 pnpm typecheck     # TypeScript must compile cleanly
-pnpm test          # Unit tests must pass
-pnpm test:e2e      # E2E tests must pass (memory backend)
+pnpm test              # Unit tests must pass
+pnpm test:e2e:sqlite   # E2E tests must pass (SQLite backend)
 ```
 
-For changes affecting persistent storage, also run:
+For changes affecting persistent storage, also run the primary production backend:
 ```bash
-pnpm test:e2e:sqlite
-pnpm test:e2e:mongodb
+pnpm test:e2e:postgres-kysely   # needs a running PostgreSQL
 ```
 
 See [docs/coding-guidelines/testing-requirements.md](docs/coding-guidelines/testing-requirements.md) for full details.

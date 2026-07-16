@@ -14,6 +14,21 @@ jobs:
       matrix:
         node-version: [24.x]
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: appuser
+          POSTGRES_PASSWORD: devpassword123
+          POSTGRES_DB: aimeat_kysely_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
 
@@ -63,7 +78,18 @@ jobs:
         working-directory: aimeat
         run: pnpm build
 
-      - name: E2E tests (memory backend)
+      - name: Prepare E2E env files (from committed examples)
+        working-directory: aimeat
+        run: |
+          cp .env.test.sqlite.example .env.test.sqlite
+          cp .env.test.postgres-kysely.example .env.test.postgres-kysely
+
+      - name: E2E tests (SQLite)
         continue-on-error: true
         working-directory: aimeat
-        run: node --env-file=.env.test.memory --import tsx test/run-e2e-ci.ts --all
+        run: pnpm test:e2e:sqlite
+
+      - name: E2E tests (PostgreSQL + Kysely — primary backend)
+        continue-on-error: true
+        working-directory: aimeat
+        run: pnpm test:e2e:postgres-kysely

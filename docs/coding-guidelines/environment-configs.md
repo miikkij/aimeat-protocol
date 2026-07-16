@@ -227,7 +227,7 @@ Two supported test configs exist for E2E testing:
 | File | Backend | Usage |
 |------|---------|-------|
 | `.env.test.sqlite` | SQLite (disk or `:memory:`) | Fast-iteration default (`pnpm test:e2e:sqlite`) |
-| `.env.test.mongodb` | MongoDB | Production-like tests (`pnpm test:e2e:mongodb`) |
+| `.env.test.postgres-kysely` | PostgreSQL + Kysely | Primary / prod backend (`pnpm test:e2e:postgres-kysely`) |
 
 > `.env.test.memory` / `pnpm test:e2e:memory` (pure in-memory) is **deprecated** — do not use it for verification.
 

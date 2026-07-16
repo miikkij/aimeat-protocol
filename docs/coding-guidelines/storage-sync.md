@@ -108,8 +108,8 @@ npx tsc --noEmit
 # PRIMARY backends — both must be green:
 pnpm test:e2e:postgres-kysely   # recreate the postgres-kysely test DB first for a full run
 pnpm test:e2e:sqlite
-# Legacy (only if you touched the Prisma path; failures informational):
-pnpm test:e2e:mongodb
+# Legacy (only if you touched the Prisma path; failures informational; pnpm script removed):
+node --env-file=.env.test.mongodb --import tsx test/run-e2e-ci.ts
 ```
 
 ---
@@ -278,12 +278,13 @@ Mirror any MongoDB model change here (same fields; use Postgres-native id/type c
 Until a formal migration framework is adopted, validation comes from E2E tests:
 
 - `pnpm test:e2e:sqlite` — validates SQLite, disk or `:memory:` (with migrations); fast-iteration default
-- `pnpm test:e2e:mongodb` — validates MongoDB via Prisma
-- `pnpm test:e2e:postgresql` — validates PostgreSQL via Prisma (or `pnpm test:e2e:all-backends` for all three)
+- `pnpm test:e2e:postgres-kysely` — validates PostgreSQL via Kysely (**primary / prod backend**)
+- `pnpm test:e2e:all-backends` — both of the above in one go
+- MongoDB (deprecated, Prisma; pnpm script removed): `node --env-file=.env.test.mongodb --import tsx test/run-e2e-ci.ts` — only when the shared Prisma path was touched; failures informational
 
 > `pnpm test:e2e:memory` (pure in-memory) is **deprecated** — not a supported backend.
 
-**All three persistent backends must pass.** If any backend fails after a schema change, the change is incomplete.
+**Both primary backends (PostgreSQL+Kysely and SQLite) must pass.** If either fails after a schema change, the change is incomplete.
 
 ---
 

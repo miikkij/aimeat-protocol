@@ -8,7 +8,7 @@
 - **PostgreSQL + Kysely** (`postgres-kysely`, `.env.test.postgres-kysely`, `src/storage/providers/postgres-kysely/`, no Prisma) — **the PRIMARY production backend; it MUST always pass.**
 - **SQLite** (better-sqlite3; `:memory:` via `AIMEAT_DB_PATH=:memory:` for the fast-iteration role on the real prod code path) — **first-class; it MUST always pass.**
 - **MongoDB** (Prisma) — **DEPRECATED, removed before AIMEAT v2.0.** Run only when a change touches the shared Prisma path; treat failures as informational, not blocking.
-- The Prisma-based **`postgres`** provider (`.env.test.postgres`, `pnpm test:e2e:postgresql`, `schema.postgres.prisma`) is **legacy** — superseded by Kysely; don't confuse it with `postgres-kysely`.
+- The Prisma-based **`postgres`** provider (`schema.postgres.prisma`, `src/storage/providers/postgres/`) is **legacy** — superseded by Kysely; its pnpm script and env example are removed. Don't confuse it with `postgres-kysely`.
 
 The in-memory backend is deprecated and produces stale failures — treat `pnpm test:e2e` and `pnpm test:e2e:memory` as deprecated; do not use them for verification, and do not report their failures as findings. **Default verification = PostgreSQL+Kysely + SQLite** (both green); Mongo only when the Prisma path is touched.
 
@@ -30,8 +30,9 @@ When a feature, bugfix, or structural change is completed:
    ```bash
    pnpm test:e2e:postgres-kysely   # PRIMARY / prod backend
    pnpm test:e2e:sqlite
-   # MongoDB (deprecating, out before v2.0) only if you touched the Prisma path:
-   # pnpm test:e2e:mongodb
+   # MongoDB (deprecating, out before v2.0; its pnpm script has been removed) only if you
+   # touched the Prisma path — run the runner manually:
+   # node --env-file=.env.test.mongodb --import tsx test/run-e2e-ci.ts
    ```
 
 3. **Target: 0 failures in the suites you ran.**
@@ -79,13 +80,16 @@ pnpm test:e2e:postgres-kysely
 # E2E with SQLite backend -- fast iteration, must pass
 pnpm test:e2e:sqlite
 
-# E2E with MongoDB backend -- DEPRECATED (out before v2.0); only if the Prisma path was touched
-pnpm test:e2e:mongodb
+# E2E with MongoDB backend -- DEPRECATED (out before v2.0); pnpm script removed.
+# Only if the Prisma path was touched, run the runner manually:
+node --env-file=.env.test.mongodb --import tsx test/run-e2e-ci.ts
+
+# Both primary backends in one go:
+pnpm test:e2e:all-backends      # SQLite + PostgreSQL+Kysely, full sweep each
 
 # DEPRECATED -- do not use:
 #   pnpm test:e2e             (memory backend, not a valid environment)
 #   pnpm test:e2e:memory      (same as above)
-#   pnpm test:e2e:all-backends (includes the deprecated memory pass)
 
 # Run a single suite (preferred during iteration -- much faster than the full sweep):
 pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding
@@ -245,8 +249,8 @@ Tests must pass on the **persistent** storage backends:
 |---------|----------|---------|-------|
 | **PostgreSQL + Kysely** | `.env.test.postgres-kysely` | `pnpm test:e2e:postgres-kysely` | **PRIMARY / prod backend (no Prisma) — must always pass.** Recreate the test DB before a full run (schema drops + migrations re-run on boot). |
 | **SQLite** | `.env.test.sqlite` | `pnpm test:e2e:sqlite` | **First-class — must always pass.** Fast iteration; set `AIMEAT_DB_PATH=:memory:` for in-memory speed on the real SQL code path. |
-| MongoDB | `.env.test.mongodb` | `pnpm test:e2e:mongodb` | **DEPRECATED — removed before v2.0.** Run only when a change touches the shared Prisma path; failures informational, not blocking. |
-| PostgreSQL (Prisma) | `.env.test.postgres` | `pnpm test:e2e:postgresql` | **Legacy** Prisma-PG — superseded by Kysely. Don't confuse with `postgres-kysely`. |
+| MongoDB | `.env.test.mongodb` | `node --env-file=.env.test.mongodb --import tsx test/run-e2e-ci.ts` (pnpm script removed) | **DEPRECATED — removed before v2.0.** Run only when a change touches the shared Prisma path; failures informational, not blocking. |
+| PostgreSQL (Prisma) | — | (pnpm script removed) | **Legacy** Prisma-PG — superseded by Kysely. Don't confuse with `postgres-kysely`. |
 
 The in-memory backend (`pnpm test:e2e:memory`, the unsuffixed `pnpm test:e2e`) is **deprecated** and not a supported environment — its `.env.test.memory` file may not even exist in the repo. AIMEAT outgrew the pure-in-memory storage path long ago; SQLite `:memory:` covers that role using the production code path.
 
