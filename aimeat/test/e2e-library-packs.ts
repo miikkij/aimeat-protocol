@@ -105,10 +105,18 @@ await test('every include URL resolves 200 on this node', async () => {
     }
   }
   assert(urls.size > 20, `Suspiciously few include URLs (${urls.size})`);
-  const misses: string[] = [];
-  for (const url of urls) {
-    const res = await fetch(url.startsWith('http') ? url : `${BASE}${url}`);
-    if (res.status !== 200) misses.push(`${url} → ${res.status}`);
+  // Cortex packs are seeded fire-and-forget at boot (service-init → seedBundledCortexes), so on a
+  // slower backend (postgres-kysely) their /v1/cortex/... URLs can 404 for the first seconds after
+  // the server reports ready. Retry misses briefly instead of racing the seeder.
+  let misses: string[] = [];
+  for (let attempt = 0; attempt < 15; attempt++) {
+    misses = [];
+    for (const url of urls) {
+      const res = await fetch(url.startsWith('http') ? url : `${BASE}${url}`);
+      if (res.status !== 200) misses.push(`${url} → ${res.status}`);
+    }
+    if (misses.length === 0) break;
+    await new Promise(r => setTimeout(r, 1000));
   }
   assert(misses.length === 0, `Include URLs not served: ${misses.join(', ')}`);
 });
