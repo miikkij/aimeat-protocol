@@ -142,5 +142,9 @@ docs/internal/
 # Local temp/scratch files (e.g. saved web pages, snapshot dumps) — never commit.
 .tmp_*
 /*.tmp.html
+# App/cortex publish-verification response dumps written to the repo root during a build
+# session (e.g. cadence-app.json, cadence-cortex-lib.json). The real app/cortex live in the
+# node store, not the repo — these are throwaway fetch snapshots.
+/cadence-*.json
 # Package build artifacts — packages/ holds app SOURCE; built .zip bundles are outputs.
 packages/*.zip
