@@ -2793,7 +2793,19 @@
       "agentRunnerLabel": "Runner",
       "agentOrganismLabel": "Organism (optional)",
       "agentNoRunners": "no agents - connect one first",
-      "agentDeployHint": "Creates a deploy task on YOUR own runner. The fleet reads the crew definition from the manifest and starts the agent under your account."
+      "agentDeployHint": "Creates a deploy task on YOUR own runner. The fleet reads the crew definition from the manifest and starts the agent under your account.",
+      "agentEdit": "Edit Agents",
+      "agentAdd": "Add Agents",
+      "agentJsonLabel": "Bundled agents (crew-def JSON array)",
+      "agentEditorHint": "A crew-def can hold a whole TEAM: up to 10 crew members per definition (process \"hierarchical\" adds an orchestrator over them), up to 5 definitions per app. Use \"Copy AI prompt\" to have your AI write or extend this JSON, then paste the result here and Save - the node validates it strictly.",
+      "agentCopyPrompt": "Copy AI prompt",
+      "agentPromptCopied": "Prompt copied - paste it to your AI chat, then paste the JSON result back here",
+      "agentPromptCopyFailed": "Copy failed - clipboard unavailable",
+      "agentJsonInvalid": "Not valid JSON",
+      "agentJsonNotArray": "Expected a JSON ARRAY of crew-def objects",
+      "agentEditSaved": "Bundled agents saved",
+      "agentEditCleared": "Bundled agents removed",
+      "agentClearHint": "Save an empty array [] to remove all bundled agents."
     },
     "v8ext": {
       "title": "Server Extensions",

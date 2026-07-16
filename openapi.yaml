@@ -13638,7 +13638,7 @@ paths:
   /v1/apps/{filename}:
     patch:
       operationId: updateApp
-      summary: Update an app you own (name, description, access code, parked and/or forkable state)
+      summary: Update an app you own (name, description, access code, parked/forkable state, bundled agents)
       description: |
         Update metadata on an app you own. Each field is independent and applied only when present
         in the body, so a `parked`-only request never clears the access code (and vice-versa).
@@ -13687,6 +13687,19 @@ paths:
                     domainLock: { type: boolean, description: Only run on this node's app origin }
                     watermark: { type: boolean, description: Embed an invisible, operator-decodable per-serve fingerprint }
                     noRawDownload: { type: boolean, description: Block the raw source download (runnable only) }
+                cortex:
+                  type: object
+                  nullable: true
+                  description: >-
+                    Agent-Bundled Apps - edit the bundled crew-defs in place on the latest version,
+                    WITHOUT re-uploading the HTML. Validated exactly like publish (a malformed
+                    agents[] rejects with INVALID_CREW_DEF). Send null or { "agents": [] } to
+                    remove the section.
+                  properties:
+                    agents:
+                      type: array
+                      maxItems: 5
+                      items: { $ref: '#/components/schemas/CrewDef' }
       responses:
         '200':
           description: App updated

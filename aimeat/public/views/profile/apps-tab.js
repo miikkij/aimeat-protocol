@@ -250,6 +250,32 @@ function AppAgents({ owner, filename, agents, showToast, session }) {
       </div>`)}`;
 }
 
+/**
+ * The ready-made prompt for authoring crew-defs in the user's own AI chat (the AIMEAT
+ * prompt-driven pattern): embeds the app context + current defs + the schema rules the node
+ * enforces at save, and asks for ONLY the JSON array back — paste it into the editor.
+ */
+function buildAgentAuthoringPrompt(app, currentAgents) {
+  return `You are writing the "bundled agents" for an AIMEAT app — declarative crew definitions (crewaimeat crew_def JSON) that the app's users can deploy onto their own agent fleet. Output ONLY a JSON array of crew-def objects (no prose, no markdown fences).
+
+APP CONTEXT
+- Name: ${app.manifest?.name || app.filename}
+- Description: ${app.manifest?.description || '(none)'}
+
+CURRENT CREW-DEFS (edit these, or design new ones):
+${JSON.stringify(currentAgents ?? [], null, 2)}
+
+SCHEMA RULES (the node rejects anything that violates these):
+- Array of 1-5 crew-def objects. Each: { "agent_name", "agents", "tasks", optional "readme_md", "llm_profile" ("content"|"coding"|"content-free"), "temperature" (0-2), "tags", "skills", "process" ("sequential"|"hierarchical") }.
+- "agent_name": 3-32 chars, lowercase alphanumeric + hyphens, unique across the array.
+- "agents": 1-10 crew members: { "role", "goal", optional "backstory", "tools" (names from the vetted set: web, memory, schedule, delegate, image, app_build), "skills", "allow_delegation" (boolean) }. Use several members + "process": "hierarchical" when the work needs an orchestrator over specialists.
+- "tasks": 1-20 items: { "id", "description", "expected_output", "agent" (must equal a declared role), optional "context" (ids of EARLIER tasks whose output feeds this one), "async" }.
+- At least one task description MUST contain the literal placeholder {{ctx.prompt}} — that is where the user's request is injected at runtime.
+- The crew-def is pure data. Never include code.
+
+Design the crew to genuinely serve this app's users, then output the JSON array.`;
+}
+
 export default function AppsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
   const NODE_URL = getNodeUrl();
@@ -261,6 +287,8 @@ export default function AppsTab({ session, showToast, onStats }) {
   const [editingMeta, setEditingMeta] = useState(null);
   const [editName, setEditName] = useState('');
   const [editDesc, setEditDesc] = useState('');
+  const [editingAgents, setEditingAgents] = useState(null);
+  const [agentsJson, setAgentsJson] = useState('');
 
   // Reload the app lists when the session becomes available / changes. loadData closes over the
   // optional onStats prop (not guaranteed memoized), so we key on session only to avoid re-running
@@ -320,6 +348,53 @@ export default function AppsTab({ session, showToast, onStats }) {
     setEditingMeta(app.filename);
     setEditName(app.manifest?.name || String(app.filename || app.name || '').replace(/\.html?$/i, ''));
     setEditDesc(app.manifest?.description || '');
+  }
+
+  // Agent-Bundled Apps authoring: add/edit/remove the crew-defs an app ships, without
+  // re-uploading its HTML. The editor is JSON-first (a crew-def IS data) + a ready-made
+  // AI prompt in the platform's prompt-driven pattern; the node validates on save.
+  function startEditAgents(app) {
+    if (editingAgents === app.filename) { setEditingAgents(null); return; }
+    setEditingAgents(app.filename);
+    setAgentsJson(JSON.stringify(app.manifest?.cortex?.agents ?? [], null, 2));
+  }
+
+  async function handleCopyAgentPrompt(app) {
+    let current;
+    try { current = JSON.parse(agentsJson); } catch { current = app.manifest?.cortex?.agents ?? []; }
+    try {
+      await navigator.clipboard.writeText(buildAgentAuthoringPrompt(app, current));
+      showToast(t('profile.apps.agentPromptCopied') || 'Prompt copied — paste it to your AI chat, then paste the JSON result back here');
+    } catch {
+      showToast(t('profile.apps.agentPromptCopyFailed') || 'Copy failed — clipboard unavailable', true);
+    }
+  }
+
+  async function handleSaveAgents(filename) {
+    let parsed;
+    try {
+      parsed = JSON.parse(agentsJson.trim() || '[]');
+    } catch (err) {
+      showToast((t('profile.apps.agentJsonInvalid') || 'Not valid JSON') + ': ' + err.message, true);
+      return;
+    }
+    if (!Array.isArray(parsed)) {
+      showToast(t('profile.apps.agentJsonNotArray') || 'Expected a JSON ARRAY of crew-def objects', true);
+      return;
+    }
+    try {
+      const resp = await patchApp(filename, { cortex: { agents: parsed } });
+      if (resp.ok === false) throw new Error(resp?.error?.message || 'Update failed');
+      showToast(parsed.length === 0
+        ? (t('profile.apps.agentEditCleared') || 'Bundled agents removed')
+        : (t('profile.apps.agentEditSaved') || 'Bundled agents saved'));
+      setEditingAgents(null);
+      loadData();
+    } catch (err) {
+      // Surface the node's real crew-def validation errors verbatim — that IS the editor's
+      // linter (api() throws on an ok:false envelope, carrying error.message).
+      showToast(err.message || (t('profile.apps.updateFailed') || 'Update failed'), true);
+    }
   }
 
   function cancelEditMeta() {
@@ -425,6 +500,7 @@ export default function AppsTab({ session, showToast, onStats }) {
               window.open(`/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}?mode=inline`, '_blank');
             }}>${t('profile.apps.launch') || 'Launch'}</button>
             <button class="btn-sm" onClick=${() => startEditMeta(a)}>${t('profile.apps.editDetails') || 'Edit Details'}</button>
+            <button class="btn-sm" onClick=${() => startEditAgents(a)}>\u{1F916} ${a.manifest?.cortex?.agents?.length ? (t('profile.apps.agentEdit') || 'Edit Agents') : (t('profile.apps.agentAdd') || 'Add Agents')}</button>
             <button class="btn-sm" onClick=${() => startEdit(a)}>${t('profile.apps.editAccess') || 'Edit Access Code'}</button>
             <button class=${a.parked ? 'btn-success btn-sm' : 'btn-outline btn-sm'} onClick=${() => handleTogglePark(a)}>${a.parked ? (t('profile.apps.unpark') || 'Unpark') : (t('profile.apps.park') || 'Park')}</button>
             <button class="btn-danger-solid btn-sm" onClick=${() => handleDelete(a.filename || a.name)}>${t('profile.apps.deleteBtn') || 'Delete'}</button>
@@ -442,6 +518,19 @@ export default function AppsTab({ session, showToast, onStats }) {
                 <button class="btn-primary btn-sm" onClick=${() => handleSaveMeta(a.filename)}>${t('profile.apps.save') || 'Save'}</button>
                 <button class="btn-outline btn-sm" onClick=${cancelEditMeta}>${t('profile.cancel') || 'Cancel'}</button>
               </div>
+            </div>
+          ` : ''}
+          ${editingAgents === a.filename ? html`
+            <div class="pf-edit-panel">
+              <label class="text-meta mb-half">\u{1F916} ${t('profile.apps.agentJsonLabel') || 'Bundled agents (crew-def JSON array)'}</label>
+              <div class="text-meta-sm mb-half">${t('profile.apps.agentEditorHint') || 'A crew-def can hold a whole TEAM: up to 10 crew members per definition (process "hierarchical" adds an orchestrator over them), up to 5 definitions per app. Use "Copy AI prompt" to have your AI write or extend this JSON, then paste the result here and Save — the node validates it strictly.'}</div>
+              <textarea class="prompt-box mb-half" rows="14" spellcheck="false" value=${agentsJson} onInput=${e => setAgentsJson(e.target.value)}></textarea>
+              <div class="flex-row-wrap">
+                <button class="btn-primary btn-sm" onClick=${() => handleSaveAgents(a.filename)}>${t('profile.apps.save') || 'Save'}</button>
+                <button class="btn-info btn-sm" onClick=${() => handleCopyAgentPrompt(a)}>\u{1F4CB} ${t('profile.apps.agentCopyPrompt') || 'Copy AI prompt'}</button>
+                <button class="btn-outline btn-sm" onClick=${() => setEditingAgents(null)}>${t('profile.cancel') || 'Cancel'}</button>
+              </div>
+              <div class="text-meta-sm mt-xs">${t('profile.apps.agentClearHint') || 'Save an empty array [] to remove all bundled agents.'}</div>
             </div>
           ` : ''}
           ${editingApp === a.filename ? html`
