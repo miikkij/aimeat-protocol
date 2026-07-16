@@ -24,7 +24,7 @@ open. It takes the assistant — and you — from a fresh clone to a **live AIME
 hosted one), **registers your AI agents** (CrewAI crews, Claude, Cursor, …) onto it, and explains the
 essentials of working with AIMEAT as it goes.
 
-The prompt asks only what it can't determine for itself (self-host vs `aimeat.io`, SQLite vs MongoDB, your
+The prompt asks only what it can't determine for itself (self-host vs `aimeat.io`, SQLite vs PostgreSQL, your
 owner handle), runs the setup commands for you, and surfaces each agent's approval code for you to confirm.
 It never invents secrets or pushes anything outward without asking.
 
@@ -360,7 +360,7 @@ runs fine without it — screenshots are an opt-in operator feature.
 
 ### From source
 
-Requires Node.js 24+ and pnpm 10+. MongoDB is optional.
+Requires Node.js 24+ and pnpm 10+. PostgreSQL is optional — SQLite runs with no external services.
 
 ```bash
 git clone https://github.com/miikkij/aimeat-protocol.git
@@ -428,7 +428,7 @@ CI). Developer docs: [aimeat-desktop/README.md](aimeat-desktop/README.md).
 
 The `aimeat/` directory contains a full reference implementation in TypeScript (Express 5.2, Node 24). It implements the Core protocol and the Platform on top: GHII/GEAI identities + TOTP 2FA, organisms/workspaces, the app platform with scoped grants and origin isolation, the agent fleet plane, **QuickJS-WASM sandboxed extensions** + cortex, skills/capabilities, a package marketplace, push notifications, WebRTC, and a comprehensive operator admin dashboard.
 
-Three storage backends: SQLite (personal nodes, local dev; run `:memory:` for true in-RAM speed), MongoDB (production), and PostgreSQL (production) — the two Prisma backends carry separate schemas/clients. The legacy pure in-memory backend is deprecated -- SQLite `:memory:` covers the fast-iteration role using the actual production code path.
+Two storage backends: **PostgreSQL + Kysely** (production — plain SQL migrations run on boot, no ORM at runtime) and **SQLite** (personal nodes, local dev; run `:memory:` for true in-RAM speed). The legacy Prisma-based MongoDB and PostgreSQL providers are deprecated and being removed before v2.0; the pure in-memory backend is likewise deprecated — SQLite `:memory:` covers the fast-iteration role using the actual production code path.
 
 See the [v4.0 Platform spec](docs/AIMEAT-RFC-v4.0-Platform-full.md) for everything built on the Core.
 
@@ -441,10 +441,10 @@ aimeat-protocol/
 ├── aimeat/                   ★ the reference implementation (Node 24 / TypeScript / Express 5)
 │   ├── src/routes/           ~132 route handlers (one per domain)
 │   ├── src/services/         ~184 business-logic services
-│   ├── src/storage/          Storage interface + SQLite / MongoDB / PostgreSQL providers
+│   ├── src/storage/          Storage interface + PostgreSQL(Kysely) / SQLite providers (+ deprecated Prisma Mongo/PG)
 │   ├── src/auth/  mcp/  middleware/  models/  server-bootstrap/  cli/  enterprise/
 │   ├── public/               Preact + HTM SPA, no build (views, components, js, css, lib)
-│   ├── prisma/               schema.prisma (Mongo) + schema.postgres.prisma
+│   ├── prisma/               deprecated Prisma schemas (Mongo + legacy PG; removed before v2.0)
 │   ├── locales/  test/  tools/   i18n · E2E suites · dev tools (synthtraces)
 │   └── docs/                  implementation-local docs (integrations, …)
 ├── python/aimeat-crewai/     ★ pip-installable CrewAI liaison/connector (own PyPI line)
