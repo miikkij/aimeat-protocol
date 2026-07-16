@@ -39,10 +39,10 @@ function MemberAccessEditor({ orgId, member, wsOptions, wsAccess, busy, setBusy,
       const r = role === 'none'
         ? await orgService.revokeWorkspaceRole(orgId, wsId, bare)
         : await orgService.grantWorkspaceRole(orgId, wsId, bare, role);
-      if (r?.ok === false) showToast(r?.error?.message || (t('organisms.accessUpdateFailed') || 'Access update failed'));
+      if (r?.ok === false) showToast(r?.error?.message || (t('organisms.accessUpdateFailed') || 'Access update failed'), true);
       else showToast(t('organisms.accessUpdated') || 'Access updated');
       onChanged?.();
-    } catch (e) { showToast((e && e.message) || (t('organisms.accessUpdateFailed') || 'Access update failed')); }
+    } catch (e) { showToast((e && e.message) || (t('organisms.accessUpdateFailed') || 'Access update failed'), true); }
     finally { setBusy(false); }
   };
   return html`
@@ -152,10 +152,10 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
     setBusy(true);
     try {
       const r = await fn();
-      if (r?.ok === false) showToast(r?.error?.message || (t(failKey) || 'Failed'));
+      if (r?.ok === false) showToast(r?.error?.message || (t(failKey) || 'Failed'), true);
       else if (okMsg) showToast(okMsg);
       await load(); onChanged?.();
-    } catch (e) { showToast((e && e.message) || (t(failKey) || 'Failed')); }
+    } catch (e) { showToast((e && e.message) || (t(failKey) || 'Failed'), true); }
     finally { setBusy(false); }
   };
 

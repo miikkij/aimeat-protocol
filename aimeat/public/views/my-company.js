@@ -143,7 +143,7 @@ function MembersPanel({ slug, creatorOwner, viewerRole }) {
       <form class="mc-form" onSubmit=${add}>
         <h3 class="mc-form-title">${t('myCompany.addMember')}</h3>
         <div class="flex-row-wrap mc-manage-row">
-          <${ContactPicker} value=${owner} onChange=${setOwner} placeholder=${t('myCompany.memberUsername')} />
+          <${ContactPicker} value=${owner} onChange=${setOwner} kinds=${['ghii']} placeholder=${t('myCompany.memberUsername')} />
           <select class="input-field input-sm" value=${role} onChange=${(e) => setRole(e.target.value)}>${roleOpts}</select>
           <button class="btn-primary btn-sm" type="submit" disabled=${busy}>${t('myCompany.addMemberBtn')}</button>
         </div>

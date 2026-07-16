@@ -249,6 +249,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
               </div>`)}
               <div class="pj-access-add">
                 <${ContactPicker} value=${grantee} onChange=${setGrantee} onSubmit=${(v) => doGrant(v, role)}
+                  kinds=${['ghii']}
                   placeholder=${t('organisms.addMemberPlaceholder') || 'owner name (or owner@node / agent#owner@node)'} disabled=${busy} />
                 <select class="pj-access-role" value=${role} onChange=${e => setRole(e.target.value)}>
                   <option value="contributor">${t('organisms.roleContributor') || 'contributor (read + write)'}</option>
