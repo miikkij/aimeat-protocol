@@ -12,6 +12,7 @@
  *     (mermaid/three promoted from invisible-vendored to first-class packs; Phase 1).
  *   v1.1.0 — 2026-07-16 — Wave 1 additions: p5 1.11.13 (LGPL-2.1, owner-approved), pixi 8.19.0
  *     (v8-idiom aiDoc), phaser 3.90.0 (arcade shell + AIMEAT leaderboard glue).
+ *   v1.2.0 — 2026-07-17 — three + p5 promoted preview -> stable (AEB-3 round 5 mid-tier win).
  */
 import type { LibraryPack } from '../library-packs.js';
 
@@ -152,12 +153,13 @@ export const VENDORED_PACKS: LibraryPack[] = [
     ].join('\n'),
     changelog: [
       { version: 'r128', date: '2026-03-05', summary: 'Initial vendoring of three.js r128 UMD at /lib/three.min.js (the last classic-global era build — later three versions are ESM-only). Promoted to a first-class pack 2026-07-16 — no API change. A future upgrade ships as a NEW file (three@<rev>.module.js), never replaces this one.' },
+      { version: 'r128', date: '2026-07-17', summary: 'Promoted preview -> stable: AEB-3 round 5 (mid-tier model, Haiku 4.5) — with three available the pack arm completed materially MORE domain than the no-pack arm, which dropped domain features (roles, demo data, aggregation) to hand-roll a 3D view. Combined-task win (aeb3-round5-midtier-ab.md); three was load-bearing (3D overview rendered).' },
     ],
     demoTemplateId: 'comp-three-scene',
     tierHint: 'T1',
     interviewTriggers: ['3d', 'webgl', 'three'],
     sizeEstimate: '~600KB',
-    status: 'preview',
+    status: 'stable',
   },
   {
     id: 'p5',
@@ -190,12 +192,13 @@ export const VENDORED_PACKS: LibraryPack[] = [
     ].join('\n'),
     changelog: [
       { version: '1.11.13', date: '2026-07-16', summary: 'Initial vendoring of p5 1.11.13 at /lib/p5@1.min.js. The @1 filename is the compatibility contract — p5 2.x (API changes) would ship as a NEW p5@2.min.js file.' },
+      { version: '1.11.13', date: '2026-07-17', summary: 'Promoted preview -> stable: AEB-3 round 5 (mid-tier model, Haiku 4.5) — the pack arm used p5 for the lead-flow particle band and completed more domain than the no-pack arm, which hand-rolled it and dropped domain features. Combined-task win (aeb3-round5-midtier-ab.md); p5 was load-bearing (particle band rendered).' },
     ],
     demoTemplateId: 'comp-p5-sketch',
     tierHint: 'T1',
     interviewTriggers: ['generative', 'creative', 'sketch', 'animation', 'particles', 'taide', 'animaatio'],
     sizeEstimate: '~1MB',
-    status: 'preview',
+    status: 'stable',
   },
   {
     id: 'pixi',
