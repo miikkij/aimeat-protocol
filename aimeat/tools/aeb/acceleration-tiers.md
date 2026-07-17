@@ -50,24 +50,43 @@ the doc produces *nothing usable* (silent no-op), not a crash. Reliability = "di
 
 ## First-cut classification (2026-07-17)
 
-Confidence: **[M]** measured in an AEB run · **[I]** inferred from version-drift + ai_doc caveats
-(not yet a controlled run). Inferred rows are provisional — run the procedure below to confirm.
+**"Proven on"** lists the specific models a run has actually demonstrated the pack on, with the
+evidence file — so a builder can deliberately pick a pack *on a model it's proven with*. `[M]` =
+measured in an AEB run · `[I]` = inferred from version-drift + ai_doc caveats (no run yet, provisional
+— treat "Proven on" as empty until someone runs it).
 
-| Pack | Pin | Tier | Where weaker models trip (the warning) | Evidence |
+| Pack | Pin | Tier | Proven on (model → verdict, evidence) | Where weaker models trip (the warning) |
 |---|---|---|---|---|
-| **three** | r128 | `any` | r128 is the last classic-global build — heavily represented, stable `THREE.*`. Low drift. | **[M]** round 5: load-bearing, Haiku rendered it |
-| **p5** | @1 | `any` | v1 `setup()/draw()` is ubiquitous and stable. Low drift. | **[M]** round 5: particle band rendered on Haiku |
-| **chartjs** / aimeat-charts | @4 | `any` | v4 ≈ v3 surface, well-known. Low drift. | **[I]** + charts used cleanly in round 4/5 |
-| **mermaid** | v11 | `any` | text diagram syntax stable; only the init/theme idiom needs care. | **[M]** aeb3-mermaid-001: 5/5 vs 4/5 |
-| **aimeat-flow** | 1.0.1 | `needs-doc` | wrapper API — model has no priors; must fetch the 3 includes + preset API. Skipping → can't use it (no crash). | **[M]** aeb3-flow-001: 5/5, −27% tokens |
-| **realtime** | v1 | `needs-doc` | AIMEAT-authored (WS/WebRTC/Yjs); no priors, must read the doc. | **[I]** |
-| **styling** | tailwind@4 + daisyui@5 | `frontier` *(prov.)* | **tailwind v4 ≠ the v3 models know** (browser-JIT, config moved); daisyUI v5 class renames. Weak models may emit v3 config / stale classes. | **[I]** — needs a run |
-| **pixi** | @8 | `frontier` | **v8 breaking vs the v7 "most examples show"**: weak models write `beginFill/drawRect/fillRect/lineStyle` (removed) → `TypeError` crash; and skip the ai_doc that says so. | **[M]** aeb3-pixi-perpack: Haiku crashed on v7 API |
-| **phaser** | @3 | `any` *(prov.)* | v3 IS the dominant Phaser in training data (v4 is new) — low drift; risk is API breadth, not version. | **[I]** — needs a run |
+| **three** | r128 | `any` [M] | Haiku 4.5 → ✅ load-bearing (`results/aeb3-round5-midtier-ab.md`) | r128 stable & ubiquitous — low drift |
+| **p5** | @1 | `any` [M] | Haiku 4.5 → ✅ particle band rendered (`aeb3-round5-midtier-ab.md`) | `setup()/draw()` ubiquitous |
+| **chartjs**/aimeat-charts | @4 | `any` [I] | *(none yet — charts used cleanly in round 4/5, not isolated)* | v4 ≈ v3 |
+| **mermaid** | v11 | `any` [M] | *(model per `aeb3-mermaid-001`: 5/5 vs 4/5)* | text syntax stable; theme-init idiom |
+| **aimeat-flow** | 1.0.1 | `needs-doc` [M] | proven idiomatic (`aeb3-flow-001`: 5/5, −27% tokens) | wrapper — no priors; must fetch doc |
+| **realtime** | v1 | `needs-doc` [I] | *(none yet)* | AIMEAT-authored; no priors |
+| **styling** | tailwind@4+daisyui@5 | `frontier` [I] | *(none yet)* | **tailwind v4 ≠ v3** models know |
+| **pixi** | @8 | `frontier` [M] | Haiku 4.5 → ❌ **crashed** on v7 API (`results/aeb3-pixi-perpack.md`); frontier unrun | **v8 breaking vs v7**: `fillRect/drawRect/beginFill` removed → crash; ai_doc skipped |
+| **phaser** | @3 | `any` [I] | *(none yet)* | v3 dominates training data — low drift |
 
-Reading it: `any` packs are safe to advertise to any model. `frontier` packs carry a version-drift
-landmine for weak models — **pixi is the confirmed example** (v7→v8). `needs-doc` packs never crash
-but are useless to a model that won't fetch the doc.
+Reading it: `any` = safe to advertise to any model. `frontier` = version-drift landmine for weak
+models (**pixi is the confirmed example** — proven to *fail* on Haiku, still frontier-usable).
+`needs-doc` = never crashes but useless to a model that won't fetch the doc. A blank "Proven on" means
+nobody has run it yet — the tier there is inferred, not demonstrated.
+
+## The proof ledger — per pack, per model, append-only
+
+A tier is a *summary*; the truth is the list of **proofs** underneath it. Each proof is one run of a
+pack's shared test set on one model:
+
+```
+proof = { pack, model, testSet, verdict: pass|fail, tokens?, evidence: results/<file>.md, date }
+```
+
+- A pack's **tier = the strongest model-strength it has a `pass` proof for** (so pixi's Haiku `fail`
+  keeps it `frontier`, not `any`, until a mid-tier `pass` exists).
+- Proofs are **additive**: a new model's run never overwrites another's — it appends a row. Over time
+  each pack accrues a matrix of "works on X, fails on Y" that builders can filter by.
+- The evidence is always a `results/*.md` file (tokens, checklist, browser findings, screenshots) —
+  never just an assertion.
 
 ---
 
@@ -75,11 +94,17 @@ but are useless to a model that won't fetch the doc.
 
 Same spirit as the `status: preview→stable` gate, but measuring *model strength* rather than pass/fail.
 
-### Step 1 — Pick a pack-neutral task where the pack is load-bearing
-Write a build spec that NEEDS the pack's capability but **never names a library** (describe the
-capability: "a rotating 3D view", "hundreds of clickable moving tokens"). Keep it domain-heavy
-(≥70% of the checklist is domain logic, not the visual/engine layer) so the score reflects
-*acceleration of real work*, not an engine demo. See `scratchpad/*-neutral-spec.md` for the shape.
+### Step 1 — Use the pack's shared test set (or write one, once)
+Each pack has a reusable **test set** under `specs/`: a `<pack>.spec.md` (a build spec that NEEDS the
+pack's capability but **never names a library** — "a rotating 3D view", "hundreds of clickable moving
+tokens") plus a `<pack>.checklist.md` (the domain + plumbing checks, ≥70% domain so the score reflects
+*acceleration of real work*, not an engine demo). Existing sets:
+- `specs/pixi.spec.md` + `specs/pixi.checklist.md` — the FLOOR fulfillment-floor task.
+- `specs/multi-visual.spec.md` + `.checklist.md` — the PIPELINE command-center task (three/p5/charts/flow).
+
+**The test set is the shared, versioned contract** — everyone who wants to prove the pack on their
+model runs the SAME spec + checklist, so proofs are comparable. Only write a new set when a pack has
+no suitable one; then commit it under `specs/` so the next person reuses it.
 
 ### Step 2 — Controlled A/B, one variable
 Build the SAME spec twice, one shot each, network to a bench node:
@@ -114,6 +139,29 @@ useful findings (doc-delivery gap; a shared read-key bug).
 
 ---
 
+## Add your own proof (anyone, any model — the point is it's easy)
+
+The proof ledger grows by contribution. To add a proof for pack `<P>` on model `<M>`:
+
+1. **Fetch the shared test set:** `specs/<P>.spec.md` + `specs/<P>.checklist.md` (if none exists,
+   write one and commit it under `specs/` first — then it's reusable by everyone after you).
+2. **Run the A/B on `<M>`** (Steps 2–4 above): control (packs stripped) vs treatment (packs shown),
+   one shot each, publish both to a bench node, drive them in a browser against the checklist.
+3. **Write the evidence file** `results/aeb3-<P>-<M-slug>.md`: the model used, tokens, the filled
+   checklist, browser findings, screenshots, and — if it failed — the exact failure mode.
+4. **Append the proof row** to this file's "Proven on" cell for `<P>` (model → verdict → evidence
+   link) and, if it changes the strongest passing tier, update the `Tier`.
+
+That's the whole loop: same spec + same checklist, one new results file, one appended row. Because the
+test set is fixed and shared, a proof from model X and a proof from model Y are directly comparable —
+the ledger becomes a "works on / fails on" matrix per pack that builders can pick from.
+
+*(Optional future helper, not built: `pnpm aeb:prove <pack> --model <name>` could scaffold the two
+build-prompt variants + the results-file stub and open the checklist — turning the 4 steps into one
+command. Propose before building.)*
+
+---
+
 ## What the tiers imply for the prompt pipeline (proposal, not yet built)
 
 - `any` packs: advertise freely to every model; the one-line blurb is enough.
@@ -122,7 +170,24 @@ useful findings (doc-delivery gap; a shared read-key bug).
   (Candidate: an optional `apiCaveat` field on the registry entry that the prompt inlines for these.)
 - `needs-doc` packs: the pipeline should *force* the ai_doc fetch before first use.
 
-Encoding the tier as an optional `modelTier?: 'any' | 'frontier' | 'needs-doc'` field on the
-`LibraryPack` registry entry (surfaced in `GET /v1/library-packs`) is the natural next step — a pack
-with no `modelTier` simply ships unlabelled, exactly as today. **This schema change is a design
-decision — do not add it until the developer signs off.**
+Encoding this on the `LibraryPack` registry entry (surfaced in `GET /v1/library-packs`) is the natural
+next step. Proposed optional fields — a pack with none simply ships unlabelled, exactly as today:
+
+```ts
+modelTier?: 'any' | 'frontier' | 'needs-doc';   // strongest proven strength (derivable from proofs)
+proofs?: Array<{
+  model: string;            // e.g. 'claude-haiku-4-5', 'claude-opus-4-8'
+  verdict: 'pass' | 'fail';
+  testSet: string;          // 'pixi' → specs/pixi.spec.md + .checklist.md
+  evidence: string;         // 'results/aeb3-pixi-perpack.md'
+  tokens?: number;
+  date: string;
+}>;
+```
+
+Then `GET /v1/library-packs` exposes, per pack, **which models it's proven on** — so a client (or the
+build pipeline) can filter "packs proven to work on the model I'm about to use". Adding a proof from a
+new model = appending one `proofs` entry + committing one `results/*.md`. **This schema change is a
+design decision (code + openapi + generate:types + both locale files + registry E2E) — do not
+implement until the developer signs off.** The `specs/` + `results/` + this table already deliver the
+same ledger in-repo today; the registry field just makes it queryable at runtime.
