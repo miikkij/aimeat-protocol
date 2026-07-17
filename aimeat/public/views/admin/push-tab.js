@@ -142,8 +142,8 @@ export default function PushTab({ data, reload }) {
     <${ExpandableHelp} title=${t('dashboard.pushHelpTitle')}>${t('dashboard.pushHelpDetail')}</${ExpandableHelp}>
 
     <div class="adm-flex-wrap adm-mb-lg" style="gap:12px;align-items:stretch">
-      <${StatCard} label=${t('dashboard.totalSubscriptions')} value=${push.total_subscriptions || subs.length} color="#06b6d4" />
-      <${StatCard} label=${t('dashboard.activeSubscriptions')} value=${subs.filter(s => s.active !== false).length} color="#22c55e" />
+      <${StatCard} label=${t('dashboard.totalSubscriptions')} value=${push.total_subscriptions || subs.length} tone="cyan" />
+      <${StatCard} label=${t('dashboard.activeSubscriptions')} value=${subs.filter(s => s.active !== false).length} tone="green" />
       <div style="margin-left:auto;display:flex;flex-direction:column;justify-content:center;gap:6px;align-items:flex-end">
         <div class="adm-flex">
           <button
