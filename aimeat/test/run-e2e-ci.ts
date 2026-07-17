@@ -60,6 +60,7 @@ const ALL_SUITES = [
     // it OFF) to exercise the login email-gate + /v1/ghii/login/attach-email recovery flow. No SMTP needed.
     'test/e2e-login-attach-email.ts',
     'test/e2e-extensions.ts',
+    'test/e2e-ext-paywall.ts',
     'test/e2e-extension-secrets.ts',
     'test/e2e-iam-extension.ts',
     'test/e2e-upsert.ts',

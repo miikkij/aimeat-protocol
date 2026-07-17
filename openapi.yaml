@@ -10993,14 +10993,14 @@ paths:
                   maxItems: 20
                   items:
                     type: object
-                    description: Needs offer_id (offers) or tool (app-tools).
+                    description: Needs offer_id (offers), tool (app-tools), or app+tool (ext-call).
                     properties:
-                      kind: { type: string, enum: [offer, org-offering, app-tool], default: offer }
+                      kind: { type: string, enum: [offer, org-offering, app-tool, ext-call], default: offer }
                       agent: { type: string, description: Provider agent GAII (or bare name for own agent) }
                       offer_id: { type: string }
-                      tool: { type: string, description: 'app-tool: the tool name from apps.{appId}.tools' }
+                      tool: { type: string, description: 'app-tool: the tool name from apps.{appId}.tools; ext-call: the action id' }
                       org: { type: string, description: 'org-offering: "creatorOwner/slug"' }
-                      app: { type: string, description: 'app-tool: "ownerName/appId"' }
+                      app: { type: string, description: 'app-tool: "ownerName/appId"; ext-call: the extension name' }
                       input: { type: object, description: 'app-tool: buyer input forwarded to the capability invoke at completion' }
                       quantity: { type: integer, minimum: 1, maximum: 1000, default: 1, description: app-tool items are limited to 1 }
                 note: { type: string, maxLength: 2000 }
@@ -22037,6 +22037,13 @@ paths:
         Invoke a specific action provided by an installed and active extension.
         The request body is action-specific and defined by the extension manifest.
         Requires authentication (Tier 1+).
+
+        Pricing (per-action, optional; declared in the manifest): the extension owner always calls
+        free. A non-owner may owe (a) an anti-abuse `tollMorsels` burn and/or (b) payment when the
+        action declares `commercial` — `payMorsels` (charged to the caller, credited to the owner)
+        and/or `payMoney`. The money channel requires a one-time token: settle a checkout
+        (`kind: ext-call`) to receive an `x-aimeat-pay-token`, then retry this call with that header.
+        Any of these that the caller cannot satisfy returns 402.
       tags: [Extensions]
       security:
         - BearerAuth: []
@@ -22053,6 +22060,12 @@ paths:
           schema:
             type: string
           description: Action identifier within the extension
+        - name: x-aimeat-pay-token
+          in: header
+          required: false
+          schema:
+            type: string
+          description: One-time token from a settled `ext-call` checkout, for a `commercial.payMoney` action.
       requestBody:
         required: false
         content:
@@ -22075,6 +22088,23 @@ paths:
                         description: Action-specific result
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '402':
+          description: |
+            Payment required — the caller could not cover the action's toll and/or price
+            (insufficient morsels, or a `payMoney` action invoked without a valid one-time token).
+            The body carries an x402 `accepts` challenge describing how to settle.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: PAYMENT_REQUIRED
         '404':
           $ref: '#/components/responses/NotFound'
         '503':

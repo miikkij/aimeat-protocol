@@ -276,6 +276,8 @@ export interface AimeatConfig {
 
   // Extension installation role restriction
   extInstallRole: 'operator' | 'owner';
+  /** TEST ONLY: register a fake EUR/USD payment handler (env AIMEAT_TEST_MONEY_HANDLER). Never in prod. */
+  testMoneyHandler: boolean;
 
   // Personal Node support (operator-side)
   personalNodesEnabled: boolean;

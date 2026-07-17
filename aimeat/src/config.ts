@@ -315,6 +315,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     encryptionKey: process.env.AIMEAT_ENCRYPTION_KEY ?? null,
     msmInstallRole: (process.env.AIMEAT_MSM_INSTALL_ROLE as 'operator' | 'owner') || 'owner',
     extInstallRole: (process.env.AIMEAT_EXT_INSTALL_ROLE as 'operator' | 'owner') || 'owner',
+    // TEST ONLY: register a fake EUR/USD payment handler so the priced-raw-call money chain can be
+    // E2E-proven without a real PSP. NEVER set in production (real money = the EE Stripe handler).
+    testMoneyHandler: process.env.AIMEAT_TEST_MONEY_HANDLER === 'true',
     personalNodesEnabled: process.env.AIMEAT_PERSONAL_NODES_ENABLED !== 'false',
     personalNodeMaxSlots: parseInt(process.env.AIMEAT_PERSONAL_NODE_MAX_SLOTS ?? '100', 10),
     personalNodeMailboxQuotaMb: parseInt(process.env.AIMEAT_PERSONAL_MAILBOX_QUOTA_MB ?? '50', 10),

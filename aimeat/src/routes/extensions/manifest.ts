@@ -3,17 +3,63 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-17 — Per-action pricing: validate + carry `tollMorsels` (anti-abuse burn) and
+ *     `commercial` {payMorsels, payMoney} for priced raw calls (design notes doc-r6tyr3o, C1/M1)
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
  */
 import type { AimeatConfig } from '../../config.js';
 import type { ExtensionRecord } from '../../storage/interface.js';
 import { parse as parseYaml } from 'yaml';
 import { SECRET_KEYS_FIELD, computeManifestSecretKeys } from '../../services/extension-secrets.js';
+import { MONEY_CURRENCIES } from '../../commerce/money.js';
 
 /** Discriminated result of validating an extension install/upsert payload. */
 export type ExtBuildResult =
   | { ok: true; record: ExtensionRecord }
   | { ok: false; status: number; code: string; message: string };
+
+const isNonNegInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && Number.isFinite(v);
+const fail = (message: string): ExtBuildResult => ({ ok: false, status: 400, code: 'INVALID_MANIFEST', message });
+
+/**
+ * Validate a raw action's pricing (design: notes doc-r6tyr3o). `tollMorsels` is an optional
+ * anti-abuse burn (non-negative integer). `commercial` (optional) prices the call: `payMorsels`
+ * must be a non-negative integer, `payMoney` (optional) is `{amount>0, currency ∈ MONEY_CURRENCIES}`,
+ * and C1 requires at least one real payment channel (`payMorsels>0` OR `payMoney`). Returns an error
+ * result on any violation, or `null` when valid. Enforces M1 by construction: morsels are revenue
+ * only inside `commercial.payMorsels`.
+ */
+function validateActionPricing(action: Record<string, unknown>, actionId: string): ExtBuildResult | null {
+  if (action.tollMorsels !== undefined && !isNonNegInt(action.tollMorsels)) {
+    return fail(`Action "${actionId}": tollMorsels must be a non-negative integer`);
+  }
+  const commercial = action.commercial as Record<string, unknown> | undefined;
+  if (commercial === undefined) return null;
+  if (typeof commercial !== 'object' || commercial === null) {
+    return fail(`Action "${actionId}": commercial must be an object`);
+  }
+  const payMorsels = commercial.payMorsels ?? 0;
+  if (!isNonNegInt(payMorsels)) {
+    return fail(`Action "${actionId}": commercial.payMorsels must be a non-negative integer`);
+  }
+  const payMoney = commercial.payMoney as Record<string, unknown> | undefined;
+  if (payMoney !== undefined) {
+    if (typeof payMoney !== 'object' || payMoney === null) {
+      return fail(`Action "${actionId}": commercial.payMoney must be an object`);
+    }
+    if (typeof payMoney.amount !== 'number' || !Number.isInteger(payMoney.amount) || payMoney.amount <= 0) {
+      return fail(`Action "${actionId}": commercial.payMoney.amount must be a positive integer (6-decimal micro-units)`);
+    }
+    if (typeof payMoney.currency !== 'string' || !(MONEY_CURRENCIES as readonly string[]).includes(payMoney.currency)) {
+      return fail(`Action "${actionId}": commercial.payMoney.currency must be one of ${MONEY_CURRENCIES.join(', ')}`);
+    }
+  }
+  // C1: at least one real payment channel.
+  if (Number(payMorsels) <= 0 && payMoney === undefined) {
+    return fail(`Action "${actionId}": commercial must set at least one payment channel (payMorsels>0 or payMoney)`);
+  }
+  return null;
+}
 
 /**
  * Validate an extension install payload (YAML manifest + scripts map) and build the
@@ -61,6 +107,9 @@ export function buildExtensionRecordFromManifest(
       return { ok: false, status: 400, code: 'MISSING_SCRIPT',
         message: `Script "${action.script as string}" referenced in action "${action.id as string}" not found in scripts object` };
     }
+    // Pricing (design: notes doc-r6tyr3o). tollMorsels = anti-abuse burn; commercial = revenue.
+    const pricingErr = validateActionPricing(action, action.id as string);
+    if (pricingErr) return pricingErr;
   }
 
   const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
@@ -94,14 +143,27 @@ export function buildExtensionRecordFromManifest(
     author: metadata.author as string,
     status: 'inactive',
     requiredApis: (manifest.required_apis as string[]) ?? [],
-    actions: actions.map(a => ({
-      id: a.id as string,
-      method: (a.method as string).toUpperCase(),
-      path: a.path as string,
-      inputSchema: (a.input as Record<string, unknown>) ?? {},
-      outputSchema: (a.output as Record<string, unknown>) ?? {},
-      scriptContent: scripts[a.script as string],
-    })),
+    actions: actions.map(a => {
+      const commercial = a.commercial as { payMorsels?: unknown; payMoney?: unknown } | undefined;
+      return {
+        id: a.id as string,
+        method: (a.method as string).toUpperCase(),
+        path: a.path as string,
+        inputSchema: (a.input as Record<string, unknown>) ?? {},
+        outputSchema: (a.output as Record<string, unknown>) ?? {},
+        scriptContent: scripts[a.script as string],
+        // Pricing (validated above; design notes doc-r6tyr3o).
+        ...(a.tollMorsels !== undefined ? { tollMorsels: a.tollMorsels as number } : {}),
+        ...(commercial ? {
+          commercial: {
+            payMorsels: (commercial.payMorsels as number | undefined) ?? 0,
+            ...(commercial.payMoney !== undefined
+              ? { payMoney: commercial.payMoney as { amount: number; currency: string } }
+              : {}),
+          },
+        } : {}),
+      };
+    }),
     config: {
       ...(manifestConfig
         ? Object.fromEntries(

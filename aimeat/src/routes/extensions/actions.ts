@@ -7,6 +7,8 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — ctx.memory.getPublic owner-agent fallback batches into one listMemoryForOwners
+ *   v1.2.0 — 2026-07-17 — Per-call paywall (enforcePaywall) before execute in both handlers +
+ *     refund-on-throw wrap (priced raw calls; design notes doc-r6tyr3o)
  */
 import { Router } from 'express';
 import { randomUUID } from 'node:crypto';
@@ -20,6 +22,7 @@ import { executeExtensionAction } from '../../services/extension-runtime.js';
 import type { ExtensionCtx } from '../../services/extension-runtime.js';
 import { logger } from '../../utils/logger.js';
 import { resolveIdentity } from '../../utils/gaii.js';
+import { enforcePaywall } from './paywall.js';
 import { safeFetch } from '../../utils/url-validator.js';
 import { enforceExtensionMemoryLimits } from '../../services/quota.js';
 import { getEncryptionKey } from '../../services/encryption.js';
@@ -78,6 +81,10 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           `Action "${actionId}" requires ${action.method}, got ${req.method}`));
         return;
       }
+
+      // Per-call paywall: owner-free / anti-abuse toll / priced payment (design: paywall.ts).
+      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii, res, payToken: req.header('x-aimeat-pay-token') ?? undefined });
+      if (!pay.ok) return;
 
       // Build the ExtensionCtx with instance-scoped memory namespace
       // Extension namespace is always ext:{name}.{instanceId} — no owner scoping,
@@ -277,7 +284,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         timeoutMs: Math.min(Math.max(ext.limits.timeoutMs, 1000), config.extensionTimeoutMs),
         maxApiCalls: Math.min(Math.max(ext.limits.maxApiCalls, 10), config.extensionMaxApiCalls),
       };
-      const result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
+      let result;
+      try {
+        result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
+      } catch (execErr) {
+        if (pay.refund) await pay.refund();   // never keep payment for a call that didn't deliver
+        throw execErr;
+      }
 
       res.json(success(config.nodeId, result, [
         { description: 'View extension', method: 'GET', url: `/v1/extensions/${extName}` },
@@ -335,6 +348,10 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           `Action "${actionId}" requires ${action.method}, got ${req.method}`));
         return;
       }
+
+      // Per-call paywall: owner-free / anti-abuse toll / priced payment (design: paywall.ts).
+      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii, res, payToken: req.header('x-aimeat-pay-token') ?? undefined });
+      if (!pay.ok) return;
 
       // Build the ExtensionCtx
       // Extension memory uses a flat namespace (ext:{name}) so apps can
@@ -537,7 +554,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         timeoutMs: Math.min(Math.max(ext.limits.timeoutMs, 1000), config.extensionTimeoutMs),
         maxApiCalls: Math.min(Math.max(ext.limits.maxApiCalls, 10), config.extensionMaxApiCalls),
       };
-      const result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
+      let result;
+      try {
+        result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
+      } catch (execErr) {
+        if (pay.refund) await pay.refund();   // never keep payment for a call that didn't deliver
+        throw execErr;
+      }
 
       res.json(success(config.nodeId, result, [
         { description: 'View extension', method: 'GET', url: `/v1/extensions/${extName}` },

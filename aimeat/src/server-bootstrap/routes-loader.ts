@@ -36,7 +36,7 @@ import { loadEnterpriseProvider, buildEnterpriseContext } from '../enterprise/lo
 import { registerPaymentHandler, resetPaymentHandlers, morselPaymentHandler } from '../commerce/payment-handlers.js';
 import { getWebBotAuthState, signOutboundRequest, resetWebBotAuth } from '../services/web-bot-auth.js';
 import { setOutboundRequestSigner } from '../utils/url-validator.js';
-import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver } from '../commerce/sellable-resolvers.js';
+import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver, extCallSellableResolver } from '../commerce/sellable-resolvers.js';
 import { setEnterpriseMcpTools } from '../mcp/enterprise-tools.js';
 import { commerceRouter } from '../routes/commerce.js';
 import { commerceUcpRouter } from '../routes/commerce-ucp.js';
@@ -348,8 +348,14 @@ export async function mountRoutes(
   resetSellableResolvers();
   registerSellableResolver(offerSellableResolver());
   registerSellableResolver(appToolSellableResolver());
+  registerSellableResolver(extCallSellableResolver());   // priced raw-call money channel (rm-commercial-raw-calls)
   for (const handler of (await enterprise.getPaymentHandlers?.()) ?? []) {
     registerPaymentHandler(handler);
+  }
+  // TEST ONLY: a fake EUR/USD rail so the money chain is E2E-provable without a real PSP. Off in prod.
+  if (config.testMoneyHandler) {
+    const { testMoneyPaymentHandler } = await import('../commerce/test-money-handler.js');
+    registerPaymentHandler(testMoneyPaymentHandler());
   }
   for (const resolver of (await enterprise.getSellableResolvers?.()) ?? []) {
     registerSellableResolver(resolver);
