@@ -10,6 +10,8 @@
  * @structure default export TabQuality({ agentName })
  * @usage rendered by agent-card.js renderTabContent() for the 'quality' tab
  * @version-history
+ *   v1.5.0 -- 2026-07-17 -- Card layout: performance full-width, reviews|rate side by
+ *     side, custom metrics full-width (shared pf-agd-card-grid scheme).
  *   v1.4.0 -- 2026-07-16 -- Mount folds statistics + done-tasks into GET /v1/agents/:name/quality/overview
  *     (getQualityOverview); individual statistics + done-tasks reads kept as fallback.
  *   v1.3.0 -- 2026-06-10 -- Deliverable rows show date+time (identical titles must be
@@ -153,8 +155,9 @@ export default function TabQuality({ agentName, showToast }) {
   const durKeys = Object.keys(durByContext);
 
   return html`
-    <div class="pf-agd-quality">
+    <div class="pf-agd-quality pf-agd-card-grid">
       <!-- Performance -->
+      <div class="pf-agd-card pf-agd-card--full">
       <div class="pf-agd-section-title">${t('profile.agents.detail.quality.performanceTitle')}</div>
       <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.performanceDesc')}</div>
       <div class="stat-grid">
@@ -189,7 +192,10 @@ export default function TabQuality({ agentName, showToast }) {
         </div>
       `}
 
+      </div>
+
       <!-- Reviews by context -->
+      <div class="pf-agd-card">
       <div class="pf-agd-section-title">${t('profile.agents.detail.quality.reviewsTitle')}</div>
       <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.reviewsDesc')}</div>
       ${contextKeys.length === 0
@@ -217,7 +223,10 @@ export default function TabQuality({ agentName, showToast }) {
           </div>
         `}
 
+      </div>
+
       <!-- Rate deliverables (completed tasks the owner can rate) -->
+      <div class="pf-agd-card">
       <div class="pf-agd-section-title">${t('profile.agents.detail.quality.pendingTitle')}</div>
       <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.pendingDesc')}</div>
       ${doneTasks.length === 0
@@ -238,7 +247,10 @@ export default function TabQuality({ agentName, showToast }) {
           </div>
         `}
 
+      </div>
+
       <!-- Custom metrics -->
+      <div class="pf-agd-card pf-agd-card--full">
       <div class="pf-agd-section-title">${t('profile.agents.detail.quality.customTitle')}</div>
       <div class="pf-agd-quality-desc">${t('profile.agents.detail.quality.customDesc')}</div>
       ${custom.length === 0
@@ -253,6 +265,8 @@ export default function TabQuality({ agentName, showToast }) {
             `)}
           </div>
         `}
+
+      </div>
 
       <${RateModal}
         open=${!!rateTarget}

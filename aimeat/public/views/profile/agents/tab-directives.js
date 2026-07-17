@@ -4,6 +4,7 @@
  *   View mode shows formatted text; edit mode uses a single textarea.
  *   Memory areas, knowledge packages, and config files live in their own tabs.
  * @version-history
+ *   v2.2.0 -- 2026-07-17 -- Tab content wrapped in a single pf-agd-card.
  *   v2.0.0 -- 2026-05-24 -- C5: rewrite as full structured text editor; M6: no SSE listener (owner-initiated only)
  *   v2.1.0 -- 2026-05-31 -- Fix: behavioral directives were sent as `content` (a
  *     field the API/storage doesn't have) so they silently vanished on save.
@@ -114,7 +115,7 @@ export default function TabDirectives({ agentName, showToast }) {
   const hasContent = purpose || content;
 
   return html`
-    <div>
+    <div class="pf-agd-card">
       ${!editing ? html`
         <!-- View mode -->
         <div class="pf-agd-section-header">

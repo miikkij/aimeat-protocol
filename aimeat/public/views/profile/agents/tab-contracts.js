@@ -7,6 +7,8 @@
  * @structure TabContracts — offered-contracts row + Active engagements + Retired (history)
  * @usage <${TabContracts} agent=${agent} agentName=${agent.name} showToast=${showToast} />
  * @version-history
+ *   v1.1.0 -- 2026-07-17 -- Card layout: offers and active-workspaces side by side in
+ *     pf-agd-card-grid; retired history spans full width.
  *   v1.0.0 — 2026-07-03 — Initial agent Contracts sub-tab (engagement visibility + activate/deactivate).
  */
 import { h } from 'preact';
@@ -66,7 +68,8 @@ export default function TabContracts({ agent, agentName, showToast }) {
   const label = (e) => e.contract || (t('organisms.bareContract') || 'contract');
 
   return html`
-    <div class="pf-agd-contracts">
+    <div class="pf-agd-contracts pf-agd-card-grid">
+      <div class="pf-agd-card">
       <div class="pf-agd-section-title">${t('profile.agents.detail.contracts.offersTitle') || 'Contracts this agent offers'}</div>
       <div class="section-desc">${t('profile.agents.detail.contracts.offersDesc') || 'The workspace contracts this agent advertises. Owners see these when choosing an agent for a workspace.'}</div>
       <div class="agc-caps">
@@ -74,8 +77,10 @@ export default function TabContracts({ agent, agentName, showToast }) {
           ? (capabilities.length ? capabilities : ['']).map(c => html`<span class="badge badge-info pj-mini" key=${c}>${'📜 '}${c || (t('organisms.bareContract') || 'contract')}</span>`)
           : html`<span class="pf-agd-empty">${t('profile.agents.detail.contracts.noOffers') || 'This agent advertises no workspace contract (add a workspace-contract + contract.<id> tag in Data Access).'}</span>`}
       </div>
+      </div>
 
-      <div class="pf-agd-section-title agc-mt">${t('profile.agents.detail.contracts.activeTitle') || 'Active in these workspaces'}</div>
+      <div class="pf-agd-card">
+      <div class="pf-agd-section-title">${t('profile.agents.detail.contracts.activeTitle') || 'Active in these workspaces'}</div>
       ${active.length ? html`
         <div class="agc-list">
           ${active.map(e => html`
@@ -92,9 +97,11 @@ export default function TabContracts({ agent, agentName, showToast }) {
             </div>`)}
         </div>`
         : html`<div class="pf-agd-empty">${t('profile.agents.detail.contracts.noneActive') || 'Not active in any workspace yet. Owners adopt this agent from a workspace’s People panel.'}</div>`}
+      </div>
 
       ${retired.length ? html`
-        <div class="pf-agd-section-title agc-mt">${t('profile.agents.detail.contracts.retiredTitle') || 'Retired (history)'}</div>
+        <div class="pf-agd-card pf-agd-card--full">
+        <div class="pf-agd-section-title">${t('profile.agents.detail.contracts.retiredTitle') || 'Retired (history)'}</div>
         <div class="agc-list">
           ${retired.map(e => html`
             <div class="agc-row agc-row--retired" key=${engKey(e)}>
@@ -107,6 +114,7 @@ export default function TabContracts({ agent, agentName, showToast }) {
               <button class="btn-ghost btn-sm" disabled=${busy === engKey(e)}
                 onClick=${() => readopt(e)}>${busy === engKey(e) ? '…' : (t('organisms.reAdopt') || 'Re-adopt')}</button>
             </div>`)}
+        </div>
         </div>` : null}
     </div>`;
 }
