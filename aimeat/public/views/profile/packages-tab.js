@@ -26,6 +26,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { EmptyState } from '/components/EmptyState.js';
+import { StatusDot } from '/components/StatusDot.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
@@ -133,7 +134,7 @@ function InstanceCard({ inst, session, onCheckUpdate, onRemove, navigate }) {
               <span class="pkg-comp-id">${escHtml(c.componentId)}</span>
               <span class="pkg-comp-type">${c.type}</span>
               <span class="pkg-comp-status">
-                <span class="pkg-dot pkg-dot-active" title=${t('packages.statusActive') || 'Active'}></span>
+                <${StatusDot} status="active" title=${t('packages.statusActive') || 'Active'} />
                 ${c.customized ? html`<span class="pkg-comp-customized" title=${t('packages.customizedHint') || 'Customized after install'}>✏</span>` : ''}
               </span>
               <span class="pkg-comp-actions">${actionsFor(c)}</span>
