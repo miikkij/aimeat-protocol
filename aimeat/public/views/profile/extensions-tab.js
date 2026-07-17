@@ -41,6 +41,7 @@ import { Spinner } from './shared.js';
 import { Modal, useConfirm } from '/components/Modal.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { StatusDot } from '/components/StatusDot.js';
+import { useMaturityLedger, maturityBadge } from './extensions-tab.maturity.js';
 import * as cortexService from '/js/services/cortex.js';
 import * as v8Ext from '/js/services/extensions.js';
 import { getNodeUrl, getSession } from '/js/services/auth.js';
@@ -73,6 +74,7 @@ export default function ExtensionsTab({ session, showToast }) {
   const [testResult, setTestResult] = useState(null);
   const [testRunning, setTestRunning] = useState(false);
 
+  const packLedger = useMaturityLedger();   // AI-acceleration tier + proofs, joined by lib name
   useEffect(() => {
     if (session) { loadExtensions(); loadServerExtensions(); }
   }, [session]);
@@ -662,7 +664,7 @@ export default function ExtensionsTab({ session, showToast }) {
                 <div class="ext-card-header">
                   <span class="ext-card-name">${ext.name}</span>
                   <span class="ext-card-version">v${ext.version || '?'}</span>
-                  <span class="badge ${isLib ? 'badge-info' : 'badge-dim'}">${isLib ? t('profile.extensions.libraryBadge') : t('profile.extensions.serviceBadge')}</span>
+                  <span class="badge ${isLib ? 'badge-info' : 'badge-dim'}">${isLib ? t('profile.extensions.libraryBadge') : t('profile.extensions.serviceBadge')}</span>${maturityBadge(html, t, packLedger, ext.name)}
                   <span class="ext-visibility-badge public">${'\u{1F310}'}</span>
                 </div>
                 <div class="ext-card-desc">${ext.description || ''}</div>
@@ -690,7 +692,7 @@ export default function ExtensionsTab({ session, showToast }) {
                 <div class="ext-card-header">
                   <span class="ext-card-name">${ext.name}</span>
                   <span class="ext-card-version">v${ext.version || '?'}</span>
-                  <span class="badge ${isLib ? 'badge-info' : 'badge-dim'}">${isLib ? t('profile.extensions.libraryBadge') : t('profile.extensions.serviceBadge')}</span>
+                  <span class="badge ${isLib ? 'badge-info' : 'badge-dim'}">${isLib ? t('profile.extensions.libraryBadge') : t('profile.extensions.serviceBadge')}</span>${maturityBadge(html, t, packLedger, ext.name)}
                   <span class="ext-visibility-badge ${vis}">${vis === 'public' ? '\u{1F310}' : '\u{1F512}'}</span>
                 </div>
                 <div class="ext-card-desc">${ext.description || ''}</div>

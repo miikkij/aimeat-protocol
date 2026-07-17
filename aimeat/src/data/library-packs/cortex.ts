@@ -35,6 +35,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     interviewTriggers: ['table', 'list', 'taulukko'],
     sizeEstimate: '~15KB',
     status: 'stable',
+    modelTier: 'needs-doc',
     promptLine: '- aimeat-ui-viewers — sortable/filterable DataTable + viewers (`AIMEAT.ui.viewers`)',
   },
   {
@@ -55,6 +56,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     interviewTriggers: ['form', 'lomake'],
     sizeEstimate: '~12KB',
     status: 'stable',
+    modelTier: 'needs-doc',
     promptLine: '- aimeat-ui-forms — form builder with validation (`AIMEAT.ui.forms`)',
   },
   {
@@ -75,6 +77,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     interviewTriggers: [],
     sizeEstimate: '~10KB',
     status: 'stable',
+    modelTier: 'needs-doc',
     promptLine: '- aimeat-ui-layout — responsive layout helpers, master/detail (`AIMEAT.ui.layout`)',
   },
   {
@@ -95,6 +98,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     interviewTriggers: [],
     sizeEstimate: '~10KB',
     status: 'stable',
+    modelTier: 'needs-doc',
     promptLine: '- aimeat-ui-nav — navbars, tabs, menus (`AIMEAT.ui.nav`)',
   },
   {
@@ -115,6 +119,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     interviewTriggers: [],
     sizeEstimate: '~10KB',
     status: 'stable',
+    modelTier: 'needs-doc',
     promptLine: '- aimeat-ui-dialogs — modals, toasts, confirms (`AIMEAT.ui.dialogs`)',
   },
   {
@@ -284,6 +289,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     interviewTriggers: ['animation', 'dashboard', 'kpi', 'stat', 'polish', 'skeleton', 'transition'],
     sizeEstimate: '~11KB',
     status: 'preview',
+    modelTier: 'needs-doc',
   },
   {
     id: 'aimeat-i18n',
@@ -303,6 +309,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     interviewTriggers: ['translation', 'language', 'käännös', 'kieli'],
     sizeEstimate: '~6KB',
     status: 'stable',
+    modelTier: 'needs-doc',
     promptLine: '- aimeat-i18n — app translations: init, t(), setLocale, LanguageSwitcher (`AIMEAT.i18n`)',
   },
 ];

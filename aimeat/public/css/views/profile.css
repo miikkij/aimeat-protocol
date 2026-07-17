@@ -597,6 +597,11 @@
 .pf .ext-visibility-badge{font-size:.7rem;padding:2px 8px;border-radius:6px;background:var(--bg-dim,#F3F4F6);margin-left:.5rem}
 .pf .ext-visibility-badge.public{color:#22c55e}
 .pf .ext-visibility-badge.private{color:var(--muted)}
+/* AI-acceleration maturity tier badge on library cards (tools/aeb/acceleration-tiers.md). */
+.pf .ext-tier{font-size:.68rem;font-weight:600;text-transform:uppercase;letter-spacing:.03em;padding:2px 7px;border-radius:999px;background:color-mix(in srgb, var(--muted, #9ca3af) 18%, transparent);color:var(--muted, #9ca3af);cursor:help;white-space:nowrap}
+.pf .ext-tier.ext-tier-frontier{background:color-mix(in srgb, var(--primary, #E8564A) 20%, transparent);color:var(--primary, #E8564A)}
+.pf .ext-tier.ext-tier-measured{background:color-mix(in srgb, #22c55e 18%, transparent);color:#16a34a}
+.pf .ext-tier.ext-tier-frontier.ext-tier-measured{background:color-mix(in srgb, var(--primary, #E8564A) 20%, transparent);color:var(--primary, #E8564A)}
 @media(max-width:600px){
   .pf .ext-grid{grid-template-columns:1fr}
   .pf .ext-bundled-grid{grid-template-columns:1fr}
