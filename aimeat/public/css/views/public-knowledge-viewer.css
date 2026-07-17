@@ -427,12 +427,6 @@
   margin: 0 0 0.5rem;
 }
 
-.pkv-loading {
-  text-align: center;
-  padding: 3rem;
-  color: var(--text-dim, #6B7280);
-}
-
 .pkv-error {
   text-align: center;
   padding: 2rem;

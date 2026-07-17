@@ -17,6 +17,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { LoadMore } from '/components/Pagination.js';
+import { Spinner } from '/components/Spinner.js';
 
 const CONTENT_TYPES = [
   'idea', 'research', 'plan', 'dataset', 'document',
@@ -371,7 +372,7 @@ function BrowseView({ onSelect }) {
       ${packages.map(pkg => html`<${PackageCard} pkg=${pkg} onSelect=${onSelect} />`)}
     </div>
 
-    ${loading && html`<div class="pkv-loading">${t('pkv.loading')}</div>`}
+    ${loading && html`<${Spinner} text=${t('pkv.loading')} />`}
 
     ${!loading && hasMore && html`
       <${LoadMore} onMore=${loadMore} label=${t('pkv.loadMore')} />
@@ -479,7 +480,7 @@ function DetailView({ packageId, onBack }) {
     }
   }, [packageId, manifest]);
 
-  if (loading) return html`<div class="pkv-loading">${t('pkv.loading')}</div>`;
+  if (loading) return html`<${Spinner} text=${t('pkv.loading')} />`;
   if (error) return html`
     <div>
       <button class="pkv-back" onClick=${onBack}>← ${t('pkv.backToLibrary')}</button>
