@@ -73,6 +73,7 @@ import ContactsTab from './profile/contacts-tab.js';
 import NotebookTab from './profile/notebook-tab.js';
 import LivingTab from './profile/living-tab.js';
 import DiscoverTab from './profile/discover-tab.js';
+import LibrariesTab from './profile/libraries-tab.js';
 
 // Each tab has a minTier: 'new' | 'active' | 'experienced'
 // Tabs with minTier <= current tier are visible in the tab bar.
@@ -113,6 +114,7 @@ const TABS = [
   { id: 'generator',     key: 'profile.generator.tabLabel',  component: GeneratorTab,      minTier: 'active' },
   { id: 'calibrator',   key: 'profile.calibrator.tabLabel', component: CalibratorTab,     minTier: 'active' },
   { id: 'packages',      key: 'profile.tabs.packages',       component: PackagesTab,       minTier: 'active' },
+  { id: 'libraries',     key: 'librariesTab.tabLabel',       component: LibrariesTab,      minTier: 'new' },
 ];
 
 export default function Profile({ navigate, locale }) {

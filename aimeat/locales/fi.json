@@ -6373,6 +6373,31 @@
     "exportSuccess": "Vietiin {count} asetusarvoa {format}-muodossa",
     "migrationHint": "Vinkki: Siirrä .env tietokantaan komennolla: aimeat config import --file .env"
   },
+  "librariesTab": {
+    "tabLabel": "Kirjastot",
+    "title": "Kirjastot",
+    "desc": "Kaikki client-kirjastot joita sovelluksesi voivat käyttää — SDK-käärijät, vendoroidut kolmannen osapuolen kirjastot (kaaviot, 3D, partikkelit, pelimoottori, tyylit) ja valmiit cortex-UI:t — sekä niiden AI-kiihdytyskypsyys: millä mallilla testattu, meniikö läpi ja mikä tier.",
+    "loading": "Ladataan kirjastoja…",
+    "searchPlaceholder": "Etsi kirjastoja…",
+    "tierAll": "Kaikki tierit",
+    "measuredOnly": "Vain testatut",
+    "tested": "Testattu",
+    "notTested": "ei vielä AEB-testattu",
+    "pass": "läpi",
+    "fail": "hylätty",
+    "noneMatch": "Yksikään kirjasto ei täsmää suodattimiin.",
+    "group": {
+      "sdk": "Client SDK",
+      "vendored": "Visuaaliset & 2D/3D-kirjastot",
+      "cortex": "Valmiit UI:t (cortex)",
+      "community": "Yhteisön julkaisemat"
+    },
+    "status": {
+      "stable": "vakaa",
+      "preview": "esikatselu",
+      "deprecated": "poistuva"
+    }
+  },
   "discover": {
     "tabLabel": "Löydä",
     "title": "Löydä",
