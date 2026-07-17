@@ -4,6 +4,9 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.19.0 -- 2026-07-17 -- Integration production view: .pf-agd-prod-grid two-column
+ *     card grid (+ --full spans); .pf-agd-info-row becomes a fixed 150px-label grid so
+ *     values and status dots align in one column.
  *   v1.18.0 -- 2026-07-17 -- Style unification round: pf-agd-section-label matches
  *     pf-agd-section-title (0.8rem); governance grid items stack label-over-value;
  *     "Next:" inside the zone-2 banner title is no longer uppercased; the "+ Add tag"
@@ -2466,6 +2469,27 @@
 .pf .pf-agd-section {
   margin-bottom: 1.25rem;
 }
+
+/* Production view: sections become cards in a responsive two-column grid so the
+   short info lists (Connection, Platform, Post-onboarding, Identity) pair up
+   side by side instead of one long ragged column with a dead right half.
+   Readiness and the delivery log stay full-width (--full). */
+.pf .pf-agd-prod-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 0.85rem;
+  align-items: stretch;
+}
+.pf .pf-agd-prod-grid > .pf-agd-section {
+  margin-bottom: 0;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  background: var(--card, #FFFFFF);
+}
+.pf .pf-agd-prod-grid > .pf-agd-section--full {
+  grid-column: 1 / -1;
+}
 /* Same visual as .pf-agd-section-title — kept as a separate name only because the
    Integration tab wraps its sections differently. Keep the two in sync. */
 .pf .pf-agd-section-label {
@@ -2476,22 +2500,25 @@
   color: var(--text-dim, #6B7280);
   margin-bottom: 0.5rem;
 }
+/* Fixed label column so values (and their status dots) line up in ONE column
+   across every row of a section — ragged flex rows read as disarray. */
 .pf .pf-agd-info-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: 150px 1fr;
+  column-gap: 0.75rem;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.3rem 0;
+  padding: 0.28rem 0;
   font-size: 0.82rem;
 }
 .pf .pf-agd-info-label {
   font-weight: 500;
-  min-width: 120px;
   color: var(--text-dim);
-  flex-shrink: 0;
+  min-width: 0;
 }
 .pf .pf-agd-info-value {
   color: var(--text);
-  word-break: break-all;
+  overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 /* ── Delivery log table ── */

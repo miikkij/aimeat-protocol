@@ -17,6 +17,9 @@
  *     payloads -- dropped 3 copied-state useState hooks, 3 hand-rolled handlers, the
  *     copied-flag params threaded through both render functions, and the local
  *     copyToClipboard import.
+ *   v1.7.0 -- 2026-07-17 -- Production view: sections become cards in a responsive
+ *     two-column grid (pf-agd-prod-grid; Readiness + Delivery log full-width) and the
+ *     ambiguous second "Version" row is labelled "Bundle version" (new i18n key).
  *   v1.6.0 -- 2026-07-17 -- Onboarding view: merge the checklist title + readiness score +
  *     duplicate "Progress: N/M  X%" row into ONE canonical section header above the
  *     progress bar (the zone-2 banner already repeats the same progress).
@@ -318,7 +321,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
     : t('profile.agents.detail.integration.manual');
 
   return html`
-    <div>
+    <div class="pf-agd-prod-grid">
       <!-- CONNECTION -->
       <div class="pf-agd-section">
         <div class="pf-agd-section-label">${t('profile.agents.detail.connection')}</div>
@@ -420,7 +423,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
         </div>
         ${bundleVersion ? html`
           <div class="pf-agd-info-row">
-            <span class="pf-agd-info-label">${t('profile.agents.skillBundle.versionLabel')}</span>
+            <span class="pf-agd-info-label">${t('profile.agents.skillBundle.bundleVersionLabel')}</span>
             <span class="pf-agd-info-value">${bundleVersion.version || '--'}</span>
           </div>
         ` : ''}
@@ -438,7 +441,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       </div>
 
       <!-- READINESS -->
-      <div class="pf-agd-section">
+      <div class="pf-agd-section pf-agd-section--full">
         <div class="pf-agd-section-label">${t('profile.agents.detail.readiness')}</div>
         <div class="pf-agd-step-pills">
           ${steps.map(s => html`
@@ -541,7 +544,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       </div>
 
       <!-- DELIVERY LOG -->
-      <div class="pf-agd-section">
+      <div class="pf-agd-section pf-agd-section--full">
         <div class="pf-agd-section-label">${t('profile.agents.detail.deliveryLog')}</div>
         ${displayDeliveries.length > 0 ? html`
           <table class="pf-agd-delivery-log">

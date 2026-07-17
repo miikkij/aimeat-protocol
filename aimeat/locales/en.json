@@ -1912,6 +1912,7 @@
         "title": "Skill Bundle",
         "downloadLabel": "Download skill bundle",
         "versionLabel": "Version",
+        "bundleVersionLabel": "Bundle version",
         "runtimeLabel": "Runtime",
         "hermesRuntime": "Hermes (OpenClaw)",
         "genericRuntime": "Generic",
