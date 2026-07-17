@@ -37,6 +37,26 @@ export interface PackChange {
   breaking?: string;
 }
 
+/**
+ * One recorded AEB proof: the pack run on ONE model, against a shared test set.
+ * The ledger is append-only — a new model's run adds an entry, never overwrites another.
+ * See tools/aeb/acceleration-tiers.md ("Add your own proof") for how these are produced.
+ */
+export interface PackProof {
+  /** Model id the run used, e.g. 'claude-haiku-4-5', 'claude-opus-4-8'. */
+  model: string;
+  /** Did the pack accelerate/render on this model, per the checklist + browser verify. */
+  verdict: 'pass' | 'fail';
+  /** The shared test set id under tools/aeb/specs/, e.g. 'pixi' → pixi.spec.md + pixi.checklist.md. */
+  testSet: string;
+  /** Repo-relative evidence file (tokens, checklist, browser findings), e.g. 'tools/aeb/results/aeb3-pixi-perpack.md'. */
+  evidence: string;
+  /** Output tokens the treatment arm spent, when recorded. */
+  tokens?: number;
+  /** ISO date of the run. */
+  date: string;
+}
+
 export interface LibraryPack {
   /** Stable id, e.g. 'chartjs', 'aimeat-charts', 'styling'. */
   id: string;
@@ -75,6 +95,30 @@ export interface LibraryPack {
   sizeEstimate: string;
   /** stable REQUIRES a demo template + a recorded AEB acceleration result. */
   status: 'preview' | 'stable' | 'deprecated';
+  /**
+   * The strongest model-strength this pack is reliably-and-accelerated on — a WARNING label, not a
+   * gate (an unlabelled pack still ships). Driven by API-version drift from training data:
+   *   'any'       — pin == the API models know; a mid-tier model codes it correctly from memory.
+   *   'frontier'  — breaking API vs the version most examples show; weak models write the old API
+   *                 from memory and crash → carry an `apiCaveat` and prefer forcing the ai_doc.
+   *   'needs-doc' — AIMEAT-authored/wrapper, no training-data priors; must fetch the ai_doc to use
+   *                 it at all (no crash, just a silent no-op if skipped).
+   * Derivable from `proofs` (strongest model with a 'pass'); set explicitly until proofs exist.
+   * Full scheme + how a pack earns this: tools/aeb/acceleration-tiers.md.
+   */
+  modelTier?: 'any' | 'frontier' | 'needs-doc';
+  /**
+   * The per-model AEB proof ledger — which models this pack has actually been demonstrated on.
+   * Lets a client/pipeline pick a pack proven on the model it is about to use. Append-only.
+   */
+  proofs?: PackProof[];
+  /**
+   * For `modelTier:'frontier'` packs ONLY: the one-line breaking-API idiom a weak model gets wrong
+   * from stale memory. The build-app prompt INLINES this next to the pack (so a model that skips the
+   * ai_doc still gets corrected), e.g. pixi's "v8 Graphics chains .rect().fill(), NOT beginFill()/
+   * drawRect() (v7, removed)". Keep it to the single most load-bearing gotcha.
+   */
+  apiCaveat?: string;
   /** Exact line used in the build-app prompt (sdk/cortex packs that the prompt lists). */
   promptLine?: string;
   /** Build-app-prompt grouping for sdk packs. */
@@ -119,7 +163,7 @@ export function renderPackText(text: string, baseUrl: string): string {
  * Pass a lang (e.g. 'fi') for localized title/description where a translation exists.
  */
 export function getLibraryPackIndex(lang?: string): Array<
-  Pick<LibraryPack, 'id' | 'kind' | 'category' | 'title' | 'description' | 'url' | 'include' | 'requires' | 'version' | 'license' | 'apiSurface' | 'demoTemplateId' | 'skillRef' | 'tierHint' | 'interviewTriggers' | 'sizeEstimate' | 'status'>
+  Pick<LibraryPack, 'id' | 'kind' | 'category' | 'title' | 'description' | 'url' | 'include' | 'requires' | 'version' | 'license' | 'apiSurface' | 'demoTemplateId' | 'skillRef' | 'tierHint' | 'interviewTriggers' | 'sizeEstimate' | 'status' | 'modelTier' | 'proofs' | 'apiCaveat'>
 > {
   const tr = (lang && TRANSLATIONS[lang]) || null;
   return PACKS.map(p => {
@@ -132,6 +176,8 @@ export function getLibraryPackIndex(lang?: string): Array<
       license: p.license, apiSurface: p.apiSurface, demoTemplateId: p.demoTemplateId,
       skillRef: p.skillRef, tierHint: p.tierHint, interviewTriggers: p.interviewTriggers,
       sizeEstimate: p.sizeEstimate, status: p.status,
+      // AI-acceleration tier + per-model proof ledger + the frontier-pack caveat (tools/aeb/acceleration-tiers.md).
+      modelTier: p.modelTier, proofs: p.proofs, apiCaveat: p.apiCaveat,
     };
   });
 }
@@ -189,6 +235,9 @@ export function buildPromptLibrarySections(nodeUrl: string): string {
     for (const p of capability) {
       const inc = renderPackText(p.include.join(' + '), nodeUrl);
       s += '- ' + p.id + ' — ' + p.description + ' Include: ' + inc + '\n';
+      // Frontier-tier packs pin an API that BREAKS vs the version a model knows from memory —
+      // inline the one load-bearing gotcha so a model that skips the ai_doc still gets corrected.
+      if (p.apiCaveat) s += '  ⚠ ' + p.apiCaveat + '\n';
     }
     s += 'Before writing code that uses a capability pack, fetch its full usage doc (API idioms, version notes, gotchas): GET ' + nodeUrl + '/v1/library-packs/<id> — the ai_doc field. Index of every pack: GET ' + nodeUrl + '/v1/library-packs. Include ONLY packs the user\'s needs match.\n';
     s += 'The live index may also list COMMUNITY packs (scope "community") — cortex libraries published by users on this node, with the same include + ai_doc contract. They are unvetted (always status "preview"): prefer a node-scope pack when one covers the same need, and read a community pack\'s ai_doc before trusting its API.\n\n';

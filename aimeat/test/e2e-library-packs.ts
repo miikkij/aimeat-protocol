@@ -175,6 +175,50 @@ await test('cortex pack versions match the bundled cortex YAML spec.version', as
   assert(mismatches.length === 0, mismatches.join(', '));
 });
 
+// ── AI-acceleration tier + per-model proof ledger (tools/aeb/acceleration-tiers.md) ──
+await test('modelTier is a valid value; frontier packs carry an apiCaveat', async () => {
+  const bad = packs.filter(p => p.modelTier && !['any', 'frontier', 'needs-doc'].includes(p.modelTier));
+  assert(bad.length === 0, `Bad modelTier: ${bad.map(p => `${p.id}=${p.modelTier}`).join(', ')}`);
+  // A frontier pack is a version-drift trap — it MUST inline the breaking idiom or the warning is toothless.
+  const frontierNoCaveat = packs.filter(p => p.modelTier === 'frontier' && !(typeof p.apiCaveat === 'string' && p.apiCaveat.length > 20));
+  assert(frontierNoCaveat.length === 0, `frontier packs missing apiCaveat: ${frontierNoCaveat.map(p => p.id).join(', ')}`);
+});
+
+await test('proof ledger entries are well-formed (model, verdict, evidence path)', async () => {
+  const problems: string[] = [];
+  for (const p of packs) {
+    if (!p.proofs) continue;
+    assert(Array.isArray(p.proofs), `${p.id}: proofs not an array`);
+    for (const pr of p.proofs) {
+      if (!pr.model || typeof pr.model !== 'string') problems.push(`${p.id}: proof missing model`);
+      if (!['pass', 'fail'].includes(pr.verdict)) problems.push(`${p.id}: bad verdict ${pr.verdict}`);
+      if (typeof pr.evidence !== 'string' || !pr.evidence.startsWith('tools/aeb/results/')) problems.push(`${p.id}: evidence not a results/ path`);
+      if (!pr.date) problems.push(`${p.id}: proof missing date`);
+    }
+  }
+  assert(problems.length === 0, problems.join('; '));
+});
+
+await test('detail endpoint exposes modelTier/proofs/apiCaveat for a proven pack', async () => {
+  const { body } = await json('/v1/library-packs/pixi');
+  const pack = body.data?.pack;
+  assert(pack?.modelTier === 'frontier', `pixi modelTier expected frontier, got ${pack?.modelTier}`);
+  assert(typeof pack?.apiCaveat === 'string' && /v8/i.test(pack.apiCaveat), 'pixi apiCaveat missing/wrong');
+  assert(Array.isArray(pack?.proofs) && pack.proofs.some((pr: any) => pr.model && pr.verdict), 'pixi proofs missing');
+});
+
+await test('build-app prompt inlines the apiCaveat for frontier packs', async () => {
+  const res = await fetch(`${BASE}/v1/prompts/build-app?format=txt`);
+  const prompt = await res.text();
+  const frontier = packs.filter(p => p.modelTier === 'frontier' && p.apiCaveat);
+  // The prompt only lists vendored/cortex capability packs — check the ones that appear there.
+  const misses = frontier.filter(p => prompt.includes(p.id) && !prompt.includes('⚠'));
+  assert(misses.length === 0, `frontier caveat not inlined in prompt for: ${misses.map(p => p.id).join(', ')}`);
+  // pixi specifically: its v8 caveat fragment must be present next to the pack.
+  const pixi = frontier.find(p => p.id === 'pixi');
+  if (pixi && prompt.includes('pixi')) assert(/beginFill|\.rect\(.*\)\.fill\(|v8/i.test(prompt), 'pixi v8 caveat fragment absent from prompt');
+});
+
 // ── Community packs: an ACTIVE + PUBLIC user cortex with a lib component appears in the
 // index (scope 'community') and serves its type:prompt content as the ai_doc. ──
 await test('community pack: active+public user cortex appears with ai_doc', async () => {

@@ -124,6 +124,7 @@ export function buildAppPrompt(
   body += 'const results = await AIMEAT.data.search("query");\n';
   body += '```\n';
   body += 'Works only when logged in. After a write, read it back to confirm it persisted.\n';
+  body += 'A key is a plain string: `get(key)` / `getPublic(gaii, key)` always return the LATEST value — never append a version, index or `:0`/`:N` suffix to a key, and read back the SAME key you wrote (a store-as-`x` / read-as-`x:0` mismatch just 404s and your UI shows nothing). To page a large list, store it as ONE array under one key (or shard with your OWN explicit id scheme), not a magic version suffix.\n';
   body += 'Shared feeds, journals, comments and discussions are ALL built this way — one public key per entry, `getPublic()` to read others\'. Never reach for Boards (deprecated, removal-bound) or organism workspaces as an app\'s data layer. When a rule must be enforced server-side (only-author-can-delete, one-vote-per-user), that logic goes into an extension — see the extension guide, not into boards/organisms.\n\n';
 
   // Public Intake — the ONLY way an anonymous (not-logged-in) visitor can submit data into an owner's

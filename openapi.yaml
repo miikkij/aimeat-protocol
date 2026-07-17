@@ -6835,11 +6835,15 @@ paths:
         SDK wrappers (/v1/libs), node-bundled cortex libs (/v1/cortex/<n>/libs) and vendored
         third-party capability packs (/lib). Compact index (no ai_doc/changelog): id, kind,
         category, description, rendered include line(s), requires, version, license, apiSurface,
-        demoTemplateId, tierHint, interviewTriggers, sizeEstimate, status, scope. Two sources
-        merge: scope "node" (the curated registry — every AI-facing library list derives from
-        it: build-app prompt, GET /v1/libs, bootstrap, llms.txt) and scope "community"
-        (active + public user-installed cortex extensions that ship a lib component; always
-        status "preview" — unvetted by the node). Public (CORS *).
+        demoTemplateId, tierHint, interviewTriggers, sizeEstimate, status, scope, and (node packs)
+        the optional AI-acceleration fields modelTier ("any" | "frontier" | "needs-doc" — the
+        model strength a pack is reliably-and-accelerated on), proofs[] (the per-model AEB proof
+        ledger: {model, verdict, testSet, evidence, tokens?, date}) and apiCaveat (for frontier
+        packs — the one breaking-API idiom a weak model gets wrong from memory). See
+        tools/aeb/acceleration-tiers.md. Two sources merge: scope "node" (the curated registry —
+        every AI-facing library list derives from it: build-app prompt, GET /v1/libs, bootstrap,
+        llms.txt) and scope "community" (active + public user-installed cortex extensions that ship
+        a lib component; always status "preview", no tier/proofs — unvetted by the node). Public (CORS *).
       tags:
         - Discovery
       parameters:

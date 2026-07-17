@@ -148,6 +148,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     interviewTriggers: ['chart', 'graph', 'dashboard', 'kaavio', 'diagrammi', 'visualisointi'],
     sizeEstimate: '~8KB (+204KB chartjs)',
     status: 'stable',
+    modelTier: 'any',
     promptLine: '- aimeat-charts — charts / graphs (`AIMEAT.charts`; load /lib/chartjs@4.js first)',
   },
   {
@@ -210,6 +211,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     interviewTriggers: ['flow', 'mindmap', 'process', 'workflow editor', 'node editor', 'prosessi', 'vuokaavio', 'miellekartta'],
     sizeEstimate: '~10KB (+46KB engine)',
     status: 'stable',
+    modelTier: 'needs-doc',
     promptLine: '- aimeat-flow — EDITABLE drag-and-drop flow / process / mindmap diagrams (`AIMEAT.flow`; fetch its pack doc for the 3 include tags + API)',
   },
   {
