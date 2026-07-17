@@ -8142,6 +8142,7 @@
     "buildHeroSub": "Copy one prompt into Claude, ChatGPT or any AI. It builds you a working app on AIMEAT, published live and yours to keep. Then let your agents run it for you, the way AIMEAT Sanomat writes itself every evening.",
     "buildHeroCopy": "Copy the build prompt →",
     "buildHeroCopied": "Copied ✓. Paste into your AI",
+    "ecLink": "New here? Learn the whole ecosystem hands-on — open the Experience Center →",
     "buildHeroAfter": "Paste it into your AI and answer its questions. When your app is ready,",
     "buildHeroAfter2": "(signing in takes seconds — Google or email).",
     "openAppsToPublish": "open your apps to add & publish it →",
@@ -8352,6 +8353,11 @@
         "continuous": "You picked: by itself. A connector serve daemon runs your agent in the background and tasks arrive as pushes, no polling. A fleet of 33 agents runs in production on this model.",
         "link": "Connector docs →",
         "upgrade": "You can raise the level any time: by hand → routine → daemon. The playbook does not expire."
+      },
+      "ec": {
+        "title": "Keep going: the Experience Center",
+        "a": "A hands-on academy for the whole ecosystem: connect your AI (the nicest way), then agents, apps, organisms and automation — layer by layer, with try-it links.",
+        "link": "Open the Experience Center →"
       },
       "h1": {
         "title": "Step 1: Tell us what you need",

@@ -37,6 +37,8 @@
  *     cumulative "this node has X" counters (apps/organisms/agents+online/knowledge/downloads).
  *   v3.4.0 — 2026-07-14 — Footer GitHub link: fix href to the real repo
  *     (github.com/miikkij/aimeat-protocol) + add the GitHub Octocat mark.
+ *   v3.5.0 — 2026-07-17 — Hero gains an Experience Center line (the hands-on academy at
+ *     experience-center.apps.aimeat.io) under the two CTAs.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -502,6 +504,7 @@ function BuildHero() {
         <button class="btn-primary" type="button" onClick=${copy}>${copied ? tr('landing.buildHeroCopied', 'Copied ✓ — paste into your AI') : tr('landing.buildHeroCopy', 'Copy the build prompt →')}</button>
         <a class="btn-outline" href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Get your own →')}</a>
       </div>
+      <p class="ld-hero2-after"><a href="https://experience-center.apps.aimeat.io" target="_blank" rel="noopener">🧭 ${tr('landing.ecLink', 'New here? Learn the whole ecosystem hands-on — open the Experience Center →')}</a></p>
       ${copied ? html`<p class="ld-hero2-after">${tr('landing.buildHeroAfter', 'Paste it into your AI and answer its questions. When your app is ready,')} <a href="/app-catalog.html">${tr('landing.openAppsToPublish', 'open your apps to add & publish it →')}</a> ${tr('landing.buildHeroAfter2', '(signing in takes seconds — Google or email).')}</p>` : ''}
     </section>
   `;
