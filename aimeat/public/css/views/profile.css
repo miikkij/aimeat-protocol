@@ -602,6 +602,31 @@
 .pf .ext-tier.ext-tier-frontier{background:color-mix(in srgb, var(--primary, #E8564A) 20%, transparent);color:var(--primary, #E8564A)}
 .pf .ext-tier.ext-tier-measured{background:color-mix(in srgb, #22c55e 18%, transparent);color:#16a34a}
 .pf .ext-tier.ext-tier-frontier.ext-tier-measured{background:color-mix(in srgb, var(--primary, #E8564A) 20%, transparent);color:var(--primary, #E8564A)}
+/* Libraries tab — the full client-library catalogue with visible AI-acceleration maturity. */
+.pf .lib-controls{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem;margin:1rem 0}
+.pf .lib-search{flex:1;min-width:180px;padding:8px 12px;border:1px solid var(--border);border-radius:8px;background:var(--card);color:var(--text)}
+.pf .lib-tier-filters{display:flex;gap:.25rem}
+.pf .lib-tier-btn{font-size:.8rem;padding:5px 10px}
+.pf .lib-tier-btn.lib-tier-active{border-color:var(--accent);background:color-mix(in srgb, var(--accent) 12%, var(--card))}
+.pf .lib-measured-toggle{display:inline-flex;align-items:center;gap:.35rem;font-size:.85rem;color:var(--muted);cursor:pointer}
+.pf .lib-group{margin-top:1.5rem}
+.pf .lib-group-heading{font-weight:600;font-size:.95rem;color:var(--muted);margin-bottom:.6rem}
+.pf .lib-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:.85rem}
+.pf .lib-card{border:1px solid var(--border);border-radius:12px;background:var(--card);padding:.9rem 1rem}
+.pf .lib-card-head{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem;margin-bottom:.35rem}
+.pf .lib-card-name{font-weight:600}
+.pf .lib-card-version{font-size:.72rem;color:var(--muted)}
+.pf .lib-status{font-size:.68rem;text-transform:uppercase;letter-spacing:.03em;padding:1px 6px;border-radius:999px;background:var(--bg-dim);color:var(--muted);margin-left:auto}
+.pf .lib-status.lib-status-stable{color:#16a34a;background:color-mix(in srgb, #22c55e 15%, transparent)}
+.pf .lib-card-desc{font-size:.85rem;color:var(--muted);line-height:1.4;margin-bottom:.55rem}
+.pf .lib-card-meta{font-size:.78rem;margin-bottom:.5rem;display:flex;flex-wrap:wrap;align-items:baseline;gap:.35rem}
+.pf .lib-tested-label{color:var(--muted);font-weight:600}
+.pf .lib-proof{display:inline-flex;flex-wrap:wrap;gap:.3rem}
+.pf .lib-proof-none{color:var(--muted);font-style:italic}
+.pf .lib-proof-item{font-size:.74rem;padding:1px 7px;border-radius:999px;font-weight:600}
+.pf .lib-proof-item.lib-proof-pass{color:#16a34a;background:color-mix(in srgb, #22c55e 15%, transparent)}
+.pf .lib-proof-item.lib-proof-fail{color:var(--primary, #E8564A);background:color-mix(in srgb, var(--primary, #E8564A) 15%, transparent)}
+.pf .lib-include{display:block;font-size:.7rem;color:var(--muted);background:var(--bg-dim);border-radius:6px;padding:5px 8px;overflow-x:auto;white-space:nowrap}
 @media(max-width:600px){
   .pf .ext-grid{grid-template-columns:1fr}
   .pf .ext-bundled-grid{grid-template-columns:1fr}

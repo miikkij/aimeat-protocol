@@ -6373,6 +6373,31 @@
     "exportSuccess": "Exported {count} config values in {format} format",
     "migrationHint": "Tip: To migrate .env to database, run: aimeat config import --file .env"
   },
+  "librariesTab": {
+    "tabLabel": "Libraries",
+    "title": "Libraries",
+    "desc": "Every client library your apps can use — SDK wrappers, vendored third-party libs (charts, 3D, particles, game engine, styling) and ready-made cortex UI — with its AI-acceleration maturity: which model it's been tested on, whether it passed, and what tier it is.",
+    "loading": "Loading libraries…",
+    "searchPlaceholder": "Search libraries…",
+    "tierAll": "All tiers",
+    "measuredOnly": "Tested only",
+    "tested": "Tested",
+    "notTested": "not yet AEB-tested",
+    "pass": "pass",
+    "fail": "fail",
+    "noneMatch": "No libraries match the filters.",
+    "group": {
+      "sdk": "Client SDK",
+      "vendored": "Visual & 2D/3D libraries",
+      "cortex": "Ready-made UI (cortex)",
+      "community": "Community-published"
+    },
+    "status": {
+      "stable": "stable",
+      "preview": "preview",
+      "deprecated": "deprecated"
+    }
+  },
   "discover": {
     "tabLabel": "Discover",
     "title": "Discover",
