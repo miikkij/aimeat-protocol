@@ -154,3 +154,6 @@ docs/internal/
 /cadence-*.json
 # Package build artifacts — packages/ holds app SOURCE; built .zip bundles are outputs.
 packages/*.zip
+
+# AEB proof scaffolder output (pnpm aeb:prove)
+aimeat/tools/aeb/runs/

@@ -156,9 +156,12 @@ That's the whole loop: same spec + same checklist, one new results file, one app
 test set is fixed and shared, a proof from model X and a proof from model Y are directly comparable —
 the ledger becomes a "works on / fails on" matrix per pack that builders can pick from.
 
-*(Optional future helper, not built: `pnpm aeb:prove <pack> --model <name>` could scaffold the two
-build-prompt variants + the results-file stub and open the checklist — turning the 4 steps into one
-command. Propose before building.)*
+**Helper (shipped):** `cd aimeat && pnpm aeb:prove <pack> --model <id> [--url <node>]` scaffolds a run
+under `tools/aeb/runs/<pack>/` — the A (packs-hidden) and B (packs-shown) build-prompt variants, the
+shared test set (spec + checklist), and a `results-stub.md` to fill. So step 1 collapses to one
+command; you still run the two arms on your model, verify in a browser, fill the stub, and append the
+`proofs` row. (`tools/aeb/runs/` is gitignored — it's scratch; the durable artifacts are the
+`results/*.md` you write and the appended proof row.)
 
 ---
 
