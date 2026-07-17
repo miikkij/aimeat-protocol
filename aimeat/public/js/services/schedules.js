@@ -41,8 +41,11 @@ export async function getSchedulerTab() {
 /**
  * Projected cron fire-times for the owner's enabled schedules within [from, to]
  * (Date objects). Returns the envelope; `res.data` = { occurrences:[{ scheduleId,
- * at }], from, to, truncated }. Join scheduleId back to listAllSchedules() records
- * for kind/name. Powers the Profile › Scheduler calendar.
+ * at }], frequent:[{ scheduleId, cron, intervalMinutes, approxPerDay }], from, to,
+ * truncated }. Continuous / high-frequency crons (≥ ~6 fires/day) come back in
+ * `frequent` (summarized, not enumerated) so they don't flood the grid; normal
+ * cadence lands in `occurrences`. Join scheduleId back to listAllSchedules()
+ * records for kind/name. Powers the Profile › Scheduler calendar.
  */
 export async function listScheduleOccurrences(from, to) {
   const qs = new URLSearchParams({ from: from.toISOString(), to: to.toISOString() });

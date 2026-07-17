@@ -37,6 +37,10 @@
  *     (managed + owner-installed extension crons) into a [from,to] window via croner, so the Profile ›
  *     Scheduler calendar can show day/week/month cadence. Window clamped to ~2 months; per-schedule and
  *     total occurrence caps guard against sub-minute crons; returns { occurrences:[{scheduleId,at}], truncated }.
+ *   v1.4.0 — 2026-07-17 — /occurrences now splits schedules by cadence: continuous / high-frequency crons
+ *     (≥ ~6 fires/day, from the median gap of the first fire-times) are summarized in a new `frequent`
+ *     array ({scheduleId, cron, intervalMinutes, approxPerDay}) instead of enumerated, so per-minute /
+ *     hourly jobs no longer flood the grid or exhaust the occurrence cap and hide the daily+ events.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -402,10 +406,16 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
 
       const PER_SCHEDULE = 366; // a year of daily runs; caps sub-daily crons
       const TOTAL_CAP = 2000;
+      // Cadence split: a schedule firing at least this often is "continuous
+      // background" — we summarize its cadence (in `frequent`) instead of
+      // enumerating every fire-time, so per-minute / hourly crons don't flood the
+      // calendar grid (nor exhaust TOTAL_CAP and hide the daily+ events beneath).
+      const FREQUENT_MIN_PER_DAY = 6; // ≥ ~every 4h → the "Continuously running" strip
       const occurrences: { scheduleId: string; at: string }[] = [];
+      // Continuous / high-frequency schedules, summarized rather than enumerated.
+      const frequent: { scheduleId: string; cron: string; intervalMinutes: number; approxPerDay: number }[] = [];
       let truncated = false;
       for (const job of jobs) {
-        if (occurrences.length >= TOTAL_CAP) { truncated = true; break; }
         if (job.enabled === false) continue;
         if (!job.cron || job.cron === '@activate') continue;
         let runs: Date[] = [];
@@ -416,6 +426,29 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
           runs = c.nextRuns(PER_SCHEDULE, from);
           c.stop();
         } catch { continue; }
+        if (runs.length === 0) continue;
+
+        // Classify cadence from the median gap of the first few fire-times
+        // (median is robust to bursty multi-time crons like "0 7,19 * * *").
+        let intervalMinutes = Infinity;
+        if (runs.length >= 2) {
+          const n = Math.min(runs.length, 7);
+          const gaps: number[] = [];
+          for (let i = 1; i < n; i++) gaps.push((runs[i].getTime() - runs[i - 1].getTime()) / 60000);
+          gaps.sort((a, b) => a - b);
+          intervalMinutes = gaps[Math.floor(gaps.length / 2)];
+        }
+        const approxPerDay = intervalMinutes === Infinity ? 0 : Math.round(1440 / intervalMinutes);
+
+        // Continuous / high-frequency → summarize, don't enumerate (never capped:
+        // there are only a handful, and the strip must list them all).
+        if (approxPerDay >= FREQUENT_MIN_PER_DAY) {
+          frequent.push({ scheduleId: job.id, cron: job.cron, intervalMinutes: Math.round(intervalMinutes), approxPerDay });
+          continue;
+        }
+
+        // Scheduled cadence → enumerate into the visible window (respecting the cap).
+        if (occurrences.length >= TOTAL_CAP) { truncated = true; continue; }
         let hitEnd = false;
         for (const r of runs) {
           if (r.getTime() > end.getTime()) { hitEnd = true; break; }
@@ -428,6 +461,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
 
       res.json(success(config.nodeId, {
         occurrences,
+        frequent,
         from: from.toISOString(),
         to: end.toISOString(),
         truncated,

@@ -7,6 +7,8 @@
  *   v1.0.0 -- 2026-06-03 -- Initial scheduler styles
  *   v1.1.0 -- 2026-07-03 -- Add the day/week/month calendar (.sch-cal-*) + .sch-flash highlight used
  *     when a calendar event scrolls to its schedule card/row. Kind colour via a --k custom property.
+ *   v1.2.0 -- 2026-07-17 -- Add the "Continuously running" strip (.sch-cal-freq*): cadence pills for
+ *     high-frequency schedules kept out of the grid, plus the aggregated ⟳ ×N fold chip (.sch-cal-freqchip).
  */
 
 .sch-tab { display: flex; flex-direction: column; gap: 1.25rem; }
@@ -183,6 +185,40 @@
 .sch-cal-bucket { margin: 0.3rem 0; }
 .sch-cal-hour { font-size: 0.72rem; color: var(--text-dim); padding-top: 0.15rem; }
 .sch-cal-hour-evs { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+
+/* ── "Continuously running" strip — high-frequency schedules kept out of the grid ── */
+.sch-cal-freq {
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--bg-dim); padding: 0.5rem 0.65rem;
+  display: flex; flex-direction: column; gap: 0.45rem;
+}
+.sch-cal-freq-head { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.sch-cal-freq-title { font-size: 0.8rem; font-weight: 700; color: var(--text-dim); display: inline-flex; align-items: center; gap: 0.4rem; }
+.sch-cal-freq-count {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 1.35rem;
+  padding: 0 0.35rem; height: 1.2rem; border-radius: 999px;
+  background: var(--card); border: 1px solid var(--border); color: var(--text); font-size: 0.72rem;
+}
+.sch-cal-freq-pills { display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.sch-cal-freqpill {
+  display: inline-flex; align-items: center; gap: 0.4rem; max-width: 100%;
+  font: inherit; font-size: 0.74rem; text-align: left; cursor: pointer;
+  padding: 0.2rem 0.55rem; border-radius: 999px;
+  border: 1px solid var(--border); border-left: 3px solid var(--k, var(--border));
+  background: var(--card); color: var(--text);
+}
+.sch-cal-freqpill:hover { filter: brightness(1.12); border-color: var(--accent); }
+.sch-cal-freqdot { width: 0.55rem; height: 0.55rem; border-radius: 50%; background: var(--k, var(--border)); flex: none; }
+.sch-cal-freqname { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sch-cal-freqcad { color: var(--text-dim); white-space: nowrap; }
+.sch-cal-freqmore {
+  font: inherit; font-size: 0.74rem; cursor: pointer; color: var(--accent);
+  background: transparent; border: 0; padding: 0.2rem 0.4rem;
+}
+/* aggregated ⟳ ×N chip when continuous schedules are folded into the grid */
+.sch-cal-freqchip { border-left-style: dashed; }
+.sch-cal-freqmark { color: var(--text-dim); }
+.sch-cal-freqcount { display: inline-flex; align-items: center; gap: 0.2rem; opacity: 0.85; }
 
 /* highlight a card/row jumped to from the calendar */
 .sch-flash { outline: 2px solid transparent; outline-offset: 2px; animation: schFlash 1.6s ease-out; }
