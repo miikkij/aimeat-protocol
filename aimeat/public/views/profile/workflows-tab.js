@@ -31,6 +31,7 @@ import { listWorkflows, getWorkflow, getBlueprint, listRuns, getRun, runWorkflow
 import { collectImages, ImageStrip } from '/components/ImageDeliverable.js';
 import WorkflowForm from './workflows-form.js';
 
+import { EmptyState } from '/components/EmptyState.js';
 const html = htm.bind(h);
 
 /** Pick a display string from a localized value (string | { locale: text }). */
@@ -151,7 +152,7 @@ export default function WorkflowsTab({ showToast }) {
       </div>
       ${error && html`<div class="wf-error">${error}</div>`}
       ${items.length === 0
-        ? html`<div class="wf-empty">${t('profile.workflows.empty')}</div>`
+        ? html`<${EmptyState} text=${t('profile.workflows.empty')} />`
         : html`<div class="wf-card-list">
             ${items.map(({ def, health }) => html`
               <div class="wf-card" key=${def.id}>
@@ -244,7 +245,7 @@ function DetailView({ id, onBack, onOpenRun, onRun, onEdit }) {
 
       <div class="wf-section-title">${t('profile.workflows.recentRuns')}</div>
       ${runs.length === 0
-        ? html`<div class="wf-empty">${t('profile.workflows.noRuns')}</div>`
+        ? html`<${EmptyState} text=${t('profile.workflows.noRuns')} />`
         : html`<table class="wf-table"><tbody>
             ${runs.map(r => html`<tr key=${r.runId} class="wf-run-row" onClick=${() => onOpenRun(r.runId)}>
               <td>${timeAgo(r.startedAt)}</td>

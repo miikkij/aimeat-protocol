@@ -15,7 +15,7 @@
 
 .wf-tab { display: flex; flex-direction: column; gap: 1.1rem; }
 .wf-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
-.wf-loading, .wf-empty { color: var(--text-dim); padding: 0.75rem 0; font-size: 0.92rem; }
+.wf-loading { color: var(--text-dim); padding: 0.75rem 0; font-size: 0.92rem; }
 .wf-error {
   background: var(--danger-bg); color: var(--danger-fg);
   border: 1px solid var(--danger-border, var(--border)); border-radius: var(--radius-sm); padding: 0.6rem 0.85rem;

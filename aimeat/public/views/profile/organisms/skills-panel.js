@@ -22,6 +22,7 @@ import { Markdown } from '/components/Markdown.js';
 import { splitSkillMd } from '/views/profile/skills-tab.js';
 import * as skillsService from '/js/services/skills.js';
 
+import { EmptyState } from '/components/EmptyState.js';
 const html = htm.bind(h);
 
 const WS_SKILL_TEMPLATE = `---
@@ -128,7 +129,7 @@ export function SkillsPanel({ orgId, wsId, showToast }) {
 
       ${loading ? html`<div class="pj-empty">${t('organisms.loading') || 'Loading…'}</div>` : (
         skills.length === 0
-          ? html`<div class="pf-skl-empty">${t('skills.wsEmpty') || 'No workspace skills yet — publish the first one.'}</div>`
+          ? html`<${EmptyState} text=${t('skills.wsEmpty') || 'No workspace skills yet — publish the first one.'} />`
           : skills.map(skill => html`
               <div key=${skill.ref} class="pf-skl-row">
                 <div class="pf-skl-row-main">

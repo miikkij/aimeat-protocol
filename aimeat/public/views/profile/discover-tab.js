@@ -16,6 +16,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { EmptyState } from '/components/EmptyState.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
@@ -137,7 +138,7 @@ export default function DiscoverTab() {
 
       ${loading ? html`<${Spinner} />` : html`
         ${!data.entries.length
-          ? html`<div class="pf-empty">${t('discover.empty')}</div>`
+          ? html`<${EmptyState} text=${t('discover.empty')} />`
           : data.entries.map(e => html`
             <a class="dsc-item" href="#" onClick=${ev => { ev.preventDefault(); openEntry(e); }}>
               <div class="dsc-item-head">

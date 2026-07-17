@@ -9,6 +9,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
+import { EmptyState } from '/components/EmptyState.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
@@ -126,7 +127,7 @@ export default function CapabilitiesTab() {
       </div>
 
       <!-- Capability list -->
-      ${!filtered.length ? html`<div class="pf-empty">${t('capabilities.noCapabilities')}</div>` : ''}
+      ${!filtered.length ? html`<${EmptyState} text=${t('capabilities.noCapabilities')} />` : ''}
 
       ${filtered.map(c => {
         const s = c.stats || {};
