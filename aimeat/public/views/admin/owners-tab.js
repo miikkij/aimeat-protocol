@@ -9,13 +9,15 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-07-18 — Vaihe 2d: hand-rolled <table> → canonical admin <DataTable> (rows/headers
+ *     model); cell content preserved verbatim.
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
-import { dt, Empty, useToast, Toast } from './shared.js';
+import { dt, Empty, useToast, Toast, DataTable } from './shared.js';
 import { grantRole } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
 
@@ -34,34 +36,22 @@ export default function OwnersTab({ data, reload }) {
 
   return html`
     ${toast && html`<${Toast} ...${toast} onDismiss=${clearToast} />`}
-    <div class="adm-card">
-      <div class="scrollable">
-        <table>
-          <thead><tr>
-            <th>${t('dashboard.name')}</th>
-            <th>${t('dashboard.displayName')}</th>
-            <th>${t('dashboard.roles')}</th>
-            <th>${t('dashboard.agents')}</th>
-            <th>${t('dashboard.created')}</th>
-            <th></th>
-          </tr></thead>
-          <tbody>
-            ${owners.map(ow => {
-              const roles = ow.roles || [];
-              const isOp = roles.includes('operator');
-              return html`<tr>
-                <td><strong>${escHtml(ow.name)}</strong></td>
-                <td>${escHtml(ow.display_name || '\u2014')}</td>
-                <td>${roles.length ? roles.map(r => html`<span class="tag" style="font-size:.75rem">${r}</span> `) : html`<span style="color:var(--text-dim)">—</span>`}</td>
-                <td>${ow.agents ? ow.agents.length : 0}</td>
-                <td style="color:var(--text-dim)">${dt(ow.created_at)}</td>
-                <td>${!isOp && html`<button class="adm-btn-sm" onClick=${() => doGrant(ow.name)}>${t('dashboard.grantOperator')}</button>`}</td>
-              </tr>`;
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
+    <${DataTable}
+      scroll=${true}
+      headers=${[t('dashboard.name'), t('dashboard.displayName'), t('dashboard.roles'), t('dashboard.agents'), t('dashboard.created'), '']}
+      rows=${owners.map(ow => {
+        const roles = ow.roles || [];
+        const isOp = roles.includes('operator');
+        return [
+          html`<strong>${escHtml(ow.name)}</strong>`,
+          escHtml(ow.display_name || '—'),
+          roles.length ? html`${roles.map(r => html`<span class="tag" style="font-size:.75rem">${r}</span> `)}` : html`<span style="color:var(--text-dim)">—</span>`,
+          ow.agents ? ow.agents.length : 0,
+          html`<span style="color:var(--text-dim)">${dt(ow.created_at)}</span>`,
+          !isOp && html`<button class="adm-btn-sm" onClick=${() => doGrant(ow.name)}>${t('dashboard.grantOperator')}</button>`,
+        ];
+      })}
+    />
     <${ConfirmUI} />
   `;
 }
