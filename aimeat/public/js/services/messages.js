@@ -11,6 +11,8 @@
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 5: Inbox tab).
  *   v1.0.1 -- 2026-06-19 -- JSDoc type annotations for frontend type-checking
  *   v1.1.0 -- 2026-06-23 -- send() carries the optional `interactive` payload (federated AskUserQuestion).
+ *   v1.1.1 -- 2026-07-17 -- uploadAttachment: add a random suffix to the storage key so same-named files
+ *     uploaded in the same millisecond (two clipboard "image.png" pastes) don't overwrite each other.
  */
 import { api, apiGet } from '/js/api.js';
 
@@ -95,7 +97,11 @@ export async function uploadAttachment(file, kindOverride) {
   let binary = '';
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   const data = btoa(binary);
-  const key = `dm-out/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+  // A random suffix keeps the key unique even for same-named files uploaded in the same millisecond
+  // (e.g. two clipboard "image.png" pastes) — without it the second upload would overwrite the first's
+  // bytes, so both attachments showed the same picture.
+  const rand = Math.random().toString(36).slice(2, 8);
+  const key = `dm-out/${Date.now()}-${rand}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const mime = file.type || 'application/octet-stream';
   await api('/v1/storage', {
     method: 'POST',

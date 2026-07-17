@@ -4,6 +4,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.15.0 — 2026-07-16 — Drop the dead .pf-side-ico rule (sidebar nav is label-only now).
  *   v2.14.0 — 2026-07-11 — .pf-ai-app-meta: muted compact tokens·calls column for the Home
  *     AgentLedgerCard by-model breakdown rows (reuses the AiSpendCard .pf-ai-* card chrome).
  *   v2.13.0 — 2026-07-06 — Toast fixes: drop the dead .pf.toast-container rule (profile.js no longer
@@ -2153,7 +2154,6 @@
 }
 .pf-side-item:hover { background: var(--bg-hover, var(--bg-dim)); }
 .pf-side-item--active { background: var(--accent-faint, var(--bg-dim)); color: var(--accent); font-weight: 700; }
-.pf-side-ico { width: 1.3rem; text-align: center; flex: 0 0 auto; }
 .pf-side-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pf-side-badge { margin-left: auto; font-size: 0.68rem; background: var(--bg-dim); color: var(--text-dim); padding: 0.05rem 0.45rem; border-radius: var(--radius-full, 999px); }
 

@@ -10,6 +10,9 @@
  *   v1.1.0 — 2026-07-14 — Composer: pasted/dropped images route to the file-attachment path (upload +
  *     shown as an image) instead of Toast UI base64-inlining them into the body (which blew the 50k
  *     body limit → 400 "Too big"). addImageBlobHook (rich) + onPaste (markdown fallback).
+ *   v1.2.0 — 2026-07-17 — Two paste-image fixes: (1) MessageBubble looks up attachment urls via the new
+ *     `${messageId}::${attachmentId}` composite key so images no longer bleed between messages; (2) pasted
+ *     clipboard images (always named "image.png") get a unique name instead of every paste sharing one.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -234,6 +237,14 @@ export function PollBuilder({ questions, setQuestions }) {
 export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, onReplyAi, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
+  // urlMap is keyed by `${messageId}::${attachmentId}` because per-message attachment ids (at0, at1…)
+  // aren't unique across messages. Build THIS message's flat { attId → url } view so prepareBody's cid
+  // resolution and the thumbnails only ever see their own message's attachments.
+  const urls = {};
+  for (const a of (msg.attachments || [])) {
+    const u = urlMap[`${msg.id}::${a.id}`];
+    if (u) urls[a.id] = u;
+  }
   const trk = tracked ? trackStateLabel(tracked.state) : null;
   return html`
     <div class=${`inbox-row ${mine ? 'inbox-row--mine' : 'inbox-row--theirs'}`}>
@@ -250,7 +261,7 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
           <button class="inbox-bubble-act" title=${t('inbox.ai.replyToMessage')}
             onClick=${() => onReplyAi?.(msg)}>✨</button>
         </div>
-        <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urlMap, expiredIds)} /></div>
+        <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urls, expiredIds)} /></div>
         ${msg.interactive?.role === 'questions' ? (
           answeredWith
             ? html`<${InteractiveAnswered} spec=${msg.interactive} answers=${answeredWith.answers || {}} />`
@@ -259,7 +270,7 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
         ) : null}
         ${nonInline.length > 0 && html`
           <div class="inbox-attach-row">
-            ${nonInline.map(a => html`<${AttachmentItem} key=${a.id} a=${a} url=${urlMap[a.id]} onOpenMarkdown=${onOpenMarkdown} />`)}
+            ${nonInline.map(a => html`<${AttachmentItem} key=${a.id} a=${a} url=${urls[a.id]} onOpenMarkdown=${onOpenMarkdown} />`)}
           </div>`}
         <div class="inbox-bubble-meta">
           ${trk ? html`<span class=${`inbox-track-badge inbox-track-badge--${trk.tone}`} title=${t('inbox.trackResponse')}>🔗 ${trk.text}</span>` : null}
@@ -303,9 +314,13 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   const addPastedImage = (blob) => {
     if (!blob) return;
     const ext = (blob.type && blob.type.split('/')[1]) || 'png';
-    const name = (blob instanceof File && blob.name) ? blob.name
-      : `pasted-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
-    const file = (blob instanceof File) ? blob : new File([blob], name, { type: blob.type || 'image/png' });
+    const orig = (blob instanceof File && blob.name) ? blob.name : '';
+    // Clipboard images always arrive as a File generically named "image.png", so every paste would share
+    // that one name (and read as the same file in the thread). Give each pasted image a unique name; keep
+    // a genuine dropped filename as-is.
+    const generic = !orig || orig.toLowerCase() === 'image.png';
+    const name = generic ? `pasted-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}` : orig;
+    const file = (blob instanceof File && !generic) ? blob : new File([blob], name, { type: blob.type || 'image/png' });
     setFiles((prev) => [...prev, file]);
   };
   // Pull image files out of a clipboard/drop event; returns true if any were handled (caller preventDefaults).

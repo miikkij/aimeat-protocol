@@ -15,6 +15,8 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.12.0 — 2026-07-16 — Drop the per-item emoji icons from the sidebar (Home, Inbox, and each
+ *     grouped/pinned item render label-only) — cleaner, less visually noisy menu.
  *   v3.11.0 — 2026-07-13 — Split into sibling modules for max-file-lines: modals →
  *     landing-page.modals.js, home cards + sidebar → landing-page.cards.js, and time/nav/
  *     format helpers → landing-page.helpers.js. Behavior, exports (computeTier/tierLevel/
@@ -313,7 +315,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
 
         <button class="pf-side-item${!openView ? ' pf-side-item--active' : ''}"
           onClick=${() => { close(); setDrawerOpen(false); }}>
-          <span class="pf-side-ico">\u{1F3E0}</span><span class="pf-side-label">${t('profile.landing.home')}</span>
+          <span class="pf-side-label">${t('profile.landing.home')}</span>
         </button>
 
         <${InboxNavButton}
@@ -325,7 +327,6 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
           const renderItem = (it, pinned) => html`
             <button class="pf-side-item${isOpen(it.id) ? ' pf-side-item--active' : ''}" key=${(pinned ? 'pin-' : '') + it.id}
               onClick=${() => { open(it.id, 'main'); setDrawerOpen(false); }}>
-              <span class="pf-side-ico">${it.icon}</span>
               <span class="pf-side-label">${t(it.labelKey)}</span>
               ${it.badgeStat && typeof stats?.[it.badgeStat] === 'number' && stats[it.badgeStat] > 0
                 ? html`<span class="pf-side-badge">${stats[it.badgeStat]}</span>` : null}

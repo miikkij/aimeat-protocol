@@ -13,6 +13,7 @@
  *   ./inbox-tab/components.js) · pure helpers (./inbox-tab/helpers.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.20.1 -- 2026-07-17 -- Fix images bleeding between messages: attachment url map keyed by `msgId::attId` (per-message ids at0/at1… repeat across messages).
  *   v1.20.0 -- 2026-07-16 -- Compose "to" field is the shared ContactPicker (contacts + directory
  *     suggestions + email resolve, valueMode 'full'); the datalist remains for the broadcast picker.
  *   v1.19.0 -- 2026-07-16 -- Mount folds the 6-request fan-out into ONE GET /v1/messages/overview
@@ -331,14 +332,15 @@ export default function InboxTab({ showToast }) {
     await Promise.all(msgs.flatMap(m => (m.attachments || [])
       .filter(a => !a.inline)
       .map(async a => {
-        if (prev[a.id]) { map[a.id] = prev[a.id]; return; } // keep the stable URL → browser won't re-fetch
-        // Inbound: only the recipient's duplicated local copy is fetchable (after accept). Outbound:
-        // the sender owns the original storage key, so resolve that — you can view/download what you sent.
+        // Key by messageId::attachmentId — per-message ids (at0, at1…) repeat, so a flat a.id map made every message's `at0` share one image.
+        const uk = `${m.id}::${a.id}`;
+        if (prev[uk]) { map[uk] = prev[uk]; return; } // cached → browser won't re-fetch
+        // Inbound: only the recipient's duplicated local copy is fetchable. Outbound: resolve the original.
         const key = (a.mode === 'duplicate' && a.localKey) ? a.localKey
           : (m.direction === 'outbound' && a.storageKey) ? a.storageKey : null;
         if (!key) return;
         const u = await messages.attachmentUrl(key).catch(() => null);
-        if (u) map[a.id] = u;
+        if (u) map[uk] = u;
       })));
     urlCacheRef.current = { convId: conv.conversationId, map };
     setUrlMap(map);
