@@ -14,7 +14,7 @@ import { t, getLocale } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { hasSession, getSession, getOwner } from '/js/services/auth.js';
 import { useViewCSS } from '/components/useViewCSS.js';
-
+import { EmptyState } from '/components/EmptyState.js';
 const html = htm.bind(h);
 
 /* ── Constants ── */
@@ -91,7 +91,7 @@ function InstanceSelector({ onSelect }) {
     <h1 class="mk-page-title">${t('mkt.instanceSelector')}</h1>
     <p class="mk-page-subtitle">${t('mkt.instanceSelectorSubtitle')}</p>
     ${instances.length === 0
-      ? html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDED2</div><div class="mk-empty-text">${t('mkt.noInstances')}</div></div>`
+      ? html`<${EmptyState} icon=${'\uD83D\uDED2'} text=${t('mkt.noInstances')} />`
       : html`
         <div class="mk-instance-grid">
           ${instances.map(inst => {
@@ -175,7 +175,7 @@ function HomeView({ extAction, instanceConfig, onNav, tl }) {
       <h2 class="mk-section-heading">${t('mkt.home.recentHeading')}</h2>
       ${recent.map(l => html`<${ListingCard} listing=${l} onNav=${onNav} tl=${tl} />`)}
     ` : html`
-      <div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDED2</div><div class="mk-empty-text">${t('mkt.home.emptyText')}</div></div>
+      <${EmptyState} icon=${'\uD83D\uDED2'} text=${t('mkt.home.emptyText')} />
     `}
 
     <div style="text-align:center; margin-top:32px;">
@@ -260,7 +260,7 @@ function BrowseView({ extAction, instanceConfig, onNav, params, tl }) {
 
     ${err ? html`<div class="mk-alert mk-alert-error">${err}</div>` : null}
     ${!results && !err ? html`<div class="mk-alert mk-alert-info">...</div>` : null}
-    ${results && results.listings.length === 0 ? html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDD0D</div><div class="mk-empty-text">${t('mkt.search.noResults')}</div></div>` : null}
+    ${results && results.listings.length === 0 ? html`<${EmptyState} icon=${'\uD83D\uDD0D'} text=${t('mkt.search.noResults')} />` : null}
     ${results && results.listings.length > 0 ? html`
       ${results.listings.map(l => html`<${ListingCard} listing=${l} onNav=${onNav} tl=${tl} />`)}
       ${results.total > 20 ? html`
@@ -306,7 +306,7 @@ function ListingDetailView({ extAction, onNav, params, tl }) {
   };
 
   if (err) return html`
-    <div class="mk-empty-state"><div class="mk-empty-icon">\u2753</div><div class="mk-empty-text">${t('mkt.detail.notFound')}</div></div>
+    <${EmptyState} icon=${'\u2753'} text=${t('mkt.detail.notFound')} />
     <div style="text-align:center;"><a class="btn-outline" onClick=${() => onNav('home')}>${t('mkt.detail.backBtn')}</a></div>
   `;
   if (!listing) return html`<div class="mk-alert mk-alert-info">...</div>`;
@@ -376,7 +376,7 @@ function CreateListingView({ extAction, instanceConfig, onNav, tl }) {
   const categories = getCategoryList(instanceConfig);
 
   if (!isLoggedIn()) return html`
-    <div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDD12</div><div class="mk-empty-text">${t('mkt.sell.authRequired')}</div></div>
+    <${EmptyState} icon=${'\uD83D\uDD12'} text=${t('mkt.sell.authRequired')} />
     <div style="text-align:center; margin-top:16px;"><a href="/v1/portal/human" class="btn-primary">${t('mkt.sell.authBtn')}</a></div>
   `;
 
@@ -484,7 +484,7 @@ function MyListingsView({ extAction, onNav, tl }) {
       .catch(e => setActionMsg('Error: ' + (e.message || 'failed')));
   };
 
-  if (!isLoggedIn()) return html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDD12</div><div class="mk-empty-text">${t('mkt.myListings.authRequired')}</div></div>`;
+  if (!isLoggedIn()) return html`<${EmptyState} icon=${'\uD83D\uDD12'} text=${t('mkt.myListings.authRequired')} />`;
   if (err) return html`<div class="mk-alert mk-alert-error">${err}</div>`;
   if (!listings) return html`<div class="mk-alert mk-alert-info">...</div>`;
 
@@ -516,7 +516,7 @@ function MyListingsView({ extAction, onNav, tl }) {
           ` : null}
         </div>
       `;
-    }) : html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDCE6</div><div class="mk-empty-text">${t('mkt.myListings.empty')}</div></div>`}
+    }) : html`<${EmptyState} icon=${'\uD83D\uDCE6'} text=${t('mkt.myListings.empty')} />`}
   `;
 }
 
@@ -544,7 +544,7 @@ function MyPurchasesView({ extAction }) {
       .catch(e => setActionMsg('Error: ' + (e.message || 'failed')));
   };
 
-  if (!isLoggedIn()) return html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDD12</div><div class="mk-empty-text">${t('mkt.myPurchases.authRequired')}</div></div>`;
+  if (!isLoggedIn()) return html`<${EmptyState} icon=${'\uD83D\uDD12'} text=${t('mkt.myPurchases.authRequired')} />`;
   if (err) return html`<div class="mk-alert mk-alert-error">${err}</div>`;
   if (!purchases) return html`<div class="mk-alert mk-alert-info">...</div>`;
 
@@ -552,7 +552,7 @@ function MyPurchasesView({ extAction }) {
     <h1 class="mk-page-title">${t('mkt.myPurchases.title')}</h1>
     <p class="mk-page-subtitle">${t('mkt.myPurchases.subtitle')}</p>
     ${actionMsg ? html`<div class="mk-alert mk-alert-info">${actionMsg}</div>` : null}
-    ${purchases.length === 0 ? html`<div class="mk-empty-state"><div class="mk-empty-icon">\uD83D\uDED2</div><div class="mk-empty-text">${t('mkt.myPurchases.empty')}</div></div>` : null}
+    ${purchases.length === 0 ? html`<${EmptyState} icon=${'\uD83D\uDED2'} text=${t('mkt.myPurchases.empty')} />` : null}
     ${purchases.map(p => {
       const title = p.title || p._listing && p._listing.title || t('mkt.myPurchases.unknown');
       return html`
