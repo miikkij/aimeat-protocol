@@ -77,11 +77,13 @@ nobody has run it yet — the tier there is inferred, not demonstrated.
 The SDK wrappers (aimeat-auth/data/organism/ai/storage/…) and the UI cortex packs
 (ui-viewers/forms/layout/nav/dialogs, canvas, dag, i18n) are all AIMEAT-authored with no
 training-data priors → **`needs-doc` by definition** (that tier is *what they are*, not a guess).
-A Haiku sweep (`results/aeb3-baselib-sweep.md`) confirmed the core SDK is called with correct idioms
-when the ai_docs are fetched, but surfaced the `needs-doc` failure mode for the UI cortex: **a
-mid-tier model loads the wrappers and then hand-rolls native HTML instead of calling them** — so the
-acceleration only lands if the model commits to the API. Fix is per-pack aiDoc (lead with a minimal
-copy-pasteable call). Browser-verified proofs for these await a watch-immune bench (see the sweep doc).
+A Haiku sweep (`results/aeb3-baselib-sweep.md`, **browser-verified on an isolated worktree bench**)
+gave: **core SDK `aimeat-auth`/`data`/`ai`/`storage` PASS** on Haiku (login-restore, private+public
+data round-trips, isAvailable, blob upload — proof rows added); `aimeat-organism`'s lib is correct but
+the app under-declared `organism:write` so create 403'd (no pass row). **UI cortex — the `needs-doc`
+failure mode, confirmed:** all six wrappers loaded but the model used NONE (hand-rolled `<table>`/forms/
+modals) and even mis-wired i18n (page shows raw keys). So they stay `needs-doc` unproven. **Fix: lead
+each cortex aiDoc with a minimal copy-pasteable call** so the wrapper is the path of least resistance.
 
 ## The proof ledger — per pack, per model, append-only
 
