@@ -41,6 +41,7 @@ import { DeliverableBody } from '/components/ImageDeliverable.js';
 import { OfferBadges, OfferExample, OfferRequirements, OfferDeliverable } from '/components/offer-card-view.js';
 import { Mermaid } from '/components/Mermaid.js';
 import { dt } from '/js/format.js';
+import { StatusDot } from '/components/StatusDot.js';
 import * as offersService from '/js/services/offers.js';
 import * as grouping from '/js/services/offers-grouping.js';
 
@@ -152,7 +153,7 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
       <div class="of-card-head" onClick=${() => setOpen(o => !o)}>
         <div class="of-card-title">
           <span class="of-offer-title">${escHtml(offer.title)}</span>
-          <span class="of-agent">${escHtml(entry.agent)} <span class="of-dot ${entry.online ? 'of-dot--on' : 'of-dot--off'}" title=${entry.online ? (t('profile.offers.online') || 'online') : (t('profile.offers.offline') || 'last seen ' + (entry.last_seen ? dt(entry.last_seen) : '—'))}></span></span>
+          <span class="of-agent">${escHtml(entry.agent)} <${StatusDot} status=${entry.online ? 'online' : 'idle'} title=${entry.online ? (t('profile.offers.online') || 'online') : (t('profile.offers.offline') || 'last seen ' + (entry.last_seen ? dt(entry.last_seen) : '—'))} /></span>
         </div>
         <${OfferBadges} offer=${offer} />
       </div>

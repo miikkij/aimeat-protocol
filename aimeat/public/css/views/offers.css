@@ -22,9 +22,6 @@
 .of-card-title { display: flex; flex-direction: column; gap: 0.15rem; min-width: 0; }
 .of-offer-title { font-weight: 600; }
 .of-agent { font-size: 0.82rem; color: var(--muted); display: inline-flex; align-items: center; gap: 0.35rem; }
-.of-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-.of-dot--on { background: var(--success, #10b981); }
-.of-dot--off { background: var(--border); }
 
 .of-badges { display: flex; flex-wrap: wrap; gap: 0.3rem; align-items: flex-start; }
 .of-badge { font-size: 0.72rem; padding: 0.05rem 0.4rem; border-radius: 10px; background: var(--bg-dim); color: var(--muted); border: 1px solid var(--border); white-space: nowrap; }
