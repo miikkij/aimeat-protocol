@@ -217,6 +217,9 @@ await test('build-app prompt inlines the apiCaveat for frontier packs', async ()
   // pixi specifically: its v8 caveat fragment must be present next to the pack.
   const pixi = frontier.find(p => p.id === 'pixi');
   if (pixi && prompt.includes('pixi')) assert(/beginFill|\.rect\(.*\)\.fill\(|v8/i.test(prompt), 'pixi v8 caveat fragment absent from prompt');
+  // The reliability tier is surfaced to the building AI (not left as API-only metadata).
+  assert(/\[frontier\]|\[any\]|\[needs-doc\]/.test(prompt), 'no modelTier tag surfaced in the build prompt');
+  assert(/reliability tag from AEB testing/i.test(prompt), 'prompt does not explain the tier tags');
 });
 
 // ── Community packs: an ACTIVE + PUBLIC user cortex with a lib component appears in the

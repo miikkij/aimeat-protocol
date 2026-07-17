@@ -487,6 +487,18 @@ function loadPbPacks() {
         var span = document.createElement('span');
         span.textContent = p.title;
         label.appendChild(cb); label.appendChild(span);
+        // AEB reliability tier + per-model proof ledger, so a human picking a pack sees
+        // which model strength it is proven on (not just left in the API).
+        if (p.modelTier) {
+          var badge = document.createElement('span');
+          badge.className = 'pb-pack-tier pb-tier-' + p.modelTier;
+          badge.textContent = p.modelTier;
+          var proven = (p.proofs || []).map(function (pr) { return pr.model + '→' + pr.verdict; }).join(', ');
+          badge.title = 'AEB reliability tier: ' + p.modelTier
+            + (proven ? ' · proven on ' + proven : ' · not yet AEB-run')
+            + (p.apiCaveat ? ' · ⚠ ' + p.apiCaveat : '');
+          label.appendChild(badge);
+        }
         wrap.appendChild(label);
       });
       // Pre-select from the idea text as the user types (never override a manual choice).
