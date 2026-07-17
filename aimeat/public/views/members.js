@@ -16,6 +16,8 @@ import { t } from '/js/i18n.js';
 import { apiGet } from '/js/api.js';
 import { escHtml } from '/js/utils.js';
 import { useViewCSS } from '/components/useViewCSS.js';
+import { Spinner } from '/components/Spinner.js';
+import { EmptyState } from '/components/EmptyState.js';
 
 export default function MembersView() {
   useViewCSS('/css/views/members.css');
@@ -28,8 +30,8 @@ export default function MembersView() {
     <div class="mbr">
       <h1 class="mbr-title">${t('members.title')}</h1>
       <p class="mbr-desc">${t('members.desc')}</p>
-      ${members === null ? html`<div class="mbr-empty">…</div>`
-        : members.length === 0 ? html`<div class="mbr-empty">${t('members.empty')}</div>`
+      ${members === null ? html`<${Spinner} />`
+        : members.length === 0 ? html`<${EmptyState} text=${t('members.empty')} />`
         : html`<div class="mbr-grid">
             ${members.map(m => html`
               <a class="mbr-card" key=${m.username} href=${`/v1/portfolio/${encodeURIComponent(m.username)}`}>

@@ -18,6 +18,8 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPost } from '/js/api.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
 import { OfferCardView } from '/components/offer-card-view.js';
+import { Spinner } from '/components/Spinner.js';
+import { EmptyState } from '/components/EmptyState.js';
 
 const html = htm.bind(h);
 
@@ -129,7 +131,7 @@ export default function CompaniesView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companies]);
 
-  if (companies === null) return html`<div class="cm-container"><div class="cm-center"><div class="spinner"></div></div></div>`;
+  if (companies === null) return html`<div class="cm-container"><div class="cm-center"><${Spinner} /></div></div>`;
   if (companies === 'enterprise') return html`<div class="cm-container"><div class="cm-card"><h1 class="cm-title">${t('companies.title')}</h1><p class="cm-desc">${t('companies.enterpriseRequired')}</p></div></div>`;
 
   return html`
@@ -146,14 +148,14 @@ export default function CompaniesView() {
       ${showOrders && html`
         <div class="cm-col cm-orders-panel">
           <h2 class="cm-col-title">${t('companies.myOrders')}</h2>
-          ${myOrders === null ? html`<div class="cm-center"><div class="spinner"></div></div>`
-            : (myOrders.length === 0 ? html`<p class="cm-empty">${t('companies.noMyOrders')}</p>`
+          ${myOrders === null ? html`<div class="cm-center"><${Spinner} /></div>`
+            : (myOrders.length === 0 ? html`<${EmptyState} text=${t('companies.noMyOrders')} />`
               : html`<ul class="cm-receipt-list">${myOrders.map(o => html`<${ReceiptRow} key=${o.id} o=${o} />`)}</ul>`)}
         </div>`}
       <div class="cm-grid">
         <aside class="cm-col">
           <h2 class="cm-col-title">${t('companies.directory')} (${companies.length})</h2>
-          ${companies.length === 0 && html`<p class="cm-empty">${t('companies.none')}</p>`}
+          ${companies.length === 0 && html`<${EmptyState} text=${t('companies.none')} />`}
           <ul class="cm-dir-list">
             ${companies.map(c => html`<li key=${c.goii}>
               <button class="cm-dir-item ${selected?.slug === c.slug && selected?.owner === c.creatorOwner ? 'active' : ''}" onClick=${() => openCompany(c.creatorOwner, c.slug)}>
@@ -166,8 +168,8 @@ export default function CompaniesView() {
           </ul>
         </aside>
         <section class="cm-col">
-          ${!selected && html`<p class="cm-empty">${t('companies.selectHint')}</p>`}
-          ${selected && !profile && html`<div class="cm-center"><div class="spinner"></div></div>`}
+          ${!selected && html`<${EmptyState} text=${t('companies.selectHint')} />`}
+          ${selected && !profile && html`<div class="cm-center"><${Spinner} /></div>`}
           ${profile && html`
             <div class="cm-profile-head">
               <div class="cm-profile-id">
@@ -182,7 +184,7 @@ export default function CompaniesView() {
                 <a class="btn-outline btn-sm cm-pf-link" href=${profile.org.portfolio.publicUrl} target="_blank">${t('companies.viewPortfolio')}</a>`}
             </div>
             <h3 class="cm-form-title">${t('companies.catalogue')}</h3>
-            ${(profile.offerings ?? []).length === 0 && html`<p class="cm-empty">${t('companies.noOfferings')}</p>`}
+            ${(profile.offerings ?? []).length === 0 && html`<${EmptyState} text=${t('companies.noOfferings')} />`}
             <ul class="cm-cat-list">
               ${(profile.offerings ?? []).map(o => html`<${PublicOfferingCard} key=${o.agentName + '/' + o.offerId} o=${o} owner=${selected.owner} slug=${selected.slug} />`)}
             </ul>

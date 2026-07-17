@@ -67,11 +67,6 @@
   margin: 0 0 0.75rem;
 }
 
-.mc-empty {
-  color: var(--text-muted);
-  font-style: italic;
-  margin: 0.5rem 0 1rem;
-}
 
 .mc-org-list {
   list-style: none;
