@@ -359,12 +359,27 @@ const auth = {
 
   /**
    * Mount a login/register button that handles the full flow.
-   * @param {string} selector - CSS selector for the container element
+   * @param {string|Element|object} selector - CSS selector, a DOM element, OR (options-first) the
+   *   opts object — calling mountLoginButton({ onLogin }) mounts into a created #aimeat-auth-bar so
+   *   the natural options-first call Just Works.
    * @param {object} [opts] - Options: { onLogin, onLogout, buttonText }
    */
   mountLoginButton(selector, opts = {}) {
-    const container = document.querySelector(selector);
-    if (!container) { console.error('AIMEAT: Container not found:', selector); return; }
+    // Resolve the mount container. Tolerate three call shapes so a common misuse doesn't crash:
+    //   mountLoginButton('#bar', opts)  — CSS selector (documented)
+    //   mountLoginButton(el, opts)      — a DOM element passed directly
+    //   mountLoginButton({ onLogin })   — options-first: mount into a default #aimeat-auth-bar
+    let container;
+    if (selector && typeof selector === 'object' && selector.nodeType === 1) {
+      container = selector;                     // a DOM element
+    } else if (selector && typeof selector === 'object') {
+      opts = selector;                          // the object IS the options — options-first call
+      container = document.getElementById('aimeat-auth-bar');
+      if (!container) { container = document.createElement('div'); container.id = 'aimeat-auth-bar'; document.body.appendChild(container); }
+    } else {
+      container = document.querySelector(selector);
+      if (!container) { console.error('AIMEAT: mountLoginButton container not found for selector:', selector, '— pass a CSS selector string, a DOM element, or an options object.'); return; }
+    }
 
     const i = opts.i18n || {};
 
