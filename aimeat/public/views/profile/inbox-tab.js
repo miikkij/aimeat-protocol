@@ -13,6 +13,8 @@
  *   ./inbox-tab/components.js) · pure helpers (./inbox-tab/helpers.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.21.0 -- 2026-07-17 -- Mobile single-pane on ≤760px: shows the list OR an open thread/composer
+ *     full-width (mode!=='idle' ⇒ `.inbox-body--panel`) with a ← Back button. Desktop two-pane unchanged.
  *   v1.20.1 -- 2026-07-17 -- Fix images bleeding between messages: attachment url map keyed by `msgId::attId` (per-message ids at0/at1… repeat across messages).
  *   v1.20.0 -- 2026-07-16 -- Compose "to" field is the shared ContactPicker (contacts + directory
  *     suggestions + email resolve, valueMode 'full'); the datalist remains for the broadcast picker.
@@ -30,17 +32,12 @@
  *     headers and requests now show the peer's display name with the login handle in parens — "Kalle (kkk)"
  *     — resolved once per peer (agents via /v1/agents/:gaii, humans via /v1/ghii/:ghii, both public) and
  *     cached; federated peers not in the local store keep the bare handle.
- *   v1.15.0 -- 2026-07-12 -- Reply with AI (TARGET-031): a ✨ action on the thread head (whole conversation)
- *     and on every message bubble hands the conversation/message to the user's OWN AI chat via a popover —
- *     COPY mode (a self-contained prompt to paste into any AI chat) or MCP mode (an AI with the AIMEAT MCP
- *     reads the thread via aimeat_dm_thread, researches inside AIMEAT, drafts, and sends via aimeat_dm_send
- *     after approval). Prompt text lives in /js/services/messages-ai-prompts.js.
+ *   v1.15.0 -- 2026-07-12 -- Reply with AI (TARGET-031): ✨ on the thread head + each bubble hands the
+ *     conversation/message to the user's own AI chat (COPY prompt or MCP mode); prompts in /js/services/messages-ai-prompts.js.
  *   v1.14.0 -- 2026-06-23 -- Per-message 📓 action parks a message straight into the notebook for later
  *     processing (instant copy via parkMessageToNotebook — keeps the source link + reply intent; no AI step).
- *   v1.13.0 -- 2026-06-23 -- Agent capabilities in chat: (A) a peer agent's public `chat.commands` render
- *     as fill-in command chips above the composer — pick one, fill the params, the filled template drops
- *     into the composer to review + send; (B) for the human's OWN agents, a 📅 schedule panel lists the
- *     agent's scheduled tasks and creates a recurring agent_task (node scheduler scoped to the agent).
+ *   v1.13.0 -- 2026-06-23 -- Agent capabilities in chat: (A) a peer agent's `chat.commands` render as
+ *     fill-in command chips above the composer; (B) a 📅 schedule panel for the human's OWN agents (recurring agent_task).
  *   v1.12.1 -- 2026-06-23 -- Operator broadcast audience is now a select: All node users OR All federation
  *     users (genesis operator → every owner across the federation; delegated per-peer fan-out server-side).
  *   v1.12.0 -- 2026-06-23 -- Operator broadcast: an operator sees an "📣 All node users" audience in the
@@ -702,7 +699,8 @@ export default function InboxTab({ showToast }) {
         ${contactOptions.map(c => html`<option value=${c.id} key=${c.id}>${c.label}</option>`)}
       </datalist>
 
-      <div class="inbox-body">
+      <div class=${`inbox-body${mode !== 'idle' ? ' inbox-body--panel' : ''}`}>
+        <button class="inbox-back" onClick=${() => { setMode('idle'); setActiveConv(null); }}>← ${t('inbox.back')}</button>
         <${ListPanel} requests=${requests} conversations=${conversations} activeConv=${activeConv}
           peerDisplay=${peerDisplay} accept=${accept} block=${block} openConversation=${openConversation} />
 

@@ -5,6 +5,9 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.2.0 -- 2026-07-17 -- Mobile single-pane: ≤760px shows one pane at a time (list, or an open
+ *     thread/composer full-width with a ← Back button) instead of a list stacked above a squeezed
+ *     thread. Adds `.inbox-back` + `.inbox-body--panel` rules; desktop two-pane unchanged.
  *   v1.1.0 -- 2026-06-16 -- Full messenger redesign (avatars, bubbles, ticks, date dividers, sticky composer).
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 5).
  */
@@ -30,8 +33,33 @@
   overflow: hidden;
   background: var(--card-bg);
 }
+/* mobile-only back button (single-pane switching); hidden on the desktop two-pane layout */
+.inbox-back {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--card-bg);
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+
 @media (max-width: 760px) {
-  .inbox-body { grid-template-columns: 1fr; height: auto; min-height: 0; }
+  /* single-pane: one column, tall enough to read a thread; the open pane fills it */
+  .inbox-body { grid-template-columns: 1fr; height: calc(100dvh - 150px); min-height: 420px; }
+  /* no panel open → show the list full-height, hide the idle placeholder */
+  .inbox-body:not(.inbox-body--panel) .inbox-panel { display: none; }
+  .inbox-body:not(.inbox-body--panel) .inbox-list { height: 100%; }
+  /* a panel is open → hide the list, reveal the back button, let the panel own the screen */
+  .inbox-body--panel { grid-template-rows: auto minmax(0, 1fr); }
+  .inbox-body--panel .inbox-list { display: none; }
+  .inbox-body--panel .inbox-back { display: inline-flex; }
 }
 
 /* ── Avatars ── */
@@ -54,7 +82,7 @@
   gap: 4px;
   min-width: 0;
 }
-@media (max-width: 760px) { .inbox-list { border-right: none; border-bottom: 1px solid var(--border-subtle); max-height: 320px; } }
+@media (max-width: 760px) { .inbox-list { border-right: none; } }
 
 .inbox-list-section {
   display: flex;
