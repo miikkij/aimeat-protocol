@@ -2109,6 +2109,9 @@
 .pb-pack-item:hover { border-color: var(--accent); }
 .pb-pack-item input { accent-color: var(--accent); margin: 0; }
 .pb-pack-item:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+/* AEB reliability-tier badge on each pack (tools/aeb/acceleration-tiers.md). */
+.pb-pack-tier { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--text-muted) 15%, transparent); color: var(--text-muted); font-weight: 600; cursor: help; }
+.pb-pack-tier.pb-tier-frontier { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
 
 /* ── Bundled-agents modal (Agent-Bundled Apps) — inspector, hosted instances, deploy form ── */
 .aga-app-ref { font-size: .78rem; color: var(--text-muted); font-weight: normal; margin-left: 6px; }

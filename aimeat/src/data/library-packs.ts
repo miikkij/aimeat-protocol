@@ -232,14 +232,16 @@ export function buildPromptLibrarySections(nodeUrl: string): string {
   const capability = VENDORED_PACKS.filter(p => p.status !== 'deprecated');
   if (capability.length > 0) {
     s += 'Optional capability packs (vendored third-party libraries, self-hosted on this node — NEVER load these from an external CDN):\n';
+    s += 'Each pack carries a reliability tag from AEB testing: [any] a mid-tier model codes it correctly from memory · [frontier] the pinned API BREAKS vs the version you likely know — you MUST fetch its ai_doc, and heed the ⚠ line · [needs-doc] AIMEAT-authored, no priors — fetch its ai_doc or you cannot use it.\n';
     for (const p of capability) {
       const inc = renderPackText(p.include.join(' + '), nodeUrl);
-      s += '- ' + p.id + ' — ' + p.description + ' Include: ' + inc + '\n';
+      const tier = p.modelTier ? ' [' + p.modelTier + ']' : '';
+      s += '- ' + p.id + tier + ' — ' + p.description + ' Include: ' + inc + '\n';
       // Frontier-tier packs pin an API that BREAKS vs the version a model knows from memory —
       // inline the one load-bearing gotcha so a model that skips the ai_doc still gets corrected.
       if (p.apiCaveat) s += '  ⚠ ' + p.apiCaveat + '\n';
     }
-    s += 'Before writing code that uses a capability pack, fetch its full usage doc (API idioms, version notes, gotchas): GET ' + nodeUrl + '/v1/library-packs/<id> — the ai_doc field. Index of every pack: GET ' + nodeUrl + '/v1/library-packs. Include ONLY packs the user\'s needs match.\n';
+    s += 'Before writing code that uses a capability pack, fetch its full usage doc (API idioms, version notes, gotchas): GET ' + nodeUrl + '/v1/library-packs/<id> — the ai_doc field (it also returns modelTier + the per-model proof ledger). Index of every pack: GET ' + nodeUrl + '/v1/library-packs. Include ONLY packs the user\'s needs match.\n';
     s += 'The live index may also list COMMUNITY packs (scope "community") — cortex libraries published by users on this node, with the same include + ai_doc contract. They are unvetted (always status "preview"): prefer a node-scope pack when one covers the same need, and read a community pack\'s ai_doc before trusting its API.\n\n';
   }
   return s;
@@ -264,9 +266,11 @@ export function buildLlmsPacksTable(): string {
   ];
   const cell = (t: string) => t.replace(/\|/g, '\\|').replace(/\n+/g, ' ');
   for (const p of PACKS) {
+    const tier = p.modelTier ? `[${p.modelTier}] ` : '';
+    const caveat = p.apiCaveat ? ` ⚠ ${p.apiCaveat}` : '';
     const doc = p.kind === 'sdk'
       ? (p.status === 'deprecated' ? p.description + ' (DEPRECATED — do not use in new apps)' : p.aiDoc)
-      : p.description + ' Full usage doc: GET /v1/library-packs/' + p.id;
+      : tier + p.description + caveat + ' Full usage doc: GET /v1/library-packs/' + p.id;
     rows.push(`| ${p.id} | \`${p.url}\` | ${cell(doc)} |`);
   }
   return rows.join('\n');
