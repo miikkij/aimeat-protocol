@@ -4,6 +4,8 @@
  * @structure Single `loadAll` fetches all dashboard data; tabs render slices of it. SSE
  *            live-updates trigger a debounced, silent background refresh.
  * @version-history
+ *   v1.5.0 — 2026-07-16 — Drop the per-item emoji icons from the sidebar nav and page title
+ *     (label-only menu — the icons added visual noise without aiding scanning).
  *   v1.1.0 — 2026-06-18 — Debounce + silence SSE-driven refresh so busy nodes don't flicker "Loading…".
  *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  *   v1.2.0 — 2026-06-24 — Add Applications moderation tab (operator hide/restore apps).
@@ -72,70 +74,70 @@ import SkillsAdminTab      from './admin/skills-tab.js';
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
   { key: 'dashboard.navNode', items: [
-    { id: 'overview',     icon: '\u{1F4CA}', key: 'dashboard.overview',   component: OverviewTab },
-    { id: 'economy',      icon: '\u{1FA99}', key: 'dashboard.economy',    component: EconomyTab },
-    { id: 'config',       icon: '\u2699',    key: 'dashboard.config',     component: ConfigTab },
-    { id: 'security',     icon: '\u{1F6E1}', key: 'admin.security.title',  component: SecurityTab },
-    { id: 'cors',         icon: '\u{1F512}', key: 'dashboard.cors',       component: CorsTab },
-    { id: 'maintenance',  icon: '\u{1F6A7}', key: 'dashboard.maintenance',component: MaintenanceTab },
-    { id: 'hooks',        icon: '\u{1F517}', key: 'dashboard.hooks',      component: HooksTab },
-    { id: 'portal',       icon: '\u{1F310}', key: 'dashboard.portal',     component: PortalTab },
-    { id: 'subdomains',   icon: '\u{1F517}', key: 'admin.subdomains.title', component: SubdomainsAdminTab },
-    { id: 'stats',        icon: '\u{1F4C8}', key: 'dashboard.stats',      component: StatsTab },
-    { id: 'database',     icon: '\u{1F5C3}', key: 'dashboard.database',   component: DatabaseTab },
-    { id: 'usage',        icon: '\u{1F4B8}', key: 'dashboard.usage',      component: UsageTab },
-    { id: 'prompts',      icon: '\u{1F4DD}', key: 'dashboard.promptsTab', component: PromptsTab },
+    { id: 'overview',     key: 'dashboard.overview',   component: OverviewTab },
+    { id: 'economy',      key: 'dashboard.economy',    component: EconomyTab },
+    { id: 'config',       key: 'dashboard.config',     component: ConfigTab },
+    { id: 'security',     key: 'admin.security.title',  component: SecurityTab },
+    { id: 'cors',         key: 'dashboard.cors',       component: CorsTab },
+    { id: 'maintenance',  key: 'dashboard.maintenance',component: MaintenanceTab },
+    { id: 'hooks',        key: 'dashboard.hooks',      component: HooksTab },
+    { id: 'portal',       key: 'dashboard.portal',     component: PortalTab },
+    { id: 'subdomains',   key: 'admin.subdomains.title', component: SubdomainsAdminTab },
+    { id: 'stats',        key: 'dashboard.stats',      component: StatsTab },
+    { id: 'database',     key: 'dashboard.database',   component: DatabaseTab },
+    { id: 'usage',        key: 'dashboard.usage',      component: UsageTab },
+    { id: 'prompts',      key: 'dashboard.promptsTab', component: PromptsTab },
   ]},
   { key: 'dashboard.navIdentity', items: [
-    { id: 'owners',  icon: '\u{1F464}', key: 'dashboard.owners',  component: OwnersTab,  count: 'owners' },
-    { id: 'agents',  icon: '\u{1F916}', key: 'dashboard.agents',  component: AgentsTab,  count: 'agents' },
-    { id: 'ghii',    icon: '\u{1F511}', key: 'dashboard.ghii',    component: GhiiTab,    count: 'ghii' },
-    { id: 'agent-integration', icon: '\u{1F50C}', key: 'admin.tabs.agentIntegration', component: AgentIntegrationAdminTab },
+    { id: 'owners',  key: 'dashboard.owners',  component: OwnersTab,  count: 'owners' },
+    { id: 'agents',  key: 'dashboard.agents',  component: AgentsTab,  count: 'agents' },
+    { id: 'ghii',    key: 'dashboard.ghii',    component: GhiiTab,    count: 'ghii' },
+    { id: 'agent-integration', key: 'admin.tabs.agentIntegration', component: AgentIntegrationAdminTab },
   ]},
   { key: 'dashboard.navData', items: [
-    { id: 'actions',       icon: '\u26A1',     key: 'dashboard.actions',       component: ActionsTab,        count: 'actions' },
-    { id: 'boards',        icon: '\u{1F4CB}',  key: 'dashboard.boards',        component: BoardsTab,         count: 'boards' },
-    { id: 'chatInstances', icon: '\u{1F4AC}',  key: 'dashboard.chatInstances', component: ChatInstancesTab,  count: 'chatInstances' },
-    { id: 'realtime',      icon: '\u{1F4E1}',  key: 'dashboard.realtime',      component: RealtimeTab,       count: 'rooms' },
-    { id: 'work',          icon: '\u{1F4E6}',  key: 'dashboard.work',          component: WorkTab,           count: 'work' },
-    { id: 'messages',      icon: '\u{1F4EC}',  key: 'admin.messages.title',    component: MessagesAdminTab },
-    { id: 'feedback',      icon: '\u{1F4E3}',  key: 'admin.feedback.title',    component: FeedbackAdminTab },
-    { id: 'memory-admin',  icon: '\u{1F5C4}',  key: 'dashboard.memoryAdmin',   component: MemoryAdminTab },
-    { id: 'agent-tasks',  icon: '\u{1F4CB}',  key: 'dashboard.agentTasksTab', component: AgentTasksAdminTab },
-    { id: 'sharing-groups', icon: '\u{1F465}', key: 'dashboard.sharingGroupsTab', component: SharingGroupsAdminTab },
-    { id: 'capabilities', icon: '⚡',     key: 'capabilities.adminTitle', component: CapabilitiesAdminTab },
-    { id: 'apps',         icon: '\u{1F4F1}', key: 'admin.apps.title',        component: AppsAdminTab },
+    { id: 'actions',       key: 'dashboard.actions',       component: ActionsTab,        count: 'actions' },
+    { id: 'boards',        key: 'dashboard.boards',        component: BoardsTab,         count: 'boards' },
+    { id: 'chatInstances', key: 'dashboard.chatInstances', component: ChatInstancesTab,  count: 'chatInstances' },
+    { id: 'realtime',      key: 'dashboard.realtime',      component: RealtimeTab,       count: 'rooms' },
+    { id: 'work',          key: 'dashboard.work',          component: WorkTab,           count: 'work' },
+    { id: 'messages',      key: 'admin.messages.title',    component: MessagesAdminTab },
+    { id: 'feedback',      key: 'admin.feedback.title',    component: FeedbackAdminTab },
+    { id: 'memory-admin',  key: 'dashboard.memoryAdmin',   component: MemoryAdminTab },
+    { id: 'agent-tasks',  key: 'dashboard.agentTasksTab', component: AgentTasksAdminTab },
+    { id: 'sharing-groups', key: 'dashboard.sharingGroupsTab', component: SharingGroupsAdminTab },
+    { id: 'capabilities', key: 'capabilities.adminTitle', component: CapabilitiesAdminTab },
+    { id: 'apps',         key: 'admin.apps.title',        component: AppsAdminTab },
   ]},
   { key: 'dashboard.navInfrastructure', items: [
-    { id: 'email',  icon: '\u2709',     key: 'dashboard.email',  component: EmailTab },
-    { id: 'push',   icon: '\u{1F514}',  key: 'dashboard.push',   component: PushTab },
-    { id: 'consul',    icon: '\u{1F5C4}',  key: 'dashboard.consul',    component: ConsulTab },
-    { id: 'scheduler', icon: '\u{23F0}',   key: 'dashboard.scheduler', component: SchedulerTab },
-    { id: 'generator-debug', icon: '\u{1F41E}', key: 'dashboard.generatorDebug', component: GeneratorDebugTab },
+    { id: 'email',  key: 'dashboard.email',  component: EmailTab },
+    { id: 'push',   key: 'dashboard.push',   component: PushTab },
+    { id: 'consul',    key: 'dashboard.consul',    component: ConsulTab },
+    { id: 'scheduler', key: 'dashboard.scheduler', component: SchedulerTab },
+    { id: 'generator-debug', key: 'dashboard.generatorDebug', component: GeneratorDebugTab },
   ]},
   { key: 'dashboard.navServices', items: [
-    { id: 'directory',   icon: '\u{1F4D6}', key: 'dashboard.directory',      component: DirectoryTab },
-    { id: 'matching',    icon: '\u{1F91D}', key: 'dashboard.matching',       component: MatchingTab },
-    { id: 'services',    icon: '\u{1F9E9}', key: 'dashboard.services',       component: ServicesTab },
-    { id: 'cortex',      icon: '\u{1F4E6}', key: 'dashboard.cortexTab',      component: CortexTab },
-    { id: 'csm',         icon: '\u{1F4E6}', key: 'dashboard.csmManagement',  component: CsmTab },
-    { id: 'knowledge',   icon: '\u{1F9E0}', key: 'knowledge.operator.tabLabel', component: KnowledgeAdminTab },
-    { id: 'skills',      icon: '\u{1F393}', key: 'dashboard.skills.tabLabel',  component: SkillsAdminTab },
-    { id: 'packages',    icon: '\u{1F9F0}', key: 'dashboard.packagesTab',      component: PackagesAdminTab },
+    { id: 'directory',   key: 'dashboard.directory',      component: DirectoryTab },
+    { id: 'matching',    key: 'dashboard.matching',       component: MatchingTab },
+    { id: 'services',    key: 'dashboard.services',       component: ServicesTab },
+    { id: 'cortex',      key: 'dashboard.cortexTab',      component: CortexTab },
+    { id: 'csm',         key: 'dashboard.csmManagement',  component: CsmTab },
+    { id: 'knowledge',   key: 'knowledge.operator.tabLabel', component: KnowledgeAdminTab },
+    { id: 'skills',      key: 'dashboard.skills.tabLabel',  component: SkillsAdminTab },
+    { id: 'packages',    key: 'dashboard.packagesTab',      component: PackagesAdminTab },
   ]},
   { key: 'dashboard.navIntegrations', items: [
-    { id: 'msm', icon: '\u{1F50C}', key: 'dashboard.msmManagement', component: MsmTab, count: 'msm' },
+    { id: 'msm', key: 'dashboard.msmManagement', component: MsmTab, count: 'msm' },
   ]},
   { key: 'dashboard.navFederation', items: [
-    { id: 'federation', icon: '\u{1F310}', key: 'dashboard.federation', component: FederationTab, count: 'peers' },
-    { id: 'genesis',    icon: '\u{1F30D}', key: 'dashboard.genesis',    component: GenesisTab,    count: 'genesis' },
+    { id: 'federation', key: 'dashboard.federation', component: FederationTab, count: 'peers' },
+    { id: 'genesis',    key: 'dashboard.genesis',    component: GenesisTab,    count: 'genesis' },
   ]},
 ];
 
-// Page icon+title lookup
+// Page title lookup
 const PAGE_TITLES = {};
 NAV_GROUPS.forEach(g => g.items.forEach(i => {
-  PAGE_TITLES[i.id] = { icon: i.icon, key: i.key };
+  PAGE_TITLES[i.id] = { key: i.key };
 }));
 
 export default function Admin({ navigate, locale }) {
@@ -390,7 +392,7 @@ export default function Admin({ navigate, locale }) {
   const allItems = NAV_GROUPS.flatMap(g => g.items);
   const activeItem = allItems.find(i => i.id === activePage) || allItems[0];
   const ActiveComponent = activeItem.component;
-  const pageInfo = PAGE_TITLES[activePage] || { icon: '', key: '' };
+  const pageInfo = PAGE_TITLES[activePage] || { key: '' };
 
   const tabProps = { data, reload: loadAll, session, navigate, locale, switchPage };
 
@@ -407,7 +409,6 @@ export default function Admin({ navigate, locale }) {
               class="adm-nav-item ${activePage === item.id ? 'active' : ''}"
               onClick=${() => switchPage(item.id)}
             >
-              <span class="icon">${item.icon}</span>
               <span class="label">${t(item.key)}</span>
               ${item.count != null && counts[item.count] != null
                 ? html`<span class="cnt">${counts[item.count]}</span>`
@@ -421,7 +422,7 @@ export default function Admin({ navigate, locale }) {
       <div class="adm-main">
         <div class="adm-topbar">
           <div class="adm-page-title">
-            <span class="icon">${pageInfo.icon}</span> ${t(pageInfo.key)}
+            ${t(pageInfo.key)}
           </div>
           <div class="adm-topbar-right">
             <button class="adm-btn" onClick=${loadAll} disabled=${loading}>

@@ -2,6 +2,8 @@
  * @file public/views/profile/landing-page.cards.js
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-07-16 — Drop the per-item emoji icons from SIDEBAR_GROUPS and the Inbox nav
+ *     button — the sidebar renders label-only now.
  *   v1.1.0 — 2026-07-16 — Contacts tab in the Activity sidebar group.
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)
  */
@@ -540,7 +542,6 @@ export function InboxNavButton({ active, onClick }) {
   useEffect(() => onLiveUpdate(['messages'], () => ref.current()), []);
   return html`
     <button class="pf-side-item${active ? ' pf-side-item--active' : ''}" onClick=${onClick}>
-      <span class="pf-side-ico">${'\u{1F4EC}'}</span>
       <span class="pf-side-label">${t('profile.tabs.inbox')}</span>
       ${unread > 0 ? html`<span class="pf-side-badge">${unread}</span>` : null}
     </button>`;
@@ -555,56 +556,56 @@ export function InboxNavButton({ active, onClick }) {
  * reserved for action-required counts only — never static totals. */
 export const SIDEBAR_GROUPS = [
   { titleKey: 'profile.landing.menuInformation', items: [   // find-anything → raw → curated → governed
-    { id: 'discover', icon: '\u{1F9ED}', labelKey: 'discover.tabLabel' },
-    { id: 'organisms', icon: '\u{1F3E2}', labelKey: 'profile.tabs.organisms' },
-    { id: 'memory', icon: '\u{1F9E0}', labelKey: 'profile.tabs.memory' },
-    { id: 'notebook', icon: '\u{1F4D3}', labelKey: 'profile.tabs.notebook' },
-    { id: 'living', icon: '\u{1F331}', labelKey: 'profile.tabs.living' },
-    { id: 'knowledge', icon: '\u{1F4DA}', labelKey: 'knowledge.tabLabel' },
-    { id: 'boards', icon: '\u{1F4CB}', labelKey: 'profile.tabs.boards' },
+    { id: 'discover', labelKey: 'discover.tabLabel' },
+    { id: 'organisms', labelKey: 'profile.tabs.organisms' },
+    { id: 'memory', labelKey: 'profile.tabs.memory' },
+    { id: 'notebook', labelKey: 'profile.tabs.notebook' },
+    { id: 'living', labelKey: 'profile.tabs.living' },
+    { id: 'knowledge', labelKey: 'knowledge.tabLabel' },
+    { id: 'boards', labelKey: 'profile.tabs.boards' },
   ] },
   { titleKey: 'profile.landing.menuAutomation', items: [    // agents + their infrastructure
-    { id: 'agents', icon: '\u{1F916}', labelKey: 'profile.tabs.agents' },
-    { id: 'ecosystem', icon: '\u{1F50C}', labelKey: 'profile.tabs.ecosystem' },
-    { id: 'offers', icon: '\u{1F9F0}', labelKey: 'profile.tabs.offers' },
-    { id: 'scheduler', icon: '⏰', labelKey: 'profile.tabs.scheduler' },
-    { id: 'workflows', icon: '\u{1F500}', labelKey: 'profile.tabs.workflows' },
-    { id: 'actions', icon: '\u{1F6E0}️', labelKey: 'profile.tabs.services' },
-    { id: 'mcp', icon: '\u{1F517}', labelKey: 'profile.tabs.mcp' },
+    { id: 'agents', labelKey: 'profile.tabs.agents' },
+    { id: 'ecosystem', labelKey: 'profile.tabs.ecosystem' },
+    { id: 'offers', labelKey: 'profile.tabs.offers' },
+    { id: 'scheduler', labelKey: 'profile.tabs.scheduler' },
+    { id: 'workflows', labelKey: 'profile.tabs.workflows' },
+    { id: 'actions', labelKey: 'profile.tabs.services' },
+    { id: 'mcp', labelKey: 'profile.tabs.mcp' },
   ] },
   { titleKey: 'profile.landing.menuActivity', items: [      // communication + events
-    { id: 'contacts', icon: '\u{1F465}', labelKey: 'contacts.tabLabel' },
-    { id: 'notifications', icon: '\u{1F514}', labelKey: 'profile.tabs.notifications' },
-    { id: 'email', icon: '\u{1F4E7}', labelKey: 'profile.tabs.email' },
-    { id: 'chatsessions', icon: '\u{1F4AC}', labelKey: 'profile.tabs.chatSessions' },
+    { id: 'contacts', labelKey: 'contacts.tabLabel' },
+    { id: 'notifications', labelKey: 'profile.tabs.notifications' },
+    { id: 'email', labelKey: 'profile.tabs.email' },
+    { id: 'chatsessions', labelKey: 'profile.tabs.chatSessions' },
   ] },
   { titleKey: 'profile.landing.menuBuildShare', items: [
-    { id: 'apps', icon: '⚙️', labelKey: 'profile.tabs.apps' },
-    { id: 'generator', icon: '\u{1F534}', labelKey: 'profile.generator.tabLabel' },
+    { id: 'apps', labelKey: 'profile.tabs.apps' },
+    { id: 'generator', labelKey: 'profile.generator.tabLabel' },
     /* foundry removed from the menu 2026-06-10 (owner: not in use). The tab module and
      * its route id still exist — restore by re-adding this item. */
-    { id: 'extensions', icon: '\u{1F50C}', labelKey: 'profile.tabs.extensions' },
-    { id: 'capabilities', icon: '⚡', labelKey: 'capabilities.tabLabel' },
-    { id: 'skills', icon: '\u{1F393}', labelKey: 'skills.tabLabel' },
-    { id: 'packages', icon: '\u{1F4E6}', labelKey: 'profile.tabs.packages' },
-    { id: 'portfolio', icon: '\u{1F3A8}', labelKey: 'portfolio.tabLabel' },
-    { id: 'calibrator', icon: '\u{1F3AF}', labelKey: 'profile.calibrator.tabLabel' },
+    { id: 'extensions', labelKey: 'profile.tabs.extensions' },
+    { id: 'capabilities', labelKey: 'capabilities.tabLabel' },
+    { id: 'skills', labelKey: 'skills.tabLabel' },
+    { id: 'packages', labelKey: 'profile.tabs.packages' },
+    { id: 'portfolio', labelKey: 'portfolio.tabLabel' },
+    { id: 'calibrator', labelKey: 'profile.calibrator.tabLabel' },
     /* TODO(owner 2026-06-10): "work" placement is undecided — parked at the bottom of
      * Build & Share until re-evaluated. */
-    { id: 'work', icon: '\u{1F4CB}', labelKey: 'profile.tabs.work' },
+    { id: 'work', labelKey: 'profile.tabs.work' },
   ] },
   { titleKey: 'profile.landing.menuAccount', items: [
-    { id: 'wallet', icon: '\u{1F48E}', labelKey: 'profile.tabs.wallet' },
-    { id: 'dataWallet', icon: '\u{1F512}', labelKey: 'profile.tabs.dataWallet' },
-    { id: 'access', icon: '\u{1F510}', labelKey: 'profile.tabs.access' },
+    { id: 'wallet', labelKey: 'profile.tabs.wallet' },
+    { id: 'dataWallet', labelKey: 'profile.tabs.dataWallet' },
+    { id: 'access', labelKey: 'profile.tabs.access' },
   ] },
   /* Operator-only: the group AND its routes are gated on the operator role (open()
    * refuses these ids for non-operators; the underlying APIs enforce server-side).
    * nodeStats left the menu — it lives as a tab on the Nodes page now. */
   { titleKey: 'profile.landing.menuInfra', adminOnly: true, items: [
-    { id: 'federation', icon: '\u{1F310}', labelKey: 'profile.tabs.federation' },
-    { id: 'nodes', icon: '\u{1F5A5}️', labelKey: 'profile.tabs.nodes' },
-    { id: 'security', icon: '\u{1F6E1}️', labelKey: 'profile.tabs.security' },
+    { id: 'federation', labelKey: 'profile.tabs.federation' },
+    { id: 'nodes', labelKey: 'profile.tabs.nodes' },
+    { id: 'security', labelKey: 'profile.tabs.security' },
   ] },
 ];
 

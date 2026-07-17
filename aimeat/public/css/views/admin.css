@@ -4,6 +4,7 @@
  *   its distinct indigo accent and a permanently-dark sidebar, but all content
  *   surfaces map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v1.9.0 — 2026-07-16 — Drop the dead .adm-nav-item .icon rule (nav is label-only now).
  *   v1.8.0 — 2026-06-25 — Applications tab: .adm-apps-rowactions (Hide/Restore + Delete row).
  *   v1.7.0 — 2026-06-24 — Applications moderation tab: .adm-apps-* (filters row,
  *     hidden-only toggle, dimmed hidden rows, modal actions).
@@ -102,7 +103,6 @@
   border-left-color: var(--accent);
   font-weight: 500;
 }
-.adm-nav-item .icon { font-size: .81rem; width: 16px; text-align: center; }
 .adm-nav-item .label { flex: 1; }
 .adm-nav-item .cnt {
   background: rgba(255,255,255,0.08);
