@@ -10,6 +10,11 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.22.0 — 2026-07-17 — UI-unification foundation: extend the spacing scale (--sp-5=20/--sp-6=24/
+       --sp-8=32/--sp-12=48) and add a font-size scale (--text-xs..--text-xl) so views stop hardcoding
+       padding:24px / font-size:0.85rem inline; add .muted/.text-dim/.text-faint/.meta text utilities
+       (there was no muted/meta utility class, so ~8 views invented .xx-muted and ~30 invented .xx-*-meta).
+       Additive only — no existing rule changed, so appearance is preserved until views adopt them.
      v1.21.0 — 2026-07-06 — Toast variants + mobile width: add --toast-info-bg/--toast-warn-bg tokens +
        .toast-info/.toast-warn classes (call sites pass 'info'/'warning' kinds; they previously fell into the
        truthy-isError red path). .toast width fit-content → max-content: anchored at left:50%, fit-content
@@ -209,6 +214,20 @@
   --sp-2: 8px;
   --sp-3: 12px;
   --sp-4: 16px;
+  --sp-5: 20px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+
+  /* ── Font-size scale (theme-invariant) ──
+     A shared type scale so views stop hardcoding font-size:0.7rem / 0.85rem /
+     1.1rem inline. Adopt in new code; the raw rem values below are the common
+     ones already scattered across the view CSS, so migration is a clean swap. */
+  --text-xs: 0.72rem;
+  --text-sm: 0.82rem;
+  --text-base: 0.92rem;
+  --text-lg: 1.1rem;
+  --text-xl: 1.35rem;
 }
 
 /* ── Dark Theme Override ──
@@ -1184,6 +1203,15 @@ select.input-field { cursor: pointer; }
 }
 /* Optional icon for the canonical EmptyState component (#9). */
 .empty-icon { display: block; font-size: 2.5rem; opacity: 0.4; margin-bottom: 0.5rem; font-style: normal; }
+
+/* ── Muted / meta text utilities ──
+   Shared replacements for the ~8 bespoke `.xx-muted` and ~30 `.xx-*-meta`
+   clones scattered across the view CSS. Colors are tokens so they flip in dark
+   mode. `.muted`/`.text-dim` dim to the mid tier; `.text-faint` to the dimmest;
+   `.meta` is the small dim caption used under cards/rows. */
+.muted, .text-dim { color: var(--text-dim); }
+.text-faint { color: var(--text-muted); }
+.meta { font-size: var(--text-sm); color: var(--text-dim); }
 
 /* ── Toggle Switch (canonical /components/ToggleSwitch.js, #14) ── */
 .toggle { display: flex; align-items: center; gap: 10px; cursor: pointer; }

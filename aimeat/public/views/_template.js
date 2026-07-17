@@ -10,6 +10,11 @@
  * @usage cp public/views/_template.js public/views/myview.js, then follow the numbered steps below.
  *
  * @version-history
+ *   v1.1.0 — 2026-07-17 — Teach the canonical patterns instead of anti-patterns:
+ *     buttons use `.btn-primary`/`.btn-ghost` directly (there is NO `.btn` base class),
+ *     the header uses `.page-title`/`.section-title`+`.section-desc`, and the render
+ *     states delegate to the canonical <Spinner>/<EmptyState> components. Copying this
+ *     scaffold now seeds good habits, not `class="btn btn-*"` + raw <h1>.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  * ─────────────────────────────────────────────────────────────────────────────
  * Copy this file to create a new view:
@@ -32,6 +37,10 @@ import { t }                       from '/js/i18n.js';
 import { escHtml }                 from '/js/utils.js';
 import { apiPost }                 from '/js/api.js';
 import { useApiCall }              from '/js/hooks.js';
+// Canonical primitives — prefer these over hand-rolled spinners/empty divs/dots.
+// Import each component directly (every view does; each has its own importmap entry).
+import { Spinner }                 from '/components/Spinner.js';
+import { EmptyState }              from '/components/EmptyState.js';
 
 /**
  * MyView — replace with your view's name and description.
@@ -71,26 +80,30 @@ export default function MyView({ navigate }) {
     if (r.ok) reload();
   }
 
-  // ── Render states ──────────────────────────────────────────────────────────
-  if (loading) return html`<div class="view-loading">${t('loading')}</div>`;
+  // ── Render states (canonical: <Spinner> for loading, <Alert> markup for error) ─
+  if (loading) return html`<${Spinner} text=${t('loading')} />`;
   if (error)   return html`<div class="alert alert-error">${escHtml(error)}</div>`;
 
   // ── Main render ────────────────────────────────────────────────────────────
+  // Header pattern: `.page-title` at the top of a standalone view, or
+  // `.section-title` + `.section-desc` for each section inside a tab. Buttons use
+  // the canonical `.btn-*` classes directly — there is NO `.btn` base class.
   return html`
     <div class="myview-container">
-      <h1>${t('myview.title')}</h1>
+      <div class="page-title">${t('myview.title')}</div>
+      <div class="section-desc">${t('myview.desc')}</div>
 
-      ${data && html`
-        <p>${escHtml(data.someField)}</p>
-      `}
+      ${data
+        ? html`<p>${escHtml(data.someField)}</p>`
+        : html`<${EmptyState} text=${t('myview.empty')} />`}
 
       <form onSubmit=${handleSubmit}>
-        <button type="submit" class="btn btn-primary" disabled=${submitting}>
+        <button type="submit" class="btn-primary" disabled=${submitting}>
           ${submitting ? t('saving') : t('myview.submit')}
         </button>
       </form>
 
-      <button class="btn btn-ghost" onClick=${() => navigate('/v1/portal')}>
+      <button class="btn-ghost" onClick=${() => navigate('/v1/portal')}>
         ${t('nav.back')}
       </button>
     </div>
