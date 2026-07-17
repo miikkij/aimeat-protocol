@@ -11,6 +11,9 @@
  *   buildPlaybook(), playbookToMarkdown()
  * @usage import { ENTRANCES, ... } from './start-flows.js' (relative — no importmap entry)
  * @version-history
+ *   v1.1.0 — 2026-07-17 — Every playbook ends with an Experience Center section
+ *     (the hands-on academy at experience-center.apps.aimeat.io) so the path
+ *     continues past the first task.
  *   v1.0.0 — 2026-06-11 — Initial: jira + default entrances, 4 verdict tiers,
  *     hosted/self/help playbooks (Spider rules: diagnosis framing, shareable
  *     verdict, ends in a copyable prompt, no email gate).
@@ -158,6 +161,17 @@ export function buildQuestionsFor(answers) {
 // prompt?: {k,f}, link?: { href, label: {k,f} } }] }.
 // Commands come from connect.html — keep them verbatim, do not invent.
 
+/** The closing section of every playbook: the path continues in the Experience Center. */
+function ecSection() {
+  return {
+    title: { k: 'start.pb.ec.title', f: 'Keep going: the Experience Center' },
+    items: [
+      { text: { k: 'start.pb.ec.a', f: 'A hands-on academy for the whole ecosystem: connect your AI (the nicest way), then agents, apps, organisms and automation — layer by layer, with try-it links.' },
+        link: { href: 'https://experience-center.apps.aimeat.io', label: { k: 'start.pb.ec.link', f: 'Open the Experience Center →' } } },
+    ],
+  };
+}
+
 export function buildPlaybook(answers, mcpUrl) {
   const { path, tool, need, automation } = answers;
   const sections = [];
@@ -185,6 +199,7 @@ export function buildPlaybook(answers, mcpUrl) {
           link: { href: '/v1/portal', label: { k: 'start.pb.h3.link', f: 'Create a free account →' } } },
       ],
     });
+    sections.push(ecSection());
     return sections;
   }
 
@@ -265,6 +280,7 @@ export function buildPlaybook(answers, mcpUrl) {
   }
   sections.push(auto);
 
+  sections.push(ecSection());
   return sections;
 }
 
