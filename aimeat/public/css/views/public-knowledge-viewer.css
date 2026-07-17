@@ -416,17 +416,6 @@
 
 /* ── Empty / Loading / Error States ── */
 
-.pkv-empty {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: var(--text-dim, #6B7280);
-}
-
-.pkv-empty h3 {
-  color: var(--text, #1A1A2E);
-  margin: 0 0 0.5rem;
-}
-
 .pkv-error {
   text-align: center;
   padding: 2rem;

@@ -1203,6 +1203,13 @@ select.input-field { cursor: pointer; }
 }
 /* Optional icon for the canonical EmptyState component (#9). */
 .empty-icon { display: block; font-size: 2.5rem; opacity: 0.4; margin-bottom: 0.5rem; font-style: normal; }
+/* Richer EmptyState slots (#9 v1.1): bold title, body line, and an action row.
+   Lets the pkv title+desc, pwv icon+action gates, and mk/hb icon+text triads
+   fold into the one component. Body keeps the base .empty italic; title/action
+   are normal weight/style. */
+.empty-title { font-style: normal; font-weight: 600; font-size: var(--text-base); color: var(--text); margin-bottom: 0.25rem; }
+.empty-text { margin: 0 auto; max-width: 32rem; }
+.empty-action { margin-top: 0.85rem; font-style: normal; display: flex; gap: 0.5rem; justify-content: center; flex-wrap: wrap; }
 
 /* ── Muted / meta text utilities ──
    Shared replacements for the ~8 bespoke `.xx-muted` and ~30 `.xx-*-meta`

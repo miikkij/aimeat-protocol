@@ -15,6 +15,7 @@ import htm from 'htm';
 import { t, getLocale, switchLocale } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { PresenceDot } from '/components/PresenceDot.js';
+import { EmptyState } from '/components/EmptyState.js';
 
 const html = htm.bind(h);
 
@@ -209,10 +210,7 @@ function SearchView({ goTo, initData }) {
               <div class="hb-tags">${(entry.interests || []).map(i => html`<span class="hb-tag">${i}</span>`)}</div>
             </div>
           `) : html`
-            <div class="hb-empty">
-              <div class="hb-empty-icon">\uD83D\uDD0D</div>
-              <div class="hb-empty-text">${t('hobbies.search.noResults')} <a onClick=${() => goTo('join')} style="color:var(--accent);cursor:pointer;">${t('hobbies.search.joinLink')}</a>!</div>
-            </div>
+            <${EmptyState} icon=${'\uD83D\uDD0D'} text=${html`${t('hobbies.search.noResults')} <a class="hb-inline-link" onClick=${() => goTo('join')}>${t('hobbies.search.joinLink')}</a>!`} />
           `}
           ${totalPages > 1 && html`
             <div class="hb-pagination">
@@ -267,8 +265,8 @@ function ProfileView({ goTo, ghii }) {
   };
 
   if (error) return html`<div class="hb-alert hb-alert-error">${t('hobbies.profile.loadError')}</div>`;
-  if (notFound) return html`<div class="hb-empty"><div class="hb-empty-icon">\uD83D\uDE15</div><div class="hb-empty-text">${t('hobbies.profile.notFound')}</div><a class="btn-outline" style="margin-top:16px;" onClick=${() => goTo('search')}>${t('hobbies.profile.backToSearch')}</a></div>`;
-  if (hidden) return html`<div class="hb-empty"><div class="hb-empty-icon">\uD83D\uDEAB</div><div class="hb-empty-text">${t('hobbies.profile.hidden')}</div><a class="btn-outline" style="margin-top:16px;" onClick=${() => goTo('search')}>${t('hobbies.profile.backToSearch')}</a></div>`;
+  if (notFound) return html`<${EmptyState} icon=${'\uD83D\uDE15'} text=${html`${t('hobbies.profile.notFound')}`} action=${html`<a class="btn-outline" onClick=${() => goTo('search')}>${t('hobbies.profile.backToSearch')}</a>`} />`;
+  if (hidden) return html`<${EmptyState} icon=${'\uD83D\uDEAB'} text=${html`${t('hobbies.profile.hidden')}`} action=${html`<a class="btn-outline" onClick=${() => goTo('search')}>${t('hobbies.profile.backToSearch')}</a>`} />`;
   if (!entry) return html`<div style="color:var(--text-dim);text-align:center;padding:24px;">...</div>`;
 
   const locStr = [entry.city, entry.area, entry.country].filter(Boolean).join(', ');
@@ -306,7 +304,7 @@ function JoinView({ goTo }) {
     return html`
       <h1 class="hb-page-title">${t('hobbies.join.title')}</h1>
       <p class="hb-page-subtitle">${t('hobbies.join.subtitle')}</p>
-      <div class="hb-alert hb-alert-error">${t('hobbies.join.authNotice')} <a href="/v1/portal" style="color:var(--accent);">${t('hobbies.join.authLink')}</a></div>
+      <div class="hb-alert hb-alert-error">${t('hobbies.join.authNotice')} <a href="/v1/portal" class="hb-inline-link">${t('hobbies.join.authLink')}</a></div>
     `;
   }
 
@@ -513,10 +511,10 @@ function MeView({ goTo }) {
     }
   };
 
-  if (!isLoggedIn()) return html`<div class="hb-empty"><div class="hb-empty-icon">\uD83D\uDE15</div><div class="hb-empty-text">${t('hobbies.me.signInRequired')} <a href="/v1/portal" style="color:var(--accent);">${t('hobbies.me.registerFirst')}</a></div></div>`;
+  if (!isLoggedIn()) return html`<${EmptyState} icon=${'\uD83D\uDE15'} text=${html`${t('hobbies.me.signInRequired')} <a href="/v1/portal" class="hb-inline-link">${t('hobbies.me.registerFirst')}</a>`} />`;
   if (status === 'loading') return html`<div style="color:var(--text-dim);text-align:center;padding:24px;">...</div>`;
   if (status === 'error') return html`<div class="hb-alert hb-alert-error">${t('hobbies.me.loadError')}</div>`;
-  if (status === 'noGhii') return html`<div class="hb-empty"><div class="hb-empty-icon">\uD83D\uDE15</div><div class="hb-empty-text">${t('hobbies.me.noGhii')} <a href="/v1/portal" style="color:var(--accent);">${t('hobbies.me.registerFirst')}</a></div></div>`;
+  if (status === 'noGhii') return html`<${EmptyState} icon=${'\uD83D\uDE15'} text=${html`${t('hobbies.me.noGhii')} <a href="/v1/portal" class="hb-inline-link">${t('hobbies.me.registerFirst')}</a>`} />`;
   if (status === 'notInDir') return html`<h1 class="hb-page-title">${t('hobbies.me.title')}</h1><div class="hb-card"><p style="color:var(--text-dim);">${t('hobbies.me.notInDirectory')}</p><a class="btn-primary" style="margin-top:12px;" onClick=${() => goTo('join')}>${t('hobbies.me.joinBtn')}</a></div>`;
 
   const locStr = [myEntry.city, myEntry.area, myEntry.country].filter(Boolean).join(', ');
@@ -619,10 +617,10 @@ function MatchesView({ goTo }) {
       .catch(() => setStatus('error'));
   }, []);
 
-  if (status === 'login') return html`<div class="hb-empty"><div class="hb-empty-icon">\uD83D\uDD12</div><div class="hb-empty-text">${t('hobbies.matches.loginRequired')} <a href="/v1/portal" style="color:var(--accent);">${t('hobbies.join.authLink')}</a></div></div>`;
+  if (status === 'login') return html`<${EmptyState} icon=${'\uD83D\uDD12'} text=${html`${t('hobbies.matches.loginRequired')} <a href="/v1/portal" class="hb-inline-link">${t('hobbies.join.authLink')}</a>`} />`;
   if (status === 'loading') return html`<h1 class="hb-page-title">${t('hobbies.matches.title')}</h1><p class="hb-page-subtitle">${t('hobbies.matches.subtitle')}</p><div style="color:var(--text-dim);text-align:center;padding:24px;">${t('hobbies.matches.loading')}</div>`;
   if (status === 'error') return html`<div class="hb-alert hb-alert-error">${t('hobbies.loadError')}</div>`;
-  if (status === 'noInterests' || (status === 'ok' && matches?.length === 0)) return html`<h1 class="hb-page-title">${t('hobbies.matches.title')}</h1><div class="hb-empty"><div class="hb-empty-icon">${status === 'noInterests' ? '\uD83E\uDD37' : '\uD83D\uDE15'}</div><div class="hb-empty-text">${t('hobbies.matches.noMatches')} ${status === 'noInterests' ? html` <a onClick=${() => goTo('join')} style="color:var(--accent);cursor:pointer;">${t('hobbies.joinDirectory')}</a>` : ''}</div></div>`;
+  if (status === 'noInterests' || (status === 'ok' && matches?.length === 0)) return html`<h1 class="hb-page-title">${t('hobbies.matches.title')}</h1><${EmptyState} icon=${status === 'noInterests' ? '\uD83E\uDD37' : '\uD83D\uDE15'} text=${html`${t('hobbies.matches.noMatches')} ${status === 'noInterests' ? html` <a onClick=${() => goTo('join')} class="hb-inline-link">${t('hobbies.joinDirectory')}</a>` : ''}`} />`;
 
   return html`
     <h1 class="hb-page-title">${t('hobbies.matches.title')}</h1>

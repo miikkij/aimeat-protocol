@@ -66,9 +66,7 @@
      theme.css .category-card / -icon / -name / -count. The former rules were token-
      equivalent; the hover #E8564A and rgba(0,0,0,0.06) shadow are now tokenized
      (var(--accent)/var(--shadow-md)) — dark-mode fix. Unified 2026-06-02 (#18). */
-  .hb-empty { text-align: center; padding: 48px 16px; }
-  .hb-empty-icon { font-size: 3rem; margin-bottom: 16px; opacity: .4; }
-  .hb-empty-text { color: var(--text-dim); font-size: 1rem; }
+  .hb-inline-link { color: var(--accent); cursor: pointer; }
   .hb-alert { padding: 12px 16px; border-radius: var(--radius-sm); margin-bottom: 16px; font-size: .9rem; }
   .hb-alert-success { background: var(--success-bg); border: 1px solid var(--success-border); color: var(--success-fg); }
   .hb-alert-error { background: var(--danger-bg); border: 1px solid var(--danger-border); color: var(--danger-fg); }

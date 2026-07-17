@@ -18,6 +18,7 @@ import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { LoadMore } from '/components/Pagination.js';
 import { Spinner } from '/components/Spinner.js';
+import { EmptyState } from '/components/EmptyState.js';
 
 const CONTENT_TYPES = [
   'idea', 'research', 'plan', 'dataset', 'document',
@@ -362,10 +363,7 @@ function BrowseView({ onSelect }) {
     ${error && html`<div class="pkv-error">${error}</div>`}
 
     ${!loading && packages.length === 0 && !error && html`
-      <div class="pkv-empty">
-        <h3>${t('pkv.emptyTitle')}</h3>
-        <p>${t('pkv.emptyDesc')}</p>
-      </div>
+      <${EmptyState} title=${t('pkv.emptyTitle')} text=${t('pkv.emptyDesc')} />
     `}
 
     <div class="pkv-grid">
@@ -490,7 +488,7 @@ function DetailView({ packageId, onBack }) {
   if (!manifest) return html`
     <div>
       <button class="pkv-back" onClick=${onBack}>← ${t('pkv.backToLibrary')}</button>
-      <div class="pkv-empty"><h3>${t('pkv.notFound')}</h3></div>
+      <${EmptyState} title=${t('pkv.notFound')} />
     </div>
   `;
 

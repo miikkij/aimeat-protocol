@@ -91,9 +91,6 @@
    rgba(0,0,0,0.06) shadow are now tokenized (var(--accent)/var(--shadow-md)).
    Unified 2026-06-02 (#18). */
 
-.mk-empty-state { text-align: center; padding: 48px 16px; }
-.mk-empty-icon { font-size: 3rem; margin-bottom: 16px; opacity: 0.4; }
-.mk-empty-text { color: var(--text-dim); font-size: 1rem; }
 
 .mk-alert { padding: 12px 16px; border-radius: 10px; margin-bottom: 16px; font-size: 0.9rem; }
 .mk-alert-success { background: var(--success-bg); border: 1px solid var(--success-border); color: var(--success-fg); }
