@@ -21,6 +21,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiDelete } from '/js/api.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { useConfirm } from '/components/Modal.js';
 import LlmConfigEditor from '/views/profile/calibrator-llm-editor.js';
 import CalibrationChart from '/views/profile/calibrator-chart.js';
 import BatchCard from '/views/profile/calibrator-batch.js';
@@ -122,6 +123,7 @@ function ProjectListView({ onSelect, showToast }) {
 // ── Detail View ──
 
 function ProjectDetailView({ projectId, onBack, showToast }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [project, setProject] = useState(null);
   const [dimensions, setDimensions] = useState([]);
   const [versions, setVersions] = useState([]);
@@ -349,14 +351,15 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
     onBack();
   }
 
-  async function handleDelete() {
-    if (!confirm(t('profile.calibrator.deleteConfirm'))) return;
-    try {
-      await deleteProject(projectId);
-      onBack();
-    } catch (e) {
-      showToast?.(e.message, true);
-    }
+  function handleDelete() {
+    confirm(t('profile.calibrator.deleteConfirm'), async () => {
+      try {
+        await deleteProject(projectId);
+        onBack();
+      } catch (e) {
+        showToast?.(e.message, true);
+      }
+    }, { danger: true });
   }
 
   if (!project) return html`<div class="fnd-cal-empty">...</div>`;
@@ -540,6 +543,7 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
         </div>
       </div>
 
+      <${ConfirmUI} />
     </div>
   `;
 }
