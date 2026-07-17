@@ -2,6 +2,9 @@
  * @file security-tab.js
  * @description Profile tab for CORS origin management (GHII + per-agent) and session revocation.
  * @version-history
+ *   v1.2.0 — 2026-07-18 — Vaihe 2d: the two bespoke `consent-table`s (per-agent CORS + sessions) →
+ *     canonical generic <DataTable> (rows/headers), unifying them with the node-wide table look
+ *     (accent-tinted divider/hover → neutral canonical). Cell content preserved verbatim.
  *   v1.1.0 — 2026-07-16 — Mount folds GHII CORS + per-agent CORS + sessions into GET /v1/security/overview
  *     (getSecurityOverview) — kills the CORS-per-agent fan-out; individual reads kept as fallback.
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes (card-h3, flex-between, etc.)
@@ -13,6 +16,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { DataTable } from '/components/DataTable.js';
 import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { listAgents } from '/js/services/agents.js';
@@ -136,39 +140,32 @@ export default function SecurityTab({ session, showToast }) {
     ${agentsCors.length === 0
       ? html`<div class="empty">${t('profile.security.noAgents')}</div>`
       : html`<div class="card scroll-x">
-          <table class="consent-table"><thead><tr>
-            <th>${t('profile.security.agent')}</th>
-            <th>${t('profile.security.origins')}</th>
-            <th>${t('profile.security.status')}</th>
-            <th></th>
-          </tr></thead><tbody>
-            ${agentsCors.map(ac => {
+          <${DataTable}
+            headers=${[t('profile.security.agent'), t('profile.security.origins'), t('profile.security.status'), '']}
+            rows=${agentsCors.map(ac => {
               const agentName = (ac.gaii || '').split('#')[0] || ac.gaii;
               const hasCustom = ac.allowed_origins !== null && ac.allowed_origins !== undefined;
               const isEditing = corsEditAgent && corsEditAgent.name === agentName;
-              return html`<tr>
-                <td><span class="text-code text-accent">${escHtml(agentName)}</span></td>
-                <td class="text-meta">${isEditing
+              return [
+                html`<span class="text-code text-accent">${escHtml(agentName)}</span>`,
+                isEditing
                   ? html`<textarea class="input-field text-code pf-textarea-sm"
                       value=${corsEditAgent.value}
                       onInput=${e => setCorsEditAgent({name: agentName, value: e.target.value})}></textarea>`
-                  : html`${hasCustom ? (ac.allowed_origins || []).join(', ') : (ac.effective || []).join(', ')}`
-                }</td>
-                <td>${hasCustom
+                  : html`<span class="text-meta">${hasCustom ? (ac.allowed_origins || []).join(', ') : (ac.effective || []).join(', ')}</span>`,
+                hasCustom
                   ? html`<span class="badge badge-success">${t('profile.security.custom')}</span>`
-                  : html`<span class="badge badge-muted">${t('profile.security.inheritedFrom')}: ${ac.inherited_from || t('profile.security.nodeDefault')}</span>`
-                }</td>
-                <td>${isEditing
+                  : html`<span class="badge badge-muted">${t('profile.security.inheritedFrom')}: ${ac.inherited_from || t('profile.security.nodeDefault')}</span>`,
+                isEditing
                   ? html`<div class="flex-row">
                       <button class="btn-primary btn-sm" onClick=${() => saveAgentCors(agentName, corsEditAgent.value)}>${t('profile.security.save')}</button>
                       <button class="btn-danger-solid btn-sm" onClick=${() => saveAgentCors(agentName, '')}>${t('profile.security.reset')}</button>
                       <button class="btn-ghost btn-sm" onClick=${() => setCorsEditAgent(null)}>${t('profile.cancel')}</button>
                     </div>`
-                  : html`<button class="btn-outline" onClick=${() => setCorsEditAgent({name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : ''})}>${t('profile.security.edit')}</button>`
-                }</td>
-              </tr>`;
+                  : html`<button class="btn-outline" onClick=${() => setCorsEditAgent({name: agentName, value: hasCustom ? (ac.allowed_origins || []).join('\\n') : ''})}>${t('profile.security.edit')}</button>`,
+              ];
             })}
-          </tbody></table>
+          />
         </div>`
     }
 
@@ -186,20 +183,13 @@ export default function SecurityTab({ session, showToast }) {
     ${sessions.length === 0
       ? html`<div class="empty">${t('profile.security.noSessions')}</div>`
       : html`<div class="card scroll-x">
-          <table class="consent-table"><thead><tr>
-            <th>${t('profile.security.sessionIdentity')}</th>
-            <th>${t('profile.security.sessionIssuedAt')}</th>
-            <th>${t('profile.security.sessionExpiresAt')}</th>
-            <th></th>
-          </tr></thead><tbody>
-            ${sessions.map(s => html`<tr>
-              <td>
-                <span class="text-code">${escHtml(s.gaii || session.owner)}</span>
-                ${s.current ? html` <span class="badge badge-success">${t('profile.security.currentSession')}</span>` : null}
-              </td>
-              <td class="text-meta">${new Date(s.issued_at).toLocaleString()}</td>
-              <td class="text-meta">${new Date(s.expires_at).toLocaleString()}</td>
-              <td>${s.current ? null : html`
+          <${DataTable}
+            headers=${[t('profile.security.sessionIdentity'), t('profile.security.sessionIssuedAt'), t('profile.security.sessionExpiresAt'), '']}
+            rows=${sessions.map(s => [
+              html`<span class="text-code">${escHtml(s.gaii || session.owner)}</span>${s.current ? html` <span class="badge badge-success">${t('profile.security.currentSession')}</span>` : null}`,
+              html`<span class="text-meta">${new Date(s.issued_at).toLocaleString()}</span>`,
+              html`<span class="text-meta">${new Date(s.expires_at).toLocaleString()}</span>`,
+              s.current ? null : html`
                 <button class="btn-danger-solid btn-sm" disabled=${revokingId === s.session_id}
                   onClick=${async () => {
                     setRevokingId(s.session_id);
@@ -212,9 +202,9 @@ export default function SecurityTab({ session, showToast }) {
                   }}>
                   ${revokingId === s.session_id ? '...' : t('profile.security.revoke')}
                 </button>
-              `}</td>
-            </tr>`)}
-          </tbody></table>
+              `,
+            ])}
+          />
         </div>`
     }
 
