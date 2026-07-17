@@ -585,6 +585,7 @@ export const SIDEBAR_GROUPS = [
     /* foundry removed from the menu 2026-06-10 (owner: not in use). The tab module and
      * its route id still exist — restore by re-adding this item. */
     { id: 'extensions', labelKey: 'profile.tabs.extensions' },
+    { id: 'libraries', labelKey: 'librariesTab.tabLabel' },
     { id: 'capabilities', labelKey: 'capabilities.tabLabel' },
     { id: 'skills', labelKey: 'skills.tabLabel' },
     { id: 'packages', labelKey: 'profile.tabs.packages' },
