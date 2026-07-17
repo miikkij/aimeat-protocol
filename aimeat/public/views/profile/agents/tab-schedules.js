@@ -5,6 +5,9 @@
  *   internal (the agent's self-reported mirror, read-only). Lets the owner create
  *   a new schedule targeting this agent (reusing the master view's CreateForm).
  * @version-history
+ *   v1.1.0 -- 2026-07-17 -- Style unification: canonical agent-detail section headers
+ *     (pf-agd-section-header/-title) instead of scheduler-view headings, pf-agd-empty
+ *     empty states, and the Tasks-tab "+ New" outline button pattern.
  *   v1.0.0 -- 2026-06-03 -- Initial agent Schedules sub-tab
  */
 import { h } from 'preact';
@@ -45,28 +48,29 @@ export default function TabSchedules({ agentName, allAgents = [], showToast }) {
 
   return html`
     <div class="sch-tab">
-      <div class="sch-head">
-        <div class="section-desc">${t('profile.scheduler.agentDesc')}</div>
-        <button class="btn-primary" onClick=${() => setShowForm(v => !v)}>
-          ${showForm ? t('profile.scheduler.close') : t('profile.scheduler.newSchedule')}
+      <div class="pf-agd-section-header">
+        <span class="pf-agd-section-title">${t('profile.agents.detail.tabs.schedules')}${managed.length + internal.length > 0 ? ` (${managed.length + internal.length})` : ''}</span>
+        <button class="btn-outline btn-sm" onClick=${() => setShowForm(v => !v)}>
+          ${showForm ? '-' : '+'} ${t('profile.scheduler.newSchedule')}
         </button>
       </div>
+      <div class="section-desc">${t('profile.scheduler.agentDesc')}</div>
 
       ${showForm && html`<${CreateForm} agents=${allAgents} lockedAgent=${agentName} showToast=${showToast}
         onCreated=${() => { setShowForm(false); loadData(); }} />`}
 
       <div class="sch-section">
-        <h3 class="sch-section-title">${t('profile.scheduler.dispatchedTitle')}</h3>
+        <div class="pf-agd-section-title">${t('profile.scheduler.dispatchedTitle')}</div>
         ${managed.length === 0
-          ? html`<div class="sch-empty">${t('profile.scheduler.noDispatched')}</div>`
+          ? html`<div class="pf-agd-empty">${t('profile.scheduler.noDispatched')}</div>`
           : html`<div class="sch-card-list">${managed.map(j => html`<${ScheduleItem} key=${j.id} schedule=${j} onChanged=${loadData} showToast=${showToast} />`)}</div>`}
       </div>
 
       <div class="sch-section">
-        <h3 class="sch-section-title">${t('profile.scheduler.internalTitle')}</h3>
+        <div class="pf-agd-section-title">${t('profile.scheduler.internalTitle')}</div>
         <div class="sch-muted sch-internal-note">${t('profile.scheduler.internalNote')}</div>
         ${internal.length === 0
-          ? html`<div class="sch-empty">${t('profile.scheduler.noInternal')}</div>`
+          ? html`<div class="pf-agd-empty">${t('profile.scheduler.noInternal')}</div>`
           : html`<table class="sch-table"><tbody>
             ${internal.map((e, i) => html`<tr key=${e.id || i}>
               <td>${e.name}${e.purpose && html`<div class="sch-muted">${e.purpose}</div>`}</td>

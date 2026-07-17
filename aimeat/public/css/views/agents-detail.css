@@ -4,6 +4,10 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.18.0 -- 2026-07-17 -- Style unification round: pf-agd-section-label matches
+ *     pf-agd-section-title (0.8rem); governance grid items stack label-over-value;
+ *     "Next:" inside the zone-2 banner title is no longer uppercased; the "+ Add tag"
+ *     chip is neutral (dim) until hover.
  *   v1.17.0 -- 2026-07-12 -- Add agent ID-card styles (.pf-agd-idcard*) — a hover/focus-revealed
  *     identity plate over each Shared Board mini-card (labelled GAII, issued date, last seen,
  *     task/message tallies, trust + morsels, issuer node). Absolutely positioned so reveal
@@ -160,6 +164,12 @@
   color: var(--text-dim, #6B7280);
   text-transform: uppercase;
   letter-spacing: 0.5px;
+}
+/* When used as a standalone group heading (outside .pf-agd-section-header),
+   e.g. the Schedules tab's AIMEAT-dispatched / Agent-internal groups. */
+.pf .sch-section > .pf-agd-section-title {
+  display: block;
+  margin: 0.25rem 0 0.5rem;
 }
 
 /* Task list items */
@@ -1858,12 +1868,12 @@
   font-weight: 500;
   border-radius: 9999px;
   background: none;
-  color: var(--accent, #E8564A);
+  color: var(--text-dim, #6B7280);
   border: 1px dashed var(--border, #E5E7EB);
   cursor: pointer;
   white-space: nowrap;
 }
-.pf .pf-agd-tag-add-btn:hover { border-color: var(--accent, #E8564A); }
+.pf .pf-agd-tag-add-btn:hover { border-color: var(--accent, #E8564A); color: var(--accent, #E8564A); }
 .pf .pf-agd-tag-add-input {
   padding: 0.15rem 0.5rem;
   font-size: 0.75rem;
@@ -2088,6 +2098,13 @@
   font-size: 0.8rem;
   color: var(--text-dim, #6B7280);
   line-height: 1.4;
+}
+/* "Next: <step>" nested inside the uppercase banner title reads as normal text,
+   not as a second shouting headline. */
+.pf .pf-agd-zone2-title .pf-agd-zone2-desc {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 500;
 }
 .pf .pf-agd-zone2-actions {
   display: flex;
@@ -2449,8 +2466,10 @@
 .pf .pf-agd-section {
   margin-bottom: 1.25rem;
 }
+/* Same visual as .pf-agd-section-title — kept as a separate name only because the
+   Integration tab wraps its sections differently. Keep the two in sync. */
 .pf .pf-agd-section-label {
-  font-size: 0.75rem;
+  font-size: 0.8rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -3215,16 +3234,19 @@
 .pf .agd-governance-grid ,
 .pf .pf-agd-governance-grid  {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 16px;
   margin-bottom: 8px;
 }
 
+/* Label stacked above its value (stat-tile style) — side-by-side rows made the
+   long values ("Completed: 0, Active: 0, Failed: 0") collide with the labels. */
 .pf .agd-governance-item ,
 .pf .pf-agd-governance-item  {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
   padding: 4px 0;
 }
 

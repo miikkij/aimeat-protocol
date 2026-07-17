@@ -17,6 +17,9 @@
  *     payloads -- dropped 3 copied-state useState hooks, 3 hand-rolled handlers, the
  *     copied-flag params threaded through both render functions, and the local
  *     copyToClipboard import.
+ *   v1.6.0 -- 2026-07-17 -- Onboarding view: merge the checklist title + readiness score +
+ *     duplicate "Progress: N/M  X%" row into ONE canonical section header above the
+ *     progress bar (the zone-2 banner already repeats the same progress).
  *   v1.5.0 -- 2026-05-31 -- Live-update refresh no longer toggles the full-tab loading
  *     placeholder (added a showSpinner option). During Hello Integration the agent
  *     posts steps/telemetry rapidly, so the frequent SSE ticks were re-rendering the
@@ -240,16 +243,16 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, cur
   return html`
     <div>
       <div class="pf-agd-section">
-        <div class="pf-agd-section-label">
-          ${t('profile.agents.detail.integration.checklistTitle')}
-          ${' -- '}${t('profile.agents.detail.integration.readinessScore')}: ${pct > 0 ? `${pct} / 100` : '--'}
+        <div class="pf-agd-section-header">
+          <span class="pf-agd-section-label">
+            ${t('profile.agents.detail.integration.checklistTitle')}: ${passed}/${total}
+          </span>
+          <span class="pf-agd-section-label">
+            ${t('profile.agents.detail.integration.readinessScore')}: ${pct > 0 ? `${pct} / 100` : '--'}
+          </span>
         </div>
         <div class="pf-agd-progress-bar">
           <div class="pf-agd-progress-fill" style="width: ${pct}%"></div>
-        </div>
-        <div class="pf-agd-section-header pf-agd-progress-header">
-          <span>${t('profile.agents.detail.integration.progress')}: ${passed}/${total}</span>
-          <span>${pct}%</span>
         </div>
       </div>
 
