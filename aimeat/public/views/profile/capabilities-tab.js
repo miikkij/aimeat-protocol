@@ -5,11 +5,16 @@
  * @version-history
  *   v1.0.0 — 2026-05-02 — Initial capability tab (CRUD form)
  *   v2.0.0 — 2026-05-02 — Redesigned: node capabilities listing, policy display, source filter
+ *   v2.1.0 — 2026-07-17 — Replace the native alert()/confirm() with the themed useToast +
+ *     useConfirm (delete now a proper danger dialog, errors a toast); the inline-styled
+ *     delete button becomes .btn-danger.btn-sm.cap-delete-btn (no inline style).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { EmptyState } from '/components/EmptyState.js';
+import { useToast } from '/components/Toast.js';
+import { useConfirm } from '/components/Modal.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
@@ -24,6 +29,8 @@ const POLICY_LABELS = {
 };
 
 export default function CapabilitiesTab() {
+  const { showToast, ToastContainer } = useToast();
+  const { confirm, ConfirmUI } = useConfirm();
   const [caps, setCaps] = useState([]);
   const [policy, setPolicy] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -72,20 +79,21 @@ export default function CapabilitiesTab() {
       setNewCap({ id: '', name: '', summary: '', callable: false, visibility: 'private', tags: '' });
       loadCaps();
     } catch (e) {
-      alert(e.message || 'Failed to create');
+      showToast(e.message || 'Failed to create', true);
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!confirm(t('capabilities.deleteConfirm'))) return;
-    const session = getSession();
-    if (!session) return;
-    try {
-      await session.fetch('/v1/capabilities/' + encodeURIComponent(id), { method: 'DELETE' });
-      loadCaps();
-    } catch (e) {
-      alert(e.message || 'Failed to delete');
-    }
+  const handleDelete = (id) => {
+    confirm(t('capabilities.deleteConfirm'), async () => {
+      const session = getSession();
+      if (!session) return;
+      try {
+        await session.fetch('/v1/capabilities/' + encodeURIComponent(id), { method: 'DELETE' });
+        loadCaps();
+      } catch (e) {
+        showToast(e.message || 'Failed to delete', true);
+      }
+    }, { danger: true });
   };
 
   if (loading) return html`<${Spinner} />`;
@@ -184,7 +192,7 @@ export default function CapabilitiesTab() {
                   </details>
                 ` : ''}
                 ${c.source?.type === 'manual' ? html`
-                  <button class="btn-danger" style="margin-top:8px;font-size:.8rem" onClick=${() => handleDelete(c.id)}>
+                  <button class="btn-danger btn-sm cap-delete-btn" onClick=${() => handleDelete(c.id)}>
                     ${t('capabilities.delete')}
                   </button>
                 ` : ''}
@@ -248,6 +256,8 @@ export default function CapabilitiesTab() {
           ` : ''}
         </div>
       ` : ''}
+      <${ToastContainer} />
+      <${ConfirmUI} />
     </div>
   `;
 }
