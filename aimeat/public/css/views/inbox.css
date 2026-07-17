@@ -5,6 +5,10 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.3.0 -- 2026-07-17 -- Reply-to quotes (`.inbox-bubble-quote`, `.inbox-replybar`, `.inbox-row--flash`)
+ *     + mobile keyboard: ≤760px height subtracts --inbox-kb (visualViewport keyboard inset set by the tab)
+ *     and the stale `.inbox-msgs{max-height:50vh}` cap from the pre-single-pane stacked layout is removed.
+ *     Bubble hover actions float as a bordered pill above the bubble's corner instead of over the text.
  *   v1.2.0 -- 2026-07-17 -- Mobile single-pane: ≤760px shows one pane at a time (list, or an open
  *     thread/composer full-width with a ← Back button) instead of a list stacked above a squeezed
  *     thread. Adds `.inbox-back` + `.inbox-body--panel` rules; desktop two-pane unchanged.
@@ -51,8 +55,10 @@
 }
 
 @media (max-width: 760px) {
-  /* single-pane: one column, tall enough to read a thread; the open pane fills it */
-  .inbox-body { grid-template-columns: 1fr; height: calc(100dvh - 150px); min-height: 420px; }
+  /* single-pane: one column, tall enough to read a thread; the open pane fills it. --inbox-kb is the
+     on-screen keyboard inset (set from visualViewport by the tab) — iOS doesn't shrink dvh for the
+     keyboard, so subtract it here to keep the composer visible above the keyboard. */
+  .inbox-body { grid-template-columns: 1fr; height: calc(100dvh - 150px - var(--inbox-kb, 0px)); min-height: 240px; }
   /* no panel open → show the list full-height, hide the idle placeholder */
   .inbox-body:not(.inbox-body--panel) .inbox-panel { display: none; }
   .inbox-body:not(.inbox-body--panel) .inbox-list { height: 100%; }
@@ -226,7 +232,6 @@
   gap: 8px;
   background: var(--bg, transparent);
 }
-@media (max-width: 760px) { .inbox-msgs { max-height: 50vh; } }
 
 /* Date divider. */
 .inbox-day { text-align: center; margin: 8px 0; }
@@ -255,6 +260,26 @@
 .inbox-bubble-body .md-body > :first-child { margin-top: 0; }
 .inbox-bubble-body .md-body > :last-child { margin-bottom: 0; }
 .inbox-bubble-body img { max-width: 100%; border-radius: var(--radius-xs); margin-top: 6px; }
+
+/* Reply-to quote at the top of a bubble — click jumps to (and flashes) the quoted original. */
+.inbox-bubble-quote {
+  display: block; width: 100%; text-align: left; cursor: pointer;
+  border: none; border-left: 3px solid var(--accent);
+  border-radius: var(--radius-xs);
+  background: var(--bg-dim);
+  padding: 5px 9px; margin-bottom: 6px;
+  font: inherit; color: inherit;
+}
+.inbox-quote-name { display: block; font-size: 11px; font-weight: 600; color: var(--accent); }
+.inbox-quote-text {
+  font-size: 12px; color: var(--text-dim);
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.inbox-row--flash .inbox-bubble {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+  transition: box-shadow 0.25s ease, border-color 0.25s ease;
+}
 
 .inbox-bubble-meta {
   display: flex;
@@ -358,6 +383,25 @@
 .inbox-ai-actions { display: flex; justify-content: flex-end; }
 
 /* ── Composer ── */
+/* "Replying to …" bar shown above the composer while a quoted reply (↩) is being written. */
+.inbox-replybar {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 12px;
+  border-top: 1px solid var(--border-subtle);
+  background: var(--card-bg-alt);
+}
+.inbox-replybar-main {
+  flex: 1; min-width: 0; text-align: left; cursor: pointer;
+  border: none; border-left: 3px solid var(--accent);
+  background: transparent; padding: 2px 0 2px 8px;
+  font: inherit; color: inherit;
+}
+.inbox-replybar-label { display: block; font-size: 11px; font-weight: 600; color: var(--accent); }
+.inbox-replybar-text {
+  display: block; font-size: 12px; color: var(--text-dim);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
 .inbox-compose-fields { padding: 12px 12px 0; }
 .inbox-composer {
   border-top: 1px solid var(--border-subtle);
@@ -412,11 +456,19 @@
 
 /* ── Tracked Responses: per-message actions, approval banner, track modal ── */
 .inbox-bubble { position: relative; }
+/* Hover actions float as a pill ABOVE the bubble's top-right corner (own background + border) so the
+   icons never sit on top of the message text. */
 .inbox-bubble-actions {
-  position: absolute; top: 4px; right: 6px;
+  position: absolute; top: -13px; right: 8px; z-index: 1;
   display: flex; gap: 2px; opacity: 0; transition: opacity .12s ease;
+  pointer-events: none;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  padding: 2px 6px;
+  box-shadow: var(--shadow-md);
 }
-.inbox-row:hover .inbox-bubble-actions { opacity: 1; }
+.inbox-row:hover .inbox-bubble-actions { opacity: 1; pointer-events: auto; }
 .inbox-bubble-act {
   border: none; background: transparent; cursor: pointer;
   font-size: 13px; line-height: 1; padding: 2px 3px; border-radius: var(--radius-xs);
