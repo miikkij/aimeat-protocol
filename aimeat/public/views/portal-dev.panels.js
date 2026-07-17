@@ -29,135 +29,129 @@ function McpPanel({ locale, isLoggedIn, session }) {
     setTimeout(() => setCopied(false), 2000);
   }, [mcpUrl]);
 
-  const tabStyle = (tab) => `padding:.4rem .75rem;border:none;border-radius:.25rem .25rem 0 0;cursor:pointer;font-size:.8rem;font-weight:600;${
-    setupTab === tab
-      ? 'background:rgba(130,100,255,.15);color:var(--accent,#a78bfa)'
-      : 'background:transparent;color:var(--muted)'
-  }`;
-
   return html`
     <div class="dv-panel">
       <h3>${dt('panel.mcpBadge', locale)}</h3>
 
       ${!isLoggedIn && html`
-        <div class="dv-mcp-prereq" style="background:rgba(255,180,0,.08);border:1px solid rgba(255,180,0,.25);border-radius:.5rem;padding:.75rem 1rem;margin-bottom:1rem">
+        <div class="dv-callout dv-callout--warn">
           <strong>${dt('panel.mcpPrereqTitle', locale)}</strong>
-          <p style="margin:.5rem 0 0;font-size:.9rem" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpPrereqDesc', locale)) }}></p>
+          <p class="dv-p-mt-lg" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpPrereqDesc', locale)) }}></p>
         </div>
       `}
 
       ${isLoggedIn && session?.gaii && html`
-        <div style="background:rgba(100,255,150,.08);border:1px solid rgba(100,255,150,.25);border-radius:.5rem;padding:.75rem 1rem;margin-bottom:1rem">
+        <div class="dv-callout dv-callout--success">
           <strong>${dt('panel.mcpReady', locale)}</strong>
-          <div style="margin-top:.5rem;font-size:.85rem">
+          <div class="dv-mt-sm">
             <div><strong>GHII:</strong> ${session.ghii || '-'}</div>
             <div><strong>Agent GAII:</strong> <code>${session.gaii}</code></div>
           </div>
-          <p style="margin:.5rem 0 0;font-size:.85rem;color:var(--muted)" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpReadyDesc', locale)) }}></p>
+          <p class="dv-p-mt-muted" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpReadyDesc', locale)) }}></p>
         </div>
       `}
 
       ${isLoggedIn && html`
-        <div style="background:rgba(130,100,255,.08);border:1px solid rgba(130,100,255,.25);border-radius:.5rem;padding:.75rem 1rem;margin-bottom:1rem">
+        <div class="dv-callout dv-callout--purple">
           <strong>${dt('panel.mcpSetupTitle', locale)}</strong>
-          <p style="margin:.5rem 0 0;font-size:.85rem" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpSetupDesc', locale)) }}></p>
+          <p class="dv-p-mt" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpSetupDesc', locale)) }}></p>
 
           <!-- Platform tabs -->
-          <div style="display:flex;gap:2px;margin-top:.75rem;border-bottom:1px solid rgba(130,100,255,.2)">
-            <button type="button" style="${tabStyle('code')}" onClick=${() => setSetupTab('code')}>
+          <div class="dv-setup-tabs">
+            <button type="button" class=${`dv-setup-tab ${setupTab === 'code' ? 'active' : ''}`} onClick=${() => setSetupTab('code')}>
               Claude Code
             </button>
-            <button type="button" style="${tabStyle('cowork')}" onClick=${() => setSetupTab('cowork')}>
+            <button type="button" class=${`dv-setup-tab ${setupTab === 'cowork' ? 'active' : ''}`} onClick=${() => setSetupTab('cowork')}>
               Claude Desktop
             </button>
-            <button type="button" style="${tabStyle('chat')}" onClick=${() => setSetupTab('chat')}>
+            <button type="button" class=${`dv-setup-tab ${setupTab === 'chat' ? 'active' : ''}`} onClick=${() => setSetupTab('chat')}>
               Claude.ai Chat
             </button>
           </div>
 
           <!-- Tab content -->
-          <div style="padding:.75rem 0 0">
+          <div class="dv-tab-content">
             ${setupTab === 'code' && html`
-              <p style="font-size:.82rem;color:var(--muted);margin:0 0 .75rem">
+              <p class="dv-panel-desc">
                 ${dt('panel.mcpSetupCodeDesc', locale)}
               </p>
-              <div style="margin-bottom:.75rem">
-                <div style="font-size:.8rem;color:var(--muted);margin-bottom:.25rem">${dt('panel.mcpCodeRunThis', locale)}</div>
-                <div style="display:flex;align-items:center;gap:.5rem">
-                  <code style="font-size:.78rem;background:var(--code-bg);padding:.4rem .6rem;border-radius:.25rem;user-select:all;flex:1;word-break:break-all">claude mcp add aimeat --transport http ${mcpUrl}</code>
+              <div class="dv-field">
+                <div class="dv-field-label">${dt('panel.mcpCodeRunThis', locale)}</div>
+                <div class="dv-code-row">
+                  <code class="dv-code">claude mcp add aimeat --transport http ${mcpUrl}</code>
                   <button type="button" onClick=${copyCommand}
-                    style="padding:.3rem .6rem;background:var(--love1,#E8564A);color:#fff;border:none;border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
+                    class="dv-copy-btn">
                     ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyCommand', locale)}
                   </button>
                 </div>
               </div>
-              <p style="font-size:.8rem;color:var(--muted);margin:0;font-style:italic">
+              <p class="dv-hint">
                 ${dt('panel.mcpCodeOAuthNote', locale)}
               </p>
             `}
 
             ${setupTab === 'cowork' && html`
-              <p style="font-size:.82rem;color:var(--muted);margin:0 0 .75rem">
+              <p class="dv-panel-desc">
                 ${dt('panel.mcpSetupCoworkDesc', locale)}
               </p>
-              <div style="font-size:.85rem">
-                <ol style="margin:0;padding-left:1.25rem;line-height:1.8">
+              <div class="dv-block-sm">
+                <ol class="dv-steps">
                   <li>${dt('panel.mcpDesktopStep1', locale)}
-                    <div style="margin:.5rem 0">
+                    <div class="dv-step-media">
                       <img src="/assets/mcp_1_add_custom_connector.png" alt="Add custom connector dialog"
-                        style="max-width:100%;border-radius:.5rem;border:1px solid var(--border,rgba(255,255,255,.1))" />
+                        class="dv-step-img" />
                     </div>
                   </li>
                   <li>${dt('panel.mcpDesktopStep2', locale)}
-                    <div style="display:flex;align-items:center;gap:.5rem;margin:.4rem 0">
-                      <code style="font-size:.78rem;background:var(--code-bg);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${mcpUrl}</code>
+                    <div class="dv-step-row">
+                      <code class="dv-code--inline">${mcpUrl}</code>
                       <button type="button" onClick=${copyUrl}
-                        style="padding:.2rem .5rem;background:rgba(130,100,255,.15);color:var(--accent,#a78bfa);border:1px solid rgba(130,100,255,.3);border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
+                        class="dv-copy-btn--alt">
                         ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyUrl', locale)}
                       </button>
                     </div>
                   </li>
                   <li>${dt('panel.mcpDesktopStep3', locale)}
-                    <div style="margin:.5rem 0">
+                    <div class="dv-step-media">
                       <img src="/assets/mcp_2_connect_disconnect_connector.png" alt="Connected connector with options"
-                        style="max-width:100%;border-radius:.5rem;border:1px solid var(--border,rgba(255,255,255,.1))" />
+                        class="dv-step-img" />
                     </div>
                   </li>
                   <li>${dt('panel.mcpDesktopStep4', locale)}</li>
                 </ol>
-                <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted);font-style:italic">${dt('panel.mcpDesktopNote', locale)}</p>
+                <p class="dv-note">${dt('panel.mcpDesktopNote', locale)}</p>
               </div>
             `}
 
             ${setupTab === 'chat' && html`
-              <div style="font-size:.85rem">
-                <p style="margin:0 0 .75rem;color:var(--muted)">${dt('panel.mcpSetupChatDesc', locale)}</p>
-                <ol style="margin:0;padding-left:1.25rem;line-height:1.6">
+              <div class="dv-block-sm">
+                <p class="dv-p-desc-muted">${dt('panel.mcpSetupChatDesc', locale)}</p>
+                <ol class="dv-steps dv-steps--tight">
                   <li>${dt('panel.mcpChatStep1', locale)}</li>
                   <li>${dt('panel.mcpChatStep2', locale)}
-                    <div style="margin:.5rem 0">
+                    <div class="dv-step-media">
                       <img src="/assets/mcp_1_add_custom_connector.png" alt="Add custom connector dialog"
-                        style="max-width:100%;border-radius:.5rem;border:1px solid var(--border,rgba(255,255,255,.1))" />
+                        class="dv-step-img" />
                     </div>
                   </li>
                   <li>${dt('panel.mcpChatStep3', locale)}
-                    <div style="display:flex;align-items:center;gap:.5rem;margin:.4rem 0">
-                      <code style="font-size:.8rem;background:var(--code-bg);padding:.25rem .5rem;border-radius:.25rem;user-select:all">${mcpUrl}</code>
+                    <div class="dv-step-row">
+                      <code class="dv-code--inline-sm">${mcpUrl}</code>
                       <button type="button" onClick=${copyUrl}
-                        style="padding:.2rem .5rem;background:rgba(130,100,255,.15);color:var(--accent,#a78bfa);border:1px solid rgba(130,100,255,.3);border-radius:.25rem;cursor:pointer;font-size:.75rem;white-space:nowrap">
+                        class="dv-copy-btn--alt">
                         ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyUrl', locale)}
                       </button>
                     </div>
                   </li>
                   <li>${dt('panel.mcpChatStep4', locale)}</li>
                   <li>${dt('panel.mcpChatStep5', locale)}
-                    <div style="margin:.5rem 0">
+                    <div class="dv-step-media">
                       <img src="/assets/mcp_2_connect_disconnect_connector.png" alt="Connected connector ready to use"
-                        style="max-width:100%;border-radius:.5rem;border:1px solid var(--border,rgba(255,255,255,.1))" />
+                        class="dv-step-img" />
                     </div>
                   </li>
                 </ol>
-                <p style="margin-top:.75rem;font-size:.8rem;color:var(--muted);font-style:italic">${dt('panel.mcpChatNote', locale)}</p>
+                <p class="dv-note">${dt('panel.mcpChatNote', locale)}</p>
               </div>
             `}
           </div>
@@ -169,18 +163,18 @@ function McpPanel({ locale, isLoggedIn, session }) {
       </div>
 
       ${isLoggedIn && html`
-        <div style="margin-top:.75rem;padding:.5rem .75rem;background:rgba(100,200,255,.06);border:1px solid rgba(100,200,255,.15);border-radius:.25rem;font-size:.82rem">
+        <div class="dv-info-box">
           <span dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpProfileLink', locale)) }}></span>
           ${' '}
-          <a href="/v1/profile#mcp" style="color:var(--accent,#a78bfa);text-decoration:underline">
+          <a href="/v1/profile#mcp" class="dv-link">
             ${dt('panel.mcpProfileLinkAction', locale)}
           </a>
         </div>
       `}
 
-      <details style="margin-top:.75rem;font-size:.85rem">
-        <summary style="cursor:pointer;color:var(--muted)">${dt('panel.mcpAuthDetails', locale)}</summary>
-        <div style="margin-top:.5rem;padding:.5rem;background:rgba(255,255,255,.03);border-radius:.25rem" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpAuthExplain', locale)) }}></div>
+      <details class="dv-details">
+        <summary class="dv-details-summary">${dt('panel.mcpAuthDetails', locale)}</summary>
+        <div class="dv-details-body" dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.mcpAuthExplain', locale)) }}></div>
       </details>
     </div>
   `;
@@ -212,8 +206,8 @@ function BrowsePanel({ locale, onSwitchToPromptPackage }) {
         <${CopyBtn} text=${prompt} locale=${locale} />
         <div class="dv-prompt-text">${prompt}</div>
       </div>
-      <h3 style="margin-top:1rem">${dt('panel.browseUpgradeTitle', locale)}</h3>
-      <ul style="margin-left:1.5rem">
+      <h3 class="dv-mt">${dt('panel.browseUpgradeTitle', locale)}</h3>
+      <ul class="dv-ul-indent">
         <li>${dt('panel.browseUpgrade1', locale)}</li>
         <li>${dt('panel.browseUpgrade2', locale)}</li>
         ${(() => {
@@ -252,8 +246,8 @@ function PromptPackagePanel({ locale, platform, variant, isLoggedIn }) {
       <h3>${dt('panel.promptBadge', locale)}</h3>
       <p dangerouslySetInnerHTML=${{ __html: sanitizeHtml(dt('panel.promptDesc', locale)) }}></p>
       ${isLoggedIn
-        ? html`<p style="color:var(--success);font-size:.85rem">\u2705 ${dt('panel.promptLoggedIn', locale)}</p>`
-        : html`<p style="color:var(--muted);font-size:.85rem">\ud83d\udc64 ${dt('panel.promptAnon', locale)}</p>`
+        ? html`<p class="dv-ok-line">\u2705 ${dt('panel.promptLoggedIn', locale)}</p>`
+        : html`<p class="dv-muted-line">\ud83d\udc64 ${dt('panel.promptAnon', locale)}</p>`
       }
       <div class="dv-goals">
         ${GOAL_LIST.map(g => html`
@@ -310,13 +304,13 @@ function CapTabs({ variant, platform, locale, isLoggedIn, session }) {
       `}
       ${activeTab === 'mcp' && (hasMcp
         ? html`<${McpPanel} locale=${locale} isLoggedIn=${isLoggedIn} session=${session} />`
-        : html`<div class="dv-unavail-notice"><div class="dv-unavail-icon">\ud83d\udd12</div><p>${dt('tabs.unavailable', locale)}</p><p style="font-size:.8rem;margin-top:.5rem">${dt('tabs.upgradeForMcp', locale)}</p></div>`
+        : html`<div class="dv-unavail-notice"><div class="dv-unavail-icon">\ud83d\udd12</div><p>${dt('tabs.unavailable', locale)}</p><p class="dv-unavail-sub">${dt('tabs.upgradeForMcp', locale)}</p></div>`
       )}
       ${activeTab === 'api' && (hasApi
         ? (variant.path === 'browse'
             ? html`<${BrowsePanel} locale=${locale} onSwitchToPromptPackage=${() => setActiveTab('apps')} />`
             : html`<${ApiPanel} locale=${locale} />`)
-        : html`<div class="dv-unavail-notice"><div class="dv-unavail-icon">\ud83d\udd12</div><p>${dt('tabs.unavailable', locale)}</p><p style="font-size:.8rem;margin-top:.5rem">${dt('tabs.upgradeForApi', locale)}</p></div>`
+        : html`<div class="dv-unavail-notice"><div class="dv-unavail-icon">\ud83d\udd12</div><p>${dt('tabs.unavailable', locale)}</p><p class="dv-unavail-sub">${dt('tabs.upgradeForApi', locale)}</p></div>`
       )}
     </div>
   `;

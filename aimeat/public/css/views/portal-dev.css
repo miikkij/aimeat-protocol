@@ -150,3 +150,48 @@
   .dv-stats { flex-direction: column; }
   .dv-container h1 { font-size: 1.4rem; }
 }
+
+/* ── MCP setup panel: lifted out of ~52 inline styles + a tabStyle() inline-CSS
+   builder + a bespoke non-brand purple/rgba(255,255,255) palette (portal-dev.panels.js).
+   All colours are theme tokens now (purple/info/success/warn tints), so the panel
+   flips correctly in dark mode. ── */
+.dv-callout { border-radius: .5rem; padding: .75rem 1rem; margin-bottom: 1rem; }
+.dv-callout--warn { background: var(--warn-bg); border: 1px solid var(--warn-border); }
+.dv-callout--success { background: var(--success-bg); border: 1px solid var(--success-border); }
+.dv-callout--purple { background: var(--purple-bg); border: 1px solid var(--purple-border); }
+.dv-info-box { margin-top: .75rem; padding: .5rem .75rem; background: var(--info-bg); border: 1px solid var(--info-border); border-radius: .25rem; font-size: .82rem; }
+.dv-setup-tabs { display: flex; gap: 2px; margin-top: .75rem; border-bottom: 1px solid var(--purple-border); }
+.dv-setup-tab { padding: .4rem .75rem; border: none; border-radius: .25rem .25rem 0 0; cursor: pointer; font-size: .8rem; font-weight: 600; background: transparent; color: var(--text-dim); }
+.dv-setup-tab.active { background: var(--purple-bg); color: var(--purple-fg); }
+.dv-tab-content { padding: .75rem 0 0; }
+.dv-panel-desc { font-size: .82rem; color: var(--text-dim); margin: 0 0 .75rem; }
+.dv-field { margin-bottom: .75rem; }
+.dv-field-label { font-size: .8rem; color: var(--text-dim); margin-bottom: .25rem; }
+.dv-code-row { display: flex; align-items: center; gap: .5rem; }
+.dv-code { font-size: .78rem; background: var(--code-bg); padding: .4rem .6rem; border-radius: .25rem; user-select: all; flex: 1; word-break: break-all; }
+.dv-code--inline { font-size: .78rem; background: var(--code-bg); padding: .25rem .5rem; border-radius: .25rem; user-select: all; }
+.dv-code--inline-sm { font-size: .8rem; background: var(--code-bg); padding: .25rem .5rem; border-radius: .25rem; user-select: all; }
+.dv-copy-btn { padding: .3rem .6rem; background: var(--accent); color: #fff; border: none; border-radius: .25rem; cursor: pointer; font-size: .75rem; white-space: nowrap; }
+.dv-copy-btn--alt { padding: .2rem .5rem; background: var(--purple-bg); color: var(--purple-fg); border: 1px solid var(--purple-border); border-radius: .25rem; cursor: pointer; font-size: .75rem; white-space: nowrap; }
+.dv-note { margin-top: .75rem; font-size: .8rem; color: var(--text-dim); font-style: italic; }
+.dv-hint { font-size: .8rem; color: var(--text-dim); margin: 0; font-style: italic; }
+.dv-step-img { max-width: 100%; border-radius: .5rem; border: 1px solid var(--border); }
+.dv-step-media { margin: .5rem 0; }
+.dv-steps { margin: 0; padding-left: 1.25rem; line-height: 1.8; }
+.dv-steps--tight { line-height: 1.6; }
+.dv-step-row { display: flex; align-items: center; gap: .5rem; margin: .4rem 0; }
+.dv-block-sm { font-size: .85rem; }
+.dv-p-mt { margin: .5rem 0 0; font-size: .85rem; }
+.dv-p-mt-muted { margin: .5rem 0 0; font-size: .85rem; color: var(--text-dim); }
+.dv-p-mt-lg { margin: .5rem 0 0; font-size: .9rem; }
+.dv-details { margin-top: .75rem; font-size: .85rem; }
+.dv-details-summary { cursor: pointer; color: var(--text-dim); }
+.dv-details-body { margin-top: .5rem; padding: .5rem; background: var(--bg-surface); border-radius: .25rem; }
+.dv-mt { margin-top: 1rem; }
+.dv-ul-indent { margin-left: 1.5rem; }
+.dv-link { color: var(--accent); text-decoration: underline; }
+.dv-ok-line { color: var(--success); font-size: .85rem; }
+.dv-muted-line { color: var(--text-dim); font-size: .85rem; }
+.dv-p-desc-muted { margin: 0 0 .75rem; color: var(--text-dim); }
+.dv-unavail-sub { font-size: .8rem; margin-top: .5rem; }
+.dv-mt-sm { margin-top: .5rem; font-size: .85rem; }
