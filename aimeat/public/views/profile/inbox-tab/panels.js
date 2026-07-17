@@ -6,6 +6,9 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-17 — Reply-to with quote: ThreadPanel resolves each message's `replyToId` to the
+ *     quoted original for its bubble (click scrolls + flashes it) and shows a dismissible "replying to"
+ *     bar above the composer while a quoted reply is being written.
  *   v1.0.0 — 2026-07-13 — Extracted from inbox-tab.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -17,7 +20,7 @@ import { Markdown } from '/components/Markdown.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import { getSession } from '/js/services/auth.js';
 import { Avatar, MessageBubble, Composer, CommandBar, CommandFill, SchedulePanel } from './components.js';
-import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, groupConversations, timeShort, dayKey, dayLabel, trackStateLabel, tallyPoll } from './helpers.js';
+import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, groupConversations, timeShort, dayKey, dayLabel, trackStateLabel, tallyPoll, quoteSnippet } from './helpers.js';
 
 export function ListPanel({ requests, conversations, activeConv, peerDisplay, accept, block, openConversation }) {
   /** One conversation row. `nested` = inside a person group (labelled by the agent/thread, indented). */
@@ -95,8 +98,22 @@ export function ThreadPanel({
   schedOpen, setSchedOpen, cmdFill, agentCommands, sending, draftPrefill, prefillNonce, msgsRef,
   peerDisplay, showToast, toggleImportant, onTrackMsg, onParkMsg, openMessageAi, submitInteractiveAnswers,
   setMdViewer, openConversationAi, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
+  replyQuote, setReplyQuote,
 }) {
   let lastDay = '';
+  // Reply-to quotes: resolve a message's `replyToId` to the original within the loaded page (a parent
+  // outside the page just renders without a quote). The sender label distinguishes you vs the peer.
+  const msgById = {};
+  for (const m of thread) msgById[m.id] = m;
+  const quoteSender = (q) => (q.direction === 'outbound' ? t('inbox.quoteYou') : peerDisplay(activeConv.peerGhii));
+  // Jump to the quoted original: scroll it into view inside the thread + flash it briefly.
+  const jumpTo = (id) => {
+    const el = document.getElementById(`inbox-msg-${id}`);
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    el.classList.add('inbox-row--flash');
+    setTimeout(() => el.classList.remove('inbox-row--flash'), 1400);
+  };
   // Map each interactive QUESTION message id → the answers reply that fulfils it, so an answered
   // question renders its read-only summary instead of the (already-used) form.
   const answersByQ = {};
@@ -131,9 +148,13 @@ export function ThreadPanel({
         ${thread.map(m => {
           const dk = dayKey(m.createdAt);
           const showDay = dk !== lastDay; lastDay = dk;
+          // An interactive answer already summarizes its question in the body — a quote would duplicate it.
+          const quoted = (m.replyToId && m.interactive?.role !== 'answers') ? msgById[m.replyToId] : null;
           return html`
             ${showDay ? html`<div class="inbox-day" key=${'d' + m.id}><span>${dayLabel(m.createdAt)}</span></div>` : null}
             <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${m.direction === 'outbound'} urlMap=${urlMap}
+              domId=${`inbox-msg-${m.id}`} quoted=${quoted} quotedName=${quoted ? quoteSender(quoted) : ''} onJumpTo=${jumpTo}
+              onQuote=${(setReplyQuote && !activeConv.viaAgent) ? setReplyQuote : null}
               starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} onPark=${onParkMsg} onReplyAi=${openMessageAi} tracked=${trackedByMsg[m.id]}
               answeredWith=${m.interactive?.role === 'questions' ? answersByQ[m.id] : null}
               onAnswer=${submitInteractiveAnswers} submitting=${sending}
@@ -163,7 +184,14 @@ export function ThreadPanel({
         ? html`<div class="inbox-announce-note">🤖 ${(t('inbox.viaAgentReadonly') || 'Sent by your agent {agent} — view only.').replace('{agent}', viaAgentName)}</div>`
         : isAnnouncement
         ? html`<div class="inbox-announce-note">📢 ${t('inbox.announcementNote')}</div>`
-        : html`<${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' + prefillNonce : '')} recipient=${activeConv.peerGhii}
+        : html`${replyQuote ? html`<div class="inbox-replybar">
+            <button class="inbox-replybar-main" onClick=${() => jumpTo(replyQuote.id)}>
+              <span class="inbox-replybar-label">↩ ${t('inbox.replyingTo')} ${escHtml(quoteSender(replyQuote))}</span>
+              <span class="inbox-replybar-text">${escHtml(quoteSnippet(replyQuote.body))}</span>
+            </button>
+            <button class="btn-ghost btn-sm" onClick=${() => setReplyQuote?.(null)} title=${t('inbox.quoteCancel')}>✕</button>
+          </div>` : null}
+          <${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' + prefillNonce : '')} recipient=${activeConv.peerGhii}
             sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill}
             draftKey=${'aimeat.inbox.draft.' + activeConv.conversationId} />`}
     </div>`;

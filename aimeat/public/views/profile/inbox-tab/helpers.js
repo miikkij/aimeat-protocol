@@ -5,6 +5,7 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-17 — quoteSnippet(): one-line plain-text excerpt of a message body for reply-quotes.
  *   v1.0.0 — 2026-07-13 — Extracted from inbox-tab.js (max-file-lines)
  */
 import { t, getLocale } from '/js/i18n.js';
@@ -98,6 +99,17 @@ export function prepareBody(body, urlMap, expiredIds) {
   });
   out = out.replace(/!\[([^\]]*)\]\((https?:[^)]+)\)/g, (m, alt) => (alt ? `\`${alt}\`` : ''));
   return out;
+}
+
+/** One-line plain-text excerpt of a message body for a reply-quote (images/code/markdown marks stripped). */
+export function quoteSnippet(body, max = 140) {
+  const s = String(body || '')
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, '🖼')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/[*_`>#]+/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return s.length > max ? `${s.slice(0, max - 1)}…` : s;
 }
 
 /** Short label + tone for a Tracked Response state (used on the message badge + the list). */
