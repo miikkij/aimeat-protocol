@@ -1,6 +1,7 @@
 {
   "inbox.title": "Messages",
   "inbox.desc": "Direct messages with other people, on this node and across the federation.",
+  "inbox.back": "Back",
   "inbox.new": "New message",
   "inbox.to": "To",
   "inbox.toPlaceholder": "Recipient (owner@node-id)",

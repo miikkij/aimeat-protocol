@@ -1,6 +1,7 @@
 {
   "inbox.title": "Viestit",
   "inbox.desc": "Suorat viestit muiden kanssa. Tällä solmulla ja federaation yli.",
+  "inbox.back": "Takaisin",
   "inbox.new": "Uusi viesti",
   "inbox.to": "Vastaanottaja",
   "inbox.toPlaceholder": "Vastaanottaja (omistaja@solmu-id)",
