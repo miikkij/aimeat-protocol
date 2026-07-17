@@ -8,7 +8,8 @@
  *   seller payout (e.g. member cut + org-wallet cut).
  * @structure SellableResolver · registerSellableResolver · getSellableResolver ·
  *   resetSellableResolvers · offerSellableResolver (core 'offer' kind) ·
- *   appToolSellableResolver (core 'app-tool' kind, TARGET-034 phase A)
+ *   appToolSellableResolver (core 'app-tool' kind, TARGET-034 phase A) ·
+ *   extCallSellableResolver (core 'ext-call' kind — priced raw-call money channel, rm-commercial-raw-calls)
  * @usage
  *   registerSellableResolver(offerSellableResolver());
  *   registerSellableResolver(appToolSellableResolver());
@@ -215,6 +216,60 @@ export function appToolSellableResolver(): SellableResolver {
             ctx.config, ctx.storage, cap, item.input ?? {}, session.buyerIdentity, callerJwt ?? '', 'normal',
           );
           return { result: invoked.result };
+        },
+      };
+    },
+  };
+}
+
+/**
+ * The 'ext-call' resolver (design notes doc-r6tyr3o, D1): buys ONE money-settled call of a priced
+ * raw extension action. The item is `{ kind:'ext-call', app:'<extName>', tool:'<actionId>' }`; the
+ * price comes from the action's `commercial.payMoney` (money only — the morsel channel is charged
+ * inline by the paywall, never here). On completion the fulfill() mints a one-time invoke token
+ * (services/ext-pay-token.ts) which the buyer replays to the raw endpoint via `x-aimeat-pay-token`.
+ * Settlement is the registered money handler (EE Stripe in prod; the test handler in E2E).
+ */
+export function extCallSellableResolver(): SellableResolver {
+  return {
+    kind: 'ext-call',
+    async resolve(storage, config, ref, _buyerOwner): Promise<Sellable> {
+      const extName = ref.app ?? '';
+      const actionId = ref.tool ?? ref.offer_id ?? '';
+      if (!extName || !actionId) {
+        throw new CommerceError('INVALID_ITEM', 400, 'ext-call items need app: "<extName>" and tool: "<actionId>"');
+      }
+      const ext = await storage.getExtension(extName);
+      if (!ext || ext.status !== 'active') {
+        throw new CommerceError('EXT_NOT_FOUND', 404, `Extension "${extName}" is not installed/active`);
+      }
+      const action = ext.actions.find((a) => a.id === actionId);
+      if (!action) throw new CommerceError('ACTION_NOT_FOUND', 404, `Action not found: ${extName}:${actionId}`);
+      const payMoney = action.commercial?.payMoney;
+      if (!payMoney) throw new CommerceError('TOOL_NOT_FOR_SALE', 422, `Action "${actionId}" declares no money price`);
+      const currency = ref.currency ?? 'morsel';
+      if (currency !== payMoney.currency) {
+        throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `This call is priced in ${payMoney.currency}, not ${currency}`);
+      }
+      if (!listPaymentHandlers().some((h) => h.currencies.includes(currency))) {
+        throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `No payment handler on this node settles ${currency}`);
+      }
+      const sellerOwner = ext.installedBy;
+      const sellerGhii = `${sellerOwner}@${config.nodeId}`;
+      const pspRec = await storage.getMemory(sellerGhii, 'commerce.psp');
+      const unitPrice = integerMicros(payMoney.amount);
+      return {
+        kind: 'ext-call', agentGaii: extName, agentName: extName, offerId: actionId,
+        title: `${extName} · ${actionId}`, sellerOwner, sellerGhii,
+        priceMorsels: unitPrice, psp: pspRec?.value ?? undefined,
+        // Payment already settled by the time fulfill runs (collect → fulfill). Mint the one-time
+        // token bound to this buyer + ext + action; the buyer replays it to the raw endpoint.
+        async fulfill(ctx, { session }) {
+          const { mintExtPayToken } = await import('../services/ext-pay-token.js');
+          const { token, expiresAt } = await mintExtPayToken(ctx.storage, {
+            buyerOwner: session.buyerOwner, ext: extName, action: actionId, currency, amount: unitPrice,
+          });
+          return { result: { pay_token: token, expiresAt, retry: `POST /v1/ext/${extName}/${actionId} with header 'x-aimeat-pay-token: ${token}'` } };
         },
       };
     },

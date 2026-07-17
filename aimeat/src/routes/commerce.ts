@@ -34,7 +34,7 @@ import { PaymentError } from '../commerce/payment-handlers.js';
 import { paymentChallenge } from '../commerce/x402.js';
 
 const ItemsSchema = z.array(z.object({
-  kind: z.enum(['offer', 'org-offering', 'app-tool']).optional(),
+  kind: z.enum(['offer', 'org-offering', 'app-tool', 'ext-call']).optional(),
   agent: z.string().min(1).max(300).optional(),
   offer_id: z.string().min(1).max(100).optional(),
   /** app-tool: the tool name (alias for offer_id) — from the app's apps.{appId}.tools manifest. */

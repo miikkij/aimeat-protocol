@@ -255,6 +255,22 @@ export interface ExtensionRecord {
     inputSchema: Record<string, unknown>;
     outputSchema: Record<string, unknown>;
     scriptContent: string;
+    /**
+     * Anti-abuse toll in morsels, per non-owner call — ALWAYS a burn (debit caller, never credit
+     * owner). Worthless friction that caps runaway/accidental use. Independent of `commercial`;
+     * may sit on top of any payment mode. Absent/0 = no toll. (Design: notes doc-r6tyr3o, M1.)
+     */
+    tollMorsels?: number;
+    /**
+     * Priced raw call. Present => a non-owner caller must pay the owner per call (owner is always
+     * free). Absent => free (the script's `public_access` decides who may call). Invariant C1:
+     * `payMorsels > 0` OR `payMoney` set. `payMorsels` is the ONLY place morsels count as REVENUE
+     * (credited to the owner); everywhere else morsels are burned (M1).
+     */
+    commercial?: {
+      payMorsels: number;                                    // morsels credited to owner (0 = money-only)
+      payMoney?: { amount: number; currency: string };       // 6-decimal micro-units, PSP-settled to owner
+    };
   }>;
   config: Record<string, unknown>;
   limits: {
