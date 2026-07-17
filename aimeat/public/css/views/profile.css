@@ -221,17 +221,17 @@
 .pf .pf-psp-chip--ok{color:var(--success,#22c55e);border-color:var(--success,#22c55e)}
 .pf .pf-psp-chip--warn{color:var(--warning,#f59e0b);border-color:var(--warning,#f59e0b)}
 .pf .tx-list{max-height:400px;overflow-y:auto}
-.pf .tx-item{display:flex;justify-content:space-between;align-items:center;padding:.6rem .8rem;border-bottom:1px solid rgba(232,86,74,.08);font-size:.85rem}
+.pf .tx-item{display:flex;justify-content:space-between;align-items:center;padding:.6rem .8rem;border-bottom:1px solid var(--border);font-size:.85rem}
 .pf .tx-item:last-child{border-bottom:none}
 .pf .tx-amount{font-weight:600;font-family:monospace}
 .pf .tx-amount.credit{color:var(--success,#22c55e)}
 .pf .tx-amount.debit{color:var(--danger,#ef4444)}
 .pf .tx-type{font-size:.75rem;color:var(--text-dim,#6B7280)}
 .pf .tx-date{font-size:.75rem;color:var(--text-dim,#6B7280)}
-.pf .tx-item-wrap{border-bottom:1px solid rgba(232,86,74,.08)}
+.pf .tx-item-wrap{border-bottom:1px solid var(--border)}
 .pf .tx-item-wrap:last-child{border-bottom:none}
 .pf .tx-item-wrap .tx-item{border-bottom:none;cursor:pointer;user-select:none}
-.pf .tx-item-wrap .tx-item:hover{background:rgba(232,86,74,.05)}
+.pf .tx-item-wrap .tx-item:hover{background:var(--accent-subtle)}
 .pf .tx-detail{padding:.4rem .8rem .8rem;font-size:.8rem;color:var(--text-dim,#6B7280);border-top:1px solid rgba(232,86,74,.05);display:grid;grid-template-columns:auto 1fr;gap:.25rem .75rem;align-items:baseline}
 .pf .tx-detail-label{font-weight:600;color:var(--text,#1A1A2E);font-size:.75rem;text-transform:uppercase}
 .pf .tx-detail-value{font-family:monospace;word-break:break-all}
@@ -2842,6 +2842,10 @@
 .pf-ct-count { color: var(--muted); font-weight: 400; }
 .pf-ct-miss { border: 1px dashed var(--border); border-radius: 8px; padding: 0.4rem 0.6rem; background: var(--bg-dim); }
 .pf-ct-blocked { margin-top: 0.8rem; }
+/* Each contact group (saved / messaged) is framed as a card; the last row drops its
+   divider so it doesn't leave a stray line above the card's bottom padding. */
+.pf-ct-group { margin-top: 0.85rem; }
+.pf-ct-group .pf-ct-row:last-child { border-bottom: none; padding-bottom: 0; }
 .pj-orgsearch { margin: 0 0 0.6rem; }
 .pj-orgsearch-input { min-width: 220px; }
 .pj-board-post { border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: 0.5rem 0.7rem; margin-bottom: 0.5rem; }

@@ -9,6 +9,10 @@
  * @usage Registered in views/profile.js TABS as id 'contacts'.
  * @version-history
  *   v1.0.0 — 2026-07-16 — Initial.
+ *   v1.1.0 — 2026-07-18 — Vaihe 3 card-cohesion: the two contact groups (saved / messaged) are now
+ *     each framed in a `.pf-agd-card` with a canonical `.pf-agd-section-label` header (were bare
+ *     `.detail-label` text over unframed border-bottom row lists). The loose rows now read as two
+ *     cohesive cards instead of a ragged column.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -112,15 +116,19 @@ export default function ContactsTab({ showToast }) {
         </div>` : null}
 
       ${contacts === null ? html`<div class="section-desc">${t('contacts.loading') || 'Loading…'}</div>` : html`
-        <div class="detail-label">${t('contacts.savedGroup') || 'Saved contacts'} <span class="pf-ct-count">${saved.length}</span></div>
-        ${saved.length ? saved.map(c => row(c, html`
-          <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => remove(c.contact_id)}>${t('contacts.remove') || 'Remove'}</button>
-        `)) : html`<div class="section-desc">${t('contacts.savedEmpty') || 'Nobody saved yet — add someone above, or save a messaged person below.'}</div>`}
+        <div class="pf-agd-card pf-ct-group">
+          <div class="pf-agd-section-label">${t('contacts.savedGroup') || 'Saved contacts'} <span class="pf-ct-count">${saved.length}</span></div>
+          ${saved.length ? saved.map(c => row(c, html`
+            <button class="btn-ghost btn-sm" disabled=${busy} onClick=${() => remove(c.contact_id)}>${t('contacts.remove') || 'Remove'}</button>
+          `)) : html`<div class="section-desc">${t('contacts.savedEmpty') || 'Nobody saved yet — add someone above, or save a messaged person below.'}</div>`}
+        </div>
 
-        <div class="detail-label">${t('contacts.messagedGroup') || 'People you\'ve messaged'} <span class="pf-ct-count">${messaged.length}</span></div>
-        ${messaged.length ? messaged.map(c => row(c, html`
-          <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => add(c.contact_id)}>${t('contacts.save') || 'Save'}</button>
-        `)) : html`<div class="section-desc">${t('contacts.messagedEmpty') || 'Direct-message conversations show up here automatically.'}</div>`}
+        <div class="pf-agd-card pf-ct-group">
+          <div class="pf-agd-section-label">${t('contacts.messagedGroup') || 'People you\'ve messaged'} <span class="pf-ct-count">${messaged.length}</span></div>
+          ${messaged.length ? messaged.map(c => row(c, html`
+            <button class="btn-outline btn-sm" disabled=${busy} onClick=${() => add(c.contact_id)}>${t('contacts.save') || 'Save'}</button>
+          `)) : html`<div class="section-desc">${t('contacts.messagedEmpty') || 'Direct-message conversations show up here automatically.'}</div>`}
+        </div>
 
         ${blockedCount > 0 ? html`
           <div class="section-desc pf-ct-blocked">

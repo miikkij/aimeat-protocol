@@ -12,6 +12,11 @@
  *     into ONE GET /v1/wallet/overview (WalletTabService); MoneyActivity seeds from `initial` + skips its
  *     own mount fetch. The Enterprise PSP section keeps its own /v1/me/psp call. Falls back to the
  *     individual endpoints if the composite is unavailable. (Phase 4 slice 3 — frontend half.)
+ *   v1.5.0 — 2026-07-18 — Vaihe 3 card-cohesion: the two remaining unframed sections now sit in a `.card`
+ *     like the balance/lifetime/history sections do — PSP `.wallet-psp` block and MoneyActivity's
+ *     purchases/sales `.tx-list`s (were bare blocks straight under their section headers). Campsite Rule 8:
+ *     the tx-item / tx-item-wrap dividers + hover swapped hardcoded rgba(232,86,74,…) for --border /
+ *     --accent-subtle tokens (theme-aware).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -65,7 +70,7 @@ function PspSection() {
   return html`
     <div class="section-title mt-2">${t('profile.wallet.pspTitle')}</div>
     <div class="section-desc">${t('profile.wallet.pspDesc')}</div>
-    <div class="wallet-psp">
+    <div class="card wallet-psp">
       ${psp.configured
         ? html`<span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.pspConfigured')} ${psp.keyHint || ''}</span>`
         : html`<span class="pf-psp-chip pf-psp-chip--warn">${t('profile.wallet.pspMissing')}</span>`}
@@ -114,10 +119,10 @@ function MoneyActivity({ initial }) {
     <div class="section-desc">${t('profile.wallet.moneyDesc')}</div>
     ${data.purchases.length ? html`
       <div class="text-meta mb-1">${t('profile.wallet.moneyPurchases')}</div>
-      <div class="tx-list">${data.purchases.map(x => row(x, false))}</div>` : null}
+      <div class="card"><div class="tx-list">${data.purchases.map(x => row(x, false))}</div></div>` : null}
     ${data.sales.length ? html`
       <div class="text-meta mb-1 mt-1">${t('profile.wallet.moneySales')}</div>
-      <div class="tx-list">${data.sales.map(x => row(x, true))}</div>` : null}`;
+      <div class="card"><div class="tx-list">${data.sales.map(x => row(x, true))}</div></div>` : null}`;
 }
 
 export default function WalletTab({ session, showToast, onStats }) {
