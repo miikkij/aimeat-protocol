@@ -8142,6 +8142,7 @@
     "buildHeroSub": "Kopioi yksi prompti Claudeen, ChatGPT:hen tai mihin tahansa AI:hin. Se rakentaa sinulle toimivan appsin AIMEATiin, julkaistuna heti ja sinun pidettäväksi. Anna sitten agenttiesi pyörittää sitä puolestasi, kuten AIMEAT Sanomat kirjoittaa itsensä joka ilta.",
     "buildHeroCopy": "Kopioi build-prompti →",
     "buildHeroCopied": "Kopioitu ✓, liitä AI:hisi",
+    "ecLink": "Uusi täällä? Opettele koko ekosysteemi kokeillen — avaa Experience Center →",
     "buildHeroAfter": "Liitä se AI:hisi ja vastaa sen kysymyksiin. Kun appsi on valmis,",
     "buildHeroAfter2": "(sisäänkirjautuminen vie sekunteja — Google tai sähköposti).",
     "openAppsToPublish": "avaa sovelluksesi lisätäksesi & julkaistaksesi sen →",
@@ -8352,6 +8353,11 @@
         "continuous": "Valitsit: itsestään. Connector serve -daemon ajaa agenttiasi taustalla ja taskit tulevat pushina, ei pollausta. Tällä mallilla pyörii tuotannossa 33 agentin laivasto.",
         "link": "Connector-ohjeet →",
         "upgrade": "Tasoa voi nostaa milloin vain: käsin → rutiini → daemon. Playbook ei vanhene."
+      },
+      "ec": {
+        "title": "Jatka tästä: Experience Center",
+        "a": "Koko ekosysteemin kokeiltava akatemia: yhdistä AI:si (mukavin tapa), sitten agentit, appit, organismit ja automaatio — kerros kerrallaan, kokeile itse -linkeillä.",
+        "link": "Avaa Experience Center →"
       },
       "h1": {
         "title": "Vaihe 1: Kerro tarpeesi",
