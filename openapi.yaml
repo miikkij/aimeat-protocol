@@ -16149,30 +16149,35 @@ paths:
         '429':
           $ref: '#/components/responses/RateLimited'
 
-  /v1/ghii/login/google:
+  /v1/ghii/login/{provider}:
     get:
-      operationId: ghiiLoginGoogleStart
-      summary: Begin Google sign-in (social login)
+      operationId: ghiiLoginProviderStart
+      summary: Begin social sign-in with an OIDC provider
       description: |
-        Starts the Google OIDC sign-in flow and redirects the browser to Google's
-        consent screen. Available only when the node has Google sign-in configured
-        (`AIMEAT_GOOGLE_OAUTH_ENABLED=true` + client credentials); otherwise returns 503.
-        This is a browser-navigation endpoint, not an API call.
+        Starts the OIDC sign-in flow for `{provider}` and redirects the browser to that provider's
+        consent screen. Browser-navigation endpoint, not an API call. Provider ids come from the
+        node's social-login registry — the built-in set is `google` (`AIMEAT_GOOGLE_OAUTH_ENABLED`),
+        `casdoor` (`AIMEAT_CASDOOR_OAUTH_ENABLED`) and `entra` (Microsoft Entra ID,
+        `AIMEAT_ENTRA_OAUTH_ENABLED`), each needing its client credentials; an operator may register
+        others. Discover the enabled providers + start URLs via `GET /v1/auth/providers`. Returns
+        503 when the requested provider is not configured on this node.
       tags: [GHII-Web]
       parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string }
+          description: 'OIDC provider id (built-in: google, casdoor, entra; or any configured provider).'
         - name: redirect
           in: query
           required: false
-          schema:
-            type: string
-          description: |
-            Same-site absolute path to return to after a successful login (must start
-            with `/`). Defaults to `/`. Other values are ignored for safety.
+          schema: { type: string }
+          description: Same-site absolute path to return to after a successful login (must start with `/`). Defaults to `/`.
       responses:
         '302':
-          description: Redirect to the Google authorization endpoint
+          description: Redirect to the provider's authorization endpoint
         '503':
-          description: Google sign-in is not available on this node
+          description: This provider's sign-in is not available on this node
           content:
             application/json:
               schema:
@@ -16185,33 +16190,35 @@ paths:
                         properties:
                           code:
                             example: FEATURE_DISABLED
-
-  /v1/ghii/login/google/callback:
+  /v1/ghii/login/{provider}/callback:
     get:
-      operationId: ghiiLoginGoogleCallback
-      summary: Google sign-in OIDC redirect callback
+      operationId: ghiiLoginProviderCallback
+      summary: OIDC redirect callback for a social sign-in provider
       description: |
-        Google redirects the browser here with `code` and `state` after consent. The node
-        exchanges the code and maps the Google identity to a GHII. A returning Google user
-        (matched by provider subject) or a verified-email match links straight to their account
-        and gets an owner session (httpOnly refresh cookie + access token) before redirecting
-        back to the SPA. A BRAND-NEW user is NOT auto-created: the node stashes the verified
-        Google identity in a short-lived signed cookie and redirects back with `?aimeat_signup=1`,
-        and the SPA prompts for a one-time username choice (see `/v1/ghii/login/pending` +
-        `/v1/ghii/login/google/finalize`). On any failure it redirects to `/?auth_error=<CODE>`.
+        The provider redirects the browser here with `code` and `state` after consent. The node
+        exchanges the code and maps the provider identity to a GHII: a returning user (matched by
+        provider subject) or a verified-email match links straight in and gets an owner session
+        (httpOnly refresh cookie + access token) before redirecting back to the SPA. A BRAND-NEW
+        user is NOT auto-created — the node stashes the verified identity in a short-lived signed
+        cookie and redirects back with `?aimeat_signup=1`, and the SPA prompts for a one-time
+        username choice (see `GET /v1/ghii/login/pending` + `POST /v1/ghii/login/{provider}/finalize`).
+        On any failure it redirects to `/?auth_error=<CODE>`.
       tags: [GHII-Web]
       parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string }
+          description: 'OIDC provider id (google, casdoor, entra, …).'
         - name: code
           in: query
           required: true
-          schema:
-            type: string
-          description: Authorization code from Google
+          schema: { type: string }
+          description: Authorization code from the provider
         - name: state
           in: query
           required: true
-          schema:
-            type: string
+          schema: { type: string }
           description: Opaque state value issued at the start of the flow
       responses:
         '302':
@@ -16219,8 +16226,73 @@ paths:
             Redirect back to the SPA on success (refresh cookie set), or to
             `/?auth_error=<CODE>` on failure.
         '503':
-          description: Google sign-in is not available on this node
-
+          description: This provider's sign-in is not available on this node
+  /v1/ghii/login/{provider}/finalize:
+    post:
+      operationId: ghiiLoginProviderFinalize
+      summary: Complete a first-time social sign-up with the chosen username
+      description: |
+        Finalizes a brand-new sign-up for `{provider}`. Reads the signed pending-signup cookie,
+        validates the chosen username (falling back to the suggested one when blank), creates the
+        owner + GHII linked to the provider account (with the welcome bonus), and establishes an
+        owner session (httpOnly refresh cookie + access token). Idempotent: if the provider identity
+        has already resolved to a GHII, that session is established instead. Rate-limited.
+      tags: [GHII-Web]
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema: { type: string }
+          description: 'OIDC provider id (google, casdoor, entra, …).'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                username:
+                  type: string
+                  description: The username the user chose or confirmed; blank uses the suggested name
+                displayName:
+                  type: string
+                  description: The display name the user chose; blank uses the provider-supplied name. Editable later (unlike the username).
+      responses:
+        '200':
+          description: Account created (or resolved) and session established
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ghii: { type: string }
+                          owner: { type: string }
+                          displayName: { type: string }
+                          redirect: { type: string }
+        '400':
+          description: No pending sign-up, or invalid username
+        '409':
+          description: |
+            Username already taken (NAME_TAKEN), or the pending sign-up is in link_existing mode —
+            an existing account claims this email but never verified it, so creating a duplicate
+            account is refused (EMAIL_IN_USE; sign in with the password once to verify + link).
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      error:
+                        type: object
+                        properties:
+                          code:
+                            example: NAME_TAKEN
   /v1/ghii/login/pending:
     get:
       operationId: ghiiLoginPending
@@ -16327,71 +16399,6 @@ paths:
                             type: string
                             nullable: true
 
-  /v1/ghii/login/google/finalize:
-    post:
-      operationId: ghiiLoginGoogleFinalize
-      summary: Complete a first-time Google sign-up with the chosen username
-      description: |
-        Finalizes a brand-new Google sign-up. Reads the signed pending-signup cookie, validates
-        the chosen username (falling back to the suggested one when blank), creates the owner +
-        GHII linked to the Google account (with the welcome bonus), and establishes an owner
-        session (httpOnly refresh cookie + access token). Idempotent: if the Google identity has
-        already resolved to a GHII, that session is established instead. Rate-limited.
-      tags: [GHII-Web]
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                username:
-                  type: string
-                  description: The username the user chose or confirmed; blank uses the suggested name
-                displayName:
-                  type: string
-                  description: The display name the user chose; blank uses the provider-supplied name. Editable later (unlike the username).
-      responses:
-        '200':
-          description: Account created (or resolved) and session established
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          ghii:
-                            type: string
-                          owner:
-                            type: string
-                          displayName:
-                            type: string
-                          redirect:
-                            type: string
-        '400':
-          description: No pending sign-up, or invalid username
-        '409':
-          description: |
-            Username already taken (NAME_TAKEN), or the pending sign-up is in link_existing mode —
-            an existing account claims this email but never verified it, so creating a duplicate
-            account is refused (EMAIL_IN_USE; sign in with the password once to verify + link).
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      error:
-                        type: object
-                        properties:
-                          code:
-                            example: NAME_TAKEN
-
   /v1/auth/providers:
     get:
       operationId: authProviders
@@ -16427,218 +16434,6 @@ paths:
                                 loginUrl:
                                   type: string
                                   description: Same-node path to begin this provider's sign-in flow
-
-  /v1/ghii/login/casdoor:
-    get:
-      operationId: ghiiLoginCasdoorStart
-      summary: Begin Casdoor sign-in (social login)
-      description: |
-        Starts the Casdoor OIDC sign-in flow and redirects the browser to Casdoor's consent screen.
-        Available only when the node has Casdoor sign-in configured (`AIMEAT_CASDOOR_OAUTH_ENABLED=true`
-        + endpoint + client credentials); otherwise returns 503. Browser-navigation endpoint.
-      tags: [GHII-Web]
-      parameters:
-        - name: redirect
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Same-site absolute path to return to after login (must start with `/`). Defaults to `/`.
-      responses:
-        '302':
-          description: Redirect to the Casdoor authorization endpoint
-        '503':
-          description: Casdoor sign-in is not available on this node
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      error:
-                        type: object
-                        properties:
-                          code:
-                            example: FEATURE_DISABLED
-
-  /v1/ghii/login/casdoor/callback:
-    get:
-      operationId: ghiiLoginCasdoorCallback
-      summary: Casdoor sign-in OIDC redirect callback
-      description: |
-        Casdoor redirects the browser here with `code` and `state`. The node exchanges the code and
-        maps the Casdoor identity to a GHII (returning user by subject, or verified-email link, else a
-        one-time username choice via `?aimeat_signup=1` + `/v1/ghii/login/casdoor/finalize`). On any
-        failure it redirects to `/?auth_error=<CODE>`.
-      tags: [GHII-Web]
-      parameters:
-        - name: code
-          in: query
-          required: true
-          schema:
-            type: string
-        - name: state
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        '302':
-          description: Redirect back to the SPA on success (refresh cookie set), or to `/?auth_error=<CODE>` on failure.
-        '503':
-          description: Casdoor sign-in is not available on this node
-
-  /v1/ghii/login/casdoor/finalize:
-    post:
-      operationId: ghiiLoginCasdoorFinalize
-      summary: Complete a first-time Casdoor sign-up with the chosen username
-      description: |
-        Finalizes a brand-new Casdoor sign-up: reads the signed pending-signup cookie (must be for the
-        casdoor provider), validates the chosen username, creates the owner + GHII linked to the Casdoor
-        account, and establishes an owner session. Idempotent on double-submit. Rate-limited.
-      tags: [GHII-Web]
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                username:
-                  type: string
-                displayName:
-                  type: string
-                  description: The display name the user chose; blank uses the provider-supplied name. Editable later (unlike the username).
-      responses:
-        '200':
-          description: Account created (or resolved) and session established
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          ghii: { type: string }
-                          owner: { type: string }
-                          displayName: { type: string }
-                          redirect: { type: string }
-        '400':
-          description: No pending sign-up, or invalid username
-        '409':
-          description: Username already taken (NAME_TAKEN) or link_existing pending refused (EMAIL_IN_USE)
-
-  /v1/ghii/login/entra:
-    get:
-      operationId: ghiiLoginEntraStart
-      summary: Begin Microsoft Entra ID sign-in (social login)
-      description: |
-        Starts the Microsoft Entra ID OIDC sign-in flow and redirects the browser to Microsoft's
-        consent screen. Available only when the node has Entra sign-in configured
-        (`AIMEAT_ENTRA_OAUTH_ENABLED=true` + client credentials); otherwise returns 503. When the node
-        pins a tenant GUID (`AIMEAT_ENTRA_OAUTH_TENANT`), only that tenant's members may complete
-        sign-in (the `tid` claim is enforced). Browser-navigation endpoint.
-      tags: [GHII-Web]
-      parameters:
-        - name: redirect
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Same-site absolute path to return to after login (must start with `/`). Defaults to `/`.
-      responses:
-        '302':
-          description: Redirect to the Entra authorization endpoint
-        '503':
-          description: Entra sign-in is not available on this node
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      error:
-                        type: object
-                        properties:
-                          code:
-                            example: FEATURE_DISABLED
-
-  /v1/ghii/login/entra/callback:
-    get:
-      operationId: ghiiLoginEntraCallback
-      summary: Microsoft Entra ID sign-in OIDC redirect callback
-      description: |
-        Entra redirects the browser here with `code` and `state`. The node exchanges the code,
-        optionally enforces the configured tenant (`tid`), and maps the identity to a GHII (returning
-        user by subject, or verified-email link for a pinned tenant, else a one-time username choice via
-        `?aimeat_signup=1` + `/v1/ghii/login/entra/finalize`). A token from a different tenant is
-        rejected with `/?auth_error=ENTRA_WRONG_TENANT`. On other failures it redirects to
-        `/?auth_error=<CODE>`.
-      tags: [GHII-Web]
-      parameters:
-        - name: code
-          in: query
-          required: true
-          schema:
-            type: string
-        - name: state
-          in: query
-          required: true
-          schema:
-            type: string
-      responses:
-        '302':
-          description: Redirect back to the SPA on success (refresh cookie set), or to `/?auth_error=<CODE>` on failure.
-        '503':
-          description: Entra sign-in is not available on this node
-
-  /v1/ghii/login/entra/finalize:
-    post:
-      operationId: ghiiLoginEntraFinalize
-      summary: Complete a first-time Microsoft Entra ID sign-up with the chosen username
-      description: |
-        Finalizes a brand-new Entra sign-up: reads the signed pending-signup cookie (must be for the
-        entra provider), validates the chosen username, creates the owner + GHII linked to the Entra
-        account, and establishes an owner session. Idempotent on double-submit. Rate-limited.
-      tags: [GHII-Web]
-      requestBody:
-        required: false
-        content:
-          application/json:
-            schema:
-              type: object
-              properties:
-                username:
-                  type: string
-                displayName:
-                  type: string
-                  description: The display name the user chose; blank uses the provider-supplied name. Editable later (unlike the username).
-      responses:
-        '200':
-          description: Account created (or resolved) and session established
-          content:
-            application/json:
-              schema:
-                allOf:
-                  - $ref: '#/components/schemas/AimeatEnvelope'
-                  - type: object
-                    properties:
-                      data:
-                        type: object
-                        properties:
-                          ghii: { type: string }
-                          owner: { type: string }
-                          displayName: { type: string }
-                          redirect: { type: string }
-        '400':
-          description: No pending sign-up, or invalid username
-        '409':
-          description: Username already taken (NAME_TAKEN) or link_existing pending refused (EMAIL_IN_USE)
 
   # ============================================================
   # Phase 1.4: Directories
