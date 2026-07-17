@@ -59,13 +59,13 @@ measured in an AEB run · `[I]` = inferred from version-drift + ai_doc caveats (
 |---|---|---|---|---|
 | **three** | r128 | `any` [M] | Haiku 4.5 → ✅ load-bearing (`results/aeb3-round5-midtier-ab.md`) | r128 stable & ubiquitous — low drift |
 | **p5** | @1 | `any` [M] | Haiku 4.5 → ✅ particle band rendered (`aeb3-round5-midtier-ab.md`) | `setup()/draw()` ubiquitous |
-| **chartjs**/aimeat-charts | @4 | `any` [I] | *(none yet — charts used cleanly in round 4/5, not isolated)* | v4 ≈ v3 |
+| **chartjs**/aimeat-charts | @4 | `any` [M] | Haiku 4.5 → ✅ 2 charts drawn (`results/aeb3-smoke-proofs.md`) | v4 ≈ v3 |
 | **mermaid** | v11 | `any` [M] | *(model per `aeb3-mermaid-001`: 5/5 vs 4/5)* | text syntax stable; theme-init idiom |
 | **aimeat-flow** | 1.0.1 | `needs-doc` [M] | proven idiomatic (`aeb3-flow-001`: 5/5, −27% tokens) | wrapper — no priors; must fetch doc |
-| **realtime** | v1 | `needs-doc` [I] | *(none yet)* | AIMEAT-authored; no priors |
-| **styling** | tailwind@4+daisyui@5 | `frontier` [I] | *(none yet)* | **tailwind v4 ≠ v3** models know |
+| **realtime** | v1 | `needs-doc` [I] | Haiku 4.5 → ⚠ blocked in auth wiring, realtime API unreached (`results/aeb3-smoke-proofs.md`) | AIMEAT-authored; no priors |
+| **styling** | tailwind@4+daisyui@5 | `any` [M] | Haiku 4.5 → ✅ full daisyUI v5 render (`results/aeb3-smoke-proofs.md`) — **reclassified from inferred `frontier`** | v4 JIT handled fine by mid-tier |
 | **pixi** | @8 | `frontier` [M] | Haiku 4.5 → ❌ **crashed** on v7 API (`results/aeb3-pixi-perpack.md`); frontier unrun | **v8 breaking vs v7**: `fillRect/drawRect/beginFill` removed → crash; ai_doc skipped |
-| **phaser** | @3 | `any` [I] | *(none yet)* | v3 dominates training data — low drift |
+| **phaser** | @3 | `any` [M] | Haiku 4.5 → ✅ arcade scene booted (`results/aeb3-smoke-proofs.md`) | v3 dominates training data — low drift |
 
 Reading it: `any` = safe to advertise to any model. `frontier` = version-drift landmine for weak
 models (**pixi is the confirmed example** — proven to *fail* on Haiku, still frontier-usable).

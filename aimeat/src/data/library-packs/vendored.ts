@@ -54,8 +54,10 @@ export const VENDORED_PACKS: LibraryPack[] = [
     interviewTriggers: ['style', 'design', 'ui', 'tailwind', 'daisyui'],
     sizeEstimate: '~270KB JIT + ~950KB CSS',
     status: 'stable',
-    modelTier: 'frontier',
-    apiCaveat: 'Tailwind v4 via @tailwindcss/browser (in-browser JIT), NOT the v3 setup most examples show: no tailwind.config.js and no build step — utility classes work directly; theme via CSS variables + the aimeat-daisyui-bridge. daisyUI v5 class names (some renamed since v4). Inferred tier — not yet AEB-proven.',
+    modelTier: 'any',
+    proofs: [
+      { model: 'claude-haiku-4-5', verdict: 'pass', testSet: 'styling-smoke', evidence: 'tools/aeb/results/aeb3-smoke-proofs.md', tokens: 48575, date: '2026-07-17' },
+    ],
   },
   {
     id: 'chartjs',
@@ -90,6 +92,9 @@ export const VENDORED_PACKS: LibraryPack[] = [
     sizeEstimate: '~204KB',
     status: 'stable',
     modelTier: 'any',
+    proofs: [
+      { model: 'claude-haiku-4-5', verdict: 'pass', testSet: 'chartjs-smoke', evidence: 'tools/aeb/results/aeb3-smoke-proofs.md', tokens: 48057, date: '2026-07-17' },
+    ],
   },
   {
     id: 'mermaid',
@@ -302,6 +307,9 @@ export const VENDORED_PACKS: LibraryPack[] = [
     sizeEstimate: '~1.2MB',
     status: 'preview',
     modelTier: 'any',
+    proofs: [
+      { model: 'claude-haiku-4-5', verdict: 'pass', testSet: 'phaser-smoke', evidence: 'tools/aeb/results/aeb3-smoke-proofs.md', tokens: 49653, date: '2026-07-17' },
+    ],
   },
   {
     id: 'realtime',
