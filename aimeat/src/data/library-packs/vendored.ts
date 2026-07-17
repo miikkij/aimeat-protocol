@@ -54,6 +54,8 @@ export const VENDORED_PACKS: LibraryPack[] = [
     interviewTriggers: ['style', 'design', 'ui', 'tailwind', 'daisyui'],
     sizeEstimate: '~270KB JIT + ~950KB CSS',
     status: 'stable',
+    modelTier: 'frontier',
+    apiCaveat: 'Tailwind v4 via @tailwindcss/browser (in-browser JIT), NOT the v3 setup most examples show: no tailwind.config.js and no build step — utility classes work directly; theme via CSS variables + the aimeat-daisyui-bridge. daisyUI v5 class names (some renamed since v4). Inferred tier — not yet AEB-proven.',
   },
   {
     id: 'chartjs',
@@ -87,6 +89,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
     interviewTriggers: ['chart', 'graph', 'plot', 'dashboard', 'kaavio', 'diagrammi'],
     sizeEstimate: '~204KB',
     status: 'stable',
+    modelTier: 'any',
   },
   {
     id: 'mermaid',
@@ -123,6 +126,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
     interviewTriggers: ['diagram', 'flowchart', 'sequence', 'gantt', 'mindmap', 'kaavio', 'vuokaavio'],
     sizeEstimate: '~3.2MB',
     status: 'stable',
+    modelTier: 'any',
   },
   {
     id: 'three',
@@ -160,6 +164,10 @@ export const VENDORED_PACKS: LibraryPack[] = [
     interviewTriggers: ['3d', 'webgl', 'three'],
     sizeEstimate: '~600KB',
     status: 'stable',
+    modelTier: 'any',
+    proofs: [
+      { model: 'claude-haiku-4-5', verdict: 'pass', testSet: 'multi-visual', evidence: 'tools/aeb/results/aeb3-round5-midtier-ab.md', tokens: 83799, date: '2026-07-17' },
+    ],
   },
   {
     id: 'p5',
@@ -199,6 +207,10 @@ export const VENDORED_PACKS: LibraryPack[] = [
     interviewTriggers: ['generative', 'creative', 'sketch', 'animation', 'particles', 'taide', 'animaatio'],
     sizeEstimate: '~1MB',
     status: 'stable',
+    modelTier: 'any',
+    proofs: [
+      { model: 'claude-haiku-4-5', verdict: 'pass', testSet: 'multi-visual', evidence: 'tools/aeb/results/aeb3-round5-midtier-ab.md', tokens: 83799, date: '2026-07-17' },
+    ],
   },
   {
     id: 'pixi',
@@ -243,6 +255,11 @@ export const VENDORED_PACKS: LibraryPack[] = [
     interviewTriggers: ['sprite', 'particle', 'webgl', '2d render', 'renderöinti'],
     sizeEstimate: '~780KB',
     status: 'preview',
+    modelTier: 'frontier',
+    apiCaveat: 'PixiJS v8, NOT the v7 most examples show: async `await app.init()` + `app.canvas` (not app.view); Graphics chains `new PIXI.Graphics().rect(x,y,w,h).fill(color)` — `beginFill()/drawRect()/fillRect()/lineStyle()` are REMOVED. Load pixi-unsafe-eval@8 AFTER pixi. Fetch the ai_doc before coding.',
+    proofs: [
+      { model: 'claude-haiku-4-5', verdict: 'fail', testSet: 'pixi', evidence: 'tools/aeb/results/aeb3-pixi-perpack.md', tokens: 71955, date: '2026-07-17' },
+    ],
   },
   {
     id: 'phaser',
@@ -284,6 +301,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
     interviewTriggers: ['game', 'peli', 'arcade', 'platformer', 'shooter', 'breakout'],
     sizeEstimate: '~1.2MB',
     status: 'preview',
+    modelTier: 'any',
   },
   {
     id: 'realtime',
@@ -313,5 +331,6 @@ export const VENDORED_PACKS: LibraryPack[] = [
     interviewTriggers: ['multiplayer', 'realtime', 'collaboration', 'chat', 'live', 'moninpeli', 'yhteismuokkaus'],
     sizeEstimate: '~17KB',
     status: 'stable',
+    modelTier: 'needs-doc',
   },
 ];

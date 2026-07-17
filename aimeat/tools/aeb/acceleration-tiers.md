@@ -187,7 +187,13 @@ proofs?: Array<{
 
 Then `GET /v1/library-packs` exposes, per pack, **which models it's proven on** — so a client (or the
 build pipeline) can filter "packs proven to work on the model I'm about to use". Adding a proof from a
-new model = appending one `proofs` entry + committing one `results/*.md`. **This schema change is a
-design decision (code + openapi + generate:types + both locale files + registry E2E) — do not
-implement until the developer signs off.** The `specs/` + `results/` + this table already deliver the
-same ledger in-repo today; the registry field just makes it queryable at runtime.
+new model = appending one `proofs` entry + committing one `results/*.md`.
+
+**SHIPPED 2026-07-17:** `modelTier`, `proofs[]` (typed `PackProof`) and `apiCaveat` are live fields on
+`LibraryPack` (src/data/library-packs.ts), populated from the evidence above, exposed in both the
+index and detail of `GET /v1/library-packs`, and E2E-guarded (a `frontier` pack MUST carry an
+`apiCaveat`; proof rows must point at a `results/` file). The build-app prompt now **inlines each
+frontier pack's `apiCaveat`** (a ⚠ line) so a doc-skipping model still gets the breaking idiom — this
+is the fix for the pixi-perpack "delivery gap" finding. An unlabelled pack still ships exactly as
+before. The `specs/` + `results/` + this table remain the human-readable ledger; the fields make it
+queryable at runtime.
