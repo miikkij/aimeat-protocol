@@ -20,7 +20,7 @@ import { screenshotUrl } from '/js/services/generator-testing.js';
 
 export function TestScopeSelector({ value, onChange, compact }) {
   return html`<div class="pf-gen-test-scope ${compact ? 'pf-gen-test-scope-compact' : ''}">
-    ${!compact && html`<h4>${t('profile.generator.test_scope_title')}</h4>`}
+    ${!compact && html`<div class="card-h3">${t('profile.generator.test_scope_title')}</div>`}
     ${['comprehensive', 'basic', 'none'].map(level => html`
       <label class="pf-gen-or-radio-label" title=${t('profile.generator.test_scope_' + level)}>
         <input type="radio" name="test-scope-${compact ? 'compact' : 'full'}" value=${level}

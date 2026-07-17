@@ -623,7 +623,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
                 <div class="fnd-cal-reflection-cols">
                   <!-- Judge column -->
                   <div class="fnd-cal-reflection-col">
-                    <h4>${t('profile.calibrator.step3a')}</h4>
+                    <div class="card-h3">${t('profile.calibrator.step3a')}</div>
                     ${jp?.error ? html`<div class="fnd-cal-hint" style="color:var(--danger)">Error: ${jp.error}</div>` : ''}
                     ${jp?.proposals?.length > 0 ? html`
                       <ol>
@@ -637,7 +637,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
                   </div>
                   <!-- Self column -->
                   <div class="fnd-cal-reflection-col">
-                    <h4>${t('profile.calibrator.step3b')}</h4>
+                    <div class="card-h3">${t('profile.calibrator.step3b')}</div>
                     ${sp?.error ? html`<div class="fnd-cal-hint" style="color:var(--danger)">Error: ${sp.error}</div>` : ''}
                     ${sp?.proposals?.length > 0 ? html`
                       <ol>

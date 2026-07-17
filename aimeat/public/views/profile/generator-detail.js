@@ -499,7 +499,7 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
   return html`
     <div class="pf-gen-component-detail">
       <div class="pf-gen-comp-header">
-        <h4>${component.label}</h4>
+        <div class="card-h3">${component.label}</div>
         <span class="pf-gen-type-badge type-${component.type}">${component.type.toUpperCase()}</span>
         <span class="pf-gen-status-badge status-${component.status}">${component.status}</span>
         <button class="btn-ghost btn-xs" style="margin-left:auto" onClick=${handleResetComponent}
