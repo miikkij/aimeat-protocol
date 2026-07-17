@@ -98,7 +98,7 @@ export default function CortexTab() {
       ${toast && html`<${Toast} type=${toast.type} text=${toast.text} onDismiss=${clearToast} />`}
       <${ConfirmUI} />
       <button class="adm-btn-action" onClick=${() => setDetail(null)}>${t('dashboard.cortex.back')}</button>
-      <h3 class="adm-section-title" style="margin-top:1rem">${escHtml(ext.name)} <span class="adm-text-dim adm-text-sm">v${ext.version || '?'}</span></h3>
+      <h3 class="adm-sec-title" style="margin-top:1rem">${escHtml(ext.name)} <span class="adm-text-dim adm-text-sm">v${ext.version || '?'}</span></h3>
       <p class="adm-text-dim">${escHtml(ext.description || '')}</p>
       <div class="adm-meta-row">
         <span>${t('dashboard.cortex.author')}: ${escHtml(ext.author || '?')}</span>
@@ -107,7 +107,7 @@ export default function CortexTab() {
         <span><${Badge} type=${isActive ? 'success' : 'muted'} label=${isActive ? t('dashboard.cortex.active') : t('dashboard.cortex.inactive')} /></span>
       </div>
 
-      <h4 class="adm-section-title" style="margin-top:1.5rem">${t('dashboard.cortex.components')}</h4>
+      <h4 class="adm-sec-title" style="margin-top:1.5rem">${t('dashboard.cortex.components')}</h4>
       <div class="adm-card">
         ${comps.length === 0 ? html`<${Empty} text=${t('dashboard.cortex.noComponents')} />` : comps.map(c => html`
           <div class="adm-row">${COMP_ICONS[c.type] || '\u{1F4C4}'} ${c.type}: ${c.type === 'schema' ? c.key_pattern : (c.name || c.filename || '')}</div>

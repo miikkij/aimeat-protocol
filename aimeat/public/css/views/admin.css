@@ -606,6 +606,25 @@
   background: var(--danger); color: #fff; border-color: transparent;
 }
 .adm-btn-danger-solid:hover { background: var(--danger); filter: brightness(0.92); }
+/* Info / ghost button modifiers (combine with .adm-btn-sm like -danger/-success). */
+.adm-btn-info { color: var(--info-fg); border-color: var(--info-border); }
+.adm-btn-info:hover { background: var(--info-bg); }
+.adm-btn-ghost { color: var(--text-dim); border-color: var(--border); }
+.adm-btn-ghost:hover { background: var(--bg-surface); }
+
+/* Previously-undefined classes used by cortex/database/skills/feedback tabs
+   (they rendered unstyled). Defined to the admin design language — no markup
+   change needed. */
+.adm-section-head { display: flex; justify-content: space-between; align-items: center; gap: 1rem; margin-bottom: 0.5rem; flex-wrap: wrap; }
+.adm-meta-row { display: flex; flex-wrap: wrap; gap: 0.35rem 1rem; color: var(--text-dim); font-size: 0.85rem; margin: 0.5rem 0; }
+.adm-actions-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.adm-row { padding: 0.35rem 0; border-bottom: 1px solid var(--border-subtle); }
+.adm-row:last-child { border-bottom: none; }
+.adm-table-wrap { overflow-x: auto; }
+.adm-link { background: none; border: none; padding: 0; color: var(--accent); cursor: pointer; font: inherit; text-align: left; }
+.adm-link:hover { text-decoration: underline; }
+.adm-desc, .adm-help-text { color: var(--text-dim); font-size: 0.85rem; }
+.adm-muted { color: var(--text-dim); }
 
 /* Subtabs row */
 .adm-subtabs { display: flex; gap: 8px; margin: 16px 0; flex-wrap: wrap; }
