@@ -186,6 +186,8 @@
   font-weight: 500;
 }
 
+.cap-delete-btn { margin-top: 8px; }
+
 .cap-create-section {
   margin-top: 20px;
 }
