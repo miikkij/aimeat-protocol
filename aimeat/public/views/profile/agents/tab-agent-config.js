@@ -9,6 +9,9 @@
  *   v1.2.0 -- 2026-06-02 -- Component unification: route handleCopy through the shared
  *     copyToClipboard (/js/utils.js) instead of raw navigator.clipboard.writeText, so the
  *     insecure-context fallback applies; toast preserved (TIER 3, stays a handler)
+ *   v1.4.0 -- 2026-07-17 -- Style unification: budget-guards card uses the canonical
+ *     agent-detail section title (pf-agd-section-title) instead of the profile-level
+ *     red section-title.
  *   v1.3.0 -- 2026-06-10 -- AgentDangerZone at the tab bottom: typed-agent-name gate +
  *     the shared confirm — replaces the Delete button that sat on every tab's footer.
  */
@@ -48,7 +51,7 @@ function ScheduleBudgetSection({ agent, agentName, showToast }) {
 
   return html`
     <div class="sch-form sch-budget-section">
-      <div class="section-title">${t('profile.scheduler.budgetTitle')}</div>
+      <div class="pf-agd-section-title">${t('profile.scheduler.budgetTitle')}</div>
       <div class="section-desc">${t('profile.scheduler.budgetDesc')}</div>
       <div class="sch-constraints">
         <label class="sch-check">

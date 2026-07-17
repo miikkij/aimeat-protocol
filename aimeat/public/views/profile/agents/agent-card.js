@@ -3,6 +3,8 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.20.0 -- 2026-07-17 -- Style unification: collapsed-bar summary separators use a
+ *     middle dot (·) instead of a pipe, matching the rest of the profile meta rows.
  *   v1.19.0 -- 2026-07-03 -- Add Contracts sub-tab (tab-contracts.js) — agent-side contract-engagement view.
  *   v1.18.0 -- 2026-06-30 -- Onboarding step labels use tOr() so a missing agentOnboarding.steps.*
  *     key falls back to the server-provided step.title instead of rendering the raw key.
@@ -404,7 +406,7 @@ function renderDeliveryIndicator(agent) {
     label = t('profile.agents.detail.deliveryPolling');
   }
 
-  return html`<span class="pf-agd-delivery-indicator">${label}${icon ? ` ${icon}` : ''} </span>`;
+  return html`<span class="pf-agd-delivery-indicator">${label}${icon ? ` ${icon}` : ''} · </span>`;
 }
 
 function renderPlatformBadge(onboarding) {
@@ -449,13 +451,13 @@ function renderReadinessBadge(state, onboarding) {
 function renderCollapsedStats(state, agent, onboarding) {
   switch (state) {
     case 'new':
-      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} | ${t('profile.agents.detail.state.newSummary')}`;
+      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)} · ` : ''}${t('profile.agents.detail.state.newSummary')}`;
     case 'onboarding': {
       const nextStep = onboarding?.steps?.find(s => s.status === 'pending');
-      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''} ${nextStep ? `| ${t('profile.agents.detail.state.next')}: ${tOr('agentOnboarding.steps.' + nextStep.id, nextStep.title || nextStep.id)}` : ''}`;
+      return html`${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}${nextStep ? ` · ${t('profile.agents.detail.state.next')}: ${tOr('agentOnboarding.steps.' + nextStep.id, nextStep.title || nextStep.id)}` : ''}`;
     }
     case 'problem':
-      return html`${t('profile.agents.detail.state.problemSummary')} | ${agent.last_seen ? `${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}`;
+      return html`${t('profile.agents.detail.state.problemSummary')}${agent.last_seen ? ` · ${t('profile.agents.detail.lastSeen')}: ${timeAgo(agent.last_seen)}` : ''}`;
     case 'idle':
     case 'production':
     default: {
@@ -466,7 +468,7 @@ function renderCollapsedStats(state, agent, onboarding) {
         if (done || act) parts.push(`${t('profile.agents.detail.today')}: ${done || 0} ${t('profile.agents.detail.done')}${act ? `, ${act} ${t('profile.agents.detail.active')}` : ''}`);
       }
       if (agent.tokensUsedToday != null) parts.push(`${t('profile.agents.detail.tokensToday')}: ${agent.tokensUsedToday.toLocaleString()}`);
-      return html`${parts.join(' | ')}`;
+      return html`${parts.join(' · ')}`;
     }
   }
 }
