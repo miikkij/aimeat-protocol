@@ -37,6 +37,8 @@ import { setOfferBilling } from '/js/services/offers.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { DeliverableBody } from '/components/ImageDeliverable.js';
 import { OfferCardView } from '/components/offer-card-view.js';
+import { Spinner } from '/components/Spinner.js';
+import { EmptyState } from '/components/EmptyState.js';
 import { THEMES, buildPortfolioData } from '/views/portfolio-themes.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 
@@ -74,7 +76,7 @@ function OrderRow({ o, view }) {
 }
 
 function OrdersList({ orders, view, empty }) {
-  if (!orders || orders.length === 0) return html`<p class="mc-empty">${empty}</p>`;
+  if (!orders || orders.length === 0) return html`<${EmptyState} text=${empty} />`;
   return html`<ul class="mc-order-list">${orders.map(o => html`<${OrderRow} key=${o.id} o=${o} view=${view} />`)}</ul>`;
 }
 
@@ -84,8 +86,8 @@ function CustomersPanel({ slug }) {
   useEffect(() => {
     apiGet(`/v1/orgs/${encodeURIComponent(slug)}/customers`).then(r => setCustomers(r.data?.customers ?? [])).catch(() => setCustomers([]));
   }, [slug]);
-  if (customers === null) return html`<div class="mc-center"><div class="spinner"></div></div>`;
-  if (!customers.length) return html`<p class="mc-empty">${t('myCompany.noCustomers')}</p>`;
+  if (customers === null) return html`<div class="mc-center"><${Spinner} /></div>`;
+  if (!customers.length) return html`<${EmptyState} text=${t('myCompany.noCustomers')} />`;
   return html`
     <ul class="mc-cust-list">
       ${customers.map(c => html`
@@ -123,7 +125,7 @@ function MembersPanel({ slug, creatorOwner, viewerRole }) {
     <option value="admin">${t('myCompany.roleAdmin')}</option>
     <option value="member">${t('myCompany.roleMember')}</option>
     <option value="visitor">${t('myCompany.roleVisitor')}</option>`;
-  if (members === null) return html`<div class="mc-center"><div class="spinner"></div></div>`;
+  if (members === null) return html`<div class="mc-center"><${Spinner} /></div>`;
   return html`
     <ul class="mc-member-list">
       ${members.map(m => {
@@ -259,7 +261,7 @@ function PaymentsPanel({ org }) {
     catch (e) { setPspMsg(e.message || 'Remove failed'); }
     finally { setPspBusy(false); }
   }
-  if (profile === null) return html`<p class="mc-empty">${t('myCompany.loading')}</p>`;
+  if (profile === null) return html`<${Spinner} />`;
   const handlers = (profile && profile.ucp && profile.ucp.payment_handlers) || [];
   const checkoutOn = !!(profile && profile.ucp && (profile.ucp.capabilities || []).length);
   const hasKybPre = !!org.businessId;
@@ -282,7 +284,7 @@ function PaymentsPanel({ org }) {
       </div>
       <div class="mc-label">${t('myCompany.paymentsHandlers')}</div>
       ${handlers.length === 0
-        ? html`<p class="mc-empty">${t('myCompany.paymentsNone')}</p>`
+        ? html`<${EmptyState} text=${t('myCompany.paymentsNone')} />`
         : html`<ul class="mc-order-list">${handlers.map(h => html`
             <li key=${h.id} class="mc-payment-row"><b>${h.title || h.id}</b> <span class="mc-mini">${h.id} · ${(h.currencies || []).join(', ')}</span></li>`)}</ul>`}
       <div class="mc-label">${t('myCompany.paymentsKyb')}
@@ -377,7 +379,7 @@ function PortfolioPanel({ org, offerings }) {
     finally { setBusy(false); }
   }
 
-  if (cfg === undefined) return html`<div class="mc-center"><div class="spinner"></div></div>`;
+  if (cfg === undefined) return html`<div class="mc-center"><${Spinner} /></div>`;
   const published = cfg?.enabled && cfg?.publicUrl;
 
   return html`
@@ -564,8 +566,8 @@ function OfferPicker({ slug, alreadyListed, onListed }) {
     catch (e) { alert(e.message || 'Failed'); }
     finally { setBusy(''); }
   }
-  if (agents === null) return html`<div class="mc-center"><div class="spinner"></div></div>`;
-  if (agents.length === 0) return html`<p class="mc-empty">${t('myCompany.noOffersToList')}</p>`;
+  if (agents === null) return html`<div class="mc-center"><${Spinner} /></div>`;
+  if (agents.length === 0) return html`<${EmptyState} text=${t('myCompany.noOffersToList')} />`;
   return html`
     <div class="mc-pick-agents">
       ${agents.map(ag => html`
@@ -657,7 +659,7 @@ export default function MyCompanyView() {
     finally { setBusy(false); }
   }
 
-  if (state === 'loading') return html`<div class="mc-container"><div class="mc-center"><div class="spinner"></div></div></div>`;
+  if (state === 'loading') return html`<div class="mc-container"><div class="mc-center"><${Spinner} /></div></div>`;
   if (state === 'enterprise') return html`<div class="mc-container"><div class="mc-card mc-stub"><h1 class="mc-title">${t('myCompany.title')}</h1><p class="mc-stub-badge">${t('myCompany.enterpriseBadge')}</p><p class="mc-desc">${t('myCompany.enterpriseRequired')}</p></div></div>`;
   if (state === 'unauth') return html`<div class="mc-container"><div class="mc-card"><h1 class="mc-title">${t('myCompany.title')}</h1><p class="mc-desc">${t('myCompany.loginRequired')}</p></div></div>`;
   if (state === 'error') return html`<div class="mc-container"><div class="mc-card"><h1 class="mc-title">${t('myCompany.title')}</h1><p class="mc-error">${errMsg}</p></div></div>`;
@@ -678,14 +680,14 @@ export default function MyCompanyView() {
       ${showMyOrders && html`
         <div class="mc-card">
           <h2 class="mc-col-title">${t('myCompany.myOrders')}</h2>
-          ${myOrders === null ? html`<div class="mc-center"><div class="spinner"></div></div>`
+          ${myOrders === null ? html`<div class="mc-center"><${Spinner} /></div>`
             : html`<${OrdersList} orders=${myOrders} view="buyer" empty=${t('myCompany.noMyOrders')} />`}
         </div>`}
 
       <div class="mc-grid">
         <aside class="mc-col">
           <h2 class="mc-col-title">${t('myCompany.yourCompanies')}</h2>
-          ${orgs.length === 0 && html`<p class="mc-empty">${t('myCompany.noCompanies')}</p>`}
+          ${orgs.length === 0 && html`<${EmptyState} text=${t('myCompany.noCompanies')} />`}
           <ul class="mc-org-list">
             ${orgs.map(org => html`<li key=${org.slug}>
               <button class="mc-org-item ${selected?.slug === org.slug ? 'active' : ''}" onClick=${() => openOrg(org)}>
@@ -706,7 +708,7 @@ export default function MyCompanyView() {
         </aside>
 
         <section class="mc-col">
-          ${!selected && html`<p class="mc-empty">${t('myCompany.selectHint')}</p>`}
+          ${!selected && html`<${EmptyState} text=${t('myCompany.selectHint')} />`}
           ${selected && html`
             <div class="mc-detail-head">
               <div class="mc-head-id">
@@ -733,7 +735,7 @@ export default function MyCompanyView() {
                 <button class="btn-outline btn-sm" onClick=${() => setShowPicker(s => !s)}>${showPicker ? t('myCompany.done') : t('myCompany.addFromOffers')}</button>
               </div>
               ${showPicker && html`<div class="mc-picker"><p class="mc-pick-hint">${t('myCompany.pickHint')}</p><${OfferPicker} slug=${selected.slug} alreadyListed=${listedKeys} onListed=${() => openOrg(selected)} /></div>`}
-              ${offerings.length === 0 && !showPicker && html`<p class="mc-empty">${t('myCompany.noOfferings')}</p>`}
+              ${offerings.length === 0 && !showPicker && html`<${EmptyState} text=${t('myCompany.noOfferings')} />`}
               <ul class="mc-off-list">
                 ${offerings.map(o => html`<${OfferingCard} key=${o.agentName + '/' + o.offerId} o=${o} orgOwner=${selected.creatorOwner} slug=${selected.slug} callerOwner=${callerOwner} role=${selected.role} onOrdered=${afterOrder} onChanged=${() => openOrg(selected)} />`)}
               </ul>`}
