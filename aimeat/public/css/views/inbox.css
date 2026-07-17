@@ -9,6 +9,7 @@
  *     + mobile keyboard: ≤760px height subtracts --inbox-kb (visualViewport keyboard inset set by the tab)
  *     and the stale `.inbox-msgs{max-height:50vh}` cap from the pre-single-pane stacked layout is removed.
  *     Bubble hover actions float as a bordered pill above the bubble's corner instead of over the text.
+ *   v1.3.1 -- 2026-07-17 -- Composer file chips align a ✕ remove button (inline-flex + gap).
  *   v1.2.0 -- 2026-07-17 -- Mobile single-pane: ≤760px shows one pane at a time (list, or an open
  *     thread/composer full-width with a ← Back button) instead of a list stacked above a squeezed
  *     thread. Adds `.inbox-back` + `.inbox-body--panel` rules; desktop two-pane unchanged.
@@ -452,7 +453,11 @@
 }
 .inbox-attach-btn:hover { border-color: var(--accent); }
 .inbox-file-chips { display: flex; flex-wrap: wrap; gap: 6px; }
-.inbox-file-chip { font-size: 12px; color: var(--text-dim); background: var(--card-bg-alt); padding: 3px 8px; border-radius: var(--radius-full); }
+.inbox-file-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: 12px; color: var(--text-dim); background: var(--card-bg-alt);
+  padding: 3px 4px 3px 8px; border-radius: var(--radius-full);
+}
 
 /* ── Tracked Responses: per-message actions, approval banner, track modal ── */
 .inbox-bubble { position: relative; }
