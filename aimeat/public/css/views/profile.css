@@ -638,7 +638,6 @@
 .pf .pkg-badge-featured{background:var(--warn-bg);color:var(--warn-fg)}
 .pf .pkg-badge-published{background:var(--success-bg);color:var(--success-fg)}
 .pf .pkg-badge-draft{background:var(--bg-surface);color:var(--text-dim)}
-.pf .pkg-empty{color:var(--muted,#888);font-size:.85rem;text-align:center;padding:2rem 0}
 /* Expanded instance card: per-component list with status dots and inline actions */
 .pf .pkg-card-expanded{grid-column:span 2}
 @media (max-width:720px){.pf .pkg-card-expanded{grid-column:span 1}}
@@ -707,7 +706,6 @@
 .kpkg-badge-published{background:var(--success-bg);color:var(--success-fg)}
 .kpkg-section{background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem}
 .kpkg-section h3{margin:0 0 .75rem}
-.kpkg-empty{color:var(--muted,#888);font-size:.85rem;text-align:center;padding:1.5rem 0}
 .kpkg-card{background:var(--bg,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:8px;padding:1rem;margin-bottom:.75rem;transition:border-color .15s}
 .kpkg-card-expanded{border-color:var(--accent,#6366F1)}
 .kpkg-card-header{display:flex;align-items:center;gap:.5rem;flex-wrap:wrap;margin-bottom:.5rem}
@@ -3260,7 +3258,6 @@
 .pf-skl-editor-md { width: 100%; font-family: var(--mono); font-size: 0.82rem; background: var(--card); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem; }
 .pf-skl-editor-actions { display: flex; align-items: center; gap: 0.5rem; margin-top: 0.5rem; flex-wrap: wrap; }
 .pf-skl-editor-hint { font-size: 0.76rem; color: var(--muted); margin-top: 0.4rem; }
-.pf-skl-empty { font-size: 0.84rem; color: var(--muted); padding: 0.4rem 0; }
 .pf-skl-frontmatter { background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.5rem 0.6rem; font-size: 0.74rem; color: var(--muted); white-space: pre-wrap; margin-bottom: 0.5rem; }
 .pf-skl-body-md { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 0.75rem 1rem; font-size: 0.86rem; max-height: 32rem; overflow: auto; }
 /* ── App-bound skills (2d) on My Apps cards ── */

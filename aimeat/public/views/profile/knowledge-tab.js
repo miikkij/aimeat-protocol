@@ -28,6 +28,7 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
+import { EmptyState } from '/components/EmptyState.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
@@ -615,7 +616,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         <h3>${t('knowledge.myKnowledge.title')}</h3>
         ${loading && html`<${Spinner} text=${t('common.loading')} />`}
         ${!loading && packages.length === 0 && html`
-          <p class="kpkg-empty">${t('knowledge.myKnowledge.empty')}</p>
+          <${EmptyState} text=${t('knowledge.myKnowledge.empty')} />
         `}
         ${!loading && packages.map(pkg => {
           const manifest = pkg.value;
@@ -692,7 +693,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                   <div class="kpkg-detail-entries">
                     <h4>${t('knowledge.myKnowledge.entries').replace('{count}', String(entries.length))}</h4>
                     ${entries.map((entry, i) => renderEntry(entry, i, pkg))}
-                    ${entries.length === 0 && html`<p class="kpkg-empty">No entries</p>`}
+                    ${entries.length === 0 && html`<${EmptyState} text=${'No entries'} />`}
                   </div>
 
                   ${(() => {
@@ -733,7 +734,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       <!-- SHARED WITH ME -->
       <div class="kpkg-section">
         <h3>${t('knowledge.sharedWithMe.title')}</h3>
-        <p class="kpkg-empty">${t('knowledge.sharedWithMe.empty')}</p>
+        <${EmptyState} text=${t('knowledge.sharedWithMe.empty')} />
       </div>
 
       <!-- KNOWLEDGE ORGANISMS -->
@@ -741,7 +742,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         <h3>${t('knowledge.organisms.title')}</h3>
         ${organismLoading && html`<${Spinner} text=${t('common.loading')} />`}
         ${!organismLoading && organismPackages.length === 0 && html`
-          <p class="kpkg-empty">${t('knowledge.organisms.empty')}</p>
+          <${EmptyState} text=${t('knowledge.organisms.empty')} />
         `}
         ${!organismLoading && organismPackages.map((pkg, i) => html`
           <div class="kpkg-card" key=${i}>
@@ -761,7 +762,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         <h3>${t('knowledge.discover.title')}</h3>
         ${discoverLoading && html`<${Spinner} text=${t('common.loading')} />`}
         ${!discoverLoading && discovered.filter(p => p.sharing?.allow_clone !== false).length === 0 && html`
-          <p class="kpkg-empty">${t('knowledge.discover.empty')}</p>
+          <${EmptyState} text=${t('knowledge.discover.empty')} />
         `}
         ${!discoverLoading && discovered.filter(pkg => pkg.sharing?.allow_clone !== false).map(pkg => html`
           <div class="kpkg-card" key=${pkg.package_id}>

@@ -22,6 +22,7 @@ import { useConfirm } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
 import * as skillsService from '/js/services/skills.js';
 
+import { EmptyState } from '/components/EmptyState.js';
 const html = htm.bind(h);
 
 /** Split a SKILL.md into its YAML frontmatter (shown as code) and markdown body (rendered). */
@@ -205,7 +206,7 @@ export default function SkillsTab({ showToast }) {
 
         ${loading ? html`<${Spinner} />` : (
           library.user.length === 0
-            ? html`<div class="pf-skl-empty">${t('skills.emptyMine')}</div>`
+            ? html`<${EmptyState} text=${t('skills.emptyMine')} />`
             : library.user.map(s => renderRow(s, { editable: true }))
         )}
       </div>
@@ -217,7 +218,7 @@ export default function SkillsTab({ showToast }) {
         <div class="pf-skl-section-hint">${t('skills.nodeLibraryHint')}</div>
         ${loading ? null : (
           library.node.length === 0
-            ? html`<div class="pf-skl-empty">${t('skills.emptyNode')}</div>`
+            ? html`<${EmptyState} text=${t('skills.emptyNode')} />`
             : library.node.map(s => renderRow(s, { editable: false }))
         )}
       </div>

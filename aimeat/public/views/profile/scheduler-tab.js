@@ -30,6 +30,7 @@ import { listAllSchedules, getSchedulerTab, createSchedule } from '/js/services/
 import ScheduleItem, { formatUntil } from './schedule-item.js';
 import SchedulerCalendar from './scheduler-calendar.js';
 
+import { EmptyState } from '/components/EmptyState.js';
 const html = htm.bind(h);
 
 /** Scroll to and briefly flash a schedule's card (or extension row) by id. */
@@ -125,7 +126,7 @@ export default function SchedulerTab({ showToast }) {
       <div class="sch-section">
         <h3 class="sch-section-title">${t('profile.scheduler.managedTitle')}</h3>
         ${data.managed.length === 0
-          ? html`<div class="sch-empty">${t('profile.scheduler.noManaged')}</div>`
+          ? html`<${EmptyState} text=${t('profile.scheduler.noManaged')} />`
           : html`<div class="sch-card-list">${data.managed.map(j => html`<${ScheduleItem} key=${j.id} schedule=${j} onChanged=${loadData} showToast=${showToast} />`)}</div>`}
       </div>
 

@@ -25,6 +25,7 @@ import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
+import { EmptyState } from '/components/EmptyState.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
@@ -403,7 +404,7 @@ export default function PackagesTab({ session, showToast, navigate }) {
         <div class="pkg-section">
           <h3>${t('packages.myInstances') || 'My Instances'}</h3>
           ${instances.length === 0 ? html`
-            <p class="pkg-empty">${t('packages.noInstances') || 'No packages installed yet.'}</p>
+            <${EmptyState} text=${t('packages.noInstances') || 'No packages installed yet.'} />
           ` : html`
             <div class="pkg-grid">
               ${instances.map(inst => html`
@@ -445,7 +446,7 @@ export default function PackagesTab({ session, showToast, navigate }) {
             </select>
           </div>
           ${filtered.length === 0 ? html`
-            <p class="pkg-empty">${t('packages.noPackages') || 'No packages available.'}</p>
+            <${EmptyState} text=${t('packages.noPackages') || 'No packages available.'} />
           ` : html`
             <div class="pkg-grid">
               ${filtered.map(pkg => html`
@@ -501,7 +502,7 @@ export default function PackagesTab({ session, showToast, navigate }) {
         <div class="pkg-section">
           <h3>${t('packages.gallery') || 'Template Gallery'}</h3>
           ${templates.length === 0 ? html`
-            <p class="pkg-empty">${t('packages.noTemplates') || 'No templates available yet.'}</p>
+            <${EmptyState} text=${t('packages.noTemplates') || 'No templates available yet.'} />
           ` : html`
             <div class="pkg-grid">
               ${templates.map(tpl => html`
