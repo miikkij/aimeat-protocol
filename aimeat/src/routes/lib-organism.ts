@@ -24,6 +24,9 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-organism.js"></script>
  *   then  const ws = await AIMEAT.organism.read(orgId); ws.spaces[0].items[0].value
  * @version-history
+ *   v1.2.0 — 2026-07-17 — createWorkspace() auto-fills a schemaRef + permissive schema per
+ *     objectType when omitted, so the documented "schemaRef optional" contract actually holds
+ *     (server meta-schema requires it; every workspace-provisioning app hit this).
  *   v1.1.0 — 2026-07-17 — create() unwraps the { organism } route envelope so it returns
  *     { id, name, ... } as documented (createWorkspace previously got orgId=undefined).
  *   v1.0.0 — 2026-07-02 — initial: normalized workspace read (objects+drafts merge, value.id
@@ -235,9 +238,28 @@ var organism = {
   // backing:'memory', writeRole:'member', schemaRef? }] }; schemas = { '<namespace>': <JSON Schema> }.
   // Needs organism:write. Returns { ws, types, schemas_locked }.
   async createWorkspace(orgId, name, manifest, schemas, readme) {
+    // The manifest meta-schema REQUIRES a schemaRef on every objectType, but this signature has
+    // always documented schemaRef as optional. Honour the documented contract: fill a schemaRef
+    // for any objectType missing one, and register a permissive schema for its namespace when the
+    // caller supplied none — so a records space provisions even without hand-authored schemas.
+    // (Both the PIPELINE flagship and the AEB A/B builders hit the required-schemaRef server rule.)
+    var m = manifest && typeof manifest === 'object' ? JSON.parse(JSON.stringify(manifest)) : manifest;
+    var sc = schemas && typeof schemas === 'object' ? Object.assign({}, schemas) : {};
+    if (m && Array.isArray(m.objectTypes)) {
+      for (var oi = 0; oi < m.objectTypes.length; oi++) {
+        var ot = m.objectTypes[oi];
+        if (ot && !ot.schemaRef) {
+          var slug = String(ot.name || ('type' + oi)).replace(/[^a-zA-Z0-9_-]/g, '-');
+          ot.schemaRef = 'schema:' + name + '-' + slug + '@1';
+        }
+        if (ot && ot.namespace && sc[ot.namespace] === undefined && (ot.mode || 'records') === 'records') {
+          sc[ot.namespace] = { type: 'object', additionalProperties: true };
+        }
+      }
+    }
     var res = await authFetch('/v1/organisms/' + encodeURIComponent(orgId) + '/workspaces', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: name, manifest: manifest, schemas: schemas, readme: readme })
+      body: JSON.stringify({ name: name, manifest: m, schemas: sc, readme: readme })
     });
     if (res.ok === false) throw fail(res, 'Failed to create workspace');
     return res.data !== undefined ? res.data : res;
