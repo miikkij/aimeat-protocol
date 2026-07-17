@@ -36792,6 +36792,8 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+        '429':
+          $ref: '#/components/responses/RateLimited'
   /v1/ghii/email/confirm:
     post:
       operationId: confirmGhiiEmail
@@ -37050,6 +37052,8 @@ paths:
                           verifiedAt: { type: string }
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -38355,7 +38359,7 @@ paths:
           required: true
           schema: { type: string }
       responses:
-        '200':
+        '201':
           description: Extension installed
           content:
             application/json:
