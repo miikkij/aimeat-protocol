@@ -44,6 +44,7 @@ import { runWithAi, stripCodeblock, cancelAiRequest, loadPromptFromBackend } fro
 import { getWorkflowStep, StepArrow } from './generator-detail.helpers.js';
 import { SpecSection } from './generator-detail.spec-section.js';
 import { TestScopeSelector, TestResultsView } from './generator-detail.results.js';
+import { useConfirm } from '/components/Modal.js';
 
 // Re-export moved symbols so existing consumers (generator-tab, generator-dashboard, dashboard hooks)
 // keep importing them from this module unchanged.
@@ -54,6 +55,7 @@ export { TestScopeSelector, TestResultsView };
 /* ── ComponentDetail ─────────────────────────────────── */
 
 export function ComponentDetail({ component, project, projectId, liveStatuses, onUpdate, onAdvance, showToast, session, orSettings }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [result, setResult] = useState(component.result || '');
   const [validationResult, setValidationResult] = useState(null);
   const [registering, setRegistering] = useState(false);
@@ -275,8 +277,8 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
     onUpdate();
   }
 
-  async function handleResetComponent() {
-    if (!confirm('Reset this component? Spec, code, test results, and registration will all be cleared.')) return;
+  function handleResetComponent() {
+    confirm('Reset this component? Spec, code, test results, and registration will all be cleared.', async () => {
     try {
       const s = session || window.AIMEAT?.auth?.getSession?.();
       if (!s) return;
@@ -306,6 +308,7 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
     } catch (e) {
       showToast?.('Reset failed: ' + e.message, true);
     }
+    }, { danger: true });
   }
 
   async function handleCopyPrompt() {
@@ -676,6 +679,7 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
           </div>
         `}
       `}
+      <${ConfirmUI} />
     </div>
   `;
 }

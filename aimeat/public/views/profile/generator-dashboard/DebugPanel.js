@@ -24,8 +24,12 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiDelete } from '/js/api.js';
 import { copyToClipboard } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { useConfirm } from '/components/Modal.js';
+import { useToast } from '/components/Toast.js';
 
 export function DebugPanel({ projectId }) {
+  const { confirm, ConfirmUI } = useConfirm();
+  const { showToast, ToastContainer } = useToast();
   const [files, setFiles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedFile, setSelectedFile] = useState(null);
@@ -59,14 +63,15 @@ export function DebugPanel({ projectId }) {
     setLoadingFile(false);
   }
 
-  async function handleDelete() {
-    if (!confirm('Delete all debug data for this project?')) return;
-    try {
-      await apiDelete(`/v1/generator/debug/${projectId}`);
-      setFiles([]);
-      setSelectedFile(null);
-      setFileContent(null);
-    } catch { /* */ }
+  function handleDelete() {
+    confirm('Delete all debug data for this project?', async () => {
+      try {
+        await apiDelete(`/v1/generator/debug/${projectId}`);
+        setFiles([]);
+        setSelectedFile(null);
+        setFileContent(null);
+      } catch { /* */ }
+    }, { danger: true });
   }
 
   const [copying, setCopying] = useState(false);
@@ -113,7 +118,7 @@ export function DebugPanel({ projectId }) {
       setTimeout(() => setCopying(false), 2000);
     } catch (e) {
       setCopying(false);
-      alert('Copy failed: ' + e.message);
+      showToast('Copy failed: ' + e.message, true);
     }
   }
 
@@ -186,5 +191,7 @@ export function DebugPanel({ projectId }) {
         ` : html`<p class="pf-gen-debug-hint">Select a file to view its content</p>`}
       </div>
     </div>
+    <${ConfirmUI} />
+    <${ToastContainer} />
   </div>`;
 }

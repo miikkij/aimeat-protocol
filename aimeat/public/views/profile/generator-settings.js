@@ -32,6 +32,7 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { saveProjectSettings, getProjectSettings } from '/js/services/generator.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
+import { useConfirm } from '/components/Modal.js';
 
 /** Compact number (73306 → "73.3k") for token axis/labels. */
 function fmtCompact(n) {
@@ -44,6 +45,7 @@ function fmtCompact(n) {
 /* ── OpenRouter / LM Studio / Custom Settings ────────── */
 
 export function OpenRouterSettings({ onSettingsChange }) {
+  const { confirm, ConfirmUI } = useConfirm();
   const [collapsed, setCollapsed] = useState(true);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [apiKey, setApiKey] = useState('');
@@ -160,25 +162,26 @@ export function OpenRouterSettings({ onSettingsChange }) {
     setTesting(false);
   }
 
-  async function handleDelete() {
-    if (!confirm(t('profile.generator.openrouter.deleteConfirm'))) return;
-    try {
-      await apiDelete('/v1/openrouter/settings');
-      setHasApiKey(false);
-      setApiKey('');
-      setModel('');
-      setVisionModel('');
-      setModels([]);
-      setModelsError(null);
-      setAutoRetry(false);
-      setMaxRetries(3);
-      setTemperature('');
-      setTopP('');
-      setMaxTokens('');
-      showMsg(t('profile.generator.openrouter.delete'));
-    } catch (e) {
-      showMsg(e.message, true);
-    }
+  function handleDelete() {
+    confirm(t('profile.generator.openrouter.deleteConfirm'), async () => {
+      try {
+        await apiDelete('/v1/openrouter/settings');
+        setHasApiKey(false);
+        setApiKey('');
+        setModel('');
+        setVisionModel('');
+        setModels([]);
+        setModelsError(null);
+        setAutoRetry(false);
+        setMaxRetries(3);
+        setTemperature('');
+        setTopP('');
+        setMaxTokens('');
+        showMsg(t('profile.generator.openrouter.delete'));
+      } catch (e) {
+        showMsg(e.message, true);
+      }
+    }, { danger: true });
   }
 
   if (!loaded) return null;
@@ -396,6 +399,7 @@ export function OpenRouterSettings({ onSettingsChange }) {
           </div>
         </div>
       `}
+      <${ConfirmUI} />
     </div>
   `;
 }

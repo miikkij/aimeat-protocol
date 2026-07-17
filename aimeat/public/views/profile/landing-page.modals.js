@@ -14,10 +14,12 @@ import { getMyPresence, setMyPresence } from "/js/services/presence.js";
 import { onLiveUpdate } from "/lib/live-updates.js";
 import { Spinner } from "./shared.js";
 import { PresenceDot } from "/components/PresenceDot.js";
+import { useToast } from "/components/Toast.js";
 
 /* ───── Edit Profile Modal ───── */
 
 export function EditProfileModal({ session, onClose, onSaved, onChangePassword }) {
+  const { showToast, ToastContainer } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [fields, setFields] = useState({ display_name: '', bio: '', avatar: '', locale: 'en', directory_listed: false });
@@ -63,10 +65,10 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
         }
         onSaved?.();
       } else {
-        alert(t('profile.landing.editError'));
+        showToast(t('profile.landing.editError'), true);
       }
     } catch {
-      alert(t('profile.landing.editError'));
+      showToast(t('profile.landing.editError'), true);
     }
     setSaving(false);
   };
@@ -144,6 +146,7 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
           </div>
         `}
       </div>
+      <${ToastContainer} />
     </div>
   `;
 }
