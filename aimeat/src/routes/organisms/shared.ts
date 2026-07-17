@@ -6,6 +6,8 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.5.0 — 2026-07-17 — collectPublicRecords + PublicRecord type: the records-space analogue of
+ *     collectPublicDocs, gated by the same meta.share, for the generic no-auth public-records read.
  *   v1.4.0 — 2026-07-16 — Version-bloat perf: publish/batch-publish/revert scans exclude `.version.N`
  *     rows in SQL (excludeVersionRows) and compute maxN value-free (workspace-versions) — historic
  *     full-copy values were loaded on every publish just to parse N out of the key names.
@@ -73,6 +75,7 @@ export type ResolvedShare = {
   access: ShareAccess; passwordHash: string | null;
 };
 export type PublicDoc = { type: string; id: string; title: string; markdown: string };
+export type PublicRecord = { type: string; id: string; value: unknown };
 
 export type OrganismHelpers = ReturnType<typeof createOrganismHelpers>;
 
@@ -601,6 +604,38 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     return out;
   };
 
+  /** Collect the PUBLISHED (.latest) records-space entries that the share meta marks public. An optional
+   *  filter narrows to one space (objectType name). Drafts/versions are never included; each entry's full
+   *  value is returned. Mirrors collectPublicDocs for records-mode spaces, gated by the same share meta
+   *  (docs[type/id] > spaces[type] > public), so a workspace opts a records space into anonymous read the
+   *  same way it opts a document space in. */
+  const collectPublicRecords = async (
+    id: string, ws: string, share: ResolvedShare, filter?: { space?: string },
+  ): Promise<PublicRecord[]> => {
+    const manifest = await readWsManifestValue(id, ws);
+    if (!manifest) return [];
+    const objectTypes = (manifest.objectTypes as Array<Record<string, unknown>> | undefined) ?? [];
+    const root = `organism.${id}.w.${ws}`;
+    const out: PublicRecord[] = [];
+    for (const ot of objectTypes) {
+      const name = typeof ot.name === 'string' ? ot.name : undefined;
+      const namespace = typeof ot.namespace === 'string' ? ot.namespace : undefined;
+      if (!name || !namespace || ot.mode !== 'records') continue;
+      if (filter?.space && filter.space !== name) continue;
+      const nsPrefix = `${root}.${namespace}.`;
+      const { items } = await storage.listAllMemory({ prefix: nsPrefix, limit: 5000 });
+      for (const r of items) {
+        if (!r.key.startsWith(nsPrefix)) continue;
+        const parts = r.key.slice(nsPrefix.length).split('.');
+        const recId = parts[0];
+        if (parts.slice(1).join('.') !== 'latest') continue;   // only published
+        if (!isDocPublic(share, name, recId)) continue;
+        out.push({ type: name, id: recId, value: r.value ?? null });
+      }
+    }
+    return out;
+  };
+
   /** Render a list of public docs as a single markdown document (for ?format=md). */
   const docsToMarkdown = (wsName: string | undefined, docs: PublicDoc[]): string => {
     const parts: string[] = [];
@@ -698,7 +733,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft,
     wsRegPrefix, bareOwner, findWsEntry, canReadWs, canReadWsManifest, readWsManifests, workspaceCountsByOrg, workspaceNamesByOrg, ensureConsent,
     setWorkspaceRole, revokeWorkspaceRole, memberRolesForWs,
-    readShareMeta, redactShare, shareGateDenied, isDocPublic, readWsManifestValue, collectPublicDocs, docsToMarkdown,
+    readShareMeta, redactShare, shareGateDenied, isDocPublic, readWsManifestValue, collectPublicDocs, collectPublicRecords, docsToMarkdown,
     requireWsManager, requireOrgAdmin, codeInviteGuards, requireOrgMember, toAgentGaii,
     validateArchiveTarget, archiveHandler,
   };
