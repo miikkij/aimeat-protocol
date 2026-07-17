@@ -169,6 +169,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     interviewTriggers: ['draw', 'drawing', 'sketch', 'piirto', 'piirustus'],
     sizeEstimate: '~10KB',
     status: 'stable',
+    modelTier: 'needs-doc',
     promptLine: '- aimeat-canvas — drawing / freeform canvas (`AIMEAT.canvas`)',
   },
   {
@@ -247,6 +248,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     interviewTriggers: ['dag', 'graph', 'pipeline', 'workflow canvas', 'org chart', 'blueprint'],
     sizeEstimate: '~14KB',
     status: 'preview',
+    modelTier: 'needs-doc',
   },
   {
     id: 'aimeat-ui-motion',
