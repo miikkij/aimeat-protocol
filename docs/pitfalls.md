@@ -127,6 +127,7 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 *Symptoms: another session's files show up in your `git status`, a commit that absorbs unrelated work.*
 
 - **Two Claude sessions can share one working tree.** Before committing, check `git status`/`git log`. Stage ONLY your files explicitly — **never `git add -A`**. For a file BOTH sessions touch (common collision points: `openapi.yaml`, `test/run-e2e-ci.ts`), stage just your hunk with `git apply --cached` (forward-apply your extracted hunk against a clean base, or stage-all then reverse-apply theirs) — do not absorb their in-flight lines.
+- **Parallel dev servers used to kill each other on `pnpm dev`** (fixed 2026-07-17): `scripts/kill-port.ts` step 2 killed EVERY node process whose command line matched `src/index.ts` — regardless of port — so a worktree server on 40733 died the moment another session ran `pnpm dev` on 40050 (symptom: full clean boot, then a silent `exit 1` with no error). It is now strictly port-scoped (a PID must own a socket on THIS port to be killed). If you see the silent-death symptom again, check who ran an OLD checkout's kill-port.
 - **The pre-commit hook runs over the whole working tree** (not just staged files), so your commit passes only if the other session's in-flight code also compiles. If the hook fails on code you didn't write, the other session is mid-edit.
 
 ## 14. Environment & tooling (Windows)
