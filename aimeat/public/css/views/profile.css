@@ -1469,6 +1469,9 @@
 .pf .stat-panel-h4   { color: var(--love1); margin: 0 0 .75rem; font-size: .9rem; }
 .pf .stat-row        { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border); }
 .pf .stat-row-label  { font-weight: 600; font-size: .85rem; }
+.pf .stat-row-label.success { color: var(--success-fg); }
+.pf .stat-row-label.warn    { color: var(--warn); }
+.pf .stat-row-label.danger  { color: var(--danger-fg); }
 .pf .stat-row-value  { color: var(--muted); font-size: .85rem; }
 .pf .stat-footer     { color: var(--muted); font-size: .8rem; margin-top: 1rem; }
 

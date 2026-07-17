@@ -825,6 +825,9 @@ a { color: inherit; text-decoration: none; }
 .stat-card-value.accent  { color: var(--accent); }
 .stat-card-value.success { color: var(--success-fg); }
 .stat-card-value.danger  { color: var(--danger-fg); }
+.stat-card-value.warn    { color: var(--warn); }
+.stat-card-value.purple  { color: var(--purple); }
+.stat-card-value.blue    { color: var(--blue); }
 .stat-card-value.mono    { font-family: var(--font-mono, monospace); }
 /* Shared responsive stat grid wrapper. */
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 32px; }

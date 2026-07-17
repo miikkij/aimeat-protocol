@@ -60,12 +60,12 @@ function successRate(sent, failed) {
   return ((sent / (sent + failed)) * 100).toFixed(1);
 }
 
-function rateColor(rate) {
-  if (rate === null) return 'var(--text-dim)';
+function rateTone(rate) {
+  if (rate === null) return '';
   const n = parseFloat(rate);
-  if (n >= 95) return '#22c55e';
-  if (n >= 80) return '#eab308';
-  return '#ef4444';
+  if (n >= 95) return 'green';
+  if (n >= 80) return 'amber';
+  return 'red';
 }
 
 /** Sum all values in a day-object whose key starts with `prefix`. */
@@ -235,16 +235,16 @@ export default function StatsTab({ data }) {
     <!-- Tunnel Stats -->
     <h3 class="adm-mt-lg adm-text-sm adm-text-accent">${t('dashboard.tunnelStats')}</h3>
     <div class="adm-grid adm-grid-4 adm-mt-md">
-      <${StatCard} label=${html`${t('dashboard.tunnelActive')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${gs.tunnel_connections_active ?? ts.connections_active ?? 0} color="#22c55e" />
+      <${StatCard} label=${html`${t('dashboard.tunnelActive')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${gs.tunnel_connections_active ?? ts.connections_active ?? 0} tone="green" />
       <${StatCard} label=${t('dashboard.tunnelTotal')} value=${ts.connections_total || 0} />
-      <${StatCard} label=${t('dashboard.tunnelDisconnections')} value=${ts.disconnections_total || 0} color="#eab308" />
-      <${StatCard} label=${t('dashboard.tunnelReconnects')} value=${ts.reconnects_total || 0} color="#3b82f6" />
+      <${StatCard} label=${t('dashboard.tunnelDisconnections')} value=${ts.disconnections_total || 0} tone="amber" />
+      <${StatCard} label=${t('dashboard.tunnelReconnects')} value=${ts.reconnects_total || 0} tone="blue" />
     </div>
     <div class="adm-grid adm-grid-4">
       <${StatCard} label=${t('dashboard.tunnelMsgSent')} value=${ts.messages_sent_total || 0} />
       <${StatCard} label=${t('dashboard.tunnelMsgReceived')} value=${ts.messages_received_total || 0} />
-      <${StatCard} label=${t('dashboard.tunnelDeliveryFails')} value=${ts.delivery_failures_total || 0} color=${ts.delivery_failures_total > 0 ? '#ef4444' : '#22c55e'} />
-      <${StatCard} label=${t('dashboard.tunnelHeartbeatMisses')} value=${ts.heartbeat_misses_total || 0} color=${ts.heartbeat_misses_total > 0 ? '#eab308' : '#22c55e'} />
+      <${StatCard} label=${t('dashboard.tunnelDeliveryFails')} value=${ts.delivery_failures_total || 0} tone=${ts.delivery_failures_total > 0 ? 'red' : 'green'} />
+      <${StatCard} label=${t('dashboard.tunnelHeartbeatMisses')} value=${ts.heartbeat_misses_total || 0} tone=${ts.heartbeat_misses_total > 0 ? 'amber' : 'green'} />
     </div>
     <div class="adm-grid adm-grid-2">
       <div class="adm-card">
@@ -261,12 +261,12 @@ export default function StatsTab({ data }) {
     <div class="adm-grid adm-grid-4 adm-mt-md">
       <${StatCard} label=${html`${t('dashboard.mailboxItems')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${gs.mailbox_items_total ?? ms.items_total ?? 0} />
       <${StatCard} label=${html`${t('dashboard.mailboxBytes')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${fmtBytes(gs.mailbox_bytes_total ?? ms.bytes_total ?? 0)} />
-      <${StatCard} label=${t('dashboard.mailboxEnqueued')} value=${ms.enqueued_total || 0} color="#3b82f6" />
-      <${StatCard} label=${t('dashboard.mailboxDelivered')} value=${ms.delivered_total || 0} color="#22c55e" />
+      <${StatCard} label=${t('dashboard.mailboxEnqueued')} value=${ms.enqueued_total || 0} tone="blue" />
+      <${StatCard} label=${t('dashboard.mailboxDelivered')} value=${ms.delivered_total || 0} tone="green" />
     </div>
     <div class="adm-grid adm-grid-4">
-      <${StatCard} label=${t('dashboard.mailboxExpired')} value=${ms.expired_total || 0} color=${ms.expired_total > 0 ? '#eab308' : '#22c55e'} />
-      <${StatCard} label=${t('dashboard.mailboxQuotaRejects')} value=${ms.quota_rejections_total || 0} color=${ms.quota_rejections_total > 0 ? '#ef4444' : '#22c55e'} />
+      <${StatCard} label=${t('dashboard.mailboxExpired')} value=${ms.expired_total || 0} tone=${ms.expired_total > 0 ? 'amber' : 'green'} />
+      <${StatCard} label=${t('dashboard.mailboxQuotaRejects')} value=${ms.quota_rejections_total || 0} tone=${ms.quota_rejections_total > 0 ? 'red' : 'green'} />
       <${StatCard} label=${html`${t('dashboard.mailboxOldestAge')} <span class="adm-badge-live">${t('dashboard.live')}</span>`} value=${fmtUp(gs.mailbox_oldest_item_age_seconds ?? ms.oldest_item_age_seconds ?? 0)} color="var(--text-dim)" />
     </div>
 
@@ -274,9 +274,9 @@ export default function StatsTab({ data }) {
     <h3 class="adm-mt-lg adm-text-sm adm-section-cyan">${t('dashboard.emailDelivery')}</h3>
     <div class="adm-grid adm-grid-4 adm-mt-md">
       <${StatCard} label=${t('dashboard.emailsSent')} value=${emailSent} />
-      <${StatCard} label=${t('dashboard.emailsFailed')} value=${emailFailed} color=${emailFailed > 0 ? '#ef4444' : '#22c55e'} />
-      <${StatCard} label=${t('dashboard.emailsRetried')} value=${emailRetried} color=${emailRetried > 0 ? '#eab308' : '#22c55e'} />
-      <${StatCard} label=${t('dashboard.successRate')} value=${emailRate !== null ? emailRate + '%' : '—'} color=${rateColor(emailRate)} />
+      <${StatCard} label=${t('dashboard.emailsFailed')} value=${emailFailed} tone=${emailFailed > 0 ? 'red' : 'green'} />
+      <${StatCard} label=${t('dashboard.emailsRetried')} value=${emailRetried} tone=${emailRetried > 0 ? 'amber' : 'green'} />
+      <${StatCard} label=${t('dashboard.successRate')} value=${emailRate !== null ? emailRate + '%' : '—'} tone=${rateTone(emailRate)} />
     </div>
     ${sd.email_sent_by_type ? html`
       <div class="adm-card adm-mt-md">
@@ -295,9 +295,9 @@ export default function StatsTab({ data }) {
     <h3 class="adm-mt-lg adm-text-sm adm-section-violet">${t('dashboard.pushDelivery')}</h3>
     <div class="adm-grid adm-grid-4 adm-mt-md">
       <${StatCard} label=${t('dashboard.pushSent')} value=${pushSent} />
-      <${StatCard} label=${t('dashboard.pushFailed')} value=${pushFailed} color=${pushFailed > 0 ? '#ef4444' : '#22c55e'} />
-      <${StatCard} label=${t('dashboard.expiredSubs')} value=${pushExpired} color=${pushExpired > 0 ? '#eab308' : '#22c55e'} />
-      <${StatCard} label=${t('dashboard.successRate')} value=${pushRate !== null ? pushRate + '%' : '—'} color=${rateColor(pushRate)} />
+      <${StatCard} label=${t('dashboard.pushFailed')} value=${pushFailed} tone=${pushFailed > 0 ? 'red' : 'green'} />
+      <${StatCard} label=${t('dashboard.expiredSubs')} value=${pushExpired} tone=${pushExpired > 0 ? 'amber' : 'green'} />
+      <${StatCard} label=${t('dashboard.successRate')} value=${pushRate !== null ? pushRate + '%' : '—'} tone=${rateTone(pushRate)} />
     </div>
     ${sd.push_sent_by_type ? html`
       <div class="adm-card adm-mt-md">
@@ -315,8 +315,8 @@ export default function StatsTab({ data }) {
     <h3 class="adm-mt-lg adm-text-sm adm-section-amber">${t('dashboard.mailboxNotifications')}</h3>
     <div class="adm-grid adm-grid-3 adm-mt-md">
       <${StatCard} label=${t('dashboard.mailboxNotifSent')} value=${mboxSent} />
-      <${StatCard} label=${t('dashboard.mailboxNotifFailed')} value=${mboxFailed} color=${mboxFailed > 0 ? '#ef4444' : '#22c55e'} />
-      <${StatCard} label=${t('dashboard.mailboxNotifBlocked')} value=${mboxBlocked} color=${mboxBlocked > 0 ? '#eab308' : '#22c55e'} />
+      <${StatCard} label=${t('dashboard.mailboxNotifFailed')} value=${mboxFailed} tone=${mboxFailed > 0 ? 'red' : 'green'} />
+      <${StatCard} label=${t('dashboard.mailboxNotifBlocked')} value=${mboxBlocked} tone=${mboxBlocked > 0 ? 'amber' : 'green'} />
     </div>
     ${(sd.mailbox_notif_blocked_by_type || sd.mailbox_notif_sent_by_type) ? html`
       <div class="adm-card adm-mt-md adm-text-sm adm-mailbox-inline">
@@ -341,24 +341,24 @@ export default function StatsTab({ data }) {
     <!-- Consent Permission Stats -->
     <h3 class="adm-mt-lg adm-text-sm adm-section-purple">${t('dashboard.consentPermStats')}</h3>
     <div class="adm-grid adm-grid-4 adm-mt-md">
-      <${StatCard} label=${t('dashboard.consentActiveRules')} value=${cs.active_rules || 0} color="#a855f7" />
-      <${StatCard} label=${t('dashboard.consentByGaii')} value=${cs.by_gaii || 0} color="#3b82f6" />
-      <${StatCard} label=${t('dashboard.consentByGhii')} value=${cs.by_ghii || 0} color="#a855f7" />
-      <${StatCard} label=${t('dashboard.consentByOrganism')} value=${cs.by_organism || 0} color="#22c55e" />
+      <${StatCard} label=${t('dashboard.consentActiveRules')} value=${cs.active_rules || 0} tone="purple" />
+      <${StatCard} label=${t('dashboard.consentByGaii')} value=${cs.by_gaii || 0} tone="blue" />
+      <${StatCard} label=${t('dashboard.consentByGhii')} value=${cs.by_ghii || 0} tone="purple" />
+      <${StatCard} label=${t('dashboard.consentByOrganism')} value=${cs.by_organism || 0} tone="green" />
     </div>
     <div class="adm-grid adm-grid-4">
-      <${StatCard} label=${t('dashboard.consentByDomain')} value=${cs.by_domain || 0} color="#eab308" />
+      <${StatCard} label=${t('dashboard.consentByDomain')} value=${cs.by_domain || 0} tone="amber" />
       <${StatCard} label=${t('dashboard.consentByNode')} value=${cs.by_node || 0} color="var(--text-dim)" />
-      <${StatCard} label=${t('dashboard.consentByWildcard')} value=${cs.by_wildcard || 0} color=${cs.by_wildcard > 0 ? '#ef4444' : '#22c55e'} />
+      <${StatCard} label=${t('dashboard.consentByWildcard')} value=${cs.by_wildcard || 0} tone=${cs.by_wildcard > 0 ? 'red' : 'green'} />
       <${StatCard} label=${t('dashboard.consentDataPatterns')} value=${cs.unique_patterns || 0} />
     </div>
 
     <!-- Security Stats -->
     <h3 class="adm-mt-lg adm-text-sm adm-section-red">${t('dashboard.securityStats')}</h3>
     <div class="adm-grid adm-grid-4 adm-mt-md">
-      <${StatCard} label=${t('dashboard.authFailures')} value=${sd.auth_failures_total || 0} color=${sd.auth_failures_total > 0 ? '#ef4444' : '#22c55e'} />
-      <${StatCard} label=${t('dashboard.rateLimitHits')} value=${sd.rate_limit_hits_total || 0} color=${sd.rate_limit_hits_total > 0 ? '#eab308' : '#22c55e'} />
-      <${StatCard} label=${t('dashboard.scopeDenials')} value=${sd.scope_denials_total || 0} color=${sd.scope_denials_total > 0 ? '#eab308' : '#22c55e'} />
+      <${StatCard} label=${t('dashboard.authFailures')} value=${sd.auth_failures_total || 0} tone=${sd.auth_failures_total > 0 ? 'red' : 'green'} />
+      <${StatCard} label=${t('dashboard.rateLimitHits')} value=${sd.rate_limit_hits_total || 0} tone=${sd.rate_limit_hits_total > 0 ? 'amber' : 'green'} />
+      <${StatCard} label=${t('dashboard.scopeDenials')} value=${sd.scope_denials_total || 0} tone=${sd.scope_denials_total > 0 ? 'amber' : 'green'} />
     </div>
   `;
 }
@@ -431,7 +431,7 @@ async function renderAllCharts(sd, chartRefs) {
       labels: weekLabels,
       datasets: [
         { label: t('dashboard.thisWeek') || 'This week', data: getWeekData(0), borderColor: '#3b82f6', backgroundColor: '#3b82f622', fill: true },
-        { label: t('dashboard.lastWeek') || 'Last week', data: getWeekData(1), borderColor: '#22c55e', backgroundColor: '#22c55e22', fill: true },
+        { label: t('dashboard.lastWeek') || 'Last week', data: getWeekData(1), borderColor: 'green', backgroundColor: '#22c55e22', fill: true },
       ],
     }, options: chartOpts });
   }
@@ -452,7 +452,7 @@ async function renderAllCharts(sd, chartRefs) {
     refs.chartTunnel = new Chart(tc, { type: 'doughnut', data: {
       labels: [t('dashboard.tunnelMsgSent') || 'Sent', t('dashboard.tunnelMsgReceived') || 'Received', t('dashboard.tunnelDeliveryFails') || 'Rejected', t('dashboard.tunnelMailboxFallbacks') || 'Fallbacks'],
       datasets: [{ data: [tunnel.messages_sent_total || 0, tunnel.messages_received_total || 0, tunnel.delivery_failures_total || 0, tunnel.mailbox_fallbacks_total || 0],
-        backgroundColor: ['#3b82f6', '#22c55e', '#ef4444', '#eab308'] }],
+        backgroundColor: ['#3b82f6', 'green', 'red', 'amber'] }],
     }, options: { responsive: true, plugins: { legend: { labels: { color: '#94a3b8' } } } } });
   }
 
