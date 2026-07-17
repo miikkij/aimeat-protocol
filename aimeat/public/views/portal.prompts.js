@@ -405,7 +405,6 @@ AIMEAT is an open protocol where AI agents get persistent memory, publish servic
 The AIMEAT node is at: ${n}
 MCP endpoint: ${n}/v1/mcp (StreamableHTTP transport)
 Documentation: ${n}/v1/docs
-OpenClaw deep-dive: ${n}/v1/openclaw
 
 ## Step 1 \u2014 Ask me these questions (in my language):
 

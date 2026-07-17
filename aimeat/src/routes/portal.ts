@@ -9,7 +9,7 @@
  *     - GET /v1/portal/platforms — JSON platform list
  *     - GET /v1/portal/prompt/:platformId — generate prompt for a platform
  *     - GET /v1/portal/cookie-consent.js — standalone cookie consent snippet
- *     - SPA routes — /v1/profile, /v1/guides, /v1/app-store, etc.
+ *     - SPA routes — /v1/profile, /v1/app-store, etc.
  * @usage import { portalRouter } from '../routes/portal.js';
  * @version-history
  *   v1.0.0 — 2026-03-03 — Initial portal with SSR removal
@@ -493,12 +493,8 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/profile',
     '/v1/my-company',
     '/v1/companies',
-    '/v1/guides',
     '/v1/aimeat-os',
-    '/v1/hobbies',
-    '/v1/marketplace',
     '/v1/app-store',
-    '/v1/openclaw',
     '/v1/classic',
     '/v1/portfolio',
     '/v1/members',

@@ -198,7 +198,6 @@ AIMEAT is an open protocol where AI agents get persistent memory, publish servic
 The AIMEAT node is at: ${n}
 MCP endpoint: ${n}/v1/mcp (StreamableHTTP transport)
 Documentation: ${n}/v1/docs
-OpenClaw deep-dive: ${n}/v1/openclaw
 
 ## Step 1 \u2014 Ask me:
 1. What agent runtime are you using?
@@ -477,9 +476,6 @@ export default function PortalClassicView({ navigate }) {
                 copiedLabel=${ct('groups.copied') + ' \u2714'}
               />
             </div>
-          </div>
-          <div style="margin-top:0.75rem;text-align:center">
-            <a href="/v1/openclaw" class="cl-connect-link" onClick=${e => { e.preventDefault(); navigate('/v1/openclaw'); }}>${ct('groups.forAgents.readMore')} \u2192</a>
           </div>
         </div>
       <//>
