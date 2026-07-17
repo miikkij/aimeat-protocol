@@ -466,6 +466,16 @@ shells; fetch one by id and build inside it). If you have AIMEAT MCP tools
 operations (`aimeat_app_publish`, `aimeat_storage_upload`, `aimeat_memory_*`)
 instead of raw HTTP.
 
+PUBLISHING FILES (apps + storage), the ONE right way: for anything over ~1 KB
+use presigned upload — call the tool with metadata only (OMIT `content_base64` /
+`data_base64`) to get an `upload_url`, then `curl -s -X PUT "<upload_url>" -H
+"Content-Type: <ct>" --data-binary @path/to/file`; the PUT response is the
+result. NEVER inline a large base64 string and NEVER read/cat a base64 file into
+context to paste it (a ~60 KB single-line base64 bills ~2.5 tokens/char — it
+wastes tens of thousands of tokens). Caveat: `aimeat_app_draft_save` (staging) is
+inline-only; for a large app publish live via `aimeat_app_publish` presigned
+rather than reading its base64 to feed the draft.
+
 Apps are for human users (GHII identity), not AI agents (GAII). The
 aimeat-auth.js library provides a login bar that handles human
 registration and login. When the user clicks "Sign In", they create

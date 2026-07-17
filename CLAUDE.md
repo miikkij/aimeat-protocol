@@ -204,6 +204,8 @@ Full guide: `docs/coding-guidelines/extension-memory-architecture.md`. Three nam
 
 File-accepting MCP tools (`aimeat_app_publish`, `aimeat_storage_upload`, `aimeat_extension_install`, `aimeat_cortex_install`) support presigned upload: omit the content param → the tool returns an `upload_url` → PUT the raw file (App/Storage) or a ZIP with `manifest.yaml` + `scripts/`/`libs/` (Extension/Cortex). Inline still works. Full guide (token TTL, size caps): `docs/coding-guidelines/mcp-uploads.md`
 
+**DEFAULT for any file over ~1 KB (apps AND storage): use presigned, never inline.** Omit the content param, then `curl -s -X PUT "<upload_url>" -H "Content-Type: <ct>" --data-binary @file`. **NEVER `Read`/`cat` a base64 (or large) file into context to inline it** — a ~60 KB single-line base64 bills ~2.5 tokens/char and reading it wastes tens of thousands of tokens; this is a repeat time-sink. Caveat: `aimeat_app_draft_save` (staging) is **inline-only** (no presigned) — for a large app publish live via `aimeat_app_publish` presigned rather than reading its base64 to feed the draft.
+
 ## Key Commands
 
 All commands from **project root** (root `package.json` proxies to `aimeat/`).
