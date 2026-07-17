@@ -506,7 +506,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
       <!-- IMPORT BOX -->
       <div class="kpkg-import-box">
-        <h3>${t('knowledge.import.title')}</h3>
+        <div class="section-title">${t('knowledge.import.title')}</div>
         <textarea
           class="kpkg-import-textarea"
           placeholder=${t('knowledge.import.placeholder')}
@@ -520,7 +520,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
         ${importPreview && html`
           <div class="kpkg-preview">
-            <h4>${t('knowledge.import.preview')}</h4>
+            <div class="card-h3">${t('knowledge.import.preview')}</div>
             <div class="kpkg-preview-meta">
               <span class="kpkg-badge kpkg-badge-type">${t('knowledge.contentTypes.' + (importPreview.pkg.content_type || 'document')) || (importPreview.pkg.content_type || 'document').toUpperCase()}</span>
               <span class="kpkg-badge kpkg-badge-synthesis">${t('knowledge.synthesis.' + (importPreview.pkg.synthesis?.level || 'original'))}</span>
@@ -613,7 +613,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
       <!-- MY KNOWLEDGE -->
       <div class="kpkg-section">
-        <h3>${t('knowledge.myKnowledge.title')}</h3>
+        <div class="section-title">${t('knowledge.myKnowledge.title')}</div>
         ${loading && html`<${Spinner} text=${t('common.loading')} />`}
         ${!loading && packages.length === 0 && html`
           <${EmptyState} text=${t('knowledge.myKnowledge.empty')} />
@@ -691,7 +691,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                   </div>
 
                   <div class="kpkg-detail-entries">
-                    <h4>${t('knowledge.myKnowledge.entries').replace('{count}', String(entries.length))}</h4>
+                    <div class="card-h3">${t('knowledge.myKnowledge.entries').replace('{count}', String(entries.length))}</div>
                     ${entries.map((entry, i) => renderEntry(entry, i, pkg))}
                     ${entries.length === 0 && html`<${EmptyState} text=${'No entries'} />`}
                   </div>
@@ -702,7 +702,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
                     const pkgRefs = manifest.references || [];
                     if (pkgRefs.length > 0 && !hasPerEntryRefs) return html`
                       <div class="kpkg-detail-refs">
-                        <h4>${t('knowledge.myKnowledge.references') || 'References'} (${t('knowledge.myKnowledge.packageLevel') || 'package-level'})</h4>
+                        <div class="card-h3">${t('knowledge.myKnowledge.references') || 'References'} (${t('knowledge.myKnowledge.packageLevel') || 'package-level'})</div>
                         ${pkgRefs.map((ref, i) => html`
                           <div key=${i} class="kpkg-ref pf-ref-row ${ref.verified ? 'kpkg-ref-verified' : 'kpkg-ref-unverified'}">
                             <span class="pf-ref-icon">${ref.verified ? '\u2705' : '\u2753'}</span>
@@ -733,13 +733,13 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
       <!-- SHARED WITH ME -->
       <div class="kpkg-section">
-        <h3>${t('knowledge.sharedWithMe.title')}</h3>
+        <div class="section-title">${t('knowledge.sharedWithMe.title')}</div>
         <${EmptyState} text=${t('knowledge.sharedWithMe.empty')} />
       </div>
 
       <!-- KNOWLEDGE ORGANISMS -->
       <div class="kpkg-section">
-        <h3>${t('knowledge.organisms.title')}</h3>
+        <div class="section-title">${t('knowledge.organisms.title')}</div>
         ${organismLoading && html`<${Spinner} text=${t('common.loading')} />`}
         ${!organismLoading && organismPackages.length === 0 && html`
           <${EmptyState} text=${t('knowledge.organisms.empty')} />
@@ -759,7 +759,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
 
       <!-- DISCOVER -->
       <div class="kpkg-section">
-        <h3>${t('knowledge.discover.title')}</h3>
+        <div class="section-title">${t('knowledge.discover.title')}</div>
         ${discoverLoading && html`<${Spinner} text=${t('common.loading')} />`}
         ${!discoverLoading && discovered.filter(p => p.sharing?.allow_clone !== false).length === 0 && html`
           <${EmptyState} text=${t('knowledge.discover.empty')} />

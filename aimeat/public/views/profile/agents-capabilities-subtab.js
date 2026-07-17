@@ -30,7 +30,7 @@ function TechnicalSkills({ capabilities }) {
 
   return html`
     <div class="agd-directive-section">
-      <h4>${tFallback('profile.agents.capabilities.technical', 'Technical Skills')}</h4>
+      <div class="card-h3">${tFallback('profile.agents.capabilities.technical', 'Technical Skills')}</div>
       <div class="agd-cap-list">
         ${capabilities.map(cap => html`
           <span class="agd-cap-badge">
@@ -58,7 +58,7 @@ function DomainKnowledge({ domains, languages: separateLanguages }) {
 
   return html`
     <div class="agd-directive-section">
-      <h4>${tFallback('profile.agents.capabilities.domain', 'Domain Knowledge')}</h4>
+      <div class="card-h3">${tFallback('profile.agents.capabilities.domain', 'Domain Knowledge')}</div>
       ${otherDomains.length > 0 && html`
         <div class="agd-cap-list">
           ${otherDomains.map(d => html`
@@ -88,7 +88,7 @@ function ActionQueueSupport({ scopes }) {
 
   return html`
     <div class="agd-directive-section">
-      <h4>${tFallback('profile.agents.capabilities.actionQueue', 'Action Queue Support')}</h4>
+      <div class="card-h3">${tFallback('profile.agents.capabilities.actionQueue', 'Action Queue Support')}</div>
       <div class="agd-cap-queue-list">
         ${canAccept && html`
           <div class="agd-cap-queue-item">

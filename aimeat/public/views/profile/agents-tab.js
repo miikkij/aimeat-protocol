@@ -455,7 +455,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
 
     ${pendingRequests.length > 0 && html`
       <div class="agent-cta mb-1">
-        <h3>${t('profile.agents.pendingRequests.title')}</h3>
+        <div class="section-title">${t('profile.agents.pendingRequests.title')}</div>
         <p>${t('profile.agents.pendingRequests.desc')}</p>
         ${pendingRequests.map(req => html`
           <div class="card mt-1 p-1" key=${req.user_code}>
