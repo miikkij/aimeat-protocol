@@ -72,6 +72,17 @@ models (**pixi is the confirmed example** — proven to *fail* on Haiku, still f
 `needs-doc` = never crashes but useless to a model that won't fetch the doc. A blank "Proven on" means
 nobody has run it yet — the tier there is inferred, not demonstrated.
 
+### Base libraries (SDK + UI cortex)
+
+The SDK wrappers (aimeat-auth/data/organism/ai/storage/…) and the UI cortex packs
+(ui-viewers/forms/layout/nav/dialogs, canvas, dag, i18n) are all AIMEAT-authored with no
+training-data priors → **`needs-doc` by definition** (that tier is *what they are*, not a guess).
+A Haiku sweep (`results/aeb3-baselib-sweep.md`) confirmed the core SDK is called with correct idioms
+when the ai_docs are fetched, but surfaced the `needs-doc` failure mode for the UI cortex: **a
+mid-tier model loads the wrappers and then hand-rolls native HTML instead of calling them** — so the
+acceleration only lands if the model commits to the API. Fix is per-pack aiDoc (lead with a minimal
+copy-pasteable call). Browser-verified proofs for these await a watch-immune bench (see the sweep doc).
+
 ## The proof ledger — per pack, per model, append-only
 
 A tier is a *summary*; the truth is the list of **proofs** underneath it. Each proof is one run of a
