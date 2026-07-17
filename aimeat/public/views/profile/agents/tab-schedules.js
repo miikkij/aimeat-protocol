@@ -5,6 +5,7 @@
  *   internal (the agent's self-reported mirror, read-only). Lets the owner create
  *   a new schedule targeting this agent (reusing the master view's CreateForm).
  * @version-history
+ *   v1.2.0 -- 2026-07-17 -- Dispatched / agent-internal groups become pf-agd-cards.
  *   v1.1.0 -- 2026-07-17 -- Style unification: canonical agent-detail section headers
  *     (pf-agd-section-header/-title) instead of scheduler-view headings, pf-agd-empty
  *     empty states, and the Tasks-tab "+ New" outline button pattern.
@@ -59,14 +60,14 @@ export default function TabSchedules({ agentName, allAgents = [], showToast }) {
       ${showForm && html`<${CreateForm} agents=${allAgents} lockedAgent=${agentName} showToast=${showToast}
         onCreated=${() => { setShowForm(false); loadData(); }} />`}
 
-      <div class="sch-section">
+      <div class="sch-section pf-agd-card">
         <div class="pf-agd-section-title">${t('profile.scheduler.dispatchedTitle')}</div>
         ${managed.length === 0
           ? html`<div class="pf-agd-empty">${t('profile.scheduler.noDispatched')}</div>`
           : html`<div class="sch-card-list">${managed.map(j => html`<${ScheduleItem} key=${j.id} schedule=${j} onChanged=${loadData} showToast=${showToast} />`)}</div>`}
       </div>
 
-      <div class="sch-section">
+      <div class="sch-section pf-agd-card">
         <div class="pf-agd-section-title">${t('profile.scheduler.internalTitle')}</div>
         <div class="sch-muted sch-internal-note">${t('profile.scheduler.internalNote')}</div>
         ${internal.length === 0

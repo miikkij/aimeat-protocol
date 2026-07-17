@@ -4,6 +4,8 @@
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.
  * @version-history
+ *   v1.8.0 -- 2026-07-17 -- Card scheme generalized: pf-agd-prod-grid renamed to the
+ *     shared pf-agd-card-grid; production sections carry pf-agd-card / --full.
  *   v1.9.0 -- 2026-07-16 -- Mount folds webhook + delivery-log + onboarding-checklist into GET
  *     /v1/agents/:name/integration/overview (getIntegrationOverview); skill-bundle version stays a
  *     separate request; individual reads kept as fallback.
@@ -321,9 +323,9 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
     : t('profile.agents.detail.integration.manual');
 
   return html`
-    <div class="pf-agd-prod-grid">
+    <div class="pf-agd-card-grid">
       <!-- CONNECTION -->
-      <div class="pf-agd-section">
+      <div class="pf-agd-section pf-agd-card">
         <div class="pf-agd-section-label">${t('profile.agents.detail.connection')}</div>
         <div class="pf-agd-info-row">
           <span class="pf-agd-info-label">${t('profile.agents.detail.integration.deliveryMethod')}</span>
@@ -407,7 +409,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       </div>
 
       <!-- PLATFORM & SKILL -->
-      <div class="pf-agd-section">
+      <div class="pf-agd-section pf-agd-card">
         <div class="pf-agd-section-label">${t('profile.agents.detail.platform')} & ${t('profile.agents.detail.skillBundle')}</div>
         <div class="pf-agd-info-row">
           <span class="pf-agd-info-label">${t('profile.agents.detail.platform')}</span>
@@ -441,7 +443,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       </div>
 
       <!-- READINESS -->
-      <div class="pf-agd-section pf-agd-section--full">
+      <div class="pf-agd-section pf-agd-card pf-agd-card--full">
         <div class="pf-agd-section-label">${t('profile.agents.detail.readiness')}</div>
         <div class="pf-agd-step-pills">
           ${steps.map(s => html`
@@ -481,7 +483,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
 
       <!-- POST-ONBOARDING SETUP -->
       ${postChecklist && html`
-        <div class="pf-agd-section">
+        <div class="pf-agd-section pf-agd-card">
           <div class="pf-agd-section-label">${t('profile.agents.detail.integration.postOnboardingSetup')}</div>
           <div class="pf-agd-info-row">
             <span class="pf-agd-info-label">${t('profile.agents.detail.integration.commandsRegistered')}</span>
@@ -517,7 +519,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       `}
 
       <!-- IDENTITY -->
-      <div class="pf-agd-section">
+      <div class="pf-agd-section pf-agd-card">
         <div class="pf-agd-section-label">${t('profile.agents.detail.identity')}</div>
         <div class="pf-agd-info-row">
           <span class="pf-agd-info-label">GAII</span>
@@ -544,7 +546,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
       </div>
 
       <!-- DELIVERY LOG -->
-      <div class="pf-agd-section pf-agd-section--full">
+      <div class="pf-agd-section pf-agd-card pf-agd-card--full">
         <div class="pf-agd-section-label">${t('profile.agents.detail.deliveryLog')}</div>
         ${displayDeliveries.length > 0 ? html`
           <table class="pf-agd-delivery-log">

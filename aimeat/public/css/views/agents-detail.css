@@ -4,6 +4,9 @@
  *   Uses agd- prefix to avoid collisions with other profile styles.
  *   All colors use CSS variables from theme.css.
  * @version-history
+ *   v1.20.0 -- 2026-07-17 -- Generalize the card scheme: .pf-agd-card (standalone or
+ *     grid child) + .pf-agd-card-grid/--full replace the integration-only
+ *     .pf-agd-prod-grid; quality section titles drop the stacked-layout margin-top.
  *   v1.19.0 -- 2026-07-17 -- Integration production view: .pf-agd-prod-grid two-column
  *     card grid (+ --full spans); .pf-agd-info-row becomes a fixed 150px-label grid so
  *     values and status dots align in one column.
@@ -2470,24 +2473,29 @@
   margin-bottom: 1.25rem;
 }
 
-/* Production view: sections become cards in a responsive two-column grid so the
-   short info lists (Connection, Platform, Post-onboarding, Identity) pair up
-   side by side instead of one long ragged column with a dead right half.
-   Readiness and the delivery log stay full-width (--full). */
-.pf .pf-agd-prod-grid {
+/* Card scheme shared by every agent-detail tab: content groups become bordered
+   cards (.pf-agd-card) and a tab that pairs short groups side by side wraps
+   them in .pf-agd-card-grid (responsive two-column; --full spans both). This
+   replaces the "one long ragged column with a dead right half" layout. */
+.pf .pf-agd-card {
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  background: var(--card, #FFFFFF);
+  min-width: 0;
+}
+.pf .pf-agd-card + .pf-agd-card { margin-top: 0.85rem; }
+.pf .pf-agd-card-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
   gap: 0.85rem;
   align-items: stretch;
 }
-.pf .pf-agd-prod-grid > .pf-agd-section {
+.pf .pf-agd-card-grid > .pf-agd-card {
+  margin-top: 0;
   margin-bottom: 0;
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 10px;
-  padding: 0.85rem 1rem;
-  background: var(--card, #FFFFFF);
 }
-.pf .pf-agd-prod-grid > .pf-agd-section--full {
+.pf .pf-agd-card-grid > .pf-agd-card--full {
   grid-column: 1 / -1;
 }
 /* Same visual as .pf-agd-section-title — kept as a separate name only because the
@@ -3382,8 +3390,10 @@
   line-height: 1.45;
 }
 
+/* Section titles sit at the top of their own card now — card padding + grid gap
+   provide the separation the old stacked layout needed a margin-top for. */
 .pf .pf-agd-quality .pf-agd-section-title {
-  margin-top: 1.25rem;
+  margin-top: 0;
 }
 
 /* Duration-by-context chips under the performance cards */

@@ -3,6 +3,8 @@
  * @description Data Access tab: shared tags, memory areas, knowledge packages,
  *   and effective scope summary.
  * @version-history
+ *   v1.10.0 -- 2026-07-17 -- Card layout: tags/areas/knowledge/skills sections pair up in
+ *     the shared pf-agd-card-grid; stored keys + scope summary span full width.
  *   v1.0.0 -- 2026-05-24 -- Initial creation for Agent Detail Tab-View
  *   v1.1.0 -- 2026-05-24 -- Add area form (F12), link package (F13), doc count (F14), tags help (F15), scope footer (F16)
  *   v1.2.0 -- 2026-05-30 -- Live-update refresh also re-fetches the currently expanded memory entry's value (was: only the key list refreshed, the open entry stayed stale until the user closed + reopened it or switched tabs). Also stop showing the full-tab "Loading..." overlay on every live-update tick -- it now only shows on initial mount.
@@ -446,9 +448,9 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
   }
 
   return html`
-    <div>
+    <div class="pf-agd-card-grid">
       <!-- SHARED TAGS -->
-      <div class="pf-agd-data-section">
+      <div class="pf-agd-data-section pf-agd-card">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.sharedTagsTitle')}</span>
           ${tags.length === 0 && !addingTag && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
@@ -481,7 +483,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       </div>
 
       <!-- MEMORY AREAS -->
-      <div class="pf-agd-data-section">
+      <div class="pf-agd-data-section pf-agd-card">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.memoryAreasTitle')}</span>
           ${!hasAreas && !addingArea && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
@@ -532,7 +534,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       </div>
 
       <!-- KNOWLEDGE PACKAGES -->
-      <div class="pf-agd-data-section">
+      <div class="pf-agd-data-section pf-agd-card">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.knowledgeTitle')}</span>
           ${!hasResources && !addingPackage && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
@@ -558,7 +560,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       </div>
 
       <!-- SKILLS (registry refs — distinct from knowledge packages) -->
-      <div class="pf-agd-data-section">
+      <div class="pf-agd-data-section pf-agd-card">
         <div class="pf-agd-section-header">
           <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.skillsTitle')}</span>
           ${skillLinks.length === 0 && !addingSkill && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
@@ -590,7 +592,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       </div>
 
       <!-- STORED MEMORY KEYS -->
-      <div class="pf-agd-data-section">
+      <div class="pf-agd-data-section pf-agd-card pf-agd-card--full">
           <div class="pf-agd-section-header">
             <span class="pf-agd-section-title">${t('profile.agents.detail.data_access.storedKeysTitle')}</span>
             ${!hasKeys && !addingKey && html`<span class="pf-agd-none-inline">${t('profile.agents.detail.data_access.noneInline') || 'none'}</span>`}
@@ -681,7 +683,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       </div>
 
       <!-- EFFECTIVE SCOPE SUMMARY -->
-      <div class="pf-agd-scope-summary">
+      <div class="pf-agd-scope-summary pf-agd-card--full">
         ${t('profile.agents.detail.data_access.effectiveScope')}:\n${
           [...memoryAreas.map(a => a.key_prefix || a.key || a), ...tags.map(tag => `agents.tag.${tag}.*`), 'agents.shared.index'].join(', ')
         }${hasResources ? `\n${t('profile.agents.detail.data_access.knowledgeTitle')}: ${resources.map(r => r.name || r.url || r).join(', ')}` : ''}
