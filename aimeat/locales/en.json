@@ -3253,6 +3253,13 @@
       "addThis": "Add this",
       "libraryBadge": "Library",
       "serviceBadge": "Service",
+      "measuredOn": "measured:",
+      "notMeasured": "not yet AEB-measured",
+      "tier": {
+        "any": "Works on any model — a mid-tier AI codes it correctly from memory",
+        "frontier": "Frontier-safe — a version-drift trap for weaker models; they must read its doc",
+        "needs-doc": "AIMEAT-authored wrapper — the AI must fetch its doc to use it (no priors)"
+      },
       "heroDesc": "Get more done with less. AI Chat can handle bigger apps when you hand it ready-made cortex building blocks — reusable UI libraries, schemas, and prompts. Use the same cortex across multiple apps.",
       "visibility": {
         "private": "Private",
