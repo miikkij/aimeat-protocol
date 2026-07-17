@@ -10,9 +10,15 @@
  *   Re-fetches on SSE updates.
  * @structure InboxTab (default, stateful container) · panels (ListPanel/ThreadPanel/TrackedPanel/ResultsPanel
  *   in ./inbox-tab/panels.js) · sub-components (Composer/MessageBubble/ReplyWithAiPopover/… in
- *   ./inbox-tab/components.js) · pure helpers (./inbox-tab/helpers.js)
+ *   ./inbox-tab/components.js) · pure helpers (./inbox-tab/helpers.js) · thread UX hooks
+ *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.22.0 -- 2026-07-17 -- Reply-to with quote (↩ on a bubble quotes the message into the reply via
+ *     `reply_to`; bubbles render their quoted original) + mobile thread ergonomics: the messenger shrinks
+ *     above the on-screen keyboard (visualViewport → --inbox-kb), focusing the composer scrolls it into
+ *     view, and a NEW message auto-scrolls the thread down once (a single jump — scrolling back up is
+ *     never fought). Drops the stale ≤760px `.inbox-msgs{max-height:50vh}` cap from the old stacked layout.
  *   v1.21.0 -- 2026-07-17 -- Mobile single-pane on ≤760px: shows the list OR an open thread/composer
  *     full-width (mode!=='idle' ⇒ `.inbox-body--panel`) with a ← Back button. Desktop two-pane unchanged.
  *   v1.20.1 -- 2026-07-17 -- Fix images bleeding between messages: attachment url map keyed by `msgId::attId` (per-message ids at0/at1… repeat across messages).
@@ -126,6 +132,7 @@ import { buildConversationReplyPrompt, buildMessageReplyPrompt, peerLabel } from
 import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary } from './inbox-tab/helpers.js';
 import { Composer, PollBuilder, MarkdownViewer, ReplyWithAiPopover } from './inbox-tab/components.js';
 import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel } from './inbox-tab/panels.js';
+import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 
 export default function InboxTab({ showToast }) {
@@ -158,6 +165,7 @@ export default function InboxTab({ showToast }) {
   const [important, setImportant] = useState(new Set());  // message ids flagged important (Tier 1)
   const [trackedList, setTrackedList] = useState([]);     // active Tracked Responses (Tier 2)
   const [trackMsg, setTrackMsg] = useState(null);         // message being tracked (opens modal)
+  const [replyQuote, setReplyQuote] = useState(null);     // message being quoted-replied to (↩)
   const [draftPrefill, setDraftPrefill] = useState('');   // suggested reply / filled command seeded into the composer
   const [prefillNonce, setPrefillNonce] = useState(0);    // bump to force a composer remount on each insert
   const [agentCommands, setAgentCommands] = useState(null); // peer agent's chat.commands (Phase A)
@@ -447,24 +455,14 @@ export default function InboxTab({ showToast }) {
     return () => { window.removeEventListener('aimeat-live-update', handler); if (liveTimerRef.current) clearTimeout(liveTimerRef.current); };
   }, [loadTrackedOnly]);
 
-  // Auto-scroll policy: jump to the latest message when a thread is OPENED, but on live content updates
-  // only follow to the bottom if the reader is ALREADY near it — never yank someone who has scrolled up
-  // (or is typing) back down. lastScrolledConvRef distinguishes a fresh open from an in-place update, and
-  // we wait for content (thread.length) so an async load still lands at the bottom on open.
-  const lastScrolledConvRef = useRef(null);
-  useEffect(() => {
-    const el = msgsRef.current;
-    if (mode !== 'thread' || !el || thread.length === 0) return;
-    const convKey = activeConv?.peerGhii ?? activeConv?.id ?? null;
-    const isNewOpen = lastScrolledConvRef.current !== convKey;
-    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
-    if (isNewOpen || nearBottom) el.scrollTop = el.scrollHeight;
-    lastScrolledConvRef.current = convKey;
-  }, [thread, mode, activeConv]);
+  // Auto-scroll (open / near-bottom follow / one-time jump on a NEW message) + mobile keyboard
+  // ergonomics (--inbox-kb + composer focus scroll) — extracted to ./inbox-tab/use-thread-ux.js.
+  useThreadAutoScroll(msgsRef, mode, thread, activeConv);
+  useMobileComposerKeyboard();
 
   const openConversation = async (conv) => {
     setActiveConv(conv); setMode('thread');
-    setDraftPrefill(''); setReplyingTrId(null);   // don't leak a suggested reply across threads
+    setDraftPrefill(''); setReplyingTrId(null); setReplyQuote(null);   // don't leak a suggested reply / quote across threads
     await loadThread(conv, true);                 // mark read only on explicit open (avoids a refresh loop)
     loadLists();
   };
@@ -656,11 +654,14 @@ export default function InboxTab({ showToast }) {
       // a reply to a subject thread (e.g. "keskustelu") spawned a brand-new thread named after the agent.
       const subject = (mode === 'compose' && composeSubject.trim()) ? composeSubject.trim() : undefined;
       const conversationId = (mode === 'thread' && activeConv) ? activeConv.conversationId : undefined;
-      const resp = await messages.send({ to: recipient, body, attachments, subject, conversationId });
+      // A quoted reply (↩) pins reply_to to the quoted message — the bubble renders the quote from it.
+      const replyTo = (mode === 'thread' && replyQuote) ? replyQuote.id : undefined;
+      const resp = await messages.send({ to: recipient, body, attachments, subject, conversationId, replyTo });
       if (resp?.ok === false) { showToast?.(resp?.error?.message || t('inbox.failed'), true); }
       else {
         reset?.();
         setComposeSubject('');
+        setReplyQuote(null);
         // If this send fulfils a Tracked Response awaiting approval, mark it replied.
         if (replyingTrId) {
           await tracked.markTrackedResponseReplied(replyingTrId, resp?.data?.message?.id).catch(() => {});
@@ -700,7 +701,7 @@ export default function InboxTab({ showToast }) {
       </datalist>
 
       <div class=${`inbox-body${mode !== 'idle' ? ' inbox-body--panel' : ''}`}>
-        <button class="inbox-back" onClick=${() => { setMode('idle'); setActiveConv(null); }}>← ${t('inbox.back')}</button>
+        <button class="inbox-back" onClick=${() => { setMode('idle'); setActiveConv(null); setReplyQuote(null); }}>← ${t('inbox.back')}</button>
         <${ListPanel} requests=${requests} conversations=${conversations} activeConv=${activeConv}
           peerDisplay=${peerDisplay} accept=${accept} block=${block} openConversation=${openConversation} />
 
@@ -773,6 +774,7 @@ export default function InboxTab({ showToast }) {
           awaitingForConv=${awaitingForConv} awaitingDrafts=${awaitingDrafts} schedOpen=${schedOpen} setSchedOpen=${setSchedOpen}
           cmdFill=${cmdFill} agentCommands=${agentCommands} sending=${sending} draftPrefill=${draftPrefill} prefillNonce=${prefillNonce}
           msgsRef=${msgsRef} peerDisplay=${peerDisplay} showToast=${showToast} toggleImportant=${toggleImportant}
+          replyQuote=${replyQuote} setReplyQuote=${setReplyQuote}
           onTrackMsg=${onTrackMsg} onParkMsg=${onParkMsg} openMessageAi=${openMessageAi} submitInteractiveAnswers=${submitInteractiveAnswers}
           setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} insertCommand=${insertCommand} setCmdFill=${setCmdFill}
           cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} />` : null}

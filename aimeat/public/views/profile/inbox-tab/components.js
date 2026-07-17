@@ -13,6 +13,8 @@
  *   v1.2.0 — 2026-07-17 — Two paste-image fixes: (1) MessageBubble looks up attachment urls via the new
  *     `${messageId}::${attachmentId}` composite key so images no longer bleed between messages; (2) pasted
  *     clipboard images (always named "image.png") get a unique name instead of every paste sharing one.
+ *   v1.3.0 — 2026-07-17 — Reply-to with quote: a ↩ bubble action starts a quoted reply, and a bubble whose
+ *     message carries `replyToId` renders the quoted original (sender + excerpt; click jumps to it).
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -24,7 +26,7 @@ import { Markdown } from '/components/Markdown.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 import * as schedules from '/js/services/schedules.js';
 import { MODES } from '/js/services/messages-ai-prompts.js';
-import { loadToastUI, prepareBody, statusTick, timeShort, trackStateLabel, ATTACH_ICO, attachKind, IFORM_OTHER } from './helpers.js';
+import { loadToastUI, prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, ATTACH_ICO, attachKind, IFORM_OTHER } from './helpers.js';
 
 export function Avatar({ seed, size = 36 }) {
   const svg = minidenticon(typeof seed === 'string' && seed ? seed : 'user');
@@ -234,7 +236,7 @@ export function PollBuilder({ questions, setQuestions }) {
     </div>`;
 }
 
-export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, onReplyAi, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting }) {
+export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   // urlMap is keyed by `${messageId}::${attachmentId}` because per-message attachment ids (at0, at1…)
@@ -247,10 +249,12 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
   }
   const trk = tracked ? trackStateLabel(tracked.state) : null;
   return html`
-    <div class=${`inbox-row ${mine ? 'inbox-row--mine' : 'inbox-row--theirs'}`}>
+    <div id=${domId} class=${`inbox-row ${mine ? 'inbox-row--mine' : 'inbox-row--theirs'}`}>
       ${!mine ? html`<${Avatar} seed=${msg.senderGhii} size=${28} />` : null}
       <div class=${`inbox-bubble ${mine ? 'inbox-bubble--mine' : 'inbox-bubble--theirs'}`}>
         <div class="inbox-bubble-actions">
+          ${onQuote ? html`<button class="inbox-bubble-act" title=${t('inbox.quoteReply')}
+            onClick=${() => onQuote(msg)}>↩</button>` : null}
           <button class=${`inbox-bubble-act${starred ? ' inbox-bubble-act--on' : ''}`} title=${t('inbox.markImportant')}
             onClick=${() => onStar?.(msg)}>${starred ? '⭐' : '☆'}</button>
           <button class=${`inbox-bubble-act${tracked ? ' inbox-bubble-act--on' : ''}`}
@@ -261,6 +265,10 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
           <button class="inbox-bubble-act" title=${t('inbox.ai.replyToMessage')}
             onClick=${() => onReplyAi?.(msg)}>✨</button>
         </div>
+        ${quoted ? html`<button class="inbox-bubble-quote" onClick=${() => onJumpTo?.(quoted.id)} title=${t('inbox.quoteJump')}>
+          <span class="inbox-quote-name">${escHtml(quotedName || '')}</span>
+          <span class="inbox-quote-text">${escHtml(quoteSnippet(quoted.body))}</span>
+        </button>` : null}
         <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urls, expiredIds)} /></div>
         ${msg.interactive?.role === 'questions' ? (
           answeredWith
