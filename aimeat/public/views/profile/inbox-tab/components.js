@@ -15,6 +15,8 @@
  *     clipboard images (always named "image.png") get a unique name instead of every paste sharing one.
  *   v1.3.0 — 2026-07-17 — Reply-to with quote: a ↩ bubble action starts a quoted reply, and a bubble whose
  *     message carries `replyToId` renders the quoted original (sender + excerpt; click jumps to it).
+ *   v1.3.1 — 2026-07-17 — Composer file chips get a ✕ — a queued (e.g. mis-pasted) attachment can be
+ *     removed before sending instead of being stuck in the outgoing message.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -398,11 +400,19 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
     clearDraft();   // a sent message is no longer a draft
   };
   const submit = () => onSend(recipient, getText(), files, reset);
+  // Remove one queued attachment before sending (a mis-paste shouldn't force starting the message over).
+  // Also clear the hidden file input when the last chip goes, so re-picking the same file fires onChange.
+  const removeFile = (idx) => setFiles((prev) => {
+    const next = prev.filter((_, j) => j !== idx);
+    if (next.length === 0 && fileRef.current) fileRef.current.value = '';
+    return next;
+  });
 
   return html`
     <div class="inbox-composer">
       ${files.length > 0 ? html`<div class="inbox-file-chips">
-        ${files.map((f, i) => html`<span class="inbox-file-chip" key=${i}>📎 ${escHtml(f.name)}</span>`)}
+        ${files.map((f, i) => html`<span class="inbox-file-chip" key=${f.name + i}>📎 ${escHtml(f.name)}
+          <button class="inbox-bc-chip-x" title=${t('inbox.attachmentRemove')} onClick=${() => removeFile(i)}>✕</button></span>`)}
       </div>` : null}
       ${mode === 'rich'
         ? html`<div class="inbox-editor" ref=${containerRef}></div>`
