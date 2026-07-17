@@ -8,6 +8,9 @@
  *     audit log with day-range selector, GDPR export button
  * @usage Loaded by profile.js route as a lazy tab component.
  * @version-history
+ *   v1.4.0 — 2026-07-18 — Vaihe 2d: the bespoke `audit-table` → canonical generic <DataTable>
+ *     (rows/headers), unifying its look with the node-wide table style. The consents `consent-table`
+ *     stays hand-rolled (its per-row `dw-expiring` highlight isn't expressible via DataTable).
  *   v1.3.0 — 2026-07-16 — Mount folds consents + audit + permission-summary into GET /v1/data-wallet
  *     (getDataWalletOverview); individual reads kept as fallback + interactive re-fetch.
  *   v1.2.0 — 2026-07-16 — Consent-grant recipient input is the shared ContactPicker (contacts +
@@ -23,6 +26,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner, recipientBadge, isExpiringSoon } from './shared.js';
+import { DataTable } from '/components/DataTable.js';
 import * as consentService from '/js/services/consent.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 
@@ -335,19 +339,15 @@ export default function DataWalletTab({ session, showToast }) {
     ${!auditEntries ? html`<${Spinner} />`
       : auditEntries.length === 0 ? html`<div class="empty">${t('wallet.audit.empty')}</div>`
       : html`<div class="card scroll-x">
-          <table class="audit-table"><thead><tr>
-            <th>${t('wallet.audit.who')}</th>
-            <th>${t('wallet.audit.what')}</th>
-            <th>${t('wallet.audit.when')}</th>
-            <th>${t('wallet.audit.purpose')}</th>
-          </tr></thead><tbody>
-            ${auditEntries.map(e => html`<tr>
-              <td>${escHtml(e.accessor_gaii || e.accessed_by || e.who || '-')}</td>
-              <td><span class="dw-code-accent">${escHtml(e.data_key || e.key || e.what || '-')}</span></td>
-              <td class="text-meta">${e.accessed_at ? timeAgo(e.accessed_at) : (e.timestamp ? timeAgo(e.timestamp) : '-')}</td>
-              <td>${escHtml(e.purpose || '-')}</td>
-            </tr>`)}
-          </tbody></table>
+          <${DataTable}
+            headers=${[t('wallet.audit.who'), t('wallet.audit.what'), t('wallet.audit.when'), t('wallet.audit.purpose')]}
+            rows=${auditEntries.map(e => [
+              escHtml(e.accessor_gaii || e.accessed_by || e.who || '-'),
+              html`<span class="dw-code-accent">${escHtml(e.data_key || e.key || e.what || '-')}</span>`,
+              html`<span class="text-meta">${e.accessed_at ? timeAgo(e.accessed_at) : (e.timestamp ? timeAgo(e.timestamp) : '-')}</span>`,
+              escHtml(e.purpose || '-'),
+            ])}
+          />
         </div>`
     }
 
