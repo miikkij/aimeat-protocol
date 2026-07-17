@@ -500,25 +500,25 @@ function AiAppsBudgetPanel() {
   const appNames = Array.from(new Set([...perAppEntries.map(([a]) => a), ...historyApps, ...Object.keys(caps)]));
 
   return html`
-    <div class="pf-gen-or-field" style="border-top:2px solid var(--cl-ink,#e5e5e5);padding-top:14px;margin-top:14px;">
+    <div class="pf-gen-or-field pf-gen-spend-section">
       <label class="pf-gen-or-label">💸 AI apps daily budget</label>
-      <div style="font-size:12px;color:#666;margin-bottom:8px;">
+      <div class="pf-gen-spend-desc">
         Apps that call <code>AIMEAT.ai.complete()</code> use this key. This is the TOTAL across all
         apps for the day; each app may spend up to this much unless you set a per-app limit below.
         When the budget is hit, further calls return <code>QUOTA_EXHAUSTED</code>.
       </div>
 
-      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-        <div style="flex:1;min-width:200px;background:#f5f5f5;border-radius:4px;height:20px;position:relative;overflow:hidden;">
-          <div style="position:absolute;top:0;left:0;bottom:0;width:${pct}%;background:${pct >= 90 ? '#ef4444' : pct >= 60 ? '#f59e0b' : '#22c55e'};transition:width .3s;"></div>
-          <div style="position:relative;text-align:center;font-size:11px;line-height:20px;font-weight:700;">
+      <div class="pf-gen-spend-bar-row">
+        <div class="pf-gen-spend-bar">
+          <div class="pf-gen-spend-bar-fill ${pct >= 90 ? 'crit' : pct >= 60 ? 'warn' : ''}" style="width:${pct}%"></div>
+          <div class="pf-gen-spend-bar-label">
             $${spent.toFixed(4)} / $${budget.toFixed(2)} (${pct}%)
           </div>
         </div>
         ${editing ? html`
           <input type="number" min="0" max="1000" step="0.10" value=${budgetInput}
                  onInput=${e => setBudgetInput(e.target.value)}
-                 style="width:90px;padding:4px 6px;font-size:13px;" />
+                 class="pf-gen-spend-budget-input" />
           <button class="btn-primary btn-sm" onClick=${saveBudget} disabled=${saving}>
             ${saving ? '...' : 'Save'}
           </button>
@@ -528,24 +528,24 @@ function AiAppsBudgetPanel() {
         `}
       </div>
 
-      ${message && html`<div class="pf-gen-or-message ${message.error ? 'pf-gen-or-message-error' : 'pf-gen-or-message-success'}" style="margin-top:8px;">${message.text}</div>`}
+      ${message && html`<div class="pf-gen-or-message pf-gen-spend-msg ${message.error ? 'pf-gen-or-message-error' : 'pf-gen-or-message-success'}">${message.text}</div>`}
 
       ${appNames.length > 0 && html`
-        <details style="margin-top:10px;" open>
-          <summary style="cursor:pointer;font-size:12px;color:#666;">
+        <details class="pf-gen-spend-details" open>
+          <summary class="pf-gen-spend-summary">
             Per-app limits & spend (${appNames.length} app${appNames.length === 1 ? '' : 's'})
           </summary>
-          <div style="font-size:11px;color:#999;margin:6px 0;">
+          <div class="pf-gen-spend-hint">
             Each app may spend up to the daily budget above. Set a cap to throttle one app below it;
             leave blank to use the full budget.
           </div>
-          <table style="width:100%;margin-top:4px;font-size:12px;border-collapse:collapse;">
+          <table class="pf-gen-spend-table">
             <thead>
-              <tr style="border-bottom:1px solid #e5e5e5;">
-                <th style="text-align:left;padding:4px;">App</th>
-                <th style="text-align:right;padding:4px;">Spent today</th>
-                <th style="text-align:right;padding:4px;">Daily cap ($)</th>
-                <th style="text-align:right;padding:4px;">Calls</th>
+              <tr>
+                <th>App</th>
+                <th class="num">Spent today</th>
+                <th class="num">Daily cap ($)</th>
+                <th class="num">Calls</th>
               </tr>
             </thead>
             <tbody>
@@ -553,20 +553,20 @@ function AiAppsBudgetPanel() {
                 const s = usage.per_app[app] || { cost_usd: 0, calls: 0 };
                 return html`
                 <tr key=${app}>
-                  <td style="padding:4px;">${app}</td>
-                  <td style="text-align:right;padding:4px;">$${(s.cost_usd || 0).toFixed(4)}</td>
-                  <td style="text-align:right;padding:4px;">
+                  <td>${app}</td>
+                  <td class="num">$${(s.cost_usd || 0).toFixed(4)}</td>
+                  <td class="num">
                     <input type="number" min="0" max="1000" step="0.10"
                       value=${caps[app] ?? ''} placeholder=${budget.toFixed(2)}
                       onInput=${e => setCaps(c => ({ ...c, [app]: e.target.value }))}
-                      style="width:74px;padding:3px 5px;font-size:12px;text-align:right;" />
+                      class="pf-gen-spend-cap-input" />
                   </td>
-                  <td style="text-align:right;padding:4px;">${s.calls || 0}</td>
+                  <td class="num">${s.calls || 0}</td>
                 </tr>`;
               })}
             </tbody>
           </table>
-          <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+          <div class="pf-gen-spend-actions">
             <button class="btn-primary btn-sm" onClick=${saveCaps} disabled=${savingCaps}>
               ${savingCaps ? '...' : 'Save per-app limits'}
             </button>
@@ -589,10 +589,10 @@ function AiAppsBudgetPanel() {
         }));
         const yFormat = isTokens ? (v) => fmtCompact(v) : (v) => '$' + (Number(v) < 1 ? Number(v).toFixed(3) : Number(v).toFixed(2));
         return html`
-          <div style="margin-top:14px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:6px;">
-              <span style="font-size:12px;font-weight:600;color:#666;">${t('profile.generator.aiUsageOverTime') || 'Usage over time (30 days)'}</span>
-              <span style="display:inline-flex;gap:4px;">
+          <div class="pf-gen-spend-chart-wrap">
+            <div class="pf-gen-spend-chart-head">
+              <span class="pf-gen-spend-chart-title">${t('profile.generator.aiUsageOverTime') || 'Usage over time (30 days)'}</span>
+              <span class="pf-gen-spend-metric-toggle">
                 <button class=${!isTokens ? 'btn-primary btn-sm' : 'btn-outline btn-sm'} onClick=${() => setMetric('cost')}>${t('profile.generator.aiMetricCost') || 'Cost'}</button>
                 <button class=${isTokens ? 'btn-primary btn-sm' : 'btn-outline btn-sm'} onClick=${() => setMetric('tokens')}>${t('profile.generator.aiMetricTokens') || 'Tokens'}</button>
               </span>
@@ -601,7 +601,7 @@ function AiAppsBudgetPanel() {
           </div>`;
       })()}
 
-      <div style="font-size:11px;color:#999;margin-top:8px;">
+      <div class="pf-gen-spend-footnote">
         Cost is estimated when the provider doesn't report it (LM Studio, custom). Your
         OpenRouter dashboard has the authoritative bill.
       </div>

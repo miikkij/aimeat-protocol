@@ -1288,6 +1288,33 @@
   border: 1px solid rgba(239, 68, 68, 0.25);
 }
 
+/* ── AI-apps daily-budget / spend section (generator-settings OpenRouterSettings) ──
+   Lifted out of ~28 inline styles + hardcoded hex; all tokenized so it flips in dark mode. */
+.pf-gen-spend-section { border-top: 2px solid var(--border); padding-top: 14px; margin-top: 14px; }
+.pf-gen-spend-desc { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+.pf-gen-spend-bar-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pf-gen-spend-bar { flex: 1; min-width: 200px; background: var(--bg-surface); border-radius: 4px; height: 20px; position: relative; overflow: hidden; }
+.pf-gen-spend-bar-fill { position: absolute; top: 0; left: 0; bottom: 0; transition: width .3s; background: var(--success); }
+.pf-gen-spend-bar-fill.warn { background: var(--warn); }
+.pf-gen-spend-bar-fill.crit { background: var(--danger); }
+.pf-gen-spend-bar-label { position: relative; text-align: center; font-size: 11px; line-height: 20px; font-weight: 700; }
+.pf-gen-spend-budget-input { width: 90px; padding: 4px 6px; font-size: 13px; }
+.pf-gen-spend-details { margin-top: 10px; }
+.pf-gen-spend-summary { cursor: pointer; font-size: 12px; color: var(--text-dim); }
+.pf-gen-spend-hint { font-size: 11px; color: var(--text-muted); margin: 6px 0; }
+.pf-gen-spend-table { width: 100%; margin-top: 4px; font-size: 12px; border-collapse: collapse; }
+.pf-gen-spend-table th, .pf-gen-spend-table td { padding: 4px; text-align: left; }
+.pf-gen-spend-table th.num, .pf-gen-spend-table td.num { text-align: right; }
+.pf-gen-spend-table thead tr { border-bottom: 1px solid var(--border); }
+.pf-gen-spend-cap-input { width: 74px; padding: 3px 5px; font-size: 12px; text-align: right; }
+.pf-gen-spend-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.pf-gen-spend-msg { margin-top: 8px; }
+.pf-gen-spend-chart-wrap { margin-top: 14px; }
+.pf-gen-spend-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.pf-gen-spend-chart-title { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+.pf-gen-spend-metric-toggle { display: inline-flex; gap: 4px; }
+.pf-gen-spend-footnote { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+
 /* ── OpenRouter Autopilot (pf-gen-or-*) ──────────────── */
 .pf-gen-or-btn-row {
   display: flex;
