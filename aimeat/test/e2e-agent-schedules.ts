@@ -387,6 +387,40 @@ await test('25. Occurrences requires auth', async () => {
     assert(status === 401, `expected 401 without auth, got ${status}`);
 });
 
+await test('26. High-frequency crons are summarized in `frequent`, not enumerated in `occurrences`', async () => {
+    // A "*/5 * * * *" cron (288 fires/day) must NOT flood the grid: it belongs in
+    // the `frequent` cadence summary, and must be absent from `occurrences`.
+    const mk = await json('/v1/schedules', {
+        method: 'POST', headers: auth1,
+        body: JSON.stringify({
+            kind: 'ai', cron: '*/5 * * * *', display_name: 'Frequent poll',
+            prompt: 'poll', input_keys: ['x'],
+        }),
+    });
+    assert(mk.status === 201, `create status ${mk.status}: ${JSON.stringify(mk.body)}`);
+    const freqId = mk.body.data.schedule.id;
+
+    const from = new Date();
+    const to = new Date(from.getTime() + 2 * 86400000);
+    const { status, body } = await json(occUrl(from, to), { headers: auth1 });
+    assert(status === 200, `status ${status}`);
+    assert(Array.isArray(body.data.frequent), '`frequent` array present');
+
+    const inOcc = body.data.occurrences.some((o: any) => o.scheduleId === freqId);
+    assert(!inOcc, 'high-frequency schedule must NOT be enumerated into occurrences');
+
+    const summary = body.data.frequent.find((f: any) => f.scheduleId === freqId);
+    assert(summary, 'high-frequency schedule appears in `frequent`');
+    assert(summary.intervalMinutes === 5, `intervalMinutes 5, got ${summary.intervalMinutes}`);
+    assert(summary.approxPerDay >= 200, `approxPerDay ~288, got ${summary.approxPerDay}`);
+
+    // The daily schedule stays in occurrences (not misclassified as frequent).
+    const dailyStillEnumerated = body.data.occurrences.some((o: any) => o.scheduleId === agentTaskScheduleId);
+    assert(dailyStillEnumerated, 'daily "0 7 * * *" schedule stays in occurrences');
+    const dailyNotFrequent = !body.data.frequent.some((f: any) => f.scheduleId === agentTaskScheduleId);
+    assert(dailyNotFrequent, 'daily schedule must not be classified frequent');
+});
+
 console.log('\nCleanup');
 await test('Cascade-delete owner 1', async () => {
     const { status } = await json(`/v1/owners/${encodeURIComponent(o1.ownerName)}`, { method: 'DELETE', headers: auth1 });

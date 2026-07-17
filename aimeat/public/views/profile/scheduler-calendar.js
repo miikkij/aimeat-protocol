@@ -13,6 +13,10 @@
  *   <${SchedulerCalendar} schedules=${[...managed, ...extensions]} reloadKey=${tick} onJumpTo=${jump} />
  * @version-history
  *   v1.0.0 -- 2026-07-03 -- Initial day/week/month scheduler calendar (server-projected cron cadence)
+ *   v1.1.0 -- 2026-07-17 -- Continuous / high-frequency schedules (server `frequent` summary — per-minute /
+ *     hourly crons) no longer flood the grid: they render once in a "Continuously running" strip above the
+ *     calendar as cadence pills (every-N-min · ~N/day), clickable to jump to the card. A "show in grid"
+ *     toggle folds them back in as aggregated ⟳ ×N/day chips (week/day columns, a ⟳×count badge in month).
  */
 import { h } from 'preact';
 import htm from 'htm';
@@ -39,6 +43,13 @@ function kindLabel(type) {
   const known = { ai: 'ai', agent_task: 'agent_task', extension: 'extension', 'eco-capability': 'eco-capability', core: 'core' };
   return known[type] ? 'profile.scheduler.kind.' + known[type] : null;
 }
+/** Human cadence for a continuous schedule from its median interval (minutes). */
+function cadenceLabel(min) {
+  if (!min || !isFinite(min)) return '';
+  if (min < 60) return t('profile.scheduler.cal.everyMin', { n: min });
+  if (min % 60 === 0) return t('profile.scheduler.cal.everyHour', { n: min / 60 });
+  return t('profile.scheduler.cal.everyMin', { n: min });
+}
 
 const HOUR_START = 6;
 const HOUR_END = 22;
@@ -47,6 +58,9 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
   const [mode, setMode] = useState('week');
   const [anchorMs, setAnchorMs] = useState(() => startOfDay(new Date()).getTime());
   const [occ, setOcc] = useState([]);            // [{ scheduleId, at: Date }]
+  const [freq, setFreq] = useState([]);          // [{ scheduleId, cron, intervalMinutes, approxPerDay }] — continuous/high-frequency
+  const [foldFreq, setFoldFreq] = useState(false); // also render continuous schedules inside the grid (aggregated)
+  const [freqExpanded, setFreqExpanded] = useState(false); // strip: show all vs. a preview
   const [truncated, setTruncated] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -95,9 +109,10 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
       .then((res) => {
         if (!alive) return;
         setOcc((res?.data?.occurrences || []).map((o) => ({ scheduleId: o.scheduleId, at: new Date(o.at) })));
+        setFreq(res?.data?.frequent || []);
         setTruncated(!!res?.data?.truncated);
       })
-      .catch(() => { if (alive) { setOcc([]); setTruncated(false); } })
+      .catch(() => { if (alive) { setOcc([]); setFreq([]); setTruncated(false); } })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [startMs, endMs, reloadKey]);
@@ -121,6 +136,20 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
   }, [occ, byId]);
 
   const eventsOn = useCallback((day) => events.filter((e) => sameDay(e.at, day)), [events]);
+
+  // Continuous / high-frequency schedules joined to their meta, busiest first.
+  const frequentList = useMemo(() => freq
+    .map((f) => {
+      const s = byId.get(f.scheduleId);
+      return {
+        scheduleId: f.scheduleId,
+        type: s?.type || 'core',
+        name: (s && (s.displayName || s.name)) || t('profile.scheduler.cal.unknown'),
+        intervalMinutes: f.intervalMinutes,
+        approxPerDay: f.approxPerDay,
+      };
+    })
+    .sort((a, b) => b.approxPerDay - a.approxPerDay), [freq, byId]);
 
   // ── navigation ──
   const shift = useCallback((dir) => setAnchorMs((ms) => {
@@ -167,16 +196,47 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
       ${truncated ? html`<div class="sch-cal-trunc">${t('profile.scheduler.cal.truncated')}</div>` : null}
     </div>`;
 
-  const emptyHint = (!loading && events.length === 0)
+  const emptyHint = (!loading && events.length === 0 && frequentList.length === 0)
     ? html`<div class="sch-cal-empty">${schedules.some((s) => s.enabled !== false && s.cron && s.cron !== '@activate')
         ? t('profile.scheduler.cal.noEvents') : t('profile.scheduler.cal.empty')}</div>`
     : null;
+
+  // ── "Continuously running" strip: high-frequency crons summarized (not one-chip-per-fire) ──
+  const FREQ_PREVIEW = 6;
+  const frequentStrip = frequentList.length ? html`<div class="sch-cal-freq">
+    <div class="sch-cal-freq-head">
+      <span class="sch-cal-freq-title">${t('profile.scheduler.cal.frequentTitle')} <span class="sch-cal-freq-count">${frequentList.length}</span></span>
+      <button type="button" class="btn-ghost btn-sm" onClick=${() => setFoldFreq((v) => !v)}>
+        ${foldFreq ? t('profile.scheduler.cal.freqHideGrid') : t('profile.scheduler.cal.freqShowGrid')}
+      </button>
+    </div>
+    <div class="sch-cal-freq-pills">
+      ${(freqExpanded ? frequentList : frequentList.slice(0, FREQ_PREVIEW)).map((f) => html`<button type="button"
+        class="sch-cal-freqpill sch-cal-ev--${kindClass(f.type)}" key=${f.scheduleId}
+        title=${`${f.name} · ${cadenceLabel(f.intervalMinutes)}`} onClick=${() => onJumpTo?.(f.scheduleId)}>
+        <span class="sch-cal-freqdot"></span>
+        <span class="sch-cal-freqname">${f.name}</span>
+        <span class="sch-cal-freqcad">${cadenceLabel(f.intervalMinutes)} · ${t('profile.scheduler.cal.perDay', { n: f.approxPerDay })}</span>
+      </button>`)}
+      ${frequentList.length > FREQ_PREVIEW ? html`<button type="button" class="sch-cal-freqmore" onClick=${() => setFreqExpanded((v) => !v)}>
+        ${freqExpanded ? t('profile.scheduler.cal.showLess') : t('profile.scheduler.cal.showMore', { n: frequentList.length - FREQ_PREVIEW })}
+      </button>` : null}
+    </div>
+  </div>` : null;
+
+  // Aggregated per-day chip for a continuous schedule (used when folded into the grid).
+  const freqChip = (f, key) => html`<button type="button"
+    class="${'sch-cal-ev sch-cal-ev--' + kindClass(f.type) + ' sch-cal-ev--click sch-cal-freqchip'}" key=${key}
+    title=${`${f.name} · ${cadenceLabel(f.intervalMinutes)}`} onClick=${() => onJumpTo?.(f.scheduleId)}>
+    <span class="sch-cal-freqmark">⟳</span> ${f.name} <span class="sch-cal-evtime">×${f.approxPerDay}</span></button>`;
+  const gridFreq = foldFreq ? frequentList : [];
 
   // ── month ──
   if (mode === 'month') {
     const cells = Array.from({ length: 42 }, (_, i) => addDays(start, i));
     return html`<section class="sch-cal">
       ${head}
+      ${frequentStrip}
       <div class="sch-cal-weekrow">${weekdays.map((w, i) => html`<div class="sch-cal-wd" key=${i}>${w}</div>`)}</div>
       <div class="sch-cal-month">
         ${cells.map((day, i) => {
@@ -185,6 +245,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
           return html`<div class="sch-cal-cell ${inMonth ? '' : 'sch-cal-cell--dim'} ${sameDay(day, now) ? 'sch-cal-cell--today' : ''}" key=${i}>
             <span class="sch-cal-daynum">${day.getDate()}</span>
             <span class="sch-cal-cell-evs">
+              ${foldFreq && inMonth && gridFreq.length ? html`<span class="sch-cal-ev sch-cal-ev--core sch-cal-ev--dot sch-cal-freqcount" title=${t('profile.scheduler.cal.frequentTitle')}><span class="sch-cal-freqmark">⟳</span> ×${gridFreq.length}</span>` : null}
               ${evs.slice(0, 3).map((e, j) => html`<button type="button" class=${evClass(e) + ' sch-cal-ev--click sch-cal-ev--dot'} key=${j} title=${evTitle(e)} onClick=${onEv(e)}>${e.name}</button>`)}
               ${evs.length > 3 ? html`<span class="sch-cal-more">+${evs.length - 3}</span>` : null}
             </span>
@@ -200,6 +261,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
     const days = Array.from({ length: 7 }, (_, i) => addDays(start, i));
     return html`<section class="sch-cal">
       ${head}
+      ${frequentStrip}
       <div class="sch-cal-week">
         ${days.map((day, i) => {
           const evs = eventsOn(day);
@@ -209,7 +271,8 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
               <span class="sch-cal-daynum">${day.getDate()}</span>
             </div>
             <div class="sch-cal-weekcol-evs">
-              ${evs.length === 0 ? html`<span class="sch-cal-dotempty">·</span>` : evs.map(chip)}
+              ${gridFreq.map((f, j) => freqChip(f, 'gf' + j))}
+              ${evs.length === 0 && gridFreq.length === 0 ? html`<span class="sch-cal-dotempty">·</span>` : evs.map(chip)}
             </div>
           </div>`;
         })}
@@ -230,7 +293,12 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
     </div>`;
   return html`<section class="sch-cal">
     ${head}
-    ${dayEvents.length === 0 && !loading ? html`<div class="sch-cal-empty">${t('profile.scheduler.cal.noEvents')}</div>` : null}
+    ${frequentStrip}
+    ${dayEvents.length === 0 && frequentList.length === 0 && !loading ? html`<div class="sch-cal-empty">${t('profile.scheduler.cal.noEvents')}</div>` : null}
+    ${foldFreq && gridFreq.length ? html`<div class="sch-cal-bucket">
+      <span class="sch-cal-hour"><span class="sch-cal-freqmark">⟳</span></span>
+      <div class="sch-cal-hour-evs">${gridFreq.map((f, j) => freqChip(f, 'gf' + j))}</div>
+    </div>` : null}
     ${earlier.length ? bucket('profile.scheduler.cal.earlier', earlier) : null}
     <div class="sch-cal-day">
       ${hours.map((hr) => {
