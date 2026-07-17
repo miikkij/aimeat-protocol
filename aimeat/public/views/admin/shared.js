@@ -30,9 +30,15 @@ import { DataTable as GenericDataTable } from '/components/DataTable.js';
 import { num, dt, fmtUp, fmtBytes } from '/js/format.js';
 export { num, dt, fmtUp, fmtBytes };
 
-/** Render a badge */
-export function Badge({ type }) {
-  return html`<span class="adm-badge adm-badge-${type}">${type}</span>`;
+/**
+ * Render a badge. `type` picks the tone class (adm-badge-${type}); the visible
+ * text is `label` when given, else the type word itself (so `<Badge type="public" />`
+ * still reads "public"). Previously `label` was silently dropped — 13 call sites
+ * that pass a human label + a semantic tone (e.g. type="success" label="Active")
+ * showed the tone word instead of the label.
+ */
+export function Badge({ type, label }) {
+  return html`<span class="adm-badge adm-badge-${type}">${label != null ? label : type}</span>`;
 }
 
 /**

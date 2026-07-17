@@ -203,6 +203,13 @@
 .adm-badge--info    { background: var(--info-bg); color: var(--info-fg); }
 .adm-badge--accent  { background: var(--purple-bg); color: var(--purple-fg); }
 .adm-badge--muted   { background: var(--bg-surface); color: var(--text-dim); }
+/* Single-dash aliases — the <Badge> component emits adm-badge-${type}, so these
+   semantic tones need the single-dash form too (were undefined → badges rendered
+   with no background in cortex/capabilities/federation tabs). neutral = muted. */
+.adm-badge-success { background: var(--success-bg); color: var(--success-fg); }
+.adm-badge-warning { background: var(--warn-bg); color: var(--warn-fg); }
+.adm-badge-muted,
+.adm-badge-neutral { background: var(--bg-surface); color: var(--text-dim); }
 
 /* Badge name aliases → semantic colors */
 .adm-badge-healthy,
