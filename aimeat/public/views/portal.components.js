@@ -195,28 +195,13 @@ function UserWorldAccordion() {
         </div>
       </details>
 
-      <!-- Marketplace -->
-      <details class="user-world-item">
-        <summary class="user-world-summary">\u{1F6D2} ${t('portal.userWorld.marketplace.title')}</summary>
-        <div class="user-world-content">
-          <div class="user-world-desc">${t('portal.userWorld.marketplace.desc')}</div>
-          <div class="user-link-row">
-            <a class="user-link-btn" href="/v1/marketplace">${t('portal.userWorld.marketplace.open')}</a>
-            <a class="user-link-btn" href="/v1/profile?tab=services">${t('portal.userWorld.marketplace.manage')}</a>
-          </div>
-        </div>
-      </details>
-
       <!-- Recent Services -->
       <details class="user-world-item">
         <summary class="user-world-summary">\u{1F9ED} ${t('portal.userWorld.services.title')}</summary>
         <div class="user-world-content">
           <div class="user-world-desc">${t('portal.userWorld.services.desc')}</div>
           <div class="user-link-row">
-            <a class="user-link-btn" href="/v1/hobbies">${t('portal.userWorld.services.hobbies')}</a>
-            <a class="user-link-btn" href="/v1/guides">${t('portal.userWorld.services.guides')}</a>
             <a class="user-link-btn" href="/v1/aimeat-os">${t('portal.userWorld.services.aimeatOs')}</a>
-            <a class="user-link-btn" href="/v1/openclaw">${t('portal.userWorld.services.openclaw')}</a>
             <a class="user-link-btn" href="/app-catalog.html">${t('portal.userWorld.services.catalog')}</a>
           </div>
         </div>
@@ -289,9 +274,6 @@ export function TheWorld({ navigate }) {
         <textarea class="prompt-box" readonly value=${connectPr}></textarea>
         <div class="prompt-actions">
           <${CopyButton} text=${connectPr} label=${t('portal.world.connect.copyBtn')} copiedLabel=${t('portal.world.connect.copied')} />
-        </div>
-        <div style="margin-top:0.75rem;text-align:center">
-          <a href="/v1/openclaw" class="connect-link">${t('portal.world.connect.readMore')} \u2192</a>
         </div>
       </div>
 

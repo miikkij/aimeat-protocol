@@ -28,10 +28,10 @@ import { ActionScriptEditor } from './services-tab.action-editor.js';
 import { ScaffoldForm } from './services-tab.scaffold-form.js';
 import { AvailableExtCard } from './services-tab.available-card.js';
 
-// Extension name → user-facing SPA URL
-const EXT_SPA_URLS = {
-  'marketplace-behaviors': '/v1/marketplace',
-};
+// Extension name → user-facing SPA URL (the marketplace-behaviors → /v1/marketplace
+// entry was removed with the legacy marketplace SPA view; extensions are managed
+// from this panel now, so the map is currently empty).
+const EXT_SPA_URLS = {};
 
 // ── Inline instance panel for a single extension ──
 function ExtensionPanel({ ext, onUninstall }) {
