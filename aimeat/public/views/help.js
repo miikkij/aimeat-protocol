@@ -15,6 +15,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { Spinner } from '/components/Spinner.js';
 
 const html = htm.bind(h);
 
@@ -42,7 +43,7 @@ export default function HelpView() {
         <p class="hlp-desc">${t('help.description')}</p>
 
         <div class="hlp-prompt-wrapper">
-          ${loading && html`<div class="hlp-loading"><div class="spinner"></div></div>`}
+          ${loading && html`<div class="hlp-loading"><${Spinner} /></div>`}
           ${error && html`<p class="hlp-error">${t('help.loadError')}</p>`}
           ${!loading && !error && html`
             <pre class="hlp-prompt-text"><code>${prompt}</code></pre>
