@@ -10,6 +10,8 @@
  *     (isOrgManager), matching their automatic workspace read access.
  *   v1.2.0 — 2026-07-16 — agents/activity readable-workspace resolution batches every manifest read into
  *     ONE cross-owner key-IN query (readWsManifests + canReadWsManifest), not one canReadWs scan per ws.
+ *   v1.3.0 — 2026-07-17 — GET /v1/organisms/:id/workspace/public/records — the generic no-auth read for
+ *     records spaces a workspace marked public (meta.share), mirroring the public documents path.
  */
 import { raw, type Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -42,7 +44,7 @@ import type { OrganismHelpers, ShareMeta, ResolvedShare } from './shared.js';
 export function registerOrganismWorkspaceOpsRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
     memberRole, toAgentGaii, findWsEntry, bareOwner, wsRegPrefix, canReadWsManifest, readWsManifests,
-    readShareMeta, collectPublicDocs, shareGateDenied, docsToMarkdown, redactShare, archiveHandler,
+    readShareMeta, collectPublicDocs, collectPublicRecords, shareGateDenied, docsToMarkdown, redactShare, archiveHandler,
   } = H;
 
   /* ── Contract engagements — the first-class link between an agent's contract capability and a
@@ -394,6 +396,27 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       return;
     }
     res.json(success(config.nodeId, { organism_id: id, ws, document: doc }));
+  });
+
+  /* ── GET /v1/organisms/:id/workspace/public/records?ws=&space= — NO AUTH. The PUBLISHED (.latest)
+   * records a workspace has marked public (via meta.share — the SAME public/spaces/docs gate as the
+   * public documents path, so a records space is opted into anonymous read exactly like a document
+   * space). ?space= limits to one records space. Each entry is { type, id, value } (the full record).
+   * 404 (no disclosure) if nothing is public; the share access mode (open/account/password) still gates
+   * the read like the public documents path. This is the generic anonymous read for public record
+   * spaces — any public showroom / catalogue / knowledge client reads its structured data through it. ── */
+  router.get('/v1/organisms/:id/workspace/public/records', async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
+    const space = typeof req.query.space === 'string' ? req.query.space : undefined;
+    const organism = await storage.getOrganism(id);
+    if (!organism || !ws) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
+    const share = await readShareMeta(id, ws);
+    const records = await collectPublicRecords(id, ws, share, space ? { space } : undefined);
+    if (records.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
+    const denied = await shareGateDenied(req, organism, id, ws, share);
+    if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
+    res.json(success(config.nodeId, { organism_id: id, ws, records }));
   });
 
   /* ── GET /v1/organisms/:id/workspace/share?ws= — the current share state (for the UI toggles).

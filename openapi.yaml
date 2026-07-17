@@ -18984,6 +18984,31 @@ paths:
         '401': { description: SHARE_PASSWORD_REQUIRED or SHARE_ACCOUNT_REQUIRED (access-gated share) }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/organisms/{id}/workspace/public/records:
+    get:
+      operationId: getPublicWorkspaceRecords
+      summary: Read a workspace's public records-space entries (NO AUTH)
+      description: |
+        Returns the PUBLISHED (`.latest`) records a workspace has marked public via `meta.share` — the
+        SAME `public` / `spaces` / `docs` gate as the public documents path, so a records space is opted
+        into anonymous read exactly like a document space. No authentication. Drafts/versions are never
+        served. `?space=` limits to one records space (objectType name). Each entry is `{ type, id, value }`
+        where `value` is the full record. Returns 404 (no disclosure) when nothing is public. When the
+        share's `access` mode gates the read, returns 401 `SHARE_PASSWORD_REQUIRED` (send a valid
+        `X-Share-Token` from the unlock endpoint) or 401 `SHARE_ACCOUNT_REQUIRED` (authenticate with any
+        account on this node). This is the generic anonymous read for public record spaces — any public
+        showroom / catalogue / knowledge client reads its structured data through it.
+      tags: [Organisms]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+        - { name: space, in: query, required: false, schema: { type: string }, description: Limit to one records-space (objectType name) }
+        - { name: X-Share-Token, in: header, required: false, schema: { type: string }, description: Share token from POST /workspace/share/unlock (password access mode) }
+      responses:
+        '200': { description: "The public records as an array of { type, id, value }" }
+        '401': { description: SHARE_PASSWORD_REQUIRED or SHARE_ACCOUNT_REQUIRED (access-gated share) }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/organisms/{id}/export:
     get:
       operationId: exportOrganism
