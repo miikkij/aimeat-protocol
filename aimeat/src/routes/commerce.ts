@@ -31,7 +31,9 @@ import {
 } from '../commerce/session-service.js';
 import type { CheckoutSessionRecord } from '../commerce/types.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
-import { paymentChallenge } from '../commerce/x402.js';
+import { paymentChallenge, x402ExactAccepts } from '../commerce/x402.js';
+import { decodeXPayment } from '../commerce/x402-facilitator.js';
+import { X402_HANDLER_ID } from '../commerce/x402-handler.js';
 
 const ItemsSchema = z.array(z.object({
   kind: z.enum(['offer', 'org-offering', 'app-tool', 'ext-call']).optional(),
@@ -66,12 +68,13 @@ const CompleteSchema = z.object({
   }).optional(),
 });
 
-function sendCommerceError(res: Response, config: AimeatConfig, err: unknown): void {
+function sendCommerceError(res: Response, config: AimeatConfig, err: unknown, extraAccepts: Array<Record<string, unknown>> = []): void {
   if (err instanceof CommerceError || err instanceof PaymentError) {
-    // 402 carries the x402-style `accepts` block so a paying agent knows how it could settle.
+    // 402 carries the `accepts` block: the AIMEAT-native schemes plus the real x402 `exact` scheme
+    // (extraAccepts) when the session is a money one and the seller has a USDC address.
     res.status(err.statusCode).json({
       ...error(config.nodeId, err.code, err.message),
-      ...(err.statusCode === 402 ? paymentChallenge(config) : {}),
+      ...(err.statusCode === 402 ? paymentChallenge(config, extraAccepts) : {}),
     });
     return;
   }
@@ -160,14 +163,23 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   router.post('/v1/commerce/checkout-sessions/:id/complete', requireAuth(), async (req, res) => {
     const parsed = CompleteSchema.safeParse(req.body ?? {});
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }
+    let session: CheckoutSessionRecord | undefined;
     try {
-      const session = await loadOwnSession(req);
+      session = await loadOwnSession(req);
       const callerJwt = (req.headers.authorization || '').replace('Bearer ', '');
-      const completed = await completeSession(storage, config, session, parsed.data.payment?.handler, parsed.data.payment?.instrument, callerJwt);
+      // x402: a buyer settling in USDC returns the signed proof in the X-PAYMENT header. When present
+      // it becomes the payment instrument and (unless another handler is named) selects the x402 handler.
+      const xPayment = decodeXPayment(req.header('X-PAYMENT') ?? undefined);
+      const handlerId = parsed.data.payment?.handler ?? (xPayment ? X402_HANDLER_ID : undefined);
+      const instrument = xPayment ?? parsed.data.payment?.instrument;
+      const completed = await completeSession(storage, config, session, handlerId, instrument, callerJwt);
       res.json(success(config.nodeId, { session: completed }, [
         { description: 'Wallet balance', method: 'GET', url: '/v1/wallet' },
       ]));
-    } catch (err) { sendCommerceError(res, config, err); }
+    } catch (err) {
+      // On a 402 from an x402 (money) session, enrich the accepts with the exact scheme the buyer signs.
+      sendCommerceError(res, config, err, session ? await x402ExactAccepts(config, storage, session) : []);
+    }
   });
 
   return router;

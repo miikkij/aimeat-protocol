@@ -11178,6 +11178,12 @@ paths:
         unbound app-tools queue an agent TASK for the manifest agent or the app owner
         (session.fulfillment.taskIds) — writes the seller's order copy, and closes the session.
         A fulfillment failure after a successful charge refunds and leaves the session open.
+        x402 (TARGET-042): a buyer settling a money (USD) session in USDC sends the signed x402
+        proof in the X-PAYMENT header; when present it selects the non-custodial com.coinbase.x402
+        handler, which verifies + settles it through the configured facilitator (funds move buyer →
+        the seller's own USDC address, never the node's). Without a proof, a money session answers
+        402 whose accepts[] carries the real x402 `exact` scheme (network, payTo, asset,
+        maxAmountRequired) alongside the AIMEAT-native schemes.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -11185,6 +11191,14 @@ paths:
         - name: id
           in: path
           required: true
+          schema: { type: string }
+        - name: X-PAYMENT
+          in: header
+          required: false
+          description: >-
+            x402 settlement proof (base64 of the exact-scheme payment payload). When present it is
+            used as the payment instrument and selects the com.coinbase.x402 handler unless
+            payment.handler names another. Non-custodial USDC settlement (TARGET-042).
           schema: { type: string }
       requestBody:
         content:
@@ -11195,16 +11209,19 @@ paths:
                 payment:
                   type: object
                   properties:
-                    handler: { type: string, description: 'Payment handler id (default io.aimeat.morsels)' }
+                    handler: { type: string, description: 'Payment handler id (default io.aimeat.morsels; com.coinbase.x402 for USDC/x402)' }
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
         '402':
-          description: Insufficient balance
+          description: >-
+            Payment required. The body carries the x402 accepts[] envelope: the AIMEAT-native
+            schemes (aimeat-checkout, aimeat-morsel-topup) plus, on an x402-enabled money session
+            with a seller USDC address, the real x402 `exact` scheme to sign and retry via X-PAYMENT.
         '409':
           description: Session not open or expired
         '422':
-          description: Unknown payment handler / currency mismatch
+          description: Unknown payment handler / currency mismatch / seller has no x402 USDC address
 
   # ── Federation ─────────────────────────────────────────────
   /v1/federation/peer/request:

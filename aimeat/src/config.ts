@@ -366,6 +366,15 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // /.well-known/mcp.json (richest single-fetch discovery, the spec's lean); 'pointer' keeps
     // the card lean and points at /v1/commerce/tools instead (TARGET-034 phase D).
     mcpCardCommerceTools: process.env.AIMEAT_MCP_CARD_COMMERCE_TOOLS === 'pointer' ? 'pointer' as const : 'inline' as const,
+    // x402 stablecoin settlement (TARGET-042): NON-CUSTODIAL USDC handler for money (USD) sessions.
+    // USDC is a payment METHOD for a USD price (model 2), never a currency of its own. Network +
+    // facilitator are parameters so Solana / another facilitator drops in without a core change. OFF
+    // by default (registers only when enabled) so a node advertises the exact scheme only when it can
+    // settle it. Base Sepolia + the public x402.org facilitator are the safe testnet defaults.
+    x402Enabled: process.env.AIMEAT_X402_ENABLED === 'true',
+    x402Network: process.env.AIMEAT_X402_NETWORK ?? 'base-sepolia',
+    x402FacilitatorUrl: process.env.AIMEAT_X402_FACILITATOR_URL ?? 'https://x402.org/facilitator',
+    x402TestFacilitator: process.env.AIMEAT_X402_TEST_FACILITATOR === 'true',
     // Web Bot Auth (RFC 9421): sign the node's outbound safeFetch traffic with the node Ed25519
     // key so peers/CDNs can verify AIMEAT's agent traffic against the key directory at
     // /.well-known/http-message-signatures-directory. OFF by default: it stamps identifying
