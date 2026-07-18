@@ -4,6 +4,38 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-07-18
+
+**AIMEAT 2.0 — real-money agentic commerce on a Mongo-free, Postgres-first foundation.** The storage
+layer left Prisma and MongoDB behind for a hand-tuned Postgres+Kysely backend (1.41.0), faster on
+every operation and verified at parity; on that foundation the commerce core opened for real money on
+**both rails at once** — stablecoins over **x402** and euros over **Stripe Connect** — each
+non-custodial, each proven against a real settlement, neither touching the commerce core. The major
+version marks the shift: an AIMEAT node no longer merely *could* take payment someday; it takes
+payment now, for real, without holding a cent.
+
+**The x402 envelope becomes real x402 settlement — an external x402-compatible agent can now pay a
+USD-priced resource in USDC on Base, and the node verifies the payment on-chain without ever holding
+funds (TARGET-042).** Since 1.40.0 a payment-required response carried an x402-*style* `accepts`
+block; it now carries the real x402 `exact` scheme (`network`, `payTo`, `asset` = USDC,
+`maxAmountRequired`, EIP-712 `extra`) alongside the AIMEAT-native schemes, so a genuine x402 client
+can read it and pay. The paying agent returns its signed EIP-3009 authorization in the `X-PAYMENT`
+header on checkout completion, and a new **non-custodial** `com.coinbase.x402` `PaymentHandler`
+verifies and settles it through a configured facilitator (the public `x402.org` facilitator by
+default, which sponsors gas) — funds move buyer → the seller's own USDC address, never the node's,
+and a reused authorization nonce is rejected as a replay. USDC is a payment **method**, not a new
+currency (model 2): the session stays `USD`, only the payment-handler list grows, and the handler
+registers beside `io.aimeat.morsels` and the EE Stripe handler with **no change to the commerce
+core**. Network and facilitator are parameters (a `base-sepolia` / `base` registry plus `AIMEAT_X402_*`
+config, off by default), and the server runtime stays dependency-free — the EIP-3009 crypto lives in
+the buyer's wallet and the facilitator, so the node only serializes the requirements and forwards the
+proof through `safeFetch`. Proven on-chain, not asserted: `e2e-x402` (8/8) against a facilitator
+double with the commerce regression green (82/82), then a real Base Sepolia settlement via the
+`x402.org` facilitator — transaction
+`0x9804072bd1abbb1ef441074647a0311cad17baa9d8e169a3cc305eac725241b5` (receipt status `0x1`, 0.10 USDC
+buyer → payTo), followed by a rejected replay. Production Base mainnet remains a separate, deliberate
+decision and is out of scope here.
+
 **The fiat money rail reaches the finish line — a node can now sell for real euros, end to end, non-custodially (TARGET-043).** The commerce core shipped the plumbing in 1.40.0; this completes it in the Enterprise edition with a real `com.stripe.spt` payment handler built on the **Stripe Connect *Platform* model**. Sellers are **Express connected accounts** onboarded through Stripe's own hosted flow (`POST /v1/orgs/{slug}/connect/onboard` mints the account + an Account Link; `GET …/connect/status` reports `charges_enabled`/`payouts_enabled`), and a card charge is created on the connected account with `application_fee_amount` routing the operator's cut — funds settle straight to the seller, so money never touches the operator's balance. Two non-custodial shapes are selectable via `AIMEAT_STRIPE_CHARGE_MODE` (`direct`, the default: charge *on* the connected account; `destination`: platform charge with `transfer_data`+`on_behalf_of`). The operator's Platform secret is read **only** from the environment (`AIMEAT_STRIPE_SECRET_KEY`) — never hardcoded, logged, or returned.
 
 **KYB stops being a stub and becomes real, Stripe-backed.** A company's real-money selling is gated on verification, and `connect/status` now **auto-verifies** it the moment its connected account can take charges and it carries a Y-tunnus (Stripe's own hosted onboarding did the KYC/KYB); the operator manual override remains. Every money sale books **DAC7** (the EU platform-operator report — per-seller, per-year/quarter consideration, transaction count, and fees) and **ALV/VAT** entries (VAT-inclusive prices, rate configurable via `AIMEAT_VAT_RATE_PERCENT`, default Finland 25.5 %), readable at `GET /v1/orgs/{slug}/payables` and `…/dac7`. The **My Company → Payments** panel gains Connect onboarding, a Stripe-backed KYB badge, and the money books (payables owed to the seller + DAC7/ALV); the standalone-key PSP form is demoted behind an *Advanced* toggle. New MCP tools: `aimeat_org_connect_onboard` / `_status` and `aimeat_org_payables`. All of this lives in the Enterprise module — **no change to the commerce core** (session, fee leg, resolver untouched).
