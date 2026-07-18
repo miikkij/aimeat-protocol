@@ -26,6 +26,11 @@
  *     (AIMEAT_SECRETARY_ENABLED, read from /v1/site/header-nav `features.secretary`). Governance + model unaffected.
  *   v0.9.0 — 2026-07-16 — Member-add input is the shared ContactPicker (contacts + directory
  *     suggestions + email resolve).
+ *   v0.10.0 — 2026-07-18 — Money UI (TARGET-043): Payments panel gains Stripe Connect (Platform)
+ *     onboarding (Express Account Links via POST /v1/orgs/{slug}/connect/onboard + status), a
+ *     Stripe-backed KYB badge, and the money books — payables owed to the seller (GET
+ *     /v1/orgs/{slug}/payables) + DAC7/ALV compliance (GET /v1/orgs/{slug}/dac7). The individual
+ *     standalone-key PSP form is demoted behind an "Advanced" toggle.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -41,6 +46,7 @@ import { Spinner } from '/components/Spinner.js';
 import { EmptyState } from '/components/EmptyState.js';
 import { THEMES, buildPortfolioData } from '/views/portfolio-themes.js';
 import { ContactPicker } from '/components/ContactPicker.js';
+import { PaymentsPanel } from '/views/my-company.payments.js';
 
 const html = htm.bind(h);
 
@@ -229,69 +235,6 @@ function SettingsPanel({ org, onSaved }) {
       ${ok && html`<p class="mc-saved">${t('myCompany.settingsSaved')}</p>`}
       <button class="btn-primary" type="submit" disabled=${busy || uploading}>${t('myCompany.saveSettings')}</button>
     </form>`;
-}
-
-/** Payments (read-only): the node's payment handlers + checkout status from /.well-known/ucp,
- * and the company's KYB pre-stage (Y-tunnus given or not). Real-money handlers appear here
- * automatically once the node's EE edition registers them — no UI change needed. */
-function PaymentsPanel({ org }) {
-  const [profile, setProfile] = useState(null);
-  const [psp, setPsp] = useState(null);
-  const [keyIn, setKeyIn] = useState('');
-  const [pspBusy, setPspBusy] = useState(false);
-  const [pspMsg, setPspMsg] = useState('');
-  const loadPsp = useCallback(() => {
-    apiGet(`/v1/orgs/${encodeURIComponent(org.slug)}/psp`).then(r => setPsp(r.data?.psp ?? { configured: false })).catch(() => setPsp(false));
-  }, [org.slug]);
-  useEffect(() => {
-    let alive = true;
-    fetch('/.well-known/ucp').then(r => r.json()).then(p => { if (alive) setProfile(p); }).catch(() => { if (alive) setProfile(false); });
-    loadPsp();
-    return () => { alive = false; };
-  }, [loadPsp]);
-  async function savePsp() {
-    setPspBusy(true); setPspMsg('');
-    try { await apiPut(`/v1/orgs/${encodeURIComponent(org.slug)}/psp`, { secret_key: keyIn.trim() }); setKeyIn(''); setPspMsg(t('myCompany.pspSaved')); loadPsp(); }
-    catch (e) { setPspMsg(e.message || 'Save failed'); }
-    finally { setPspBusy(false); }
-  }
-  async function removePsp() {
-    setPspBusy(true); setPspMsg('');
-    try { await apiDelete(`/v1/orgs/${encodeURIComponent(org.slug)}/psp`); setPspMsg(t('myCompany.pspRemoved')); loadPsp(); }
-    catch (e) { setPspMsg(e.message || 'Remove failed'); }
-    finally { setPspBusy(false); }
-  }
-  if (profile === null) return html`<${Spinner} />`;
-  const handlers = (profile && profile.ucp && profile.ucp.payment_handlers) || [];
-  const checkoutOn = !!(profile && profile.ucp && (profile.ucp.capabilities || []).length);
-  const hasKybPre = !!org.businessId;
-  return html`
-    <div class="mc-payments">
-      <div class="mc-label">${t('myCompany.pspTitle')}
-        ${psp && psp.configured
-          ? html`<span class="mc-chip mc-chip-ok">${t('myCompany.pspConfigured')} ${psp.keyHint || ''}</span>`
-          : html`<span class="mc-chip mc-chip-warn">${t('myCompany.pspMissing')}</span>`}
-      </div>
-      <span class="mc-mini">${t('myCompany.pspHint')}</span>
-      <div class="flex-row-wrap mc-manage-row">
-        <input class="input-field input-sm mc-psp-input" type="password" placeholder="sk_live_…" value=${keyIn} onInput=${(e) => setKeyIn(e.target.value)} />
-        <button class="btn-primary btn-sm" disabled=${pspBusy || keyIn.trim().length < 8} onClick=${savePsp}>${t('myCompany.pspSave')}</button>
-        ${psp && psp.configured && html`<button class="btn-ghost btn-sm mc-remove" disabled=${pspBusy} onClick=${removePsp}>${t('myCompany.pspRemove')}</button>`}
-      </div>
-      ${pspMsg && html`<span class="mc-mini">${pspMsg}</span>`}
-      <div class="mc-label">${t('myCompany.paymentsCheckout')}
-        <span class="mc-chip ${checkoutOn ? 'mc-chip-ok' : 'mc-chip-warn'}">${checkoutOn ? t('myCompany.paymentsOn') : t('myCompany.paymentsOff')}</span>
-      </div>
-      <div class="mc-label">${t('myCompany.paymentsHandlers')}</div>
-      ${handlers.length === 0
-        ? html`<${EmptyState} text=${t('myCompany.paymentsNone')} />`
-        : html`<ul class="mc-order-list">${handlers.map(h => html`
-            <li key=${h.id} class="mc-payment-row"><b>${h.title || h.id}</b> <span class="mc-mini">${h.id} · ${(h.currencies || []).join(', ')}</span></li>`)}</ul>`}
-      <div class="mc-label">${t('myCompany.paymentsKyb')}
-        <span class="mc-chip ${hasKybPre ? 'mc-chip-ok' : 'mc-chip-warn'}">${hasKybPre ? t('myCompany.paymentsKybPre') : t('myCompany.paymentsKybMissing')}</span>
-      </div>
-      <span class="mc-mini">${t('myCompany.paymentsKybHint')}</span>
-    </div>`;
 }
 
 /** Compose the prompt the user takes to their AI to generate the portfolio HTML (prompt-driven). */
