@@ -103,6 +103,7 @@ const ALL_SUITES = [
     'test/e2e-agent-offers.ts',
     'test/e2e-commerce.ts',
     'test/e2e-x402.ts',
+    'test/e2e-x402-testnet.ts',
     'test/e2e-organism-membership.ts',
     'test/e2e-organism-member-visibility.ts',
     'test/e2e-anonymous-identity-leaks.ts',
