@@ -12,7 +12,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { stripCodeblock } from './generator-prompts/strip.js';
+import { stripCodeblock } from './llm-strip.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
 import { LIVING_AUTHOR_SYSTEM, LIVING_AUTHOR_TEMPLATE } from './living-author-prompt.js';
 

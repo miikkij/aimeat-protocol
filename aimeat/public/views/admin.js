@@ -62,7 +62,6 @@ import KnowledgeAdminTab from './admin/knowledge-tab.js';
 import PromptsTab        from './admin/prompts-tab.js';
 import PackagesAdminTab  from './admin/packages-tab.js';
 import MemoryAdminTab    from './admin/memory-tab.js';
-import GeneratorDebugTab from './admin/generator-debug-tab.js';
 import CapabilitiesAdminTab from './admin/capabilities-tab.js';
 import AgentTasksAdminTab from './admin/agent-tasks-tab.js';
 import SharingGroupsAdminTab from './admin/sharing-groups-tab.js';
@@ -113,7 +112,6 @@ const NAV_GROUPS = [
     { id: 'push',   key: 'dashboard.push',   component: PushTab },
     { id: 'consul',    key: 'dashboard.consul',    component: ConsulTab },
     { id: 'scheduler', key: 'dashboard.scheduler', component: SchedulerTab },
-    { id: 'generator-debug', key: 'dashboard.generatorDebug', component: GeneratorDebugTab },
   ]},
   { key: 'dashboard.navServices', items: [
     { id: 'directory',   key: 'dashboard.directory',      component: DirectoryTab },

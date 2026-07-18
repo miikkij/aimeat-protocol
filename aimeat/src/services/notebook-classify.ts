@@ -21,7 +21,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { stripCodeblock } from './generator-prompts/strip.js';
+import { stripCodeblock } from './llm-strip.js';
 import { collectWorkspaceSummary } from './structure-overview.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
 import { NOTEBOOK_CLASSIFY_SYSTEM, NOTEBOOK_CLASSIFY_TEMPLATE } from './notebook-classify-prompt.js';

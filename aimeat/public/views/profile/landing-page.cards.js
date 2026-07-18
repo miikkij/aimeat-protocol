@@ -581,7 +581,6 @@ export const SIDEBAR_GROUPS = [
   ] },
   { titleKey: 'profile.landing.menuBuildShare', items: [
     { id: 'apps', labelKey: 'profile.tabs.apps' },
-    { id: 'generator', labelKey: 'profile.generator.tabLabel' },
     /* foundry removed from the menu 2026-06-10 (owner: not in use). The tab module and
      * its route id still exist — restore by re-adding this item. */
     { id: 'extensions', labelKey: 'profile.tabs.extensions' },

@@ -160,17 +160,6 @@ export function platformSections(config: AimeatConfig): ConfigSection[] {
       ],
     },
     {
-      title: 'Service Generator',
-      entries: [
-        {
-          envVar: 'AIMEAT_GENERATOR_ENABLED',
-          description: 'Show Generator tab in profile view',
-          value: String(config.generatorEnabled),
-          defaultVal: 'true',
-        },
-      ],
-    },
-    {
       title: 'App Origin Isolation (H-2)',
       entries: [
         {

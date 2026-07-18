@@ -17,7 +17,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
 import * as orgService from '/js/services/organisms.js';
-import { OpenRouterSettings } from '/views/profile/generator-settings.js';
+import { OpenRouterSettings } from '/views/profile/openrouter-settings.js';
 
 export function WorkspaceGenerator({ orgId, wsId, showToast, onApplied, onOpenSettings, showRegenerate, manifest, genBusy, setGenBusy }) {
   const [genDesc, setGenDesc] = useState('');

@@ -34,7 +34,6 @@ import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as pkgService from '/js/services/packages.js';
 import { apiGet } from '/js/api.js';
-import { importPackageToGenerator } from '/js/services/generator-packaging.js';
 
 // ─── InstanceCard ───────────────────────────────────────────────────────────
 // Expanded card for one installed package instance: shows every component's
@@ -256,21 +255,6 @@ export default function PackagesTab({ session, showToast, navigate }) {
     }
   };
 
-  const handleOpenInGenerator = async (groupId, author) => {
-    const currentUser = session?.owner || '';
-    const isOwn = author === currentUser;
-    if (!isOwn) {
-      const ok = window.confirm(t('profile.generator.forkConfirm') || 'This will create your own copy of this package for editing. Continue?');
-      if (!ok) return;
-    }
-    try {
-      await importPackageToGenerator(groupId, null, currentUser);
-      showToast(t('profile.packages.importSuccess') || 'Package imported as generator project');
-      navigate('generator');
-    } catch (e) {
-      showToast(e.message, true);
-    }
-  };
 
   const handleDownloadZip = async (groupId, name) => {
     try {
@@ -475,11 +459,6 @@ export default function PackagesTab({ session, showToast, navigate }) {
                       <button class="btn-outline btn-sm" onClick=${() => handleDownloadZip(pkg.packageGroupId, pkg.name)}>
                         ${t('packages.downloadZip') || 'Download ZIP'}
                       </button>
-                      <button class="btn-outline btn-sm" onClick=${() => handleOpenInGenerator(pkg.packageGroupId, pkg.author)}>
-                        ${pkg.author === session?.owner
-                          ? (t('packages.editInGenerator') || 'Edit in Generator')
-                          : (t('packages.openInGenerator') || 'Open in Generator')}
-                      </button>
                       ${pkg.status === 'published' && !pkg.templateStatus && pkg.author === session?.owner && html`
                         <button class="btn-outline btn-sm" onClick=${() => handleProposeAsTemplate(pkg.packageGroupId)}>
                           ${t('packages.proposeAsTemplate') || 'Propose as Template'}
@@ -525,11 +504,6 @@ export default function PackagesTab({ session, showToast, navigate }) {
                       </button>
                       <button class="btn-outline btn-sm" onClick=${() => handleDownloadZip(tpl.packageGroupId, tpl.title)}>
                         ${t('packages.downloadZip') || 'Download ZIP'}
-                      </button>
-                      <button class="btn-outline btn-sm" onClick=${() => handleOpenInGenerator(tpl.packageGroupId, tpl.packageAuthor)}>
-                        ${tpl.packageAuthor === session?.owner
-                          ? (t('packages.editInGenerator') || 'Edit in Generator')
-                          : (t('packages.openInGenerator') || 'Open in Generator')}
                       </button>
                     </div>
                   </div>

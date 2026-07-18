@@ -39,7 +39,6 @@ export interface PromptSeedEntry {
 }
 
 // Seed groups are extracted into ./prompt-defaults/* to keep this file within max-file-lines.
-import { GENERATOR_PROMPT_SEEDS } from './generator-prompt-seeds.js';
 import { NOTEBOOK_BUILDER_SEEDS } from './prompt-defaults/notebook-builders.js';
 import { TIER_CORE_SEEDS } from './prompt-defaults/tiers-core.js';
 import { TIER_EXTENDED_SEEDS } from './prompt-defaults/tiers-extended.js';
@@ -60,10 +59,4 @@ export const PROMPT_SEEDS: PromptSeedEntry[] = [
   ...KNOWLEDGE_SEEDS,
   ...PLATFORM_SEEDS,
   ...MANIFEST_ARCHITECT_SEEDS,
-
-  // ═══════════════════════════════════════════════════════════════════
-  // Generator prompts — imported from separate file
-  // ═══════════════════════════════════════════════════════════════════
-  ...GENERATOR_PROMPT_SEEDS,
-
 ];

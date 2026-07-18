@@ -1,5 +1,5 @@
 import { readFileSync } from 'node:fs';
-import { stripCodeblock } from '../src/services/generator-prompts/strip.js';
+import { stripCodeblock } from '../src/services/llm-strip.js';
 
 const raw = readFileSync('data/debug/generator/prj-mnhzlw4a-2k21l/components/cortex-data/test-raw-response.txt', 'utf8');
 const stripped = stripCodeblock(raw);

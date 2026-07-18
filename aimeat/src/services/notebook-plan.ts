@@ -18,7 +18,7 @@
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
-import { stripCodeblock } from './generator-prompts/strip.js';
+import { stripCodeblock } from './llm-strip.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
 import { buildPlacementContext, type PlacementOrganism } from './notebook-classify.js';
 import { NOTEBOOK_PLAN_SYSTEM, NOTEBOOK_PLAN_TEMPLATE } from './notebook-plan-prompt.js';

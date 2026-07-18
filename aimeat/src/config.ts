@@ -498,8 +498,6 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
     maxExtensionsPerOwner: parseInt(process.env.AIMEAT_MAX_EXTENSIONS_PER_OWNER || '10', 10),
 
-    // Service Generator
-    generatorEnabled: process.env.AIMEAT_GENERATOR_ENABLED !== 'false',
 
     // Prompt Calibrator
     calibratorEnabled: process.env.AIMEAT_CALIBRATOR_ENABLED !== 'false',

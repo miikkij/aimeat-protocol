@@ -33,7 +33,7 @@ import { TrackResponseModal } from './track-response-modal.js';
 import { generatePlan, runStep, composeEnrichedMarkdown, buildCatalogue } from '/js/services/notebook-plan.js';
 import * as offersService from '/js/services/offers.js';
 import { Markdown } from '/components/Markdown.js';
-import { OpenRouterSettings } from './generator-settings.js';
+import { OpenRouterSettings } from './openrouter-settings.js';
 import { NEW, NB_STEPS, relTime, firstLine, noteText } from './notebook-helpers.js';
 
 export default function NoteCard({ note, showToast, orgNames, settings, autoEnrich, onChanged, onOrgsChanged, onDelete }) {
