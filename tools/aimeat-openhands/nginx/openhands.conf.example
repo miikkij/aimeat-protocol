@@ -1,0 +1,67 @@
+# AIMEAT-boosted OpenHands — nginx reverse proxy: TLS + Basic Auth + WebSocket.
+#
+# ⚠️  SECURITY: self-hosted OpenHands has NO login of its own, and its UI can run arbitrary
+#     code on this host (shell + docker socket + your AIMEAT agent token). The auth_basic gate
+#     below (over TLS) is the ONLY thing stopping the whole internet from taking over this box.
+#     Do not remove it. An IP allowlist on top is strongly recommended.
+#
+# Setup (see DEPLOY-PROMPT.md "Expose via nginx"):
+#   1) Point a DNS A record for __DOMAIN__ at this host.
+#   2) Create the password file:  htpasswd -c /etc/nginx/openhands.htpasswd <username>
+#   3) Get a cert:  certbot --nginx -d __DOMAIN__   (or certonly + the paths below)
+#   4) Put this file in /etc/nginx/sites-available/, symlink into sites-enabled/, nginx -t, reload.
+#   5) In the bundle .env: OPENHANDS_PORT_BIND=127.0.0.1:13781 and
+#      PERMITTED_CORS_ORIGINS=https://__DOMAIN__  (then re-run: docker compose up -d).
+
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+
+server {
+    listen 80;
+    listen [::]:80;
+    server_name __DOMAIN__;
+
+    location /.well-known/acme-challenge/ { root /var/www/certbot; }
+    location / { return 301 https://$host$request_uri; }
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name __DOMAIN__;
+
+    ssl_certificate     /etc/letsencrypt/live/__DOMAIN__/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/__DOMAIN__/privkey.pem;
+
+    # ── Authentication (MANDATORY — OpenHands has none of its own) ──
+    auth_basic           "AIMEAT OpenHands";
+    auth_basic_user_file /etc/nginx/openhands.htpasswd;
+
+    # ── Strongly recommended: also restrict by source IP. Uncomment + set your IP(s). ──
+    # allow 203.0.113.4;
+    # deny all;
+
+    client_max_body_size 100m;
+
+    location / {
+        proxy_pass http://127.0.0.1:13781;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket upgrade (OpenHands streams the agent over WS — required or the UI hangs).
+        proxy_set_header Upgrade    $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+
+        # Agent runs are long-lived — keep the stream open and don't buffer it.
+        proxy_read_timeout  3600s;
+        proxy_send_timeout  3600s;
+        proxy_buffering     off;
+    }
+}
