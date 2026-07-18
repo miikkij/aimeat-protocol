@@ -185,6 +185,11 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
         title: isRequest ? `${senderGhii} wants to message you` : `New message from ${senderGhii}`,
         body: messagePreview(body),
         link: isRequest ? '/v1/profile#inbox/requests' : `/v1/profile#inbox/${conversationId}`,
+        // A delivered DM gets an inline reply box in the bell (POST /v1/messages back to the sender).
+        // A pending request has no thread to reply into yet — it keeps its navigate-to-requests link.
+        actions: isRequest ? undefined : [
+          { id: 'reply', label: 'Reply', kind: 'reply', to: senderGhii, conversationId, subject: subject || undefined, replyTo: id },
+        ],
       });
     }
     await logDelivery(ctx, { messageId: id, origin: 'local', targetNodeId: config.nodeId, status: 'delivered', latencyMs: 0 });

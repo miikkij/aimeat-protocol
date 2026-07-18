@@ -19192,6 +19192,11 @@ paths:
         Lists the caller's notifications (newest first) plus the unread count, for the header bell.
         Notifications are created server-side by events (e.g. a workspace access request/approval).
         Owner-scoped — you only see your own owner's notifications.
+
+        Each notification may carry an inline `actions[]` array the bell renders as buttons:
+        `{ id, label, kind }` where kind is `reply` (opens a reply box → POST /v1/messages),
+        `api` (calls `endpoint` with the caller's own session, e.g. approve/deny a request), or
+        `navigate` (a deep link). Actions are set only by trusted node emit code — see the POST note.
       tags: [Notifications]
       security: [{ BearerAuth: [] }]
       responses:
@@ -19210,6 +19215,10 @@ paths:
         notification gets the app's name prefixed to the title (provenance) and `link` defaults to
         the app's own open URL (`/v1/apps/{owner}/{file}?mode=inline`) so the click reopens the app.
         Delivery is best-effort (`created: true` confirms acceptance, not push delivery).
+
+        A client-supplied `actions` field is rejected with 400: inline `reply`/`api` actions execute
+        with the recipient's own authority when clicked, so they may only originate from trusted node
+        emit code — a caller wanting an extra button uses `link` (navigation carries no authority).
       tags: [Notifications]
       security: [{ BearerAuth: [] }]
       requestBody:

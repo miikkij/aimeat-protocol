@@ -8,14 +8,21 @@
  *   When the recipient has a web-push subscription, the same notification is also delivered as a
  *   browser push (best-effort) whose click deep-links to the same target as the bell entry.
  * @structure
- *   - notify(storage, recipientGhii, { type, title, body?, link? })
+ *   - notify(storage, recipientGhii, { type, title, body?, link?, actions? })
  *   - setNotifyPushService(push) — wired once at boot so notify() can bridge to web push
  *   - notifLinkToUrl(link) — bell link vocabulary ('/v1/profile#inbox/<id>') → openable URL
+ *   - NotifAction — an inline action a notification carries (reply | api | navigate), rendered as a
+ *     button in the header bell. SECURITY: 'reply'/'api' actions execute with the RECIPIENT's own
+ *     authority when they click, so they may ONLY be set by trusted server-side emit code — never
+ *     derived from a principal's input. The public POST /v1/notifications route rejects them.
+ *   - isSafeNotifActionEndpoint(path) — same-node-path guard shared with the route.
  * @usage import { notify } from '../services/notify.js';
  *   await notify(storage, `${creatorOwner}@${nodeId}`, { type: 'workspace_access_request', title, link });
  * @version-history
  *   v1.0.0 -- 2026-06-08 -- Initial: memory-backed notification inbox.
  *   v1.1.0 -- 2026-07-02 -- Bridge bell notifications to web push with deep-link URL translation.
+ *   v1.2.0 -- 2026-07-18 -- Inline notification actions (reply/api/navigate); mirror up to two into
+ *     the web-push payload so the SW can offer OS-level action buttons.
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
@@ -23,6 +30,29 @@ import type { PushService } from './push.js';
 
 export const NOTIF_PREFIX = 'notif.';
 const NOTIF_TTL_HOURS = 24 * 90;   // 90 days
+/** How many actions a single notification may carry (bell + web-push button budget). */
+export const MAX_NOTIF_ACTIONS = 3;
+
+/** Visual weight of an action button in the bell (maps to existing btn-* classes). */
+export type NotifActionStyle = 'primary' | 'default' | 'danger';
+
+/**
+ * An inline action a notification offers. Three kinds:
+ *   - 'navigate': deep-link somewhere in the SPA (link-equivalent, carries no new authority).
+ *   - 'reply':    open an inline text box in the bell and POST /v1/messages to `to` (DM reply).
+ *   - 'api':      call a same-node endpoint (approve/deny/accept/decline) with the clicker's JWT.
+ * `id` is a stable slug ('reply' | 'approve' | 'deny' | 'accept' | 'decline' | 'reject' | ...) the
+ * frontend uses to localize the button label; `label` is the English fallback.
+ */
+export type NotifAction =
+  | { id: string; label: string; kind: 'navigate'; link: string; style?: NotifActionStyle }
+  | { id: string; label: string; kind: 'reply'; to: string; conversationId?: string; subject?: string; replyTo?: string; style?: NotifActionStyle }
+  | { id: string; label: string; kind: 'api'; method: 'POST' | 'PATCH' | 'DELETE'; endpoint: string; body?: Record<string, unknown>; confirm?: boolean; style?: NotifActionStyle };
+
+/** Same-node path guard for an action endpoint/link ('/...' only — never '//host' or a full URL). */
+export function isSafeNotifActionEndpoint(path: unknown): path is string {
+  return typeof path === 'string' && path.startsWith('/') && !path.startsWith('//') && path.length <= 500;
+}
 
 /** Wired once at boot (routes-loader) so every notify() call can also fire a web push. */
 let pushService: PushService | null = null;
@@ -39,6 +69,12 @@ export interface NotifyInput {
   body?: string;
   /** Optional in-app link the notification deep-links to (e.g. '/v1/profile#organisms'). */
   link?: string;
+  /**
+   * Optional inline actions (reply / api / navigate) rendered as buttons in the bell. Trusted-only:
+   * only server-side emit code sets these — see the SECURITY note in the file header. Capped at
+   * MAX_NOTIF_ACTIONS; anything beyond is dropped.
+   */
+  actions?: NotifAction[];
 }
 
 /**
@@ -65,11 +101,12 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
   try {
     const id = randomUUID();
     const now = new Date().toISOString();
+    const actions = Array.isArray(input.actions) ? input.actions.slice(0, MAX_NOTIF_ACTIONS) : [];
     // Key sorts lexically by time; the route sorts newest-first explicitly anyway.
     await storage.setMemory({
       key: `${NOTIF_PREFIX}${now}.${id.slice(0, 8)}`,
       ownerGaii: recipientGhii,
-      value: { id, type: input.type, title: input.title, body: input.body ?? '', link: input.link ?? '', read: false, createdAt: now },
+      value: { id, type: input.type, title: input.title, body: input.body ?? '', link: input.link ?? '', actions, read: false, createdAt: now },
       visibility: 'private',
       tags: ['notif'],
       ttlHours: NOTIF_TTL_HOURS,
@@ -80,11 +117,16 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
     if (pushService?.enabled) {
       // Same tag per type ⇒ a newer notification of the same kind replaces the shown one instead
       // of stacking. A recipient without a push subscription is a silent no-op inside the service.
+      // Mirror up to two actions into the OS-level push (Notification.actions caps low, and a lock
+      // screen can't take free text) — the SW turns a button click into a focus + postMessage so the
+      // open SPA runs it with the owner's session; data.actions carries the full descriptors.
       void pushService.sendNotification(recipientGhii.split('@')[0], {
         title: input.title,
         body: input.body ?? '',
         url: notifLinkToUrl(input.link),
         tag: `notif:${input.type}`,
+        actions: actions.slice(0, 2).map(a => ({ action: a.id, title: a.label })),
+        data: { notifId: id, actions },
       }).catch(() => { /* push is best-effort */ });
     }
   } catch {

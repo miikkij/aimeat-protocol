@@ -420,12 +420,19 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       // Notify the creator + admins so the request doesn't go unnoticed (mirrors the
       // workspace-access request path). admins includes the creator, so dedupe.
       const approvers = [...new Set([organism.creatorGhii, ...organism.admins])];
+      const reviewEndpoint = `/v1/organisms/${id}/join-requests/${request.id}/review`;
       for (const approver of approvers) {
         await notify(storage, `${approver}@${config.nodeId}`, {
           type: 'organism_join_request',
           title: `${ghii} requested to join "${organism.name}"`,
           body: typeof message === 'string' ? message : '',
           link: '/v1/profile#organisms',
+          // Approve/Reject post the review endpoint as the admin. Once one admin decides, the others'
+          // clicks return 409 ALREADY_REVIEWED — the bell surfaces that and refreshes.
+          actions: [
+            { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: reviewEndpoint, body: { decision: 'approved' }, style: 'primary' },
+            { id: 'reject', label: 'Reject', kind: 'api', method: 'POST', endpoint: reviewEndpoint, body: { decision: 'rejected' }, style: 'danger', confirm: true },
+          ],
         });
       }
       emitChange('notifications');

@@ -325,6 +325,11 @@ export async function createNameInvitation(
     type: 'organism_invitation',
     title: `${input.inviterGhii} invited you to join "${input.organism.name}"`,
     link: '/v1/profile#organisms',
+    // Accept/Decline post the invitee's own invitation endpoints (no body; keyed by org id + caller).
+    actions: [
+      { id: 'accept', label: 'Accept', kind: 'api', method: 'POST', endpoint: `/v1/organisms/${input.organism.id}/invitations/accept`, style: 'primary' },
+      { id: 'decline', label: 'Decline', kind: 'api', method: 'POST', endpoint: `/v1/organisms/${input.organism.id}/invitations/decline`, style: 'default', confirm: true },
+    ],
   });
   emitChange('notifications', `${invitee}@${config.nodeId}`);
   emitChange('organisms');

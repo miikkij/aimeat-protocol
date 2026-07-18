@@ -182,12 +182,19 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     });
     // Share the requester's own future contributions with the organism (read).
     await ensureConsent(callerGaii, `organism.${id}.w.${ws}.**`, `organism.${id}`, 'workspace-contribution');
-    // Notify the workspace creator so the request doesn't go unnoticed.
+    // Notify the workspace creator so the request doesn't go unnoticed. Approve/Deny buttons post the
+    // decision endpoint with the clicker's (creator/admin) JWT — the route re-authorizes, so a stale
+    // click just 403s/no-ops.
+    const wsDecision = `/v1/organisms/${id}/workspace-access/decision`;
     await notify(storage, `${createdBy}@${config.nodeId}`, {
       type: 'workspace_access_request',
       title: `${ownerName} requested access to "${entry.name ?? ws}"`,
       body: typeof message === 'string' ? message : '',
       link: '/v1/profile#organisms',
+      actions: [
+        { id: 'approve', label: 'Approve', kind: 'api', method: 'POST', endpoint: wsDecision, body: { ws, requester: ownerName, decision: 'approve' }, style: 'primary' },
+        { id: 'deny', label: 'Deny', kind: 'api', method: 'POST', endpoint: wsDecision, body: { ws, requester: ownerName, decision: 'deny' }, style: 'danger', confirm: true },
+      ],
     });
     emitChange('notifications');
     res.status(201).json(success(config.nodeId, { status: 'requested', ws, workspace_creator: createdBy }));

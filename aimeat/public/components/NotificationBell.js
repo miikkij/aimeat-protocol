@@ -15,6 +15,8 @@
  *   v1.0.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  *   v1.1.0 — 2026-07-02 — Extract openNotificationLink() so push-notification clicks reuse the
  *     same deep-link translation as bell clicks (supports both '#hash' and '?tab=' forms).
+ *   v1.2.0 — 2026-07-18 — Inline notification actions: reply box (POST /v1/messages) + api buttons
+ *     (approve/deny/accept/decline/reject) that call the action endpoint with the owner's session.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -41,6 +43,13 @@ function relTime(iso) {
     return d.toLocaleDateString();
   } catch { return ''; }
 }
+
+// Action id → i18n key (falls back to the server-provided English label) and → button class.
+const ACTION_I18N = {
+  reply: 'notif.action.reply', approve: 'notif.action.approve', deny: 'notif.action.deny',
+  accept: 'notif.action.accept', decline: 'notif.action.decline', reject: 'notif.action.reject',
+};
+const BTN_CLASS = { primary: 'btn-primary', danger: 'btn-danger', default: 'btn-outline' };
 
 /**
  * Deep-link a notification target into the SPA. Handles both notification link vocabularies:
@@ -80,10 +89,14 @@ export function openNotificationLink(link, onNavigate) {
 }
 
 export function NotificationBell({ t, onNavigate }) {
-  const tr = (k, fb) => (t ? t(k) : null) || fb;
+  const tr = (k, fb) => (t && k ? t(k) : null) || fb;
   const [items, setItems] = useState([]);
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
+  const [replyFor, setReplyFor] = useState(null);   // notif id whose reply box is open
+  const [replyText, setReplyText] = useState('');
+  const [busyKey, setBusyKey] = useState(null);      // `${notifId}:${actionId}` in flight
+  const [results, setResults] = useState({});        // notifId → { ok, msg }
   const ref = useRef(null);
 
   const load = useCallback(async () => {
@@ -107,6 +120,7 @@ export function NotificationBell({ t, onNavigate }) {
   const toggle = async () => {
     const next = !open;
     setOpen(next);
+    if (!next) { setReplyFor(null); setReplyText(''); }
     if (next && unread > 0) {
       setUnread(0);
       setItems(its => its.map(n => ({ ...n, read: true })));
@@ -116,6 +130,82 @@ export function NotificationBell({ t, onNavigate }) {
   const clickNotif = (n) => {
     setOpen(false);
     openNotificationLink(n.link, onNavigate);
+  };
+
+  const actionLabel = (a) => tr(ACTION_I18N[a.id], a.label || a.id);
+
+  // 'api' action (approve/deny/accept/decline/reject): call the endpoint with the owner's session.
+  const runApi = async (n, a) => {
+    if (a.confirm && !window.confirm(tr('notif.action.confirm', 'Are you sure?'))) return;
+    setBusyKey(`${n.id}:${a.id}`);
+    const r = await api(a.endpoint, { method: a.method || 'POST', body: a.body ? JSON.stringify(a.body) : undefined });
+    setBusyKey(null);
+    const ok = !!(r && r.ok);
+    setResults(s => ({ ...s, [n.id]: { ok, msg: ok ? actionLabel(a) : (r && r.error && r.error.message) || tr('notif.action.failed', 'Action failed') } }));
+    load();
+  };
+
+  // 'reply' action: send the typed text as a DM back to the sender, then close the box.
+  const sendReply = async (n, a) => {
+    const text = replyText.trim();
+    if (!text) return;
+    setBusyKey(`${n.id}:reply`);
+    const r = await api('/v1/messages', { method: 'POST', body: JSON.stringify({
+      to: a.to, body: text, conversation_id: a.conversationId, reply_to: a.replyTo, subject: a.subject,
+    }) });
+    setBusyKey(null);
+    const ok = !!(r && r.ok);
+    if (ok) { setReplyFor(null); setReplyText(''); }
+    setResults(s => ({ ...s, [n.id]: { ok, msg: ok ? tr('notif.action.sent', 'Reply sent') : (r && r.error && r.error.message) || tr('notif.action.failed', 'Action failed') } }));
+    load();
+  };
+
+  const openReply = (n, a) => {
+    setReplyFor(cur => (cur === n.id ? null : n.id));
+    setReplyText('');
+    setResults(s => ({ ...s, [n.id]: undefined }));
+    // Stash so an "AI draft" jump lands in the right thread.
+    if (a.conversationId) { try { sessionStorage.setItem('aimeat.inbox.open', a.conversationId); } catch { /* noop */ } }
+  };
+
+  const renderAction = (n, a) => {
+    const key = `${n.id}:${a.id}`;
+    const busy = busyKey === key;
+    const cls = BTN_CLASS[a.style] || 'btn-outline';
+    if (a.kind === 'reply') {
+      return html`<button class="notif-action-btn ${cls}" key=${a.id} disabled=${busy} onClick=${(e) => { e.stopPropagation(); openReply(n, a); }}>${actionLabel(a)}</button>`;
+    }
+    if (a.kind === 'navigate') {
+      return html`<button class="notif-action-btn ${cls}" key=${a.id} onClick=${(e) => { e.stopPropagation(); setOpen(false); openNotificationLink(a.link, onNavigate); }}>${actionLabel(a)}</button>`;
+    }
+    return html`<button class="notif-action-btn ${cls}" key=${a.id} disabled=${busy} onClick=${(e) => { e.stopPropagation(); runApi(n, a); }}>${busy ? '…' : actionLabel(a)}</button>`;
+  };
+
+  const renderItem = (n) => {
+    const actions = Array.isArray(n.actions) ? n.actions : [];
+    const res = results[n.id];
+    const replyAction = actions.find(a => a.kind === 'reply');
+    return html`
+      <div class="notif-item ${n.read ? '' : 'unread'}" key=${n.id}>
+        <button class="notif-item-main" onClick=${() => clickNotif(n)}>
+          <div class="notif-item-title">${n.title}</div>
+          ${n.body ? html`<div class="notif-item-body">${n.body}</div>` : null}
+          <div class="notif-item-time">${relTime(n.createdAt)}</div>
+        </button>
+        ${actions.length ? html`<div class="notif-actions">${actions.map(a => renderAction(n, a))}</div>` : null}
+        ${replyFor === n.id && replyAction ? html`
+          <div class="notif-reply">
+            <textarea class="notif-reply-input" rows="2" placeholder=${tr('notif.action.replyPlaceholder', 'Write a reply…')}
+              value=${replyText} onInput=${(e) => setReplyText(e.target.value)}></textarea>
+            <div class="notif-reply-row">
+              <button class="notif-action-btn btn-primary" disabled=${busyKey === `${n.id}:reply` || !replyText.trim()} onClick=${() => sendReply(n, replyAction)}>
+                ${busyKey === `${n.id}:reply` ? '…' : tr('notif.action.send', 'Send')}</button>
+              <button class="notif-action-btn btn-ghost" onClick=${() => { setOpen(false); openNotificationLink(n.link, onNavigate); }}>${tr('notif.action.aiDraft', 'Reply with AI')}</button>
+              <button class="notif-action-btn btn-ghost" onClick=${() => { setReplyFor(null); setReplyText(''); }}>${tr('common.cancel', 'Cancel')}</button>
+            </div>
+          </div>` : null}
+        ${res ? html`<div class="notif-result ${res.ok ? 'ok' : 'err'}">${res.ok ? '✓ ' : '⚠ '}${res.msg}</div>` : null}
+      </div>`;
   };
 
   return html`
@@ -128,12 +218,7 @@ export function NotificationBell({ t, onNavigate }) {
           <div class="notif-dropdown-head">${tr('notif.title', 'Notifications')}</div>
           ${items.length === 0
             ? html`<div class="notif-empty">${tr('notif.empty', 'No notifications yet')}</div>`
-            : items.map(n => html`
-              <button class="notif-item ${n.read ? '' : 'unread'}" key=${n.id} onClick=${() => clickNotif(n)}>
-                <div class="notif-item-title">${n.title}</div>
-                ${n.body ? html`<div class="notif-item-body">${n.body}</div>` : null}
-                <div class="notif-item-time">${relTime(n.createdAt)}</div>
-              </button>`)}
+            : items.map(n => renderItem(n))}
         </div>` : null}
     </div>`;
 }

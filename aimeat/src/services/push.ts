@@ -30,6 +30,8 @@ export interface PushPayload {
   badge?: string;
   url?: string;
   tag?: string;
+  /** OS-level notification action buttons ({ action, title }); the SW renders + routes these. */
+  actions?: Array<{ action: string; title: string }>;
   data?: Record<string, unknown>;
 }
 

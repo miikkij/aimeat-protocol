@@ -3,9 +3,12 @@
  * @description E2E for the notification inbox WRITE surface (POST /v1/notifications): an owner (or
  *   a scoped app/agent) notifies their OWN owner — the record lands in the bell inbox with a
  *   deep link. Covers: create → list, link/title/type validation, the scope gate (an agent token
- *   without notifications:send gets 403), and mark-read.
+ *   without notifications:send gets 403), mark-read, the inline-actions security invariant (a
+ *   client-supplied actions field is rejected), and the DM reply action end-to-end.
  * @version-history
  *   v1.0.0 — 2026-07-02 — Initial: self-notify create/validate/scope-gate/read flow.
+ *   v1.1.0 — 2026-07-18 — Inline actions: reject client-supplied actions (403/400 invariant) +
+ *     a delivered DM carries a reply action whose params drive a working POST /v1/messages reply.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=notifications
 
@@ -99,6 +102,54 @@ await test('7. Mark all read clears the unread count', async () => {
     assert(r.status === 200 && r.body.data.marked >= 1, `read ${r.status}, marked ${r.body?.data?.marked}`);
     const list = await json('/v1/notifications', { headers: auth(A.token) });
     assert(list.body.data.unread === 0, `unread should be 0, got ${list.body.data.unread}`);
+});
+
+await test('8. SECURITY: a client-supplied actions field is rejected (400)', async () => {
+    // Inline reply/api actions execute with the recipient's authority — only trusted node emit code
+    // may set them. Even the owner (who bypasses scope) cannot inject one via the public route.
+    const r = await json('/v1/notifications', {
+        method: 'POST', headers: auth(A.token),
+        body: JSON.stringify({ title: 'sneaky', actions: [{ id: 'x', label: 'Grant me', kind: 'api', method: 'POST', endpoint: '/v1/admin/mint', body: { amount: 1000000 } }] }),
+    });
+    assert(r.status === 400, `expected 400 rejecting actions, got ${r.status}: ${JSON.stringify(r.body.error)}`);
+});
+
+// ── Reply-action end-to-end: a delivered DM notification carries a reply action whose params drive
+// a real POST /v1/messages reply that the original sender receives. ──
+const ghiiOf = (name: string) => `${name}@${NODE_ID}`;
+let B: Awaited<ReturnType<typeof setupOwner>>;
+let replyAction: any = null;
+let convId = '';
+
+await test('9. Setup owner B + A→B first contact (request) then accept', async () => {
+    B = await setupOwner('b');
+    const send1 = await json('/v1/messages', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ to: ghiiOf(B.name), body: 'Hi B — first contact' }) });
+    assert(send1.status === 201, `first send ${send1.status}: ${JSON.stringify(send1.body.error)}`);
+    const accept = await json(`/v1/messages/requests/${encodeURIComponent(ghiiOf(A.name))}/accept`, { method: 'POST', headers: auth(B.token) });
+    assert(accept.status === 200, `accept ${accept.status}: ${JSON.stringify(accept.body.error)}`);
+});
+
+await test('10. A delivered DM to B carries a reply action pointing back at A', async () => {
+    const send2 = await json('/v1/messages', { method: 'POST', headers: auth(A.token), body: JSON.stringify({ to: ghiiOf(B.name), body: 'Second message — now delivered' }) });
+    assert(send2.status === 201, `second send ${send2.status}`);
+    const list = await json('/v1/notifications', { headers: auth(B.token) });
+    const dm = (list.body.data.notifications || []).find((n: any) => n.type === 'direct_message' && Array.isArray(n.actions) && n.actions.some((a: any) => a.kind === 'reply'));
+    assert(!!dm, 'B has a direct_message notification with a reply action');
+    replyAction = dm.actions.find((a: any) => a.kind === 'reply');
+    assert(replyAction.to === ghiiOf(A.name), `reply action targets A, got ${replyAction.to}`);
+    assert(typeof replyAction.conversationId === 'string' && replyAction.conversationId.length > 0, 'reply action carries conversationId');
+    convId = replyAction.conversationId;
+});
+
+await test('11. Using the reply action, B replies and A receives it', async () => {
+    const reply = await json('/v1/messages', {
+        method: 'POST', headers: auth(B.token),
+        body: JSON.stringify({ to: replyAction.to, body: 'Reply straight from the bell', conversation_id: replyAction.conversationId, reply_to: replyAction.replyTo, subject: replyAction.subject }),
+    });
+    assert(reply.status === 201, `reply send ${reply.status}: ${JSON.stringify(reply.body.error)}`);
+    const inbox = await json('/v1/messages/inbox', { headers: auth(A.token) });
+    const seen = (inbox.body.data.messages || []).some((m: any) => (m.body || '').includes('Reply straight from the bell'));
+    assert(seen, 'A sees B\'s bell reply in the inbox');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
