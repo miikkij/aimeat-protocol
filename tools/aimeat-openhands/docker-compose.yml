@@ -12,20 +12,20 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
-      # Agent-server image the app spawns (pinned to the 1.8 line).
-      - AGENT_SERVER_IMAGE_REPOSITORY=ghcr.io/openhands/agent-server
-      - AGENT_SERVER_IMAGE_TAG=1.26.0-python
+      # The agent RUNTIME image the app spawns. We point it at a CUSTOM image that bakes the
+      # aimeat-app-builder skill into /home/openhands/.openhands/skills (built by
+      # scripts/build-runtime.sh). This is the mechanism that works: the runtime container is
+      # separate from this app container and does NOT see its ~/.openhands, and bind-mounting a
+      # host dir into the runtime HOME breaks its permission setup — so the skill must live in
+      # the runtime image itself. The app uses a locally-built image as-is (it only pulls when
+      # the image is absent), so no registry push is needed.
+      - AGENT_SERVER_IMAGE_REPOSITORY=${AGENT_SERVER_IMAGE_REPOSITORY:-aimeat/agent-server}
+      - AGENT_SERVER_IMAGE_TAG=${AGENT_SERVER_IMAGE_TAG:-1.26.0-python}
       - LOG_ALL_EVENTS=true
       # LLM: Kimi K2.7 Code via OpenRouter (the documented GUI env path).
       - LLM_MODEL=${LLM_MODEL:-openrouter/moonshotai/kimi-k2.7-code}
       - LLM_API_KEY=${OPENROUTER_API_KEY:?set OPENROUTER_API_KEY in .env}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://openrouter.ai/api/v1}
-      # Make the aimeat-app-builder skill visible to the agent RUNTIME container. The app
-      # spawns a SEPARATE agent-server container (user `openhands`, HOME /home/openhands) which
-      # does NOT see this app container's ~/.openhands — so a file-drop there never reaches the
-      # agent. SANDBOX_VOLUMES bind-mounts our host skills dir into the runtime's auto-loaded
-      # ~/.agents/skills (read-only). render-config.sh populates the host dir below.
-      - SANDBOX_VOLUMES=${HOME}/.aimeat-openhands/skills:/home/openhands/.agents/skills:ro
       # Allow the browser origins that reach this UI. Add the host IP for LAN access (an
       # IP-based origin otherwise fails CORS). Comma-separated.
       - PERMITTED_CORS_ORIGINS=${PERMITTED_CORS_ORIGINS:-http://localhost:3000}
