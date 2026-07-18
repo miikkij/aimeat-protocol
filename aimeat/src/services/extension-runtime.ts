@@ -11,6 +11,7 @@
  *   v2.0.0 -- 2026-04-29 -- Replace isolated-vm with quickjs-emscripten (pure WASM, no C++ build tools)
  *   v2.1.0 -- 2026-07-07 -- Await/abort in-flight host calls before disposing the runtime; fixes JS_FreeRuntime gc assertion abort when a script rejects with sibling async calls still pending (e.g. multi-feed fetch, one feed fails)
  *   v2.2.0 -- 2026-07-08 -- Self-heal a poisoned WASM engine: detect an emscripten abort and rebuild the module singleton so one abort no longer fails every later run until a process restart
+ *   v2.3.0 -- 2026-07-18 -- transformScript preserves top-level helpers/consts declared ABOVE `export default` (rewrites the export in place instead of wrapping the whole script) -- fixes QuickJS "unexpected token 'const'" for actions that define a helper above the export, which the extension prompt explicitly permits
  */
 import { getQuickJS, newQuickJSWASMModule, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
 import type { QuickJSContext, QuickJSHandle, QuickJSWASMModule } from 'quickjs-emscripten';
@@ -149,8 +150,14 @@ function registerLogFn(
 }
 
 function transformScript(scriptContent: string): string {
-    const body = scriptContent.replace(/export\s+default\s+/, '').trim();
-    return `const __userFn = ${body};`;
+    // Turn the action's `export default <fn>` into `const __userFn = <fn>` IN PLACE, so any
+    // top-level helper declarations (const/function) that precede the export are preserved.
+    // The extension prompt explicitly tells authors to "define a HELPER FUNCTION above the
+    // action exports"; the old version wrapped the WHOLE script as `const __userFn = <script>`,
+    // which produced `const __userFn = const BASE_URL = …` → QuickJS "unexpected token 'const'".
+    // For a script that starts directly with `export default` the output is byte-identical to before.
+    const transformed = scriptContent.replace(/export\s+default\s+/, 'const __userFn = ').trim();
+    return transformed.endsWith(';') ? transformed : `${transformed};`;
 }
 
 function buildSandboxScript(userFnDecl: string): string {
