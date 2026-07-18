@@ -43,8 +43,8 @@ import type { OrganismHelpers, ShareMeta, ResolvedShare } from './shared.js';
 
 export function registerOrganismWorkspaceOpsRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
-    memberRole, toAgentGaii, findWsEntry, bareOwner, wsRegPrefix, canReadWsManifest, readWsManifests,
-    readShareMeta, collectPublicDocs, collectPublicRecords, shareGateDenied, docsToMarkdown, redactShare, archiveHandler,
+    memberRole, toAgentGaii, findWsEntry, bareOwner, wsRegPrefix, canReadWs, canReadWsManifest, readWsManifests,
+    readShareMeta, collectPublicDocs, collectPublicRecords, collectWsRecords, shareGateDenied, docsToMarkdown, redactShare, archiveHandler,
   } = H;
 
   /* ── Contract engagements — the first-class link between an agent's contract capability and a
@@ -416,6 +416,27 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     if (records.length === 0) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No public records')); return; }
     const denied = await shareGateDenied(req, organism, id, ws, share);
     if (denied) { res.status(401).json(error(config.nodeId, denied.code, denied.message)); return; }
+    res.json(success(config.nodeId, { organism_id: id, ws, records }));
+  });
+
+  /* ── GET /v1/organisms/:id/workspace/records?ws=&space= — AUTHENTICATED member read of a
+   * workspace's PUBLISHED (.latest) records: the members-only analogue of /workspace/public/records,
+   * with the same { type, id, value } rows. No share gating — authorization IS the workspace read
+   * authz (canReadWs: same-owner, membership/consent, GEAI data-area). Owner sessions bypass scopes;
+   * an app session (H-2) needs the owner-granted `organism:read` scope, which is how a published app
+   * (e.g. the Experience Center's gated business levels) reads members-only curriculum for the
+   * signed-in user — access is granted/revoked per user via workspace membership. Agents use the MCP
+   * workspace_read surface; this REST route serves browser sessions and scoped app grants.
+   * 404 (no disclosure) for a missing organism/workspace AND for an unauthorized caller. ── */
+  router.get('/v1/organisms/:id/workspace/records', requireAuth(), requireScope('organism:read'), async (req, res) => {
+    const id = req.params.id as string;
+    const ws = typeof req.query.ws === 'string' ? req.query.ws : '';
+    const space = typeof req.query.space === 'string' ? req.query.space : undefined;
+    const organism = await storage.getOrganism(id);
+    if (!organism || !ws) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
+    const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    if (!(await canReadWs(id, ws, callerGaii))) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Not found')); return; }
+    const records = await collectWsRecords(id, ws, space ? { space } : undefined);
     res.json(success(config.nodeId, { organism_id: id, ws, records }));
   });
 

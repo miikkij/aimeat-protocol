@@ -6,6 +6,9 @@
  *   invitation gates, archive handler) that every organism route group shares; the module-level
  *   fresherRec/roleSatisfies are pure utilities the route handlers reference directly.
  * @version-history
+ *   v1.6.0 — 2026-07-18 — collectWsRecords: the share-agnostic published-records collector; the public
+ *     collector becomes a share-filter over it, and the new authenticated member-records route reads
+ *     through it gated by canReadWs (one collection code path, two authz gates — no drift).
  *   v1.5.0 — 2026-07-17 — collectPublicRecords + PublicRecord type: the records-space analogue of
  *     collectPublicDocs, gated by the same meta.share, for the generic no-auth public-records read.
  *   v1.4.0 — 2026-07-16 — Version-bloat perf: publish/batch-publish/revert scans exclude `.version.N`
@@ -609,8 +612,11 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
    *  value is returned. Mirrors collectPublicDocs for records-mode spaces, gated by the same share meta
    *  (docs[type/id] > spaces[type] > public), so a workspace opts a records space into anonymous read the
    *  same way it opts a document space in. */
-  const collectPublicRecords = async (
-    id: string, ws: string, share: ResolvedShare, filter?: { space?: string },
+  /** EVERY published (.latest) record of the workspace's record spaces — NO share gating. The caller
+   *  is responsible for authorization (the member route gates on canReadWs; the public route filters
+   *  this through the share meta via {@link collectPublicRecords}). */
+  const collectWsRecords = async (
+    id: string, ws: string, filter?: { space?: string },
   ): Promise<PublicRecord[]> => {
     const manifest = await readWsManifestValue(id, ws);
     if (!manifest) return [];
@@ -629,12 +635,16 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
         const parts = r.key.slice(nsPrefix.length).split('.');
         const recId = parts[0];
         if (parts.slice(1).join('.') !== 'latest') continue;   // only published
-        if (!isDocPublic(share, name, recId)) continue;
         out.push({ type: name, id: recId, value: r.value ?? null });
       }
     }
     return out;
   };
+
+  const collectPublicRecords = async (
+    id: string, ws: string, share: ResolvedShare, filter?: { space?: string },
+  ): Promise<PublicRecord[]> =>
+    (await collectWsRecords(id, ws, filter)).filter(r => isDocPublic(share, r.type, r.id));
 
   /** Render a list of public docs as a single markdown document (for ?format=md). */
   const docsToMarkdown = (wsName: string | undefined, docs: PublicDoc[]): string => {
@@ -733,7 +743,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft,
     wsRegPrefix, bareOwner, findWsEntry, canReadWs, canReadWsManifest, readWsManifests, workspaceCountsByOrg, workspaceNamesByOrg, ensureConsent,
     setWorkspaceRole, revokeWorkspaceRole, memberRolesForWs,
-    readShareMeta, redactShare, shareGateDenied, isDocPublic, readWsManifestValue, collectPublicDocs, collectPublicRecords, docsToMarkdown,
+    readShareMeta, redactShare, shareGateDenied, isDocPublic, readWsManifestValue, collectPublicDocs, collectPublicRecords, collectWsRecords, docsToMarkdown,
     requireWsManager, requireOrgAdmin, codeInviteGuards, requireOrgMember, toAgentGaii,
     validateArchiveTarget, archiveHandler,
   };

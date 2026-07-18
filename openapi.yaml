@@ -19013,6 +19013,32 @@ paths:
         '401': { description: SHARE_PASSWORD_REQUIRED or SHARE_ACCOUNT_REQUIRED (access-gated share) }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/organisms/{id}/workspace/records:
+    get:
+      operationId: getWorkspaceRecordsAsMember
+      summary: Read a workspace's published records as an authorized member
+      description: |
+        The AUTHENTICATED members-only analogue of the public records read: returns EVERY published
+        (`.latest`) record of the workspace's record spaces as `{ type, id, value }` rows — no share
+        gating; authorization is the workspace read authz itself (same-owner, membership/consent,
+        GEAI data-area). Owner sessions bypass scopes; an app session (H-2) must hold the owner-granted
+        `organism:read` scope — this is how a published app renders members-only content (e.g. gated
+        curriculum) for the signed-in user, with access granted/revoked per user via workspace
+        membership. Agents use the MCP workspace_read surface instead. `?space=` limits to one records
+        space. Returns 404 (no disclosure) for a missing organism/workspace AND for an unauthorized
+        caller.
+      tags: [Organisms]
+      security: [{ bearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, description: Organism ID }
+        - { name: ws, in: query, required: true, schema: { type: string }, description: Workspace id }
+        - { name: space, in: query, required: false, schema: { type: string }, description: Limit to one records-space (objectType name) }
+      responses:
+        '200': { description: "The workspace's published records as an array of { type, id, value }" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { description: Missing organism:read scope (app/agent sessions) }
+        '404': { $ref: '#/components/responses/NotFound' }
+
   /v1/organisms/{id}/export:
     get:
       operationId: exportOrganism
