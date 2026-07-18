@@ -52,7 +52,7 @@ State persists in `~/.openhands`, so restarts (`docker compose restart`) keep th
   the mounted volume forever. `config.toml`'s `api_key` is sent as `Authorization: Bearer`.
 - **Pruning defaults**: list the bundled microagents the image ships and add the unwanted ones
   to `disabled_microagents` in `config.toml.template`; set `load_public_skills=false` in the
-  agent context to skip the public catalog. See the WSL2 deploy prompt.
+  agent context to skip the public catalog. See `DEPLOY-PROMPT.md`.
 
 Token lifetime: the agent token is long-lived (node `agentJwtTtlSeconds`, ~90 days). When it
 expires, delete `secrets/aimeat.env` and re-run `scripts/setup.sh`.
