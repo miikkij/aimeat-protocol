@@ -328,3 +328,8 @@
 /* Shared full-width form input for My Company forms (Settings / Portfolio / create-company);
    overrides the base .mc-input above with full-width + border-box sizing. */
 .mc-input { width: 100%; padding: 0.5rem 0.6rem; background: var(--bg-dim); color: var(--text); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 0.9rem; box-sizing: border-box; font-family: inherit; }
+
+/* Money books (Payments panel): payables + DAC7/ALV per-currency rows (TARGET-043). */
+.mc-money-box { display: flex; flex-direction: column; gap: 0.25rem; padding: 0.5rem 0.6rem; background: var(--bg-dim); border: 1px solid var(--border); border-radius: var(--radius-sm); margin: 0.25rem 0 0.5rem; }
+.mc-money-row { display: flex; justify-content: space-between; align-items: baseline; gap: 0.75rem; }
+.mc-money-row b { color: var(--text); font-variant-numeric: tabular-nums; }
