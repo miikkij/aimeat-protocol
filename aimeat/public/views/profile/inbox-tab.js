@@ -454,7 +454,7 @@ export default function InboxTab({ showToast }) {
   // Auto-scroll (open / near-bottom follow / one-time jump on a NEW message) + mobile keyboard
   // ergonomics (--inbox-kb + composer focus scroll) — extracted to ./inbox-tab/use-thread-ux.js.
   useThreadAutoScroll(msgsRef, mode, thread, activeConv);
-  useMobileComposerKeyboard();
+  useMobileComposerKeyboard(mode);
 
   const openConversation = async (conv) => {
     setActiveConv(conv); setMode('thread');

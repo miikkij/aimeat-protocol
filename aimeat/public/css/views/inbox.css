@@ -5,6 +5,10 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.5.0 -- 2026-07-18 -- Fix the keyboard dead-gap + heavy composer: ≤760px open-panel body height now
+ *     uses measured `--inbox-avail` (body-top→visual-viewport-bottom) instead of the `dvh − keyboard`
+ *     double-count that collapsed the pane on Android Chrome; new `.inbox-textarea--chat` = the mobile
+ *     single-line auto-growing composer (no Toast UI toolbar). Drops the stale `--inbox-kb` var.
  *   v1.4.0 -- 2026-07-18 -- Mobile space reclaim: when a thread/compose panel is open (`.inbox--panel`),
  *     ≤760px hides the section header (title/desc/actions) and grows the body to ~full viewport; wider
  *     bubbles (85%), tighter message/composer padding, and the "Reply with AI" pill collapses to its ✨
@@ -60,10 +64,8 @@
 }
 
 @media (max-width: 760px) {
-  /* single-pane: one column, tall enough to read a thread; the open pane fills it. --inbox-kb is the
-     on-screen keyboard inset (set from visualViewport by the tab) — iOS doesn't shrink dvh for the
-     keyboard, so subtract it here to keep the composer visible above the keyboard. */
-  .inbox-body { grid-template-columns: 1fr; height: calc(100dvh - 168px - var(--inbox-kb, 0px)); min-height: 240px; }
+  /* single-pane: one column, tall enough to read a thread; the open pane fills it. */
+  .inbox-body { grid-template-columns: 1fr; height: calc(100dvh - 168px); min-height: 240px; }
   /* no panel open → show the list full-height, hide the idle placeholder */
   .inbox-body:not(.inbox-body--panel) .inbox-panel { display: none; }
   .inbox-body:not(.inbox-body--panel) .inbox-list { height: 100%; }
@@ -74,11 +76,13 @@
 
   /* Mobile: when a thread/compose panel is open, drop the big section header (title + description +
      tracked/broadcast/new actions) and reclaim that vertical space for the conversation — the thread
-     header already names who you're talking to, and ← Back returns to the list where the header returns.
-     The body then gets nearly the whole viewport (only the profile top nav sits above it). */
+     header already names who you're talking to, and ← Back returns to the list where the header returns. */
   .inbox--panel { gap: 0; }
   .inbox--panel .inbox-head { display: none; }
-  .inbox--panel .inbox-body { height: calc(100dvh - 96px - var(--inbox-kb, 0px)); }
+  /* --inbox-avail = measured height from the body's top to the visual-viewport bottom (set by the tab's
+     useMobileComposerKeyboard); the composer then sits right on the keyboard with the thread filling the
+     rest — no dead gap. Fallback for the pre-measure first paint. */
+  .inbox--panel .inbox-body { height: var(--inbox-avail, calc(100dvh - 88px)); }
 
   /* Use the narrow screen: wider bubbles, tighter message padding, a compact thread header. */
   .inbox-msgs { padding: 12px 10px; }
@@ -447,6 +451,8 @@
   color: inherit;
 }
 .inbox-textarea { resize: vertical; min-height: 42px; }
+/* Mobile chat input: a single auto-growing line (JS sets height up to a cap), no manual resize handle. */
+.inbox-textarea--chat { resize: none; min-height: 40px; max-height: 132px; line-height: 1.4; overflow-y: auto; }
 .inbox-input:focus, .inbox-textarea:focus { outline: none; border-color: var(--border-focus); }
 
 /* Toast UI editor host + markdown fallback. */

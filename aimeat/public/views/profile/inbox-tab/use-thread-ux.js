@@ -9,6 +9,9 @@
  * @version-history
  *   v1.0.0 — 2026-07-17 — Extracted from inbox-tab.js (max-file-lines) alongside the new mobile
  *     keyboard handling + one-time new-message auto-scroll.
+ *   v1.1.0 — 2026-07-18 — Rework useMobileComposerKeyboard(mode): MEASURE available height (body top →
+ *     visualViewport bottom) as `--inbox-avail` instead of the `dvh − keyboard` double-count that collapsed
+ *     the messenger on Android Chrome; drop the composer scrollIntoView(center) that left a dead gap.
  */
 import { useEffect, useRef } from 'preact/hooks';
 
@@ -37,30 +40,56 @@ export function useThreadAutoScroll(msgsRef, mode, thread, activeConv) {
   }, [thread, mode, activeConv]);
 }
 
-/** Mobile keyboard ergonomics. (1) The on-screen keyboard's height is published as --inbox-kb: on iOS
- *  the layout viewport (and thus dvh) does NOT shrink when the keyboard opens — only visualViewport
- *  does — so the ≤760px .inbox-body height subtracts this var to keep the composer above the keyboard.
- *  (2) Focusing an editable inside the composer scrolls it into view once the keyboard has settled. */
-export function useMobileComposerKeyboard() {
+/** Mobile keyboard ergonomics — the reliable version. Rather than the fragile `dvh − keyboard` math (which
+ *  double-counted on Android Chrome, where dvh ALSO shrinks for the keyboard → the messenger collapsed and
+ *  left a big dead gap above the keyboard), we MEASURE the real space: from the top of `.inbox-body` down to
+ *  the bottom of the visual viewport (which excludes the keyboard on every platform), and publish it as
+ *  `--inbox-avail`. The ≤760px open-panel body height uses that, so the composer sits right on the keyboard
+ *  with the thread filling the rest — no void, no page-scroll jump. We deliberately do NOT scrollIntoView the
+ *  composer (that centered it and created the gap); instead we keep the message list pinned to the bottom.
+ *  Only active on mobile with a thread/compose panel open; otherwise the var is cleared and CSS falls back. */
+export function useMobileComposerKeyboard(mode) {
+  const syncRef = useRef(() => {});
   useEffect(() => {
     const vv = window.visualViewport;
     const root = document.documentElement;
-    const onResize = vv ? () => {
-      const kb = Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop));
-      root.style.setProperty('--inbox-kb', `${kb}px`);
-    } : null;
-    if (vv && onResize) { vv.addEventListener('resize', onResize); onResize(); }
+    const isNarrow = () => window.matchMedia('(max-width: 760px)').matches;
+    const sync = () => {
+      const body = document.querySelector('.inbox-body');
+      if (!vv || !body || !isNarrow() || !body.classList.contains('inbox-body--panel')) {
+        root.style.removeProperty('--inbox-avail');
+        return;
+      }
+      // Distance from the body's top edge to the top of the visible (keyboard-excluded) area, then the
+      // remaining height below it. Clamp so a mid-animation reading can't collapse the pane.
+      const top = body.getBoundingClientRect().top - (vv.offsetTop || 0);
+      const avail = Math.max(220, Math.round(vv.height - top));
+      root.style.setProperty('--inbox-avail', `${avail}px`);
+    };
+    syncRef.current = sync;
     const onFocusIn = (e) => {
-      if (!window.matchMedia('(max-width: 760px)').matches) return;
+      if (!isNarrow()) return;
       const el = e.target;
       if (!(el instanceof HTMLElement) || !el.closest('.inbox-composer')) return;
-      setTimeout(() => { try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch { /* noop */ } }, 300);
+      // The keyboard animates in — re-measure as the viewport settles, then keep the latest messages in view.
+      setTimeout(sync, 120); setTimeout(sync, 360);
+      setTimeout(() => { const m = document.querySelector('.inbox-msgs'); if (m) m.scrollTop = m.scrollHeight; }, 380);
     };
+    if (vv) { vv.addEventListener('resize', sync); vv.addEventListener('scroll', sync); }
+    window.addEventListener('resize', sync);
     window.addEventListener('focusin', onFocusIn);
+    sync();
     return () => {
-      if (vv && onResize) vv.removeEventListener('resize', onResize);
-      root.style.removeProperty('--inbox-kb');
+      if (vv) { vv.removeEventListener('resize', sync); vv.removeEventListener('scroll', sync); }
+      window.removeEventListener('resize', sync);
       window.removeEventListener('focusin', onFocusIn);
+      root.style.removeProperty('--inbox-avail');
     };
   }, []);
+  // Re-measure when the panel opens/closes (mode change) — no viewport event fires on a pure route switch.
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => syncRef.current());
+    const t = setTimeout(() => syncRef.current(), 220);
+    return () => { cancelAnimationFrame(raf); clearTimeout(t); };
+  }, [mode]);
 }
