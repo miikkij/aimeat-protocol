@@ -5,6 +5,10 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.4.0 -- 2026-07-18 -- Mobile space reclaim: when a thread/compose panel is open (`.inbox--panel`),
+ *     ≤760px hides the section header (title/desc/actions) and grows the body to ~full viewport; wider
+ *     bubbles (85%), tighter message/composer padding, and the "Reply with AI" pill collapses to its ✨
+ *     icon. Thread header id-block flexes so action buttons align right.
  *   v1.3.0 -- 2026-07-17 -- Reply-to quotes (`.inbox-bubble-quote`, `.inbox-replybar`, `.inbox-row--flash`)
  *     + mobile keyboard: ≤760px height subtracts --inbox-kb (visualViewport keyboard inset set by the tab)
  *     and the stale `.inbox-msgs{max-height:50vh}` cap from the pre-single-pane stacked layout is removed.
@@ -59,7 +63,7 @@
   /* single-pane: one column, tall enough to read a thread; the open pane fills it. --inbox-kb is the
      on-screen keyboard inset (set from visualViewport by the tab) — iOS doesn't shrink dvh for the
      keyboard, so subtract it here to keep the composer visible above the keyboard. */
-  .inbox-body { grid-template-columns: 1fr; height: calc(100dvh - 150px - var(--inbox-kb, 0px)); min-height: 240px; }
+  .inbox-body { grid-template-columns: 1fr; height: calc(100dvh - 168px - var(--inbox-kb, 0px)); min-height: 240px; }
   /* no panel open → show the list full-height, hide the idle placeholder */
   .inbox-body:not(.inbox-body--panel) .inbox-panel { display: none; }
   .inbox-body:not(.inbox-body--panel) .inbox-list { height: 100%; }
@@ -67,6 +71,23 @@
   .inbox-body--panel { grid-template-rows: auto minmax(0, 1fr); }
   .inbox-body--panel .inbox-list { display: none; }
   .inbox-body--panel .inbox-back { display: inline-flex; }
+
+  /* Mobile: when a thread/compose panel is open, drop the big section header (title + description +
+     tracked/broadcast/new actions) and reclaim that vertical space for the conversation — the thread
+     header already names who you're talking to, and ← Back returns to the list where the header returns.
+     The body then gets nearly the whole viewport (only the profile top nav sits above it). */
+  .inbox--panel { gap: 0; }
+  .inbox--panel .inbox-head { display: none; }
+  .inbox--panel .inbox-body { height: calc(100dvh - 96px - var(--inbox-kb, 0px)); }
+
+  /* Use the narrow screen: wider bubbles, tighter message padding, a compact thread header. */
+  .inbox-msgs { padding: 12px 10px; }
+  .inbox-bubble { max-width: 85%; }
+  .inbox-thread-head { padding: 10px 12px; gap: 8px; }
+  .inbox-composer { padding: 8px 10px; }
+  .inbox-compose-fields { padding: 10px 10px 0; }
+  /* Collapse the "Reply with AI" button to just its ✨ icon so it never crowds the thread header. */
+  .inbox-ai-btn .inbox-ai-btn-label { display: none; }
 }
 
 /* ── Avatars ── */
@@ -220,7 +241,9 @@
   border-bottom: 1px solid var(--border-subtle);
   flex: none;
 }
-.inbox-thread-id { min-width: 0; }
+.inbox-thread-id { min-width: 0; flex: 1; }
+/* The "Reply with AI" pill in the thread header stays on one line (icon + label). */
+.inbox-ai-btn { flex: none; white-space: nowrap; }
 
 /* Message scroll area. */
 .inbox-msgs {
@@ -474,6 +497,11 @@
   box-shadow: var(--shadow-md);
 }
 .inbox-row:hover .inbox-bubble-actions { opacity: 1; pointer-events: auto; }
+/* Touch devices have no hover — the per-message actions (↩ reply, ⭐, 🔗, 📓, ✨) would be unreachable.
+   Reveal them permanently there so a phone user can actually reply to / act on a message by tapping. */
+@media (hover: none) {
+  .inbox-bubble-actions { opacity: 1; pointer-events: auto; }
+}
 .inbox-bubble-act {
   border: none; background: transparent; cursor: pointer;
   font-size: 13px; line-height: 1; padding: 2px 3px; border-radius: var(--radius-xs);
