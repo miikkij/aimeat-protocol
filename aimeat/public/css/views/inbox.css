@@ -5,6 +5,10 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.6.0 -- 2026-07-18 -- TRUE full-screen mobile chat: ≤760px open panel becomes `position:fixed;inset:0`
+ *     over the whole viewport (covers the app shell nav/menu/breadcrumb); body height var(--inbox-avail,
+ *     100dvh) + safe-area padding under the composer. ← Back drops `.inbox--panel` → shell returns. Pairs
+ *     with spa.html viewport interactive-widget=resizes-content + viewport-fit=cover.
  *   v1.5.0 -- 2026-07-18 -- Fix the keyboard dead-gap + heavy composer: ≤760px open-panel body height now
  *     uses measured `--inbox-avail` (body-top→visual-viewport-bottom) instead of the `dvh − keyboard`
  *     double-count that collapsed the pane on Android Chrome; new `.inbox-textarea--chat` = the mobile
@@ -74,15 +78,27 @@
   .inbox-body--panel .inbox-list { display: none; }
   .inbox-body--panel .inbox-back { display: inline-flex; }
 
-  /* Mobile: when a thread/compose panel is open, drop the big section header (title + description +
-     tracked/broadcast/new actions) and reclaim that vertical space for the conversation — the thread
-     header already names who you're talking to, and ← Back returns to the list where the header returns. */
-  .inbox--panel { gap: 0; }
+  /* FULL-SCREEN mobile chat: when a thread/compose panel is open, lift the whole messenger OUT of the
+     profile shell and pin it over the ENTIRE viewport — the app bar, ☰ Menu, bell, Logout pill and the
+     "Messages" breadcrumb all live in the shell above and are simply covered. ← Back closes the panel
+     (mode → 'idle'), which drops `.inbox--panel` and reveals the app + menus again, exactly as before.
+     z 1000 sits above the app nav but below the inbox's own 1200 modals (mdviewer / AI popover). Fixed
+     inset:0 is the same pattern those modals already use, so no transformed-ancestor surprises. */
+  .inbox--panel { position: fixed; inset: 0; z-index: 1000; gap: 0; margin: 0; background: var(--bg, var(--card-bg)); }
+  /* Lock the shell behind the full-screen chat so it can't scroll under it (and drop its scrollbar so the
+     overlay is truly edge-to-edge). Also hide the app's sticky top nav — it lives in a HIGHER stacking
+     context than the profile subtree, so the overlay's z-index can't cover it; the chat has its own ←
+     Back, and closing the thread (mode→idle) drops `.inbox--panel` and the nav returns. :has on body is
+     supported by every browser that ships the modern viewport units this layout already needs. */
+  body:has(.inbox--panel) { overflow: hidden; }
+  body:has(.inbox--panel) .topnav { display: none; }
   .inbox--panel .inbox-head { display: none; }
-  /* --inbox-avail = measured height from the body's top to the visual-viewport bottom (set by the tab's
-     useMobileComposerKeyboard); the composer then sits right on the keyboard with the thread filling the
-     rest — no dead gap. Fallback for the pre-measure first paint. */
-  .inbox--panel .inbox-body { height: var(--inbox-avail, calc(100dvh - 88px)); }
+  /* --inbox-avail = measured visual-viewport height (set by the tab's useMobileComposerKeyboard). With the
+     viewport meta's interactive-widget=resizes-content, 100dvh already tracks the keyboard, so it's the
+     fallback; either way the composer sits right on the keyboard with the thread filling the rest. */
+  .inbox--panel .inbox-body { height: var(--inbox-avail, 100dvh); border: none; border-radius: 0; }
+  /* Home-indicator / gesture-bar clearance under the composer. */
+  .inbox--panel .inbox-composer { padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
 
   /* Use the narrow screen: wider bubbles, tighter message padding, a compact thread header. */
   .inbox-msgs { padding: 12px 10px; }
