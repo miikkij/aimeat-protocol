@@ -12,13 +12,17 @@
  *   v1.3.0 — 2026-07-16 — ?all=1 rosters ALL workspaces for an org creator/admin (was caller-owned only);
  *     PATCH email invitation (edit pending orgRole/workspaces); grant-apply loops moved to the shared
  *     applyInvitationWorkspaceGrants core (services/invitations.ts).
+ *   v1.4.0 — 2026-07-18 — Email-invitation routes (create/list/edit/cancel) accept an app session (H-2)
+ *     holding the owner-granted organism:invite scope via requireRoleOrScope — a published app (the
+ *     Experience Center admin pane) invites customers with tier grants in-app. requireOrgAdmin still
+ *     gates every path to the organism's creator/admin; agent/owner role callers are unchanged.
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole, optionalAuth } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope, optionalAuth } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner, validateOwnerName } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
@@ -344,7 +348,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   /* POST /v1/organisms/:id/invitations/email — invite an external email (creator/admin only).
    * Throttle a single inviter to bound outbound email; the per-organism pending cap in
    * createEmailInvitation() is the harder backstop against accumulating spam invites. */
-  router.post('/v1/organisms/:id/invitations/email', requireAuth(), requireRole('agent'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
+  router.post('/v1/organisms/:id/invitations/email', requireAuth(), requireRoleOrScope('agent', 'organism:invite'), rateLimit({ max: 20, windowMs: 10 * 60 * 1000 }), async (req, res) => {
     const callerGhii = req.auth!.owner as string;
     const id = req.params.id as string;
     const organism = await requireOrgAdmin(req, res, id);
@@ -382,7 +386,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   });
 
   /* GET /v1/organisms/:id/invitations/email — list pending email invitations (creator/admin) */
-  router.get('/v1/organisms/:id/invitations/email', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.get('/v1/organisms/:id/invitations/email', requireAuth(), requireRoleOrScope('agent', 'organism:invite'), async (req, res) => {
     const id = req.params.id as string;
     const organism = await requireOrgAdmin(req, res, id);
     if (!organism) return;
@@ -392,7 +396,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
 
   /* PATCH /v1/organisms/:id/invitations/email/:invId — edit a PENDING email invite's role/workspace
    * grants (rights stay editable until accepted, mirroring the name-invite PATCH). Body: { orgRole?, workspaces? } */
-  router.patch('/v1/organisms/:id/invitations/email/:invId', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.patch('/v1/organisms/:id/invitations/email/:invId', requireAuth(), requireRoleOrScope('agent', 'organism:invite'), async (req, res) => {
     const id = req.params.id as string;
     const invId = req.params.invId as string;
     const organism = await requireOrgAdmin(req, res, id);
@@ -420,7 +424,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
   });
 
   /* POST /v1/organisms/:id/invitations/email/:invId/cancel — cancel a pending email invite (creator/admin) */
-  router.post('/v1/organisms/:id/invitations/email/:invId/cancel', requireAuth(), requireRole('agent'), async (req, res) => {
+  router.post('/v1/organisms/:id/invitations/email/:invId/cancel', requireAuth(), requireRoleOrScope('agent', 'organism:invite'), async (req, res) => {
     const id = req.params.id as string;
     const invId = req.params.invId as string;
     const organism = await requireOrgAdmin(req, res, id);
