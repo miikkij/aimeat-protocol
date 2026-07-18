@@ -17,6 +17,8 @@
  *     message carries `replyToId` renders the quoted original (sender + excerpt; click jumps to it).
  *   v1.3.1 — 2026-07-17 — Composer file chips get a ✕ — a queued (e.g. mis-pasted) attachment can be
  *     removed before sending instead of being stuck in the outgoing message.
+ *   v1.4.0 — 2026-07-18 — Composer accepts a `focusNonce`: bumping it focuses the editor (rich .focus() or
+ *     the fallback textarea) so clicking ↩ Reply on a bubble drops the cursor straight into the input.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -295,7 +297,7 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
  * markdown-textarea + live-preview fallback if the editor can't load. Owns its own draft + file
  * state; calls onSend(recipient, markdown, files, reset). Remount it (via key) per conversation so
  * the draft doesn't leak between threads. */
-export function Composer({ recipient, sendLabel, sending, onSend, initialText = '', draftKey = '' }) {
+export function Composer({ recipient, sendLabel, sending, onSend, initialText = '', draftKey = '', focusNonce = 0 }) {
   // Restore an in-progress draft for this conversation/compose (localStorage), or the passed initialText.
   const readDraft = () => { try { return draftKey ? (localStorage.getItem(draftKey) || '') : ''; } catch { return ''; } };
   const seeded = initialText || readDraft();   // an explicit suggested reply wins; else restore a draft
@@ -304,6 +306,7 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   const [files, setFiles] = useState([]);
   const containerRef = useRef(null);
   const editorRef = useRef(null);
+  const taRef = useRef(null);
   const fileRef = useRef(null);
   const saveTimer = useRef(null);
   // Debounced auto-save of the draft (skipped when there's no key). Empty text clears the draft.
@@ -393,6 +396,22 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
     }
   }, [mode, initialText]);
 
+  // Focus the composer when the parent bumps focusNonce (e.g. after clicking ↩ Reply on a bubble) so the
+  // user can start typing straight away instead of clicking into the editor. A short delay lets the reply
+  // bar / editor settle first. Skip the initial 0 so a fresh mount never steals focus / pops the keyboard.
+  useEffect(() => {
+    if (!focusNonce) return undefined;
+    const id = setTimeout(() => {
+      try {
+        if (mode === 'rich' && editorRef.current?.focus) editorRef.current.focus();
+        else if (taRef.current) taRef.current.focus();
+      } catch { /* noop */ }
+    }, 60);
+    return () => clearTimeout(id);
+    // Only focusNonce is the trigger; mode/refs are read at fire time.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusNonce]);
+
   const getText = () => (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
   const reset = () => {
     try { editorRef.current?.setMarkdown(''); } catch { /* noop */ }
@@ -417,7 +436,7 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
       ${mode === 'rich'
         ? html`<div class="inbox-editor" ref=${containerRef}></div>`
         : html`<div class="inbox-md-fallback">
-            <textarea class="inbox-textarea" rows="3" placeholder=${t('inbox.bodyPlaceholder')}
+            <textarea class="inbox-textarea" rows="3" ref=${taRef} placeholder=${t('inbox.bodyPlaceholder')}
               value=${md} onPaste=${handleImagePaste}
               onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); }}></textarea>
             <div class="inbox-md-preview"><${Markdown} text=${md} /></div>

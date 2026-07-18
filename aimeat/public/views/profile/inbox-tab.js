@@ -14,6 +14,8 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.23.0 -- 2026-07-18 -- ↩ Reply on a bubble focuses the composer (`composerFocus`→Composer.focusNonce);
+ *     root gets `inbox--panel` so ≤760px drops the section header for a near-full-viewport thread (css v1.4.0).
  *   v1.22.0 -- 2026-07-17 -- Reply-to with quote (↩ on a bubble quotes the message into the reply via
  *     `reply_to`; bubbles render their quoted original) + mobile thread ergonomics: the messenger shrinks
  *     above the on-screen keyboard (visualViewport → --inbox-kb), focusing the composer scrolls it into
@@ -30,14 +32,12 @@
  *   v1.18.0 -- 2026-07-13 -- Split for max-file-lines: pure helpers → ./inbox-tab/helpers.js, presentational
  *     sub-components → ./inbox-tab/components.js, and the render panels (list/thread/tracked/results) →
  *     ./inbox-tab/panels.js as prop-driven components. Behavior/hooks unchanged; InboxTab keeps all state.
- *   v1.17.0 -- 2026-07-12 -- Owner-aggregation: the list now also shows conversations one of the owner's
- *     OWN agents had with external people (a DM the agent sent from its own inbox), tagged `viaAgent` and
- *     labelled "via <agent>". These open READ-ONLY (banner + no composer; no read receipt), read under the
- *     agent via GET conversations/:id?agent=<gaii>. Backend aggregates only this owner's agents.
- *   v1.16.0 -- 2026-07-12 -- Peer display names (TARGET-031 part A): thread head, conversation list, group
- *     headers and requests now show the peer's display name with the login handle in parens — "Kalle (kkk)"
- *     — resolved once per peer (agents via /v1/agents/:gaii, humans via /v1/ghii/:ghii, both public) and
- *     cached; federated peers not in the local store keep the bare handle.
+ *   v1.17.0 -- 2026-07-12 -- Owner-aggregation: the list also shows conversations one of the owner's OWN
+ *     agents had with external people (tagged `viaAgent`, labelled "via <agent>"), opened READ-ONLY (no
+ *     composer/receipt) via GET conversations/:id?agent=<gaii>.
+ *   v1.16.0 -- 2026-07-12 -- Peer display names (TARGET-031 part A): thread head / list / group headers /
+ *     requests show "display name (handle)" — "Kalle (kkk)" — resolved once per peer (agents via
+ *     /v1/agents/:gaii, humans via /v1/ghii/:ghii) and cached; federated peers keep the bare handle.
  *   v1.15.0 -- 2026-07-12 -- Reply with AI (TARGET-031): ✨ on the thread head + each bubble hands the
  *     conversation/message to the user's own AI chat (COPY prompt or MCP mode); prompts in /js/services/messages-ai-prompts.js.
  *   v1.14.0 -- 2026-06-23 -- Per-message 📓 action parks a message straight into the notebook for later
@@ -59,22 +59,17 @@
  *     (questions, options, multi/Other/required) that fans out an interactive AskUserQuestion to the
  *     audience; a Results view aggregates per-option tallies + delivered/read/answered counts. Sent
  *     broadcasts are tracked in localStorage so results stay re-accessible (📊 Results).
- *   v1.8.1 -- 2026-06-23 -- Perf: cache resolved attachment URLs per conversation. A refresh / new message
- *     reused to re-resolve EVERY attachment (fresh presigned URL each time → new <img src> → the whole
- *     image gallery re-downloaded on every send/reply — hundreds of MB on an image-heavy thread). Now only
- *     not-yet-resolved attachments are fetched; existing URLs stay stable so the browser doesn't re-fetch.
+ *   v1.8.1 -- 2026-06-23 -- Perf: cache resolved attachment URLs per conversation so a refresh / new
+ *     message only fetches not-yet-resolved attachments (was re-downloading every image — hundreds of MB).
  *   v1.8.0 -- 2026-06-23 -- Send-to-many (broadcast): a 📢 Broadcast compose with a recipient-chip picker
  *     (+ Share Group audience) and a mode toggle — Message (repliable) vs Announcement (read-only). An
  *     announcement thread hides the reply composer for the recipient.
  *   v1.7.4 -- 2026-06-23 -- Recipient suggestions when composing: the "to" field autocompletes (datalist)
  *     with your own agents (GAIIs, labelled) + everyone you have a thread with — no retyping long GAIIs.
- *   v1.7.3 -- 2026-06-23 -- Show an AGENT's own presence dot on its conversation row (a nested agent row
- *     now renders <PresenceDot> for the agent GAII — connected = available, recently-seen = away, else
- *     offline — instead of nothing). The owner group header still shows the human's presence.
- *   v1.7.2 -- 2026-06-23 -- Delivery ticks now distinguish delivered from sent: delivered = ✓✓ (grey,
- *     "reached the mailbox" — incl. agent threads, which never send a read receipt), read = ✓✓ coloured,
- *     sent = ✓, queued = clock. Previously delivered rendered as a single ✓ identical to sent, so an
- *     agent DM never showed a "got there" confirmation.
+ *   v1.7.3 -- 2026-06-23 -- Show an AGENT's own presence dot on its nested conversation row (connected =
+ *     available, recently-seen = away, else offline); the owner group header still shows the human's.
+ *   v1.7.2 -- 2026-06-23 -- Delivery ticks distinguish delivered (✓✓ grey) / read (✓✓ coloured) / sent (✓)
+ *     / queued (clock) — previously delivered looked identical to sent (agent DMs never send a read receipt).
  *   v1.7.1 -- 2026-06-23 -- Fix thread-splitting: a reply in an open thread now pins to that
  *     conversationId. Without it, replying in a SUBJECT thread fell back to the default per-pair thread,
  *     so the reply spawned a brand-new thread named after the agent (e.g. "concierge") and the subject
@@ -166,6 +161,7 @@ export default function InboxTab({ showToast }) {
   const [trackedList, setTrackedList] = useState([]);     // active Tracked Responses (Tier 2)
   const [trackMsg, setTrackMsg] = useState(null);         // message being tracked (opens modal)
   const [replyQuote, setReplyQuote] = useState(null);     // message being quoted-replied to (↩)
+  const [composerFocus, setComposerFocus] = useState(0);  // bump → focus the composer (e.g. after ↩ Reply)
   const [draftPrefill, setDraftPrefill] = useState('');   // suggested reply / filled command seeded into the composer
   const [prefillNonce, setPrefillNonce] = useState(0);    // bump to force a composer remount on each insert
   const [agentCommands, setAgentCommands] = useState(null); // peer agent's chat.commands (Phase A)
@@ -506,6 +502,10 @@ export default function InboxTab({ showToast }) {
     setAiReply({ title: t('inbox.ai.replyToMessage'), build: (mode) => buildMessageReplyPrompt(src, mode) });
   };
 
+  // ↩ Reply on a bubble: pin the quote AND focus the composer (bump a nonce the Composer watches). Kept
+  // separate from the raw setter so cancelling the quote (✕) doesn't re-pop the keyboard.
+  const startQuoteReply = useCallback((msg) => { setReplyQuote(msg); setComposerFocus(n => n + 1); }, []);
+
   const startCompose = () => { setMode('compose'); setActiveConv(null); setTo(''); setComposeSubject(''); };
   const startBroadcast = () => { setMode('broadcast'); setActiveConv(null); setBcRecipients([]); setBcInput(''); setBcMode('broadcast'); setBcGroupId(''); setBcType('message'); setBcQuestions([]); setBcAudience(''); };
   const addBcRecipient = (id) => {
@@ -680,7 +680,7 @@ export default function InboxTab({ showToast }) {
 
   /* ── Render ── */
   return html`
-    <div class="inbox">
+    <div class=${`inbox${mode !== 'idle' ? ' inbox--panel' : ''}`}>
       <div class="inbox-head">
         <div>
           <div class="section-title">${t('inbox.title')}</div>
@@ -774,7 +774,7 @@ export default function InboxTab({ showToast }) {
           awaitingForConv=${awaitingForConv} awaitingDrafts=${awaitingDrafts} schedOpen=${schedOpen} setSchedOpen=${setSchedOpen}
           cmdFill=${cmdFill} agentCommands=${agentCommands} sending=${sending} draftPrefill=${draftPrefill} prefillNonce=${prefillNonce}
           msgsRef=${msgsRef} peerDisplay=${peerDisplay} showToast=${showToast} toggleImportant=${toggleImportant}
-          replyQuote=${replyQuote} setReplyQuote=${setReplyQuote}
+          replyQuote=${replyQuote} setReplyQuote=${setReplyQuote} onQuoteReply=${startQuoteReply} composerFocus=${composerFocus}
           onTrackMsg=${onTrackMsg} onParkMsg=${onParkMsg} openMessageAi=${openMessageAi} submitInteractiveAnswers=${submitInteractiveAnswers}
           setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} insertCommand=${insertCommand} setCmdFill=${setCmdFill}
           cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} />` : null}

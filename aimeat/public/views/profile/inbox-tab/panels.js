@@ -6,6 +6,8 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-07-18 — Clicking ↩ Reply on a bubble now focuses the composer (via `onQuoteReply` +
+ *     `composerFocus` bump) so the cursor lands in the input; the ✕ cancel still uses the raw setter.
  *   v1.1.0 — 2026-07-17 — Reply-to with quote: ThreadPanel resolves each message's `replyToId` to the
  *     quoted original for its bubble (click scrolls + flashes it) and shows a dismissible "replying to"
  *     bar above the composer while a quoted reply is being written.
@@ -98,7 +100,7 @@ export function ThreadPanel({
   schedOpen, setSchedOpen, cmdFill, agentCommands, sending, draftPrefill, prefillNonce, msgsRef,
   peerDisplay, showToast, toggleImportant, onTrackMsg, onParkMsg, openMessageAi, submitInteractiveAnswers,
   setMdViewer, openConversationAi, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
-  replyQuote, setReplyQuote,
+  replyQuote, setReplyQuote, onQuoteReply, composerFocus,
 }) {
   let lastDay = '';
   // Reply-to quotes: resolve a message's `replyToId` to the original within the loaded page (a parent
@@ -139,7 +141,7 @@ export function ThreadPanel({
           ${viaAgentName ? html`<div class="inbox-thread-via">🤖 ${t('inbox.sentByAgent')} ${escHtml(viaAgentName)}</div>` : null}
           <div class="inbox-sub">${escHtml(activeConv.peerGhii)}</div>
         </div>
-        ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}>✨ ${t('inbox.ai.replyWithAi')}</button>` : null}
+        ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}>✨ <span class="inbox-ai-btn-label">${t('inbox.ai.replyWithAi')}</span></button>` : null}
         ${peerIsMyAgent && !viaAgentName ? html`<button class=${`btn-ghost btn-sm inbox-sched-btn${schedOpen ? ' inbox-sched-btn--on' : ''}`}
           onClick=${() => setSchedOpen(o => !o)} title=${t('inbox.schedTitle')}>📅</button>` : null}
       </div>
@@ -154,7 +156,7 @@ export function ThreadPanel({
             ${showDay ? html`<div class="inbox-day" key=${'d' + m.id}><span>${dayLabel(m.createdAt)}</span></div>` : null}
             <${MessageBubble} key=${m.id + m.direction} msg=${m} mine=${m.direction === 'outbound'} urlMap=${urlMap}
               domId=${`inbox-msg-${m.id}`} quoted=${quoted} quotedName=${quoted ? quoteSender(quoted) : ''} onJumpTo=${jumpTo}
-              onQuote=${(setReplyQuote && !activeConv.viaAgent) ? setReplyQuote : null}
+              onQuote=${(onQuoteReply && !activeConv.viaAgent) ? onQuoteReply : null}
               starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} onPark=${onParkMsg} onReplyAi=${openMessageAi} tracked=${trackedByMsg[m.id]}
               answeredWith=${m.interactive?.role === 'questions' ? answersByQ[m.id] : null}
               onAnswer=${submitInteractiveAnswers} submitting=${sending}
@@ -193,7 +195,7 @@ export function ThreadPanel({
           </div>` : null}
           <${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' + prefillNonce : '')} recipient=${activeConv.peerGhii}
             sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill}
-            draftKey=${'aimeat.inbox.draft.' + activeConv.conversationId} />`}
+            focusNonce=${composerFocus} draftKey=${'aimeat.inbox.draft.' + activeConv.conversationId} />`}
     </div>`;
 }
 
