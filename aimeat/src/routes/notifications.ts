@@ -31,10 +31,19 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
   const router = Router();
   const ownerGhii = (req: Express.Request) => `${req.auth!.owner}@${config.nodeId}`;
 
-  /* ── GET /v1/notifications — the caller's inbox (newest first) + unread count ── */
+  /* ── GET /v1/notifications — the caller's inbox (newest first) + unread count ──
+   * SCOPE BY OWNER, not globally. The old query — `listAllMemory({prefix, limit:500})` —
+   * fetched 500 rows across ALL owners. On the Kysely (prod) backend that orders by key
+   * ASC (notification keys are `notif.<ISO>.<id>`, so ASC = oldest-first), so once the
+   * node held >500 notifications total, the window was entirely OLD rows and every recent
+   * notification for every owner fell outside it — the bell silently froze. `ownerPrefix`
+   * restricts the query to THIS owner's rows (bounded by the 90-day TTL); the generous
+   * `limit` then returns effectively all of them regardless of each backend's ordering
+   * (Kysely key-ASC / SQLite updatedAt-DESC), and the JS sort-desc + slice(0,50) below
+   * yields the newest 50 with an accurate unread count. */
   router.get('/v1/notifications', requireAuth(), async (req, res) => {
     const ghii = ownerGhii(req);
-    const { items } = await storage.listAllMemory({ prefix: NOTIF_PREFIX, limit: 500 });
+    const { items } = await storage.listAllMemory({ prefix: NOTIF_PREFIX, ownerPrefix: ghii, limit: 1000 });
     const mine = items
       .filter(r => r.ownerGaii === ghii)
       .map(r => r.value as NotifValue)
