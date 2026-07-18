@@ -22,6 +22,7 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 12. [Deploy, release & node-hosted apps](#12-deploy-release--node-hosted-apps)
 13. [Concurrency & shared checkout](#13-concurrency--shared-checkout)
 14. [Environment & tooling (Windows)](#14-environment--tooling-windows)
+15. [Mobile, viewport & on-screen keyboard](#15-mobile-viewport--on-screen-keyboard)
 
 ---
 
@@ -139,3 +140,15 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **Stop `pnpm dev` before `pnpm install` touching native deps** — a running dev server holds the native DLLs (better-sqlite3) and you get an EPERM on Windows.
 - **Login 500s on the dev node** usually mean the WSL docker (the database container) died — ask the user to restart it, then restart `pnpm dev`.
 - **`pnpm dev` is not a full watcher** — backend `src/` edits need a restart; `src/static/*` + `public/*` are served fresh on F5.
+
+## 15. Mobile, viewport & on-screen keyboard
+*Symptoms: a "mobile-optimized" view still feels cramped, a bottom input hides behind the keyboard, a big dead gap above the keyboard, an overlay that can't cover the app nav.*
+
+Full how-to (the pattern, not just the traps): **`docs/frontend-development-guide.md` → Mobile & Responsive UX**. Reference impl: the Messages tab (`public/views/profile/inbox-tab/`, `public/css/views/inbox.css`).
+
+- **"Mobile-optimized" ≠ stacked columns.** Trimming chrome (hide a header, widen bubbles) is usually NOT enough — the user means a **native full-screen** experience. A focused view (chat/editor/wizard) should take the whole screen (`position: fixed; inset: 0` under `@media (max-width:760px)`, gated on an is-active class) with a Back affordance to return the app. *(Bit us on Messages: incremental CSS left the app shell eating ~half the screen; only the full-screen overlay satisfied.)*
+- **A `z-index` overlay does NOT cover the sticky `.topnav`.** The nav sits in a **higher stacking context** (an ancestor of the profile subtree), so a fixed overlay at `z-index:1000` still paints *under* a `z-index:100` nav. **Hide the nav instead** while full-screen: `body:has(.your-fullscreen-class) .topnav { display: none; }` (+ `body:has(...) { overflow: hidden; }` to lock background scroll). z-index wars won't win this.
+- **A bottom-pinned input hides behind the on-screen keyboard.** Android Chrome / iOS Safari shrink the *visual* viewport but NOT the *layout* viewport / `100dvh`, and `position:fixed;bottom:0` anchors to the layout viewport → the input ends up under the keyboard. Fix: add **`interactive-widget=resizes-content`** (+`viewport-fit=cover`) to the `spa.html` viewport meta (iOS16+/Android — makes the keyboard resize the layout viewport so `dvh`/fixed-bottom track it), with a **`visualViewport`-measured height** var as the older-engine fallback.
+- **Dead gap above the keyboard = double-counting or center-scroll.** Two causes: (1) `calc(100dvh − keyboardHeight)` — with `resizes-content`, `dvh` ALREADY excludes the keyboard, so subtracting it again collapses the pane; use the measured height OR `dvh`, not both. (2) `el.scrollIntoView({ block: 'center' })` on the composer focus — it centers the input and leaves emptiness below; keep the message list pinned to the bottom instead. *(Both bit us; fixed by measuring `body-top → visualViewport-bottom` and dropping the center-scroll.)*
+- **Heavy desktop widgets are miserable on a phone.** The Toast UI rich editor (Write/Preview + WYSIWYG toolbar) behind a keyboard is unusable — open a plain auto-growing `<textarea>` on `≤760px` and don't even load Toast UI there (detect once via `matchMedia('(max-width:760px)')` at mount).
+- **Verify by shrinking the viewport.** Playwright MCP can't pop a real keyboard, but resizing the viewport height (e.g. 780 → 440 after focusing the input) emulates the layout-viewport shrink; assert the composer bottom ≈ viewport bottom (0 gap) and the thread still scrolls.

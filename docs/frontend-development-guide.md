@@ -478,6 +478,49 @@ These patterns MUST NOT appear in any `public/` JS or CSS file:
 
 ---
 
+## Mobile & Responsive UX
+
+**"Mobile-optimized" does NOT mean "the desktop layout, but the columns stack."** It means the view uses the phone's interface the way a native app does and *feels* right. The bar is: open it on a phone and it should feel like a real mobile app, not a desktop page squeezed into a narrow column. When a task says "make X mobile-friendly," aim for that — incremental chrome-trimming (hiding a header, widening a column) is usually not enough. Reference implementation: the profile **Messages** tab (`public/views/profile/inbox-tab/` + `public/css/views/inbox.css` — full-screen chat, native composer, keyboard handling).
+
+### The full-screen pattern (focused views: chat, editor, wizard)
+
+A focused mobile view should take the **whole screen**, with a clear way back to the app. The app shell (top nav, sidebar toggle, breadcrumb) is chrome the user doesn't need while doing the task — get it out of the way.
+
+- **Lift the view out of the shell** with `position: fixed; inset: 0; z-index: 1000` under `@media (max-width: 760px)`, gated on an "is-active" class (e.g. a thread is open). This overlays the shell entirely.
+- **Hide shell chrome you can't cover.** The sticky `.topnav` lives in a **higher stacking context** than the profile subtree, so your overlay's `z-index` will NOT paint over it — a fixed overlay at z-index 1000 still renders *under* a z-index-100 nav that sits in an ancestor context. Hide it instead: `@media (max-width: 760px) { body:has(.your-fullscreen-class) .topnav { display: none; } }`. Also lock background scroll: `body:has(.your-fullscreen-class) { overflow: hidden; }`.
+- **Give a Back affordance** that drops the is-active class → the overlay disappears and the shell/menus return. No new route needed.
+- **Desktop is untouched** — every rule above is inside `@media (max-width: 760px)`, so the desktop layout (e.g. a two-pane messenger) is unchanged. Verify `position` is `static` on desktop.
+
+### The on-screen keyboard (the part everyone gets wrong)
+
+A bottom-pinned input (chat composer, sticky footer) hides *behind* the keyboard by default, because engines disagree on what the keyboard does to the viewport:
+
+- **Android Chrome:** the keyboard shrinks the **visual** viewport; the **layout** viewport (and `100dvh`) does NOT shrink unless you opt in.
+- **iOS Safari:** same — the layout viewport stays full-height, `position: fixed; bottom: 0` anchors to it, so the input ends up under the keyboard.
+
+Fix it with **two layers**:
+
+1. **Viewport meta (primary, iOS16+/Android):** in `public/spa.html`,
+   `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">`.
+   `interactive-widget=resizes-content` makes the keyboard resize the **layout** viewport, so `100dvh` and `fixed inset:0` shrink to the keyboard-excluded area and the composer stays above it. `viewport-fit=cover` exposes `env(safe-area-inset-*)`.
+2. **`visualViewport` measurement (fallback, older engines):** a hook reads `window.visualViewport.height` on its `resize`/`scroll` events and publishes the real available height as a CSS var; the container height uses `var(--measured, 100dvh)`. See `useMobileComposerKeyboard(mode)` in `inbox-tab/use-thread-ux.js` — it measures `body-top → visualViewport-bottom`.
+
+Then:
+- **Never `scrollIntoView({ block: 'center' })` a bottom input on focus** — it centers the input and leaves a dead gap below it. Keep the message list pinned to the bottom instead.
+- **Never do `calc(100dvh − keyboardHeight)`** — with `resizes-content`, `dvh` *already* accounts for the keyboard, so subtracting it again double-counts and collapses the pane. Use the measured height OR `dvh`, not both subtracted.
+- **Pad for the home-indicator:** `padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px))` on the bottom bar.
+- `VirtualKeyboard API` (`navigator.virtualKeyboard.overlaysContent` + `env(keyboard-inset-*)`) is Chromium-only and requires manual inset management — `interactive-widget=resizes-content` is simpler and covers our case, so we don't use it.
+
+### Native-feeling controls
+
+Swap heavy desktop widgets for simple ones on mobile. The rich Toast UI editor (Write/Preview tabs, WYSIWYG toolbar) is miserable behind a phone keyboard — the composer opens as a plain auto-growing `<textarea>` on `≤760px` (and Toast UI never even loads there), keeping the rich editor for desktop. Detect once with `window.matchMedia('(max-width: 760px)').matches` at mount.
+
+### Verify on a real (emulated) phone
+
+Per Rule 1b, drive the Playwright MCP browser at a mobile viewport (e.g. 390×780): open the flow, confirm the view fills the screen with no app chrome, click Back and confirm the shell returns, then **shrink the viewport height** (e.g. → 440) to emulate the keyboard and confirm the input stays fully visible at the bottom with **no gap below it**. Screenshot as evidence.
+
+---
+
 ## Profile Tab SPA
 
 The profile view (`/v1/profile`) is a tabbed SPA within the main SPA. It manages 24 tab components, each in `public/views/profile/`.
