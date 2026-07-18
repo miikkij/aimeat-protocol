@@ -930,6 +930,27 @@
   color: var(--text); padding: 10px; font-family: monospace; font-size: 0.85em; resize: vertical;
 }
 
+/* ── Two-pane workspace: prompt (copy) | response (paste) ──────────────
+   On wide screens the copy-prompt and the paste-response sit side-by-side so
+   the generator uses the full width; below 1024px they stack. The generator
+   dashboard escapes the profile's 1360px cap (via :has) to give the panes room. */
+.pf-content:has(.pf-gen-dashboard) { max-width: 1760px; }
+.pf-gen-workspace {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 16px;
+  align-items: stretch; margin-bottom: 20px;
+}
+.pf-gen-workspace .pf-gen-section { margin-bottom: 0; }
+.pf-gen-ws-pane { display: flex; flex-direction: column; min-width: 0; }
+.pf-gen-ws-pane .pf-gen-prompt-box { max-height: none; height: clamp(240px, 44vh, 520px); margin-bottom: 10px; }
+.pf-gen-ws-pane .pf-gen-result-area { flex: 1 1 auto; min-height: clamp(240px, 44vh, 520px); }
+.pf-gen-ws-pane .pf-gen-actions,
+.pf-gen-ws-pane .flex-row-wrap { margin-top: 10px; flex-wrap: wrap; }
+@media (max-width: 1024px) {
+  .pf-gen-workspace { grid-template-columns: 1fr; gap: 12px; }
+  .pf-gen-ws-pane .pf-gen-prompt-box { height: auto; max-height: 280px; }
+  .pf-gen-ws-pane .pf-gen-result-area { min-height: 220px; }
+}
+
 .pf-gen-errors {
   background: var(--danger-bg); border: 1px solid var(--danger-border); border-radius: 6px;
   padding: 12px; margin-top: 12px;
@@ -1058,11 +1079,27 @@
 
 @media(max-width:700px) {
   .pf-gen-dash-body { flex-direction: column; }
-  .pf-gen-sidebar { width: 100%; display: flex; gap: 4px; flex-wrap: wrap; }
-  .pf-gen-phase-group { margin-bottom: 0; }
+  /* Sidebar becomes a horizontal, swipeable rail of component chips so it never
+     eats vertical space or wraps into a tall stack on a phone. */
+  .pf-gen-sidebar {
+    width: 100%; display: flex; gap: 8px; flex-wrap: nowrap;
+    overflow-x: auto; -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px; margin-bottom: 8px;
+    scrollbar-width: thin;
+  }
+  .pf-gen-phase-group { margin-bottom: 0; flex-shrink: 0; }
+  .pf-gen-phase-label { padding-left: 2px; }
+  .pf-gen-comp-item { white-space: nowrap; border-radius: 6px; border-left-width: 4px; }
   .pf-gen-header-actions { flex-wrap: wrap; }
-  .pf-gen-lifecycle-toolbar { flex-direction: column; gap: 8px; }
-  .pf-gen-lifecycle-actions { justify-content: center; }
+  .pf-gen-dash-header { flex-wrap: wrap; }
+  .pf-gen-lifecycle-toolbar { flex-direction: column; gap: 8px; align-items: stretch; }
+  .pf-gen-lifecycle-actions { justify-content: flex-start; }
+  .pf-gen-detail { padding: 12px 12px; }
+  /* Prompt/response panes already stack (workspace collapses at 1024px); give the
+     textareas a comfortable touch height and let the prompt box scroll. */
+  .pf-gen-ws-pane .pf-gen-prompt-box { max-height: 220px; }
+  .pf-gen-ws-pane .pf-gen-result-area { min-height: 200px; }
+  .pf-gen-or-run-all-bar { flex-direction: column; align-items: stretch; gap: 8px; }
 }
 
 /* ══ Shared Profile Utilities (2026-03-17) ══════════════ */

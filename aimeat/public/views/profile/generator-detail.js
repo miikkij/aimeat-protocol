@@ -542,8 +542,10 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
         specValidation=${specValidation} setSpecValidation=${setSpecValidation}
         setGeneratedPrompt=${setGeneratedPrompt} />`}
 
+      <!-- WORKSPACE: prompt (copy) | response (paste) — two-pane on wide, stacked on mobile -->
+      <div class="pf-gen-workspace">
       <!-- CODE PROMPT (AI Chat Mode) -->
-      <div class="pf-gen-section">
+      <div class="pf-gen-section pf-gen-ws-pane">
         <label>${t('profile.generator.prompt')}</label>
         <pre class="pf-gen-prompt-box">${prompt}</pre>
         <div class="flex-row-wrap">
@@ -566,7 +568,7 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
           </button>
         </div>
       </div>
-      <div class="pf-gen-section">
+      <div class="pf-gen-section pf-gen-ws-pane">
         <div class="flex-row">
           <label>${t('profile.generator.result')}</label>
           ${workflowStep === 'paste' && html`<${StepArrow} direction="down" />`}
@@ -577,7 +579,7 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
         <textarea
           ref=${el => { resultRef.current = el; }}
           class="pf-gen-result-area"
-          rows="12"
+          rows="16"
           placeholder=${component.type === 'extension'
             ? t('profile.generator.extensionResultPlaceholder')
             : t('profile.generator.resultPlaceholder')}
@@ -609,6 +611,7 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
           `}
         </div>
       </div>
+      </div>
 
       <!-- Errors -->
       ${validationResult && !validationResult.valid && html`
@@ -634,7 +637,8 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
       <!-- Test Section (for registered testable components) -->
       <!-- Same structure as component generation: PROMPT → RESULT (test code) → RUN -->
       ${isTestable && html`
-        <div class="pf-gen-section pf-gen-test-section">
+        <div class="pf-gen-workspace">
+        <div class="pf-gen-section pf-gen-test-section pf-gen-ws-pane">
           <label>${t('profile.generator.test_prompt')} (${testEnvironment})</label>
           <pre class="pf-gen-prompt-box">${currentTestPrompt}</pre>
           <div class="flex-row-wrap">
@@ -652,11 +656,11 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
             `}
           </div>
         </div>
-        <div class="pf-gen-section">
+        <div class="pf-gen-section pf-gen-ws-pane">
           <label>${t('profile.generator.test_code')}</label>
           <textarea
             class="pf-gen-result-area"
-            rows="8"
+            rows="14"
             placeholder=${t('profile.generator.test_code_placeholder')}
             value=${testCode}
             onInput=${e => setTestCode(e.target.value)}
@@ -669,6 +673,7 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
                 : t('profile.generator.test_run')}
             </button>
           </div>
+        </div>
         </div>
 
         <!-- Test Result -->
