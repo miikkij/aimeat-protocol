@@ -86,7 +86,7 @@ As of **v4.0**, AIMEAT is specified as two layers (the spec is split to match):
 2. **Memory & storage** — consent-governed key-value + files with visibility tiers (`private` / `owner` / `group` / `members` / `workspace` / `public`), versioning, and schema locking
 3. **Authorization** — consent + a runtime access-guard + a capability (IAM) model + scoped delegation grants
 4. **Collaboration** — **organisms** (groups) and **workspaces** (shared, versioned, access-gated record spaces) — the "shared living surface" humans, agents, and apps mutate together
-5. **Economy & metering** — **morsels** (an internal quality-gate token, not cryptocurrency) *and* a real-currency **usage ledger** (USD LLM cost). These are *meters, not one currency*, behind a pluggable, non-mandatory payment interface — the operator owns any KYC/billing
+5. **Economy & metering** — **morsels** (an internal quality-gate token, not cryptocurrency) *and* a real-currency **usage ledger** (USD LLM cost). These are *meters, not one currency*, behind a pluggable, non-mandatory payment interface — the operator owns any KYC/billing. That interface now has real, **non-custodial** settlement: a protocol-agnostic checkout (native REST + **UCP** + **ACP** adapters) that pays in morsels, **USDC over x402** (Base), or **euros over Stripe Connect** — funds land on the seller, never the node
 6. **Federation** — bilateral peering whose live use is logging into a peered node with your own credentials
 7. **Observability** — metrics, health, telemetry
 
@@ -290,6 +290,18 @@ Comicland is a community for AI-generated comics built end-to-end from VS Code w
 What's in there: a prompt-driven creation pipeline (AI interview produces a script, the app generates per-page Nano-Banana-style image prompts with character/environment references, the user pastes the resulting images back); a 3-step episode wizard with page or panel images; a drag-and-drop speech-bubble overlay editor with language-keyed translations; multi-tenant reading where any logged-in user can read another author's published series from their own GHII namespace; characters and environments with multiple reference images and a chosen showcase; follow/tip/comment social actions; per-series public/private toggle and per-episode draft/published toggle so authors can prepare quietly and roll out when ready; full FI/EN i18n. All of it stored in AIMEAT memory + storage with proper public/private visibility, no Comicland-specific backend code beyond one sandboxed extension with eleven router-actions.
 
 The same loop works for any sufficiently rich app: open a folder, point Claude Code at the node, and iterate. The MCP tools (`aimeat_app_publish`, `aimeat_extension_install`, `aimeat_cortex_install`, `aimeat_memory_*`, `aimeat_storage_*`) cover the entire publish/install/inspect cycle.
+
+### Sell services and get paid
+
+Any priced thing on a node — an agent offer, a company offering, or a callable **app-tool** — is a checkout. One protocol-agnostic **commerce core** turns it into a `CheckoutSession`, and buyers reach it three ways from the same core: the **native** REST API (`/v1/commerce/checkout-sessions`), a **UCP** adapter (`/.well-known/ucp`, `/ucp/v1`), and an **ACP** merchant surface (product feed + `/.well-known/acp.json`). Every payment-required response carries an **x402** `accepts` block telling an agent how to pay.
+
+Settlement is **non-custodial** and pluggable — the same session settles in:
+
+- **morsels**, the internal token, on the node's own ledger;
+- **USDC over x402** (Base) — an external x402-compatible agent signs an EIP-3009 authorization, a facilitator verifies and settles it on-chain, and funds move straight to the seller's wallet; the node holds nothing (proven end-to-end on Base Sepolia);
+- **euros over Stripe Connect** (Enterprise) — sellers are Stripe Express connected accounts, charges land on the seller with the operator's platform fee routed as an application fee, and DAC7 + VAT are booked.
+
+The commerce core never holds funds or keys, and adding a rail is one more `PaymentHandler` — the core stays untouched. Agent-faced apps can monetize their tools the same way (priced `app-tool` calls listed in the product feed and the MCP server card).
 
 ### Calibrate prompts
 
