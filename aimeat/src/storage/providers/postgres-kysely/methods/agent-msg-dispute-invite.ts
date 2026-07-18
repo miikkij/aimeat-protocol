@@ -52,6 +52,7 @@ function toInvitation(r: Selectable<Invitation>): InvitationRecord {
     status: r.status as InvitationRecord['status'],
     createdAt: iso(r.createdAt), expiresAt: iso(r.expiresAt),
     acceptedAt: isoOrNull(r.acceptedAt), acceptedBy: r.acceptedBy ?? null,
+    returnUrl: r.returnUrl ?? null,
   };
 }
 
@@ -197,7 +198,7 @@ export const invitationMethods = {
       emailHash: rec.emailHash, invitedBy: rec.invitedBy, provisionedOwner: rec.provisionedOwner ?? null,
       message: rec.message ?? null, status: rec.status, createdAt: new Date(rec.createdAt),
       expiresAt: new Date(rec.expiresAt), acceptedAt: rec.acceptedAt ? new Date(rec.acceptedAt) : null,
-      acceptedBy: rec.acceptedBy ?? null,
+      acceptedBy: rec.acceptedBy ?? null, returnUrl: rec.returnUrl ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();
   },

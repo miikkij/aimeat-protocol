@@ -129,7 +129,8 @@ export function applySchemaTables2(db: Database.Database): void {
       createdAt        TEXT NOT NULL,
       expiresAt        TEXT NOT NULL,
       acceptedAt       TEXT,
-      acceptedBy       TEXT
+      acceptedBy       TEXT,
+      returnUrl        TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_invitations_tokenHash ON invitations(tokenHash);
     CREATE INDEX IF NOT EXISTS idx_invitations_organismId ON invitations(organismId);

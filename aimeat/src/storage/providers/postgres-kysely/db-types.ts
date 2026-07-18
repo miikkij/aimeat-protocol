@@ -808,6 +808,7 @@ export interface Invitation {
   organismId: string;
   orgRole: Generated<string>;
   provisionedOwner: string | null;
+  returnUrl: string | null;
   status: Generated<string>;
   tokenHash: string;
   type: Generated<string>;
