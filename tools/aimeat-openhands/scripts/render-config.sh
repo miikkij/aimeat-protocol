@@ -31,14 +31,9 @@ print("Wrote config.toml")
 PY
 chmod 600 config.toml
 
-# Install the global skill into a DEDICATED host dir that docker-compose bind-mounts into the
-# agent RUNTIME container at /home/openhands/.agents/skills (via SANDBOX_VOLUMES). This dir is
-# user-owned (unlike ~/.openhands, which the container creates as root) and holds ONLY our
-# skill, so it maps cleanly onto the runtime's auto-loaded ~/.agents/skills.
-SKILLS_DIR="${HOME}/.aimeat-openhands/skills"
-mkdir -p "$SKILLS_DIR"
-rm -rf "$SKILLS_DIR/aimeat-app-builder"
-cp -r skills/aimeat-app-builder "$SKILLS_DIR/"
-echo "Installed skill -> $SKILLS_DIR/aimeat-app-builder"
-echo "  (docker-compose mounts this into the runtime at /home/openhands/.agents/skills:ro)"
-echo "Done. Next: docker compose up -d"
+# NOTE: the aimeat-app-builder skill is NOT installed here. It is baked into the agent-server
+# RUNTIME image (runtime/Dockerfile, built by scripts/build-runtime.sh) because the runtime is
+# a separate container that loads skills from its own ~/.openhands/skills. The skill source is
+# this bundle's skills/aimeat-app-builder/ (the Docker build context), so edits there flow into
+# the next `bash scripts/build-runtime.sh`.
+echo "Rendered config.toml. Next: bash scripts/build-runtime.sh && docker compose up -d"

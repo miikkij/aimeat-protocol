@@ -101,20 +101,21 @@ Show me the list before disabling if you're unsure which to keep.
    Settings → MCP → Streamable HTTP: url `https://aimeat.io/v2/mcp/appdev`, bearer =
    `AIMEAT_AGENT_TOKEN` from `secrets/aimeat.env`. It then persists in `~/.openhands` forever.
    Report which path worked (config.toml vs one-time UI add).
-4. **Skill loaded into the AGENT (not just present on disk).** The agent runs in a separate
-   agent-server runtime container; the bundle bind-mounts `~/.aimeat-openhands/skills` into it
-   at `/home/openhands/.agents/skills` via `SANDBOX_VOLUMES`. Verify the mount reached the
-   runtime, then verify the agent actually loaded it:
-   - Confirm the host dir exists: `ls ~/.aimeat-openhands/skills/aimeat-app-builder/SKILL.md`.
-   - With a conversation open, find the runtime container and confirm the mount:
-     `RT=$(docker ps --format '{{.Names}}' | grep -i agent-server | head -1); docker exec "$RT" sh -lc 'ls ~/.agents/skills'` — it should list `aimeat-app-builder`.
+4. **Skill loaded into the AGENT.** The agent runs in a separate agent-server runtime container;
+   the skill is baked into a **custom runtime image** (`runtime/Dockerfile` → COPY into
+   `/home/openhands/.openhands/skills/aimeat-app-builder` + `chown` to `openhands`), which
+   `scripts/build-runtime.sh` builds and `docker-compose.yml` selects via
+   `AGENT_SERVER_IMAGE_REPOSITORY/TAG`. `setup.sh` runs the build automatically. Do NOT
+   bind-mount a host dir into the runtime HOME (it 500s conversations on `~/.openhands/profiles`).
+   Verify:
+   - Image built: `docker image ls | grep aimeat/agent-server`.
+   - Skill in the image: `docker run --rm --entrypoint sh aimeat/agent-server:1.26.0-python -lc 'cat /home/openhands/.openhands/skills/aimeat-app-builder/SKILL.md | head -3'`.
    - **Decisive probe:** in a fresh conversation ask *"Do you have a skill about building AIMEAT
      apps? Quote its one golden rule."* Success = the agent names `aimeat-app-builder` and the
-     `/v1/prompts/build-app` rule. If it says it has no such skill, the mount did not reach the
-     runtime — fall back to a thin custom agent-server image (`FROM
-     ghcr.io/openhands/agent-server:1.26.0-python`, COPY the skill dir into
-     `/home/openhands/.agents/skills/aimeat-app-builder/`, build `--load`, point the app at it
-     with `AGENT_SERVER_IMAGE_REPOSITORY`/`AGENT_SERVER_IMAGE_TAG`). Report which path worked.
+     `/v1/prompts/build-app` rule (it will be in the conversation's `SystemPromptEvent`). If it
+     says it has no such skill, confirm the app is actually using the custom image
+     (`AGENT_SERVER_IMAGE_REPOSITORY`/`TAG` in the running container's env) and that a new
+     conversation was started after `up`.
 5. **Smoke test:** start a conversation and ask *"List my AIMEAT apps"* — the agent should call
    an `aimeat_*` MCP tool and return results, proving the MCP + token work.
 

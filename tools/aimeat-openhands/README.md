@@ -13,7 +13,8 @@ build-app spec, built single-file AIMEAT apps, and **published them live over MC
 |-------|--------------|
 | `skills/aimeat-app-builder/` | An always-available OpenHands **skill**. Its golden rule: fetch `GET /v1/prompts/build-app` from the node at runtime (canonical, never drifts) → build one HTML file → verify locally → publish via the `aimeat_app_publish` MCP tool → return the live URL. Kills the hallucinated-`src` failure mode. |
 | `config.toml.template` | Preconfigured **MCP** (AIMEAT `/v2/mcp/appdev`, bearer token) + **LLM** (Kimi via OpenRouter) + **microagent pruning**. Rendered to a git-ignored `config.toml` with your secrets. |
-| `docker-compose.yml` | Runs `openhands:1.8`, persistent `~/.openhands` volume, LLM env, config mount. |
+| `runtime/Dockerfile` + `scripts/build-runtime.sh` | Build a thin **custom agent-server runtime image** that bakes the skill into the container the app spawns. Required — see "How the skill reaches the agent" below. |
+| `docker-compose.yml` | Runs `openhands:1.8`, persistent `~/.openhands` volume, LLM env, config mount, and points the runtime at the custom image. |
 | `scripts/aimeat-connect.sh` | Runs the AIMEAT **device-auth** flow; you approve the agent once in the browser; the token is captured and stored. No manual token juggling. |
 | `scripts/render-config.sh` | Fills the config template with your secrets and installs the skill into `~/.openhands/skills/`. |
 | `scripts/setup.sh` | One-shot: `.env` → connect → render → `up`. Idempotent. |
@@ -54,14 +55,18 @@ State persists in `~/.openhands`, so restarts (`docker compose restart`) keep th
   to `disabled_microagents` in `config.toml.template`; set `load_public_skills=false` in the
   agent context to skip the public catalog. See `DEPLOY-PROMPT.md`.
 - **How the skill reaches the agent** (important): OpenHands runs the agent in a **separate
-  agent-server runtime container** (user `openhands`, HOME `/home/openhands`) that does **not**
-  see the app container's `~/.openhands`. So a file dropped in `~/.openhands/skills` is invisible
-  to the agent. This bundle instead bind-mounts the host dir `~/.aimeat-openhands/skills` (filled
-  by `render-config.sh`) into the runtime's auto-loaded `~/.agents/skills` via `SANDBOX_VOLUMES`
-  in `docker-compose.yml`. Verify after deploy by asking a fresh conversation *"quote the golden
-  rule of the aimeat-app-builder skill"* — it should recite the `/v1/prompts/build-app` rule.
-  If `SANDBOX_VOLUMES` isn't honored on your build, the fallback is a thin custom agent-server
-  image that COPYs the skill into `/home/openhands/.agents/skills/` (`AGENT_SERVER_IMAGE_*`).
+  agent-server runtime container** (user `openhands` uid 10001, HOME `/home/openhands`) that does
+  **not** see the app container's `~/.openhands`. So a file dropped there is invisible to the
+  agent, and bind-mounting a host dir into the runtime's HOME breaks its permission setup
+  (conversations 500 on `~/.openhands/profiles`). The working mechanism — what this bundle does —
+  is a **custom runtime image**: `runtime/Dockerfile` COPYs the skill into
+  `/home/openhands/.openhands/skills/aimeat-app-builder` and `chown`s it to `openhands`;
+  `scripts/build-runtime.sh` builds `aimeat/agent-server:1.26.0-python` locally (the app uses a
+  local image as-is — no registry push); `docker-compose.yml` points the runtime at it via
+  `AGENT_SERVER_IMAGE_REPOSITORY/TAG`. `setup.sh` runs the build automatically. Verify after
+  deploy by asking a fresh conversation *"quote the golden rule of the aimeat-app-builder
+  skill"* — it should recite the `/v1/prompts/build-app` rule (confirmed: the skill appears in
+  the agent's `SystemPromptEvent`). Edit the skill → re-run `build-runtime.sh` → restart.
 
 Token lifetime: the agent token is long-lived (node `agentJwtTtlSeconds`, ~90 days). When it
 expires, delete `secrets/aimeat.env` and re-run `scripts/setup.sh`.

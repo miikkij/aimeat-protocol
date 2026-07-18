@@ -29,9 +29,16 @@ else
   echo "Existing secrets/aimeat.env found — skipping connect (delete it to re-connect)."
 fi
 
-# 3) render config + install skill
-echo "== Rendering config + installing skill =="
+# 3) render config (MCP + LLM + pruning)
+echo "== Rendering config =="
 bash scripts/render-config.sh
+
+# 3b) build the runtime image that bakes the skill into the spawned agent-server container.
+# The app loads user skills from the RUNTIME's own ~/.openhands/skills (a separate container
+# that does NOT see this host's ~/.openhands mount), so the skill must live in the runtime
+# image. See runtime/Dockerfile.
+echo "== Building AIMEAT agent-server runtime image (skill baked in) =="
+bash scripts/build-runtime.sh
 
 # 4) up
 echo "== Starting OpenHands =="
