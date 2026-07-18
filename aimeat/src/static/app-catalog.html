@@ -120,6 +120,11 @@
       longer overflow), pin .app-actions to the card bottom + always-visible (buttons stop
       "hyppelehtii"), retire the .st-server badge, add the purple .app-staging-badge pill +
       .act-staging "Open staging" button styling.
+    v2.15.1 — 2026-07-18 — Fix the "Bundled agents" modal (Inspect & deploy) rendering inline at the
+      bottom of the page instead of as a centered overlay: #agents-overlay was missing from the shared
+      overlay-wrapper rule (position:fixed/inset:0/z-index/backdrop) and its [hidden] display:none
+      counterpart, so it had no modal styling at all — same class of miss as #lineage/#protection in
+      v2.9.1. Added #agents-overlay to both selector lists.
 -->
 <html lang="en">
 <head>
@@ -1515,6 +1520,7 @@
     #json-import-overlay,
     #lineage-overlay,
     #confirm-overlay,
+    #agents-overlay,
     #protection-overlay {
       position: fixed;
       inset: 0;
@@ -1540,6 +1546,7 @@
     #json-import-overlay[hidden],
     #lineage-overlay[hidden],
     #confirm-overlay[hidden],
+    #agents-overlay[hidden],
     #protection-overlay[hidden] {
       display: none;
     }
