@@ -23471,6 +23471,13 @@ paths:
                       role: { type: string, enum: [viewer, contributor] }
                 message: { type: string, description: Optional personal note included in the email }
                 expiresInDays: { type: integer, minimum: 1, maximum: 30, description: 'Days until the invitation expires (default: 7)' }
+                return_url:
+                  type: string
+                  description: >-
+                    Optional post-accept return target so the invitee lands back in the inviting app
+                    (an app slug like "experience-center" or a full URL). ALLOWLISTED server-side to the
+                    node's own origin and app-origin subdomains (apps.<apex> / *.apps.<apex>); any other
+                    target is silently dropped (stored as null → default profile redirect). Open-redirect guard.
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
@@ -23642,6 +23649,9 @@ paths:
         Public — resolve an email-invitation token for the accept page: returns the organism summary,
         organism role, workspace grants (with names), the inviter, the invited email, and whether that
         email already maps to a registered account. Returns 410 when the invitation is expired/used.
+        optionalAuth: when a session is present the response also carries a `viewer` object
+        { owner, has_verified_email, email_matches } so the accept page can warn — before the button —
+        that the signed-in account cannot accept (its verified email doesn't match the invited address).
       tags: [Organisms]
       security: []
       parameters:
@@ -23657,9 +23667,13 @@ paths:
       summary: Accept an email invitation (public)
       description: >-
         Public — accept an email invitation. With an authenticated session, joins as the current
-        account; otherwise creates a new account from { username, password, display_name } (the
-        invited email is recorded as verified). Applies organism membership + the workspace grants,
-        marks the invitation accepted (single-use), and establishes a login session (refresh cookie).
+        account ONLY when that account's verified email matches the invited address (recipient
+        binding — otherwise 403 EMAIL_MISMATCH and the invite is NOT consumed); a wrong signed-in
+        session can never absorb the grant. Otherwise creates a new account from { username, password,
+        display_name } (the invited email is recorded as verified). Applies organism membership + the
+        workspace grants, marks the invitation accepted (single-use), and establishes a login session
+        (refresh cookie). The success response `redirect` is the inviter's allowlisted return target
+        (an app the invitee lands in signed-in) when one was pinned, else the profile organisms view.
       tags: [Organisms]
       security: []
       parameters:
@@ -23679,6 +23693,7 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' } # EMAIL_MISMATCH — signed-in email ≠ invited address; invite left pending
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '410': { $ref: '#/components/responses/AimeatError' }

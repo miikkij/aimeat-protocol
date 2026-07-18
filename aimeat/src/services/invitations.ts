@@ -16,6 +16,9 @@
  * @usage const { invitation, acceptUrl, emailSent } = await createEmailInvitation(storage, config, input);
  *   const membership = await createNameInvitation(storage, config, { organism, inviterGhii, inviteeRaw, role, workspaces });
  * @version-history
+ *   v1.4.0 — 2026-07-18 — resolveInvitationReturnTarget(): allowlist an inviter-pinned post-accept
+ *     redirect (node origin + app-origin subdomains only — open-redirect guard); createEmailInvitation
+ *     stores the validated returnUrl so a link invitee can land back in the inviting app after accept.
  *   v1.3.0 — 2026-07-16 — Name-invite core: role + invitedWorkspaces at invite time, direct add
  *     (addOrganismMember), pending-invite update/cancel, shared grant application
  *     (applyInvitationWorkspaceGrants extracted from the email-accept + code-mint loops).
@@ -48,6 +51,55 @@ export function hashInviteToken(raw: string): string {
 /** SHA-256 of a normalized email — matches GHII.emailHash hashing (existing-user detection). */
 export function inviteEmailHash(email: string): string {
   return createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
+}
+
+/**
+ * Resolve + ALLOWLIST an inviter-supplied return target for the post-accept redirect. Accepts either
+ * a full URL or a bare app slug ("experience-center" → https://experience-center.<appHost>). Returns
+ * the normalized absolute URL ONLY when its host is the node's own origin or an app-origin host/
+ * subdomain (`apps.<apex>` / `*.apps.<apex>`, plus `*.apps.localhost` on a localhost node). Returns
+ * null for anything else. This is the open-redirect guard: an accept page is auth-adjacent (it sets a
+ * session cookie), so an arbitrary attacker URL must never be reflected. Enforced at BOTH mint time
+ * (store only a safe value) and redirect time (re-validate the stored value — the security-critical
+ * check, in case the allowlist changed after mint). Plaintext http is rejected off-localhost.
+ */
+export function resolveInvitationReturnTarget(raw: unknown, config: AimeatConfig): string | null {
+  if (typeof raw !== 'string') return null;
+  const s = raw.trim();
+  if (!s || s.length > 2048) return null;
+
+  let candidate = s;
+  if (/^[a-z0-9][a-z0-9-]{0,62}$/i.test(s)) {
+    // Bare app slug → the app's subdomain of the app-origin host (needs a configured app host).
+    if (!config.appHost) return null;
+    candidate = `https://${s.toLowerCase()}.${config.appHost}`;
+  } else if (!/^https?:\/\//i.test(s)) {
+    // A host (or host/path) without a scheme — assume https so URL() can parse it.
+    candidate = `https://${s}`;
+  }
+
+  let url: URL;
+  try { url = new URL(candidate); } catch { return null; }
+  if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
+
+  const host = url.hostname.toLowerCase();
+  const isLocalHost = host === 'localhost' || host.endsWith('.localhost');
+  if (url.protocol === 'http:' && !isLocalHost) return null; // no plaintext redirect off localhost
+
+  // 1) The node's own origin (baseUrl host).
+  let nodeHost = '';
+  try { nodeHost = new URL(config.baseUrl).hostname.toLowerCase(); } catch { /* host-less baseUrl */ }
+  if (nodeHost && host === nodeHost) return url.toString();
+
+  // 2) The app-origin host + any per-app subdomain (apps.<apex> / *.apps.<apex>).
+  const appHost = (config.appHost || '').toLowerCase();
+  if (appHost && (host === appHost || host.endsWith(`.${appHost}`))) return url.toString();
+
+  // 3) Local-dev convenience: *.apps.localhost when the node itself runs on localhost.
+  const nodeIsLocal = nodeHost === 'localhost' || nodeHost.endsWith('.localhost');
+  if (nodeIsLocal && (host === 'apps.localhost' || host.endsWith('.apps.localhost'))) return url.toString();
+
+  return null;
 }
 
 /** A validation/precondition failure the caller maps to its own error shape (HTTP envelope / MCP text). */
@@ -122,6 +174,7 @@ export interface CreateEmailInvitationInput {
   workspaces: InvitationWorkspaceGrant[]; // caller has authorized these (org creator/admin can grant any)
   message?: string | null;
   expiresInDays?: number;
+  returnUrl?: string | null; // raw inviter-supplied return target (app slug or URL); allowlisted here
 }
 
 export interface CreateEmailInvitationResult {
@@ -161,6 +214,8 @@ export async function createEmailInvitation(
     : INVITE_DEFAULT_EXPIRY_DAYS;
   const now = Date.now();
   const rawToken = randomBytes(32).toString('hex');
+  // Allowlist the return target now so an unsafe value is never persisted (re-validated at redirect).
+  const returnUrl = input.returnUrl != null ? resolveInvitationReturnTarget(input.returnUrl, config) : null;
   const invitation: InvitationRecord = {
     id: uuidv4(),
     tokenHash: hashInviteToken(rawToken),
@@ -178,6 +233,7 @@ export async function createEmailInvitation(
     expiresAt: new Date(now + days * DAY_MS).toISOString(),
     acceptedAt: null,
     acceptedBy: null,
+    returnUrl,
   };
   await storage.createInvitation(invitation);
 

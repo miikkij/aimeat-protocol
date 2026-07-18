@@ -6,10 +6,14 @@
  *   visitor registers right here (username + password; the invited email is shown, locked, and
  *   recorded as verified) and is joined in one atomic POST /v1/invitations/:token/accept. An already
  *   registered / already logged-in visitor (including anyone returning from a social sign-in) accepts
- *   as their current account. Social sign-up + existing-user login reuse AIMEAT.auth.showLoginModal
- *   (its social buttons redirect back here logged-in; then "Accept" joins as that account). On accept
- *   the server sets the refresh cookie, so a full navigation to the redirect boots the SPA logged-in.
- * @structure default export InviteAccept() — load invitation → register-and-join OR accept-as-me.
+ *   as their current account — BUT only when that account's verified email matches the invited
+ *   address (recipient binding; the server enforces it and the page warns up front using the GET
+ *   `viewer` verdict, so a wrong signed-in session cannot silently absorb the grant). Social sign-up +
+ *   existing-user login reuse AIMEAT.auth.showLoginModal. On accept the server sets the refresh cookie
+ *   and returns a redirect target (the inviter's allowlisted app return URL, else the profile); a full
+ *   navigation there boots the SPA / opens the app logged-in.
+ * @structure default export InviteAccept() — load invitation (+viewer) → register-and-join OR
+ *   accept-as-me (email-matched) OR wrong-account panel (sign out / switch account).
  * @usage routed at /v1/invite?token=<token> by spa.html
  * @version-history
  *   v1.0.0 — 2026-07-04 — Initial (email invitations for unregistered users).
@@ -18,9 +22,13 @@
  *   v1.1.0 — 2026-07-10 — Social sign-in providers (GET /v1/auth/providers) rendered as co-equal
  *     "Continue with X" buttons: Google was hidden behind a text link, so invited first-timers
  *     concluded a password was mandatory.
+ *   v1.2.0 — 2026-07-18 — SECURITY (invite-hijack): a signed-in visitor whose verified email does NOT
+ *     match the invited address sees a "wrong account" panel (sign out / switch account) instead of an
+ *     accept button; the server's 403 EMAIL_MISMATCH is rendered the same way as a fallback. Re-fetch
+ *     the `viewer` verdict on login/logout. Redirect follows the accept response's return target.
  */
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { api } from '/js/api.js';
@@ -28,14 +36,16 @@ import { escHtml } from '/js/utils.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+const fill = (s, vars) => Object.keys(vars).reduce((acc, k) => acc.split(`{${k}}`).join(vars[k]), s);
 
 export default function InviteAccept() {
   const token = new URLSearchParams(window.location.search).get('token') || '';
-  const [state, setState] = useState({ status: 'loading', inv: null, error: '' });
+  const [state, setState] = useState({ status: 'loading', inv: null, viewer: null, error: '' });
   const [authed, setAuthed] = useState(() => !!window.AIMEAT?.auth?.hasSession);
   const [form, setForm] = useState({ username: '', password: '', display_name: '' });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [mismatch, setMismatch] = useState(false); // server said EMAIL_MISMATCH on POST (fallback path)
   const [providers, setProviders] = useState([]);
 
   // Social sign-in providers, rendered as co-equal buttons — an invited first-timer should not
@@ -56,10 +66,11 @@ export default function InviteAccept() {
   }
 
   // Become reactive to an in-place login/logout (username/password via the shared modal, or a
-  // logout on this page) so the view flips between the accept-as-me button and the register form.
+  // logout on this page) so the view flips between accept-as-me and the register form, and so we
+  // re-fetch the server's per-session `viewer` verdict for the newly-active (or cleared) session.
   useEffect(() => {
     const onLogin = () => setAuthed(true);
-    const onLogout = () => setAuthed(false);
+    const onLogout = () => { setAuthed(false); setMismatch(false); };
     window.AIMEAT?.auth?.on?.('login', onLogin);
     window.AIMEAT?.auth?.on?.('logout', onLogout);
     return () => {
@@ -68,30 +79,32 @@ export default function InviteAccept() {
     };
   }, []);
 
-  // Load the invitation details (public).
+  // Load the invitation details (public). Re-runs when the session changes so `viewer.email_matches`
+  // (whether accepting as the current account is allowed) reflects who is actually signed in.
   useEffect(() => {
-    if (!token) { setState({ status: 'error', error: tr('invite.missing', 'This invitation link is missing its token.') }); return undefined; }
+    if (!token) { setState({ status: 'error', inv: null, viewer: null, error: tr('invite.missing', 'This invitation link is missing its token.') }); return undefined; }
     let live = true;
     api('/v1/invitations/' + encodeURIComponent(token))
-      .then((res) => { if (live) setState({ status: 'ready', inv: res.data.invitation, error: '' }); })
-      .catch((e) => { if (live) setState({ status: 'error', error: e.message || tr('invite.invalid', 'This invitation is invalid, was cancelled, or has expired.') }); });
+      .then((res) => { if (live) setState({ status: 'ready', inv: res.data.invitation, viewer: res.data.viewer || null, error: '' }); })
+      .catch((e) => { if (live) setState({ status: 'error', inv: null, viewer: null, error: e.message || tr('invite.invalid', 'This invitation is invalid, was cancelled, or has expired.') }); });
     return () => { live = false; };
-  }, [token]);
+  }, [token, authed]);
 
   // POST accept: with a body (new account) or empty (accept as the current session). On success the
-  // server set the refresh cookie — a full navigation boots the SPA logged-in at the redirect.
-  async function accept(body) {
-    setSubmitting(true); setFormError('');
+  // server set the refresh cookie + returned a redirect target — a full navigation opens it logged-in.
+  const accept = useCallback(async (body) => {
+    setSubmitting(true); setFormError(''); setMismatch(false);
     try {
       const res = await api('/v1/invitations/' + encodeURIComponent(token) + '/accept', {
         method: 'POST', body: JSON.stringify(body || {}),
       });
       window.location.href = (res && res.data && res.data.redirect) || '/v1/profile#organisms';
     } catch (e) {
+      if (e && e.code === 'EMAIL_MISMATCH') { setMismatch(true); setSubmitting(false); return; }
       setFormError(e.message || tr('invite.acceptFailed', 'Could not accept the invitation.'));
       setSubmitting(false);
     }
-  }
+  }, [token]);
 
   function acceptAsNew() {
     const username = form.username.trim();
@@ -103,6 +116,13 @@ export default function InviteAccept() {
 
   function signInInstead() {
     if (window.AIMEAT?.auth?.showLoginModal) window.AIMEAT.auth.showLoginModal({ onLogin: () => setAuthed(true) });
+  }
+
+  // Sign out and stay on the accept page, so the visitor can register the invited email or sign in as
+  // the account it belongs to. The 'logout' event handler above re-fetches the viewer verdict.
+  function signOutAndRetry() {
+    try { window.AIMEAT?.auth?.logout?.(); } catch { /* ignore */ }
+    setAuthed(false); setMismatch(false);
   }
 
   if (state.status === 'loading') {
@@ -120,6 +140,7 @@ export default function InviteAccept() {
   }
 
   const inv = state.inv;
+  const viewer = state.viewer;
   const org = inv.organism || {};
   const workspaces = inv.workspaces || [];
   const summary = html`
@@ -137,7 +158,31 @@ export default function InviteAccept() {
       ${inv.message ? html`<p class="inv-message">“${escHtml(inv.message)}”</p>` : null}
     </div>`;
 
-  // Already signed in (incl. returning from a social sign-in): accept as the current account.
+  // Signed in, but this account is NOT the invited party (verified email doesn't match) — OR the
+  // server refused a POST with EMAIL_MISMATCH. Never let a wrong account absorb an operator-curated
+  // invitation: explain, and offer to sign out / switch account rather than showing an accept button.
+  const wrongAccount = authed && (mismatch || (viewer && viewer.email_matches === false));
+  if (wrongAccount) {
+    const who = (viewer && viewer.owner) || (window.AIMEAT?.auth?.getSession?.()?.owner) || '';
+    return html`
+      <div class="inv-wrap">
+        <div class="inv-card">
+          <span class="inv-badge">${tr('invite.badge', 'Invitation')}</span>
+          <h1 class="inv-title">${tr('invite.mismatchTitle', 'Wrong account')}</h1>
+          ${summary}
+          <p class="inv-error">
+            ${who ? fill(tr('invite.signedInAs', "You're signed in as {owner}."), { owner: who }) + ' ' : null}
+            ${fill(tr('invite.mismatchBody', 'This invitation was sent to {email}. It can only be accepted by the account whose verified email is that address. Sign out and open the link again, or ask the inviter to add your account directly.'), { email: inv.email || '' })}
+          </p>
+          <div class="inv-actions">
+            <button class="btn-primary inv-btn" onClick=${signOutAndRetry}>${tr('invite.signOutRetry', 'Sign out')}</button>
+            <button class="btn-outline inv-btn" onClick=${signInInstead}>${tr('invite.switchAccount', 'Use a different account')}</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // Already signed in as the invited party (verified email matches): accept as the current account.
   if (authed) {
     return html`
       <div class="inv-wrap">
@@ -194,7 +239,7 @@ export default function InviteAccept() {
         <div class="inv-or">${tr('invite.or', 'OR')}</div>
         ${providers.map((p) => html`
           <button key=${p.id} class="btn-outline inv-btn inv-signin" onClick=${() => socialSignIn(p)}>
-            ${tr('invite.continueWith', 'Continue with {label}').replace('{label}', p.label || p.id)}
+            ${fill(tr('invite.continueWith', 'Continue with {label}'), { label: p.label || p.id })}
           </button>`)}
         <button class="btn-outline inv-btn inv-signin" onClick=${signInInstead}>
           ${tr('invite.signInInstead', 'Already have an account? Sign in')}

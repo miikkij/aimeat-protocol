@@ -8299,5 +8299,10 @@
   "invite.acceptCta": "Accept & join",
   "invite.or": "OR",
   "invite.continueWith": "Continue with {label}",
-  "invite.signInInstead": "Already have an account? Sign in"
+  "invite.signInInstead": "Already have an account? Sign in",
+  "invite.mismatchTitle": "Wrong account",
+  "invite.signedInAs": "You're signed in as {owner}.",
+  "invite.mismatchBody": "This invitation was sent to {email}. It can only be accepted by the account whose verified email is that address. Sign out and open the link again, or ask the inviter to add your account directly.",
+  "invite.signOutRetry": "Sign out",
+  "invite.switchAccount": "Use a different account"
 }

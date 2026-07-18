@@ -649,18 +649,19 @@ export const extensionsNotifyMethods = {
       expiresAt: row.expiresAt as string,
       acceptedAt: (row.acceptedAt as string | null) ?? null,
       acceptedBy: (row.acceptedBy as string | null) ?? null,
+      returnUrl: (row.returnUrl as string | null) ?? null,
     };
   },
 
   async createInvitation(this: SqliteStorage, rec: import('../../../../storage/repositories/invitation.repository.js').InvitationRecord): Promise<void> {
     this.db.prepare(
       `INSERT INTO invitations
-         (id, tokenHash, organismId, orgRole, type, workspaces, email, emailHash, invitedBy, provisionedOwner, message, status, createdAt, expiresAt, acceptedAt, acceptedBy)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (id, tokenHash, organismId, orgRole, type, workspaces, email, emailHash, invitedBy, provisionedOwner, message, status, createdAt, expiresAt, acceptedAt, acceptedBy, returnUrl)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       rec.id, rec.tokenHash, rec.organismId, rec.orgRole, rec.type ?? 'link', JSON.stringify(rec.workspaces ?? []),
       rec.email, rec.emailHash, rec.invitedBy, rec.provisionedOwner ?? null, rec.message ?? null, rec.status,
-      rec.createdAt, rec.expiresAt, rec.acceptedAt ?? null, rec.acceptedBy ?? null,
+      rec.createdAt, rec.expiresAt, rec.acceptedAt ?? null, rec.acceptedBy ?? null, rec.returnUrl ?? null,
     );
   },
 

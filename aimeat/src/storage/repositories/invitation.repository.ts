@@ -13,6 +13,8 @@
  *   v1.0.0 — 2026-07-04 — Initial (email invitations for unregistered users).
  *   v1.1.0 — 2026-07-05 — Add provisioned-code invitations: type ('link'|'code'), provisionedOwner, countInvitationsByInviter (per-inviter quota).
  *   v1.2.0 — 2026-07-07 — Add getCodeInvitationByProvisionedOwner (first-login credential issuance, TARGET-011).
+ *   v1.3.0 — 2026-07-18 — Add returnUrl: an allowlisted app/node URL the inviter can pin so a link
+ *     invitee lands back in the inviting app (e.g. the Experience Center) already signed in after accept.
  */
 
 /** One selected workspace + the role the invitee should receive there. */
@@ -38,6 +40,7 @@ export interface InvitationRecord {
   expiresAt: string; // ISO — hard expiry (lazy-checked at read/accept + swept by a core job)
   acceptedAt: string | null;
   acceptedBy: string | null; // bare owner name of the account that accepted (code: set when the provisioned account first logs in)
+  returnUrl: string | null; // (link only) allowlisted app/node URL to land the accepter on after joining — set at mint, re-validated at redirect (open-redirect guard). null = default profile redirect.
 }
 
 export interface InvitationRepository {

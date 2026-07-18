@@ -8299,5 +8299,10 @@
   "invite.acceptCta": "Hyväksy ja liity",
   "invite.or": "TAI",
   "invite.continueWith": "Jatka palvelulla {label}",
-  "invite.signInInstead": "Onko sinulla jo tili? Kirjaudu"
+  "invite.signInInstead": "Onko sinulla jo tili? Kirjaudu",
+  "invite.mismatchTitle": "Väärä tili",
+  "invite.signedInAs": "Olet kirjautuneena tilillä {owner}.",
+  "invite.mismatchBody": "Tämä kutsu lähetettiin osoitteeseen {email}. Sen voi hyväksyä vain tili, jonka vahvistettu sähköposti on kyseinen osoite. Kirjaudu ulos ja avaa linkki uudelleen, tai pyydä kutsujaa lisäämään tilisi suoraan.",
+  "invite.signOutRetry": "Kirjaudu ulos",
+  "invite.switchAccount": "Käytä toista tiliä"
 }

@@ -14,6 +14,10 @@
  *   v1.1.0 — 2026-07-05 — Add provisioned-code invitation ("key") coverage (C1–C7).
  *   v1.2.0 — 2026-07-07 — Cover first-login durable credentials (C2 + C2b): the response issues a
  *     dash-free, validator-clean password once, rotating away the bootstrap code (TARGET-011).
+ *   v1.3.0 — 2026-07-18 — Recipient-binding on a signed-in accept (invite-hijack fix): matched verified
+ *     email → 200 (10), different verified email → 403 EMAIL_MISMATCH + invite stays pending (10b), no
+ *     verified email → 403 (10c), GET `viewer` verdict (10d). Part C return_url: allowlisted target
+ *     round-trips (10e), non-allowlisted target is dropped to the default redirect (10f).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=invitations
 
@@ -148,15 +152,102 @@ await test('9. Cancel invalidates an invite before use', async () => {
     assert(acc.status === 404, `cancelled accept expected 404, got ${acc.status}`);
 });
 
-await test('10. An already-logged-in user can accept as their account', async () => {
-    const email4 = `carol.${Date.now()}@example.com`;
-    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: email4, orgRole: 'member' }) });
-    const t4 = tokenFrom(c.body.data.accept_url);
-    const acc = await json(`/v1/invitations/${t4}/accept`, { method: 'POST', headers: auth(B.token), body: '{}' });
-    assert(acc.status === 200 && acc.body.data.status === 'joined', `authed accept ${acc.status}: ${JSON.stringify(acc.body.error)}`);
+// ── Recipient binding: a signed-in session may accept ONLY if its verified email == the invited
+//    address (invite-hijack guard). Registering via an invite records the invited email as verified,
+//    so we mint verified-email accounts by accepting a first invite, then test the accept-as-self path. ──
+
+/** Invite `email`, register a fresh account via the token, and return its session token + verified email. */
+async function registerVerified(email: string): Promise<{ name: string; token: string; email: string }> {
+    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email, orgRole: 'member' }) });
+    const tk = tokenFrom(c.body.data.accept_url);
+    const name = `ver${Date.now()}${Math.floor(Math.random() * 1e4)}`;
+    const acc = await json(`/v1/invitations/${tk}/accept`, { method: 'POST', body: JSON.stringify({ username: name, password: 'VerPass1234' }) });
+    assert(acc.status === 200 && typeof acc.body.data.token === 'string', `registerVerified accept ${acc.status}: ${JSON.stringify(acc.body.error)}`);
+    return { name, token: acc.body.data.token, email };
+}
+
+let V: { name: string; token: string; email: string };
+await test('10. Logged-in account whose verified email MATCHES accepts as self (200)', async () => {
+    const matchEmail = `match.${Date.now()}@example.com`;
+    V = await registerVerified(matchEmail); // verified email = matchEmail, already a member
+    // A second invite to the SAME email — the matched, signed-in account may absorb it.
+    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: matchEmail, orgRole: 'member' }) });
+    const t = tokenFrom(c.body.data.accept_url);
+    const acc = await json(`/v1/invitations/${t}/accept`, { method: 'POST', headers: auth(V.token), body: '{}' });
+    assert(acc.status === 200 && acc.body.data.status === 'joined', `matched authed accept ${acc.status}: ${JSON.stringify(acc.body.error)}`);
     assert(acc.body.data.created_account === false, 'did not create a new account');
     const m = await json(`/v1/organisms/${orgId}/members`, { headers: auth(A.token) });
-    assert((m.body.data.members || []).some((x: any) => x.ghii === B.name), 'B is now a member');
+    assert((m.body.data.members || []).some((x: any) => x.ghii === V.name), 'V is a member');
+});
+
+await test('10b. Logged-in account with a DIFFERENT verified email → 403 EMAIL_MISMATCH (invite stays pending)', async () => {
+    const otherEmail = `other.${Date.now()}@example.com`;
+    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: otherEmail, orgRole: 'member' }) });
+    const t = tokenFrom(c.body.data.accept_url);
+    const acc = await json(`/v1/invitations/${t}/accept`, { method: 'POST', headers: auth(V.token), body: '{}' }); // V's verified email ≠ otherEmail
+    assert(acc.status === 403, `expected 403, got ${acc.status}`);
+    assert(acc.body.error?.code === 'EMAIL_MISMATCH', `expected EMAIL_MISMATCH, got ${acc.body.error?.code}`);
+    // NOT consumed — the right party can still use it.
+    const get = await json(`/v1/invitations/${t}`);
+    assert(get.status === 200, `invite should still be pending, got ${get.status}`);
+});
+
+await test('10c. Logged-in account with NO verified email → 403 (invite not consumed)', async () => {
+    const noVerEmail = `nover.${Date.now()}@example.com`;
+    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: noVerEmail, orgRole: 'member' }) });
+    const t = tokenFrom(c.body.data.accept_url);
+    const acc = await json(`/v1/invitations/${t}/accept`, { method: 'POST', headers: auth(B.token), body: '{}' }); // B (POST /v1/ghii) has no verified email
+    assert(acc.status === 403 && acc.body.error?.code === 'EMAIL_MISMATCH', `expected 403 EMAIL_MISMATCH, got ${acc.status} ${acc.body.error?.code}`);
+    const get = await json(`/v1/invitations/${t}`);
+    assert(get.status === 200, `invite should still be pending, got ${get.status}`);
+});
+
+await test('10d. GET details carries a per-session viewer verdict (match true / mismatch false)', async () => {
+    const vEmail = `viewer.${Date.now()}@example.com`;
+    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: V.email, orgRole: 'member' }) });
+    const tMatch = tokenFrom(c.body.data.accept_url);
+    const gMatch = await json(`/v1/invitations/${tMatch}`, { headers: auth(V.token) });
+    assert(gMatch.body.data.viewer?.email_matches === true && gMatch.body.data.viewer?.has_verified_email === true, `viewer should match: ${JSON.stringify(gMatch.body.data.viewer)}`);
+    assert(gMatch.body.data.viewer?.owner === V.name, 'viewer.owner is the session owner');
+    // A different invited email → the same session is a mismatch; an anon GET returns no viewer.
+    const c2 = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: vEmail, orgRole: 'member' }) });
+    const tMiss = tokenFrom(c2.body.data.accept_url);
+    const gMiss = await json(`/v1/invitations/${tMiss}`, { headers: auth(V.token) });
+    assert(gMiss.body.data.viewer?.email_matches === false, 'viewer should be a mismatch for a different email');
+    const gAnon = await json(`/v1/invitations/${tMiss}`);
+    assert(gAnon.status === 200 && !gAnon.body.data.viewer, 'anon GET carries no viewer verdict');
+});
+
+await test('10e. Part C — an allowlisted return_url round-trips to the accept redirect', async () => {
+    const rEmail = `ret.${Date.now()}@example.com`;
+    const ret = 'https://experience-center.apps.localhost/'; // app-origin subdomain — allowlisted on a localhost node
+    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: rEmail, orgRole: 'member', return_url: ret }) });
+    assert(c.status === 201, `invite ${c.status}: ${JSON.stringify(c.body.error)}`);
+    const t = tokenFrom(c.body.data.accept_url);
+    const uname = `retu${Date.now()}${Math.floor(Math.random() * 1e4)}`;
+    const acc = await json(`/v1/invitations/${t}/accept`, { method: 'POST', body: JSON.stringify({ username: uname, password: 'RetPass1234' }) });
+    assert(acc.status === 200, `accept ${acc.status}: ${JSON.stringify(acc.body.error)}`);
+    assert(acc.body.data.redirect === ret, `redirect should be the return target, got ${acc.body.data.redirect}`);
+});
+
+await test('10f. Part C — a non-allowlisted return_url is dropped (no open redirect)', async () => {
+    const eEmail = `evil.${Date.now()}@example.com`;
+    const c = await json(`/v1/organisms/${orgId}/invitations/email`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ email: eEmail, orgRole: 'member', return_url: 'https://evil.example.com/phish' }) });
+    assert(c.status === 201, `invite ${c.status}: ${JSON.stringify(c.body.error)}`);
+    const t = tokenFrom(c.body.data.accept_url);
+    const uname = `evilu${Date.now()}${Math.floor(Math.random() * 1e4)}`;
+    const acc = await json(`/v1/invitations/${t}/accept`, { method: 'POST', body: JSON.stringify({ username: uname, password: 'EvilPass1234' }) });
+    assert(acc.status === 200, `accept ${acc.status}: ${JSON.stringify(acc.body.error)}`);
+    assert(acc.body.data.redirect === '/v1/profile#organisms', `non-allowlisted target must fall back to the default, got ${acc.body.data.redirect}`);
+});
+
+await test('10g. A direct-adds B as a plain member (code-key quota tests below mint as B)', async () => {
+    // Recipient binding means B (no verified email) can no longer join by accepting an email invite —
+    // so make B a member the operator way (direct add), which is exactly the flow those customers use.
+    const r = await json(`/v1/organisms/${orgId}/members`, { method: 'POST', headers: auth(A.token), body: JSON.stringify({ ghii: B.name, role: 'member' }) });
+    assert(r.status === 200 || r.status === 201, `direct-add B ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const m = await json(`/v1/organisms/${orgId}/members`, { headers: auth(A.token) });
+    assert((m.body.data.members || []).some((x: any) => x.ghii === B.name && x.status === 'active'), 'B is now an active member');
 });
 
 await test('11. Non-admin cannot invite (403)', async () => {

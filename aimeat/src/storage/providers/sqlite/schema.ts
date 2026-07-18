@@ -277,6 +277,11 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('invitations', 'provisionedOwner', 'TEXT');
   db.exec('CREATE INDEX IF NOT EXISTS idx_invitations_invitedBy ON invitations(invitedBy)');
 
+  // Return target — an inviter-pinned, allowlisted app/node URL the link invitee is redirected to
+  // after accepting (e.g. back into the Experience Center admin app, already signed in). Additive/
+  // nullable; existing invitations read back as returnUrl=NULL (→ default profile redirect).
+  safeAddColumn('invitations', 'returnUrl', 'TEXT');
+
   // Name-invite parity with email invites — workspace grants chosen at invite time, applied on
   // accept (JSON array [{ws, role}]). Additive/nullable; existing memberships read back unchanged.
   safeAddColumn('organism_memberships', 'invitedWorkspaces', 'TEXT');
