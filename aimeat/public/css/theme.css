@@ -10,6 +10,8 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.23.0 — 2026-07-18 — Notification bell inline actions: split .notif-item into a clickable
+       .notif-item-main + an actions row; add .notif-actions/.notif-action-btn/.notif-reply*/.notif-result.
      v1.22.0 — 2026-07-17 — UI-unification foundation: extend the spacing scale (--sp-5=20/--sp-6=24/
        --sp-8=32/--sp-12=48) and add a font-size scale (--text-xs..--text-xl) so views stop hardcoding
        padding:24px / font-size:0.85rem inline; add .muted/.text-dim/.text-faint/.meta text utilities
@@ -481,12 +483,22 @@ a { color: inherit; text-decoration: none; }
 .notif-dropdown { position: absolute; right: 0; top: calc(100% + 6px); width: 320px; max-height: 60vh; overflow-y: auto; background: var(--card); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 10px 30px rgba(0,0,0,0.18); z-index: 1200; }
 .notif-dropdown-head { font-weight: 700; font-size: 0.9rem; color: var(--text); padding: 0.6rem 0.85rem; border-bottom: 1px solid var(--border-subtle); position: sticky; top: 0; background: var(--card); }
 .notif-empty { padding: 1rem 0.85rem; color: var(--muted); font-size: 0.85rem; }
-.notif-item { display: block; width: 100%; text-align: left; background: none; border: none; border-bottom: 1px solid var(--border-subtle); padding: 0.55rem 0.85rem; cursor: pointer; }
-.notif-item:hover { background: var(--bg-dim); }
+.notif-item { display: block; border-bottom: 1px solid var(--border-subtle); }
 .notif-item.unread { background: var(--accent-subtle); }
+.notif-item-main { display: block; width: 100%; text-align: left; background: none; border: none; padding: 0.55rem 0.85rem; cursor: pointer; }
+.notif-item-main:hover { background: var(--bg-dim); }
 .notif-item-title { font-size: 0.85rem; font-weight: 600; color: var(--text); }
 .notif-item-body { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
 .notif-item-time { font-size: 0.7rem; color: var(--muted); margin-top: 0.2rem; }
+/* Inline notification actions (reply / approve / deny …) */
+.notif-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0 0.85rem 0.55rem; }
+.notif-action-btn { font-size: 0.74rem; padding: 0.25rem 0.7rem; border-radius: 7px; line-height: 1.3; }
+.notif-reply { padding: 0 0.85rem 0.6rem; }
+.notif-reply-input { width: 100%; box-sizing: border-box; resize: vertical; font: inherit; font-size: 0.8rem; padding: 0.4rem 0.5rem; border-radius: 7px; border: 1px solid var(--border); background: var(--bg-dim); color: var(--text); }
+.notif-reply-row { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.4rem; }
+.notif-result { font-size: 0.76rem; padding: 0.3rem 0.85rem 0.55rem; }
+.notif-result.ok { color: var(--success, #4caf50); }
+.notif-result.err { color: var(--danger, #e0564a); }
 
 .topnav-right a {
   font-size: 0.84rem;

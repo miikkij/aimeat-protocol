@@ -606,7 +606,21 @@
   },
   "notif": {
     "title": "Notifications",
-    "empty": "No notifications yet"
+    "empty": "No notifications yet",
+    "action": {
+      "reply": "Reply",
+      "approve": "Approve",
+      "deny": "Deny",
+      "accept": "Accept",
+      "decline": "Decline",
+      "reject": "Reject",
+      "send": "Send",
+      "aiDraft": "Reply with AI",
+      "replyPlaceholder": "Write a reply…",
+      "confirm": "Are you sure?",
+      "sent": "Reply sent",
+      "failed": "Action failed"
+    }
   },
   "nav": {
     "try": "Try it",

@@ -5,12 +5,16 @@
  *
  * @structure
  *   - install/activate: skipWaiting + clients.claim so click-routing fixes take effect immediately
- *   - push: parses the JSON payload into a notification (title/body/icon/badge/tag/data.url)
+ *   - push: parses the JSON payload into a notification (title/body/icon/badge/tag/data.url), and
+ *     renders up to two OS-level action buttons from payload.actions ([{action,title}])
  *   - notificationclick: focuses a matching same-path window (postMessage 'aimeat-notification-click')
- *     for in-place tab switching, else opens a new window that cold-loads via ?tab= / #hash
+ *     for in-place tab switching, else opens a new window that cold-loads via ?tab= / #hash. When an
+ *     action button was clicked, it also posts 'aimeat-notification-action' with the action id so the
+ *     focused SPA can run it with the owner's session (a lock screen can't hold the JWT).
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-07-18 — Render notification action buttons + route action clicks to the SPA.
  */
 
 // Take over immediately so click-routing fixes apply without waiting for every tab to close.
@@ -30,6 +34,11 @@ self.addEventListener('push', (event) => {
       data: data.data || data,
     };
     if (data.url) options.data.url = data.url;
+    // OS-level action buttons (most platforms show ≤2). The full action descriptors ride along in
+    // options.data.actions so a click can be routed back to the SPA to execute with the owner's JWT.
+    if (Array.isArray(data.actions) && data.actions.length) {
+      options.actions = data.actions.slice(0, 2).map((a) => ({ action: a.action, title: a.title }));
+    }
     event.waitUntil(self.registration.showNotification(title, options));
   } catch {
     const text = event.data.text();
@@ -39,17 +48,25 @@ self.addEventListener('push', (event) => {
 
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
-  const url = event.notification.data?.url || '/v1/profile';
+  const data = event.notification.data || {};
+  // Which action button (if any) was pressed → its full descriptor from the payload.
+  const descriptor = event.action && Array.isArray(data.actions)
+    ? data.actions.find((a) => a.id === event.action) : null;
+  const url = data.url || '/v1/profile';
   const target = new URL(url, self.location.origin);
+  const actionMsg = descriptor ? { type: 'aimeat-notification-action', action: descriptor, notifId: data.notifId } : null;
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
         let clientUrl;
         try { clientUrl = new URL(client.url); } catch { continue; }
         if (clientUrl.origin !== target.origin || clientUrl.pathname !== target.pathname) continue;
-        client.postMessage({ type: 'aimeat-notification-click', url: target.pathname + target.search + target.hash });
+        // A focused SPA runs the action with the owner's session; a plain click just switches view.
+        client.postMessage(actionMsg || { type: 'aimeat-notification-click', url: target.pathname + target.search + target.hash });
         return 'focus' in client ? client.focus() : undefined;
       }
+      // No matching window: cold-open the deep link. (Inline action execution needs the SPA loaded;
+      // the owner lands on the target view and can complete it there.)
       return clients.openWindow(target.href);
     })
   );

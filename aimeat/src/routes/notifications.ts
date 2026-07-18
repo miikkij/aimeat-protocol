@@ -14,16 +14,18 @@
  *   v1.0.0 -- 2026-06-08 -- Initial: memory-backed notification inbox.
  *   v1.1.0 -- 2026-07-02 -- POST /v1/notifications: apps/agents notify their own owner
  *     (scope notifications:send); app notifications deep-link back to the app by default.
+ *   v1.2.0 -- 2026-07-18 -- Notifications carry inline actions[] (server-set only); the public
+ *     create route rejects a client-supplied actions field to keep reply/api actions trusted.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
-import { NOTIF_PREFIX, notify } from '../services/notify.js';
+import { NOTIF_PREFIX, notify, type NotifAction } from '../services/notify.js';
 import { emitChange } from '../services/event-bus.js';
 
-interface NotifValue { id: string; type: string; title: string; body: string; link: string; read: boolean; createdAt: string }
+interface NotifValue { id: string; type: string; title: string; body: string; link: string; actions?: NotifAction[]; read: boolean; createdAt: string }
 
 export function notificationsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -68,6 +70,14 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
       }
       if (type !== undefined && (typeof type !== 'string' || !/^[a-z0-9_:.-]{1,64}$/i.test(type))) {
         res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'type must match [a-z0-9_:.-]{1,64}'));
+        return;
+      }
+      // SECURITY: inline reply/api actions execute with the RECIPIENT's authority when clicked, so
+      // they may only originate from trusted server-side emit code — never a principal (app/agent/
+      // owner) posting here. Reject any client-supplied actions outright; a caller wanting an
+      // extra button uses `link` (navigation carries no authority).
+      if ((req.body as Record<string, unknown>)?.actions !== undefined) {
+        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'actions are set by the node, not by the notification creator; use link for navigation'));
         return;
       }
 

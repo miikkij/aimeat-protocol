@@ -606,7 +606,21 @@
   },
   "notif": {
     "title": "Ilmoitukset",
-    "empty": "Ei ilmoituksia vielä"
+    "empty": "Ei ilmoituksia vielä",
+    "action": {
+      "reply": "Vastaa",
+      "approve": "Hyväksy",
+      "deny": "Hylkää",
+      "accept": "Hyväksy",
+      "decline": "Kieltäydy",
+      "reject": "Hylkää",
+      "send": "Lähetä",
+      "aiDraft": "Vastaa tekoälyllä",
+      "replyPlaceholder": "Kirjoita vastaus…",
+      "confirm": "Oletko varma?",
+      "sent": "Vastaus lähetetty",
+      "failed": "Toiminto epäonnistui"
+    }
   },
   "nav": {
     "try": "Kokeile",
