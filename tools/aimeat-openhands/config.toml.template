@@ -1,0 +1,34 @@
+# AIMEAT-boosted OpenHands — config template.
+# render-config.sh substitutes the __PLACEHOLDERS__ from .env + secrets/aimeat.env and
+# writes the real config.toml (git-ignored). Do not put secrets in THIS file.
+
+[core]
+# Keep runs deterministic-ish and quiet; adjust to taste.
+max_iterations = 100
+
+[llm]
+# Cheap recycled intelligence via OpenRouter. LLM_* env vars in docker-compose.yml also
+# set these for the GUI; this block covers the CLI/core path too.
+model = "__LLM_MODEL__"
+api_key = "__OPENROUTER_API_KEY__"
+base_url = "https://openrouter.ai/api/v1"
+temperature = 0.0
+
+[agent]
+# We WANT prompt extensions on — that's how our aimeat-app-builder skill reaches the agent.
+enable_prompt_extensions = true
+# Prune bundled microagents that are noise for AIMEAT app-building. Fill with the names the
+# running image actually ships (list them with the enumerate step in the README); leaving
+# entries that don't exist is harmless.
+disabled_microagents = []
+
+[mcp]
+# The AIMEAT node, preconfigured. `api_key` is sent as `Authorization: Bearer <token>`
+# (OpenHands SDK default). The token is minted by scripts/aimeat-connect.sh.
+shttp_servers = [
+    {
+        url = "__NODE_BASE_URL__/v2/mcp/appdev",
+        api_key = "__AGENT_TOKEN__",
+        timeout = 180
+    }
+]

@@ -1,0 +1,5 @@
+# Never commit real credentials or per-machine env.
+.env
+secrets/
+*.token
+agent_token.txt

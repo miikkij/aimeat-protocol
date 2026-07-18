@@ -1,0 +1,31 @@
+# AIMEAT-boosted OpenHands. `docker compose up -d` after ./scripts/setup.sh.
+# Persistent state (settings, skills, MCP) lives in the host ~/.openhands volume, so config
+# survives restarts and rebuilds. Secrets come from .env — never hard-code them here.
+
+services:
+  openhands:
+    image: docker.openhands.dev/openhands/openhands:1.8
+    pull_policy: always
+    container_name: aimeat-openhands
+    ports:
+      - "3000:3000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      # Agent-server image the app spawns (pinned to the 1.8 line).
+      - AGENT_SERVER_IMAGE_REPOSITORY=ghcr.io/openhands/agent-server
+      - AGENT_SERVER_IMAGE_TAG=1.26.0-python
+      - LOG_ALL_EVENTS=true
+      # LLM: Kimi K2.7 Code via OpenRouter (the documented GUI env path).
+      - LLM_MODEL=${LLM_MODEL:-openrouter/moonshotai/kimi-k2.7-code}
+      - LLM_API_KEY=${OPENROUTER_API_KEY:?set OPENROUTER_API_KEY in .env}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://openrouter.ai/api/v1}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Persistent OpenHands state (skills, settings.json, MCP live here).
+      - ${HOME}/.openhands:/.openhands
+      # Preconfigured MCP + LLM + pruning for the CLI/core path. render-config.sh produces
+      # this file with the real token/key. Harmless if the GUI ignores it (MCP also lives
+      # in the mounted ~/.openhands once added).
+      - ./config.toml:/app/config.toml:ro
+    restart: unless-stopped
