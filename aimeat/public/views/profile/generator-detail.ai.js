@@ -120,3 +120,24 @@ export async function loadPromptFromBackend(projectId, componentId, type = 'code
   if (!resp.ok) throw new Error(resp.error?.message || 'Failed to load prompt');
   return resp.data?.prompt || '';
 }
+
+/**
+ * Build a self-correction prompt from the database via the backend build route.
+ * Replaces the browser-side System-A builders (buildFixPrompt, buildReflectionPrompt,
+ * buildExplainPrompt, buildImpactPrompt, buildEditPrompt, buildBlueprintFixPrompt) so the
+ * copy-paste flow uses the SAME DB templates the autopilot uses — single source of truth.
+ * @param {string} projectId
+ * @param {string} promptId - one of gen-fix|gen-reflection|gen-explain|gen-edit|gen-impact|gen-blueprint-fix|gen-fresh-generation
+ * @param {Object} payload - runtime data: { componentId?, code?, errors?, changeRequest?, upstreamChanges?, componentType?, componentLabel?, originalPrompt?, testContext?, previousAttempts?, reflectionDiagnosis? }
+ * @returns {Promise<string>} the prompt text
+ */
+export async function buildPromptFromBackend(projectId, promptId, payload = {}) {
+  const s = window.AIMEAT?.auth?.getSession?.();
+  if (!s) throw new Error('Not authenticated');
+  const resp = await s.fetch(`/v1/generator/${projectId}/prompts/build`, {
+    method: 'POST',
+    body: JSON.stringify({ promptId, ...payload }),
+  });
+  if (!resp.ok) throw new Error(resp.error?.message || 'Failed to build prompt');
+  return resp.data?.prompt || '';
+}

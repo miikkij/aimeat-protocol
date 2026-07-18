@@ -32,15 +32,14 @@ import { CopyButton } from '/components/CopyButton.js';
 import {
   saveComponent, saveSpec, registerComponent, reregisterComponent, writeProjectLog, writeDebugArtifact,
 } from '/js/services/generator.js';
-// DEPRECATED: browser-side prompt builders no longer used. Prompts loaded from database via API.
-// import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
+// All prompts (including the self-correction ones) are loaded from the database via API —
+// single source of truth shared with the autopilot. No browser-side prompt builders remain.
 import { validateComponent } from '/js/services/generator-validate.js';
 import { verifyContract } from '/js/services/generator-contract.js';
 import { smokeTest } from '/js/services/generator-smoke.js';
 import { createBundle } from '/js/services/generator-context-bundle.js';
-import { buildExplainPrompt, buildReflectionPrompt, buildFixPrompt } from '/js/services/generator-prompts-fix.js';
 import { runComponentTest, screenshotUrl } from '/js/services/generator-testing.js';
-import { runWithAi, stripCodeblock, cancelAiRequest, loadPromptFromBackend } from './generator-detail.ai.js';
+import { runWithAi, stripCodeblock, cancelAiRequest, loadPromptFromBackend, buildPromptFromBackend } from './generator-detail.ai.js';
 import { getWorkflowStep, StepArrow } from './generator-detail.helpers.js';
 import { SpecSection } from './generator-detail.spec-section.js';
 import { TestScopeSelector, TestResultsView } from './generator-detail.results.js';
@@ -341,7 +340,9 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
         const max = orSettings.maxRetries || 3;
         for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
           showToast?.(t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
-          const fp = buildFixPrompt(fresh, content, vr.errors, component.type);
+          const fp = await buildPromptFromBackend(projectId, 'gen-fix', {
+            componentId: component.id, originalPrompt: fresh, code: content, errors: vr.errors, componentType: component.type,
+          });
           content = await runWithAi(projectId, fp);
           setResult(content);
           vr = validateComponent(component.type, content, project.blueprint);
@@ -366,19 +367,42 @@ export function ComponentDetail({ component, project, projectId, liveStatuses, o
     setAiRunning(false);
   }
 
-  // Mandatory reflection before fix — diagnose first, then fix
-  const reflectionPrompt = validationResult && !validationResult.valid
-    ? buildReflectionPrompt(result, validationResult.errors)
-    : null;
-  const fixPrompt = validationResult && !validationResult.valid
-    ? buildFixPrompt(prompt, result, validationResult.errors, component.type)
-    : null;
+  // Self-correction prompts — fetched from the DB (single source of truth) on validation
+  // transitions, not on every keystroke. Reflection + fix are built for the failed code;
+  // explain is offered after generation, before validation.
+  const [reflectionPrompt, setReflectionPrompt] = useState(null);
+  const [fixPrompt, setFixPrompt] = useState(null);
+  const [explainPrompt, setExplainPrompt] = useState(null);
 
-  // Explain prompt — optional step after generation, before validation
-  const bpComp = project.blueprint?.components?.find(c => c.label === component.label || c.id === component.id);
-  const explainPrompt = result.trim() && !validationResult
-    ? buildExplainPrompt(component.type, result, bpComp)
-    : null;
+  const validationFailed = !!(validationResult && !validationResult.valid);
+  useEffect(() => {
+    if (validationFailed) {
+      buildPromptFromBackend(projectId, 'gen-reflection', {
+        componentId: component.id, code: result, errors: validationResult.errors, componentType: component.type,
+      }).then(setReflectionPrompt).catch(() => setReflectionPrompt(null));
+      buildPromptFromBackend(projectId, 'gen-fix', {
+        componentId: component.id, originalPrompt: prompt, code: result, errors: validationResult.errors, componentType: component.type,
+      }).then(setFixPrompt).catch(() => setFixPrompt(null));
+    } else {
+      setReflectionPrompt(null);
+      setFixPrompt(null);
+    }
+    // Intentionally keyed on the validation transition, not `result`, to avoid a network
+    // POST on every keystroke — the failed code is captured when validation ran.
+    // eslint-disable-next-line
+  }, [validationResult, projectId, component.id, component.type]);
+
+  const canExplain = !!(result.trim() && !validationResult);
+  useEffect(() => {
+    if (canExplain) {
+      buildPromptFromBackend(projectId, 'gen-explain', {
+        componentId: component.id, code: result, componentType: component.type,
+      }).then(setExplainPrompt).catch(() => setExplainPrompt(null));
+    } else {
+      setExplainPrompt(null);
+    }
+    // eslint-disable-next-line
+  }, [canExplain, projectId, component.id, component.type]);
 
   // Test prompt for testable component types
   const testableTypes = ['extension', 'cortex', 'app'];

@@ -60,14 +60,23 @@ import {
   saveInterviewSpec,
   writeProjectLog,
 } from '/js/services/generator.js';
-import { buildBlueprintFixPrompt } from '/js/services/generator-prompts.js';
-
 /** Load blueprint or interview prompt from backend (DB seeds — single source of truth) */
 async function loadGeneratorPrompt(projectId, type = 'blueprint', locale = 'en') {
   const s = window.AIMEAT?.auth?.getSession?.();
   if (!s) throw new Error('Not authenticated');
   const resp = await s.fetch(`/v1/generator/${projectId}/prompts?type=${type}&locale=${locale}`);
   if (!resp.ok) throw new Error(resp.error?.message || 'Failed to load prompt');
+  return resp.data?.prompt || '';
+}
+
+/** Build a self-correction prompt (e.g. gen-blueprint-fix) from backend DB templates. */
+async function buildGeneratorPrompt(projectId, promptId, payload = {}) {
+  const s = window.AIMEAT?.auth?.getSession?.();
+  if (!s) throw new Error('Not authenticated');
+  const resp = await s.fetch(`/v1/generator/${projectId}/prompts/build`, {
+    method: 'POST', body: JSON.stringify({ promptId, ...payload }),
+  });
+  if (!resp.ok) throw new Error(resp.error?.message || 'Failed to build prompt');
   return resp.data?.prompt || '';
 }
 import { validateBlueprint, validateInterviewSpec, validateSpecQuality } from '/js/services/generator-validate.js';
@@ -151,8 +160,22 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
   const [blueprintErrors, setBlueprintErrors] = useState([]);
   const [interviewSpec, setInterviewSpec] = useState('');
   const [interviewErrors, setInterviewErrors] = useState([]);
-  const [interviewParsed, setInterviewParsed] = useState(null);
   const [aiRunning, setAiRunning] = useState(null); // null | 'interview' | 'blueprint'
+  // Setter only — the parsed interview spec is persisted to the backend (saveInterviewSpec)
+  // and re-read there; the local value is no longer consumed since blueprint-fix moved to the DB.
+  const [, setInterviewParsed] = useState(null);
+  const [blueprintFixPrompt, setBlueprintFixPrompt] = useState(null);
+
+  // Build the blueprint-fix retry prompt from the backend (DB template — keeps service_slug
+  // and every rule the canonical blueprint prompt carries) when the blueprint has errors.
+  useEffect(() => {
+    if (blueprintErrors.length > 0 && project?.projectId) {
+      buildGeneratorPrompt(project.projectId, 'gen-blueprint-fix', { errors: blueprintErrors })
+        .then(setBlueprintFixPrompt).catch(() => setBlueprintFixPrompt(null));
+    } else {
+      setBlueprintFixPrompt(null);
+    }
+  }, [blueprintErrors, project?.projectId]);
 
   async function handleAnalyze() {
     if (!description.trim()) return;
@@ -356,7 +379,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
         const max = orSettings.maxRetries || 3;
         for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
           showToast?.(t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
-          const fixPrompt = buildBlueprintFixPrompt(description, vr.errors, interviewParsed);
+          const fixPrompt = await buildGeneratorPrompt(project.projectId, 'gen-blueprint-fix', { errors: vr.errors });
           content = await runWithAi(project.projectId, fixPrompt);
           setBlueprintResult(content);
           vr = validateBlueprint(content);
@@ -390,9 +413,7 @@ function NewProjectView({ onBack, onCreated, showToast, orSettings }) {
   }
 
   if (phase === 'blueprint') {
-    const fixPrompt = blueprintErrors.length > 0
-      ? buildBlueprintFixPrompt(description, blueprintErrors, interviewParsed)
-      : null;
+    const fixPrompt = blueprintFixPrompt;
     return html`
       <div class="pf-gen-new-project">
         <button class="btn-outline" onClick=${() => setPhase('describe')}>${t('profile.generator.back')}</button>

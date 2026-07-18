@@ -339,8 +339,8 @@ Analyze the errors and the ACTUAL API RESPONSES above. In 2-5 sentences, explain
 3. What specific lines or patterns in the code need to change?
 
 Be precise — reference exact field names from the API responses. Do NOT write code.`,
-    variables: ['failed_code', 'errors', 'test_context'],
-    usedIn: ['generator-autopilot'],
+    variables: ['failed_code', 'spec_contract', 'errors', 'test_context'],
+    usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
   {
@@ -377,6 +377,114 @@ ERRORS:
 Return the corrected result in the same format as the original.`,
     variables: ['disclaimer', 'original_prompt', 'code', 'errors', 'component_type', 'type_constraints', 'html_entity_rules', 'test_context', 'previous_attempts', 'reflection_diagnosis'],
     usedIn: ['generator-autopilot'],
+  },
+
+  // ═══════════════════════════════════════════════════════════════════
+  // Explain / Impact / Edit — migrated from generator-prompts-fix.js so the
+  // browser fetches them from the DB like every other prompt (single source).
+  // ═══════════════════════════════════════════════════════════════════
+
+  {
+    id: 'gen-explain',
+    group: 'generator',
+    name: 'Explain Component',
+    description: 'Ask the AI to describe what it built before validation — compares against the blueprint contract.',
+    content: `You just generated a {{component_type}} component. Before we validate it, explain what you built.
+
+## Generated Code (abbreviated)
+{{generated_result}}
+
+## Blueprint Contract
+This component must produce: {{produces}}
+
+## Your Task (2-5 sentences, no code)
+1. What does this component export or provide?
+2. What data shapes does it return?
+3. Does it match the blueprint contract above? If not, what's missing?`,
+    variables: ['component_type', 'generated_result', 'produces'],
+    usedIn: ['generator-ui'],
+  },
+
+  {
+    id: 'gen-impact',
+    group: 'generator',
+    name: 'Change Impact Analysis',
+    description: 'Analyze which components a proposed change affects (root/update/none) — drives the Edit Service flow.',
+    content: `{{disclaimer}}You are analyzing the impact of a change to an AIMEAT service.
+
+## Service Blueprint
+
+{{component_list}}
+
+## Proposed Change
+
+{{change_request}}
+
+## Your Task
+
+Analyze which components need to be modified for this change. For EACH component, classify as:
+
+- **ROOT CAUSE** — this component directly causes the problem or is the primary target of the change
+- **NEEDS UPDATE** — this component must change because upstream data shape or API changed
+- **NO CHANGE** — this component is unaffected
+
+Return a JSON object:
+\`\`\`json
+{
+  "analysis": [
+    {
+      "id": "ext-1",
+      "label": "Component Label",
+      "impact": "root|update|none",
+      "reason": "One sentence explaining why this component is/isn't affected",
+      "suggestedChange": "Brief description of what to change, or null if no change needed"
+    }
+  ],
+  "summary": "One paragraph overview of the change and its blast radius"
+}
+\`\`\`
+
+Rules:
+- Be conservative — if you're unsure whether a component needs updating, mark it as "update" not "none"
+- If the change affects data shape (fields, types, formats), ALL downstream consumers need "update"
+- If the change is purely visual/UI, only the app needs updating
+- Include ALL components in the analysis, even those with "none" impact`,
+    variables: ['disclaimer', 'component_list', 'change_request'],
+    usedIn: ['generator-ui'],
+  },
+
+  {
+    id: 'gen-edit',
+    group: 'generator',
+    name: 'Edit Component',
+    description: 'Targeted edit of an existing component — current code + change request, minimal-diff rules.',
+    content: `{{disclaimer}}{{context}}
+
+You are modifying an existing AIMEAT {{type_label}}: **{{label}}**
+{{type_constraints}}
+## Current Installed Code
+
+\`\`\`
+{{current_code}}
+\`\`\`
+
+## Change Request
+
+{{change_request}}
+{{upstream_section}}
+## Rules
+
+- Modify ONLY what the change request asks for
+- Keep ALL other code, structure, and logic identical
+- Do NOT refactor, restyle, rename, or "improve" unrelated code
+- Do NOT add features, comments, or documentation beyond what's requested
+- Return the COMPLETE modified component in the same format as the original
+- If the component is YAML + JavaScript (extension), return both in the same format
+- If the change request is unclear, make the minimal change that addresses it
+
+Return the complete modified {{type_label}} — not a diff, not a partial snippet.`,
+    variables: ['disclaimer', 'context', 'type_label', 'label', 'type_constraints', 'current_code', 'change_request', 'upstream_section'],
+    usedIn: ['generator-ui'],
   },
 
   {

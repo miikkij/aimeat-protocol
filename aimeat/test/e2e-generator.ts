@@ -687,6 +687,37 @@ await test('Agent: blueprint submit returns validation errors for invalid YAML',
     assert(validStatus === 200, `Valid blueprint submit: expected 200, got ${validStatus}`);
 });
 
+await test('Prompt build route: self-correction prompts build from DB (single source of truth)', async () => {
+    const buildOne = async (promptId: string, extra: Record<string, unknown> = {}) => {
+        const r = await json(`/v1/generator/${generatorApiProjectId}/prompts/build`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${generatorAgentToken}` },
+            body: JSON.stringify({ promptId, ...extra }),
+        });
+        assert(r.status === 200, `${promptId}: expected 200, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(typeof r.body.data?.prompt === 'string' && r.body.data.prompt.length > 0, `${promptId}: expected non-empty prompt`);
+        return r.body.data.prompt as string;
+    };
+    await buildOne('gen-fix', { componentId: 'csm-main', componentType: 'csm', code: 'x', errors: ['boom'] });
+    await buildOne('gen-reflection', { componentId: 'csm-main', componentType: 'csm', code: 'x', errors: ['boom'] });
+    await buildOne('gen-explain', { componentId: 'csm-main', componentType: 'csm', code: 'x' });
+    await buildOne('gen-impact', { changeRequest: 'add a field' });
+    await buildOne('gen-edit', { componentId: 'csm-main', componentType: 'csm', code: 'x', changeRequest: 'rename' });
+    // blueprint-fix MUST wrap the canonical blueprint prompt, which requires service_slug —
+    // regression guard for the old bug where the browser's blueprint-fix omitted it.
+    const bpFix = await buildOne('gen-blueprint-fix', { errors: ['missing service_slug'] });
+    assert(bpFix.includes('service_slug'), 'blueprint-fix prompt must include service_slug');
+});
+
+await test('Prompt build route: rejects a non-buildable promptId', async () => {
+    const r = await json(`/v1/generator/${generatorApiProjectId}/prompts/build`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${generatorAgentToken}` },
+        body: JSON.stringify({ promptId: 'gen-blueprint' }),
+    });
+    assert(r.status === 400, `Expected 400 for non-buildable promptId, got ${r.status}`);
+});
+
 await test('Agent: component submit validates and stores valid CSM', async () => {
     const validCsm = `\`\`\`yaml
 service:

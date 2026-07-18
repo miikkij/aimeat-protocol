@@ -41,6 +41,10 @@ import {
   resolveReflection,
   resolveFreshGeneration,
   resolveFix,
+  resolveExplain,
+  resolveImpact,
+  resolveEdit,
+  resolveBlueprintFix,
 } from './resolvers-fix.js';
 import {
   resolveTestExtensionSpec,
@@ -80,6 +84,10 @@ export async function resolvePromptVars(
     'gen-reflection': resolveReflection,
     'gen-fresh-generation': resolveFreshGeneration,
     'gen-fix': resolveFix,
+    'gen-explain': resolveExplain,
+    'gen-impact': resolveImpact,
+    'gen-edit': resolveEdit,
+    'gen-blueprint-fix': resolveBlueprintFix,
     'gen-test-extension-spec': resolveTestExtensionSpec,
     'gen-test-cortex-spec': resolveTestCortexSpec,
     'gen-test-cortex-component': resolveTestCortexComponent,

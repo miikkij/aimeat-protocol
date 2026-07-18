@@ -81,6 +81,76 @@ export function resolveFix(data: PromptRuntimeData, fragments: Record<string, st
   };
 }
 
+export function resolveExplain(data: PromptRuntimeData): Vars {
+  // Migrated from browser buildExplainPrompt() — describe the component before validating.
+  const produces = ((data.blueprintComponent?.produces as string[] | undefined) || []).join(', ') || 'none specified';
+  return {
+    component_type: data.componentType || '',
+    generated_result: (data.code || '').substring(0, 2000),
+    produces,
+  };
+}
+
+export function resolveImpact(data: PromptRuntimeData): Vars {
+  // Migrated from browser buildImpactPrompt() — classify each component's blast radius.
+  const componentList = ((data.blueprint?.components) || []).map(c => {
+    const produces = (c.produces || []).join(', ') || 'none';
+    const consumes = (c.consumes || []).join(', ') || 'none';
+    return `- ${c.id} (${c.type}: ${c.label})\n  produces: ${produces}\n  consumes: ${consumes}`;
+  }).join('\n');
+  return {
+    component_list: componentList,
+    change_request: data.changeRequest || '',
+  };
+}
+
+export function resolveEdit(data: PromptRuntimeData, fragments: Record<string, string>): Vars {
+  // Migrated from browser buildEditPrompt() — minimal-diff edit of an existing component.
+  const type = data.componentType || '';
+  const typeLabel = type === 'csm' ? 'CSM manifest'
+    : type === 'msm' ? 'MSM manifest'
+    : type === 'extension' ? 'Extension'
+    : type === 'cortex' ? 'Cortex library'
+    : type === 'app' ? 'App (HTML/JS)'
+    : type === 'translation' ? 'Translation file'
+    : type === 'memory' ? 'Memory structure' : type;
+  const sc = fragments.sandbox_constraints || '';
+  const nr = fragments.namespace_rules || '';
+  const ecr = fragments.extension_consumption_rules || '';
+  const her = fragments.html_entity_rules || '';
+  let typeConstraints = '';
+  if (type === 'extension') {
+    typeConstraints = `\n${sc}\n\n${nr}\n\n${her}`;
+  } else if (type === 'cortex') {
+    typeConstraints = `\n${nr}\n\n${ecr}`;
+  } else if (type === 'app') {
+    typeConstraints = `\n${nr}\n\n## App Constraints (browser HTML — do NOT violate during edit)\n- Keep CSP meta tag if using CDN scripts\n- Keep AIMEAT.auth/data setup intact\n- Handle empty state gracefully`;
+  }
+  let upstreamSection = '';
+  if (data.upstreamChanges) {
+    upstreamSection = `\n## Upstream Data Changes\n\nThe following upstream components have been modified. Your code may need to adapt:\n\n${data.upstreamChanges}\n\nMake sure your code correctly handles the new data format described above.\n`;
+  }
+  return {
+    type_label: typeLabel,
+    label: data.componentLabel || '',
+    type_constraints: typeConstraints,
+    current_code: data.code || '',
+    change_request: data.changeRequest || '',
+    upstream_section: upstreamSection,
+  };
+}
+
+export function resolveBlueprintFix(data: PromptRuntimeData): Vars {
+  // Migrated from browser buildBlueprintFixPrompt(). {{blueprint_body}} is the fully-
+  // resolved gen-blueprint prompt, built and injected by the route — so the retry keeps
+  // service_slug and every other rule the canonical blueprint prompt carries (fixes the
+  // old bug where the browser's blueprint-fix omitted service_slug the validator requires).
+  return {
+    errors: (data.errors || []).map((e, i) => `${i + 1}. ${e}`).join('\n'),
+    blueprint_body: data.blueprintBody || '',
+  };
+}
+
 // Match browser buildTestContextSection() from fix.js lines 173-199
 export function buildTestContextSection(testContext: Record<string, unknown>): string {
   let section = '\n\n## Test Failure Context\n';

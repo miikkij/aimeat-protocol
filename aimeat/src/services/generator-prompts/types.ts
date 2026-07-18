@@ -180,4 +180,10 @@ export interface PromptRuntimeData {
   previousAttempts?: Array<Record<string, unknown>>;
   /** Reflection diagnosis text (for fix prompts) — root cause analysis from diagnostic step */
   reflectionDiagnosis?: string;
+  /** Change request text (for edit / impact prompts) */
+  changeRequest?: string;
+  /** Upstream data-shape changes note (for edit prompts) */
+  upstreamChanges?: string;
+  /** Fully-resolved gen-blueprint prompt, injected by the route for gen-blueprint-fix */
+  blueprintBody?: string;
 }
