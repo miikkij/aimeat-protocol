@@ -292,26 +292,18 @@ export async function runAutopilot(
       const compLabel = (comp.label as string) || cid;
       const compType = (comp.type as string) || 'unknown';
 
-      // Phase gate: only process types enabled for this run.
-      // Enable one phase at a time. Verify each before enabling the next.
-      const ENABLED_TYPES = ['csm', 'memory', 'translation', 'extension', 'cortex']; // Phase gate: stop after cortex — app gated
-      // Cortex subtype gate: only cortex-data for now
-      const ENABLED_CORTEX_SUBTYPES = ['data', 'component', 'app-domain'];
-      if (!ENABLED_TYPES.includes(compType)) {
-        alog.info(`[${cid}] Phase gate: ${compType} not enabled yet — stopping pipeline`);
-        entry.status.componentResults.push({ id: cid, label: compLabel, status: 'phase_gated' });
-        break;
-      }
-
-      // Cortex subtype gate
-      if (compType === 'cortex') {
-        const bpC = ((blueprint.components as Array<Record<string, unknown>>) || []).find((c: Record<string, unknown>) => c.label === compLabel);
-        const sub = (bpC?.subtype as string) || '';
-        if (!ENABLED_CORTEX_SUBTYPES.includes(sub)) {
-          alog.info(`[${cid}] Cortex subtype gate: ${sub} not enabled yet — stopping pipeline (enabled: ${ENABLED_CORTEX_SUBTYPES.join(', ')})`);
-          entry.status.componentResults.push({ id: cid, label: compLabel, status: 'phase_gated' });
-          break;
-        }
+      // No phase gate: the autopilot builds EVERY component type the blueprint produces —
+      // csm, memory, translation, extension, all cortex subtypes, AND app — matching the
+      // copy-paste flow. (The old ENABLED_TYPES/ENABLED_CORTEX_SUBTYPES gate was a temporary
+      // "enable one phase at a time" scaffold that break'd the whole pipeline the moment it
+      // reached an app — so autopilot could never finish a full service. Downstream code
+      // (spec, register, smoke, probe, test) already handles app + every cortex subtype.)
+      const KNOWN_TYPES = ['csm', 'msm', 'memory', 'translation', 'extension', 'cortex', 'app'];
+      if (!KNOWN_TYPES.includes(compType)) {
+        alog.warn(`[${cid}] Unknown component type "${compType}" — skipping (not stopping the pipeline)`);
+        entry.status.progress.skipped++;
+        entry.status.componentResults.push({ id: cid, label: compLabel, status: 'skipped_unknown_type' });
+        continue;
       }
 
       updateStatus({ currentComponent: compLabel });
