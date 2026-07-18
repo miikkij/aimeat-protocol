@@ -38,7 +38,6 @@ export { AgentActivityOverviewService, createAgentActivityOverviewService, type 
 export { AgentDataAccessOverviewService, createAgentDataAccessOverviewService, type AgentDataAccessOverview } from './agent-data-access-overview-db-service.js';
 export { AgentIntegrationOverviewService, createAgentIntegrationOverviewService, type AgentIntegrationOverview } from './agent-integration-overview-db-service.js';
 export { AgentQualityOverviewService, createAgentQualityOverviewService, type AgentQualityOverview } from './agent-quality-overview-db-service.js';
-export { GeneratorStateService, createGeneratorStateService, type GeneratorState } from './generator-state-db-service.js';
 export { WorkTabService, createWorkTabService, type WorkOverview } from './work-tab-db-service.js';
 export { DataWalletService, createDataWalletService, type DataWalletOverview } from './data-wallet-db-service.js';
 export { LivingDocsService, createLivingDocsService, type LivingDocsOverview } from './living-docs-db-service.js';

@@ -1,13 +1,16 @@
 /**
- * @file generator-settings.js
- * @description Settings components for the service generator — OpenRouter/LM Studio
- *   AI provider configuration and blueprint-defined service/user settings collection.
+ * @file openrouter-settings.js
+ * @description AI provider configuration panel — OpenRouter / LM Studio / custom
+ *   OpenAI-compatible provider, API key, model + vision model, sampling params, and the
+ *   AI-apps daily-budget / per-app spend panel. Standalone; used by the profile AI tab and
+ *   by any view that embeds AI-provider settings.
  * @structure
- *   - OpenRouterSettings: collapsible panel for AI provider, API key, model, auto-retry
- *   - SettingsCollectionView: renders blueprint-defined settings fields, saves values
+ *   - OpenRouterSettings: collapsible panel for AI provider, API key, model, auto-retry, budget
  * @usage
- *   import { OpenRouterSettings, SettingsCollectionView } from './generator-settings.js';
+ *   import { OpenRouterSettings } from './openrouter-settings.js';
  * @version-history
+ *   v2.0.0 — 2026-07-18 — Split out of generator-settings.js (SettingsCollectionView removed with
+ *     the deleted Generator feature); dropped the generator.js project-settings import. OpenRouterSettings unchanged.
  *   v1.5.0 — 2026-07-05 — Model dropdown now populates for custom OpenAI-compatible providers
  *     (e.g. NVIDIA NIM https://integrate.api.nvidia.com/v1): reload models after every save (not
  *     only when a new key is typed, so switching base URL refreshes the list), surface model-load
@@ -30,7 +33,6 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
-import { saveProjectSettings, getProjectSettings } from '/js/services/generator.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import { useConfirm } from '/components/Modal.js';
 
@@ -44,9 +46,9 @@ function fmtCompact(n) {
 
 /* ── OpenRouter / LM Studio / Custom Settings ────────── */
 
-export function OpenRouterSettings({ onSettingsChange }) {
+export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
   const { confirm, ConfirmUI } = useConfirm();
-  const [collapsed, setCollapsed] = useState(true);
+  const [collapsed, setCollapsed] = useState(!startOpen);
   const [hasApiKey, setHasApiKey] = useState(false);
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
@@ -609,94 +611,3 @@ function AiAppsBudgetPanel() {
   `;
 }
 
-/* ── Settings Collection ─────────────────────────────── */
-
-export function SettingsCollectionView({ project, blueprint, onComplete, showToast }) {
-  const [values, setValues] = useState({});
-  const [saving, setSaving] = useState(false);
-  const [errors, setErrors] = useState([]);
-  const [loaded, setLoaded] = useState(false);
-
-  const serviceSettings = blueprint?.settings?.service || [];
-  const userSettingsDef = blueprint?.settings?.user || [];
-  const allSettings = [...serviceSettings, ...userSettingsDef];
-  const noSettings = allSettings.length === 0;
-
-  // Load previously saved settings
-  useEffect(() => {
-    if (noSettings || loaded) return;
-    getProjectSettings(project.projectId).then(saved => {
-      if (saved && Object.keys(saved).length > 0) {
-        // Merge saved values with defaults (saved values take priority)
-        const merged = {};
-        for (const s of allSettings) {
-          merged[s.key] = saved[s.key] !== undefined ? saved[s.key] : (s.default || '');
-        }
-        setValues(merged);
-      }
-      setLoaded(true);
-    }).catch(() => setLoaded(true));
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Load saved settings once per project (guarded by loaded/noSettings); allSettings is rebuilt each render and `loaded` flips inside the async body, so adding them would re-fire the loader. Intentionally keyed to projectId.
-  }, [project.projectId]);
-
-  // Auto-skip when no settings needed (hook always called, respecting rules of hooks)
-  useEffect(() => {
-    if (noSettings) onComplete({});
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- Fire onComplete once when there are no settings to collect; onComplete is a caller callback intentionally excluded to avoid re-firing on parent re-render.
-  }, [noSettings]);
-
-  if (noSettings) {
-    return html`<p class="pf-gen-notice">${t('profile.generator.settings_no_settings')}</p>`;
-  }
-
-  const handleSave = async () => {
-    setSaving(true);
-    setErrors([]);
-
-    // Check required fields
-    const missing = serviceSettings.filter(s => s.required && !values[s.key]);
-    if (missing.length > 0) {
-      setErrors(missing.map(s => s.label + ' ' + t('profile.generator.settings_required').toLowerCase()));
-      setSaving(false);
-      return;
-    }
-
-    // Identify secret keys for encryption
-    const secretKeys = allSettings.filter(s => s.type === 'secret').map(s => s.key);
-
-    try {
-      await saveProjectSettings(project.projectId, values, secretKeys);
-      onComplete(values);
-    } catch (e) {
-      showToast?.(e.message, true);
-    }
-    setSaving(false);
-  };
-
-  return html`<div class="pf-gen-settings-collection">
-    <div class="section-title section-title-spaced">${t('profile.generator.settings_title')}</div>
-    <p class="section-desc">${t('profile.generator.settings_description')}</p>
-    ${errors.length > 0 && html`<div class="pf-gen-errors">
-      ${errors.map(e => html`<p class="pf-gen-error-line">${e}</p>`)}
-    </div>`}
-    ${allSettings.map(s => html`<div class="pf-gen-section">
-      <label>
-        ${s.label}
-        ${s.required ? html` <span class="pf-gen-required">*</span>` : ''}
-      </label>
-      <input type=${s.type === 'secret' ? 'password' : s.type === 'number' ? 'number' : 'text'}
-        autocomplete="off" data-1p-ignore data-lpignore="true"
-        value=${values[s.key] || s.default || ''}
-        placeholder=${s.default ? String(s.default) : ''}
-        onInput=${e => setValues(prev => ({ ...prev, [s.key]: e.target.value }))} />
-    </div>`)}
-    <div class="pf-gen-actions">
-      <button class="btn-primary" onClick=${handleSave} disabled=${saving}>
-        ${t('profile.generator.settings_save')}
-      </button>
-      <button class="btn-outline" onClick=${() => onComplete({})}>
-        ${t('profile.generator.settings_skip')}
-      </button>
-    </div>
-  </div>`;
-}

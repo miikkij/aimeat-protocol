@@ -481,8 +481,6 @@ export interface AimeatConfig {
   extensionMaxInstalled: number;
   maxExtensionsPerOwner: number;
 
-  // Service Generator
-  generatorEnabled: boolean;
 
   // Prompt Calibrator
   calibratorEnabled: boolean;

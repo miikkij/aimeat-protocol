@@ -62,7 +62,7 @@ import SkillsTab from './profile/skills-tab.js';
 import OrganismsTab from './profile/organisms-tab.js';
 import OffersTab from './profile/offers-tab.js';
 import NotificationsTab from './profile/notifications-tab.js';
-import GeneratorTab from './profile/generator-tab.js';
+import { OpenRouterSettings } from './profile/openrouter-settings.js';
 import CalibratorTab from './profile/calibrator-tab.js';
 import PackagesTab from './profile/packages-tab.js';
 import CapabilitiesTab from './profile/capabilities-tab.js';
@@ -78,6 +78,10 @@ import LibrariesTab from './profile/libraries-tab.js';
 // Each tab has a minTier: 'new' | 'active' | 'experienced'
 // Tabs with minTier <= current tier are visible in the tab bar.
 // Deep links (?tab=X) bypass tier filtering.
+// The former "Generator" tab now hosts only the AI-provider (OpenRouter) settings,
+// opened by default. The Generator feature itself was removed.
+function OpenRouterTab(props) { return html`<${OpenRouterSettings} ...${props} startOpen=${true} />`; }
+
 const TABS = [
   { id: 'messages',      key: 'profile.tabs.inbox',          component: InboxTab,          minTier: 'new' },
   { id: 'contacts',      key: 'contacts.tabLabel',           component: ContactsTab,       minTier: 'new' },
@@ -111,7 +115,7 @@ const TABS = [
   { id: 'security',      key: 'profile.tabs.security',       component: SecurityTab,       minTier: 'experienced' },
   { id: 'email',         key: 'profile.tabs.email',          component: EmailTab,          minTier: 'new' },
   { id: 'notifications', key: 'profile.tabs.notifications',  component: NotificationsTab,  minTier: 'active' },
-  { id: 'generator',     key: 'profile.generator.tabLabel',  component: GeneratorTab,      minTier: 'active' },
+  { id: 'generator',     key: 'profile.generator.openrouter.title', component: OpenRouterTab, minTier: 'active' },
   { id: 'calibrator',   key: 'profile.calibrator.tabLabel', component: CalibratorTab,     minTier: 'active' },
   { id: 'packages',      key: 'profile.tabs.packages',       component: PackagesTab,       minTier: 'active' },
   { id: 'libraries',     key: 'librariesTab.tabLabel',       component: LibrariesTab,      minTier: 'new' },

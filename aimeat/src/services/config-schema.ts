@@ -162,8 +162,6 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   { key: 'extInstallRole', dotPath: 'extensions.install_role', envVar: 'AIMEAT_EXT_INSTALL_ROLE', type: 'string', validate: v => ['operator', 'owner'].includes(v as string), immutable: false, description: 'Role required to install extensions: operator or owner' },
   { key: 'maxExtensionsPerOwner', dotPath: 'extensions.max_per_owner', envVar: 'AIMEAT_MAX_EXTENSIONS_PER_OWNER', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 100, immutable: false, description: 'Max extensions per owner', range: '1-100' },
 
-  // ── Service Generator (mutable) ──
-  { key: 'generatorEnabled', dotPath: 'generator.enabled', envVar: 'AIMEAT_GENERATOR_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Enable Service Generator in profile view' },
 
   // ── Push Notifications (Phase 3.1, mutable) ──
   { key: 'pushEnabled', dotPath: 'push.enabled', envVar: 'AIMEAT_PUSH_ENABLED', type: 'boolean', validate: v => typeof v === 'boolean', immutable: false, description: 'Web push notifications enabled' },

@@ -35,7 +35,6 @@ export function nodeCapabilities(config: AimeatConfig): string[] {
   const caps: string[] = ['memory', 'actions', 'work', 'wallet', 'federation'];
   const flag = (on: boolean, name: string) => { if (on) caps.push(name); };
   flag(config.extendedFeaturesEnabled, 'boards');
-  flag(config.generatorEnabled, 'generator');
   flag(config.calibratorEnabled, 'calibrator');
   flag(config.extensionsEnabled, 'extensions');
   flag(config.cortexEnabled, 'cortex');
