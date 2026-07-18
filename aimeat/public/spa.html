@@ -423,14 +423,37 @@
         }
       }, []);
 
-      // Push-notification clicks on an already-open window: the service worker (sw.js) focuses
-      // this window and posts the notification's target URL — deep-link it in place (tab switch,
-      // inbox thread) instead of a full reload.
+      // Push-notification interactions on an already-open window. The service worker (sw.js) focuses
+      // this window and posts either:
+      //   - 'aimeat-notification-click': the notification's target URL → deep-link it in place.
+      //   - 'aimeat-notification-action': an action button was pressed. A lock screen can't hold the
+      //     JWT, so the SW hands the action here to run with the owner's session. An 'api' action
+      //     (approve/deny/accept/decline) executes directly; 'reply'/'navigate' just deep-link so the
+      //     owner completes it in the SPA (a reply needs text we can't compose from a button).
       useEffect(() => {
         if (!('serviceWorker' in navigator)) return undefined;
-        const onSwMessage = (e) => {
-          if (!e.data || e.data.type !== 'aimeat-notification-click' || !e.data.url) return;
-          openNotificationLink(e.data.url, navigate);
+        const onSwMessage = async (e) => {
+          const d = e.data;
+          if (!d) return;
+          if (d.type === 'aimeat-notification-click' && d.url) { openNotificationLink(d.url, navigate); return; }
+          if (d.type === 'aimeat-notification-action' && d.action) {
+            const a = d.action;
+            if (a.kind === 'api' && a.endpoint) {
+              try {
+                const jwt = window.AIMEAT?.auth?.getSession?.()?.jwt;
+                if (jwt) {
+                  await fetch(a.endpoint, {
+                    method: a.method || 'POST',
+                    headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + jwt },
+                    body: a.body ? JSON.stringify(a.body) : undefined,
+                  });
+                  window.dispatchEvent(new CustomEvent('aimeat-live-update'));
+                }
+              } catch { /* best-effort; the target view still shows the current state */ }
+            }
+            // Land the owner on the notification's target so the result is visible in context.
+            if (d.url) openNotificationLink(d.url, navigate);
+          }
         };
         navigator.serviceWorker.addEventListener('message', onSwMessage);
         return () => navigator.serviceWorker.removeEventListener('message', onSwMessage);

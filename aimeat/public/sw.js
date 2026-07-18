@@ -54,7 +54,9 @@ self.addEventListener('notificationclick', (event) => {
     ? data.actions.find((a) => a.id === event.action) : null;
   const url = data.url || '/v1/profile';
   const target = new URL(url, self.location.origin);
-  const actionMsg = descriptor ? { type: 'aimeat-notification-action', action: descriptor, notifId: data.notifId } : null;
+  const actionMsg = descriptor
+    ? { type: 'aimeat-notification-action', action: descriptor, notifId: data.notifId, url: target.pathname + target.search + target.hash }
+    : null;
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
