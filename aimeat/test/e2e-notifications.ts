@@ -152,5 +152,37 @@ await test('11. Using the reply action, B replies and A receives it', async () =
     assert(seen, 'A sees B\'s bell reply in the inbox');
 });
 
+// ── Regression: recent notifications must show even past the old 500-row global window ──
+// The bell used to fetch `listAllMemory({prefix:'notif.', limit:500})` — the node's OLDEST
+// 500 notification keys across ALL owners — then filter to the caller. Once >500 existed,
+// every recent notification fell outside the window and the bell silently froze. This seeds
+// one owner past that threshold and asserts their newest notification is still returned.
+await test('12. REGRESSION: the newest notification is returned even with >500 total', async () => {
+    const C = await setupOwner('c');
+    const TARGET = 520; // comfortably over the old 500-row global cap
+    const chunk = 20;
+    for (let i = 0; i < TARGET; i += chunk) {
+        await Promise.all(
+            Array.from({ length: Math.min(chunk, TARGET - i) }, (_, j) =>
+                json('/v1/notifications', {
+                    method: 'POST', headers: auth(C.token),
+                    body: JSON.stringify({ title: `bulk-${i + j}`, type: 'bulk' }),
+                }),
+            ),
+        );
+    }
+    // A distinctly-titled newest notification created LAST — it has the highest key, so the
+    // old global-oldest-500 window would clip it; the per-owner fix must surface it.
+    const marker = `newest-${Date.now()}`;
+    const created = await json('/v1/notifications', { method: 'POST', headers: auth(C.token), body: JSON.stringify({ title: marker, type: 'bulk' }) });
+    assert(created.status === 201, `create newest ${created.status}`);
+    const list = await json('/v1/notifications', { headers: auth(C.token) });
+    assert(list.status === 200, `list ${list.status}`);
+    const notifs = list.body.data.notifications || [];
+    assert(notifs.length > 0, 'list is non-empty');
+    assert(notifs[0].title === marker, `newest-first ordering surfaces the marker; got top="${notifs[0]?.title}"`);
+    assert(list.body.data.unread > 500, `unread reflects all of the owner's unread (>500), got ${list.body.data.unread}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
