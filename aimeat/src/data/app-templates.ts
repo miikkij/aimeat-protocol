@@ -177,3 +177,28 @@ export function getAppTemplateIndex(lang?: string): Array<Pick<AppTemplate, 'id'
     return { id, kind, tier, title: (o && o.title) || title, description: (o && o.description) || description, libs };
   });
 }
+
+/**
+ * A prompt section listing the ready-made app templates (shells → components → use-cases)
+ * so a generator prompt can tell the AI "start from one of these, fetch its content, compose".
+ * Generated from the registry (drift-proof), mirroring buildPromptLibrarySections().
+ * Pass `nodeUrl` (no trailing slash) so the fetch pointer is correct; `lang` localizes titles.
+ */
+export function buildPromptTemplateSections(nodeUrl: string, lang?: string): string {
+  const idx = getAppTemplateIndex(lang);
+  const byKind = (k: AppTemplate['kind']) => idx.filter(t => t.kind === k);
+  const line = (t: { id: string; tier?: string; title: string; description: string; libs?: string[] }) => {
+    const tier = t.tier ? ` [${t.tier}]` : '';
+    const libs = (t.libs && t.libs.length) ? ` — libs: ${t.libs.join(', ')}` : '';
+    return `- ${t.id}${tier} — ${t.title}: ${t.description}${libs}`;
+  };
+  let s = '### Ready-made templates (compose from these — do NOT start from a blank file)\n';
+  s += 'Fetch any template\'s full content with GET ' + nodeUrl + '/v1/app-templates/<id>; the index is GET ' + nodeUrl + '/v1/app-templates.\n\n';
+  const shells = byKind('app-shell');
+  if (shells.length) s += 'App shells (pick ONE as the base):\n' + shells.map(line).join('\n') + '\n\n';
+  const comps = byKind('component');
+  if (comps.length) s += 'Components (drop into a shell as needed):\n' + comps.map(line).join('\n') + '\n\n';
+  const uses = byKind('use-case');
+  if (uses.length) s += 'Full use-case examples (whole small apps to adapt):\n' + uses.map(line).join('\n') + '\n\n';
+  return s;
+}

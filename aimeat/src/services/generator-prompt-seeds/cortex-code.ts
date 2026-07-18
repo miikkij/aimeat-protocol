@@ -226,6 +226,8 @@ Your \\\`render(container)\\\` creates a complete feature view.
 
 {{platform_ui_section}}
 
+## Reusable libraries available on this node (prefer these over hand-rolling)
+{{library_packs}}
 {{translation_section}}
 
 ## Loading Translations
@@ -310,7 +312,7 @@ Second block — JavaScript library:
   AIMEAT[LIB_NAME] = exports;
 })(window.AIMEAT || (window.AIMEAT = {}));
 \\\`\\\`\\\``,
-    variables: ['disclaimer', 'label', 'spec_section', 'use_case', 'view_section', 'structures', 'data_cortex_api', 'translation_section', 'service_slug', 'platform_ui_section'],
+    variables: ['disclaimer', 'label', 'spec_section', 'use_case', 'view_section', 'structures', 'data_cortex_api', 'translation_section', 'service_slug', 'platform_ui_section', 'library_packs'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -350,6 +352,9 @@ The app loads ONLY this cortex. This cortex provides everything the app needs.
 {{feature_apis}}
 
 {{platform_layout_section}}
+
+## Reusable libraries available on this node (prefer these over hand-rolling)
+{{library_packs}}
 
 ## Data Cortex
 {{data_cortex_section}}
@@ -445,7 +450,7 @@ Second block — JavaScript library. ADAPT this working template — change view
 CRITICAL: The header (AIMEAT logo, sign in) is NOT your responsibility. It is provided by the page shell.
 Your render(container) receives a div#app — render your navigation + views INTO that container.
 Use ONLY the EXACT translation keys from the Translation Keys section. Do NOT invent shortened keys like "nav.search" — use "app.nav.search".`,
-    variables: ['disclaimer', 'label', 'project_description', 'spec_section', 'feature_apis', 'data_cortex_section', 'translation_keys', 'service_slug', 'platform_layout_section', 'app_domain_template'],
+    variables: ['disclaimer', 'label', 'project_description', 'spec_section', 'feature_apis', 'data_cortex_section', 'translation_keys', 'service_slug', 'platform_layout_section', 'app_domain_template', 'library_packs'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 
@@ -483,6 +488,8 @@ The app page just loads libraries and calls init() + render().
 
 {{cortex_or_api_section}}
 
+## Reusable libraries available on this node (load ONLY what you use; prefer these over CDNs)
+{{library_packs}}
 ## Output: Complete HTML file
 
 Return a complete HTML file using this EXACT structure. ADAPT only the marked sections.
@@ -618,7 +625,7 @@ entry: index.html
 - The app-domain cortex handles ALL application logic — the HTML page just loads libraries and boots
 {{cortex_rules}}
 {{html_entity_rules}}`,
-    variables: ['context', 'label', 'project_context', 'cortex_script_loads', 'cortex_or_api_section', 'cortex_rules', 'html_entity_rules', 'app_name', 'app_description', 'app_title', 'app_domain_lib', 'app_locale', 'app_theme'],
+    variables: ['context', 'label', 'project_context', 'cortex_script_loads', 'cortex_or_api_section', 'cortex_rules', 'html_entity_rules', 'app_name', 'app_description', 'app_title', 'app_domain_lib', 'app_locale', 'app_theme', 'library_packs'],
     usedIn: ['generator-autopilot', 'generator-ui'],
   },
 ];

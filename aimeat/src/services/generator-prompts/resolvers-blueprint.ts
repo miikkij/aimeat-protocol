@@ -9,9 +9,12 @@
 
 import type { PromptRuntimeData } from './types.js';
 import type { Vars } from './resolver-helpers.js';
+import { buildPromptLibrarySections } from '../../data/library-packs.js';
+import { buildPromptTemplateSections } from '../../data/app-templates.js';
 
 export function resolveBlueprint(data: PromptRuntimeData): Vars {
   const interviewSpec = data.interviewSpec;
+  const nodeUrl = data.nodeUrl || '';
   const interviewSpecSection = interviewSpec
     ? `\n## Refined Specification (from requirements interview)\n\`\`\`json\n${JSON.stringify(interviewSpec, null, 2)}\n\`\`\`\n\nUse the specification above to determine the exact components needed. The data sources, entities, views, and constraints have been validated with the user.\n`
     : '';
@@ -35,11 +38,18 @@ export function resolveBlueprint(data: PromptRuntimeData): Vars {
       '\n\nWhen the blueprint\'s cortex component needs an existing library, add a "uses" field listing the library names.\n';
   }
 
+  // Library packs + app templates — the full registry of reusable libraries and starter
+  // scaffolds this node ships, so the blueprint composes from them instead of inventing.
+  const libraryPacks = nodeUrl ? buildPromptLibrarySections(nodeUrl) : '';
+  const appTemplates = nodeUrl ? buildPromptTemplateSections(nodeUrl, specLocale) : '';
+
   return {
     description: data.projectDescription || '',
     interview_spec_section: interviewSpecSection,
     language_note: languageNote,
     cortex_catalog: cortexCatalog,
+    library_packs: libraryPacks,
+    app_templates: appTemplates,
   };
 }
 

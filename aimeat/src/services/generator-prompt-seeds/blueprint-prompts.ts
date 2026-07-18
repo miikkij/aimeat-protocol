@@ -101,6 +101,13 @@ The user wants to create this service:
 {{description}}
 ---
 {{interview_spec_section}}{{language_note}}{{cortex_catalog}}
+## Reusable building blocks on this node (compose from these — do NOT reinvent)
+This node already ships a rich set of libraries and starter templates. Plan the service to REUSE
+them: a cortex/app component's "uses" field names the libraries it loads, and an app can start from
+a template shell. Prefer an existing library or template over hand-writing equivalent logic.
+
+{{library_packs}}
+{{app_templates}}
 Analyze this request and produce a JSON blueprint listing ALL components needed.
 
 CRITICAL: Return ONLY a JSON object with "service_slug", "architecture", "components", "phases", "dataModel", and optionally "settings" and "testScenarios". Nothing else.
@@ -385,7 +392,7 @@ Examples:
 Be concrete: use real-world example values from the project's domain.
 Test the happy path — the test system handles error paths.
 Include testScenarios at the top level of the output JSON (alongside "components", "phases", "dataModel").`,
-    variables: ['disclaimer', 'context', 'description', 'interview_spec_section', 'language_note', 'cortex_catalog'],
+    variables: ['disclaimer', 'context', 'description', 'interview_spec_section', 'language_note', 'cortex_catalog', 'library_packs', 'app_templates'],
     usedIn: ['generator-ui'],
   },
 

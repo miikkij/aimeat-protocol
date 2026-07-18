@@ -707,6 +707,8 @@ await test('Prompt build route: self-correction prompts build from DB (single so
     // regression guard for the old bug where the browser's blueprint-fix omitted it.
     const bpFix = await buildOne('gen-blueprint-fix', { errors: ['missing service_slug'] });
     assert(bpFix.includes('service_slug'), 'blueprint-fix prompt must include service_slug');
+    // Phase 2: the blueprint prompt must surface the reusable libraries + templates section.
+    assert(bpFix.includes('Reusable building blocks'), 'blueprint prompt must include the reusable building-blocks (libraries + templates) section');
 });
 
 await test('Prompt build route: rejects a non-buildable promptId', async () => {
