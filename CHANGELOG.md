@@ -4,6 +4,8 @@ All notable changes to AIMEAT are documented in this file.
 
 ## [Unreleased]
 
+**The Messages tab becomes a real mobile chat, not a desktop page squeezed into a phone.** On a narrow screen (≤760px) opening a conversation now takes the **whole screen** — the messenger lifts out of the profile shell (`position: fixed; inset: 0`), the app top-nav / ☰ menu / breadcrumb / Logout pill are hidden (the sticky nav lives in a higher stacking context, so it's hidden rather than out-z-indexed), and background scroll is locked; **← Back** drops the overlay and the app chrome returns. The composer is a plain auto-growing `<textarea>` there instead of the heavy Toast UI editor (which never loads on mobile), and the on-screen keyboard is handled correctly: the viewport meta gains `interactive-widget=resizes-content` + `viewport-fit=cover` (the keyboard resizes the layout viewport so the composer stays above it on iOS 16+/Android), with a `visualViewport` measurement (`--inbox-avail`) as the fallback and `env(safe-area-inset-bottom)` clearance under the composer — no more input hidden behind the keyboard and no dead gap above it. Clicking ↩ Reply on a message now focuses the composer so you can type straight away, and per-message actions (reply/star/track/park/AI) are tappable on touch (they were hover-only). Desktop is unchanged (two-pane messenger, rich editor). The reusable mobile pattern is written up in `docs/frontend-development-guide.md` → *Mobile & Responsive UX* and `docs/pitfalls.md` §15.
+
 ## [2.0.0] - 2026-07-18
 
 **AIMEAT 2.0 — real-money agentic commerce on a Mongo-free, Postgres-first foundation.** The storage
