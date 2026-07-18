@@ -8,7 +8,12 @@ services:
     pull_policy: always
     container_name: aimeat-openhands
     ports:
-      - "3000:3000"
+      # Host bind for the UI. Default publishes on all interfaces :3000 (fine for local dev).
+      # On a shared/prod host set OPENHANDS_PORT_BIND in .env to bind localhost-only on a
+      # non-default port, e.g. OPENHANDS_PORT_BIND=127.0.0.1:13781, and reach it via an SSH
+      # tunnel. The container port is always 3000; PERMITTED_CORS_ORIGINS must match the origin
+      # you browse to.
+      - "${OPENHANDS_PORT_BIND:-3000}:3000"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
