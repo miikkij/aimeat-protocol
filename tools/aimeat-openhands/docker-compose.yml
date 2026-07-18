@@ -20,6 +20,15 @@ services:
       - LLM_MODEL=${LLM_MODEL:-openrouter/moonshotai/kimi-k2.7-code}
       - LLM_API_KEY=${OPENROUTER_API_KEY:?set OPENROUTER_API_KEY in .env}
       - LLM_BASE_URL=${LLM_BASE_URL:-https://openrouter.ai/api/v1}
+      # Make the aimeat-app-builder skill visible to the agent RUNTIME container. The app
+      # spawns a SEPARATE agent-server container (user `openhands`, HOME /home/openhands) which
+      # does NOT see this app container's ~/.openhands — so a file-drop there never reaches the
+      # agent. SANDBOX_VOLUMES bind-mounts our host skills dir into the runtime's auto-loaded
+      # ~/.agents/skills (read-only). render-config.sh populates the host dir below.
+      - SANDBOX_VOLUMES=${HOME}/.aimeat-openhands/skills:/home/openhands/.agents/skills:ro
+      # Allow the browser origins that reach this UI. Add the host IP for LAN access (an
+      # IP-based origin otherwise fails CORS). Comma-separated.
+      - PERMITTED_CORS_ORIGINS=${PERMITTED_CORS_ORIGINS:-http://localhost:3000}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # Persistent OpenHands state (skills, settings.json, MCP live here).

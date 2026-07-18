@@ -53,6 +53,15 @@ State persists in `~/.openhands`, so restarts (`docker compose restart`) keep th
 - **Pruning defaults**: list the bundled microagents the image ships and add the unwanted ones
   to `disabled_microagents` in `config.toml.template`; set `load_public_skills=false` in the
   agent context to skip the public catalog. See `DEPLOY-PROMPT.md`.
+- **How the skill reaches the agent** (important): OpenHands runs the agent in a **separate
+  agent-server runtime container** (user `openhands`, HOME `/home/openhands`) that does **not**
+  see the app container's `~/.openhands`. So a file dropped in `~/.openhands/skills` is invisible
+  to the agent. This bundle instead bind-mounts the host dir `~/.aimeat-openhands/skills` (filled
+  by `render-config.sh`) into the runtime's auto-loaded `~/.agents/skills` via `SANDBOX_VOLUMES`
+  in `docker-compose.yml`. Verify after deploy by asking a fresh conversation *"quote the golden
+  rule of the aimeat-app-builder skill"* — it should recite the `/v1/prompts/build-app` rule.
+  If `SANDBOX_VOLUMES` isn't honored on your build, the fallback is a thin custom agent-server
+  image that COPYs the skill into `/home/openhands/.agents/skills/` (`AGENT_SERVER_IMAGE_*`).
 
 Token lifetime: the agent token is long-lived (node `agentJwtTtlSeconds`, ~90 days). When it
 expires, delete `secrets/aimeat.env` and re-run `scripts/setup.sh`.

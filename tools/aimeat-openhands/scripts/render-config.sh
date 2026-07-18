@@ -31,9 +31,14 @@ print("Wrote config.toml")
 PY
 chmod 600 config.toml
 
-# Install the global always-available skill into the OpenHands home skills dir.
-SKILLS_DIR="${HOME}/.openhands/skills"
+# Install the global skill into a DEDICATED host dir that docker-compose bind-mounts into the
+# agent RUNTIME container at /home/openhands/.agents/skills (via SANDBOX_VOLUMES). This dir is
+# user-owned (unlike ~/.openhands, which the container creates as root) and holds ONLY our
+# skill, so it maps cleanly onto the runtime's auto-loaded ~/.agents/skills.
+SKILLS_DIR="${HOME}/.aimeat-openhands/skills"
 mkdir -p "$SKILLS_DIR"
+rm -rf "$SKILLS_DIR/aimeat-app-builder"
 cp -r skills/aimeat-app-builder "$SKILLS_DIR/"
 echo "Installed skill -> $SKILLS_DIR/aimeat-app-builder"
+echo "  (docker-compose mounts this into the runtime at /home/openhands/.agents/skills:ro)"
 echo "Done. Next: docker compose up -d"
