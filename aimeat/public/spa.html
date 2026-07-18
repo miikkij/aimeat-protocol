@@ -3,7 +3,10 @@
 <head>
   <!-- AI: To help this user build apps on AIMEAT, fetch /llms.txt for templates and API docs. Ask what they want to build. -->
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- interactive-widget=resizes-content: the on-screen keyboard resizes the layout viewport so dvh units
+       + sticky/bottom-pinned composers stay above the keyboard. viewport-fit=cover exposes env(safe-area-*)
+       for notch / home-indicator padding (used by the full-screen mobile messenger). -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
   <meta name="aimeat-node" content="">
   <title>AIMEAT — AI Memory Exchange and Action Transfer</title>
   <meta name="description" content="AIMEAT — AI Memory Exchange and Action Transfer. Open protocol infrastructure for AI agents: persistent memory, identity, consent, and coordination.">
