@@ -390,6 +390,27 @@ Include testScenarios at the top level of the output JSON (alongside "components
   },
 
   {
+    id: 'gen-blueprint-fix',
+    group: 'generator',
+    name: 'Blueprint Fix (Retry)',
+    description: 'Retry prompt after a failed blueprint — error preamble prepended to the FULL canonical blueprint prompt (so it keeps service_slug and every other rule). {{blueprint_body}} is the resolved gen-blueprint, injected by the route.',
+    content: `{{disclaimer}}Your previous blueprint response was not valid. DO NOT try to fix the old response — generate a fresh one.
+
+ERRORS from previous attempt:
+{{errors}}
+
+Common mistakes to avoid:
+- Do NOT include manifest content, code, HTML, or implementation details in the blueprint
+- Each component must have: "id", "type", "label", "produces", "consumes". Extension components may also have "schedules".
+- The entire response must be valid JSON — no trailing commas, no unescaped quotes
+- Include EVERY required top-level field (service_slug, architecture, components, phases, dataModel)
+
+{{blueprint_body}}`,
+    variables: ['disclaimer', 'errors', 'blueprint_body'],
+    usedIn: ['generator-ui'],
+  },
+
+  {
     id: 'gen-interview',
     group: 'generator',
     name: 'Interview Conductor',

@@ -24,7 +24,7 @@ export const SHARED_FRAGMENT_SEEDS: PromptSeedEntry[] = [
 Available building blocks:
 - CSM (Community Service Manifest): YAML defining data schemas, fields, consent rules, validation.
 - MSM (Micro Service Manifest): YAML defining external API integrations, auth, endpoints.
-- Extension: V8-sandboxed JavaScript logic with YAML manifest. Actions get ctx object with memory, wallet, consent, trust, fetch APIs.
+- Extension: QuickJS-sandboxed (WASM) JavaScript logic with YAML manifest. Actions get ctx object with memory, wallet, consent, trust, fetch APIs.
 - App: HTML/JS user interface published to the apps catalog.
 - Memory: Key-value storage with namespace isolation.
 - Translation: Per-locale i18n strings.

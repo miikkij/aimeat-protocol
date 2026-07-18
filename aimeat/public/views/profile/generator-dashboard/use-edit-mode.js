@@ -35,9 +35,9 @@ import {
   saveComponent, registerComponent, writeProjectLog,
   savePendingEdit, clearPendingEdit,
 } from '/js/services/generator.js';
-import { buildImpactPrompt, buildEditPrompt, buildFixPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
 import { runWithAi, stripCodeblock } from '../generator-detail.js';
+import { buildPromptFromBackend } from '../generator-detail.ai.js';
 
 /** History helper — creates a new component object with a history entry appended */
 function addHistory(comp, action, extra = {}) {
@@ -79,8 +79,8 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
     clearPendingEdit(projectId).catch(() => {});
   }
 
-  function handleCopyImpactPrompt() {
-    const prompt = buildImpactPrompt(changeRequest, core.project?.blueprint);
+  async function handleCopyImpactPrompt() {
+    const prompt = await buildPromptFromBackend(projectId, 'gen-impact', { changeRequest });
     copyToClipboard(prompt).catch(() => {});
     showToast?.(t('profile.generator.impactPromptCopied'));
     setEditMode('impact');
@@ -90,7 +90,7 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
     if (!orSettings?.hasApiKey) return;
     setAiRunning('impact');
     try {
-      const prompt = buildImpactPrompt(changeRequest, core.project?.blueprint);
+      const prompt = await buildPromptFromBackend(projectId, 'gen-impact', { changeRequest });
       const content = await runWithAi(projectId, prompt);
       setImpactResult(content);
       setEditMode('impact');
@@ -147,12 +147,12 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
           .filter(a => a.impact === 'root' && a.id !== comp.id)
           .map(a => `- ${a.label}: ${a.suggestedChange}`)
           .join('\n') || '';
-        const prompt = buildEditPrompt(
-          comp.type, comp.label,
-          comp.result || '(no current code)',
-          item.suggestedChange || changeRequest,
-          upstream || null,
-        );
+        const prompt = await buildPromptFromBackend(projectId, 'gen-edit', {
+          componentId: comp.id, componentType: comp.type, componentLabel: comp.label,
+          code: comp.result || '(no current code)',
+          changeRequest: item.suggestedChange || changeRequest,
+          upstreamChanges: upstream || undefined,
+        });
 
         let content;
         try {
@@ -173,7 +173,9 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
             autopilotState.setStep(
               comp.label + ' - ' + t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max)
             );
-            const fp = buildFixPrompt(prompt, content, vr.errors, comp.type);
+            const fp = await buildPromptFromBackend(projectId, 'gen-fix', {
+              componentId: comp.id, originalPrompt: prompt, code: content, errors: vr.errors, componentType: comp.type,
+            });
             try { content = await runWithAi(projectId, fp); } catch { break; }
             content = stripCodeblock(content);
             vr = validateComponent(comp.type, content, core.project?.blueprint);
@@ -215,17 +217,17 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
     showToast?.(t('profile.generator.openrouter.stepComplete'));
   }
 
-  function handleCopyEditPrompt(comp, suggestedChange) {
+  async function handleCopyEditPrompt(comp, suggestedChange) {
     const upstream = impactParsed?.analysis
       ?.filter(a => a.impact === 'root' && a.id !== comp.id)
       ?.map(a => `- ${a.label}: ${a.suggestedChange}`)
       ?.join('\n') || '';
-    const prompt = buildEditPrompt(
-      comp.type, comp.label,
-      comp.result || '(no current code)',
-      suggestedChange || changeRequest,
-      upstream || null,
-    );
+    const prompt = await buildPromptFromBackend(projectId, 'gen-edit', {
+      componentId: comp.id, componentType: comp.type, componentLabel: comp.label,
+      code: comp.result || '(no current code)',
+      changeRequest: suggestedChange || changeRequest,
+      upstreamChanges: upstream || undefined,
+    });
     copyToClipboard(prompt).catch(() => {});
     showToast?.(t('profile.generator.editPromptCopied').replace('{name}', comp.label));
   }
@@ -238,12 +240,12 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
         ?.filter(a => a.impact === 'root' && a.id !== comp.id)
         ?.map(a => `- ${a.label}: ${a.suggestedChange}`)
         ?.join('\n') || '';
-      const prompt = buildEditPrompt(
-        comp.type, comp.label,
-        comp.result || '(no current code)',
-        suggestedChange || changeRequest,
-        upstream || null,
-      );
+      const prompt = await buildPromptFromBackend(projectId, 'gen-edit', {
+        componentId: comp.id, componentType: comp.type, componentLabel: comp.label,
+        code: comp.result || '(no current code)',
+        changeRequest: suggestedChange || changeRequest,
+        upstreamChanges: upstream || undefined,
+      });
       let content = await runWithAi(projectId, prompt);
       content = stripCodeblock(content);
       let vr = validateComponent(comp.type, content, core.project?.blueprint);
@@ -251,7 +253,9 @@ export function useEditMode(core, autopilotState, projectId, orSettings, session
       if (!vr.valid && orSettings?.autoRetry) {
         const max = orSettings.maxRetries || 3;
         for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
-          const fp = buildFixPrompt(prompt, content, vr.errors, comp.type);
+          const fp = await buildPromptFromBackend(projectId, 'gen-fix', {
+            componentId: comp.id, originalPrompt: prompt, code: content, errors: vr.errors, componentType: comp.type,
+          });
           try { content = await runWithAi(projectId, fp); } catch { break; }
           content = stripCodeblock(content);
           vr = validateComponent(comp.type, content, core.project?.blueprint);

@@ -32,10 +32,10 @@ import { apiPost } from '/js/api.js';
 import {
   loadAllComponents, saveComponent, registerComponent, writeProjectLog,
 } from '/js/services/generator.js';
-import { buildComponentPrompt, buildFixPrompt, buildReflectionPrompt, buildTestPrompt } from '/js/services/generator-prompts.js';
 import { validateComponent } from '/js/services/generator-validate.js';
 import { runTests, runComponentTest } from '/js/services/generator-testing.js';
 import { runWithAi, stripCodeblock } from '../generator-detail.js';
+import { loadPromptFromBackend, buildPromptFromBackend } from '../generator-detail.ai.js';
 
 /**
  * @param {Object} core — useDashboardCore return value
@@ -109,10 +109,7 @@ export function useTestExecution(core, projectId, orSettings, session, showToast
       let testCode;
       try {
         await writeProjectLog(projectId, 'test_prompt_generating', { meta: { component: comp.label, type: comp.type, by: 'batch' } });
-        const testPrompt = buildTestPrompt(
-          comp.type, comp.result, comp.label, comp.registeredAs,
-          core.project?.blueprint, core.interviewSpec
-        );
+        const testPrompt = await loadPromptFromBackend(projectId, comp.id, 'test');
         testCode = await runWithAi(projectId, testPrompt);
         testCode = stripCodeblock(testCode);
         await saveComponent(projectId, { ...comp, testPrompt, testCode, testEnvironment });
@@ -192,20 +189,21 @@ export function useTestExecution(core, projectId, orSettings, session, showToast
     showToast?.(t('profile.generator.test_fix_round') + ' ' + (testFixRound + 1));
 
     try {
-      const completedComps = core.components.filter(c => c.status === 'done' && c.registeredAs);
-      const originalPrompt = comp.prompt || await buildComponentPrompt(
-        comp.type, comp.label,
-        core.project?.description, core.project?.blueprint, completedComps,
-        core.interviewSpec,
-      );
+      const originalPrompt = comp.prompt || await loadPromptFromBackend(projectId, comp.id, 'code');
       // Step 1: Reflection — diagnose the failure before writing code
       let reflectionDiagnosis = '';
       try {
-        const reflectionPrompt = buildReflectionPrompt(comp.result || '', failedTestComp.errors || [], testContext);
+        const reflectionPrompt = await buildPromptFromBackend(projectId, 'gen-reflection', {
+          componentId: comp.id, code: comp.result || '', errors: failedTestComp.errors || [],
+          componentType: comp.type, testContext,
+        });
         reflectionDiagnosis = await runWithAi(projectId, reflectionPrompt);
       } catch { /* reflection is optional enhancement */ }
 
-      const fixP = buildFixPrompt(originalPrompt, comp.result || '', failedTestComp.errors || [], comp.type, testContext, null, reflectionDiagnosis);
+      const fixP = await buildPromptFromBackend(projectId, 'gen-fix', {
+        componentId: comp.id, originalPrompt, code: comp.result || '', errors: failedTestComp.errors || [],
+        componentType: comp.type, testContext, reflectionDiagnosis,
+      });
 
       let content = await runWithAi(projectId, fixP);
       content = stripCodeblock(content);
@@ -216,7 +214,9 @@ export function useTestExecution(core, projectId, orSettings, session, showToast
         const max = orSettings.maxRetries || 3;
         for (let attempt = 1; attempt <= max && !vr.valid; attempt++) {
           showToast?.(t('profile.generator.openrouter.retrying').replace('{current}', attempt).replace('{max}', max));
-          const retryP = buildFixPrompt(originalPrompt, content, vr.errors, comp.type);
+          const retryP = await buildPromptFromBackend(projectId, 'gen-fix', {
+            componentId: comp.id, originalPrompt, code: content, errors: vr.errors, componentType: comp.type,
+          });
           content = await runWithAi(projectId, retryP);
           content = stripCodeblock(content);
           vr = validateComponent(comp.type, content, core.project?.blueprint);

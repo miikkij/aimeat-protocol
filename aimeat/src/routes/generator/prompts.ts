@@ -1,10 +1,21 @@
 /**
  * @file src/routes/generator/prompts.ts
- * @description Generator prompt-building routes — per-component code/spec/test prompt and the
- *   blueprint/interview prompt, both assembled from stored project state via buildPrompt. Extracted
- *   from src/routes/generator.ts to satisfy max-file-lines.
+ * @description Generator prompt-building routes — per-component code/spec/test prompt, the
+ *   blueprint/interview prompt, and the self-correction (fix/reflection/explain/edit/impact/
+ *   blueprint-fix) prompts, all assembled from stored project state via buildPrompt. This is
+ *   the SINGLE source of truth for generator prompts: both the browser UI and the server
+ *   autopilot fetch from here, so the two flows always run identical prompts.
+ * @structure
+ *   - loadComponentPromptContext: shared loader — completed components (+ merged specs), self
+ *     spec, extension/data-API spec, translation keys — used by the code/spec/test GET route
+ *     and the POST build route.
+ *   - registerPromptRoutes: GET /prompts/:cid (code|spec|test), GET /prompts (blueprint|interview),
+ *     POST /prompts/build (fix|reflection|explain|edit|impact|blueprint-fix|fresh-generation).
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/generator.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-18 — Add POST /prompts/build so the browser fetches the self-correction
+ *     prompts from the DB too (kills System A client builders); extract shared context loader;
+ *     blueprint-fix now wraps the canonical gen-blueprint (keeps service_slug).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -14,6 +25,110 @@ import { success, error } from '../../middleware/envelope.js';
 import { logger } from '../../utils/logger.js';
 import { buildPrompt } from '../../services/generator-prompts/index.js';
 import type { PromptRuntimeData, Blueprint, InterviewSpec, ComponentState } from '../../services/generator-prompts/types.js';
+
+type BlueprintShape = { components?: Array<{ id: string; type: string; label: string; subtype?: string }>; dataModel?: Record<string, unknown> };
+
+/**
+ * Load the cross-component context a per-component prompt needs: every completed component
+ * (with its spec merged from the canonical generator.<project>.spec.<id> key), this component's
+ * own spec, the extension spec + data-API spec cortex prompts depend on, and translation keys.
+ * Shared by the code/spec/test GET route and the POST build route so both see identical context.
+ */
+async function loadComponentPromptContext(
+  storage: Storage,
+  gaii: string,
+  projectId: string,
+  componentId: string,
+  component: { id: string; type: string; label: string; subtype?: string },
+  blueprint: BlueprintShape,
+): Promise<{
+  completedComponents: ComponentState[];
+  selfSpec: Record<string, unknown> | undefined;
+  extensionSpec: Record<string, unknown> | undefined;
+  dataApiSpec: Record<string, unknown> | undefined;
+  translationKeys: string[];
+}> {
+  const componentKeyPrefix = `generator.${projectId}.component.`;
+  const specKeyPrefix = `generator.${projectId}.spec.`;
+  const [allComponentRecords, allSpecRecords] = await Promise.all([
+    storage.listMemory(gaii, { prefix: componentKeyPrefix }),
+    storage.listMemory(gaii, { prefix: specKeyPrefix }),
+  ]);
+  const specByComponentId = new Map<string, unknown>();
+  for (const sr of allSpecRecords) specByComponentId.set(sr.key.slice(specKeyPrefix.length), sr.value);
+
+  const completedComponents = allComponentRecords
+    .filter(r => {
+      const val = r.value as { status?: string; registeredAs?: string };
+      return (val.status === 'registered' || val.status === 'ready' || val.status === 'done') && val.registeredAs;
+    })
+    .map(r => {
+      const val = r.value as Record<string, unknown>;
+      if (!val.subtype && blueprint?.components) {
+        const bpc = blueprint.components.find((c) => c.label === val.label || c.id === val.id);
+        if (bpc && (bpc as Record<string, unknown>).subtype) {
+          val.subtype = (bpc as Record<string, unknown>).subtype;
+          logger.warn(`⚠️ SUBTYPE MISSING from stored component "${val.id || val.label}" — enriched from blueprint as "${(bpc as Record<string, unknown>).subtype}". Autopilot will auto-fix this.`);
+        }
+      }
+      if (!val.spec) {
+        const compId = (val.id as string) || r.key.slice(componentKeyPrefix.length);
+        if (specByComponentId.has(compId)) val.spec = specByComponentId.get(compId);
+      }
+      return val;
+    }) as unknown as ComponentState[];
+
+  const specRec = await storage.getMemory(gaii, `generator.${projectId}.spec.${componentId}`);
+  const selfSpec = specRec?.value as Record<string, unknown> | undefined;
+
+  let extensionSpec: Record<string, unknown> | undefined;
+  let dataApiSpec: Record<string, unknown> | undefined;
+  if (component.type === 'cortex' && blueprint?.components) {
+    const extBpComp = blueprint.components.find((c) => c.type === 'extension');
+    if (extBpComp) {
+      const extSpecRec = await storage.getMemory(gaii, `generator.${projectId}.spec.${extBpComp.id}`);
+      extensionSpec = extSpecRec?.value as Record<string, unknown> | undefined;
+    }
+    const dataCortexBp = blueprint.components.find((c) => c.type === 'cortex' && (c as Record<string, unknown>).subtype === 'data');
+    if (dataCortexBp && dataCortexBp.id !== componentId) {
+      const dataSpecRec = await storage.getMemory(gaii, `generator.${projectId}.spec.${dataCortexBp.id}`);
+      dataApiSpec = dataSpecRec?.value as Record<string, unknown> | undefined;
+    }
+  }
+
+  const translationKeys = (completedComponents as unknown as Array<Record<string, unknown>>)
+    .filter(c => c.type === 'translation' && (c.contextBundle as Record<string, unknown>)?.keys)
+    .flatMap(c => ((c.contextBundle as Record<string, unknown>)?.keys as string[]) || []);
+
+  return { completedComponents, selfSpec, extensionSpec, dataApiSpec, translationKeys };
+}
+
+/** Build the canonical blueprint prompt (with the live cortex-lib catalog), used by the
+ *  blueprint GET route and reused as the body of the blueprint-fix retry prompt. */
+async function buildBlueprintPromptBody(
+  storage: Storage,
+  config: AimeatConfig,
+  authHeader: string,
+  projectDescription: string,
+  interviewSpec: unknown,
+): Promise<string> {
+  let cortexCatalog: Array<Record<string, unknown>> = [];
+  try {
+    const cortexResp = await fetch(`http://localhost:${config.port}/v1/cortex`, {
+      headers: { 'Authorization': authHeader || '' },
+    });
+    const cortexJson = await cortexResp.json() as { data?: Array<Record<string, unknown>> };
+    cortexCatalog = (cortexJson.data || []).filter((c: Record<string, unknown>) =>
+      c.active && ((c.components as Array<Record<string, unknown>>) || []).some((comp: Record<string, unknown>) => comp.type === 'lib')
+    );
+  } catch { /* cortex catalog optional */ }
+
+  return buildPrompt(storage, 'gen-blueprint', {
+    projectDescription,
+    interviewSpec,
+    cortexCatalog,
+  } as unknown as PromptRuntimeData);
+}
 
 export function registerPromptRoutes(
   router: Router,
@@ -32,7 +147,6 @@ export function registerPromptRoutes(
       const projectId = req.params['projectId'] as string;
       const componentId = req.params['componentId'] as string;
 
-      // Load project state
       const [projectRec, interviewRec] = await Promise.all([
         storage.getMemory(gaii, `generator.${projectId}.project`),
         storage.getMemory(gaii, `generator.${projectId}.interview-spec`),
@@ -42,7 +156,7 @@ export function registerPromptRoutes(
         return;
       }
 
-      const project = projectRec.value as { blueprint?: { components?: Array<{ id: string; type: string; label: string }>; dataModel?: Record<string, unknown> }; description?: string };
+      const project = projectRec.value as { blueprint?: BlueprintShape; description?: string };
       const interviewSpec = interviewRec?.value ?? null;
       const blueprint = project.blueprint;
 
@@ -51,59 +165,19 @@ export function registerPromptRoutes(
         return;
       }
 
-      const component = blueprint.components.find((c: { id: string }) => c.id === componentId);
+      const component = blueprint.components.find((c) => c.id === componentId);
       if (!component) {
         res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Component "${componentId}" not in blueprint`));
         return;
       }
 
-      // Load completed components for context
-      // Include 'done' status — autopilot uses 'done' while UI uses 'registered'/'ready'
-      const allComponentRecords = await storage.listMemory(gaii, { prefix: `generator.${projectId}.component.` });
-      // Load every stored spec and merge it onto the matching component — the SAME thing the
-      // browser's loadAllComponents() does (generator.js: specMap[component.id]). Specs live under
-      // their own key (generator.<project>.spec.<id>), NOT on the component record, so without this
-      // merge a dependency's spec — e.g. the data cortex's methods/returnsExample that a component
-      // cortex prompt needs via resolveCortexComponent → completedComponents[].spec — would be missing
-      // and the prompt would silently degrade. Reading from the spec key makes the chain consume the
-      // spec from the exact same canonical place the autopilot/UI wrote it.
-      const componentKeyPrefix = `generator.${projectId}.component.`;
-      const specKeyPrefix = `generator.${projectId}.spec.`;
-      const allSpecRecords = await storage.listMemory(gaii, { prefix: specKeyPrefix });
-      const specByComponentId = new Map<string, unknown>();
-      for (const sr of allSpecRecords) specByComponentId.set(sr.key.slice(specKeyPrefix.length), sr.value);
-      const completedComponents = allComponentRecords
-        .filter(r => {
-          const val = r.value as { status?: string; registeredAs?: string };
-          return (val.status === 'registered' || val.status === 'ready' || val.status === 'done') && val.registeredAs;
-        })
-        .map(r => {
-          // Enrich with subtype from blueprint (not stored in component records)
-          const val = r.value as Record<string, unknown>;
-          if (!val.subtype && blueprint?.components) {
-            const bpc = blueprint.components.find((c: { id: string; label: string }) => c.label === val.label || c.id === val.id);
-            if (bpc && (bpc as Record<string, unknown>).subtype) {
-              val.subtype = (bpc as Record<string, unknown>).subtype;
-              logger.warn(`⚠️ SUBTYPE MISSING from stored component "${val.id || val.label}" — enriched from blueprint as "${(bpc as Record<string, unknown>).subtype}". Autopilot will auto-fix this.`);
-            }
-          }
-          // Merge the spec from its canonical key if the record doesn't already carry it
-          if (!val.spec) {
-            const compId = (val.id as string) || r.key.slice(componentKeyPrefix.length);
-            if (specByComponentId.has(compId)) val.spec = specByComponentId.get(compId);
-          }
-          return val;
-        });
-
-      // Determine prompt type — code (default) or spec
+      // Determine prompt type — code (default), spec, or test
       const promptType = (req.query.type as string) || 'code';
-
       let promptId: string;
       if (promptType === 'test') {
-        // Test prompt
         if (component.type === 'extension') promptId = 'gen-test-extension-spec';
         else if (component.type === 'cortex') {
-          const sub = (component as Record<string, unknown>).subtype as string || '';
+          const sub = (component.subtype as string) || '';
           if (sub === 'component') promptId = 'gen-test-cortex-component';
           else if (sub === 'app-domain') promptId = 'gen-test-cortex-app-domain';
           else promptId = 'gen-test-cortex-spec';
@@ -114,10 +188,9 @@ export function registerPromptRoutes(
           return;
         }
       } else if (promptType === 'spec') {
-        // Spec prompt — only for extension and cortex
         if (component.type === 'extension') promptId = 'gen-extension-spec';
         else if (component.type === 'cortex') {
-          const sub = (component as Record<string, unknown>).subtype as string || '';
+          const sub = (component.subtype as string) || '';
           if (sub === 'data') promptId = 'gen-data-api-spec';
           else if (sub === 'component') promptId = 'gen-component-spec';
           else if (sub === 'app-domain') promptId = 'gen-app-domain-spec';
@@ -129,14 +202,13 @@ export function registerPromptRoutes(
           return;
         }
       } else {
-        // Code prompt
         const promptIdMap: Record<string, string> = {
           csm: 'gen-csm', memory: 'gen-memory', translation: 'gen-translation',
           extension: 'gen-extension-code', app: 'gen-app',
         };
         promptId = promptIdMap[component.type];
         if (component.type === 'cortex') {
-          const sub = (component as Record<string, unknown>).subtype as string || '';
+          const sub = (component.subtype as string) || '';
           if (sub === 'data') promptId = 'gen-cortex-data';
           else if (sub === 'component') promptId = 'gen-cortex-component';
           else if (sub === 'app-domain') promptId = 'gen-cortex-app-domain';
@@ -145,32 +217,7 @@ export function registerPromptRoutes(
         if (!promptId) promptId = 'gen-extension-code';
       }
 
-      // Load extension spec if available (for code prompts that reference it)
-      const specRec = await storage.getMemory(gaii, `generator.${projectId}.spec.${componentId}`);
-      const selfSpec = specRec?.value as Record<string, unknown> | undefined;
-
-      // Load extension spec for cortex prompts that need it (gen-data-api-spec, gen-cortex-data)
-      let extensionSpec: Record<string, unknown> | undefined;
-      let dataApiSpec: Record<string, unknown> | undefined;
-      if (component.type === 'cortex') {
-        // Find extension component ID from blueprint
-        const extBpComp = blueprint.components.find((c: { type: string }) => c.type === 'extension');
-        if (extBpComp) {
-          const extSpecRec = await storage.getMemory(gaii, `generator.${projectId}.spec.${extBpComp.id}`);
-          extensionSpec = extSpecRec?.value as Record<string, unknown> | undefined;
-        }
-        // Find data-cortex spec for component/app-domain spec prompts
-        const dataCortexBp = blueprint.components.find((c: { type: string; subtype?: string }) => c.type === 'cortex' && (c as Record<string, unknown>).subtype === 'data');
-        if (dataCortexBp && dataCortexBp.id !== componentId) {
-          const dataSpecRec = await storage.getMemory(gaii, `generator.${projectId}.spec.${dataCortexBp.id}`);
-          dataApiSpec = dataSpecRec?.value as Record<string, unknown> | undefined;
-        }
-      }
-
-      // Gather translation keys for cortex component/app-domain prompts
-      const translationKeys = (completedComponents as Array<Record<string, unknown>>)
-        .filter(c => c.type === 'translation' && (c.contextBundle as Record<string, unknown>)?.keys)
-        .flatMap(c => ((c.contextBundle as Record<string, unknown>)?.keys as string[]) || []);
+      const ctx = await loadComponentPromptContext(storage, gaii, projectId, componentId, component, blueprint);
 
       let prompt: string;
       try {
@@ -180,12 +227,12 @@ export function registerPromptRoutes(
           blueprintComponent: component,
           componentLabel: component.label,
           componentType: component.type,
-          completedComponents: completedComponents as unknown as ComponentState[],
+          completedComponents: ctx.completedComponents,
           projectDescription: project.description || '',
-          selfSpec,
-          extensionSpec,
-          dataApiSpec,
-          translationKeys,
+          selfSpec: ctx.selfSpec,
+          extensionSpec: ctx.extensionSpec,
+          dataApiSpec: ctx.dataApiSpec,
+          translationKeys: ctx.translationKeys,
         } as unknown as PromptRuntimeData);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -200,6 +247,99 @@ export function registerPromptRoutes(
         label: component.label,
         prompt,
       }));
+    }
+  );
+
+  // POST /v1/generator/:projectId/prompts/build — build a self-correction prompt.
+  // The browser has runtime data the GET route doesn't (the current code, validator errors,
+  // the edit/change request), so it POSTs that here and the server assembles the prompt from
+  // the SAME DB templates the autopilot uses. Supported kinds:
+  //   fix, reflection, explain, edit, impact, blueprint-fix, fresh-generation.
+  const BUILDABLE = new Set([
+    'gen-fix', 'gen-reflection', 'gen-explain', 'gen-edit', 'gen-impact',
+    'gen-blueprint-fix', 'gen-fresh-generation',
+  ]);
+  router.post('/v1/generator/:projectId/prompts/build',
+    requireAuth(),
+    requireRole('agent'),
+    requireScope('generator:read'),
+    async (req, res) => {
+      const gaii = ownerGhii(req);
+      const projectId = req.params['projectId'] as string;
+      const body = (req.body ?? {}) as {
+        promptId?: string; componentId?: string; code?: string; errors?: string[];
+        changeRequest?: string; upstreamChanges?: string; componentType?: string;
+        componentLabel?: string; originalPrompt?: string; testContext?: Record<string, unknown>;
+        previousAttempts?: Array<Record<string, unknown>>; reflectionDiagnosis?: string;
+      };
+      const promptId = body.promptId || '';
+      if (!BUILDABLE.has(promptId)) {
+        res.status(400).json(error(config.nodeId, 'BAD_PROMPT', `promptId "${promptId}" is not buildable via this route`));
+        return;
+      }
+
+      const [projectRec, interviewRec] = await Promise.all([
+        storage.getMemory(gaii, `generator.${projectId}.project`),
+        storage.getMemory(gaii, `generator.${projectId}.interview-spec`),
+      ]);
+      if (!projectRec) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Project not found'));
+        return;
+      }
+      const project = projectRec.value as { blueprint?: BlueprintShape; description?: string };
+      const interviewSpec = interviewRec?.value ?? null;
+      const blueprint = project.blueprint;
+
+      // Assemble runtime data: stored project state + browser-supplied fields.
+      const data: PromptRuntimeData = {
+        blueprint: blueprint as unknown as Blueprint,
+        interviewSpec: interviewSpec as unknown as InterviewSpec,
+        projectDescription: project.description || '',
+        code: body.code,
+        errors: body.errors,
+        changeRequest: body.changeRequest,
+        upstreamChanges: body.upstreamChanges,
+        componentType: body.componentType,
+        componentLabel: body.componentLabel,
+        originalPrompt: body.originalPrompt,
+        testContext: body.testContext,
+        previousAttempts: body.previousAttempts,
+        reflectionDiagnosis: body.reflectionDiagnosis,
+      };
+
+      // Component-scoped prompts: enrich with this component's blueprint entry + context.
+      if (body.componentId && blueprint?.components) {
+        const component = blueprint.components.find((c) => c.id === body.componentId);
+        if (component) {
+          data.blueprintComponent = component;
+          if (!data.componentType) data.componentType = component.type;
+          if (!data.componentLabel) data.componentLabel = component.label;
+          const ctx = await loadComponentPromptContext(storage, gaii, projectId, body.componentId, component, blueprint);
+          data.completedComponents = ctx.completedComponents;
+          data.selfSpec = ctx.selfSpec;
+          data.extensionSpec = ctx.extensionSpec;
+          data.dataApiSpec = ctx.dataApiSpec;
+          data.translationKeys = ctx.translationKeys;
+        }
+      }
+
+      // Blueprint-fix wraps the canonical blueprint prompt so the retry keeps service_slug etc.
+      if (promptId === 'gen-blueprint-fix') {
+        data.blueprintBody = await buildBlueprintPromptBody(
+          storage, config, req.headers.authorization || '', project.description || '', interviewSpec,
+        );
+      }
+
+      let prompt: string;
+      try {
+        prompt = await buildPrompt(storage, promptId, data);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        logger.error(`[generator] buildPrompt (build route) FAILED for ${promptId}: ${msg}`);
+        res.status(500).json(error(config.nodeId, 'PROMPT_BUILD_FAILED', `Failed to build prompt "${promptId}": ${msg}`));
+        return;
+      }
+      res.json(success(config.nodeId, { promptId, prompt }));
     }
   );
 
@@ -223,11 +363,9 @@ export function registerPromptRoutes(
 
       const project = projectRec.value as { description?: string };
       const interviewSpec = interviewRec?.value ?? null;
-
       const promptType = (req.query.type as string) || 'blueprint';
 
       if (promptType === 'interview') {
-        // Interview prompt — gen-interview from DB
         const prompt = await buildPrompt(storage, 'gen-interview', {
           projectDescription: project.description || '',
           locale: (req.query.locale as string) || (interviewSpec as Record<string, unknown>)?.locale as string || 'en',
@@ -236,25 +374,9 @@ export function registerPromptRoutes(
         return;
       }
 
-      // Blueprint prompt — gen-blueprint from DB
-      // Load cortex catalog for available libraries
-      let cortexCatalog: Array<Record<string, unknown>> = [];
-      try {
-        const cortexResp = await fetch(`http://localhost:${config.port}/v1/cortex`, {
-          headers: { 'Authorization': req.headers.authorization || '' },
-        });
-        const cortexJson = await cortexResp.json() as { data?: Array<Record<string, unknown>> };
-        cortexCatalog = (cortexJson.data || []).filter((c: Record<string, unknown>) =>
-          c.active && ((c.components as Array<Record<string, unknown>>) || []).some((comp: Record<string, unknown>) => comp.type === 'lib')
-        );
-      } catch { /* cortex catalog optional */ }
-
-      const prompt = await buildPrompt(storage, 'gen-blueprint', {
-        projectDescription: project.description || '',
-        interviewSpec,
-        cortexCatalog,
-      } as unknown as PromptRuntimeData);
-
+      const prompt = await buildBlueprintPromptBody(
+        storage, config, req.headers.authorization || '', project.description || '', interviewSpec,
+      );
       res.json(success(config.nodeId, { prompt }));
     }
   );
