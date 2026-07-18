@@ -2,6 +2,11 @@
  * @file src/routes/libs/auth-lib-part2.ts
  * @description aimeat-auth.js browser library source, middle segment (event system, public auth API, login pill, theme toggle, modal i18n). Extracted from libs.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-18 — Opt-in compact login pill: mountLoginButton({ compact:true }) renders a
+ *     small gold "account" button (green dot + initials) on ≤600px that opens the full pill as an
+ *     anchored popover — so the fixed-width pill no longer overflows cramped app headers on mobile.
+ *     Added AIMEAT.auth.compactPill capability flag for feature detection. Bespoke navs (SPA) that
+ *     don't pass compact are unaffected.
  *   v1.0.0 — 2026-07-13 — Extracted from libs.ts (max-file-lines)
  */
 export function aimeatAuthLibPart2(): string {
@@ -357,12 +362,18 @@ const auth = {
     });
   },
 
+  // Capability flag so an embedding app can feature-detect the opt-in compact login pill
+  // (AIMEAT.auth.compactPill) and adapt its own header — e.g. drop a bespoke hamburger once the
+  // library can render the compact account button itself. Present only on libs that support it.
+  compactPill: true,
+
   /**
    * Mount a login/register button that handles the full flow.
    * @param {string|Element|object} selector - CSS selector, a DOM element, OR (options-first) the
    *   opts object — calling mountLoginButton({ onLogin }) mounts into a created #aimeat-auth-bar so
    *   the natural options-first call Just Works.
-   * @param {object} [opts] - Options: { onLogin, onLogout, buttonText }
+   * @param {object} [opts] - Options: { onLogin, onLogout, buttonText, compact } — compact:true
+   *   renders a small "account" button on narrow viewports that opens the full pill as a popover.
    */
   mountLoginButton(selector, opts = {}) {
     // Resolve the mount container. Tolerate three call shapes so a common misuse doesn't crash:
@@ -388,7 +399,7 @@ const auth = {
       // persisted copy, but fall back to localStorage on first paint before login completes.
       const stored = currentSession || load('session');
       if (stored) {
-        container.innerHTML = '<div class="aimeat-auth-pill" style="display:inline-flex;align-items:center;gap:10px;padding:8px 18px;'
+        var pillHtml = '<div class="aimeat-auth-pill" style="display:inline-flex;align-items:center;gap:10px;padding:8px 18px;'
           + 'background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);'
           + 'border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);'
           + 'border-radius:10px;'
@@ -423,6 +434,23 @@ const auth = {
           + 'box-shadow:0 1px 0 rgba(255,140,140,.25) inset,0 -1px 0 rgba(80,10,10,.4) inset,0 2px 6px rgba(153,27,27,.5);'
           + 'text-shadow:0 1px 1px rgba(0,0,0,.4)">' + escHtml(i.logoutBtn || 'Logout') + '</button>'
           + '</div>';
+        // Opt-in compact mode (opts.compact): on a narrow viewport the full pill would overflow a
+        // cramped app header, so we wrap it behind a small gold "account" button (green dot +
+        // initials) that opens the full pill as a popover. Desktop renders the pill inline as
+        // before. Apps that already handle the mobile pill themselves (e.g. the SPA top-nav) simply
+        // don't pass compact, so they are entirely unaffected.
+        if (opts.compact) {
+          ensureAuthPillStyles();
+          var ini = pillInitials(stored.displayName || stored.ghii || stored.owner);
+          container.innerHTML = '<div class="aimeat-auth-wrap">'
+            + '<button class="aimeat-auth-compact" id="aimeat-auth-compact" aria-haspopup="true" aria-expanded="false" '
+            + 'aria-label="' + escHtml(i.account || 'Account') + '">'
+            + '<span class="cdot" aria-hidden="true"></span><span class="cini">' + escHtml(ini) + '</span>'
+            + '<span class="ccar" aria-hidden="true">\\u25BE</span></button>'
+            + pillHtml + '</div>';
+        } else {
+          container.innerHTML = pillHtml;
+        }
         document.getElementById('aimeat-logout-btn').addEventListener('click', () => {
           auth.logout();
           render();
@@ -434,6 +462,16 @@ const auth = {
             render(); // reflect revoke (→ Sign In) or a re-grant
             if (res && res.revoked && opts.onLogout) opts.onLogout();
           }).catch(() => {});
+        });
+        // Compact trigger toggles the popover. The document-level outside-click / Escape closers are
+        // registered ONCE per mount (below, after render()) — not here — so re-renders don't stack them.
+        var compactBtn = document.getElementById('aimeat-auth-compact');
+        if (compactBtn) compactBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          var w = container.querySelector('.aimeat-auth-wrap');
+          if (!w) return;
+          var open = w.classList.toggle('aimeat-open');
+          compactBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
         });
       } else {
         container.innerHTML = '<style>.aimeat-sign-btn{'
@@ -462,6 +500,23 @@ const auth = {
       wireThemeToggle(container, i); // present in both signed-in and signed-out markup
     }
     render();
+    // Close the compact popover on an outside click or Escape. Registered ONCE per mount (looks up
+    // the current wrap at event time, so it survives re-renders without stacking listeners). No-op
+    // unless opts.compact rendered a wrap.
+    if (opts.compact) {
+      var closeCompact = () => {
+        var w = container.querySelector('.aimeat-auth-wrap.aimeat-open');
+        if (!w) return;
+        w.classList.remove('aimeat-open');
+        var cb = w.querySelector('.aimeat-auth-compact');
+        if (cb) cb.setAttribute('aria-expanded', 'false');
+      };
+      document.addEventListener('click', (ev) => {
+        var w = container.querySelector('.aimeat-auth-wrap.aimeat-open');
+        if (w && !w.contains(ev.target)) closeCompact();
+      });
+      document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') closeCompact(); });
+    }
     // Re-render when the session changes out-of-band — e.g. the H-2 silent SSO on an app origin
     // logs in asynchronously AFTER this button first painted "Sign In". Only re-render (do NOT call
     // opts.onLogin here — the interactive modal path already does, and apps often set onLogin to
@@ -529,6 +584,49 @@ function wireThemeToggle(container, i) {
     var title = dark ? (i.themeToLight || 'Switch to light mode') : (i.themeToDark || 'Switch to dark mode');
     btn.title = title; btn.setAttribute('aria-label', title);
   });
+}
+
+// ── Compact login pill (opt-in via mountLoginButton({ compact:true })) ───────────────────────
+// On viewports ≤600px the full gold pill is replaced by a small gold "account" button (green dot +
+// initials + caret); tapping it opens the full pill as an anchored popover carrying the name, theme
+// toggle, permissions gear and logout. Styles are injected once; the show/hide is pure CSS media so
+// it reflows on rotation. Only apps that pass compact:true get this — bespoke navs are untouched.
+function ensureAuthPillStyles() {
+  if (document.getElementById('aimeat-auth-pill-css')) return;
+  var st = document.createElement('style');
+  st.id = 'aimeat-auth-pill-css';
+  st.textContent = [
+    '.aimeat-auth-wrap{position:relative;display:inline-flex;align-items:center}',
+    '.aimeat-auth-compact{display:none;align-items:center;gap:7px;padding:5px 11px 5px 9px;cursor:pointer;',
+      'background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);',
+      'border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);',
+      'border-radius:10px;box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4);',
+      'font-family:system-ui;font-size:13px;color:#2a1800;text-shadow:0 1px 0 rgba(245,230,163,.5)}',
+    '.aimeat-auth-compact .cdot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;',
+      'background:radial-gradient(circle at 35% 35%,#b0ffc8,#00c853 40%,#00802e 80%,#003d15);box-shadow:0 0 5px rgba(0,200,83,.6)}',
+    '.aimeat-auth-compact .cini{font-weight:800;letter-spacing:.3px;max-width:96px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}',
+    '.aimeat-auth-compact .ccar{font-size:9px;opacity:.75;transition:transform .18s}',
+    '.aimeat-auth-wrap.aimeat-open .aimeat-auth-compact .ccar{transform:rotate(180deg)}',
+    '@media (max-width:600px){',
+      '.aimeat-auth-compact{display:inline-flex}',
+      '.aimeat-auth-wrap>.aimeat-auth-pill{position:absolute;top:calc(100% + 8px);right:0;z-index:1000;',
+        'display:none!important;flex-wrap:wrap!important;justify-content:flex-start;row-gap:9px;',
+        'min-width:210px;max-width:calc(100vw - 24px)}',
+      '.aimeat-auth-wrap.aimeat-open>.aimeat-auth-pill{display:flex!important}',
+    '}'
+  ].join('');
+  (document.head || document.documentElement).appendChild(st);
+}
+
+// Two-letter initials for the compact button, from a display name / GHII / owner (strips the
+// @node and #owner suffixes so a GAII/GHII shows the person, not the node).
+function pillInitials(s) {
+  s = (s || '').trim();
+  if (!s) return '\\u2022'; // bullet fallback
+  s = s.split('@')[0].split('#')[0].trim();
+  var parts = s.split(/\\s+/).filter(Boolean);
+  if (parts.length >= 2) return (parts[0].charAt(0) + parts[1].charAt(0)).toUpperCase();
+  return s.slice(0, 2).toUpperCase();
 }
 
 // ── Sign-in modal language helpers ──
