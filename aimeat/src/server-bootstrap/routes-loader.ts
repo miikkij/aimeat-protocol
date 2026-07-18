@@ -357,6 +357,16 @@ export async function mountRoutes(
     const { testMoneyPaymentHandler } = await import('../commerce/test-money-handler.js');
     registerPaymentHandler(testMoneyPaymentHandler());
   }
+  // x402 stablecoin settlement (TARGET-042): the NON-CUSTODIAL USDC handler for money (USD) sessions.
+  // The facilitator is a parameter — an off-chain double in E2E (AIMEAT_X402_TEST_FACILITATOR), the
+  // real safeFetch client against config.x402FacilitatorUrl in prod. OFF unless AIMEAT_X402_ENABLED.
+  if (config.x402Enabled) {
+    const { x402PaymentHandler } = await import('../commerce/x402-handler.js');
+    const { httpFacilitator, testFacilitator } = await import('../commerce/x402-facilitator.js');
+    registerPaymentHandler(x402PaymentHandler(
+      config, config.x402TestFacilitator ? testFacilitator() : httpFacilitator(config.x402FacilitatorUrl),
+    ));
+  }
   for (const resolver of (await enterprise.getSellableResolvers?.()) ?? []) {
     registerSellableResolver(resolver);
   }

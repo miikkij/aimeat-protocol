@@ -279,6 +279,18 @@ export interface AimeatConfig {
   /** TEST ONLY: register a fake EUR/USD payment handler (env AIMEAT_TEST_MONEY_HANDLER). Never in prod. */
   testMoneyHandler: boolean;
 
+  // x402 stablecoin settlement (TARGET-042): a NON-CUSTODIAL USDC PaymentHandler that settles a
+  // money (USD) session via the x402 `exact` scheme + a Coinbase-style facilitator. USDC is a
+  // payment METHOD for a USD price (model 2), never a currency of its own. Network + facilitator
+  // are parameters so another chain/facilitator drops in without a core change.
+  x402Enabled: boolean;
+  /** x402 network id advertised in the accepts[] exact scheme (e.g. 'base-sepolia' | 'base'). */
+  x402Network: string;
+  /** Facilitator base URL whose /verify + /settle endpoints check + settle the onchain payment. */
+  x402FacilitatorUrl: string;
+  /** TEST ONLY: swap the real facilitator for an off-chain double so the x402 chain is E2E-provable. */
+  x402TestFacilitator: boolean;
+
   // Personal Node support (operator-side)
   personalNodesEnabled: boolean;
   personalNodeMaxSlots: number;
