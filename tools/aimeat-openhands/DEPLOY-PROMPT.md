@@ -139,12 +139,37 @@ The bundle is identical on prod; these are the only differences:
   `AIMEAT_OWNER` you approve with). It becomes `openhands#<owner>@<node>`. Consider narrowing
   `AIMEAT_SCOPES` in `.env` from `*` to just what app-building needs
   (`app:* extension:* cortex:* storage:* organism:* workspace:* skill:*`) for least privilege.
-- **Do NOT expose the UI publicly.** OpenHands has no auth on its own UI and can run arbitrary
-  code. Bind it to localhost on a non-default port and reach it over an SSH tunnel, or put it
-  behind the existing reverse proxy with auth. Set in `.env`:
-  `OPENHANDS_PORT_BIND=127.0.0.1:13781` and `PERMITTED_CORS_ORIGINS=http://localhost:13781`,
-  then tunnel with `ssh -L 13781:localhost:13781 user@host` and browse `http://localhost:13781`.
-  (The container port stays 3000 internally.)
+- **Do NOT expose the UI publicly without auth.** OpenHands has no login of its own and its UI
+  can run arbitrary code on this host. Either reach it over an SSH tunnel (set
+  `OPENHANDS_PORT_BIND=127.0.0.1:13781` + `PERMITTED_CORS_ORIGINS=http://localhost:13781`, then
+  `ssh -L 13781:localhost:13781 user@host` → `http://localhost:13781`), or expose it via nginx
+  with TLS + auth — see the next section. Container port stays 3000 internally either way.
+
+## Expose via nginx (browser access, no SSH tunnel)
+
+The host already runs nginx. Add a dedicated HTTPS subdomain that proxies to the localhost-bound
+OpenHands, gated by Basic Auth. **The auth is mandatory** — it is the only thing between the
+internet and arbitrary code execution on this host.
+
+1. **Keep OpenHands bound to localhost.** In `.env`: `OPENHANDS_PORT_BIND=127.0.0.1:13781` and
+   `PERMITTED_CORS_ORIGINS=https://<subdomain>` (the public HTTPS origin, NOT localhost). Re-run
+   `docker compose up -d`.
+2. **DNS:** ask me to point an A record for the `<subdomain>` (e.g. `openhands.aimeat.io`) at this
+   host, or confirm a wildcard already covers it.
+3. **Basic-auth password:** `sudo htpasswd -c /etc/nginx/openhands.htpasswd <username>` (ask me
+   for the username; I'll set the password when prompted, or generate a strong one and give it to
+   me — do not print it back afterward).
+4. **Site config:** copy `nginx/openhands.conf.example` from the bundle, replace `__DOMAIN__` with
+   the subdomain, place it in `/etc/nginx/sites-available/openhands.conf`, symlink into
+   `sites-enabled/`. It already handles the WebSocket upgrade + long agent-stream timeouts.
+5. **TLS cert:** use the host's existing certbot — `sudo certbot --nginx -d <subdomain>` (or match
+   however aimeat.io's certs are issued). Ensure the cert paths in the config match.
+6. **Apply:** `sudo nginx -t && sudo systemctl reload nginx`.
+7. **Verify:** open `https://<subdomain>` → browser prompts for Basic Auth → after login the
+   OpenHands UI loads; start a conversation and confirm the agent **streams a reply** (proves the
+   WebSocket proxy works, not just the page). Then run the skill probe + MCP smoke test. Confirm
+   `https://<subdomain>` is TLS-valid and that hitting it without credentials returns 401.
+   Recommended hardening: also uncomment the `allow <your-ip>; deny all;` lines in the config.
 - **Docker socket:** the compose mounts `/var/run/docker.sock` (OpenHands spawns its runtime
   container) — same as dev. Ensure the prod host allows that and has the disk for the
   agent-server image.

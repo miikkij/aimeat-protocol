@@ -14,6 +14,7 @@ build-app spec, built single-file AIMEAT apps, and **published them live over MC
 | `skills/aimeat-app-builder/` | An always-available OpenHands **skill**. Its golden rule: fetch `GET /v1/prompts/build-app` from the node at runtime (canonical, never drifts) → build one HTML file → verify locally → publish via the `aimeat_app_publish` MCP tool → return the live URL. Kills the hallucinated-`src` failure mode. |
 | `config.toml.template` | Preconfigured **MCP** (AIMEAT `/v2/mcp/appdev`, bearer token) + **LLM** (Kimi via OpenRouter) + **microagent pruning**. Rendered to a git-ignored `config.toml` with your secrets. |
 | `runtime/Dockerfile` + `scripts/build-runtime.sh` | Build a thin **custom agent-server runtime image** that bakes the skill into the container the app spawns. Required — see "How the skill reaches the agent" below. |
+| `nginx/openhands.conf.example` | Reverse-proxy template (TLS + **Basic Auth** + WebSocket) for exposing the UI on a subdomain. OpenHands has **no login of its own** — this auth gate is mandatory before any internet exposure. |
 | `docker-compose.yml` | Runs `openhands:1.8`, persistent `~/.openhands` volume, LLM env, config mount, and points the runtime at the custom image. |
 | `scripts/aimeat-connect.sh` | Runs the AIMEAT **device-auth** flow; you approve the agent once in the browser; the token is captured and stored. No manual token juggling. |
 | `scripts/render-config.sh` | Fills the config template with your secrets and installs the skill into `~/.openhands/skills/`. |
