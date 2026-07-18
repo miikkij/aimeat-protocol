@@ -132,6 +132,7 @@ const ALL_SUITES = [
     'test/e2e-workspace-backing-gate.ts',
     'test/e2e-workspace-public-sharing.ts',
     'test/e2e-workspace-public-records.ts',
+    'test/e2e-workspace-member-records.ts',
     'test/e2e-signage-agent-faced.ts',
     'test/e2e-mcp-catalogue.ts',
     'test/e2e-mcp-memory-extended.ts',

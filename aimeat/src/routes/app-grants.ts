@@ -73,6 +73,7 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'workflow:write': 'Create, save, and run your automations (workflows)',
   'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
   'notifications:send': 'Send you notifications (bell + browser push) that open this app',
+  'organism:read': 'Read the published content of workspaces you are a member of (e.g. gated curriculum an app renders for you)',
   'organism:invite': 'Invite people into organisms you belong to (send email invitations / access keys on your behalf)',
   'organism:write': 'Create organisms and workspaces on your behalf (an app that provisions its own structured data space)',
 };
