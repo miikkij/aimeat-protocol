@@ -127,6 +127,7 @@ async function buildBlueprintPromptBody(
     projectDescription,
     interviewSpec,
     cortexCatalog,
+    nodeUrl: config.baseUrl.replace(/\/+$/, ''),
   } as unknown as PromptRuntimeData);
 }
 
@@ -233,6 +234,7 @@ export function registerPromptRoutes(
           extensionSpec: ctx.extensionSpec,
           dataApiSpec: ctx.dataApiSpec,
           translationKeys: ctx.translationKeys,
+          nodeUrl: config.baseUrl.replace(/\/+$/, ''),
         } as unknown as PromptRuntimeData);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
@@ -305,6 +307,7 @@ export function registerPromptRoutes(
         testContext: body.testContext,
         previousAttempts: body.previousAttempts,
         reflectionDiagnosis: body.reflectionDiagnosis,
+        nodeUrl: config.baseUrl.replace(/\/+$/, ''),
       };
 
       // Component-scoped prompts: enrich with this component's blueprint entry + context.

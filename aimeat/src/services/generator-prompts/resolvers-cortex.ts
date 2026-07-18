@@ -9,6 +9,7 @@
 
 import { logger } from '../../utils/logger.js';
 import type { PromptRuntimeData } from './types.js';
+import { buildPromptLibrarySections } from '../../data/library-packs.js';
 import {
   type Vars,
   warnFallback,
@@ -165,6 +166,7 @@ export function resolveCortexComponent(data: PromptRuntimeData): Vars {
     spec_section: specSection,
     service_slug: serviceSlug,
     platform_ui_section: platformUiSection,
+    library_packs: data.nodeUrl ? buildPromptLibrarySections(data.nodeUrl) : '',
   };
 }
 
@@ -357,6 +359,7 @@ ${viewCases}
     service_slug: serviceSlug,
     platform_layout_section: platformLayoutSection,
     app_domain_template: appDomainTemplate,
+    library_packs: data.nodeUrl ? buildPromptLibrarySections(data.nodeUrl) : '',
   };
 }
 
@@ -573,5 +576,6 @@ const detail = await extCall('my-extension', 'getDetail', { id: 'abc-123' });
     app_domain_lib: appDomainLib,
     app_locale: appLocale,
     app_theme: appTheme,
+    library_packs: data.nodeUrl ? buildPromptLibrarySections(data.nodeUrl) : '',
   };
 }

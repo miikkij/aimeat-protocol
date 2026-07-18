@@ -186,4 +186,7 @@ export interface PromptRuntimeData {
   upstreamChanges?: string;
   /** Fully-resolved gen-blueprint prompt, injected by the route for gen-blueprint-fix */
   blueprintBody?: string;
+  /** Node base URL (no trailing slash), injected by the routes so resolvers can render
+   *  the library-pack + app-template sections (which point at /v1/libs, /v1/cortex, /v1/app-templates). */
+  nodeUrl?: string;
 }
