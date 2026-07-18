@@ -19,6 +19,9 @@
  *     removed before sending instead of being stuck in the outgoing message.
  *   v1.4.0 — 2026-07-18 — Composer accepts a `focusNonce`: bumping it focuses the editor (rich .focus() or
  *     the fallback textarea) so clicking ↩ Reply on a bubble drops the cursor straight into the input.
+ *   v1.5.0 — 2026-07-18 — Mobile composer is a plain auto-growing textarea (`mode:'simple'`, no Toast UI
+ *     toolbar/Write-Preview/WYSIWYG — a phone keyboard + heavy WYSIWYG is miserable); ≤760px opens straight
+ *     into it so Toast UI never even loads there. Desktop keeps the rich editor.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -301,7 +304,11 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   // Restore an in-progress draft for this conversation/compose (localStorage), or the passed initialText.
   const readDraft = () => { try { return draftKey ? (localStorage.getItem(draftKey) || '') : ''; } catch { return ''; } };
   const seeded = initialText || readDraft();   // an explicit suggested reply wins; else restore a draft
-  const [mode, setMode] = useState('rich');     // 'rich' = Toast UI; 'markdown' = fallback textarea
+  // 'rich' = Toast UI (desktop); 'simple' = a plain auto-growing textarea (mobile chat input, no toolbar/
+  // preview — a phone keyboard + heavy WYSIWYG toolbar is miserable); 'markdown' = the textarea+preview
+  // fallback when Toast UI can't load. Mobile opens straight into 'simple' so we never load Toast UI there.
+  const isNarrow = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 760px)').matches;
+  const [mode, setMode] = useState(isNarrow ? 'simple' : 'rich');
   const [md, setMd] = useState(seeded);
   const [files, setFiles] = useState([]);
   const containerRef = useRef(null);
@@ -412,10 +419,16 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusNonce]);
 
+  // Auto-grow the simple (mobile) textarea to fit its content, capped so it never eats the thread.
+  const autoGrow = (ta) => { if (!ta) return; ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 132) + 'px'; };
+  // Size the simple textarea to any seeded draft on mount (and keep it 1 row when empty).
+  useEffect(() => { if (mode === 'simple') autoGrow(taRef.current); }, [mode]);
+
   const getText = () => (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
   const reset = () => {
     try { editorRef.current?.setMarkdown(''); } catch { /* noop */ }
     setMd(''); setFiles([]); if (fileRef.current) fileRef.current.value = '';
+    if (mode === 'simple' && taRef.current) taRef.current.style.height = 'auto';
     clearDraft();   // a sent message is no longer a draft
   };
   const submit = () => onSend(recipient, getText(), files, reset);
@@ -435,6 +448,10 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
       </div>` : null}
       ${mode === 'rich'
         ? html`<div class="inbox-editor" ref=${containerRef}></div>`
+        : mode === 'simple'
+        ? html`<textarea class="inbox-textarea inbox-textarea--chat" rows="1" ref=${taRef} placeholder=${t('inbox.bodyPlaceholder')}
+            value=${md} onPaste=${handleImagePaste}
+            onInput=${(e) => { setMd(e.target.value); saveDraft(e.target.value); autoGrow(e.target); }}></textarea>`
         : html`<div class="inbox-md-fallback">
             <textarea class="inbox-textarea" rows="3" ref=${taRef} placeholder=${t('inbox.bodyPlaceholder')}
               value=${md} onPaste=${handleImagePaste}
