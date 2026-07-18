@@ -543,7 +543,108 @@ class AimeatRealtime {
   }
 }
 
+/**
+ * SharedClock — a network-synced timeline clock for realtime apps.
+ *
+ * Every peer derives the SAME step from one anchor: `t0` (the unix-ms instant of
+ * "step 0") plus a tempo. This is the reusable core that sequencer/jam/animation
+ * apps kept re-implementing (Band Jam among them): the t0 math, the "don't let the
+ * beat jump on a tempo change" re-anchor, and the sync handshake payloads.
+ *
+ * Not tied to music — `steps`/`subdiv` are just a division of a repeating bar; use
+ * it for any looped shared timeline. Pair it with AimeatRealtime broadcasts:
+ *
+ *   const clock = new SharedClock({ bpm: 120, steps: 16 });
+ *   clock.onStep((step) => { ... play or draw this step ... });
+ *   // leader:  rt.broadcast(clock.start());      // {type:'transport',state:'play',t0,bpm}
+ *   // joiner:  rt.broadcast({ type: 'sync-request' });
+ *   rt.on('broadcast', ({ payload }) => {
+ *     if (payload.type === 'sync-request' && clock.playing) rt.broadcast(clock.syncState());
+ *     if (payload.type === 'sync-state' || payload.type === 'transport') clock.adopt(payload);
+ *     if (payload.type === 'bpm') clock.setBpm(payload.bpm);
+ *   });
+ */
+class SharedClock {
+  /** @param {{bpm?:number, steps?:number, subdiv?:number, now?:()=>number}} [opts] */
+  constructor(opts = {}) {
+    this.bpm = opts.bpm || 120;
+    this.steps = opts.steps || 16;      // steps per repeating bar
+    this.subdiv = opts.subdiv || 4;     // steps per beat (4 = 16th notes)
+    this._now = opts.now || (() => Date.now());
+    this.t0 = null;                     // unix ms of step 0
+    this.playing = false;
+    this._lastStep = -1;
+    this._timer = null;
+    this._cbs = [];
+  }
+
+  /** ms per step at the current tempo. */
+  stepMs() { return 60000 / this.bpm / this.subdiv; }
+
+  /** Current step index (0..steps-1), or -1 if stopped / before t0. */
+  step() {
+    if (!this.playing || this.t0 == null) return -1;
+    const elapsed = this._now() - this.t0;
+    if (elapsed < 0) return -1;
+    return ((Math.floor(elapsed / this.stepMs()) % this.steps) + this.steps) % this.steps;
+  }
+
+  /** Start (or restart) the clock at `t0`. Returns a `transport` payload to broadcast. */
+  start(t0 = this._now()) {
+    this.t0 = t0;
+    this.playing = true;
+    this._lastStep = -1;
+    this._ensureTimer();
+    return this.transport('play');
+  }
+
+  /** Stop. Returns a `transport` payload to broadcast. */
+  stop() {
+    this.playing = false;
+    this._lastStep = -1;
+    return this.transport('stop');
+  }
+
+  /** Change tempo WITHOUT making the current step jump (re-anchors t0). */
+  setBpm(bpm) {
+    if (!bpm || bpm === this.bpm) { this.bpm = bpm || this.bpm; return; }
+    const cur = this.step();
+    this.bpm = bpm;
+    if (cur >= 0 && this.t0 != null) this.t0 = this._now() - cur * this.stepMs();
+  }
+
+  /** Adopt a peer's transport/sync-state (only takes t0/bpm you're given). */
+  adopt(payload = {}) {
+    if (payload.bpm) this.bpm = payload.bpm;
+    if (payload.t0 != null) this.t0 = payload.t0;
+    if ('transportPlaying' in payload) this.playing = !!payload.transportPlaying;
+    else if ('state' in payload) this.playing = payload.state === 'play';
+    if (this.playing) this._ensureTimer();
+  }
+
+  /** Register a callback fired once per step transition with the step index. */
+  onStep(cb) { this._cbs.push(cb); this._ensureTimer(); return this; }
+
+  /** Build the broadcast payloads (send these via rt.broadcast). */
+  transport(state) { return { type: 'transport', state, t0: this.t0, bpm: this.bpm }; }
+  syncState() { return { type: 'sync-state', t0: this.t0, bpm: this.bpm, transportPlaying: this.playing }; }
+
+  /** Stop the internal ticker (call on teardown). */
+  destroy() { if (this._timer) { clearInterval(this._timer); this._timer = null; } this._cbs = []; }
+
+  _ensureTimer() {
+    if (this._timer || typeof setInterval !== 'function') return;
+    // 8ms poll → detect step transitions crisply without a callback per frame
+    this._timer = setInterval(() => {
+      if (!this.playing || this.t0 == null) return;
+      const s = this.step();
+      if (s !== this._lastStep) { this._lastStep = s; for (const cb of this._cbs) { try { cb(s); } catch { /* ignore */ } } }
+    }, 8);
+  }
+}
+
 // Export for both ESM and script tag usage
 if (typeof globalThis !== 'undefined') {
   globalThis.AimeatRealtime = AimeatRealtime;
+  globalThis.SharedClock = SharedClock;
 }
