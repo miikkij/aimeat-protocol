@@ -139,10 +139,12 @@ The bundle is identical on prod; these are the only differences:
   `AIMEAT_OWNER` you approve with). It becomes `openhands#<owner>@<node>`. Consider narrowing
   `AIMEAT_SCOPES` in `.env` from `*` to just what app-building needs
   (`app:* extension:* cortex:* storage:* organism:* workspace:* skill:*`) for least privilege.
-- **Do NOT expose port 3000 publicly.** OpenHands has no auth on its own UI and can run
-  arbitrary code. Bind it to localhost and reach it over an SSH tunnel, or put it behind the
-  existing reverse proxy with auth. To bind localhost-only, change the compose port mapping to
-  `"127.0.0.1:3000:3000"`.
+- **Do NOT expose the UI publicly.** OpenHands has no auth on its own UI and can run arbitrary
+  code. Bind it to localhost on a non-default port and reach it over an SSH tunnel, or put it
+  behind the existing reverse proxy with auth. Set in `.env`:
+  `OPENHANDS_PORT_BIND=127.0.0.1:13781` and `PERMITTED_CORS_ORIGINS=http://localhost:13781`,
+  then tunnel with `ssh -L 13781:localhost:13781 user@host` and browse `http://localhost:13781`.
+  (The container port stays 3000 internally.)
 - **Docker socket:** the compose mounts `/var/run/docker.sock` (OpenHands spawns its runtime
   container) — same as dev. Ensure the prod host allows that and has the disk for the
   agent-server image.
