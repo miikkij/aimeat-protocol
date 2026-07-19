@@ -163,6 +163,7 @@ import { aimeatCommerceLib } from './lib-commerce.js';
 import { aimeatWebmcpLib } from './lib-webmcp.js';
 import { aimeatAgentFaceLib } from './lib-agentface.js';
 import { aimeatAuthLib } from './libs/auth-lib.js';
+import { sdkLibSource } from './libs/sdk-serve.js';
 import { buildLibsCatalogue } from '../data/library-packs.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
@@ -253,9 +254,13 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, aimeatAudioLib(config));
   });
 
-  // GET /v1/libs/aimeat-speech.js — Speech library
-  router.get('/v1/libs/aimeat-speech.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatSpeechLib(config));
+  // GET /v1/libs/aimeat-speech.js — Speech library. Migrated to a componentized ESM source
+  // bundled by esbuild (src/static/sdk-libs/speech/, SDK-libs migration Phase 0); served as the
+  // committed IIFE + a per-node config prelude. `?impl=legacy` still serves the old string
+  // generator so the A/B equivalence diff can compare them (removed in Phase 5).
+  router.get('/v1/libs/aimeat-speech.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatSpeechLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'speech'));
   });
 
   // GET /v1/libs/aimeat-capabilities.js — Capability discovery, invoke, management
