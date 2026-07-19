@@ -187,8 +187,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
 
   // GET /v1/libs/aimeat-webmcp.js — WebMCP bridge (expose app/node tools to in-browser agents;
   // priced tools pay through the commerce checkout). TARGET-034 phase C.
-  router.get('/v1/libs/aimeat-webmcp.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatWebmcpLib(config));
+  // (migrated: sdk-libs/webmcp/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-webmcp.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatWebmcpLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'webmcp'));
   });
 
   // GET /v1/libs/aimeat-agentface.js — publish the app's Agent Face (migrated: sdk-libs/agentface/; ?impl=legacy)
@@ -219,9 +221,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, sdkLibSource(config, 'data'));
   });
 
-  // GET /v1/libs/aimeat-storage.js — File storage library
-  router.get('/v1/libs/aimeat-storage.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatStorageLib(config));
+  // GET /v1/libs/aimeat-storage.js — File storage library (migrated: sdk-libs/storage/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-storage.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatStorageLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'storage'));
   });
 
   // GET /v1/libs/aimeat-markdown.js — safe GFM markdown renderer (AIMEAT.md.render)
@@ -229,9 +232,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, aimeatMarkdownLib(config));
   });
 
-  // GET /v1/libs/aimeat-social.js — Boards & social library
-  router.get('/v1/libs/aimeat-social.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatSocialLib(config));
+  // GET /v1/libs/aimeat-social.js — Boards & social library (migrated: sdk-libs/social/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-social.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatSocialLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'social'));
   });
 
   // GET /v1/libs/aimeat-wallet.js — Wallet library (migrated: src/static/sdk-libs/wallet/; ?impl=legacy)
@@ -246,9 +250,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, sdkLibSource(config, 'workflows'));
   });
 
-  // GET /v1/libs/aimeat-work.js — Actions & work exchange library
-  router.get('/v1/libs/aimeat-work.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatWorkLib(config));
+  // GET /v1/libs/aimeat-work.js — Actions & work exchange library (migrated: sdk-libs/work/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-work.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatWorkLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'work'));
   });
 
   // GET /v1/libs/aimeat-tunnel.js — Personal node tunnel client
@@ -315,9 +320,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, sdkLibSource(config, 'live'));
   });
 
-  // GET /v1/libs/aimeat-commerce.js — checkout sessions, offer prices, money formatting (TARGET-033)
-  router.get('/v1/libs/aimeat-commerce.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatCommerceLib(config));
+  // GET /v1/libs/aimeat-commerce.js — checkout/offer prices (migrated: sdk-libs/commerce/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-commerce.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatCommerceLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'commerce'));
   });
 
   // GET /v1/libs/ — List available libraries. Derived from the library-pack registry

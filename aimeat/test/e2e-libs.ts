@@ -604,7 +604,7 @@ await test('GET /v1/libs/aimeat-storage.js — serves JavaScript', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-storage.js`);
     assert(res.ok, `storage lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.storage'), 'should expose AIMEAT.storage');
+    assert(text.includes('upload'), 'should expose the storage API (upload)'); // componentized: attaches via _core attach()
     assert(text.includes('enableDropZone'), 'should include drop zone helper');
 });
 
@@ -612,7 +612,7 @@ await test('GET /v1/libs/aimeat-social.js — serves JavaScript', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-social.js`);
     assert(res.ok, `social lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.social'), 'should expose AIMEAT.social');
+    assert(text.includes('createBoard'), 'should expose the social API (createBoard)'); // componentized: attaches via _core attach()
     assert(text.includes('subscribe'), 'should include subscriptions');
 });
 
@@ -630,7 +630,7 @@ await test('GET /v1/libs/aimeat-work.js — serves JavaScript', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-work.js`);
     assert(res.ok, `work lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.work'), 'should expose AIMEAT.work');
+    assert(text.includes('catalogue'), 'should expose the work API (catalogue)'); // componentized: attaches via _core attach()
     assert(text.includes('waitFor'), 'should include polling helper');
 });
 
@@ -675,7 +675,7 @@ await test('GET /v1/libs/aimeat-commerce.js — serves checkout + money-formatti
     const res = await fetch(`${BASE}/v1/libs/aimeat-commerce.js`);
     assert(res.ok, `commerce lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.commerce'), 'should expose AIMEAT.commerce');
+    assert(text.includes('fmtMoney'), 'should expose the commerce API (fmtMoney)'); // componentized: attaches via _core attach()
     assert(text.includes('buyOffer'), 'should include the one-call purchase');
     assert(text.includes('/v1/commerce/checkout-sessions'), 'should call the checkout API');
     assert(text.includes('paymentRequired'), 'should surface the x402-style 402 accepts block');
