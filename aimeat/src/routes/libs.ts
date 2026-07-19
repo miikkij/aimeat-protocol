@@ -233,9 +233,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, aimeatSocialLib(config));
   });
 
-  // GET /v1/libs/aimeat-wallet.js — Wallet library
-  router.get('/v1/libs/aimeat-wallet.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatWalletLib(config));
+  // GET /v1/libs/aimeat-wallet.js — Wallet library (migrated: src/static/sdk-libs/wallet/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-wallet.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatWalletLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'wallet'));
   });
 
   // GET /v1/libs/aimeat-workflows.js — Agent Workflows client (incl. human-input answer loop)
@@ -268,18 +269,24 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   });
 
   // GET /v1/libs/aimeat-capabilities.js — Capability discovery, invoke, management
-  router.get('/v1/libs/aimeat-capabilities.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatCapabilitiesLib(config));
+  // (migrated: src/static/sdk-libs/capabilities/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-capabilities.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatCapabilitiesLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'capabilities'));
   });
 
   // GET /v1/libs/aimeat-ai.js — AI completion using the user's OpenRouter key
-  router.get('/v1/libs/aimeat-ai.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatAiLib(config));
+  // (migrated: src/static/sdk-libs/ai/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-ai.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatAiLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'ai'));
   });
 
   // GET /v1/libs/aimeat-agents.js — commission & observe the owner's agents
-  router.get('/v1/libs/aimeat-agents.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatAgentsLib(config));
+  // (migrated: src/static/sdk-libs/agents/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-agents.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatAgentsLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'agents'));
   });
 
   // GET /v1/libs/aimeat-organism.js — organism/workspace content client (normalized read + draft/publish)
