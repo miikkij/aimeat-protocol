@@ -191,10 +191,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, aimeatWebmcpLib(config));
   });
 
-  // GET /v1/libs/aimeat-agentface.js — publish the app's Agent Face (the markdown read-surface
-  // served on the app URL for Accept: text/markdown) in one call from inside the running app.
-  router.get('/v1/libs/aimeat-agentface.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatAgentFaceLib(config));
+  // GET /v1/libs/aimeat-agentface.js — publish the app's Agent Face (migrated: sdk-libs/agentface/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-agentface.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatAgentFaceLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'agentface'));
   });
 
   // GET /v1/libs/aimeat-header.js — Drop-in canonical site header (nav + theme +
@@ -204,9 +204,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   });
 
   // GET /v1/libs/portfolio-standalone.js — bridge shim injected into portfolios
-  // served on the portfolio origin (<username>.portfolio.<apex>).
-  router.get('/v1/libs/portfolio-standalone.js', (_req, res) => {
-    sendJavascriptLibrary(res, portfolioStandaloneLib(config));
+  // served on the portfolio origin (migrated: sdk-libs/portfolio-standalone/; ?impl=legacy)
+  router.get('/v1/libs/portfolio-standalone.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, portfolioStandaloneLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'portfolio-standalone'));
   });
 
   // GET /v1/libs/aimeat-data.js — Memory & Micro-Memory library. Migrated to componentized ESM
@@ -239,9 +240,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, sdkLibSource(config, 'wallet'));
   });
 
-  // GET /v1/libs/aimeat-workflows.js — Agent Workflows client (incl. human-input answer loop)
-  router.get('/v1/libs/aimeat-workflows.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatWorkflowsLib(config));
+  // GET /v1/libs/aimeat-workflows.js — Agent Workflows client (migrated: sdk-libs/workflows/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-workflows.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatWorkflowsLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'workflows'));
   });
 
   // GET /v1/libs/aimeat-work.js — Actions & work exchange library
@@ -289,14 +291,16 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, sdkLibSource(config, 'agents'));
   });
 
-  // GET /v1/libs/aimeat-organism.js — organism/workspace content client (normalized read + draft/publish)
-  router.get('/v1/libs/aimeat-organism.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatOrganismLib(config));
+  // GET /v1/libs/aimeat-organism.js — organism/workspace content client (migrated: sdk-libs/organism/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-organism.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatOrganismLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'organism'));
   });
 
-  // GET /v1/libs/aimeat-intake.js — Public Intake client (public getForm/submit + owner form management)
-  router.get('/v1/libs/aimeat-intake.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatIntakeLib(config));
+  // GET /v1/libs/aimeat-intake.js — Public Intake client (migrated: sdk-libs/intake/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-intake.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatIntakeLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'intake'));
   });
 
   // GET /v1/libs/aimeat-editor.js — markdown editor (CodeMirror 6 + toolbar + split preview)

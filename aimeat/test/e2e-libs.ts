@@ -650,7 +650,9 @@ await test('GET /v1/libs/aimeat-organism.js — serves normalized workspace clie
     const res = await fetch(`${BASE}/v1/libs/aimeat-organism.js`);
     assert(res.ok, `organism lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.organism'), 'should expose AIMEAT.organism');
+    // Componentized (SDK-libs migration): attaches via _core `attach('organism', …)` rather than a
+    // literal `AIMEAT.organism =`, so assert on stable organism-surface markers instead.
+    assert(text.includes('createWorkspace'), 'should expose the organism API (createWorkspace)');
     assert(text.includes('normalizeWorkspace'), 'should include the objects+drafts normalizer');
     assert(text.includes('writeDraft'), 'should include draft writes');
     assert(text.includes('/publish'), 'should include the publish call');

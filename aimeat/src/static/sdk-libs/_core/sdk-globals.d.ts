@@ -16,6 +16,9 @@ interface Window {
   // there is no single static shape, so `any` is the honest type for cross-lib member access.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   AIMEAT?: Record<string, any>;
+  /** aimeat-agentface also exposes its surface under the convention's spec name. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  AIMEATAgentFace?: Record<string, any>;
   /** Serve-time config prelude prepended to each bundle (see _core/config.js + libs/sdk-serve.ts). */
   __AIMEAT_SDK_CFG__?: { nodeId: string; baseUrl: string; heartbeatMs?: number };
   /** Safari's prefixed AudioContext. */

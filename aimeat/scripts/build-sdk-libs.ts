@@ -43,6 +43,11 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'ai', entry: 'ai/index.js' },
   { name: 'capabilities', entry: 'capabilities/index.js' },
   { name: 'agents', entry: 'agents/index.js' },
+  { name: 'agentface', entry: 'agentface/index.js' },
+  { name: 'intake', entry: 'intake/index.js' },
+  { name: 'organism', entry: 'organism/index.js' },
+  { name: 'workflows', entry: 'workflows/index.js' },
+  { name: 'portfolio-standalone', entry: 'portfolio-standalone/index.js' },
 ];
 
 function banner(name: string): string {
