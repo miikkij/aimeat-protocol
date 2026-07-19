@@ -333,7 +333,9 @@ The canonical app-building prompt is **node-served** at `GET /v1/prompts/build-a
 
 > The old SPA **service generator** (`public/js/services/generator-prompts-*.js`) and **Foundry** were **removed** (Generator 2026-07-18, Foundry 2026-07-13) — do not revive them or reference `generator-*` files.
 
-When editing the build-app prompt (or any app-building guidance): verify every API claim against `src/routes/lib-*.ts` + `public/cortex-bundled/*.js`; extension data → `getPublic('ext:name', key)`; user data (translations/settings) → `AIMEAT.data.get(key)` (NEVER tell cortex to read translations from `ext:`); extension actions must `export default async function(ctx, input) { ... }`.
+When editing the build-app prompt (or any app-building guidance): verify every API claim against the served browser SDK sources under `src/static/sdk-libs/<name>/` (+ `public/cortex-bundled/*.js`); extension data → `getPublic('ext:name', key)`; user data (translations/settings) → `AIMEAT.data.get(key)` (NEVER tell cortex to read translations from `ext:`); extension actions must `export default async function(ctx, input) { ... }`.
+
+> **Served browser SDK libs (`/v1/libs/aimeat-*.js`) are authored as componentized, JSDoc-typed ESM under `src/static/sdk-libs/<name>/`** (DRY via `_core/`, < 800 lines/file), esbuild-bundled to a classic IIFE (`pnpm build:sdk`, guarded by `check:sdk` + `typecheck:sdk`), and served with a per-node config prelude by `src/routes/libs.ts`. **Never author a served lib as JavaScript inside a TypeScript template string** (the old `lib-*.ts` / `auth-lib-part*.ts` pattern — removed 2026-07-19); edit the ESM source and rebuild. Full plan: `docs/internal/sdk-libs-migration-plan.md`.
 
 ## Naming Convention — AIMEAT Only
 

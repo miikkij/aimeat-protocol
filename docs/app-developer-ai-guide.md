@@ -598,7 +598,7 @@ else renderIssueList(r.parsed.issues);
 ## Where to look next
 
 - API endpoint source: [`aimeat/src/routes/ai.ts`](../aimeat/src/routes/ai.ts)
-- Browser library source: [`aimeat/src/routes/lib-ai.ts`](../aimeat/src/routes/lib-ai.ts)
+- Browser library source: [`aimeat/src/static/sdk-libs/ai/index.js`](../aimeat/src/static/sdk-libs/ai/index.js)
 - Design doc with rationale: [`docs/research/2026-05-29-aimeat-ai-capability.md`](research/2026-05-29-aimeat-ai-capability.md)
 - E2E tests as examples of expected behaviour:
   [`aimeat/test/ai.ts`](../aimeat/test/ai.ts)
