@@ -22,6 +22,7 @@
     "typecheck:frontend": "cd aimeat && pnpm typecheck:frontend",
     "check:importmap": "cd aimeat && pnpm check:importmap",
     "check:no-max-tokens": "cd aimeat && pnpm check:no-max-tokens",
+    "check:packs-doc": "cd aimeat && pnpm check:packs-doc",
     "build:app-catalog": "cd aimeat && pnpm build:app-catalog",
     "check:app-catalog": "cd aimeat && pnpm check:app-catalog",
     "check:mcp-tools": "cd aimeat && pnpm check:mcp-tools",

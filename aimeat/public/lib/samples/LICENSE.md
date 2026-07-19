@@ -16,14 +16,13 @@ redistribution in MIT-licensed software.
 
 To be populated. Built-in synthesis provides drum sounds without samples.
 
-## Guitar (guitar/)
+## Guitar (guitar/), Bass (bass/), Flute (flute/)
 
-To be populated. Built-in Karplus-Strong synthesis provides guitar sounds without samples.
-
-## Bass (bass/)
-
-To be populated. Built-in subtractive synthesis provides bass sounds without samples.
-
-## Flute (flute/)
-
-To be populated. Built-in synthesis provides flute sounds without samples.
+**FluidR3_GM soundfont** pre-rendered per-note MP3s (acoustic_guitar_nylon,
+acoustic_bass, flute)
+- License: MIT
+- Source: https://github.com/gleitz/midi-js-soundfonts (Benjamin Gleitzman's
+  pre-rendered renders of Frank Wen's FluidR3_GM soundfont)
+- CDN: https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/
+- Populated 2026-07-19 with the exact note subsets `SAMPLE_NOTES` in
+  aimeat-audio.js expects (nearest-sample pitch shift covers the gaps).

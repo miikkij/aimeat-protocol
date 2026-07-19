@@ -2,6 +2,8 @@
  * @file src/routes/memory/key.ts
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-19 — public :gaii/:key read supports ?soft=1 (200 + exists:false, identical
+ *     for missing and hidden records — no existence leak), matching the authed route
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
  */
 
@@ -410,8 +412,16 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const gaii = decodeURIComponent(req.params.gaii as string);
     const key = decodeURIComponent(req.params.key as string);
 
+    // Soft read (?soft=1): 200 + { value: null, exists: false } instead of a 404 for keys that
+    // legitimately may not exist yet — avoids browser-console 404 noise. SECURITY: the soft
+    // response is byte-identical for "missing" and "exists but hidden" so it never reveals
+    // the existence of non-public records (mirrors the 404 parity of the hard path).
+    const soft = !!req.query.soft;
+    const softMiss = () => { res.json(success(config.nodeId, { key, value: null, exists: false })); };
+
     const record = await storage.getMemory(gaii, key);
     if (!record) {
+      if (soft) { softMiss(); return; }
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Public memory not found: ${key}`));
       return;
     }
@@ -487,13 +497,15 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
         return;
       }
       // Anonymous (incl. the shared anonymous identity): behave like other
-      // non-public records — 404, don't reveal existence.
+      // non-public records — 404 (or the identical soft miss), don't reveal existence.
+      if (soft) { softMiss(); return; }
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Public memory not found: ${key}`));
       return;
     }
 
     // Non-public data: if consent is not enabled, fall back to old behavior (404)
     if (!config.consentEnabled) {
+      if (soft) { softMiss(); return; }
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Public memory not found: ${key}`));
       return;
     }
