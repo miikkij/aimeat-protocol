@@ -209,9 +209,13 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, portfolioStandaloneLib(config));
   });
 
-  // GET /v1/libs/aimeat-data.js — Memory & Micro-Memory library
-  router.get('/v1/libs/aimeat-data.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatDataLib(config));
+  // GET /v1/libs/aimeat-data.js — Memory & Micro-Memory library. Migrated to componentized ESM
+  // (src/static/sdk-libs/data/) — the config-path proof lib: NODE_URL/NODE_ID come from _core/config
+  // (the prelude), authed calls go through _core/session. `?impl=legacy` serves the old generator
+  // for the A/B equivalence diff (removed in Phase 5).
+  router.get('/v1/libs/aimeat-data.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatDataLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'data'));
   });
 
   // GET /v1/libs/aimeat-storage.js — File storage library
