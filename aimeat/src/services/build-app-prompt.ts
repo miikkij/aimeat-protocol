@@ -12,6 +12,8 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   v1.5.0 — 2026-07-19 — MCP-agent section: load node:aimeat-app-builder first + curated
+ *     pitfall registry pointer (/v1/appdev/pitfalls) (AppDev KB Phase 2)
  *   v1.4.0 — 2026-07-16 — Auth Pattern path 3: AIMEAT.auth.on('login'/'logout') — async logins
  *     (app-subdomain silent SSO, consent-popup return) fire neither onLogin nor a pending
  *     login(); AEB-3 finding aeb3-flow-001 (a 5/5 app stayed hidden after grant on app origin).
@@ -250,7 +252,8 @@ export function buildAppPrompt(
 
   // Agentic-coder note: MCP-connected agents publish directly instead of the human paste flow.
   body += '### If you are an agentic coder with AIMEAT MCP tools\n';
-  body += 'When `aimeat_*` MCP tools are available in your environment (Claude Code, Cursor, any MCP client), they are already authenticated as the user — USE THEM for node operations instead of raw HTTP: `aimeat_app_publish` to publish/update the app (upload mode for files > 1 KB), `aimeat_storage_upload` for files, `aimeat_memory_write`/`aimeat_memory_read` for data, `aimeat_discover` for discovery. Register throwaway accounts only for cross-user testing; the app itself is published under the user\'s own account via MCP. The publish walkthrough below is for HUMANS pasting in a chat — skip telling it to an MCP-equipped agent, just publish.\n';
+  body += 'When `aimeat_*` MCP tools are available in your environment (Claude Code, Cursor, OpenHands, any MCP client), they are already authenticated as the user — USE THEM for node operations instead of raw HTTP: `aimeat_app_publish` to publish/update the app (upload mode for files > 1 KB), `aimeat_storage_upload` for files, `aimeat_memory_write`/`aimeat_memory_read` for data, `aimeat_discover` for discovery. Register throwaway accounts only for cross-user testing; the app itself is published under the user\'s own account via MCP. The publish walkthrough below is for HUMANS pasting in a chat — skip telling it to an MCP-equipped agent, just publish.\n';
+  body += 'Load the paved-path skill first: `aimeat_skill_get` with ref `node:aimeat-app-builder` (spec-first workflow, research-before-building, publish checklist). Also skim the curated pitfall registry at `GET /v1/appdev/pitfalls` (filter `?applies_to=` for the areas you touch) — it is the distilled list of what breaks app builds on this platform.\n';
   body += 'Namespace rule: data written through MCP tools is stored under the AGENT\'s identity (GAII, `name#owner@node`), NOT the human owner\'s — so a browser app reading the signed-in owner\'s keys will NOT see it. When agents seed or share data the app must read: store the author identity inside each record, write such keys with public visibility and read them with `AIMEAT.data.getPublic(<full agent GAII>, key)`, or add `?owner_scope=true` to memory reads (resolves the owner\'s agents\' keys too).\n\n';
 
   // After-build publish walkthrough (new-app mode only)

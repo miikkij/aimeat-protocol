@@ -9,6 +9,9 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.4.0 -- 2026-07-19 -- aimeat-app-builder (public): the paved path for building apps ON
+ *     the node over MCP — spec-first, research-before-building (apps/packs/pitfalls), presigned
+ *     publish. Canonical home of the skill formerly shipped only inside the OpenHands runtime image.
  *   v1.3.0 -- 2026-07-16 -- aimeat-game-apps (public): game/creative-canvas apps with the
  *     phaser/pixi/p5 library packs — engine selection, v8/instance-mode idioms, AIMEAT glue.
  *   v1.2.0 -- 2026-07-14 -- aimeat-node-guide app section: the agent-face paragraph (Accept:
@@ -493,6 +496,91 @@ Published AIMEAT apps are one HTML file — avoid external asset files entirely:
 2. Works at mobile width (Phaser Scale.FIT / p5 windowResized / pixi resizeTo).
 3. Pauses when the tab hides (battery): phaser \`game.loop.sleep()/wake()\`.
 4. High-score write → read back → visible on the leaderboard without a reload.
+`,
+  },
+  {
+    name: 'aimeat-app-builder',
+    visibility: 'public',
+    skillMd: `---
+name: aimeat-app-builder
+description: Build and publish apps ON an AIMEAT node over MCP (the aimeat_* tools) or REST. The paved path for any "build/make/publish an app, game or tool on AIMEAT" request — fetch the canonical build spec first, research what already exists, build a single-file app from a template, verify, publish, and report the live URL. Use whenever an owner asks for an app on the node.
+license: MIT
+metadata:
+  audience: agent
+---
+
+# Building AIMEAT apps
+
+An **AIMEAT app** is a **single self-contained HTML file**. The node hosts it and serves it
+on its own subdomain (e.g. \`https://<name>.apps.<node-domain>/\`). It logs the user in, reads
+and writes their data, and uses node-hosted UI/AI libraries — all from \`<script>\` tags
+pointing at the node. There is **no build step and no backend to write**: the node is the
+backend. If you have the \`aimeat_*\` MCP tools, publish directly over MCP — you do not need
+the web UI.
+
+## The one rule that matters: fetch the canonical spec first
+
+The node serves the **authoritative, always-current build-app specification** — the single
+source of truth for available libraries, allowed script URLs, required \`<meta>\` tags,
+auth/data APIs, and templates. **Before writing any app, fetch it and follow it exactly:**
+
+\`\`\`
+GET /v1/prompts/build-app        ← the spec (law; re-fetch every time, it changes)
+GET /v1/app-templates            ← starter templates (start from one, do not invent structure)
+GET /v1/appdev/pitfalls          ← curated "what bites app builders" registry
+\`\`\`
+
+Everything the app loads at runtime — CSS, auth, data, UI libraries — must be a URL
+**listed in that spec**. Never invent script/style \`src\` URLs; they 404 and break the app.
+
+## Research before building
+
+Before writing code, look at what already exists on the node and reuse it:
+
+1. \`aimeat_app_list\` — the owner's existing apps: a prior app is often the best template
+   (fork or copy its patterns instead of starting cold).
+2. \`GET /v1/library-packs\` — the capability packs (charts, realtime, iam, styling, ai, …)
+   with per-pack AI docs at \`/v1/library-packs/{id}\`.
+3. \`GET /v1/appdev/pitfalls\` — read the criticals for the areas you will touch
+   (auth, ext/cortex, realtime, mobile, publish) BEFORE you hit them.
+4. \`aimeat_skill_list\` — skills bound to existing apps (\`binding=app:{owner}/{file}\`)
+   show how those apps want to be driven.
+
+Frame the build from the research (template tier, packs, whether the app needs its own
+users → aimeat-iam), propose the frame to the user, then build. If the user says to just
+build it the usual way, skip the research and go.
+
+## Workflow
+
+1. **Fetch the spec** (above). Skim the templates; pick the closest one.
+2. **Build one HTML file.** Single file, no bundler. Include the required meta tags the
+   spec lists (at minimum \`aimeat-app\` + \`aimeat-scopes\`). Use
+   \`AIMEAT.auth.mountLoginButton(...)\` + \`AIMEAT.auth.login()\` for sign-in,
+   \`AIMEAT.data.get/set(key, value, { visibility })\` for storage, and the node UI helpers.
+   Respect the light/dark theme via \`data-theme\` + CSS variables — never hardcode colors.
+3. **Verify locally before publishing.** Syntax-check the inline JS (\`node --check\` on the
+   extracted script); verify the script tags resolve to real node URLs.
+4. **Publish over MCP.** \`aimeat_app_publish\` — for any file over ~1 KB use **presigned
+   upload** (omit the content param → PUT the raw HTML to the returned \`upload_url\`).
+   Re-publishing the same \`filename\` bumps the version — it does not duplicate.
+5. **Return the live URL** and confirm with \`aimeat_app_list\` if unsure.
+
+## When the app needs external data (an extension)
+
+A third-party API call belongs in an **AIMEAT extension** (sandboxed server-side function),
+not in the browser: it owns its \`ext:<name>\` memory namespace, makes outbound HTTP via
+\`ctx.fetch()\`, and exports actions as \`export default async function (ctx, input) {...}\`.
+The app reads it **through** the node's cortex libs, never directly. Most apps need NO
+extension — just auth + data + UI libs.
+
+## Do / Don't
+
+- **Do** fetch \`/v1/prompts/build-app\` every time — it is canonical and it changes.
+- **Do** research existing apps/packs/pitfalls first; start from a template.
+- **Do** verify locally, publish over MCP (presigned for >1 KB), hand back the live URL.
+- **Don't** invent library/script URLs or reference files the spec doesn't list.
+- **Don't** build a separate backend, a bundler, or a multi-file app.
+- **Don't** hardcode brand colors or bypass the AIMEAT auth/data/UI libraries.
 `,
   },
 ];
