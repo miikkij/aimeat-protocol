@@ -18,39 +18,24 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
-import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { getAppdevPitfalls } from '../data/appdev-pitfalls.js';
+import {
+    PITFALL_PACKAGE_ID, PITFALL_PREFIX, PITFALL_MANIFEST_KEY, PITFALL_SLUG_RE, slugifyKb,
+    listOwnerScopeMemory as kbListOwnerScope, ownIdentitySet as kbOwnIdentitySet,
+    findOwnEntry as kbFindOwnEntry, upsertPitfallManifest,
+    type LearnedPitfallValue,
+} from '../services/appdev-kb.js';
 
-export const PITFALL_PACKAGE_ID = 'appdev-pitfalls';
-const PREFIX = `packages/${PITFALL_PACKAGE_ID}/`;
-const MANIFEST_KEY = `packages/${PITFALL_PACKAGE_ID}/manifest`;
+export { PITFALL_PACKAGE_ID };
 
-const SLUG_RE = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const SEVERITIES = ['info', 'warn', 'critical'] as const;
 const SEV_RANK: Record<string, number> = { critical: 0, warn: 1, info: 2 };
 
-interface PitfallEntryValue {
-    title: string;
-    symptom: string;
-    resolution: string;
-    /** Self-reported primary model that hit/solved this. Indicative, never audited. */
-    model: string;
-    category: string;
-    slug: string;
-    applies_to: string[];
-    severity: (typeof SEVERITIES)[number];
-    status: 'active' | 'outdated';
-    app_ref?: string;
-    reported_by: string;
-    created: string;
-    updated: string;
-}
+type PitfallEntryValue = LearnedPitfallValue;
 
-function slugify(s: string): string {
-    return s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64) || 'entry';
-}
+function slugify(s: string): string { return slugifyKb(s); }
 
 function asIndexEntry(source: 'learned' | 'learned-shared', rec: MemoryRecord): Record<string, unknown> {
     const v = rec.value as Partial<PitfallEntryValue> | null;
@@ -78,72 +63,12 @@ export function registerAppdevPitfallTools(
 ): void {
     const agentGaii = getAgentGaii();
 
-    /** Owner-scope aggregation (GHII + every same-owner agent), same pattern as knowledge.ts. */
-    async function listOwnerScopeMemory(opts: { prefix?: string; tags?: string[] }): Promise<MemoryRecord[]> {
-        const parsed = parseGAII(agentGaii);
-        const owner = parsed?.owner;
-        if (!owner) return storage.listMemory(agentGaii, opts);
-        const ownerGhii = `${owner}@${config.nodeId}`;
-        const agents = await storage.getAgentsByOwner(owner);
-        const owners = [ownerGhii, ...agents.map(a => a.gaii)];
-        const priority = new Map(owners.map((g, i) => [g, i]));
-        const rows = await storage.listMemoryForOwners(owners, opts);
-        rows.sort((x, y) => (priority.get(x.ownerGaii) ?? 0) - (priority.get(y.ownerGaii) ?? 0));
-        const seen = new Set<string>();
-        const out: MemoryRecord[] = [];
-        for (const rec of rows) {
-            if (!seen.has(rec.key)) { seen.add(rec.key); out.push(rec); }
-        }
-        return out;
-    }
-
-    function ownIdentitySet(): Promise<Set<string>> {
-        const parsed = parseGAII(agentGaii);
-        const owner = parsed?.owner;
-        if (!owner) return Promise.resolve(new Set([agentGaii]));
-        return storage.getAgentsByOwner(owner).then(agents =>
-            new Set([`${owner}@${config.nodeId}`, ...agents.map(a => a.gaii)]));
-    }
-
-    async function findOwnEntry(key: string): Promise<MemoryRecord | null> {
-        const rows = await listOwnerScopeMemory({ prefix: key });
-        return rows.find(r => r.key === key) ?? null;
-    }
-
-    async function upsertManifest(entryKey: string, title: string, remove = false): Promise<void> {
-        const now = new Date().toISOString();
-        const existing = await findOwnEntry(MANIFEST_KEY);
-        type ManifestValue = { name: string; content_type: string; tags: string[]; entries: Array<{ key: string; title?: string }>; updated?: string };
-        const value: ManifestValue = (existing?.value as ManifestValue | null) ?? {
-            name: 'AppDev pitfalls (learned)',
-            content_type: 'appdev-pitfalls',
-            tags: ['pitfall'],
-            entries: [],
-        };
-        const entries = Array.isArray(value.entries) ? value.entries : [];
-        const idx = entries.findIndex(e => e.key === entryKey);
-        if (remove) {
-            if (idx === -1) return;
-            entries.splice(idx, 1);
-        } else if (idx === -1) {
-            entries.push({ key: entryKey, title });
-        } else {
-            entries[idx] = { key: entryKey, title };
-        }
-        value.entries = entries;
-        value.updated = now;
-        await storage.setMemory({
-            key: MANIFEST_KEY,
-            ownerGaii: existing?.ownerGaii ?? agentGaii,
-            value,
-            visibility: existing?.visibility ?? 'owner',
-            tags: existing?.tags ?? ['knowledge-package', 'pitfall'],
-            ttlHours: null,
-            version: (existing?.version ?? 0) + 1,
-            createdAt: existing?.createdAt ?? now,
-            updatedAt: now,
-        });
-    }
+    const listOwnerScopeMemory = (opts: { prefix?: string; tags?: string[] }) =>
+        kbListOwnerScope(storage, config, agentGaii, opts);
+    const ownIdentitySet = () => kbOwnIdentitySet(storage, config, agentGaii);
+    const findOwnEntry = (key: string) => kbFindOwnEntry(storage, config, agentGaii, key);
+    const upsertManifest = (entryKey: string, title: string, remove = false) =>
+        upsertPitfallManifest(storage, config, agentGaii, entryKey, title, remove);
 
     // ── aimeat_appdev_pitfall_report — upsert one learned pitfall ──
     mcp.tool(
@@ -166,10 +91,10 @@ export function registerAppdevPitfallTools(
         async ({ model, category, title, symptom, resolution, slug, applies_to, severity, status, app_ref, share }) => {
             const cat = slugify(category);
             const slg = slug ? slug.toLowerCase() : slugify(title);
-            if (!SLUG_RE.test(cat) || !SLUG_RE.test(slg)) {
+            if (!PITFALL_SLUG_RE.test(cat) || !PITFALL_SLUG_RE.test(slg)) {
                 return { content: [{ type: 'text' as const, text: 'Invalid category/slug — use kebab-case (a-z, 0-9, dashes)' }], isError: true };
             }
-            const key = `${PREFIX}${cat}/${slg}`;
+            const key = `${PITFALL_PREFIX}${cat}/${slg}`;
             const now = new Date().toISOString();
             const existing = await findOwnEntry(key);
             const normModel = model.trim().toLowerCase();
@@ -237,9 +162,9 @@ export function registerAppdevPitfallTools(
             const entries: Array<Record<string, unknown>> = [];
 
             if (effScope === 'own' || effScope === 'all') {
-                const own = await listOwnerScopeMemory({ prefix: PREFIX, tags: ['pitfall'] });
+                const own = await listOwnerScopeMemory({ prefix: PITFALL_PREFIX, tags: ['pitfall'] });
                 for (const rec of own) {
-                    if (rec.key === MANIFEST_KEY) continue;
+                    if (rec.key === PITFALL_MANIFEST_KEY) continue;
                     entries.push(asIndexEntry('learned', rec));
                 }
             }
@@ -255,9 +180,9 @@ export function registerAppdevPitfallTools(
                 }
                 // Other owners' public-shared learned entries.
                 const ownIds = await ownIdentitySet();
-                const { items } = await storage.listAllMemory({ prefix: PREFIX, visibility: 'public', limit: 500 });
+                const { items } = await storage.listAllMemory({ prefix: PITFALL_PREFIX, visibility: 'public', limit: 500 });
                 for (const rec of items) {
-                    if (rec.key === MANIFEST_KEY) continue;
+                    if (rec.key === PITFALL_MANIFEST_KEY) continue;
                     if (ownIds.has(rec.ownerGaii)) continue; // own entries come from the own branch
                     if (!(rec.tags ?? []).includes('pitfall')) continue;
                     entries.push(asIndexEntry('learned-shared', rec));
@@ -312,7 +237,7 @@ export function registerAppdevPitfallTools(
         },
         annotationsFor('aimeat_appdev_pitfall_delete'),
         async ({ category, slug }) => {
-            const key = `${PREFIX}${slugify(category)}/${slug.toLowerCase()}`;
+            const key = `${PITFALL_PREFIX}${slugify(category)}/${slug.toLowerCase()}`;
             const existing = await findOwnEntry(key);
             if (!existing) {
                 return { content: [{ type: 'text' as const, text: `Pitfall entry not found: ${key}` }], isError: true };

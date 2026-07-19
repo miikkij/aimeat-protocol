@@ -5,23 +5,73 @@
  *   GET /v1/appdev/pitfalls returns a paginated index with facet counts;
  *   GET /v1/appdev/pitfalls/:id returns one full entry. Public read-only data (CORS *).
  *   Scope note: this surface covers app development on the platform only, never node development.
- * @structure appdevPitfallsRouter(config) → Router
- * @usage app.use(appdevPitfallsRouter(config)) from the routes loader.
+ * @structure appdevPitfallsRouter(config, storage) → Router
+ * @usage app.use(appdevPitfallsRouter(config, storage)) from the routes loader.
  * @version-history
+ *   v1.1.0 — 2026-07-19 — learned-entry management for the profile UI: GET /learned (full
+ *     bodies, own + optional shared), PATCH /learned/:category/:slug (share/status flags),
+ *     DELETE /learned/:category/:slug — registered before /:id (route-ordering).
  *   v1.0.0 — 2026-07-19 — initial: paginated index (+applies_to/severity filters, facets) + by-id.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
+import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
+import { resolveIdentity } from '../utils/gaii.js';
 import {
   getAppdevPitfalls, getAppdevPitfallFacets,
 } from '../data/appdev-pitfalls.js';
+import {
+  listLearnedPitfalls, setPitfallFlags, deletePitfallEntry,
+} from '../services/appdev-kb.js';
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 25;
 
-export function appdevPitfallsRouter(config: AimeatConfig): Router {
+export function appdevPitfallsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  // ── LEARNED entries (the profile UI's management surface) — MUST be registered before
+  // the parameterized /v1/appdev/pitfalls/:id route or "learned" would match as an id. ──
+
+  // GET /v1/appdev/pitfalls/learned[?include_shared=1] — the caller's own learned entries
+  // (full bodies, any visibility) + optionally other owners' public-shared entries.
+  router.get('/v1/appdev/pitfalls/learned', requireAuth(), async (req, res) => {
+    const identity = resolveIdentity(req.auth!, config.nodeId);
+    const includeShared = req.query.include_shared === '1' || req.query.include_shared === 'true';
+    const entries = await listLearnedPitfalls(storage, config, identity, { includeShared });
+    res.json(success(config.nodeId, { pitfalls: entries, total: entries.length }));
+  });
+
+  // PATCH /v1/appdev/pitfalls/learned/:category/:slug — toggle share (visibility) / status.
+  router.patch('/v1/appdev/pitfalls/learned/:category/:slug', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    const identity = resolveIdentity(req.auth!, config.nodeId);
+    const share = typeof req.body?.share === 'boolean' ? req.body.share as boolean : undefined;
+    const status = req.body?.status === 'active' || req.body?.status === 'outdated'
+      ? req.body.status as 'active' | 'outdated' : undefined;
+    if (share === undefined && status === undefined) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Provide share (boolean) and/or status (active|outdated)'));
+      return;
+    }
+    const entry = await setPitfallFlags(storage, config, identity, req.params.category as string, req.params.slug as string, { share, status });
+    if (!entry) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such learned pitfall in your scope'));
+      return;
+    }
+    res.json(success(config.nodeId, { pitfall: entry }));
+  });
+
+  // DELETE /v1/appdev/pitfalls/learned/:category/:slug — remove the entry + manifest ref.
+  router.delete('/v1/appdev/pitfalls/learned/:category/:slug', requireAuth(), requireScope('memory:write'), async (req, res) => {
+    const identity = resolveIdentity(req.auth!, config.nodeId);
+    const ok = await deletePitfallEntry(storage, config, identity, req.params.category as string, req.params.slug as string);
+    if (!ok) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such learned pitfall in your scope'));
+      return;
+    }
+    res.json(success(config.nodeId, { deleted: true }));
+  });
 
   // GET /v1/appdev/pitfalls[?applies_to=ext&severity=critical&limit=25&offset=0&include_outdated=1]
   router.get('/v1/appdev/pitfalls', (req, res) => {

@@ -2,6 +2,7 @@
  * @file public/views/profile/landing-page.cards.js
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-07-19 — AppDev tab (KB UI): learned-pitfall + template management surface, start-prompt copy, model badge
  *   v1.2.0 — 2026-07-16 — Drop the per-item emoji icons from SIDEBAR_GROUPS and the Inbox nav
  *     button — the sidebar renders label-only now.
  *   v1.1.0 — 2026-07-16 — Contacts tab in the Activity sidebar group.
@@ -581,6 +582,7 @@ export const SIDEBAR_GROUPS = [
   ] },
   { titleKey: 'profile.landing.menuBuildShare', items: [
     { id: 'apps', labelKey: 'profile.tabs.apps' },
+    { id: 'appdev', labelKey: 'profile.tabs.appDev' },
     /* foundry removed from the menu 2026-06-10 (owner: not in use). The tab module and
      * its route id still exist — restore by re-adding this item. */
     { id: 'extensions', labelKey: 'profile.tabs.extensions' },
