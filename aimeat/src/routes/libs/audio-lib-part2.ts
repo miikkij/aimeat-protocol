@@ -130,6 +130,10 @@ var SAMPLE_NOTES = {
   'guitar-el': ['E2','A2','D3','G3','B3','E4','A4','E5'],
   bass: ['E1','A1','D2','G2','B2','E3'],
   flute: ['C4','E4','A4','C5','E5','A5','C6'],
+  strings: ['C2','G2','C3','G3','C4','G4','C5','G5','C6'],
+  organ: ['C2','G2','C3','G3','C4','G4','C5','G5','C6'],
+  epiano: ['C2','G2','C3','G3','C4','G4','C5','G5','C6'],
+  trumpet: ['E3','A3','C4','E4','A4','C5','E5','A5'],
   drums: ['kick','snare','hihat','hihat-open','crash','ride','tom-high','tom-mid','tom-low','clap','cowbell']
 };
 
