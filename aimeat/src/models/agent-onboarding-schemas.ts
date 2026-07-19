@@ -7,6 +7,7 @@
  *   - Step-specific confirmation schemas (IdentifyPlatformSchema, etc.)
  *   - createDefaultSteps() -- factory for fresh onboarding step list
  * @version-history
+ *   2026-07-19 — model/modelDetectedBy: indicative primary-LLM attribution on agents (AppDev KB Phase 3)
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase B
  *   v1.1.0 -- 2026-05-28 -- Add publish_commands + publish_config as required
  *                            post-onboarding steps (machine-validated by reading
@@ -331,6 +332,10 @@ export function createDefaultSteps(mode?: AgentMode): AgentOnboardingStep[] {
 export const IdentifyPlatformSchema = z.object({
   platform: z.string().min(1).max(50),
   platform_version: z.string().max(50).optional(),
+  /** Primary LLM model driving the agent (e.g. 'claude-haiku-4.5', 'kimi-k2.6').
+   *  Self-reported and INDICATIVE only — platforms delegate to subagents on other
+   *  models mid-session. Normalized lowercase; used for attribution/filtering. */
+  model: z.string().min(1).max(64).transform(s => s.trim().toLowerCase()).optional(),
 });
 
 export const InstallSkillSchema = z.object({

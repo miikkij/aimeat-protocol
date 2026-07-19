@@ -245,11 +245,43 @@ await test('4. POST step identify_platform passes with valid payload', async () 
     const { status, body } = await json(`/v1/agents/${agentName}/onboarding/step/identify_platform`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ platform: 'hermes', platform_version: '2.1.0' }),
+        body: JSON.stringify({ platform: 'hermes', platform_version: '2.1.0', model: 'Claude-Haiku-4.5' }),
     });
     assert(status === 200, `status ${status}: ${JSON.stringify(body)}`);
     assert(body.data.step.status === 'passed', `expected passed, got ${body.data.step.status}`);
     assert(body.data.step.id === 'identify_platform', `expected identify_platform, got ${body.data.step.id}`);
+});
+
+await test('4b. identify_platform stored the model on the agent record (lowercase-normalized)', async () => {
+    const { status, body } = await json('/v1/agents', {
+        headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(status === 200, `status ${status}`);
+    const agent = (body.data?.agents ?? []).find((a: any) => a.name === agentName);
+    assert(agent, `agent ${agentName} missing from owner list`);
+    assert(agent.platform === 'hermes', `platform not stored: ${agent.platform}`);
+    assert(agent.model === 'claude-haiku-4.5', `model not stored/normalized: ${JSON.stringify(agent.model)}`);
+    assert(agent.model_detected_by === 'self_report', `model_detected_by wrong: ${agent.model_detected_by}`);
+});
+
+await test('4c. identify_platform with an over-long model is handled safely (no 500, capped)', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/onboarding/step/identify_platform`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ platform: 'hermes', model: 'x'.repeat(200) }),
+    });
+    assert(status === 200 || status === 400, `unexpected status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+    if (status === 200) {
+        const { body: list } = await json('/v1/agents', { headers: { Authorization: `Bearer ${ownerToken}` } });
+        const agent = (list.data?.agents ?? []).find((a: any) => a.name === agentName);
+        assert(agent && typeof agent.model === 'string' && agent.model.length <= 64, `model not capped: len ${agent?.model?.length}`);
+    }
+    // Restore the canonical model for later steps' assertions.
+    await json(`/v1/agents/${agentName}/onboarding/step/identify_platform`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ platform: 'hermes', platform_version: '2.1.0', model: 'claude-haiku-4.5' }),
+    });
 });
 
 await test('5. POST step install_skill passes with valid payload', async () => {

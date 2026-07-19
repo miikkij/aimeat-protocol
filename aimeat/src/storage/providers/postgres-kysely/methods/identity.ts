@@ -5,6 +5,7 @@
  *   RevokedToken tables. These are the methods the server's anonymous-identity bootstrap and the
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
+ *   2026-07-19 — model/modelDetectedBy: indicative primary-LLM attribution on agents (AppDev KB Phase 3)
  *   v1.1.0 — 2026-07-16 — Add getGHIIsByGhiis batch (Phase 3): many GHII records by ghii in one query.
  *   v1.0.0 — 2026-07-15 — Phase 5: owner/agent/ghii/auth-revoke on Postgres+Kysely.
  */
@@ -37,6 +38,7 @@ function toAgentRecord(r: Selectable<Agent>): AgentRecord {
     webhookUrl: r.webhookUrl ?? undefined, webhookSecret: r.webhookSecret ?? undefined, webhookEnabled: r.webhookEnabled ?? false,
     webhookLastSuccess: isoOpt(r.webhookLastSuccess), webhookLastFailure: isoOpt(r.webhookLastFailure), webhookFailCount: r.webhookFailCount ?? 0,
     platform: r.platform ?? undefined, platformVersion: r.platformVersion ?? undefined, platformDetectedBy: (r.platformDetectedBy ?? undefined) as AgentRecord['platformDetectedBy'],
+    model: r.model ?? undefined, modelDetectedBy: (r.modelDetectedBy ?? undefined) as AgentRecord['modelDetectedBy'],
     tags: arr(r.tags), mode: (r.mode ?? 'interactive') as AgentRecord['mode'], maxConcurrentTasks: r.maxConcurrentTasks ?? 1,
     dailySpendLimit: r.dailySpendLimit ?? undefined,
     scheduleConstraintDefaults: (r.scheduleConstraintDefaults ?? undefined) as AgentRecord['scheduleConstraintDefaults'],
@@ -116,6 +118,7 @@ export const identityMethods = {
       webhookLastSuccess: a.webhookLastSuccess ? new Date(a.webhookLastSuccess) : null,
       webhookLastFailure: a.webhookLastFailure ? new Date(a.webhookLastFailure) : null, webhookFailCount: a.webhookFailCount ?? 0,
       platform: a.platform ?? null, platformVersion: a.platformVersion ?? null, platformDetectedBy: a.platformDetectedBy ?? null,
+      model: a.model ?? null, modelDetectedBy: a.modelDetectedBy ?? null,
       tags: a.tags ?? [], createdAt: new Date(a.createdAt), lastSeen: new Date(a.lastSeen),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();

@@ -44,6 +44,8 @@ function deserializeAgent(row: Record<string, unknown>): AgentRecord {
   if (row.platform) record.platform = row.platform as string;
   if (row.platformVersion) record.platformVersion = row.platformVersion as string;
   if (row.platformDetectedBy) record.platformDetectedBy = row.platformDetectedBy as 'auto' | 'self_report' | 'message_reply';
+  if (row.model) record.model = row.model as string;
+  if (row.modelDetectedBy) record.modelDetectedBy = row.modelDetectedBy as 'self_report';
   if (row.tags) record.tags = JSON.parse(row.tags as string);
   return record;
 }
@@ -52,8 +54,8 @@ export function createAgent(db: Database.Database, agent: AgentRecord): AgentRec
   try {
     db.prepare(
       `INSERT INTO agents (gaii, name, owner, displayName, description, capabilities, publicKey, trustScore, morselBalance, createdAt, lastSeen, semantic, allowedOrigins, defaultScopes, federate,
-       webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, tags)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       webhookUrl, webhookSecret, webhookEnabled, webhookLastSuccess, webhookLastFailure, webhookFailCount, platform, platformVersion, platformDetectedBy, model, modelDetectedBy, tags)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       agent.gaii, agent.name, agent.owner,
       agent.displayName ?? null, agent.description ?? null,
@@ -67,6 +69,7 @@ export function createAgent(db: Database.Database, agent: AgentRecord): AgentRec
       agent.webhookUrl ?? null, agent.webhookSecret ?? null, agent.webhookEnabled ? 1 : 0,
       agent.webhookLastSuccess ?? null, agent.webhookLastFailure ?? null, agent.webhookFailCount ?? 0,
       agent.platform ?? null, agent.platformVersion ?? null, agent.platformDetectedBy ?? null,
+      agent.model ?? null, agent.modelDetectedBy ?? null,
       agent.tags ? JSON.stringify(agent.tags) : null,
     );
     return agent;
@@ -95,7 +98,7 @@ export function updateAgent(db: Database.Database, gaii: string, updates: Partia
      publicKey = ?, trustScore = ?, morselBalance = ?, createdAt = ?, lastSeen = ?, semantic = ?,
      allowedOrigins = ?, defaultScopes = ?, federate = ?,
      webhookUrl = ?, webhookSecret = ?, webhookEnabled = ?, webhookLastSuccess = ?, webhookLastFailure = ?, webhookFailCount = ?,
-     platform = ?, platformVersion = ?, platformDetectedBy = ?, tags = ?
+     platform = ?, platformVersion = ?, platformDetectedBy = ?, model = ?, modelDetectedBy = ?, tags = ?
      WHERE gaii = ?`
   ).run(
     updated.name, updated.owner,
@@ -110,6 +113,7 @@ export function updateAgent(db: Database.Database, gaii: string, updates: Partia
     updated.webhookUrl ?? null, updated.webhookSecret ?? null, updated.webhookEnabled ? 1 : 0,
     updated.webhookLastSuccess ?? null, updated.webhookLastFailure ?? null, updated.webhookFailCount ?? 0,
     updated.platform ?? null, updated.platformVersion ?? null, updated.platformDetectedBy ?? null,
+    updated.model ?? null, updated.modelDetectedBy ?? null,
     updated.tags ? JSON.stringify(updated.tags) : null,
     gaii,
   );

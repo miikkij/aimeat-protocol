@@ -55,6 +55,14 @@ export interface AgentRecord {
   platform?: string;
   platformVersion?: string;
   platformDetectedBy?: 'auto' | 'self_report' | 'message_reply';
+  /**
+   * The primary LLM model driving this agent (e.g. 'claude-haiku-4.5', 'kimi-k2.6').
+   * INDICATIVE, not a guarantee: self-reported, and coding platforms delegate to
+   * subagents on cheaper models mid-session. Used for attribution/filtering
+   * (model-keyed knowledge, pitfall stats) — never for auditing.
+   */
+  model?: string;
+  modelDetectedBy?: 'self_report';
   // Tags for inter-agent data sharing + UI grouping (crew:*, source:*, role:*, project:*)
   tags?: string[];
   /**

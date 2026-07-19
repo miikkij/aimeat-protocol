@@ -28,10 +28,12 @@ export const agentTools: ConnectCliToolDefinition[] = [
         input: {
             platform: { type: 'string', required: true, description: 'Runtime/platform name, for example hermes, claude, vscode, or generic.' },
             platform_version: { type: 'string', description: 'Runtime/platform version if known.' },
+            model: { type: 'string', description: 'Primary LLM model driving the agent (e.g. claude-haiku-4.5). Self-reported, indicative only.' },
         },
         handler: ({ client, agentPath }, input) => client.post(`/v1/agents/${agentPath}/onboarding/step/identify_platform`, {
             platform: requiredString(input, 'platform'),
             ...(optionalString(input, 'platform_version') ? { platform_version: optionalString(input, 'platform_version') } : {}),
+            ...(optionalString(input, 'model') ? { model: optionalString(input, 'model') } : {}),
         }),
     },
     {

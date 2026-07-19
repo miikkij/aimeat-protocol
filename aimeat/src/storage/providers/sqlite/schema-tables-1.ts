@@ -48,6 +48,8 @@ export function applySchemaTables1(db: Database.Database): void {
       platform           TEXT,
       platformVersion    TEXT,
       platformDetectedBy TEXT,
+      model              TEXT,
+      modelDetectedBy    TEXT,
       tags               TEXT
     );
 

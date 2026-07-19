@@ -39,11 +39,13 @@ export function registerOnboardingTools(mcp: McpServer, registry: AgentRegistry)
         agent_name: agentNameSchema,
         platform: z.string().describe('Runtime/platform name, for example claude, openclaw, hermes, generic, or vscode'),
         platform_version: z.string().optional().describe('Runtime/platform version if known'),
-    }, annotationsFor('aimeat_onboarding_identify_platform'), async ({ agent_name, platform, platform_version }) => {
+        model: z.string().max(64).optional().describe('Primary LLM model driving this agent (e.g. claude-haiku-4.5, kimi-k2.6). Self-reported, indicative attribution only'),
+    }, annotationsFor('aimeat_onboarding_identify_platform'), async ({ agent_name, platform, platform_version, model }) => {
         const { client, agent } = pickAgent(registry, agent_name);
         const enc = encodeURIComponent(agent);
         const body: Record<string, unknown> = { platform };
         if (platform_version) body.platform_version = platform_version;
+        if (model) body.model = model;
         const resp = await client.post(`/v1/agents/${enc}/onboarding/step/identify_platform`, body);
         return asText(resp.data ?? resp);
     });

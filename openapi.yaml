@@ -29735,7 +29735,11 @@ paths:
           application/json:
             schema:
               type: object
-              description: Step-specific payload (varies by step ID)
+              description: >-
+                Step-specific payload (varies by step ID). identify_platform accepts
+                platform (required), platform_version, and model — the primary LLM model
+                driving the agent (e.g. claude-haiku-4.5; self-reported, indicative only,
+                stored on the agent record for attribution/filtering).
       responses:
         '200':
           description: Step validation result

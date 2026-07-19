@@ -2,6 +2,7 @@
  * @file src/routes/agents/profile-metadata.ts
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   2026-07-19 — model/modelDetectedBy: indicative primary-LLM attribution on agents (AppDev KB Phase 3)
  *   v1.1.0 — 2026-07-16 — Engagements enrichment reads all orgs' workspace registries in ONE cross-owner
  *     key-IN query (getMemoryByKeysAnyOwner) instead of a listAllMemory scan per engagement org (Phase 3).
  *   v1.0.0 — 2026-07-13 — Extracted from agents.ts (max-file-lines)
@@ -135,6 +136,11 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         federate: a.federate ?? false,
         tags: a.tags ?? [],
         mode: a.mode ?? 'interactive',
+        platform: a.platform ?? null,
+        platform_version: a.platformVersion ?? null,
+        // Indicative only — self-reported primary model (subagent delegation may differ).
+        model: a.model ?? null,
+        model_detected_by: a.modelDetectedBy ?? null,
         max_concurrent_tasks: a.maxConcurrentTasks ?? 1,
         daily_spend_limit: a.dailySpendLimit ?? null,
         schedule_constraint_defaults: a.scheduleConstraintDefaults ?? [],
