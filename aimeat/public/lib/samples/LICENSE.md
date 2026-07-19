@@ -37,5 +37,16 @@ tom-high=D3/50, clap=Eb2/39, cowbell=Ab3/56)
 - Source: https://github.com/dave4mpls/midi-js-soundfonts-with-drums (gleitz
   fork that adds the GM percussion renders missing upstream)
 
+## Strings (strings/), Organ (organ/), E-piano (epiano/), Trumpet (trumpet/)
+
+**MusyngKite soundfont** pre-rendered per-note MP3s (string_ensemble_1,
+drawbar_organ, electric_piano_1, trumpet)
+- License: MIT — https://github.com/gleitz/midi-js-soundfonts (MusyngKite/)
+- Added 2026-07-19 (Band Jam feedback round 2)
+
+Note (2026-07-19, feedback round 2): bass swapped MusyngKite → **FluidR3
+electric_bass_finger** (MusyngKite render sustained like a church organ) and
+guitar-steel swapped MusyngKite → **FluidR3 acoustic_guitar_steel**.
+
 All note subsets match `SAMPLE_NOTES` in aimeat-audio.js exactly (nearest-sample
 pitch shift covers the gaps).
