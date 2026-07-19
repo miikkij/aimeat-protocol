@@ -7,8 +7,13 @@ description: >
 license: MIT
 metadata:
   author: AIMEAT
-  version: "1.0"
+  version: "1.1"
 ---
+
+> **Canonical version lives on the node.** This baked-in copy is a bootstrap seed. If the
+> `aimeat_skill_get` tool is available, fetch `node:aimeat-app-builder` and follow THAT
+> version — it is kept current (research flow, pitfall registry, new tooling). Both versions
+> agree on the core rule: the live spec at `GET /v1/prompts/build-app` always wins.
 
 # Building AIMEAT apps
 

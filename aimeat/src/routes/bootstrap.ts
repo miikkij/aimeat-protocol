@@ -18,6 +18,8 @@
  *   v1.5.0 -- 2026-07-16 -- sdk_libraries derived from the library-pack registry (drift kill,
  *     Library Acceleration Program Phase 1) + library_packs_endpoint; /llms.txt substitutes the
  *     {{LIBRARY_PACKS_TABLE}} token from the same registry
+ *   v1.6.0 -- 2026-07-19 -- app_building: builder_skill (node:aimeat-app-builder) +
+ *     pitfalls_endpoint (/v1/appdev/pitfalls) pointers (AppDev KB Phase 2)
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -220,9 +222,11 @@ export function bootstrapRouter(
               limitation: 'Memory keys limited to anonymous.* namespace',
             },
             app_building: {
-              note: 'When building an app, always use the standard template with the AIMEAT login bar. FIRST fetch the canonical build prompt: GET /v1/prompts/build-app (?format=txt for raw text, ?idea=<what to build>) — the same battle-tested prompt the app-catalog Create-new-app button copies. Starter skeletons: GET /v1/app-templates. See the "Building Apps on AIMEAT" section in /llms.txt for the full SDK documentation.',
+              note: 'When building an app, always use the standard template with the AIMEAT login bar. FIRST fetch the canonical build prompt: GET /v1/prompts/build-app (?format=txt for raw text, ?idea=<what to build>) — the same battle-tested prompt the app-catalog Create-new-app button copies. MCP-equipped agents: load the paved-path skill node:aimeat-app-builder via aimeat_skill_get. Starter skeletons: GET /v1/app-templates. Curated what-breaks-app-builds registry: GET /v1/appdev/pitfalls. See the "Building Apps on AIMEAT" section in /llms.txt for the full SDK documentation.',
               build_prompt: `${base}/v1/prompts/build-app`,
+              builder_skill: 'node:aimeat-app-builder (aimeat_skill_get) — the paved-path workflow skill',
               starter_templates_endpoint: `${base}/v1/app-templates`,
+              pitfalls_endpoint: `${base}/v1/appdev/pitfalls`,
               // Derived from the library-pack registry (src/data/library-packs.ts) — the
               // pre-registry hardcoded copy of this list had drifted from the build prompt.
               sdk_libraries: buildSdkLibrariesList(base),

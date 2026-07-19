@@ -5,6 +5,8 @@
  *   consumer read), cross-owner visibility, MCP aimeat_skill_* tools, and the presigned
  *   skill-directory ZIP upload including traversal/symlink rejection.
  * @version-history
+ *   v1.2.0 -- 2026-07-19 -- 27b3: seeded public aimeat-app-builder (AppDev KB Phase 2) —
+ *     present in the discovery index, digest-consistent, carries spec-first + research + pitfalls
  *   v1.1.0 -- 2026-07-14 -- Phase 5b: Agent Skills discovery index (/.well-known/agent-skills,
  *     RFC v0.2.0) — $schema + entry shape, sha256 digest match, members-only non-leak, 404s,
  *     seeded public aimeat-node-guide present + digest-consistent
@@ -640,6 +642,22 @@ await test('27b2. seeded aimeat-node-guide serves anonymously and its bytes hash
     assert(body.includes('device-authorize'), 'guide covers agent connection');
     assert(body.includes('/v1/prompts/build-app'), 'guide covers app building');
     assert(body.includes('handbook'), 'guide covers handbooks');
+});
+
+await test('27b3. seeded aimeat-app-builder is public and serves the paved-path workflow', async () => {
+    const idxRes = await rawFetch('/.well-known/agent-skills/index.json');
+    const idx = await idxRes.json() as any;
+    const entry = idx.skills.find((s: any) => s.name === 'aimeat-app-builder');
+    assert(entry, `aimeat-app-builder missing from index: ${JSON.stringify(idx.skills.map((s: any) => s.name))}`);
+    const res = await rawFetch('/.well-known/agent-skills/aimeat-app-builder/SKILL.md');
+    assert(res.status === 200, `status ${res.status}`);
+    const body = await res.text();
+    const actual = `sha256:${createHash('sha256').update(body, 'utf8').digest('hex')}`;
+    assert(actual === entry.digest, `served bytes hash ${actual} != index digest ${entry.digest}`);
+    assert(body.includes('/v1/prompts/build-app'), 'skill misses the spec-first rule');
+    assert(body.includes('/v1/appdev/pitfalls'), 'skill misses the pitfall registry');
+    assert(body.includes('Research before building'), 'skill misses the research phase');
+    assert(body.includes('aimeat_app_publish'), 'skill misses the MCP publish path');
 });
 
 await test('27c. SKILL.md URL serves the digested bytes anonymously; members-only + unknown skills 404', async () => {
