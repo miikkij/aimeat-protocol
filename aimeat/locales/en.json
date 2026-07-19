@@ -610,6 +610,7 @@
   "notif": {
     "title": "Notifications",
     "empty": "No notifications yet",
+    "clearAll": "Clear all",
     "action": {
       "reply": "Reply",
       "approve": "Approve",

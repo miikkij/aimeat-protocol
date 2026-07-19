@@ -26,6 +26,8 @@
  *     (presigned meta cannot express them; a re-upload never strips cortex deps / bundled agents).
  *   v1.5.0 — 2026-07-19 — handleAppUpload provisions the per-app subdomain at publish time
  *     (mirrors POST /v1/apps; pitfall publish/new-app-subdomain-provisioning-lag).
+ *   v1.6.0 — 2026-07-19 — handleAppUpload adds non-blocking `mobile_hints` (lintAppHtmlForMobile),
+ *     mirroring the inline publish path, so presigned publishes get the same phone-overflow hints.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -37,6 +39,7 @@ import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
 import { publishSkill, type SkillScope } from '../services/skills.js';
 import { parseGAII } from '../utils/gaii.js';
+import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
@@ -189,6 +192,10 @@ async function handleAppUpload(
     logger.info(`App ${isUpdate ? 'updated' : 'published'} via upload: ${filename} v${newVersion}`, { by: sub });
     emitResourceListChanged(sub);
 
+    // Non-blocking mobile hints — same static lint as the inline publish path; surfaced so the
+    // builder catches phone-overflow bugs (missing viewport, grid 1fr blowout) before users do.
+    const mobileHints = lintAppHtmlForMobile(data.toString('utf8'));
+
     res.json({
         success: true,
         type: 'app',
@@ -199,6 +206,7 @@ async function handleAppUpload(
         is_update: isUpdate,
         download_url: downloadUrl,
         inline_url: `${downloadUrl}?mode=inline`,
+        ...(mobileHints.length ? { mobile_hints: mobileHints } : {}),
     });
 }
 

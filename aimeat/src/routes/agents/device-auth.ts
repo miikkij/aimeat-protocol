@@ -9,6 +9,10 @@
  *     never cross-owner, an agent approver cannot grant scopes beyond its own token's, and the
  *     approval is attributed (approvedBy). Config gate: sameOwnerAutoApprove (default on).
  *     Approve flow extracted to approveDeviceAuth(), shared with the /verify consent path.
+ *   v1.2.0 — 2026-07-19 — device-authorize `owner` accepts the account's verified EMAIL as well as
+ *     the handle: an `owner` containing '@' is resolved (case-insensitive, verified-email only) to the
+ *     bare handle before anything downstream. Email only selects the target account — not an auth
+ *     factor — so the RFC 8628 approval semantics are unchanged.
  */
 import type { Router, Request } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -25,6 +29,7 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { emitChange } from '../../services/event-bus.js';
 import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { detectPlatform } from '../../services/platform-detector.js';
+import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { DEVICE_AUTH_EXPIRY_MS, VALID_MODES } from './constants.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
@@ -215,6 +220,21 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'agent_name is required'));
       return;
     }
+
+    // `owner` may be the account HANDLE (as today) or the account's verified EMAIL. An email only
+    // NAMES which account this device request targets — it is never an auth factor (the human still
+    // approves the device code while logged in). Everything downstream keys off the resolved bare
+    // handle, so resolve up front, before rate-limit/auto-approval/GAII construction.
+    let ownerName: string = owner;
+    if (typeof owner === 'string' && owner.includes('@')) {
+      const resolved = await resolveOwnerByVerifiedEmail(storage, owner);
+      if (!resolved.ok) {
+        const status = resolved.code === 'INVALID_EMAIL' ? 400 : resolved.code === 'AMBIGUOUS' ? 409 : 404;
+        res.status(status).json(error(config.nodeId, resolved.code, resolved.message));
+        return;
+      }
+      ownerName = resolved.ownerName;
+    }
     if (mode !== undefined && !VALID_MODES.includes(mode)) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
         `mode must be one of: ${VALID_MODES.join(', ')}`));
@@ -228,7 +248,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     }
 
     // Rate limit: max 10 pending per owner name
-    const pendingCount = await storage.countPendingDeviceAuthByOwner(owner);
+    const pendingCount = await storage.countPendingDeviceAuthByOwner(ownerName);
     if (pendingCount >= 10) {
       res.status(429).json(error(config.nodeId, 'RATE_LIMITED', 'Too many pending authorization requests for this owner'));
       return;
@@ -254,7 +274,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     const authRequest: DeviceAuthorizationRecord = {
       deviceCode,
       userCode,
-      ownerName: owner,
+      ownerName,
       agentName: agent_name,
       displayName: display_name,
       description,
@@ -280,7 +300,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     const requestedScopes: string[] = Array.isArray(scopes)
       ? scopes.filter((s: unknown) => typeof s === 'string')
       : config.defaultAgentScopes;
-    const principal = config.sameOwnerAutoApprove ? autoApprovePrincipal(req, owner) : null;
+    const principal = config.sameOwnerAutoApprove ? autoApprovePrincipal(req, ownerName) : null;
     if (principal) {
       const invalid = scopesExceedNodeMax(config, requestedScopes);
       if (invalid.length > 0) {
@@ -296,7 +316,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
         // OWNER decides — the request stays pending rather than failing the registration.
         autoApproveNote = `Scopes beyond the approving agent's own (${escalating.join(', ')}) need the owner's manual approval.`;
       } else {
-        const approvedByGaii = principal.kind === 'agent' ? req.auth!.sub : owner;
+        const approvedByGaii = principal.kind === 'agent' ? req.auth!.sub : ownerName;
         const result = await approveDeviceAuth(
           config, storage, authRequest, approvedByGaii, requestedScopes,
           req.headers['user-agent'] as string | undefined,

@@ -195,6 +195,7 @@ const ALL_SUITES = [
     'test/e2e-agent-skill-bundle.ts',
     'test/e2e-skills.ts',
     'test/e2e-agent-onboarding.ts',
+    'test/e2e-agent-connect-email.ts',
     'test/e2e-ecosystem-app-foundation.ts',
     'test/e2e-ecosystem-automation.ts',
     'test/e2e-ecosystem-automation-recipe.ts',

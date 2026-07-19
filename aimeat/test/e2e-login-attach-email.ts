@@ -1,20 +1,32 @@
 /**
  * @file e2e-login-attach-email.ts
- * @description E2E for recovering a legacy/unverified account during sign-in. Self-spawns a server with
- *   AIMEAT_EMAIL_CONFIRMATION_REQUIRED=true (the shared test server keeps it OFF so every other suite can
- *   log in without email) and exercises: the login gate returning email_required/has_email details, the
- *   no-auth POST /v1/ghii/login/attach-email endpoint (password re-verification, validation, email
- *   uniqueness, federation rejection), and its wiring into POST /v1/ghii/verify-email. The final
+ * @description E2E for recovering a legacy/unverified account during sign-in, and for registration under
+ *   the email gate. Self-spawns its own server (the shared test server keeps the gate OFF). Phase 0 boots
+ *   with the gate OFF and seeds accounts that PREDATE the gate (a no-email legacy account; a verified-email
+ *   account via code-invite), then RESTARTS the same DB with the gate ON. It exercises: registration
+ *   enforcement under the gate (no email → EMAIL_REQUIRED on both /v1/ghii and register-web; a fresh email →
+ *   verification_id; a taken verified email → EMAIL_TAKEN), the login gate returning email_required/has_email
+ *   details, the no-auth POST /v1/ghii/login/attach-email endpoint (password re-verification, validation,
+ *   email uniqueness, federation rejection), and its wiring into POST /v1/ghii/verify-email. The final
  *   "correct code → verificationLevel 1 → login succeeds" leg needs the plaintext code, which is only
  *   delivered over SMTP (absent here), so it is covered by the unchanged verify-email path + the wrong-code
  *   assertion below.
  * @version-history
+ *   v1.1.0 — 2026-07-19 — The "email already owned" 409 now requires a VERIFIED owner: emailHash is a
+ *     verified-email binding (an unverified register-web email no longer reserves the address), so the
+ *     taken-email account is provisioned with a verified email via the code-invite flow.
  *   v1.0.0 — 2026-07-08 — Initial suite for /v1/ghii/login/attach-email + login email-gate details
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
+import * as ed from '@noble/ed25519';
+import { createHash } from 'node:crypto';
+ed.hashes.sha512 = (m: Uint8Array) => new Uint8Array(createHash('sha512').update(m).digest());
+async function sign(privB64: string, msg: string): Promise<string> {
+    return Buffer.from(await ed.signAsync(new TextEncoder().encode(msg), Buffer.from(privB64, 'base64'))).toString('base64');
+}
 
 const PORT = process.env.E2E_ATTACH_EMAIL_PORT ?? '40268';
 const BASE = `http://localhost:${PORT}`;
@@ -40,15 +52,15 @@ function cleanupDb() {
     }
 }
 
-async function startServer(): Promise<ChildProcess> {
-    cleanupDb();
+async function startServer(gateOn: boolean, freshDb: boolean): Promise<ChildProcess> {
+    if (freshDb) cleanupDb();               // first boot wipes; the restart REUSES the same DB file
     const env = {
         ...process.env,
         AIMEAT_PORT: PORT,
         AIMEAT_BASE_URL: BASE,
         AIMEAT_NODE_ID: NODE_ID,
-        // The whole point of this suite: the operator requires a verified email to log in.
-        AIMEAT_EMAIL_CONFIRMATION_REQUIRED: 'true',
+        // The whole point of this suite: the operator requires a verified email to log in / register.
+        AIMEAT_EMAIL_CONFIRMATION_REQUIRED: gateOn ? 'true' : 'false',
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_RL_WORK: '1000',
         AIMEAT_RL_MEMORY: '1000', AIMEAT_RL_BOARDS: '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
@@ -65,31 +77,88 @@ async function startServer(): Promise<ChildProcess> {
     throw new Error('Server failed to start');
 }
 
+async function stopServer(child: ChildProcess): Promise<void> {
+    child.kill('SIGTERM');
+    const start = Date.now();
+    while (!child.killed && child.exitCode === null && Date.now() - start < 5000) {
+        await new Promise(r => setTimeout(r, 100));
+    }
+    await new Promise(r => setTimeout(r, 500)); // let the port + DB lock release before the restart
+}
+
 async function main() {
-    const server = await startServer();
+    const legacy = `legacy${Date.now() % 1000000}`;      // no-email account (the fatalii case)
+    const password = 'LegacyPass123';
+    const emailOwner = `hasmail${Date.now() % 1000000}`;  // holds a taken (verified) email
+    const takenEmail = `taken-${Date.now()}@example.com`;
+    let verificationId = '';
+
+    console.log('\n=== Login → attach-email recovery E2E ===\n');
+
+    // ── Phase 0: with the gate OFF, seed accounts that PREDATE the operator turning the gate on:
+    //    a no-email legacy account, and an account holding a verified email (via code-invite). ──
+    console.log('Phase 0 — seed pre-gate accounts (email gate OFF)');
+    let server = await startServer(false, true);
     try {
-        const legacy = `legacy${Date.now() % 1000000}`;      // no-email account (the fatalii case)
-        const password = 'LegacyPass123';
-        const emailOwner = `hasmail${Date.now() % 1000000}`;  // holds a taken email
-        const takenEmail = `taken-${Date.now()}@example.com`;
-        let verificationId = '';
-
-        console.log('\n=== Login → attach-email recovery E2E (email gate ON) ===\n');
-
-        console.log('Setup — register a no-email (legacy-style) account + an email-holding account');
-        await test('register no-email account WITH a password (POST /v1/ghii)', async () => {
-            // POST /v1/ghii sets a password but no email → exactly the legacy pre-email-mandate account.
-            // (register-web creates passwordless accounts, so it can't stand in for this case.)
+        await test('register no-email account WITH a password (POST /v1/ghii, gate off)', async () => {
             const { status, body } = await json('/v1/ghii', {
                 method: 'POST', body: JSON.stringify({ username: legacy, display_name: 'Legacy User', password }),
             });
             assert(status === 201, `status ${status}: ${JSON.stringify(body.error)}`);
         });
-        await test('register an account that already owns an email (register-web)', async () => {
-            const { status } = await json('/v1/ghii/register-web', {
-                method: 'POST', body: JSON.stringify({ username: emailOwner, display_name: 'Has Mail', email: takenEmail }),
+        await test('provision an account with a VERIFIED email (code-invite)', async () => {
+            // emailHash is a verified-email binding, so the "email taken" case below needs a VERIFIED
+            // owner. The code-invite flow is the only e2e-safe way to attach a verified email (no SMTP).
+            const reg = await json('/v1/ghii', { method: 'POST', body: JSON.stringify({ username: `inviter${Date.now() % 1000000}`, display_name: 'Inviter', password: 'InviteP123' }) });
+            assert(reg.status === 201, `inviter reg ${reg.status}`);
+            const inv = reg.body.data.owner.name as string;
+            const ts = new Date().toISOString();
+            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: inv, timestamp: ts, signature: await sign(reg.body.data.private_key, inv + NODE_ID + ts) }) });
+            const token = tok.body.data.token as string;
+            const org = await json('/v1/organisms', { method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: JSON.stringify({ name: 'Attach Org', type: 'project', join_policy: 'invite_only', visibility: 'public' }) });
+            assert(org.status === 201, `org ${org.status}`);
+            const mint = await json(`/v1/organisms/${org.body.data.organism.id}/invitations/code`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ email: takenEmail, username: emailOwner, code: 'SuperSecret99', display_name: 'Has Mail' }),
             });
-            assert(status === 201, `status ${status}`);
+            assert(mint.status === 201, `code mint ${mint.status}: ${JSON.stringify(mint.body.error)}`);
+        });
+    } finally {
+        await stopServer(server);
+    }
+
+    // ── Restart with the gate ON (same DB): the legacy account now exists but is unverified. ──
+    console.log('\nSwitching the email gate ON (restart, same DB)…');
+    server = await startServer(true, false);
+    try {
+        console.log('\nPhase 0b — registration is now gated (no email → refused)');
+        await test('register WITHOUT email under the gate → 400 EMAIL_REQUIRED (POST /v1/ghii)', async () => {
+            const { status, body } = await json('/v1/ghii', {
+                method: 'POST', body: JSON.stringify({ username: `noemail${Date.now() % 1000000}`, display_name: 'No Email', password }),
+            });
+            assert(status === 400, `expected 400, got ${status}`);
+            assert(body.error?.code === 'EMAIL_REQUIRED', `code ${body.error?.code}`);
+        });
+        await test('register WITHOUT email under the gate → 400 EMAIL_REQUIRED (register-web)', async () => {
+            const { status, body } = await json('/v1/ghii/register-web', {
+                method: 'POST', body: JSON.stringify({ username: `noemailw${Date.now() % 1000000}`, display_name: 'No Email Web' }),
+            });
+            assert(status === 400, `expected 400, got ${status}`);
+            assert(body.error?.code === 'EMAIL_REQUIRED', `code ${body.error?.code}`);
+        });
+        await test('register WITH a fresh email under the gate → 201 + verification_id (POST /v1/ghii)', async () => {
+            const { status, body } = await json('/v1/ghii', {
+                method: 'POST', body: JSON.stringify({ username: `withmail${Date.now() % 1000000}`, display_name: 'With Email', password, email: `fresh-${Date.now()}@example.com` }),
+            });
+            assert(status === 201, `expected 201, got ${status}: ${JSON.stringify(body.error)}`);
+            assert(typeof body.data.verification_id === 'string' && body.data.verification_id.length > 0, 'verification_id present');
+        });
+        await test('register WITH an already-verified email under the gate → 409 EMAIL_TAKEN', async () => {
+            const { status, body } = await json('/v1/ghii', {
+                method: 'POST', body: JSON.stringify({ username: `dupmail${Date.now() % 1000000}`, display_name: 'Dup', password, email: takenEmail }),
+            });
+            assert(status === 409, `expected 409, got ${status}`);
+            assert(body.error?.code === 'EMAIL_TAKEN', `code ${body.error?.code}`);
         });
 
         console.log('\nPhase 1 — login is gated and tells the client an email is required');

@@ -157,3 +157,9 @@ packages/*.zip
 
 # AEB proof scaffolder output (pnpm aeb:prove)
 aimeat/tools/aeb/runs/
+
+# AI-generated imagery (scripts/gen_image.py). Local only — copy the ones you want into the
+# project, or --upload them to AIMEAT storage. The generator's config holds secrets.
+genimages/
+scripts/.env
+

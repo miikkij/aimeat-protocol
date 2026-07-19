@@ -7,9 +7,13 @@
  *   list view unions the consent rows with the owner's DM conversation peers and resolves display
  *   names at read time (nothing cached on the row). Email lookup is EXACT-match only via the same
  *   privacy-preserving hash the invite flow uses.
- * @structure ContactsError; contactKind; listContactsMerged; saveContact; removeContact; resolveContactEmail.
+ * @structure ContactsError; contactKind; listContactsMerged; saveContact; removeContact;
+ *   resolveContactEmail; resolveOwnerByVerifiedEmail (verified email → owner handle, invariant-asserted).
  * @usage const { contacts } = await listContactsMerged(storage, config, ownerGhii, { q });
  * @version-history
+ *   v1.1.0 — 2026-07-19 — Add resolveOwnerByVerifiedEmail: verified-email → owner handle for
+ *     email-or-handle connect (device-auth --owner), reading the full match set to assert the
+ *     one-verified-email-per-account invariant instead of silently picking.
  *   v1.0.0 — 2026-07-16 — Initial: merged list, proactive save, gate-safe remove, email resolve.
  */
 import type { AimeatConfig } from '../config.js';
@@ -18,6 +22,7 @@ import { conversationIdFor } from '../utils/messaging.js';
 import { emitChange } from './event-bus.js';
 import { inviteEmailHash } from './invitations.js';
 import { getActiveEmailService } from './email.js';
+import { logger } from '../utils/logger.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -159,4 +164,38 @@ export async function resolveContactEmail(storage: Storage, email: string): Prom
   const rec = await storage.getGHIIByEmailHash(inviteEmailHash(clean));
   if (rec) return { found: true, ghii: rec.ghii, owner: rec.ghii.split('@')[0], display_name: rec.displayName ?? null };
   return { found: false, can_invite: !!getActiveEmailService()?.enabled };
+}
+
+export type ResolveOwnerByEmailResult =
+  | { ok: true; ownerName: string; ghii: string }
+  | { ok: false; code: 'INVALID_EMAIL' | 'NO_ACCOUNT' | 'AMBIGUOUS'; message: string };
+
+/**
+ * Resolve an account's VERIFIED email → its local owner handle, case-insensitively (same
+ * privacy-preserving hash as resolveContactEmail, gated to `emailVerifiedAt`). Used where a user may
+ * name their account by email instead of handle (e.g. the connector's device-auth `--owner`). The
+ * email only SELECTS the target account; it is never an authentication factor.
+ *
+ * Enforcement is layered: a partial-unique index on `emailHash` makes >1 verified match impossible at
+ * the DB, but we still read the full set and ASSERT it (log + AMBIGUOUS) rather than silently pick one,
+ * so any drift is surfaced loudly. Unverified email bindings never resolve.
+ */
+export async function resolveOwnerByVerifiedEmail(storage: Storage, email: string): Promise<ResolveOwnerByEmailResult> {
+  const clean = (email || '').trim().toLowerCase();
+  if (!clean || !EMAIL_RE.test(clean)) {
+    return { ok: false, code: 'INVALID_EMAIL', message: `"${email}" is not a valid email address.` };
+  }
+  const verified = (await storage.getGHIIsByEmailHash(inviteEmailHash(clean))).filter(m => !!m.emailVerifiedAt);
+  if (verified.length === 0) {
+    return { ok: false, code: 'NO_ACCOUNT', message: 'No account on this node has that email as a verified address.' };
+  }
+  if (verified.length > 1) {
+    // Should be impossible under the one-verified-email-per-account-per-node invariant (DB-enforced).
+    logger.error('Email→owner resolution is ambiguous: >1 account shares a verified email hash', {
+      matches: verified.map(m => m.ghii),
+    });
+    return { ok: false, code: 'AMBIGUOUS', message: 'That email maps to more than one account — contact the node operator.' };
+  }
+  const rec = verified[0];
+  return { ok: true, ownerName: rec.ownerName ?? rec.ghii.split('@')[0], ghii: rec.ghii };
 }

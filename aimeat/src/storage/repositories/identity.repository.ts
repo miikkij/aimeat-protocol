@@ -25,6 +25,12 @@ export interface IdentityRepository {
   getGHIIByOwner(ownerName: string): Promise<GHIIRecord | null>;
   updateGHII(ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null>;
   getGHIIByEmailHash(emailHash: string): Promise<GHIIRecord | null>;
+  /**
+   * ALL GHII records sharing an email hash. Normally 0 or 1 (the one-verified-email-per-account-per-node
+   * invariant is DB-enforced by a partial-unique index), but the resolver still reads the full set so a
+   * would-be duplicate is ASSERTED (logged + treated as ambiguous) rather than silently picked.
+   */
+  getGHIIsByEmailHash(emailHash: string): Promise<GHIIRecord[]>;
   getGHIIByGoogleSub(googleSub: string): Promise<GHIIRecord | null>;
   /** Look up a GHII by an external OIDC identity (provider id + stable subject). */
   getGHIIByExternalId(provider: string, sub: string): Promise<GHIIRecord | null>;

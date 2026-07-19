@@ -5,9 +5,12 @@
  *   profile (optionally with a password hash, a verified email, and/or a linked external identity),
  *   and records the welcome-bonus transaction. Used by the OIDC signup finalize path and the email
  *   invitation accept path so account creation stays identical across entry points.
- * @structure ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
+ * @structure ProvisionEmailTakenError; ProvisionOwnerOpts / ProvisionedOwner; provisionOwner(storage, config, opts).
  * @usage const { owner, ghii } = await provisionOwner(storage, config, { username, displayName, passwordHash });
  * @version-history
+ *   v1.1.0 — 2026-07-19 — Enforce one-verified-email-per-account-per-node: reject a verifiedEmail already
+ *     bound elsewhere BEFORE creating any rows (ProvisionEmailTakenError), so the DB-unique emailHash can
+ *     never leave a dangling owner.
  *   v1.0.0 — 2026-07-04 — Extracted from oauth-login.createOwnerForProvider + /v1/ghii register, for
  *     reuse by the email-invitation accept flow.
  */
@@ -19,6 +22,12 @@ import { generateKeyPair } from '../auth/keypair.js';
 /** SHA-256 hex of a normalized email — matches GHII.emailHash hashing everywhere else. */
 function emailHashOf(email: string): string {
   return createHash('sha256').update(email.toLowerCase().trim()).digest('hex');
+}
+
+/** Thrown by provisionOwner when the requested verified email is already bound to another account.
+ *  Callers map it to a 409 EMAIL_TAKEN. */
+export class ProvisionEmailTakenError extends Error {
+  constructor(message: string) { super(message); this.name = 'ProvisionEmailTakenError'; }
 }
 
 export interface ProvisionOwnerOpts {
@@ -56,6 +65,18 @@ export async function provisionOwner(
 ): Promise<ProvisionedOwner> {
   const { username, displayName } = opts;
   const now = new Date().toISOString();
+
+  // One-email-per-account-per-node: refuse to provision a verified email already bound elsewhere BEFORE
+  // creating any rows (the GHII's emailHash is DB-unique — creating the owner first would leave a
+  // dangling owner when createGHII hit the constraint). Callers surface this as a clean 4xx.
+  const verifiedEmail = opts.verifiedEmail ? opts.verifiedEmail.toLowerCase().trim() : null;
+  if (verifiedEmail) {
+    const taken = await storage.getGHIIByEmailHash(emailHashOf(verifiedEmail));
+    if (taken) {
+      throw new ProvisionEmailTakenError(`Email already registered to ${taken.ghii}`);
+    }
+  }
+
   const keyPair = await generateKeyPair();
 
   // First real owner becomes operator (self-heal: also promote if no operator exists anywhere).
@@ -73,7 +94,7 @@ export async function provisionOwner(
     createdAt: now,
   });
 
-  const verified = opts.verifiedEmail ? opts.verifiedEmail.toLowerCase().trim() : null;
+  const verified = verifiedEmail;
   const ghii = `${username}@${config.nodeId}`;
   const ghiiRecord = await storage.createGHII({
     username,
