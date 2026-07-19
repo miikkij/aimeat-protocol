@@ -9,6 +9,7 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-07-19 — publish/draft_publish next_steps nudge (face+bound-skills+template hint, best-effort) (AppDev KB Phase 6)
  *   v1.0.0 — 2026-05-02 — Initial creation: 5 tools for app publish, list, get, delete, versions
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -36,6 +37,8 @@ import { generateDraftToken } from '../services/draft-token.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { agentFaceKey } from '../services/agent-face.js';
+import { listSkillsByBinding } from '../services/skills.js';
 
 export function registerAppsTools(
     mcp: McpServer,
@@ -45,6 +48,23 @@ export function registerAppsTools(
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
 ): void {
+
+    // Post-publish reflection nudge (AppDev KB Phase 6): report whether the app already has an
+    // agent face + bound skills, and hint at proposing a template. Best-effort — a publish must
+    // NEVER fail because this enrichment does.
+    async function buildNextSteps(ownerGaii: string, ownerName: string, filename: string): Promise<Record<string, unknown> | undefined> {
+        try {
+            const [faceRec, boundSkills] = await Promise.all([
+                storage.getMemory(ownerGaii, agentFaceKey(filename)).catch(() => null),
+                listSkillsByBinding(storage, config, `app:${ownerName}/${filename}`, { ownerName }).catch(() => []),
+            ]);
+            return {
+                agent_face_present: !!faceRec,
+                bound_skills_count: boundSkills.length,
+                template_proposal_hint: 'If anything here generalizes, record it: aimeat_app_template_propose (with your model id). Finish checklist: agent face published, a skill bound (metadata.binding app:owner/filename), learnings reported via aimeat_appdev_pitfall_report.',
+            };
+        } catch { return undefined; }
+    }
 
     // ── Tool 1: aimeat_app_publish ──
     mcp.tool(
@@ -208,6 +228,7 @@ export function registerAppsTools(
                             is_update: isUpdate,
                             download_url: downloadUrl,
                             inline_url: `${downloadUrl}?mode=inline`,
+                            next_steps: await buildNextSteps(ownerGaii, parsed.owner, filename),
                         }, null, 2),
                     }],
                 };
@@ -337,6 +358,7 @@ export function registerAppsTools(
                             filename, version_number: newVersion, is_update: isUpdate,
                             parked: parkedState, download_url: downloadUrl, inline_url: `${downloadUrl}?mode=inline`,
                             note: 'Draft published as the new live version; the draft slot is cleared.',
+                            next_steps: await buildNextSteps(ownerGaii, parsed.owner, filename),
                         }, null, 2),
                     }],
                 };

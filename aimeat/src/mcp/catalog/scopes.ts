@@ -54,6 +54,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     // — a stricter gate would just dead-end the tool for every appdev-profile agent.
     aimeat_appdev_pitfall_report: 'memory:write',
     aimeat_appdev_pitfall_delete: 'memory:write',
+    // Template proposals are owner-GHII memory records; same reasoning as above.
+    aimeat_app_template_propose: 'memory:write',
+    aimeat_app_template_delete: 'memory:write',
 
     // Boards / social (mutations → social:write; subscribe → social:read).
     // NOTE: aimeat_board_read / aimeat_board_list are intentionally NOT gated — the REST

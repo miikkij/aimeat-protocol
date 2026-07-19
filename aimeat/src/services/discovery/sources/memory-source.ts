@@ -14,6 +14,8 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.3.0 — 2026-07-19 — AppDev KB Phase 6: the `templates` source referenced below now actually
+ *     exists (sources/templates-source.ts) — until now the exclusion had no owning source or writer.
  *   v0.2.0 — 2026-06-24 — Secretary P5 (S-D): exclude template.catalog.* (owned by the `templates`
  *     source) so a published template surfaces once, as type 'template', not also as generic 'memory'.
  *   v0.1.0 — 2026-06-23 — Phase 1: memory/FTS source over searchText + listing (design doc 2026-06-23).
