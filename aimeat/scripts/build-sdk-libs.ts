@@ -59,6 +59,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'markdown', entry: 'markdown/index.js' },
   { name: 'audio', entry: 'audio/index.js' },
   { name: 'tunnel', entry: 'tunnel/index.js' },
+  { name: 'auth', entry: 'auth/index.js' },
 ];
 
 function banner(name: string): string {
