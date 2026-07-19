@@ -2,6 +2,8 @@
  * @file src/routes/libs/audio-lib-part2.ts
  * @description aimeat-audio.js browser library source, tail segment (sample loader, custom synth, soundboard, realtime bridge, global expose). Extracted from lib-audio.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-19 — SAMPLE_NOTES gains guitar-steel + guitar-el (MusyngKite sample sets
+ *     shipped under /lib/samples); loadSamples supports the new ids out of the box
  *   v1.0.0 — 2026-07-13 — Extracted from lib-audio.ts (max-file-lines)
  */
 export function aimeatAudioLibPart2(): string {
@@ -124,6 +126,8 @@ var soundboard = {
 var SAMPLE_NOTES = {
   piano: ['A2','C3','Ds3','A3','C4','Ds4','A4','C5','Ds5','C6','C7'],
   guitar: ['E2','A2','D3','G3','B3','E4','A4','E5'],
+  'guitar-steel': ['E2','A2','D3','G3','B3','E4','A4','E5'],
+  'guitar-el': ['E2','A2','D3','G3','B3','E4','A4','E5'],
   bass: ['E1','A1','D2','G2','B2','E3'],
   flute: ['C4','E4','A4','C5','E5','A5','C6'],
   drums: ['kick','snare','hihat','hihat-open','crash','ride','tom-high','tom-mid','tom-low','clap','cowbell']

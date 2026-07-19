@@ -12,17 +12,30 @@ redistribution in MIT-licensed software.
 - CDN: https://tonejs.github.io/audio/salamander/
 - Attribution: Piano samples by Alexander Holm, CC BY 3.0
 
+## Guitar (guitar/)
+
+**FluidR3_GM** acoustic_guitar_nylon pre-rendered per-note MP3s
+- License: MIT — https://github.com/gleitz/midi-js-soundfonts
+
+## Guitar steel (guitar-steel/), Guitar electric (guitar-el/), Bass (bass/), Flute (flute/)
+
+**MusyngKite soundfont** pre-rendered per-note MP3s (acoustic_guitar_steel,
+electric_guitar_clean, electric_bass_finger, flute) — higher-quality renders
+than FluidR3 (the soundfont-player default for the same reason)
+- License: MIT
+- Source: https://github.com/gleitz/midi-js-soundfonts
+- CDN: https://gleitz.github.io/midi-js-soundfonts/MusyngKite/
+- bass + flute upgraded from FluidR3 → MusyngKite 2026-07-19
+
 ## Drums (drums/)
 
-To be populated. Built-in synthesis provides drum sounds without samples.
-
-## Guitar (guitar/), Bass (bass/), Flute (flute/)
-
-**FluidR3_GM soundfont** pre-rendered per-note MP3s (acoustic_guitar_nylon,
-acoustic_bass, flute)
+**FluidR3_GM percussion** (GM drum channel) pre-rendered MP3s, renamed from GM
+note names to the `SAMPLE_NOTES.drums` ids (kick=C2/36, snare=D2/38, hihat=Gb2/42,
+hihat-open=Bb2/46, crash=Db3/49, ride=Eb3/51, tom-low=G2/43, tom-mid=B2/47,
+tom-high=D3/50, clap=Eb2/39, cowbell=Ab3/56)
 - License: MIT
-- Source: https://github.com/gleitz/midi-js-soundfonts (Benjamin Gleitzman's
-  pre-rendered renders of Frank Wen's FluidR3_GM soundfont)
-- CDN: https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/
-- Populated 2026-07-19 with the exact note subsets `SAMPLE_NOTES` in
-  aimeat-audio.js expects (nearest-sample pitch shift covers the gaps).
+- Source: https://github.com/dave4mpls/midi-js-soundfonts-with-drums (gleitz
+  fork that adds the GM percussion renders missing upstream)
+
+All note subsets match `SAMPLE_NOTES` in aimeat-audio.js exactly (nearest-sample
+pitch shift covers the gaps).
