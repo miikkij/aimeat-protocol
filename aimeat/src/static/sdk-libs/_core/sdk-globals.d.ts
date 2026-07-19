@@ -21,6 +21,8 @@ interface Window {
   AIMEATAgentFace?: Record<string, any>;
   /** Serve-time config prelude prepended to each bundle (see _core/config.js + libs/sdk-serve.ts). */
   __AIMEAT_SDK_CFG__?: { nodeId: string; baseUrl: string; heartbeatMs?: number };
+  /** aimeat-header's idempotency guard (mounts the canonical nav at most once). */
+  __AIMEAT_HEADER_MOUNTED__?: boolean;
   /** Safari's prefixed AudioContext. */
   webkitAudioContext?: typeof AudioContext;
   // SpeechRecognition / webkitSpeechRecognition have no lib.dom type; the instance API is accessed

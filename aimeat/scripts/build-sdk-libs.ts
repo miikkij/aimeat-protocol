@@ -48,6 +48,9 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'organism', entry: 'organism/index.js' },
   { name: 'workflows', entry: 'workflows/index.js' },
   { name: 'portfolio-standalone', entry: 'portfolio-standalone/index.js' },
+  { name: 'header', entry: 'header/index.js' },
+  { name: 'editor', entry: 'editor/index.js' },
+  { name: 'live', entry: 'live/index.js' },
 ];
 
 function banner(name: string): string {
