@@ -24,6 +24,7 @@
     "check:no-max-tokens": "cd aimeat && pnpm check:no-max-tokens",
     "build:app-catalog": "cd aimeat && pnpm build:app-catalog",
     "check:app-catalog": "cd aimeat && pnpm check:app-catalog",
+    "check:mcp-tools": "cd aimeat && pnpm check:mcp-tools",
     "telemetry:stats": "cd aimeat && pnpm telemetry:stats",
     "telemetry:prune": "cd aimeat && pnpm telemetry:prune",
     "consent-audit:stats": "cd aimeat && pnpm consent-audit:stats",

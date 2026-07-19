@@ -219,9 +219,11 @@ describe('requireScope', () => {
     });
 
     describe('operator bypass', () => {
+        // Operator principals always co-carry the 'owner' role in production
+        // (operator ⊂ owner); the scope bypass keys off 'owner'. operator-only is never minted.
         it('operators bypass all scope checks', () => {
             const mw = requireScope('memory:read', 'catalogue:write', 'wallet:transfer');
-            const req = mockReq({ auth: token({ roles: ['operator'], scopes: [] }) });
+            const req = mockReq({ auth: token({ roles: ['owner', 'operator'], scopes: [] }) });
             const res = mockRes();
             const next = vi.fn();
 
@@ -232,7 +234,7 @@ describe('requireScope', () => {
 
         it('operator with empty scopes still passes', () => {
             const mw = requireScope('social:admin');
-            const req = mockReq({ auth: token({ roles: ['operator'], scopes: [] }) });
+            const req = mockReq({ auth: token({ roles: ['owner', 'operator'], scopes: [] }) });
             const res = mockRes();
             const next = vi.fn();
 

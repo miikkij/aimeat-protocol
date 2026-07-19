@@ -7,6 +7,8 @@
  *   workspace_* / organism create/backup handlers that blocked deterministic CrewAI crews from
  *   reading/writing organism workspaces through the no-LLM shell path.
  * @version-history
+ *   v1.1.0 -- 2026-07-19 -- Connector reachability: every cliFallback tool now has a shell handler
+ *     (message_history maps to GET /v1/agents/:name/messages), so the known-missing list is empty.
  *   v1.0.0 -- 2026-06-09 -- Initial: cliFallback ↔ CONNECT_CLI_TOOLS parity, both directions.
  */
 import { describe, it, expect } from 'vitest';
@@ -19,10 +21,7 @@ import { CONNECT_CLI_TOOLS } from '../../src/cli/connect/tool-call.js';
  * deleting a handler) fails the test below — intentional: the shell surface must not advertise a tool
  * it cannot run. To close one: add a handler to CONNECT_CLI_TOOLS and delete it from here.
  */
-const KNOWN_MISSING_CLI_HANDLERS = [
-  // No agent-facing REST route — the server MCP reads storage directly (storage.listMessages).
-  'aimeat_message_history',
-].sort();
+const KNOWN_MISSING_CLI_HANDLERS: string[] = [].sort();
 
 const WORKSPACE_AND_ORGANISM_SHELL_TOOLS = [
   'aimeat_workspace_list', 'aimeat_workspace_read', 'aimeat_workspace_write', 'aimeat_workspace_publish',

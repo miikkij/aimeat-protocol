@@ -248,4 +248,56 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     const resp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/comments?${params.toString()}`);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });
+
+  const out = (resp: { data?: unknown; ok?: boolean }) =>
+    ({ content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) });
+
+  // → POST /v1/organisms/:id/(archive|unarchive) — archive/restore an organism or a scoped subtree.
+  mcp.tool('aimeat_organism_archive', descriptionFor('aimeat_organism_archive'), {
+    organism_id: z.string().describe('The organism id.'),
+    level: z.string().describe('Archive scope: organism | workspace | namespace | key.'),
+    action: z.enum(['archive', 'unarchive']).optional().describe('Default archive.'),
+    ws: z.string().optional().describe('Workspace id (for level=workspace/namespace/key).'),
+    namespace: z.string().optional().describe('Namespace (for level=namespace/key).'),
+    key: z.string().optional().describe('Record key (for level=key).'),
+  }, annotationsFor('aimeat_organism_archive'), async ({ organism_id, level, action, ws, namespace, key }) => {
+    const act = action === 'unarchive' ? 'unarchive' : 'archive';
+    const body: Record<string, unknown> = { level };
+    if (ws) body.ws = ws;
+    if (namespace) body.namespace = namespace;
+    if (key) body.key = key;
+    return out(await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/${act}`, body));
+  });
+
+  // → POST /v1/organisms/:id/invitations/email — invite an external email (creator/admin).
+  mcp.tool('aimeat_organism_invite_email', descriptionFor('aimeat_organism_invite_email'), {
+    organism_id: z.string().describe('The organism id.'),
+    email: z.string().describe('Email address to invite.'),
+    org_role: z.enum(['member', 'admin']).optional().describe('Organism role granted on accept (default member).'),
+    workspaces: z.array(z.object({ ws: z.string(), role: z.enum(['viewer', 'contributor']) })).optional().describe('Optional per-workspace grants.'),
+    message: z.string().optional().describe('Optional personal note included in the email.'),
+    expires_in_days: z.number().int().positive().optional().describe('Days until the invitation expires (1-30, default 7).'),
+  }, annotationsFor('aimeat_organism_invite_email'), async ({ organism_id, email, org_role, workspaces, message, expires_in_days }) => {
+    const body: Record<string, unknown> = { email };
+    if (org_role) body.orgRole = org_role;
+    if (workspaces) body.workspaces = workspaces;
+    if (message) body.message = message;
+    if (expires_in_days !== undefined) body.expiresInDays = expires_in_days;
+    return out(await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/email`, body));
+  });
+
+  // → GET /v1/organisms/:id/invitations/email — list pending email invitations.
+  mcp.tool('aimeat_organism_invitations_email', descriptionFor('aimeat_organism_invitations_email'), {
+    organism_id: z.string().describe('The organism id.'),
+  }, annotationsFor('aimeat_organism_invitations_email'), async ({ organism_id }) => {
+    return out(await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/email`));
+  });
+
+  // → POST /v1/organisms/:id/invitations/email/:invId/cancel — cancel a pending email invitation.
+  mcp.tool('aimeat_organism_invitation_email_cancel', descriptionFor('aimeat_organism_invitation_email_cancel'), {
+    organism_id: z.string().describe('The organism id.'),
+    invitation_id: z.string().describe('The invitation id to cancel.'),
+  }, annotationsFor('aimeat_organism_invitation_email_cancel'), async ({ organism_id, invitation_id }) => {
+    return out(await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/invitations/email/${encodeURIComponent(invitation_id)}/cancel`));
+  });
 }

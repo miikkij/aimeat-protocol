@@ -487,7 +487,7 @@ describe('workspaceAccessMiddleware', () => {
       expect(nextCalled).toBe(false);
       expect(res._status).toBe(403);
       expect(res._body.error.code).toBe('CONSENT_REQUIRED');
-      expect(res._body.error.message).toContain('No agent found');
+      expect(res._body.error.message).toContain('Active consent required');
     });
 
     it('returns 403 CONSENT_REQUIRED when no matching consent exists', async () => {

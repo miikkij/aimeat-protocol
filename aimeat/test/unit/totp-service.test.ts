@@ -34,10 +34,10 @@ describe('setupTotp', () => {
     expect(uniqueCodes.size).toBe(result.backupCodes.length);
   });
 
-  it('backup codes are 8 hex characters', async () => {
+  it('backup codes are 12 hex characters', async () => {
     const result = await setupTotp('testuser', BASE_CONFIG);
     for (const code of result.backupCodes) {
-      expect(code).toMatch(/^[0-9a-f]{8}$/);
+      expect(code).toMatch(/^[0-9a-f]{12}$/);
     }
   });
 
@@ -140,10 +140,10 @@ describe('generateBackupCodes', () => {
     expect(result.hashed).toHaveLength(10);
   });
 
-  it('generates 8-char hex codes', () => {
+  it('generates 12-char hex codes', () => {
     const result = generateBackupCodes(5);
     for (const code of result.plain) {
-      expect(code).toMatch(/^[0-9a-f]{8}$/);
+      expect(code).toMatch(/^[0-9a-f]{12}$/);
     }
   });
 

@@ -56,6 +56,30 @@ function makeConfig(overrides: Partial<AimeatConfig> = {}): AimeatConfig {
     } as AimeatConfig;
 }
 
+// Post the 2026-03-17 single-balance migration (commit ecbd26f8), the morsel balance lives on
+// the owner GHII, not on the agent. debit/credit/transfer resolve any GAII → owner GHII.
+// These helpers seed an owner GHII and read the balance behind any identity.
+async function seedOwner(storage: SqliteStorage, ownerName: string): Promise<void> {
+    await storage.createGHII({
+        username: ownerName,
+        nodeId: 'test-node',
+        ghii: `${ownerName}@test-node`,
+        displayName: ownerName,
+        verificationLevel: 1,
+        ownerName,
+        totpEnabled: false,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+    });
+}
+
+async function balOf(storage: SqliteStorage, identity: string): Promise<number> {
+    const ghii = storage.resolveGhii(identity);
+    if (!ghii) return 0;
+    const rec = await storage.getGHII(ghii);
+    return rec?.morselBalance ?? 0;
+}
+
 // ════════════════════════════════════════════════════════════════════
 // ── calculateWorkCost ──
 // ════════════════════════════════════════════════════════════════════
@@ -106,213 +130,30 @@ describe('calculateWorkCost', () => {
 });
 
 // ════════════════════════════════════════════════════════════════════
-// ── Balance Operations (via SqliteStorage) ──
-// ════════════════════════════════════════════════════════════════════
-
-describe('Balance operations (SqliteStorage)', () => {
-    let storage: SqliteStorage;
-    const GAII_A = 'alice#test-owner@test-node';
-    const GAII_B = 'bob#test-owner@test-node';
-
-    beforeEach(async () => {
-        storage = new SqliteStorage(':memory:');
-        await storage.createAgent(makeAgent({ gaii: GAII_A, name: 'alice', morselBalance: 1000 }));
-        await storage.createAgent(makeAgent({ gaii: GAII_B, name: 'bob', morselBalance: 500 }));
-    });
-
-    // ── Debit ──
-
-    it('debit reduces balance correctly', async () => {
-        const ok = await storage.debitBalance(GAII_A, 300);
-        expect(ok).toBe(true);
-
-        const agent = await storage.getAgent(GAII_A);
-        expect(agent!.morselBalance).toBe(700);
-    });
-
-    it('debit exact balance to zero succeeds', async () => {
-        const ok = await storage.debitBalance(GAII_A, 1000);
-        expect(ok).toBe(true);
-
-        const agent = await storage.getAgent(GAII_A);
-        expect(agent!.morselBalance).toBe(0);
-    });
-
-    it('negative balance is prevented — debit more than available', async () => {
-        const ok = await storage.debitBalance(GAII_A, 1001);
-        expect(ok).toBe(false);
-
-        // Balance must be unchanged
-        const agent = await storage.getAgent(GAII_A);
-        expect(agent!.morselBalance).toBe(1000);
-    });
-
-    it('debit zero succeeds but does not change balance', async () => {
-        const ok = await storage.debitBalance(GAII_A, 0);
-        // SQLite: morselBalance >= 0 is true, but changes may be 0 due to no actual row change
-        // The important thing is balance stays the same
-        const agent = await storage.getAgent(GAII_A);
-        expect(agent!.morselBalance).toBe(1000);
-    });
-
-    it('debit non-existent agent returns false', async () => {
-        const ok = await storage.debitBalance('nonexistent#owner@node', 10);
-        expect(ok).toBe(false);
-    });
-
-    // ── Credit ──
-
-    it('credit increases balance correctly', async () => {
-        const ok = await storage.creditBalance(GAII_A, 200);
-        expect(ok).toBe(true);
-
-        const agent = await storage.getAgent(GAII_A);
-        expect(agent!.morselBalance).toBe(1200);
-    });
-
-    it('credit zero does not change balance', async () => {
-        const ok = await storage.creditBalance(GAII_A, 0);
-        const agent = await storage.getAgent(GAII_A);
-        expect(agent!.morselBalance).toBe(1000);
-    });
-
-    it('credit non-existent agent returns false', async () => {
-        const ok = await storage.creditBalance('nonexistent#owner@node', 100);
-        expect(ok).toBe(false);
-    });
-
-    // ── Transfer ──
-
-    it('transfer preserves total supply (sum of balances stays the same)', async () => {
-        const totalBefore = 1000 + 500; // GAII_A + GAII_B
-
-        const ok = await storage.transferBalance(GAII_A, GAII_B, 400);
-        expect(ok).toBe(true);
-
-        const agentA = await storage.getAgent(GAII_A);
-        const agentB = await storage.getAgent(GAII_B);
-        expect(agentA!.morselBalance).toBe(600);
-        expect(agentB!.morselBalance).toBe(900);
-        expect(agentA!.morselBalance + agentB!.morselBalance).toBe(totalBefore);
-    });
-
-    it('transfer entire balance works', async () => {
-        const ok = await storage.transferBalance(GAII_A, GAII_B, 1000);
-        expect(ok).toBe(true);
-
-        const agentA = await storage.getAgent(GAII_A);
-        const agentB = await storage.getAgent(GAII_B);
-        expect(agentA!.morselBalance).toBe(0);
-        expect(agentB!.morselBalance).toBe(1500);
-    });
-
-    it('transfer more than available fails and preserves both balances', async () => {
-        const ok = await storage.transferBalance(GAII_A, GAII_B, 2000);
-        expect(ok).toBe(false);
-
-        const agentA = await storage.getAgent(GAII_A);
-        const agentB = await storage.getAgent(GAII_B);
-        expect(agentA!.morselBalance).toBe(1000);
-        expect(agentB!.morselBalance).toBe(500);
-    });
-
-    it('transfer to non-existent agent — sender is debited but credit silently fails', async () => {
-        // This tests the current atomic transaction behavior:
-        // SQLite: debit succeeds, then credit UPDATE hits 0 rows but doesn't fail
-        // The transaction is atomic so both run in the same txn
-        const ok = await storage.transferBalance(GAII_A, 'nonexistent#owner@node', 100);
-        // transferBalance returns true if debit succeeds (credit UPDATE runs but may match 0 rows)
-        // Let's verify the actual behavior
-        const agentA = await storage.getAgent(GAII_A);
-        // Whether transfer returns true or false, balance integrity matters
-        if (ok) {
-            // If transfer "succeeded" (debit worked), sender was debited
-            expect(agentA!.morselBalance).toBe(900);
-        } else {
-            // If transfer failed atomically, no change
-            expect(agentA!.morselBalance).toBe(1000);
-        }
-    });
-
-    // ── creditBalanceCapped ──
-
-    it('creditBalanceCapped credits up to cap', async () => {
-        // Agent A has 1000, cap is 1200, add 500 → should only add 200
-        const credited = await storage.creditBalanceCapped(GAII_A, 500, 1200);
-        expect(credited).toBe(200);
-
-        const agent = await storage.getAgent(GAII_A);
-        expect(agent!.morselBalance).toBe(1200);
-    });
-
-    it('creditBalanceCapped returns 0 when already at cap', async () => {
-        const credited = await storage.creditBalanceCapped(GAII_A, 100, 1000);
-        expect(credited).toBe(0);
-
-        const agent = await storage.getAgent(GAII_A);
-        expect(agent!.morselBalance).toBe(1000);
-    });
-
-    it('creditBalanceCapped returns 0 when above cap', async () => {
-        const credited = await storage.creditBalanceCapped(GAII_A, 100, 500);
-        expect(credited).toBe(0);
-
-        const agent = await storage.getAgent(GAII_A);
-        expect(agent!.morselBalance).toBe(1000);
-    });
-
-    it('creditBalanceCapped credits full amount when well below cap', async () => {
-        const credited = await storage.creditBalanceCapped(GAII_B, 100, 2000);
-        expect(credited).toBe(100);
-
-        const agent = await storage.getAgent(GAII_B);
-        expect(agent!.morselBalance).toBe(600);
-    });
-
-    it('creditBalanceCapped returns 0 for non-existent agent', async () => {
-        const credited = await storage.creditBalanceCapped('nonexistent#o@n', 100, 500);
-        expect(credited).toBe(0);
-    });
-
-    // ── Multiple sequential debits ──
-
-    it('multiple sequential debits drain balance correctly', async () => {
-        await storage.debitBalance(GAII_A, 300);
-        await storage.debitBalance(GAII_A, 300);
-        await storage.debitBalance(GAII_A, 300);
-
-        const agent = await storage.getAgent(GAII_A);
-        expect(agent!.morselBalance).toBe(100);
-
-        // The 4th debit of 300 should fail (only 100 left)
-        const ok = await storage.debitBalance(GAII_A, 300);
-        expect(ok).toBe(false);
-        const agentAfter = await storage.getAgent(GAII_A);
-        expect(agentAfter!.morselBalance).toBe(100);
-    });
-});
-
-// ════════════════════════════════════════════════════════════════════
 // ── Escrow Flows (holdEscrow / settlePayment / returnEscrow) ──
 // ════════════════════════════════════════════════════════════════════
 
 describe('Escrow flows (morsel service)', () => {
     let storage: SqliteStorage;
-    const REQUESTER = 'requester#owner@node';
-    const PROVIDER = 'provider#owner@node';
+    // Distinct owners: under the single-balance model requester and provider must not share an
+    // owner GHII, or the escrow debit and settlement credit would net against one balance.
+    const REQUESTER = 'requester#reqowner@node';
+    const PROVIDER = 'provider#provowner@node';
 
     beforeEach(async () => {
         storage = new SqliteStorage(':memory:');
-        await storage.createAgent(makeAgent({ gaii: REQUESTER, name: 'requester', morselBalance: 1000 }));
-        await storage.createAgent(makeAgent({ gaii: PROVIDER, name: 'provider', morselBalance: 0 }));
+        await storage.createAgent(makeAgent({ gaii: REQUESTER, name: 'requester' }));
+        await storage.createAgent(makeAgent({ gaii: PROVIDER, name: 'provider' }));
+        await seedOwner(storage, 'reqowner');
+        await seedOwner(storage, 'provowner');
+        await storage.creditBalance(REQUESTER, 1000); // fund requester's owner GHII
     });
 
     it('holdEscrow reduces requester balance', async () => {
         const ok = await holdEscrow(storage, REQUESTER, PROVIDER, 'wk-001', 110);
         expect(ok).toBe(true);
 
-        const agent = await storage.getAgent(REQUESTER);
-        expect(agent!.morselBalance).toBe(890);
+        expect(await balOf(storage, REQUESTER)).toBe(890);
     });
 
     it('holdEscrow creates a transaction record', async () => {
@@ -333,8 +174,7 @@ describe('Escrow flows (morsel service)', () => {
         expect(ok).toBe(false);
 
         // Balance unchanged
-        const agent = await storage.getAgent(REQUESTER);
-        expect(agent!.morselBalance).toBe(1000);
+        expect(await balOf(storage, REQUESTER)).toBe(1000);
     });
 
     it('settlePayment credits provider with base price', async () => {
@@ -354,8 +194,7 @@ describe('Escrow flows (morsel service)', () => {
         const result = await settlePayment(storage, config, work);
         expect(result.providerEarnings).toBe(100);
 
-        const provider = await storage.getAgent(PROVIDER);
-        expect(provider!.morselBalance).toBe(100);
+        expect(await balOf(storage, PROVIDER)).toBe(100);
     });
 
     it('settlePayment burns correct portion of network fee', async () => {
@@ -402,7 +241,7 @@ describe('Escrow flows (morsel service)', () => {
 
     it('returnEscrow returns funds to requester', async () => {
         await holdEscrow(storage, REQUESTER, PROVIDER, 'wk-cancel', 110);
-        expect((await storage.getAgent(REQUESTER))!.morselBalance).toBe(890);
+        expect(await balOf(storage, REQUESTER)).toBe(890);
 
         const work = makeWork({
             trackingCode: 'wk-cancel',
@@ -414,8 +253,7 @@ describe('Escrow flows (morsel service)', () => {
 
         await returnEscrow(storage, work);
 
-        const requester = await storage.getAgent(REQUESTER);
-        expect(requester!.morselBalance).toBe(1000); // back to original
+        expect(await balOf(storage, REQUESTER)).toBe(1000); // back to original
     });
 
     it('returnEscrow creates escrow_return transaction', async () => {
@@ -451,9 +289,8 @@ describe('Escrow flows (morsel service)', () => {
 
         await returnEscrow(storage, work, 50);
 
-        const requester = await storage.getAgent(REQUESTER);
         // 1000 - 110 (held) + 50 (partial return) = 940
-        expect(requester!.morselBalance).toBe(940);
+        expect(await balOf(storage, REQUESTER)).toBe(940);
     });
 
     it('escrow hold + settle preserves total morsels (provider gets base, fees accounted)', async () => {
@@ -471,8 +308,8 @@ describe('Escrow flows (morsel service)', () => {
 
         const result = await settlePayment(storage, config, work);
 
-        const requesterBal = (await storage.getAgent(REQUESTER))!.morselBalance;
-        const providerBal = (await storage.getAgent(PROVIDER))!.morselBalance;
+        const requesterBal = await balOf(storage, REQUESTER);
+        const providerBal = await balOf(storage, PROVIDER);
 
         // Requester started at 1000, paid 110 in escrow
         // Provider got 100 (basePrice) credited
@@ -490,12 +327,11 @@ describe('Escrow flows (morsel service)', () => {
         expect(await holdEscrow(storage, REQUESTER, PROVIDER, 'wk-2', 300)).toBe(true);
         expect(await holdEscrow(storage, REQUESTER, PROVIDER, 'wk-3', 300)).toBe(true);
 
-        const agent = await storage.getAgent(REQUESTER);
-        expect(agent!.morselBalance).toBe(100);
+        expect(await balOf(storage, REQUESTER)).toBe(100);
 
         // 4th hold should fail — only 100 remaining
         expect(await holdEscrow(storage, REQUESTER, PROVIDER, 'wk-4', 200)).toBe(false);
-        expect((await storage.getAgent(REQUESTER))!.morselBalance).toBe(100);
+        expect(await balOf(storage, REQUESTER)).toBe(100);
     });
 });
 
@@ -633,7 +469,8 @@ describe('applyDailyAllowance', () => {
 
     beforeEach(async () => {
         storage = new SqliteStorage(':memory:');
-        await storage.createAgent(makeAgent({ gaii: GAII, name: 'daily', morselBalance: 0 }));
+        await storage.createAgent(makeAgent({ gaii: GAII, name: 'daily' }));
+        await seedOwner(storage, 'owner'); // allowance credits the agent's owner GHII
     });
 
     it('credits the full daily allowance when below cap', async () => {
@@ -641,8 +478,7 @@ describe('applyDailyAllowance', () => {
         const credited = await applyDailyAllowance(storage, config, GAII);
         expect(credited).toBe(50);
 
-        const agent = await storage.getAgent(GAII);
-        expect(agent!.morselBalance).toBe(50);
+        expect(await balOf(storage, GAII)).toBe(50);
     });
 
     it('credits partial amount when close to cap', async () => {
@@ -653,8 +489,7 @@ describe('applyDailyAllowance', () => {
         const credited = await applyDailyAllowance(storage, config, GAII);
         expect(credited).toBe(20); // 500 - 480 = 20
 
-        const agent = await storage.getAgent(GAII);
-        expect(agent!.morselBalance).toBe(500);
+        expect(await balOf(storage, GAII)).toBe(500);
     });
 
     it('credits zero when already at cap', async () => {
@@ -664,8 +499,7 @@ describe('applyDailyAllowance', () => {
         const credited = await applyDailyAllowance(storage, config, GAII);
         expect(credited).toBe(0);
 
-        const agent = await storage.getAgent(GAII);
-        expect(agent!.morselBalance).toBe(500);
+        expect(await balOf(storage, GAII)).toBe(500);
     });
 
     it('creates allowance transaction when credited', async () => {

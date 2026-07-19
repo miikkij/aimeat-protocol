@@ -4,6 +4,7 @@
  *   MCP (src/mcp/workflows.ts) so `aimeat connect serve --surface agent` exposes the same
  *   save/get/run tools locally. Thin REST wrappers over /v1/workflows.
  * @version-history
+ *   v1.1.0 -- 2026-07-19 -- Add workflow_answer + workflow_pending_inputs (human-input steps).
  *   v1.0.0 -- 2026-06-13 -- Close the connector-surface gap for workflow_save/get/run.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -46,5 +47,21 @@ export function registerWorkflowTools(mcp: McpServer, registry: AgentRegistry): 
     mode: z.enum(['signals-only', 'full']).describe('signals-only = evaluate each step\'s signals against existing memory (no dispatch — an instant health check); full = execute the steps live.'),
   }, annotationsFor('aimeat_workflow_run'), async ({ id, mode }) => {
     return out(await client.post(`/v1/workflows/${encodeURIComponent(id)}/run`, { mode }));
+  });
+
+  // → GET /v1/workflows/pending-inputs — runs paused awaiting human input.
+  mcp.tool('aimeat_workflow_pending_inputs', descriptionFor('aimeat_workflow_pending_inputs'), {},
+    annotationsFor('aimeat_workflow_pending_inputs'), async () => {
+      return out(await client.get('/v1/workflows/pending-inputs'));
+    });
+
+  // → POST /v1/workflows/:id/runs/:runId/steps/:stepId/answer — answer a paused human-input step.
+  mcp.tool('aimeat_workflow_answer', descriptionFor('aimeat_workflow_answer'), {
+    id: z.string().describe('The workflow id.'),
+    run_id: z.string().describe('The run id (from aimeat_workflow_pending_inputs).'),
+    step_id: z.string().describe('The paused step id awaiting input.'),
+    answer: z.record(z.string(), z.unknown()).optional().describe('The answer payload for the step.'),
+  }, annotationsFor('aimeat_workflow_answer'), async ({ id, run_id, step_id, answer }) => {
+    return out(await client.post(`/v1/workflows/${encodeURIComponent(id)}/runs/${encodeURIComponent(run_id)}/steps/${encodeURIComponent(step_id)}/answer`, { answer: answer ?? {} }));
   });
 }

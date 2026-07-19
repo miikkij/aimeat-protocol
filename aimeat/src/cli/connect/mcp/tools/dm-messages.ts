@@ -7,6 +7,9 @@
  * @version-history
  *   v1.0.0 -- 2026-06-22 -- Initial: aimeat_dm_send / aimeat_dm_inbox / aimeat_dm_thread.
  *   v1.1.0 -- 2026-06-23 -- Add aimeat_dm_ask (structured federated AskUserQuestion) — connector parity.
+ *   v1.2.0 -- 2026-07-19 -- Add aimeat_dm_send_as_owner — the shell path sends via POST /v1/messages as the
+ *     connected principal (there is no send-as-owner REST route; the server MCP tool remains the way to
+ *     speak strictly as the owner from an agent).
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -54,6 +57,26 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     if (body) payload.body = body;
     if (subject) payload.subject = subject;
     if (conversation_id) payload.conversation_id = conversation_id;
+    const resp = await client.post('/v1/messages', payload);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+  });
+
+  mcp.tool('aimeat_dm_send_as_owner', descriptionFor('aimeat_dm_send_as_owner'), {
+    agent_name: agentNameSchema,
+    to: z.string().describe('Recipient: owner@node, agent#owner@node, or eco:app#owner@node.'),
+    body: z.string().optional().describe('Message body (GFM markdown). Optional if you attach a file.'),
+    reply_to: z.string().optional().describe('Id of a message you are replying to (keeps the thread).'),
+    subject: z.string().optional().describe('Open a NEW topic thread with this title.'),
+    conversation_id: z.string().optional().describe('Continue a specific existing thread by id.'),
+    attachments: z.array(z.record(z.string(), z.unknown())).optional().describe('Up to 20 { storage_key, mime, kind, size, name } descriptors.'),
+  }, annotationsFor('aimeat_dm_send_as_owner'), async ({ agent_name, to, body, reply_to, subject, conversation_id, attachments }) => {
+    const { client } = pickAgent(registry, agent_name);
+    const payload: Record<string, unknown> = { to };
+    if (body) payload.body = body;
+    if (reply_to) payload.reply_to = reply_to;
+    if (subject) payload.subject = subject;
+    if (conversation_id) payload.conversation_id = conversation_id;
+    if (attachments) payload.attachments = attachments;
     const resp = await client.post('/v1/messages', payload);
     return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
   });

@@ -18,6 +18,11 @@ function memStorage(opts?: { stepAgent?: Partial<AgentRecord> | null }): Storage
       const prefix = opts2?.prefix ?? '';
       return [...map.values()].filter(r => r.ownerGaii === owner && r.key.startsWith(prefix));
     },
+    // Batch owner-scope query (N+1 fix, commit 990d8268) — mirror listMemory across a list of identities.
+    listMemoryForOwners: async (owners: string[], opts2?: { prefix?: string }) => {
+      const prefix = opts2?.prefix ?? '';
+      return [...map.values()].filter(r => owners.includes(r.ownerGaii) && r.key.startsWith(prefix));
+    },
     getAgent: async (gaii: string) => (gaii.startsWith('bot#') ? (opts?.stepAgent ?? null) as AgentRecord | null : null),
     getAgentTask: async () => null,
     getAgentsByOwner: async () => [],

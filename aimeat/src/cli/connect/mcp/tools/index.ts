@@ -41,6 +41,10 @@ import { registerFlagsTools } from './flags.js';
 import { registerFeedbackTools } from './feedback.js';
 import { registerHandbookTools } from './handbook.js';
 import { registerOnboardingTools } from './onboarding.js';
+import { registerAppdevTools } from './appdev.js';
+import { registerCommerceTools } from './commerce.js';
+import { registerContactTools } from './contacts.js';
+import { registerOperatorTools } from './operator.js';
 
 export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void {
   registerCoreTools(mcp, registry);
@@ -71,4 +75,8 @@ export function registerAllTools(mcp: McpServer, registry: AgentRegistry): void 
   registerFeedbackTools(mcp, registry);
   registerHandbookTools(mcp, registry);
   registerOnboardingTools(mcp, registry);
+  registerAppdevTools(mcp, registry);
+  registerCommerceTools(mcp, registry);
+  registerContactTools(mcp, registry);
+  registerOperatorTools(mcp, registry);
 }
