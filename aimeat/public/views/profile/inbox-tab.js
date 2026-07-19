@@ -14,6 +14,9 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.24.0 -- 2026-07-19 -- Conversation → Notebook (📓 on the thread head next to ✨): summarize the
+ *     whole thread — with its images — and park it into the Notebook for filing/enrichment. Three modes:
+ *     server-side AI summary (owner's OpenRouter key, vision-aware), copy-prompt (own chat), or raw.
  *   v1.23.1 -- 2026-07-19 -- Fix "badge shows N new but the open thread never updates": a 'messages'
  *     live-update now ALWAYS reloads the open thread (dropped the isComposingInThread guard that skipped
  *     the whole reload while an editable was focused, so incoming messages stayed invisible until
@@ -127,9 +130,10 @@ import { firstLine } from './notebook-helpers.js';
 import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
-import { buildConversationReplyPrompt, buildMessageReplyPrompt, peerLabel } from '/js/services/messages-ai-prompts.js';
+import { peerLabel } from '/js/services/messages-ai-prompts.js';
 import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary } from './inbox-tab/helpers.js';
-import { Composer, PollBuilder, MarkdownViewer, ReplyWithAiPopover } from './inbox-tab/components.js';
+import { Composer, PollBuilder, MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
+import { buildConversationReplyProps, buildMessageReplyProps, buildConversationNotebookProps } from './inbox-tab/ai-actions.js';
 import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel } from './inbox-tab/panels.js';
 import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
 import { ContactPicker } from '/components/ContactPicker.js';
@@ -142,6 +146,7 @@ export default function InboxTab({ showToast }) {
   const [urlMap, setUrlMap] = useState({});
   const [mdViewer, setMdViewer] = useState(null);         // { url, name } — open markdown attachment viewer
   const [aiReply, setAiReply] = useState(null);           // { title, build } — Reply with AI popover (TARGET-031)
+  const [nbConv, setNbConv] = useState(null);             // { title, promptText, runServerSummary, parkConversation } — Conversation → Notebook popover
   const [peerNames, setPeerNames] = useState({});         // id (GHII/GAII or owner@node) → resolved display name
   const peerNamesRef = useRef({});                        // dedup bookkeeping: an id present here was already looked up
   const [composeSubject, setComposeSubject] = useState(''); // optional subject → opens a new topic thread
@@ -488,19 +493,11 @@ export default function InboxTab({ showToast }) {
   // "Display name (handle)" for an id, falling back to the bare handle when we have no display name.
   const peerDisplay = (id) => peerLabel(id, peerNames[id]);
 
-  // Reply with AI (TARGET-031): hand the whole open conversation, or one message, to the popover which
-  // renders a copy-paste prompt (any AI chat) or an MCP instruction prompt (aimeat_dm_thread → draft →
-  // aimeat_dm_send after approval). `build(mode)` closes over the current thread/message + peer.
-  const openConversationAi = () => {
-    if (!activeConv) return;
-    const src = { peerGhii: activeConv.peerGhii, subject: activeConv.subject, conversationId: activeConv.conversationId, thread, peerName: peerNames[activeConv.peerGhii] };
-    setAiReply({ title: `${t('inbox.ai.replyTo')} ${peerDisplay(activeConv.peerGhii)}`, build: (mode) => buildConversationReplyPrompt(src, mode) });
-  };
-  const openMessageAi = (msg) => {
-    if (!activeConv) return;
-    const src = { peerGhii: activeConv.peerGhii, subject: activeConv.subject, conversationId: activeConv.conversationId, message: msg, peerName: peerNames[activeConv.peerGhii] };
-    setAiReply({ title: t('inbox.ai.replyToMessage'), build: (mode) => buildMessageReplyPrompt(src, mode) });
-  };
+  // Thread-head AI actions — Reply with AI (TARGET-031) and Conversation → Notebook (summarize the whole
+  // thread + images, park it for filing/enrichment). Config assembly lives in ./inbox-tab/ai-actions.js.
+  const openConversationAi = () => { if (activeConv) setAiReply(buildConversationReplyProps({ activeConv, thread, peerName: peerNames[activeConv.peerGhii], peerDisplayName: peerDisplay(activeConv.peerGhii) })); };
+  const openMessageAi = (msg) => { if (activeConv) setAiReply(buildMessageReplyProps({ activeConv, msg, peerName: peerNames[activeConv.peerGhii] })); };
+  const openConversationNotebook = () => { if (activeConv) setNbConv(buildConversationNotebookProps({ activeConv, thread, urlMap, peerName: peerNames[activeConv.peerGhii], title: `${t('inbox.notebook.toNotebook')} — ${peerDisplay(activeConv.peerGhii)}` })); };
 
   // ↩ Reply on a bubble: pin the quote AND focus the composer (bump a nonce the Composer watches). Kept
   // separate from the raw setter so cancelling the quote (✕) doesn't re-pop the keyboard.
@@ -776,7 +773,7 @@ export default function InboxTab({ showToast }) {
           msgsRef=${msgsRef} peerDisplay=${peerDisplay} showToast=${showToast} toggleImportant=${toggleImportant}
           replyQuote=${replyQuote} setReplyQuote=${setReplyQuote} onQuoteReply=${startQuoteReply} composerFocus=${composerFocus}
           onTrackMsg=${onTrackMsg} onParkMsg=${onParkMsg} openMessageAi=${openMessageAi} submitInteractiveAnswers=${submitInteractiveAnswers}
-          setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} insertCommand=${insertCommand} setCmdFill=${setCmdFill}
+          setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} openConversationNotebook=${openConversationNotebook} insertCommand=${insertCommand} setCmdFill=${setCmdFill}
           cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} />` : null}
 
         ${mode === 'tracked' ? html`<${TrackedPanel} activeTracked=${activeTracked} doneCount=${doneCount}
@@ -795,5 +792,8 @@ export default function InboxTab({ showToast }) {
         onClose=${() => setTrackMsg(null)} onDone=${loadLists} showToast=${showToast} />
       ${mdViewer && html`<${MarkdownViewer} url=${mdViewer.url} name=${mdViewer.name} onClose=${() => setMdViewer(null)} />`}
       ${aiReply && html`<${ReplyWithAiPopover} title=${aiReply.title} build=${aiReply.build} showToast=${showToast} onClose=${() => setAiReply(null)} />`}
+      ${nbConv && html`<${ConversationToNotebookPopover} title=${nbConv.title} promptText=${nbConv.promptText}
+        runServerSummary=${nbConv.runServerSummary} parkConversation=${nbConv.parkConversation}
+        showToast=${showToast} onClose=${() => setNbConv(null)} />`}
     </div>`;
 }
