@@ -289,7 +289,7 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_appdev_overview',
-        description: 'THE research call before building an app ON AIMEAT — one compact "big picture": the owner\'s existing apps (often the best template to fork/copy), library packs with per-model AEB proof summaries, T1/T2/T3 app-shell templates, loadable skills (node:aimeat-app-builder first), curated + learned pitfalls (model-faceted), and prior template proposals. Indexes only with drill-down pointers; pass sections=[...] for a partial fetch and model=<your model> to mark proven packs and filter learned pitfalls. Flow: research (this) → frame → propose to the user → build.',
+        description: 'THE research call before building an app ON AIMEAT — one compact "big picture": the owner\'s existing apps (often the best template to fork/copy), library packs with per-model AEB proof summaries, T1/T2/T3 app-shell templates, loadable skills (node:aimeat-app-builder first), curated + learned pitfalls (model-faceted), and prior template proposals. Indexes only with drill-down pointers; pass sections=[...] for a partial fetch and model=<YOUR OWN model id — self-identify, never ask the user> to mark proven packs and filter learned pitfalls. Flow: research (this) → frame → propose to the user → build.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -303,7 +303,7 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
-            model: { type: 'string', required: true, description: 'Primary LLM model that hit/solved this (e.g. claude-haiku-4.5). Indicative attribution.' },
+            model: { type: 'string', required: true, description: 'YOUR OWN model id — the model that hit/solved this. Self-identify from your own configuration, never ask the user. Indicative attribution.' },
             category: { type: 'string', required: true, description: 'Kebab-case category (auth, ext, cortex, realtime, mobile, publish, ai, data...).' },
             title: { type: 'string', required: true, description: 'Short imperative title.' },
             symptom: { type: 'string', required: true, description: 'What the builder observes.' },
@@ -353,7 +353,7 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
             derived_from: { type: 'object', required: true, description: '{owner, filename} of YOUR published source app.' },
             tier: { type: 'string', required: true, enum: ['T1', 'T2', 'T3'], description: 'T1 pure client · T2 +cortex · T3 +extension.' },
             reuse_notes: { type: 'string', required: true, description: 'What generalizes — the parts a next build should copy/keep.' },
-            model: { type: 'string', required: true, description: 'Model that built the source app (indicative).' },
+            model: { type: 'string', required: true, description: 'YOUR OWN model id — the model that built the source app. Self-identify, never ask the user (indicative).' },
             tags: { type: 'array', description: 'Discovery tags.' },
             start_mode: { type: 'string', enum: ['fork', 'scaffold', 'either'], description: 'How the next build starts (default either).' },
             start_mode_rationale: { type: 'string', description: 'Why that start mode.' },

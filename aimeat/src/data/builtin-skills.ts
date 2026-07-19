@@ -537,7 +537,7 @@ Everything the app loads at runtime — CSS, auth, data, UI libraries — must b
 ## Research before building (research → frame → propose → build → finish)
 
 Before writing code, look at what already exists on the node and reuse it. ONE call gives
-the big picture: \`aimeat_appdev_overview\` (pass your model id) — the owner's existing apps
+the big picture: \`aimeat_appdev_overview\` (pass your OWN model id — you know which model you are; self-identify, never ask the user) — the owner's existing apps
 and **template proposals** (often the fastest correct starting point: fork or copy their
 patterns), library packs with per-model proofs, T1/T2/T3 templates, and the pitfalls
 (curated + learned) for the areas you will touch. Drill down from there:
@@ -555,7 +555,7 @@ After a successful publish (the publish response's \`next_steps\` shows what is 
 1. Publish the app's **agent face** + bind a **skill** (\`metadata.binding\`
    \`app:{owner}/{filename}\`) so the app is agent-facing by default.
 2. If anything generalizes, record a template: \`aimeat_app_template_propose\`
-   (your model id required) — the next build starts from it.
+   (your own model id required — self-identify) — the next build starts from it.
 3. Report what bit you: \`aimeat_appdev_pitfall_report\` (model required; upserts by slug;
    \`share: true\` publishes it platform-wide) — the next builder skips your mistake.
 
