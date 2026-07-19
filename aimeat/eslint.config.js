@@ -96,6 +96,9 @@ export default tseslint.config(
     files: ['src/static/sdk-libs/**/*.js'],
     rules: {
       'no-undef': 'off',
+      // These libs are ported browser code that uses the classic `var self = this` closure idiom
+      // in prototype methods / event callbacks (e.g. aimeat-tunnel's WebSocket client). Allow it.
+      '@typescript-eslint/no-this-alias': 'off',
     },
   },
 );
