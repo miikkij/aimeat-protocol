@@ -32,6 +32,12 @@
  *     APP_GRANTABLE_SCOPES so a control-plane app (TARGET-006 AGENCY) can orchestrate the owner's
  *     OWN agents/automations with explicit consent. Enforcement stays in the task routes
  *     (owner-match) + requireScope on workflow routes — never cross-owner, never a scope escalation.
+ *   v1.5.0 — 2026-07-19 — Own-app parity for the VISIBLE flow (Band Jam scope-upgrade findings):
+ *     authorize validates that a per-app-subdomain redirect_uri maps to exactly the requesting app
+ *     (else INVALID_REDIRECT_URI — app X can no longer run the flow in app Y's name) and records
+ *     originBound; GET /request/:id exposes app_owner + origin_bound so the consent page can
+ *     auto-approve the owner's OWN app (silent-bridge policy); the authorization_code token
+ *     response carries app + own so the SDK's pill/gear metadata stays correct via this path too.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -93,6 +99,7 @@ interface PendingRequest {
   codeChallengeMethod: 'S256' | 'plain';
   responseMode: 'query' | 'web_message'; // web_message → consent page postMessages the code to the popup-opener app
   manage: boolean; // true → consent page always shows the management screen (gear); false → may auto-approve an existing grant
+  originBound: boolean; // redirect_uri verified to be THE per-app subdomain mapped to this app → own-app auto-approve eligible
   expiresAt: number;
 }
 
@@ -108,6 +115,7 @@ interface AuthCode {
   state: string;
   codeChallenge: string;
   codeChallengeMethod: 'S256' | 'plain';
+  own: boolean;         // origin-bound request approved by the app's own owner (parity with the silent bridge's `own`)
   expiresAt: number;
 }
 
@@ -215,13 +223,30 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       return res.status(404).json(error(config.nodeId, 'APP_NOT_FOUND', `No published app "${app}"`));
     }
 
+    // Origin binding: when redirect_uri lives on a PER-APP subdomain, that subdomain must map to
+    // exactly this app — otherwise app X could run the flow in app Y's name and harvest a code on
+    // its own origin. A bound request is what makes own-app auto-approve safe on the consent page
+    // (parity with the silent bridge, which binds by origin the same way). Path-form apps share the
+    // bare app host → cannot be bound → they keep the manual consent screen.
+    let originBound = false;
+    const appHostL = (config.appHost || '').toLowerCase();
+    const rdHost = new URL(redirectUri).hostname.toLowerCase();
+    if (appHostL && rdHost !== appHostL && rdHost.endsWith('.' + appHostL)) {
+      const sub = rdHost.slice(0, -(appHostL.length + 1));
+      const site = sub && !sub.includes('.') ? await storage.getSubdomainSite(sub) : null;
+      if (!site || !site.enabled || site.kind !== 'app' || site.target !== app) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_REDIRECT_URI', 'redirect_uri subdomain is not bound to this app'));
+      }
+      originBound = true;
+    }
+
     const responseMode = String(req.query.response_mode ?? 'query') === 'web_message' ? 'web_message' : 'query';
     const manage = String(req.query.manage ?? '') === '1';
     const requestId = `agreq-${randomBytes(18).toString('hex')}`;
     pendingRequests.set(requestId, {
       requestId, app, appName: appRecord.manifest?.name || app.slice(slash + 1),
       appOrigin: rd.origin, scopes: requested, redirectUri, state, codeChallenge,
-      codeChallengeMethod: method === 'plain' ? 'plain' : 'S256', responseMode, manage,
+      codeChallengeMethod: method === 'plain' ? 'plain' : 'S256', responseMode, manage, originBound,
       expiresAt: Date.now() + REQUEST_TTL_MS,
     });
 
@@ -244,6 +269,10 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       response_mode: pending.responseMode,
       manage: pending.manage, // true → always show the management screen; false → may auto-approve an existing grant
       state: pending.state, // echoed back by the consent page in the web_message revoke postMessage
+      // app_owner + origin_bound let the consent page recognise the owner's OWN app (auto-approve,
+      // same policy as the silent bridge) — but ONLY when the redirect origin is bound to this app.
+      app_owner: pending.app.includes('/') ? pending.app.slice(0, pending.app.indexOf('/')) : null,
+      origin_bound: pending.originBound,
       scopes: pending.scopes.map(s => ({ scope: s, description: APP_GRANTABLE_SCOPES[s] })),
     }));
   });
@@ -268,12 +297,16 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
 
     const gaii = resolveIdentity(req.auth!, config.nodeId); // owner GHII (alice@node)
     const owner = req.auth!.owner;
+    // Own only when the approving owner IS the app's owner AND the request is origin-bound — an
+    // unbound request (path-form app, dev localhost) never earns the own flag even for the owner.
+    const appOwner = pending.app.includes('/') ? pending.app.slice(0, pending.app.indexOf('/')) : '';
+    const own = pending.originBound && !!appOwner && owner === appOwner;
     const code = `agc-${randomBytes(24).toString('hex')}`;
     authCodes.set(code, {
       code, app: pending.app, appName: pending.appName, appOrigin: pending.appOrigin,
       owner, gaii, scopes: grantedScopes, redirectUri: pending.redirectUri,
       state: pending.state, codeChallenge: pending.codeChallenge, codeChallengeMethod: pending.codeChallengeMethod,
-      expiresAt: Date.now() + CODE_TTL_MS,
+      own, expiresAt: Date.now() + CODE_TTL_MS,
     });
 
     const url = new URL(pending.redirectUri);
@@ -428,9 +461,12 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
         refreshTokenHash: hashToken(rawRefresh), createdAt: now, lastUsedAt: now, revoked: false,
       });
       const { token, expiresIn } = await issueAccessToken({ gaii: ac.gaii, owner: ac.owner, scopes: ac.scopes, grantId });
+      // app + own: same metadata the silent bridge returns, so the SDK keeps the login pill's
+      // grant-gear state correct when the session came through the visible consent flow instead.
       return res.json(success(config.nodeId, {
         access_token: token, token_type: 'Bearer', expires_in: expiresIn,
         refresh_token: rawRefresh, scope: ac.scopes.join(' '), grant_id: grantId,
+        app: ac.app, own: ac.own,
       }));
     }
 

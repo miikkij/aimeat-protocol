@@ -579,7 +579,10 @@
     "loginCta": "Log in",
     "errorTitle": "Cannot grant access",
     "missing": "No authorization request.",
-    "expired": "This request has expired."
+    "expired": "This request has expired.",
+    "ownBadge": "Your app",
+    "ownIntro": "This is your own app. It still uses a scoped, revocable key — never your login session.",
+    "newScope": "new"
   },
   "common": {
     "cancel": "Cancel",

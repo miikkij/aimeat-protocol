@@ -3,6 +3,11 @@
  * @description aimeat-auth.js browser library source, head segment (config, Ed25519 crypto, IndexedDB key store, session object). Extracted from libs.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from libs.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-19 — Scope-drift self-heal (Band Jam findings): appScopeDrift() compares the
+ *     app-declared scopes to the session token's; session.fetch treats a 403 with drift as a stale
+ *     grant → one silent-bridge re-run (auto-upgrades the owner's own app) + one retry, else emits
+ *     'scopes-stale'. Consent-popup path now takes own/app from the token response instead of
+ *     hardcoding own=false (login_required hits own apps too).
  */
 import type { AimeatConfig } from '../../config.js';
 import { listEnabledProviderMeta } from '../../services/oidc-providers.js';
@@ -303,6 +308,15 @@ function isAppOrigin() {
   try { return location.origin !== new URL(APEX_URL).origin; } catch (e) { return false; }
 }
 
+// Scopes the app DECLARES (meta aimeat-scopes / defaults) that this app-origin session's token
+// does NOT carry. Non-empty after an app update added scopes to an already-granted app — the
+// signal for the self-heal in session.fetch (own apps) / the 'scopes-stale' event (foreign apps).
+function appScopeDrift(session) {
+  if (!session || !session._appOrigin || !session.jwt) return [];
+  var have = (parseJwt(session.jwt) || {}).scopes || [];
+  return appDeclaredScopes().split(' ').filter(function (s) { return s && have.indexOf(s) < 0; });
+}
+
 function silentAppToken() {
   return new Promise(function (resolve) {
     var apexOrigin;
@@ -479,7 +493,10 @@ function restoreSessionFromAppOrigin(interactive) {
     if (!grant && interactive && r && (r.error === 'consent_required' || r.error === 'login_required') && r.app) {
       appId = r.app;
       grant = await requestConsentPopup(r.app, r.scope);
-      own = false; // the consent flow only runs for apps the user does NOT own
+      // login_required hits OWN apps too (owner not logged into the apex yet) — the token exchange
+      // now reports own/app itself, so trust it instead of assuming the popup means a foreign app.
+      own = !!(grant && grant.own);
+      if (grant && grant.app) appId = grant.app;
     }
     if (!grant || !grant.access_token) return null;
     return _buildAppSession(grant.access_token, appId, own, grant.display_name);
@@ -554,6 +571,26 @@ function createSession(data) {
       const url = NODE_URL + path;
       const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + session.jwt, ...(opts.headers || {}) };
       const resp = await fetch(url, { ...opts, headers });
+      // Scope-drift self-heal (H-2): a 403 on an app-origin session whose token is missing scopes
+      // the app now DECLARES means the grant predates a scope-adding update. One silent bridge
+      // re-run upgrades the owner's own app in place (the bridge auto-approves own apps with the
+      // declared scopes); anything else surfaces 'scopes-stale' so the app/pill can prompt the
+      // user through the visible consent. One attempt per session — never a retry loop.
+      if (resp.status === 403 && session._appOrigin && !session._scopeHealTried) {
+        var missing = appScopeDrift(session);
+        if (missing.length) {
+          session._scopeHealTried = true;
+          var t = await silentAppToken();
+          if (t && t.ok && t.access_token && !appScopeDrift({ _appOrigin: true, jwt: t.access_token })) {
+            session.jwt = t.access_token;
+            persistSession(session);
+            scheduleAutoRefresh(session);
+            var retry = await fetch(url, { ...opts, headers: { ...headers, 'Authorization': 'Bearer ' + session.jwt } });
+            return retry.json();
+          }
+          emit('scopes-stale', { app: session._app || null, missing: missing });
+        }
+      }
       return resp.json();
     },
 

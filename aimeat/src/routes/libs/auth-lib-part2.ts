@@ -2,6 +2,7 @@
  * @file src/routes/libs/auth-lib-part2.ts
  * @description aimeat-auth.js browser library source, middle segment (event system, public auth API, login pill, theme toggle, modal i18n). Extracted from libs.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-07-19 — manageGrant() requests the app-DECLARED scopes + adopts own/app from the token response.
  *   v1.1.0 — 2026-07-18 — Opt-in compact login pill: mountLoginButton({ compact:true }) renders a
  *     small gold "account" button (green dot + initials) on ≤600px that opens the full pill as an
  *     anchored popover — so the fixed-width pill no longer overflows cramped app headers on mobile.
@@ -254,9 +255,10 @@ const auth = {
   async manageGrant() {
     const s = currentSession || load('session');
     if (!s || !s._app) return null;
-    const res = await requestConsentPopup(s._app, (s.scopes || []).join(' '), true); // manage = always show the screen
+    // Request the app-DECLARED scopes (not the old session's) so a scope-adding update surfaces pre-checked.
+    const res = await requestConsentPopup(s._app, appDeclaredScopes(), true); // manage = always show the screen
     if (res && res.revoked) { await auth.logout(); return { revoked: true }; }
-    if (res && res.access_token) return _buildAppSession(res.access_token, s._app, s._own);
+    if (res && res.access_token) return _buildAppSession(res.access_token, res.app || s._app, res.own != null ? !!res.own : s._own);
     return null;
   },
 
