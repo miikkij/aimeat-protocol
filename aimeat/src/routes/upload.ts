@@ -24,6 +24,8 @@
  *     (the owner-addressed /v1/pub embed form; see services/doc-images).
  *   v1.4.0 — 2026-07-16 — handleAppUpload carries usesCortex + cortex.agents forward on update
  *     (presigned meta cannot express them; a re-upload never strips cortex deps / bundled agents).
+ *   v1.5.0 — 2026-07-19 — handleAppUpload provisions the per-app subdomain at publish time
+ *     (mirrors POST /v1/apps; pitfall publish/new-app-subdomain-provisioning-lag).
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -38,6 +40,7 @@ import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
+import { ensureAppSubdomain } from './subdomains.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -174,6 +177,13 @@ async function handleAppUpload(
         parked: parkedState,
         createdAt: new Date().toISOString(),
     });
+
+    // Provision the per-app subdomain mapping NOW — mirrors POST /v1/apps; previously it was
+    // only auto-assigned on the first path-form open, so a brand-new app's vanity subdomain
+    // 404'd until someone hit the canonical URL. Best-effort: never fails the publish.
+    if (/\.html?$/i.test(filename)) {
+        try { await ensureAppSubdomain(storage, config, ownerName, filename); } catch { /* best-effort */ }
+    }
 
     const downloadUrl = `/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}`;
     logger.info(`App ${isUpdate ? 'updated' : 'published'} via upload: ${filename} v${newVersion}`, { by: sub });

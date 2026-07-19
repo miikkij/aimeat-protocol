@@ -31,6 +31,9 @@
  *   v1.0.0 — 2026-07-13 — ported verbatim from app-catalog buildPromptFromBuilder() (cortex.js)
  *     so the node becomes the single source of truth (AEB pilot finding: the best app-building
  *     accelerator was locked inside the browser bundle, invisible to agentic coders).
+ *   v1.1.0 — 2026-07-19 — "Game / playful look — form language, not just palette" section
+ *     (extruded type via the fonts pack, sticker cards, juice, world-object ambient rule) —
+ *     born from pitfall app/candy-palette-alone-is-not-a-game-look.
  */
 import type { AimeatConfig } from '../config.js';
 // The grantable scope vocabulary — imported so the prompt's scope list can NEVER drift from
@@ -243,6 +246,17 @@ export function buildAppPrompt(
   body += '  addEventListener("storage", function(e){ if(e.key==="aimeat-theme" && e.newValue) apply(e.newValue); }); })();\n';
   body += '```\n';
   body += 'Always include <meta name="viewport" content="width=device-width, initial-scale=1.0">. Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
+
+  // Game form language — palette alone reads as a dashboard; the FORM LANGUAGE makes the game.
+  // Born from pitfall app/candy-palette-alone-is-not-a-game-look (TOWER TETRIS, 2026-07-19).
+  body += '### Game / playful look — form language, not just palette\n';
+  body += 'A game styled with only bright colors on white rounded cards still reads as a SaaS dashboard. Users judge this instantly. If the app is a game (or wants a playful/energetic feel), change the FORM LANGUAGE:\n';
+  body += '- **Display type**: load the `fonts` pack (self-hosted Baloo 2 + Bangers — never an external font CDN) and give headings/numbers/buttons EXTRUDED depth: an 8-direction outline + a hard shade + a soft drop via layered text-shadow. A candy logo = per-letter colored <span>s with small individual rotations.\n';
+  body += "- **Sticker cards**: 3px solid border (white in light / dark-tinted in dark) + an OFFSET color shadow (e.g. 6px 6px 0 rgba(...)) + a slight rotate(±1-2deg) per card + gradient tint backgrounds — instead of flat white panels.\n";
+  body += '- **Frame the play area**: wrap the game canvas in a gradient border div; give its interior life (checkerboard tint, inner glow) instead of a plain background.\n';
+  body += "- **Juice**: screen-shake keyframes on big events, scale-pop on changing numbers, a shine-sweep ::after on primary buttons, floating combo text. Small, cheap, and they carry most of the game feel.\n";
+  body += '- **Ambient life lives IN the scene**: with a 3D/canvas view, decorations must be world objects (orbiting meshes, drifting sprites INSIDE the canvas) — never flat absolutely-positioned CSS elements over the canvas; those do not parallax and read as mistakes. CSS sky layers (clouds/stars) BEHIND a transparent canvas are fine.\n';
+  body += 'Non-game apps: skip this section — the styling pack + clean CSS variables are the right default.\n\n';
 
   // Rules
   body += '### Important Rules\n';

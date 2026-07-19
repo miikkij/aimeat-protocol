@@ -66,6 +66,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:no-max-tokens
 
+      - name: Library-pack doc-truth (assets exist + ai_doc claims executed)
+        working-directory: aimeat
+        run: pnpm check:packs-doc
+
       - name: app-catalog.html in sync with its sources
         working-directory: aimeat
         run: pnpm check:app-catalog

@@ -13,6 +13,8 @@
  *   v1.1.0 — 2026-07-16 — Wave 1 additions: p5 1.11.13 (LGPL-2.1, owner-approved), pixi 8.19.0
  *     (v8-idiom aiDoc), phaser 3.90.0 (arcade shell + AIMEAT leaderboard glue).
  *   v1.2.0 — 2026-07-17 — three + p5 promoted preview -> stable (AEB-3 round 5 mid-tier win).
+ *   v1.3.0 — 2026-07-19 — realtime aiDoc corrected (constructor + events + find-or-create rooms;
+ *     tolerant {session} form added to the lib); NEW fonts pack (Baloo 2 + Bangers, OFL 1.1).
  */
 import type { LibraryPack } from '../library-packs.js';
 
@@ -312,6 +314,42 @@ export const VENDORED_PACKS: LibraryPack[] = [
     ],
   },
   {
+    id: 'fonts',
+    kind: 'vendored',
+    category: 'ui',
+    title: 'Display fonts (Baloo 2 + Bangers)',
+    description: 'Self-hosted display fonts for game/brand UIs — Baloo 2 (chunky rounded, variable 400-800) and Bangers (arcade/comic). Latin + latin-ext (Finnish ä/ö covered), SIL OFL 1.1. One CSS include; never load fonts from an external CDN (the app CSP and the vendoring policy both forbid it).',
+    url: '/lib/fonts.css',
+    include: ['<link href="{{BASE_URL}}/lib/fonts.css" rel="stylesheet" type="text/css" />'],
+    requires: [],
+    version: 'Baloo 2 v23 · Bangers v25',
+    majorPin: 'fonts.css (families are additive; a future family ships as a new @font-face, never a replacement)',
+    license: 'OFL-1.1',
+    sourceUrl: 'https://fonts.google.com/specimen/Baloo+2 · https://fonts.google.com/specimen/Bangers',
+    apiSurface: "(CSS) font-family: 'Baloo 2' | 'Bangers'; helper classes .font-display / .font-arcade",
+    aiDoc: [
+      'One include line in <head> gives two self-hosted display families (latin + latin-ext — ä/ö work):',
+      "- 'Baloo 2' — chunky rounded, VARIABLE weight 400-800. The default game/playful display face:",
+      '  headings, stat numbers, buttons. Use font-weight 700-800 for the chunky look.',
+      "- 'Bangers' — arcade/comic caps, single weight 400, tall and loud. Logos, TETRIS!-style",
+      '  combo shouts, one-word titles. All-caps by design; add letter-spacing (~.04em).',
+      "Helper classes: .font-display (Baloo 2 stack) and .font-arcade (Bangers stack), or set",
+      "font-family directly with a system fallback: font-family:'Baloo 2','Segoe UI',system-ui,sans-serif.",
+      'Game-look recipe: pair with extruded text (text-shadow: 8-direction outline + 0 4px 0 shade',
+      '+ soft drop) and sticker cards — the fonts carry the personality, the shadows carry the depth.',
+      'Total ~101 KB for all four woff2 subsets; font-display:swap so text renders instantly.',
+      'Never link fonts.googleapis.com or any external font CDN from an app — self-hosted only.',
+    ].join('\n'),
+    changelog: [
+      { version: 'Baloo 2 v23 · Bangers v25', date: '2026-07-19', summary: 'Initial vendoring (latin + latin-ext woff2, OFL 1.1 — see /lib/fonts/LICENSE.md). Born from pitfall app/candy-palette-alone-is-not-a-game-look: the node had no display fonts, so game UIs fell back to system faces.' },
+    ],
+    tierHint: 'T1',
+    interviewTriggers: ['game', 'font', 'fontti', 'typography', 'logo', 'arcade', 'playful'],
+    sizeEstimate: '~101KB (4 woff2 subsets)',
+    status: 'preview',   // policy: new packs start preview; flip stable with an AEB result
+    modelTier: 'any',
+  },
+  {
     id: 'realtime',
     kind: 'vendored',
     category: 'realtime',
@@ -325,11 +363,20 @@ export const VENDORED_PACKS: LibraryPack[] = [
     apiSurface: 'window.AimeatRealtime, window.SharedClock',
     aiDoc: [
       'AimeatRealtime — rooms over the node\'s /v1/realtime WebSocket with optional WebRTC + Yjs CRDT.',
-      'const rt = new AimeatRealtime({ session }); register rt.on(...) handlers BEFORE rt.connect().',
-      'Join/create a room by name; broadcast JSON messages to everyone in the room; presence events',
-      'tell you who is in the room. For shared documents use the Yjs CRDT surface (conflict-free',
-      'concurrent edits). Throttle high-frequency events (pointermove etc.) to ~30ms batches — send',
-      'ONE batched message per tick, not one per event (the WS is rate-limited).',
+      'Construct: const rt = new AimeatRealtime(nodeBaseUrl, session.jwt) — positional, canonical —',
+      'or new AimeatRealtime({ session }) (sugar: session.jwt + the page origin). Register EVERY',
+      'rt.on(...) handler BEFORE rt.connect(roomId, nick).',
+      'Rooms over HTTP first: await rt.createRoom({ app_type, name, is_public, max_peers, tags }) →',
+      'room.id; await rt.listRooms({ app_type }) → rooms[]. Find-or-create by app_type and pick the',
+      'LOWEST room id so concurrent creators converge on one room. Then rt.connect(room.id, nick).',
+      "Events: 'joined' (msg.peerId = you, msg.peers[] = existing {peerId, nick, state}),",
+      "'peer-joined' / 'peer-left' / 'peer-presence' ({peerId, nick, state}), 'broadcast'",
+      '(msg.payload = exactly what the sender passed to rt.broadcast(payload)), \'close\', \'error\'.',
+      'There is NO trusted sender field on broadcast — carry an op id + author INSIDE your payload',
+      'and de-dupe by id. Presence: rt.presence(state) → peers get peer-presence.',
+      'For shared documents use the Yjs CRDT surface (conflict-free concurrent edits). Throttle',
+      'high-frequency events (pointermove etc.) to ~30ms batches — send ONE batched message per',
+      'tick, not one per event (the WS is rate-limited).',
       'SharedClock (window.SharedClock) — a network-synced timeline for sequencers/jams/animation:',
       "  const clock = new SharedClock({ bpm: 120, steps: 16 }); clock.onStep((s) => draw(s));",
       "  Leader: rt.broadcast(clock.start()). Joiner: rt.broadcast({type:'sync-request'}) then",
@@ -341,6 +388,7 @@ export const VENDORED_PACKS: LibraryPack[] = [
     changelog: [
       { version: '1', date: '2026-03-03', summary: 'Initial AIMEAT-authored realtime client at /lib/realtime.js (WS rooms + WebRTC + Yjs).' },
       { version: '1', date: '2026-07-18', summary: 'Added SharedClock (window.SharedClock) — a network-synced t0 timeline (start/stop/step/onStep, adopt, setBpm re-anchor, transport/sync-state payloads). Additive; existing AimeatRealtime API unchanged. Extracted from the Band Jam app pattern.' },
+      { version: '1', date: '2026-07-19', summary: 'Constructor also accepts an options object ({ session } or { baseUrl, token }) — additive sugar; the positional (baseUrl, token) form is unchanged and existing apps are unaffected. ai_doc corrected: it previously showed a {session}-only constructor that did not exist (pitfall realtime/aimeatrealtime-constructor-is-baseurl-token), and now documents the full event list and find-or-create room guidance.' },
     ],
     demoTemplateId: 'comp-realtime-room',
     tierHint: 'T1',

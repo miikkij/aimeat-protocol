@@ -22,6 +22,7 @@
     "build:app-catalog": "tsx scripts/build-app-catalog.ts",
     "check:app-catalog": "tsx scripts/build-app-catalog.ts --check",
     "check:mcp-tools": "tsx scripts/audit-mcp-tools.ts --check",
+    "check:packs-doc": "vitest run test/unit/library-packs-doc-truth.test.ts",
     "aeb:prove": "tsx scripts/aeb-prove.ts",
     "aeb:ledger": "tsx scripts/aeb-ledger.ts",
     "start": "node --env-file=.env dist/src/index.js start",
