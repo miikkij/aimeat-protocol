@@ -1,9 +1,15 @@
 /**
  * @file libs.ts
  * @description Serves browser helper libraries used by AIMEAT apps, including auth, data, storage, social, wallet, and capability clients.
- * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
+ * @structure libsRouter route registration — a data-driven loop over SDK_LIB_NAMES + explicit auth
+ *   (OIDC-provider prelude) and portfolio-standalone routes, all serving committed esbuild-IIFE
+ *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.0.0 - 2026-07-19 - SDK-libs migration Phase 5: every browser lib is now authored as
+ *   componentized JSDoc-typed ESM under src/static/sdk-libs/ and esbuild-bundled to an IIFE served at
+ *   the same URL. Removed all 23 JS-in-a-template-string generators (lib-*.ts, libs/auth-lib-part*.ts,
+ *   libs/audio-lib-part2.ts) + the ?impl=legacy branches; routes are now a loop over SDK_LIB_NAMES.
  * v1.38.0 - 2026-07-16 - New library aimeat-workflows.js: the Agent Workflows client
  *   (list/get/save/remove defs, run signals|full + sandbox, runs/health/blueprint, cancel) incl.
  *   the human-in-the-loop surface (pendingInputs + answer + watchRun over the aimeat-live
@@ -140,32 +146,19 @@
 import { Router, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { aimeatDataLib } from './lib-data.js';
-import { aimeatStorageLib } from './lib-storage.js';
-import { aimeatMarkdownLib } from './lib-markdown.js';
-import { aimeatSocialLib } from './lib-social.js';
-import { aimeatWalletLib } from './lib-wallet.js';
-import { aimeatWorkflowsLib } from './lib-workflows.js';
-import { aimeatWorkLib } from './lib-work.js';
-import { aimeatTunnelLib } from './lib-tunnel.js';
-import { aimeatAudioLib } from './lib-audio.js';
-import { aimeatSpeechLib } from './lib-speech.js';
-import { aimeatCapabilitiesLib } from './lib-capabilities.js';
-import { aimeatAiLib } from './lib-ai.js';
-import { aimeatAgentsLib } from './lib-agents.js';
-import { aimeatHeaderLib } from './lib-header.js';
-import { portfolioStandaloneLib } from './lib-portfolio-standalone.js';
-import { aimeatOrganismLib } from './lib-organism.js';
-import { aimeatIntakeLib } from './lib-intake.js';
-import { aimeatEditorLib } from './lib-editor.js';
-import { aimeatLiveLib } from './lib-live.js';
-import { aimeatCommerceLib } from './lib-commerce.js';
-import { aimeatWebmcpLib } from './lib-webmcp.js';
-import { aimeatAgentFaceLib } from './lib-agentface.js';
-import { aimeatAuthLib } from './libs/auth-lib.js';
 import { sdkLibSource, configPrelude, readSdkBundle } from './libs/sdk-serve.js';
 import { listEnabledProviderMeta } from '../services/oidc-providers.js';
 import { buildLibsCatalogue } from '../data/library-packs.js';
+
+// The migrated SDK libraries, served from committed esbuild-IIFE bundles (src/static/sdk-libs/dist/)
+// + a per-node config prelude. Route path is /v1/libs/aimeat-<name>.js; sdkLibSource(config, name)
+// reads dist/aimeat-<name>.js. `auth` (OIDC-provider prelude) + `portfolio-standalone` (non-aimeat
+// URL) are wired explicitly below; everything else is this list. Sources: src/static/sdk-libs/<name>/.
+const SDK_LIB_NAMES = [
+  'speech', 'data', 'wallet', 'ai', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
+  'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'webmcp',
+  'markdown', 'audio', 'tunnel',
+] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {
   res.set('Cache-Control', 'no-store');
@@ -181,158 +174,28 @@ function sendJavascriptLibrary(res: Response, source: string): void {
 export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   const router = Router();
 
-  // GET /v1/libs/aimeat-auth.js — Auth helper library (migrated: src/static/sdk-libs/auth/; ?impl=legacy).
-  // Prepends the standard config prelude PLUS an auth-specific one carrying the node's enabled OIDC
-  // providers (server-computed — the generic prelude only has nodeId/baseUrl), which auth/config.js
-  // reads as window.__AIMEAT_AUTH_CFG__.providers.
-  router.get('/v1/libs/aimeat-auth.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatAuthLib(config)); return; }
-    const authCfg = `window.__AIMEAT_AUTH_CFG__=${JSON.stringify({ providers: listEnabledProviderMeta(config) })};\n`;
-    sendJavascriptLibrary(res, configPrelude(config) + authCfg + readSdkBundle('auth'));
-  });
+  // ── Migrated SDK libraries: one route per lib, each serving its committed esbuild-IIFE bundle
+  // (src/static/sdk-libs/dist/aimeat-<name>.js) + a per-node config prelude. Sources live under
+  // src/static/sdk-libs/<name>/. The two exceptions (auth's OIDC-provider prelude, portfolio's
+  // non-aimeat URL) are wired explicitly after the loop.
+  for (const name of SDK_LIB_NAMES) {
+    router.get(`/v1/libs/aimeat-${name}.js`, (_req, res) => {
+      sendJavascriptLibrary(res, sdkLibSource(config, name));
+    });
+  }
 
-  // GET /v1/libs/aimeat-webmcp.js — WebMCP bridge (expose app/node tools to in-browser agents;
-  // priced tools pay through the commerce checkout). TARGET-034 phase C.
-  // (migrated: sdk-libs/webmcp/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-webmcp.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatWebmcpLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'webmcp'));
-  });
-
-  // GET /v1/libs/aimeat-agentface.js — publish the app's Agent Face (migrated: sdk-libs/agentface/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-agentface.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatAgentFaceLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'agentface'));
-  });
-
-  // GET /v1/libs/aimeat-header.js — Drop-in canonical site header (migrated: sdk-libs/header/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-header.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatHeaderLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'header'));
-  });
-
-  // GET /v1/libs/portfolio-standalone.js — bridge shim injected into portfolios
-  // served on the portfolio origin (migrated: sdk-libs/portfolio-standalone/; ?impl=legacy)
-  router.get('/v1/libs/portfolio-standalone.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, portfolioStandaloneLib(config)); return; }
+  // GET /v1/libs/portfolio-standalone.js — portfolio-origin bridge shim (non-aimeat-prefixed URL).
+  router.get('/v1/libs/portfolio-standalone.js', (_req, res) => {
     sendJavascriptLibrary(res, sdkLibSource(config, 'portfolio-standalone'));
   });
 
-  // GET /v1/libs/aimeat-data.js — Memory & Micro-Memory library. Migrated to componentized ESM
-  // (src/static/sdk-libs/data/) — the config-path proof lib: NODE_URL/NODE_ID come from _core/config
-  // (the prelude), authed calls go through _core/session. `?impl=legacy` serves the old generator
-  // for the A/B equivalence diff (removed in Phase 5).
-  router.get('/v1/libs/aimeat-data.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatDataLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'data'));
-  });
-
-  // GET /v1/libs/aimeat-storage.js — File storage library (migrated: sdk-libs/storage/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-storage.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatStorageLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'storage'));
-  });
-
-  // GET /v1/libs/aimeat-markdown.js — safe GFM markdown renderer (migrated: sdk-libs/markdown/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-markdown.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatMarkdownLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'markdown'));
-  });
-
-  // GET /v1/libs/aimeat-social.js — Boards & social library (migrated: sdk-libs/social/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-social.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatSocialLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'social'));
-  });
-
-  // GET /v1/libs/aimeat-wallet.js — Wallet library (migrated: src/static/sdk-libs/wallet/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-wallet.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatWalletLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'wallet'));
-  });
-
-  // GET /v1/libs/aimeat-workflows.js — Agent Workflows client (migrated: sdk-libs/workflows/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-workflows.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatWorkflowsLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'workflows'));
-  });
-
-  // GET /v1/libs/aimeat-work.js — Actions & work exchange library (migrated: sdk-libs/work/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-work.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatWorkLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'work'));
-  });
-
-  // GET /v1/libs/aimeat-tunnel.js — Personal node tunnel client (migrated: sdk-libs/tunnel/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-tunnel.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatTunnelLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'tunnel'));
-  });
-
-  // GET /v1/libs/aimeat-audio.js — Audio engine library (migrated: sdk-libs/audio/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-audio.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatAudioLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'audio'));
-  });
-
-  // GET /v1/libs/aimeat-speech.js — Speech library. Migrated to a componentized ESM source
-  // bundled by esbuild (src/static/sdk-libs/speech/, SDK-libs migration Phase 0); served as the
-  // committed IIFE + a per-node config prelude. `?impl=legacy` still serves the old string
-  // generator so the A/B equivalence diff can compare them (removed in Phase 5).
-  router.get('/v1/libs/aimeat-speech.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatSpeechLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'speech'));
-  });
-
-  // GET /v1/libs/aimeat-capabilities.js — Capability discovery, invoke, management
-  // (migrated: src/static/sdk-libs/capabilities/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-capabilities.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatCapabilitiesLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'capabilities'));
-  });
-
-  // GET /v1/libs/aimeat-ai.js — AI completion using the user's OpenRouter key
-  // (migrated: src/static/sdk-libs/ai/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-ai.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatAiLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'ai'));
-  });
-
-  // GET /v1/libs/aimeat-agents.js — commission & observe the owner's agents
-  // (migrated: src/static/sdk-libs/agents/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-agents.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatAgentsLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'agents'));
-  });
-
-  // GET /v1/libs/aimeat-organism.js — organism/workspace content client (migrated: sdk-libs/organism/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-organism.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatOrganismLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'organism'));
-  });
-
-  // GET /v1/libs/aimeat-intake.js — Public Intake client (migrated: sdk-libs/intake/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-intake.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatIntakeLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'intake'));
-  });
-
-  // GET /v1/libs/aimeat-editor.js — markdown editor (migrated: sdk-libs/editor/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-editor.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatEditorLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'editor'));
-  });
-
-  // GET /v1/libs/aimeat-live.js — realtime live-updates (migrated: sdk-libs/live/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-live.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatLiveLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'live'));
-  });
-
-  // GET /v1/libs/aimeat-commerce.js — checkout/offer prices (migrated: sdk-libs/commerce/; ?impl=legacy)
-  router.get('/v1/libs/aimeat-commerce.js', (req, res) => {
-    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatCommerceLib(config)); return; }
-    sendJavascriptLibrary(res, sdkLibSource(config, 'commerce'));
+  // GET /v1/libs/aimeat-auth.js — Auth library. Prepends the standard config prelude PLUS an
+  // auth-specific one carrying the node's enabled OIDC providers (server-computed — the generic
+  // prelude only has nodeId/baseUrl), which auth/config.js reads as window.__AIMEAT_AUTH_CFG__.providers.
+  router.get('/v1/libs/aimeat-auth.js', (_req, res) => {
+    const authCfg = `window.__AIMEAT_AUTH_CFG__=${JSON.stringify({ providers: listEnabledProviderMeta(config) })};
+`;
+    sendJavascriptLibrary(res, configPrelude(config) + authCfg + readSdkBundle('auth'));
   });
 
   // GET /v1/libs/ — List available libraries. Derived from the library-pack registry
