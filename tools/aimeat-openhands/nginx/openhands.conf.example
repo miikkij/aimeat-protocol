@@ -1,17 +1,31 @@
-# AIMEAT-boosted OpenHands — nginx reverse proxy: TLS + Basic Auth + WebSocket.
+# AIMEAT-boosted OpenHands — nginx reverse proxy: TLS + Basic Auth + WebSocket +
+# dynamic runtime-container proxy + default MCP proxy.
 #
 # ⚠️  SECURITY: self-hosted OpenHands has NO login of its own, and its UI can run arbitrary
 #     code on this host (shell + docker socket + your AIMEAT agent token). The auth_basic gate
-#     below (over TLS) is the ONLY thing stopping the whole internet from taking over this box.
+#     below (over TLS) is the ONLY thing stopping the whole internet from taking over the app UI.
 #     Do not remove it. An IP allowlist on top is strongly recommended.
+#
+# The two auth-off exceptions (/runtime-<port>/* and /mcp/mcp) are safe because:
+#   - The agent-server inside each runtime container enforces its own session_api_key
+#     (32-char random per-conversation token; a Bearer over Basic Auth would be redundant).
+#   - The default MCP proxy checks X-Session-API-Key + X-OpenHands-ServerConversation-ID.
+#   - Both back-ends bind to 172.17.0.1 (docker0 host-IP, host-private) — not the internet.
 #
 # Setup (see DEPLOY-PROMPT.md "Expose via nginx"):
 #   1) Point a DNS A record for __DOMAIN__ at this host.
-#   2) Create the password file:  htpasswd -c /etc/nginx/openhands.htpasswd <username>
-#   3) Get a cert:  certbot --nginx -d __DOMAIN__   (or certonly + the paths below)
-#   4) Put this file in /etc/nginx/sites-available/, symlink into sites-enabled/, nginx -t, reload.
-#   5) In the bundle .env: OPENHANDS_PORT_BIND=127.0.0.1:13781 and
-#      PERMITTED_CORS_ORIGINS=https://__DOMAIN__  (then re-run: docker compose up -d).
+#   2) Ensure /etc/docker/daemon.json has {"ip": "172.17.0.1"} and `systemctl restart docker`
+#      with no containers running (live-restore skips the network reconfig otherwise).
+#      Without this, runtime containers publish to 127.0.0.1: only, which nginx can't reach.
+#   3) Create the password file:  htpasswd -c /etc/nginx/openhands.htpasswd <username>
+#   4) Get a cert:  certbot --nginx -d __DOMAIN__   (or certonly + point paths below)
+#   5) Put this file in /etc/nginx/sites-available/, symlink into sites-enabled/, nginx -t, reload.
+#   6) In the bundle .env set:
+#        OPENHANDS_PORT_BIND=127.0.0.1:13781
+#        PERMITTED_CORS_ORIGINS=https://__DOMAIN__
+#        WEB_HOST=__DOMAIN__
+#        SANDBOX_CONTAINER_URL_PATTERN=https://__DOMAIN__/runtime-{port}
+#      then re-run: docker compose up -d && bash scripts/postup.sh
 
 map $http_upgrade $connection_upgrade {
     default upgrade;
@@ -46,6 +60,54 @@ server {
 
     client_max_body_size 100m;
 
+    # ── Runtime container proxy ──────────────────────────────────
+    # Spawned agent-server containers bind their app port to 172.17.0.1:<random>
+    # (via daemon.json ip=172.17.0.1). The app tells the browser to reach them at
+    # https://__DOMAIN__/runtime-<port>/*  — this location extracts <port> and forwards.
+    # Auth is OFF here: the runtime enforces its own session_api_key (bearer per conversation).
+    # Named captures avoid nginx's builtin $uri clash: `$rt_path` not `$uri`.
+    location ~ ^/runtime-(?<rt_port>[0-9]+)(?<rt_path>/.*)?$ {
+        auth_basic off;
+
+        proxy_pass http://172.17.0.1:$rt_port$rt_path$is_args$args;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        $connection_upgrade;
+
+        proxy_read_timeout  3600s;
+        proxy_send_timeout  3600s;
+        proxy_buffering     off;
+    }
+
+    # ── Default MCP proxy ────────────────────────────────────────
+    # When WEB_HOST is set (see .env.example), the app self-links its default MCP server
+    # to https://__DOMAIN__/mcp/mcp. Runtime containers hit that URL to enumerate tools.
+    # Auth is OFF: OpenHands stamps X-Session-API-Key + X-OpenHands-ServerConversation-ID
+    # on those requests, and the upstream (this same host on :13781) validates them.
+    location = /mcp/mcp {
+        auth_basic off;
+
+        proxy_pass http://127.0.0.1:13781/mcp/mcp;
+        proxy_http_version 1.1;
+
+        proxy_set_header Host              $host;
+        proxy_set_header X-Real-IP         $remote_addr;
+        proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade           $http_upgrade;
+        proxy_set_header Connection        $connection_upgrade;
+
+        proxy_read_timeout  3600s;
+        proxy_send_timeout  3600s;
+        proxy_buffering     off;
+    }
+
+    # ── App UI ───────────────────────────────────────────────────
     location / {
         proxy_pass http://127.0.0.1:13781;
         proxy_http_version 1.1;
