@@ -276,7 +276,9 @@ await test('GET /v1/libs/aimeat-ai.js serves the lib', async () => {
   const res = await fetch(`${BASE}/v1/libs/aimeat-ai.js`);
   assert(res.status === 200, `expected 200, got ${res.status}`);
   const text = await res.text();
-  assert(text.includes('AIMEAT.ai'), 'lib defines AIMEAT.ai');
+  // Componentized (SDK-libs migration): attaches via _core `attach('ai', …)` — not a literal
+  // `AIMEAT.ai =` — and esbuild may normalize the quote style, so match either.
+  assert(/attach\(["']ai["']/.test(text), 'lib attaches the AIMEAT.ai surface');
   assert(text.includes('isAvailable'), 'lib exposes isAvailable');
   assert(text.includes('/v1/ai/available'), 'isAvailable probes /v1/ai/available');
   assert(text.includes('complete'), 'lib exposes complete');
