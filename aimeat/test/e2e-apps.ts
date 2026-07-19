@@ -712,7 +712,8 @@ await test('GET /v1/libs/aimeat-agentface.js serves the library as JavaScript', 
     assert((res.headers.get('content-type') ?? '').includes('javascript'), `content-type ${res.headers.get('content-type')}`);
     const src = await res.text();
     assert(src.includes(".agentface"), 'writes the convention key apps.{filename}.agentface');
-    assert(src.includes("visibility: 'public'"), "publishes with visibility 'public'");
+    // esbuild may normalize the quote style in the bundle (single → double), so match either.
+    assert(/visibility:\s*["']public["']/.test(src), "publishes with visibility 'public'");
     assert(src.includes('AIMEATAgentFace'), 'exposes the AIMEATAgentFace global');
     assert(src.includes('AIMEAT.auth is required'), 'clear error when aimeat-auth is missing');
     assert(src.includes('Not signed in'), 'clear error when called unauthenticated');

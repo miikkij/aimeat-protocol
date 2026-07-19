@@ -38,7 +38,8 @@ await test('GET /v1/libs/aimeat-audio.js returns JavaScript', async () => {
     const ct = res.headers.get('content-type') || '';
     assert(ct.includes('javascript'), `Expected JS content-type, got: ${ct}`);
     const body = await res.text();
-    assert(body.includes('AIMEAT.audio'), 'Should contain AIMEAT.audio');
+    // Componentized (SDK-libs migration): attaches via _core `attach('audio', …)`, esbuild-quoted.
+    assert(/attach\(["']audio["']/.test(body), 'Should attach the AIMEAT.audio surface');
     assert(body.includes('play'), 'Should contain play function');
     assert(body.includes('piano'), 'Should contain piano instrument');
     assert(body.includes('drums'), 'Should contain drums instrument');
@@ -65,7 +66,8 @@ await test('GET /v1/libs/aimeat-speech.js returns JavaScript', async () => {
     const ct = res.headers.get('content-type') || '';
     assert(ct.includes('javascript'), `Expected JS content-type, got: ${ct}`);
     const body = await res.text();
-    assert(body.includes('AIMEAT.speech'), 'Should contain AIMEAT.speech');
+    // Componentized (SDK-libs migration): attaches via _core `attach('speech', …)`, esbuild-quoted.
+    assert(/attach\(["']speech["']/.test(body), 'Should attach the AIMEAT.speech surface');
     assert(body.includes('say'), 'Should contain say function');
     assert(body.includes('listen'), 'Should contain listen function');
     assert(body.includes('voices'), 'Should contain voices function');
