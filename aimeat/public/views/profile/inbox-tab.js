@@ -14,6 +14,10 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.23.1 -- 2026-07-19 -- Fix "badge shows N new but the open thread never updates": a 'messages'
+ *     live-update now ALWAYS reloads the open thread (dropped the isComposingInThread guard that skipped
+ *     the whole reload while an editable was focused, so incoming messages stayed invisible until
+ *     send/reopen). Scroll-yank-while-typing is handled in useThreadAutoScroll instead (css/use-thread-ux v1.2.0).
  *   v1.23.0 -- 2026-07-18 -- ↩ Reply on a bubble focuses the composer (`composerFocus`→Composer.focusNonce);
  *     root gets `inbox--panel` so ≤760px drops the section header for a near-full-viewport thread (css v1.4.0).
  *   v1.22.0 -- 2026-07-17 -- Reply-to with quote (↩ on a bubble quotes the message into the reply via
@@ -410,18 +414,14 @@ export default function InboxTab({ showToast }) {
     return [...map.entries()].map(([id, label]) => ({ id, label }));
   })();
 
-  // True when the user is actively composing (an editable is focused). While composing we skip the
-  // open-thread reload so a live-update's full setThread can't re-render the message list and yank scroll
-  // mid-typing (the "jerks while I write" symptom). loadLists still runs (unread badges), and the next
-  // send/thread-open reloads the thread, so nothing is permanently missed — just deferred past the keystroke.
-  const isComposingInThread = () => {
-    const ae = typeof document !== 'undefined' ? document.activeElement : null;
-    if (!ae) return false;
-    if (ae.tagName === 'TEXTAREA' || ae.tagName === 'INPUT') return true;
-    return ae instanceof HTMLElement && ae.isContentEditable;
-  };
+  // A 'messages' live-update ALWAYS reloads the open thread so incoming messages render immediately —
+  // even while you're typing a reply (previously the whole reload was skipped when an editable was
+  // focused, so new messages stayed invisible until send/reopen: the "badge shows N new but the thread
+  // never updates" bug). The "don't yank scroll while I write" concern is handled where it belongs —
+  // useThreadAutoScroll suppresses the new-message jump while the composer is focused (near-bottom
+  // follow still applies), so the message list re-renders without stealing the caret or the scroll.
   const liveRef = useRef(null);
-  liveRef.current = () => { loadLists(); if (activeConv && !isComposingInThread()) loadThread(activeConv); };
+  liveRef.current = () => { loadLists(); if (activeConv) loadThread(activeConv); };
   // Selective live refresh. `e.detail.domains` is a Set<string> (or null = "everything changed",
   // e.g. a reconnect catch-up). IMPORTANT: it is a Set, not an Array — an earlier `Array.isArray`
   // check silently never matched, so the inbox re-fetched on EVERY change (memory/organism/task
