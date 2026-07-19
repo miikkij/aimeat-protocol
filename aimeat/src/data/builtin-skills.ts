@@ -9,6 +9,7 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   2026-07-19 — Research-first flow (AppDev KB Phase 7): Step 0 + tier decision tree + finish checklist / appdev-flow prompt / handbook module
  *   v1.4.0 -- 2026-07-19 -- aimeat-app-builder (public): the paved path for building apps ON
  *     the node over MCP — spec-first, research-before-building (apps/packs/pitfalls), presigned
  *     publish. Canonical home of the skill formerly shipped only inside the OpenHands runtime image.
@@ -533,22 +534,30 @@ GET /v1/appdev/pitfalls          ← curated "what bites app builders" registry
 Everything the app loads at runtime — CSS, auth, data, UI libraries — must be a URL
 **listed in that spec**. Never invent script/style \`src\` URLs; they 404 and break the app.
 
-## Research before building
+## Research before building (research → frame → propose → build → finish)
 
-Before writing code, look at what already exists on the node and reuse it:
+Before writing code, look at what already exists on the node and reuse it. ONE call gives
+the big picture: \`aimeat_appdev_overview\` (pass your model id) — the owner's existing apps
+and **template proposals** (often the fastest correct starting point: fork or copy their
+patterns), library packs with per-model proofs, T1/T2/T3 templates, and the pitfalls
+(curated + learned) for the areas you will touch. Drill down from there:
+\`GET /v1/library-packs/{id}\` (per-pack AI doc), \`GET /v1/appdev/pitfalls\` (curated
+registry), \`aimeat_appdev_pitfall_list\` (learned, model-filterable), \`aimeat_skill_list\`
+\`binding=app:{owner}/{file}\` (how existing apps want to be driven).
 
-1. \`aimeat_app_list\` — the owner's existing apps: a prior app is often the best template
-   (fork or copy its patterns instead of starting cold).
-2. \`GET /v1/library-packs\` — the capability packs (charts, realtime, iam, styling, ai, …)
-   with per-pack AI docs at \`/v1/library-packs/{id}\`.
-3. \`GET /v1/appdev/pitfalls\` — read the criticals for the areas you will touch
-   (auth, ext/cortex, realtime, mobile, publish) BEFORE you hit them.
-4. \`aimeat_skill_list\` — skills bound to existing apps (\`binding=app:{owner}/{file}\`)
-   show how those apps want to be driven.
+Frame the build from the research (tier T1/T2/T3, packs, whether the app needs its own
+users → aimeat-iam decided NOW), propose the frame to the user in 3-5 lines, then build.
+If the user says to just build it the usual way, skip the research and go.
 
-Frame the build from the research (template tier, packs, whether the app needs its own
-users → aimeat-iam), propose the frame to the user, then build. If the user says to just
-build it the usual way, skip the research and go.
+## Finish — this is where the acceleration compounds
+
+After a successful publish (the publish response's \`next_steps\` shows what is missing):
+1. Publish the app's **agent face** + bind a **skill** (\`metadata.binding\`
+   \`app:{owner}/{filename}\`) so the app is agent-facing by default.
+2. If anything generalizes, record a template: \`aimeat_app_template_propose\`
+   (your model id required) — the next build starts from it.
+3. Report what bit you: \`aimeat_appdev_pitfall_report\` (model required; upserts by slug;
+   \`share: true\` publishes it platform-wide) — the next builder skips your mistake.
 
 ## Workflow
 

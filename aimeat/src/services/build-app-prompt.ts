@@ -12,6 +12,7 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-07-19 — Research-first flow (AppDev KB Phase 7): Step 0 + tier decision tree + finish checklist / appdev-flow prompt / handbook module
  *   v1.5.0 — 2026-07-19 — MCP-agent section: load node:aimeat-app-builder first + curated
  *     pitfall registry pointer (/v1/appdev/pitfalls) (AppDev KB Phase 2)
  *   v1.4.0 — 2026-07-16 — Auth Pattern path 3: AIMEAT.auth.on('login'/'logout') — async logins
@@ -39,6 +40,7 @@ import { APP_GRANTABLE_SCOPES } from '../routes/app-grants.js';
 // lists can never drift from /v1/libs, /v1/library-packs, bootstrap or llms.txt (Phase 1
 // of the Library Acceleration Program killed the 4-way hardcoded-list drift).
 import { buildPromptLibrarySections } from '../data/library-packs.js';
+import { buildResearchStep, buildFinishChecklist } from './appdev-flow-constants.js';
 
 export interface BuildAppPromptOptions {
   /** Conversation/UI language for the generated app. Only 'en' and 'fi' are localized. */
@@ -67,6 +69,14 @@ export function buildAppPrompt(
   let body = '';
   body += isImprove ? '## AIMEAT Platform Instructions\n\n' : '## Step 2 — Build it (once I have answered)\n\n';
   body += 'This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n';
+
+  // Tier decision tree — the shape decision comes BEFORE any code (AppDev KB Phase 7).
+  body += "### Choose the app's shape (T1/T2/T3)\n";
+  body += 'Decide the tier first; start from the matching shell at GET ' + nodeUrl + '/v1/app-templates:\n';
+  body += '- **T1 — pure client** (shell-pure-client): auth + data + UI in one HTML file. The default; most apps end here.\n';
+  body += '- **T2 — +cortex** (shell-cortex): the app leans on ready-made cortex UI libs (DataTable, forms, charts). Pick when the UI is data-heavy.\n';
+  body += '- **T3 — +extension** (shell-extension): the app needs SERVER-side work — a third-party API (ctx.fetch), server-enforced rules (only-author-can-delete, one-vote-per-user), or its own `ext:` data. Only tier that ships an extension.\n';
+  body += '- **Own users/roles?** If the app has its own member community (roles, levels, moderation) use the `aimeat-iam` pack + the App-IAM template from the START — hand-rolled auth lists in memory keys are painful to retrofit and usually forgotten.\n\n';
 
   // Libraries: the whole section (SDK groups + Ready-made UI cortex + Optional capability
   // packs) is generated from the library-pack registry — src/data/library-packs.ts — so this
@@ -253,7 +263,8 @@ export function buildAppPrompt(
   // Agentic-coder note: MCP-connected agents publish directly instead of the human paste flow.
   body += '### If you are an agentic coder with AIMEAT MCP tools\n';
   body += 'When `aimeat_*` MCP tools are available in your environment (Claude Code, Cursor, OpenHands, any MCP client), they are already authenticated as the user — USE THEM for node operations instead of raw HTTP: `aimeat_app_publish` to publish/update the app (upload mode for files > 1 KB), `aimeat_storage_upload` for files, `aimeat_memory_write`/`aimeat_memory_read` for data, `aimeat_discover` for discovery. Register throwaway accounts only for cross-user testing; the app itself is published under the user\'s own account via MCP. The publish walkthrough below is for HUMANS pasting in a chat — skip telling it to an MCP-equipped agent, just publish.\n';
-  body += 'Load the paved-path skill first: `aimeat_skill_get` with ref `node:aimeat-app-builder` (spec-first workflow, research-before-building, publish checklist). Also skim the curated pitfall registry at `GET /v1/appdev/pitfalls` (filter `?applies_to=` for the areas you touch) — it is the distilled list of what breaks app builds on this platform.\n';
+  body += 'Load the paved-path skill first: `aimeat_skill_get` with ref `node:aimeat-app-builder` (spec-first workflow, research-before-building, publish checklist). Research with ONE call: `aimeat_appdev_overview` (pass your model id) — your existing apps + template proposals, library packs with per-model proofs, curated + learned pitfalls. Skim the pitfalls for the areas you touch before you hit them.\n';
+  body += buildFinishChecklist();
   body += 'Namespace rule: data written through MCP tools is stored under the AGENT\'s identity (GAII, `name#owner@node`), NOT the human owner\'s — so a browser app reading the signed-in owner\'s keys will NOT see it. When agents seed or share data the app must read: store the author identity inside each record, write such keys with public visibility and read them with `AIMEAT.data.getPublic(<full agent GAII>, key)`, or add `?owner_scope=true` to memory reads (resolves the owner\'s agents\' keys too).\n\n';
 
   // After-build publish walkthrough (new-app mode only)
@@ -272,6 +283,7 @@ export function buildAppPrompt(
   if (!isImprove) {
     full += 'Help me build a single-file HTML app that runs on AIMEAT.\n';
     full += 'My initial idea: ' + idea + '\n\n';
+    full += buildResearchStep();
     full += '## Step 1 — Interview me first\n';
     full += 'If I have not described my idea above, your FIRST reply must ask me what I want to build. Then ask me these in ONE message and wait for my answers:\n';
     full += '1. What kind of app? (message board · multiplayer game · notes/journal · habit or expense tracker · family tools like shared lists/calendar · drawing/creative · music jam · real-time collaboration · offer or need help/services · something else)\n';

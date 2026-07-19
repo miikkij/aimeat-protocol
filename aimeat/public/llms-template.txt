@@ -465,10 +465,15 @@ shells; fetch one by id and build inside it). If you have AIMEAT MCP tools
 (`aimeat_*`) connected, they are already authenticated — use them for node
 operations (`aimeat_app_publish`, `aimeat_storage_upload`, `aimeat_memory_*`)
 instead of raw HTTP, and load the paved-path skill first:
-`aimeat_skill_get` ref `node:aimeat-app-builder`. Before building, read the
-curated pitfall registry — `GET {{BASE_URL}}/v1/appdev/pitfalls`
+`aimeat_skill_get` ref `node:aimeat-app-builder`. Before building, research
+with ONE call — the MCP tool `aimeat_appdev_overview` (or
+`GET {{BASE_URL}}/v1/appdev/overview`, authed): your existing apps + template
+proposals, library packs with per-model proofs, and the pitfalls. Curated
+pitfall registry alone: `GET {{BASE_URL}}/v1/appdev/pitfalls`
 (`?applies_to=auth|ext|cortex|realtime|mobile|publish|ai|iam`) — the distilled
-list of what actually breaks app builds on this platform.
+list of what actually breaks app builds on this platform. The full
+research-first flow prompt (paste it to your coding agent once, every build
+starts smarter): `GET {{BASE_URL}}/v1/prompts/appdev-flow?format=txt`.
 
 PUBLISHING FILES (apps + storage), the ONE right way: for anything over ~1 KB
 use presigned upload — call the tool with metadata only (OMIT `content_base64` /

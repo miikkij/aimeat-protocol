@@ -3,6 +3,7 @@
  * @description Operating handbook for the v2 `appdev` surface (/v2/mcp/appdev · `aimeat connect serve
  *   --surface appdev`). Self-contained; tool list mirrors MCP_SURFACES.appdev.
  * @version-history
+ *   2026-07-19 — Research-first flow (AppDev KB Phase 7): Step 0 + tier decision tree + finish checklist / appdev-flow prompt / handbook module
  *   v1.0.0 -- 2026-05-30 -- Initial appdev-surface handbook
  *   v1.1.0 -- 2026-06-09 -- Add the Organism workspaces & agent-contracts section (points to
  *     docs/agent-workspace-contracts.md) so workspace-processing agents are built to the convention.
@@ -35,6 +36,24 @@ manifest.yaml + libs/) · \`aimeat_cortex_activate\` · \`aimeat_cortex_deactiva
 **Storage.** \`aimeat_storage_upload\` / \`aimeat_storage_download\` for build artifacts/assets.
 
 **Reference.** \`aimeat_handbook_get\` — read the appdev / generator directives.
+
+**Research & knowledge (the research-first flow).** \`aimeat_appdev_overview\` — ONE call before
+framing any build: the owner's apps + template proposals, library packs with per-model proofs,
+T1/T2/T3 templates, curated + learned pitfalls (pass your model id) · \`aimeat_appdev_pitfall_list\`
+(scope own/platform/all, paginated) · \`aimeat_appdev_pitfall_report\` (record what bit you — model
+required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_template_propose\`/
+\`_list\`/\`_get\` (distill a reusable template after a publish; the next build starts from it).
+
+## Research-first build flow (research → frame → propose → build → finish)
+1. RESEARCH: load the \`node:aimeat-app-builder\` skill (\`aimeat_skill_get\`), call
+   \`aimeat_appdev_overview\`, and fetch the canonical spec \`GET /v1/prompts/build-app\` (it is law).
+2. FRAME: tier (T1 pure client / T2 +cortex / T3 +extension), packs, start point (fork a prior
+   app / template proposal / shell), own-users → aimeat-iam decided NOW.
+3. PROPOSE the frame to the user in 3-5 lines; adjust.
+4. BUILD flexibly within the frame; verify locally; publish (presigned upload > ~1 KB).
+5. FINISH: agent face + bound skill (\`metadata.binding\`), \`aimeat_app_template_propose\`,
+   \`aimeat_appdev_pitfall_report\` — the publish response's \`next_steps\` shows what is missing.
+The user can always say "just build it the usual way" — then skip 1-3.
 
 ## Build → ship loop
 1. Build the artifact locally (HTML app, extension ZIP, or cortex ZIP).
