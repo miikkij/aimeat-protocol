@@ -34,6 +34,20 @@ services:
       # Allow the browser origins that reach this UI. Add the host IP for LAN access (an
       # IP-based origin otherwise fails CORS). Comma-separated.
       - PERMITTED_CORS_ORIGINS=${PERMITTED_CORS_ORIGINS:-http://localhost:3000}
+      # Public hostname (no scheme). If set, the app self-links + spawned runtime containers
+      # reach the default MCP proxy via https://<WEB_HOST>/mcp/mcp instead of the fallback
+      # http://host.docker.internal:3000/mcp/mcp — which fails whenever the app is bound
+      # to a non-3000 host port (spawned runtime containers cannot reach it). Leave empty
+      # for pure-local dev on :3000; set to your public domain in prod (e.g. openhands.example.com).
+      - WEB_HOST=${WEB_HOST:-}
+      # Internal loopback for the app's own MCP proxy calls. Keeps the default MCP resolvable
+      # inside the app container regardless of the host port bind.
+      - SANDBOX_LOCAL_RUNTIME_URL=${SANDBOX_LOCAL_RUNTIME_URL:-http://127.0.0.1:3000}
+      # Browser-facing URL pattern for spawned runtime containers. Required when the app
+      # is behind a reverse proxy — without it the browser gets a naked host_port URL like
+      # https://openhands.example.com:56743 which is not reachable through the proxy.
+      # Only meaningful in bridge network mode (the default).
+      - SANDBOX_CONTAINER_URL_PATTERN=${SANDBOX_CONTAINER_URL_PATTERN:-http://localhost:{port}}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       # Persistent OpenHands state (settings.json, openhands.db, user microagents live here).
