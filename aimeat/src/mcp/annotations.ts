@@ -203,6 +203,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_app_template_list: { title: 'List App Template Proposals', readOnlyHint: true },
     aimeat_app_template_get: { title: 'Read App Template Proposal', readOnlyHint: true },
     aimeat_app_template_delete: { title: 'Delete App Template Proposal', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_appdev_proof_attach: { title: 'Attach Acceleration Proof', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_appdev_pitfall_report: { title: 'Report AppDev Pitfall', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_appdev_pitfall_list: { title: 'List AppDev Pitfalls', readOnlyHint: true },
     aimeat_appdev_pitfall_delete: { title: 'Delete AppDev Pitfall', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },

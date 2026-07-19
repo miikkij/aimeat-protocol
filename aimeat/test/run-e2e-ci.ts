@@ -95,6 +95,7 @@ const ALL_SUITES = [
     'test/e2e-mcp-knowledge.ts',
     'test/e2e-mcp-appdev-pitfalls.ts',
     'test/e2e-app-template-proposals.ts',
+    'test/e2e-appdev-proofs.ts',
     'test/e2e-mcp-organisms.ts',
     'test/e2e-mcp-workspaces.ts',
     'test/e2e-organism-workspace-access.ts',

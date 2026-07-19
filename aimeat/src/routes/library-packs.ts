@@ -16,6 +16,7 @@
  *   communityPackDetail() · libraryPackIds()
  * @usage app.use(libraryPacksRouter(config, storage)) from routes-loader.
  * @version-history
+ *   2026-07-19 — Self-reported acceleration proofs (AppDev KB Phase 8): community-pack + template proofs; self_reported labeling
  *   v1.1.0 — 2026-07-17 — community packs: active+public user cortexes with a lib component
  *     appear in the index (scope 'community') and serve their type:prompt doc as ai_doc.
  *   v1.0.0 — 2026-07-16 — initial: index + by-id endpoints over the library-pack registry
@@ -89,6 +90,31 @@ function communityPackDetail(ext: CortexExtensionRecord, baseUrl: string) {
   };
 }
 
+/** Self-reported per-model proofs for community packs, keyed by pack id — one prefix read
+ *  over the public `libpack.proofs.{packId}` records (attached via aimeat_appdev_proof_attach). */
+async function loadCommunityProofs(storage: Storage): Promise<Map<string, unknown[]>> {
+  const out = new Map<string, unknown[]>();
+  try {
+    const { items } = await storage.listAllMemory({ prefix: 'libpack.proofs.', visibility: 'public', limit: 500 });
+    for (const rec of items) {
+      const v = rec.value as { packId?: string; proofs?: unknown[] } | null;
+      if (v?.packId && Array.isArray(v.proofs)) out.set(v.packId, v.proofs);
+    }
+  } catch { /* best-effort — packs serve without proofs */ }
+  return out;
+}
+
+/** Attach self-reported proofs (+ passing-model summary) to a community entry. Proofs never
+ *  upgrade the vetting status — a community pack stays `preview`; self_reported labels the trust. */
+function withCommunityProofs<T extends { id: string }>(entry: T, proofsByPack: Map<string, unknown[]>): T & Record<string, unknown> {
+  const proofs = proofsByPack.get(entry.id);
+  if (!proofs || proofs.length === 0) return entry;
+  const proven = proofs
+    .filter((p): p is { model: string; verdict: string } => !!p && typeof p === 'object' && (p as { verdict?: string }).verdict === 'pass')
+    .map(p => p.model);
+  return { ...entry, proofs, self_reported: true, proven_models: [...new Set(proven)] };
+}
+
 export function libraryPacksRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -106,9 +132,11 @@ export function libraryPacksRouter(config: AimeatConfig, storage: Storage): Rout
       scope: 'node' as const,
       include: p.include.map(l => renderPackText(l, config.baseUrl)),
     }));
-    let community: ReturnType<typeof communityIndexEntry>[] = [];
+    let community: Array<Record<string, unknown>> = [];
     try {
-      community = (await communityExtensions(storage)).map(e => communityIndexEntry(e, config.baseUrl));
+      const exts = await communityExtensions(storage);
+      const proofsByPack = await loadCommunityProofs(storage);
+      community = exts.map(e => withCommunityProofs(communityIndexEntry(e, config.baseUrl), proofsByPack));
     } catch { /* community listing is best-effort — the curated index always serves */ }
 
     let packs: Array<Record<string, unknown>> = [...staticIndex, ...community];
@@ -131,7 +159,10 @@ export function libraryPacksRouter(config: AimeatConfig, storage: Storage): Rout
       try {
         const ext = (await communityExtensions(storage)).find(e => e.name === id);
         if (ext) {
-          res.json(success(config.nodeId, { pack: communityPackDetail(ext, config.baseUrl) }));
+          const proofsByPack = await loadCommunityProofs(storage);
+          res.json(success(config.nodeId, {
+            pack: withCommunityProofs(communityPackDetail(ext, config.baseUrl), proofsByPack),
+          }));
           return;
         }
       } catch { /* fall through to 404 */ }

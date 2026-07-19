@@ -57,6 +57,7 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Template proposals are owner-GHII memory records; same reasoning as above.
     aimeat_app_template_propose: 'memory:write',
     aimeat_app_template_delete: 'memory:write',
+    aimeat_appdev_proof_attach: 'memory:write',
 
     // Boards / social (mutations → social:write; subscribe → social:read).
     // NOTE: aimeat_board_read / aimeat_board_list are intentionally NOT gated — the REST
