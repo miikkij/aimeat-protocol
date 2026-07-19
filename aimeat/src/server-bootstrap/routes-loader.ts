@@ -573,7 +573,7 @@ export async function mountRoutes(
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
   app.use(appTemplatesRouter(config, storage));
-  app.use(appdevPitfallsRouter(config));
+  app.use(appdevPitfallsRouter(config, storage));
   app.use(appdevOverviewRouter(config, storage));
   app.use(libraryPacksRouter(config, storage));
   // Backup routes BEFORE appsRouter so /v1/apps/backup/* never collides with

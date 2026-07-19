@@ -4,6 +4,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.16.0 — 2026-07-19 — AppDev tab (pf-adk-*): prompt cards, learned-pitfall rows,
+ *     chips (model/shared/tier/proof), severity badges (AppDev KB UI phase).
  *   v2.15.0 — 2026-07-16 — Drop the dead .pf-side-ico rule (sidebar nav is label-only now).
  *   v2.14.0 — 2026-07-11 — .pf-ai-app-meta: muted compact tokens·calls column for the Home
  *     AgentLedgerCard by-model breakdown rows (reuses the AiSpendCard .pf-ai-* card chrome).
@@ -3375,3 +3377,33 @@
 .pf-app-skill-chip { display: inline-flex; align-items: center; gap: 0.25rem; }
 .pf-app-skill-x { background: none; border: none; color: inherit; cursor: pointer; font-size: 0.85rem; padding: 0 0.1rem; line-height: 1; }
 .pf-app-skill-picker { display: inline-flex; align-items: center; gap: 0.4rem; }
+
+/* ── AppDev tab (pf-adk-*) — knowledge base + start prompts (AppDev KB UI phase) ── */
+.pf-adk .section-title { margin-top: 1.6rem; }
+.pf-adk .section-title:first-child { margin-top: 0; }
+.pf-adk-prompt-card { margin-bottom: 0.7rem; }
+.pf-adk-prompt-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 0.8rem; flex-wrap: wrap; }
+.pf-adk-prompt-title { font-weight: 600; }
+.pf-adk-prompt-actions { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
+.pf-adk-prompt-body { margin-top: 0.7rem; max-height: 22rem; overflow: auto; white-space: pre-wrap; word-break: break-word; font-size: 0.78rem; line-height: 1.45; background: var(--bg-dim); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem; }
+.pf-adk-filters { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; margin: 0.5rem 0 0.8rem; }
+.pf-adk-filter { display: inline-flex; align-items: center; gap: 0.35rem; font-size: 0.85rem; color: var(--muted); cursor: pointer; }
+.pf-adk-filter--active { border-color: var(--accent); color: var(--accent); }
+.pf-adk-row { margin-bottom: 0.55rem; padding: 0.7rem 0.9rem; }
+.pf-adk-row--outdated { opacity: 0.6; }
+.pf-adk-row-head { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; cursor: pointer; }
+.pf-adk-row-title { display: flex; align-items: center; gap: 0.5rem; font-weight: 600; min-width: 0; flex: 1 1 14rem; }
+.pf-adk-row-chips { display: flex; align-items: center; gap: 0.35rem; flex-wrap: wrap; }
+.pf-adk-row-body { margin-top: 0.7rem; display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.88rem; color: var(--muted); border-top: 1px solid var(--border); padding-top: 0.7rem; }
+.pf-adk-row-body strong { color: var(--fg); }
+.pf-adk-chip { display: inline-flex; align-items: center; padding: 0.1rem 0.5rem; border-radius: 999px; font-size: 0.72rem; border: 1px solid var(--border); background: var(--bg-dim); color: var(--muted); }
+.pf-adk-chip--model { border-color: var(--accent); color: var(--accent); background: transparent; }
+.pf-adk-chip--shared { border-color: var(--success); color: var(--success); background: transparent; }
+.pf-adk-chip--outdated { text-decoration: line-through; }
+.pf-adk-chip--tier { font-weight: 700; }
+.pf-adk-chip--proof { border-color: var(--success); color: var(--success); }
+.pf-adk-sev { display: inline-flex; align-items: center; padding: 0.05rem 0.45rem; border-radius: 6px; font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.03em; }
+.pf-adk-sev--critical { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+.pf-adk-sev--warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.pf-adk-sev--info { background: var(--bg-dim); color: var(--muted); }
+.pf-adk-empty { color: var(--muted); font-size: 0.9rem; padding: 0.9rem; margin-bottom: 0.7rem; }

@@ -3,6 +3,7 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   2026-07-19 — AppDev tab (KB UI): learned-pitfall + template management surface, start-prompt copy, model badge
  *   v1.20.0 -- 2026-07-17 -- Style unification: collapsed-bar summary separators use a
  *     middle dot (·) instead of a pipe, matching the rest of the profile meta rows.
  *   v1.19.0 -- 2026-07-03 -- Add Contracts sub-tab (tab-contracts.js) — agent-side contract-engagement view.
@@ -256,6 +257,7 @@ export default function AgentCard({ agent, onboarding, expanded, onToggle, sessi
           <div class="pf-agd-zone1-badges">
             ${renderModeBadge(agent)}
             ${renderPlatformBadge(onboarding)}
+            ${renderModelBadge(agent)}
             ${renderReadinessBadge(state, onboarding)}
             ${agent.federate && html`<span class="pf-agd-badge pf-agd-badge--federation">${t('profile.federated')}</span>`}
           </div>
@@ -414,6 +416,13 @@ function renderPlatformBadge(onboarding) {
   if (!platform) return null;
   const version = onboarding?.platformVersion;
   return html`<span class="pf-agd-badge pf-agd-badge--platform">${platform}${version ? ` v${version}` : ''}</span>`;
+}
+
+// Self-reported primary LLM (indicative — coding platforms delegate to subagents on other
+// models mid-session). Comes from the owner agent list projection (agent.model).
+function renderModelBadge(agent) {
+  if (!agent?.model) return null;
+  return html`<span class="pf-agd-badge pf-agd-badge--model" title=${t('profile.agents.modelBadgeTitle')}>${agent.model}</span>`;
 }
 
 const READINESS_RANKS = { none: 0, basic: 1, standard: 2, advanced: 3, full: 4 };

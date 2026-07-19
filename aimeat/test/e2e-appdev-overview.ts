@@ -129,6 +129,87 @@ await test('owner isolation: B does not see A\'s apps', async () => {
     assert(!body.data.apps.items.some((a: any) => a.filename === 'overview-demo.html'), 'cross-owner app leak');
 });
 
+// ── Learned-KB + template REST management (the profile UI surface) ──
+
+await test('learned KB REST: seed via memory → list → PATCH share → cross-owner shared view → DELETE', async () => {
+    const seed = {
+        title: 'UI test pitfall', symptom: 'something visibly broke in a build',
+        resolution: 'do the visibly better thing instead', model: 'claude-haiku-4.5',
+        category: 'auth', slug: 'ui-test-entry', applies_to: ['auth'],
+        severity: 'warn', status: 'active', reported_by: 'ui-e2e',
+        created: new Date().toISOString(), updated: new Date().toISOString(),
+    };
+    const { status: ws } = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${tokenA}` },
+        body: JSON.stringify({
+            key: 'packages/appdev-pitfalls/auth/ui-test-entry',
+            value: seed, visibility: 'owner', tags: ['knowledge-entry', 'pitfall', 'model:claude-haiku-4.5'],
+        }),
+    });
+    assert(ws === 200 || ws === 201, `seed write ${ws}`);
+
+    const { status: ls, body: list } = await json('/v1/appdev/pitfalls/learned', { headers: { Authorization: `Bearer ${tokenA}` } });
+    assert(ls === 200, `learned list ${ls}`);
+    const entry = list.data.pitfalls.find((p: any) => p.slug === 'ui-test-entry');
+    assert(entry && entry.source === 'own' && entry.shared === false, `entry missing/wrong: ${JSON.stringify(entry)}`);
+    assert(entry.symptom && entry.resolution, 'full bodies missing from learned list');
+
+    const { status: ps, body: patched } = await json('/v1/appdev/pitfalls/learned/auth/ui-test-entry', {
+        method: 'PATCH', headers: { Authorization: `Bearer ${tokenA}` },
+        body: JSON.stringify({ share: true, status: 'outdated' }),
+    });
+    assert(ps === 200, `patch ${ps}: ${JSON.stringify(patched).slice(0, 150)}`);
+    assert(patched.data.pitfall.shared === true && patched.data.pitfall.status === 'outdated', 'flags not applied');
+
+    // Owner B sees it only via include_shared, as source 'shared'
+    const { body: bPlain } = await json('/v1/appdev/pitfalls/learned', { headers: { Authorization: `Bearer ${tokenB}` } });
+    assert(!bPlain.data.pitfalls.some((p: any) => p.slug === 'ui-test-entry'), 'leak into B own list');
+    const { body: bShared } = await json('/v1/appdev/pitfalls/learned?include_shared=1', { headers: { Authorization: `Bearer ${tokenB}` } });
+    const sharedEntry = bShared.data.pitfalls.find((p: any) => p.slug === 'ui-test-entry');
+    assert(sharedEntry && sharedEntry.source === 'shared', 'shared entry not visible to B');
+
+    // B cannot delete A's entry; A can
+    const { status: bd } = await json('/v1/appdev/pitfalls/learned/auth/ui-test-entry', { method: 'DELETE', headers: { Authorization: `Bearer ${tokenB}` } });
+    assert(bd === 404, `B delete expected 404, got ${bd}`);
+    const { status: ad } = await json('/v1/appdev/pitfalls/learned/auth/ui-test-entry', { method: 'DELETE', headers: { Authorization: `Bearer ${tokenA}` } });
+    assert(ad === 200, `A delete ${ad}`);
+    const { body: after } = await json('/v1/appdev/pitfalls/learned', { headers: { Authorization: `Bearer ${tokenA}` } });
+    assert(!after.data.pitfalls.some((p: any) => p.slug === 'ui-test-entry'), 'entry survived delete');
+});
+
+await test('templates REST: seed manifest → list/get with source app → cross-owner 404 → DELETE', async () => {
+    const manifest = {
+        id: 'ui-test-template', title: 'UI test template', description: 'rest surface test',
+        derivedFrom: { owner: ownerA, filename: 'overview-demo.html', version: 1, node: 'test' },
+        tier: 'T1', tags: ['demo'], reuseNotes: 'the header layout generalizes',
+        startMode: 'either', model: 'claude-haiku-4.5', proposedBy: 'ui-e2e',
+        createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
+    };
+    const { status: ws } = await json('/v1/memory', {
+        method: 'POST', headers: { Authorization: `Bearer ${tokenA}` },
+        body: JSON.stringify({
+            key: 'template.catalog.ui-test-template.manifest',
+            value: manifest, visibility: 'private', tags: ['template', 'template-proposal'],
+        }),
+    });
+    assert(ws === 200 || ws === 201, `seed write ${ws}`);
+
+    const { status: ls, body: list } = await json('/v1/appdev/templates', { headers: { Authorization: `Bearer ${tokenA}` } });
+    assert(ls === 200 && list.data.templates.some((t: any) => t.id === 'ui-test-template'), 'template missing from list');
+
+    const { status: gs, body: got } = await json('/v1/appdev/templates/ui-test-template', { headers: { Authorization: `Bearer ${tokenA}` } });
+    assert(gs === 200, `get ${gs}`);
+    assert(got.data.template.tier === 'T1' && got.data.source_app.exists === true, `detail wrong: ${JSON.stringify(got.data.source_app)}`);
+
+    const { status: bg } = await json('/v1/appdev/templates/ui-test-template', { headers: { Authorization: `Bearer ${tokenB}` } });
+    assert(bg === 404, `B get expected 404, got ${bg}`);
+
+    const { status: ds } = await json('/v1/appdev/templates/ui-test-template', { method: 'DELETE', headers: { Authorization: `Bearer ${tokenA}` } });
+    assert(ds === 200, `delete ${ds}`);
+    const { body: after } = await json('/v1/appdev/templates', { headers: { Authorization: `Bearer ${tokenA}` } });
+    assert(!after.data.templates.some((t: any) => t.id === 'ui-test-template'), 'template survived delete');
+});
+
 console.log('\n' + '─'.repeat(40));
 console.log(`AppDev overview E2E: ${passed} passed, ${failed} failed of ${passed + failed}`);
 if (failed > 0) process.exit(1);

@@ -6987,6 +6987,110 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /v1/appdev/pitfalls/learned:
+    get:
+      operationId: listLearnedAppdevPitfalls
+      summary: The caller's learned appdev pitfalls (profile UI management surface)
+      description: >-
+        Full-body learned pitfall entries in the caller's owner scope (own GHII + every
+        same-owner agent), any visibility; with include_shared=1 also other owners'
+        public-shared entries (source: shared, read-only). Curated registry entries are
+        served separately at GET /v1/appdev/pitfalls.
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: include_shared
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: data.pitfalls (full bodies) + data.total
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/appdev/pitfalls/learned/{category}/{slug}:
+    patch:
+      operationId: updateLearnedAppdevPitfall
+      summary: Toggle share (platform-wide visibility) and/or status on an own learned pitfall
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: category, in: path, required: true, schema: { type: string } }
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                share: { type: boolean, description: true = public (platform-wide), false = owner-private }
+                status: { type: string, enum: [active, outdated] }
+      responses:
+        '200':
+          description: The updated entry (data.pitfall)
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          description: No such learned pitfall in the caller's scope
+    delete:
+      operationId: deleteLearnedAppdevPitfall
+      summary: Delete an own learned pitfall (entry + manifest ref)
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: category, in: path, required: true, schema: { type: string } }
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: data.deleted = true
+        '404':
+          description: No such learned pitfall in the caller's scope
+
+  /v1/appdev/templates:
+    get:
+      operationId: listAppdevTemplateProposals
+      summary: The caller's agent-proposed app templates (full manifests)
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: data.templates + data.total
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/appdev/templates/{id}:
+    get:
+      operationId: getAppdevTemplateProposal
+      summary: One template proposal + the source app's live state
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: data.template + data.source_app
+        '404':
+          description: No such template proposal
+    delete:
+      operationId: deleteAppdevTemplateProposal
+      summary: Delete a template proposal
+      tags: [Discovery]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: data.deleted = true
+        '404':
+          description: No such template proposal
+
   /v1/appdev/pitfalls:
     get:
       operationId: listAppdevPitfalls

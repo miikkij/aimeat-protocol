@@ -8,6 +8,7 @@
  *   updateStats, navigate, renderTab) rendering LandingPage + a toast pill.
  * @usage Lazy-loaded route component for /v1/profile.
  * @version-history
+ *   2026-07-19 — AppDev tab (KB UI): learned-pitfall + template management surface, start-prompt copy, model badge
  *   v1.3.0 — 2026-07-06 — Toast fix: drop the .pf.toast-container wrapper (its
  *     fixed+transform box was the containing block of the fixed .toast inside,
  *     collapsing it to a one-character-per-line sliver) and adopt Toast.js's
@@ -55,6 +56,7 @@ import NodesTab from './profile/nodes-tab.js';
 import AccessTab from './profile/access-tab.js';
 import DataWalletTab from './profile/data-wallet-tab.js';
 import NodeStatsTab from './profile/node-stats-tab.js';
+import AppDevTab from './profile/appdev-tab.js';
 import SecurityTab from './profile/security-tab.js';
 import EmailTab from './profile/email-tab.js';
 import KnowledgeTab from './profile/knowledge-tab.js';
@@ -105,6 +107,7 @@ const TABS = [
   { id: 'actions',       key: 'profile.tabs.services',       component: ServicesTab,       minTier: 'active' },
   { id: 'boards',        key: 'profile.tabs.boards',         component: BoardsTab,         minTier: 'active' },
   { id: 'apps',          key: 'profile.tabs.apps',           component: AppsTab,           minTier: 'active' },
+  { id: 'appdev',        key: 'profile.tabs.appDev',         component: AppDevTab,         minTier: 'active' },
   { id: 'extensions',    key: 'profile.tabs.extensions',     component: ExtensionsTab,     minTier: 'active' },
   { id: 'capabilities', key: 'capabilities.tabLabel',       component: CapabilitiesTab,   minTier: 'active' },
   { id: 'federation',    key: 'profile.tabs.federation',     component: FederationTab,     minTier: 'experienced' },
