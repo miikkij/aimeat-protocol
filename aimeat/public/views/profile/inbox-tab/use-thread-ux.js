@@ -7,6 +7,10 @@
  *   Extracted from inbox-tab.js to satisfy max-file-lines.
  * @usage import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
  * @version-history
+ *   v1.2.0 — 2026-07-19 — useThreadAutoScroll now suppresses the one-time new-message jump while the
+ *     composer is focused (near-bottom follow still applies). This lets the inbox reload the open thread
+ *     on EVERY 'messages' live-update — so incoming messages render immediately even while you're typing
+ *     a reply — without yanking the scroll/caret (the old fix instead skipped the whole reload).
  *   v1.0.0 — 2026-07-17 — Extracted from inbox-tab.js (max-file-lines) alongside the new mobile
  *     keyboard handling + one-time new-message auto-scroll.
  *   v1.1.0 — 2026-07-18 — Rework useMobileComposerKeyboard(mode): MEASURE available height (body top →
@@ -32,7 +36,12 @@ export function useThreadAutoScroll(msgsRef, mode, thread, activeConv) {
     const isNewOpen = lastScrolledConvRef.current !== convKey;
     const hasNewMsg = !isNewOpen && lastMsgIdRef.current !== null && lastId !== lastMsgIdRef.current;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 160;
-    if (isNewOpen || nearBottom || hasNewMsg) el.scrollTop = el.scrollHeight;
+    // While you're typing a reply, a live-updated new message must still RENDER but must not yank the
+    // scroll out from under the caret — so suppress the one-time new-message jump when the composer is
+    // focused (near-bottom follow still applies: if you were already at the bottom you keep following).
+    const ae = typeof document !== 'undefined' ? document.activeElement : null;
+    const composing = ae instanceof HTMLElement && !!ae.closest('.inbox-composer');
+    if (isNewOpen || nearBottom || (hasNewMsg && !composing)) el.scrollTop = el.scrollHeight;
     lastScrolledConvRef.current = convKey;
     lastMsgIdRef.current = lastId;
     // msgsRef is a stable ref object — the content deps below are the real triggers.
