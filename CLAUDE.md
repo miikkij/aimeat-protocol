@@ -88,6 +88,21 @@ Full guide: `docs/coding-guidelines/security-development-dna.md`
 
 Author **new design specs, plans, and roadmap items as documents/records in the relevant AIMEAT organism on aimeat.io** (appdev/AIMEAT MCP) — **not** in repo `docs/`. This is deliberate dogfooding: we run our own knowledge work on our own product, surface what works and what breaks, and keep the data in the service we own. Route to the organism where that product's roadmap is tracked (each MACHINE ROOM app → its own organism/FABRIC; the AIMEAT platform itself, incl. `app-catalog`, → the FABRIC roadmap hub). Publishing such a record is a **gate** — draft freely, publish only on the developer's explicit go-ahead in this session (dogfood rituals below; cf. Rule 9). **Canonical in the repo, unchanged:** `openapi.yaml`, the RFC sections + coding-guideline references under `docs/`, `CLAUDE.md`, and `docs/known_gaps.md`.
 
+### Rule 12: Imagery Is Generated, Never Placeholder Junk
+
+**No bland stock/clip-art/placeholder images — ever.** When a task needs an image (an app icon, a banner, a hero graphic, an illustration, an og-image), **generate a proper AIMEAT-quality one** with `scripts/gen_image.py` instead of shipping something generic.
+
+```bash
+python scripts/gen_image.py --out icons/agent-badge "a glowing AI agent badge, coral-red accent"
+python scripts/gen_image.py --out banners/hero --size 1344x576 "wide hero banner for the CADENCE CRM app"
+python scripts/gen_image.py --out app/logo --upload "the DROP app logo, minimal geometric mark"   # → public URL for in-app use
+```
+
+- Config is `scripts/.env` (copy `scripts/.env.example`): `OPENROUTER_API_KEY` + `IMAGE_MODEL`. The capability activates **only** when that key is set — if it isn't, tell the developer rather than falling back to a placeholder.
+- Output lands in `genimages/<subfolder>/` (gitignored). Pick the subfolder by where it's headed. Then **either copy the chosen file into the project** (e.g. `public/`, an app bundle, `aimeat-desktop/.../icons`) **or `--upload`** it to AIMEAT storage for apps to reference by URL.
+- Every `--upload` is logged to `genimages/uploads.json` (URL, storage key, account GHII, model, prompt) — **read it** before re-generating, so we reuse an already-uploaded image instead of paying for it twice.
+- The house style (coral-red `#E8564A` + slate/near-black, premium/geometric) is applied automatically; pass `--no-style` only when a specific look demands it.
+
 ---
 
 ## Coding Guidelines Reference

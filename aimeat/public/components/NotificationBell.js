@@ -17,6 +17,8 @@
  *     same deep-link translation as bell clicks (supports both '#hash' and '?tab=' forms).
  *   v1.2.0 — 2026-07-18 — Inline notification actions: reply box (POST /v1/messages) + api buttons
  *     (approve/deny/accept/decline/reject) that call the action endpoint with the owner's session.
+ *   v1.3.0 — 2026-07-19 — "Clear all" in the dropdown head (DELETE /v1/notifications) — deletes every
+ *     notification for the owner (not just mark-read), optimistic empty + reconcile.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -99,10 +101,22 @@ export function NotificationBell({ t, onNavigate }) {
   const [results, setResults] = useState({});        // notifId → { ok, msg }
   const ref = useRef(null);
 
+  const [clearing, setClearing] = useState(false);
+
   const load = useCallback(async () => {
     const r = await api('/v1/notifications');
     if (r && r.data) { setItems(r.data.notifications || []); setUnread(r.data.unread || 0); }
   }, []);
+
+  // "Clear all" — delete every notification for the owner (not just mark read). Optimistic: empty the
+  // list + zero the badge immediately, then reconcile from the server response.
+  const clearAll = useCallback(async () => {
+    setClearing(true);
+    setItems([]); setUnread(0); setReplyFor(null); setResults({});
+    await api('/v1/notifications', { method: 'DELETE', body: JSON.stringify({}) });
+    setClearing(false);
+    load();
+  }, [load]);
 
   useEffect(() => {
     load();
@@ -215,7 +229,10 @@ export function NotificationBell({ t, onNavigate }) {
       </button>
       ${open ? html`
         <div class="notif-dropdown">
-          <div class="notif-dropdown-head">${tr('notif.title', 'Notifications')}</div>
+          <div class="notif-dropdown-head">
+            <span>${tr('notif.title', 'Notifications')}</span>
+            ${items.length > 0 ? html`<button class="notif-clear-all" disabled=${clearing} onClick=${(e) => { e.stopPropagation(); clearAll(); }}>${clearing ? '…' : tr('notif.clearAll', 'Clear all')}</button>` : null}
+          </div>
           ${items.length === 0
             ? html`<div class="notif-empty">${tr('notif.empty', 'No notifications yet')}</div>`
             : items.map(n => renderItem(n))}

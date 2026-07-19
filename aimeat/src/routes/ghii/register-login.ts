@@ -4,6 +4,10 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-19 — POST /v1/ghii accepts an optional email and, when the node runs with the email
+ *     gate on (AIMEAT_EMAIL_CONFIRMATION_REQUIRED), REQUIRES one (EMAIL_REQUIRED) — a supplied email is
+ *     recorded + a verification code sent, and a duplicate is refused (EMAIL_TAKEN). OAuth accounts are
+ *     verified at sign-in, so they satisfy the gate without this path.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/ghii.ts (max-file-lines)
  */
 import type { Router, RequestHandler } from 'express';
@@ -27,6 +31,28 @@ import { logger } from '../../utils/logger.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { GhiiRegistrationSchema, GhiiLoginSchema, validateBody } from '../../models/schemas.js';
 
+/** Create a pending 'registration' email-verification (15-min code) + dispatch it when email is enabled.
+ *  Shared by POST /v1/ghii and attach-email; /v1/ghii/verify-email finalises it (emailHash + level 1). */
+async function startRegistrationEmailVerification(
+    storage: Storage, emailService: EmailService | undefined,
+    ownerName: string, email: string, locale?: string,
+): Promise<{ verificationId: string; emailSent: boolean }> {
+    const clean = email.toLowerCase().trim();
+    const code = String(Math.floor(100000 + Math.random() * 900000));
+    const verificationId = randomBytes(16).toString('hex');
+    const now = new Date().toISOString();
+    await storage.createEmailVerification({
+        id: verificationId, ownerName,
+        emailHash: createHash('sha256').update(clean).digest('hex'),
+        code: createHash('sha256').update(code).digest('hex'),
+        purpose: 'registration', status: 'pending', attempts: 0,
+        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), createdAt: now, verifiedAt: null,
+    });
+    let emailSent = false;
+    if (emailService?.enabled) { await emailService.sendVerificationCode(clean, code, locale); emailSent = true; }
+    return { verificationId, emailSent };
+}
+
 export function registerRegisterLoginRoutes(
     router: Router,
     config: AimeatConfig,
@@ -39,7 +65,8 @@ export function registerRegisterLoginRoutes(
     // Creates an owner account + GHII profile in one step
     router.post('/v1/ghii', registrationLimit, validateBody(GhiiRegistrationSchema, config.nodeId), async (req, res) => {
         let { username, display_name } = req.body ?? {};
-        const { bio, avatar, locale, password } = req.body ?? {};
+        const { bio, avatar, locale, password, email } = req.body ?? {};
+        const cleanEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
 
         if (!username || typeof username !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
@@ -159,6 +186,18 @@ export function registerRegisterLoginRoutes(
             return;
         }
 
+        // Email gate: with AIMEAT_EMAIL_CONFIRMATION_REQUIRED an account cannot be created without an email
+        // (OAuth users satisfy this — their IdP email is verified at sign-in); a supplied email must be free.
+        if (config.emailConfirmationRequired && !cleanEmail) {
+            res.status(400).json(error(config.nodeId, 'EMAIL_REQUIRED',
+                'This node requires a verified email to register. Provide an "email" (a code will be sent to confirm it) or sign in with Google/Microsoft/Casdoor.'));
+            return;
+        }
+        if (cleanEmail && await storage.getGHIIByEmailHash(createHash('sha256').update(cleanEmail).digest('hex'))) {
+            res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN', 'That email is already associated with another account.'));
+            return;
+        }
+
         // First real owner gets operator role (same logic as /v1/owners)
         // Self-heal: if no operator exists anywhere, promote this user
         const allOwners = await storage.listOwners();
@@ -191,6 +230,8 @@ export function registerRegisterLoginRoutes(
             verificationLevel: 0,
             ownerName: owner.name,
             totpEnabled: false,
+            notificationEmail: cleanEmail || undefined,  // unverified — does NOT reserve the emailHash
+            magicLinkEnabled: cleanEmail ? true : undefined,
             morselBalance: config.welcomeBonus,
             createdAt: now,
             updatedAt: now,
@@ -205,6 +246,14 @@ export function registerRegisterLoginRoutes(
                 amount: config.welcomeBonus,
                 timestamp: now,
             });
+        }
+
+        // Kick off email verification when an email was supplied (see helper).
+        let verificationId: string | null = null;
+        let emailSent = false;
+        if (cleanEmail) {
+            ({ verificationId, emailSent } = await startRegistrationEmailVerification(
+                storage, emailService, username, cleanEmail, typeof locale === 'string' ? locale : undefined));
         }
 
         // SECURITY: Prevent caching of response containing private key
@@ -225,6 +274,8 @@ export function registerRegisterLoginRoutes(
                 name: owner.name,
                 roles: owner.roles,
             },
+            verification_id: verificationId,
+            email_sent: emailSent,
             private_key: keyPair.privateKey,
             public_key: keyPair.publicKey,
             has_password: !!passwordHash,
@@ -729,37 +780,17 @@ export function registerRegisterLoginRoutes(
             return;
         }
 
-        const code = String(Math.floor(100000 + Math.random() * 900000));
-        const codeHash = createHash('sha256').update(code).digest('hex');
-        const now = new Date().toISOString();
-        const verId = randomBytes(16).toString('hex');
-
-        // purpose 'registration' so the existing no-auth /v1/ghii/verify-email completes it.
-        await storage.createEmailVerification({
-            id: verId,
-            ownerName: loginName,
-            emailHash,
-            code: codeHash,
-            purpose: 'registration',
-            status: 'pending',
-            attempts: 0,
-            expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), // 15 min
-            createdAt: now,
-            verifiedAt: null,
-        });
-
         // Attach the email now so notification/recovery work once the code is confirmed. emailHash +
         // verificationLevel are finalised by /v1/ghii/verify-email on a correct code.
         await storage.updateGHII(ghii, { notificationEmail: normalizedEmail, magicLinkEnabled: true });
 
-        if (emailService?.enabled) {
-            await emailService.sendVerificationCode(normalizedEmail, code, ghiiRecord.locale);
-        }
+        const { verificationId: verId, emailSent } = await startRegistrationEmailVerification(
+            storage, emailService, loginName, normalizedEmail, ghiiRecord.locale);
 
         res.json(success(config.nodeId, {
             ok: true,
             verification_id: verId,
-            email_sent: !!emailService?.enabled,
+            email_sent: emailSent,
             message: 'Verification code sent',
         }, [
             { description: 'Confirm the code to finish setup', method: 'POST', url: '/v1/ghii/verify-email' },

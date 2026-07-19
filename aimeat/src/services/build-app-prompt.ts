@@ -12,6 +12,9 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-07-19 — Mobile safety checklist section (overflow-x:clip, minmax(0,1fr)+min-width:0,
+ *     wrap-wide-content, verify scrollWidth===clientWidth) + viewport meta gains viewport-fit=cover
+ *     + interactive-widget=resizes-content. Prevention baked into the paved path.
  *   2026-07-19 — Research-first flow (AppDev KB Phase 7): Step 0 + tier decision tree + finish checklist / appdev-flow prompt / handbook module
  *   v1.5.0 — 2026-07-19 — MCP-agent section: load node:aimeat-app-builder first + curated
  *     pitfall registry pointer (/v1/appdev/pitfalls) (AppDev KB Phase 2)
@@ -245,7 +248,19 @@ export function buildAppPrompt(
   body += '  apply(localStorage.getItem("aimeat-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));\n';
   body += '  addEventListener("storage", function(e){ if(e.key==="aimeat-theme" && e.newValue) apply(e.newValue); }); })();\n';
   body += '```\n';
-  body += 'Always include <meta name="viewport" content="width=device-width, initial-scale=1.0">. Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
+  body += 'Always include the viewport meta: `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">` (the last part makes the on-screen keyboard resize the layout instead of hiding bottom inputs). Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
+
+  // Mobile safety checklist — the recurring "it looks tiny / overflows on a phone" class of bug,
+  // as positive DO-rules. The app-shell templates already bake these in; hand-rolled layouts must
+  // follow them. (Distilled from the curated mobile pitfalls — auth-pill-overflow, grid-track-blowout.)
+  body += '### Mobile safety checklist (do these — they prevent the #1 phone bug)\n';
+  body += 'One element wider than the screen makes mobile browsers shrink-to-fit the WHOLE page, so every font renders tiny. Prevent it:\n';
+  body += '- **`body { overflow-x: clip; }`** — a belt-and-braces guard against horizontal overflow. Use `clip`, NOT `hidden` (hidden makes body a scroll container and breaks `position: sticky` headers).\n';
+  body += '- **The login pill is already mobile-safe** — `mountLoginButton` renders a compact account button + popover on phones automatically on an app origin. Do NOT put other fixed-width widgets in the header row next to it; let header children shrink (`min-width: 0`).\n';
+  body += '- **CSS grid: use `grid-template-columns: … minmax(0,1fr)` and `min-width: 0` on grid/flex children.** A plain `1fr` is `minmax(auto,1fr)`, so a wide non-wrapping child (a table, `<pre>`, long code) inflates the track and overflows the page even inside an `overflow-x:auto` wrapper. `minmax(0,…)` + `min-width:0` let it shrink so the wrapper actually scrolls.\n';
+  body += '- **Wrap wide content** — put tables / code blocks / diagrams in a `overflow-x:auto` container, and `flex-wrap: wrap` any toolbar/nav row whose item count can grow (tabs, pager dots).\n';
+  body += '- **Verify**: at 390px (portrait) AND ~844px (landscape), `document.documentElement.scrollWidth === clientWidth` (zero horizontal overflow) and body text stays ≥14px.\n';
+  body += 'For a focused view (chat/editor/wizard) on ≤760px, go full-screen (`position:fixed; inset:0` gated on an is-active class) with a Back affordance, rather than sharing the screen with app chrome.\n\n';
 
   // Game form language — palette alone reads as a dashboard; the FORM LANGUAGE makes the game.
   // Born from pitfall app/candy-palette-alone-is-not-a-game-look (TOWER TETRIS, 2026-07-19).

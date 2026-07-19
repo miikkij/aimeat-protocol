@@ -6,11 +6,14 @@
  *   and let apps/agents post a notification to their OWN owner (bell + web push, deep-linked).
  *   Owner-scoped: a caller only ever sees their own owner's notifications.
  * @structure
- *   - GET  /v1/notifications        — list (newest first) + unread count
- *   - POST /v1/notifications        — create a notification for the caller's own owner
- *   - POST /v1/notifications/read   — mark notifications read ({ ids } or { all: true })
+ *   - GET    /v1/notifications      — list (newest first) + unread count
+ *   - POST   /v1/notifications      — create a notification for the caller's own owner
+ *   - POST   /v1/notifications/read — mark notifications read ({ ids } or { all: true })
+ *   - DELETE /v1/notifications      — clear notifications (all, or a given { ids }) — the bell's "Clear all"
  * @usage app.use(notificationsRouter(config, storage));
  * @version-history
+ *   v1.3.0 -- 2026-07-19 -- DELETE /v1/notifications: "Clear all" from the header bell removes the owner's
+ *     notif rows (owner-scoped list → bulkDeleteMemory, per-key fallback); optional { ids } to clear a subset.
  *   v1.0.0 -- 2026-06-08 -- Initial: memory-backed notification inbox.
  *   v1.1.0 -- 2026-07-02 -- POST /v1/notifications: apps/agents notify their own owner
  *     (scope notifications:send); app notifications deep-link back to the app by default.
@@ -147,6 +150,29 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
       }
     }
     res.json(success(config.nodeId, { marked }));
+  });
+
+  /* ── DELETE /v1/notifications — clear the caller's notifications (all, or a given { ids: [...] }) ──
+   * "Clear all" from the header bell: notifications are per-owner memory rows under NOTIF_PREFIX, so we
+   * list THIS owner's notif rows (owner-scoped, never NOT deleteMemoryByPrefix which spans all owners)
+   * and remove them — batched via bulkDeleteMemory when the backend offers it, else a per-key fallback. */
+  router.delete('/v1/notifications', requireAuth(), async (req, res) => {
+    const ghii = ownerGhii(req);
+    const ids = Array.isArray(req.body?.ids) ? new Set(req.body.ids) : null;
+    const mine = await storage.listMemory(ghii, { prefix: NOTIF_PREFIX });
+    const refs = mine
+      .filter(r => { const v = r.value as NotifValue; return v && v.id && (!ids || ids.has(v.id)); })
+      .map(r => ({ ownerGaii: ghii, key: r.key }));
+    let cleared = 0;
+    if (refs.length) {
+      if (storage.bulkDeleteMemory) {
+        cleared = await storage.bulkDeleteMemory(refs);
+      } else {
+        for (const ref of refs) { if (await storage.deleteMemory(ref.ownerGaii, ref.key)) cleared++; }
+      }
+      emitChange('notifications', ghii);
+    }
+    res.json(success(config.nodeId, { cleared }));
   });
 
   return router;

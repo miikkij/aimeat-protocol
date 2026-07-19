@@ -374,6 +374,9 @@ export const GhiiRegistrationSchema = z.object({
     avatar: z.string().max(128).optional(),
     locale: z.string().max(10).optional(),
     password: z.string().max(256).optional(),
+    // Optional at the schema level; REQUIRED at runtime when the node runs with the email gate on
+    // (AIMEAT_EMAIL_CONFIRMATION_REQUIRED). When present it is recorded + a verification code is sent.
+    email: z.string().email().max(256).optional(),
 });
 
 export const GhiiWebRegistrationSchema = z.object({

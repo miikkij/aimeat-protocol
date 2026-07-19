@@ -35,7 +35,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { hashPassword } from '../../services/password.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
-import { provisionOwner } from '../../services/owner-provisioning.js';
+import { provisionOwner, ProvisionEmailTakenError } from '../../services/owner-provisioning.js';
 import { establishOwnerSession } from '../../services/owner-session.js';
 import { getActiveEmailService } from '../../services/email.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
@@ -484,18 +484,24 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     }
     if (await storage.getOwner(uname)) { res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${uname}" is already registered`)); return; }
 
-    // Provision the guest account: the code IS the password (hashed here → a minted high-entropy
-    // credential, so the interactive strength validator is intentionally not run). verifiedEmail lifts
-    // the email-confirmation gate in one step (verificationLevel 1).
+    // Provision the guest account: the code IS the password (hashed → a minted high-entropy credential,
+    // so the strength validator is intentionally skipped). verifiedEmail lifts the confirmation gate in
+    // one step (level 1); provisionOwner throws ProvisionEmailTakenError if it's already taken → 409.
     const passwordHash = await hashPassword(code);
-    await provisionOwner(storage, config, {
-      username: uname,
-      displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : uname,
-      passwordHash,
-      locale: typeof locale === 'string' ? locale : undefined,
-      verifiedEmail: cleanEmail,
-      enableMagicLink: false,
-    });
+    try {
+      await provisionOwner(storage, config, {
+        username: uname,
+        displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : uname,
+        passwordHash,
+        locale: typeof locale === 'string' ? locale : undefined,
+        verifiedEmail: cleanEmail,
+        enableMagicLink: false,
+      });
+    } catch (e) {
+      if (!(e instanceof ProvisionEmailTakenError)) throw e;
+      res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN', 'That email already belongs to an account on this node.'));
+      return;
+    }
     emitChange('ghii');
 
     // Join the organism (mirrors the accept handler: membership row + roster arrays in sync).
@@ -717,14 +723,23 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       if (pwErr) { res.status(400).json(error(config.nodeId, 'WEAK_PASSWORD', pwErr)); return; }
       if (await storage.getOwner(username)) { res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${username}" is already registered`)); return; }
       const passwordHash = await hashPassword(password);
-      const { owner } = await provisionOwner(storage, config, {
-        username,
-        displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : username,
-        passwordHash,
-        locale: typeof locale === 'string' ? locale : undefined,
-        verifiedEmail: inv.email, // the invite proves reachability → the new account's email is verified
-        enableMagicLink: true,
-      });
+      let owner;
+      try {
+        ({ owner } = await provisionOwner(storage, config, {
+          username,
+          displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : username,
+          passwordHash,
+          locale: typeof locale === 'string' ? locale : undefined,
+          verifiedEmail: inv.email, // the invite proves reachability → the new account's email is verified
+          enableMagicLink: true,
+        }));
+      } catch (e) {
+        // The invited email already backs an account — accept from THAT account, don't fork it.
+        if (!(e instanceof ProvisionEmailTakenError)) throw e;
+        res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN',
+          'An account already exists for this email. Sign in with it, then open the invitation link again.'));
+        return; // do NOT consume the invite
+      }
       ownerName = owner.name;
       createdAccount = true;
       emitChange('ghii');

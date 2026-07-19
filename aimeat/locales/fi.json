@@ -610,6 +610,7 @@
   "notif": {
     "title": "Ilmoitukset",
     "empty": "Ei ilmoituksia vielä",
+    "clearAll": "Tyhjennä kaikki",
     "action": {
       "reply": "Vastaa",
       "approve": "Hyväksy",
