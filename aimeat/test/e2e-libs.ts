@@ -593,7 +593,9 @@ await test('GET /v1/libs/aimeat-data.js — serves JavaScript', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-data.js`);
     assert(res.ok, `data lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.data'), 'should expose AIMEAT.data');
+    // The lib is componentized (SDK-libs migration): it attaches via _core `attach('data', …)`
+    // rather than a literal `AIMEAT.data =`, so assert on stable data-surface markers instead.
+    assert(text.includes('getPublic'), 'should expose the memory API (getPublic)');
     assert(text.includes('micro'), 'should include micro-memory support');
     assert(res.headers.get('Content-Type')?.includes('javascript'), 'should be javascript');
 });
