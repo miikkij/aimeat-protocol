@@ -17,6 +17,11 @@
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 3: consent page).
  *   v1.1.0 — 2026-06-20 — Popup (web_message) delivery + "trust this app" reframe + Advanced
  *     per-scope subset selection (consent flow wired to apps via the SDK).
+ *   v1.2.0 — 2026-07-19 — Own-app + scope-upgrade fixes (Band Jam findings): the signed-in owner's
+ *     OWN app (server-verified origin_bound + app_owner) auto-approves like the silent bridge and
+ *     shows "Your app" instead of "not yours"; manage mode pre-checks the UNION of granted +
+ *     requested scopes and badges newly requested ones "new" (they used to come unchecked, so
+ *     users silently kept the old grant after an app added a scope).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -34,6 +39,7 @@ export default function AppGrant() {
   const [advanced, setAdvanced] = useState(false);
   const [selected, setSelected] = useState(() => new Set());
   const [existingGrant, setExistingGrant] = useState(null); // the grant this app already holds (manage mode)
+  const [ownApp, setOwnApp] = useState(false); // server-verified: origin-bound request for the signed-in owner's own app
 
   const requestId = new URLSearchParams(window.location.search).get('req') || '';
   const [authed, setAuthed] = useState(() => !!window.AIMEAT?.auth?.hasSession);
@@ -67,9 +73,19 @@ export default function AppGrant() {
         } catch { /* ignore */ }
         if (!live) return;
         const reqScopes = (res.data.scopes || []).map((s) => s.scope);
-        const granted = grant ? grant.scopes : reqScopes;
+        // The owner's OWN app (server-verified: the redirect origin is bound to exactly this app):
+        // same auto-approve policy as the silent bridge — their own app never needs the trust prompt.
+        // The server computes `own` independently at consent time, so this is UX, not the gate.
+        const myOwner = (window.AIMEAT?.auth?.storedGhii || '').split('@')[0];
+        const own = !!(res.data.origin_bound && res.data.app_owner && myOwner && myOwner === res.data.app_owner);
+        // Pre-check the UNION of already-granted and now-requested scopes: an app update that added
+        // a scope must surface it CHECKED — presenting it unchecked made users keep the old grant
+        // without noticing (the Band Jam scope-upgrade trap).
+        const granted = grant ? [...new Set([...grant.scopes, ...reqScopes])] : reqScopes;
         setExistingGrant(grant);
         setSelected(new Set(granted));
+        setOwnApp(own);
+        if (own && !res.data.manage) { setState({ status: 'autoapprove', request: res.data }); return; }
         // Pass-through: when NOT explicitly managing (the gear) and the app already holds a grant that
         // covers what it's asking for, just approve silently — no second prompt for an app you trust.
         const covers = grant && reqScopes.every((s) => grant.scopes.includes(s));
@@ -170,13 +186,15 @@ export default function AppGrant() {
   return html`
     <div class="agr-wrap">
       <div class="agr-card">
-        <span class="agr-badge">${tr('appGrant.externalBadge', 'External app')}</span>
+        <span class="agr-badge ${ownApp ? 'agr-badge-own' : ''}">${ownApp ? tr('appGrant.ownBadge', 'Your app') : tr('appGrant.externalBadge', 'External app')}</span>
         <h1 class="agr-title">${existingGrant ? tr('appGrant.manageTitle', 'Manage this app’s access') : tr('appGrant.trustTitle', 'Trust this app?')}</h1>
         <div class="agr-app">
           <div class="agr-app-name">${escHtml(req.app_name)}</div>
           <div class="agr-app-origin">${escHtml(req.app_origin)}</div>
         </div>
-        <p class="agr-muted">${tr('appGrant.trustIntro', 'This app is not yours. It gets its OWN scoped, revocable key — never your login session. You can revoke it anytime in Profile › Access.')}</p>
+        <p class="agr-muted">${ownApp
+          ? tr('appGrant.ownIntro', 'This is your own app. It still uses a scoped, revocable key — never your login session.')
+          : tr('appGrant.trustIntro', 'This app is not yours. It gets its OWN scoped, revocable key — never your login session. You can revoke it anytime in Profile › Access.')}</p>
 
         <div class="agr-scopes-label">${tr('appGrant.needsLabel', 'This app needs:')}</div>
         <ul class="agr-scopes">
@@ -186,7 +204,9 @@ export default function AppGrant() {
                 <input type="checkbox" class="agr-scope-check" checked=${selected.has(s.scope)}
                   onChange=${() => toggle(s.scope)} aria-label=${s.scope} />`}
               <span class="agr-scope-text">
-                <span class="agr-scope-desc">${escHtml(s.description || s.scope)}</span>
+                <span class="agr-scope-desc">${escHtml(s.description || s.scope)}
+                  ${existingGrant && !existingGrant.scopes.includes(s.scope) && html`<span class="agr-scope-newbadge">${tr('appGrant.newScope', 'new')}</span>`}
+                </span>
                 <span class="agr-scope-name">${escHtml(s.scope)}</span>
               </span>
             </li>`)}

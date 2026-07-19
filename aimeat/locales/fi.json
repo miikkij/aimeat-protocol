@@ -579,7 +579,10 @@
     "loginCta": "Kirjaudu",
     "errorTitle": "Pääsyä ei voida myöntää",
     "missing": "Ei valtuutuspyyntöä.",
-    "expired": "Tämä pyyntö on vanhentunut."
+    "expired": "Tämä pyyntö on vanhentunut.",
+    "ownBadge": "Oma appisi",
+    "ownIntro": "Tämä on oma appisi. Sekin käyttää rajattua, peruttavaa avainta — ei koskaan kirjautumisistuntoasi.",
+    "newScope": "uusi"
   },
   "common": {
     "cancel": "Peruuta",
