@@ -2,11 +2,11 @@
  * @file src/routes/libs/auth-lib-part2.ts
  * @description aimeat-auth.js browser library source, middle segment (event system, public auth API, login pill, theme toggle, modal i18n). Extracted from libs.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-07-19 — Compact login pill is now the DEFAULT on app origins (isAppOrigin()), not
+ *     opt-in — every published app is mobile-safe out of the box. Apex SPA stays full; explicit
+ *     compact:true/false still wins.
  *   v1.1.0 — 2026-07-18 — Opt-in compact login pill: mountLoginButton({ compact:true }) renders a
- *     small gold "account" button (green dot + initials) on ≤600px that opens the full pill as an
- *     anchored popover — so the fixed-width pill no longer overflows cramped app headers on mobile.
- *     Added AIMEAT.auth.compactPill capability flag for feature detection. Bespoke navs (SPA) that
- *     don't pass compact are unaffected.
+ *     small "account" button on ≤600px that opens the full pill as a popover; +compactPill flag.
  *   v1.0.0 — 2026-07-13 — Extracted from libs.ts (max-file-lines)
  */
 export function aimeatAuthLibPart2(): string {
@@ -372,8 +372,10 @@ const auth = {
    * @param {string|Element|object} selector - CSS selector, a DOM element, OR (options-first) the
    *   opts object — calling mountLoginButton({ onLogin }) mounts into a created #aimeat-auth-bar so
    *   the natural options-first call Just Works.
-   * @param {object} [opts] - Options: { onLogin, onLogout, buttonText, compact } — compact:true
-   *   renders a small "account" button on narrow viewports that opens the full pill as a popover.
+   * @param {object} [opts] - Options: { onLogin, onLogout, buttonText, compact }. compact renders a
+   *   small "account" button on narrow viewports (≤600px) that opens the full pill as a popover;
+   *   it DEFAULTS to true on app origins (mobile-safe) and false on the apex, and an explicit
+   *   compact:true/false always wins.
    */
   mountLoginButton(selector, opts = {}) {
     // Resolve the mount container. Tolerate three call shapes so a common misuse doesn't crash:
@@ -393,6 +395,9 @@ const auth = {
     }
 
     const i = opts.i18n || {};
+    // Compact pill (account button + popover on ≤600px) is the mobile-safe DEFAULT on app origins
+    // (a fixed-width pill overflows a phone header); apex SPA stays full; explicit compact wins.
+    const useCompact = opts.compact !== undefined ? !!opts.compact : isAppOrigin();
 
     function render() {
       // Prefer the live session (carries the H-2 _app/_own grant metadata for the gear) over the
@@ -434,12 +439,9 @@ const auth = {
           + 'box-shadow:0 1px 0 rgba(255,140,140,.25) inset,0 -1px 0 rgba(80,10,10,.4) inset,0 2px 6px rgba(153,27,27,.5);'
           + 'text-shadow:0 1px 1px rgba(0,0,0,.4)">' + escHtml(i.logoutBtn || 'Logout') + '</button>'
           + '</div>';
-        // Opt-in compact mode (opts.compact): on a narrow viewport the full pill would overflow a
-        // cramped app header, so we wrap it behind a small gold "account" button (green dot +
-        // initials) that opens the full pill as a popover. Desktop renders the pill inline as
-        // before. Apps that already handle the mobile pill themselves (e.g. the SPA top-nav) simply
-        // don't pass compact, so they are entirely unaffected.
-        if (opts.compact) {
+        // Compact mode (useCompact — default ON on app origins): wrap the full pill behind a small
+        // "account" button that opens it as a popover on ≤600px; desktop/apex render it inline.
+        if (useCompact) {
           ensureAuthPillStyles();
           var ini = pillInitials(stored.displayName || stored.ghii || stored.owner);
           container.innerHTML = '<div class="aimeat-auth-wrap">'
@@ -502,8 +504,8 @@ const auth = {
     render();
     // Close the compact popover on an outside click or Escape. Registered ONCE per mount (looks up
     // the current wrap at event time, so it survives re-renders without stacking listeners). No-op
-    // unless opts.compact rendered a wrap.
-    if (opts.compact) {
+    // unless useCompact rendered a wrap.
+    if (useCompact) {
       var closeCompact = () => {
         var w = container.querySelector('.aimeat-auth-wrap.aimeat-open');
         if (!w) return;

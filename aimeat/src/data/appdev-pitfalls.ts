@@ -10,6 +10,8 @@
  *   getAppdevPitfalls() / getAppdevPitfallIndex() / getAppdevPitfallFacets() — accessors.
  * @usage import { getAppdevPitfalls, getAppdevPitfallIndex } from '../data/appdev-pitfalls.js';
  * @version-history
+ *   v1.1.0 — 2026-07-19 — +flex-nav-wrap (mobile) +app-grant-node-role-via-owners (auth); updated
+ *     auth-pill-overflow now that the compact pill is default + shells ship overflow-x:clip.
  *   v1.0.0 — 2026-07-19 — initial: 26 curated entries distilled from docs/pitfalls.md
  *     (app-builder-relevant sections only) + recurring app-build lessons.
  */
@@ -133,6 +135,16 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     severity: 'warn',
     source: 'curated',
     docRef: 'docs/pitfalls.md §6',
+    updatedAt: '2026-07-19',
+  }),
+  E({
+    id: 'app-grant-node-role-via-owners',
+    title: 'App tokens carry roles:["app"] — read the owner\'s NODE role via GET /v1/owners/:name',
+    symptom: 'The app cannot tell whether the signed-in user is a node operator/admin — session.roles on an app origin is just ["app"], so a node-role check is always false.',
+    fix: 'The app-grant token identifies the owner (session.owner) but NOT their node roles. To check a node-level role (e.g. operator), fetch GET /v1/owners/{session.owner} with the session jwt — it returns the roles array to the owner themselves (anonymous callers get name/display_name only, so nothing leaks). Probe it after login and re-render when it resolves.',
+    appliesTo: ['auth', 'app'],
+    severity: 'info',
+    source: 'curated',
     updatedAt: '2026-07-19',
   }),
 
@@ -289,7 +301,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'auth-pill-overflow',
     title: 'The golden auth pill overflows portrait headers and shrinks the whole page',
     symptom: 'On a ~390px phone the page zooms out and every font renders tiny — one un-shrinkable header element (the fixed-width login pill next to brand + toggles) forces shrink-to-fit.',
-    fix: 'Mount the pill with AIMEAT.auth.mountLoginButton(sel, { compact: true }) (renders a small account button + popover on ≤600px). Belt-and-braces: body{overflow-x:clip} (clip, NOT hidden — hidden breaks position:sticky), and let flex children shrink (min-width:0). Verify scrollWidth === clientWidth at 390px and phone-landscape.',
+    fix: 'Mostly handled for you now: mountLoginButton renders a compact account button + popover on ≤600px BY DEFAULT on app origins (aimeat-auth v1.2.0), and the app-shell templates ship body{overflow-x:clip}. So the fix is: use the shell (or copy its head), do NOT put other fixed-width widgets in the header row, let flex children shrink (min-width:0), and keep body{overflow-x:clip} (clip, NOT hidden — hidden breaks position:sticky). Verify scrollWidth === clientWidth at 390px and phone-landscape.',
     appliesTo: ['mobile', 'auth'],
     severity: 'warn',
     source: 'curated',
@@ -301,6 +313,17 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     title: 'A fixed FAB drifts off-screen when the body scrolls horizontally',
     symptom: 'A position:fixed;right:16px floating button sits past the visible right edge on a phone — the body became horizontally scrollable (usually via the header overflow above) and fixed anchors to the wider area.',
     fix: 'Kill the horizontal overflow at its source (shrinkable flex children, clipped header widgets) instead of repositioning the FAB.',
+    appliesTo: ['mobile'],
+    severity: 'info',
+    source: 'curated',
+    docRef: 'docs/pitfalls.md §15',
+    updatedAt: '2026-07-19',
+  }),
+  E({
+    id: 'flex-nav-wrap',
+    title: 'A flex nav/toolbar row with a variable item count overflows on mobile',
+    symptom: 'A row of tabs/chips, or a slide-deck pager (prev/next + one dot per slide), fits at a few items but pushes the page wider once the count grows.',
+    fix: 'Add flex-wrap:wrap (+ a row-gap) so extra items fold to a second line instead of overflowing. Easy to miss because it only bites past a threshold — a pager that fit at 3 dots overflowed at 9.',
     appliesTo: ['mobile'],
     severity: 'info',
     source: 'curated',
