@@ -9,6 +9,7 @@
  *   import { registerKnowledgeTools } from './knowledge.js';
  *   registerKnowledgeTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.0.0 — 2026-03-21 — Initial creation: 4 tools + 1 resource for knowledge management via MCP
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -212,9 +213,18 @@ export function registerKnowledgeTools(
             package_id: z.string().describe('The knowledge package ID'),
             entry_key: z.string().describe('Entry key (short name, e.g. "summary" or "chapter-1")'),
             content: z.string().describe('Entry content as a string (plain text or JSON)'),
+            model: z.string().max(64).optional().describe('Optional: the LLM model this knowledge came from (stored as a model: tag; indicative attribution)'),
         },
         annotationsFor('aimeat_knowledge_contribute'),
-        async ({ package_id, entry_key, content }) => {
+        async ({ package_id, entry_key, content, model }) => {
+            // The appdev-pitfalls package is schema-reserved — its entries need model/category/
+            // severity structure, so raw contributions are redirected to the dedicated tool.
+            if (package_id === 'appdev-pitfalls') {
+                return {
+                    content: [{ type: 'text' as const, text: 'The appdev-pitfalls package is reserved — report pitfalls with aimeat_appdev_pitfall_report (model attribution is required there).' }],
+                    isError: true,
+                };
+            }
             const manifestKey = `packages/${package_id}/manifest`;
             const manifest = await storage.getMemory(agentGaii, manifestKey);
             if (!manifest) {
@@ -238,12 +248,18 @@ export function registerKnowledgeTools(
             // Check if entry exists to preserve version
             const existing = await storage.getMemory(agentGaii, fullEntryKey);
 
+            const normModel = model?.trim().toLowerCase();
+            const baseTags = existing?.tags ?? ['knowledge-entry'];
+            const tags = normModel
+                ? [...baseTags.filter(t => !t.startsWith('model:')), `model:${normModel}`]
+                : baseTags;
+
             await storage.setMemory({
                 key: fullEntryKey,
                 ownerGaii: agentGaii,
                 value,
                 visibility: existing?.visibility ?? 'owner',
-                tags: existing?.tags ?? ['knowledge-entry'],
+                tags,
                 ttlHours: null,
                 version: (existing?.version ?? 0) + 1,
                 createdAt: existing?.createdAt ?? now,

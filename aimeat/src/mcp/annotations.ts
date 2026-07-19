@@ -21,6 +21,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.0.0 -- 2026-05-29 -- Initial annotation map covering all 94 registered tools
  *     across server MCP and connector MCP, for Connectors Directory submission.
  *     Classification source: docs/plans/2026-05-29-connectors-directory-submission.md
@@ -197,6 +198,9 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_knowledge_get: { title: 'Read Knowledge Package', readOnlyHint: true },
     aimeat_knowledge_links: { title: 'Get Knowledge Links', readOnlyHint: true },
     aimeat_knowledge_contribute: { title: 'Contribute to Knowledge Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_appdev_pitfall_report: { title: 'Report AppDev Pitfall', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_appdev_pitfall_list: { title: 'List AppDev Pitfalls', readOnlyHint: true },
+    aimeat_appdev_pitfall_delete: { title: 'Delete AppDev Pitfall', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
 
     // ── Apps ──
     aimeat_app_list: { title: 'List Apps', readOnlyHint: true },

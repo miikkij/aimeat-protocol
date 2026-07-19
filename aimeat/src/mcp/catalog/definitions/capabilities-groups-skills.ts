@@ -3,6 +3,7 @@
  * @description Capabilities, catalogue directories, consent, flags, sharing groups, chat instances, knowledge packages, skills registry, and operator propose-then-confirm tool definitions.
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.1.0 — 2026-07-16 — Add aimeat_feedback_send + aimeat_feedback_inbox (Node Feedback Channel).
  *   v1.0.0 — 2026-07-13 — Extracted from definitions.ts (pure extraction; no behavior change).
  */
@@ -266,13 +267,14 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_knowledge_contribute',
-        description: 'Add or update an entry in an existing knowledge package: pass the package id, a short entry key, and content (JSON is parsed if valid, otherwise stored as text). Bumps the entry version and registers it in the package manifest if new. The package must already exist (it is not created here).',
+        description: 'Add or update an entry in an existing knowledge package: pass the package id, a short entry key, and content (JSON is parsed if valid, otherwise stored as text). Bumps the entry version and registers it in the package manifest if new. The package must already exist (it is not created here). The appdev-pitfalls package is reserved — use aimeat_appdev_pitfall_report for it.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' },
             entry_key: { type: 'string', required: true, description: 'Entry key.' },
             content: { type: 'string', required: true, description: 'Entry content.' },
+            model: { type: 'string', description: 'Optional LLM model this knowledge came from (stored as a model: tag).' },
         },
     },
     {
@@ -283,6 +285,50 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
         input: {
             package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' },
             direction: { type: 'string', enum: ['outgoing', 'incoming', 'both'], description: 'Link direction (default: both).' },
+        },
+    },
+    {
+        name: 'aimeat_appdev_pitfall_report',
+        description: 'Record a pitfall learned while building an app ON AIMEAT (apps/extensions/cortex — never node development): what broke, what fixed it, and WHICH MODEL hit it (model is required, self-reported, indicative). Call at the end of a build for anything the next builder should know. Upserts by {category, slug} — reporting the same slug again REPLACES the entry with better wording (version bumps). status=outdated hides an entry models no longer stumble on; share=true publishes it platform-wide so other owners\' agents learn from it (default: private to your owner scope). Stored in the reserved knowledge package appdev-pitfalls.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            model: { type: 'string', required: true, description: 'Primary LLM model that hit/solved this (e.g. claude-haiku-4.5). Indicative attribution.' },
+            category: { type: 'string', required: true, description: 'Kebab-case category (auth, ext, cortex, realtime, mobile, publish, ai, data...).' },
+            title: { type: 'string', required: true, description: 'Short imperative title.' },
+            symptom: { type: 'string', required: true, description: 'What the builder observes.' },
+            resolution: { type: 'string', required: true, description: 'What to do instead.' },
+            slug: { type: 'string', description: 'Stable kebab-case slug; same {category, slug} updates the entry.' },
+            applies_to: { type: 'array', description: 'Areas: app, auth, ext, cortex, iam, realtime, ai, mobile, publish.' },
+            severity: { type: 'string', enum: ['info', 'warn', 'critical'], description: 'Default warn.' },
+            status: { type: 'string', enum: ['active', 'outdated'], description: 'outdated = kept but hidden from default lists.' },
+            app_ref: { type: 'string', description: 'Related app (owner/filename.html).' },
+            share: { type: 'boolean', description: 'true = platform-wide public entry; default private to your owner scope.' },
+        },
+    },
+    {
+        name: 'aimeat_appdev_pitfall_list',
+        description: 'List appdev pitfalls before building an app ON AIMEAT — merged from your own learned entries, the node\'s curated registry, and other owners\' shared entries. scope: own (your bubble) | platform (curated + shared) | all (default). Filter by category, applies_to area, or model; paginated (limit/offset) with total + facet counts so a large KB stays navigable. Outdated entries are hidden by default. Full learned entries via aimeat_knowledge_get package_id=appdev-pitfalls; curated detail via GET /v1/appdev/pitfalls/{id}.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            scope: { type: 'string', enum: ['own', 'platform', 'all'], description: 'Default all.' },
+            category: { type: 'string', description: 'Filter by category.' },
+            model: { type: 'string', description: 'Filter learned entries to one model.' },
+            applies_to: { type: 'string', description: 'Filter by area.' },
+            status: { type: 'string', enum: ['active', 'outdated', 'all'], description: 'Default active.' },
+            limit: { type: 'number', description: 'Page size, default 25 (max 100).' },
+            offset: { type: 'number', description: 'Page start, default 0.' },
+        },
+    },
+    {
+        name: 'aimeat_appdev_pitfall_delete',
+        description: 'Delete one of your learned appdev-pitfall entries entirely (removes the entry and its manifest reference). Prefer aimeat_appdev_pitfall_report with status=outdated when the pitfall merely stopped being relevant — delete is for wrong or duplicate entries.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            category: { type: 'string', required: true, description: 'Entry category.' },
+            slug: { type: 'string', required: true, description: 'Entry slug.' },
         },
     },
     {
