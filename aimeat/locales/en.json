@@ -4503,6 +4503,8 @@
     "completeAccountTitle": "One last step",
     "completeAccountDesc": "Add an email to finish setting up your account. We’ll send a verification code to confirm it.",
     "completeAccountDescResend": "Confirm your email to finish signing in. We’ll send a verification code — edit the address if it’s wrong.",
+    "registerEmailTitle": "Add your email",
+    "registerEmailDesc": "Enter your email to create your account. We’ll send a verification code to confirm it.",
     "sendVerificationCode": "Send Verification Code",
     "enterCodeTitle": "Enter Verification Code",
     "enterCodeDesc": "We sent a 6-digit code to your email. Enter it below to finish and sign in.",

@@ -2,6 +2,7 @@
  * @file src/routes/libs/auth-lib-part2.ts
  * @description aimeat-auth.js browser library source, middle segment (event system, public auth API, login pill, theme toggle, modal i18n). Extracted from libs.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-07-19 — Sign-in modal overlay is scroll-safe (flex-start + overflow-y:auto + margin:auto card) so an over-tall modal stays fully reachable instead of clipping its buttons.
  *   v1.2.0 — 2026-07-19 — Compact login pill is now the DEFAULT on app origins (isAppOrigin()), not
  *     opt-in — every published app is mobile-safe out of the box. Apex SPA stays full; explicit
  *     compact:true/false still wins.
@@ -763,9 +764,8 @@ function showLoginModal(opts, renderBtn) {
     + '.aimeat-lang.active{background:#E8564A;color:#fff;border-color:#E8564A;cursor:default}'
     + '@keyframes aimeatModalIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}'
     + '</style>'
-    + '<div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px">'
-    + '<div style="background:#FFFFFF;border-radius:16px;max-width:420px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05);' + (anim ? 'animation:aimeatModalIn .3s ease' : '') + '">'
-    // Header
+    + '<div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px">'
+    + '<div style="background:#FFFFFF;border-radius:16px;max-width:420px;width:100%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05);' + (anim ? 'animation:aimeatModalIn .3s ease' : '') + '">'
     + '<div style="padding:28px 32px 0;position:relative">'
     + '<div class="aimeat-langsw">'
     + '<button type="button" class="aimeat-lang' + (lang === 'en' ? ' active' : '') + '" data-lang="en">EN</button>'

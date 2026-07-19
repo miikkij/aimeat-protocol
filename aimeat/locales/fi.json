@@ -4503,6 +4503,8 @@
     "completeAccountTitle": "Vielä yksi vaihe",
     "completeAccountDesc": "Lisää sähköpostiosoite viimeistelläksesi tilisi. Lähetämme vahvistuskoodin sen vahvistamiseksi.",
     "completeAccountDescResend": "Vahvista sähköpostiosoitteesi kirjautuaksesi sisään. Lähetämme vahvistuskoodin — muokkaa osoitetta, jos se on väärin.",
+    "registerEmailTitle": "Lisää sähköpostiosoitteesi",
+    "registerEmailDesc": "Anna sähköpostiosoitteesi luodaksesi tilisi. Lähetämme vahvistuskoodin sen vahvistamiseksi.",
     "sendVerificationCode": "Lähetä vahvistuskoodi",
     "enterCodeTitle": "Syötä vahvistuskoodi",
     "enterCodeDesc": "Lähetimme 6-numeroisen koodin sähköpostiisi. Syötä se alle viimeistelläksesi ja kirjautuaksesi sisään.",
