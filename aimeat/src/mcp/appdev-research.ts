@@ -31,7 +31,7 @@ export function registerAppdevResearchTools(
         'aimeat_appdev_overview',
         descriptionFor('aimeat_appdev_overview'),
         {
-            model: z.string().max(64).optional().describe('Your primary model (e.g. claude-haiku-4.5) — marks packs proven for it and filters learned pitfalls. Indicative'),
+            model: z.string().max(64).optional().describe('Your OWN model id (e.g. claude-fable-5, kimi-k2.7-code) — self-identify from your own configuration, never ask the user. Marks packs proven for it and filters learned pitfalls. Indicative'),
             sections: z.array(z.enum(OVERVIEW_SECTIONS)).optional().describe('Subset of sections to fetch (default all): apps, library_packs, app_templates, skills, pitfalls_curated, pitfalls_learned, template_proposals'),
         },
         annotationsFor('aimeat_appdev_overview'),

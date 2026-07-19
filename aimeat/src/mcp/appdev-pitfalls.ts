@@ -75,7 +75,7 @@ export function registerAppdevPitfallTools(
         'aimeat_appdev_pitfall_report',
         descriptionFor('aimeat_appdev_pitfall_report'),
         {
-            model: z.string().min(1).max(64).describe('REQUIRED: the primary LLM model that hit/solved this (e.g. claude-haiku-4.5, kimi-k2.6). Self-reported, indicative attribution'),
+            model: z.string().min(1).max(64).describe('REQUIRED: YOUR OWN model id — the model that hit/solved this (e.g. claude-fable-5, kimi-k2.7-code). Self-identify from your own configuration, never ask the user. Indicative attribution'),
             category: z.string().min(1).max(40).describe('Kebab-case category, e.g. auth, ext, cortex, realtime, mobile, publish, ai, data'),
             title: z.string().min(3).max(160).describe('Short imperative title of the pitfall'),
             symptom: z.string().min(5).max(2000).describe('What the builder observes when hitting it'),

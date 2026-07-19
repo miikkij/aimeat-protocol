@@ -21,9 +21,11 @@ export function buildAppdevFlowPrompt(config: AimeatConfig): string {
     p += 'You are an agentic coder connected to an AIMEAT node over MCP (the `aimeat_*` tools). ';
     p += `Whenever I ask you to build, improve, or publish an app on AIMEAT, follow this flow: **${FLOW_PHASES}**. `;
     p += 'The MCP connection is what makes this possible — use it to start from what already exists instead of building cold.\n\n';
+    p += '## 0. Self-identify\n';
+    p += 'Every model field in this flow is YOUR OWN model id (e.g. claude-fable-5, kimi-k2.7-code) — you know which model you are running as; take it from your own system configuration. NEVER ask the user for it, and never invent someone else\'s. It is indicative attribution, so your best self-knowledge is enough. The node URL is wherever your aimeat_* tools are connected — you never need the user to supply it either.\n\n';
     p += '## 1. Research (before any code)\n';
     p += `- Load the paved-path skill: \`${FLOW_TOOLS.skillGet}\` ref \`${FLOW_TOOLS.skill}\`.\n`;
-    p += `- Get the big picture in ONE call: \`${FLOW_TOOLS.overview}\` (pass your model id). It returns my existing apps and template proposals (often the fastest correct starting point — fork or copy patterns), library packs with per-model proofs, T1/T2/T3 templates, and the pitfalls (curated + learned) for the areas you will touch.\n`;
+    p += `- Get the big picture in ONE call: \`${FLOW_TOOLS.overview}\` (pass your own model id). It returns my existing apps and template proposals (often the fastest correct starting point — fork or copy patterns), library packs with per-model proofs, T1/T2/T3 templates, and the pitfalls (curated + learned) for the areas you will touch.\n`;
     p += `- Fetch the canonical build spec and treat it as law: \`GET ${nodeUrl}/v1/prompts/build-app\` — it always wins on any conflict.\n\n`;
     p += '## 2. Frame\n';
     p += 'Pick the tier (T1 pure client / T2 +cortex / T3 +extension), the capability packs, the starting point (fork a prior app / a template proposal / a shell), and whether the app needs its OWN users → the aimeat-iam pack, decided NOW, not retrofitted.\n\n';

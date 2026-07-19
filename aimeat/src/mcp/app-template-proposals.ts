@@ -45,7 +45,7 @@ export function registerAppTemplateProposalTools(
             }),
             tier: z.enum(['T1', 'T2', 'T3']).describe('T1 pure client · T2 +cortex · T3 +extension'),
             reuse_notes: z.string().min(10).max(8000).describe('What generalizes: the parts a next build should copy/keep'),
-            model: z.string().min(1).max(64).describe('REQUIRED: the model that built the source app (indicative)'),
+            model: z.string().min(1).max(64).describe('REQUIRED: YOUR OWN model id — the model that built the source app. Self-identify, never ask the user (indicative)'),
             tags: z.array(z.string().max(30)).max(12).optional(),
             start_mode: z.enum(['fork', 'scaffold', 'either']).optional().describe('How the next build should start (default either)'),
             start_mode_rationale: z.string().max(500).optional(),
