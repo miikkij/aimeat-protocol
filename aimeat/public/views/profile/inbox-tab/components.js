@@ -22,6 +22,9 @@
  *   v1.5.0 — 2026-07-18 — Mobile composer is a plain auto-growing textarea (`mode:'simple'`, no Toast UI
  *     toolbar/Write-Preview/WYSIWYG — a phone keyboard + heavy WYSIWYG is miserable); ≤760px opens straight
  *     into it so Toast UI never even loads there. Desktop keeps the rich editor.
+ *   v1.6.0 — 2026-07-19 — Composer gets an expand toggle (⤢/⤡): enlarges the editor to ~60% of the
+ *     viewport so long/formatted drafts are fully visible. Rich mode resizes via Toast UI `setHeight`;
+ *     the markdown fallback + simple textarea grow via the `.inbox-composer--tall` class / lifted cap.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -310,6 +313,8 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   const isNarrow = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 760px)').matches;
   const [mode, setMode] = useState(isNarrow ? 'simple' : 'rich');
   const [md, setMd] = useState(seeded);
+  // Temporarily enlarge the editor (~60% of the viewport) so long/formatted drafts are fully visible.
+  const [expanded, setExpanded] = useState(false);
   const [files, setFiles] = useState([]);
   const containerRef = useRef(null);
   const editorRef = useRef(null);
@@ -419,10 +424,26 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusNonce]);
 
-  // Auto-grow the simple (mobile) textarea to fit its content, capped so it never eats the thread.
-  const autoGrow = (ta) => { if (!ta) return; ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 132) + 'px'; };
-  // Size the simple textarea to any seeded draft on mount (and keep it 1 row when empty).
-  useEffect(() => { if (mode === 'simple') autoGrow(taRef.current); }, [mode]);
+  // Resize the Toast UI editor when the expand toggle flips (rich mode sets its own inline height via
+  // JS, so a CSS class can't reach it — the fallback/simple textareas are sized by `.inbox-composer--tall`
+  // in CSS instead). `160px` matches the construction default.
+  useEffect(() => {
+    if (mode !== 'rich' || !editorRef.current?.setHeight) return;
+    const tall = typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.6) : 400;
+    try { editorRef.current.setHeight(expanded ? tall + 'px' : '160px'); } catch { /* noop */ }
+  }, [expanded, mode]);
+
+  // Auto-grow the simple (mobile) textarea to fit its content, capped so it never eats the thread. When
+  // expanded, the cap lifts to ~60vh so a long draft is fully visible.
+  const autoGrow = (ta) => {
+    if (!ta) return;
+    const cap = expanded && typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.6) : 132;
+    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, cap) + 'px';
+  };
+  // Size the simple textarea to any seeded draft on mount (and keep it 1 row when empty); re-fit when the
+  // expand cap changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (mode === 'simple') autoGrow(taRef.current); }, [mode, expanded]);
 
   const getText = () => (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
   const reset = () => {
@@ -441,7 +462,7 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   });
 
   return html`
-    <div class="inbox-composer">
+    <div class="inbox-composer ${expanded ? 'inbox-composer--tall' : ''}">
       ${files.length > 0 ? html`<div class="inbox-file-chips">
         ${files.map((f, i) => html`<span class="inbox-file-chip" key=${f.name + i}>📎 ${escHtml(f.name)}
           <button class="inbox-bc-chip-x" title=${t('inbox.attachmentRemove')} onClick=${() => removeFile(i)}>✕</button></span>`)}
@@ -459,9 +480,13 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
             <div class="inbox-md-preview"><${Markdown} text=${md} /></div>
           </div>`}
       <div class="inbox-composer-bar">
-        <label class="inbox-attach-btn" title=${t('inbox.attach')}>
-          📎<input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
-        </label>
+        <div class="inbox-bar-left">
+          <label class="inbox-attach-btn" title=${t('inbox.attach')}>
+            📎<input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
+          </label>
+          <button type="button" class="inbox-attach-btn" title=${expanded ? t('inbox.collapse') : t('inbox.expand')}
+            aria-pressed=${expanded} onClick=${() => setExpanded((v) => !v)}>${expanded ? '⤡' : '⤢'}</button>
+        </div>
         <button class="btn-primary btn-sm" disabled=${sending || !recipient} onClick=${submit}>
           ${sending ? t('inbox.sending') : sendLabel}
         </button>

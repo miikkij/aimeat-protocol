@@ -148,6 +148,8 @@
   "admin.messages.detail": "Detail",
   "admin.messages.none": "No deliveries yet.",
   "inbox.attach": "Attach a file",
+  "inbox.expand": "Enlarge the editor",
+  "inbox.collapse": "Shrink the editor",
   "inbox.today": "Today",
   "inbox.yesterday": "Yesterday",
   "inbox.youPrefix": "You:",
