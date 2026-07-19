@@ -221,6 +221,8 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('agents', 'platform', 'TEXT');
   safeAddColumn('agents', 'platformVersion', 'TEXT');
   safeAddColumn('agents', 'platformDetectedBy', 'TEXT');
+  safeAddColumn('agents', 'model', 'TEXT');
+  safeAddColumn('agents', 'modelDetectedBy', 'TEXT');
   safeAddColumn('agents', 'tags', 'TEXT');
 
   // Agent operational mode (autonomous | interactive | task-runner | coordinator | workstation)

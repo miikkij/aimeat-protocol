@@ -10,6 +10,7 @@
  *   - DELETE /v1/agents/:name/onboarding/override    -- Clear readiness override
  *   - DELETE /v1/agents/:name/onboarding           -- Cancel onboarding
  * @version-history
+ *   2026-07-19 — model/modelDetectedBy: indicative primary-LLM attribution on agents (AppDev KB Phase 3)
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase B
  *   v1.1.0 -- 2026-05-24 -- Add readiness override + auto-complete on step confirm
  *   v1.2.0 -- 2026-05-28 -- Add post_onboarding_checklist (commands_registered,
@@ -403,10 +404,14 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       step.details = { ...step.details, ...result.details };
 
       if (stepId === 'identify_platform' && req.body?.platform) {
+        const model = typeof req.body.model === 'string' && req.body.model.trim()
+          ? req.body.model.trim().toLowerCase().slice(0, 64) : undefined;
         await storage.updateAgent(agentGaii, {
           platform: req.body.platform,
           platformVersion: req.body.platform_version,
           platformDetectedBy: 'self_report',
+          // Indicative attribution only (self-reported; subagent delegation may differ).
+          ...(model ? { model, modelDetectedBy: 'self_report' as const } : {}),
         });
         onboarding.detectedPlatform = req.body.platform;
       }

@@ -177,10 +177,15 @@ async function confirmOnboardingStep(
         step.details = { ...step.details, ...result.details };
 
         if (stepId === 'identify_platform' && typeof body.platform === 'string') {
+            const model = typeof body.model === 'string' && body.model.trim()
+                ? body.model.trim().toLowerCase().slice(0, 64) : undefined;
             await storage.updateAgent(agentGaii, {
                 platform: body.platform,
                 platformVersion: typeof body.platform_version === 'string' ? body.platform_version : undefined,
                 platformDetectedBy: 'self_report',
+                // Indicative attribution only — self-reported, and platforms delegate to
+                // subagents on other models mid-session.
+                ...(model ? { model, modelDetectedBy: 'self_report' as const } : {}),
             });
             onboarding.detectedPlatform = body.platform;
         }
@@ -254,8 +259,9 @@ export function registerAgentOnboardingTools(
     mcp.tool('aimeat_onboarding_identify_platform', descriptionFor('aimeat_onboarding_identify_platform'), {
         platform: z.string().describe('Runtime/platform name, for example claude, openclaw, hermes, generic, or vscode'),
         platform_version: z.string().optional().describe('Runtime/platform version if known'),
-    }, annotationsFor('aimeat_onboarding_identify_platform'), async ({ platform, platform_version }) => {
-        const result = await confirmOnboardingStep(agentGaii, 'identify_platform', { platform, platform_version }, storage, emitResourceUpdated);
+        model: z.string().max(64).optional().describe('Primary LLM model driving this agent, for example claude-haiku-4.5 or kimi-k2.6. Self-reported and indicative — used for attribution and filtering, never auditing'),
+    }, annotationsFor('aimeat_onboarding_identify_platform'), async ({ platform, platform_version, model }) => {
+        const result = await confirmOnboardingStep(agentGaii, 'identify_platform', { platform, platform_version, model }, storage, emitResourceUpdated);
         return result.error ? asError(String(result.error)) : asText(result);
     });
 

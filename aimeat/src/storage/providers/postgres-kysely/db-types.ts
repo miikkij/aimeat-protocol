@@ -69,6 +69,8 @@ export interface Agent {
   platform: string | null;
   platformDetectedBy: string | null;
   platformVersion: string | null;
+  model: string | null;
+  modelDetectedBy: string | null;
   publicKey: string;
   scheduleConstraintDefaults: Json | null;
   tags: string[] | null;
