@@ -5,8 +5,10 @@ import { fireHook } from '../../src/utils/fire-hook.js';
 import type { AimeatConfig, ExtensionHooks } from '../../src/config.js';
 import type { ActionRecord } from '../../src/storage/interface.js';
 
-// Mock the url-validator module to avoid real DNS lookups in tests
-vi.mock('../../src/utils/url-validator.js', () => ({
+// Partial mock: stub validateOutboundUrl to skip real DNS lookups, but keep the
+// real safeFetch (hooks.ts sends webhooks through it) so the global-fetch spy fires.
+vi.mock('../../src/utils/url-validator.js', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../src/utils/url-validator.js')>()),
   validateOutboundUrl: vi.fn().mockResolvedValue({ valid: true }),
 }));
 

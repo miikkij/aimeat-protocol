@@ -14,6 +14,7 @@
  *   v1.1.0 -- 2026-05-28 -- Include shared catalog CLI fallback coverage
  *   v1.2.0 -- 2026-05-28 -- Report catalog drift against MCP surfaces and CLI handlers
  *   v1.3.0 -- 2026-05-29 -- Add TOOL_ANNOTATIONS coverage check
+ *   v1.4.0 -- 2026-07-19 -- Add --check gate mode (exit 1 on drift) for pre-commit + CI
  */
 
 import { readdir, readFile } from 'node:fs/promises';
@@ -232,6 +233,27 @@ const report = buildReport(serverTools, connectorTools);
 
 if (process.argv.includes('--json')) {
     console.log(JSON.stringify(report, null, 2));
+} else if (process.argv.includes('--check')) {
+    // Gate mode (pre-commit + CI): fail on any drift signal that must stay empty.
+    // cliFallbackWithoutServerMcp is intentionally NOT gated — a handful of tools are
+    // connector-only convenience with no server /v1/mcp surface (see surfaces.ts V2_EXCLUDED).
+    const drift: Record<string, string[]> = {
+        cliFallbackWithoutHandler: report.catalog.cliFallbackWithoutHandler,
+        cliFallbackWithoutConnectorMcp: report.catalog.cliFallbackWithoutConnectorMcp,
+        serverMcpWithoutCatalog: report.catalog.serverMcpWithoutCatalog,
+        connectorMcpWithoutCatalog: report.catalog.connectorMcpWithoutCatalog,
+        registeredWithoutAnnotation: report.annotations.registeredWithoutAnnotation,
+        annotationWithoutRegistration: report.annotations.annotationWithoutRegistration,
+    };
+    const offenders = Object.entries(drift).filter(([, v]) => v.length > 0);
+    if (offenders.length === 0) {
+        console.log('[audit:mcp-tools] ✓ no MCP tool drift');
+    } else {
+        console.error('[audit:mcp-tools] ✗ MCP tool drift detected — wire the tools (surfaces + connector + CLI handler) or update the catalog/exclusions:');
+        for (const [key, names] of offenders) console.error(`  ${key} (${names.length}): ${names.join(', ')}`);
+        console.error('Run `pnpm audit:mcp-tools` for the full parity report.');
+        process.exit(1);
+    }
 } else {
     printMarkdownReport(report);
 }

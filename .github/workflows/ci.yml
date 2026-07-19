@@ -70,6 +70,14 @@ jobs:
         working-directory: aimeat
         run: pnpm check:app-catalog
 
+      - name: MCP tool surface/handler parity (check:mcp-tools)
+        working-directory: aimeat
+        run: pnpm check:mcp-tools
+
+      - name: Unit tests (vitest)
+        working-directory: aimeat
+        run: pnpm test
+
       - name: Build
         working-directory: aimeat
         run: pnpm build

@@ -15,14 +15,25 @@
  *     (REST PATCH /tags relaxed from owner-role to same-owner). mode_set stays owner-only.
  *   v1.3.0 -- 2026-07-02 -- mode_set relaxed from owner-role to same-owner too (parity with tags_set),
  *     so a device-authed crew can self-set task-runner mode at startup.
+ *   v1.4.0 -- 2026-07-19 -- Register aimeat_agent_statistics on the connector MCP (thin proxy to
+ *     GET /v1/agents/:name/statistics) so the shell-callable tool is also reachable via MCP.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
+import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 
 export function registerAgentManagementTools(mcp: McpServer, registry: AgentRegistry): void {
+
+  mcp.tool('aimeat_agent_statistics', descriptionFor('aimeat_agent_statistics'), {
+    agent_name: agentNameSchema,
+  }, annotationsFor('aimeat_agent_statistics'), async ({ agent_name }) => {
+    const { client, agent } = pickAgent(registry, agent_name);
+    const resp = await client.get(`/v1/agents/${encodeURIComponent(agent)}/statistics`);
+    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+  });
 
   mcp.tool(
     'aimeat_agent_tags_set',

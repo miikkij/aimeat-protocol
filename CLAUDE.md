@@ -225,7 +225,7 @@ pnpm start -- --db sqlite --db-path ./data/aimeat.db
 
 Single suite (preferred during iteration): `cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-onboarding`. Memory-backend test commands are **deprecated** — don't use them.
 
-**Pre-commit gate:** a committed hook (`.githooks/pre-commit`, activated by the root `prepare` script via `git config core.hooksPath .githooks`) blocks every commit unless `lint` + `typecheck` + `typecheck:frontend` + `check:importmap` + `check:no-max-tokens` + `check:app-catalog` pass. The same six run in CI (`.github/workflows/ci.yml`). E2E/Playwright are NOT in the hook (too slow / need a DB) — run those per Rule 1. Bypass only in a genuine emergency with `git commit --no-verify`.
+**Pre-commit gate:** a committed hook (`.githooks/pre-commit`, activated by the root `prepare` script via `git config core.hooksPath .githooks`) blocks every commit unless `lint` + `typecheck` + `typecheck:frontend` + `check:importmap` + `check:no-max-tokens` + `check:app-catalog` + `check:mcp-tools` pass. The same seven run in CI (`.github/workflows/ci.yml`), which additionally runs the full `pnpm test` (vitest unit suite) after the static checks. E2E/Playwright are NOT in the hook or the fast CI path (too slow / need a DB) — run those per Rule 1. Bypass only in a genuine emergency with `git commit --no-verify`.
 
 ## Code Conventions
 

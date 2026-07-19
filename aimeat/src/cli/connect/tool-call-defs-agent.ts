@@ -2,6 +2,8 @@
  * @file cli/connect/tool-call-defs-agent.ts
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 -- 2026-07-19 -- Connector reachability: shell handlers for message_history, dm_send_as_owner,
+ *     and feedback send/inbox — thin REST proxies (contacts stay connector-MCP-only, not cliFallback).
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -345,4 +347,72 @@ export const agentTools: ConnectCliToolDefinition[] = [
             message: optionalString(input, 'message') ?? optionalString(input, 'reason') ?? 'Task failed',
         }),
     },
+    {
+        // → GET /v1/agents/:name/messages[?thread_id=&page=&per_page=] — full agent↔owner thread history.
+        name: 'aimeat_message_history',
+        description: 'Read the agent↔owner conversation history (a thread, or recent messages across threads), oldest-first per page.',
+        input: {
+            thread_id: { type: 'string', description: 'Conversation thread to read (omit for recent across all threads).' },
+            page: { type: 'number', description: 'Page number (default 1).' },
+            per_page: { type: 'number', description: 'Messages per page (default 20, max 100).' },
+        },
+        handler: ({ client, agentPath }, input) => client.get(`/v1/agents/${agentPath}/messages${query({
+            thread_id: optionalString(input, 'thread_id'), page: optionalNumber(input, 'page'), per_page: optionalNumber(input, 'per_page'),
+        })}`),
+    },
+    {
+        // Send a federated DM AS THE OWNER (consented delegation). No send-as-owner REST route exists;
+        // POST /v1/messages sends as the connector's own principal, so this shell path delegates to the
+        // standard send (the server MCP tool remains the way to speak strictly as the owner from an agent).
+        name: 'aimeat_dm_send_as_owner',
+        description: 'Send a federated direct message on the owner\'s behalf (Reply-with-AI). Sends via the standard message route as the connected principal.',
+        input: {
+            to: { type: 'string', required: true, description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.' },
+            body: { type: 'string', description: 'Message body (markdown). Optional if attachments are given.' },
+            reply_to: { type: 'string', description: 'Id of a message you are replying to (keeps the thread).' },
+            subject: { type: 'string', description: 'Open a NEW topic thread with this title.' },
+            conversation_id: { type: 'string', description: 'Continue a specific existing thread by id.' },
+            attachments: { type: 'array', description: 'Up to 20 { storage_key, mime, kind, size, name } descriptors.' },
+        },
+        handler: ({ client }, input) => {
+            const body: JsonObject = { to: requiredString(input, 'to') };
+            const text = optionalString(input, 'body'); if (text) body.body = text;
+            const replyTo = optionalString(input, 'reply_to'); if (replyTo) body.reply_to = replyTo;
+            const subject = optionalString(input, 'subject'); if (subject) body.subject = subject;
+            const conversationId = optionalString(input, 'conversation_id'); if (conversationId) body.conversation_id = conversationId;
+            const attachments = optionalArray(input, 'attachments'); if (attachments) body.attachments = attachments;
+            return client.post('/v1/messages', body);
+        },
+    },
+    {
+        // → POST /v1/feedback (new thread) or POST /v1/feedback/:id/reply (reply into a thread).
+        name: 'aimeat_feedback_send',
+        description: 'Open a platform-feedback thread to the node operator, or reply into an existing one via thread_id.',
+        input: {
+            body: { type: 'string', required: true, description: 'The feedback text (max 8000 chars).' },
+            category: { type: 'string', enum: ['bug', 'blocker', 'idea', 'ux', 'question', 'other'], description: 'Category (required for a new thread).' },
+            title: { type: 'string', description: 'Short summary (required for a new thread).' },
+            context: { type: 'object', description: 'Optional pointers: { app, endpoint, version, url }.' },
+            thread_id: { type: 'string', description: 'Existing thread id to reply into (omit to open a new thread).' },
+        },
+        handler: ({ client }, input) => {
+            const threadId = optionalString(input, 'thread_id');
+            if (threadId) return client.post(`/v1/feedback/${encodeURIComponent(threadId)}/reply`, { body: requiredString(input, 'body') });
+            const body: JsonObject = {
+                category: optionalString(input, 'category') ?? '', title: optionalString(input, 'title') ?? '', body: requiredString(input, 'body'),
+            };
+            const context = optionalRecord(input, 'context'); if (context) body.context = context;
+            return client.post('/v1/feedback', body);
+        },
+    },
+    {
+        // → GET /v1/feedback/mine — the agent's own feedback threads + operator replies.
+        name: 'aimeat_feedback_inbox',
+        description: 'List your own platform-feedback threads and the operator\'s replies.',
+        input: {},
+        handler: ({ client }) => client.get('/v1/feedback/mine'),
+    },
+    // NOTE: the owner contacts (aimeat_contact_*) are NOT cliFallback — they are exposed on the connector
+    // MCP surface (mcp/tools/contacts.ts) but intentionally have no `aimeat connect call` shell handler,
+    // so no orphan handler is added here.
 ];

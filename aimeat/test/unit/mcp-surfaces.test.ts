@@ -78,16 +78,14 @@ describe('v2 MCP surfaces', () => {
     });
 
     it('surface sizes are in the expected ballpark', () => {
-        // Ballpark guard (was stale at 20/50/52 — drifted as workspace + other tools were added;
-        // brought current 2026-06-23: reconciled drift (+aimeat_discover, +aimeat_organism_update,
-        // +aimeat_organism_overview, +aimeat_workspace_overview, +aimeat_dm_ask) — surfaces now fully
-        // cover the connector and the catalog has no uncovered tools).
-        // 2026-07-02: +aimeat_iam_define on appdev; the guard was ALREADY behind on every row
-        // (pre-existing drift — validateSurfaces() above is the real invariant and stayed green),
-        // so reconciled every row to the counted actuals.
-        expect(MCP_SURFACES.appdev.length).toBe(50);
-        expect(MCP_SURFACES.agent.length).toBe(82);
-        expect(MCP_SURFACES.service.length).toBe(77);
-        expect(MCP_SURFACES.admin.length).toBe(15);
+        // Ballpark FLOORS, not exact counts. The exact-count assertions were reconciled twice and kept
+        // drifting behind every tool addition (they were stale at 50/82/77 while the surfaces were
+        // already 73/111/99). validateSurfaces() above (uncovered/unknown === []) is the real guard;
+        // these floors just catch a surface being gutted, without churning on every new tool. Set a bit
+        // below the current actuals (77/120/102/15 as of 2026-07-19 connector-reachability wiring).
+        expect(MCP_SURFACES.appdev.length).toBeGreaterThanOrEqual(72);
+        expect(MCP_SURFACES.agent.length).toBeGreaterThanOrEqual(112);
+        expect(MCP_SURFACES.service.length).toBeGreaterThanOrEqual(96);
+        expect(MCP_SURFACES.admin.length).toBeGreaterThanOrEqual(14);
     });
 });

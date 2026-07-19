@@ -414,4 +414,8 @@ export const organismTools: ConnectCliToolDefinition[] = [
             return client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access${query({ ws })}`);
         },
     },
+    // NOTE: the organism email-invitation tools (aimeat_organism_invite_email / _invitations_email /
+    // _invitation_email_cancel) are NOT cliFallback — they are exposed on the connector MCP surface
+    // (mcp/tools/organisms.ts) but intentionally have no `aimeat connect call` shell handler, so no orphan
+    // handler is added here.
 ];

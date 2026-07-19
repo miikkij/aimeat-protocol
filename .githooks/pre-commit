@@ -7,6 +7,7 @@
 #   4. Importmap ↔ imports in sync       — pnpm check:importmap
 #   5. No max_tokens caps on AI calls    — pnpm check:no-max-tokens
 #   6. app-catalog.html ↔ its sources    — pnpm check:app-catalog
+#   7. MCP tool surface/handler parity    — pnpm check:mcp-tools
 #
 # These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
 # (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
@@ -35,5 +36,8 @@ pnpm -s check:no-max-tokens
 
 echo "[pre-commit] app-catalog.html ↔ sources in sync (check:app-catalog)…"
 pnpm -s check:app-catalog
+
+echo "[pre-commit] MCP tool surface/handler parity (check:mcp-tools)…"
+pnpm -s check:mcp-tools
 
 echo "[pre-commit] ✓ all checks passed"
