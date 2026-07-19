@@ -36,8 +36,12 @@ services:
       - PERMITTED_CORS_ORIGINS=${PERMITTED_CORS_ORIGINS:-http://localhost:3000}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      # Persistent OpenHands state (skills, settings.json, MCP live here).
-      - ${HOME}/.openhands:/.openhands
+      # Persistent OpenHands state (settings.json, openhands.db, user microagents live here).
+      # MUST mount at /root/.openhands — the container runs as root, and the app looks for
+      # user skills at `Path.home() / '.openhands' / 'microagents'` (== /root/.openhands/microagents).
+      # A previous version mounted at /.openhands, which the app never reads. See
+      # scripts/postup.sh for the matching user-microagent install.
+      - ${HOME}/.openhands:/root/.openhands
       # Preconfigured MCP + LLM + pruning for the CLI/core path. render-config.sh produces
       # this file with the real token/key. Harmless if the GUI ignores it (MCP also lives
       # in the mounted ~/.openhands once added).

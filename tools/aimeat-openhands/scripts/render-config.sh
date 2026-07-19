@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # @file scripts/render-config.sh
 # @description Render config.toml from config.toml.template, substituting secrets from
-#   .env + secrets/aimeat.env. Also copies the aimeat-app-builder skill into the OpenHands
-#   global skills dir (~/.openhands/skills). Run after aimeat-connect.sh, before docker up.
+#   .env + secrets/aimeat.env. Run after aimeat-connect.sh, before docker up.
+#   (The aimeat-app-builder skill is baked into the agent-server runtime image by
+#   scripts/build-runtime.sh, and copied to $HOME/.openhands/microagents by
+#   scripts/postup.sh so the GUI Skills tab lists it.)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
