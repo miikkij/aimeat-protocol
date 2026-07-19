@@ -384,6 +384,21 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
         input: { id: { type: 'string', required: true, description: 'Template proposal id.' } },
     },
     {
+        name: 'aimeat_appdev_proof_attach',
+        description: 'Attach a SELF-REPORTED per-model acceleration proof (pass/fail + evidence) to a community contribution you own: a community library pack (your public cortex lib — proofs surface on /v1/library-packs with self_reported: true) or one of your app-template proposals. Append-only ledger, duplicate (model, test_set, date) rejected; honest fails make your passes credible. This is the "proven acceleration" attribution sellers build a track record with — a node-verified badge is a separate later feature, never implied by these.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            subject_type: { type: 'string', required: true, enum: ['library_pack', 'app_template'], description: 'What the proof attaches to.' },
+            subject_id: { type: 'string', required: true, description: 'Community pack id (cortex name) or template proposal id.' },
+            model: { type: 'string', required: true, description: 'Model the run was made with (indicative).' },
+            verdict: { type: 'string', required: true, enum: ['pass', 'fail'], description: 'Did it accelerate the run.' },
+            evidence: { type: 'string', required: true, description: 'URL / storage / memory ref to the run evidence.' },
+            test_set: { type: 'string', description: 'Repeatable test-set id, when used.' },
+            tokens: { type: 'number', description: 'Output tokens the run consumed.' },
+        },
+    },
+    {
         name: 'aimeat_skill_publish',
         description: 'Publish or update a skill in the skills registry — a SKILL.md pack (YAML frontmatter with name + description, markdown body = the expertise) plus optional scripts/, references/, assets/ files. Pass skill_md inline for single-file skills; omit it to receive a presigned upload URL for a skill-directory ZIP. Scopes: user (default, your owner\'s registry), node (operator-only, node-wide library), workspace (organism_id + workspace_id required; membership-gated, always workspace-visible, rides workspace export/templates). Republishing the same name bumps the version. Skills are a dedicated system, distinct from knowledge packages.',
         caller: 'agent',

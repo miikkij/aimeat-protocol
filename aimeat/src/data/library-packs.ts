@@ -18,6 +18,7 @@
  *   · buildLlmsPacksTable()
  * @usage import { getLibraryPacks, buildPromptLibrarySections } from '../data/library-packs.js';
  * @version-history
+ *   2026-07-19 — Self-reported acceleration proofs (AppDev KB Phase 8): community-pack + template proofs; self_reported labeling
  *   v1.0.0 — 2026-07-16 — initial registry + surface generators (Library Acceleration Program,
  *     Phase 1: kills the 4-way hardcoded lib-list drift).
  */
@@ -242,7 +243,7 @@ export function buildPromptLibrarySections(nodeUrl: string): string {
       if (p.apiCaveat) s += '  ⚠ ' + p.apiCaveat + '\n';
     }
     s += 'Before writing code that uses a capability pack, fetch its full usage doc (API idioms, version notes, gotchas): GET ' + nodeUrl + '/v1/library-packs/<id> — the ai_doc field (it also returns modelTier + the per-model proof ledger). Index of every pack: GET ' + nodeUrl + '/v1/library-packs. Include ONLY packs the user\'s needs match.\n';
-    s += 'The live index may also list COMMUNITY packs (scope "community") — cortex libraries published by users on this node, with the same include + ai_doc contract. They are unvetted (always status "preview"): prefer a node-scope pack when one covers the same need, and read a community pack\'s ai_doc before trusting its API.\n\n';
+    s += 'The live index may also list COMMUNITY packs (scope "community") — cortex libraries published by users on this node, with the same include + ai_doc contract. They are unvetted (always status "preview"): prefer a node-scope pack when one covers the same need, and read a community pack\'s ai_doc before trusting its API. A community pack may carry SELF-REPORTED per-model proofs (proofs[] with self_reported: true, proven_models) — treat them as the owner\'s own acceleration claims, not a node-verified badge.\n\n';
   }
   return s;
 }

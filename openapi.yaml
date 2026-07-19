@@ -6845,7 +6845,7 @@ paths:
   /v1/library-packs:
     get:
       operationId: listLibraryPacks
-      summary: Library-pack registry index
+      summary: Library-pack registry index (community entries may carry self-reported proofs[] + proven_models)
       description: >-
         The data-driven registry of every client-side library an AIMEAT app can include —
         SDK wrappers (/v1/libs), node-bundled cortex libs (/v1/cortex/<n>/libs) and vendored

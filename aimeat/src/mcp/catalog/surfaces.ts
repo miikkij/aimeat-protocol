@@ -56,6 +56,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_skill_publish', 'aimeat_skill_list', 'aimeat_skill_get', 'aimeat_skill_link', 'aimeat_skill_unlink',
         'aimeat_appdev_overview', 'aimeat_appdev_pitfall_report', 'aimeat_appdev_pitfall_list', 'aimeat_appdev_pitfall_delete',
         'aimeat_app_template_propose', 'aimeat_app_template_list', 'aimeat_app_template_get', 'aimeat_app_template_delete',
+        'aimeat_appdev_proof_attach',
         'aimeat_handbook_get',
     ],
     agent: [
@@ -74,6 +75,7 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',
         'aimeat_appdev_overview', 'aimeat_appdev_pitfall_report', 'aimeat_appdev_pitfall_list', 'aimeat_appdev_pitfall_delete',
         'aimeat_app_template_propose', 'aimeat_app_template_list', 'aimeat_app_template_get', 'aimeat_app_template_delete',
+        'aimeat_appdev_proof_attach',
         'aimeat_skill_publish', 'aimeat_skill_list', 'aimeat_skill_get', 'aimeat_skill_link', 'aimeat_skill_unlink',
         'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
         'aimeat_capabilities_list', 'aimeat_capabilities_get', 'aimeat_capabilities_invoke',
