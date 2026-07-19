@@ -16,6 +16,9 @@
  *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.3.1 -- 2026-06-19 -- Security (CR-1): ctx.wallet.consume rejects non-positive/non-finite amounts before debiting.
  *   v1.4.0 — 2026-07-16 — ctx.memory.getPublic owner-agent fallback batches into one listMemoryForOwners
+ *   v1.5.0 — 2026-07-19 — aimeat_extension_install gains update:true (in-place upsert preserving
+ *     lifecycle + ext: memory, owner-gated) and activate:true (skip separate activate call);
+ *     closes pitfall ext/extension-install-no-upsert
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -386,9 +389,11 @@ export function registerExtensionsTools(
         {
             manifest: z.string().optional().describe('Extension manifest in YAML format. Omit to get an upload URL for a ZIP bundle.'),
             scripts: z.record(z.string(), z.string()).optional().describe('Map of script filename to JavaScript source code. Omit for upload mode.'),
+            update: z.boolean().optional().describe('Upsert an already-installed extension in place (same validation; activation status, lifecycle fields and its ext: memory are preserved). Without this flag an existing name is an error.'),
+            activate: z.boolean().optional().describe('Activate immediately after install/update — skips the separate aimeat_extension_activate call.'),
         },
         annotationsFor('aimeat_extension_install'),
-        async ({ manifest: manifestYaml, scripts }) => {
+        async ({ manifest: manifestYaml, scripts, update, activate }) => {
             // --- UPLOAD MODE: no manifest provided, return presigned upload URL ---
             if (!manifestYaml) {
                 const maxBytes = config.extensionMaxCodeSizeKb * 1024 * 50;
@@ -465,8 +470,15 @@ export function registerExtensionsTools(
             // Check if extension already exists
             const name = metadata.name as string;
             const existingExt = await storage.getExtension(name);
-            if (existingExt) {
-                return { content: [{ type: 'text' as const, text: `Extension "${name}" is already installed` }], isError: true };
+            if (existingExt && !update) {
+                return { content: [{ type: 'text' as const, text: `Extension "${name}" is already installed — pass update: true to upsert it in place (activation status and its ext: memory are preserved), or delete + reinstall.` }], isError: true };
+            }
+            if (existingExt && update) {
+                // Only the installing owner may update their extension in place.
+                const callerOwner = parseGAII(getAgentGaii())?.owner ?? '';
+                if (existingExt.installedBy && existingExt.installedBy !== callerOwner) {
+                    return { content: [{ type: 'text' as const, text: `Extension "${name}" was installed by "${existingExt.installedBy}" — only the installing owner may update it` }], isError: true };
+                }
             }
 
             // Build ExtensionRecord
@@ -533,22 +545,66 @@ export function registerExtensionsTools(
             };
 
             try {
-                const created = await storage.createExtension(record);
-                logger.info(`Extension installed via MCP: ${created.name}`, { version: created.version, by: record.installedBy });
+                let result: ExtensionRecord;
+                let action: 'installed' | 'updated';
+                if (existingExt) {
+                    // In-place upsert (mirrors PUT /v1/extensions/:name): swap code + metadata,
+                    // preserve lifecycle fields (status, installedBy/At, activatedAt) and ext: memory.
+                    const updated = await storage.updateExtension(name, {
+                        version: record.version,
+                        description: record.description,
+                        author: record.author,
+                        requiredApis: record.requiredApis,
+                        actions: record.actions,
+                        config: record.config,
+                        limits: record.limits,
+                        federation: record.federation,
+                        instances: record.instances,
+                    });
+                    result = updated ?? { ...record, status: existingExt.status };
+                    action = 'updated';
+                    logger.info(`Extension updated via MCP: ${name}`, { version: record.version, by: record.installedBy });
+                } else {
+                    result = await storage.createExtension(record);
+                    action = 'installed';
+                    logger.info(`Extension installed via MCP: ${result.name}`, { version: result.version, by: record.installedBy });
+                }
+
+                // Optional immediate activation (skips the separate activate call).
+                let status = result.status;
+                if (activate && status !== 'active') {
+                    await storage.updateExtension(name, { status: 'active', activatedAt: new Date().toISOString() });
+                    status = 'active';
+                }
+                // Actions may have changed (or just went live) — refresh aggregated capabilities.
+                if (status === 'active') {
+                    import('../services/capability-aggregator.js')
+                        .then(m => m.runCapabilityAggregation(config, storage))
+                        .catch(() => {});
+                }
+
+                // An ACTIVE extension whose manifest declares schedules needs a schedule
+                // re-registration this tool cannot perform — point at the REST upsert.
+                const manifestSchedules = manifest.schedules as unknown[] | undefined;
+                const scheduleNote = (action === 'updated' && status === 'active' && Array.isArray(manifestSchedules) && manifestSchedules.length > 0)
+                    ? 'schedules in the manifest are NOT re-registered by this tool — use PUT /v1/extensions/{name} (REST upsert) or deactivate + activate to refresh them'
+                    : undefined;
 
                 return {
                     content: [{
                         type: 'text' as const,
                         text: JSON.stringify({
-                            name: created.name,
-                            version: created.version,
-                            status: created.status,
-                            actions: created.actions.map(a => ({ id: a.id, method: a.method, path: a.path })),
+                            name: result.name,
+                            version: result.version,
+                            status,
+                            action,
+                            ...(scheduleNote ? { note: scheduleNote } : {}),
+                            actions: result.actions.map(a => ({ id: a.id, method: a.method, path: a.path })),
                         }, null, 2),
                     }],
                 };
             } catch (err) {
-                return { content: [{ type: 'text' as const, text: `Failed to install extension: ${(err as Error).message}` }], isError: true };
+                return { content: [{ type: 'text' as const, text: `Failed to ${update ? 'update' : 'install'} extension: ${(err as Error).message}` }], isError: true };
             }
         },
     );

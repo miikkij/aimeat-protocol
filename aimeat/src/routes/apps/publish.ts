@@ -8,6 +8,8 @@
  *   v1.1.0 — 2026-07-16 — Agent-Bundled Apps Slice 1: accept `cortex.agents` (declarative
  *     crew-defs) in the publish payload, validated fail-loud against CrewDefSchema — a
  *     malformed agents[] REJECTS the publish; carried forward on update when omitted.
+ *   v1.2.0 — 2026-07-19 — provision the per-app subdomain (ensureAppSubdomain) at publish time
+ *     so a new app's vanity URL works immediately (pitfall publish/new-app-subdomain-provisioning-lag).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -22,6 +24,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
+import { ensureAppSubdomain } from '../subdomains.js';
 import type { CanonicalOwner } from './helpers.js';
 
 export function registerPublishRoutes(
@@ -241,6 +244,14 @@ export function registerPublishRoutes(
             operatorHideReason,
             createdAt: now,
         });
+
+        // Provision the per-app subdomain mapping NOW (HTML apps) — previously it was only
+        // auto-assigned on the first path-form open, so a brand-new app's vanity subdomain
+        // 404'd until someone hit the canonical URL (pitfall publish/new-app-subdomain-
+        // provisioning-lag). Best-effort: a failed ensure never fails the publish.
+        if (/\.html?$/i.test(filename)) {
+            try { await ensureAppSubdomain(storage, config, owner, filename); } catch { /* best-effort */ }
+        }
 
         // Handle optional screenshot upload (still uses file storage)
         let hasScreenshot = false;

@@ -547,12 +547,14 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_extension_install',
-        description: 'Install a server-side extension (sandboxed WASM that can store ext: memory and call external APIs via ctx.fetch). Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and scripts in scripts/. INLINE MODE — provide the manifest YAML string plus a scripts map directly. After install, activate with aimeat_extension_activate.',
+        description: 'Install or update a server-side extension (sandboxed WASM that can store ext: memory and call external APIs via ctx.fetch). Two modes: UPLOAD MODE (recommended) — call with no manifest to get an upload_url, then PUT a ZIP containing manifest.yaml at root and scripts in scripts/. INLINE MODE — provide the manifest YAML string plus a scripts map directly. Updating an installed extension: pass update:true to upsert it in place (activation status, lifecycle fields and its ext: memory are preserved; owner-gated). Pass activate:true to activate in the same call; otherwise activate with aimeat_extension_activate.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             manifest: { type: 'string', description: 'Extension manifest in YAML format. Omit to get an upload_url for a ZIP bundle. Use @file:path with the CLI fallback.' },
             scripts: { type: 'object', description: 'Map of script filename to JavaScript source code. Omit for upload mode.' },
+            update: { type: 'boolean', description: 'Upsert an already-installed extension in place (lifecycle + ext: memory preserved). Without this, an existing name is an error.' },
+            activate: { type: 'boolean', description: 'Activate immediately after install/update.' },
         },
     },
     {
