@@ -219,6 +219,10 @@ export const identityMethods = {
     const r = await this.db.selectFrom('Ghii').selectAll().where('emailHash', '=', emailHash).executeTakeFirst();
     return r ? toGHIIRecord(r) : null;
   },
+  async getGHIIsByEmailHash(this: PostgresKyselyStorage, emailHash: string): Promise<GHIIRecord[]> {
+    const rows = await this.db.selectFrom('Ghii').selectAll().where('emailHash', '=', emailHash).execute();
+    return rows.map(toGHIIRecord);
+  },
   async getGHIIByGoogleSub(this: PostgresKyselyStorage, googleSub: string): Promise<GHIIRecord | null> {
     const r = await this.db.selectFrom('Ghii').selectAll().where('googleSub', '=', googleSub).executeTakeFirst();
     return r ? toGHIIRecord(r) : null;

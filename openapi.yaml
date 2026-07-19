@@ -5427,7 +5427,13 @@ paths:
               properties:
                 owner:
                   type: string
-                  description: Owner name
+                  description: |
+                    The target account: either the account HANDLE (e.g. `alice`) or the account's
+                    VERIFIED email address (case-insensitive). A value containing `@` is resolved as an
+                    email to the owning account's handle. No account with that verified email → 404
+                    `NO_ACCOUNT`; malformed email → 400 `INVALID_EMAIL`; (should-never-happen) more than
+                    one match → 409 `AMBIGUOUS`. The value only SELECTS which account this request targets
+                    — it is not an authentication factor (the human still approves the device code).
                 agent_name:
                   type: string
                   description: Agent name (3-32 chars, lowercase alphanumeric + hyphens)
@@ -5477,6 +5483,10 @@ paths:
                             type: boolean
         '400':
           $ref: '#/components/responses/BadRequest'
+        '404':
+          description: '`owner` was an email with no matching verified account (NO_ACCOUNT)'
+        '409':
+          description: '`owner` email maps to more than one account (AMBIGUOUS — invariant violation)'
         '429':
           description: Too many pending requests for this owner
 
@@ -16079,6 +16089,9 @@ paths:
         Register a new human owner via the web portal. Creates an owner record,
         GHII, and profile. No authentication required. If email is provided,
         a verification code is sent and the response includes a verificationId.
+        When the node's email gate is on (`AIMEAT_EMAIL_CONFIRMATION_REQUIRED`),
+        an email is REQUIRED (missing → `400 EMAIL_REQUIRED`); an email already
+        verified on another account → `409 EMAIL_TAKEN`.
       tags: [GHII-Web]
       requestBody:
         required: true
@@ -35187,6 +35200,12 @@ paths:
         username or a full `username@node-id` (the node part must match this node). The first
         real owner is auto-granted the `operator` role. Returns the owner keypair once —
         the private key is never retrievable again. A welcome morsel bonus is granted.
+
+        When an `email` is supplied it is recorded and a verification code is sent (confirm via
+        `POST /v1/ghii/verify-email`); a `verification_id` is returned. When the node runs with the
+        email gate on (`AIMEAT_EMAIL_CONFIRMATION_REQUIRED`), an email is REQUIRED — registering
+        without one → `400 EMAIL_REQUIRED` (OAuth sign-in satisfies the gate, its IdP email being
+        verified at that instant). An email already verified on another account → `409 EMAIL_TAKEN`.
       requestBody:
         required: true
         content:
@@ -35201,6 +35220,7 @@ paths:
                 avatar: { type: string }
                 locale: { type: string }
                 password: { type: string, description: Optional; min 8 chars, strength-validated }
+                email: { type: string, format: email, description: 'Optional; REQUIRED when the email gate is on. Recorded + a verification code sent.' }
       responses:
         '201':
           description: Identity created
@@ -35230,14 +35250,16 @@ paths:
                             properties:
                               name: { type: string }
                               roles: { type: array, items: { type: string } }
+                          verification_id: { type: string, nullable: true, description: Present when an email was supplied; confirm it via POST /v1/ghii/verify-email }
+                          email_sent: { type: boolean, description: Whether a verification email was dispatched (email service must be enabled) }
                           private_key: { type: string }
                           public_key: { type: string }
                           has_password: { type: boolean }
                           note: { type: string }
         '400':
-          $ref: '#/components/responses/BadRequest'
+          description: Invalid input, or EMAIL_REQUIRED when the node's email gate is on and no email was supplied
         '409':
-          $ref: '#/components/responses/Conflict'
+          description: NAME_TAKEN, or EMAIL_TAKEN when the email is already verified on another account
     put:
       operationId: updateGhii
       tags: [GHII]

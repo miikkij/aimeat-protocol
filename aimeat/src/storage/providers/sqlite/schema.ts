@@ -164,6 +164,27 @@ export function initializeSchema(db: Database.Database): void {
   // Added AFTER the ALTERs above for the same upgrade-safety reason as googleSub.
   safeAddColumn('ghiis', 'externalIdentities', 'TEXT');
 
+  // One-email-per-account-per-node invariant — a partial UNIQUE index makes a duplicate emailHash
+  // impossible at the DB (email-or-handle connect + the email→owner resolver rely on this). The dedupe
+  // + index below reference emailHash + emailVerifiedAt, so guarantee both columns exist first (a very
+  // old upgraded ghiis table predates emailVerifiedAt) — safeAddColumn is a no-op when already present.
+  safeAddColumn('ghiis', 'emailHash', 'TEXT');
+  safeAddColumn('ghiis', 'emailVerifiedAt', 'TEXT');
+  // Dedupe FIRST (a would-be duplicate would make the CREATE UNIQUE INDEX throw and crash boot): keep the
+  // best row per hash — verified beats unverified, oldest wins the tie — and null the losers' pointer.
+  db.exec(`UPDATE ghiis SET emailHash = NULL
+           WHERE emailHash IS NOT NULL
+             AND ghii NOT IN (
+               SELECT ghii FROM (
+                 SELECT ghii, ROW_NUMBER() OVER (
+                   PARTITION BY emailHash
+                   ORDER BY (emailVerifiedAt IS NOT NULL) DESC, createdAt ASC, ghii ASC
+                 ) AS rn
+                 FROM ghiis WHERE emailHash IS NOT NULL
+               ) ranked WHERE ranked.rn = 1
+             )`);
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_ghii_emailHash ON ghiis(emailHash) WHERE emailHash IS NOT NULL');
+
   // Organism archive — partial index over the ACTIVE working set only. Keeps the live owner/prefix
   // scans (the AI-material reads) physically small as archived rows accumulate. Created AFTER the
   // safeAddColumn('memory','archived') ALTER above, or upgraded DBs crash with "no such column".

@@ -4,6 +4,11 @@
  *   POST /v1/ghii/verify-email, POST /v1/ghii/magic-link, GET /v1/ghii/magic-link/verify. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-07-19 — register-web enforces the email gate (EMAIL_REQUIRED when the operator requires a
+ *     verified email) and refuses an email already verified elsewhere (EMAIL_TAKEN) at registration.
+ *   v1.1.0 — 2026-07-19 — emailHash is now a VERIFIED-email binding: register-web no longer stamps it at
+ *     account creation (deferred to verify-email), and verify-email refuses an email already verified on
+ *     another account (EMAIL_TAKEN) — upholding one-email-per-account-per-node.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/ghii.ts (max-file-lines)
  */
 import type { Router, RequestHandler } from 'express';
@@ -68,6 +73,13 @@ export function registerWebVerifyRoutes(
             display_name = display_name.split('@')[0];
         }
 
+        // Email gate: when the operator requires a verified email, an account cannot be created without one.
+        if (config.emailConfirmationRequired && !(typeof email === 'string' && email.length > 0)) {
+            res.status(400).json(error(config.nodeId, 'EMAIL_REQUIRED',
+                'This node requires a verified email to register. Provide an "email" or sign in with Google/Microsoft/Casdoor.'));
+            return;
+        }
+
         // Check if owner name is already taken
         const existingOwner = await storage.getOwner(username);
         if (existingOwner) {
@@ -75,10 +87,20 @@ export function registerWebVerifyRoutes(
             return;
         }
 
-        // Hash email if provided
+        // Hash email if provided. This drives the verification record below; it is NOT stamped onto the
+        // GHII yet. emailHash is a VERIFIED-email binding (one per account per node, DB-unique) — it is
+        // claimed only once the code is confirmed in /v1/ghii/verify-email, never at account creation.
         const emailHash = (typeof email === 'string' && email.length > 0)
             ? createHash('sha256').update(email.toLowerCase().trim()).digest('hex')
             : undefined;
+        // One verified email per account per node: refuse up front if it is already verified elsewhere.
+        if (emailHash) {
+            const emailOwner = await storage.getGHIIByEmailHash(emailHash);
+            if (emailOwner) {
+                res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN', 'That email is already associated with another account.'));
+                return;
+            }
+        }
 
         // Generate keypair for the owner account
         const keyPair = await generateKeyPair();
@@ -112,8 +134,7 @@ export function registerWebVerifyRoutes(
             verificationLevel: 0,
             ownerName: owner.name,
             totpEnabled: false,
-            emailHash,
-            magicLinkEnabled: !!emailHash,
+            // emailHash + magicLinkEnabled are set by /v1/ghii/verify-email once the email is proven.
             notificationEmail: (typeof email === 'string' && email.length > 0) ? email.toLowerCase().trim() : undefined,
             morselBalance: config.welcomeBonus,
             loginCount: 0,
@@ -255,6 +276,13 @@ export function registerWebVerifyRoutes(
 
         // Update GHII with verified email info + track login
         const ghii = `${record.ownerName}@${config.nodeId}`;
+        // One-email-per-account-per-node: refuse to claim an email hash already verified elsewhere. The
+        // DB partial-unique index is the hard backstop; this returns a clean 409 instead of a 500.
+        const emailOwner = await storage.getGHIIByEmailHash(record.emailHash);
+        if (emailOwner && emailOwner.ghii !== ghii) {
+            res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN', 'That email is already verified on another account.'));
+            return;
+        }
         const ghiiBeforeUpdate = await storage.getGHII(ghii);
         await storage.updateGHII(ghii, {
             emailHash: record.emailHash,
