@@ -638,7 +638,9 @@ await test('GET /v1/libs/aimeat-markdown.js — serves render + renderRich + ren
     const res = await fetch(`${BASE}/v1/libs/aimeat-markdown.js`);
     assert(res.ok, `markdown lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.md'), 'should expose AIMEAT.md');
+    // Componentized (SDK-libs migration): attaches via _core `attach('md', …)` rather than a literal
+    // `AIMEAT.md =`, so assert on a stable md-surface marker (sanitizeHref) instead.
+    assert(text.includes('sanitizeHref'), 'should expose the markdown surface (sanitizeHref)');
     assert(text.includes('renderRich'), 'should include the rich pipeline');
     assert(text.includes('renderToString'), 'should include the string form');
     assert(text.includes('suppressErrorRendering'), 'mermaid init must suppress error-bomb rendering');

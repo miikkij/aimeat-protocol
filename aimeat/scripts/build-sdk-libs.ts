@@ -56,6 +56,9 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'work', entry: 'work/index.js' },
   { name: 'commerce', entry: 'commerce/index.js' },
   { name: 'webmcp', entry: 'webmcp/index.js' },
+  { name: 'markdown', entry: 'markdown/index.js' },
+  { name: 'audio', entry: 'audio/index.js' },
+  { name: 'tunnel', entry: 'tunnel/index.js' },
 ];
 
 function banner(name: string): string {

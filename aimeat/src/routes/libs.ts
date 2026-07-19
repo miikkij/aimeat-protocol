@@ -227,9 +227,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, sdkLibSource(config, 'storage'));
   });
 
-  // GET /v1/libs/aimeat-markdown.js — safe GFM markdown renderer (AIMEAT.md.render)
-  router.get('/v1/libs/aimeat-markdown.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatMarkdownLib(config));
+  // GET /v1/libs/aimeat-markdown.js — safe GFM markdown renderer (migrated: sdk-libs/markdown/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-markdown.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatMarkdownLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'markdown'));
   });
 
   // GET /v1/libs/aimeat-social.js — Boards & social library (migrated: sdk-libs/social/; ?impl=legacy)
@@ -256,14 +257,16 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, sdkLibSource(config, 'work'));
   });
 
-  // GET /v1/libs/aimeat-tunnel.js — Personal node tunnel client
-  router.get('/v1/libs/aimeat-tunnel.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatTunnelLib(config));
+  // GET /v1/libs/aimeat-tunnel.js — Personal node tunnel client (migrated: sdk-libs/tunnel/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-tunnel.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatTunnelLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'tunnel'));
   });
 
-  // GET /v1/libs/aimeat-audio.js — Audio engine library
-  router.get('/v1/libs/aimeat-audio.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatAudioLib(config));
+  // GET /v1/libs/aimeat-audio.js — Audio engine library (migrated: sdk-libs/audio/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-audio.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatAudioLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'audio'));
   });
 
   // GET /v1/libs/aimeat-speech.js — Speech library. Migrated to a componentized ESM source

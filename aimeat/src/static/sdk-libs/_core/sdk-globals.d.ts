@@ -23,6 +23,16 @@ interface Window {
   __AIMEAT_SDK_CFG__?: { nodeId: string; baseUrl: string; heartbeatMs?: number };
   /** aimeat-header's idempotency guard (mounts the canonical nav at most once). */
   __AIMEAT_HEADER_MOUNTED__?: boolean;
+  // Rich-renderer CDN globals loaded on demand by aimeat-markdown (markdown-it + plugins, DOMPurify,
+  // highlight.js, mermaid) — untyped external libraries, hence `any`.
+  /* eslint-disable @typescript-eslint/no-explicit-any */
+  markdownit?: any;
+  markdownitTaskLists?: any;
+  markdownitFootnote?: any;
+  DOMPurify?: any;
+  hljs?: any;
+  mermaid?: any;
+  /* eslint-enable @typescript-eslint/no-explicit-any */
   /** Safari's prefixed AudioContext. */
   webkitAudioContext?: typeof AudioContext;
   // SpeechRecognition / webkitSpeechRecognition have no lib.dom type; the instance API is accessed
