@@ -4924,7 +4924,10 @@ paths:
         **302-redirects** to the trusted apex consent page (`/v1/app-grant?req=...`) where the
         owner approves. `code_challenge_method` is `S256` (or `plain` for non-secure-context clients
         without crypto.subtle — real app origins are https/S256); `redirect_uri` must be on the
-        app origin (never the apex); `scope` must be drawn from the grantable scope set. With
+        app origin (never the apex), and when it lives on a **per-app subdomain** that subdomain
+        must map to exactly the requesting `app` (else `INVALID_REDIRECT_URI`) — a bound request
+        marks the pending request `origin_bound`, unlocking own-app auto-approve on the consent
+        page; `scope` must be drawn from the grantable scope set. With
         `response_mode=web_message` the consent page postMessages the code back to the app
         popup-opener (so the user stays in the app); the default `query` mode full-redirects.
       tags: [Auth]
@@ -4946,7 +4949,11 @@ paths:
     get:
       operationId: appGrantRequest
       summary: Read a pending app-grant request (for the consent page)
-      description: Returns the requesting app and the exact scopes (with descriptions) for the consent UI to render. Unguessable id; no auth.
+      description: |
+        Returns the requesting app and the exact scopes (with descriptions) for the consent UI to
+        render, plus `app_owner` (the app's owner name) and `origin_bound` (the redirect origin is
+        verified to be this very app's subdomain) — together these let the consent page auto-approve
+        the signed-in owner's OWN app, matching the silent-bridge policy. Unguessable id; no auth.
       tags: [Auth]
       parameters:
         - { in: path, name: requestId, required: true, schema: { type: string } }
@@ -5011,8 +5018,11 @@ paths:
         Called by the app from its own origin (CORS `*`). With `grant_type=authorization_code`
         (+ PKCE `code_verifier`) the node creates the persistent grant and returns a short-lived
         **scoped** access JWT (role `app`, the granted scopes, an `app_grant` claim) + a rotating
-        refresh token — never the owner's session. With `grant_type=refresh_token` it rotates the
-        refresh token and re-mints the access JWT. A revoked grant yields `401`.
+        refresh token — never the owner's session. The code-exchange response also carries `app`
+        (owner/filename) and `own` (origin-bound request approved by the app's own owner) so the
+        SDK's login-pill metadata matches the silent bridge. With `grant_type=refresh_token` it
+        rotates the refresh token and re-mints the access JWT **with the stored grant's scopes**
+        (a refresh never widens scopes on its own). A revoked grant yields `401`.
       tags: [Auth]
       requestBody:
         required: true

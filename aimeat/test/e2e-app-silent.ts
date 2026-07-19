@@ -9,10 +9,16 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-silent.ts
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial (H-2 seamless secure app SSO).
+ *   v1.1.0 — 2026-07-19 — Phase 4 (scope-upgrade + own-app visible flow, Band Jam findings):
+ *     silent re-request with MORE scopes upgrades the own-app grant in place (refresh follows);
+ *     refresh_token never expands scopes on its own; the visible authorize flow rejects a
+ *     redirect_uri on ANOTHER app's subdomain, exposes app_owner/origin_bound on the pending
+ *     request, and the code exchange reports own=true only for the app's own origin-bound owner.
  */
 import { spawn, type ChildProcess } from 'node:child_process';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { createHash, randomBytes } from 'node:crypto';
 
 const PORT = process.env.E2E_SILENT_PORT ?? '40264';
 const BASE = `http://localhost:${PORT}`;
@@ -88,7 +94,35 @@ async function silent(origin: string, scope: string, cookie: string | null) {
     if (cookie) headers['Cookie'] = `aimeat_rt=${encodeURIComponent(cookie)}`;
     const res = await fetch(`${BASE}/v1/auth/app-grant-silent?origin=${encodeURIComponent(origin)}&scope=${encodeURIComponent(scope)}`, { headers });
     const body = await res.json() as any;
-    return body.data as { ok: boolean; error?: string; access_token?: string; scope?: string };
+    return body.data as { ok: boolean; error?: string; access_token?: string; scope?: string; refresh_token?: string; own?: boolean };
+}
+/** Start the VISIBLE authorize flow (PKCE) and return { status, requestId, body, verifier, redirect }. */
+async function authorize(app: string, scope: string, redirectUri: string) {
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const q = new URLSearchParams({
+        app, response_type: 'code', scope, redirect_uri: redirectUri,
+        code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const loc = res.headers.get('location') ?? '';
+    const m = /req=([^&]+)/.exec(loc);
+    const body = res.status === 302 ? null : await res.json().catch(() => null) as any;
+    return { status: res.status, requestId: m ? decodeURIComponent(m[1]) : null, body, verifier, redirect: redirectUri };
+}
+/** Approve a pending request as `token`'s owner and exchange the code (PKCE) for the token response. */
+async function consentAndExchange(requestId: string, verifier: string, redirectUri: string, token: string) {
+    const con = await json('/v1/app-grants/authorize-consent', {
+        method: 'POST', headers: { Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ request_id: requestId }),
+    });
+    assert(con.status === 200, `consent: ${con.status} ${JSON.stringify(con.body)}`);
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', {
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirectUri }),
+    });
+    assert(tok.status === 200, `token: ${tok.status} ${JSON.stringify(tok.body)}`);
+    return tok.body.data as { access_token: string; scope: string; app?: string; own?: boolean; refresh_token: string };
 }
 
 async function main() {
@@ -184,6 +218,66 @@ async function main() {
         await test('GET /app-login.js and /app-silent.js serve', async () => {
             const a1 = await fetch(`${BASE}/app-login.js`); assert(a1.status === 200, `app-login.js: ${a1.status}`);
             const a2 = await fetch(`${BASE}/app-silent.js`); assert(a2.status === 200, `app-silent.js: ${a2.status}`);
+        });
+
+        console.log('\nPhase 4: Scope upgrades + own-app visible flow (Band Jam findings)');
+        await test('own-app silent re-request with MORE scopes upgrades the grant in place', async () => {
+            const r1 = await silent(ORIGIN_A, 'memory:read', A.rt);
+            assert(r1.ok && r1.scope === 'memory:read', `initial narrow grant, got ${JSON.stringify(r1)}`);
+            const r2 = await silent(ORIGIN_A, 'memory:read memory:write ai:use', A.rt);
+            assert(r2.ok === true, `upgrade should auto-approve for the own app, got ${JSON.stringify(r2)}`);
+            const s2 = (r2.scope || '').split(' ');
+            assert(s2.includes('memory:write') && s2.includes('ai:use'), `upgraded scopes, got ${r2.scope}`);
+            // The GRANT RECORD (not just the token) carries the new scopes: a refresh follows it.
+            const ref = await json('/v1/app-grants/token', {
+                method: 'POST', body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: r2.refresh_token }),
+            });
+            assert(ref.status === 200, `refresh: ${ref.status}`);
+            const rs = (ref.body.data.scope || '').split(' ');
+            assert(rs.includes('memory:write') && rs.includes('ai:use'), `refresh reflects upgraded grant, got ${ref.body.data.scope}`);
+        });
+        await test('refresh_token never expands scopes on its own (follows the stored grant only)', async () => {
+            const r1 = await silent(ORIGIN_B, 'memory:read', B.rt); // B's own app, narrow grant
+            assert(r1.ok && !!r1.refresh_token, `B own-app grant, got ${JSON.stringify(r1)}`);
+            const ref = await json('/v1/app-grants/token', {
+                method: 'POST', body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: r1.refresh_token }),
+            });
+            assert(ref.status === 200, `refresh: ${ref.status}`);
+            assert(ref.body.data.scope === 'memory:read', `refresh must not widen, got ${ref.body.data.scope}`);
+        });
+        await test('visible authorize REJECTS a redirect_uri on another app\'s subdomain', async () => {
+            const r = await authorize(`${a}/app-a.html`, 'memory:read', `${ORIGIN_B}/callback`);
+            assert(r.status === 400, `expected 400, got ${r.status}`);
+            assert(r.body?.error?.code === 'INVALID_REDIRECT_URI', `expected INVALID_REDIRECT_URI, got ${JSON.stringify(r.body?.error)}`);
+        });
+        await test('visible authorize on the app\'s OWN subdomain → request is origin_bound with app_owner', async () => {
+            const r = await authorize(`${a}/app-a.html`, 'memory:read', `${ORIGIN_A}/callback`);
+            assert(r.status === 302 && !!r.requestId, `authorize: ${r.status}`);
+            const det = await json(`/v1/app-grants/request/${r.requestId}`);
+            assert(det.status === 200, `request: ${det.status}`);
+            assert(det.body.data.app_owner === a, `app_owner, got ${det.body.data.app_owner}`);
+            assert(det.body.data.origin_bound === true, `origin_bound, got ${det.body.data.origin_bound}`);
+        });
+        await test('code exchange reports own=true when the app\'s own owner approves a bound request', async () => {
+            const r = await authorize(`${a}/app-a.html`, 'memory:read', `${ORIGIN_A}/callback`);
+            assert(r.status === 302 && !!r.requestId, `authorize: ${r.status}`);
+            const tok = await consentAndExchange(r.requestId!, r.verifier, r.redirect, A.token);
+            assert(tok.own === true, `own should be true, got ${JSON.stringify(tok.own)}`);
+            assert(tok.app === `${a}/app-a.html`, `app echoed, got ${tok.app}`);
+        });
+        await test('code exchange reports own=false when ANOTHER owner approves the same app', async () => {
+            const r = await authorize(`${a}/app-a.html`, 'memory:read', `${ORIGIN_A}/callback`);
+            assert(r.status === 302 && !!r.requestId, `authorize: ${r.status}`);
+            const tok = await consentAndExchange(r.requestId!, r.verifier, `${ORIGIN_A}/callback`, B.token);
+            assert(tok.own === false, `own should be false for a non-owner, got ${JSON.stringify(tok.own)}`);
+        });
+        await test('bare app-host redirect (path-form app) stays allowed but NOT origin_bound', async () => {
+            const r = await authorize(`${a}/app-a.html`, 'memory:read', `https://${APP_HOST}/apps/a/callback`);
+            assert(r.status === 302 && !!r.requestId, `authorize: ${r.status}`);
+            const det = await json(`/v1/app-grants/request/${r.requestId}`);
+            assert(det.body.data.origin_bound === false, `origin_bound must be false, got ${det.body.data.origin_bound}`);
+            const tok = await consentAndExchange(r.requestId!, r.verifier, `https://${APP_HOST}/apps/a/callback`, A.token);
+            assert(tok.own === false, `unbound request never earns own even for the owner, got ${JSON.stringify(tok.own)}`);
         });
 
         console.log('\n─────────────────────────────────────');

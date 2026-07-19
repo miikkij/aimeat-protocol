@@ -2,12 +2,11 @@
  * @file src/routes/libs/auth-lib-part2.ts
  * @description aimeat-auth.js browser library source, middle segment (event system, public auth API, login pill, theme toggle, modal i18n). Extracted from libs.ts to satisfy max-file-lines.
  * @version-history
- *   v1.3.0 — 2026-07-19 — Sign-in modal overlay is scroll-safe (flex-start + overflow-y:auto + margin:auto card) so an over-tall modal stays fully reachable instead of clipping its buttons.
+ *   v1.4.0 — 2026-07-19 — Sign-in modal overlay is scroll-safe (flex-start + overflow-y:auto + margin:auto card) so an over-tall modal stays fully reachable instead of clipping its buttons.
+ *   v1.3.0 — 2026-07-19 — manageGrant() requests the app-DECLARED scopes + adopts own/app from the token response.
  *   v1.2.0 — 2026-07-19 — Compact login pill is now the DEFAULT on app origins (isAppOrigin()), not
- *     opt-in — every published app is mobile-safe out of the box. Apex SPA stays full; explicit
- *     compact:true/false still wins.
- *   v1.1.0 — 2026-07-18 — Opt-in compact login pill: mountLoginButton({ compact:true }) renders a
- *     small "account" button on ≤600px that opens the full pill as a popover; +compactPill flag.
+ *     opt-in — every published app is mobile-safe out of the box. Apex SPA stays full; explicit compact:true/false wins.
+ *   v1.1.0 — 2026-07-18 — Opt-in compact login pill (compact:true): small account button on ≤600px; +compactPill flag.
  *   v1.0.0 — 2026-07-13 — Extracted from libs.ts (max-file-lines)
  */
 export function aimeatAuthLibPart2(): string {
@@ -255,9 +254,10 @@ const auth = {
   async manageGrant() {
     const s = currentSession || load('session');
     if (!s || !s._app) return null;
-    const res = await requestConsentPopup(s._app, (s.scopes || []).join(' '), true); // manage = always show the screen
+    // App-DECLARED scopes (not the old session's) so a scope-adding update surfaces; manage=always show the screen.
+    const res = await requestConsentPopup(s._app, appDeclaredScopes(), true);
     if (res && res.revoked) { await auth.logout(); return { revoked: true }; }
-    if (res && res.access_token) return _buildAppSession(res.access_token, s._app, s._own);
+    if (res && res.access_token) return _buildAppSession(res.access_token, res.app || s._app, res.own != null ? !!res.own : s._own);
     return null;
   },
 
