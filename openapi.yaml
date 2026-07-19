@@ -19452,6 +19452,27 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { description: Missing notifications:send scope }
+    delete:
+      operationId: clearNotifications
+      summary: Clear the caller's notifications (the bell's "Clear all")
+      description: |
+        Delete the caller's in-app notifications — the header bell's "Clear all". Unlike
+        POST /v1/notifications/read (which only marks them read), this REMOVES the rows. Owner-scoped:
+        only the caller's own notifications are affected. Omit the body (or send `{}`) to clear ALL;
+        pass `{ ids: [...] }` to delete just those.
+      tags: [Notifications]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids: { type: array, items: { type: string }, description: Notification ids to clear (omit to clear all) }
+      responses:
+        '200': { description: "Count cleared ({ cleared })" }
+        '401': { $ref: '#/components/responses/Unauthorized' }
 
   /v1/notifications/read:
     post:
