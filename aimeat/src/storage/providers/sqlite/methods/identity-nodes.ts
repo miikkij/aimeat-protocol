@@ -295,6 +295,11 @@ export const identityNodesMethods = {
     return row ? this.deserializeGHII(row) : null;
   },
 
+  async getGHIIsByEmailHash(this: SqliteStorage, emailHash: string): Promise<GHIIRecord[]> {
+    const rows = this.db.prepare('SELECT * FROM ghiis WHERE emailHash = ?').all(emailHash) as Record<string, unknown>[];
+    return rows.map(r => this.deserializeGHII(r));
+  },
+
   async getGHIIByGoogleSub(this: SqliteStorage, googleSub: string): Promise<GHIIRecord | null> {
     const row = this.db.prepare('SELECT * FROM ghiis WHERE googleSub = ?').get(googleSub) as Record<string, unknown> | undefined;
     return row ? this.deserializeGHII(row) : null;

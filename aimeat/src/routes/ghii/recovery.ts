@@ -4,6 +4,8 @@
  *   POST /v1/ghii/email/verify, /email/confirm, /password/reset-request, /password/reset,
  *   /password/change, /account/recover. Extracted from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-19 — email/confirm refuses an email already verified on another account
+ *     (EMAIL_TAKEN) — upholding one-email-per-account-per-node ahead of the DB unique index.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/ghii.ts (max-file-lines)
  */
 import type { Router } from 'express';
@@ -137,6 +139,13 @@ export function registerRecoveryRoutes(
 
         // Update GHII with verified email info
         const ghii = `${ownerName}@${config.nodeId}`;
+        // One-email-per-account-per-node: don't claim an email hash already verified on another account
+        // (clean 409 ahead of the DB partial-unique index backstop).
+        const emailOwner = await storage.getGHIIByEmailHash(record.emailHash);
+        if (emailOwner && emailOwner.ghii !== ghii) {
+            res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN', 'That email is already verified on another account.'));
+            return;
+        }
         // Find the email from the verification record's emailHash
         // We store the notificationEmail separately to keep it accessible
         await storage.updateGHII(ghii, {
