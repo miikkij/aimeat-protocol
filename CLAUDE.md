@@ -130,7 +130,7 @@ The **AIMEAT Protocol** (AI Memory Exchange and Action Transfer) — an open pro
 
 ### Prompt-Driven Workflow
 
-AIMEAT's core interaction pattern: the app generates ready-made prompts, the user copies them to their chosen AI chat, and brings results back; previous results feed subsequent prompts. It's (1) free — users use their own AI chats, (2) safe — users see everything before submitting, (3) AI-agnostic. **When adding to the generator pipeline, the work is in the prompt text** — not UI buttons or backend logic. The app composes prompts, shows them, accepts/validates responses, threads previous responses into later prompts.
+AIMEAT's core interaction pattern: the app generates ready-made prompts, the user copies them to their chosen AI chat, and brings results back; previous results feed subsequent prompts. It's (1) free — users use their own AI chats, (2) safe — users see everything before submitting, (3) AI-agnostic. **When adding to a prompt-generation flow, the work is in the prompt text** — not UI buttons or backend logic. The app composes prompts, shows them, accepts/validates responses, threads previous responses into later prompts.
 
 ## AIMEAT Development Organism (dogfood) — session rituals
 
@@ -277,7 +277,7 @@ Two rules from those mechanisms that bite often:
 
 ## Spec Documents
 
-**Current spec (v4.0, two-layer):** `docs/AIMEAT-RFC-v4.0-Core-full.md` (generic federatable Core protocol) + `docs/AIMEAT-RFC-v4.0-Platform-full.md` (the aimeat.io platform built on the Core). The v4.0 split re-baselines the spec against the implementation: it promotes organisms/workspaces, the app platform (app grants + H-2 origin isolation), the agent fleet plane, extensions/cortex, skills/capabilities, GEAI ecosystem apps, and the metering ledger to first-class; reframes the economy as **meters, not currencies** (morsels + USD metering) behind a *pluggable, non-mandatory* payment interface; keeps federation first-class around its real use (cross-node identity/login); and marks **micro-memory, OTK/Tier 0.5, legacy Ed25519 challenge-response, boards, and Foundry as deprecated/removal**. v4.0 is a conceptual reframe, **not** an API break.
+**Current spec (v4.0, two-layer):** `docs/AIMEAT-RFC-v4.0-Core-full.md` (generic federatable Core protocol) + `docs/AIMEAT-RFC-v4.0-Platform-full.md` (the aimeat.io platform built on the Core). The v4.0 split re-baselines the spec against the implementation: it promotes organisms/workspaces, the app platform (app grants + H-2 origin isolation), the agent fleet plane, extensions/cortex, skills/capabilities, GEAI ecosystem apps, and the metering ledger to first-class; reframes the economy as **meters, not currencies** (morsels + USD metering) behind a *pluggable, non-mandatory* payment interface; keeps federation first-class around its real use (cross-node identity/login); and marks **micro-memory, OTK/Tier 0.5, legacy Ed25519 challenge-response, and boards as deprecated** (the **Generator and Foundry are already removed** — replaced by the OpenHands app-builder, see below). v4.0 is a conceptual reframe, **not** an API break.
 
 `openapi.yaml` remains the canonical API contract (keep in sync, Rule 3). Supporting: `docs/aimeat-implementation-prompt.md`; `docs/a-endpoints.md` (endpoint reference); `docs/b-config.md` (config schema); `docs/c-platform-notes.md` (AI platform compat).
 
@@ -312,11 +312,13 @@ SSR-removal history (6 files / ~9,000 lines removed 2026-03-03, static-HTML URL 
 
 The catalogue of traps we've hit — organised by the KIND of problem (build/bundling, routing, frontend↔backend drift, identity/auth, storage, i18n, extensions/cortex, AI calls, crypto, organisms, deploy, concurrency, Windows tooling) — lives in **[`docs/pitfalls.md`](docs/pitfalls.md)**. Read it when something breaks in a way that feels like it "should work"; add an entry when a bug turns out to be a *repeatable* trap, not a one-off.
 
-### Generator pipeline notes
+### App-building prompt system
 
-**Two separate app-building prompt systems — never confuse them:** (1) the SPA **service generator** (`public/js/services/generator-prompts-*.js`) produces full ext+cortex+app SERVICE stacks via the portal's generator pipeline; (2) the **app-catalog "Create new app"** prompt builds single-file HTML apps — its canonical text is **node-served** at `GET /v1/prompts/build-app` (source of truth: `src/services/build-app-prompt.ts`; the app-catalog fetches it, and `src/static/app-catalog/js/cortex.js` keeps only an offline fallback). Agent-facing discovery: `/llms.txt` + bootstrap `app_building` point to the build prompt and `/v1/app-templates`. Improve app-building guidance in the NODE service, never in the catalog fallback. (See `docs/pitfalls.md` §1.)
+The canonical app-building prompt is **node-served** at `GET /v1/prompts/build-app` (source of truth: `src/services/build-app-prompt.ts`) — it builds single-file HTML apps. It has two consumers: the **app-catalog "Create new app"** flow fetches it (`src/static/app-catalog/js/cortex.js` keeps only an offline fallback), and the **OpenHands app-builder** (`tools/aimeat-openhands/`, via its `aimeat-app-builder` skill) fetches the same spec at runtime. Agent-facing discovery: `/llms.txt` + bootstrap `app_building` point to the build prompt and `/v1/app-templates`. **Improve app-building guidance in the NODE service (`build-app-prompt.ts`), never in the catalog fallback.** (See `docs/pitfalls.md` §1.)
 
-When modifying generator prompt templates (`public/js/services/generator-prompts-*.js`): verify every API claim against `src/routes/lib-*.ts` + `public/cortex-bundled/*.js`; extension data → `getPublic('ext:name', key)`; user data (translations/settings) → `AIMEAT.data.get(key)` (NEVER tell cortex to read translations from `ext:`); extension actions must `export default async function(ctx, input) { ... }`.
+> The old SPA **service generator** (`public/js/services/generator-prompts-*.js`) and **Foundry** were **removed** (Generator 2026-07-18, Foundry 2026-07-13) — do not revive them or reference `generator-*` files.
+
+When editing the build-app prompt (or any app-building guidance): verify every API claim against `src/routes/lib-*.ts` + `public/cortex-bundled/*.js`; extension data → `getPublic('ext:name', key)`; user data (translations/settings) → `AIMEAT.data.get(key)` (NEVER tell cortex to read translations from `ext:`); extension actions must `export default async function(ctx, input) { ... }`.
 
 ## Naming Convention — AIMEAT Only
 

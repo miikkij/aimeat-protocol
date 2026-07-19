@@ -224,5 +224,3 @@ POST /v1/cortex/{name}/activate
 | `src/routes/lib-data.ts:106-115` | `AIMEAT.data.getPublic()` browser implementation |
 | `src/routes/cortex.ts:48-86` | Cortex registration (expects `libs` dict) |
 | `src/routes/cortex.ts:230-271` | Cortex activate (idempotent — skips if already active) |
-| `public/js/services/generator-prompts-base.js:1582-1619` | `NAMESPACE_RULES` constant |
-| `public/js/services/generator-prompts-base.js:1703-1744` | `EXTENSION_CONSUMPTION_RULES` constant |

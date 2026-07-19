@@ -37,8 +37,8 @@ Without this capability, every AIMEAT app that wants AI assistance has to:
 - Skip AI features entirely
 
 `AIMEAT.ai` solves all three. The user configures their OpenRouter key **once**
-in their AIMEAT profile (Generator / Foundry / Calibrator already use it for
-their own purposes). Apps then reach the same key via a budget-gated server
+in their AIMEAT profile (the Calibrator and other node AI features already use
+it for their own purposes). Apps then reach the same key via a budget-gated server
 endpoint — they never see the key, can't exfiltrate it, and can't run up
 spend beyond what the user has allowed.
 
@@ -235,7 +235,7 @@ async function setupAiButton() {
 function handleAiError(e, btn) {
   switch (e.code) {
     case 'NO_API_KEY':
-      alert('You haven\'t configured an OpenRouter key yet. Open Settings → Generator → OpenRouter to set one.');
+      alert('You haven\'t configured an OpenRouter key yet. Open your AIMEAT profile → OpenRouter settings to set one.');
       break;
     case 'QUOTA_EXHAUSTED':
       alert('Your daily AI budget is used up. Raise it in Settings or wait until midnight UTC.');
@@ -603,5 +603,5 @@ else renderIssueList(r.parsed.issues);
 - E2E tests as examples of expected behaviour:
   [`aimeat/test/ai.ts`](../aimeat/test/ai.ts)
 - The OpenRouter settings panel UI lives in
-  [`aimeat/public/views/profile/generator-settings.js`](../aimeat/public/views/profile/generator-settings.js)
+  [`aimeat/public/views/profile/openrouter-settings.js`](../aimeat/public/views/profile/openrouter-settings.js)
   (`AiAppsBudgetPanel`).

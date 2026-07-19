@@ -497,7 +497,7 @@ All configuration is via environment variables. Set them in your `.env` file or 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AIMEAT_DEV_MODE` | `false` | Development mode — bypasses OTK validation on micro-memory |
+| `AIMEAT_DEV_MODE` | `false` | Development mode — relaxes auth validation for local development |
 | `AIMEAT_ANONYMOUS` | `false` | Anonymous mode — no auth required, creates shared agent on startup |
 
 ### Auth & Tokens
@@ -505,8 +505,8 @@ All configuration is via environment variables. Set them in your `.env` file or 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `AIMEAT_JWT_TTL` | `3600` | JWT lifetime in seconds |
-| `AIMEAT_OTK_TTL_MS` | `300000` | One-time key expiry in milliseconds (5 min) |
-| `AIMEAT_OTK_GRACE_MS` | `60000` | OTK grace period in milliseconds (1 min) |
+| `AIMEAT_OTK_TTL_MS` | `300000` | One-time key expiry in milliseconds (5 min) — **deprecated (v4.0)**, off by default; agent auth is device authorization (RFC 8628) |
+| `AIMEAT_OTK_GRACE_MS` | `60000` | OTK grace period in milliseconds (1 min) — **deprecated (v4.0)**, off by default; agent auth is device authorization (RFC 8628) |
 
 ### Storage
 
@@ -518,7 +518,7 @@ All configuration is via environment variables. Set them in your `.env` file or 
 
 | Variable | Default | Description |
 |----------|---------|-------------|
-| `AIMEAT_KEYED_BROWSE` | `true` | Enable keyed browse (Tier 0.5) |
+| `AIMEAT_KEYED_BROWSE` | `true` | Enable keyed browse (Tier 0.5) — **deprecated (v4.0)**, off by default |
 | `AIMEAT_EXTENDED_FEATURES` | `true` | Enable boards, federation, storage, validate |
 
 ### Quotas
@@ -527,7 +527,7 @@ All configuration is via environment variables. Set them in your `.env` file or 
 |----------|---------|-------------|
 | `AIMEAT_MEMORY_QUOTA_MB` | `10` | Default memory quota per owner in MB |
 | `AIMEAT_STORAGE_QUOTA_MB` | `100` | Default file storage quota per owner in MB |
-| `AIMEAT_MICRO_MEMORY_QUOTA_KB` | `500` | Micro-memory quota per agent in KB |
+| `AIMEAT_MICRO_MEMORY_QUOTA_KB` | `500` | Micro-memory quota per agent in KB — **deprecated (v4.0)**, off by default |
 | `AIMEAT_MEMORY_OVERAGE_MORSELS` | `10` | Extra memory cost: morsels per MB per month |
 | `AIMEAT_STORAGE_OVERAGE_MORSELS` | `100` | Extra storage cost: morsels per GB per month |
 | `AIMEAT_MAX_URL_LENGTH` | `8192` | Maximum URL length accepted |

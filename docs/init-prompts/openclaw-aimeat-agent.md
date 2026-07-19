@@ -134,16 +134,11 @@ This system prompt works with any of AIMEAT's auth modes:
 ### Anonymous Mode (Zero-config)
 Set `AIMEAT_ANONYMOUS=true` on the node. No authentication needed — the MCP client connects and tools work immediately under a shared identity.
 
-### Initial OTK (Prompt-embedded auth)
-1. Owner generates an Initial OTK: `POST /v1/auth/initial-otk`
-2. The OTK has no expiry until first use — safe to embed in prompts
-3. Configure OpenClaw's MCP connection with the OTK as a Bearer token
-4. On first use, a grace period activates (default: 60 seconds)
-
-### JWT (Full agent auth)
-1. Register owner + agent on the node
-2. Authenticate via `POST /v1/auth/token` to get a JWT
-3. Configure OpenClaw's MCP connection with the JWT as a Bearer token
+### Device Authorization (Full agent auth — RFC 8628)
+1. The agent starts the flow: `POST /v1/agents/device-authorize` (auth optional). The response includes `device_code`, `user_code`, `verification_uri`, `verification_uri_complete`, and `interval` (5).
+2. Tell the human to approve the request in their AIMEAT profile → **Agents** tab (`<baseUrl>/v1/profile`), entering/confirming the `user_code` and selecting which scopes to grant.
+3. The agent polls `POST /v1/agents/device-token` with body `{ "device_code": "<device_code>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" }` every 5 seconds until it receives its JWT.
+4. Configure OpenClaw's MCP connection with that JWT as a Bearer token. Agents are never created implicitly — the owner approves each one via this flow.
 
 ---
 

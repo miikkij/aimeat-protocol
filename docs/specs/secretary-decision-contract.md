@@ -9,6 +9,8 @@
 
 # Secretary Decision-Log Contract
 
+> **⚠️ Historical / superseded.** The Secretary feature is being **removed** from AIMEAT. This spec is retained as design history only — it does not describe current behavior. The referenced plan `docs/plans/2026-06-23-secretary-feature.md` no longer exists. For current behavior see the v4.0 RFC (Core + Platform) and `openapi.yaml`.
+
 A **decision** is one self-describing memory record under the owner's namespace. It captures a choice
 the Secretary made or recommended, **stays open after the choice**, and is revisited by a scheduled
 review that records what actually happened and scores the decision quality. Without the revisit step
