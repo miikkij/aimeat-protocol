@@ -9,6 +9,7 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.0.0 — 2026-03-20 — Extracted from src/routes/mcp.ts (pure refactor, no logic changes)
  *   v1.1.0 — 2026-03-21 — Added registerOrganismsTools registration (5 tools + 1 resource)
  *   v1.2.0 — 2026-03-21 — Added registerKnowledgeTools registration (4 tools + 1 resource)
@@ -42,6 +43,7 @@ import { registerBoardsTools } from './boards.js';
 import { registerOrganismsTools } from './organisms.js';
 import { registerWorkspaceTools } from './workspaces.js';
 import { registerKnowledgeTools } from './knowledge.js';
+import { registerAppdevPitfallTools } from './appdev-pitfalls.js';
 import { registerSkillsTools } from './skills.js';
 import { registerOperatorConfigTools } from './operator-config.js';
 import { registerExtensionsTools } from './extensions.js';
@@ -141,6 +143,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerOrganismsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerWorkspaceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerKnowledgeTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
         registerSkillsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerOperatorConfigTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerExtensionsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

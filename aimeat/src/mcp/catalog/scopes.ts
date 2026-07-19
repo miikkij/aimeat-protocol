@@ -18,6 +18,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.4.0 -- 2026-07-14 -- Commerce scopes (commerce:sell / commerce:buy) for the MCP commerce
  *     tools — deliberately stricter than the requireAuth-only REST commerce routes (documented
  *     divergence: PSP secrets + owner-balance spending warrant least-privilege on the agent surface).
@@ -46,6 +47,13 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_memory_search: 'memory:read',
     aimeat_memory_read_public: 'memory:read',
     aimeat_memory_write: 'memory:write',
+
+    // AppDev pitfall KB (learned entries are memory records under packages/appdev-pitfalls/).
+    // Delete gates on memory:write (not memory:delete) deliberately: it only removes the owner's
+    // OWN KB entries, report can already overwrite them, and no scope profile grants memory:delete
+    // — a stricter gate would just dead-end the tool for every appdev-profile agent.
+    aimeat_appdev_pitfall_report: 'memory:write',
+    aimeat_appdev_pitfall_delete: 'memory:write',
 
     // Boards / social (mutations → social:write; subscribe → social:read).
     // NOTE: aimeat_board_read / aimeat_board_list are intentionally NOT gated — the REST
