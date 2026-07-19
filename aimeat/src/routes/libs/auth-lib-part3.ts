@@ -2,6 +2,10 @@
  * @file src/routes/libs/auth-lib-part3.ts
  * @description aimeat-auth.js browser library source, tail segment (sign-in modal, signup modals, focus/visibility refresh, global expose). Extracted from libs.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-19 — Registration under the email gate collects an email in-modal: a new-username
+ *     register that returns EMAIL_REQUIRED opens the email sub-view in 'register' mode (POST /v1/ghii
+ *     with the email → verify-email → password login), instead of dead-ending at the raw error. Modal
+ *     overlays (notice + Google-signup) made scroll-safe (align-items:flex-start + overflow-y:auto).
  *   v1.0.0 — 2026-07-13 — Extracted from libs.ts (max-file-lines)
  */
 export function aimeatAuthLibPart3(): string {
@@ -125,20 +129,33 @@ export function aimeatAuthLibPart3(): string {
   // send the code (attach-email) and to re-login once the email is verified.
   var pendingEmailLogin = null;
 
-  // Open the complete-account flow after a successful password but an unverified/missing email.
-  // hasEmail (from the server details) picks the prefill hint text.
-  function openEmailCompletion(user, pass, hasEmail) {
-    pendingEmailLogin = { username: user, password: pass };
+  // Open the email step of the sign-in flow. Two modes share the same two-step sub-view:
+  //   'attach'   — an existing account logged in with the right password but still needs a verified
+  //                email (legacy account with none, or an unverified one). step1 → attach-email.
+  //   'register' — a brand-new account under the email gate: there is nothing to create yet, so
+  //                step1 → POST /v1/ghii (with the email) actually creates the account + sends the
+  //                code. Both modes finish identically: verify-email → password login.
+  // hasEmail (attach mode, from server details) picks the prefill hint text; displayName carries the
+  // display name typed on the login form into the register POST.
+  function openEmailCompletion(user, pass, hasEmail, mode, displayName) {
+    pendingEmailLogin = { username: user, password: pass, mode: mode || 'attach', displayName: displayName || user };
     showView('email');
     document.getElementById('aimeat-em-step1').style.display = '';
     document.getElementById('aimeat-em-step2').style.display = 'none';
     var emailInput = document.getElementById('aimeat-em-email');
     emailInput.value = '';
+    var titleEl = document.querySelector('#aimeat-em-step1 h3');
     var desc = document.querySelector('#aimeat-em-step1 p');
-    if (desc) {
-      desc.textContent = hasEmail
-        ? (i.completeAccountDescResend || 'Confirm your email to finish signing in. We\\u2019ll send a verification code — edit the address if it\\u2019s wrong.')
-        : (i.completeAccountDesc || 'Add an email to finish setting up your account. We\\u2019ll send a verification code to confirm it.');
+    if (pendingEmailLogin.mode === 'register') {
+      if (titleEl) titleEl.textContent = i.registerEmailTitle || 'Add your email';
+      if (desc) desc.textContent = i.registerEmailDesc || 'Enter your email to create your account. We\\u2019ll send a verification code to confirm it.';
+    } else {
+      if (titleEl) titleEl.textContent = i.completeAccountTitle || 'One last step';
+      if (desc) {
+        desc.textContent = hasEmail
+          ? (i.completeAccountDescResend || 'Confirm your email to finish signing in. We\\u2019ll send a verification code — edit the address if it\\u2019s wrong.')
+          : (i.completeAccountDesc || 'Add an email to finish setting up your account. We\\u2019ll send a verification code to confirm it.');
+      }
     }
     document.getElementById('aimeat-em-err').style.display = 'none';
     setTimeout(function () { emailInput.focus(); }, 50);
@@ -178,10 +195,27 @@ export function aimeatAuthLibPart3(): string {
     btn.textContent = i.working || 'Working...';
     btn.disabled = true;
     try {
-      var res = await api('/v1/ghii/login/attach-email', {
-        method: 'POST',
-        body: JSON.stringify({ username: pendingEmailLogin.username, password: pendingEmailLogin.password, email: email }),
-      });
+      var res;
+      if (pendingEmailLogin.mode === 'register') {
+        // Brand-new account under the email gate: create it now WITH the email. The node records the
+        // (unverified) email, sends a code, and returns a verification_id — it does NOT log us in
+        // (the gate holds until verify-email lifts verificationLevel to 1, then we password-login).
+        res = await api('/v1/ghii', {
+          method: 'POST',
+          credentials: 'include',
+          body: JSON.stringify({
+            username: pendingEmailLogin.username,
+            display_name: pendingEmailLogin.displayName,
+            password: pendingEmailLogin.password,
+            email: email,
+          }),
+        });
+      } else {
+        res = await api('/v1/ghii/login/attach-email', {
+          method: 'POST',
+          body: JSON.stringify({ username: pendingEmailLogin.username, password: pendingEmailLogin.password, email: email }),
+        });
+      }
       // Keep the id — /v1/ghii/verify-email requires it to confirm the code.
       pendingEmailLogin.verificationId = res.data && res.data.verification_id;
       document.getElementById('aimeat-em-step1').style.display = 'none';
@@ -378,6 +412,15 @@ export function aimeatAuthLibPart3(): string {
       renderBtn();
       if (opts.onLogin) opts.onLogin(session);
     } catch(e) {
+      // Email gate on + a genuinely new username → the node refuses to create the account without a
+      // verified email. Open the email step (register mode) to collect one, create the account, and
+      // verify — instead of dead-ending at the raw EMAIL_REQUIRED error.
+      if (e.code === 'EMAIL_REQUIRED') {
+        btn.textContent = i.signInBtn || 'Sign In / Register';
+        btn.disabled = false;
+        openEmailCompletion(username, password, false, 'register', displayName);
+        return;
+      }
       // If NAME_TAKEN, try logging in with password
       if (e.message.includes('already registered') || e.message.includes('NAME_TAKEN')) {
         try {
@@ -446,8 +489,8 @@ function showSignupNoticeModal(i, opts) {
     + '.aimeat-cancel{padding:12px 20px;background:none;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:10px;cursor:pointer;font-size:15px;font-weight:500;font-family:DM Sans,system-ui,sans-serif;transition:background .15s}'
     + '.aimeat-cancel:hover{background:#F3F4F6}'
     + '</style>'
-    + '<div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px">'
-    + '<div style="background:#FFFFFF;border-radius:16px;max-width:440px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05)">'
+    + '<div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px">'
+    + '<div style="background:#FFFFFF;border-radius:16px;max-width:440px;width:100%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05)">'
     + '<div style="padding:28px 32px 24px">'
     + '<h2 style="margin:0 0 8px;font-size:21px;font-weight:800;color:#1A1A2E">' + escHtml(opts.title || '') + '</h2>'
     + '<p style="margin:0 0 18px;font-size:14px;color:#6B7280;line-height:1.55">' + escHtml(opts.body || '') + '</p>'
@@ -504,8 +547,8 @@ function showGoogleSignupModal(pending, i) {
     + '.aimeat-cancel{padding:12px 20px;background:none;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:10px;cursor:pointer;font-size:15px;font-weight:500;font-family:DM Sans,system-ui,sans-serif;transition:background .15s}'
     + '.aimeat-cancel:hover{background:#F3F4F6}'
     + '</style>'
-    + '<div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:center;justify-content:center;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px">'
-    + '<div style="background:#FFFFFF;border-radius:16px;max-width:440px;width:100%;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05)">'
+    + '<div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px">'
+    + '<div style="background:#FFFFFF;border-radius:16px;max-width:440px;width:100%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05)">'
     + '<div style="padding:28px 32px 24px">'
     + '<h2 style="margin:0 0 8px;font-size:21px;font-weight:800;color:#1A1A2E">' + escHtml(i.signupTitle || 'Choose your username') + '</h2>'
     + '<p style="margin:0 0 6px;font-size:14px;color:#6B7280;line-height:1.5">' + escHtml(i.signupIntro || "You're signing in for the first time. Pick the username for your AIMEAT account.") + '</p>'
