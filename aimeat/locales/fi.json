@@ -148,6 +148,8 @@
   "admin.messages.detail": "Lisätieto",
   "admin.messages.none": "Ei toimituksia vielä.",
   "inbox.attach": "Liitä tiedosto",
+  "inbox.expand": "Suurenna editori",
+  "inbox.collapse": "Pienennä editori",
   "inbox.today": "Tänään",
   "inbox.yesterday": "Eilen",
   "inbox.youPrefix": "Sinä:",
