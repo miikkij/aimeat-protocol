@@ -14,6 +14,7 @@
  *   v1.2.0 -- 2026-07-10 -- Remove the deleted Secretary/Specialists/use-case-Template suites
  *            (e2e-secretary, e2e-secretary-disabled, e2e-specialists, e2e-organism-templates,
  *            e2e-b2b-sales-hub-template) and the AIMEAT_SECRETARY_ENABLED env pin.
+ *   v1.3.0 -- 2026-07-19 -- Add e2e-appdev-pitfalls.ts (AppDev Knowledge Base Phase 1).
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -83,6 +84,7 @@ const ALL_SUITES = [
     'test/e2e-knowledge.ts',
     'test/e2e-libs.ts',
     'test/e2e-library-packs.ts',
+    'test/e2e-appdev-pitfalls.ts',
     'test/e2e-mcp.ts',
     'test/e2e-mcp-scopes.ts',
     'test/e2e-mcp-v2.ts',

@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.5.0 — 2026-07-19 — Mount appdevPitfallsRouter (/v1/appdev/pitfalls, AppDev KB Phase 1)
  *   v1.4.0 — 2026-07-14 — Mount agentSkillsDiscoveryRouter (/.well-known/agent-skills, RFC v0.2.0)
  *   v1.3.0 — 2026-07-14 — Register the app-tool sellable resolver (TARGET-034 phase A)
  *   v1.2.0 — 2026-07-13 — Commerce core (TARGET-033): payment-handler registry + commerceRouter mount
@@ -91,6 +92,7 @@ import { chatInstancesRouter } from '../routes/chat-instances.js';
 import { totpRouter } from '../routes/totp.js';
 import { libsRouter } from '../routes/libs.js';
 import { appTemplatesRouter } from '../routes/app-templates.js';
+import { appdevPitfallsRouter } from '../routes/appdev-pitfalls.js';
 import { libraryPacksRouter } from '../routes/library-packs.js';
 import { appsRouter } from '../routes/apps.js';
 import { appStoreRouter } from '../routes/app-store.js';
@@ -570,6 +572,7 @@ export async function mountRoutes(
   app.use(chatInstancesRouter(config, storage));
   app.use(libsRouter(config, storage));
   app.use(appTemplatesRouter(config, storage));
+  app.use(appdevPitfallsRouter(config));
   app.use(libraryPacksRouter(config, storage));
   // Backup routes BEFORE appsRouter so /v1/apps/backup/* never collides with
   // the parameterized /v1/apps/:owner/:filename routes.
