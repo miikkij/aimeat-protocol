@@ -6937,6 +6937,54 @@ paths:
         '404':
           description: No such template
 
+  /v1/appdev/pitfalls:
+    get:
+      operationId: listAppdevPitfalls
+      summary: Curated appdev-pitfall registry index
+      description: >-
+        Platform-level "what bites app builders" knowledge for AI agents building apps ON AIMEAT
+        (apps, extensions, cortexes — never node development). Paginated index with total and
+        facet counts (per applies-to scope and severity), sorted critical → warn → info.
+        Public (CORS *).
+      tags:
+        - Discovery
+      parameters:
+        - name: applies_to
+          in: query
+          schema: { type: string, enum: [app, auth, ext, cortex, iam, realtime, ai, mobile, publish] }
+        - name: severity
+          in: query
+          schema: { type: string, enum: [info, warn, critical] }
+        - name: limit
+          in: query
+          schema: { type: integer, default: 25, maximum: 100 }
+        - name: offset
+          in: query
+          schema: { type: integer, default: 0 }
+        - name: include_outdated
+          in: query
+          schema: { type: boolean, default: false }
+      responses:
+        '200':
+          description: Paginated pitfall index (data.pitfalls, data.total, data.facets)
+
+  /v1/appdev/pitfalls/{id}:
+    get:
+      operationId: getAppdevPitfall
+      summary: One curated appdev pitfall (full entry)
+      tags:
+        - Discovery
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: The pitfall entry (data.pitfall)
+        '404':
+          description: No such pitfall
+
   # ── Memory ─────────────────────────────────────────────────
   /v1/memory:
     post:
