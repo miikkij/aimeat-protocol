@@ -2,7 +2,8 @@
 # @file scripts/setup.sh
 # @description One-shot bootstrap for the AIMEAT-boosted OpenHands. Idempotent — safe to re-run.
 #   1) ensure .env exists  2) connect to AIMEAT (device auth)  3) render config + install skill
-#   4) bring the stack up. After this, OpenHands is permanently wired to AIMEAT.
+#   4) bring the stack up  5) post-up: install user microagent + preconfigure GUI LLM profile.
+#   After this, OpenHands is permanently wired to AIMEAT.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -43,6 +44,12 @@ bash scripts/build-runtime.sh
 # 4) up
 echo "== Starting OpenHands =="
 docker compose up -d
+
+# 5) post-up: install user microagent so the GUI Skills tab lists aimeat-app-builder, and
+# preconfigure the LLM (settings + named profile) so Settings > LLM is not blank on first open.
+echo "== Post-up configuration =="
+bash scripts/postup.sh
+
 echo
 echo "Open http://localhost:3000  (or http://<this-host-ip>:3000 from another machine)."
 echo "Ask it: \"Build an AIMEAT app that ...\" and it will fetch the spec, build, and publish."
