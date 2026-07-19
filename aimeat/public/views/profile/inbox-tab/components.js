@@ -25,6 +25,8 @@
  *   v1.6.0 — 2026-07-19 — Composer gets an expand toggle (⤢/⤡): enlarges the editor to ~60% of the
  *     viewport so long/formatted drafts are fully visible. Rich mode resizes via Toast UI `setHeight`;
  *     the markdown fallback + simple textarea grow via the `.inbox-composer--tall` class / lifted cap.
+ *   v1.7.0 — 2026-07-19 — ConversationToNotebookPopover: capture a whole thread (with images) into the
+ *     Notebook via three modes — server-side AI summary (owner's key), copy-prompt (own chat), or raw.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -612,6 +614,90 @@ export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
         <div class="inbox-ai-actions">
           <button class="btn-primary btn-sm" onClick=${copy}>${copied ? '✓ ' + t('inbox.ai.copied') : '📋 ' + t('inbox.ai.copy')}</button>
         </div>
+      </div>
+    </div>`;
+}
+
+/* ── Conversation → Notebook — capture a WHOLE thread (with its images) into the notebook for later
+ *    filing/enrichment into a workspace. Three modes, all landing in parkConversationToNotebook:
+ *      ✨ ai   — summarize server-side with the owner's own OpenRouter key (runServerSummary), edit, park.
+ *      📋 copy — copy the summary prompt into the owner's own AI chat, paste the result back, park.
+ *      📥 raw  — park the whole chain (text + images) as-is; enrich it later in the Notebook.
+ *    The parent (InboxTab) owns the async work (AI call + park + toasts) via the passed callbacks. ── */
+export function ConversationToNotebookPopover({ title, promptText, runServerSummary, parkConversation, onClose, showToast }) {
+  const [mode, setMode] = useState('ai');       // 'ai' | 'copy' | 'raw'
+  const [copied, setCopied] = useState(false);
+  const [aiSummary, setAiSummary] = useState('');
+  const [pasted, setPasted] = useState('');
+  const [running, setRunning] = useState(false);
+  const [parking, setParking] = useState(false);
+
+  const copy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(promptText);
+      else { const ta = document.createElement('textarea'); ta.value = promptText; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+      setCopied(true); setTimeout(() => setCopied(false), 1800);
+      showToast?.(t('inbox.ai.copied'));
+    } catch { showToast?.(t('inbox.failed'), true); }
+  };
+
+  const genSummary = async () => {
+    setRunning(true);
+    try {
+      const s = await runServerSummary();
+      if (s && s.trim()) setAiSummary(s.trim());
+      else showToast?.(t('inbox.notebook.summaryEmpty'), true);
+    } catch (e) { showToast?.(e?.message || t('inbox.failed'), true); }
+    finally { setRunning(false); }
+  };
+
+  const doPark = async (summary) => {
+    setParking(true);
+    try { await parkConversation({ summary: summary || '' }); showToast?.(t('inbox.notebook.parked')); onClose(); }
+    catch (e) { showToast?.(e?.message || t('inbox.failed'), true); setParking(false); }
+  };
+
+  return html`
+    <div class="inbox-ai-overlay" onClick=${onClose}>
+      <div class="inbox-ai-modal" onClick=${(e) => e.stopPropagation()}>
+        <div class="inbox-ai-head">
+          <span class="inbox-ai-title">📓 ${title}</span>
+          <button class="btn-ghost btn-sm" onClick=${onClose} title=${t('inbox.close')}>✕</button>
+        </div>
+        <div class="inbox-ai-modes">
+          <button class=${`inbox-ai-mode${mode === 'ai' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('ai')}>✨ ${t('inbox.notebook.modeAi')}</button>
+          <button class=${`inbox-ai-mode${mode === 'copy' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('copy')}>📋 ${t('inbox.notebook.modeCopy')}</button>
+          <button class=${`inbox-ai-mode${mode === 'raw' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('raw')}>📥 ${t('inbox.notebook.modeRaw')}</button>
+        </div>
+        ${mode === 'ai' ? html`
+          <div class="inbox-ai-hint">${t('inbox.notebook.hintAi')}</div>
+          ${!aiSummary ? html`
+            <div class="inbox-ai-actions">
+              <button class="btn-primary btn-sm" disabled=${running} onClick=${genSummary}>${running ? '… ' + t('inbox.notebook.summarizing') : '✨ ' + t('inbox.notebook.genSummary')}</button>
+            </div>`
+          : html`
+            <textarea class="inbox-ai-text" rows="12" value=${aiSummary} onInput=${(e) => setAiSummary(e.target.value)}></textarea>
+            <div class="inbox-ai-actions">
+              <button class="btn-ghost btn-sm" disabled=${running} onClick=${genSummary}>${running ? '…' : '↻ ' + t('inbox.notebook.regen')}</button>
+              <button class="btn-primary btn-sm" disabled=${parking} onClick=${() => doPark(aiSummary)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}</button>
+            </div>`}
+        ` : mode === 'copy' ? html`
+          <div class="inbox-ai-hint">${t('inbox.notebook.hintCopy')}</div>
+          <textarea class="inbox-ai-text" readOnly rows="8" value=${promptText}></textarea>
+          <div class="inbox-ai-actions">
+            <button class="btn-primary btn-sm" onClick=${copy}>${copied ? '✓ ' + t('inbox.ai.copied') : '📋 ' + t('inbox.ai.copy')}</button>
+          </div>
+          <div class="inbox-ai-hint">${t('inbox.notebook.pasteHint')}</div>
+          <textarea class="inbox-ai-text" rows="8" placeholder=${t('inbox.notebook.pastePh')} value=${pasted} onInput=${(e) => setPasted(e.target.value)}></textarea>
+          <div class="inbox-ai-actions">
+            <button class="btn-primary btn-sm" disabled=${parking || !pasted.trim()} onClick=${() => doPark(pasted)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}</button>
+          </div>
+        ` : html`
+          <div class="inbox-ai-hint">${t('inbox.notebook.hintRaw')}</div>
+          <div class="inbox-ai-actions">
+            <button class="btn-primary btn-sm" disabled=${parking} onClick=${() => doPark('')}>${parking ? '…' : '📥 ' + t('inbox.notebook.parkRaw')}</button>
+          </div>
+        `}
       </div>
     </div>`;
 }
