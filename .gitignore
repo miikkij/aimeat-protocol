@@ -163,3 +163,9 @@ aimeat/tools/aeb/runs/
 genimages/
 scripts/.env
 
+
+# SDK-libs migration: the served IIFE bundles under src/static/sdk-libs/dist/ ARE committed
+# (same model as the committed src/static/app-catalog.html), kept fresh by `pnpm check:sdk` in the
+# pre-commit hook + CI. Re-include them from the blanket `dist/` rule above.
+!aimeat/src/static/sdk-libs/dist/
+!aimeat/src/static/sdk-libs/dist/**

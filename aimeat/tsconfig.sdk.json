@@ -1,0 +1,26 @@
+{
+  // @file tsconfig.sdk.json
+  // @description Type-checking config for the served browser SDK libraries authored as real,
+  //   JSDoc-annotated ESM under src/static/sdk-libs/. The browser loads the esbuild-bundled IIFE
+  //   (src/static/sdk-libs/dist/, excluded here — it is generated), but this config runs
+  //   `tsc --noEmit` (checkJs) over the SOURCE so the type-safety the old JS-in-a-string form
+  //   never had is actually enforced. It emits nothing. Mirrors tsconfig.frontend.json.
+  // @usage  pnpm typecheck:sdk   (and in the pre-commit hook + CI alongside the other typechecks)
+  // @version-history
+  //   v1.0.0 — 2026-07-19 — Initial SDK-libs type-checking config (checkJs, DOM libs, dist excluded).
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "allowJs": true,
+    "checkJs": true,
+    "noEmit": true,
+    "strict": false,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "types": []
+  },
+  "include": ["src/static/sdk-libs/**/*.js", "src/static/sdk-libs/**/*.d.ts"],
+  "exclude": ["node_modules", "src/static/sdk-libs/dist/**"]
+}

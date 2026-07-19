@@ -27,7 +27,12 @@ export default tseslint.config(
       'dist/**',
       'node_modules/**',
       'test/**',
-      'src/static/**',
+      // src/static is not our source EXCEPT the SDK-libs migration sources (real, JSDoc-typed
+      // ESM under src/static/sdk-libs/, which we DO lint — 800-line + header rules apply). Keep
+      // everything else under src/static ignored, and ignore the generated dist bundles.
+      'src/static/app-catalog/**',
+      'src/static/*.js',
+      'src/static/sdk-libs/dist/**',
       'src/generated/**',
       // kysely-codegen output (the typed DB schema) — generated, do not lint.
       'src/storage/providers/*/db-types.ts',
@@ -81,6 +86,16 @@ export default tseslint.config(
       'no-useless-escape': 'error',
       'preserve-caught-error': 'error',
       'no-useless-assignment': 'error',
+    },
+  },
+  {
+    // The served SDK libraries (src/static/sdk-libs/) are browser ESM, type-checked by
+    // tsconfig.sdk.json (checkJs). As with public/, eslint's no-undef can't see the browser/SDK
+    // globals (window, document, speechSynthesis, MediaRecorder, AIMEAT, …) and would only flood
+    // with false positives tsc already covers — defer it to tsc. dist/ bundles are ignored above.
+    files: ['src/static/sdk-libs/**/*.js'],
+    rules: {
+      'no-undef': 'off',
     },
   },
 );
