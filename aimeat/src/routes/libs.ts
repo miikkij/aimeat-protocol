@@ -163,7 +163,8 @@ import { aimeatCommerceLib } from './lib-commerce.js';
 import { aimeatWebmcpLib } from './lib-webmcp.js';
 import { aimeatAgentFaceLib } from './lib-agentface.js';
 import { aimeatAuthLib } from './libs/auth-lib.js';
-import { sdkLibSource } from './libs/sdk-serve.js';
+import { sdkLibSource, configPrelude, readSdkBundle } from './libs/sdk-serve.js';
+import { listEnabledProviderMeta } from '../services/oidc-providers.js';
 import { buildLibsCatalogue } from '../data/library-packs.js';
 
 function sendJavascriptLibrary(res: Response, source: string): void {
@@ -180,9 +181,14 @@ function sendJavascriptLibrary(res: Response, source: string): void {
 export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   const router = Router();
 
-  // GET /v1/libs/aimeat-auth.js — Auth helper library
-  router.get('/v1/libs/aimeat-auth.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatAuthLib(config));
+  // GET /v1/libs/aimeat-auth.js — Auth helper library (migrated: src/static/sdk-libs/auth/; ?impl=legacy).
+  // Prepends the standard config prelude PLUS an auth-specific one carrying the node's enabled OIDC
+  // providers (server-computed — the generic prelude only has nodeId/baseUrl), which auth/config.js
+  // reads as window.__AIMEAT_AUTH_CFG__.providers.
+  router.get('/v1/libs/aimeat-auth.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatAuthLib(config)); return; }
+    const authCfg = `window.__AIMEAT_AUTH_CFG__=${JSON.stringify({ providers: listEnabledProviderMeta(config) })};\n`;
+    sendJavascriptLibrary(res, configPrelude(config) + authCfg + readSdkBundle('auth'));
   });
 
   // GET /v1/libs/aimeat-webmcp.js — WebMCP bridge (expose app/node tools to in-browser agents;
