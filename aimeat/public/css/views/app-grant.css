@@ -4,6 +4,7 @@
  *   screen where an owner reviews a published app's requested scopes (H-2 Phase 3).
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 3).
+ *   v1.1.0 — 2026-07-19 — Own-app badge variant + "new" chip for newly requested scopes.
  */
 
 .agr-wrap { max-width: 540px; margin: 3rem auto; padding: 0 1.25rem; }
@@ -63,6 +64,23 @@
   border-radius: 999px;
   padding: 0.18rem 0.6rem;
   margin-bottom: 0.6rem;
+}
+/* The signed-in owner's OWN app — reassuring, not warning */
+.agr-badge-own { color: var(--success, #3dbf6e); }
+
+/* Chip on a scope the app requests but the existing grant doesn't hold yet */
+.agr-scope-newbadge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 0 0.4rem;
+  margin-left: 0.45rem;
+  vertical-align: 0.08em;
 }
 
 /* Advanced toggle (link-style button) */
