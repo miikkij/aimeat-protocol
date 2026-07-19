@@ -663,7 +663,9 @@ await test('GET /v1/libs/aimeat-editor.js — serves CM6 editor with fallback', 
     const res = await fetch(`${BASE}/v1/libs/aimeat-editor.js`);
     assert(res.ok, `editor lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.editor'), 'should expose AIMEAT.editor');
+    // Componentized (SDK-libs migration): attaches via _core `attach('editor', …)` rather than a
+    // literal `AIMEAT.editor =`, so assert on the stable editor-surface marker (split) instead.
+    assert(text.includes('split'), 'should expose the editor API (split)');
     assert(text.includes('codemirror@6.0.2'), 'CM6 must be exact-pinned (the @6 range resolves to CM5 on esm.sh)');
     assert(text.includes('textarea'), 'should include the textarea fallback');
     assert(text.includes('toolbar'), 'should include the toolbar builder');

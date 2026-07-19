@@ -197,10 +197,10 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, sdkLibSource(config, 'agentface'));
   });
 
-  // GET /v1/libs/aimeat-header.js — Drop-in canonical site header (nav + theme +
-  // language + live login pill) for standalone pages such as custom portal templates.
-  router.get('/v1/libs/aimeat-header.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatHeaderLib(config));
+  // GET /v1/libs/aimeat-header.js — Drop-in canonical site header (migrated: sdk-libs/header/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-header.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatHeaderLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'header'));
   });
 
   // GET /v1/libs/portfolio-standalone.js — bridge shim injected into portfolios
@@ -303,14 +303,16 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
     sendJavascriptLibrary(res, sdkLibSource(config, 'intake'));
   });
 
-  // GET /v1/libs/aimeat-editor.js — markdown editor (CodeMirror 6 + toolbar + split preview)
-  router.get('/v1/libs/aimeat-editor.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatEditorLib(config));
+  // GET /v1/libs/aimeat-editor.js — markdown editor (migrated: sdk-libs/editor/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-editor.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatEditorLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'editor'));
   });
 
-  // GET /v1/libs/aimeat-live.js — realtime live-updates (SSE subscribe helper, TARGET-012)
-  router.get('/v1/libs/aimeat-live.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatLiveLib(config));
+  // GET /v1/libs/aimeat-live.js — realtime live-updates (migrated: sdk-libs/live/; ?impl=legacy)
+  router.get('/v1/libs/aimeat-live.js', (req, res) => {
+    if (req.query.impl === 'legacy') { sendJavascriptLibrary(res, aimeatLiveLib(config)); return; }
+    sendJavascriptLibrary(res, sdkLibSource(config, 'live'));
   });
 
   // GET /v1/libs/aimeat-commerce.js — checkout sessions, offer prices, money formatting (TARGET-033)
