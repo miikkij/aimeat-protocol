@@ -198,6 +198,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_knowledge_get: { title: 'Read Knowledge Package', readOnlyHint: true },
     aimeat_knowledge_links: { title: 'Get Knowledge Links', readOnlyHint: true },
     aimeat_knowledge_contribute: { title: 'Contribute to Knowledge Package', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_appdev_overview: { title: 'AppDev Research Overview', readOnlyHint: true },
     aimeat_appdev_pitfall_report: { title: 'Report AppDev Pitfall', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_appdev_pitfall_list: { title: 'List AppDev Pitfalls', readOnlyHint: true },
     aimeat_appdev_pitfall_delete: { title: 'Delete AppDev Pitfall', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },

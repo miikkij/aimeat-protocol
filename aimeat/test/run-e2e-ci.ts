@@ -85,6 +85,7 @@ const ALL_SUITES = [
     'test/e2e-libs.ts',
     'test/e2e-library-packs.ts',
     'test/e2e-appdev-pitfalls.ts',
+    'test/e2e-appdev-overview.ts',
     'test/e2e-mcp.ts',
     'test/e2e-mcp-scopes.ts',
     'test/e2e-mcp-v2.ts',
