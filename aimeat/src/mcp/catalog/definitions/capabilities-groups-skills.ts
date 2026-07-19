@@ -458,9 +458,9 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_operator_agent_configure',
-        description: 'Configure a same-owner agent with PROPOSE-THEN-CONFIRM. Without confirm_token nothing is applied: the tool returns the current state, the proposed state, a field-level diff, and a single-use confirm_token (10 min TTL) bound to exactly this change — show the diff to the owner. Calling again with the same arguments plus the token applies it; changing anything invalidates the token. Configurable: display_name, description, mode, tags, scopes. Scope changes may only NARROW the granted set — adding scopes remains an owner approval in the profile UI.',
+        description: 'Configure a same-owner agent with PROPOSE-THEN-CONFIRM. Without confirm_token nothing is applied: the tool returns the current state, the proposed state, a field-level diff, and a single-use confirm_token (10 min TTL) bound to exactly this change — show the diff to the owner. Calling again with the same arguments plus the token applies it; changing anything invalidates the token. Configurable: display_name, description, mode, tags, scopes. Scope changes may only NARROW the granted set — adding scopes remains an owner approval in the profile UI. (Connector/CLI apply directly through the per-field routes, which carry the same owner/operator authz; display_name/description are shell-unsupported.)',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {
             agent_name: { type: 'string', required: true, description: 'Which same-owner agent to configure.' },
             display_name: { type: 'string', description: 'New display name.' },
@@ -473,9 +473,9 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_operator_ai_config',
-        description: 'Inspect or change the owner\'s AI routing + daily budget with PROPOSE-THEN-CONFIRM. With no fields: returns the current safe view (daily_budget_usd, model, reasoning_model, execution_model). With fields but no confirm_token: applies NOTHING — returns current/proposed/diff + a single-use token (10 min) bound to exactly this change; show the diff to the owner. With the token: applies. The API key is stored separately and can NEVER be read or changed through this tool.',
+        description: 'Inspect or change the owner\'s AI routing + daily budget with PROPOSE-THEN-CONFIRM. With no fields: returns the current safe view (daily_budget_usd, model, reasoning_model, execution_model). With fields but no confirm_token: applies NOTHING — returns current/proposed/diff + a single-use token (10 min) bound to exactly this change; show the diff to the owner. With the token: applies. The API key is stored separately and can NEVER be read or changed through this tool. (Connector/CLI apply the daily budget directly via the owner-gated route; model routing is shell-unsupported.)',
         caller: 'agent',
-        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        visibility: { publicMcp: true, connectorMcp: true, cliFallback: true },
         input: {
             daily_budget_usd: { type: 'number', description: 'Daily AI spend cap in USD (0-1000).' },
             model: { type: 'string', description: 'Default model id.' },

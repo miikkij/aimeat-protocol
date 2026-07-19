@@ -2,6 +2,10 @@
  * @file cli/connect/tool-call-defs-agent.ts
  * @description Onboarding, agent, message, DM and task connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 -- 2026-07-19 -- Add shell handlers for operator_agent_configure + operator_ai_config so an
+ *     operator-privileged principal can configure the system via `aimeat connect call`. Direct-apply
+ *     through the per-field routes (PATCH /v1/agents/:name/{mode,tags,scopes}, POST /v1/ai/settings);
+ *     scopes is requireRole('owner') which the role hierarchy also admits operators — a plain agent 403s.
  *   v1.1.0 -- 2026-07-19 -- Connector reachability: shell handlers for message_history, dm_send_as_owner,
  *     and feedback send/inbox — thin REST proxies (contacts stay connector-MCP-only, not cliFallback).
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
@@ -415,4 +419,39 @@ export const agentTools: ConnectCliToolDefinition[] = [
     // NOTE: the owner contacts (aimeat_contact_*) are NOT cliFallback — they are exposed on the connector
     // MCP surface (mcp/tools/contacts.ts) but intentionally have no `aimeat connect call` shell handler,
     // so no orphan handler is added here.
+    {
+        // Operator config-enactment. The server MCP tool runs propose-then-confirm with no single REST
+        // route; the shell path APPLIES DIRECTLY through the per-field routes that exist —
+        // PATCH /v1/agents/:name/{mode,tags,scopes}. Those routes carry the real authz (scopes is
+        // requireRole('owner'); mode/tags are same-owner), so only an owner/operator principal can enact
+        // a change — a plain agent token gets 403. display_name/description have no route (shell-unsupported).
+        name: 'aimeat_operator_agent_configure',
+        handler: async ({ client }, input) => {
+            const target = requiredString(input, 'agent_name');
+            const applied: JsonObject = {};
+            const unsupported: string[] = [];
+            const mode = optionalString(input, 'mode');
+            if (mode !== undefined) applied.mode = (await client.patch(`/v1/agents/${encodeURIComponent(target)}/mode`, { mode })).data ?? 'ok';
+            const tags = optionalArray(input, 'tags');
+            if (tags !== undefined) applied.tags = (await client.patch(`/v1/agents/${encodeURIComponent(target)}/tags`, { tags })).data ?? 'ok';
+            const scopes = optionalArray(input, 'scopes');
+            if (scopes !== undefined) applied.scopes = (await client.patch(`/v1/agents/${encodeURIComponent(target)}/scopes`, { scopes })).data ?? 'ok';
+            if (optionalString(input, 'display_name') !== undefined) unsupported.push('display_name');
+            if (optionalString(input, 'description') !== undefined) unsupported.push('description');
+            return { ok: true as const, data: { agent: target, applied, ...(unsupported.length ? { unsupported, note: 'These fields have no REST route — use the server MCP tool or the profile UI.' } : {}) } };
+        },
+    },
+    {
+        // Owner AI budget/routing. daily_budget_usd applies via POST /v1/ai/settings (owner-gated);
+        // model routing has no REST route (shell-unsupported — set it via the profile UI or server MCP).
+        name: 'aimeat_operator_ai_config',
+        handler: async ({ client }, input) => {
+            const applied: JsonObject = {};
+            const unsupported: string[] = [];
+            const budget = optionalNumber(input, 'daily_budget_usd');
+            if (budget !== undefined) applied.ai_settings = (await client.post('/v1/ai/settings', { daily_budget_usd: budget })).data ?? 'ok';
+            for (const k of ['model', 'reasoning_model', 'execution_model']) if (optionalString(input, k) !== undefined) unsupported.push(k);
+            return { ok: true as const, data: { applied, ...(unsupported.length ? { unsupported, note: 'Model routing has no REST route — set it via the profile UI or the server MCP tool.' } : {}) } };
+        },
+    },
 ];
