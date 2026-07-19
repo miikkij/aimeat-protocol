@@ -2,6 +2,9 @@
  * @file public/views/profile/landing-page.cards.js
  * @description Profile home dashboard cards, home sub-components, and the sidebar group model. Extracted from landing-page.js to satisfy max-file-lines.
  * @version-history
+ *   2026-07-19 — Re-add the orphaned OpenRouter Settings item (route id 'generator') to the Build & Share
+ *     group — it lost its menu entry when the Generator feature was removed, leaving the AI-provider key
+ *     config reachable only by deep link.
  *   2026-07-19 — AppDev tab (KB UI): learned-pitfall + template management surface, start-prompt copy, model badge
  *   v1.2.0 — 2026-07-16 — Drop the per-item emoji icons from SIDEBAR_GROUPS and the Inbox nav
  *     button — the sidebar renders label-only now.
@@ -591,6 +594,10 @@ export const SIDEBAR_GROUPS = [
     { id: 'skills', labelKey: 'skills.tabLabel' },
     { id: 'packages', labelKey: 'profile.tabs.packages' },
     { id: 'portfolio', labelKey: 'portfolio.tabLabel' },
+    /* AI-provider (OpenRouter) key + spend budget. Route id is still 'generator' — the Generator tab
+     * was repurposed to host only these settings when the Generator feature was removed (2026-07-18).
+     * Re-added to the menu 2026-07-19 after it was orphaned (reachable only by ?tab=generator). */
+    { id: 'generator', labelKey: 'profile.generator.openrouter.title' },
     { id: 'calibrator', labelKey: 'profile.calibrator.tabLabel' },
     /* TODO(owner 2026-06-10): "work" placement is undecided — parked at the bottom of
      * Build & Share until re-evaluated. */
