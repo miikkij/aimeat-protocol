@@ -6821,6 +6821,27 @@ paths:
         '200':
           description: The build prompt (JSON envelope with prompt + body, or text/plain with format=txt)
 
+  /v1/prompts/appdev-flow:
+    get:
+      operationId: getAppdevFlowPrompt
+      summary: Research-first appdev flow prompt (paste-able)
+      description: >-
+        The paste-able flow prompt a user gives an MCP-connected coding agent (Claude Code,
+        OpenHands, Cursor) so every AIMEAT app build follows research → frame → propose →
+        build → finish instead of coding cold: load node:aimeat-app-builder, call
+        aimeat_appdev_overview, frame the tier/packs/iam decision, propose, build, then finish
+        with agent face + template proposal + pitfall report. The user can always skip. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the prompt as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The flow prompt (JSON envelope, or text/plain with format=txt)
+
   /v1/library-packs:
     get:
       operationId: listLibraryPacks

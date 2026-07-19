@@ -227,6 +227,8 @@ export function bootstrapRouter(
               builder_skill: 'node:aimeat-app-builder (aimeat_skill_get) — the paved-path workflow skill',
               starter_templates_endpoint: `${base}/v1/app-templates`,
               pitfalls_endpoint: `${base}/v1/appdev/pitfalls`,
+              research_overview: `${base}/v1/appdev/overview (MCP: aimeat_appdev_overview) — ONE call: your apps, packs with per-model proofs, templates, pitfalls`,
+              flow_prompt: `${base}/v1/prompts/appdev-flow — paste-able research-first flow for MCP coding agents (research → frame → propose → build → finish)`,
               // Derived from the library-pack registry (src/data/library-packs.ts) — the
               // pre-registry hardcoded copy of this list had drifted from the build prompt.
               sdk_libraries: buildSdkLibrariesList(base),

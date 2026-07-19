@@ -29,6 +29,7 @@ import { isV2Role, V2_ROLES } from '../mcp/catalog/surfaces.js';
 import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
 import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
 import { buildAppPrompt } from '../services/build-app-prompt.js';
+import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -256,6 +257,29 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Starter templates (use-case scaffolds + app shells)', method: 'GET', url: '/v1/app-templates' },
       { description: 'Publish the finished app', method: 'POST', url: '/v1/apps' },
+    ]));
+  });
+
+  // GET /v1/prompts/appdev-flow — the paste-able research-first flow prompt: what a user gives
+  // Claude Code / OpenHands to make MCP-connected app building start from research (existing
+  // apps, packs, pitfalls) instead of cold. Public. ?format=txt for raw text/plain.
+  // MUST be registered before /v1/prompts/:tier.
+  router.get('/v1/prompts/appdev-flow', (req, res) => {
+    const prompt = buildAppdevFlowPrompt(config);
+    if (req.query.format === 'txt') {
+      res.type('text/plain; charset=utf-8').send(prompt);
+      return;
+    }
+    res.json(success(config.nodeId, {
+      id: 'appdev-flow',
+      name: 'AIMEAT research-first app development flow',
+      description: 'Paste this to an MCP-connected coding agent (Claude Code, OpenHands, Cursor) so every AIMEAT app build starts with research (research → frame → propose → build → finish). Skippable by the user at any time.',
+      prompt,
+      system_prompt: prompt,
+    }, [
+      { description: 'The canonical build spec', method: 'GET', url: '/v1/prompts/build-app' },
+      { description: 'The one-call research surface (MCP: aimeat_appdev_overview)', method: 'GET', url: '/v1/appdev/overview' },
+      { description: 'Curated pitfalls', method: 'GET', url: '/v1/appdev/pitfalls' },
     ]));
   });
 
