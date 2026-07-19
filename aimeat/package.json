@@ -21,6 +21,7 @@
     "build": "tsc && node --input-type=module -e \"import fs from 'fs';fs.cpSync('locales','dist/locales',{recursive:true});fs.cpSync('public','dist/public',{recursive:true});fs.cpSync('src/static','dist/static',{recursive:true});fs.cpSync('.env.example','dist/.env.example');fs.cpSync('src/storage/providers/postgres-kysely/migrations','dist/src/storage/providers/postgres-kysely/migrations',{recursive:true});\"",
     "build:app-catalog": "tsx scripts/build-app-catalog.ts",
     "check:app-catalog": "tsx scripts/build-app-catalog.ts --check",
+    "check:packs-doc": "vitest run test/unit/library-packs-doc-truth.test.ts",
     "aeb:prove": "tsx scripts/aeb-prove.ts",
     "aeb:ledger": "tsx scripts/aeb-ledger.ts",
     "start": "node --env-file=.env dist/src/index.js start",

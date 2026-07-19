@@ -20,6 +20,7 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 | `pixi-unsafe-eval@8.min.js` | `pixi.js` (unsafe-eval companion — REQUIRED after pixi under the app CSP) | 8.19.0 | `pixi` | `https://cdn.jsdelivr.net/npm/pixi.js@8/dist/packages/unsafe-eval.min.js` | MIT |
 | `phaser@3.min.js` | `phaser` | 3.90.0 | `phaser` | `https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js` | MIT |
 | `drawflow@0.min.js` + `.min.css` | `drawflow` (engine INSIDE the aimeat-flow cortex — apps use AIMEAT.flow, never Drawflow directly) | 0.0.60 | `aimeat-flow` | `https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/` | MIT |
+| `fonts.css` + `fonts/*.woff2` | Baloo 2 (variable 400–800) + Bangers display fonts, latin + latin-ext (ä/ö) | Baloo 2 v23 · Bangers v25 | `fonts` | Google Fonts CDN (see `fonts/LICENSE.md`) | OFL-1.1 |
 | `realtime.js` | AIMEAT-local (WS/WebRTC/Yjs client + `SharedClock` synced timeline) | 1 | `realtime` | this repo | MIT |
 | `toastui/toastui-editor-all.min.js` + `.min.css` | TOAST UI Editor | (SPA-internal) | — | `https://uicdn.toast.com` | MIT |
 | `preact.mjs`, `preact-hooks.mjs`, `htm.mjs`, `yaml.mjs`, `minidenticons.min.js` | preact / htm / yaml / minidenticons (ESM) | (SPA-internal, importmap) | — | jsdelivr | MIT |

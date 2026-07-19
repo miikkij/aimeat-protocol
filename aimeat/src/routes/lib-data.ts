@@ -9,6 +9,8 @@
  *   - (embedded) data.set/get/getPublic: authed memory API with app-creator public fallback
  *
  * @version-history
+ *   v1.1.0 — 2026-07-19 — get()/getPublic() read with ?soft=1: missing keys resolve null via a
+ *     clean 200 (no browser-console 404 noise); resolved contract unchanged
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { AimeatConfig } from '../config.js';
@@ -57,9 +59,11 @@ const data = {
     return res.data;
   },
 
-  // Read a single entry (falls back to public read from app creator if not found or empty)
+  // Read a single entry (falls back to public read from app creator if not found or empty).
+  // Uses ?soft=1 so a missing key is a clean 200 (value null) — no browser-console 404 noise;
+  // the contract is unchanged: resolves null when the key does not exist.
   async get(key) {
-    const res = await authFetch('/v1/memory/' + encodeURIComponent(key));
+    const res = await authFetch('/v1/memory/' + encodeURIComponent(key) + '?soft=1');
     var val = res.ok ? res.data.value : null;
     var isEmpty = val == null || (typeof val === 'object' && Object.keys(val).length === 0);
     if (!isEmpty) return val;
@@ -129,9 +133,10 @@ const data = {
     return res.data;
   },
 
-  // Read another agent's public memory (no auth needed)
+  // Read another agent's public memory (no auth needed). ?soft=1: missing (or hidden)
+  // keys resolve null via a clean 200 instead of logging a console 404.
   async getPublic(gaii, key) {
-    const url = NODE_URL + '/v1/memory/' + encodeURIComponent(gaii) + '/' + encodeURIComponent(key);
+    const url = NODE_URL + '/v1/memory/' + encodeURIComponent(gaii) + '/' + encodeURIComponent(key) + '?soft=1';
     const r = await fetch(url);
     const res = await r.json();
     if (!res.ok) {

@@ -1,8 +1,16 @@
 /**
- * AimeatRealtime — browser client for AIMEAT P2P realtime rooms.
+ * @file realtime.js
+ * @description AimeatRealtime — browser client for AIMEAT P2P realtime rooms (WS rooms +
+ *   WebRTC data channels + Yjs CRDT sync) and SharedClock (network-synced timeline).
+ * @version-history
+ *   v1.2.0 — 2026-07-19 — constructor also accepts an options object ({ session } or
+ *     { baseUrl, token }); positional (baseUrl, token) unchanged — existing apps unaffected
+ *   v1.1.0 — 2026-07-18 — SharedClock added (extracted from the Band Jam pattern)
+ *   v1.0.0 — 2026-03-03 — initial WS rooms + WebRTC + Yjs client
  *
  * Usage:
  *   const rt = new AimeatRealtime('https://node.example.com', token);
+ *   // or equivalently: new AimeatRealtime({ session })   (uses session.jwt + page origin)
  *   const room = await rt.createRoom({ app_type: 'whiteboard', name: 'My Board' });
  *   rt.connect(room.id, 'Alice');
  *   rt.on('peer-joined', (msg) => console.log('New peer:', msg.nick));
@@ -20,10 +28,18 @@
  */
 class AimeatRealtime {
   /**
-   * @param {string} baseUrl — AIMEAT node URL (e.g. https://node.example.com)
-   * @param {string} token — JWT auth token
+   * @param {string|object} baseUrl — AIMEAT node URL (e.g. https://node.example.com), OR an
+   *   options object: { session } (uses session.jwt + the page origin) or { baseUrl, token }.
+   * @param {string} [token] — JWT auth token (positional form)
    */
   constructor(baseUrl, token) {
+    // Tolerant object form — the positional (baseUrl, token) path below is unchanged.
+    if (baseUrl && typeof baseUrl === 'object') {
+      const opts = baseUrl;
+      const sess = opts.session || null;
+      token = token || opts.token || (sess && sess.jwt) || null;
+      baseUrl = opts.baseUrl || opts.nodeUrl || (typeof location !== 'undefined' ? location.origin : '');
+    }
     this.baseUrl = baseUrl.replace(/\/$/, '');
     this.token = token;
     this.ws = null;
