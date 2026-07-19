@@ -57,7 +57,7 @@ public/
 │   ├── theme.css             # Global design tokens + shared component styles
 │   └── views/                # Per-view scoped CSS
 │       ├── portal.css
-│       ├── profile.css       # Profile view + all tab styles (pf-*, pf-gen-*)
+│       ├── profile.css       # Profile view + all tab styles (pf-*)
 │       ├── portfolio.css
 │       ├── portal-classic.css
 │       ├── portal-dev.css
@@ -94,10 +94,6 @@ public/
 │       ├── cortex.js          # Cortex extension API
 │       ├── extensions.js      # Extension management API
 │       ├── federation.js      # Federation API
-│       ├── generator.js       # Service generator API
-│       ├── generator-packaging.js  # Package template API
-│       ├── generator-prompts.js    # AI prompt builder
-│       ├── generator-validate.js   # Validation helpers
 │       ├── knowledge.js       # Knowledge package API
 │       ├── memory.js          # Memory key-value API
 │       ├── nodes.js           # Federated nodes API
@@ -120,7 +116,7 @@ public/
 │   ├── portal-classic.js
 │   ├── portal-dev.js
 │   ├── profile.js             # Profile shell (tabs, session, SSE dispatcher)
-│   ├── profile/               # Profile tab components (24 tabs)
+│   ├── profile/               # Profile tab components (one file per tab)
 │   │   ├── shared.js          # Shared profile components (Spinner, etc.)
 │   │   ├── access-tab.js      # Session keys, login history
 │   │   ├── agents-tab.js      # Agent management + device auth
@@ -131,7 +127,6 @@ public/
 │   │   ├── email-tab.js       # Email notification settings
 │   │   ├── extensions-tab.js  # Installed extensions/cortex
 │   │   ├── federation-tab.js  # Node federation
-│   │   ├── generator-tab.js   # Service generator workflow
 │   │   ├── knowledge-tab.js   # Knowledge packages
 │   │   ├── mcp-tab.js         # MCP server management
 │   │   ├── memory-tab.js      # Key-value storage + files
@@ -304,8 +299,7 @@ Each view has its own CSS file in `public/css/views/`. Classes are prefixed with
 | View | Prefix | Example |
 |------|--------|---------|
 | portal | `gn-` | `.gn-hero-title` |
-| profile | `pf-` | `.pf .section-title`, `.pf-gen-sidebar` |
-| profile/generator | `pf-gen-` | `.pf-gen-dashboard` |
+| profile | `pf-` | `.pf .section-title`, `.pf .section-desc` |
 | portfolio | (in portfolio.css) | |
 | portal-classic | `cl-` | `.cl-root` |
 | portal-dev | `dv-` | `.dv-root` |
@@ -523,7 +517,7 @@ Per Rule 1b, drive the Playwright MCP browser at a mobile viewport (e.g. 390×78
 
 ## Profile Tab SPA
 
-The profile view (`/v1/profile`) is a tabbed SPA within the main SPA. It manages 24 tab components, each in `public/views/profile/`.
+The profile view (`/v1/profile`) is a tabbed SPA within the main SPA. It manages its tab components, one file per tab in `public/views/profile/`.
 
 ### Profile Tab Component Contract
 
@@ -650,7 +644,7 @@ Translation keys follow dot-notation in nested JSON under `locales/en.json` and 
 | `cards` | Landing page cards |
 | `groups` | Expandable groups |
 | `welcome` | Welcome board |
-| `profile` | Profile view (all tabs: `profile.agents.*`, `profile.wallet.*`, `profile.generator.*`, etc.) |
+| `profile` | Profile view (all tabs: `profile.agents.*`, `profile.wallet.*`, `profile.skills.*`, etc.) |
 | `dashboard` | Admin dashboard (all tabs) |
 | `dev` | Dev portal |
 | `classic` | Classic portal |

@@ -139,6 +139,8 @@
 }
 ```
 
+> **Note:** The `micro_memory` block (`"micro_memory": { "enabled": true, ... }`) is **deprecated in v4.0** and off by default in current nodes. It is retained in this example for backward reference only; current storage does not rely on micro-memory. See the v4.0 RFC (Core + Platform).
+
 ---
 
 **END OF SPECIFICATION**

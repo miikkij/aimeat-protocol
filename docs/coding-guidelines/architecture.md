@@ -150,7 +150,7 @@ The old "eight pillars" framing is superseded by the v4.0 Core/Platform split. B
 | Ecosystem (GEAI) | `ecosystem-apps.ts`, `ecosystem-events.ts` | External apps + event plane |
 | Realtime UX | `sse.ts`, `notifications.ts`, `push.ts`, `realtime.ts`, `public-events.ts` | Live updates, push, WebRTC |
 
-**Deprecated / removal (do not build on):** `micro-memory.ts`, OTK / Tier 0.5 (in `auth.ts`), legacy Ed25519 challenge-response (`POST /v1/auth/token`), `boards.ts` (legacy — apps supplant it), `foundry.ts` (a fork of `generator.ts` — to be removed; `generator.ts` itself is a minimal legacy tool). `marketplace.ts` was already removed.
+**Deprecated / removal (do not build on):** `micro-memory.ts`, OTK / Tier 0.5 (in `auth.ts`), legacy Ed25519 challenge-response (`POST /v1/auth/token`), `boards.ts` (legacy — apps supplant it). **Already removed:** `foundry.ts` and `generator.ts` (the whole Generator/Foundry app-building path — replaced by the OpenHands app-builder that fetches `GET /v1/prompts/build-app`), and `marketplace.ts`.
 
 ---
 

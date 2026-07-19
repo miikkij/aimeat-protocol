@@ -4,7 +4,7 @@
 
 Version: 3.0-era snapshot | Original date: 2026-04-30
 
-> **Stale snapshot (kept as a domain inventory).** This list predates the **v4.0 re-baseline**. For the current, accurate picture use **`AIMEAT-RFC-v4.0-Core-full.md` + `AIMEAT-RFC-v4.0-Platform-full.md`** (and `openapi.yaml`). Notable shifts since this list: the economy is **meters, not one currency** (morsels + USD metering ledger); **organisms/workspaces, the app platform + app-grants, the agent fleet plane, extensions/cortex, skills/capabilities, GEAI ecosystem apps** are first-class; and **micro-memory, OTK/Tier 0.5, legacy Ed25519 challenge-response, boards, and Foundry are deprecated**. Treat any entry below that conflicts with the v4.0 docs as superseded.
+> **Stale snapshot (kept as a domain inventory).** This list predates the **v4.0 re-baseline**. For the current, accurate picture use **`AIMEAT-RFC-v4.0-Core-full.md` + `AIMEAT-RFC-v4.0-Platform-full.md`** (and `openapi.yaml`). Notable shifts since this list: the economy is **meters, not one currency** (morsels + USD metering ledger); **organisms/workspaces, the app platform + app-grants, the agent fleet plane, extensions/cortex, skills/capabilities, GEAI ecosystem apps, commerce/checkout (UCP+ACP, x402 USDC, Stripe Connect)** are first-class; and **micro-memory, OTK/Tier 0.5, legacy Ed25519 challenge-response, boards, the Generator, Foundry, and the Secretary are removed/deprecated**. The **Generator and Foundry are replaced by the OpenHands app-building agent** (§23); the **`aimeat-crewai` Python liaison** (§27) and the **Tauri desktop app** (§12) are new. Treat any entry below that conflicts with the v4.0 docs as superseded.
 
 This document lists every feature and capability provided by the AIMEAT protocol and the AIMEAT.io reference implementation. Features are grouped by domain. Each entry notes whether it is a protocol-level requirement (RFC) or an implementation-level extension (AIMEAT.io).
 
@@ -29,10 +29,10 @@ This document lists every feature and capability provided by the AIMEAT protocol
 | Feature | Source | Description |
 |---------|--------|-------------|
 | **Ed25519 Cryptographic Identity** | RFC | All identity operations use Ed25519 keypairs (RFC 8032). Nodes, owners, and agents each have keypairs. Private keys are returned once at registration and never stored by the node. |
-| **Four Authentication Tiers** | RFC | Tiered access from Tier 0 (browse, no auth, GET only) through Tier 0.5 (OTK keyed browse) and Tier 1 (agent, JWT bearer) to Tier 2 (operator). Accommodates AI platforms with varying HTTP capabilities. |
+| **Four Authentication Tiers** | RFC | Tiered access from Tier 0 (browse, no auth, GET only) through Tier 0.5 (OTK keyed browse) and Tier 1 (agent, JWT bearer) to Tier 2 (operator). Accommodates AI platforms with varying HTTP capabilities. **Tier 0.5 / OTK are deprecated in v4.0** — device authorization + MCP is the current agent path. |
 | **Device Authorization (RFC 8628)** | RFC | Agent authentication via device code flow. The agent polls for a token while the owner approves the connection from a browser, selecting which scopes to grant. Primary agent auth method since v3.0. |
 | **JWT Tokens (EdDSA)** | RFC | Signed with the node's Ed25519 key. Includes subject (GAII or owner), roles, and scopes. Supports refresh, revocation, and configurable TTL (default 1 hour, max 24 hours). |
-| **One-Time Keys (OTK)** | RFC | Short-lived tokens enabling GET-based write operations for AI platforms that cannot set HTTP headers. Supports dormant Initial OTKs that activate on first use, designed for embedding in prompts. |
+| **One-Time Keys (OTK)** | RFC | **Deprecated (v4.0), off by default.** Short-lived tokens enabling GET-based write operations for AI platforms that cannot set HTTP headers. Supports dormant Initial OTKs that activate on first use, designed for embedding in prompts. Superseded by device auth + MCP. |
 | **Role-Based Access Control** | RFC | Three roles -- `agent`, `owner`, `operator` -- in a strict hierarchy. Operators have all owner abilities; owners have all agent abilities for their own agents. Per-endpoint authorization is enforced. |
 | **Scoped Agent Capabilities** | RFC | Fine-grained permission scopes (`memory:read`, `memory:write`, `work:request`, `boards:write`, etc.) that limit which protocol features each agent can access. Owners select scopes during device authorization. |
 | **Key Rotation (Rekey)** | RFC | Agents can rotate their Ed25519 keypair via `POST /v1/agents/{gaii}/rekey`. The old keypair is invalidated immediately and active JWTs are revoked. |
@@ -50,7 +50,7 @@ This document lists every feature and capability provided by the AIMEAT protocol
 | **Schema Locking** | RFC | Memory keys can be locked to a JSON Schema. Once set, all subsequent writes must validate against the schema. Enables structured, type-safe data storage. |
 | **Memory Search** | RFC | Full-text search across keys, tags, and values. Supports tag filtering, visibility filtering, regex pattern matching, and flag count filtering. |
 | **Memory Quotas** | RFC | Per-agent limits on number of keys (default 100), total size (default 10 MB), and single value size (default 1 MB). Excess writes are rejected with 429 QUOTA_EXCEEDED. |
-| **Micro-Memory** | RFC | Ultra-lightweight key-value store for high-frequency reads and Tier 0.5 access. Organized into sets with five visibility modes (private, public_read, shared_read, shared_write, public_write). All operations use a single GET endpoint with query parameters. |
+| **Micro-Memory** | RFC | **Deprecated (v4.0), off by default.** Ultra-lightweight key-value store for high-frequency reads and Tier 0.5 access. Organized into sets with five visibility modes (private, public_read, shared_read, shared_write, public_write). All operations use a single GET endpoint with query parameters. |
 | **Binary Storage** | RFC | File upload, download, and management. Supports single upload (up to 50 MB), chunked upload (up to 5 GB), HTTP Range requests for resumable downloads, MIME type tracking, and per-file visibility controls. |
 | **CORS per Memory Key** | RFC | Individual memory keys can have their own CORS allowed origins, following a four-level inheritance chain: node default, GHII (owner), agent, memory key. |
 
@@ -162,6 +162,7 @@ This document lists every feature and capability provided by the AIMEAT protocol
 | Feature | Source | Description |
 |---------|--------|-------------|
 | **Personal Node System** | RFC + AIMEAT.io | Lightweight AIMEAT instances for individual users. Store data locally while leveraging an operator node's federation connectivity and marketplace access. Run behind NATs with tunnel support. |
+| **Desktop App (aimeat-desktop)** | AIMEAT.io | A [Tauri](https://tauri.app) Windows desktop app (`aimeat-desktop/`) that lets a non-technical user run their **own AIMEAT node without a terminal**: a control-panel + system-tray window that starts/stops the bundled reference server, shows status/logs, edits config, and opens the web dashboard. Self-contained single installer (bundles `node.exe` sidecar + built server + native better-sqlite3); all state in a writable app-data folder with **persistent SQLite** that survives restarts. |
 | **Tunnel Manager** | AIMEAT.io | Encrypted P2P tunnel from personal node to operator node. Handles request proxying, keepalive, and automatic reconnection with exponential backoff. |
 | **Offline Mailbox** | AIMEAT.io | When a personal node is offline, messages and work requests are stored in the operator's mailbox (default 50 MB, 7-day retention). Delivered when the node reconnects. |
 
@@ -263,16 +264,19 @@ This document lists every feature and capability provided by the AIMEAT protocol
 | Feature | Source | Description |
 |---------|--------|-------------|
 | **Portfolio System** | AIMEAT.io | Public-facing agent/owner profiles showcasing capabilities, work history, trust scores, knowledge contributions, and app publications. Searchable catalog with geographic and capability filters. |
-| **23-Tab Tiered Profile View** | AIMEAT.io | User dashboard with tabs organized by experience tier (new, active, experienced). Covers wallet, memory, agents, chat sessions, MCP, knowledge, organisms, work, services, boards, apps, extensions, federation, nodes, data wallet, notifications, generator, packages, and more. |
+| **Tiered Profile View** | AIMEAT.io | User dashboard with tabs organized by experience tier (new, active, experienced). Covers wallet, memory, agents, chat sessions, MCP, knowledge, organisms/workspaces, work/tasks, services, apps, extensions, federation, nodes, data wallet, messages/contacts, notifications, packages, and more. (The old **generator** tab was removed along with the Generator tool — see §23.) |
 | **Adaptive Landing Page** | AIMEAT.io | Tier-gated dashboard that adapts content based on user activity level, showing relevant quick actions and status information. |
 
 ---
 
-## 23. Generator Tool
+## 23. App-Building Agent (OpenHands)
+
+> **Replaces the removed Generator and Foundry.** The old in-portal *AI Service Generator* and the *Foundry* were removed; app-building now happens through a real coding agent that fetches the node's canonical build-app spec at runtime.
 
 | Feature | Source | Description |
 |---------|--------|-------------|
-| **AI Service Generator** | AIMEAT.io | Multi-step pipeline for creating custom apps and services through AI-assisted generation. Users describe what they want in natural language; the generator produces deployable packages with all required components (CSM, extensions, translations). |
+| **AIMEAT-boosted OpenHands** (`tools/aimeat-openhands/`) | AIMEAT.io | A repeatable, preconfigured [OpenHands](https://github.com/OpenHands/OpenHands) deployment wired to an AIMEAT node out of the box. Ships an `aimeat-app-builder` skill whose golden rule is: fetch `GET /v1/prompts/build-app` from the node at runtime → build a single-file HTML app → verify locally → publish via the `aimeat_app_publish` MCP tool → return the live URL. Bundles device-auth connect scripts, a custom agent-server runtime image, MCP + LLM config templates, and an nginx reverse-proxy (TLS + Basic Auth) for internet exposure. Proven with Kimi K2.7 Code via OpenRouter (~$0.4/app), publishing apps live over MCP (e.g. `tetrisat.apps.aimeat.io`). |
+| **Node build-app spec** | AIMEAT.io | The canonical single-file-app build prompt is node-served at `GET /v1/prompts/build-app` (source `src/services/build-app-prompt.ts`), plus `/v1/app-templates`. Any app-builder (OpenHands, an agent, or the app-catalog "Create new app") fetches it so guidance never drifts. |
 
 ---
 
@@ -281,7 +285,7 @@ This document lists every feature and capability provided by the AIMEAT protocol
 | Feature | Source | Description |
 |---------|--------|-------------|
 | **Site Template Engine** | AIMEAT.io | Customizable landing pages for nodes using HTML templates with dynamic data interpolation from the memory system. Supports load balancer mode for multi-instance deployments and template caching. |
-| **Portal & Onboarding** | AIMEAT.io | Web interface for user discovery, registration, and agent setup. Includes platform-specific instructions (Claude, ChatGPT, Gemini, Copilot), connectivity key workflow visualization, and a copy-paste-to-AI workflow. |
+| **Portal & Onboarding** | AIMEAT.io | Web interface for user discovery, registration, and agent setup. Includes platform-specific instructions (Claude, ChatGPT, Gemini, Copilot), device-authorization agent setup (RFC 8628; the old connectivity-key workflow was removed in v1.1.0), and a copy-paste-to-AI workflow. |
 | **Setup Wizard** | AIMEAT.io | Web-based and CLI setup wizards for first-time node operators. 5-step process covering use case selection, core settings, economy settings, and security setup. Generates `.env` configuration files. |
 | **PWA & Offline Support** | AIMEAT.io | Progressive Web App with service worker for offline access. Cache-first for static assets, network-first for API calls. Installable on mobile devices. |
 
@@ -300,7 +304,7 @@ This document lists every feature and capability provided by the AIMEAT protocol
 
 | Feature | Source | Description |
 |---------|--------|-------------|
-| **32-Tab Admin Dashboard** | AIMEAT.io | Comprehensive operator interface built with Preact + HTM (no build step). 8 navigation groups: Node Operations (9 tabs), Identity (3), Data (6), Infrastructure (4), Services (7), Integrations (1), Federation (2). |
+| **Admin Dashboard** | AIMEAT.io | Comprehensive operator interface built with Preact + HTM (no build step), organized into navigation groups (Node Operations, Identity, Data, Infrastructure, Services, Integrations, Federation). *(Exact tab counts have grown since the v3.0 snapshot — treat any fixed number here as indicative.)* |
 | **Runtime Configuration** | AIMEAT.io | Over 255 parameters configurable via environment variables, INI/JSON files, CLI arguments, or runtime API. Dot-path notation, provenance tracking, mutability classification, and validation rules. Changes to mutable fields take effect immediately without restart. |
 | **Background Job Scheduler** | AIMEAT.io | Unified job management with cron scheduling, manual triggering, retry with exponential backoff, and status tracking. Built-in jobs for cache cleanup, trust decay, daily allowance, match engine, federation sync, mailbox cleanup, and more. |
 | **Prometheus Metrics** | AIMEAT.io | Prometheus-format metrics endpoint covering HTTP request throughput, latency, error rates, business metrics (agents, work, morsels, federation), and system metrics. Configurable access level (public, authenticated, operator). |
@@ -312,8 +316,9 @@ This document lists every feature and capability provided by the AIMEAT protocol
 
 | Feature | Source | Description |
 |---------|--------|-------------|
-| **Client JavaScript SDK** | AIMEAT.io | Seven browser-ready ESM libraries served directly from the node with zero build step: aimeat-auth, aimeat-data, aimeat-storage, aimeat-social, aimeat-wallet, aimeat-work, aimeat-tunnel. Auto-envelope handling, token management, and TypeScript-compatible JSDoc annotations. |
+| **Client JavaScript SDK** | AIMEAT.io | Browser-ready ESM libraries served directly from the node with zero build step: aimeat-auth, aimeat-data, aimeat-storage, aimeat-social, aimeat-wallet, aimeat-work, aimeat-tunnel (and more). Auto-envelope handling, token management, and TypeScript-compatible JSDoc annotations. |
 | **Test Harness** | AIMEAT.io | Interactive HTML page that loads all SDK libraries and provides a console for testing API operations, debugging authentication flows, and exploring the API. |
+| **Python Liaison + CrewAI Connector (`aimeat-crewai`)** | AIMEAT.io | Pip-installable CrewAI integration (`pip install aimeat-crewai`, in-repo at `python/aimeat-crewai/`, own tag-triggered PyPI release line). Drop one **liaison agent** into a crew and it handles all AIMEAT communication — Hello Integration handshake, capability reporting, memory writes, knowledge publishing, task-lifecycle updates — via CrewAI's `MCPServerAdapter` against the node's MCP surface (local `aimeat connect serve` stdio or the node's HTTP MCP endpoint), with full `aimeat_*` tool access under the crew's registered agent identity. Key modules: `liaison.py`, `mcp_client.py`, `daemon.py`, `offers.py`/`workflow_spec.py`, `cli.py`. |
 
 ---
 
@@ -355,5 +360,93 @@ This document lists every feature and capability provided by the AIMEAT protocol
 
 ---
 
-*AIMEAT Feature List v3.0 -- April 2026*
-*Generated from RFC v3.0 and Implementation Guide v3.0*
+# Part II — Post-v3.0 Additions (v4.0 platform)
+
+> These domains did **not exist** in the v3.0 snapshot above and were added 2026-07-19. They are summaries — the authoritative contract remains **RFC v4.0 Core/Platform + `openapi.yaml`**. Route files cited are under `aimeat/src/routes/`.
+
+## 32. Commerce & Payments
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **Checkout & UCP (Universal Commerce Protocol)** | AIMEAT.io | Commerce core: open/complete checkout, morsel-settlement handler, and a `/.well-known/ucp` discovery document. `commerce.ts`, `commerce-ucp.ts`, `lib-commerce.ts`; MCP `aimeat_checkout_open/complete/list`. |
+| **Agentic Commerce (ACP)** | AIMEAT.io | Agent-facing commerce protocol surface for programmatic purchasing. `commerce-acp.ts`. |
+| **x402 On-Chain Settlement** | AIMEAT.io | Real **x402 USDC**, non-custodial settlement on Base Sepolia (testnet scope); FABRIC card-x402. `viem` is a dev-dependency only; prod mainnet out of scope. |
+| **Stripe Connect Platform Rail** | AIMEAT.io (EE) | Enterprise-edition Stripe Connect money rail for real-money payouts with DAC7 + Finnish ALV/VAT handling; org KYB, payables, PSP config. `aimeat_org_*`, `aimeat_commerce_psp_*`. Live activation gated on Y-tunnus + bank + ToS. |
+| **Pluggable PSP Interface** | AIMEAT.io | Payment providers are **non-mandatory and pluggable** — set/status/delete a PSP per org or per node. The economy is meters (morsels + USD), not a single currency. |
+
+## 33. Metering Ledger (USD)
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **LLM Metering Ledger** | AIMEAT.io | Per-owner USD metering of AI/LLM usage at `/v1/ledger/*`, backed by per-day `ai-usage.<gaii>.<date>` records and a usage-history endpoint. Reframes the economy as **meters, not currencies** behind the pluggable payment interface. `ledger.ts`, `usage.ts`. |
+
+## 34. Agent Fleet — Tasks & Workflows
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **Tasks** | AIMEAT.io | Full task lifecycle for an owner's agent fleet: create, get, list, event, complete, fail, plus `propose_todos` / `todo`. `agent-tasks.ts`; MCP `aimeat_task_*`. |
+| **Workflows (DAG engine)** | AIMEAT.io | `/v1/workflows` with a DAG execution engine and **human-in-the-loop input** (pending-inputs → answer), save + run. `workflows.ts`; MCP `aimeat_workflow_run/save/get/pending_inputs/answer`. |
+| **Offerings / Offers** | AIMEAT.io | Offer descriptors + pricing and workflow signals; an offering "ask" resolves to the **task** path (not work/escrow). `push_wake` latched at daemon startup. Mirrored in the Python side (`offers.py`, `workflow_spec.py`). |
+
+## 35. Skills & Capabilities Registry
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **Skills (SKILL.md packs)** | AIMEAT.io | Publish/link/unlink/get/list skill packs with scopes, refs, and `@semver` pins; **app-bound skills** via `metadata.binding`; agents can be "boosted" with a skill. Node-scope vs user-scope. `skills.ts`, `agent-skills-discovery.ts`, `agent-skill-bundle.ts`; MCP `aimeat_skill_*`. |
+| **Capabilities** | AIMEAT.io | Registerable, invokable capabilities with create/get/list/invoke/update and **vouch** (peer endorsement). `capabilities.ts`; MCP `aimeat_capabilities_*`. |
+
+## 36. GEAI Ecosystem Apps
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **Ecosystem Apps (GEAI)** | AIMEAT.io | A **third principal type** `eco:{app}#owner@node-id` — the domain where external applications are systematically connected to AIMEAT. Onboarded via hello→approve→token (a device-auth clone) with **TOFU key pinning** + a scope and data-area allowlist; writes into its own `eco:` namespace; **consented like an agent** (revocable, attributable). `ecosystem-apps.ts`, `ecosystem-events.ts`, `access-tokens.ts`; MCP `aimeat_org_connect_*`. |
+
+## 37. IAM / Access Model
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **Access Model (groups + levels)** | AIMEAT.io | Effective access resolved as **authority ∩ consent**, with sharing groups and access levels; GEAI/eco principals first-class. `permissions.ts`, `sharing-groups.ts`; MCP `aimeat_iam_define`. |
+| **App Grants & H-2 Origin Isolation** | AIMEAT.io | Hosted (internal) apps are identity-bearing via **scoped app grants** that resolve `role:'app'` to the owner but fence to approved scopes + data areas; app-origin isolation (H-2) prevents cross-app data bleed. |
+
+## 38. Messaging & Contacts
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **Direct Messages (Postilaatikko)** | AIMEAT.io | Agent/owner direct messaging: send, inbox, thread, `ask`, send-as-owner, plus **Reply-with-AI**. `messages.ts`; MCP `aimeat_dm_*`, `aimeat_message_*`. |
+| **Contacts** | AIMEAT.io | Address book with direct add + invites and email resolution; `/v1/contacts`. `contacts.ts`; MCP `aimeat_contact_*`. |
+| **Feedback** | AIMEAT.io | Structured feedback send/inbox channel. MCP `aimeat_feedback_*`. |
+
+## 39. App Platform (beyond the §18 marketplace)
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **App Catalog & Single-File Apps** | AIMEAT.io | App-catalog UI (esbuild-built from `src/static/app-catalog/`) plus a **node-served canonical build prompt** at `GET /v1/prompts/build-app` and `/v1/app-templates`. `app-store.ts`, `app-templates.ts`. |
+| **App Tools** | AIMEAT.io | Server-side app tool sets (e.g. commerce) that an app publishes and gets. MCP `aimeat_app_tools_publish/get`. |
+| **App Forking** | AIMEAT.io | Forkable gate + lineage tracking + copy-protection (watermark requires an encryption key). MCP `aimeat_app_fork`. |
+| **Presigned Uploads** | AIMEAT.io | MCP presigned PUT URLs for apps/storage/extensions/cortex (default for files > ~1 KB). |
+| **Subdomain Routing** | AIMEAT.io | Apps served at `{app}.apps.aimeat.io`. `subdomains.ts`. |
+| **App Org Provisioning** | AIMEAT.io | Apps create their own organism + workspace via an `organism:write` grant. |
+
+## 40. Organisms & Workspaces (first-class)
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **Workspaces** | AIMEAT.io | Versioned record spaces with draft → publish, `expected_version` change-guards, members grant/revoke, comments, access, transfer, revert-to-draft, and object delete. Some namespaces (`*_event`, `release`) are append-only. `organisms.ts`; MCP `aimeat_workspace_*`. |
+| **Organism Invitations** | AIMEAT.io | In-node + **email** invitations, join/leave, member add, invitation lifecycle. MCP `aimeat_organism_invite[_email]`, `aimeat_organism_join/leave/member_add`. |
+
+## 41. WebMCP
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **WebMCP** | AIMEAT.io | A browser-side MCP surface letting apps expose/consume MCP tools from the page. `webmcp.ts`, `lib-webmcp.ts`. |
+
+## 42. Enterprise Edition (open-core)
+
+| Feature | Source | Description |
+|---------|--------|-------------|
+| **Enterprise Edition (`ee/`)** | AIMEAT.io | Private open-core module with a **GOII** (org identity), **KYB** sell-gate, Stripe Connect platform payouts, and DAC7 reporting. Deployed to prod; only live money activation (Y-tunnus + bank + ToS) remains. `aimeat_org_kyb_*`, `/v2/mcp/enterprise`. |
+
+---
+
+*AIMEAT Feature List -- v3.0 base (April 2026), Part II + targeted updates 2026-07-19 (commerce/ledger/tasks/workflows/skills/GEAI/IAM/messaging/app-platform/EE added; OpenHands, desktop app, Python liaison; Generator/Foundry/Secretary removed).*
+*Canonical current picture: RFC v4.0 Core + Platform + `openapi.yaml`.*

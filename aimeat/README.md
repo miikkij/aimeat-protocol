@@ -183,7 +183,7 @@ That's the federation play: each platform is an island, and through AIMEAT its a
 
 ### Build apps with AI
 
-Tell any AI what you want. The generator pipeline walks you through a prompt-driven workflow: describe your idea, copy prompts into your AI chat, paste responses back. The system validates each component and registers it on your node. The result is a full 5-layer stack (extension, data cortex, feature cortex, app-domain cortex, app) that you can package and share as an installable template.
+Tell any AI what you want and get a working app. Your node serves a canonical build-app prompt at `GET /v1/prompts/build-app`: the app-catalog's **Create new app** flow fetches it, or point a real coding agent at the same spec — the repo ships a preconfigured **OpenHands app-builder** (`tools/aimeat-openhands/`) that builds a single-file HTML app and publishes it live over MCP. Apps use AIMEAT memory, storage, and the client SDK, and can be packaged and shared as installable templates.
 
 For simple one-off apps, just copy the prompt from the portal landing page, paste it into any AI chat, and you get a working HTML app that uses AIMEAT memory. No registration needed.
 

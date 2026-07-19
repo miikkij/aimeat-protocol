@@ -46,7 +46,7 @@ Individual end-user applications built on this Platform (the MACHINE ROOM apps, 
 - 3 Programmable Compute & the Metered AI Plane (extensions, cortex, AI proxy, scheduler, workflows)
 - 4 Skills & Capabilities
 - 5 The Ecosystem (GEAI apps & event plane)
-- 6 Build Tools (Generator; Foundry — removal)
+- 6 Build Tools (node-served build-app prompt + OpenHands; Generator & Foundry removed)
 - 7 Live Surface: Realtime, Notifications, Push, SSE
 - 8 Business, Payments & Enterprise Direction
 - 9 Deprecations & Cleanup
@@ -214,13 +214,13 @@ The GEAI addition matters: it lets a whole class of third-party apps act on an o
 
 ## 6. Build Tools
 
-### 6.1 Generator (Minimal / Legacy)
+### 6.1 App-Building (current)
 
-A prompt-driven component/app generation engine (project → interview → blueprint → generate → test → register) with a background autopilot. **Status: minimal — "a poor man's coding tool."** It *just* works and is not recommended for real app authoring; AI-accelerated authoring in a real coding environment (or claude.ai/Claude Code driving the Core APIs) is the intended path. Retained, low priority. `generator.ts`, `generator-autopilot.ts`.
+App authoring is **AI-accelerated in a real coding environment**, not an in-portal wizard. The canonical build-app prompt is **node-served** at `GET /v1/prompts/build-app` (source `src/services/build-app-prompt.ts`): the app-catalog's **Create new app** flow fetches it, and the repo ships a preconfigured **OpenHands app-builder** (`tools/aimeat-openhands/`, via its `aimeat-app-builder` skill) that fetches the same spec at runtime, builds a single-file HTML app, and publishes it live over MCP. claude.ai / Claude Code driving the Core APIs is an equally supported path. Agent-facing discovery: `/llms.txt` + bootstrap `app_building` → the build prompt + `/v1/app-templates`.
 
-### 6.2 Foundry — DEPRECATED, TO BE REMOVED
+### 6.2 Removed: Generator & Foundry
 
-`foundry.ts` is a **literal fork** of `generator.ts` (header: "Copied from generator.ts v5.2.0") — a second ~50 KB copy of the same engine. It is **already deprecated and should be removed entirely.** v4.0 records this as a cleanup action, not a feature. No new integration should reference `foundry:*` scopes or routes.
+The old prompt-driven **Generator** (`generator.ts`, "a poor man's coding tool") and **Foundry** (`foundry.ts` — a literal fork of Generator) have been **removed** (Generator 2026-07-18, Foundry 2026-07-13), replaced by §6.1. No integration should reference `generator.ts`, `foundry.ts`, or `generator:*` / `foundry:*` routes/scopes — that surface no longer exists.
 
 ---
 
@@ -273,8 +273,8 @@ v4.0 makes these explicit so they can be executed, not just noted:
 
 | Item | Decision |
 |------|----------|
-| **Foundry** (`foundry.ts`) | **Remove** — a duplicate fork of Generator. Retire routes + `foundry:*` scopes. |
-| **Generator** | Keep as minimal/legacy; do not invest; not the app-authoring path. |
+| **Foundry** (`foundry.ts`) | **Removed** (2026-07-13) — was a duplicate fork of Generator; routes + `foundry:*` scopes retired. |
+| **Generator** (`generator.ts`) | **Removed** (2026-07-18) — replaced by the node-served build-app prompt + OpenHands app-builder (§6.1). |
 | **Micro-memory** (Core §13) | **Drop** — a flaky early workaround for AI↔system conversation, superseded by MCP. Nice idea, ultimately noise. |
 | **OTK / Tier 0.5** (Core §9) | **Drop** — same rationale; the whole ecosystem moved to device-auth + MCP. |
 | **Legacy Ed25519 challenge-response** (Core §9) | Keep mounted for now (federation/node signing leans on the keypair); off the mainline. |
@@ -315,8 +315,9 @@ Legend: **P** primary/live · **B** built · **PARTIAL** · **DEP** deprecated/r
 | Librarian retrieval | **B** | FTS, app-grant-gated |
 | Ecosystem/GEAI apps + event plane | **B** | Third principal, realizes Core §4.3 |
 | Realtime/SSE/notifications/push | **P** / **FLAG** | SSE+push live; WebRTC flagged |
-| Generator | **PARTIAL** | "Poor man's coding tool"; legacy |
-| Foundry | **DEP** | Fork of Generator; **remove** |
+| App-building (build-app prompt + OpenHands) | **P** | Node-served spec; §6.1 |
+| Generator | **REMOVED** | Replaced by build-app prompt + OpenHands |
+| Foundry | **REMOVED** | Was a fork of Generator |
 | Business/payments/402 interface | **DIRECTION** | Enabling, not mandating; operator owns KYC |
 
 ---

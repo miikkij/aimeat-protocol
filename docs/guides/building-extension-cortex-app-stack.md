@@ -873,8 +873,8 @@ When starting a new ext+cortex+app stack:
   apps and cortex libs
 - `docs/app-developer-libraries-research.md` — the design rationale for
   `AIMEAT.{auth,data,storage,social,wallet,ai}` libs
-- `docs/generator-guide.md` — the generator pipeline that produces
-  ext+cortex+app stacks automatically (helpful for naming conventions)
+- `GET /v1/prompts/build-app` (source `src/services/build-app-prompt.ts`) —
+  the node-served canonical app-building prompt (naming conventions + API rules)
 - `docs/plans/2026-05-29-comicland-ai-session-audit.md` — concrete
   lessons from one full session of iterating on a stack like this
 - `aimeat/src/routes/agent-tasks.ts` — every task API endpoint with

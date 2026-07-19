@@ -61,9 +61,9 @@ Your OpenClaw agent now has access to all 18 AIMEAT MCP tools. Try:
 
 ---
 
-## Authenticated Setup (Initial OTK)
+## Authenticated Setup (Device Authorization)
 
-For production use, authenticate your agent with an Initial OTK — a one-time key that doesn't expire until first use, perfect for embedding in agent configs.
+For production use, connect your agent via **Device Authorization (RFC 8628)**. Agents are never created implicitly — registration creates only the owner + GHII, and the owner explicitly approves each agent and selects its scopes. (The old connectivity-key / OTK flow was removed in v1.1.0.)
 
 ### 1. Start your AIMEAT node
 
@@ -72,61 +72,46 @@ cd aimeat
 pnpm dev
 ```
 
-### 2. Register an owner and agent
+### 2. Start the device-authorization flow
+
+The agent kicks off the flow (auth optional):
 
 ```bash
-# Register owner
-curl -X POST http://localhost:40050/v1/owners \
+curl -X POST http://localhost:40050/v1/agents/device-authorize \
   -H "Content-Type: application/json" \
-  -d '{"name": "myowner", "displayName": "My Owner"}'
-
-# Register agent (use the keypair from owner registration)
-curl -X POST http://localhost:40050/v1/agents \
-  -H "Content-Type: application/json" \
-  -H "Authorization: Bearer <owner-jwt>" \
   -d '{"name": "openclaw-agent", "displayName": "My OpenClaw Agent"}'
-```
-
-### 3. Generate an Initial OTK
-
-```bash
-curl -X POST http://localhost:40050/v1/auth/initial-otk \
-  -H "Authorization: Bearer <owner-jwt>"
 ```
 
 Response:
 ```json
 {
   "data": {
-    "otk": "otk-abc123...",
-    "initial": true,
-    "grace_ms": 60000,
-    "note": "No expiry until first use. Once used, valid for 60 seconds."
+    "device_code": "dc-abc123...",
+    "user_code": "WXYZ-1234",
+    "verification_uri": "http://localhost:40050/v1/profile",
+    "verification_uri_complete": "http://localhost:40050/v1/profile?user_code=WXYZ-1234",
+    "interval": 5
   }
 }
 ```
 
-### 4. Configure OpenClaw with the OTK
+### 3. Owner approves in the profile Agents tab
 
-```yaml
-mcp_servers:
-  - name: aimeat
-    transport: streamable-http
-    url: http://localhost:40050/v1/mcp
-    headers:
-      Authorization: "Bearer otk-abc123..."
-```
+The owner opens their AIMEAT profile (`http://localhost:40050/v1/profile`), goes to the **Agents** tab, enters/confirms the `user_code` (`WXYZ-1234`), and selects which **scopes** to grant the agent.
 
-The OTK remains dormant until OpenClaw first connects. After its first use, a grace period (default 60s) allows retries, then it expires. For long-running agents, use JWT auth instead.
+### 4. Poll for the agent's token
 
-### 5. For long-running agents: JWT auth
+The agent polls every 5 seconds (the `interval`) until the owner approves and a JWT is issued:
 
 ```bash
-# Get a JWT (valid for 1 hour by default)
-curl -X POST http://localhost:40050/v1/auth/token \
+curl -X POST http://localhost:40050/v1/agents/device-token \
   -H "Content-Type: application/json" \
-  -d '{"gaii": "openclaw-agent#myowner@<node-id>", "signature": "<ed25519-signature>"}'
+  -d '{"device_code": "dc-abc123...", "grant_type": "urn:ietf:params:oauth:grant-type:device_code"}'
 ```
+
+Until approval this returns an `authorization_pending` status; once approved it returns the agent's JWT.
+
+### 5. Configure OpenClaw with the JWT
 
 ```yaml
 mcp_servers:
@@ -165,7 +150,9 @@ Sessions are managed via the `mcp-session-id` response header. The MCP SDK handl
 
 ---
 
-## All 18 MCP Tools
+## MCP Tools (representative)
+
+The tools below are a representative slice — the live tool set is larger and is a per-session snapshot of the agent's granted scopes, so exactly which tools appear depends on the scopes the owner approved during device authorization.
 
 ### User Tools
 
@@ -278,7 +265,7 @@ Agent stores the result:
 |-------|----------|
 | "Connection refused" | Ensure AIMEAT is running: `pnpm dev`. Check port 40050. |
 | "Unauthorized" in anonymous mode | Verify `AIMEAT_ANONYMOUS=true` is set in `.env` or environment. |
-| OTK expired | Initial OTKs expire after first use + grace period. Generate a new one or use JWT auth. |
+| "Unauthorized" with a token | The agent's JWT may have expired, or the owner hasn't approved the device-authorization request yet. Re-run the device-auth flow (steps 2–4) and confirm approval in the profile Agents tab. |
 | "Operator role required" | Admin tools (15-18) require the operator role. Only the first registered owner is auto-promoted. |
 | Tools not appearing | Verify your MCP client sends `initialize` before `tools/list`. The StreamableHTTP transport requires proper session setup. |
 | Rate limited | AIMEAT enforces per-agent rate limits. Wait and retry, or check `X-RateLimit-*` headers. |
