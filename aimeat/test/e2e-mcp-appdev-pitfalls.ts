@@ -299,6 +299,17 @@ await test('delete removes the entry and its manifest reference', async () => {
     assert(!(manifest.entries ?? []).some((e: any) => e.key.includes('/auth/')), 'manifest ref not cleaned');
 });
 
+await test('aimeat_appdev_overview merges learned pitfalls + curated + packs in one call', async () => {
+    const body = await A.call('aimeat_appdev_overview', { model: 'claude-haiku-4.5' });
+    assert(!body.result?.isError, `overview errored: ${JSON.stringify(body).slice(0, 200)}`);
+    const out = JSON.parse(body.result.content[0].text);
+    assert(out.model === 'claude-haiku-4.5', 'model echo missing');
+    assert(out.pitfalls_learned.items.some((p: any) => p.model === 'claude-haiku-4.5'), 'learned entry missing from overview');
+    assert(out.pitfalls_learned.model_facets['claude-haiku-4.5'] >= 1, 'model facet missing');
+    assert(out.pitfalls_curated.total >= 20, 'curated index missing');
+    assert(/aimeat-app-builder/.test(out.skills.builder_skill), 'builder skill pointer missing');
+});
+
 await test('delete of a missing entry errors cleanly', async () => {
     const del = await A.call('aimeat_appdev_pitfall_delete', { category: 'nope', slug: 'missing' });
     assert(del.result?.isError === true, 'expected isError for missing entry');

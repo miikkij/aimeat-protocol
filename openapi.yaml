@@ -6937,6 +6937,35 @@ paths:
         '404':
           description: No such template
 
+  /v1/appdev/overview:
+    get:
+      operationId: getAppdevOverview
+      summary: AppDev research overview (the big picture before building)
+      description: >-
+        One compact research surface for building apps ON AIMEAT: the caller's existing apps,
+        library packs (per-model proof summaries), T1/T2/T3 app-shell templates, loadable
+        skills (node:aimeat-app-builder first), curated + learned pitfalls (model-faceted),
+        and prior template proposals. Indexes only with drill-down pointers; ?sections= for a
+        partial fetch, ?model= for indicative model marking/filtering. Authenticated
+        (owner or agent session).
+      tags:
+        - Discovery
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: model
+          in: query
+          schema: { type: string, maxLength: 64 }
+        - name: sections
+          in: query
+          schema: { type: string }
+          description: Comma-separated subset of apps,library_packs,app_templates,skills,pitfalls_curated,pitfalls_learned,template_proposals
+      responses:
+        '200':
+          description: The overview sections (indexes + drill-down pointers)
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /v1/appdev/pitfalls:
     get:
       operationId: listAppdevPitfalls

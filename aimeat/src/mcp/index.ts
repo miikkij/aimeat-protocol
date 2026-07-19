@@ -44,6 +44,7 @@ import { registerOrganismsTools } from './organisms.js';
 import { registerWorkspaceTools } from './workspaces.js';
 import { registerKnowledgeTools } from './knowledge.js';
 import { registerAppdevPitfallTools } from './appdev-pitfalls.js';
+import { registerAppdevResearchTools } from './appdev-research.js';
 import { registerSkillsTools } from './skills.js';
 import { registerOperatorConfigTools } from './operator-config.js';
 import { registerExtensionsTools } from './extensions.js';
@@ -144,6 +145,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerWorkspaceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerKnowledgeTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
+        registerAppdevResearchTools(mcp, storage, config, () => agentGaii);
         registerSkillsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerOperatorConfigTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerExtensionsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

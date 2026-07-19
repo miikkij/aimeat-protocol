@@ -288,6 +288,16 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_appdev_overview',
+        description: 'THE research call before building an app ON AIMEAT — one compact "big picture": the owner\'s existing apps (often the best template to fork/copy), library packs with per-model AEB proof summaries, T1/T2/T3 app-shell templates, loadable skills (node:aimeat-app-builder first), curated + learned pitfalls (model-faceted), and prior template proposals. Indexes only with drill-down pointers; pass sections=[...] for a partial fetch and model=<your model> to mark proven packs and filter learned pitfalls. Flow: research (this) → frame → propose to the user → build.',
+        caller: 'agent',
+        visibility: agentEverywhere,
+        input: {
+            model: { type: 'string', description: 'Your primary model (indicative), e.g. claude-haiku-4.5.' },
+            sections: { type: 'array', description: 'Subset: apps, library_packs, app_templates, skills, pitfalls_curated, pitfalls_learned, template_proposals.' },
+        },
+    },
+    {
         name: 'aimeat_appdev_pitfall_report',
         description: 'Record a pitfall learned while building an app ON AIMEAT (apps/extensions/cortex — never node development): what broke, what fixed it, and WHICH MODEL hit it (model is required, self-reported, indicative). Call at the end of a build for anything the next builder should know. Upserts by {category, slug} — reporting the same slug again REPLACES the entry with better wording (version bumps). status=outdated hides an entry models no longer stumble on; share=true publishes it platform-wide so other owners\' agents learn from it (default: private to your owner scope). Stored in the reserved knowledge package appdev-pitfalls.',
         caller: 'agent',

@@ -93,6 +93,7 @@ import { totpRouter } from '../routes/totp.js';
 import { libsRouter } from '../routes/libs.js';
 import { appTemplatesRouter } from '../routes/app-templates.js';
 import { appdevPitfallsRouter } from '../routes/appdev-pitfalls.js';
+import { appdevOverviewRouter } from '../routes/appdev-overview.js';
 import { libraryPacksRouter } from '../routes/library-packs.js';
 import { appsRouter } from '../routes/apps.js';
 import { appStoreRouter } from '../routes/app-store.js';
@@ -573,6 +574,7 @@ export async function mountRoutes(
   app.use(libsRouter(config, storage));
   app.use(appTemplatesRouter(config, storage));
   app.use(appdevPitfallsRouter(config));
+  app.use(appdevOverviewRouter(config, storage));
   app.use(libraryPacksRouter(config, storage));
   // Backup routes BEFORE appsRouter so /v1/apps/backup/* never collides with
   // the parameterized /v1/apps/:owner/:filename routes.
