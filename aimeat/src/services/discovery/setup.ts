@@ -7,6 +7,9 @@
  * @structure buildDiscoveryRegistry(storage, config) → DiscoveryRegistry (memory + capabilities + apps + agent-tasks)
  * @usage const registry = buildDiscoveryRegistry(storage, config);
  * @version-history
+ *   v0.3.0 — 2026-07-19 — AppDev KB Phase 6: the `templates` source now actually EXISTS and is
+ *     registered here (agent-proposed app templates at template.catalog.*). The v0.2.0 line below
+ *     was aspirational — no templates-source file or writer existed until now.
  *   v0.2.0 — 2026-06-24 — Secretary P5 (S-D): register the `templates` source (published use-case templates).
  *   v0.1.0 — 2026-06-23 — Phase 4: shared registry builder for REST + MCP surfaces (design doc 2026-06-23).
  */
@@ -15,6 +18,7 @@ import type { Storage } from '../../storage/interface.js';
 import { createRegistry, type DiscoveryRegistry } from './registry.js';
 import { createMemorySource } from './sources/memory-source.js';
 import { createCapabilitiesSource, createAppsSource, createAgentTasksSource } from './sources/table-sources.js';
+import { createTemplatesSource } from './sources/templates-source.js';
 
 export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): DiscoveryRegistry {
   const registry = createRegistry();
@@ -22,5 +26,6 @@ export function buildDiscoveryRegistry(storage: Storage, config: AimeatConfig): 
   registry.register(createCapabilitiesSource(storage, config));  // capabilities table
   registry.register(createAppsSource(storage, config));          // apps table
   registry.register(createAgentTasksSource(storage, config));    // agent_tasks table
+  registry.register(createTemplatesSource(storage, config));     // agent-proposed app templates (template.catalog.*)
   return registry;
 }
