@@ -151,21 +151,43 @@ The host already runs nginx. Add a dedicated HTTPS subdomain that proxies to the
 OpenHands, gated by Basic Auth. **The auth is mandatory** — it is the only thing between the
 internet and arbitrary code execution on this host.
 
-1. **Keep OpenHands bound to localhost.** In `.env`: `OPENHANDS_PORT_BIND=127.0.0.1:13781` and
-   `PERMITTED_CORS_ORIGINS=https://<subdomain>` (the public HTTPS origin, NOT localhost). Re-run
-   `docker compose up -d`.
-2. **DNS:** ask me to point an A record for the `<subdomain>` (e.g. `openhands.aimeat.io`) at this
-   host, or confirm a wildcard already covers it.
-3. **Basic-auth password:** `sudo htpasswd -c /etc/nginx/openhands.htpasswd <username>` (ask me
-   for the username; I'll set the password when prompted, or generate a strong one and give it to
-   me — do not print it back afterward).
-4. **Site config:** copy `nginx/openhands.conf.example` from the bundle, replace `__DOMAIN__` with
+1. **Docker daemon default IP.** Runtime containers publish random ports; without this they land
+   on `127.0.0.1:` (nginx can't reach them from its docker network) or `0.0.0.0:` (public — the
+   internet can). Neither works. Set `/etc/docker/daemon.json`:
+   ```json
+   { "ip": "172.17.0.1" }
+   ```
+   then `systemctl restart docker` **with no containers running** (`docker stop $(docker ps -q)`
+   first, then start docker, then start containers). Live-restore skips the network reconfig if
+   containers are up. After: `docker port <any-container>` shows binds as `172.17.0.1:<port>`.
+   The docker0 host-IP is host-private (not reachable from the internet); nginx and other
+   containers reach it fine.
+2. **Bundle `.env`.** Set:
+   ```
+   OPENHANDS_PORT_BIND=127.0.0.1:13781
+   PERMITTED_CORS_ORIGINS=https://<subdomain>
+   WEB_HOST=<subdomain>
+   SANDBOX_CONTAINER_URL_PATTERN=https://<subdomain>/runtime-{port}
+   ```
+   Re-run `docker compose up -d`. `WEB_HOST` fixes the default MCP proxy URL; `SANDBOX_CONTAINER_URL_PATTERN`
+   makes the browser reach spawned runtime containers through nginx (see the site template's
+   `location ~ ^/runtime-<port>` block).
+3. **DNS:** ask me to point an A record for the `<subdomain>` at this host, or confirm a
+   wildcard already covers it.
+4. **Basic-auth password:** `sudo htpasswd -c /etc/nginx/openhands.htpasswd <username>` (ask me
+   for the username; I'll set the password when prompted, or generate a strong one and give it
+   to you — do not print it back afterward).
+5. **Site config:** copy `nginx/openhands.conf.example` from the bundle, replace `__DOMAIN__` with
    the subdomain, place it in `/etc/nginx/sites-available/openhands.conf`, symlink into
-   `sites-enabled/`. It already handles the WebSocket upgrade + long agent-stream timeouts.
-5. **TLS cert:** use the host's existing certbot — `sudo certbot --nginx -d <subdomain>` (or match
-   however aimeat.io's certs are issued). Ensure the cert paths in the config match.
-6. **Apply:** `sudo nginx -t && sudo systemctl reload nginx`.
-7. **Verify:** open `https://<subdomain>` → browser prompts for Basic Auth → after login the
+   `sites-enabled/`. It includes: WebSocket upgrade + long agent-stream timeouts, dynamic
+   `/runtime-<port>/*` proxy to `172.17.0.1:<port>` (auth off — runtime enforces its own
+   session_api_key), and `/mcp/mcp` proxy (auth off — session-api-key + conversation-ID validated
+   upstream).
+6. **TLS cert:** use the host's existing certbot — `sudo certbot --nginx -d <subdomain>` (or
+   match however the parent domain's certs are issued). Ensure the cert paths in the config match.
+7. **Apply:** `sudo nginx -t && sudo systemctl reload nginx`, then re-run `bash scripts/postup.sh`
+   (writes the LLM settings + profile + aimeat MCP config into the app now that it's proxied).
+8. **Verify:** open `https://<subdomain>` → browser prompts for Basic Auth → after login the
    OpenHands UI loads; start a conversation and confirm the agent **streams a reply** (proves the
    WebSocket proxy works, not just the page). Then run the skill probe + MCP smoke test. Confirm
    `https://<subdomain>` is TLS-valid and that hitting it without credentials returns 401.

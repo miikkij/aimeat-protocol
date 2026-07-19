@@ -7,6 +7,9 @@
 #   2) POST the LLM settings (agent_settings_diff) and create+activate a named GUI profile
 #      so the Settings > LLM > Profiles page is preconfigured on first open. Without this,
 #      env vars only reach the CLI/core code path and the GUI comes up unconfigured.
+#   3) POST the aimeat MCP-server config (uses the RemoteMCPServer `auth` field, which is
+#      what OpenHands SDK expects for a raw Bearer token — NOT `headers.Authorization`).
+#      Requires secrets/aimeat.env to exist (created by scripts/aimeat-connect.sh).
 # Idempotent. Safe to re-run.
 set -euo pipefail
 
@@ -104,4 +107,45 @@ if [ "$ACTIVE_MODEL" = "$LLM_MODEL" ]; then
     echo "Activated profile '$PROFILE_NAME' (model=$ACTIVE_MODEL)."
 else
     echo "WARNING: profile activation returned model='$ACTIVE_MODEL' (expected '$LLM_MODEL')" >&2
+fi
+
+# ── 3) Preconfigure the aimeat MCP server ─────────────────────────────────
+# Activating a profile REPLACES agent_settings with the profile's contents; profiles don't
+# save mcp_config today, so we always POST the MCP config AFTER activation. The Bearer token
+# goes in the `auth` field (RemoteMCPServer schema), not `headers.Authorization` — putting it
+# in headers means the OpenHands SDK doesn't recognise it, tool-listing hangs 30s, and the UI's
+# "API Key" field shows blank.
+if [ -f secrets/aimeat.env ]; then
+    # shellcheck disable=SC1091
+    set -a && . ./secrets/aimeat.env && set +a
+    if [ -n "${AIMEAT_AGENT_TOKEN:-}" ]; then
+        MCP_URL="${AIMEAT_BASE_URL:-https://aimeat.io}/v2/mcp/appdev"
+        MCP_BODY=$(
+            AIMEAT_AGENT_TOKEN="$AIMEAT_AGENT_TOKEN" \
+            MCP_URL="$MCP_URL" \
+            python3 - <<'PY'
+import json, os
+print(json.dumps({
+    "agent_settings_diff": {
+        "mcp_config": {
+            "mcpServers": {
+                "aimeat": {
+                    "url": os.environ["MCP_URL"],
+                    "auth": os.environ["AIMEAT_AGENT_TOKEN"],
+                }
+            }
+        }
+    }
+}))
+PY
+        )
+        curl -sf -X POST "$UI_BASE/api/v1/settings" \
+            -H 'Content-Type: application/json' \
+            -d "$MCP_BODY" > /dev/null
+        echo "Configured MCP server 'aimeat' (auth via RemoteMCPServer.auth)."
+    else
+        echo "WARNING: secrets/aimeat.env has no AIMEAT_AGENT_TOKEN — skipping MCP config" >&2
+    fi
+else
+    echo "WARNING: secrets/aimeat.env missing — skipping MCP config (run scripts/aimeat-connect.sh first)" >&2
 fi
