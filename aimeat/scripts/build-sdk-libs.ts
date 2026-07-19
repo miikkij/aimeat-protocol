@@ -39,6 +39,10 @@ interface SdkLib {
 export const SDK_LIBS: SdkLib[] = [
   { name: 'speech', entry: 'speech/index.js' },
   { name: 'data', entry: 'data/index.js' },
+  { name: 'wallet', entry: 'wallet/index.js' },
+  { name: 'ai', entry: 'ai/index.js' },
+  { name: 'capabilities', entry: 'capabilities/index.js' },
+  { name: 'agents', entry: 'agents/index.js' },
 ];
 
 function banner(name: string): string {

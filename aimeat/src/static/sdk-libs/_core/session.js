@@ -12,10 +12,15 @@
  */
 
 /**
- * The live AIMEAT session object exposed by aimeat-auth.js.
+ * The live AIMEAT session object exposed by aimeat-auth.js. Only the members libs actually read
+ * are declared; it carries more (see aimeat-auth's createSession).
  * @typedef {Object} AimeatSession
  * @property {(path: string, opts?: RequestInit) => Promise<any>} fetch  Authed fetch → parsed envelope.
  * @property {string} [jwt]
+ * @property {string} [ghii]   Full GHII/GAII of the signed-in principal.
+ * @property {string} [owner]  Bare owner name.
+ * @property {string} [displayName]
+ * @property {string[]} [roles]
  */
 
 /**

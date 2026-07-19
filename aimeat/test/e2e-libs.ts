@@ -620,7 +620,9 @@ await test('GET /v1/libs/aimeat-wallet.js — serves JavaScript', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-wallet.js`);
     assert(res.ok, `wallet lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.wallet'), 'should expose AIMEAT.wallet');
+    // Componentized (SDK-libs migration): attaches via _core `attach('wallet', …)` rather than a
+    // literal `AIMEAT.wallet =`, so assert on stable wallet-surface markers instead.
+    assert(text.includes('balance'), 'should expose the wallet API (balance)');
     assert(text.includes('mountBadge'), 'should include badge UI');
 });
 
