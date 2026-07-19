@@ -5,6 +5,10 @@
  *   from scratch. Consumed by ../app-templates.ts which assembles the TEMPLATES registry.
  * @structure SHELL_PURE_CLIENT · SHELL_CORTEX · SHELL_EXTENSION
  * @version-history
+ *   v1.1.0 — 2026-07-19 — Mobile-safe by construction: viewport meta gains viewport-fit=cover +
+ *     interactive-widget=resizes-content (keyboard resizes the layout), and body gets overflow-x-clip
+ *     (kills the horizontal-overflow / shrink-to-fit class of bug). The login pill is compact-by-
+ *     default on app origins (aimeat-auth v1.2.0), so these shells need no per-app mobile work.
  *   v1.0.0 — 2026-07-13 — Extracted from src/data/app-templates.ts (max-file-lines)
  */
 
@@ -23,14 +27,14 @@ entry: index.html
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>{{App Title}}</title>
   <!-- Self-hosted Tailwind v4 + daisyUI 5 + theme bridge (served by the node, not a CDN) -->
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
   <script src="/lib/tailwindcss@4.js"></script>
 </head>
-<body class="bg-base-100 text-base-content min-h-screen flex flex-col">
+<body class="bg-base-100 text-base-content min-h-screen flex flex-col overflow-x-clip">
   <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50">
     <div class="flex-1"><span class="text-lg font-bold">{{App Title}}</span></div>
     <div class="flex-none"><span id="login"></span></div>
@@ -90,13 +94,13 @@ entry: index.html
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>{{App Title}}</title>
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
   <script src="/lib/tailwindcss@4.js"></script>
 </head>
-<body class="bg-base-100 text-base-content min-h-screen flex flex-col">
+<body class="bg-base-100 text-base-content min-h-screen flex flex-col overflow-x-clip">
   <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50">
     <div class="flex-1"><span class="text-lg font-bold">{{App Title}}</span></div>
     <div class="flex-none"><span id="login"></span></div>
@@ -148,13 +152,13 @@ entry: index.html
 <html lang="en" data-theme="dark">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>{{App Title}}</title>
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
   <script src="/lib/tailwindcss@4.js"></script>
 </head>
-<body class="bg-base-100 text-base-content min-h-screen flex flex-col">
+<body class="bg-base-100 text-base-content min-h-screen flex flex-col overflow-x-clip">
   <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50">
     <div class="flex-1"><span class="text-lg font-bold">{{App Title}}</span></div>
     <div class="flex-none"><span id="login"></span></div>

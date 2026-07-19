@@ -10,6 +10,8 @@
  *     malformed agents[] REJECTS the publish; carried forward on update when omitted.
  *   v1.2.0 — 2026-07-19 — provision the per-app subdomain (ensureAppSubdomain) at publish time
  *     so a new app's vanity URL works immediately (pitfall publish/new-app-subdomain-provisioning-lag).
+ *   v1.3.0 — 2026-07-19 — non-blocking `mobile_hints` in the publish response (lintAppHtmlForMobile):
+ *     catches the recurring phone-overflow bugs (missing viewport meta, grid 1fr blowout) at publish.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -24,6 +26,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
+import { lintAppHtmlForMobile } from '../../utils/app-mobile-lint.js';
 import { ensureAppSubdomain } from '../subdomains.js';
 import type { CanonicalOwner } from './helpers.js';
 
@@ -281,6 +284,10 @@ export function registerPublishRoutes(
 
         const downloadUrl = `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`;
 
+        // Non-blocking mobile hints (HTML only) — surfaced so the builder catches the recurring
+        // "overflows / tiny on a phone" bugs before users do. Never affects the publish outcome.
+        const mobileHints = mimeType === 'text/html' ? lintAppHtmlForMobile(data.toString('utf8')) : [];
+
         const changeAction = isUpdate ? 'app_update' as const : 'app_publish' as const;
         await storage.addSiteChangeLog({
             id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
@@ -323,6 +330,7 @@ export function registerPublishRoutes(
             note: isUpdate
                 ? `App updated to version ${newVersion}. Previous version${existingVersion > 1 ? 's are' : ' is'} preserved.`
                 : 'App published. Others can download this file and open it locally.',
+            ...(mobileHints.length ? { mobile_hints: mobileHints } : {}),
         }, [
             { description: 'View all versions', method: 'GET', url: `${downloadUrl}/versions` },
         ]));
