@@ -15,6 +15,10 @@
  *   - PresencePill + PresenceDialog — header status pill that opens the availability settings dialog
  *   - LandingPage — main orchestrator (default export)
  * @version-history
+ *   v3.12.1 — 2026-07-20 — Fix: the `aimeat-open-tab` handler force-opens (never toggles). Tapping a
+ *     message push-notification while the Messages tab was already open toggled it CLOSED (back to
+ *     Home) instead of switching to the new conversation; now it leaves the already-open tab in place
+ *     and lets that tab's own listener consume the deep-link.
  *   v3.12.0 — 2026-07-16 — Drop the per-item emoji icons from the sidebar (Home, Inbox, and each
  *     grouped/pinned item render label-only) — cleaner, less visually noisy menu.
  *   v3.11.0 — 2026-07-13 — Split into sibling modules for max-file-lines: modals →
@@ -281,7 +285,14 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   useEffect(() => {
     const handler = (e) => {
       const tabId = e.detail?.tabId;
-      if (tabId) open(tabId, e.detail?.slot || 'main');
+      if (!tabId) return;
+      // Force-OPEN semantics (never toggle): a deep-link/cross-nav must land ON the tab. open()
+      // toggles, so calling it when that tab is already active would CLOSE it back to Home — the
+      // exact bug when a message notification is tapped while the Messages tab is already open. If
+      // it's already open, leave it; the tab's own aimeat-open-tab listener consumes the deep-link
+      // (e.g. inbox-tab opens the freshly-arrived conversation).
+      if (openViewRef.current?.tabId === tabId) return;
+      open(tabId, e.detail?.slot || 'main');
     };
     window.addEventListener('aimeat-open-tab', handler);
     return () => window.removeEventListener('aimeat-open-tab', handler);

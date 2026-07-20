@@ -4,6 +4,10 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.16.1 — 2026-07-20 — Mobile home-dashboard overflow fix: .pf-home-card (and the spend/quota
+ *     tiles, chips, and long app-name row) get min-width:0 so unbreakable inner content no longer
+ *     forces a card — and the whole home grid — wider than a narrow phone (content ran off the right
+ *     edge, clipped by body{overflow-x:hidden}). .pf-usage-head wraps a very long quota value.
  *   v2.16.0 — 2026-07-19 — AppDev tab (pf-adk-*): prompt cards, learned-pitfall rows,
  *     chips (model/shared/tier/proof), severity badges (AppDev KB UI phase).
  *   v2.15.0 — 2026-07-16 — Drop the dead .pf-side-ico rule (sidebar nav is label-only now).
@@ -2977,7 +2981,11 @@
 .pf-waiting-where { color: var(--muted); }
 .pf-home-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin: 1rem 0; }
 @media (max-width: 760px) { .pf-home-grid { grid-template-columns: 1fr; } }
-.pf-home-card { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 0.8rem 1rem; }
+/* min-width:0 is load-bearing: grid/flex items default to min-width:auto and refuse to shrink
+   below their content's intrinsic width. Without it, a card with unbreakable inner content (long
+   app names, the 3-col number grid, the chart canvas) forces its grid column — and thus the whole
+   home dashboard — wider than a narrow phone, overflowing the right edge. */
+.pf-home-card { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 0.8rem 1rem; min-width: 0; }
 .pf-home-card-title { font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-dim); margin-bottom: 0.5rem; background: none; border: none; padding: 0; text-align: left; }
 .pf-home-card-link { cursor: pointer; }
 .pf-home-card-link:hover { color: var(--text); }
@@ -3017,7 +3025,14 @@
 .pf-ai-apps-head { font-size: 0.75rem; font-weight: 600; color: var(--muted); margin-bottom: 0.35rem; }
 .pf-ai-app-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; font-size: 0.82rem; }
 .pf-ai-app-dot { width: 10px; height: 10px; border-radius: 3px; flex: none; }
-.pf-ai-app-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+/* min-width:0 lets the flex:1 item actually shrink so the ellipsis engages on a long app name
+   (a bare flex:1 keeps min-width:auto and would overflow the card on a narrow screen instead). */
+.pf-ai-app-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text); }
+/* Let the spend tiles / quota chips shrink to their column on a narrow screen (tabular numbers
+   otherwise hold an intrinsic min-width and push the card past the viewport). */
+.pf-ai-win, .pf-usage-chip { min-width: 0; }
+/* A very long quota value wraps under its label instead of forcing the row wider than the screen. */
+.pf-usage-head { flex-wrap: wrap; }
 .pf-ai-app-cost { color: var(--text); font-variant-numeric: tabular-nums; }
 .pf-ai-app-pct { width: 3ch; text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
 .pf-ai-app-meta { color: var(--muted); font-size: 0.72rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
