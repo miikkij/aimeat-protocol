@@ -12,14 +12,17 @@
  *       one → the acceptance flow mints the entitlement.
  *   Keys: `exchange.offering.{id}` / `exchange.need.{id}` / `exchange.bid.{needId}.{id}` — public so the
  *   marketplace is browsable; ownership is the record's provider/requester GHII (authorised by the routes).
- * @structure Offering·Need·Bid types · put/get/list/delete for each · matchOfferings
+ * @structure Offering·Need·Bid types · UsageTerms·NeedSpec · put/get/list/delete for each · matchOfferings ·
+ *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.1.0 — 2026-07-20 — Legibility layer: UsageTerms + NeedSpec on records; offeringStats (usage/reputation)
+ *     + offeringConsumers (provider lineage) derived from entitlements (no metrics table).
  *   v1.0.0 — 2026-07-20 — Initial marketplace records (offering/need/bid) + capability matching (Phase C).
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
-import type { EntitlementUnit, PricingSpec } from './metered-entitlements.js';
+import { listEntitlementsByProvider, type EntitlementUnit, type PricingSpec } from './metered-entitlements.js';
 
 /** The action `commercial` block an offering/contract prices against. */
 export interface ActionCommercial {
@@ -75,6 +78,30 @@ export interface Provenance {
   odpsVersion?: string;
 }
 
+/**
+ * How a consumer may use the delivered data — the consent-forward half of provenance. A provider PROMISE
+ * surfaced to the consumer BEFORE they contract, so "may I refine and resell this downstream?" is answered
+ * up front (it is not enforced by the node — it is the stated licence the contract is accepted under).
+ */
+export interface UsageTerms {
+  derivatives: boolean;        // may the consumer build derivative works from the output?
+  resale: boolean;             // may the consumer resell / redistribute the raw or derived output?
+  attribution: boolean;        // must the consumer attribute the source?
+  note?: string;               // free-text nuance (e.g. "internal analytics only")
+}
+
+/**
+ * The MINIMUM a requester needs from a fulfilment — lets a provider (or an AI assessing candidates) judge
+ * FIT without guessing from a one-line description. This is what makes a NEED answerable: "here is the
+ * shape I must get back", not just "I want company data".
+ */
+export interface NeedSpec {
+  requiredFields: string[];    // fields the output MUST contain to be acceptable
+  format?: string;             // desired shape, e.g. 'JSON array of { name, businessId }'
+  sample?: string;             // an example of an acceptable response (illustrative)
+  notes?: string;              // constraints (freshness, coverage, rate) the fulfilment must meet
+}
+
 /** A public supply listing. */
 export interface Offering {
   offeringId: string;
@@ -89,6 +116,7 @@ export interface Offering {
   currency: string | null;
   plans: OfferingPlan[];
   provenance: Provenance | null;
+  usageTerms: UsageTerms | null;   // how the consumer may use the output (derivatives/resale/attribution)
   tags: string[];
   state: 'listed' | 'delisted';
   createdAt: string;
@@ -104,6 +132,7 @@ export interface Need {
   ext: string | null;           // desired capability (may be null when only a description is known)
   action: string | null;
   description: string;
+  spec: NeedSpec | null;        // the minimum shape a fulfilment must return (makes the need answerable)
   budgetUnit: EntitlementUnit | null;
   budgetCap: number | null;
   autonomy: 'supervised' | 'auto';
@@ -209,4 +238,62 @@ export async function listBids(storage: Storage, needId: string): Promise<Bid[]>
 export async function getBid(storage: Storage, needId: string, bidId: string): Promise<Bid | null> {
   const rec = (await storage.listAllMemory({ prefix: bidPrefix(needId) + bidId, limit: 2 })).items.find(r => r.key === bidPrefix(needId) + bidId);
   return rec ? (rec.value as Bid) : null;
+}
+
+// ── METRICS / REPUTATION (the measurability layer) ───────────────────────────
+/**
+ * Usage/reputation for an offering — the "is this API actually used, and successful?" signal that was in
+ * the original measurability spec. Derived entirely from the entitlements against it (each carries its own
+ * call + spend counters), so it needs no separate metrics table: a real, tamper-resistant record of demand.
+ */
+export interface OfferingStats {
+  activeContracts: number;     // live entitlements (state === 'active')
+  totalContracts: number;      // every entitlement ever minted against this capability
+  totalCalls: number;          // metered calls served across all contracts
+  totalSettledUnits: number;   // value settled to the provider, in the offering's unit
+  consumers: number;           // distinct consuming identities
+  listedAt: string;            // when the offering was first listed
+  lastUsedAt: string | null;   // most recent contract activity (proxy: latest entitlement update with calls)
+}
+
+/** Compute an offering's usage stats from the entitlements minted against its (provider, ext, action). */
+export async function offeringStats(storage: Storage, o: Offering): Promise<OfferingStats> {
+  const ents = (await listEntitlementsByProvider(storage, o.providerGhii)).filter(e => e.ext === o.ext && e.action === o.action);
+  const consumers = new Set(ents.map(e => e.consumerGaii));
+  let totalCalls = 0, totalSettledUnits = 0, activeContracts = 0, lastUsedAt: string | null = null;
+  for (const e of ents) {
+    totalCalls += e.budget.calls;
+    totalSettledUnits += e.budget.spentUnits;
+    if (e.state === 'active') activeContracts += 1;
+    if (e.budget.calls > 0 && (!lastUsedAt || e.updatedAt > lastUsedAt)) lastUsedAt = e.updatedAt;
+  }
+  return { activeContracts, totalContracts: ents.length, totalCalls, totalSettledUnits, consumers: consumers.size, listedAt: o.createdAt, lastUsedAt };
+}
+
+/**
+ * The provider's DATA-LINEAGE view: who holds a contract against this offering, how much they have consumed,
+ * and when they last used it — answering "where is my data used, by whom, and how much?". One row per live
+ * or historical contract. Provider-only (the route authorises); the consuming identity is shown so the
+ * provider can see (and, via the off-switch, react to) each relationship.
+ */
+export interface ConsumerRow {
+  consumerGaii: string;
+  appId: string | null;
+  contractRef: string;
+  unit: EntitlementUnit;
+  calls: number;
+  settledUnits: number;
+  state: string;
+  lastUsedAt: string;
+}
+
+/** List the consumers holding contracts against an offering (provider lineage/consumption log). */
+export async function offeringConsumers(storage: Storage, o: Offering): Promise<ConsumerRow[]> {
+  const ents = (await listEntitlementsByProvider(storage, o.providerGhii)).filter(e => e.ext === o.ext && e.action === o.action);
+  return ents
+    .map(e => ({
+      consumerGaii: e.consumerGaii, appId: e.appId, contractRef: e.contractRef, unit: e.unit,
+      calls: e.budget.calls, settledUnits: e.budget.spentUnits, state: e.state, lastUsedAt: e.updatedAt,
+    }))
+    .sort((a, b) => b.calls - a.calls);
 }

@@ -94,6 +94,10 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_handbook_get',
         // Commerce, buyer side: the owner's personal agent buys priced offers/app-tools.
         'aimeat_app_tools_get', 'aimeat_checkout_open', 'aimeat_checkout_complete', 'aimeat_checkout_list',
+        // EXCHANGE marketplace: browse/accept/post/bid the two-sided data-service market.
+        'aimeat_exchange_offerings', 'aimeat_exchange_offering_get', 'aimeat_exchange_accept',
+        'aimeat_exchange_contracts', 'aimeat_exchange_contract_off', 'aimeat_exchange_needs',
+        'aimeat_exchange_need_post', 'aimeat_exchange_bid', 'aimeat_exchange_bid_accept', 'aimeat_exchange_consumers',
     ],
     service: [
         'aimeat_discover',
@@ -121,6 +125,10 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_commerce_psp_set', 'aimeat_commerce_psp_status', 'aimeat_commerce_psp_delete',
         'aimeat_app_tools_publish', 'aimeat_app_tools_get', 'aimeat_offer_price_set',
         'aimeat_checkout_open', 'aimeat_checkout_complete', 'aimeat_checkout_list',
+        // EXCHANGE marketplace, both sides: a provider lists/bids/sees lineage; a consumer accepts contracts.
+        'aimeat_exchange_offerings', 'aimeat_exchange_offering_get', 'aimeat_exchange_accept',
+        'aimeat_exchange_contracts', 'aimeat_exchange_contract_off', 'aimeat_exchange_needs',
+        'aimeat_exchange_need_post', 'aimeat_exchange_bid', 'aimeat_exchange_bid_accept', 'aimeat_exchange_consumers',
     ],
     admin: [
         'aimeat_admin_stats', 'aimeat_admin_agents', 'aimeat_admin_config', 'aimeat_admin_mint',

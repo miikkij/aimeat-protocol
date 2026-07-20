@@ -43,6 +43,7 @@ import { discoveryWorkBoardsTools } from './definitions/discovery-work-boards.js
 import { capabilitiesGroupsSkillsTools } from './definitions/capabilities-groups-skills.js';
 import { organismsWorkspacesAppsTools } from './definitions/organisms-workspaces-apps.js';
 import { commerceTools } from './definitions/commerce.js';
+import { exchangeTools } from './definitions/exchange.js';
 
 export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...agentMessagingTools,
@@ -51,6 +52,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...capabilitiesGroupsSkillsTools,
     ...organismsWorkspacesAppsTools,
     ...commerceTools,
+    ...exchangeTools,
 ];
 
 const definitionByName = new Map(CLI_FALLBACK_TOOL_DEFINITIONS.map(definition => [definition.name, definition]));

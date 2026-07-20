@@ -39,6 +39,7 @@ import { agentTools } from './tool-call-defs-agent.js';
 import { coreTools } from './tool-call-defs-core.js';
 import { organismTools } from './tool-call-defs-organism.js';
 import { appTools } from './tool-call-defs-apps.js';
+import { exchangeTools } from './tool-call-defs-exchange.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
 export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
@@ -46,6 +47,7 @@ export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...coreTools,
     ...organismTools,
     ...appTools,
+    ...exchangeTools,
 ];
 
 function getTool(name: string): ConnectCliToolDefinition | undefined {

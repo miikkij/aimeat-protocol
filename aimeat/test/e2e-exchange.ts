@@ -9,6 +9,8 @@
  *   spend; the consumer's pause/revoke off-switch blocks calls; and re-accepting resumes (spend carried).
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange.ts
  * @version-history
+ *   v1.1.0 — 2026-07-20 — Legibility layer: offering detail (I/O schema + recipe + stats), usage terms, need
+ *     min-spec, provider consumer-lineage (owner-only), ?stats=1 list.
  *   v1.0.0 — 2026-07-20 — Initial EXCHANGE loop proof (G1+G2+G3 + acceptance surface).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -262,6 +264,51 @@ await test('Requester accepts the bid → entitlement minted; the metered call t
   assert(await balance(buyer.token) === cb - 10, 'buyer charged the authoritative price under the bid contract');
   const need = await json('/v1/exchange/needs?mine=1', { headers: auth(buyer.token) });
   assert(need.body.data.needs.find((n: any) => n.needId === needId)?.state === 'matched', 'need should be matched');
+});
+
+// ── LEGIBILITY LAYER: offering detail (I/O schema + recipe + stats), usage terms, need spec, provider lineage ──
+await test('Offering DETAIL exposes the I/O schema, call recipe, and usage stats', async () => {
+  const r = await json(`/v1/exchange/offerings/${offeringId}`);
+  assert(r.status === 200, `detail ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const d = r.body.data;
+  assert(d.offering?.offeringId === offeringId, 'detail returns the offering');
+  assert(d.capability && typeof d.capability.output_schema === 'object', 'detail carries the action output schema');
+  assert(d.call_recipe?.method === 'POST' && d.call_recipe.url === `/v1/ext/${EXT}/validate`, `call recipe: ${JSON.stringify(d.call_recipe)}`);
+  // 'validate' was consumed by the capped consumer (2 calls) + the bid buyer (1 call) → real usage across ≥2 consumers.
+  assert(d.stats.totalCalls >= 3, `stats.totalCalls should reflect metered use, got ${d.stats.totalCalls}`);
+  assert(d.stats.consumers >= 2, `stats.consumers should count distinct consumers, got ${d.stats.consumers}`);
+});
+
+await test('Offering carries provider USAGE TERMS (derivatives/resale/attribution)', async () => {
+  const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ ext: EXT, action: 'cheap', title: 'Cheap feed', usage_terms: { derivatives: true, resale: false, attribution: true, note: 'internal analytics' } }) });
+  assert(r.status === 201, `list w/ terms ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const ut = r.body.data.offering.usageTerms;
+  assert(ut && ut.derivatives === true && ut.resale === false && ut.attribution === true, `usage terms roundtrip: ${JSON.stringify(ut)}`);
+});
+
+await test('Need carries a MIN-SPEC (required fields + format) so a provider can judge fit', async () => {
+  const r = await json('/v1/exchange/needs', { method: 'POST', headers: auth(buyer.token),
+    body: JSON.stringify({ description: 'Company registry with VAT status', spec: { requiredFields: ['name', 'vatValid'], format: 'JSON { name, vatValid }' }, budget_unit: 'morsels', budget_cap: 40 }) });
+  assert(r.status === 201, `need w/ spec ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const s = r.body.data.need.spec;
+  assert(s && Array.isArray(s.requiredFields) && s.requiredFields.includes('vatValid') && s.format, `need spec roundtrip: ${JSON.stringify(s)}`);
+});
+
+await test('Provider LINEAGE: the offering owner sees who holds contracts; a stranger gets 404', async () => {
+  const mine = await json(`/v1/exchange/offerings/${offeringId}/consumers`, { headers: auth(provider.token) });
+  assert(mine.status === 200, `consumers ${mine.status}: ${JSON.stringify(mine.body?.error)}`);
+  assert(mine.body.data.consumers.length >= 2, `provider should see its consumers, got ${mine.body.data.consumers.length}`);
+  assert(mine.body.data.consumers.some((c: any) => c.calls >= 1), 'a consumer row should carry its call count');
+  const stranger = await json(`/v1/exchange/offerings/${offeringId}/consumers`, { headers: auth(consumer.token) });
+  assert(stranger.status === 404, `a non-owner must not read the lineage, got ${stranger.status}`);
+});
+
+await test('Offerings list with ?stats=1 folds usage into each listing', async () => {
+  const r = await json('/v1/exchange/offerings?stats=1');
+  assert(r.status === 200, `list+stats ${r.status}`);
+  const o = r.body.data.offerings.find((x: any) => x.offeringId === offeringId);
+  assert(o && o.stats && typeof o.stats.totalCalls === 'number', `stats folded into list: ${JSON.stringify(o?.stats)}`);
 });
 
 // ── MONEY unit (real currency via the accrual rail) — needs a EUR money handler (test.money in E2E) ──

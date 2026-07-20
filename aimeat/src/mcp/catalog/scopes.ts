@@ -137,6 +137,22 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_checkout_open: 'commerce:buy',
     aimeat_checkout_complete: 'commerce:buy',
     aimeat_checkout_list: 'commerce:buy',
+
+    // EXCHANGE marketplace (TARGET-045 over MCP). Like commerce, the REST /v1/exchange routes are
+    // requireAuth-only today — these MCP tools are gated STRICTER on purpose: accepting/bidding mints
+    // durable metered entitlements that authorise (charged) spend on the owner's balance. exchange:read
+    // = browse/detail/needs/contracts/lineage; exchange:write = accept/off/post/bid/bid-accept.
+    // Owner-attached '*' agents get both; granular agents opt in per scope.
+    aimeat_exchange_offerings: 'exchange:read',
+    aimeat_exchange_offering_get: 'exchange:read',
+    aimeat_exchange_contracts: 'exchange:read',
+    aimeat_exchange_needs: 'exchange:read',
+    aimeat_exchange_consumers: 'exchange:read',
+    aimeat_exchange_accept: 'exchange:write',
+    aimeat_exchange_contract_off: 'exchange:write',
+    aimeat_exchange_need_post: 'exchange:write',
+    aimeat_exchange_bid: 'exchange:write',
+    aimeat_exchange_bid_accept: 'exchange:write',
 };
 
 /**

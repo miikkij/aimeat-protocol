@@ -7,9 +7,12 @@
  *   direct acceptance route). Records are public (browsable); writes are owner-authorised. The heavy
  *   orchestration (agent negotiation, composite assembly) lives in the marketplace app/agent — this router
  *   is the generic store + capability match.
- * @structure exchangeMarketRouter — offerings (POST/GET/DELETE) · needs (POST/GET/close) · bids (POST/GET/accept)
+ * @structure exchangeMarketRouter — offerings (POST/GET/GET :id detail/GET :id/consumers/DELETE) ·
+ *   needs (POST/GET/close) · bids (POST/GET/accept)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-07-20 — Legibility: offering detail (I/O schema + call-recipe + stats), provider consumers
+ *     (lineage), usage_terms on offerings, spec on needs, ?stats=1 on the list.
  *   v1.0.0 — 2026-07-20 — Initial marketplace: offerings, needs, bids, capability match, accept-bid → mint (Phase C).
  */
 import { Router } from 'express';
@@ -22,14 +25,39 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { createEntitlement, readEntitlementForCall } from '../services/metered-entitlements.js';
 import {
-  type Offering, type Need, type Bid, type ActionCommercial,
+  type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type NeedSpec,
   resolveActionPricing, newOfferingId, newNeedId, newBidId,
   putOffering, getOffering, listOfferings, deleteOffering, matchOfferings,
   putNeed, getNeed, listNeeds, putBid, listBids, getBid,
+  offeringStats, offeringConsumers,
 } from '../services/exchange-market.js';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const posOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
+
+/** Parse a provider-declared usage licence from a request body (all fields optional; defaults are permissive-but-attributed). */
+function parseUsageTerms(v: unknown): UsageTerms | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  return {
+    derivatives: o.derivatives !== false,
+    resale: o.resale === true,
+    attribution: o.attribution !== false,
+    note: typeof o.note === 'string' ? o.note : undefined,
+  };
+}
+
+/** Parse a need's minimum-spec (required output fields + desired shape) from a request body. */
+function parseNeedSpec(v: unknown): NeedSpec | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const requiredFields = Array.isArray(o.requiredFields) ? (o.requiredFields as unknown[]).filter(f => typeof f === 'string') as string[] : [];
+  const spec: NeedSpec = { requiredFields };
+  if (typeof o.format === 'string') spec.format = o.format;
+  if (typeof o.sample === 'string') spec.sample = o.sample;
+  if (typeof o.notes === 'string') spec.notes = o.notes;
+  return (requiredFields.length || spec.format || spec.sample || spec.notes) ? spec : null;
+}
 
 export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -70,6 +98,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,
       plans: (act.commercial as ActionCommercial | undefined)?.plans ?? [],
       provenance: (b.provenance && typeof b.provenance === 'object') ? b.provenance as Offering['provenance'] : null,
+      usageTerms: parseUsageTerms(b.usage_terms),
       tags: Array.isArray(b.tags) ? (b.tags as unknown[]).filter(t => typeof t === 'string') as string[] : [],
       state: 'listed', createdAt: now, updatedAt: now,
     };
@@ -77,12 +106,56 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     return res.status(201).json(success(config.nodeId, { offering }));
   });
 
-  /** Browse listed offerings (matching a capability or free text). Public — no auth required. */
+  /**
+   * Offering DETAIL (public) — everything a human or agent needs to decide + integrate: the I/O SCHEMA of
+   * the underlying action, the CALL RECIPE (the contract IS the access — you call as yourself, no API key),
+   * usage terms, provenance, and usage STATS (reputation). One call, so the app/agent needn't stitch it.
+   */
+  router.get('/v1/exchange/offerings/:id', async (req: Request, res: Response) => {
+    const o = await getOffering(storage, str(req.params.id));
+    if (!o) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering'));
+    const extRec = await storage.getExtension(o.ext);
+    const act = extRec?.actions.find(a => a.id === o.action);
+    const stats = await offeringStats(storage, o);
+    return res.json(success(config.nodeId, {
+      offering: o,
+      capability: act ? {
+        input_schema: act.inputSchema ?? {},
+        output_schema: act.outputSchema ?? {},
+        toll_morsels: act.tollMorsels ?? 0,
+      } : null,
+      call_recipe: {
+        method: 'POST',
+        url: `/v1/ext/${o.ext}/${o.action}`,
+        auth: 'Your own AIMEAT token — the accepted contract (metered entitlement) authorises the call; no separate API key is issued.',
+        note: 'Each call is metered + charged to your budget at the provider price; the provider’s own upstream keys stay server-side.',
+        mcp: `aimeat_extension_invoke { "name": "${o.ext}", "action": "${o.action}", "input": { … } }`,
+      },
+      stats,
+    }));
+  });
+
+  /**
+   * Offering CONSUMERS (provider lineage) — who holds a contract against my offering, how much they consumed,
+   * when they last used it. Provider-only: "where is my data used, by whom?".
+   */
+  router.get('/v1/exchange/offerings/:id/consumers', requireAuth(), async (req: Request, res: Response) => {
+    const o = await getOffering(storage, str(req.params.id));
+    if (!o || o.providerOwner !== req.auth!.owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering of yours'));
+    const consumers = await offeringConsumers(storage, o);
+    return res.json(success(config.nodeId, { offeringId: o.offeringId, consumers, count: consumers.length }));
+  });
+
+  /** Browse listed offerings (matching a capability or free text). Public. `?stats=1` folds in usage/reputation. */
   router.get('/v1/exchange/offerings', async (req: Request, res: Response) => {
     const ext = str(req.query.ext), action = str(req.query.action), q = str(req.query.q);
     const offerings = (ext && action) || q
       ? await matchOfferings(storage, { ext: ext || null, action: action || null, text: q || null })
       : await listOfferings(storage);
+    if (str(req.query.stats) === '1') {
+      const withStats = await Promise.all(offerings.map(async o => ({ ...o, stats: await offeringStats(storage, o) })));
+      return res.json(success(config.nodeId, { offerings: withStats, count: withStats.length }));
+    }
     return res.json(success(config.nodeId, { offerings, count: offerings.length }));
   });
 
@@ -109,6 +182,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       appId: str(b.app_id) || null,
       ext: str(b.ext) || null, action: str(b.action) || null,
       description,
+      spec: parseNeedSpec(b.spec),
       budgetUnit, budgetCap: posOrNull(b.budget_cap),
       autonomy: b.autonomy === 'auto' ? 'auto' : 'supervised',
       state: 'open', createdAt: now, updatedAt: now,
