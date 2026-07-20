@@ -58,6 +58,7 @@ const manifest = (name: string) => JSON.stringify({
   actions: [
     { id: 'validate', method: 'POST', path: '/validate', script: 'echo', commercial: { payMorsels: 10 } },
     { id: 'cheap', method: 'POST', path: '/cheap', script: 'echo', commercial: { payMorsels: 4 } },
+    { id: 'money', method: 'POST', path: '/money', script: 'echo', commercial: { payMoney: { amount: 100000, currency: 'EUR' } } },
     { id: 'free', method: 'POST', path: '/free', script: 'echo' },
   ],
   config: { public_access: { default: true } },
@@ -169,6 +170,50 @@ await test('Re-accepting resumes the contract and carries spend forward', async 
   const call = await invoke(consumer.token, 'cheap');
   assert(call.status === 200, `call after resume ${call.status}: ${JSON.stringify(call.body?.error)}`);
 });
+
+// ── MONEY unit (real currency via the accrual rail) — needs a EUR money handler (test.money in E2E) ──
+let moneyEnabled = false;
+try {
+  const ucp = await fetch(`${BASE}/.well-known/ucp`).then((r) => r.json()) as any;
+  moneyEnabled = (ucp.ucp?.payment_handlers || []).some((h: any) =>
+    Array.isArray(h.currencies) && h.currencies.includes('EUR'));
+} catch { /* leave false */ }
+
+if (!moneyEnabled) {
+  console.log('  ⏭  money-unit contract skipped — no EUR handler (set AIMEAT_TEST_MONEY_HANDLER=true)');
+} else {
+  await test('Accept a MONEY-priced contract → unit=money, authoritative EUR price, budget in micros', async () => {
+    const r = await accept(consumer.token, 'money', { cap_units: 250000, app_id: appId }); // 0.25 EUR cap
+    assert(r.status === 201, `accept money ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    const e = r.body.data.entitlement;
+    assert(e.unit === 'money' && e.currency === 'EUR', `unit/currency: ${JSON.stringify(e)}`);
+    assert(e.price_per_call === 100000, `authoritative EUR price (100000 micros), got ${e.price_per_call}`);
+    assert(e.budget.cap_units === 250000 && e.budget.spent_units === 0, `budget: ${JSON.stringify(e.budget)}`);
+  });
+
+  await test('Metered MONEY call: real EUR accrues off-ledger (morsels UNCHANGED), budget spent=100000', async () => {
+    const cb = await balance(consumer.token);          // morsel balance must not move — money is off-ledger
+    const r = await invoke(consumer.token, 'money');
+    assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    assert(await balance(consumer.token) === cb, 'money settles off the morsel ledger — morsels unchanged');
+    const list = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+    const e = list.body.data.entitlements.find((x: any) => x.action === 'money');
+    assert(e.budget.spent_units === 100000 && e.budget.calls === 1, `budget after 1 money call: ${JSON.stringify(e.budget)}`);
+  });
+
+  await test('MONEY budget cap hard-stops: 2nd call ok (0.20/0.25), 3rd → 402 BUDGET_EXHAUSTED', async () => {
+    const two = await invoke(consumer.token, 'money');   // spent -> 200000, under 250000
+    assert(two.status === 200, `2nd money call ${two.status}`);
+    const three = await invoke(consumer.token, 'money'); // 300000 > 250000 cap → denied
+    assert(three.status === 402 && three.body?.error?.code === 'BUDGET_EXHAUSTED', `expected BUDGET_EXHAUSTED, got ${three.status}/${JSON.stringify(three.body?.error)}`);
+  });
+
+  await test('G3 cost surface splits money vs morsels: money spent=200000, 2 calls', async () => {
+    const r = await json(`/v1/apps/cost?app_id=${encodeURIComponent(appId)}`, { headers: auth(consumer.token) });
+    assert(r.status === 200, `cost ${r.status}`);
+    assert(r.body.data.totals.money.spent_units === 200000 && r.body.data.totals.money.calls === 2, `money totals: ${JSON.stringify(r.body.data.totals.money)}`);
+  });
+}
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

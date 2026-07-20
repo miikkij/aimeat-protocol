@@ -93,14 +93,24 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     if (!extRec) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Extension "${ext}" not found`));
     const act = extRec.actions.find(a => a.id === action);
     if (!act) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Action "${action}" not found on "${ext}"`));
-    const price = act.commercial?.payMorsels;
-    if (typeof price !== 'number' || !Number.isInteger(price) || price <= 0) {
+
+    // AUTHORITATIVE price + unit from the provider action — money (payMoney) takes precedence over morsels.
+    const comm = act.commercial;
+    const money = comm?.payMoney;
+    let unit: 'morsels' | 'money';
+    let pricePerCall: number;
+    let currency: string | null = null;
+    if (money && typeof money.amount === 'number' && Number.isInteger(money.amount) && money.amount > 0) {
+      unit = 'money'; pricePerCall = money.amount; currency = money.currency;
+    } else if (typeof comm?.payMorsels === 'number' && Number.isInteger(comm.payMorsels) && comm.payMorsels > 0) {
+      unit = 'morsels'; pricePerCall = comm.payMorsels;
+    } else {
       return res.status(400).json(error(config.nodeId, 'NOT_PRICED',
-        `Action "${ext}/${action}" has no morsel price; only morsel-priced actions are contractable in slice-1`));
+        `Action "${ext}/${action}" has no price; only priced actions are contractable`));
     }
-    if (capUnits !== null && capUnits < price) {
+    if (capUnits !== null && capUnits < pricePerCall) {
       return res.status(400).json(error(config.nodeId, 'BUDGET_TOO_LOW',
-        `Budget cap (${capUnits}) is below the ${price}-morsel price of a single call`));
+        `Budget cap (${capUnits}) is below the ${pricePerCall}-${unit === 'money' ? currency : 'morsel'} price of a single call`));
     }
     const providerGhii = `${extRec.installedBy}@${config.nodeId}`;
 
@@ -108,7 +118,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const existing = await readEntitlementForCall(storage, consumerGaii, ext, action);
     const ent = await createEntitlement(storage, {
       consumerGaii, appId, providerGhii, ext, action, capabilityLabel: `${ext}/${action}`,
-      unit: 'morsels', pricePerCall: price, capUnits, contractRef, escrowParty, createdBy: owner,
+      unit, pricePerCall, currency, capUnits, contractRef, escrowParty, createdBy: owner,
       carrySpend: existing,
     });
     return res.status(201).json(success(config.nodeId, { entitlement: view(config, ent) }, [
