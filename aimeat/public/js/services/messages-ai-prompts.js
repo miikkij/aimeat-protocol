@@ -19,6 +19,8 @@
  *   - handleOf(id) / peerLabel(id) — short label helpers (mirrors inbox-tab peerName)
  *   - buildConversationReplyPrompt({ peerGhii, subject, conversationId, thread }, mode)
  *   - buildMessageReplyPrompt({ peerGhii, subject, conversationId, message }, mode)
+ *   - buildConversationSummaryPrompt({ peerGhii, subject, thread, peerName }) — distill a whole thread
+ *     into a filo-ready note (summary/decisions/open-questions/actions/ideas) for the Notebook capture.
  * @usage
  *   import { buildConversationReplyPrompt, MODES } from '/js/services/messages-ai-prompts.js';
  *   const text = buildConversationReplyPrompt({ peerGhii, subject, conversationId, thread }, MODES.COPY);
@@ -31,6 +33,9 @@
  *   v1.2.0 -- 2026-07-12 -- MCP mode sends AS THE OWNER via aimeat_dm_send_as_owner (consent-gated
  *     delegation, scope messages:send-as-owner), landing the reply in the owner's thread from the owner.
  *     Graceful fallback to "hand me the reply" when the scope isn't granted; still never aimeat_dm_send.
+ *   v1.3.0 -- 2026-07-19 -- buildConversationSummaryPrompt: distill a whole thread into a knowledge note
+ *     (summary/decisions/open-questions/actions/ideas). One prompt, two deliveries — the server-side
+ *     /v1/ai/complete summary AND the copy-paste "run it in my own chat" mode of the Notebook capture.
  */
 
 export const MODES = { COPY: 'copy', MCP: 'mcp' };
@@ -162,6 +167,39 @@ export function buildConversationReplyPrompt({ peerGhii, subject, conversationId
     '3. Any links or references you found that back it up.',
     '',
     'Ask me for anything you need before finalizing. I will paste your reply back into AIMEAT myself.',
+  ].join('\n');
+}
+
+/**
+ * Distill a whole conversation into a self-contained knowledge note — the prompt behind the Inbox
+ * "→ Notebook" capture. Used two ways with the SAME text: sent to /v1/ai/complete (server-side, the
+ * owner's own key) and shown for copy-paste into the owner's own AI chat. English framing (house rule);
+ * the model answers in the conversation's language.
+ * @param {ConversationSource} [src]
+ */
+export function buildConversationSummaryPrompt({ peerGhii, subject, thread, peerName } = {}) {
+  const them = peerLabel(peerGhii, peerName);
+  const topic = subject ? ` (topic: "${subject}")` : '';
+  const convo = transcript(thread, peerGhii, peerName || handleOf(peerGhii));
+  return [
+    '# Summarize this conversation for my knowledge base',
+    '',
+    `This is my AIMEAT conversation with **${them}**${topic}. Distill it into a clean, self-contained`,
+    'Markdown note I can file into my workspace. Write in the SAME language as the conversation.',
+    '',
+    '## Produce these sections (drop a heading only when it would be genuinely empty)',
+    '1. **Summary** — 2-4 sentences on what this conversation was about.',
+    '2. **Decisions** — concrete decisions that were made (bullet list).',
+    '3. **Open questions** — anything still unresolved or awaiting an answer.',
+    '4. **Action items** — who does what next, if stated (name the owner when known).',
+    '5. **Ideas worth keeping** — proposals, concepts, or directions raised that are worth revisiting.',
+    '',
+    'Stay faithful to what was actually said — do not invent decisions or facts. Images shown as',
+    '`![name](url)` were shared but you cannot see them — reference them by name, never guess their',
+    'contents. Start the note with a single H1 title line.',
+    '',
+    '## The conversation',
+    convo,
   ].join('\n');
 }
 
