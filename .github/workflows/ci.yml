@@ -58,6 +58,10 @@ jobs:
         working-directory: aimeat
         run: pnpm typecheck:frontend
 
+      - name: Type check (SDK libs — checkJs over src/static/sdk-libs/)
+        working-directory: aimeat
+        run: pnpm typecheck:sdk
+
       - name: Importmap consistency (spa.html ↔ absolute imports)
         working-directory: aimeat
         run: pnpm check:importmap
@@ -73,6 +77,10 @@ jobs:
       - name: app-catalog.html in sync with its sources
         working-directory: aimeat
         run: pnpm check:app-catalog
+
+      - name: SDK-libs dist bundles in sync with their sources
+        working-directory: aimeat
+        run: pnpm check:sdk
 
       - name: MCP tool surface/handler parity (check:mcp-tools)
         working-directory: aimeat

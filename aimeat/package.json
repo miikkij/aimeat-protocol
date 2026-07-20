@@ -16,11 +16,13 @@
     "docs/csm-examples/"
   ],
   "scripts": {
-    "dev": "tsx scripts/kill-port.ts && tsx scripts/build-app-catalog.ts && node --env-file=.env --import tsx src/index.ts start",
+    "dev": "tsx scripts/kill-port.ts && tsx scripts/build-app-catalog.ts && tsx scripts/build-sdk-libs.ts && node --env-file=.env --import tsx src/index.ts start",
     "dev:watch": "tsx watch src/index.ts",
     "build": "tsc && node --input-type=module -e \"import fs from 'fs';fs.cpSync('locales','dist/locales',{recursive:true});fs.cpSync('public','dist/public',{recursive:true});fs.cpSync('src/static','dist/static',{recursive:true});fs.cpSync('.env.example','dist/.env.example');fs.cpSync('src/storage/providers/postgres-kysely/migrations','dist/src/storage/providers/postgres-kysely/migrations',{recursive:true});\"",
     "build:app-catalog": "tsx scripts/build-app-catalog.ts",
     "check:app-catalog": "tsx scripts/build-app-catalog.ts --check",
+    "build:sdk": "tsx scripts/build-sdk-libs.ts",
+    "check:sdk": "tsx scripts/build-sdk-libs.ts --check",
     "check:mcp-tools": "tsx scripts/audit-mcp-tools.ts --check",
     "check:packs-doc": "vitest run test/unit/library-packs-doc-truth.test.ts",
     "aeb:prove": "tsx scripts/aeb-prove.ts",
@@ -87,6 +89,7 @@
     "lint": "eslint src/ public/ --max-warnings 0",
     "typecheck": "tsc --noEmit",
     "typecheck:frontend": "tsc --noEmit -p tsconfig.frontend.json",
+    "typecheck:sdk": "tsc --noEmit -p tsconfig.sdk.json",
     "check:importmap": "tsx scripts/check-importmap.ts",
     "check:no-max-tokens": "tsx scripts/check-no-max-tokens.ts",
     "screenshot:worker": "tsx scripts/screenshot-worker.ts",

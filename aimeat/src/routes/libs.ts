@@ -1,9 +1,15 @@
 /**
  * @file libs.ts
  * @description Serves browser helper libraries used by AIMEAT apps, including auth, data, storage, social, wallet, and capability clients.
- * @structure libsRouter route registration; aimeatAuthLib browser auth/session helper; individual library imports delegated to lib-* modules.
+ * @structure libsRouter route registration — a data-driven loop over SDK_LIB_NAMES + explicit auth
+ *   (OIDC-provider prelude) and portfolio-standalone routes, all serving committed esbuild-IIFE
+ *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.0.0 - 2026-07-19 - SDK-libs migration Phase 5: every browser lib is now authored as
+ *   componentized JSDoc-typed ESM under src/static/sdk-libs/ and esbuild-bundled to an IIFE served at
+ *   the same URL. Removed all 23 JS-in-a-template-string generators (lib-*.ts, libs/auth-lib-part*.ts,
+ *   libs/audio-lib-part2.ts) + the ?impl=legacy branches; routes are now a loop over SDK_LIB_NAMES.
  * v1.38.0 - 2026-07-16 - New library aimeat-workflows.js: the Agent Workflows client
  *   (list/get/save/remove defs, run signals|full + sandbox, runs/health/blueprint, cancel) incl.
  *   the human-in-the-loop surface (pendingInputs + answer + watchRun over the aimeat-live
@@ -140,30 +146,19 @@
 import { Router, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { aimeatDataLib } from './lib-data.js';
-import { aimeatStorageLib } from './lib-storage.js';
-import { aimeatMarkdownLib } from './lib-markdown.js';
-import { aimeatSocialLib } from './lib-social.js';
-import { aimeatWalletLib } from './lib-wallet.js';
-import { aimeatWorkflowsLib } from './lib-workflows.js';
-import { aimeatWorkLib } from './lib-work.js';
-import { aimeatTunnelLib } from './lib-tunnel.js';
-import { aimeatAudioLib } from './lib-audio.js';
-import { aimeatSpeechLib } from './lib-speech.js';
-import { aimeatCapabilitiesLib } from './lib-capabilities.js';
-import { aimeatAiLib } from './lib-ai.js';
-import { aimeatAgentsLib } from './lib-agents.js';
-import { aimeatHeaderLib } from './lib-header.js';
-import { portfolioStandaloneLib } from './lib-portfolio-standalone.js';
-import { aimeatOrganismLib } from './lib-organism.js';
-import { aimeatIntakeLib } from './lib-intake.js';
-import { aimeatEditorLib } from './lib-editor.js';
-import { aimeatLiveLib } from './lib-live.js';
-import { aimeatCommerceLib } from './lib-commerce.js';
-import { aimeatWebmcpLib } from './lib-webmcp.js';
-import { aimeatAgentFaceLib } from './lib-agentface.js';
-import { aimeatAuthLib } from './libs/auth-lib.js';
+import { sdkLibSource, configPrelude, readSdkBundle } from './libs/sdk-serve.js';
+import { listEnabledProviderMeta } from '../services/oidc-providers.js';
 import { buildLibsCatalogue } from '../data/library-packs.js';
+
+// The migrated SDK libraries, served from committed esbuild-IIFE bundles (src/static/sdk-libs/dist/)
+// + a per-node config prelude. Route path is /v1/libs/aimeat-<name>.js; sdkLibSource(config, name)
+// reads dist/aimeat-<name>.js. `auth` (OIDC-provider prelude) + `portfolio-standalone` (non-aimeat
+// URL) are wired explicitly below; everything else is this list. Sources: src/static/sdk-libs/<name>/.
+const SDK_LIB_NAMES = [
+  'speech', 'data', 'wallet', 'ai', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
+  'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'webmcp',
+  'markdown', 'audio', 'tunnel',
+] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {
   res.set('Cache-Control', 'no-store');
@@ -179,123 +174,28 @@ function sendJavascriptLibrary(res: Response, source: string): void {
 export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   const router = Router();
 
-  // GET /v1/libs/aimeat-auth.js — Auth helper library
-  router.get('/v1/libs/aimeat-auth.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatAuthLib(config));
-  });
+  // ── Migrated SDK libraries: one route per lib, each serving its committed esbuild-IIFE bundle
+  // (src/static/sdk-libs/dist/aimeat-<name>.js) + a per-node config prelude. Sources live under
+  // src/static/sdk-libs/<name>/. The two exceptions (auth's OIDC-provider prelude, portfolio's
+  // non-aimeat URL) are wired explicitly after the loop.
+  for (const name of SDK_LIB_NAMES) {
+    router.get(`/v1/libs/aimeat-${name}.js`, (_req, res) => {
+      sendJavascriptLibrary(res, sdkLibSource(config, name));
+    });
+  }
 
-  // GET /v1/libs/aimeat-webmcp.js — WebMCP bridge (expose app/node tools to in-browser agents;
-  // priced tools pay through the commerce checkout). TARGET-034 phase C.
-  router.get('/v1/libs/aimeat-webmcp.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatWebmcpLib(config));
-  });
-
-  // GET /v1/libs/aimeat-agentface.js — publish the app's Agent Face (the markdown read-surface
-  // served on the app URL for Accept: text/markdown) in one call from inside the running app.
-  router.get('/v1/libs/aimeat-agentface.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatAgentFaceLib(config));
-  });
-
-  // GET /v1/libs/aimeat-header.js — Drop-in canonical site header (nav + theme +
-  // language + live login pill) for standalone pages such as custom portal templates.
-  router.get('/v1/libs/aimeat-header.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatHeaderLib(config));
-  });
-
-  // GET /v1/libs/portfolio-standalone.js — bridge shim injected into portfolios
-  // served on the portfolio origin (<username>.portfolio.<apex>).
+  // GET /v1/libs/portfolio-standalone.js — portfolio-origin bridge shim (non-aimeat-prefixed URL).
   router.get('/v1/libs/portfolio-standalone.js', (_req, res) => {
-    sendJavascriptLibrary(res, portfolioStandaloneLib(config));
+    sendJavascriptLibrary(res, sdkLibSource(config, 'portfolio-standalone'));
   });
 
-  // GET /v1/libs/aimeat-data.js — Memory & Micro-Memory library
-  router.get('/v1/libs/aimeat-data.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatDataLib(config));
-  });
-
-  // GET /v1/libs/aimeat-storage.js — File storage library
-  router.get('/v1/libs/aimeat-storage.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatStorageLib(config));
-  });
-
-  // GET /v1/libs/aimeat-markdown.js — safe GFM markdown renderer (AIMEAT.md.render)
-  router.get('/v1/libs/aimeat-markdown.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatMarkdownLib(config));
-  });
-
-  // GET /v1/libs/aimeat-social.js — Boards & social library
-  router.get('/v1/libs/aimeat-social.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatSocialLib(config));
-  });
-
-  // GET /v1/libs/aimeat-wallet.js — Wallet library
-  router.get('/v1/libs/aimeat-wallet.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatWalletLib(config));
-  });
-
-  // GET /v1/libs/aimeat-workflows.js — Agent Workflows client (incl. human-input answer loop)
-  router.get('/v1/libs/aimeat-workflows.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatWorkflowsLib(config));
-  });
-
-  // GET /v1/libs/aimeat-work.js — Actions & work exchange library
-  router.get('/v1/libs/aimeat-work.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatWorkLib(config));
-  });
-
-  // GET /v1/libs/aimeat-tunnel.js — Personal node tunnel client
-  router.get('/v1/libs/aimeat-tunnel.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatTunnelLib(config));
-  });
-
-  // GET /v1/libs/aimeat-audio.js — Audio engine library
-  router.get('/v1/libs/aimeat-audio.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatAudioLib(config));
-  });
-
-  // GET /v1/libs/aimeat-speech.js — Speech library
-  router.get('/v1/libs/aimeat-speech.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatSpeechLib(config));
-  });
-
-  // GET /v1/libs/aimeat-capabilities.js — Capability discovery, invoke, management
-  router.get('/v1/libs/aimeat-capabilities.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatCapabilitiesLib(config));
-  });
-
-  // GET /v1/libs/aimeat-ai.js — AI completion using the user's OpenRouter key
-  router.get('/v1/libs/aimeat-ai.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatAiLib(config));
-  });
-
-  // GET /v1/libs/aimeat-agents.js — commission & observe the owner's agents
-  router.get('/v1/libs/aimeat-agents.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatAgentsLib(config));
-  });
-
-  // GET /v1/libs/aimeat-organism.js — organism/workspace content client (normalized read + draft/publish)
-  router.get('/v1/libs/aimeat-organism.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatOrganismLib(config));
-  });
-
-  // GET /v1/libs/aimeat-intake.js — Public Intake client (public getForm/submit + owner form management)
-  router.get('/v1/libs/aimeat-intake.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatIntakeLib(config));
-  });
-
-  // GET /v1/libs/aimeat-editor.js — markdown editor (CodeMirror 6 + toolbar + split preview)
-  router.get('/v1/libs/aimeat-editor.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatEditorLib(config));
-  });
-
-  // GET /v1/libs/aimeat-live.js — realtime live-updates (SSE subscribe helper, TARGET-012)
-  router.get('/v1/libs/aimeat-live.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatLiveLib(config));
-  });
-
-  // GET /v1/libs/aimeat-commerce.js — checkout sessions, offer prices, money formatting (TARGET-033)
-  router.get('/v1/libs/aimeat-commerce.js', (_req, res) => {
-    sendJavascriptLibrary(res, aimeatCommerceLib(config));
+  // GET /v1/libs/aimeat-auth.js — Auth library. Prepends the standard config prelude PLUS an
+  // auth-specific one carrying the node's enabled OIDC providers (server-computed — the generic
+  // prelude only has nodeId/baseUrl), which auth/config.js reads as window.__AIMEAT_AUTH_CFG__.providers.
+  router.get('/v1/libs/aimeat-auth.js', (_req, res) => {
+    const authCfg = `window.__AIMEAT_AUTH_CFG__=${JSON.stringify({ providers: listEnabledProviderMeta(config) })};
+`;
+    sendJavascriptLibrary(res, configPrelude(config) + authCfg + readSdkBundle('auth'));
   });
 
   // GET /v1/libs/ — List available libraries. Derived from the library-pack registry

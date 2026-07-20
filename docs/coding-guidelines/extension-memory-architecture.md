@@ -221,6 +221,6 @@ POST /v1/cortex/{name}/activate
 | `src/routes/extensions.ts:1013` | `callerGaii = resolveIdentity(req.auth!, config.nodeId)` |
 | `src/routes/extensions.ts:1075-1088` | `ctx.memory.getPublic()` implementation |
 | `src/routes/memory.ts:832-910` | Public memory read route `GET /v1/memory/:gaii/:key` (no auth) |
-| `src/routes/lib-data.ts:106-115` | `AIMEAT.data.getPublic()` browser implementation |
+| `src/static/sdk-libs/data/index.js` (`getPublic`) | `AIMEAT.data.getPublic()` browser implementation |
 | `src/routes/cortex.ts:48-86` | Cortex registration (expects `libs` dict) |
 | `src/routes/cortex.ts:230-271` | Cortex activate (idempotent — skips if already active) |

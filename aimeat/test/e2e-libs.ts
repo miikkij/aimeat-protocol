@@ -593,7 +593,9 @@ await test('GET /v1/libs/aimeat-data.js — serves JavaScript', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-data.js`);
     assert(res.ok, `data lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.data'), 'should expose AIMEAT.data');
+    // The lib is componentized (SDK-libs migration): it attaches via _core `attach('data', …)`
+    // rather than a literal `AIMEAT.data =`, so assert on stable data-surface markers instead.
+    assert(text.includes('getPublic'), 'should expose the memory API (getPublic)');
     assert(text.includes('micro'), 'should include micro-memory support');
     assert(res.headers.get('Content-Type')?.includes('javascript'), 'should be javascript');
 });
@@ -602,7 +604,7 @@ await test('GET /v1/libs/aimeat-storage.js — serves JavaScript', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-storage.js`);
     assert(res.ok, `storage lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.storage'), 'should expose AIMEAT.storage');
+    assert(text.includes('upload'), 'should expose the storage API (upload)'); // componentized: attaches via _core attach()
     assert(text.includes('enableDropZone'), 'should include drop zone helper');
 });
 
@@ -610,7 +612,7 @@ await test('GET /v1/libs/aimeat-social.js — serves JavaScript', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-social.js`);
     assert(res.ok, `social lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.social'), 'should expose AIMEAT.social');
+    assert(text.includes('createBoard'), 'should expose the social API (createBoard)'); // componentized: attaches via _core attach()
     assert(text.includes('subscribe'), 'should include subscriptions');
 });
 
@@ -618,7 +620,9 @@ await test('GET /v1/libs/aimeat-wallet.js — serves JavaScript', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-wallet.js`);
     assert(res.ok, `wallet lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.wallet'), 'should expose AIMEAT.wallet');
+    // Componentized (SDK-libs migration): attaches via _core `attach('wallet', …)` rather than a
+    // literal `AIMEAT.wallet =`, so assert on stable wallet-surface markers instead.
+    assert(text.includes('balance'), 'should expose the wallet API (balance)');
     assert(text.includes('mountBadge'), 'should include badge UI');
 });
 
@@ -626,7 +630,7 @@ await test('GET /v1/libs/aimeat-work.js — serves JavaScript', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-work.js`);
     assert(res.ok, `work lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.work'), 'should expose AIMEAT.work');
+    assert(text.includes('catalogue'), 'should expose the work API (catalogue)'); // componentized: attaches via _core attach()
     assert(text.includes('waitFor'), 'should include polling helper');
 });
 
@@ -634,7 +638,9 @@ await test('GET /v1/libs/aimeat-markdown.js — serves render + renderRich + ren
     const res = await fetch(`${BASE}/v1/libs/aimeat-markdown.js`);
     assert(res.ok, `markdown lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.md'), 'should expose AIMEAT.md');
+    // Componentized (SDK-libs migration): attaches via _core `attach('md', …)` rather than a literal
+    // `AIMEAT.md =`, so assert on a stable md-surface marker (sanitizeHref) instead.
+    assert(text.includes('sanitizeHref'), 'should expose the markdown surface (sanitizeHref)');
     assert(text.includes('renderRich'), 'should include the rich pipeline');
     assert(text.includes('renderToString'), 'should include the string form');
     assert(text.includes('suppressErrorRendering'), 'mermaid init must suppress error-bomb rendering');
@@ -646,7 +652,9 @@ await test('GET /v1/libs/aimeat-organism.js — serves normalized workspace clie
     const res = await fetch(`${BASE}/v1/libs/aimeat-organism.js`);
     assert(res.ok, `organism lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.organism'), 'should expose AIMEAT.organism');
+    // Componentized (SDK-libs migration): attaches via _core `attach('organism', …)` rather than a
+    // literal `AIMEAT.organism =`, so assert on stable organism-surface markers instead.
+    assert(text.includes('createWorkspace'), 'should expose the organism API (createWorkspace)');
     assert(text.includes('normalizeWorkspace'), 'should include the objects+drafts normalizer');
     assert(text.includes('writeDraft'), 'should include draft writes');
     assert(text.includes('/publish'), 'should include the publish call');
@@ -657,7 +665,9 @@ await test('GET /v1/libs/aimeat-editor.js — serves CM6 editor with fallback', 
     const res = await fetch(`${BASE}/v1/libs/aimeat-editor.js`);
     assert(res.ok, `editor lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.editor'), 'should expose AIMEAT.editor');
+    // Componentized (SDK-libs migration): attaches via _core `attach('editor', …)` rather than a
+    // literal `AIMEAT.editor =`, so assert on the stable editor-surface marker (split) instead.
+    assert(text.includes('split'), 'should expose the editor API (split)');
     assert(text.includes('codemirror@6.0.2'), 'CM6 must be exact-pinned (the @6 range resolves to CM5 on esm.sh)');
     assert(text.includes('textarea'), 'should include the textarea fallback');
     assert(text.includes('toolbar'), 'should include the toolbar builder');
@@ -667,7 +677,7 @@ await test('GET /v1/libs/aimeat-commerce.js — serves checkout + money-formatti
     const res = await fetch(`${BASE}/v1/libs/aimeat-commerce.js`);
     assert(res.ok, `commerce lib failed: ${res.status}`);
     const text = await res.text();
-    assert(text.includes('AIMEAT.commerce'), 'should expose AIMEAT.commerce');
+    assert(text.includes('fmtMoney'), 'should expose the commerce API (fmtMoney)'); // componentized: attaches via _core attach()
     assert(text.includes('buyOffer'), 'should include the one-call purchase');
     assert(text.includes('/v1/commerce/checkout-sessions'), 'should call the checkout API');
     assert(text.includes('paymentRequired'), 'should surface the x402-style 402 accepts block');
