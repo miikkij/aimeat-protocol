@@ -10,6 +10,8 @@
  * @version-history
  *   v1.3.0 — 2026-07-16 — Add openStagingPreview(owner, filename): mint a preview token for an
  *     EXISTING staging draft and open it top-level, driving a library card's "Open staging" button.
+ *   v1.3.0 — 2026-07-20 — Cost & Contracts section (EXCHANGE G3 / TARGET-045): own published apps get a
+ *     read-only per-app EXCHANGE entitlement surface (cost.js) after Monetize.
  *   v1.2.0 — 2026-07-14 — Monetize section (TARGET-034 phase B): own published apps get the
  *     apps.{appId}.tools tool editor (monetize.js) between Skills and Manage-on-server.
  *   v1.1.0 — 2026-07-11 — Own-published apps: "Edit Access Code" in serverMgmtInner + "Attach skill"
@@ -23,6 +25,7 @@ import { dtlBtn, showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
 import { monetizeSectionInner, monetizeOnOpen } from './monetize.js';
+import { costSectionInner, costOnOpen } from './cost.js';
 import { appManifestAgents } from './app-agents.js';
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
@@ -163,6 +166,8 @@ function openDetailView(appId) {
   // Monetize (TARGET-034): reset + async-load the apps.{appId}.tools manifest for OWN published
   // apps before the first render so the section shell picks up the loading state.
   monetizeOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
+  // Cost & contracts (EXCHANGE G3): async-load this app's EXCHANGE entitlements for OWN published apps.
+  costOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
   document.getElementById('detail-view').hidden = false;
   renderDetailView();
   // AI availability + published versions load asynchronously and re-render in place.
@@ -479,6 +484,12 @@ function renderDetailView() {
     ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + '</div>'
     : '';
 
+  // ── COST & CONTRACTS (EXCHANGE G3 / TARGET-045) — what this app SOURCES (own published apps only) ──
+  // Stable container: cost.js re-renders #detail-cost in place after the async load.
+  var costHtml = (app.published && detailIsOwnPublished(app))
+    ? '<div class="dtl-section" id="detail-cost">' + costSectionInner() + '</div>'
+    : '';
+
   // ── BUNDLED AGENTS (Agent-Bundled Apps) — crew-defs this app ships. The section lists the
   // agent names and opens the shared Bundled-agents modal (inspector + hosted instances with
   // prices + deploy-your-own). Manifest read from the server-manifest cache.
@@ -502,7 +513,7 @@ function renderDetailView() {
   }
 
   document.getElementById('detail-body').innerHTML =
-    statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + mgmtHtml + actionsHtml;
+    statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + mgmtHtml + actionsHtml;
 }
 
 // Bound skills (skills registry): skills whose frontmatter metadata.binding names this app.

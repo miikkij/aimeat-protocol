@@ -62,6 +62,7 @@ const ALL_SUITES = [
     'test/e2e-login-attach-email.ts',
     'test/e2e-extensions.ts',
     'test/e2e-ext-paywall.ts',
+    'test/e2e-exchange.ts',
     'test/e2e-extension-secrets.ts',
     'test/e2e-iam-extension.ts',
     'test/e2e-upsert.ts',

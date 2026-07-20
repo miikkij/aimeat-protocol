@@ -3028,6 +3028,20 @@
       "monetize.saved": "Tool manifest saved.",
       "monetize.saveFailed": "Saving the tool manifest failed",
       "monetize.needLogin": "Sign in to edit the tool manifest.",
+      "cost.title": "📊 Cost & contracts — what this app sources",
+      "cost.hint": "This app’s EXCHANGE contracts: durable metered entitlements it calls, with live spend against each budget and the platform rake. The per-call price comes from the provider; you set only the budget cap.",
+      "cost.empty": "No EXCHANGE contracts yet — this app sources nothing priced.",
+      "cost.summary": "{n} contract(s) · {spent} 🥩 spent · {calls} call(s)",
+      "cost.capabilityCol": "Capability",
+      "cost.providerCol": "Provider",
+      "cost.priceCol": "Price / call",
+      "cost.rakeCol": "Rake",
+      "cost.budgetCol": "Budget (spent / cap)",
+      "cost.stateCol": "State",
+      "cost.uncapped": "uncapped",
+      "cost.remaining": "{n} left",
+      "cost.needLogin": "Sign in to view this app’s cost & contracts.",
+      "cost.loadFailed": "Could not load cost & contracts",
       "detail.editAccess": "Access code",
       "detail.accessCodeHint": "Set or remove an optional code required to open this app.",
       "detail.accessCodeLabel": "Access code",
@@ -3456,6 +3470,20 @@
       "monetize.saved": "Työkalumanifesti tallennettu.",
       "monetize.saveFailed": "Työkalumanifestin tallennus epäonnistui",
       "monetize.needLogin": "Kirjaudu sisään muokataksesi työkalumanifestia.",
+      "cost.title": "📊 Kulut & sopimukset — mitä tämä appi hankkii",
+      "cost.hint": "Tämän appin EXCHANGE-sopimukset: pysyvät mitatut käyttöoikeudet joita se kutsuu, live-kulutus kutakin budjettia vasten ja alustan siivu. Kutsukohtainen hinta tulee tarjoajalta; sinä asetat vain budjettikaton.",
+      "cost.empty": "Ei vielä EXCHANGE-sopimuksia — tämä appi ei hanki mitään hinnoiteltua.",
+      "cost.summary": "{n} sopimus(ta) · {spent} 🥩 käytetty · {calls} kutsu(a)",
+      "cost.capabilityCol": "Kyvykkyys",
+      "cost.providerCol": "Tarjoaja",
+      "cost.priceCol": "Hinta / kutsu",
+      "cost.rakeCol": "Siivu",
+      "cost.budgetCol": "Budjetti (käytetty / katto)",
+      "cost.stateCol": "Tila",
+      "cost.uncapped": "ei kattoa",
+      "cost.remaining": "{n} jäljellä",
+      "cost.needLogin": "Kirjaudu sisään nähdäksesi tämän appin kulut & sopimukset.",
+      "cost.loadFailed": "Kulujen & sopimusten lataus epäonnistui",
       "detail.skillDetach": "Irrota",
       "detail.skillAttachError": "Taidon liittäminen epäonnistui",
       "detail.editAccess": "Pääsykoodi",
@@ -4902,6 +4930,79 @@
     });
   }
 
+  // src/static/app-catalog/js/cost.js
+  var cState = "off";
+  var cData = null;
+  var cAppId = "";
+  function apiBase2() {
+    var cfg = loadConfig();
+    return (cfg.aimeatUrl || "").replace(/\/+$/, "");
+  }
+  function rerender2() {
+    var el = document.getElementById("detail-cost");
+    if (el) el.innerHTML = costSectionInner();
+  }
+  function costOnOpen(owner, appId, isOwn) {
+    cData = null;
+    if (!isOwn || !owner || !appId) {
+      cState = "off";
+      cAppId = "";
+      return;
+    }
+    cAppId = owner + "/" + appId;
+    cState = "loading";
+    var token = getCortexOwnerToken();
+    if (!token) {
+      cState = "error";
+      cData = { _needLogin: true };
+      return;
+    }
+    fetch(apiBase2() + "/v1/apps/cost?app_id=" + encodeURIComponent(cAppId), {
+      headers: { "Authorization": "Bearer " + token }
+    }).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      if (!res || !res.ok || !res.data) throw new Error("bad response");
+      cData = res.data;
+      cState = "ready";
+      rerender2();
+    }).catch(function() {
+      cState = "error";
+      cData = null;
+      rerender2();
+    });
+  }
+  function stateBadge(state) {
+    var cls = state === "active" ? "ok" : state === "paused" ? "diff" : "none";
+    return '<span class="dtl-sync ' + cls + '" style="margin:0">' + escapeHtml(state) + "</span>";
+  }
+  function contractRow(c) {
+    var b = c.budget || {};
+    var cap = b.cap_units === null || b.cap_units === void 0 ? t("cost.uncapped") : b.spent_units + " / " + b.cap_units;
+    var remaining = b.remaining_units === null || b.remaining_units === void 0 ? "" : ' <span class="dtl-stat-label">(' + t("cost.remaining").replace("{n}", b.remaining_units) + ")</span>";
+    var providerShort = String(c.provider || "").split("@")[0];
+    return '<div class="dtl-status-row" style="align-items:center;gap:10px;flex-wrap:wrap"><div class="dtl-stat" style="flex:1;min-width:150px"><span class="dtl-stat-val">' + escapeHtml(c.capability || "") + '</span><span class="dtl-stat-label">' + escapeHtml(t("cost.providerCol")) + ": " + escapeHtml(providerShort) + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("cost.priceCol") + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.price_per_call)) + ' 🥩</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("cost.rakeCol") + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.rake_per_call)) + " 🥩 (" + escapeHtml(String(c.rake_percent)) + '%)</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("cost.budgetCol") + '</span><span class="dtl-stat-val">' + escapeHtml(cap) + remaining + '</span></div><div class="dtl-stat">' + stateBadge(c.state) + "</div></div>";
+  }
+  function costSectionInner() {
+    if (cState === "off") return "";
+    var html = "<h3>" + t("cost.title") + '</h3><p class="dtl-desc">' + t("cost.hint") + "</p>";
+    if (cState === "loading") {
+      return html + '<span style="color:var(--text-muted);font-size:.85rem">…</span>';
+    }
+    if (cState === "error") {
+      var msg = cData && cData._needLogin ? t("cost.needLogin") : t("cost.loadFailed");
+      return html + '<span class="dtl-sync none">' + escapeHtml(msg) + "</span>";
+    }
+    var contracts = cData && cData.contracts || [];
+    if (!contracts.length) {
+      return html + '<span class="dtl-sync none">' + t("cost.empty") + "</span>";
+    }
+    var m = cData.totals && cData.totals.morsels || { spent_units: 0, calls: 0 };
+    html += '<div class="dtl-sync ok" style="margin:0 0 10px">' + t("cost.summary").replace("{n}", cData.total_contracts).replace("{spent}", m.spent_units).replace("{calls}", m.calls) + "</div>";
+    for (var i = 0; i < contracts.length; i++) html += contractRow(contracts[i]);
+    return html;
+  }
+
   // src/static/app-catalog/js/app-agents.js
   var getServerManifests;
   function initAppAgents(deps) {
@@ -5169,6 +5270,7 @@
     var app = detailGetApp();
     if (!app) return;
     monetizeOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
+    costOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     document.getElementById("detail-view").hidden = false;
     renderDetailView();
     detailCheckAiAvailability();
@@ -5342,6 +5444,7 @@
       (ownPub ? '<div id="detail-skill-attach" style="margin-top:8px">' + detailSkillAttachInner() + "</div>" : "") + "</div>";
     }
     var monetizeHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + "</div>" : "";
+    var costHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-cost">' + costSectionInner() + "</div>" : "";
     var agentsHtml = "";
     if (app.published) {
       var agOwner = detailServerOwner(app);
@@ -5356,7 +5459,7 @@
         ) + "</div>";
       }
     }
-    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + mgmtHtml + actionsHtml;
+    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + mgmtHtml + actionsHtml;
   }
   function detailLoadSkills(owner, filename) {
     var config = loadConfig();
