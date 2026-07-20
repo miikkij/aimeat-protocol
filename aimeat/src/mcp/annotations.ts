@@ -290,6 +290,21 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     // a callable app-tool's fulfillment may invoke sandboxed/third-party capability code.
     aimeat_checkout_complete: { title: 'Complete Checkout (pay + fulfill)', readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     aimeat_checkout_list: { title: 'List My Checkout Sessions', readOnlyHint: true },
+
+    // ── Exchange marketplace (TARGET-045 over MCP) ──
+    aimeat_exchange_offerings: { title: 'Browse Exchange Offerings', readOnlyHint: true },
+    aimeat_exchange_offering_get: { title: 'Get Exchange Offering Detail', readOnlyHint: true },
+    // accept mints a durable metered entitlement (idempotent per (consumer, ext, action): re-accepting
+    // replaces + carries spend forward, not a new contract each call).
+    aimeat_exchange_accept: { title: 'Accept Exchange Contract', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_exchange_contracts: { title: 'List My Exchange Contracts', readOnlyHint: true },
+    // pause is reversible; revoke is terminal — the consumer off-switch carries a destructive path.
+    aimeat_exchange_contract_off: { title: 'Pause / Revoke Exchange Contract', readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+    aimeat_exchange_needs: { title: 'Browse Exchange Needs', readOnlyHint: true },
+    aimeat_exchange_need_post: { title: 'Post Exchange Need', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_exchange_bid: { title: 'Bid on Exchange Need', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_exchange_bid_accept: { title: 'Accept Exchange Bid (mint contract)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_exchange_consumers: { title: 'List Offering Consumers (provider lineage)', readOnlyHint: true },
 };
 
 /**

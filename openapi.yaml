@@ -8098,15 +8098,19 @@ paths:
       summary: List a supply OFFERING for an action your extension owns (EXCHANGE marketplace / TARGET-045)
       description: >
         Publish a public supply listing for a priced action of an extension you own. Price + plans are read
-        AUTHORITATIVELY from the action (`commercial`); you add title/description/provenance/tags. Body:
-        `{ ext, action, title?, description?, provenance?, tags? }`. Returns `{ offering }`.
+        AUTHORITATIVELY from the action (`commercial`); you add title/description/provenance/tags and a usage
+        licence (`usage_terms`). Body: `{ ext, action, title?, description?, provenance?, usage_terms?, tags? }`.
+        `usage_terms` = `{ derivatives?, resale?, attribution?, note? }` — the provider's promise on how the
+        consumer may use the output. Returns `{ offering }`.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
         content: { application/json: { schema: { type: object, required: [ext, action], properties: {
           ext: { type: string }, action: { type: string }, title: { type: string }, description: { type: string },
-          provenance: { type: object }, tags: { type: array, items: { type: string } } } } } }
+          provenance: { type: object }, tags: { type: array, items: { type: string } },
+          usage_terms: { type: object, properties: {
+            derivatives: { type: boolean }, resale: { type: boolean }, attribution: { type: boolean }, note: { type: string } } } } } } }
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/AimeatError' }
@@ -8117,19 +8121,50 @@ paths:
       summary: Browse listed EXCHANGE offerings (public) — by capability or free text (TARGET-045)
       description: >
         Public browse of listed supply. `?ext=&action=` matches a capability exactly; `?q=` free-text over
-        title/description/tags; omit both for all listings. Cheapest base price first. Returns `{ offerings, count }`.
+        title/description/tags; omit both for all listings. `?stats=1` folds usage/reputation
+        (`stats: { activeContracts, totalContracts, totalCalls, totalSettledUnits, consumers, listedAt, lastUsedAt }`)
+        into each listing. Cheapest base price first. Returns `{ offerings, count }`.
       tags: [Commerce]
       parameters:
         - { name: ext, in: query, schema: { type: string } }
         - { name: action, in: query, schema: { type: string } }
         - { name: q, in: query, schema: { type: string } }
+        - { name: stats, in: query, schema: { type: string, enum: ['1'] } }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
 
   /v1/exchange/offerings/{id}:
+    get:
+      operationId: exchangeOfferingDetail
+      summary: One EXCHANGE offering's full detail — I/O schema, call recipe, usage stats (public) (TARGET-045)
+      description: >
+        Everything a human or agent needs to judge fit and integrate: the offering, the capability's
+        `input_schema`/`output_schema`, a `call_recipe` (the contract IS the access — you call `POST
+        /v1/ext/{ext}/{action}` as yourself, no separate API key), and usage `stats` (reputation). Public.
+        Returns `{ offering, capability, call_recipe, stats }`.
+      tags: [Commerce]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/AimeatError' }
     delete:
       operationId: exchangeDelistOffering
       summary: Delist one of your EXCHANGE offerings (TARGET-045)
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/exchange/offerings/{id}/consumers:
+    get:
+      operationId: exchangeOfferingConsumers
+      summary: Provider data-lineage — who holds contracts against your offering (owner only) (TARGET-045)
+      description: >
+        The provider's consumption log: for each contract minted against this offering, the consuming identity,
+        calls served, value settled, state, and last use — "where is my data used, by whom?". Owner-only
+        (a stranger gets 404). Returns `{ offeringId, consumers, count }`.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
@@ -8142,14 +8177,19 @@ paths:
       operationId: exchangePostNeed
       summary: Post an open NEED (demand) providers can bid on (EXCHANGE marketplace / TARGET-045)
       description: >
-        Publish a demand. Body: `{ description, ext?, action?, budget_unit?, budget_cap?, autonomy?, app_id? }`.
-        Returns `{ need, matches }` (offerings already satisfying it, so you can accept directly).
+        Publish a demand. Body: `{ description, ext?, action?, spec?, budget_unit?, budget_cap?, autonomy?, app_id? }`.
+        `spec` = `{ requiredFields?, format?, sample?, notes? }` — the minimum shape a fulfilment must return,
+        so a provider (or an AI assessing candidates) can judge fit. Returns `{ need, matches }` (offerings
+        already satisfying it, so you can accept directly).
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
         content: { application/json: { schema: { type: object, required: [description], properties: {
           description: { type: string }, ext: { type: string }, action: { type: string },
+          spec: { type: object, properties: {
+            requiredFields: { type: array, items: { type: string } }, format: { type: string },
+            sample: { type: string }, notes: { type: string } } },
           budget_unit: { type: string, enum: [money, morsels] }, budget_cap: { type: integer },
           autonomy: { type: string, enum: [supervised, auto] }, app_id: { type: string } } } } }
       responses:
