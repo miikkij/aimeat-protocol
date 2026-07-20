@@ -621,6 +621,16 @@
     }
     .fav-section-count { opacity: .6; font-weight: 400; }
 
+    /* "Promoted" badge in the detail Promote section */
+    .dtl-badge-on {
+      font-size: .7rem;
+      font-weight: 600;
+      color: #34d399;
+      border: 1px solid #34d399;
+      border-radius: 10px;
+      padding: 1px 8px;
+    }
+
     /* ── Card Menu Button ─────────────────────────────── */
 
     .card-menu-btn {

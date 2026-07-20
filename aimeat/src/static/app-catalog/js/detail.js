@@ -26,6 +26,7 @@ import { saveApp, deleteApp } from './db.js';
 import { dtlBtn, showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t, getLang } from './i18n.js';
+import { getPromotion, setPromotion, loadPromoted } from './promote.js';
 import { monetizeSectionInner, monetizeOnOpen } from './monetize.js';
 import { costSectionInner, costOnOpen } from './cost.js';
 import { appManifestAgents } from './app-agents.js';
@@ -499,6 +500,11 @@ function renderDetailView() {
     ? '<div class="dtl-section" id="detail-cost">' + costSectionInner() + '</div>'
     : '';
 
+  // ── PROMOTE (Phase 2c) — showcase this app on your public profile with EN/FI pitch copy.
+  //    Own published apps only; persists to the PUBLIC app-catalog.promoted memory doc.
+  var promoteHtml = (app.published && detailIsOwnPublished(app))
+    ? buildPromoteSection(app) : '';
+
   // ── BUNDLED AGENTS (Agent-Bundled Apps) — crew-defs this app ships. The section lists the
   // agent names and opens the shared Bundled-agents modal (inspector + hosted instances with
   // prices + deploy-your-own). Manifest read from the server-manifest cache.
@@ -522,7 +528,56 @@ function renderDetailView() {
   }
 
   document.getElementById('detail-body').innerHTML =
-    statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + mgmtHtml + actionsHtml;
+    statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+}
+
+// The Promote section: a short EN/FI pitch that surfaces this app on the owner's public profile.
+// Saving writes the PUBLIC app-catalog.promoted doc; clearing both fields un-promotes the app.
+function promoteRef(app) { return detailServerOwner(app) + '/' + (app.publishedFilename || ''); }
+function buildPromoteSection(app) {
+  var ref = promoteRef(app);
+  var cur = getPromotion(ref) || {};
+  var on = !!(cur.en || cur.fi);
+  return '<div class="dtl-section" id="detail-promote">' +
+      '<h3 style="display:flex;align-items:center;gap:8px">📣 ' + t('promote.title') +
+        (on ? ' <span class="dtl-badge-on">' + t('promote.on') + '</span>' : '') + '</h3>' +
+      '<p class="dtl-desc">' + t('promote.hint') + '</p>' +
+      '<label class="dtl-stat-label" for="detail-promo-en">' + t('promote.en') + '</label>' +
+      '<textarea id="detail-promo-en" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.en || '') + '</textarea>' +
+      '<label class="dtl-stat-label" for="detail-promo-fi">' + t('promote.fi') + '</label>' +
+      '<textarea id="detail-promo-fi" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.fi || '') + '</textarea>' +
+      '<div class="dtl-btn-row" style="margin:0 0 4px">' +
+        dtlBtn('🌐 ' + t('detail.translateEnFi'), 'window._launcher.detailTranslateDesc(\'en\',\'fi\',\'detail-promo-\',\'detail-promo-tr-status\')') +
+        dtlBtn('🌐 ' + t('detail.translateFiEn'), 'window._launcher.detailTranslateDesc(\'fi\',\'en\',\'detail-promo-\',\'detail-promo-tr-status\')') +
+      '</div>' +
+      '<div class="dtl-ai-status" id="detail-promo-tr-status" style="margin:0 0 8px"></div>' +
+      '<div class="dtl-btn-row">' +
+        dtlBtn(t('promote.save'), 'window._launcher.detailPromoteSave()', {variant:'primary'}) +
+        (on ? dtlBtn(t('promote.remove'), 'window._launcher.detailPromoteClear()') : '') +
+      '</div>' +
+      '<div class="dtl-ai-status" id="detail-promo-status"></div>' +
+    '</div>';
+}
+
+function detailPromoteSave() {
+  var app = detailGetApp();
+  if (!app || !detailIsOwnPublished(app)) return;
+  var en = (document.getElementById('detail-promo-en') || {}).value || '';
+  var fi = (document.getElementById('detail-promo-fi') || {}).value || '';
+  var statusEl = document.getElementById('detail-promo-status');
+  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('promote.saving'); }
+  setPromotion(promoteRef(app), { en: en, fi: fi }).then(function (nowOn) {
+    renderApps();
+    renderDetailView();
+    var s2 = document.getElementById('detail-promo-status');
+    if (s2) { s2.style.color = '#34d399'; s2.textContent = nowOn ? '✔ ' + t('promote.saved') : '✔ ' + t('promote.removed'); }
+  });
+}
+
+function detailPromoteClear() {
+  var en = document.getElementById('detail-promo-en'); if (en) en.value = '';
+  var fi = document.getElementById('detail-promo-fi'); if (fi) fi.value = '';
+  detailPromoteSave();
 }
 
 // Bound skills (skills registry): skills whose frontmatter metadata.binding names this app.
@@ -894,12 +949,15 @@ function detailAboutSave() {
     .catch(function(err) { showNotice('Error: ' + (err.message || err)); });
 }
 
-// Translate the description from one language field to another via the owner's OpenRouter key
-// (/v1/ai/complete). srcLang/dstLang are 'en'|'fi'; fills the destination textarea in place.
-function detailTranslateDesc(srcLang, dstLang) {
-  var srcEl = document.getElementById('detail-desc-' + srcLang);
-  var dstEl = document.getElementById('detail-desc-' + dstLang);
-  var statusEl = document.getElementById('detail-tr-status');
+// Translate one language field to another via the owner's OpenRouter key (/v1/ai/complete).
+// srcLang/dstLang are 'en'|'fi'; fills the destination textarea in place. `prefix` picks the field
+// pair ('detail-desc-' for the description editor, 'detail-promo-' for the promotion editor);
+// `statusId` picks the status line. Reused by both the description and promotion editors.
+function detailTranslateDesc(srcLang, dstLang, prefix, statusId) {
+  prefix = prefix || 'detail-desc-';
+  var srcEl = document.getElementById(prefix + srcLang);
+  var dstEl = document.getElementById(prefix + dstLang);
+  var statusEl = document.getElementById(statusId || 'detail-tr-status');
   if (!srcEl || !dstEl) return;
   var text = (srcEl.value || '').trim();
   if (!text) { if (statusEl) statusEl.textContent = t('detail.trNeedSource'); return; }
@@ -909,12 +967,8 @@ function detailTranslateDesc(srcLang, dstLang) {
   var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
   if (!aimeatUrl) { if (statusEl) statusEl.textContent = t('detail.aiUnavailable'); return; }
   var langName = { en: 'English', fi: 'Finnish' };
-  var enfiBtn = document.getElementById('detail-tr-enfi');
-  var fienBtn = document.getElementById('detail-tr-fien');
-  if (enfiBtn) enfiBtn.disabled = true;
-  if (fienBtn) fienBtn.disabled = true;
   if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.translating'); }
-  var systemPrompt = 'You are a professional translator for short app-store descriptions. '
+  var systemPrompt = 'You are a professional translator for short app-store copy. '
     + 'Translate the text from ' + (langName[srcLang] || srcLang) + ' to ' + (langName[dstLang] || dstLang) + '. '
     + 'Return ONLY the translated text — no quotes, no notes, no explanation. Keep it concise and natural.';
   fetch(aimeatUrl + '/v1/ai/complete', {
@@ -924,8 +978,6 @@ function detailTranslateDesc(srcLang, dstLang) {
   })
     .then(function(resp) { return resp.json(); })
     .then(function(json) {
-      if (enfiBtn) enfiBtn.disabled = false;
-      if (fienBtn) fienBtn.disabled = false;
       if (!json || !json.ok) {
         var msg = (json && json.error && json.error.message) || 'Translation failed';
         if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + msg; }
@@ -937,8 +989,6 @@ function detailTranslateDesc(srcLang, dstLang) {
       if (statusEl) { statusEl.style.color = '#34d399'; statusEl.textContent = '✔ ' + t('detail.trDone'); }
     })
     .catch(function(err) {
-      if (enfiBtn) enfiBtn.disabled = false;
-      if (fienBtn) fienBtn.disabled = false;
       if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + (err.message || 'Translation failed'); }
     });
 }
@@ -1729,6 +1779,8 @@ export {
   detailAboutCancel,
   detailAboutSave,
   detailTranslateDesc,
+  detailPromoteSave,
+  detailPromoteClear,
   detailToggleFavorite,
   detailAccessCodeEdit,
   detailAccessCodeCancel,
