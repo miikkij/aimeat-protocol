@@ -148,6 +148,7 @@ import { agentTelemetryRouter } from '../routes/agent-telemetry.js';
 import { ledgerRouter } from '../routes/ledger.js';
 import { appsCostRouter } from '../routes/apps-cost.js';
 import { exchangeRouter } from '../routes/exchange.js';
+import { exchangeMarketRouter } from '../routes/exchange-market.js';
 import { agentSkillBundleRouter } from '../routes/agent-skill-bundle.js';
 import { skillsRouter } from '../routes/skills.js';
 import { webmcpRouter } from '../routes/webmcp.js';
@@ -397,6 +398,7 @@ export async function mountRoutes(
   app.use(ledgerRouter(config, storage));         // LEDGER (TARGET-016) — agent LLM usage/cost read API
   app.use(appsCostRouter(config, storage));       // EXCHANGE G3 (TARGET-045) — per-app cost & contracts
   app.use(exchangeRouter(config, storage));       // EXCHANGE (TARGET-045) — contract acceptance / entitlement mint
+  app.use(exchangeMarketRouter(config, storage));  // EXCHANGE (TARGET-045 Phase C) — marketplace: offerings/needs/bids
   app.use(agentSkillBundleRouter(config, storage));
   app.use(skillsRouter(config, storage));  // Skills registry (dedicated system, Phase 2a)
   app.use(webmcpRouter(config, storage));  // WebMCP bridge (TARGET-034 phase C) — before appsRouter (shares /v1/apps/:owner/:filename/*)

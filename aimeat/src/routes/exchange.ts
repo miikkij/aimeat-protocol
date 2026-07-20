@@ -31,8 +31,9 @@ import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import {
   createEntitlement, readEntitlementForCall, listEntitlementsByConsumer,
-  pauseEntitlement, revokeEntitlement, type MeteredEntitlement, type PricingSpec,
+  pauseEntitlement, revokeEntitlement, type MeteredEntitlement,
 } from '../services/metered-entitlements.js';
+import { resolveActionPricing, type ActionCommercial } from '../services/exchange-market.js';
 
 function ownerOf(gaii: string): string {
   return gaii.split('@')[0].split('#').pop() ?? gaii;
@@ -95,35 +96,12 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const act = extRec.actions.find(a => a.id === action);
     if (!act) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Action "${action}" not found on "${ext}"`));
 
-    // AUTHORITATIVE price + unit from the provider action — money (payMoney) takes precedence over morsels.
-    const comm = act.commercial;
-    const money = comm?.payMoney;
-    let unit: 'morsels' | 'money';
-    let pricePerCall: number;
-    let currency: string | null = null;
-    if (money && typeof money.amount === 'number' && Number.isInteger(money.amount) && money.amount > 0) {
-      unit = 'money'; pricePerCall = money.amount; currency = money.currency;
-    } else if (typeof comm?.payMorsels === 'number' && Number.isInteger(comm.payMorsels) && comm.payMorsels > 0) {
-      unit = 'morsels'; pricePerCall = comm.payMorsels;
-    } else {
-      return res.status(400).json(error(config.nodeId, 'NOT_PRICED',
-        `Action "${ext}/${action}" has no price; only priced actions are contractable`));
-    }
-    // Optional pricing PLAN (bundle / subscription) chosen from the provider's authoritative plans.
-    // No plan_id → per_call at the base price. Amounts come from the provider (consumer can't undercut).
+    // AUTHORITATIVE price + unit + (optional plan) pricing — shared resolver, so a consumer can never
+    // undercut the provider. `plan_id` picks a provider-declared bundle/subscription plan; none → per_call.
     const planId = typeof b.plan_id === 'string' && b.plan_id ? b.plan_id : null;
-    let pricing: PricingSpec | null = null;
-    if (planId) {
-      const plan = (comm?.plans ?? []).find(p => p.id === planId);
-      if (!plan) return res.status(404).json(error(config.nodeId, 'PLAN_NOT_FOUND', `Action "${ext}/${action}" offers no plan "${planId}"`));
-      if (plan.model === 'bundle') {
-        pricing = { model: 'bundle', blockSize: plan.blockSize, blockPrice: plan.blockPrice, callsRemaining: 0 };
-      } else {
-        const epoch = new Date(0).toISOString();   // start expired → the first call renews (buys the first period)
-        pricing = { model: 'subscription', periodSeconds: plan.periodSeconds, periodPrice: plan.periodPrice,
-          callsPerWindow: plan.callsPerWindow, windowSeconds: plan.windowSeconds, validUntil: epoch, windowStart: epoch, windowCount: 0 };
-      }
-    }
+    const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, planId);
+    if (!priced.ok) return res.status(priced.code === 'NOT_PRICED' ? 400 : 404).json(error(config.nodeId, priced.code, `Action "${ext}/${action}": ${priced.message}`));
+    const { unit, pricePerCall, currency, pricing } = priced;
     // Budget floor: the cap must cover a single charge (per-call price, or a bundle block / subscription period).
     const minCharge = pricing?.model === 'bundle' ? pricing.blockPrice : pricing?.model === 'subscription' ? pricing.periodPrice : pricePerCall;
     if (capUnits !== null && capUnits < minCharge) {
