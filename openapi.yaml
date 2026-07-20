@@ -8080,6 +8080,134 @@ paths:
         '404':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/exchange/offerings:
+    post:
+      operationId: exchangeListOffering
+      summary: List a supply OFFERING for an action your extension owns (EXCHANGE marketplace / TARGET-045)
+      description: >
+        Publish a public supply listing for a priced action of an extension you own. Price + plans are read
+        AUTHORITATIVELY from the action (`commercial`); you add title/description/provenance/tags. Body:
+        `{ ext, action, title?, description?, provenance?, tags? }`. Returns `{ offering }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [ext, action], properties: {
+          ext: { type: string }, action: { type: string }, title: { type: string }, description: { type: string },
+          provenance: { type: object }, tags: { type: array, items: { type: string } } } } } }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+    get:
+      operationId: exchangeBrowseOfferings
+      summary: Browse listed EXCHANGE offerings (public) — by capability or free text (TARGET-045)
+      description: >
+        Public browse of listed supply. `?ext=&action=` matches a capability exactly; `?q=` free-text over
+        title/description/tags; omit both for all listings. Cheapest base price first. Returns `{ offerings, count }`.
+      tags: [Commerce]
+      parameters:
+        - { name: ext, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+        - { name: q, in: query, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
+  /v1/exchange/offerings/{id}:
+    delete:
+      operationId: exchangeDelistOffering
+      summary: Delist one of your EXCHANGE offerings (TARGET-045)
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/exchange/needs:
+    post:
+      operationId: exchangePostNeed
+      summary: Post an open NEED (demand) providers can bid on (EXCHANGE marketplace / TARGET-045)
+      description: >
+        Publish a demand. Body: `{ description, ext?, action?, budget_unit?, budget_cap?, autonomy?, app_id? }`.
+        Returns `{ need, matches }` (offerings already satisfying it, so you can accept directly).
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [description], properties: {
+          description: { type: string }, ext: { type: string }, action: { type: string },
+          budget_unit: { type: string, enum: [money, morsels] }, budget_cap: { type: integer },
+          autonomy: { type: string, enum: [supervised, auto] }, app_id: { type: string } } } } }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+    get:
+      operationId: exchangeBrowseNeeds
+      summary: Browse EXCHANGE needs — `?open=1` open only, `?mine=1` your own (TARGET-045)
+      tags: [Commerce]
+      parameters:
+        - { name: open, in: query, schema: { type: string } }
+        - { name: mine, in: query, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
+  /v1/exchange/needs/{id}/close:
+    post:
+      operationId: exchangeCloseNeed
+      summary: Close one of your EXCHANGE needs (TARGET-045)
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/exchange/needs/{id}/bids:
+    post:
+      operationId: exchangeBidOnNeed
+      summary: Bid on an open NEED with an action your extension owns (EXCHANGE / TARGET-045)
+      description: 'Body: `{ ext, action, offering_id?, plan_id?, note? }`. Returns `{ bid }`.'
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [ext, action], properties: {
+          ext: { type: string }, action: { type: string }, offering_id: { type: string },
+          plan_id: { type: string }, note: { type: string } } } } }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+        '409': { $ref: '#/components/responses/AimeatError' }
+    get:
+      operationId: exchangeListBids
+      summary: List bids on a NEED (public) (TARGET-045)
+      tags: [Commerce]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
+  /v1/exchange/needs/{id}/bids/{bidId}/accept:
+    post:
+      operationId: exchangeAcceptBid
+      summary: Accept a bid on your NEED → mint the metered entitlement (EXCHANGE / TARGET-045)
+      description: >
+        The requester accepts a bid; mints the durable entitlement (consumer = you, provider = bidder), with
+        the bid's plan + authoritative price. Optional body `{ cap_units }` overrides the need's budget cap.
+        Marks the bid accepted + the need matched. Returns `{ entitlement_id, ext, action, unit, pricing }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: bidId, in: path, required: true, schema: { type: string } }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+
   /v1/ledger/billing:
     get:
       operationId: ledgerBilling
