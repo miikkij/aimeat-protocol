@@ -7962,6 +7962,40 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/apps/{appId}/cost:
+    get:
+      operationId: appCost
+      summary: Per-app EXCHANGE cost & contracts surface (EXCHANGE G3 / TARGET-045)
+      description: >
+        Owner-scoped read that composes an app's priced EXCHANGE dependencies so the app-catalog can
+        show, per app: its active contracts (metered entitlements), live consumption (spend + calls
+        against each budget), an estimated per-call / remaining-budget cost, and the platform rake.
+        Attribution is by the entitlement's `appId`; the caller only ever sees entitlements whose
+        consumer is their own owner (strictly cross-owner). Generic — any app with priced dependencies
+        uses it. LLM-usage attribution is out of scope for slice-1 (the usage ledger has no appId
+        dimension yet); this composes the entitlement spend, which IS the per-app metered consumption
+        record. Response `data`: `{ app_id, owner_ghii, active_contracts, total_contracts,
+        totals: { morsels: { spent_units, calls, contracts }, money: {...} },
+        contracts: [{ entitlement_id, capability, provider, contract_ref, state, unit, currency,
+        price_per_call, rake_percent, rake_per_call, escrow_party,
+        budget: { cap_units, spent_units, remaining_units, calls }, estimated_calls_remaining }] }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: appId
+          in: path
+          required: true
+          schema: { type: string }
+          description: App id ("owner/filename") whose sourcing cost & contracts to return.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/ledger/billing:
     get:
       operationId: ledgerBilling

@@ -16,6 +16,7 @@
  *   const gate = await authorizeAndCharge(storage, consumerGaii, ext, action, priceMicros);
  *   if (!gate.ok) return res.status(402)...;
  * @version-history
+ *   v1.1.0 — 2026-07-20 — Add `appId` dimension + listEntitlementsByApp for the per-app cost surface (G3)
  *   v1.0.0 — 2026-07-20 — Initial G1 entitlement object (EXCHANGE slice-1): create / lookup-by-call /
  *     authorize+charge (budget decrement) / pause / revoke. Read-modify-write budget counter — see the
  *     concurrency note on authorizeAndCharge (a dedicated atomic counter is deferred to G5).
@@ -44,6 +45,8 @@ export interface MeteredEntitlement {
   entitlementId: string;
   /** Who may call: an app GEAI, an owner GHII, or a full GAII. Verified against the caller on every charge. */
   consumerGaii: string;
+  /** The consuming app id ("owner/filename") when the consumer is an app — powers the per-app cost surface (G3). */
+  appId: string | null;
   /** Who gets paid (the seller GHII). */
   providerGhii: string;
   /** Provider capability coordinates. Slice-1 = an extension action; a hop = one (ext, action) pair. */
@@ -98,13 +101,19 @@ export async function listEntitlementsByProvider(storage: Storage, providerGhii:
   return items.map(r => r.value as MeteredEntitlement).filter(v => v && v.providerGhii === providerGhii);
 }
 
+/** Every entitlement a consuming app holds (the per-app cost/contract surface, G3). Filtered prefix scan. */
+export async function listEntitlementsByApp(storage: Storage, appId: string): Promise<MeteredEntitlement[]> {
+  const { items } = await storage.listAllMemory({ prefix: 'entitlement.', limit: 5000 });
+  return items.map(r => r.value as MeteredEntitlement).filter(v => v && v.appId === appId);
+}
+
 /** Mint (or overwrite) an entitlement — called by the contract-acceptance flow after both sides agree.
  *  One `(consumer, ext, action)` triple has one entitlement; re-minting replaces it (e.g. renegotiated price),
  *  carrying spend forward only when explicitly asked. */
 export async function createEntitlement(
   storage: Storage,
   input: {
-    consumerGaii: string; providerGhii: string; ext: string; action: string; capabilityLabel?: string;
+    consumerGaii: string; appId?: string | null; providerGhii: string; ext: string; action: string; capabilityLabel?: string;
     unit: EntitlementUnit; pricePerCall: number; currency?: string | null;
     capUnits?: number | null; rakePercent?: number | null; contractRef: string;
     escrowParty?: 'consumer' | 'provider' | null; createdBy: string; carrySpend?: MeteredEntitlement | null;
@@ -114,6 +123,7 @@ export async function createEntitlement(
   const value: MeteredEntitlement = {
     entitlementId: input.carrySpend?.entitlementId || randomUUID(),
     consumerGaii: input.consumerGaii,
+    appId: input.appId ?? input.carrySpend?.appId ?? null,
     providerGhii: input.providerGhii,
     ext: input.ext,
     action: input.action,
