@@ -99,7 +99,7 @@ export function ThreadPanel({
   activeConv, thread, urlMap, important, trackedByMsg, awaitingForConv, awaitingDrafts,
   schedOpen, setSchedOpen, cmdFill, agentCommands, sending, draftPrefill, prefillNonce, msgsRef,
   peerDisplay, showToast, toggleImportant, onTrackMsg, onParkMsg, openMessageAi, submitInteractiveAnswers,
-  setMdViewer, openConversationAi, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
+  setMdViewer, openConversationAi, openConversationNotebook, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
   replyQuote, setReplyQuote, onQuoteReply, composerFocus,
 }) {
   let lastDay = '';
@@ -142,6 +142,7 @@ export function ThreadPanel({
           <div class="inbox-sub">${escHtml(activeConv.peerGhii)}</div>
         </div>
         ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}>✨ <span class="inbox-ai-btn-label">${t('inbox.ai.replyWithAi')}</span></button>` : null}
+        ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationNotebook} title=${t('inbox.notebook.toNotebook')}>📓 <span class="inbox-ai-btn-label">${t('inbox.notebook.toNotebookShort')}</span></button>` : null}
         ${peerIsMyAgent && !viaAgentName ? html`<button class=${`btn-ghost btn-sm inbox-sched-btn${schedOpen ? ' inbox-sched-btn--on' : ''}`}
           onClick=${() => setSchedOpen(o => !o)} title=${t('inbox.schedTitle')}>📅</button>` : null}
       </div>

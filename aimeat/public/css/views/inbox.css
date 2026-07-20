@@ -485,7 +485,14 @@
   font-size: 14px;
 }
 
+/* Expanded composer (the ⤢ toggle): grow the fallback/simple textarea + preview to ~60vh so a long or
+   formatted draft is fully visible. The rich Toast UI editor is resized in JS via setHeight instead. */
+.inbox-composer--tall .inbox-textarea { min-height: 60vh; }
+.inbox-composer--tall .inbox-textarea--chat { max-height: 60vh; }
+.inbox-composer--tall .inbox-md-preview { max-height: 60vh; }
+
 .inbox-composer-bar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.inbox-bar-left { display: flex; align-items: center; gap: 8px; }
 .inbox-attach-btn {
   display: inline-flex;
   align-items: center;

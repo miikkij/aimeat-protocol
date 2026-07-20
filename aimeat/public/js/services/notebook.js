@@ -11,6 +11,9 @@
  *   - distributeNote(text) — POST /v1/librarian/distribute (split into placed chunks)
  *   - materializeDocument(plan) — resolve/create org → ws → document space → draft→publish doc → drop source
  *   - distributeChunks(chunks, sourceKey, onProgress) — materialize each chunk to its home
+ *   - parkMessageToNotebook(msg) — park ONE inbox message for later processing
+ *   - parkConversationToNotebook({conv,thread,peerName,summary,images}) — park a WHOLE thread (transcript +
+ *     inline image embeds, optional AI/pasted summary) as one entry, ready for classify/distribute
  *   - getNotebookSettings/saveNotebookSettings — the per-owner trust toggles (notebook.settings)
  * @version-history
  *   v1.0.0 — 2026-06-19 — Initial: classify + materialize-document orchestration (slice B).
@@ -21,10 +24,13 @@
  *   v1.3.0 — 2026-06-23 — materializeDocument now writes via writeDraft + publishDraft (was a raw
  *     `.latest` memory write) so notebook documents get version history and appear in the workspace
  *     activity log/heatmap — the document-path counterpart to the v1.2.0 record fix.
+ *   v1.4.0 — 2026-07-19 — parkConversationToNotebook: capture a whole inbox thread (transcript + inline
+ *     image embeds, optional summary) as one notebook entry for the "→ Notebook" conversation capture.
  */
 import { api, apiPost } from '/js/api.js';
 import { createMemory, getMemory, deleteMemory } from '/js/services/memory.js';
 import { createOrganism, saveManifest, listWorkspaces, saveWorkspaceRegistry, wsRoot, writeDraft, publishDraft } from '/js/services/organisms.js';
+import { handleOf } from '/js/services/messages-ai-prompts.js';
 
 const DOC_SPACE = 'pages';
 
@@ -79,6 +85,76 @@ export async function parkMessageToNotebook(msg, opts = {}) {
   };
   const resp = await createMemory(key, value, 'private');
   if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not park to notebook');
+  return { key };
+}
+
+/** A short, stable UTC timestamp for a transcript line (locale-independent so the note is reproducible). */
+function nbStamp(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return Number.isFinite(d.getTime()) ? d.toISOString().replace('T', ' ').slice(0, 16) + ' UTC' : '';
+}
+
+/** Render a whole thread as a Markdown transcript, embedding each message's image attachments inline
+ *  (by url) so they survive into the materialized workspace document. `images` groups by messageId. */
+function renderConversationMarkdown(thread, peerGhii, peerName, images) {
+  const them = peerName || handleOf(peerGhii);
+  const byMsg = {};
+  for (const im of (images || [])) (byMsg[im.messageId] || (byMsg[im.messageId] = [])).push(im);
+  return (thread || []).map((m) => {
+    const who = m.direction === 'outbound' ? 'Me' : them;
+    const when = nbStamp(m.createdAt);
+    const body = String(m.body || '').trim();
+    const imgs = (byMsg[m.id] || []).map((im) => `\n\n![${im.name || 'image'}](${im.url})`).join('');
+    return `**${who}**${when ? ` — ${when}` : ''}\n\n${body}${imgs}`;
+  }).join('\n\n---\n\n');
+}
+
+/** Pull an H1/first line out of a summary to use as the note title, or null. */
+function summaryTitle(summary) {
+  const first = String(summary || '').split('\n').map((l) => l.trim()).find(Boolean);
+  if (!first) return null;
+  return first.replace(/^#+\s*/, '').slice(0, 120) || null;
+}
+
+/**
+ * Park a WHOLE conversation into the notebook as one entry (text + inline image embeds), ready for the
+ * existing classify/distribute enrichment. The three inbox capture modes all land here:
+ *   - a server-side / pasted AI summary → stored above a "Full transcript" section, or
+ *   - raw (no summary) → just the transcript.
+ * @param {object} [args]
+ * @param {{ conversationId?:string, peerGhii?:string, subject?:string }} [args.conv]
+ * @param {Array} [args.thread]   The loaded thread messages.
+ * @param {string} [args.peerName]
+ * @param {string} [args.summary]  An AI (server or pasted) summary markdown; omit for a raw capture.
+ * @param {Array<{messageId:string,id:string,name?:string,url:string}>} [args.images]  Image attachments.
+ */
+export async function parkConversationToNotebook({ conv, thread, peerName, summary, images } = {}) {
+  const peerGhii = conv?.peerGhii || '';
+  const transcriptMd = renderConversationMarkdown(thread, peerGhii, peerName, images);
+  const sum = (summary || '').trim();
+  const text = sum
+    ? `${sum}\n\n---\n\n## Full transcript\n\n${transcriptMd}`
+    : transcriptMd;
+  const title = summaryTitle(sum) || `Conversation with ${peerName || handleOf(peerGhii)}`;
+  const key = 'notebook.inbox.' + Date.now();
+  const value = {
+    text,
+    title,
+    capturedAt: new Date().toISOString(),
+    source: {
+      kind: 'conversation',
+      conversationId: conv?.conversationId,
+      peerGhii,
+      originNodeId: (peerGhii.split('@')[1] || ''),
+      messageCount: (thread || []).length,
+      attachments: (images || []).map((im) => ({ messageId: im.messageId, id: im.id, name: im.name, url: im.url })),
+    },
+    // A summarized thread is a knowledge capture, not an unanswered message — it owes no reply.
+    trackedResponseIntent: { owes: false, mode: 'approve' },
+  };
+  const resp = await createMemory(key, value, 'private');
+  if (resp?.ok === false) throw new Error(resp.error?.message || 'Could not park conversation to notebook');
   return { key };
 }
 

@@ -22,6 +22,11 @@
  *   v1.5.0 — 2026-07-18 — Mobile composer is a plain auto-growing textarea (`mode:'simple'`, no Toast UI
  *     toolbar/Write-Preview/WYSIWYG — a phone keyboard + heavy WYSIWYG is miserable); ≤760px opens straight
  *     into it so Toast UI never even loads there. Desktop keeps the rich editor.
+ *   v1.6.0 — 2026-07-19 — Composer gets an expand toggle (⤢/⤡): enlarges the editor to ~60% of the
+ *     viewport so long/formatted drafts are fully visible. Rich mode resizes via Toast UI `setHeight`;
+ *     the markdown fallback + simple textarea grow via the `.inbox-composer--tall` class / lifted cap.
+ *   v1.7.0 — 2026-07-19 — ConversationToNotebookPopover: capture a whole thread (with images) into the
+ *     Notebook via three modes — server-side AI summary (owner's key), copy-prompt (own chat), or raw.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -310,6 +315,8 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   const isNarrow = typeof window !== 'undefined' && window.matchMedia?.('(max-width: 760px)').matches;
   const [mode, setMode] = useState(isNarrow ? 'simple' : 'rich');
   const [md, setMd] = useState(seeded);
+  // Temporarily enlarge the editor (~60% of the viewport) so long/formatted drafts are fully visible.
+  const [expanded, setExpanded] = useState(false);
   const [files, setFiles] = useState([]);
   const containerRef = useRef(null);
   const editorRef = useRef(null);
@@ -419,10 +426,26 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusNonce]);
 
-  // Auto-grow the simple (mobile) textarea to fit its content, capped so it never eats the thread.
-  const autoGrow = (ta) => { if (!ta) return; ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, 132) + 'px'; };
-  // Size the simple textarea to any seeded draft on mount (and keep it 1 row when empty).
-  useEffect(() => { if (mode === 'simple') autoGrow(taRef.current); }, [mode]);
+  // Resize the Toast UI editor when the expand toggle flips (rich mode sets its own inline height via
+  // JS, so a CSS class can't reach it — the fallback/simple textareas are sized by `.inbox-composer--tall`
+  // in CSS instead). `160px` matches the construction default.
+  useEffect(() => {
+    if (mode !== 'rich' || !editorRef.current?.setHeight) return;
+    const tall = typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.6) : 400;
+    try { editorRef.current.setHeight(expanded ? tall + 'px' : '160px'); } catch { /* noop */ }
+  }, [expanded, mode]);
+
+  // Auto-grow the simple (mobile) textarea to fit its content, capped so it never eats the thread. When
+  // expanded, the cap lifts to ~60vh so a long draft is fully visible.
+  const autoGrow = (ta) => {
+    if (!ta) return;
+    const cap = expanded && typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.6) : 132;
+    ta.style.height = 'auto'; ta.style.height = Math.min(ta.scrollHeight, cap) + 'px';
+  };
+  // Size the simple textarea to any seeded draft on mount (and keep it 1 row when empty); re-fit when the
+  // expand cap changes.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (mode === 'simple') autoGrow(taRef.current); }, [mode, expanded]);
 
   const getText = () => (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
   const reset = () => {
@@ -441,7 +464,7 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   });
 
   return html`
-    <div class="inbox-composer">
+    <div class="inbox-composer ${expanded ? 'inbox-composer--tall' : ''}">
       ${files.length > 0 ? html`<div class="inbox-file-chips">
         ${files.map((f, i) => html`<span class="inbox-file-chip" key=${f.name + i}>📎 ${escHtml(f.name)}
           <button class="inbox-bc-chip-x" title=${t('inbox.attachmentRemove')} onClick=${() => removeFile(i)}>✕</button></span>`)}
@@ -459,9 +482,13 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
             <div class="inbox-md-preview"><${Markdown} text=${md} /></div>
           </div>`}
       <div class="inbox-composer-bar">
-        <label class="inbox-attach-btn" title=${t('inbox.attach')}>
-          📎<input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
-        </label>
+        <div class="inbox-bar-left">
+          <label class="inbox-attach-btn" title=${t('inbox.attach')}>
+            📎<input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
+          </label>
+          <button type="button" class="inbox-attach-btn" title=${expanded ? t('inbox.collapse') : t('inbox.expand')}
+            aria-pressed=${expanded} onClick=${() => setExpanded((v) => !v)}>${expanded ? '⤡' : '⤢'}</button>
+        </div>
         <button class="btn-primary btn-sm" disabled=${sending || !recipient} onClick=${submit}>
           ${sending ? t('inbox.sending') : sendLabel}
         </button>
@@ -587,6 +614,90 @@ export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
         <div class="inbox-ai-actions">
           <button class="btn-primary btn-sm" onClick=${copy}>${copied ? '✓ ' + t('inbox.ai.copied') : '📋 ' + t('inbox.ai.copy')}</button>
         </div>
+      </div>
+    </div>`;
+}
+
+/* ── Conversation → Notebook — capture a WHOLE thread (with its images) into the notebook for later
+ *    filing/enrichment into a workspace. Three modes, all landing in parkConversationToNotebook:
+ *      ✨ ai   — summarize server-side with the owner's own OpenRouter key (runServerSummary), edit, park.
+ *      📋 copy — copy the summary prompt into the owner's own AI chat, paste the result back, park.
+ *      📥 raw  — park the whole chain (text + images) as-is; enrich it later in the Notebook.
+ *    The parent (InboxTab) owns the async work (AI call + park + toasts) via the passed callbacks. ── */
+export function ConversationToNotebookPopover({ title, promptText, runServerSummary, parkConversation, onClose, showToast }) {
+  const [mode, setMode] = useState('ai');       // 'ai' | 'copy' | 'raw'
+  const [copied, setCopied] = useState(false);
+  const [aiSummary, setAiSummary] = useState('');
+  const [pasted, setPasted] = useState('');
+  const [running, setRunning] = useState(false);
+  const [parking, setParking] = useState(false);
+
+  const copy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(promptText);
+      else { const ta = document.createElement('textarea'); ta.value = promptText; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
+      setCopied(true); setTimeout(() => setCopied(false), 1800);
+      showToast?.(t('inbox.ai.copied'));
+    } catch { showToast?.(t('inbox.failed'), true); }
+  };
+
+  const genSummary = async () => {
+    setRunning(true);
+    try {
+      const s = await runServerSummary();
+      if (s && s.trim()) setAiSummary(s.trim());
+      else showToast?.(t('inbox.notebook.summaryEmpty'), true);
+    } catch (e) { showToast?.(e?.message || t('inbox.failed'), true); }
+    finally { setRunning(false); }
+  };
+
+  const doPark = async (summary) => {
+    setParking(true);
+    try { await parkConversation({ summary: summary || '' }); showToast?.(t('inbox.notebook.parked')); onClose(); }
+    catch (e) { showToast?.(e?.message || t('inbox.failed'), true); setParking(false); }
+  };
+
+  return html`
+    <div class="inbox-ai-overlay" onClick=${onClose}>
+      <div class="inbox-ai-modal" onClick=${(e) => e.stopPropagation()}>
+        <div class="inbox-ai-head">
+          <span class="inbox-ai-title">📓 ${title}</span>
+          <button class="btn-ghost btn-sm" onClick=${onClose} title=${t('inbox.close')}>✕</button>
+        </div>
+        <div class="inbox-ai-modes">
+          <button class=${`inbox-ai-mode${mode === 'ai' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('ai')}>✨ ${t('inbox.notebook.modeAi')}</button>
+          <button class=${`inbox-ai-mode${mode === 'copy' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('copy')}>📋 ${t('inbox.notebook.modeCopy')}</button>
+          <button class=${`inbox-ai-mode${mode === 'raw' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('raw')}>📥 ${t('inbox.notebook.modeRaw')}</button>
+        </div>
+        ${mode === 'ai' ? html`
+          <div class="inbox-ai-hint">${t('inbox.notebook.hintAi')}</div>
+          ${!aiSummary ? html`
+            <div class="inbox-ai-actions">
+              <button class="btn-primary btn-sm" disabled=${running} onClick=${genSummary}>${running ? '… ' + t('inbox.notebook.summarizing') : '✨ ' + t('inbox.notebook.genSummary')}</button>
+            </div>`
+          : html`
+            <textarea class="inbox-ai-text" rows="12" value=${aiSummary} onInput=${(e) => setAiSummary(e.target.value)}></textarea>
+            <div class="inbox-ai-actions">
+              <button class="btn-ghost btn-sm" disabled=${running} onClick=${genSummary}>${running ? '…' : '↻ ' + t('inbox.notebook.regen')}</button>
+              <button class="btn-primary btn-sm" disabled=${parking} onClick=${() => doPark(aiSummary)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}</button>
+            </div>`}
+        ` : mode === 'copy' ? html`
+          <div class="inbox-ai-hint">${t('inbox.notebook.hintCopy')}</div>
+          <textarea class="inbox-ai-text" readOnly rows="8" value=${promptText}></textarea>
+          <div class="inbox-ai-actions">
+            <button class="btn-primary btn-sm" onClick=${copy}>${copied ? '✓ ' + t('inbox.ai.copied') : '📋 ' + t('inbox.ai.copy')}</button>
+          </div>
+          <div class="inbox-ai-hint">${t('inbox.notebook.pasteHint')}</div>
+          <textarea class="inbox-ai-text" rows="8" placeholder=${t('inbox.notebook.pastePh')} value=${pasted} onInput=${(e) => setPasted(e.target.value)}></textarea>
+          <div class="inbox-ai-actions">
+            <button class="btn-primary btn-sm" disabled=${parking || !pasted.trim()} onClick=${() => doPark(pasted)}>${parking ? '…' : '📓 ' + t('inbox.notebook.park')}</button>
+          </div>
+        ` : html`
+          <div class="inbox-ai-hint">${t('inbox.notebook.hintRaw')}</div>
+          <div class="inbox-ai-actions">
+            <button class="btn-primary btn-sm" disabled=${parking} onClick=${() => doPark('')}>${parking ? '…' : '📥 ' + t('inbox.notebook.parkRaw')}</button>
+          </div>
+        `}
       </div>
     </div>`;
 }

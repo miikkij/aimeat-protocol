@@ -8,6 +8,10 @@
  * @version-history
  *   v1.0.0 -- initial file-based store
  *   v1.1.0 -- 2026-05-29 -- Add listAllTokens() for multi-agent serve
+ *   v1.2.0 -- 2026-07-19 -- Decode filenames on the FIRST '@', not the last: agent names are '@'-free
+ *     (lowercase alphanumeric + hyphens), so the first '@' is the true agent|owner boundary. The last-'@'
+ *     split mis-parsed `{agent}@{owner}.token` whenever the owner slug contained an '@' (an email),
+ *     registering the agent under a wrong name and 403-ing its self-scoped calls.
  */
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -47,6 +51,19 @@ export interface StoredCredential {
 }
 
 /**
+ * Parse a `{agent}@{owner}.token` filename into its agent + owner. Split on the FIRST '@' — agent names
+ * are '@'-free (lowercase alphanumeric + hyphens), so it is the authoritative boundary and an owner slug
+ * that itself contains '@' (an email) parses correctly. Returns null for a non-`.token` or shapeless name.
+ */
+export function parseTokenFilename(name: string): { agent: string; owner: string } | null {
+  if (!name.endsWith('.token')) return null;
+  const stem = name.slice(0, -'.token'.length);
+  const at = stem.indexOf('@');
+  if (at <= 0 || at === stem.length - 1) return null;
+  return { agent: stem.slice(0, at), owner: stem.slice(at + 1) };
+}
+
+/**
  * Scan the tokens directory and return every stored credential. File naming
  * is `{agent}@{owner}.token`; unparseable filenames are skipped silently.
  */
@@ -60,16 +77,12 @@ export async function listAllTokens(): Promise<StoredCredential[]> {
   }
   const out: StoredCredential[] = [];
   for (const name of entries) {
-    if (!name.endsWith('.token')) continue;
-    const stem = name.slice(0, -'.token'.length);
-    const at = stem.lastIndexOf('@');
-    if (at <= 0 || at === stem.length - 1) continue;
-    const agent = stem.slice(0, at);
-    const owner = stem.slice(at + 1);
+    const parsed = parseTokenFilename(name);
+    if (!parsed) continue;
     try {
       const token = readFileSync(join(dir, name), 'utf-8').trim();
       if (!token) continue;
-      out.push({ agent, owner, token });
+      out.push({ agent: parsed.agent, owner: parsed.owner, token });
     } catch { /* unreadable file, skip */ }
   }
   return out;

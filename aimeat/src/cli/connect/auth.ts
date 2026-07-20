@@ -49,6 +49,22 @@ interface DeviceTokenResponse {
   access_token: string;
   gaii: string;
   name: string;
+  owner?: string;
+}
+
+/**
+ * The canonical, '@'-free owner HANDLE for this agent — taken from the device-token response, NEVER the
+ * raw `--owner` the user typed (which may be an email, e.g. when connecting by email). The account is
+ * resolved server-side (the browser login), and the handle comes back in the response, so keying local
+ * artifacts (token filename, per-agent config) by it keeps `{agent}@{owner}.token` unambiguous and lets
+ * the serve daemon parse it correctly. Prefer the gaii's owner segment (`agent#owner@node`), fall back to
+ * the response `owner`, then to the CLI value with any '@'-suffix stripped.
+ */
+export function ownerHandleFrom(tokenData: DeviceTokenResponse, cliOwner: string): string {
+  const fromGaii = /#([^@]+)@/.exec(tokenData.gaii);
+  if (fromGaii) return fromGaii[1];
+  if (typeof tokenData.owner === 'string' && tokenData.owner && !tokenData.owner.includes('@')) return tokenData.owner;
+  return cliOwner.includes('@') ? cliOwner.split('@')[0] : cliOwner;
 }
 
 interface OAuthErrorResponse {
@@ -316,22 +332,26 @@ export async function runAuth(args: AuthArgs): Promise<void> {
   const token = tokenData;
   s.stop('Approved!');
 
+  // Key ALL local artifacts by the resolved owner HANDLE, not the raw `--owner` (which may be an email).
+  // This keeps `{agent}@{owner}.token` unambiguous so the serve daemon derives the right agent name.
+  const ownerHandle = ownerHandleFrom(token, owner);
+
   // Before storing the new token, check whether this is the first agent (so it
   // gets marked as `primary: true` in its per-agent config -- multi-agent serve
   // resolves to the primary agent when no agent_name is given).
   const tokensBefore = await listAllTokens();
-  const sameAlreadyExists = tokensBefore.some(t => t.agent === agentName && t.owner === owner);
-  const isFirstAgent = tokensBefore.filter(t => !(t.agent === agentName && t.owner === owner)).length === 0;
+  const sameAlreadyExists = tokensBefore.some(t => t.agent === agentName && t.owner === ownerHandle);
+  const isFirstAgent = tokensBefore.filter(t => !(t.agent === agentName && t.owner === ownerHandle)).length === 0;
 
-  await storeToken(agentName, owner, token.access_token);
-  success(`Token stored (aimeat:${agentName}@${owner})`);
+  await storeToken(agentName, ownerHandle, token.access_token);
+  success(`Token stored (aimeat:${agentName}@${ownerHandle})`);
 
   // Per-agent config (~/.aimeat/agents/{agent}/config.yaml). Preserve any
   // existing runner/wake/poll_interval if the agent is being re-connected.
   const existingPerAgent = loadPerAgentConfig(agentName);
   savePerAgentConfig(agentName, {
     agent: agentName,
-    owner,
+    owner: ownerHandle,
     node_url: nodeUrl,
     primary: existingPerAgent?.primary ?? isFirstAgent,
     mode: mode ?? existingPerAgent?.mode,
@@ -344,7 +364,7 @@ export async function runAuth(args: AuthArgs): Promise<void> {
   // (`loadConfig().agent`) keep working. The first-registered agent becomes the
   // global's `agent`; later agents do not overwrite it.
   if (isFirstAgent || sameAlreadyExists) {
-    saveConfig({ node_url: nodeUrl, agent: agentName, owner });
+    saveConfig({ node_url: nodeUrl, agent: agentName, owner: ownerHandle });
   }
 
   client.setToken(token.access_token);
