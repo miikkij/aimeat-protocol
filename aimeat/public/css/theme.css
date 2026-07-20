@@ -10,6 +10,9 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.23.1 — 2026-07-20 — Mobile: pin .notif-dropdown to fixed viewport insets under 560px (the
+       320px, right:0-anchored panel ran off the LEFT edge — the bell sits mid-right of the bar — and
+       got clipped by body{overflow-x:hidden}); long notif titles/bodies wrap (overflow-wrap:anywhere).
      v1.23.0 — 2026-07-18 — Notification bell inline actions: split .notif-item into a clickable
        .notif-item-main + an actions row; add .notif-actions/.notif-action-btn/.notif-reply*/.notif-result.
      v1.22.0 — 2026-07-17 — UI-unification foundation: extend the spacing scale (--sp-5=20/--sp-6=24/
@@ -502,6 +505,21 @@ a { color: inherit; text-decoration: none; }
 .notif-result { font-size: 0.76rem; padding: 0.3rem 0.85rem 0.55rem; }
 .notif-result.ok { color: var(--success, #4caf50); }
 .notif-result.err { color: var(--danger, #e0564a); }
+/* Long sender GHIIs / subjects wrap instead of forcing the panel wider than the screen. */
+.notif-item-title, .notif-item-body { overflow-wrap: anywhere; }
+/* Mobile: the 320px-wide, right:0-anchored dropdown runs off the LEFT edge (the bell sits
+   mid-right of the bar) and gets clipped by body{overflow-x:hidden}. Pin it to fixed viewport
+   insets so it spans the screen width minus small margins, regardless of the bell's position. */
+@media (max-width: 560px) {
+  .notif-dropdown {
+    position: fixed;
+    top: calc(var(--nav-height, 56px) + 4px);
+    right: 8px;
+    left: 8px;
+    width: auto;
+    max-height: 72vh;
+  }
+}
 
 .topnav-right a {
   font-size: 0.84rem;
