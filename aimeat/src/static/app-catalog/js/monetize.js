@@ -68,7 +68,7 @@ export function monetizeOnOpen(owner, appId, isOwn) {
 
 function priceLabel(tool) {
   var parts = [];
-  if (tool.price && tool.price.morsels > 0) parts.push(tool.price.morsels + ' 🥩');
+  if (tool.price && tool.price.morsels > 0) parts.push(tool.price.morsels + ' morsels');
   if (tool.priceMoney && tool.priceMoney.amount > 0) {
     parts.push((tool.priceMoney.amount / MONEY_UNIT) + ' ' + tool.priceMoney.currency);
   }
