@@ -7962,6 +7962,123 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/apps/cost:
+    get:
+      operationId: appCost
+      summary: Per-app EXCHANGE cost & contracts surface (EXCHANGE G3 / TARGET-045)
+      description: >
+        Owner-scoped read that composes an app's priced EXCHANGE dependencies so the app-catalog can
+        show, per app: its active contracts (metered entitlements), live consumption (spend + calls
+        against each budget), an estimated per-call / remaining-budget cost, and the platform rake.
+        Attribution is by the entitlement's `appId`; the caller only ever sees entitlements whose
+        consumer is their own owner (strictly cross-owner). Generic — any app with priced dependencies
+        uses it. LLM-usage attribution is out of scope for slice-1 (the usage ledger has no appId
+        dimension yet); this composes the entitlement spend, which IS the per-app metered consumption
+        record. Response `data`: `{ app_id, owner_ghii, active_contracts, total_contracts,
+        totals: { morsels: { spent_units, calls, contracts }, money: {...} },
+        contracts: [{ entitlement_id, capability, provider, contract_ref, state, unit, currency,
+        price_per_call, rake_percent, rake_per_call, escrow_party,
+        budget: { cap_units, spent_units, remaining_units, calls }, estimated_calls_remaining }] }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: app_id
+          in: query
+          required: true
+          schema: { type: string }
+          description: App id ("owner/filename") whose sourcing cost & contracts to return.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/exchange/entitlements:
+    post:
+      operationId: exchangeAcceptContract
+      summary: Accept an EXCHANGE contract → mint a metered entitlement (EXCHANGE / TARGET-045)
+      description: >
+        The WRITE side of the metered entitlement. The caller's owner accepts a negotiated contract to
+        call a provider's extension action at a metered price. The per-call PRICE is read authoritatively
+        from the provider's ext action (`commercial.payMorsels`) — the request supplies only the BUDGET
+        cap and the contract ref, so a consumer can neither undercut the provider nor be charged an
+        unaccepted price. The entitlement's consumer is always the caller's own owner (strictly
+        cross-owner). Slice-1 covers morsel-priced actions. Body: `{ ext, action, contract_ref,
+        cap_units?, app_id?, escrow_party? }`. Response `data`: `{ entitlement: {...} }`.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ext, action, contract_ref]
+              properties:
+                ext: { type: string }
+                action: { type: string }
+                contract_ref: { type: string }
+                cap_units: { type: integer, description: Spend cap in the price unit (morsels). Omit for uncapped. }
+                app_id: { type: string, description: Consuming app id ("owner/filename") for the per-app cost surface. }
+                escrow_party: { type: string, enum: [consumer, provider] }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+    get:
+      operationId: exchangeListEntitlements
+      summary: List the caller-owner's EXCHANGE entitlements (EXCHANGE / TARGET-045)
+      description: >
+        Every metered entitlement the caller's owner holds as consumer, with live spend + budget.
+        Response `data`: `{ entitlements: [{ entitlement_id, provider, ext, action, unit, price_per_call,
+        rake_percent, contract_ref, state, budget: { cap_units, spent_units, remaining_units, calls } }] }`.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/exchange/entitlements/off:
+    post:
+      operationId: exchangeEntitlementOff
+      summary: Pause or revoke one of your EXCHANGE entitlements (EXCHANGE / TARGET-045)
+      description: >
+        The consumer's off-switch. `mode: pause` is reversible (re-accept to resume); `mode: revoke` is
+        terminal. Only the entitlement's own consumer may. Body: `{ ext, action, mode }`.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ext, action]
+              properties:
+                ext: { type: string }
+                action: { type: string }
+                mode: { type: string, enum: [pause, revoke], default: pause }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/ledger/billing:
     get:
       operationId: ledgerBilling
