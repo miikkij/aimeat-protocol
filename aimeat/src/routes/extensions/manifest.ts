@@ -29,7 +29,7 @@ const fail = (message: string): ExtBuildResult => ({ ok: false, status: 400, cod
  * result on any violation, or `null` when valid. Enforces M1 by construction: morsels are revenue
  * only inside `commercial.payMorsels`.
  */
-function validateActionPricing(action: Record<string, unknown>, actionId: string): ExtBuildResult | null {
+export function validateActionPricing(action: Record<string, unknown>, actionId: string): ExtBuildResult | null {
   if (action.tollMorsels !== undefined && !isNonNegInt(action.tollMorsels)) {
     return fail(`Action "${actionId}": tollMorsels must be a non-negative integer`);
   }
