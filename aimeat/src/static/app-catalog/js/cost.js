@@ -68,8 +68,8 @@ function contractRow(c) {
         '<span class="dtl-stat-val">' + escapeHtml(c.capability || '') + '</span>' +
         '<span class="dtl-stat-label">' + escapeHtml(t('cost.providerCol')) + ': ' + escapeHtml(providerShort) + '</span>' +
       '</div>' +
-      '<div class="dtl-stat"><span class="dtl-stat-label">' + t('cost.priceCol') + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.price_per_call)) + ' 🥩</span></div>' +
-      '<div class="dtl-stat"><span class="dtl-stat-label">' + t('cost.rakeCol') + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.rake_per_call)) + ' 🥩 (' + escapeHtml(String(c.rake_percent)) + '%)</span></div>' +
+      '<div class="dtl-stat"><span class="dtl-stat-label">' + t('cost.priceCol') + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.price_per_call)) + ' morsels</span></div>' +
+      '<div class="dtl-stat"><span class="dtl-stat-label">' + t('cost.rakeCol') + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.rake_per_call)) + ' morsels (' + escapeHtml(String(c.rake_percent)) + '%)</span></div>' +
       '<div class="dtl-stat"><span class="dtl-stat-label">' + t('cost.budgetCol') + '</span><span class="dtl-stat-val">' + escapeHtml(cap) + remaining + '</span></div>' +
       '<div class="dtl-stat">' + stateBadge(c.state) + '</div>' +
     '</div>';
