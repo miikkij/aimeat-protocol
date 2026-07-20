@@ -11,6 +11,7 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v1.2.0 — 2026-07-20 — EXCHANGE G2: consult a durable metered entitlement (budget + rake) before the token/morsel channels (TARGET-045)
  *   v1.1.0 — 2026-07-17 — Money channel: consume the one-time ext-pay token (D1/D3) instead of 402-stub
  *   v1.0.0 — 2026-07-17 — Initial (Phase 2: owner-free + toll + morsel payment; money → 402)
  */
@@ -22,6 +23,7 @@ import type { ExtensionRecord } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { consumeExtPayToken } from '../../services/ext-pay-token.js';
+import { settleViaEntitlement } from './entitlement-gate.js';
 import { logger } from '../../utils/logger.js';
 
 type ExtAction = ExtensionRecord['actions'][number];
@@ -87,6 +89,13 @@ export async function enforcePaywall(args: {
 
   // 3. Not commercial → free public call (the script's own public_access decides who may read).
   if (!action.commercial) return { ok: true };
+
+  // 3.5 EXCHANGE metered-call gateway (G2, TARGET-045): when the caller holds a durable entitlement for
+  //     this exact (ext, action), it takes over the commercial settlement — budget cap + platform rake —
+  //     so a negotiated contract flows without a per-call checkout. Additive: null → no entitlement, fall
+  //     through to the one-time money-token + morsel channels below (unchanged pre-EXCHANGE behaviour).
+  const viaEntitlement = await settleViaEntitlement({ config, storage, ext, action, callerGaii, res });
+  if (viaEntitlement) return viaEntitlement;
 
   // 4. Money channel (D1/D3): require a one-time token minted by a settled ext-call checkout.
   //    Checked BEFORE the morsel debit so a combo-2 caller without money is never charged morsels.
