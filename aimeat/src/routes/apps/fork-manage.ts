@@ -232,7 +232,7 @@ export function registerForkManageRoutes(
         // Rename / re-describe in place: the display name is metadata, the URL is
         // keyed off owner/filename, so this never changes the link. Only the latest
         // version's manifest is updated (the version the catalogue surfaces).
-        const metaUpdate: { name?: string; description?: string } = {};
+        const metaUpdate: { name?: string; description?: string; descriptions?: Record<string, string> } = {};
         if ('name' in body) {
             if (typeof body.name !== 'string') {
                 res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'name must be a string'));
@@ -261,7 +261,29 @@ export function registerForkManageRoutes(
             }
             metaUpdate.description = trimmedDesc;
         }
-        if (metaUpdate.name !== undefined || metaUpdate.description !== undefined) {
+        // Per-locale descriptions (EN/FI, extensible): a `{ locale: text }` map. Each value is a
+        // string ≤2000 chars; blank values are dropped. Additive — the canonical `description` stays.
+        if ('descriptions' in body) {
+            if (typeof body.descriptions !== 'object' || body.descriptions === null || Array.isArray(body.descriptions)) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'descriptions must be an object mapping locale → text'));
+                return;
+            }
+            const cleaned: Record<string, string> = {};
+            for (const [loc, val] of Object.entries(body.descriptions as Record<string, unknown>)) {
+                if (typeof val !== 'string') {
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `descriptions.${loc} must be a string`));
+                    return;
+                }
+                const trimmed = val.trim();
+                if (trimmed.length > 2000) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `descriptions.${loc} must be at most 2000 characters`));
+                    return;
+                }
+                if (trimmed.length > 0) cleaned[loc] = trimmed;
+            }
+            metaUpdate.descriptions = cleaned;
+        }
+        if (metaUpdate.name !== undefined || metaUpdate.description !== undefined || metaUpdate.descriptions !== undefined) {
             await storage.updateAppMeta(effectiveGaii, filename, metaUpdate);
             if (metaUpdate.name !== undefined && metaUpdate.description !== undefined) {
                 notes.push('Name and description updated. The app link is unchanged.');

@@ -22,6 +22,11 @@ export interface AppManifestCortex {
 export interface AppManifest {
   name: string;
   description: string;
+  // Per-locale descriptions (BCP-47-ish keys, e.g. 'en', 'fi'), extensible to more languages.
+  // The catalogue shows the entry matching the viewer's UI language, falling back to `description`.
+  // `description` stays the canonical/default; this map is purely additive. Mirrors the
+  // `SystemPromptRecord.locales` convention in this file.
+  descriptions?: Record<string, string>;
   version: string;              // semver string (display-only)
   category: string;
   tags: string[];
