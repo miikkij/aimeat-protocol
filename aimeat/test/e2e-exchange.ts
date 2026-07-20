@@ -59,6 +59,8 @@ const manifest = (name: string) => JSON.stringify({
     { id: 'validate', method: 'POST', path: '/validate', script: 'echo', commercial: { payMorsels: 10 } },
     { id: 'cheap', method: 'POST', path: '/cheap', script: 'echo', commercial: { payMorsels: 4 } },
     { id: 'money', method: 'POST', path: '/money', script: 'echo', commercial: { payMoney: { amount: 100000, currency: 'EUR' } } },
+    { id: 'bundled', method: 'POST', path: '/bundled', script: 'echo', commercial: { payMorsels: 5, plans: [{ id: 'pack3', model: 'bundle', blockSize: 3, blockPrice: 12 }] } },
+    { id: 'subbed', method: 'POST', path: '/subbed', script: 'echo', commercial: { payMorsels: 5, plans: [{ id: 'basic', model: 'subscription', periodSeconds: 3600, periodPrice: 30, callsPerWindow: 2, windowSeconds: 60 }] } },
     { id: 'free', method: 'POST', path: '/free', script: 'echo' },
   ],
   config: { public_access: { default: true } },
@@ -169,6 +171,43 @@ await test('Re-accepting resumes the contract and carries spend forward', async 
   assert(r.body.data.entitlement.budget.spent_units === prev.budget.spent_units, 'spend carried forward across re-accept');
   const call = await invoke(consumer.token, 'cheap');
   assert(call.status === 200, `call after resume ${call.status}: ${JSON.stringify(call.body?.error)}`);
+});
+
+// ── PRICING MODEL: bundle (N calls per block price) ──
+await test('Bundle plan: block of 3 for 12 — call#1 charges 12 (refill), calls #2/#3 free', async () => {
+  const a = await accept(consumer.token, 'bundled', { app_id: appId, plan_id: 'pack3', cap_units: 100 });
+  assert(a.status === 201 && a.body.data.entitlement.pricing.model === 'bundle', `accept bundle: ${a.status} ${JSON.stringify(a.body?.data?.entitlement?.pricing || a.body?.error)}`);
+  const b0 = await balance(consumer.token);
+  const c1 = await invoke(consumer.token, 'bundled');
+  assert(c1.status === 200, `bundle call1 ${c1.status}`);
+  assert(await balance(consumer.token) === b0 - 12, 'call#1 buys the block (−12)');
+  const b1 = await balance(consumer.token);
+  await invoke(consumer.token, 'bundled');            // call#2 — from quota
+  await invoke(consumer.token, 'bundled');            // call#3 — from quota
+  assert(await balance(consumer.token) === b1, 'calls #2/#3 draw from the block (free)');
+});
+
+await test('Bundle refills: call#4 buys a new block (−12), spend=24 over 4 calls', async () => {
+  const b = await balance(consumer.token);
+  const c4 = await invoke(consumer.token, 'bundled');
+  assert(c4.status === 200 && await balance(consumer.token) === b - 12, 'call#4 refills the block (−12)');
+  const list = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+  const e = list.body.data.entitlements.find((x: any) => x.action === 'bundled');
+  assert(e.budget.spent_units === 24 && e.budget.calls === 4, `bundle budget: ${JSON.stringify(e.budget)}`);
+});
+
+// ── PRICING MODEL: subscription (flat period fee + rate limit N/window) ──
+await test('Subscription plan: call#1 charges the 30 period fee; call#2 free; call#3 → 429 rate-limited', async () => {
+  const a = await accept(consumer.token, 'subbed', { app_id: appId, plan_id: 'basic', cap_units: 100 });
+  assert(a.status === 201 && a.body.data.entitlement.pricing.model === 'subscription', `accept sub: ${a.status} ${JSON.stringify(a.body?.data?.entitlement?.pricing || a.body?.error)}`);
+  const b0 = await balance(consumer.token);
+  const c1 = await invoke(consumer.token, 'subbed');
+  assert(c1.status === 200 && await balance(consumer.token) === b0 - 30, 'call#1 buys the period (−30)');
+  const b1 = await balance(consumer.token);
+  const c2 = await invoke(consumer.token, 'subbed');
+  assert(c2.status === 200 && await balance(consumer.token) === b1, 'call#2 is within the paid period (free)');
+  const c3 = await invoke(consumer.token, 'subbed');
+  assert(c3.status === 429 && c3.body?.error?.code === 'RATE_LIMITED', `call#3 over 2/window → 429, got ${c3.status}/${JSON.stringify(c3.body?.error)}`);
 });
 
 // ── MONEY unit (real currency via the accrual rail) — needs a EUR money handler (test.money in E2E) ──

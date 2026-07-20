@@ -47,6 +47,7 @@ function toContractView(config: AimeatConfig, e: MeteredEntitlement) {
     unit: e.unit,
     currency: e.currency,
     price_per_call: e.pricePerCall,
+    pricing: e.pricing ?? { model: 'per_call' },
     rake_percent: rakePct,
     rake_per_call: percentFee(e.pricePerCall, rakePct),
     escrow_party: e.escrowParty,
