@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <!--
   @file src/static/app-catalog.html
-  @description Self-contained "My Apps" launcher SPA (IndexedDB-backed) for installing,
-    publishing, and running user apps. Runs published app HTML only inside a sandboxed,
-    opaque-origin iframe — never as a top-level document on the apex origin (H-2).
+  @description Self-contained "My Apps" launcher SPA (SERVER-ONLY — no browser persistence) for
+    creating, publishing, and managing the owner's server apps. Creating an app publishes it to the
+    server (unlisted); nothing is stored in the browser. Runs published app HTML only inside a
+    sandboxed, opaque-origin iframe — never as a top-level document on the apex origin (H-2).
   @structure Inline <style>__APP_CATALOG_STYLES__</style>
 </head>
 <body data-active-view="library">
@@ -11,13 +12,6 @@
   <header>
     <a class="aimeat-cta aimeat-home" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span class="aimeat-cta-spark">⚡</span><span id="aimeat-home-label">aimeat.io</span></a>
     <h1 data-i18n="header.title">My Apps</h1>
-    <div class="mode-toggle-wrap">
-      <span class="mode-caption" data-i18n="mode.caption" data-i18n-title="mode.caption.title" title="These toggle which browser-local apps you see — not server visibility">Local apps</span>
-      <div class="mode-toggle">
-        <button id="mode-global" class="mode-btn active" onclick="window._launcher.switchDbMode('global')" data-i18n="mode.global" data-i18n-title="mode.global.title" title="Shared across all accounts on this browser">&#x1F310; Shared</button>
-        <button id="mode-personal" class="mode-btn" onclick="window._launcher.switchDbMode('personal')" data-i18n="mode.personal" data-i18n-title="mode.personal.title" title="Private to your account">&#x1F464; Mine</button>
-      </div>
-    </div>
     <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
     <div class="header-actions">
       <span id="headerAuth" class="header-auth-pill"></span>
@@ -118,12 +112,6 @@
     <p class="view-empty-hint" data-i18n="view.communityHint">Community apps are apps other people on this node have published. When someone publishes one, it shows up here.</p>
   </div>
 
-  <!-- Recently Opened Strip -->
-  <div id="recent-section" data-view="library" style="display:none;margin:0 24px 1rem">
-    <h3 style="margin:0 0 .5rem;font-size:.9rem;color:var(--text-muted)" data-i18n="sec.recent">&#x1F552; Recently Opened</h3>
-    <div id="recent-strip" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
-  </div>
-
   <div id="local-apps-block" class="local-apps-block" data-view="library">
     <div id="local-apps-header" style="display:none">
       <h2 style="font-size:1rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px"><span data-i18n="sec.local">&#x1F4DA; Your apps</span> <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>
@@ -142,18 +130,10 @@
     <div class="modal" id="add-app-modal">
       <h2 id="modal-title" data-i18n="addModal.title">Add App</h2>
 
-      <!-- Source tabs -->
+      <!-- Source tabs — server-only: paste HTML or upload an HTML/ZIP file; it publishes to your account. -->
       <div class="modal-tabs">
-        <button class="modal-tab active" data-tab="url" data-i18n="tab.url">URL</button>
+        <button class="modal-tab active" data-tab="paste" data-i18n="tab.paste">Paste</button>
         <button class="modal-tab" data-tab="file" data-i18n="tab.file">File</button>
-        <button class="modal-tab" data-tab="paste" data-i18n="tab.paste">Paste</button>
-        <button class="modal-tab" data-tab="aimeat" data-i18n="tab.aimeat">AIMEAT</button>
-      </div>
-
-      <!-- URL tab content -->
-      <div class="tab-content active" id="tab-url">
-        <label class="modal-label" for="app-url" data-i18n="addModal.url">App URL</label>
-        <input type="url" id="app-url" class="modal-input" placeholder="https://example.com/app.html" autocomplete="off"/>
       </div>
 
       <!-- File tab content -->
@@ -169,20 +149,10 @@
         </div>
       </div>
 
-      <!-- Paste tab content -->
-      <div class="tab-content" id="tab-paste">
+      <!-- Paste tab content (default) -->
+      <div class="tab-content active" id="tab-paste">
         <label class="modal-label" for="app-paste-code" data-i18n="addModal.paste">Paste HTML Source Code</label>
         <textarea id="app-paste-code" class="modal-input" rows="10" placeholder="Paste your HTML source code here..." data-i18n-ph="addModal.pastePh" style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:.8rem;resize:vertical;min-height:160px;line-height:1.4"></textarea>
-      </div>
-
-      <!-- AIMEAT tab content -->
-      <div class="tab-content" id="tab-aimeat">
-        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5" data-i18n="addModal.aimeatHelp">
-          Import apps from a connected AIMEAT server. Configure the server URL in Settings first.
-        </p>
-        <button type="button" class="modal-btn primary" onclick="window._launcher.importFromAimeat()" style="width:100%" data-i18n="addModal.fetch">
-          Fetch Available Apps
-        </button>
       </div>
 
       <!-- Common fields -->
@@ -319,21 +289,6 @@
         </div>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-section-title" data-i18n="settings.backup">Backup &amp; Restore</div>
-        <div class="settings-backup-actions">
-          <button type="button" class="modal-btn secondary" onclick="window._launcher.exportBackup()" data-i18n="settings.exportJson">Export JSON</button>
-          <button type="button" class="modal-btn secondary" onclick="document.getElementById('import-file-input').click()" data-i18n="settings.importJson">Import JSON</button>
-          <button type="button" class="modal-btn secondary" onclick="window._launcher.removeDuplicateApps()" data-i18n="dedup.btn">&#x1F9F9; Remove duplicate apps</button>
-          <input type="file" id="import-file-input" accept=".json" hidden/>
-        </div>
-      </div>
-
-      <div class="settings-section" style="margin-bottom:0">
-        <div class="settings-section-title" data-i18n="settings.danger">Danger Zone</div>
-        <button type="button" class="modal-btn danger" onclick="window._launcher.clearAllData()" data-i18n="settings.clearAll">Clear All Data</button>
-      </div>
-
       <div class="modal-actions" style="margin-top:24px">
         <button type="button" class="modal-btn secondary" id="settings-cancel-btn" data-i18n="common.cancel">Cancel</button>
         <button type="button" class="modal-btn primary" id="settings-save-btn" data-i18n="common.save">Save</button>
@@ -356,18 +311,6 @@
         <button class="modal-btn primary" id="source-test-live-btn" hidden data-i18n="detail.testLive">Test on real origin</button>
         <button class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="detail.publishTested">Publish tested version</button>
         <button class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- AIMEAT Import Dialog (dynamically populated) -->
-  <div id="aimeat-import-overlay" hidden>
-    <div class="modal" id="aimeat-import-modal">
-      <h2 data-i18n="import.title">Import from AIMEAT</h2>
-      <div class="aimeat-app-list" id="aimeat-app-list"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('aimeat-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
-        <button type="button" class="modal-btn primary" onclick="window._launcher.processAimeatImport()" data-i18n="import.selected">Import Selected</button>
       </div>
     </div>
   </div>
@@ -398,20 +341,6 @@
       </div>
     </div>
   </div>
-
-  <!-- JSON Backup Import Modal (user-selected, duplicate-aware) -->
-  <div id="json-import-overlay" hidden>
-    <div class="modal" id="json-import-modal">
-      <h2 data-i18n="jsonImport.title">&#x1F4E5; Import JSON backup</h2>
-      <div id="json-import-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
-      <div id="json-import-body" style="overflow-y:auto;max-height:55vh"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('json-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
-        <button type="button" class="modal-btn primary" id="json-import-btn" onclick="window._launcher.submitJsonImport()" data-i18n="srvImport.import">Import selected</button>
-      </div>
-    </div>
-  </div>
-
 
   <!-- Backup Import Modal -->
   <div id="backup-overlay" hidden>

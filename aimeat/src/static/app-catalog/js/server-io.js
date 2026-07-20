@@ -1,21 +1,22 @@
 /**
  * @file server-io.js
- * @description Everything that talks to the NODE about apps: import-from-AIMEAT, publish, the
- *   two-view (Library/Community) + operator subdomain mappings, H-2 app-grant consents, the .zip
- *   backup export/restore, and the (never-automatic) server→local import. Owns no state itself — the
- *   shared app-state lives in main and is read via injected getters / written via injected setters;
- *   main-local fns (+ closeModal/addAppFromUrl from apps-io) injected via initServerIo(deps). Carved
- *   from main.js.
- * @usage import { initServerIo, loadPublishedApps, importFromAimeat } from './server-io.js'; initServerIo({...})
+ * @description Everything that talks to the NODE about apps: publish (incl. the create-flow
+ *   publish-then-unlist), the two-view (Library/Community) + operator subdomain mappings, H-2
+ *   app-grant consents, and the .zip backup export/restore. Owns no state itself — the shared
+ *   app-state lives in main and is read via injected getters / written via injected setters;
+ *   main-local fns (+ closeModal from apps-io) injected via initServerIo(deps). Carved from main.js.
+ * @usage import { initServerIo, loadPublishedApps, showPublishModal } from './server-io.js'; initServerIo({...})
  * @version-history
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 11).
+ *   v2.0.0 — 2026-07-20 — Server-only cutover: drop "Import from AIMEAT" (offline server→local import);
+ *     the create flow publishes then parks so a new app lands unlisted.
  */
 import { escapeHtml, jsArg, bareOwnerName, sameOwner, filterAttr } from './util.js';
-import { getAllApps, saveApp, getDbName } from './db.js';
+import { getAllApps, saveApp } from './db.js';
 import { showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
-import { closeModal, addAppFromUrl } from './apps-io.js';
+import { closeModal } from './apps-io.js';
 import { getCortexOwnerToken } from './cortex.js';
 import { fetchAppContentBase64, refreshServerMgmt } from './detail.js';
 
@@ -26,170 +27,15 @@ export function initServerIo(deps) {
   ({ getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId, renderApps, refreshAll } = deps);
 }
 
-// ── AIMEAT Import ───────────────────────────────
-
-var aimeatAppsCache = [];
-
-function formatFileSize(bytes) {
-  if (bytes < 1024) return bytes + ' B';
-  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
-  return (bytes / 1048576).toFixed(1) + ' MB';
-}
-
-function importFromAimeat() {
-  var config = loadConfig();
-  if (!config.aimeatUrl) {
-    showNotice('Set AIMEAT server URL in Settings first');
-    return;
-  }
-
-  var aimeatUrl = config.aimeatUrl.replace(/\/+$/, ''); // strip trailing slash
-  closeModal();
-
-  fetch(aimeatUrl + '/v1/apps?include_peers=true')
-    .then(function (resp) {
-      if (!resp.ok) throw new Error('Server returned ' + resp.status);
-      return resp.json();
-    })
-    .then(function (json) {
-      var apps = json.data && json.data.apps ? json.data.apps : [];
-      var peerApps = json.data && json.data.peer_apps ? json.data.peer_apps : [];
-      // Merge local and peer apps; tag peer apps with source info
-      for (var p = 0; p < peerApps.length; p++) {
-        peerApps[p]._from_peer = true;
-      }
-      var allFetched = apps.concat(peerApps);
-      if (allFetched.length === 0) {
-        showNotice('No apps found on the AIMEAT server');
-        return;
-      }
-      aimeatAppsCache = allFetched;
-      showAimeatImportDialog(allFetched, aimeatUrl);
-    })
-    .catch(function (err) {
-      var msg = 'Failed to fetch apps from AIMEAT server.\n\n' + (err.message || err);
-      if (err.message && err.message.indexOf('Failed to fetch') !== -1) {
-        msg += '\n\nIf the launcher is opened via file://, CORS will block the request. Open it from the AIMEAT server instead.';
-      }
-      showNotice(msg);
-    });
-}
-
-function showAimeatImportDialog(apps, aimeatUrl) {
-  var listEl = document.getElementById('aimeat-app-list');
-  var html = '';
-  for (var i = 0; i < apps.length; i++) {
-    var app = apps[i];
-    var displayName = (app.manifest && app.manifest.name) ? app.manifest.name : app.filename;
-    var displayAuthor = (app.manifest && app.manifest.authorDisplay) ? app.manifest.authorDisplay : (app.owner || '');
-    var displayDesc = (app.manifest && app.manifest.description) ? app.manifest.description : '';
-    var displayVer = app.version_number ? 'v' + app.version_number : '';
-    var displayCat = (app.manifest && app.manifest.category) ? app.manifest.category : '';
-    var peerLabel = app._from_peer && app._peer_node ? ' \u00B7 \uD83C\uDF10 ' + escapeHtml(app._peer_node) : '';
-    html +=
-      '<div class="aimeat-app-item">' +
-        '<input type="checkbox" data-index="' + i + '" checked/>' +
-        '<div class="aimeat-app-info">' +
-          '<div class="aimeat-app-name">' + escapeHtml(displayName) + (displayVer ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(displayVer) + '</span>' : '') + '</div>' +
-          '<div class="aimeat-app-size">' + formatFileSize(app.size) + (displayAuthor ? ' \u00B7 ' + escapeHtml(displayAuthor) : '') + (displayCat ? ' \u00B7 ' + escapeHtml(displayCat) : '') + peerLabel + '</div>' +
-          (displayDesc ? '<div class="aimeat-app-size" style="opacity:.6">' + escapeHtml(displayDesc.substring(0, 100)) + '</div>' : '') +
-        '</div>' +
-        '<select data-index="' + i + '">' +
-          '<option value="link">Link (online only)</option>' +
-          '<option value="download">Download (offline)</option>' +
-        '</select>' +
-      '</div>';
-  }
-  listEl.innerHTML = html;
-  // Store the aimeatUrl for processing
-  listEl.dataset.aimeatUrl = aimeatUrl;
-  document.getElementById('aimeat-import-overlay').hidden = false;
-}
-
-function processAimeatImport() {
-  var listEl = document.getElementById('aimeat-app-list');
-  var aimeatUrl = listEl.dataset.aimeatUrl;
-  var checkboxes = listEl.querySelectorAll('input[type="checkbox"]');
-  var selects = listEl.querySelectorAll('select');
-  var config = loadConfig();
-  var defaultOpenMode = config.defaultOpenMode || 'tab';
-
-  var toImport = [];
-  for (var i = 0; i < checkboxes.length; i++) {
-    if (checkboxes[i].checked) {
-      var idx = parseInt(checkboxes[i].getAttribute('data-index'), 10);
-      var mode = selects[i].value;
-      toImport.push({ app: aimeatAppsCache[idx], mode: mode });
-    }
-  }
-
-  if (toImport.length === 0) {
-    showNotice('No apps selected');
-    return;
-  }
-
-  var promises = [];
-  for (var j = 0; j < toImport.length; j++) {
-    (function (item) {
-      var app = item.app;
-      var name = (app.manifest && app.manifest.name) ? app.manifest.name : app.filename.replace(/\.html?$/i, '');
-      var importedVersion = app.version_number || 1;
-      // For peer apps, use the peer's URL as the base
-      var baseUrl = (app._from_peer && app._peer_url) ? app._peer_url.replace(/\/+$/, '') : aimeatUrl;
-
-      if (item.mode === 'link') {
-        // Link mode: store URL with ?mode=inline, pinned to latest
-        var inlineUrl = baseUrl + app.download_url + '?mode=inline';
-        promises.push(addAppFromUrl(name, inlineUrl, '\u{1F4E6}', ['aimeat'], defaultOpenMode));
-      } else {
-        // Download mode: fetch content and store blob (pinned to current version)
-        var downloadUrl = baseUrl + app.download_url;
-        promises.push(
-          fetch(downloadUrl)
-            .then(function (resp) {
-              if (!resp.ok) throw new Error('Download failed: ' + resp.status);
-              return resp.text();
-            })
-            .then(function (content) {
-              var encoded = btoa(unescape(encodeURIComponent(content)));
-              var record = {
-                id: generateId(),
-                name: name,
-                description: (app.manifest && app.manifest.description) ? app.manifest.description : '',
-                source: 'aimeat',
-                aimeatOwner: app.owner || null,
-                aimeatFilename: app.filename || null,
-                aimeatVersion: importedVersion,
-                url: null,
-                blob: encoded,
-                tags: ['aimeat'],
-                openMode: defaultOpenMode,
-                icon: '\u{1F4E6}',
-                screenshot: null,
-                favorite: false,
-                addedAt: new Date().toISOString(),
-                lastOpenedAt: null
-              };
-              return saveApp(record);
-            })
-        );
-      }
-    })(toImport[j]);
-  }
-
-  Promise.all(promises).then(function () {
-    document.getElementById('aimeat-import-overlay').hidden = true;
-    renderApps();
-  }).catch(function (err) {
-    showNotice('Import error: ' + (err.message || err));
-  });
-}
-
 // ── Publish to AIMEAT ───────────────────────────
 
 var publishAppId = null;
+// When the publish is driven by the "Add app" create flow we park the app straight after publishing
+// so a freshly-created app lands UNLISTED (on the server, not yet public) rather than instantly live.
+var publishUnlisted = false;
 
-function showPublishModal(appId) {
+function showPublishModal(appId, opts) {
+  publishUnlisted = !!(opts && opts.unlisted);
   var app = null;
   for (var i = 0; i < getMainApps().length; i++) {
     if (getMainApps()[i].id === appId) { app = getMainApps()[i]; break; }
@@ -330,6 +176,13 @@ function submitPublish() {
         app.publishedVersionNumber = json.data.version_number || 1;
         app.publishedVersionsUrl = json.data.versions_url || null;
         saveApp(app).then(function() {
+          // Create flow: park it immediately so the new app is UNLISTED (server-only, not public).
+          if (publishUnlisted) {
+            app.parked = true;
+            statusEl.textContent = '\u2714 ' + (t('publish.savedUnlisted') || 'Saved (unlisted)');
+            try { toggleParkApp(filename, true); } catch (e) { /* park is best-effort */ }
+          }
+          publishUnlisted = false;
           loadPublishedApps();
           // Close the modal shortly after showing success \u2014 otherwise it dead-ends with a
           // disabled button and the user isn't sure the publish took.
@@ -1204,8 +1057,6 @@ async function deleteServerApp(filename) {
 
 export {
   isOperatorSession,
-  importFromAimeat,
-  processAimeatImport,
   showPublishModal,
   submitPublish,
   toggleCommunity,

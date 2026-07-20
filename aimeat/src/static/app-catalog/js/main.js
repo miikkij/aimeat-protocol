@@ -4,23 +4,27 @@
  *   served src/static/app-catalog.html). Holds catalog state, rendering, actions, and the
  *   window._launcher handler surface consumed by inline onclick in the markup. Carved from
  *   the former single inline <script>; further modules are split out incrementally.
- * @structure  imports (i18n data) → state → db → api → render → actions → window._launcher → init
+ * @structure  imports (i18n data) → state → api → render → actions → window._launcher → init
  * @usage  built, not loaded raw: pnpm build:app-catalog
+ * @version-history
+ *   v2.0.0 — 2026-07-20 — Server-only cutover: drop the IndexedDB/Shared-Mine plumbing; wire the
+ *     create-flow publish (initAppsIo showPublishModal) and the one-time legacy-local migration.
  */
 import { t, getLang, setLang, applyI18n } from './i18n.js';
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, bareOwnerName, sameOwner, filterAttr, isSameOriginUrl, currentOwnerName, generateId, readFileAsText } from './util.js';
-import { getAllApps, saveApp, deleteApp, openDB, getDbName, getDbMode, setDbMode, closeDbInstance } from './db.js';
+import { getAllApps, saveApp, deleteApp } from './db.js';
 import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './ui.js';
 import { loadConfig, saveConfig } from './config.js';
 import { extractZip, bundleZip } from './zip.js';
 import { initDetail, refreshServerMgmt, openDetailView, editAppDetails, closeDetailView, detailLaunch, mountLoginPill, detailAboutEdit, detailAboutCancel, detailAboutSave, detailToggleFavorite, detailAccessCodeEdit, detailAccessCodeCancel, detailAccessCodeSave, detailSkillAttachToggle, detailSkillAttach, detailSkillDetach, detailSetScreenshot, detailRefreshScreenshot, detailAiRun, detailAiTest, detailAiKeep, detailAiDiscard, detailTestDraftLive, detailPublishTestedDraft, openStagingPreview, sourceTestDraftLive, sourcePublishTested, detailEditSource, detailImproveExternal, detailSharePrompt, detailPublish, detailDelete, openPublishedDetail, fetchAppContentBase64, showLineageModal, showProtectionModal, saveProtection, showVersionsModal, restoreVersion, forkVersion } from './detail.js';
 import { monetizeAddTool, monetizeEditTool, monetizeCancelEdit, monetizeSaveTool, monetizeDeleteTool } from './monetize.js';
 import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken, openCortexEditor, cortexEditorAddLib, cortexEditorSave, cortexEditorExport, closeCortexEditor, openPromptBuilder, closePbPanel, buildPromptFromBuilder, updatePbPreview } from './cortex.js';
-import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp, exportBackup, handleImportBackup, jsonImportSelectAll, submitJsonImport, removeDuplicateApps, clearAllData } from './settings.js';
-import { initAppsIo, setEditingAppId, addAppFromZip, addAppFromUrl, addAppFromFile, addAppFromSource, showModal, requireSignInThen, parseAppMeta, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
-import { initServerIo, isOperatorSession, importFromAimeat, processAimeatImport, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
-import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, renderRecentlyOpened, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt, onCardDragStart, onCardDragEnd, onCardDragOver, onCardDrop } from './render.js';
+import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp } from './settings.js';
+import { initAppsIo, setEditingAppId, showModal, requireSignInThen, parseAppMeta, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
+import { initServerIo, isOperatorSession, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
+import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt } from './render.js';
 import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from './app-agents.js';
+import { checkLegacyLocalApps } from './migrate.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -38,37 +42,8 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
     try { renderApps(); } catch (e) {}
     try { renderTags(); } catch (e) {}
     try { loadPublishedApps(); } catch (e) {}
-    try { renderRecentlyOpened(); } catch (e) {}
     try { loadCortexExtensions(); } catch (e) {}
     try { mountLoginPill(); } catch (e) {}  // re-render the golden pill in the new language
-  }
-
-  function switchDbMode(mode) {
-    if (mode === getDbMode()) return;
-    // Personal mode is per-account and meaningless without a session — it would silently show the
-    // shared Global DB (the "my apps vanished when I changed browser" confusion). Require sign-in
-    // first, keeping the toggle on the current mode until the user actually signs in.
-    if (mode === 'personal' && !currentOwnerName()) {
-      updateModeToggle();
-      requireSignInThen(function () { switchDbMode('personal'); });
-      return;
-    }
-    setDbMode(mode);
-    closeDbInstance();
-    updateModeToggle();
-    refreshAll();
-  }
-
-  function updateModeToggle() {
-    var globalBtn = document.getElementById('mode-global');
-    var personalBtn = document.getElementById('mode-personal');
-    if (!globalBtn || !personalBtn) return;
-    globalBtn.classList.toggle('active', getDbMode() === 'global');
-    personalBtn.classList.toggle('active', getDbMode() === 'personal');
-    // Personal needs a session — dim it and explain via the title when logged out.
-    var signedIn = !!currentOwnerName();
-    personalBtn.classList.toggle('mode-btn-locked', !signedIn);
-    personalBtn.title = signedIn ? t('mode.personal.title') : t('mode.personal.needsLogin');
   }
 
   // ── Config → config.js (loadConfig / saveConfig, imported above) ──
@@ -105,7 +80,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
   // ── Public API ────────────────────────────────────
 
   window._launcher = {
-    openDB: openDB,
     getAllApps: getAllApps,
     saveApp: saveApp,
     deleteApp: deleteApp,
@@ -126,10 +100,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
     handleContextAction: handleContextAction,
     generateId: generateId,
     readFileAsText: readFileAsText,
-    addAppFromUrl: addAppFromUrl,
-    addAppFromFile: addAppFromFile,
-    addAppFromSource: addAppFromSource,
-    addAppFromZip: addAppFromZip,
     showModal: showModal,
     closeModal: closeModal,
     openSettings: openSettings,
@@ -138,10 +108,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
     saveSettings: saveSettings,
     closeSettings: closeSettings,
     applyTheme: applyTheme,
-    exportBackup: exportBackup,
-    clearAllData: clearAllData,
-    importFromAimeat: importFromAimeat,
-    processAimeatImport: processAimeatImport,
     viewSource: viewSource,
     generateHomepagePrompt: generateHomepagePrompt,
     showPublishModal: showPublishModal,
@@ -149,7 +115,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
     loadPublishedApps: loadPublishedApps,
     toggleCommunity: toggleCommunity,
     switchView: switchView,
-    switchDbMode: switchDbMode,
     unpublishApp: unpublishApp,
     deleteServerApp: deleteServerApp,
     toggleParkApp: toggleParkApp,
@@ -176,9 +141,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
     revokeConsent: revokeConsent,
     submitSubdomainAssign: submitSubdomainAssign,
     unassignSubdomain: unassignSubdomain,
-    jsonImportSelectAll: jsonImportSelectAll,
-    submitJsonImport: submitJsonImport,
-    removeDuplicateApps: removeDuplicateApps,
     toggleBackupMenu: toggleBackupMenu,
     toggleCreateMenu: toggleCreateMenu,
     toggleCortexBar: toggleCortexBar,
@@ -214,7 +176,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
     detailSetScreenshot: detailSetScreenshot,
     detailRefreshScreenshot: detailRefreshScreenshot,
     openPublishedDetail: openPublishedDetail,
-    renderRecentlyOpened: renderRecentlyOpened,
     loadCortexExtensions: loadCortexExtensions,
     showCortexPopup: showCortexPopup,
     cortexCopy: cortexCopy,
@@ -225,10 +186,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
     cortexEditorExport: cortexEditorExport,
     openPromptBuilder: openPromptBuilder,
     closePbPanel: closePbPanel,
-    onCardDragStart: onCardDragStart,
-    onCardDragEnd: onCardDragEnd,
-    onCardDragOver: onCardDragOver,
-    onCardDrop: onCardDrop,
     syncConfigToServer: syncConfigToServer,
     loadConfigFromServer: loadConfigFromServer,
     setLanguage: setLanguage,
@@ -244,7 +201,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
     allApps = [];
     renderApps();
     loadPublishedApps();
-    renderRecentlyOpened();
   }
 
   // ── Bootstrap ─────────────────────────────────────
@@ -254,7 +210,7 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
     // can open the detail view or mount the login pill (whose onAuthChanged uses these).
     initDetail({
       refreshAll: refreshAll, loadPublishedApps: loadPublishedApps, renderApps: renderApps,
-      updateModeToggle: updateModeToggle, getCortexOwnerToken: getCortexOwnerToken, launchApp: launchApp,
+      updateModeToggle: function () {}, getCortexOwnerToken: getCortexOwnerToken, launchApp: launchApp,
       viewPublished: viewPublished, viewSource: viewSource, generateId: generateId,
       generateSharePrompt: generateSharePrompt, openPromptBuilder: openPromptBuilder,
       showPublishModal: showPublishModal,
@@ -266,7 +222,7 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
     });
     initAppAgents({ getServerManifests: function () { return serverAppManifests; } });
     initSettings({ generateId: generateId, renderApps: renderApps, loadPublishedApps: loadPublishedApps });
-    initAppsIo({ generateId: generateId, readFileAsText: readFileAsText, renderApps: renderApps, getMainApps: function () { return allApps; } });
+    initAppsIo({ generateId: generateId, readFileAsText: readFileAsText, renderApps: renderApps, getMainApps: function () { return allApps; }, showPublishModal: showPublishModal });
     initServerIo({
       getMainApps: function () { return allApps; },
       getServerState: function () { return serverStateByFilename; },
@@ -300,7 +256,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
       ? _urlLang
       : ((loadConfig().language === 'fi') ? 'fi' : 'en'));
     applyI18n();
-    updateModeToggle();
     // Restore the last-used view (Kirjasto / Yhteisö); defaults to Library.
     var _savedView = 'library';
     try { _savedView = localStorage.getItem('appCatalogView') || 'library'; } catch (e) { /* private mode */ }
@@ -327,6 +282,10 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
     document.getElementById('confirm-overlay').addEventListener('click', function (e) {
       if (e.target === this) closeConfirm(false);
     });
+
+    // One-time migration off the retired browser-local catalog: offer a JSON export of any apps
+    // left in the old IndexedDB store, so the server-only cutover never silently loses them.
+    try { checkLegacyLocalApps(); } catch (e) { /* migration is best-effort */ }
 
     // Deep link ?create=1 — open the AI prompt builder ("Build an app") right away.
     if (_params.get('create') === '1') {
@@ -374,21 +333,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
       }
     });
 
-    // ── Import backup file input ────────────────────
-    document.getElementById('import-file-input').addEventListener('change', function () {
-      if (this.files && this.files.length > 0) {
-        handleImportBackup(this.files[0]);
-        this.value = ''; // Reset for re-import
-      }
-    });
-
-    // ── Click AIMEAT import overlay to close ────────
-    document.getElementById('aimeat-import-overlay').addEventListener('click', function (e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
-    });
-
     // ── Click publish overlay to close ──────────────
     document.getElementById('publish-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
@@ -416,11 +360,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
       this.value = '';
     });
     document.getElementById('backup-overlay').addEventListener('click', function (e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
-    });
-    document.getElementById('json-import-overlay').addEventListener('click', function (e) {
       if (e.target === this) {
         this.hidden = true;
       }
@@ -592,16 +531,12 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
           document.getElementById('source-overlay').hidden = true;
         } else if (!document.getElementById('context-menu').hidden) {
           hideContextMenu();
-        } else if (!document.getElementById('aimeat-import-overlay').hidden) {
-          document.getElementById('aimeat-import-overlay').hidden = true;
         } else if (!document.getElementById('publish-overlay').hidden) {
           document.getElementById('publish-overlay').hidden = true;
         } else if (!document.getElementById('subdomain-overlay').hidden) {
           document.getElementById('subdomain-overlay').hidden = true;
         } else if (!document.getElementById('backup-overlay').hidden) {
           document.getElementById('backup-overlay').hidden = true;
-        } else if (!document.getElementById('json-import-overlay').hidden) {
-          document.getElementById('json-import-overlay').hidden = true;
         } else if (!document.getElementById('settings-overlay').hidden) {
           closeSettings();
         } else if (!document.getElementById('modal-overlay').hidden) {
@@ -622,27 +557,6 @@ import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from 
         e.preventDefault();
         document.getElementById('search-input').focus();
       }
-    });
-
-    // ── Long-press for touch devices ─────────────────
-    document.getElementById('app-grid').addEventListener('touchstart', function(e) {
-      var card = e.target.closest('.app-card');
-      if (!card) return;
-      var appId = card.getAttribute('data-id');
-      card._longPressTimer = setTimeout(function() {
-        e.preventDefault();
-        window._launcher.showContextMenu(e.touches[0], appId);
-      }, 500);
-    }, { passive: false });
-
-    document.getElementById('app-grid').addEventListener('touchend', function(e) {
-      var card = e.target.closest('.app-card');
-      if (card && card._longPressTimer) clearTimeout(card._longPressTimer);
-    });
-
-    document.getElementById('app-grid').addEventListener('touchmove', function(e) {
-      var card = e.target.closest('.app-card');
-      if (card && card._longPressTimer) clearTimeout(card._longPressTimer);
     });
 
     // ── Copy Source button ───────────────────────────

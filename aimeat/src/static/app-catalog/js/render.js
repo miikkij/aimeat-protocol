@@ -13,6 +13,8 @@
  *   v1.1.0 — 2026-07-16 — Card badges now reflect PUBLICATION state only (retire the
  *     "Server only" concept: a published no-local-copy app is "Listed vN", not "server").
  *     Add a Staging pill + split Open into "Open released" / "Open staging" when has_draft.
+ *   v2.0.0 — 2026-07-20 — Server-only cutover: grid renders the owner's server apps only (no local
+ *     merge), drop drag-reorder + Recently-Opened + the local-only card affordances + byte stats.
  */
 import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl } from './util.js';
 import { getAllApps, saveApp, deleteApp } from './db.js';
@@ -280,22 +282,16 @@ function buildLibraryEntries(localApps, serverApps) {
 
 function renderApps() {
   getAllApps().then(function (apps) {
-    setAllApps(apps); // keep the raw local list (openPublishedDetail et al. read getMainApps())
+    setAllApps(apps); // keep the transient working-set (openPublishedDetail materializes into it)
 
-    // Unified library list: one entry per app (local + own-server, deduped by filename).
-    var entries = buildLibraryEntries(apps, ownServerApps);
+    // Server-only library: one entry per OWN server app (published + parked). No browser-local
+    // apps exist anymore, so nothing local is merged in — the grid is purely the owner's server apps.
+    var entries = buildLibraryEntries([], ownServerApps);
 
-    // Sort: favorites first, then by explicit sortOrder, then most-recent.
+    // Sort: Listed (public) before Unlisted (parked); the server already returns each group
+    // newest-first, so preserve that order within a group.
     entries.sort(function (a, b) {
-      if (a.favorite && !b.favorite) return -1;
-      if (!a.favorite && b.favorite) return 1;
-      var oA = typeof a.sortOrder === 'number' ? a.sortOrder : Infinity;
-      var oB = typeof b.sortOrder === 'number' ? b.sortOrder : Infinity;
-      if (oA !== oB) return oA - oB;
-      var dateA = a.lastOpenedAt || a.addedAt || '';
-      var dateB = b.lastOpenedAt || b.addedAt || '';
-      if (dateA > dateB) return -1;
-      if (dateA < dateB) return 1;
+      if (!!a.parked !== !!b.parked) return a.parked ? 1 : -1;
       return 0;
     });
 
@@ -357,19 +353,11 @@ function renderApps() {
       grid.innerHTML = html;
     }
 
-    // Stats: count + total local blob size (server-only apps have no local footprint).
+    // Stats: app count only — the catalog is server-only, so there is no local footprint to report.
     var statsEl = document.getElementById('stats');
-    var totalSize = 0;
-    for (var sz = 0; sz < entries.length; sz++) {
-      if (entries[sz].blob) totalSize += entries[sz].blob.length;
-    }
-    var sizeLabel = totalSize < 1024 ? totalSize + ' B'
-      : totalSize < 1048576 ? (totalSize / 1024).toFixed(1) + ' KB'
-      : (totalSize / 1048576).toFixed(1) + ' MB';
-    statsEl.textContent = entries.length + ' ' + t('stats.apps') + ' · ' + sizeLabel + ' ' + t('stats.stored');
+    statsEl.textContent = entries.length + ' ' + t('stats.apps');
 
     renderTags();
-    renderRecentlyOpened();
   });
 }
 
@@ -428,24 +416,6 @@ function libraryCardHtml(e, i) {
       '</div>' +
       (e.favorite ? '<span class="fav-star visible">⭐</span>' : '') +
     '</div>';
-}
-
-function renderRecentlyOpened() {
-  var section = document.getElementById('recent-section');
-  var strip = document.getElementById('recent-strip');
-  var recent = getMainApps()
-    .filter(function(a) { return a.lastOpenedAt; })
-    .sort(function(a, b) { return (b.lastOpenedAt || '') > (a.lastOpenedAt || '') ? 1 : -1; })
-    .slice(0, 5);
-  if (recent.length === 0) { section.style.display = 'none'; return; }
-  section.style.display = 'block';
-  strip.innerHTML = recent.map(function(app) {
-    var icon = app.icon || '\u{1F4DD}';
-    return '<div style="background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:10px;padding:.6rem .8rem;cursor:pointer;min-width:120px;flex-shrink:0;transition:all .15s" onclick="window._launcher.launchApp(\'' + escapeHtml(app.id) + '\', \'' + escapeHtml(app.openMode || 'tab') + '\')" onmouseover="this.style.borderColor=\'var(--border-hover)\'" onmouseout="this.style.borderColor=\'var(--border-subtle)\'">' +
-      '<div style="font-size:1.3rem;text-align:center">' + escapeHtml(icon) + '</div>' +
-      '<div style="font-size:.75rem;font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px">' + escapeHtml(app.name) + '</div>' +
-    '</div>';
-  }).join('');
 }
 
 // ── Iframe helpers ────────────────────────────────
@@ -538,23 +508,9 @@ async function handleContextAction(action) {
       break;
 
     case 'edit':
-      // Open modal pre-filled with app data
-      setEditingAppId(appId);
-      document.getElementById('modal-title').textContent = 'Edit App';
-      document.getElementById('app-name').value = app.name || '';
-      document.getElementById('app-icon').value = app.icon || '';
-      document.getElementById('app-tags').value = (app.tags || []).join(', ');
-
-      // Set the correct source tab
-      if (app.source === 'url') {
-        switchTab('url');
-        document.getElementById('app-url').value = app.url || '';
-      } else {
-        switchTab('file');
-        document.getElementById('selected-file-name').textContent = '(existing file)';
-      }
-
-      document.getElementById('modal-overlay').hidden = false;
+      // Server-only: editing an app's name/description/icon/tags is done in the detail view
+      // ("Edit details"); route there instead of the old local Add/Edit modal.
+      openDetailView(appId);
       break;
 
     case 'favorite':
@@ -709,82 +665,7 @@ function generateHomepagePrompt() {
   overlay.hidden = false;
 }
 
-// ── Drag & Drop Reordering (card reorder) ─────────
-
-var dragSourceId = null;
-
-function onCardDragStart(e) {
-  var card = e.target.closest('.app-card');
-  if (!card) return;
-  dragSourceId = card.dataset.id;
-  card.classList.add('dragging');
-  e.dataTransfer.effectAllowed = 'move';
-  e.dataTransfer.setData('text/plain', dragSourceId);
-}
-
-function onCardDragEnd(e) {
-  var card = e.target.closest('.app-card');
-  if (card) card.classList.remove('dragging');
-  // Remove all drag-over highlights
-  var cards = document.querySelectorAll('.app-card.drag-over');
-  for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
-  dragSourceId = null;
-}
-
-function onCardDragOver(e) {
-  e.preventDefault();
-  e.dataTransfer.dropEffect = 'move';
-  var card = e.target.closest('.app-card');
-  if (!card || card.dataset.id === dragSourceId) return;
-  // Remove highlight from others
-  var cards = document.querySelectorAll('.app-card.drag-over');
-  for (var i = 0; i < cards.length; i++) cards[i].classList.remove('drag-over');
-  card.classList.add('drag-over');
-}
-
-function onCardDrop(e) {
-  e.preventDefault();
-  var targetCard = e.target.closest('.app-card');
-  if (!targetCard) return;
-  var targetId = targetCard.dataset.id;
-  if (!dragSourceId || dragSourceId === targetId) return;
-
-  // Find indexes in the currently rendered/sorted getMainApps()
-  var srcIdx = -1, tgtIdx = -1;
-  for (var i = 0; i < getMainApps().length; i++) {
-    if (getMainApps()[i].id === dragSourceId) srcIdx = i;
-    if (getMainApps()[i].id === targetId) tgtIdx = i;
-  }
-  if (srcIdx === -1 || tgtIdx === -1) return;
-
-  // Move the source app to the target position
-  var moved = getMainApps().splice(srcIdx, 1)[0];
-  getMainApps().splice(tgtIdx, 0, moved);
-
-  // Assign sortOrder values based on new positions
-  var saves = [];
-  for (var j = 0; j < getMainApps().length; j++) {
-    getMainApps()[j].sortOrder = j;
-    saves.push(saveApp(getMainApps()[j]));
-  }
-
-  // Re-render immediately (no animation delay for reorder)
-  var grid = document.getElementById('app-grid');
-  var cards = grid.querySelectorAll('.app-card');
-  for (var k = 0; k < cards.length; k++) {
-    cards[k].classList.remove('drag-over', 'dragging');
-  }
-
-  Promise.all(saves).then(function () {
-    renderApps();
-  });
-}
-
 export {
-  onCardDragStart,
-  onCardDragEnd,
-  onCardDragOver,
-  onCardDrop,
   renderTags,
   filterByTag,
   launchApp,
@@ -792,7 +673,6 @@ export {
   viewPublished,
   launchInIframe,
   renderApps,
-  renderRecentlyOpened,
   closeIframe,
   openExternal,
   showContextMenu,
