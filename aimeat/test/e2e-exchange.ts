@@ -58,8 +58,14 @@ const SCRIPTS = { echo: 'export default async function(ctx, input){ return { ech
 const manifest = (name: string) => JSON.stringify({
   metadata: { name, version: '1.0.0', description: 'exchange e2e provider', author: 'e2e' },
   actions: [
-    { id: 'validate', method: 'POST', path: '/validate', script: 'echo', commercial: { payMorsels: 10 } },
-    { id: 'cheap', method: 'POST', path: '/cheap', script: 'echo', commercial: { payMorsels: 4 } },
+    { id: 'validate', method: 'POST', path: '/validate', script: 'echo',
+      input: { type: 'object', properties: { q: { type: 'string' } } },
+      output: { type: 'object', properties: { echo: {}, caller: { type: 'string' } } },
+      commercial: { payMorsels: 10 } },
+    { id: 'cheap', method: 'POST', path: '/cheap', script: 'echo',
+      input: { type: 'object', properties: { q: { type: 'string' } } },
+      output: { type: 'object', properties: { echo: {} } },
+      commercial: { payMorsels: 4 } },
     { id: 'money', method: 'POST', path: '/money', script: 'echo', commercial: { payMoney: { amount: 100000, currency: 'EUR' } } },
     { id: 'bundled', method: 'POST', path: '/bundled', script: 'echo', commercial: { payMorsels: 5, plans: [{ id: 'pack3', model: 'bundle', blockSize: 3, blockPrice: 12 }] } },
     { id: 'subbed', method: 'POST', path: '/subbed', script: 'echo', commercial: { payMorsels: 5, plans: [{ id: 'basic', model: 'subscription', periodSeconds: 3600, periodPrice: 30, callsPerWindow: 2, windowSeconds: 60 }] } },
@@ -216,13 +222,26 @@ await test('Subscription plan: call#1 charges the 30 period fee; call#2 free; ca
 let offeringId = '', needId = '', bidId = '';
 let buyer: Awaited<ReturnType<typeof setupOwner>>;
 
+const validTerms = { derivatives: true, resale: false, attribution: true };
 await test('Provider lists an OFFERING for its priced action (authoritative price from the action)', async () => {
   const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token),
-    body: JSON.stringify({ ext: EXT, action: 'validate', title: 'Y-tunnus validation', description: 'PRH company lookup', tags: ['prh', 'finland'] }) });
+    body: JSON.stringify({ ext: EXT, action: 'validate', title: 'Y-tunnus validation', description: 'PRH company lookup', tags: ['prh', 'finland'], usage_terms: validTerms }) });
   assert(r.status === 201, `list offering ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const o = r.body.data.offering;
   assert(o.unit === 'morsels' && o.basePrice === 10, `offering price authoritative: ${JSON.stringify(o)}`);
   offeringId = o.offeringId;
+});
+
+await test('Legibility gate: listing an action with NO published schema → 400 SCHEMA_REQUIRED', async () => {
+  const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ ext: EXT, action: 'money', title: 'no schema', usage_terms: validTerms }) });
+  assert(r.status === 400 && r.body?.error?.code === 'SCHEMA_REQUIRED', `expected SCHEMA_REQUIRED, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Legibility gate: listing WITHOUT usage_terms → 400 USAGE_TERMS_REQUIRED', async () => {
+  const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ ext: EXT, action: 'validate', title: 'no terms' }) });
+  assert(r.status === 400 && r.body?.error?.code === 'USAGE_TERMS_REQUIRED', `expected USAGE_TERMS_REQUIRED, got ${r.status}/${JSON.stringify(r.body?.error)}`);
 });
 
 await test('Browse offerings by capability finds the listing (public, no auth)', async () => {

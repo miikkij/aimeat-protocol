@@ -8099,14 +8099,16 @@ paths:
       description: >
         Publish a public supply listing for a priced action of an extension you own. Price + plans are read
         AUTHORITATIVELY from the action (`commercial`); you add title/description/provenance/tags and a usage
-        licence (`usage_terms`). Body: `{ ext, action, title?, description?, provenance?, usage_terms?, tags? }`.
-        `usage_terms` = `{ derivatives?, resale?, attribution?, note? }` — the provider's promise on how the
-        consumer may use the output. Returns `{ offering }`.
+        licence (`usage_terms`). Body: `{ ext, action, title?, description?, provenance?, usage_terms, tags? }`.
+        LEGIBILITY GATE: the action MUST publish a non-empty input AND output schema (else 400 SCHEMA_REQUIRED),
+        and `usage_terms` is REQUIRED (else 400 USAGE_TERMS_REQUIRED) — so every listing is integrable and
+        governed. `usage_terms` = `{ derivatives?, resale?, attribution?, note? }` — the provider's promise on
+        how the consumer may use the output. Returns `{ offering }`.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, required: [ext, action], properties: {
+        content: { application/json: { schema: { type: object, required: [ext, action, usage_terms], properties: {
           ext: { type: string }, action: { type: string }, title: { type: string }, description: { type: string },
           provenance: { type: object }, tags: { type: array, items: { type: string } },
           usage_terms: { type: object, properties: {

@@ -11,6 +11,8 @@
  *   needs (POST/GET/close) · bids (POST/GET/accept)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-07-20 — Legibility GATE: listing an offering now REQUIRES a published input+output schema
+ *     (400 SCHEMA_REQUIRED) and usage_terms (400 USAGE_TERMS_REQUIRED) — every listing integrable + governed.
  *   v1.1.0 — 2026-07-20 — Legibility: offering detail (I/O schema + call-recipe + stats), provider consumers
  *     (lineage), usage_terms on offerings, spec on needs, ?stats=1 on the list.
  *   v1.0.0 — 2026-07-20 — Initial marketplace: offerings, needs, bids, capability match, accept-bid → mint (Phase C).
@@ -34,6 +36,8 @@ import {
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const posOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
+/** A publishable schema is a non-empty object (an empty `{}` counts as "not published"). */
+const hasSchema = (v: unknown): boolean => !!v && typeof v === 'object' && Object.keys(v as Record<string, unknown>).length > 0;
 
 /** Parse a provider-declared usage licence from a request body (all fields optional; defaults are permissive-but-attributed). */
 function parseUsageTerms(v: unknown): UsageTerms | null {
@@ -87,6 +91,18 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     if (!act) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Action "${action}" not found on "${ext}"`));
     const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, null);
     if (!priced.ok) return res.status(400).json(error(config.nodeId, priced.code, priced.message));
+    // LEGIBILITY GATE: an offering must be integrable + governed to be listed. The action MUST publish an
+    // input AND output schema (so a consumer/agent knows what to send and gets back), and the listing MUST
+    // state usage terms (so a consumer knows if they may refine/resell). Enforced at the supply source.
+    if (!hasSchema(act.inputSchema) || !hasSchema(act.outputSchema)) {
+      return res.status(400).json(error(config.nodeId, 'SCHEMA_REQUIRED',
+        `Action "${ext}/${action}" must publish a non-empty input AND output schema before it can be offered on EXCHANGE (a consumer must know what to send and receive)`));
+    }
+    const usageTerms = parseUsageTerms(b.usage_terms);
+    if (!usageTerms) {
+      return res.status(400).json(error(config.nodeId, 'USAGE_TERMS_REQUIRED',
+        'usage_terms is required to list an offering — state { derivatives, resale, attribution, note? } so a consumer knows how they may use the output'));
+    }
     const now = new Date().toISOString();
     const offering: Offering = {
       offeringId: newOfferingId(),
@@ -98,7 +114,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,
       plans: (act.commercial as ActionCommercial | undefined)?.plans ?? [],
       provenance: (b.provenance && typeof b.provenance === 'object') ? b.provenance as Offering['provenance'] : null,
-      usageTerms: parseUsageTerms(b.usage_terms),
+      usageTerms,
       tags: Array.isArray(b.tags) ? (b.tags as unknown[]).filter(t => typeof t === 'string') as string[] : [],
       state: 'listed', createdAt: now, updatedAt: now,
     };
