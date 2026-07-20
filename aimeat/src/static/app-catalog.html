@@ -3031,7 +3031,7 @@
       "cost.title": "📊 Cost & contracts — what this app sources",
       "cost.hint": "This app’s EXCHANGE contracts: durable metered entitlements it calls, with live spend against each budget and the platform rake. The per-call price comes from the provider; you set only the budget cap.",
       "cost.empty": "No EXCHANGE contracts yet — this app sources nothing priced.",
-      "cost.summary": "{n} contract(s) · {spent} 🥩 spent · {calls} call(s)",
+      "cost.summary": "{n} contract(s) · {spent} morsels spent · {calls} call(s)",
       "cost.capabilityCol": "Capability",
       "cost.providerCol": "Provider",
       "cost.priceCol": "Price / call",
@@ -3473,7 +3473,7 @@
       "cost.title": "📊 Kulut & sopimukset — mitä tämä appi hankkii",
       "cost.hint": "Tämän appin EXCHANGE-sopimukset: pysyvät mitatut käyttöoikeudet joita se kutsuu, live-kulutus kutakin budjettia vasten ja alustan siivu. Kutsukohtainen hinta tulee tarjoajalta; sinä asetat vain budjettikaton.",
       "cost.empty": "Ei vielä EXCHANGE-sopimuksia — tämä appi ei hanki mitään hinnoiteltua.",
-      "cost.summary": "{n} sopimus(ta) · {spent} 🥩 käytetty · {calls} kutsu(a)",
+      "cost.summary": "{n} sopimus(ta) · {spent} morselia käytetty · {calls} kutsu(a)",
       "cost.capabilityCol": "Kyvykkyys",
       "cost.providerCol": "Tarjoaja",
       "cost.priceCol": "Hinta / kutsu",
@@ -4789,7 +4789,7 @@
   }
   function priceLabel(tool) {
     var parts = [];
-    if (tool.price && tool.price.morsels > 0) parts.push(tool.price.morsels + " 🥩");
+    if (tool.price && tool.price.morsels > 0) parts.push(tool.price.morsels + " morsels");
     if (tool.priceMoney && tool.priceMoney.amount > 0) {
       parts.push(tool.priceMoney.amount / MONEY_UNIT + " " + tool.priceMoney.currency);
     }
@@ -4981,7 +4981,7 @@
     var cap = b.cap_units === null || b.cap_units === void 0 ? t("cost.uncapped") : b.spent_units + " / " + b.cap_units;
     var remaining = b.remaining_units === null || b.remaining_units === void 0 ? "" : ' <span class="dtl-stat-label">(' + t("cost.remaining").replace("{n}", b.remaining_units) + ")</span>";
     var providerShort = String(c.provider || "").split("@")[0];
-    return '<div class="dtl-status-row" style="align-items:center;gap:10px;flex-wrap:wrap"><div class="dtl-stat" style="flex:1;min-width:150px"><span class="dtl-stat-val">' + escapeHtml(c.capability || "") + '</span><span class="dtl-stat-label">' + escapeHtml(t("cost.providerCol")) + ": " + escapeHtml(providerShort) + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("cost.priceCol") + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.price_per_call)) + ' 🥩</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("cost.rakeCol") + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.rake_per_call)) + " 🥩 (" + escapeHtml(String(c.rake_percent)) + '%)</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("cost.budgetCol") + '</span><span class="dtl-stat-val">' + escapeHtml(cap) + remaining + '</span></div><div class="dtl-stat">' + stateBadge(c.state) + "</div></div>";
+    return '<div class="dtl-status-row" style="align-items:center;gap:10px;flex-wrap:wrap"><div class="dtl-stat" style="flex:1;min-width:150px"><span class="dtl-stat-val">' + escapeHtml(c.capability || "") + '</span><span class="dtl-stat-label">' + escapeHtml(t("cost.providerCol")) + ": " + escapeHtml(providerShort) + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("cost.priceCol") + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.price_per_call)) + ' morsels</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("cost.rakeCol") + '</span><span class="dtl-stat-val">' + escapeHtml(String(c.rake_per_call)) + " morsels (" + escapeHtml(String(c.rake_percent)) + '%)</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("cost.budgetCol") + '</span><span class="dtl-stat-val">' + escapeHtml(cap) + remaining + '</span></div><div class="dtl-stat">' + stateBadge(c.state) + "</div></div>";
   }
   function costSectionInner() {
     if (cState === "off") return "";
