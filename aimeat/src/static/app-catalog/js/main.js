@@ -21,10 +21,11 @@ import { monetizeAddTool, monetizeEditTool, monetizeCancelEdit, monetizeSaveTool
 import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken, openCortexEditor, cortexEditorAddLib, cortexEditorSave, cortexEditorExport, closeCortexEditor, openPromptBuilder, closePbPanel, buildPromptFromBuilder, updatePbPreview } from './cortex.js';
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp } from './settings.js';
 import { initAppsIo, setEditingAppId, showModal, requireSignInThen, parseAppMeta, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
-import { initServerIo, isOperatorSession, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
+import { initServerIo, isOperatorSession, showPublishModal, submitPublish, toggleCommunity, switchView, showSubdomainModal, submitSubdomainAssign, unassignSubdomain, closeConsents, openConsents, revokeConsent, toggleBackupMenu, toggleCreateMenu, closeCreateMenu, toggleCortexBar, exportBackupZip, importBackupPick, importBackupFile, backupUpdateSummary, backupSelectAll, submitBackupRestore, loadPublishedApps, refreshFavoritesUI, applyServerFilter, unpublishApp, toggleParkApp, toggleForkApp, deleteServerApp } from './server-io.js';
 import { initRender, setServerManifests, setOwnServerApps, setIframeUrl, serverStateByFilename, serverAppManifests, ownAppProtection, ownServerApps, currentIframeUrl, renderTags, filterByTag, launchApp, launchInTab, viewPublished, launchInIframe, renderApps, closeIframe, openExternal, showContextMenu, hideContextMenu, handleContextAction, viewSource, generateSharePrompt, generateHomepagePrompt } from './render.js';
 import { initAppAgents, showAppAgentsModal, agentsDeploy, agentsUndeploy } from './app-agents.js';
 import { checkLegacyLocalApps } from './migrate.js';
+import { toggleFavorite } from './favorites.js';
 
 
   // ── i18n (en / fi) ─────────────────────────────────
@@ -113,6 +114,8 @@ import { checkLegacyLocalApps } from './migrate.js';
     showPublishModal: showPublishModal,
     submitPublish: submitPublish,
     loadPublishedApps: loadPublishedApps,
+    // Toggle a server-backed favourite (ref = "owner/filename"), then re-render the ⭐ group + stars.
+    toggleFavorite: function (ref) { toggleFavorite(ref).then(function () { try { refreshFavoritesUI(); } catch (e) {} }); },
     toggleCommunity: toggleCommunity,
     switchView: switchView,
     unpublishApp: unpublishApp,

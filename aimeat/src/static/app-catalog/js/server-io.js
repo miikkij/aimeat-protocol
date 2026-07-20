@@ -15,10 +15,11 @@ import { escapeHtml, jsArg, bareOwnerName, sameOwner, filterAttr } from './util.
 import { getAllApps, saveApp } from './db.js';
 import { showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
-import { t } from './i18n.js';
+import { t, getLang } from './i18n.js';
 import { closeModal } from './apps-io.js';
 import { getCortexOwnerToken } from './cortex.js';
 import { fetchAppContentBase64, refreshServerMgmt } from './detail.js';
+import { favStarHtml, isFavorite, loadFavorites } from './favorites.js';
 
 // Injected once at bootstrap by main.js: read getters + write setters for the shared app-state
 // (which stays main-owned), plus a few main-local fns.
@@ -26,6 +27,11 @@ let getMainApps, getServerState, getServerManifests, setServerManifests, getOwnS
 export function initServerIo(deps) {
   ({ getMainApps, getServerState, getServerManifests, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId, renderApps, refreshAll } = deps);
 }
+
+// Cache of the last full server-app list (own + community) + base URL, so a favourite toggle can
+// re-render the ⭐ group + all star states without a network round-trip.
+let lastAllServerApps = [];
+let lastAimeatUrl = '';
 
 // ── Publish to AIMEAT ───────────────────────────
 
@@ -795,7 +801,9 @@ function loadPublishedApps() {
     }
   } catch(e) {}
 
-  getAllApps().then(function() {
+  // Load the owner's favourites alongside the app list so the ⭐ group + stars match the current
+  // session (also refreshes them on an auth change, which routes through here via refreshAll).
+  Promise.all([getAllApps(), loadFavorites()]).then(function() {
     if (!aimeatUrl) {
       setOwnServerApps([]);
       renderApps();
@@ -827,14 +835,18 @@ function loadPublishedApps() {
           ? serverApps.filter(function(a) { return !sameOwner(a.owner, currentOwner); })
           : serverApps;
 
+        // Cache the FULL list (own + community) so a favourite toggle can re-render the ⭐ group
+        // and the star state in place, without another round-trip.
+        lastAllServerApps = serverApps;
+        lastAimeatUrl = aimeatUrl;
+
         return loadSubdomainSites().then(function () {
-          // Unified Kirjasto grid: cache the owner's server apps (published + parked) so
-          // renderApps() merges them with local apps into ONE card per app (deduped by
-          // filename; buildLibraryEntries handles the parked/published state). Logged out →
-          // no owner server apps (a visitor browses everything under Community).
+          // Kirjasto grid: the owner's server apps (published + parked). Logged out → none
+          // (a visitor browses everything under Community).
           setOwnServerApps(currentOwner ? ownApps : []);
           renderApps();
           renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
+          renderFavorites(serverApps, aimeatUrl); // ⭐ group pinned atop the Library
           applyServerFilter(); // re-apply any active search/tag to the community cards
         });
       })
@@ -877,6 +889,55 @@ function applyServerFilter() {
   if (sectionEl) sectionEl.style.display = (filtering && shown === 0) ? 'none' : '';
 }
 
+// One published-app card (used by BOTH the Community grid and the ⭐ Favourites group). Carries a
+// favourite toggle + a description localized to the current UI language.
+function publishedCardHtml(sa, aimeatUrl) {
+  var owner = sa.owner || '';
+  var fn = sa.filename || '';
+  var ref = owner + '/' + fn;
+  var m = sa.manifest || {};
+  var name = m.name || fn;
+  var version = sa.version_number ? 'v' + sa.version_number : '';
+  var description = (m.descriptions && m.descriptions[getLang()]) || m.description || '';
+  var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '';
+  var author = m.authorDisplay || owner;
+  var viewUrl = aimeatUrl + '/v1/apps/' + encodeURIComponent(owner) + '/' + encodeURIComponent(fn);
+  // Agent-Bundled Apps: this app ships its own agent(s) — badge it and offer the Bundled-agents modal.
+  var shipsAgent = !!(m.cortex && m.cortex.agents && m.cortex.agents.length);
+  return '<div class="published-card"' + filterAttr(name, m.tags || []) + '>' +
+      favStarHtml(ref) +
+      '<div class="published-card-name">' + escapeHtml(name) + '</div>' +
+      (description ? '<div class="published-card-desc">' + escapeHtml(description) + '</div>' : '') +
+      '<div class="published-card-footer">' +
+        '<div class="published-card-metaline">' +
+          '<span class="pcm-main" style="color:var(--accent)">&#x1F464; ' + escapeHtml(author) + '</span>' +
+          (date ? '<span class="pcm-date">' + date + '</span>' : '') +
+        '</div>' +
+        '<div class="published-card-actions">' +
+          '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + jsArg(name) + '\')">' + t('card.view') + '</button>' +
+          // Fork is offered on a community app only when its owner marked it forkable.
+          (sa.forkable
+            ? '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(owner) + '\', \'' + escapeHtml(fn) + '\', ' + (sa.version_number || 0) + ')" title="' + escapeHtml(t('card.forkHint')) + '">' + t('card.fork') + '</button>'
+            : '') +
+          (shipsAgent
+            ? '<button onclick="window._launcher.showAppAgentsModal(\'' + jsArg(owner) + '\', \'' + jsArg(fn) + '\')" title="' + escapeHtml(t('card.agentHint')) + '">' + t('card.agent') + '</button>'
+            : '') +
+        '</div>' +
+        ((version || (sa.forks && sa.forks > 0) || shipsAgent)
+          ? '<div class="published-card-badgerow">'
+            + (shipsAgent
+              ? '<span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">&#x1F916;</span>'
+              : '')
+            + ((sa.forks && sa.forks > 0)
+              ? '<span class="pcb-forks" title="' + escapeHtml(t('card.forksHint')) + '" onclick="window._launcher.showLineageModal(\'' + escapeHtml(owner) + '\', \'' + escapeHtml(fn) + '\')">⑂ ' + sa.forks + '</span>'
+              : '')
+            + (version ? '<span class="pcb-version">' + escapeHtml(version) + '</span>' : '')
+            + '</div>'
+          : '') +
+      '</div>' +
+    '</div>';
+}
+
 function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, currentOwner) {
   if (!section || !grid || !countEl) return;
   if (serverApps.length === 0) {
@@ -885,58 +946,47 @@ function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, curr
     updateCommunityEmpty();
     return;
   }
-
   section.style.display = '';
   countEl.textContent = '(' + serverApps.length + ')';
-
   var html = '';
-  for (var i = 0; i < serverApps.length; i++) {
-    var sa = serverApps[i];
-    var name = (sa.manifest && sa.manifest.name) ? sa.manifest.name : (sa.filename || '');
-    var version = sa.version_number ? 'v' + sa.version_number : '';
-    var description = (sa.manifest && sa.manifest.description) ? sa.manifest.description : '';
-    var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : '';
-    var author = (sa.manifest && sa.manifest.authorDisplay) ? sa.manifest.authorDisplay : (sa.owner || '');
-    var viewUrl = aimeatUrl + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(sa.filename || '');
-    // Agent-Bundled Apps: this app ships its own agent(s) — badge it and offer the
-    // Bundled-agents modal (inspect the crew-def, use a hosted instance, or deploy your own).
-    var shipsAgent = !!(sa.manifest && sa.manifest.cortex && sa.manifest.cortex.agents && sa.manifest.cortex.agents.length);
-    html +=
-      '<div class="published-card"' + filterAttr(name, (sa.manifest && sa.manifest.tags) || []) + '>' +
-        '<div class="published-card-name">' + escapeHtml(name) + '</div>' +
-        (description ? '<div class="published-card-desc">' + escapeHtml(description) + '</div>' : '') +
-        '<div class="published-card-footer">' +
-          '<div class="published-card-metaline">' +
-            '<span class="pcm-main" style="color:var(--accent)">&#x1F464; ' + escapeHtml(author) + '</span>' +
-            (date ? '<span class="pcm-date">' + date + '</span>' : '') +
-          '</div>' +
-          '<div class="published-card-actions">' +
-            '<button onclick="window._launcher.viewPublished(\'' + escapeHtml(viewUrl) + '?mode=inline\', \'' + jsArg(name) + '\')">' + t('card.view') + '</button>' +
-            // Fork is offered on a community (someone else's) app only when its owner
-            // marked it forkable; otherwise the server would reject the fork (403).
-            (sa.forkable
-              ? '<button onclick="window._launcher.forkVersion(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\', ' + (sa.version_number || 0) + ')" title="' + escapeHtml(t('card.forkHint')) + '">' + t('card.fork') + '</button>'
-              : '') +
-            (shipsAgent
-              ? '<button onclick="window._launcher.showAppAgentsModal(\'' + jsArg(sa.owner || '') + '\', \'' + jsArg(sa.filename || '') + '\')" title="' + escapeHtml(t('card.agentHint')) + '">' + t('card.agent') + '</button>'
-              : '') +
-          '</div>' +
-          ((version || (sa.forks && sa.forks > 0) || shipsAgent)
-            ? '<div class="published-card-badgerow">'
-              + (shipsAgent
-                ? '<span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">&#x1F916;</span>'
-                : '')
-              + ((sa.forks && sa.forks > 0)
-                ? '<span class="pcb-forks" title="' + escapeHtml(t('card.forksHint')) + '" onclick="window._launcher.showLineageModal(\'' + escapeHtml(sa.owner || '') + '\', \'' + escapeHtml(sa.filename || '') + '\')">⑂ ' + sa.forks + '</span>'
-                : '')
-              + (version ? '<span class="pcb-version">' + escapeHtml(version) + '</span>' : '')
-              + '</div>'
-            : '') +
-        '</div>' +
-      '</div>';
-  }
+  for (var i = 0; i < serverApps.length; i++) html += publishedCardHtml(serverApps[i], aimeatUrl);
   grid.innerHTML = html;
   updateCommunityEmpty();
+}
+
+// The ⭐ Favourites group (Library view): apps the owner favourited, drawn from the FULL server-app
+// list (own + community). Pinned above "Your apps"; hidden when there are none.
+function renderFavorites(allServerApps, aimeatUrl) {
+  var section = document.getElementById('favorites-section');
+  var grid = document.getElementById('favorites-grid');
+  var countEl = document.getElementById('favorites-count');
+  if (!section || !grid) return;
+  var favs = (allServerApps || []).filter(function (sa) { return isFavorite((sa.owner || '') + '/' + (sa.filename || '')); });
+  if (favs.length === 0) { section.style.display = 'none'; grid.innerHTML = ''; return; }
+  section.style.display = '';
+  if (countEl) countEl.textContent = '(' + favs.length + ')';
+  var html = '';
+  for (var i = 0; i < favs.length; i++) html += publishedCardHtml(favs[i], aimeatUrl);
+  grid.innerHTML = html;
+}
+
+// Re-render everything that shows a star (own grid, community grid, ⭐ group) from the cached list
+// after a favourite toggle — no re-fetch. Called by the _launcher.toggleFavorite handler.
+function refreshFavoritesUI() {
+  renderFavorites(lastAllServerApps, lastAimeatUrl);
+  var currentOwner = null;
+  try {
+    var s = (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession());
+    currentOwner = (s && s.owner) || (JSON.parse(localStorage.getItem('aimeat_session') || '{}').owner) || null;
+  } catch (e) { /* anonymous */ }
+  var communityApps = currentOwner
+    ? lastAllServerApps.filter(function (a) { return !sameOwner(a.owner, currentOwner); })
+    : lastAllServerApps;
+  renderCommunityApps(communityApps, lastAimeatUrl,
+    document.getElementById('community-section'), document.getElementById('community-grid'),
+    document.getElementById('community-count'), currentOwner);
+  applyServerFilter();
+  renderApps(); // own-grid stars
 }
 
 // Render the owner's PARKED apps in their own section. A parked app is hidden from
@@ -1078,6 +1128,7 @@ export {
   backupSelectAll,
   submitBackupRestore,
   loadPublishedApps,
+  refreshFavoritesUI,
   applyServerFilter,
   unpublishApp,
   toggleParkApp,

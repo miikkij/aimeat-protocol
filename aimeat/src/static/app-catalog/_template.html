@@ -112,6 +112,12 @@
     <p class="view-empty-hint" data-i18n="view.communityHint">Community apps are apps other people on this node have published. When someone publishes one, it shows up here.</p>
   </div>
 
+  <!-- ⭐ Favourites group (Library) — apps the owner favourited, pinned above "Your apps" -->
+  <div id="favorites-section" data-view="library" style="display:none;margin:0 24px 1rem">
+    <h2 class="fav-section-title"><span data-i18n="fav.title">⭐ Favourites</span> <span id="favorites-count" class="fav-section-count"></span></h2>
+    <div id="favorites-grid" class="published-grid"></div>
+  </div>
+
   <div id="local-apps-block" class="local-apps-block" data-view="library">
     <div id="local-apps-header" style="display:none">
       <h2 style="font-size:1rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px"><span data-i18n="sec.local">&#x1F4DA; Your apps</span> <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>

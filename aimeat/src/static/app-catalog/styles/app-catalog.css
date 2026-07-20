@@ -591,6 +591,36 @@
       opacity: 1;
     }
 
+    /* ── Server-backed favourite toggle (⭐ on any app / published card) ─── */
+    .fav-toggle {
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 2px;
+      opacity: .5;
+      transition: opacity var(--transition), transform var(--transition);
+      z-index: 2;
+    }
+    .fav-toggle:hover { opacity: 1; transform: scale(1.15); }
+    .fav-toggle.on { opacity: 1; }
+    .published-card { position: relative; }
+    .published-card .fav-toggle { left: auto; right: 8px; top: 8px; }
+    .fav-section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 .6rem;
+    }
+    .fav-section-count { opacity: .6; font-weight: 400; }
+
     /* ── Card Menu Button ─────────────────────────────── */
 
     .card-menu-btn {
