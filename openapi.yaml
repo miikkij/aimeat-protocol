@@ -8080,6 +8080,18 @@ paths:
         '404':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/exchange/info:
+    get:
+      operationId: exchangeInfo
+      summary: EXCHANGE marketplace economics — the platform rake + units (EXCHANGE / TARGET-045)
+      description: >
+        Public. Returns `{ rake_percent, rake_note, units, morsel_note }` — the platform fee applied to
+        each metered call (the provider keeps the rest), set by the node operator via
+        AIMEAT_COMMERCE_FEE_PERCENT / AIMEAT_MARKETPLACE_TX_FEE_PERCENT.
+      tags: [Commerce]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
   /v1/exchange/offerings:
     post:
       operationId: exchangeListOffering
