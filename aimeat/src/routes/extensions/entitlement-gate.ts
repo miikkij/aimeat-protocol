@@ -7,18 +7,14 @@
  *   client-side app could never enforce). It is purely ADDITIVE: with no entitlement it returns `null` and
  *   the existing paywall channels (one-time money token / plain morsel charge) run unchanged.
  *
- *   Two settlement rails, chosen by the entitlement's `unit` (the pricing MODEL is orthogonal — per-call
- *   here; bundle/subscription build on the same rails):
- *     - `morsels` — fully in-repo, atomic (debit caller `price`, credit provider `price − fee`, route
- *       `fee` via {@link settleMarketplaceFee}).
- *     - `money`   — REAL currency via the ACCRUAL rail ({@link settleEntitlementMoney}): each call records
- *       a real EUR/USD obligation (buyer → seller, minus rake) through a money PaymentHandler
- *       (`io.aimeat.invoice` in prod / `test.money` in E2E), off the morsel ledger.
+ *   The PRICING MODEL ({@link computeCharge}) decides what THIS call costs (per_call → base price; bundle →
+ *   0 within quota, block price on refill; subscription → 0 within a paid period + rate-limited, period fee
+ *   on renewal). The SETTLEMENT RAIL (the entitlement `unit`) decides how that amount moves:
+ *     - `morsels` — atomic in-repo debit/credit + rake via {@link settleMarketplaceFee}.
+ *     - `money`   — real EUR/USD accrual via {@link settleEntitlementMoney} (off the morsel ledger).
  * @structure settleViaEntitlement · settleMorsels · settleMoney
- * @usage
- *   const out = await settleViaEntitlement({ config, storage, ext, action, callerGaii, res });
- *   if (out) { if (!out.ok) return; ...proceed, calling out.refund on a post-payment script throw... }
  * @version-history
+ *   v1.2.0 — 2026-07-20 — Pricing models (Phase B): computeCharge drives per-call amount (bundle/subscription + rate limit).
  *   v1.1.0 — 2026-07-20 — Wire the money unit to the accrual rail (real EUR/USD); split morsel/money settlement.
  *   v1.0.0 — 2026-07-20 — Initial G2 gateway: entitlement authorise + morsel settlement + platform rake.
  */
@@ -31,7 +27,8 @@ import { paymentChallenge } from '../../commerce/x402.js';
 import { percentFee, formatMoneyMajor } from '../../commerce/money.js';
 import { commerceFeePercent, settleMarketplaceFee } from '../../services/marketplace-fee.js';
 import {
-  readEntitlementForCall, budgetAllows, commitSpend, refundSpend, type MeteredEntitlement,
+  readEntitlementForCall, budgetAllows, commitSpend, refundSpend, computeCharge,
+  type MeteredEntitlement, type PricingSpec,
 } from '../../services/metered-entitlements.js';
 import { settleEntitlementMoney, refundEntitlementMoney } from '../../services/entitlement-money.js';
 import type { PaywallOutcome } from './paywall.js';
@@ -47,11 +44,13 @@ interface SettleArgs {
   callerGaii: string;
   res: Response;
   ent: MeteredEntitlement;
+  charge: number;         // amount to settle for THIS call, in the entitlement's unit (0 within quota/period)
+  newPricing: PricingSpec; // advanced pricing state to persist on commit
 }
 
 /**
  * Settle a raw invoke through a durable entitlement, or return `null` to fall through to the standard
- * paywall. On an `ok:false` outcome a 402/500 has already been sent (the caller must `return`).
+ * paywall. On an `ok:false` outcome a 402/429/500 has already been sent (the caller must `return`).
  */
 export async function settleViaEntitlement(args: {
   config: AimeatConfig; storage: Storage; ext: ExtensionRecord; action: ExtAction; callerGaii: string; res: Response;
@@ -60,15 +59,22 @@ export async function settleViaEntitlement(args: {
   const ent = await readEntitlementForCall(storage, callerGaii, ext.name, action.id);
   if (!ent) return null;                       // no contract for this call → standard paywall applies
 
-  // Paused / revoked / exhausted → the contract no longer authorises this call (unit-agnostic).
   if (ent.state !== 'active') {
     res.status(402).json({ ...error(config.nodeId, 'ENTITLEMENT_INACTIVE',
       `Your EXCHANGE entitlement for ${ext.name}/${action.id} is ${ent.state} (contract ${ent.contractRef}).`),
       ...paymentChallenge(config) });
     return { ok: false };
   }
-  // Budget cap reached (a prior call exhausted it, or the cap was renegotiated below spend) → deny.
-  if (!budgetAllows(ent)) {
+
+  // Pricing model decides the per-call charge (bundle quota / subscription period + rate limit).
+  const decision = computeCharge(ent, Date.now());
+  if (!decision.allowed) {
+    res.status(429).json(error(config.nodeId, 'RATE_LIMITED',
+      `Your EXCHANGE subscription for ${ext.name}/${action.id} is over its rate limit — retry shortly (contract ${ent.contractRef}).`));
+    return { ok: false };
+  }
+  // Budget cap is checked against THIS call's charge (a refill/renewal may cost a block/period fee).
+  if (!budgetAllows(ent, decision.chargeUnits)) {
     const cap = ent.unit === 'money' ? `${formatMoneyMajor(ent.budget.capUnits ?? 0)} ${ent.currency ?? ''}`.trim() : `${ent.budget.capUnits} morsel`;
     res.status(402).json({ ...error(config.nodeId, 'BUDGET_EXHAUSTED',
       `Your EXCHANGE entitlement for ${ext.name}/${action.id} has spent its ${cap} budget (contract ${ent.contractRef}).`),
@@ -76,15 +82,15 @@ export async function settleViaEntitlement(args: {
     return { ok: false };
   }
 
-  const settleArgs: SettleArgs = { config, storage, ext, action, callerGaii, res, ent };
+  const settleArgs: SettleArgs = { config, storage, ext, action, callerGaii, res, ent, charge: decision.chargeUnits, newPricing: decision.pricing };
   return ent.unit === 'money' ? settleMoney(settleArgs) : settleMorsels(settleArgs);
 }
 
-/** Morsel rail: atomic debit caller / credit provider cut / route rake, then commit the spend. */
-async function settleMorsels({ config, storage, ext, action, callerGaii, res, ent }: SettleArgs): Promise<PaywallOutcome> {
-  const price = Math.max(0, ent.pricePerCall);
+/** Morsel rail: atomic debit caller / credit provider cut / route rake for THIS call's charge, then commit. */
+async function settleMorsels({ config, storage, ext, action, callerGaii, res, ent, charge, newPricing }: SettleArgs): Promise<PaywallOutcome> {
+  const price = Math.max(0, charge);
   const rakePct = ent.rakePercent ?? commerceFeePercent(config);
-  const fee = percentFee(price, rakePct);          // ceils — a positive price always carries its rake
+  const fee = percentFee(price, rakePct);          // ceils — a positive charge always carries its rake
   const providerCut = price - fee;
   const track = `exchange:${ext.name}:${action.id}:${ent.contractRef}`;
   const ts = new Date().toISOString();
@@ -110,7 +116,7 @@ async function settleMorsels({ config, storage, ext, action, callerGaii, res, en
     await settleMarketplaceFee(storage, config, { fee, payerGhii: callerGaii, trackingCode: track, source: 'exchange' });
   }
 
-  await commitSpend(storage, ent);
+  await commitSpend(storage, ent, price, newPricing);
   return {
     ok: true,
     refund: async () => {
@@ -118,35 +124,39 @@ async function settleMorsels({ config, storage, ext, action, callerGaii, res, en
         if (providerCut > 0) await storage.debitBalance(ent.providerGhii, providerCut);
         await storage.creditBalance(callerGaii, price);
       }
-      await refundSpend(storage, callerGaii, ext.name, action.id);
+      await refundSpend(storage, callerGaii, ext.name, action.id, price);
       logger.warn(`[entitlement-gate] refunded ${price} morsels (script threw after payment)`, { ext: ext.name, action: action.id });
     },
   };
 }
 
-/** Money rail: accrue a REAL currency obligation (buyer → provider, minus rake) via a money handler, then commit. */
-async function settleMoney({ config, storage, ext, action, callerGaii, res, ent }: SettleArgs): Promise<PaywallOutcome> {
-  const price = Math.max(0, ent.pricePerCall);   // micro-units
+/** Money rail: accrue a REAL currency obligation for THIS call's charge (buyer → provider, minus rake), then commit. */
+async function settleMoney({ config, storage, ext, action, callerGaii, res, ent, charge, newPricing }: SettleArgs): Promise<PaywallOutcome> {
+  const price = Math.max(0, charge);   // micro-units
   const currency = ent.currency ?? 'EUR';
   const rakePct = ent.rakePercent ?? commerceFeePercent(config);
   const reference = `exchange:${ext.name}:${action.id}:${ent.contractRef}`;
+  let trackingCode = '';
 
-  const settled = await settleEntitlementMoney(storage, config, {
-    consumerGhii: callerGaii, providerGhii: ent.providerGhii, priceMicros: price, currency, feePct: rakePct, reference,
-  });
-  if (!settled.ok) {
-    res.status(402).json({ ...error(config.nodeId, 'MONEY_SETTLEMENT_UNAVAILABLE',
-      `This EXCHANGE call is priced ${formatMoneyMajor(price)} ${currency} but the money rail could not settle (${settled.reason}).`),
-      ...paymentChallenge(config) });
-    return { ok: false };
+  if (price > 0) {
+    const settled = await settleEntitlementMoney(storage, config, {
+      consumerGhii: callerGaii, providerGhii: ent.providerGhii, priceMicros: price, currency, feePct: rakePct, reference,
+    });
+    if (!settled.ok) {
+      res.status(402).json({ ...error(config.nodeId, 'MONEY_SETTLEMENT_UNAVAILABLE',
+        `This EXCHANGE call is priced ${formatMoneyMajor(price)} ${currency} but the money rail could not settle (${settled.reason}).`),
+        ...paymentChallenge(config) });
+      return { ok: false };
+    }
+    trackingCode = settled.trackingCode;
   }
 
-  await commitSpend(storage, ent);
+  await commitSpend(storage, ent, price, newPricing);
   return {
     ok: true,
     refund: async () => {
-      await refundEntitlementMoney(storage, config, { consumerGhii: callerGaii, providerGhii: ent.providerGhii, priceMicros: price, currency, trackingCode: settled.trackingCode });
-      await refundSpend(storage, callerGaii, ext.name, action.id);
+      if (price > 0) await refundEntitlementMoney(storage, config, { consumerGhii: callerGaii, providerGhii: ent.providerGhii, priceMicros: price, currency, trackingCode });
+      await refundSpend(storage, callerGaii, ext.name, action.id, price);
       logger.warn(`[entitlement-gate] refunded ${formatMoneyMajor(price)} ${currency} (script threw after payment)`, { ext: ext.name, action: action.id });
     },
   };

@@ -58,6 +58,30 @@ export function validateActionPricing(action: Record<string, unknown>, actionId:
   if (Number(payMorsels) <= 0 && payMoney === undefined) {
     return fail(`Action "${actionId}": commercial must set at least one payment channel (payMorsels>0 or payMoney)`);
   }
+  // Optional EXCHANGE pricing plans (bundle / subscription) — amounts in the action's unit (TARGET-045 Phase B).
+  const plans = commercial.plans;
+  if (plans !== undefined) {
+    if (!Array.isArray(plans)) return fail(`Action "${actionId}": commercial.plans must be an array`);
+    const ids = new Set<string>();
+    for (const raw of plans) {
+      const plan = raw as Record<string, unknown>;
+      if (typeof plan.id !== 'string' || !plan.id) return fail(`Action "${actionId}": each plan needs a non-empty id`);
+      if (ids.has(plan.id)) return fail(`Action "${actionId}": duplicate plan id "${plan.id}"`);
+      ids.add(plan.id);
+      const posInt = (v: unknown) => typeof v === 'number' && Number.isInteger(v) && v > 0;
+      if (plan.model === 'bundle') {
+        if (!posInt(plan.blockSize) || !posInt(plan.blockPrice)) {
+          return fail(`Action "${actionId}" plan "${plan.id}": bundle needs positive integer blockSize + blockPrice`);
+        }
+      } else if (plan.model === 'subscription') {
+        if (!posInt(plan.periodSeconds) || !posInt(plan.periodPrice) || !posInt(plan.callsPerWindow) || !posInt(plan.windowSeconds)) {
+          return fail(`Action "${actionId}" plan "${plan.id}": subscription needs positive integer periodSeconds, periodPrice, callsPerWindow, windowSeconds`);
+        }
+      } else {
+        return fail(`Action "${actionId}" plan "${plan.id}": model must be 'bundle' or 'subscription'`);
+      }
+    }
+  }
   return null;
 }
 
@@ -144,7 +168,7 @@ export function buildExtensionRecordFromManifest(
     status: 'inactive',
     requiredApis: (manifest.required_apis as string[]) ?? [],
     actions: actions.map(a => {
-      const commercial = a.commercial as { payMorsels?: unknown; payMoney?: unknown } | undefined;
+      const commercial = a.commercial as { payMorsels?: unknown; payMoney?: unknown; plans?: unknown } | undefined;
       return {
         id: a.id as string,
         method: (a.method as string).toUpperCase(),
@@ -159,6 +183,9 @@ export function buildExtensionRecordFromManifest(
             payMorsels: (commercial.payMorsels as number | undefined) ?? 0,
             ...(commercial.payMoney !== undefined
               ? { payMoney: commercial.payMoney as { amount: number; currency: string } }
+              : {}),
+            ...(commercial.plans !== undefined
+              ? { plans: commercial.plans as NonNullable<ExtensionRecord['actions'][number]['commercial']>['plans'] }
               : {}),
           },
         } : {}),
