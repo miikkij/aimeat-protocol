@@ -629,6 +629,16 @@
     }
     .fav-section-count { opacity: .6; font-weight: 400; }
 
+    /* "Promoted" badge in the detail Promote section */
+    .dtl-badge-on {
+      font-size: .7rem;
+      font-weight: 600;
+      color: #34d399;
+      border: 1px solid #34d399;
+      border-radius: 10px;
+      padding: 1px 8px;
+    }
+
     /* ── Card Menu Button ─────────────────────────────── */
 
     .card-menu-btn {
@@ -2932,6 +2942,16 @@
       "detail.trDone": "Translated",
       "detail.trEmpty": "The AI returned nothing — try again.",
       "detail.trNeedSource": "Write the source-language description first.",
+      "promote.title": "Promote",
+      "promote.hint": "Showcase this app on your public profile with a short pitch. Fill English and/or Finnish; visitors see the one matching their language.",
+      "promote.en": "Promotion text (English)",
+      "promote.fi": "Promotion text (Finnish)",
+      "promote.save": "Save promotion",
+      "promote.remove": "Stop promoting",
+      "promote.on": "Promoted",
+      "promote.saving": "Saving…",
+      "promote.saved": "Promoted on your profile.",
+      "promote.removed": "No longer promoted.",
       "detail.renameHint": "The app link stays the same — only the displayed name and description change.",
       "detail.nameRequired": "Name cannot be empty.",
       "detail.descRequired": "Description cannot be empty.",
@@ -3389,6 +3409,16 @@
       "detail.trDone": "Käännetty",
       "detail.trEmpty": "Tekoäly ei palauttanut mitään — yritä uudelleen.",
       "detail.trNeedSource": "Kirjoita ensin lähdekielinen kuvaus.",
+      "promote.title": "Nosto",
+      "promote.hint": "Nosta tämä sovellus julkiseen profiiliisi lyhyellä myyntipuheella. Täytä englanti ja/tai suomi; vierailijat näkevät kieltään vastaavan.",
+      "promote.en": "Nostoteksti (englanti)",
+      "promote.fi": "Nostoteksti (suomi)",
+      "promote.save": "Tallenna nosto",
+      "promote.remove": "Lopeta nostaminen",
+      "promote.on": "Nostettu",
+      "promote.saving": "Tallennetaan…",
+      "promote.saved": "Nostettu profiiliisi.",
+      "promote.removed": "Ei enää nostettu.",
       "detail.renameHint": "Sovelluksen linkki pysyy samana — vain näytettävä nimi ja kuvaus muuttuvat.",
       "detail.nameRequired": "Nimi ei voi olla tyhjä.",
       "detail.descRequired": "Kuvaus ei voi olla tyhjä.",
@@ -4288,9 +4318,9 @@
   function loadPbCore() {
     var config = loadConfig();
     if (!config.aimeatUrl) return;
-    var base2 = config.aimeatUrl.replace(/\/+$/, "");
+    var base3 = config.aimeatUrl.replace(/\/+$/, "");
     ["new", "improve"].forEach(function(mode) {
-      fetch(base2 + "/v1/prompts/build-app?mode=" + mode + "&lang=" + encodeURIComponent(getLang())).then(function(r) {
+      fetch(base3 + "/v1/prompts/build-app?mode=" + mode + "&lang=" + encodeURIComponent(getLang())).then(function(r) {
         return r.json();
       }).then(function(d) {
         var body = d && d.data && d.data.body;
@@ -4307,8 +4337,8 @@
     if (!sel) return;
     var config = loadConfig();
     if (!config.aimeatUrl) return;
-    var base2 = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(base2 + "/v1/app-templates?lang=" + encodeURIComponent(getLang())).then(function(r) {
+    var base3 = config.aimeatUrl.replace(/\/+$/, "");
+    fetch(base3 + "/v1/app-templates?lang=" + encodeURIComponent(getLang())).then(function(r) {
       return r.json();
     }).then(function(d) {
       var list = (d.data && d.data.templates || []).filter(function(t2) {
@@ -4332,7 +4362,7 @@
           updatePbPreview();
           return;
         }
-        fetch(base2 + "/v1/app-templates/" + encodeURIComponent(id)).then(function(r) {
+        fetch(base3 + "/v1/app-templates/" + encodeURIComponent(id)).then(function(r) {
           return r.json();
         }).then(function(d2) {
           window.pbTemplate = d2.data && d2.data.template || null;
@@ -4358,8 +4388,8 @@
     if (!wrap) return;
     var config = loadConfig();
     if (!config.aimeatUrl) return;
-    var base2 = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(base2 + "/v1/library-packs?lang=" + encodeURIComponent(getLang())).then(function(r) {
+    var base3 = config.aimeatUrl.replace(/\/+$/, "");
+    fetch(base3 + "/v1/library-packs?lang=" + encodeURIComponent(getLang())).then(function(r) {
       return r.json();
     }).then(function(d) {
       var all = d.data && d.data.packs || [];
@@ -4380,7 +4410,7 @@
         cb.value = p.id;
         cb.onchange = function() {
           pbPackTouched[p.id] = true;
-          if (cb.checked) loadPbPackDoc(base2, p.id);
+          if (cb.checked) loadPbPackDoc(base3, p.id);
           else updatePbPreview();
         };
         var span = document.createElement("span");
@@ -4403,14 +4433,14 @@
       if (desc && !desc._pbPackListener) {
         desc._pbPackListener = true;
         desc.addEventListener("input", function() {
-          pbMatchPacksToIdea(base2);
+          pbMatchPacksToIdea(base3);
         });
       }
-      pbMatchPacksToIdea(base2);
+      pbMatchPacksToIdea(base3);
     }).catch(function() {
     });
   }
-  function pbMatchPacksToIdea(base2) {
+  function pbMatchPacksToIdea(base3) {
     var desc = document.getElementById("pb-description");
     var text = (desc && desc.value || "").toLowerCase();
     pbPacks.forEach(function(p) {
@@ -4423,19 +4453,19 @@
       });
       if (hit && !cb.checked) {
         cb.checked = true;
-        loadPbPackDoc(base2, p.id);
+        loadPbPackDoc(base3, p.id);
       } else if (!hit && cb.checked) {
         cb.checked = false;
         updatePbPreview();
       }
     });
   }
-  function loadPbPackDoc(base2, id) {
+  function loadPbPackDoc(base3, id) {
     if (pbPackDocs[id]) {
       updatePbPreview();
       return;
     }
-    fetch(base2 + "/v1/library-packs/" + encodeURIComponent(id)).then(function(r) {
+    fetch(base3 + "/v1/library-packs/" + encodeURIComponent(id)).then(function(r) {
       return r.json();
     }).then(function(d) {
       var pack = d.data && d.data.pack;
@@ -4624,6 +4654,71 @@
   function updatePbPreview() {
     var preview = document.getElementById("pb-preview");
     preview.textContent = buildPromptFromBuilder();
+  }
+
+  // src/static/app-catalog/js/promote.js
+  var KEY = "app-catalog.promoted";
+  var promoted = {};
+  function base() {
+    return (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+  }
+  function getPromotion(ref) {
+    return promoted[ref] || null;
+  }
+  function getPromotedItems() {
+    return Object.keys(promoted).map(function(ref) {
+      return { ref, text: promoted[ref] || {} };
+    });
+  }
+  function loadPromoted() {
+    var token = getCortexOwnerToken();
+    var b = base();
+    if (!token || !b) {
+      promoted = {};
+      return Promise.resolve();
+    }
+    return fetch(b + "/v1/memory/" + encodeURIComponent(KEY), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+      return r.ok ? r.json() : null;
+    }).then(function(j) {
+      var items = j && j.data && j.data.value && Array.isArray(j.data.value.items) ? j.data.value.items : [];
+      var map = {};
+      items.forEach(function(it) {
+        if (it && typeof it.ref === "string" && it.text && typeof it.text === "object") map[it.ref] = { en: it.text.en || "", fi: it.text.fi || "" };
+      });
+      promoted = map;
+    }).catch(function() {
+    });
+  }
+  function persist() {
+    var token = getCortexOwnerToken();
+    var b = base();
+    if (!token || !b) return Promise.resolve();
+    var items = getPromotedItems();
+    return fetch(b + "/v1/memory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({
+        key: KEY,
+        value: { version: 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), items },
+        visibility: "public"
+      })
+    }).catch(function() {
+    });
+  }
+  function setPromotion(ref, text) {
+    var en = text && text.en ? String(text.en).trim() : "";
+    var fi = text && text.fi ? String(text.fi).trim() : "";
+    var now;
+    if (!en && !fi) {
+      delete promoted[ref];
+      now = false;
+    } else {
+      promoted[ref] = { en, fi };
+      now = true;
+    }
+    return persist().then(function() {
+      return now;
+    });
   }
 
   // src/static/app-catalog/js/monetize.js
@@ -4946,8 +5041,8 @@
       showNotice(t("agents.none"));
       return;
     }
-    var base2 = aimeatBase();
-    if (!base2) {
+    var base3 = aimeatBase();
+    if (!base3) {
       showNotice("Set AIMEAT server URL in Settings first");
       return;
     }
@@ -4963,7 +5058,7 @@
     document.getElementById("agents-overlay").hidden = false;
     defs.forEach(function(def2, i2) {
       var headers = token ? { "Authorization": "Bearer " + token } : {};
-      fetch(base2 + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/agents/" + encodeURIComponent(def2.agent_name) + "/instances", { headers }).then(function(r) {
+      fetch(base3 + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/agents/" + encodeURIComponent(def2.agent_name) + "/instances", { headers }).then(function(r) {
         return r.json();
       }).then(function(json) {
         var el = document.getElementById("aga-instances-" + i2);
@@ -4979,7 +5074,7 @@
       });
     });
     if (token) {
-      fetch(base2 + "/v1/agents", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+      fetch(base3 + "/v1/agents", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
         return r.json();
       }).then(function(json) {
         var agents = json.data && json.data.agents || [];
@@ -5006,7 +5101,7 @@
       } catch (e) {
       }
       if (me) {
-        fetch(base2 + "/v1/organisms?member=" + encodeURIComponent(me), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+        fetch(base3 + "/v1/organisms?member=" + encodeURIComponent(me), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
           return r.json();
         }).then(function(json) {
           var orgs = json.data && json.data.organisms || [];
@@ -5185,14 +5280,14 @@
     var app = detailGetApp();
     if (!app) return;
     if (app.published && (app.publishedUrl || app.publishedFilename)) {
-      var base2 = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+      var base3 = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
       var url;
       if (app.publishedUrl) {
-        url = base2 + app.publishedUrl;
+        url = base3 + app.publishedUrl;
       } else {
         var st = getServerState()[app.publishedFilename] || {};
         var owner = st.owner || currentOwnerName() || "";
-        url = base2 + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(app.publishedFilename);
+        url = base3 + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(app.publishedFilename);
       }
       viewPublished(url + "?mode=inline", app.name);
     } else {
@@ -5332,6 +5427,7 @@
     }
     var monetizeHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + "</div>" : "";
     var costHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-cost">' + costSectionInner() + "</div>" : "";
+    var promoteHtml = app.published && detailIsOwnPublished(app) ? buildPromoteSection(app) : "";
     var agentsHtml = "";
     if (app.published) {
       var agOwner = detailServerOwner(app);
@@ -5346,7 +5442,43 @@
         ) + "</div>";
       }
     }
-    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + mgmtHtml + actionsHtml;
+    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+  }
+  function promoteRef(app) {
+    return detailServerOwner(app) + "/" + (app.publishedFilename || "");
+  }
+  function buildPromoteSection(app) {
+    var ref = promoteRef(app);
+    var cur = getPromotion(ref) || {};
+    var on = !!(cur.en || cur.fi);
+    return '<div class="dtl-section" id="detail-promote"><h3 style="display:flex;align-items:center;gap:8px">📣 ' + t("promote.title") + (on ? ' <span class="dtl-badge-on">' + t("promote.on") + "</span>" : "") + '</h3><p class="dtl-desc">' + t("promote.hint") + '</p><label class="dtl-stat-label" for="detail-promo-en">' + t("promote.en") + '</label><textarea id="detail-promo-en" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.en || "") + '</textarea><label class="dtl-stat-label" for="detail-promo-fi">' + t("promote.fi") + '</label><textarea id="detail-promo-fi" class="modal-input" rows="2" maxlength="500" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(cur.fi || "") + '</textarea><div class="dtl-btn-row" style="margin:0 0 4px">' + dtlBtn("🌐 " + t("detail.translateEnFi"), "window._launcher.detailTranslateDesc('en','fi','detail-promo-','detail-promo-tr-status')") + dtlBtn("🌐 " + t("detail.translateFiEn"), "window._launcher.detailTranslateDesc('fi','en','detail-promo-','detail-promo-tr-status')") + '</div><div class="dtl-ai-status" id="detail-promo-tr-status" style="margin:0 0 8px"></div><div class="dtl-btn-row">' + dtlBtn(t("promote.save"), "window._launcher.detailPromoteSave()", { variant: "primary" }) + (on ? dtlBtn(t("promote.remove"), "window._launcher.detailPromoteClear()") : "") + '</div><div class="dtl-ai-status" id="detail-promo-status"></div></div>';
+  }
+  function detailPromoteSave() {
+    var app = detailGetApp();
+    if (!app || !detailIsOwnPublished(app)) return;
+    var en = (document.getElementById("detail-promo-en") || {}).value || "";
+    var fi = (document.getElementById("detail-promo-fi") || {}).value || "";
+    var statusEl = document.getElementById("detail-promo-status");
+    if (statusEl) {
+      statusEl.style.color = "var(--text-muted)";
+      statusEl.textContent = t("promote.saving");
+    }
+    setPromotion(promoteRef(app), { en, fi }).then(function(nowOn) {
+      renderApps();
+      renderDetailView();
+      var s2 = document.getElementById("detail-promo-status");
+      if (s2) {
+        s2.style.color = "#34d399";
+        s2.textContent = nowOn ? "✔ " + t("promote.saved") : "✔ " + t("promote.removed");
+      }
+    });
+  }
+  function detailPromoteClear() {
+    var en = document.getElementById("detail-promo-en");
+    if (en) en.value = "";
+    var fi = document.getElementById("detail-promo-fi");
+    if (fi) fi.value = "";
+    detailPromoteSave();
   }
   function detailLoadSkills(owner, filename) {
     var config = loadConfig();
@@ -5558,27 +5690,27 @@
     return h;
   }
   function skillListMine() {
-    var base2 = skillApiBase();
-    if (!base2) return Promise.reject(new Error("No server configured"));
-    return fetch(base2 + "/v1/skills?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
+    var base3 = skillApiBase();
+    if (!base3) return Promise.reject(new Error("No server configured"));
+    return fetch(base3 + "/v1/skills?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
       return r.json();
     }).then(function(j) {
       return j.data && j.data.skills ? j.data.skills : [];
     });
   }
   function skillGetMine(name) {
-    var base2 = skillApiBase();
-    return fetch(base2 + "/v1/skills/" + encodeURIComponent(name) + "?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
+    var base3 = skillApiBase();
+    return fetch(base3 + "/v1/skills/" + encodeURIComponent(name) + "?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
       return r.json();
     }).then(function(j) {
       return j.data && j.data.skill || null;
     });
   }
   function skillPublish(skillMd, files) {
-    var base2 = skillApiBase();
+    var base3 = skillApiBase();
     var body = { skill_md: skillMd };
     if (files && Object.keys(files).length) body.files = files;
-    return fetch(base2 + "/v1/skills", { method: "POST", headers: skillAuthHeaders(true), body: JSON.stringify(body) }).then(function(r) {
+    return fetch(base3 + "/v1/skills", { method: "POST", headers: skillAuthHeaders(true), body: JSON.stringify(body) }).then(function(r) {
       return r.json().then(function(j) {
         if (!j.ok) throw new Error(j.error && (j.error.message || j.error.code) || "HTTP " + r.status);
         return j.data && j.data.skill || null;
@@ -5710,10 +5842,11 @@
       showNotice("Error: " + (err.message || err));
     });
   }
-  function detailTranslateDesc(srcLang, dstLang) {
-    var srcEl = document.getElementById("detail-desc-" + srcLang);
-    var dstEl = document.getElementById("detail-desc-" + dstLang);
-    var statusEl = document.getElementById("detail-tr-status");
+  function detailTranslateDesc(srcLang, dstLang, prefix, statusId) {
+    prefix = prefix || "detail-desc-";
+    var srcEl = document.getElementById(prefix + srcLang);
+    var dstEl = document.getElementById(prefix + dstLang);
+    var statusEl = document.getElementById(statusId || "detail-tr-status");
     if (!srcEl || !dstEl) return;
     var text = (srcEl.value || "").trim();
     if (!text) {
@@ -5732,15 +5865,11 @@
       return;
     }
     var langName = { en: "English", fi: "Finnish" };
-    var enfiBtn = document.getElementById("detail-tr-enfi");
-    var fienBtn = document.getElementById("detail-tr-fien");
-    if (enfiBtn) enfiBtn.disabled = true;
-    if (fienBtn) fienBtn.disabled = true;
     if (statusEl) {
       statusEl.style.color = "var(--text-muted)";
       statusEl.textContent = t("detail.translating");
     }
-    var systemPrompt = "You are a professional translator for short app-store descriptions. Translate the text from " + (langName[srcLang] || srcLang) + " to " + (langName[dstLang] || dstLang) + ". Return ONLY the translated text — no quotes, no notes, no explanation. Keep it concise and natural.";
+    var systemPrompt = "You are a professional translator for short app-store copy. Translate the text from " + (langName[srcLang] || srcLang) + " to " + (langName[dstLang] || dstLang) + ". Return ONLY the translated text — no quotes, no notes, no explanation. Keep it concise and natural.";
     fetch(aimeatUrl + "/v1/ai/complete", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
@@ -5748,8 +5877,6 @@
     }).then(function(resp) {
       return resp.json();
     }).then(function(json) {
-      if (enfiBtn) enfiBtn.disabled = false;
-      if (fienBtn) fienBtn.disabled = false;
       if (!json || !json.ok) {
         var msg = json && json.error && json.error.message || "Translation failed";
         if (statusEl) {
@@ -5772,8 +5899,6 @@
         statusEl.textContent = "✔ " + t("detail.trDone");
       }
     }).catch(function(err) {
-      if (enfiBtn) enfiBtn.disabled = false;
-      if (fienBtn) fienBtn.disabled = false;
       if (statusEl) {
         statusEl.style.color = "var(--accent)";
         statusEl.textContent = "✘ " + (err.message || "Translation failed");
@@ -6072,9 +6197,9 @@
   function draftApi(method, owner, filename, sub, body) {
     var cfg = loadConfig();
     if (!cfg.aimeatUrl) return Promise.reject(new Error("Set the AIMEAT server URL in Settings first"));
-    var base2 = cfg.aimeatUrl.replace(/\/+$/, "");
+    var base3 = cfg.aimeatUrl.replace(/\/+$/, "");
     var path = "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/" + sub;
-    return fetch(base2 + path, {
+    return fetch(base3 + path, {
       method,
       headers: { "Authorization": "Bearer " + getCortexOwnerToken2(), "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : void 0
@@ -6534,8 +6659,8 @@
       showNotice(t("common.loginRequired") || "You must be logged in to fork an app into your own catalogue. Sign in first.");
       return;
     }
-    var base2 = (filename || "app").replace(/\.html?$/i, "");
-    var suggested = base2 + "-fork.html";
+    var base3 = (filename || "app").replace(/\.html?$/i, "");
+    var suggested = base3 + "-fork.html";
     var newName = prompt(t("fork.prompt") || 'Fork "' + filename + '" into a new app.\n\nNew filename:', suggested);
     if (!newName) return;
     newName = newName.trim();
@@ -6939,9 +7064,9 @@
   }
 
   // src/static/app-catalog/js/favorites.js
-  var KEY = "app-catalog.favorites";
+  var KEY2 = "app-catalog.favorites";
   var favSet = /* @__PURE__ */ new Set();
-  function base() {
+  function base2() {
     return (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
   }
   function isFavorite(ref) {
@@ -6949,12 +7074,12 @@
   }
   function loadFavorites() {
     var token = getCortexOwnerToken();
-    var b = base();
+    var b = base2();
     if (!token || !b) {
       favSet = /* @__PURE__ */ new Set();
       return Promise.resolve();
     }
-    return fetch(b + "/v1/memory/" + encodeURIComponent(KEY), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+    return fetch(b + "/v1/memory/" + encodeURIComponent(KEY2), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
       return r.ok ? r.json() : null;
     }).then(function(j) {
       var refs = j && j.data && j.data.value && Array.isArray(j.data.value.refs) ? j.data.value.refs : [];
@@ -6964,15 +7089,15 @@
     }).catch(function() {
     });
   }
-  function persist() {
+  function persist2() {
     var token = getCortexOwnerToken();
-    var b = base();
+    var b = base2();
     if (!token || !b) return Promise.resolve();
     return fetch(b + "/v1/memory", {
       method: "POST",
       headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
       body: JSON.stringify({
-        key: KEY,
+        key: KEY2,
         value: { version: 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), refs: Array.from(favSet) },
         visibility: "private"
       })
@@ -6988,7 +7113,7 @@
       favSet.add(ref);
       now = true;
     }
-    return persist().then(function() {
+    return persist2().then(function() {
       return now;
     });
   }
@@ -7665,7 +7790,7 @@
       }
     } catch (e) {
     }
-    Promise.all([getAllApps(), loadFavorites()]).then(function() {
+    Promise.all([getAllApps(), loadFavorites(), loadPromoted()]).then(function() {
       if (!aimeatUrl) {
         setOwnServerApps([]);
         renderApps3();
@@ -8043,7 +8168,7 @@
     }
   }
   function buildLibraryEntries(localApps, serverApps) {
-    var base2 = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+    var base3 = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
     var byFilename = {};
     var entries = [];
     serverStateByFilename = {};
@@ -8073,7 +8198,7 @@
         filename: la.publishedFilename || null,
         owner: null,
         versionNumber: la.publishedVersionNumber || null,
-        viewUrl: la.publishedUrl ? base2 + la.publishedUrl : "",
+        viewUrl: la.publishedUrl ? base3 + la.publishedUrl : "",
         forkable: false,
         forks: 0
       };
@@ -8096,7 +8221,7 @@
         m.hasDraft = !!sa.has_draft;
         m.hasAgents = shipsAgent;
         m.protection = prot;
-        m.viewUrl = base2 + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn);
+        m.viewUrl = base3 + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn);
         if (!m.description && sa.manifest && sa.manifest.description) m.description = sa.manifest.description;
       } else {
         var se = {
@@ -8121,7 +8246,7 @@
           filename: fn,
           owner: sa.owner || "",
           versionNumber: sa.version_number || null,
-          viewUrl: base2 && fn ? base2 + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn) : "",
+          viewUrl: base3 && fn ? base3 + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn) : "",
           forkable: !!sa.forkable,
           forks: sa.forks || 0,
           protection: prot,
@@ -8586,6 +8711,8 @@
     detailAboutCancel,
     detailAboutSave,
     detailTranslateDesc,
+    detailPromoteSave,
+    detailPromoteClear,
     detailToggleFavorite,
     detailAccessCodeEdit,
     detailAccessCodeCancel,

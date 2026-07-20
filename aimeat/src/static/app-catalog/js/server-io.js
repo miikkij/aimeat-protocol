@@ -20,6 +20,7 @@ import { closeModal } from './apps-io.js';
 import { getCortexOwnerToken } from './cortex.js';
 import { fetchAppContentBase64, refreshServerMgmt } from './detail.js';
 import { favStarHtml, isFavorite, loadFavorites } from './favorites.js';
+import { loadPromoted } from './promote.js';
 
 // Injected once at bootstrap by main.js: read getters + write setters for the shared app-state
 // (which stays main-owned), plus a few main-local fns.
@@ -803,7 +804,7 @@ function loadPublishedApps() {
 
   // Load the owner's favourites alongside the app list so the ⭐ group + stars match the current
   // session (also refreshes them on an auth change, which routes through here via refreshAll).
-  Promise.all([getAllApps(), loadFavorites()]).then(function() {
+  Promise.all([getAllApps(), loadFavorites(), loadPromoted()]).then(function() {
     if (!aimeatUrl) {
       setOwnServerApps([]);
       renderApps();
