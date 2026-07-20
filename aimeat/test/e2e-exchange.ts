@@ -210,6 +210,60 @@ await test('Subscription plan: call#1 charges the 30 period fee; call#2 free; ca
   assert(c3.status === 429 && c3.body?.error?.code === 'RATE_LIMITED', `call#3 over 2/window → 429, got ${c3.status}/${JSON.stringify(c3.body?.error)}`);
 });
 
+// ── MARKETPLACE: offering (supply) + need (demand) + bid → accept → mint (Phase C) ──
+let offeringId = '', needId = '', bidId = '';
+let buyer: Awaited<ReturnType<typeof setupOwner>>;
+
+await test('Provider lists an OFFERING for its priced action (authoritative price from the action)', async () => {
+  const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ ext: EXT, action: 'validate', title: 'Y-tunnus validation', description: 'PRH company lookup', tags: ['prh', 'finland'] }) });
+  assert(r.status === 201, `list offering ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const o = r.body.data.offering;
+  assert(o.unit === 'morsels' && o.basePrice === 10, `offering price authoritative: ${JSON.stringify(o)}`);
+  offeringId = o.offeringId;
+});
+
+await test('Browse offerings by capability finds the listing (public, no auth)', async () => {
+  const r = await json(`/v1/exchange/offerings?ext=${EXT}&action=validate`);
+  assert(r.status === 200, `browse ${r.status}`);
+  assert(r.body.data.offerings.some((o: any) => o.offeringId === offeringId), `listing not found: ${r.body.data.count}`);
+});
+
+await test('A non-owner cannot list someone else’s extension as an offering → 403', async () => {
+  const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(consumer.token),
+    body: JSON.stringify({ ext: EXT, action: 'validate', title: 'stolen' }) });
+  assert(r.status === 403, `expected 403, got ${r.status}`);
+});
+
+await test('Consumer posts a NEED → open, and matches surface the offering', async () => {
+  buyer = await setupOwner('buy');
+  const r = await json('/v1/exchange/needs', { method: 'POST', headers: auth(buyer.token),
+    body: JSON.stringify({ ext: EXT, action: 'validate', description: 'Need Finnish company lookups', budget_unit: 'morsels', budget_cap: 50 }) });
+  assert(r.status === 201, `post need ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  needId = r.body.data.need.needId;
+  assert(r.body.data.matches.some((o: any) => o.offeringId === offeringId), 'offering should match the need');
+});
+
+await test('Open needs are browsable; provider bids on the need', async () => {
+  const open = await json('/v1/exchange/needs?open=1');
+  assert(open.status === 200 && open.body.data.needs.some((n: any) => n.needId === needId), 'need not in open list');
+  const r = await json(`/v1/exchange/needs/${needId}/bids`, { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ ext: EXT, action: 'validate', offering_id: offeringId, note: 'happy to serve' }) });
+  assert(r.status === 201, `bid ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  bidId = r.body.data.bid.bidId;
+});
+
+await test('Requester accepts the bid → entitlement minted; the metered call then works', async () => {
+  const acc = await json(`/v1/exchange/needs/${needId}/bids/${bidId}/accept`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ cap_units: 50 }) });
+  assert(acc.status === 201, `accept bid ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
+  const cb = await balance(buyer.token);
+  const call = await invoke(buyer.token, 'validate');
+  assert(call.status === 200, `metered call after bid-accept ${call.status}: ${JSON.stringify(call.body?.error)}`);
+  assert(await balance(buyer.token) === cb - 10, 'buyer charged the authoritative price under the bid contract');
+  const need = await json('/v1/exchange/needs?mine=1', { headers: auth(buyer.token) });
+  assert(need.body.data.needs.find((n: any) => n.needId === needId)?.state === 'matched', 'need should be matched');
+});
+
 // ── MONEY unit (real currency via the accrual rail) — needs a EUR money handler (test.money in E2E) ──
 let moneyEnabled = false;
 try {
