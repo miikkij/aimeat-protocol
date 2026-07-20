@@ -19,6 +19,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { createEntitlement, readEntitlementForCall } from '../services/metered-entitlements.js';
 import {
   type Offering, type Need, type Bid, type ActionCommercial,
@@ -32,6 +33,17 @@ const posOrNull = (v: unknown): number | null => (typeof v === 'number' && Numbe
 
 export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+
+  // ── INFO — the marketplace's public economics (rake, currencies) ─────────────
+  /** Public: what the platform takes on each metered call + the units in play. */
+  router.get('/v1/exchange/info', (_req: Request, res: Response) => {
+    return res.json(success(config.nodeId, {
+      rake_percent: commerceFeePercent(config),
+      rake_note: 'Platform fee applied to each metered call (provider keeps the rest). Set by the node operator.',
+      units: ['morsels', 'EUR', 'USD'],
+      morsel_note: 'Morsels are the node’s throttle unit (plain integers); real money settles in EUR/USD.',
+    }));
+  });
 
   // ── OFFERINGS (supply) ─────────────────────────────────────────────────────
   /** List a supply offering for an action the caller's extension owns. Pricing is read from the action. */
