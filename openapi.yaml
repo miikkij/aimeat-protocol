@@ -7962,7 +7962,7 @@ paths:
         '403':
           $ref: '#/components/responses/AimeatError'
 
-  /v1/apps/{appId}/cost:
+  /v1/apps/cost:
     get:
       operationId: appCost
       summary: Per-app EXCHANGE cost & contracts surface (EXCHANGE G3 / TARGET-045)
@@ -7983,17 +7983,17 @@ paths:
       security:
         - BearerAuth: []
       parameters:
-        - name: appId
-          in: path
+        - name: app_id
+          in: query
           required: true
           schema: { type: string }
           description: App id ("owner/filename") whose sourcing cost & contracts to return.
       responses:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
-        '401':
+        '400':
           $ref: '#/components/responses/AimeatError'
-        '403':
+        '401':
           $ref: '#/components/responses/AimeatError'
 
   /v1/exchange/entitlements:

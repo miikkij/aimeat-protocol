@@ -112,7 +112,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
       carrySpend: existing,
     });
     return res.status(201).json(success(config.nodeId, { entitlement: view(config, ent) }, [
-      { description: 'This app’s cost & contracts', method: 'GET', url: appId ? `/v1/apps/${appId}/cost` : '/v1/exchange/entitlements' },
+      { description: 'This app’s cost & contracts', method: 'GET', url: appId ? `/v1/apps/cost?app_id=${encodeURIComponent(appId)}` : '/v1/exchange/entitlements' },
     ]));
   });
 
