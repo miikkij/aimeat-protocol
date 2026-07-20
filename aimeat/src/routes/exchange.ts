@@ -31,7 +31,7 @@ import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import {
   createEntitlement, readEntitlementForCall, listEntitlementsByConsumer,
-  pauseEntitlement, revokeEntitlement, type MeteredEntitlement,
+  pauseEntitlement, revokeEntitlement, type MeteredEntitlement, type PricingSpec,
 } from '../services/metered-entitlements.js';
 
 function ownerOf(gaii: string): string {
@@ -51,6 +51,7 @@ function view(config: AimeatConfig, e: MeteredEntitlement) {
     unit: e.unit,
     currency: e.currency,
     price_per_call: e.pricePerCall,
+    pricing: e.pricing ?? { model: 'per_call' },
     rake_percent: rakePct,
     rake_per_call: percentFee(e.pricePerCall, rakePct),
     contract_ref: e.contractRef,
@@ -108,9 +109,26 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
       return res.status(400).json(error(config.nodeId, 'NOT_PRICED',
         `Action "${ext}/${action}" has no price; only priced actions are contractable`));
     }
-    if (capUnits !== null && capUnits < pricePerCall) {
+    // Optional pricing PLAN (bundle / subscription) chosen from the provider's authoritative plans.
+    // No plan_id → per_call at the base price. Amounts come from the provider (consumer can't undercut).
+    const planId = typeof b.plan_id === 'string' && b.plan_id ? b.plan_id : null;
+    let pricing: PricingSpec | null = null;
+    if (planId) {
+      const plan = (comm?.plans ?? []).find(p => p.id === planId);
+      if (!plan) return res.status(404).json(error(config.nodeId, 'PLAN_NOT_FOUND', `Action "${ext}/${action}" offers no plan "${planId}"`));
+      if (plan.model === 'bundle') {
+        pricing = { model: 'bundle', blockSize: plan.blockSize, blockPrice: plan.blockPrice, callsRemaining: 0 };
+      } else {
+        const epoch = new Date(0).toISOString();   // start expired → the first call renews (buys the first period)
+        pricing = { model: 'subscription', periodSeconds: plan.periodSeconds, periodPrice: plan.periodPrice,
+          callsPerWindow: plan.callsPerWindow, windowSeconds: plan.windowSeconds, validUntil: epoch, windowStart: epoch, windowCount: 0 };
+      }
+    }
+    // Budget floor: the cap must cover a single charge (per-call price, or a bundle block / subscription period).
+    const minCharge = pricing?.model === 'bundle' ? pricing.blockPrice : pricing?.model === 'subscription' ? pricing.periodPrice : pricePerCall;
+    if (capUnits !== null && capUnits < minCharge) {
       return res.status(400).json(error(config.nodeId, 'BUDGET_TOO_LOW',
-        `Budget cap (${capUnits}) is below the ${pricePerCall}-${unit === 'money' ? currency : 'morsel'} price of a single call`));
+        `Budget cap (${capUnits}) is below the ${minCharge}-${unit === 'money' ? currency : 'morsel'} minimum charge`));
     }
     const providerGhii = `${extRec.installedBy}@${config.nodeId}`;
 
@@ -118,7 +136,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const existing = await readEntitlementForCall(storage, consumerGaii, ext, action);
     const ent = await createEntitlement(storage, {
       consumerGaii, appId, providerGhii, ext, action, capabilityLabel: `${ext}/${action}`,
-      unit, pricePerCall, currency, capUnits, contractRef, escrowParty, createdBy: owner,
+      unit, pricePerCall, currency, pricing, capUnits, contractRef, escrowParty, createdBy: owner,
       carrySpend: existing,
     });
     return res.status(201).json(success(config.nodeId, { entitlement: view(config, ent) }, [

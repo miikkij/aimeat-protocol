@@ -8022,9 +8022,10 @@ paths:
                 ext: { type: string }
                 action: { type: string }
                 contract_ref: { type: string }
-                cap_units: { type: integer, description: Spend cap in the price unit (morsels). Omit for uncapped. }
+                cap_units: { type: integer, description: Spend cap in the price unit (morsels, or money micro-units). Omit for uncapped. }
                 app_id: { type: string, description: Consuming app id ("owner/filename") for the per-app cost surface. }
                 escrow_party: { type: string, enum: [consumer, provider] }
+                plan_id: { type: string, description: "Optional provider pricing plan (bundle / subscription) from the action's commercial.plans; omit for per-call at the base price." }
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
