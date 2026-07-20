@@ -599,6 +599,36 @@
       opacity: 1;
     }
 
+    /* ── Server-backed favourite toggle (⭐ on any app / published card) ─── */
+    .fav-toggle {
+      position: absolute;
+      top: 6px;
+      left: 8px;
+      background: none;
+      border: none;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 2px;
+      opacity: .5;
+      transition: opacity var(--transition), transform var(--transition);
+      z-index: 2;
+    }
+    .fav-toggle:hover { opacity: 1; transform: scale(1.15); }
+    .fav-toggle.on { opacity: 1; }
+    .published-card { position: relative; }
+    .published-card .fav-toggle { left: auto; right: 8px; top: 8px; }
+    .fav-section-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: var(--text);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 0 0 .6rem;
+    }
+    .fav-section-count { opacity: .6; font-weight: 400; }
+
     /* ── Card Menu Button ─────────────────────────────── */
 
     .card-menu-btn {
@@ -2261,6 +2291,12 @@
     <p class="view-empty-hint" data-i18n="view.communityHint">Community apps are apps other people on this node have published. When someone publishes one, it shows up here.</p>
   </div>
 
+  <!-- ⭐ Favourites group (Library) — apps the owner favourited, pinned above "Your apps" -->
+  <div id="favorites-section" data-view="library" style="display:none;margin:0 24px 1rem">
+    <h2 class="fav-section-title"><span data-i18n="fav.title">⭐ Favourites</span> <span id="favorites-count" class="fav-section-count"></span></h2>
+    <div id="favorites-grid" class="published-grid"></div>
+  </div>
+
   <div id="local-apps-block" class="local-apps-block" data-view="library">
     <div id="local-apps-header" style="display:none">
       <h2 style="font-size:1rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px"><span data-i18n="sec.local">&#x1F4DA; Your apps</span> <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>
@@ -2690,6 +2726,9 @@
       "sec.local": "📚 Your apps",
       "sec.localNote": "One card per app. The badge shows its publication state — Listed (public in the catalogue) or Unlisted (on the server but hidden from the public catalogue). A purple Staging pill marks an app that also has an unpublished draft.",
       "sec.localHint": "💡 Add app publishes to your account as unlisted — list it when it's ready to be public.",
+      "fav.title": "⭐ Favourites",
+      "fav.add": "Add to favourites",
+      "fav.remove": "Remove from favourites",
       "stats.apps": "apps",
       "stats.stored": "stored",
       "addModal.title": "Add App",
@@ -3144,6 +3183,9 @@
       "sec.local": "📚 Sinun sovelluksesi",
       "sec.localNote": "Yksi kortti per sovellus. Merkki kertoo julkaisutilan — Listalla (näkyy julkisessa katalogissa) tai Ei listalla (palvelimella mutta piilossa julkisesta katalogista). Violetti Staging-merkki kertoo että apilla on myös julkaisematon luonnos.",
       "sec.localHint": "💡 Lisää sovellus julkaisee tilillesi ei-listalla — listaa se kun se on valmis julkiseksi.",
+      "fav.title": "⭐ Suosikit",
+      "fav.add": "Lisää suosikkeihin",
+      "fav.remove": "Poista suosikeista",
       "stats.apps": "sovellusta",
       "stats.stored": "tallennettu",
       "addModal.title": "Lisää sovellus",
@@ -4246,9 +4288,9 @@
   function loadPbCore() {
     var config = loadConfig();
     if (!config.aimeatUrl) return;
-    var base = config.aimeatUrl.replace(/\/+$/, "");
+    var base2 = config.aimeatUrl.replace(/\/+$/, "");
     ["new", "improve"].forEach(function(mode) {
-      fetch(base + "/v1/prompts/build-app?mode=" + mode + "&lang=" + encodeURIComponent(getLang())).then(function(r) {
+      fetch(base2 + "/v1/prompts/build-app?mode=" + mode + "&lang=" + encodeURIComponent(getLang())).then(function(r) {
         return r.json();
       }).then(function(d) {
         var body = d && d.data && d.data.body;
@@ -4265,8 +4307,8 @@
     if (!sel) return;
     var config = loadConfig();
     if (!config.aimeatUrl) return;
-    var base = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(base + "/v1/app-templates?lang=" + encodeURIComponent(getLang())).then(function(r) {
+    var base2 = config.aimeatUrl.replace(/\/+$/, "");
+    fetch(base2 + "/v1/app-templates?lang=" + encodeURIComponent(getLang())).then(function(r) {
       return r.json();
     }).then(function(d) {
       var list = (d.data && d.data.templates || []).filter(function(t2) {
@@ -4290,7 +4332,7 @@
           updatePbPreview();
           return;
         }
-        fetch(base + "/v1/app-templates/" + encodeURIComponent(id)).then(function(r) {
+        fetch(base2 + "/v1/app-templates/" + encodeURIComponent(id)).then(function(r) {
           return r.json();
         }).then(function(d2) {
           window.pbTemplate = d2.data && d2.data.template || null;
@@ -4316,8 +4358,8 @@
     if (!wrap) return;
     var config = loadConfig();
     if (!config.aimeatUrl) return;
-    var base = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(base + "/v1/library-packs?lang=" + encodeURIComponent(getLang())).then(function(r) {
+    var base2 = config.aimeatUrl.replace(/\/+$/, "");
+    fetch(base2 + "/v1/library-packs?lang=" + encodeURIComponent(getLang())).then(function(r) {
       return r.json();
     }).then(function(d) {
       var all = d.data && d.data.packs || [];
@@ -4338,7 +4380,7 @@
         cb.value = p.id;
         cb.onchange = function() {
           pbPackTouched[p.id] = true;
-          if (cb.checked) loadPbPackDoc(base, p.id);
+          if (cb.checked) loadPbPackDoc(base2, p.id);
           else updatePbPreview();
         };
         var span = document.createElement("span");
@@ -4361,14 +4403,14 @@
       if (desc && !desc._pbPackListener) {
         desc._pbPackListener = true;
         desc.addEventListener("input", function() {
-          pbMatchPacksToIdea(base);
+          pbMatchPacksToIdea(base2);
         });
       }
-      pbMatchPacksToIdea(base);
+      pbMatchPacksToIdea(base2);
     }).catch(function() {
     });
   }
-  function pbMatchPacksToIdea(base) {
+  function pbMatchPacksToIdea(base2) {
     var desc = document.getElementById("pb-description");
     var text = (desc && desc.value || "").toLowerCase();
     pbPacks.forEach(function(p) {
@@ -4381,19 +4423,19 @@
       });
       if (hit && !cb.checked) {
         cb.checked = true;
-        loadPbPackDoc(base, p.id);
+        loadPbPackDoc(base2, p.id);
       } else if (!hit && cb.checked) {
         cb.checked = false;
         updatePbPreview();
       }
     });
   }
-  function loadPbPackDoc(base, id) {
+  function loadPbPackDoc(base2, id) {
     if (pbPackDocs[id]) {
       updatePbPreview();
       return;
     }
-    fetch(base + "/v1/library-packs/" + encodeURIComponent(id)).then(function(r) {
+    fetch(base2 + "/v1/library-packs/" + encodeURIComponent(id)).then(function(r) {
       return r.json();
     }).then(function(d) {
       var pack = d.data && d.data.pack;
@@ -4904,8 +4946,8 @@
       showNotice(t("agents.none"));
       return;
     }
-    var base = aimeatBase();
-    if (!base) {
+    var base2 = aimeatBase();
+    if (!base2) {
       showNotice("Set AIMEAT server URL in Settings first");
       return;
     }
@@ -4921,7 +4963,7 @@
     document.getElementById("agents-overlay").hidden = false;
     defs.forEach(function(def2, i2) {
       var headers = token ? { "Authorization": "Bearer " + token } : {};
-      fetch(base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/agents/" + encodeURIComponent(def2.agent_name) + "/instances", { headers }).then(function(r) {
+      fetch(base2 + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/agents/" + encodeURIComponent(def2.agent_name) + "/instances", { headers }).then(function(r) {
         return r.json();
       }).then(function(json) {
         var el = document.getElementById("aga-instances-" + i2);
@@ -4937,7 +4979,7 @@
       });
     });
     if (token) {
-      fetch(base + "/v1/agents", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+      fetch(base2 + "/v1/agents", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
         return r.json();
       }).then(function(json) {
         var agents = json.data && json.data.agents || [];
@@ -4964,7 +5006,7 @@
       } catch (e) {
       }
       if (me) {
-        fetch(base + "/v1/organisms?member=" + encodeURIComponent(me), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+        fetch(base2 + "/v1/organisms?member=" + encodeURIComponent(me), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
           return r.json();
         }).then(function(json) {
           var orgs = json.data && json.data.organisms || [];
@@ -5143,14 +5185,14 @@
     var app = detailGetApp();
     if (!app) return;
     if (app.published && (app.publishedUrl || app.publishedFilename)) {
-      var base = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+      var base2 = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
       var url;
       if (app.publishedUrl) {
-        url = base + app.publishedUrl;
+        url = base2 + app.publishedUrl;
       } else {
         var st = getServerState()[app.publishedFilename] || {};
         var owner = st.owner || currentOwnerName() || "";
-        url = base + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(app.publishedFilename);
+        url = base2 + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(app.publishedFilename);
       }
       viewPublished(url + "?mode=inline", app.name);
     } else {
@@ -5516,27 +5558,27 @@
     return h;
   }
   function skillListMine() {
-    var base = skillApiBase();
-    if (!base) return Promise.reject(new Error("No server configured"));
-    return fetch(base + "/v1/skills?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
+    var base2 = skillApiBase();
+    if (!base2) return Promise.reject(new Error("No server configured"));
+    return fetch(base2 + "/v1/skills?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
       return r.json();
     }).then(function(j) {
       return j.data && j.data.skills ? j.data.skills : [];
     });
   }
   function skillGetMine(name) {
-    var base = skillApiBase();
-    return fetch(base + "/v1/skills/" + encodeURIComponent(name) + "?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
+    var base2 = skillApiBase();
+    return fetch(base2 + "/v1/skills/" + encodeURIComponent(name) + "?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
       return r.json();
     }).then(function(j) {
       return j.data && j.data.skill || null;
     });
   }
   function skillPublish(skillMd, files) {
-    var base = skillApiBase();
+    var base2 = skillApiBase();
     var body = { skill_md: skillMd };
     if (files && Object.keys(files).length) body.files = files;
-    return fetch(base + "/v1/skills", { method: "POST", headers: skillAuthHeaders(true), body: JSON.stringify(body) }).then(function(r) {
+    return fetch(base2 + "/v1/skills", { method: "POST", headers: skillAuthHeaders(true), body: JSON.stringify(body) }).then(function(r) {
       return r.json().then(function(j) {
         if (!j.ok) throw new Error(j.error && (j.error.message || j.error.code) || "HTTP " + r.status);
         return j.data && j.data.skill || null;
@@ -6030,9 +6072,9 @@
   function draftApi(method, owner, filename, sub, body) {
     var cfg = loadConfig();
     if (!cfg.aimeatUrl) return Promise.reject(new Error("Set the AIMEAT server URL in Settings first"));
-    var base = cfg.aimeatUrl.replace(/\/+$/, "");
+    var base2 = cfg.aimeatUrl.replace(/\/+$/, "");
     var path = "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/" + sub;
-    return fetch(base + path, {
+    return fetch(base2 + path, {
       method,
       headers: { "Authorization": "Bearer " + getCortexOwnerToken2(), "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : void 0
@@ -6492,8 +6534,8 @@
       showNotice(t("common.loginRequired") || "You must be logged in to fork an app into your own catalogue. Sign in first.");
       return;
     }
-    var base = (filename || "app").replace(/\.html?$/i, "");
-    var suggested = base + "-fork.html";
+    var base2 = (filename || "app").replace(/\.html?$/i, "");
+    var suggested = base2 + "-fork.html";
     var newName = prompt(t("fork.prompt") || 'Fork "' + filename + '" into a new app.\n\nNew filename:', suggested);
     if (!newName) return;
     newName = newName.trim();
@@ -6896,6 +6938,66 @@
     }
   }
 
+  // src/static/app-catalog/js/favorites.js
+  var KEY = "app-catalog.favorites";
+  var favSet = /* @__PURE__ */ new Set();
+  function base() {
+    return (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+  }
+  function isFavorite(ref) {
+    return favSet.has(ref);
+  }
+  function loadFavorites() {
+    var token = getCortexOwnerToken();
+    var b = base();
+    if (!token || !b) {
+      favSet = /* @__PURE__ */ new Set();
+      return Promise.resolve();
+    }
+    return fetch(b + "/v1/memory/" + encodeURIComponent(KEY), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+      return r.ok ? r.json() : null;
+    }).then(function(j) {
+      var refs = j && j.data && j.data.value && Array.isArray(j.data.value.refs) ? j.data.value.refs : [];
+      favSet = new Set(refs.filter(function(x) {
+        return typeof x === "string";
+      }));
+    }).catch(function() {
+    });
+  }
+  function persist() {
+    var token = getCortexOwnerToken();
+    var b = base();
+    if (!token || !b) return Promise.resolve();
+    return fetch(b + "/v1/memory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({
+        key: KEY,
+        value: { version: 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), refs: Array.from(favSet) },
+        visibility: "private"
+      })
+    }).catch(function() {
+    });
+  }
+  function toggleFavorite(ref) {
+    var now;
+    if (favSet.has(ref)) {
+      favSet.delete(ref);
+      now = false;
+    } else {
+      favSet.add(ref);
+      now = true;
+    }
+    return persist().then(function() {
+      return now;
+    });
+  }
+  function favStarHtml(ref) {
+    var on = favSet.has(ref);
+    var title = on ? t("fav.remove") || "Remove from favourites" : t("fav.add") || "Add to favourites";
+    return '<button class="fav-toggle' + (on ? " on" : "") + `" onclick="event.stopPropagation(); window._launcher.toggleFavorite('` + String(ref).replace(/'/g, "\\'") + `')" title="` + title + '">' + (on ? "⭐" : "☆") + "</button>";
+  }
+
   // src/static/app-catalog/js/server-io.js
   var getMainApps3;
   var getServerState2;
@@ -6911,6 +7013,8 @@
   function initServerIo(deps) {
     ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests3, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId: generateId4, renderApps: renderApps3, refreshAll: refreshAll2 } = deps);
   }
+  var lastAllServerApps = [];
+  var lastAimeatUrl = "";
   var publishAppId = null;
   var publishUnlisted = false;
   function showPublishModal3(appId, opts) {
@@ -7561,7 +7665,7 @@
       }
     } catch (e) {
     }
-    getAllApps().then(function() {
+    Promise.all([getAllApps(), loadFavorites()]).then(function() {
       if (!aimeatUrl) {
         setOwnServerApps([]);
         renderApps3();
@@ -7584,10 +7688,13 @@
         var communityApps = currentOwner ? serverApps.filter(function(a) {
           return !sameOwner(a.owner, currentOwner);
         }) : serverApps;
+        lastAllServerApps = serverApps;
+        lastAimeatUrl = aimeatUrl;
         return loadSubdomainSites().then(function() {
           setOwnServerApps(currentOwner ? ownApps : []);
           renderApps3();
           renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
+          renderFavorites(serverApps, aimeatUrl);
           applyServerFilter();
         });
       }).catch(function() {
@@ -7622,6 +7729,21 @@
     var sectionEl = document.getElementById("community-section");
     if (sectionEl) sectionEl.style.display = filtering && shown === 0 ? "none" : "";
   }
+  function publishedCardHtml(sa, aimeatUrl) {
+    var owner = sa.owner || "";
+    var fn = sa.filename || "";
+    var ref = owner + "/" + fn;
+    var m = sa.manifest || {};
+    var name = m.name || fn;
+    var version = sa.version_number ? "v" + sa.version_number : "";
+    var description = m.descriptions && m.descriptions[getLang()] || m.description || "";
+    var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : "";
+    var author = m.authorDisplay || owner;
+    var viewUrl = aimeatUrl + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(fn);
+    var shipsAgent = !!(m.cortex && m.cortex.agents && m.cortex.agents.length);
+    return '<div class="published-card"' + filterAttr(name, m.tags || []) + ">" + favStarHtml(ref) + '<div class="published-card-name">' + escapeHtml(name) + "</div>" + (description ? '<div class="published-card-desc">' + escapeHtml(description) + "</div>" : "") + '<div class="published-card-footer"><div class="published-card-metaline"><span class="pcm-main" style="color:var(--accent)">&#x1F464; ' + escapeHtml(author) + "</span>" + (date ? '<span class="pcm-date">' + date + "</span>" : "") + `</div><div class="published-card-actions"><button onclick="window._launcher.viewPublished('` + escapeHtml(viewUrl) + "?mode=inline', '" + jsArg(name) + `')">` + t("card.view") + "</button>" + // Fork is offered on a community app only when its owner marked it forkable.
+    (sa.forkable ? `<button onclick="window._launcher.forkVersion('` + escapeHtml(owner) + "', '" + escapeHtml(fn) + "', " + (sa.version_number || 0) + ')" title="' + escapeHtml(t("card.forkHint")) + '">' + t("card.fork") + "</button>" : "") + (shipsAgent ? `<button onclick="window._launcher.showAppAgentsModal('` + jsArg(owner) + "', '" + jsArg(fn) + `')" title="` + escapeHtml(t("card.agentHint")) + '">' + t("card.agent") + "</button>" : "") + "</div>" + (version || sa.forks && sa.forks > 0 || shipsAgent ? '<div class="published-card-badgerow">' + (shipsAgent ? '<span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">&#x1F916;</span>' : "") + (sa.forks && sa.forks > 0 ? '<span class="pcb-forks" title="' + escapeHtml(t("card.forksHint")) + `" onclick="window._launcher.showLineageModal('` + escapeHtml(owner) + "', '" + escapeHtml(fn) + `')">⑂ ` + sa.forks + "</span>" : "") + (version ? '<span class="pcb-version">' + escapeHtml(version) + "</span>" : "") + "</div>" : "") + "</div></div>";
+  }
   function renderCommunityApps(serverApps, aimeatUrl, section, grid, countEl, currentOwner) {
     if (!section || !grid || !countEl) return;
     if (serverApps.length === 0) {
@@ -7633,21 +7755,50 @@
     section.style.display = "";
     countEl.textContent = "(" + serverApps.length + ")";
     var html = "";
-    for (var i = 0; i < serverApps.length; i++) {
-      var sa = serverApps[i];
-      var name = sa.manifest && sa.manifest.name ? sa.manifest.name : sa.filename || "";
-      var version = sa.version_number ? "v" + sa.version_number : "";
-      var description = sa.manifest && sa.manifest.description ? sa.manifest.description : "";
-      var date = sa.created_at ? new Date(sa.created_at).toLocaleDateString() : "";
-      var author = sa.manifest && sa.manifest.authorDisplay ? sa.manifest.authorDisplay : sa.owner || "";
-      var viewUrl = aimeatUrl + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(sa.filename || "");
-      var shipsAgent = !!(sa.manifest && sa.manifest.cortex && sa.manifest.cortex.agents && sa.manifest.cortex.agents.length);
-      html += '<div class="published-card"' + filterAttr(name, sa.manifest && sa.manifest.tags || []) + '><div class="published-card-name">' + escapeHtml(name) + "</div>" + (description ? '<div class="published-card-desc">' + escapeHtml(description) + "</div>" : "") + '<div class="published-card-footer"><div class="published-card-metaline"><span class="pcm-main" style="color:var(--accent)">&#x1F464; ' + escapeHtml(author) + "</span>" + (date ? '<span class="pcm-date">' + date + "</span>" : "") + `</div><div class="published-card-actions"><button onclick="window._launcher.viewPublished('` + escapeHtml(viewUrl) + "?mode=inline', '" + jsArg(name) + `')">` + t("card.view") + "</button>" + // Fork is offered on a community (someone else's) app only when its owner
-      // marked it forkable; otherwise the server would reject the fork (403).
-      (sa.forkable ? `<button onclick="window._launcher.forkVersion('` + escapeHtml(sa.owner || "") + "', '" + escapeHtml(sa.filename || "") + "', " + (sa.version_number || 0) + ')" title="' + escapeHtml(t("card.forkHint")) + '">' + t("card.fork") + "</button>" : "") + (shipsAgent ? `<button onclick="window._launcher.showAppAgentsModal('` + jsArg(sa.owner || "") + "', '" + jsArg(sa.filename || "") + `')" title="` + escapeHtml(t("card.agentHint")) + '">' + t("card.agent") + "</button>" : "") + "</div>" + (version || sa.forks && sa.forks > 0 || shipsAgent ? '<div class="published-card-badgerow">' + (shipsAgent ? '<span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">&#x1F916;</span>' : "") + (sa.forks && sa.forks > 0 ? '<span class="pcb-forks" title="' + escapeHtml(t("card.forksHint")) + `" onclick="window._launcher.showLineageModal('` + escapeHtml(sa.owner || "") + "', '" + escapeHtml(sa.filename || "") + `')">⑂ ` + sa.forks + "</span>" : "") + (version ? '<span class="pcb-version">' + escapeHtml(version) + "</span>" : "") + "</div>" : "") + "</div></div>";
-    }
+    for (var i = 0; i < serverApps.length; i++) html += publishedCardHtml(serverApps[i], aimeatUrl);
     grid.innerHTML = html;
     updateCommunityEmpty();
+  }
+  function renderFavorites(allServerApps, aimeatUrl) {
+    var section = document.getElementById("favorites-section");
+    var grid = document.getElementById("favorites-grid");
+    var countEl = document.getElementById("favorites-count");
+    if (!section || !grid) return;
+    var favs = (allServerApps || []).filter(function(sa) {
+      return isFavorite((sa.owner || "") + "/" + (sa.filename || ""));
+    });
+    if (favs.length === 0) {
+      section.style.display = "none";
+      grid.innerHTML = "";
+      return;
+    }
+    section.style.display = "";
+    if (countEl) countEl.textContent = "(" + favs.length + ")";
+    var html = "";
+    for (var i = 0; i < favs.length; i++) html += publishedCardHtml(favs[i], aimeatUrl);
+    grid.innerHTML = html;
+  }
+  function refreshFavoritesUI() {
+    renderFavorites(lastAllServerApps, lastAimeatUrl);
+    var currentOwner = null;
+    try {
+      var s = window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession();
+      currentOwner = s && s.owner || JSON.parse(localStorage.getItem("aimeat_session") || "{}").owner || null;
+    } catch (e) {
+    }
+    var communityApps = currentOwner ? lastAllServerApps.filter(function(a) {
+      return !sameOwner(a.owner, currentOwner);
+    }) : lastAllServerApps;
+    renderCommunityApps(
+      communityApps,
+      lastAimeatUrl,
+      document.getElementById("community-section"),
+      document.getElementById("community-grid"),
+      document.getElementById("community-count"),
+      currentOwner
+    );
+    applyServerFilter();
+    renderApps3();
   }
   async function unpublishApp(appId) {
     if (!await showConfirm(t("confirm.removePublished"))) return;
@@ -7892,7 +8043,7 @@
     }
   }
   function buildLibraryEntries(localApps, serverApps) {
-    var base = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+    var base2 = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
     var byFilename = {};
     var entries = [];
     serverStateByFilename = {};
@@ -7922,7 +8073,7 @@
         filename: la.publishedFilename || null,
         owner: null,
         versionNumber: la.publishedVersionNumber || null,
-        viewUrl: la.publishedUrl ? base + la.publishedUrl : "",
+        viewUrl: la.publishedUrl ? base2 + la.publishedUrl : "",
         forkable: false,
         forks: 0
       };
@@ -7945,7 +8096,7 @@
         m.hasDraft = !!sa.has_draft;
         m.hasAgents = shipsAgent;
         m.protection = prot;
-        m.viewUrl = base + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn);
+        m.viewUrl = base2 + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn);
         if (!m.description && sa.manifest && sa.manifest.description) m.description = sa.manifest.description;
       } else {
         var se = {
@@ -7970,7 +8121,7 @@
           filename: fn,
           owner: sa.owner || "",
           versionNumber: sa.version_number || null,
-          viewUrl: base && fn ? base + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn) : "",
+          viewUrl: base2 && fn ? base2 + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn) : "",
           forkable: !!sa.forkable,
           forks: sa.forks || 0,
           protection: prot,
@@ -8066,7 +8217,8 @@
     return '<div class="app-card' + (e.hasLocal ? "" : " server-only") + '" data-id="' + idAttr + '"' + dragAttrs + filterAttr(e.name, e.tags) + ' onclick="' + detailCall + '"' + (e.hasLocal ? ` oncontextmenu="window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')"` : "") + ' style="animation-delay:' + i * 0.04 + 's"><span class="app-status-badge st-' + st + '">' + escapeHtml(libStatusLabel(e)) + "</span>" + (e.hasDraft ? '<span class="app-staging-badge" title="' + escapeHtml(t("card.stagingHint")) + '">' + escapeHtml(t("card.stagingBadge")) + "</span>" : "") + menuBtn + '<div class="app-icon">' + escapeHtml(e.icon || "📝") + '</div><div class="app-name">' + escapeHtml(e.name) + (e.origin === "ai-published" ? ' <span class="ai-origin-badge">AI</span>' : "") + (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">🤖</span>' : "") + "</div>" + (function() {
       var d = e.descriptions && e.descriptions[getLang()] || e.description || "";
       return d ? '<div class="app-source">' + escapeHtml(d) + "</div>" : '<div class="app-source">' + sourceLabel(e.source) + "</div>";
-    })() + '<div class="app-actions">' + openBtns + '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t("ctx.details")) + "</button></div>" + (e.favorite ? '<span class="fav-star visible">⭐</span>' : "") + "</div>";
+    })() + '<div class="app-actions">' + openBtns + '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t("ctx.details")) + "</button></div>" + // Server-backed favourite toggle (owner/filename); only for server apps with a filename.
+    (e.filename ? favStarHtml((e.owner || e.aimeatOwner || "") + "/" + e.filename) : "") + "</div>";
   }
   var currentIframeUrl = "";
   function closeIframe() {
@@ -8415,6 +8567,15 @@
     showPublishModal: showPublishModal3,
     submitPublish,
     loadPublishedApps: loadPublishedApps2,
+    // Toggle a server-backed favourite (ref = "owner/filename"), then re-render the ⭐ group + stars.
+    toggleFavorite: function(ref) {
+      toggleFavorite(ref).then(function() {
+        try {
+          refreshFavoritesUI();
+        } catch (e) {
+        }
+      });
+    },
     toggleCommunity,
     switchView,
     unpublishApp,

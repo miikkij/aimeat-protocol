@@ -21,6 +21,7 @@ import { getAllApps, saveApp, deleteApp } from './db.js';
 import { showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t, getLang } from './i18n.js';
+import { favStarHtml } from './favorites.js';
 import { setEditingAppId, switchTab } from './apps-io.js';
 import { openPromptBuilder } from './cortex.js';
 import { openDetailView, openPublishedDetail } from './detail.js';
@@ -419,7 +420,8 @@ function libraryCardHtml(e, i) {
         openBtns +
         '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t('ctx.details')) + '</button>' +
       '</div>' +
-      (e.favorite ? '<span class="fav-star visible">⭐</span>' : '') +
+      // Server-backed favourite toggle (owner/filename); only for server apps with a filename.
+      (e.filename ? favStarHtml((e.owner || e.aimeatOwner || '') + '/' + e.filename) : '') +
     '</div>';
 }
 
