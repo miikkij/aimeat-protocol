@@ -4,10 +4,12 @@
 #   1. ESLint (src/ + public/)           — pnpm lint
 #   2. Backend type check (tsc)          — pnpm typecheck
 #   3. Frontend type check (checkJs)     — pnpm typecheck:frontend
-#   4. Importmap ↔ imports in sync       — pnpm check:importmap
-#   5. No max_tokens caps on AI calls    — pnpm check:no-max-tokens
-#   6. app-catalog.html ↔ its sources    — pnpm check:app-catalog
-#   7. MCP tool surface/handler parity    — pnpm check:mcp-tools
+#   4. SDK-libs type check (checkJs)      — pnpm typecheck:sdk
+#   5. Importmap ↔ imports in sync       — pnpm check:importmap
+#   6. No max_tokens caps on AI calls    — pnpm check:no-max-tokens
+#   7. app-catalog.html ↔ its sources    — pnpm check:app-catalog
+#   8. SDK-libs dist ↔ their sources     — pnpm check:sdk
+#   9. MCP tool surface/handler parity    — pnpm check:mcp-tools
 #
 # These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
 # (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
@@ -28,6 +30,9 @@ pnpm -s typecheck
 echo "[pre-commit] Type check — frontend / checkJs (typecheck:frontend)…"
 pnpm -s typecheck:frontend
 
+echo "[pre-commit] Type check — SDK libs / checkJs (typecheck:sdk)…"
+pnpm -s typecheck:sdk
+
 echo "[pre-commit] Importmap ↔ imports in sync (check:importmap)…"
 pnpm -s check:importmap
 
@@ -36,6 +41,9 @@ pnpm -s check:no-max-tokens
 
 echo "[pre-commit] app-catalog.html ↔ sources in sync (check:app-catalog)…"
 pnpm -s check:app-catalog
+
+echo "[pre-commit] SDK-libs dist ↔ sources in sync (check:sdk)…"
+pnpm -s check:sdk
 
 echo "[pre-commit] MCP tool surface/handler parity (check:mcp-tools)…"
 pnpm -s check:mcp-tools
