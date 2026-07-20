@@ -2,9 +2,10 @@
 <!DOCTYPE html>
 <!--
   @file src/static/app-catalog.html
-  @description Self-contained "My Apps" launcher SPA (IndexedDB-backed) for installing,
-    publishing, and running user apps. Runs published app HTML only inside a sandboxed,
-    opaque-origin iframe — never as a top-level document on the apex origin (H-2).
+  @description Self-contained "My Apps" launcher SPA (SERVER-ONLY — no browser persistence) for
+    creating, publishing, and managing the owner's server apps. Creating an app publishes it to the
+    server (unlisted); nothing is stored in the browser. Runs published app HTML only inside a
+    sandboxed, opaque-origin iframe — never as a top-level document on the apex origin (H-2).
   @structure Inline <style> theme; markup; large inline <script> exposing window._launcher.
   @usage Served at GET /app-catalog.html (relaxed CSP) from server-bootstrap/static-files.ts.
   @version-history
@@ -2160,13 +2161,6 @@
   <header>
     <a class="aimeat-cta aimeat-home" id="aimeat-home-link" href="/" data-i18n-title="cta.backHome" title="Back to home"><span class="aimeat-cta-spark">⚡</span><span id="aimeat-home-label">aimeat.io</span></a>
     <h1 data-i18n="header.title">My Apps</h1>
-    <div class="mode-toggle-wrap">
-      <span class="mode-caption" data-i18n="mode.caption" data-i18n-title="mode.caption.title" title="These toggle which browser-local apps you see — not server visibility">Local apps</span>
-      <div class="mode-toggle">
-        <button id="mode-global" class="mode-btn active" onclick="window._launcher.switchDbMode('global')" data-i18n="mode.global" data-i18n-title="mode.global.title" title="Shared across all accounts on this browser">&#x1F310; Shared</button>
-        <button id="mode-personal" class="mode-btn" onclick="window._launcher.switchDbMode('personal')" data-i18n="mode.personal" data-i18n-title="mode.personal.title" title="Private to your account">&#x1F464; Mine</button>
-      </div>
-    </div>
     <input type="text" id="search-input" placeholder="Search apps..." data-i18n-ph="search.ph" autocomplete="off" spellcheck="false"/>
     <div class="header-actions">
       <span id="headerAuth" class="header-auth-pill"></span>
@@ -2267,12 +2261,6 @@
     <p class="view-empty-hint" data-i18n="view.communityHint">Community apps are apps other people on this node have published. When someone publishes one, it shows up here.</p>
   </div>
 
-  <!-- Recently Opened Strip -->
-  <div id="recent-section" data-view="library" style="display:none;margin:0 24px 1rem">
-    <h3 style="margin:0 0 .5rem;font-size:.9rem;color:var(--text-muted)" data-i18n="sec.recent">&#x1F552; Recently Opened</h3>
-    <div id="recent-strip" style="display:flex;gap:.75rem;overflow-x:auto;padding-bottom:.5rem"></div>
-  </div>
-
   <div id="local-apps-block" class="local-apps-block" data-view="library">
     <div id="local-apps-header" style="display:none">
       <h2 style="font-size:1rem;font-weight:700;color:var(--text);display:flex;align-items:center;gap:8px"><span data-i18n="sec.local">&#x1F4DA; Your apps</span> <span id="local-apps-count" style="opacity:.6;font-weight:400"></span></h2>
@@ -2291,18 +2279,10 @@
     <div class="modal" id="add-app-modal">
       <h2 id="modal-title" data-i18n="addModal.title">Add App</h2>
 
-      <!-- Source tabs -->
+      <!-- Source tabs — server-only: paste HTML or upload an HTML/ZIP file; it publishes to your account. -->
       <div class="modal-tabs">
-        <button class="modal-tab active" data-tab="url" data-i18n="tab.url">URL</button>
+        <button class="modal-tab active" data-tab="paste" data-i18n="tab.paste">Paste</button>
         <button class="modal-tab" data-tab="file" data-i18n="tab.file">File</button>
-        <button class="modal-tab" data-tab="paste" data-i18n="tab.paste">Paste</button>
-        <button class="modal-tab" data-tab="aimeat" data-i18n="tab.aimeat">AIMEAT</button>
-      </div>
-
-      <!-- URL tab content -->
-      <div class="tab-content active" id="tab-url">
-        <label class="modal-label" for="app-url" data-i18n="addModal.url">App URL</label>
-        <input type="url" id="app-url" class="modal-input" placeholder="https://example.com/app.html" autocomplete="off"/>
       </div>
 
       <!-- File tab content -->
@@ -2318,20 +2298,10 @@
         </div>
       </div>
 
-      <!-- Paste tab content -->
-      <div class="tab-content" id="tab-paste">
+      <!-- Paste tab content (default) -->
+      <div class="tab-content active" id="tab-paste">
         <label class="modal-label" for="app-paste-code" data-i18n="addModal.paste">Paste HTML Source Code</label>
         <textarea id="app-paste-code" class="modal-input" rows="10" placeholder="Paste your HTML source code here..." data-i18n-ph="addModal.pastePh" style="font-family:'Consolas','Monaco','Courier New',monospace;font-size:.8rem;resize:vertical;min-height:160px;line-height:1.4"></textarea>
-      </div>
-
-      <!-- AIMEAT tab content -->
-      <div class="tab-content" id="tab-aimeat">
-        <p style="font-size:.85rem;color:var(--text-muted);margin-bottom:14px;line-height:1.5" data-i18n="addModal.aimeatHelp">
-          Import apps from a connected AIMEAT server. Configure the server URL in Settings first.
-        </p>
-        <button type="button" class="modal-btn primary" onclick="window._launcher.importFromAimeat()" style="width:100%" data-i18n="addModal.fetch">
-          Fetch Available Apps
-        </button>
       </div>
 
       <!-- Common fields -->
@@ -2468,21 +2438,6 @@
         </div>
       </div>
 
-      <div class="settings-section">
-        <div class="settings-section-title" data-i18n="settings.backup">Backup &amp; Restore</div>
-        <div class="settings-backup-actions">
-          <button type="button" class="modal-btn secondary" onclick="window._launcher.exportBackup()" data-i18n="settings.exportJson">Export JSON</button>
-          <button type="button" class="modal-btn secondary" onclick="document.getElementById('import-file-input').click()" data-i18n="settings.importJson">Import JSON</button>
-          <button type="button" class="modal-btn secondary" onclick="window._launcher.removeDuplicateApps()" data-i18n="dedup.btn">&#x1F9F9; Remove duplicate apps</button>
-          <input type="file" id="import-file-input" accept=".json" hidden/>
-        </div>
-      </div>
-
-      <div class="settings-section" style="margin-bottom:0">
-        <div class="settings-section-title" data-i18n="settings.danger">Danger Zone</div>
-        <button type="button" class="modal-btn danger" onclick="window._launcher.clearAllData()" data-i18n="settings.clearAll">Clear All Data</button>
-      </div>
-
       <div class="modal-actions" style="margin-top:24px">
         <button type="button" class="modal-btn secondary" id="settings-cancel-btn" data-i18n="common.cancel">Cancel</button>
         <button type="button" class="modal-btn primary" id="settings-save-btn" data-i18n="common.save">Save</button>
@@ -2505,18 +2460,6 @@
         <button class="modal-btn primary" id="source-test-live-btn" hidden data-i18n="detail.testLive">Test on real origin</button>
         <button class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="detail.publishTested">Publish tested version</button>
         <button class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- AIMEAT Import Dialog (dynamically populated) -->
-  <div id="aimeat-import-overlay" hidden>
-    <div class="modal" id="aimeat-import-modal">
-      <h2 data-i18n="import.title">Import from AIMEAT</h2>
-      <div class="aimeat-app-list" id="aimeat-app-list"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('aimeat-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
-        <button type="button" class="modal-btn primary" onclick="window._launcher.processAimeatImport()" data-i18n="import.selected">Import Selected</button>
       </div>
     </div>
   </div>
@@ -2547,20 +2490,6 @@
       </div>
     </div>
   </div>
-
-  <!-- JSON Backup Import Modal (user-selected, duplicate-aware) -->
-  <div id="json-import-overlay" hidden>
-    <div class="modal" id="json-import-modal">
-      <h2 data-i18n="jsonImport.title">&#x1F4E5; Import JSON backup</h2>
-      <div id="json-import-status" style="margin:4px 0;font-size:.85rem;min-height:1.1em"></div>
-      <div id="json-import-body" style="overflow-y:auto;max-height:55vh"></div>
-      <div class="modal-actions">
-        <button type="button" class="modal-btn secondary" onclick="document.getElementById('json-import-overlay').hidden = true" data-i18n="common.cancel">Cancel</button>
-        <button type="button" class="modal-btn primary" id="json-import-btn" onclick="window._launcher.submitJsonImport()" data-i18n="srvImport.import">Import selected</button>
-      </div>
-    </div>
-  </div>
-
 
   <!-- Backup Import Modal -->
   <div id="backup-overlay" hidden>
@@ -2717,14 +2646,14 @@
       "action.settings": "Settings",
       "action.help": "Help",
       "help.title": "❓ How this catalog works",
-      "help.modesTitle": "Shared vs Mine (browser-local apps)",
-      "help.modes": 'The header toggle picks which BROWSER-LOCAL apps you see — it is NOT about server visibility. "Shared" = local apps visible to every account signed in on this browser; "Mine" = local apps private to your account (needs you to be signed in). Your published/server apps are unaffected either way.',
+      "help.modesTitle": "Creating an app",
+      "help.modes": "Add app lets you paste HTML or upload an HTML/ZIP file (or Generate with AI). It publishes straight to your account as UNLISTED — on the server but not yet public — so you can review it before listing. Nothing is stored only in your browser.",
       "help.whereTitle": "Where your apps live",
-      "help.where": "Local apps live only in this browser (IndexedDB) — they don't follow you to another browser or device. Publish an app to put it on the server, then you can manage it from anywhere. Each app shows as ONE card with a badge saying where it lives.",
+      "help.where": "Every app lives on the server under your account — the catalog is server-only, so nothing is kept in this browser. Your apps follow you to any browser or device automatically.",
       "help.sectionsTitle": "The two views",
-      "help.sections": "Two tabs. Library = your apps, each as one card whose badge shows its publication state — Listed (published, public in the catalogue), Unlisted (on the server but hidden from the catalogue, still usable by you and anyone with the link), or Local (a draft in this browser, not on the server yet). A purple Staging pill marks an app that also has an unpublished draft waiting. Community = apps other people have published.",
+      "help.sections": "Two tabs. Library = your apps, each as one card whose badge shows its publication state — Listed (public in the catalogue) or Unlisted (on the server but hidden from the catalogue, still usable by you and anyone with the link). A purple Staging pill marks an app that also has an unpublished draft waiting. Community = apps other people have published.",
       "help.backupTitle": '"Backup" means two different things',
-      "help.backup": "The 💾 menu (top bar) exports/imports your SERVER apps + extensions as a .zip. Settings → Export/Import JSON backs up this browser's LOCAL catalog. They are separate.",
+      "help.backup": "The 💾 menu (top bar) exports/imports your SERVER apps + extensions as a .zip — a full server-side backup you can restore selectively.",
       "help.standaloneTitle": "Which node this talks to",
       "help.standalone": "This catalog is served by its node and always talks to that node (same-origin) — the Server URL in Settings is fixed to it. To use your own, open /app-catalog.html on your node: localhost, aimeat-desktop, and federated nodes each serve their OWN catalog.",
       "action.theme": "Toggle light / dark",
@@ -2759,8 +2688,8 @@
       "sec.parkedBlurb": "Only you can see and use these — they stay usable but are hidden from the public catalogue. Press Publish to move one back to Published Apps.",
       "sec.recent": "🕒 Recently Opened",
       "sec.local": "📚 Your apps",
-      "sec.localNote": "One card per app. The badge shows its publication state — Listed (published, public in the catalogue), Unlisted (on the server but hidden from the public catalogue), or Local (a draft in this browser, not on the server yet). A purple Staging pill marks an app that also has an unpublished draft.",
-      "sec.localHint": "💡 Publish a local app to put it on the server — then you can manage it from anywhere.",
+      "sec.localNote": "One card per app. The badge shows its publication state — Listed (public in the catalogue) or Unlisted (on the server but hidden from the public catalogue). A purple Staging pill marks an app that also has an unpublished draft.",
+      "sec.localHint": "💡 Add app publishes to your account as unlisted — list it when it's ready to be public.",
       "stats.apps": "apps",
       "stats.stored": "stored",
       "addModal.title": "Add App",
@@ -2826,6 +2755,8 @@
       "publish.accessCodeHint": "4-64 chars. If set, only people with the code can download.",
       "publish.submit": "Publish",
       "publish.loginRequired": "Sign in to publish to AIMEAT. Anonymous publishing is disabled — use the Sign in button in the top bar.",
+      "publish.savedUnlisted": "Saved — your app is on the server as unlisted. Open it and press List when you want it public.",
+      "migrate.found": "You have {n} app(s) saved only in this browser from the old local catalog. The catalog is now server-only, so they no longer appear here. Download them as a JSON backup now? You can re-publish any you still want.",
       "auth.signIn": "❤️ Sign In",
       "auth.loggedIn": "logged in",
       "auth.logout": "Logout",
@@ -3138,7 +3069,7 @@
       "tag.favorites": "⭐ Favorites",
       "empty.noApps": "No apps yet",
       "empty.noAppsDesc": "Add your first app using the + button above",
-      "empty.formats": "Supports: HTML files, URLs, ZIP packages, AIMEAT imports",
+      "empty.formats": "Supports: HTML files and ZIP packages",
       "empty.noMatch": "No matches",
       "empty.noMatchDesc": "No apps match the current filter. Try a different search term or tag."
     },
@@ -3161,14 +3092,14 @@
       "action.settings": "Asetukset",
       "action.help": "Ohje",
       "help.title": "❓ Miten tämä katalogi toimii",
-      "help.modesTitle": "Jaetut vs Omat (selain-paikalliset appit)",
-      "help.modes": 'Yläpalkin valitsin päättää mitkä SELAIN-PAIKALLISET appit näet — se EI liity server-näkyvyyteen. "Jaetut" = paikalliset appit näkyvät kaikille tähän selaimeen kirjautuneille tileille; "Omat" = paikalliset appit yksityisiä tilillesi (vaatii sisäänkirjautumisen). Julkaistut/server-appisi eivät muutu kummassakaan.',
+      "help.modesTitle": "Sovelluksen luominen",
+      "help.modes": "Lisää sovellus antaa liittää HTML:ää tai ladata HTML/ZIP-tiedoston (tai luoda sen tekoälyllä). Se julkaistaan suoraan tilillesi EI LISTALLA — palvelimelle mutta ei vielä julkiseksi — joten voit tarkistaa sen ennen listaamista. Mitään ei tallenneta vain selaimeesi.",
       "help.whereTitle": "Missä appisi asuvat",
-      "help.where": "Paikalliset appit asuvat vain tässä selaimessa (IndexedDB) — ne eivät seuraa toiseen selaimeen tai laitteeseen. Julkaise appi siirtääksesi sen palvelimelle, minkä jälkeen hallitset sitä mistä tahansa. Jokainen appi näkyy YHTENÄ korttina, jonka merkki kertoo missä se sijaitsee.",
+      "help.where": "Jokainen sovellus sijaitsee palvelimella tililläsi — katalogi on vain palvelinpohjainen, joten mitään ei säilytetä tässä selaimessa. Sovelluksesi seuraavat sinua mihin tahansa selaimeen tai laitteeseen automaattisesti.",
       "help.sectionsTitle": "Kaksi näkymää",
-      "help.sections": "Kaksi välilehteä. Kirjasto = sinun appisi, jokainen yhtenä korttina jonka merkki kertoo julkaisutilan — Listalla (julkaistu, näkyy katalogissa), Ei listalla (palvelimella mutta piilossa katalogista, sinä ja kuka tahansa linkillä voitte yhä käyttää), tai Paikallinen (luonnos tässä selaimessa, ei vielä palvelimella). Violetti Staging-merkki kertoo että apilla on myös julkaisematon luonnos odottamassa. Yhteisö = muiden julkaisemat appit.",
+      "help.sections": "Kaksi välilehteä. Kirjasto = sinun appisi, jokainen yhtenä korttina jonka merkki kertoo julkaisutilan — Listalla (näkyy julkisessa katalogissa) tai Ei listalla (palvelimella mutta piilossa katalogista, sinä ja kuka tahansa linkillä voitte yhä käyttää). Violetti Staging-merkki kertoo että apilla on myös julkaisematon luonnos odottamassa. Yhteisö = muiden julkaisemat appit.",
       "help.backupTitle": '"Varmuuskopio" tarkoittaa kahta eri asiaa',
-      "help.backup": "💾-valikko (yläpalkki) vie/tuo PALVELIN-appisi + laajennukset .zip-tiedostona. Asetukset → Vie/Tuo JSON varmuuskopioi tämän selaimen PAIKALLISEN katalogin. Ne ovat erillisiä.",
+      "help.backup": "💾-valikko (yläpalkki) vie/tuo PALVELIN-appisi + laajennukset .zip-tiedostona — täysi palvelinpuolen varmuuskopio, jonka voit palauttaa valikoiden.",
       "help.standaloneTitle": "Mille nodelle tämä puhuu",
       "help.standalone": "Tämän katalogin tarjoilee sen node, ja se puhuu aina sille nodelle (same-origin) — Asetusten Palvelin-URL on kiinnitetty siihen. Käyttääksesi omaa: avaa /app-catalog.html omalla nodellasi. localhost, aimeat-desktop ja federoidut nodet tarjoilevat kukin OMAN kataloginsa.",
       "action.theme": "Vaihda vaalea / tumma",
@@ -3203,8 +3134,8 @@
       "sec.parkedBlurb": "Vain sinä näet ja voit käyttää näitä — ne pysyvät käytettävissä mutta eivät näy julkisessa katalogissa. Paina Julkaise siirtääksesi takaisin julkaistuihin.",
       "sec.recent": "🕒 Viimeksi avatut",
       "sec.local": "📚 Sinun sovelluksesi",
-      "sec.localNote": "Yksi kortti per sovellus. Merkki kertoo julkaisutilan — Listalla (julkaistu, näkyy katalogissa), Ei listalla (palvelimella mutta piilossa julkisesta katalogista) tai Paikallinen (luonnos tässä selaimessa, ei vielä palvelimella). Violetti Staging-merkki kertoo että apilla on myös julkaisematon luonnos.",
-      "sec.localHint": "💡 Julkaise paikallinen sovellus viedäksesi sen palvelimelle — sen jälkeen voit hallita sitä mistä tahansa.",
+      "sec.localNote": "Yksi kortti per sovellus. Merkki kertoo julkaisutilan — Listalla (näkyy julkisessa katalogissa) tai Ei listalla (palvelimella mutta piilossa julkisesta katalogista). Violetti Staging-merkki kertoo että apilla on myös julkaisematon luonnos.",
+      "sec.localHint": "💡 Lisää sovellus julkaisee tilillesi ei-listalla — listaa se kun se on valmis julkiseksi.",
       "stats.apps": "sovellusta",
       "stats.stored": "tallennettu",
       "addModal.title": "Lisää sovellus",
@@ -3270,6 +3201,8 @@
       "publish.accessCodeHint": "4–64 merkkiä. Jos asetettu, vain koodin tietävät voivat ladata.",
       "publish.submit": "Julkaise",
       "publish.loginRequired": "Kirjaudu sisään julkaistaksesi AIMEATiin. Anonyymi julkaisu on poistettu käytöstä — käytä yläpalkin Kirjaudu-painiketta.",
+      "publish.savedUnlisted": "Tallennettu — sovelluksesi on palvelimella ei-listalla. Avaa se ja paina Listaa kun haluat sen julkiseksi.",
+      "migrate.found": "Sinulla on {n} sovellus(ta) tallennettuna vain tähän selaimeen vanhasta paikallisesta katalogista. Katalogi on nyt vain palvelinpohjainen, joten ne eivät enää näy täällä. Ladataanko ne nyt JSON-varmuuskopiona? Voit julkaista uudelleen ne jotka haluat säilyttää.",
       "auth.signIn": "❤️ Kirjaudu",
       "auth.loggedIn": "kirjautunut",
       "auth.logout": "Kirjaudu ulos",
@@ -3582,7 +3515,7 @@
       "tag.favorites": "⭐ Suosikit",
       "empty.noApps": "Ei vielä sovelluksia",
       "empty.noAppsDesc": "Lisää ensimmäinen sovellus yllä olevalla +-painikkeella",
-      "empty.formats": "Tukee: HTML-tiedostot, URL-osoitteet, ZIP-paketit, AIMEAT-tuonnit",
+      "empty.formats": "Tukee: HTML-tiedostot ja ZIP-paketit",
       "empty.noMatch": "Ei osumia",
       "empty.noMatchDesc": "Mikään sovellus ei vastaa nykyistä suodatinta. Kokeile eri hakusanaa tai tunnistetta."
     }
@@ -3705,128 +3638,25 @@
   }
 
   // src/static/app-catalog/js/db.js
-  var DB_NAME_GLOBAL = "AppLauncherDB";
-  var DB_VERSION = 2;
-  var STORE_NAME2 = "apps";
-  var dbInstance = null;
-  var currentDbMode = localStorage.getItem("appCatalogMode") || "global";
-  function getDbMode() {
-    return currentDbMode;
-  }
-  function setDbMode(mode) {
-    currentDbMode = mode;
-    try {
-      localStorage.setItem("appCatalogMode", mode);
-    } catch (e) {
-    }
-  }
-  function closeDbInstance() {
-    if (dbInstance) {
-      try {
-        dbInstance.close();
-      } catch (e) {
-      }
-      dbInstance = null;
-    }
-  }
-  function getDbName() {
-    if (currentDbMode === "personal") {
-      var owner = null;
-      try {
-        if (window.AIMEAT && window.AIMEAT.auth && window.AIMEAT.auth.getSession()) {
-          owner = window.AIMEAT.auth.getSession().owner || null;
-        }
-        if (!owner) {
-          var stored = localStorage.getItem("aimeat_session");
-          if (stored) owner = JSON.parse(stored).owner || null;
-        }
-      } catch (e) {
-      }
-      if (owner) return DB_NAME_GLOBAL + "_" + owner;
-    }
-    return DB_NAME_GLOBAL;
-  }
-  function openDB() {
-    var name = getDbName();
-    if (dbInstance && dbInstance.name === name) return Promise.resolve(dbInstance);
-    if (dbInstance) {
-      dbInstance.close();
-      dbInstance = null;
-    }
-    return new Promise(function(resolve, reject) {
-      const request = indexedDB.open(name, DB_VERSION);
-      request.onupgradeneeded = function(event) {
-        const db = event.target.result;
-        var store;
-        if (!db.objectStoreNames.contains(STORE_NAME2)) {
-          store = db.createObjectStore(STORE_NAME2, { keyPath: "id" });
-          store.createIndex("tags", "tags", { multiEntry: true });
-          store.createIndex("source", "source", { unique: false });
-          store.createIndex("favorite", "favorite", { unique: false });
-          store.createIndex("sortOrder", "sortOrder", { unique: false });
-        } else {
-          store = event.target.transaction.objectStore(STORE_NAME2);
-          if (!store.indexNames.contains("sortOrder")) {
-            store.createIndex("sortOrder", "sortOrder", { unique: false });
-          }
-        }
-      };
-      request.onsuccess = function(event) {
-        dbInstance = event.target.result;
-        resolve(dbInstance);
-      };
-      request.onerror = function(event) {
-        reject(event.target.error);
-      };
-    });
-  }
+  var workingSet = [];
   function getAllApps() {
-    return openDB().then(function(db) {
-      return new Promise(function(resolve, reject) {
-        const tx = db.transaction(STORE_NAME2, "readonly");
-        const request = tx.objectStore(STORE_NAME2).getAll();
-        request.onsuccess = function() {
-          resolve(request.result);
-        };
-        request.onerror = function() {
-          reject(request.error);
-        };
-      });
-    });
+    return Promise.resolve(workingSet.slice());
   }
   function saveApp(app) {
-    return openDB().then(function(db) {
-      return new Promise(function(resolve, reject) {
-        const tx = db.transaction(STORE_NAME2, "readwrite");
-        tx.objectStore(STORE_NAME2).put(app);
-        tx.oncomplete = function() {
-          resolve();
-        };
-        tx.onerror = function() {
-          reject(tx.error);
-        };
-        tx.onabort = function() {
-          reject(tx.error);
-        };
+    if (app && app.id) {
+      var idx = workingSet.findIndex(function(a) {
+        return a.id === app.id;
       });
-    });
+      if (idx >= 0) workingSet[idx] = app;
+      else workingSet.push(app);
+    }
+    return Promise.resolve();
   }
   function deleteApp(id) {
-    return openDB().then(function(db) {
-      return new Promise(function(resolve, reject) {
-        const tx = db.transaction(STORE_NAME2, "readwrite");
-        tx.objectStore(STORE_NAME2).delete(id);
-        tx.oncomplete = function() {
-          resolve();
-        };
-        tx.onerror = function() {
-          reject(tx.error);
-        };
-        tx.onabort = function() {
-          reject(tx.error);
-        };
-      });
+    workingSet = workingSet.filter(function(a) {
+      return a.id !== id;
     });
+    return Promise.resolve();
   }
 
   // src/static/app-catalog/js/ui.js
@@ -5326,11 +5156,6 @@
     });
   }
   function onAuthChanged() {
-    if (getDbMode() === "personal" && !currentOwnerName()) {
-      setDbMode("global");
-    }
-    closeDbInstance();
-    updateModeToggle();
     try {
       refreshAll();
     } catch (e) {
@@ -5412,7 +5237,7 @@
     var tags = app.tags && app.tags.length ? app.tags.join(", ") : "—";
     var cortex = app.usesCortex && app.usesCortex.length ? app.usesCortex.join(", ") : "—";
     var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : "—";
-    var favBtn = app.blob ? '<button class="dtl-fav-btn" title="' + escapeHtml(t(app.favorite ? "detail.unfavorite" : "detail.favorite")) + '" onclick="window._launcher.detailToggleFavorite()">' + (app.favorite ? "⭐" : "☆") + "</button>" : "";
+    var favBtn = "";
     var aboutHeader = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>' + t("detail.about") + '</span><span style="display:flex;align-items:center;gap:8px">' + favBtn + (canEditAbout && !detailEditingAbout ? dtlBtn(t("detail.editDetails"), "window._launcher.detailAboutEdit()") : "") + "</span></h3>";
     var aboutBody;
     if (detailEditingAbout) {
@@ -6617,11 +6442,7 @@
   }
 
   // src/static/app-catalog/js/settings.js
-  var generateId3;
-  var renderApps2;
-  var loadPublishedApps2;
-  function initSettings(deps) {
-    ({ generateId: generateId3, renderApps: renderApps2, loadPublishedApps: loadPublishedApps2 } = deps);
+  function initSettings() {
   }
   function applyTheme(theme) {
     if (theme === "dark") {
@@ -6768,260 +6589,36 @@
   function closeHelp() {
     document.getElementById("help-overlay").hidden = true;
   }
-  function exportBackup() {
-    getAllApps().then(function(apps) {
-      var config = loadConfig();
-      var backup = {
-        version: 1,
-        exportedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        config,
-        apps
-      };
-      var json = JSON.stringify(backup, null, 2);
-      var blob = new Blob([json], { type: "application/json" });
-      var url = URL.createObjectURL(blob);
-      var a = document.createElement("a");
-      a.href = url;
-      a.download = "app-catalog-backup-" + (/* @__PURE__ */ new Date()).toISOString().slice(0, 10) + ".json";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    });
-  }
-  function localAppKey(a) {
-    if (a.publishedFilename) return "pf:" + a.publishedFilename;
-    return "nm:" + (a.name || "") + "|" + (a.blob ? a.blob.length : a.url || "");
-  }
-  var jsonImportState = null;
-  function handleImportBackup(file) {
-    if (!file) return;
-    var reader = new FileReader();
-    reader.onload = function() {
-      var backup;
-      try {
-        backup = JSON.parse(reader.result);
-      } catch (e) {
-        showNotice("Failed to parse backup file: " + (e.message || e));
-        return;
-      }
-      if (!backup.apps || !Array.isArray(backup.apps)) {
-        showNotice("Invalid backup file: missing apps array");
-        return;
-      }
-      getAllApps().then(function(existing) {
-        var existingKeys = {};
-        existing.forEach(function(a) {
-          existingKeys[localAppKey(a)] = true;
-        });
-        jsonImportState = {
-          backup,
-          rows: backup.apps.map(function(a) {
-            return { app: a, isDup: !!existingKeys[localAppKey(a)] };
-          })
-        };
-        renderJsonImportModal();
-      });
-    };
-    reader.readAsText(file);
-  }
-  function renderJsonImportModal() {
-    var rows = jsonImportState.rows;
-    var body = document.getElementById("json-import-body");
-    var html = '<p style="font-size:.8rem;color:var(--text-muted);margin:4px 0 8px">' + t("jsonImport.desc") + '</p><div class="backup-toolbar-row"><div><button class="backup-link-btn" onclick="window._launcher.jsonImportSelectAll(true)">' + t("backup.selectAll") + '</button> / <button class="backup-link-btn" onclick="window._launcher.jsonImportSelectAll(false)">' + t("backup.selectNone") + '</button></div></div><table class="backup-table"><tbody>';
-    for (var i = 0; i < rows.length; i++) {
-      var a = rows[i].app;
-      html += '<tr><td><input type="checkbox" class="json-import-cb" data-i="' + i + '"' + (rows[i].isDup ? "" : " checked") + "/></td><td>" + escapeHtml(a.name || a.publishedFilename || "Untitled") + (a.publishedFilename ? '<div class="mono-cell">' + escapeHtml(a.publishedFilename) + "</div>" : "") + "</td><td>" + sourceLabel(a.source) + "</td><td>" + (rows[i].isDup ? '<span class="backup-status-badge backup-status-exists">' + t("jsonImport.statusDup") + "</span>" : '<span class="backup-status-badge backup-status-new">' + t("backup.statusNew") + "</span>") + "</td></tr>";
-    }
-    html += "</tbody></table>";
-    if (jsonImportState.backup.config && typeof jsonImportState.backup.config === "object") {
-      html += '<label style="display:flex;align-items:center;gap:8px;margin-top:10px;font-size:.85rem"><input type="checkbox" id="json-import-config"/> ' + t("jsonImport.config") + "</label>";
-    }
-    body.innerHTML = html;
-    document.getElementById("json-import-status").textContent = "";
-    document.getElementById("json-import-btn").style.display = "";
-    document.getElementById("json-import-overlay").hidden = false;
-  }
-  function jsonImportSelectAll(checked) {
-    document.querySelectorAll(".json-import-cb").forEach(function(b) {
-      b.checked = checked;
-    });
-  }
-  function submitJsonImport() {
-    var statusEl = document.getElementById("json-import-status");
-    var selected = [];
-    document.querySelectorAll(".json-import-cb").forEach(function(b) {
-      if (b.checked) selected.push(jsonImportState.rows[parseInt(b.getAttribute("data-i"), 10)].app);
-    });
-    var configCb = document.getElementById("json-import-config");
-    var importConfig = !!(configCb && configCb.checked);
-    if (selected.length === 0 && !importConfig) {
-      statusEl.style.color = "#ef4444";
-      statusEl.textContent = t("backup.nothingSelected");
-      return;
-    }
-    if (importConfig) {
-      var merged = Object.assign({}, loadConfig(), jsonImportState.backup.config);
-      saveConfig(merged);
-      applyTheme(merged.theme);
-    }
-    Promise.all(selected.map(function(a) {
-      var app = Object.assign({}, a);
-      app.id = generateId3();
-      return saveApp(app);
-    })).then(function() {
-      statusEl.style.color = "#34d399";
-      statusEl.textContent = "✔ " + t("jsonImport.done") + ": " + selected.length;
-      document.getElementById("json-import-btn").style.display = "none";
-      renderApps2();
-      loadPublishedApps2();
-    });
-  }
-  function removeDuplicateApps() {
-    getAllApps().then(async function(apps) {
-      var groups = {};
-      apps.forEach(function(a) {
-        var k = localAppKey(a);
-        (groups[k] = groups[k] || []).push(a);
-      });
-      var toDelete = [];
-      Object.keys(groups).forEach(function(k) {
-        var g = groups[k];
-        if (g.length < 2) return;
-        g.sort(function(x, y) {
-          if (!!y.favorite !== !!x.favorite) return (y.favorite ? 1 : 0) - (x.favorite ? 1 : 0);
-          return (x.addedAt || "") < (y.addedAt || "") ? -1 : 1;
-        });
-        toDelete = toDelete.concat(g.slice(1));
-      });
-      if (toDelete.length === 0) {
-        showNotice(t("dedup.none"));
-        return;
-      }
-      if (!await showConfirm(t("dedup.confirm") + " " + toDelete.length)) return;
-      Promise.all(toDelete.map(function(a) {
-        return deleteApp(a.id);
-      })).then(function() {
-        renderApps2();
-        loadPublishedApps2();
-        showNotice(t("dedup.done") + ": " + toDelete.length);
-      });
-    });
-  }
-  async function clearAllData() {
-    if (!await showConfirm(t("confirm.clearAll1"))) return;
-    if (!await showConfirm(t("confirm.clearAll2"))) return;
-    openDB().then(function(db) {
-      return new Promise(function(resolve, reject) {
-        var tx = db.transaction(STORE_NAME, "readwrite");
-        tx.objectStore(STORE_NAME).clear();
-        tx.oncomplete = function() {
-          resolve();
-        };
-        tx.onerror = function() {
-          reject(tx.error);
-        };
-      });
-    }).then(function() {
-      localStorage.removeItem("appLauncherConfig");
-      applyTheme("dark");
-      renderApps2();
-      document.getElementById("settings-overlay").hidden = true;
-      showNotice("All data cleared");
-    });
-  }
 
   // src/static/app-catalog/js/apps-io.js
-  var generateId4;
+  var generateId3;
   var readFileAsText2;
-  var renderApps3;
+  var renderApps2;
   var getMainApps2;
+  var showPublishModal2;
   function initAppsIo(deps) {
-    ({ generateId: generateId4, readFileAsText: readFileAsText2, renderApps: renderApps3, getMainApps: getMainApps2 } = deps);
+    ({ generateId: generateId3, readFileAsText: readFileAsText2, renderApps: renderApps2, getMainApps: getMainApps2, showPublishModal: showPublishModal2 } = deps);
   }
-  async function addAppFromZip(name, arrayBuffer, icon, tags, openMode) {
-    var files = await extractZip(arrayBuffer);
-    var bundledHtml = await bundleZip(files);
-    var encoded = btoa(unescape(encodeURIComponent(bundledHtml)));
+  function createAppFromHtml(name, html, icon, tags, description) {
+    var encoded = btoa(unescape(encodeURIComponent(html)));
     var app = {
-      id: generateId4(),
+      id: generateId3(),
       name,
-      description: "",
-      source: "zip",
+      description: description || "",
+      source: "create",
       url: null,
       blob: encoded,
-      tags,
-      openMode,
-      icon: icon || "📦",
-      screenshot: null,
-      favorite: false,
-      addedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      lastOpenedAt: null
-    };
-    await saveApp(app);
-    return app;
-  }
-  function addAppFromUrl(name, url, icon, tags, openMode) {
-    var app = {
-      id: generateId4(),
-      name,
-      description: "",
-      source: "url",
-      url,
-      blob: null,
-      tags,
-      openMode,
+      tags: tags || [],
       icon: icon || "📝",
-      screenshot: null,
-      favorite: false,
-      addedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      lastOpenedAt: null
+      published: false,
+      addedAt: (/* @__PURE__ */ new Date()).toISOString()
     };
     return saveApp(app).then(function() {
-      return app;
-    });
-  }
-  function addAppFromFile(name, file, icon, tags, openMode) {
-    return readFileAsText2(file).then(function(content) {
-      var encoded = btoa(unescape(encodeURIComponent(content)));
-      var app = {
-        id: generateId4(),
-        name,
-        description: "",
-        source: "local",
-        url: null,
-        blob: encoded,
-        tags,
-        openMode,
-        icon: icon || "📝",
-        screenshot: null,
-        favorite: false,
-        addedAt: (/* @__PURE__ */ new Date()).toISOString(),
-        lastOpenedAt: null
-      };
-      return saveApp(app).then(function() {
-        return app;
-      });
-    });
-  }
-  function addAppFromSource(name, sourceCode, icon, tags, openMode) {
-    var encoded = btoa(unescape(encodeURIComponent(sourceCode)));
-    var app = {
-      id: generateId4(),
-      name,
-      description: parseAppMeta(sourceCode).description || "",
-      source: "local",
-      url: null,
-      blob: encoded,
-      tags,
-      openMode,
-      icon: icon || "📝",
-      screenshot: null,
-      favorite: false,
-      addedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      lastOpenedAt: null
-    };
-    return saveApp(app).then(function() {
+      try {
+        getMainApps2().push(app);
+      } catch (e) {
+      }
+      if (typeof showPublishModal2 === "function") showPublishModal2(app.id, { unlisted: true });
       return app;
     });
   }
@@ -7030,7 +6627,7 @@
   function showModal() {
     document.getElementById("modal-overlay").hidden = false;
     document.getElementById("modal-title").textContent = t("addModal.title");
-    switchTab("url");
+    switchTab("paste");
   }
   function requireSignInThen(next) {
     if (getCortexOwnerToken()) {
@@ -7078,7 +6675,6 @@
   }
   function closeModal() {
     document.getElementById("modal-overlay").hidden = true;
-    document.getElementById("app-url").value = "";
     document.getElementById("app-name").value = "";
     document.getElementById("app-icon").value = "";
     document.getElementById("app-tags").value = "";
@@ -7132,7 +6728,6 @@
     var name = document.getElementById("app-name").value.trim();
     var icon = document.getElementById("app-icon").value.trim();
     var tagsRaw = document.getElementById("app-tags").value.trim();
-    var openMode = "tab";
     var tags = tagsRaw ? tagsRaw.split(",").map(function(t2) {
       return t2.trim();
     }).filter(Boolean) : [];
@@ -7155,76 +6750,50 @@
       app.name = name;
       app.icon = icon || app.icon;
       app.tags = tags;
-      app.openMode = openMode;
       saveApp(app).then(function() {
         closeModal();
-        renderApps3();
+        renderApps2();
       });
       return;
     }
     var activeTab = document.querySelector(".modal-tab.active");
-    var tabName = activeTab ? activeTab.getAttribute("data-tab") : "url";
-    if (tabName === "url") {
-      var url = document.getElementById("app-url").value.trim();
-      if (!url) {
-        showNotice("Please enter a URL");
-        return;
-      }
-      if (!name) {
-        try {
-          name = new URL(url).hostname;
-        } catch (e) {
-          name = url;
-        }
-      }
-      addAppFromUrl(name, url, icon, tags, openMode).then(function() {
-        closeModal();
-        renderApps3();
-      });
-    } else if (tabName === "paste") {
+    var tabName = activeTab ? activeTab.getAttribute("data-tab") : "paste";
+    if (tabName === "paste") {
       var pastedCode = document.getElementById("app-paste-code").value.trim();
       if (!pastedCode) {
         showNotice("Please paste your HTML source code");
         return;
       }
-      if (!name) {
-        var titleMatch = pastedCode.match(/<title[^>]*>([^<]+)<\/title>/i);
-        name = titleMatch ? titleMatch[1].trim() : "Pasted App";
-      }
-      addAppFromSource(name, pastedCode, icon, tags, openMode).then(function() {
-        closeModal();
-        renderApps3();
-      });
+      var meta = parseAppMeta(pastedCode);
+      if (!name) name = meta.name || "Pasted App";
+      closeModal();
+      createAppFromHtml(name, pastedCode, icon, tags, meta.description);
     } else if (tabName === "file") {
       if (!selectedFile) {
         showNotice("Please select a file");
         return;
       }
-      if (selectedFile.name.toLowerCase().endsWith(".zip")) {
-        if (!name) {
-          name = selectedFile.name.replace(/\.zip$/i, "");
-        }
-        selectedFile.arrayBuffer().then(function(arrayBuffer) {
-          return addAppFromZip(name, arrayBuffer, icon, tags, openMode);
-        }).then(function() {
+      var file = selectedFile;
+      if (file.name.toLowerCase().endsWith(".zip")) {
+        if (!name) name = file.name.replace(/\.zip$/i, "");
+        file.arrayBuffer().then(function(arrayBuffer) {
+          return extractZip(arrayBuffer);
+        }).then(function(files) {
+          return bundleZip(files);
+        }).then(function(html) {
           closeModal();
-          renderApps3();
+          return createAppFromHtml(name, html, icon, tags, parseAppMeta(html).description);
         }).catch(function(err) {
           showNotice("ZIP import failed: " + (err.message || err));
         });
       } else {
-        if (!name) {
-          name = selectedFile.name.replace(/\.html?$/i, "");
-        }
-        addAppFromFile(name, selectedFile, icon, tags, openMode).then(function() {
+        if (!name) name = file.name.replace(/\.html?$/i, "");
+        readFileAsText2(file).then(function(html) {
           closeModal();
-          renderApps3();
+          createAppFromHtml(name, html, icon, tags, parseAppMeta(html).description);
         });
       }
     }
-  }
-  function setEditingAppId(v) {
-    editingAppId = v;
   }
 
   // src/static/app-catalog/js/server-io.js
@@ -7236,137 +6805,16 @@
   var setOwnServerApps;
   var getActiveTag;
   var getSearchQuery;
-  var generateId5;
-  var renderApps4;
+  var generateId4;
+  var renderApps3;
   var refreshAll2;
   function initServerIo(deps) {
-    ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests3, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId: generateId5, renderApps: renderApps4, refreshAll: refreshAll2 } = deps);
-  }
-  var aimeatAppsCache = [];
-  function formatFileSize(bytes) {
-    if (bytes < 1024) return bytes + " B";
-    if (bytes < 1048576) return (bytes / 1024).toFixed(1) + " KB";
-    return (bytes / 1048576).toFixed(1) + " MB";
-  }
-  function importFromAimeat() {
-    var config = loadConfig();
-    if (!config.aimeatUrl) {
-      showNotice("Set AIMEAT server URL in Settings first");
-      return;
-    }
-    var aimeatUrl = config.aimeatUrl.replace(/\/+$/, "");
-    closeModal();
-    fetch(aimeatUrl + "/v1/apps?include_peers=true").then(function(resp) {
-      if (!resp.ok) throw new Error("Server returned " + resp.status);
-      return resp.json();
-    }).then(function(json) {
-      var apps = json.data && json.data.apps ? json.data.apps : [];
-      var peerApps = json.data && json.data.peer_apps ? json.data.peer_apps : [];
-      for (var p = 0; p < peerApps.length; p++) {
-        peerApps[p]._from_peer = true;
-      }
-      var allFetched = apps.concat(peerApps);
-      if (allFetched.length === 0) {
-        showNotice("No apps found on the AIMEAT server");
-        return;
-      }
-      aimeatAppsCache = allFetched;
-      showAimeatImportDialog(allFetched, aimeatUrl);
-    }).catch(function(err) {
-      var msg = "Failed to fetch apps from AIMEAT server.\n\n" + (err.message || err);
-      if (err.message && err.message.indexOf("Failed to fetch") !== -1) {
-        msg += "\n\nIf the launcher is opened via file://, CORS will block the request. Open it from the AIMEAT server instead.";
-      }
-      showNotice(msg);
-    });
-  }
-  function showAimeatImportDialog(apps, aimeatUrl) {
-    var listEl = document.getElementById("aimeat-app-list");
-    var html = "";
-    for (var i = 0; i < apps.length; i++) {
-      var app = apps[i];
-      var displayName = app.manifest && app.manifest.name ? app.manifest.name : app.filename;
-      var displayAuthor = app.manifest && app.manifest.authorDisplay ? app.manifest.authorDisplay : app.owner || "";
-      var displayDesc = app.manifest && app.manifest.description ? app.manifest.description : "";
-      var displayVer = app.version_number ? "v" + app.version_number : "";
-      var displayCat = app.manifest && app.manifest.category ? app.manifest.category : "";
-      var peerLabel = app._from_peer && app._peer_node ? " · 🌐 " + escapeHtml(app._peer_node) : "";
-      html += '<div class="aimeat-app-item"><input type="checkbox" data-index="' + i + '" checked/><div class="aimeat-app-info"><div class="aimeat-app-name">' + escapeHtml(displayName) + (displayVer ? ' <span style="opacity:.5;font-size:.85em">' + escapeHtml(displayVer) + "</span>" : "") + '</div><div class="aimeat-app-size">' + formatFileSize(app.size) + (displayAuthor ? " · " + escapeHtml(displayAuthor) : "") + (displayCat ? " · " + escapeHtml(displayCat) : "") + peerLabel + "</div>" + (displayDesc ? '<div class="aimeat-app-size" style="opacity:.6">' + escapeHtml(displayDesc.substring(0, 100)) + "</div>" : "") + '</div><select data-index="' + i + '"><option value="link">Link (online only)</option><option value="download">Download (offline)</option></select></div>';
-    }
-    listEl.innerHTML = html;
-    listEl.dataset.aimeatUrl = aimeatUrl;
-    document.getElementById("aimeat-import-overlay").hidden = false;
-  }
-  function processAimeatImport() {
-    var listEl = document.getElementById("aimeat-app-list");
-    var aimeatUrl = listEl.dataset.aimeatUrl;
-    var checkboxes = listEl.querySelectorAll('input[type="checkbox"]');
-    var selects = listEl.querySelectorAll("select");
-    var config = loadConfig();
-    var defaultOpenMode = config.defaultOpenMode || "tab";
-    var toImport = [];
-    for (var i = 0; i < checkboxes.length; i++) {
-      if (checkboxes[i].checked) {
-        var idx = parseInt(checkboxes[i].getAttribute("data-index"), 10);
-        var mode = selects[i].value;
-        toImport.push({ app: aimeatAppsCache[idx], mode });
-      }
-    }
-    if (toImport.length === 0) {
-      showNotice("No apps selected");
-      return;
-    }
-    var promises = [];
-    for (var j = 0; j < toImport.length; j++) {
-      (function(item) {
-        var app = item.app;
-        var name = app.manifest && app.manifest.name ? app.manifest.name : app.filename.replace(/\.html?$/i, "");
-        var importedVersion = app.version_number || 1;
-        var baseUrl = app._from_peer && app._peer_url ? app._peer_url.replace(/\/+$/, "") : aimeatUrl;
-        if (item.mode === "link") {
-          var inlineUrl = baseUrl + app.download_url + "?mode=inline";
-          promises.push(addAppFromUrl(name, inlineUrl, "📦", ["aimeat"], defaultOpenMode));
-        } else {
-          var downloadUrl = baseUrl + app.download_url;
-          promises.push(
-            fetch(downloadUrl).then(function(resp) {
-              if (!resp.ok) throw new Error("Download failed: " + resp.status);
-              return resp.text();
-            }).then(function(content) {
-              var encoded = btoa(unescape(encodeURIComponent(content)));
-              var record = {
-                id: generateId5(),
-                name,
-                description: app.manifest && app.manifest.description ? app.manifest.description : "",
-                source: "aimeat",
-                aimeatOwner: app.owner || null,
-                aimeatFilename: app.filename || null,
-                aimeatVersion: importedVersion,
-                url: null,
-                blob: encoded,
-                tags: ["aimeat"],
-                openMode: defaultOpenMode,
-                icon: "📦",
-                screenshot: null,
-                favorite: false,
-                addedAt: (/* @__PURE__ */ new Date()).toISOString(),
-                lastOpenedAt: null
-              };
-              return saveApp(record);
-            })
-          );
-        }
-      })(toImport[j]);
-    }
-    Promise.all(promises).then(function() {
-      document.getElementById("aimeat-import-overlay").hidden = true;
-      renderApps4();
-    }).catch(function(err) {
-      showNotice("Import error: " + (err.message || err));
-    });
+    ({ getMainApps: getMainApps3, getServerState: getServerState2, getServerManifests: getServerManifests3, setServerManifests, getOwnServerApps, setOwnServerApps, getActiveTag, getSearchQuery, generateId: generateId4, renderApps: renderApps3, refreshAll: refreshAll2 } = deps);
   }
   var publishAppId = null;
-  function showPublishModal2(appId) {
+  var publishUnlisted = false;
+  function showPublishModal3(appId, opts) {
+    publishUnlisted = !!(opts && opts.unlisted);
     var app = null;
     for (var i = 0; i < getMainApps3().length; i++) {
       if (getMainApps3()[i].id === appId) {
@@ -7488,7 +6936,16 @@
         app.publishedVersionNumber = json.data.version_number || 1;
         app.publishedVersionsUrl = json.data.versions_url || null;
         saveApp(app).then(function() {
-          loadPublishedApps3();
+          if (publishUnlisted) {
+            app.parked = true;
+            statusEl.textContent = "✔ " + (t("publish.savedUnlisted") || "Saved (unlisted)");
+            try {
+              toggleParkApp(filename, true);
+            } catch (e) {
+            }
+          }
+          publishUnlisted = false;
+          loadPublishedApps2();
           setTimeout(function() {
             var ov = document.getElementById("publish-overlay");
             if (ov) ov.hidden = true;
@@ -7642,7 +7099,7 @@
       statusEl.textContent = "✔ " + t("subModal.assigned") + " — " + sub + "." + apexHostLabel();
       return loadSubdomainSites();
     }).then(function() {
-      loadPublishedApps3();
+      loadPublishedApps2();
     }).catch(function(err) {
       statusEl.style.color = "#ef4444";
       statusEl.textContent = err.message || String(err);
@@ -7660,7 +7117,7 @@
       subdomainModalState.existingSub = null;
       return loadSubdomainSites();
     }).then(function() {
-      loadPublishedApps3();
+      loadPublishedApps2();
     }).catch(function(err) {
       statusEl.style.color = "#ef4444";
       statusEl.textContent = err.message || String(err);
@@ -7985,7 +7442,7 @@
     }
     return page(0);
   }
-  function loadPublishedApps3() {
+  function loadPublishedApps2() {
     var config = loadConfig();
     var aimeatUrl = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
     var communitySection = document.getElementById("community-section");
@@ -8007,7 +7464,7 @@
     getAllApps().then(function() {
       if (!aimeatUrl) {
         setOwnServerApps([]);
-        renderApps4();
+        renderApps3();
         if (communitySection) communitySection.style.display = "none";
         return;
       }
@@ -8029,13 +7486,13 @@
         }) : serverApps;
         return loadSubdomainSites().then(function() {
           setOwnServerApps(currentOwner ? ownApps : []);
-          renderApps4();
+          renderApps3();
           renderCommunityApps(communityApps, aimeatUrl, communitySection, communityGrid, communityCountEl, currentOwner);
           applyServerFilter();
         });
       }).catch(function() {
         setOwnServerApps([]);
-        renderApps4();
+        renderApps3();
         if (communitySection) communitySection.style.display = "none";
       });
     });
@@ -8123,7 +7580,7 @@
         delete app.publishedVersionNumber;
         delete app.publishedVersionsUrl;
         saveApp(app).then(function() {
-          loadPublishedApps3();
+          loadPublishedApps2();
         });
       } else {
         showNotice("Failed to remove: " + (json.error && json.error.message || "Unknown error"));
@@ -8149,7 +7606,7 @@
     }).then(function(json) {
       if (json.ok) {
         if (getServerState2()[filename]) getServerState2()[filename].parked = !!parked;
-        loadPublishedApps3();
+        loadPublishedApps2();
         refreshServerMgmt();
       } else {
         showNotice("Failed: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
@@ -8175,7 +7632,7 @@
     }).then(function(json) {
       if (json.ok) {
         if (getServerState2()[filename]) getServerState2()[filename].forkable = !!forkable;
-        loadPublishedApps3();
+        loadPublishedApps2();
         refreshServerMgmt();
       } else {
         showNotice("Failed: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
@@ -8202,7 +7659,7 @@
       return resp.json();
     }).then(function(json) {
       if (json.ok) {
-        loadPublishedApps3();
+        loadPublishedApps2();
       } else {
         showNotice("Failed to delete: " + (json.error && json.error.message ? json.error.message : "Unknown error"));
       }
@@ -8261,7 +7718,7 @@
   }
   function filterByTag(tag) {
     setActiveTag(tag);
-    renderApps5();
+    renderApps4();
     applyServerFilter();
   }
   function launchApp2(id, mode) {
@@ -8438,20 +7895,12 @@
     }
     return entries;
   }
-  function renderApps5() {
+  function renderApps4() {
     getAllApps().then(function(apps) {
       setAllApps(apps);
-      var entries = buildLibraryEntries(apps, ownServerApps);
+      var entries = buildLibraryEntries([], ownServerApps);
       entries.sort(function(a, b) {
-        if (a.favorite && !b.favorite) return -1;
-        if (!a.favorite && b.favorite) return 1;
-        var oA = typeof a.sortOrder === "number" ? a.sortOrder : Infinity;
-        var oB = typeof b.sortOrder === "number" ? b.sortOrder : Infinity;
-        if (oA !== oB) return oA - oB;
-        var dateA = a.lastOpenedAt || a.addedAt || "";
-        var dateB = b.lastOpenedAt || b.addedAt || "";
-        if (dateA > dateB) return -1;
-        if (dateA < dateB) return 1;
+        if (!!a.parked !== !!b.parked) return a.parked ? 1 : -1;
         return 0;
       });
       var filtered = entries;
@@ -8500,14 +7949,8 @@
         grid.innerHTML = html;
       }
       var statsEl = document.getElementById("stats");
-      var totalSize = 0;
-      for (var sz = 0; sz < entries.length; sz++) {
-        if (entries[sz].blob) totalSize += entries[sz].blob.length;
-      }
-      var sizeLabel = totalSize < 1024 ? totalSize + " B" : totalSize < 1048576 ? (totalSize / 1024).toFixed(1) + " KB" : (totalSize / 1048576).toFixed(1) + " MB";
-      statsEl.textContent = entries.length + " " + t("stats.apps") + " · " + sizeLabel + " " + t("stats.stored");
+      statsEl.textContent = entries.length + " " + t("stats.apps");
       renderTags();
-      renderRecentlyOpened();
     });
   }
   function libraryCardHtml(e, i) {
@@ -8520,24 +7963,6 @@
     var dragAttrs = e.hasLocal ? ' draggable="true" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)"' : "";
     var menuBtn = e.hasLocal ? `<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')" title="` + escapeHtml(t("common.menu")) + '">⋮</button>' : "";
     return '<div class="app-card' + (e.hasLocal ? "" : " server-only") + '" data-id="' + idAttr + '"' + dragAttrs + filterAttr(e.name, e.tags) + ' onclick="' + detailCall + '"' + (e.hasLocal ? ` oncontextmenu="window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')"` : "") + ' style="animation-delay:' + i * 0.04 + 's"><span class="app-status-badge st-' + st + '">' + escapeHtml(libStatusLabel(e)) + "</span>" + (e.hasDraft ? '<span class="app-staging-badge" title="' + escapeHtml(t("card.stagingHint")) + '">' + escapeHtml(t("card.stagingBadge")) + "</span>" : "") + menuBtn + '<div class="app-icon">' + escapeHtml(e.icon || "📝") + '</div><div class="app-name">' + escapeHtml(e.name) + (e.origin === "ai-published" ? ' <span class="ai-origin-badge">AI</span>' : "") + (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">🤖</span>' : "") + "</div>" + (e.description ? '<div class="app-source">' + escapeHtml(e.description) + "</div>" : '<div class="app-source">' + sourceLabel(e.source) + "</div>") + '<div class="app-actions">' + openBtns + '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t("ctx.details")) + "</button></div>" + (e.favorite ? '<span class="fav-star visible">⭐</span>' : "") + "</div>";
-  }
-  function renderRecentlyOpened() {
-    var section = document.getElementById("recent-section");
-    var strip = document.getElementById("recent-strip");
-    var recent = getMainApps4().filter(function(a) {
-      return a.lastOpenedAt;
-    }).sort(function(a, b) {
-      return (b.lastOpenedAt || "") > (a.lastOpenedAt || "") ? 1 : -1;
-    }).slice(0, 5);
-    if (recent.length === 0) {
-      section.style.display = "none";
-      return;
-    }
-    section.style.display = "block";
-    strip.innerHTML = recent.map(function(app) {
-      var icon = app.icon || "📝";
-      return `<div style="background:var(--surface-glass);border:1px solid var(--border-subtle);border-radius:10px;padding:.6rem .8rem;cursor:pointer;min-width:120px;flex-shrink:0;transition:all .15s" onclick="window._launcher.launchApp('` + escapeHtml(app.id) + "', '" + escapeHtml(app.openMode || "tab") + `')" onmouseover="this.style.borderColor='var(--border-hover)'" onmouseout="this.style.borderColor='var(--border-subtle)'"><div style="font-size:1.3rem;text-align:center">` + escapeHtml(icon) + '</div><div style="font-size:.75rem;font-weight:600;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100px">' + escapeHtml(app.name) + "</div></div>";
-    }).join("");
   }
   var currentIframeUrl = "";
   function closeIframe() {
@@ -8599,24 +8024,12 @@
         openDetailView(appId);
         break;
       case "edit":
-        setEditingAppId(appId);
-        document.getElementById("modal-title").textContent = "Edit App";
-        document.getElementById("app-name").value = app.name || "";
-        document.getElementById("app-icon").value = app.icon || "";
-        document.getElementById("app-tags").value = (app.tags || []).join(", ");
-        if (app.source === "url") {
-          switchTab("url");
-          document.getElementById("app-url").value = app.url || "";
-        } else {
-          switchTab("file");
-          document.getElementById("selected-file-name").textContent = "(existing file)";
-        }
-        document.getElementById("modal-overlay").hidden = false;
+        openDetailView(appId);
         break;
       case "favorite":
         app.favorite = !app.favorite;
         saveApp(app).then(function() {
-          renderApps5();
+          renderApps4();
         });
         break;
       case "view-source":
@@ -8627,13 +8040,13 @@
           return app.name || "this app";
         }))) {
           deleteApp(appId).then(function() {
-            renderApps5();
-            loadPublishedApps3();
+            renderApps4();
+            loadPublishedApps2();
           });
         }
         break;
       case "publish":
-        showPublishModal2(appId);
+        showPublishModal3(appId);
         break;
       case "improve-ai":
         openPromptBuilder(app);
@@ -8725,58 +8138,107 @@
     overlay.dataset.appName = "Homepage";
     overlay.hidden = false;
   }
-  var dragSourceId = null;
-  function onCardDragStart(e) {
-    var card = e.target.closest(".app-card");
-    if (!card) return;
-    dragSourceId = card.dataset.id;
-    card.classList.add("dragging");
-    e.dataTransfer.effectAllowed = "move";
-    e.dataTransfer.setData("text/plain", dragSourceId);
-  }
-  function onCardDragEnd(e) {
-    var card = e.target.closest(".app-card");
-    if (card) card.classList.remove("dragging");
-    var cards = document.querySelectorAll(".app-card.drag-over");
-    for (var i = 0; i < cards.length; i++) cards[i].classList.remove("drag-over");
-    dragSourceId = null;
-  }
-  function onCardDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = "move";
-    var card = e.target.closest(".app-card");
-    if (!card || card.dataset.id === dragSourceId) return;
-    var cards = document.querySelectorAll(".app-card.drag-over");
-    for (var i = 0; i < cards.length; i++) cards[i].classList.remove("drag-over");
-    card.classList.add("drag-over");
-  }
-  function onCardDrop(e) {
-    e.preventDefault();
-    var targetCard = e.target.closest(".app-card");
-    if (!targetCard) return;
-    var targetId = targetCard.dataset.id;
-    if (!dragSourceId || dragSourceId === targetId) return;
-    var srcIdx = -1, tgtIdx = -1;
-    for (var i = 0; i < getMainApps4().length; i++) {
-      if (getMainApps4()[i].id === dragSourceId) srcIdx = i;
-      if (getMainApps4()[i].id === targetId) tgtIdx = i;
+
+  // src/static/app-catalog/js/migrate.js
+  var DONE_KEY = "appCatalogLocalMigrated";
+  async function legacyDbNames() {
+    var names = ["AppLauncherDB"];
+    try {
+      if (indexedDB.databases) {
+        var list = await indexedDB.databases();
+        list.forEach(function(d) {
+          if (d && d.name && d.name.indexOf("AppLauncherDB") === 0 && names.indexOf(d.name) < 0) names.push(d.name);
+        });
+      }
+    } catch (e) {
     }
-    if (srcIdx === -1 || tgtIdx === -1) return;
-    var moved = getMainApps4().splice(srcIdx, 1)[0];
-    getMainApps4().splice(tgtIdx, 0, moved);
-    var saves = [];
-    for (var j = 0; j < getMainApps4().length; j++) {
-      getMainApps4()[j].sortOrder = j;
-      saves.push(saveApp(getMainApps4()[j]));
-    }
-    var grid = document.getElementById("app-grid");
-    var cards = grid.querySelectorAll(".app-card");
-    for (var k = 0; k < cards.length; k++) {
-      cards[k].classList.remove("drag-over", "dragging");
-    }
-    Promise.all(saves).then(function() {
-      renderApps5();
+    return names;
+  }
+  function openExisting(name) {
+    return new Promise(function(resolve) {
+      var req;
+      try {
+        req = indexedDB.open(name);
+      } catch (e) {
+        resolve(null);
+        return;
+      }
+      req.onsuccess = function() {
+        resolve(req.result);
+      };
+      req.onerror = function() {
+        resolve(null);
+      };
+      req.onupgradeneeded = function() {
+      };
     });
+  }
+  function readApps(db) {
+    return new Promise(function(resolve) {
+      if (!db || !db.objectStoreNames || !db.objectStoreNames.contains("apps")) {
+        resolve([]);
+        return;
+      }
+      try {
+        var tx = db.transaction("apps", "readonly");
+        var r = tx.objectStore("apps").getAll();
+        r.onsuccess = function() {
+          resolve(r.result || []);
+        };
+        r.onerror = function() {
+          resolve([]);
+        };
+      } catch (e) {
+        resolve([]);
+      }
+    });
+  }
+  function downloadJson(apps) {
+    var json = JSON.stringify({ version: 1, exportedAt: (/* @__PURE__ */ new Date()).toISOString(), apps }, null, 2);
+    var blob = new Blob([json], { type: "application/json" });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url;
+    a.download = "app-catalog-local-apps.json";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  async function checkLegacyLocalApps() {
+    try {
+      if (localStorage.getItem(DONE_KEY)) return;
+    } catch (e) {
+      return;
+    }
+    var apps = [];
+    try {
+      var names = await legacyDbNames();
+      for (var i = 0; i < names.length; i++) {
+        var db = await openExisting(names[i]);
+        var found = await readApps(db);
+        if (found && found.length) apps = apps.concat(found);
+        try {
+          if (db) db.close();
+        } catch (e) {
+        }
+      }
+    } catch (e) {
+    }
+    if (!apps.length) {
+      try {
+        localStorage.setItem(DONE_KEY, "1");
+      } catch (e) {
+      }
+      return;
+    }
+    var msg = (t("migrate.found") || "You have {n} local app(s) from the old catalog. Download them as a backup?").replace("{n}", String(apps.length));
+    var wants = await showConfirm(msg);
+    if (wants) downloadJson(apps);
+    try {
+      localStorage.setItem(DONE_KEY, "1");
+    } catch (e) {
+    }
   }
 
   // src/static/app-catalog/js/main.js
@@ -8790,7 +8252,7 @@
     }
     applyI18n();
     try {
-      renderApps5();
+      renderApps4();
     } catch (e) {
     }
     try {
@@ -8798,11 +8260,7 @@
     } catch (e) {
     }
     try {
-      loadPublishedApps3();
-    } catch (e) {
-    }
-    try {
-      renderRecentlyOpened();
+      loadPublishedApps2();
     } catch (e) {
     }
     try {
@@ -8814,41 +8272,16 @@
     } catch (e) {
     }
   }
-  function switchDbMode(mode) {
-    if (mode === getDbMode()) return;
-    if (mode === "personal" && !currentOwnerName()) {
-      updateModeToggle2();
-      requireSignInThen(function() {
-        switchDbMode("personal");
-      });
-      return;
-    }
-    setDbMode(mode);
-    closeDbInstance();
-    updateModeToggle2();
-    refreshAll3();
-  }
-  function updateModeToggle2() {
-    var globalBtn = document.getElementById("mode-global");
-    var personalBtn = document.getElementById("mode-personal");
-    if (!globalBtn || !personalBtn) return;
-    globalBtn.classList.toggle("active", getDbMode() === "global");
-    personalBtn.classList.toggle("active", getDbMode() === "personal");
-    var signedIn = !!currentOwnerName();
-    personalBtn.classList.toggle("mode-btn-locked", !signedIn);
-    personalBtn.title = signedIn ? t("mode.personal.title") : t("mode.personal.needsLogin");
-  }
   var allApps = [];
   var activeTag = null;
   var searchQuery = "";
   window._launcher = {
-    openDB,
     getAllApps,
     saveApp,
     deleteApp,
     loadConfig,
     saveConfig,
-    renderApps: renderApps5,
+    renderApps: renderApps4,
     renderTags,
     filterByTag,
     launchApp: launchApp2,
@@ -8865,10 +8298,6 @@
     handleContextAction,
     generateId,
     readFileAsText,
-    addAppFromUrl,
-    addAppFromFile,
-    addAppFromSource,
-    addAppFromZip,
     showModal,
     closeModal,
     openSettings,
@@ -8877,18 +8306,13 @@
     saveSettings,
     closeSettings,
     applyTheme,
-    exportBackup,
-    clearAllData,
-    importFromAimeat,
-    processAimeatImport,
     viewSource: viewSource2,
     generateHomepagePrompt,
-    showPublishModal: showPublishModal2,
+    showPublishModal: showPublishModal3,
     submitPublish,
-    loadPublishedApps: loadPublishedApps3,
+    loadPublishedApps: loadPublishedApps2,
     toggleCommunity,
     switchView,
-    switchDbMode,
     unpublishApp,
     deleteServerApp,
     toggleParkApp,
@@ -8915,9 +8339,6 @@
     revokeConsent,
     submitSubdomainAssign,
     unassignSubdomain,
-    jsonImportSelectAll,
-    submitJsonImport,
-    removeDuplicateApps,
     toggleBackupMenu,
     toggleCreateMenu,
     toggleCortexBar,
@@ -8953,7 +8374,6 @@
     detailSetScreenshot,
     detailRefreshScreenshot,
     openPublishedDetail,
-    renderRecentlyOpened,
     loadCortexExtensions,
     showCortexPopup,
     cortexCopy,
@@ -8964,10 +8384,6 @@
     cortexEditorExport,
     openPromptBuilder,
     closePbPanel,
-    onCardDragStart,
-    onCardDragEnd,
-    onCardDragOver,
-    onCardDrop,
     syncConfigToServer,
     loadConfigFromServer,
     setLanguage,
@@ -8978,16 +8394,16 @@
   window.cortexCopy = cortexCopy;
   function refreshAll3() {
     allApps = [];
-    renderApps5();
-    loadPublishedApps3();
-    renderRecentlyOpened();
+    renderApps4();
+    loadPublishedApps2();
   }
   document.addEventListener("DOMContentLoaded", function() {
     initDetail({
       refreshAll: refreshAll3,
-      loadPublishedApps: loadPublishedApps3,
-      renderApps: renderApps5,
-      updateModeToggle: updateModeToggle2,
+      loadPublishedApps: loadPublishedApps2,
+      renderApps: renderApps4,
+      updateModeToggle: function() {
+      },
       getCortexOwnerToken,
       launchApp: launchApp2,
       viewPublished: viewPublished2,
@@ -8995,7 +8411,7 @@
       generateId,
       generateSharePrompt: generateSharePrompt2,
       openPromptBuilder,
-      showPublishModal: showPublishModal2,
+      showPublishModal: showPublishModal3,
       getMainApps: function() {
         return allApps;
       },
@@ -9014,10 +8430,10 @@
     initAppAgents({ getServerManifests: function() {
       return serverAppManifests;
     } });
-    initSettings({ generateId, renderApps: renderApps5, loadPublishedApps: loadPublishedApps3 });
-    initAppsIo({ generateId, readFileAsText, renderApps: renderApps5, getMainApps: function() {
+    initSettings({ generateId, renderApps: renderApps4, loadPublishedApps: loadPublishedApps2 });
+    initAppsIo({ generateId, readFileAsText, renderApps: renderApps4, getMainApps: function() {
       return allApps;
-    } });
+    }, showPublishModal: showPublishModal3 });
     initServerIo({
       getMainApps: function() {
         return allApps;
@@ -9040,7 +8456,7 @@
         return searchQuery;
       },
       generateId,
-      renderApps: renderApps5,
+      renderApps: renderApps4,
       refreshAll: refreshAll3
     });
     initRender({
@@ -9072,7 +8488,6 @@
     var _urlLang = _params.get("lang");
     setLang(_urlLang === "fi" || _urlLang === "en" ? _urlLang : loadConfig().language === "fi" ? "fi" : "en");
     applyI18n();
-    updateModeToggle2();
     var _savedView = "library";
     try {
       _savedView = localStorage.getItem("appCatalogView") || "library";
@@ -9085,8 +8500,8 @@
       if (_homeLabel && location.host) _homeLabel.textContent = location.host.replace(/^apps\./, "");
     } catch (e) {
     }
-    renderApps5();
-    loadPublishedApps3();
+    renderApps4();
+    loadPublishedApps2();
     loadCortexExtensions();
     loadConfigFromServer();
     document.getElementById("confirm-ok-btn").addEventListener("click", function() {
@@ -9098,6 +8513,10 @@
     document.getElementById("confirm-overlay").addEventListener("click", function(e) {
       if (e.target === this) closeConfirm(false);
     });
+    try {
+      checkLegacyLocalApps();
+    } catch (e) {
+    }
     if (_params.get("create") === "1") {
       try {
         openPromptBuilder(null);
@@ -9106,7 +8525,7 @@
     }
     document.getElementById("search-input").addEventListener("input", function(e) {
       searchQuery = e.target.value.trim();
-      renderApps5();
+      renderApps4();
       applyServerFilter();
     });
     document.getElementById("add-btn").addEventListener("click", function() {
@@ -9131,17 +8550,6 @@
         closeSettings();
       }
     });
-    document.getElementById("import-file-input").addEventListener("change", function() {
-      if (this.files && this.files.length > 0) {
-        handleImportBackup(this.files[0]);
-        this.value = "";
-      }
-    });
-    document.getElementById("aimeat-import-overlay").addEventListener("click", function(e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
-    });
     document.getElementById("publish-overlay").addEventListener("click", function(e) {
       if (e.target === this) {
         this.hidden = true;
@@ -9162,11 +8570,6 @@
       this.value = "";
     });
     document.getElementById("backup-overlay").addEventListener("click", function(e) {
-      if (e.target === this) {
-        this.hidden = true;
-      }
-    });
-    document.getElementById("json-import-overlay").addEventListener("click", function(e) {
       if (e.target === this) {
         this.hidden = true;
       }
@@ -9301,16 +8704,12 @@
           document.getElementById("source-overlay").hidden = true;
         } else if (!document.getElementById("context-menu").hidden) {
           hideContextMenu();
-        } else if (!document.getElementById("aimeat-import-overlay").hidden) {
-          document.getElementById("aimeat-import-overlay").hidden = true;
         } else if (!document.getElementById("publish-overlay").hidden) {
           document.getElementById("publish-overlay").hidden = true;
         } else if (!document.getElementById("subdomain-overlay").hidden) {
           document.getElementById("subdomain-overlay").hidden = true;
         } else if (!document.getElementById("backup-overlay").hidden) {
           document.getElementById("backup-overlay").hidden = true;
-        } else if (!document.getElementById("json-import-overlay").hidden) {
-          document.getElementById("json-import-overlay").hidden = true;
         } else if (!document.getElementById("settings-overlay").hidden) {
           closeSettings();
         } else if (!document.getElementById("modal-overlay").hidden) {
@@ -9329,23 +8728,6 @@
         e.preventDefault();
         document.getElementById("search-input").focus();
       }
-    });
-    document.getElementById("app-grid").addEventListener("touchstart", function(e) {
-      var card = e.target.closest(".app-card");
-      if (!card) return;
-      var appId = card.getAttribute("data-id");
-      card._longPressTimer = setTimeout(function() {
-        e.preventDefault();
-        window._launcher.showContextMenu(e.touches[0], appId);
-      }, 500);
-    }, { passive: false });
-    document.getElementById("app-grid").addEventListener("touchend", function(e) {
-      var card = e.target.closest(".app-card");
-      if (card && card._longPressTimer) clearTimeout(card._longPressTimer);
-    });
-    document.getElementById("app-grid").addEventListener("touchmove", function(e) {
-      var card = e.target.closest(".app-card");
-      if (card && card._longPressTimer) clearTimeout(card._longPressTimer);
     });
     document.getElementById("copy-source-btn").addEventListener("click", function() {
       var code = document.getElementById("source-code").value;
@@ -9417,7 +8799,7 @@
           btn.textContent = "Save Changes";
           btn.disabled = true;
         }, 1500);
-        renderApps5();
+        renderApps4();
       }).catch(function(err) {
         btn.textContent = "Save Changes";
         btn.disabled = false;

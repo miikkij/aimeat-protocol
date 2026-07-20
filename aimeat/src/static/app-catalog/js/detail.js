@@ -8,6 +8,8 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   v1.4.0 — 2026-07-20 — Server-only cutover: drop the local-only favourite star; the detail view
+ *     always operates on a server app (materialized in memory on demand for editing).
  *   v1.3.0 — 2026-07-16 — Add openStagingPreview(owner, filename): mint a preview token for an
  *     EXISTING staging draft and open it top-level, driving a library card's "Open staging" button.
  *   v1.3.0 — 2026-07-20 — Cost & Contracts section (EXCHANGE G3 / TARGET-045): own published apps get a
@@ -20,7 +22,7 @@
  *   v1.0.0 — 2026-07-10 — Initial extraction (TARGET-021 Aalto 3 modularization, phase 7).
  */
 import { escapeHtml, jsArg, sourceLabel, sourceLabelText, currentOwnerName } from './util.js';
-import { saveApp, deleteApp, getDbMode, setDbMode, closeDbInstance } from './db.js';
+import { saveApp, deleteApp } from './db.js';
 import { dtlBtn, showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
@@ -240,15 +242,8 @@ function loadScriptOnce(src) {
 }
 
 function onAuthChanged() {
-  // Personal mode is per-account: if the user signed OUT while in it, fall back to Global — it
-  // would otherwise silently show the shared Global DB.
-  if (getDbMode() === 'personal' && !currentOwnerName()) {
-    setDbMode('global');
-  }
-  // The per-account IndexedDB changes with the signed-in owner, so re-open it and re-render the
-  // LOCAL grid + tags too — not just the server sections (the stale-grid-after-login bug).
-  closeDbInstance();
-  updateModeToggle();
+  // Server-only catalog: the grid is rebuilt from the server on every auth change, so a sign-in /
+  // sign-out just re-fetches the owner's apps (their parked/listed apps appear or drop away).
   try { refreshAll(); } catch (e) { try { loadPublishedApps(); } catch (e2) {} }
   var sub = document.getElementById('publish-submit-btn');
   var st = document.getElementById('publish-status');
@@ -344,10 +339,9 @@ function renderDetailView() {
   var tags = (app.tags && app.tags.length) ? app.tags.join(', ') : '—';
   var cortex = (app.usesCortex && app.usesCortex.length) ? app.usesCortex.join(', ') : '—';
   var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : '—';
-  var favBtn = app.blob
-    ? '<button class="dtl-fav-btn" title="' + escapeHtml(t(app.favorite ? 'detail.unfavorite' : 'detail.favorite')) + '"'
-        + ' onclick="window._launcher.detailToggleFavorite()">' + (app.favorite ? '⭐' : '☆') + '</button>'
-    : '';
+  // Favourites are a Phase-2 (server-backed) feature; the old local-only star was dropped with the
+  // server-only cutover so it isn't shown here anymore.
+  var favBtn = '';
   var aboutHeader =
     '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px">' +
       '<span>' + t('detail.about') + '</span>' +
