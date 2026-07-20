@@ -14,7 +14,8 @@
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-storage.ts (SDK-libs migration Phase 2).
  */
 import { NODE_URL } from '../_core/config.js';
-import { getSession, authFetch } from '../_core/session.js';
+import { makeSession } from '../_core/session.js';
+const { getSession, authFetch } = makeSession('aimeat-storage.js');
 import { attach } from '../_core/namespace.js';
 
 const storage = {

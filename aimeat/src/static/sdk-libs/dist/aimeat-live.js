@@ -3,14 +3,23 @@
 "use strict";
 (() => {
   // src/static/sdk-libs/_core/session.js
-  function getSession() {
+  function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
-      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before this library.");
+      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before " + (libLabel || "this library"));
     }
     const s = auth.getSession();
     if (!s) throw new Error("Not logged in. Call AIMEAT.auth.login() first.");
     return s;
+  }
+  function authFetch(path, opts, libLabel) {
+    return getSession(libLabel).fetch(path, opts);
+  }
+  function makeSession(libLabel) {
+    return {
+      getSession: () => getSession(libLabel),
+      authFetch: (path, opts) => authFetch(path, opts, libLabel)
+    };
   }
 
   // src/static/sdk-libs/_core/namespace.js
@@ -25,6 +34,7 @@
   }
 
   // src/static/sdk-libs/live/index.js
+  var { getSession: getSession2 } = makeSession("aimeat-live.js");
   var es = null;
   var subscribers = [];
   var debounceTimer = null;
@@ -82,7 +92,7 @@
   async function _open() {
     var session;
     try {
-      session = getSession();
+      session = getSession2();
     } catch {
       scheduleReconnect();
       return;

@@ -15,7 +15,8 @@
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-data.ts; NODE_URL/NODE_ID now from _core/config.
  */
 import { NODE_URL, NODE_ID } from '../_core/config.js';
-import { authFetch } from '../_core/session.js';
+import { makeSession } from '../_core/session.js';
+const { authFetch } = makeSession('aimeat-data.js');
 import { attach } from '../_core/namespace.js';
 
 // ── Memory API (Tier 1, JWT auth) ──

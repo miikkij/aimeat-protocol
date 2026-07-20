@@ -3,17 +3,23 @@
 "use strict";
 (() => {
   // src/static/sdk-libs/_core/session.js
-  function getSession() {
+  function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
-      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before this library.");
+      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before " + (libLabel || "this library"));
     }
     const s = auth.getSession();
     if (!s) throw new Error("Not logged in. Call AIMEAT.auth.login() first.");
     return s;
   }
-  function authFetch(path, opts) {
-    return getSession().fetch(path, opts);
+  function authFetch(path, opts, libLabel) {
+    return getSession(libLabel).fetch(path, opts);
+  }
+  function makeSession(libLabel) {
+    return {
+      getSession: () => getSession(libLabel),
+      authFetch: (path, opts) => authFetch(path, opts, libLabel)
+    };
   }
 
   // src/static/sdk-libs/_core/namespace.js
@@ -28,6 +34,7 @@
   }
 
   // src/static/sdk-libs/ai/index.js
+  var { authFetch: authFetch2 } = makeSession("aimeat-ai.js");
   var _availCache = null;
   var _modelsCache = null;
   var ai = {
@@ -42,12 +49,12 @@
       const now = Date.now();
       if (_availCache && now - _availCache.t < 6e4) return _availCache.v;
       try {
-        const r = await authFetch("/v1/ai/available");
+        const r = await authFetch2("/v1/ai/available");
         if (r && r.ok && r.data && typeof r.data.available === "boolean") {
           _availCache = { v: r.data.available, t: now };
           return r.data.available;
         }
-        const s = await authFetch("/v1/openrouter/settings");
+        const s = await authFetch2("/v1/openrouter/settings");
         const v = !!(s && s.ok && s.data && (s.data.hasApiKey || s.data.has_api_key));
         _availCache = { v, t: now };
         return v;
@@ -82,7 +89,7 @@
         max_tokens: opts.max_tokens,
         app_id: opts.app_id
       };
-      const r = await authFetch("/v1/ai/complete", {
+      const r = await authFetch2("/v1/ai/complete", {
         method: "POST",
         body: JSON.stringify(body)
       });
@@ -135,7 +142,7 @@
     async models() {
       const now = Date.now();
       if (_modelsCache && now - _modelsCache.t < 36e5) return _modelsCache.v;
-      const r = await authFetch("/v1/openrouter/models");
+      const r = await authFetch2("/v1/openrouter/models");
       if (!r || !r.ok) throw new Error(r && r.error && r.error.message || "Failed to list models");
       const v = r.data && r.data.models ? r.data.models : [];
       _modelsCache = { v, t: now };
@@ -145,7 +152,7 @@
      * Today's spend snapshot (owner-only). Useful for "AI used: $0.04 / $1.00".
      */
     async usage() {
-      const r = await authFetch("/v1/ai/usage");
+      const r = await authFetch2("/v1/ai/usage");
       if (!r || !r.ok) throw new Error(r && r.error && r.error.message || "Failed to read usage");
       return r.data;
     },

@@ -18,17 +18,23 @@
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
   // src/static/sdk-libs/_core/session.js
-  function getSession() {
+  function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
-      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before this library.");
+      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before " + (libLabel || "this library"));
     }
     const s = auth.getSession();
     if (!s) throw new Error("Not logged in. Call AIMEAT.auth.login() first.");
     return s;
   }
-  function authFetch(path, opts) {
-    return getSession().fetch(path, opts);
+  function authFetch(path, opts, libLabel) {
+    return getSession(libLabel).fetch(path, opts);
+  }
+  function makeSession(libLabel) {
+    return {
+      getSession: () => getSession(libLabel),
+      authFetch: (path, opts) => authFetch(path, opts, libLabel)
+    };
   }
 
   // src/static/sdk-libs/_core/namespace.js
@@ -43,6 +49,7 @@
   }
 
   // src/static/sdk-libs/social/index.js
+  var { authFetch: authFetch2 } = makeSession("aimeat-social.js");
   async function publicFetch(path) {
     const r = await fetch(NODE_URL + path);
     return r.json();
@@ -52,7 +59,7 @@
     // Create a new board
     async createBoard(name, opts) {
       const body = { name, visibility: "public", ...opts };
-      const res = await authFetch("/v1/boards", { method: "POST", body: JSON.stringify(body) });
+      const res = await authFetch2("/v1/boards", { method: "POST", body: JSON.stringify(body) });
       if (!res.ok) throw new Error(res.error?.message || "Failed to create board");
       return res.data;
     },
@@ -66,7 +73,7 @@
     // Post to a board
     async post(boardId, content) {
       const body = typeof content === "string" ? { body: content } : content;
-      const res = await authFetch("/v1/boards/" + encodeURIComponent(boardId) + "/posts", {
+      const res = await authFetch2("/v1/boards/" + encodeURIComponent(boardId) + "/posts", {
         method: "POST",
         body: JSON.stringify(body)
       });
@@ -96,7 +103,7 @@
     // ── Reactions & Replies ──
     // React to a post
     async react(boardId, postId, reaction) {
-      const res = await authFetch(
+      const res = await authFetch2(
         "/v1/boards/" + encodeURIComponent(boardId) + "/posts/" + encodeURIComponent(postId) + "/react",
         { method: "POST", body: JSON.stringify({ reaction }) }
       );
@@ -106,7 +113,7 @@
     // Reply to a post
     async reply(boardId, postId, body) {
       const content = typeof body === "string" ? { body } : body;
-      const res = await authFetch(
+      const res = await authFetch2(
         "/v1/boards/" + encodeURIComponent(boardId) + "/posts/" + encodeURIComponent(postId) + "/replies",
         { method: "POST", body: JSON.stringify(content) }
       );
@@ -117,7 +124,7 @@
     // Subscribe to a board
     async subscribe(boardId, opts) {
       const body = { callback_url: opts?.callback_url, filters: opts?.filters };
-      const res = await authFetch("/v1/boards/" + encodeURIComponent(boardId) + "/subscribe", {
+      const res = await authFetch2("/v1/boards/" + encodeURIComponent(boardId) + "/subscribe", {
         method: "POST",
         body: JSON.stringify(body)
       });
@@ -126,7 +133,7 @@
     },
     // Unsubscribe from a board
     async unsubscribe(boardId) {
-      const res = await authFetch("/v1/boards/" + encodeURIComponent(boardId) + "/subscribe", {
+      const res = await authFetch2("/v1/boards/" + encodeURIComponent(boardId) + "/subscribe", {
         method: "DELETE"
       });
       if (!res.ok) throw new Error(res.error?.message || "Failed to unsubscribe");
@@ -134,7 +141,7 @@
     },
     // List own subscriptions
     async subscriptions() {
-      const res = await authFetch("/v1/boards/subscriptions");
+      const res = await authFetch2("/v1/boards/subscriptions");
       if (!res.ok) throw new Error(res.error?.message || "Failed to list subscriptions");
       return res.data;
     },

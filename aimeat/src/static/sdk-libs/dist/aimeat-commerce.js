@@ -18,17 +18,23 @@
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
   // src/static/sdk-libs/_core/session.js
-  function getSession() {
+  function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
-      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before this library.");
+      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before " + (libLabel || "this library"));
     }
     const s = auth.getSession();
     if (!s) throw new Error("Not logged in. Call AIMEAT.auth.login() first.");
     return s;
   }
-  function authFetch(path, opts) {
-    return getSession().fetch(path, opts);
+  function authFetch(path, opts, libLabel) {
+    return getSession(libLabel).fetch(path, opts);
+  }
+  function makeSession(libLabel) {
+    return {
+      getSession: () => getSession(libLabel),
+      authFetch: (path, opts) => authFetch(path, opts, libLabel)
+    };
   }
 
   // src/static/sdk-libs/_core/namespace.js
@@ -43,6 +49,7 @@
   }
 
   // src/static/sdk-libs/commerce/index.js
+  var { authFetch: authFetch2 } = makeSession("aimeat-commerce.js");
   var NODE_URL2 = APEX_URL;
   var MONEY_UNIT = 1e6;
   function commerceError(res, fallback) {
@@ -106,7 +113,7 @@
     },
     /** Read one offer (with price/priceMoney) from an agent's published offers. */
     async getOffer(agent, offerId) {
-      const res = await authFetch("/v1/agents/" + encodeURIComponent(agent) + "/offers");
+      const res = await authFetch2("/v1/agents/" + encodeURIComponent(agent) + "/offers");
       if (!res.ok) throw commerceError(res, "Failed to read offers");
       const offers = res.data && res.data.offers || [];
       return offers.find(function(o) {
@@ -141,7 +148,7 @@
       );
       if (opts && opts.note) body.note = opts.note;
       if (opts && opts.currency) body.currency = opts.currency;
-      const res = await authFetch("/v1/commerce/checkout-sessions", {
+      const res = await authFetch2("/v1/commerce/checkout-sessions", {
         method: "POST",
         body: JSON.stringify(body)
       });
@@ -150,20 +157,20 @@
     },
     /** Read one of the buyer's checkout sessions. */
     async getCheckout(id) {
-      const res = await authFetch("/v1/commerce/checkout-sessions/" + encodeURIComponent(id));
+      const res = await authFetch2("/v1/commerce/checkout-sessions/" + encodeURIComponent(id));
       if (!res.ok) throw commerceError(res, "Failed to read checkout");
       return res.data.session;
     },
     /** The buyer's checkout sessions (purchases), newest first. */
     async listCheckouts(opts) {
       const qs = opts && opts.limit ? "?limit=" + opts.limit : "";
-      const res = await authFetch("/v1/commerce/checkout-sessions" + qs);
+      const res = await authFetch2("/v1/commerce/checkout-sessions" + qs);
       if (!res.ok) throw commerceError(res, "Failed to list checkouts");
       return res.data.sessions;
     },
     /** Replace the cart of an open session. */
     async updateCheckout(id, items) {
-      const res = await authFetch("/v1/commerce/checkout-sessions/" + encodeURIComponent(id), {
+      const res = await authFetch2("/v1/commerce/checkout-sessions/" + encodeURIComponent(id), {
         method: "PATCH",
         body: JSON.stringify({ items: normalizeItems(items) })
       });
@@ -172,7 +179,7 @@
     },
     /** Cancel an open session. */
     async cancelCheckout(id) {
-      const res = await authFetch("/v1/commerce/checkout-sessions/" + encodeURIComponent(id), {
+      const res = await authFetch2("/v1/commerce/checkout-sessions/" + encodeURIComponent(id), {
         method: "PATCH",
         body: JSON.stringify({ cancel: true })
       });
@@ -185,7 +192,7 @@
      * Returns the completed session: session.receipt { handler, charged, fee }, session.fulfillment.
      */
     async completeCheckout(id, payment) {
-      const res = await authFetch("/v1/commerce/checkout-sessions/" + encodeURIComponent(id) + "/complete", {
+      const res = await authFetch2("/v1/commerce/checkout-sessions/" + encodeURIComponent(id) + "/complete", {
         method: "POST",
         body: JSON.stringify(payment ? { payment } : {})
       });
@@ -203,7 +210,7 @@
     /** The seller's received orders (completed sessions where you are the seller). */
     async listOrders(opts) {
       const qs = opts && opts.limit ? "?limit=" + opts.limit : "";
-      const res = await authFetch("/v1/commerce/orders" + qs);
+      const res = await authFetch2("/v1/commerce/orders" + qs);
       if (!res.ok) throw commerceError(res, "Failed to list orders");
       return res.data.orders;
     },

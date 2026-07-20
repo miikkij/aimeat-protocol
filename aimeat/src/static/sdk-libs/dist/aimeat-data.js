@@ -18,17 +18,23 @@
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
   // src/static/sdk-libs/_core/session.js
-  function getSession() {
+  function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
-      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before this library.");
+      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before " + (libLabel || "this library"));
     }
     const s = auth.getSession();
     if (!s) throw new Error("Not logged in. Call AIMEAT.auth.login() first.");
     return s;
   }
-  function authFetch(path, opts) {
-    return getSession().fetch(path, opts);
+  function authFetch(path, opts, libLabel) {
+    return getSession(libLabel).fetch(path, opts);
+  }
+  function makeSession(libLabel) {
+    return {
+      getSession: () => getSession(libLabel),
+      authFetch: (path, opts) => authFetch(path, opts, libLabel)
+    };
   }
 
   // src/static/sdk-libs/_core/namespace.js
@@ -43,11 +49,12 @@
   }
 
   // src/static/sdk-libs/data/index.js
+  var { authFetch: authFetch2 } = makeSession("aimeat-data.js");
   var data = {
     // Write or upsert a memory entry
     async set(key, value, opts) {
       const body = { key, value, visibility: "private", ...opts };
-      const res = await authFetch("/v1/memory", { method: "POST", body: JSON.stringify(body) });
+      const res = await authFetch2("/v1/memory", { method: "POST", body: JSON.stringify(body) });
       if (!res.ok) throw new Error(res.error?.message || "Failed to set memory");
       return res.data;
     },
@@ -55,7 +62,7 @@
     // Uses ?soft=1 so a missing key is a clean 200 (value null) — no browser-console 404 noise;
     // the contract is unchanged: resolves null when the key does not exist.
     async get(key) {
-      const res = await authFetch("/v1/memory/" + encodeURIComponent(key) + "?soft=1");
+      const res = await authFetch2("/v1/memory/" + encodeURIComponent(key) + "?soft=1");
       var val = res.ok ? res.data.value : null;
       var isEmpty = val == null || typeof val === "object" && Object.keys(val).length === 0;
       if (!isEmpty) return val;
@@ -78,7 +85,7 @@
     },
     // Read full entry metadata
     async getEntry(key) {
-      const res = await authFetch("/v1/memory/" + encodeURIComponent(key));
+      const res = await authFetch2("/v1/memory/" + encodeURIComponent(key));
       if (!res.ok) {
         if (res.error?.code === "NOT_FOUND") return null;
         throw new Error(res.error?.message || "Failed to get memory");
@@ -88,7 +95,7 @@
     // Update with optimistic locking
     async update(key, value, version, opts) {
       const body = { value, version, ...opts };
-      const res = await authFetch("/v1/memory/" + encodeURIComponent(key), {
+      const res = await authFetch2("/v1/memory/" + encodeURIComponent(key), {
         method: "PUT",
         body: JSON.stringify(body)
       });
@@ -97,7 +104,7 @@
     },
     // Delete an entry
     async delete(key) {
-      const res = await authFetch("/v1/memory/" + encodeURIComponent(key), { method: "DELETE" });
+      const res = await authFetch2("/v1/memory/" + encodeURIComponent(key), { method: "DELETE" });
       if (!res.ok) throw new Error(res.error?.message || "Failed to delete memory");
       return res.data;
     },
@@ -108,7 +115,7 @@
       if (opts?.visibility) params.set("visibility", opts.visibility);
       if (opts?.tags) params.set("tags", opts.tags.join(","));
       const qs = params.toString();
-      const res = await authFetch("/v1/memory" + (qs ? "?" + qs : ""));
+      const res = await authFetch2("/v1/memory" + (qs ? "?" + qs : ""));
       if (!res.ok) throw new Error(res.error?.message || "Failed to list memory");
       return res.data;
     },
@@ -116,7 +123,7 @@
     async search(query, opts) {
       const params = new URLSearchParams({ q: query });
       if (opts?.visibility) params.set("visibility", opts.visibility);
-      const res = await authFetch("/v1/memory/search?" + params.toString());
+      const res = await authFetch2("/v1/memory/search?" + params.toString());
       if (!res.ok) throw new Error(res.error?.message || "Failed to search memory");
       return res.data;
     },

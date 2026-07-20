@@ -14,7 +14,8 @@
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-tunnel.ts (SDK-libs migration Phase 2).
  */
 import { NODE_URL, HEARTBEAT_MS } from '../_core/config.js';
-import { getSession } from '../_core/session.js';
+import { makeSession } from '../_core/session.js';
+const { getSession } = makeSession('aimeat-tunnel.js');
 import { attach } from '../_core/namespace.js';
 
 function uuid() {

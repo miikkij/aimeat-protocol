@@ -18,17 +18,23 @@
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
   // src/static/sdk-libs/_core/session.js
-  function getSession() {
+  function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
-      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before this library.");
+      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before " + (libLabel || "this library"));
     }
     const s = auth.getSession();
     if (!s) throw new Error("Not logged in. Call AIMEAT.auth.login() first.");
     return s;
   }
-  function authFetch(path, opts) {
-    return getSession().fetch(path, opts);
+  function authFetch(path, opts, libLabel) {
+    return getSession(libLabel).fetch(path, opts);
+  }
+  function makeSession(libLabel) {
+    return {
+      getSession: () => getSession(libLabel),
+      authFetch: (path, opts) => authFetch(path, opts, libLabel)
+    };
   }
 
   // src/static/sdk-libs/_core/namespace.js
@@ -43,6 +49,7 @@
   }
 
   // src/static/sdk-libs/storage/index.js
+  var { getSession: getSession2, authFetch: authFetch2 } = makeSession("aimeat-storage.js");
   var storage = {
     // Upload a file (File object, Blob, or base64 string)
     async upload(fileOrData, opts) {
@@ -70,7 +77,7 @@
       } else {
         throw new Error("upload() expects a File, Blob, or base64 string");
       }
-      const res = await authFetch("/v1/storage", {
+      const res = await authFetch2("/v1/storage", {
         method: "POST",
         body: JSON.stringify({ key, data, mime_type, visibility })
       });
@@ -79,7 +86,7 @@
     },
     // Download a file as Blob
     async download(key) {
-      const session = getSession();
+      const session = getSession2();
       const jwt = session.jwt;
       const r = await fetch(NODE_URL + "/v1/storage/" + encodeURIComponent(key), {
         headers: { "Authorization": "Bearer " + jwt }
@@ -94,13 +101,13 @@
     },
     // List all files
     async list() {
-      const res = await authFetch("/v1/storage");
+      const res = await authFetch2("/v1/storage");
       if (!res.ok) throw new Error(res.error?.message || "Failed to list files");
       return res.data;
     },
     // Get file metadata (HEAD request)
     async metadata(key) {
-      const session = getSession();
+      const session = getSession2();
       const jwt = session.jwt;
       const r = await fetch(NODE_URL + "/v1/storage/" + encodeURIComponent(key), {
         method: "HEAD",
@@ -116,7 +123,7 @@
     },
     // Delete a file
     async delete(key) {
-      const res = await authFetch("/v1/storage/" + encodeURIComponent(key), { method: "DELETE" });
+      const res = await authFetch2("/v1/storage/" + encodeURIComponent(key), { method: "DELETE" });
       if (!res.ok) throw new Error(res.error?.message || "Delete failed");
       return res.data;
     },
@@ -127,13 +134,13 @@
       const mime_type = opts?.mime_type || file.type || "application/octet-stream";
       const visibility = opts?.visibility || "private";
       const totalChunks = Math.ceil(file.size / chunkSize);
-      const initRes = await authFetch("/v1/storage/upload/init", {
+      const initRes = await authFetch2("/v1/storage/upload/init", {
         method: "POST",
         body: JSON.stringify({ key, mime_type, visibility, chunk_size: chunkSize, total_chunks: totalChunks })
       });
       if (!initRes.ok) throw new Error(initRes.error?.message || "Chunked upload init failed");
       const uploadId = initRes.data.upload_id;
-      const session = getSession();
+      const session = getSession2();
       for (let i = 0; i < totalChunks; i++) {
         const start = i * chunkSize;
         const end = Math.min(start + chunkSize, file.size);
@@ -150,13 +157,13 @@
         if (!r.ok) throw new Error("Chunk " + i + " upload failed: " + r.status);
         if (opts?.onProgress) opts.onProgress({ chunk: i, total: totalChunks, percent: Math.round((i + 1) / totalChunks * 100) });
       }
-      const completeRes = await authFetch("/v1/storage/upload/" + uploadId + "/complete", { method: "POST" });
+      const completeRes = await authFetch2("/v1/storage/upload/" + uploadId + "/complete", { method: "POST" });
       if (!completeRes.ok) throw new Error(completeRes.error?.message || "Chunked upload complete failed");
       return completeRes.data;
     },
     // Abort a chunked upload
     async abortUpload(uploadId) {
-      const res = await authFetch("/v1/storage/upload/" + uploadId, { method: "DELETE" });
+      const res = await authFetch2("/v1/storage/upload/" + uploadId, { method: "DELETE" });
       if (!res.ok) throw new Error(res.error?.message || "Abort failed");
       return res.data;
     },
