@@ -25,7 +25,7 @@ import { escapeHtml, jsArg, sourceLabel, sourceLabelText, currentOwnerName } fro
 import { saveApp, deleteApp } from './db.js';
 import { dtlBtn, showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
-import { t } from './i18n.js';
+import { t, getLang } from './i18n.js';
 import { monetizeSectionInner, monetizeOnOpen } from './monetize.js';
 import { costSectionInner, costOnOpen } from './cost.js';
 import { appManifestAgents } from './app-agents.js';
@@ -350,13 +350,26 @@ function renderDetailView() {
         ((canEditAbout && !detailEditingAbout) ? dtlBtn(t('detail.editDetails'), 'window._launcher.detailAboutEdit()') : '') +
       '</span>' +
     '</h3>';
+  // Per-locale descriptions: EN + FI (extensible). Seed from the manifest's descriptions map,
+  // falling back to the canonical description for the default language so an app that only ever had
+  // a single description pre-fills English.
+  var descs = app.descriptions || {};
+  var descEnVal = descs.en || (app.description || '');
+  var descFiVal = descs.fi || '';
   var aboutBody;
   if (detailEditingAbout) {
     aboutBody =
       '<label class="dtl-stat-label" for="detail-name-input">' + t('detail.nameLabel') + '</label>' +
       '<input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || '') + '" style="margin:4px 0 10px" />' +
-      '<label class="dtl-stat-label" for="detail-desc-input">' + t('detail.descLabel') + '</label>' +
-      '<textarea id="detail-desc-input" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 8px;resize:vertical">' + escapeHtml(app.description || '') + '</textarea>' +
+      '<label class="dtl-stat-label" for="detail-desc-en">' + t('detail.descEn') + '</label>' +
+      '<textarea id="detail-desc-en" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(descEnVal) + '</textarea>' +
+      '<label class="dtl-stat-label" for="detail-desc-fi">' + t('detail.descFi') + '</label>' +
+      '<textarea id="detail-desc-fi" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(descFiVal) + '</textarea>' +
+      '<div class="dtl-btn-row" style="margin:0 0 4px">' +
+        dtlBtn('🌐 ' + t('detail.translateEnFi'), 'window._launcher.detailTranslateDesc(\'en\',\'fi\')', {id:'detail-tr-enfi'}) +
+        dtlBtn('🌐 ' + t('detail.translateFiEn'), 'window._launcher.detailTranslateDesc(\'fi\',\'en\')', {id:'detail-tr-fien'}) +
+      '</div>' +
+      '<div class="dtl-ai-status" id="detail-tr-status" style="margin:0 0 8px"></div>' +
       '<label class="dtl-stat-label" for="detail-icon-input">' + t('detail.iconLabel') + '</label>' +
       '<input id="detail-icon-input" class="modal-input" maxlength="4" value="' + escapeHtml(app.icon || '') + '" style="margin:4px 0 10px;text-align:center;font-size:1.2rem" />' +
       '<label class="dtl-stat-label" for="detail-tags-input">' + t('detail.tagsLabel') + '</label>' +
@@ -367,8 +380,10 @@ function renderDetailView() {
         dtlBtn(t('detail.cancelEdit'), 'window._launcher.detailAboutCancel()') +
       '</div>';
   } else {
+    // Show the description in the current UI language, falling back to the canonical one.
+    var shownDesc = (app.descriptions && app.descriptions[getLang()]) || app.description || '';
     aboutBody =
-      (app.description ? '<p class="dtl-desc">' + escapeHtml(app.description) + '</p>' : '') +
+      (shownDesc ? '<p class="dtl-desc">' + escapeHtml(shownDesc) + '</p>' : '') +
       '<div class="dtl-meta-grid">' +
         metaItem(t('detail.category'), app.category || 'utility') +
         metaItem(t('detail.tags'), tags) +
@@ -813,22 +828,31 @@ function detailAboutSave() {
   var app = detailGetApp();
   if (!app) return;
   var nameEl = document.getElementById('detail-name-input');
-  var descEl = document.getElementById('detail-desc-input');
+  var enEl = document.getElementById('detail-desc-en');
+  var fiEl = document.getElementById('detail-desc-fi');
   var iconEl = document.getElementById('detail-icon-input');
   var tagsEl = document.getElementById('detail-tags-input');
   var newName = nameEl ? nameEl.value.trim() : '';
-  var newDesc = descEl ? descEl.value.trim() : '';
+  var enDesc = enEl ? enEl.value.trim() : '';
+  var fiDesc = fiEl ? fiEl.value.trim() : '';
+  // Per-locale map (drop blanks); the canonical description is the English one, or Finnish when
+  // English is blank, so an app always has a non-empty fallback description.
+  var newDescriptions = {};
+  if (enDesc) newDescriptions.en = enDesc;
+  if (fiDesc) newDescriptions.fi = fiDesc;
+  var newDesc = enDesc || fiDesc || '';
   // icon + tags are LOCAL metadata (same as the context-menu Edit modal) — no server round-trip.
   var newIcon = iconEl ? iconEl.value.trim() : (app.icon || '');
   var newTags = tagsEl
     ? tagsEl.value.split(',').map(function (s) { return s.trim(); }).filter(Boolean)
     : (app.tags || []);
   if (!newName) { showNotice(t('detail.nameRequired') || 'Name cannot be empty.'); if (nameEl) nameEl.focus(); return; }
-  if (app.published && !newDesc) { showNotice(t('detail.descRequired') || 'Description cannot be empty.'); if (descEl) descEl.focus(); return; }
+  if (app.published && !newDesc) { showNotice(t('detail.descRequired') || 'Description cannot be empty.'); if (enEl) enEl.focus(); return; }
 
   function finishLocal() {
     app.name = newName;
     app.description = newDesc;
+    app.descriptions = newDescriptions;
     app.icon = newIcon;
     app.tags = newTags;
     saveApp(app).then(function() {
@@ -851,22 +875,72 @@ function detailAboutSave() {
   fetch(aimeatUrl + '/v1/apps/' + encodeURIComponent(filename), {
     method: 'PATCH',
     headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: newName, description: newDesc })
+    body: JSON.stringify({ name: newName, description: newDesc, descriptions: newDescriptions })
   })
     .then(function(resp) { return resp.json().then(function(j) { return { ok: resp.ok, j: j }; }); })
     .then(function(res) {
       if (res.ok && res.j && res.j.ok !== false) {
-        // Keep the cached server manifest in sync so a re-render shows the new name.
+        // Keep the cached server manifest in sync so a re-render shows the new name + descriptions.
         var key = owner + '\n' + filename;
         getServerManifests()[key] = getServerManifests()[key] || {};
         getServerManifests()[key].name = newName;
         getServerManifests()[key].description = newDesc;
+        getServerManifests()[key].descriptions = newDescriptions;
         finishLocal();
       } else {
         showNotice('Failed: ' + ((res.j && res.j.error && res.j.error.message) || 'Unknown error'));
       }
     })
     .catch(function(err) { showNotice('Error: ' + (err.message || err)); });
+}
+
+// Translate the description from one language field to another via the owner's OpenRouter key
+// (/v1/ai/complete). srcLang/dstLang are 'en'|'fi'; fills the destination textarea in place.
+function detailTranslateDesc(srcLang, dstLang) {
+  var srcEl = document.getElementById('detail-desc-' + srcLang);
+  var dstEl = document.getElementById('detail-desc-' + dstLang);
+  var statusEl = document.getElementById('detail-tr-status');
+  if (!srcEl || !dstEl) return;
+  var text = (srcEl.value || '').trim();
+  if (!text) { if (statusEl) statusEl.textContent = t('detail.trNeedSource'); return; }
+  var token = getCortexOwnerToken();
+  if (!token) { if (statusEl) statusEl.textContent = t('detail.aiLoginNeeded'); return; }
+  var config = loadConfig();
+  var aimeatUrl = (config.aimeatUrl || '').replace(/\/+$/, '');
+  if (!aimeatUrl) { if (statusEl) statusEl.textContent = t('detail.aiUnavailable'); return; }
+  var langName = { en: 'English', fi: 'Finnish' };
+  var enfiBtn = document.getElementById('detail-tr-enfi');
+  var fienBtn = document.getElementById('detail-tr-fien');
+  if (enfiBtn) enfiBtn.disabled = true;
+  if (fienBtn) fienBtn.disabled = true;
+  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('detail.translating'); }
+  var systemPrompt = 'You are a professional translator for short app-store descriptions. '
+    + 'Translate the text from ' + (langName[srcLang] || srcLang) + ' to ' + (langName[dstLang] || dstLang) + '. '
+    + 'Return ONLY the translated text — no quotes, no notes, no explanation. Keep it concise and natural.';
+  fetch(aimeatUrl + '/v1/ai/complete', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+    body: JSON.stringify({ prompt: text, systemPrompt: systemPrompt, app_id: 'app-catalog' })
+  })
+    .then(function(resp) { return resp.json(); })
+    .then(function(json) {
+      if (enfiBtn) enfiBtn.disabled = false;
+      if (fienBtn) fienBtn.disabled = false;
+      if (!json || !json.ok) {
+        var msg = (json && json.error && json.error.message) || 'Translation failed';
+        if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + msg; }
+        return;
+      }
+      var out = (json.data && json.data.content ? json.data.content : '').trim();
+      if (!out) { if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + t('detail.trEmpty'); } return; }
+      dstEl.value = out;
+      if (statusEl) { statusEl.style.color = '#34d399'; statusEl.textContent = '✔ ' + t('detail.trDone'); }
+    })
+    .catch(function(err) {
+      if (enfiBtn) enfiBtn.disabled = false;
+      if (fienBtn) fienBtn.disabled = false;
+      if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + (err.message || 'Translation failed'); }
+    });
 }
 
 // Manual override: upload a custom image as this published app's thumbnail. (Bulk auto-capture is
@@ -1331,6 +1405,7 @@ function openPublishedDetail(owner, filename, localId, versionNumber) {
         id: generateId(),
         name: meta.name || filename.replace(/\.html?$/i, ''),
         description: meta.description || '',
+        descriptions: meta.descriptions || null,
         category: meta.category || 'utility',
         tags: meta.tags || [],
         usesCortex: meta.usesCortex || [],
@@ -1565,6 +1640,7 @@ async function restoreVersion(owner, filename, version) {
         mime_type: 'text/html',
         name: meta.name || filename.replace(/\.html?$/i, ''),
         description: meta.description || '',
+        descriptions: meta.descriptions || null,
         category: meta.category || 'utility',
         tags: meta.tags || [],
         uses_cortex: meta.usesCortex || []
@@ -1652,6 +1728,7 @@ export {
   detailAboutEdit,
   detailAboutCancel,
   detailAboutSave,
+  detailTranslateDesc,
   detailToggleFavorite,
   detailAccessCodeEdit,
   detailAccessCodeCancel,

@@ -48,7 +48,7 @@ export function registerPublishRoutes(
         const {
             filename, content, mime_type, access_code,
             screenshot, screenshot_mime_type,
-            name, description, version: semver, category, tags, icon,
+            name, description, descriptions, version: semver, category, tags, icon,
             uses_cortex, cortex, price_morsels, license_type, protection,
         } = req.body ?? {};
 
@@ -184,6 +184,9 @@ export function registerPublishRoutes(
         let carriedUsesCortex: string[] | undefined;
         let carriedIcon: string | undefined;
         let carriedCortex: AppManifestCortex | undefined;
+        // Per-locale descriptions survive a re-publish too (an update never silently drops them)
+        // unless the caller sends a new `descriptions` map.
+        let carriedDescriptions: Record<string, string> | undefined;
         if (isUpdate) {
             const existingApp = await storage.getApp(ownerGhii, filename);
             parkedState = !!existingApp?.parked;
@@ -197,6 +200,20 @@ export function registerPublishRoutes(
             carriedUsesCortex = existingApp?.manifest?.usesCortex;
             carriedIcon = existingApp?.manifest?.icon;
             carriedCortex = existingApp?.manifest?.cortex;
+            carriedDescriptions = existingApp?.manifest?.descriptions;
+        }
+
+        // Sanitize an optional per-locale descriptions map ({ locale: text }); drop blanks, cap 2000
+        // chars each. When omitted on an update, carry the existing map forward.
+        let effectiveDescriptions: Record<string, string> | undefined;
+        if (descriptions && typeof descriptions === 'object' && !Array.isArray(descriptions)) {
+            const cleaned: Record<string, string> = {};
+            for (const [loc, val] of Object.entries(descriptions as Record<string, unknown>)) {
+                if (typeof val === 'string' && val.trim().length > 0) cleaned[loc] = val.trim().slice(0, 2000);
+            }
+            if (Object.keys(cleaned).length > 0) effectiveDescriptions = cleaned;
+        } else if (carriedDescriptions) {
+            effectiveDescriptions = carriedDescriptions;
         }
 
         const now = new Date().toISOString();
@@ -209,6 +226,7 @@ export function registerPublishRoutes(
             authorDisplay: owner,
             usesCortex: Array.isArray(uses_cortex) ? uses_cortex.filter((c: unknown) => typeof c === 'string') : (carriedUsesCortex ?? []),
         };
+        if (effectiveDescriptions) manifest.descriptions = effectiveDescriptions;
         if (typeof icon === 'string') manifest.icon = icon;
         else if (carriedIcon) manifest.icon = carriedIcon;
         // cortex.agents: an explicit `cortex` in the payload replaces the section (send

@@ -2885,6 +2885,14 @@
       "detail.iconLabel": "Icon (emoji)",
       "detail.tagsLabel": "Tags (comma separated)",
       "detail.descLabel": "Description",
+      "detail.descEn": "Description (English)",
+      "detail.descFi": "Description (Finnish)",
+      "detail.translateEnFi": "Translate EN → FI",
+      "detail.translateFiEn": "Translate FI → EN",
+      "detail.translating": "Translating…",
+      "detail.trDone": "Translated",
+      "detail.trEmpty": "The AI returned nothing — try again.",
+      "detail.trNeedSource": "Write the source-language description first.",
       "detail.renameHint": "The app link stays the same — only the displayed name and description change.",
       "detail.nameRequired": "Name cannot be empty.",
       "detail.descRequired": "Description cannot be empty.",
@@ -3331,6 +3339,14 @@
       "detail.iconLabel": "Kuvake (emoji)",
       "detail.tagsLabel": "Tunnisteet (pilkulla eroteltuna)",
       "detail.descLabel": "Kuvaus",
+      "detail.descEn": "Kuvaus (englanti)",
+      "detail.descFi": "Kuvaus (suomi)",
+      "detail.translateEnFi": "Käännä EN → FI",
+      "detail.translateFiEn": "Käännä FI → EN",
+      "detail.translating": "Käännetään…",
+      "detail.trDone": "Käännetty",
+      "detail.trEmpty": "Tekoäly ei palauttanut mitään — yritä uudelleen.",
+      "detail.trNeedSource": "Kirjoita ensin lähdekielinen kuvaus.",
       "detail.renameHint": "Sovelluksen linkki pysyy samana — vain näytettävä nimi ja kuvaus muuttuvat.",
       "detail.nameRequired": "Nimi ei voi olla tyhjä.",
       "detail.descRequired": "Kuvaus ei voi olla tyhjä.",
@@ -5239,11 +5255,15 @@
     var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : "—";
     var favBtn = "";
     var aboutHeader = '<h3 style="display:flex;align-items:center;justify-content:space-between;gap:8px"><span>' + t("detail.about") + '</span><span style="display:flex;align-items:center;gap:8px">' + favBtn + (canEditAbout && !detailEditingAbout ? dtlBtn(t("detail.editDetails"), "window._launcher.detailAboutEdit()") : "") + "</span></h3>";
+    var descs = app.descriptions || {};
+    var descEnVal = descs.en || (app.description || "");
+    var descFiVal = descs.fi || "";
     var aboutBody;
     if (detailEditingAbout) {
-      aboutBody = '<label class="dtl-stat-label" for="detail-name-input">' + t("detail.nameLabel") + '</label><input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || "") + '" style="margin:4px 0 10px" /><label class="dtl-stat-label" for="detail-desc-input">' + t("detail.descLabel") + '</label><textarea id="detail-desc-input" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 8px;resize:vertical">' + escapeHtml(app.description || "") + '</textarea><label class="dtl-stat-label" for="detail-icon-input">' + t("detail.iconLabel") + '</label><input id="detail-icon-input" class="modal-input" maxlength="4" value="' + escapeHtml(app.icon || "") + '" style="margin:4px 0 10px;text-align:center;font-size:1.2rem" /><label class="dtl-stat-label" for="detail-tags-input">' + t("detail.tagsLabel") + '</label><input id="detail-tags-input" class="modal-input" value="' + escapeHtml((app.tags || []).join(", ")) + '" placeholder="tools, productivity" style="margin:4px 0 8px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("detail.renameHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAboutSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAboutCancel()") + "</div>";
+      aboutBody = '<label class="dtl-stat-label" for="detail-name-input">' + t("detail.nameLabel") + '</label><input id="detail-name-input" class="modal-input" maxlength="120" value="' + escapeHtml(app.name || "") + '" style="margin:4px 0 10px" /><label class="dtl-stat-label" for="detail-desc-en">' + t("detail.descEn") + '</label><textarea id="detail-desc-en" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(descEnVal) + '</textarea><label class="dtl-stat-label" for="detail-desc-fi">' + t("detail.descFi") + '</label><textarea id="detail-desc-fi" class="modal-input" rows="3" maxlength="2000" style="margin:4px 0 6px;resize:vertical">' + escapeHtml(descFiVal) + '</textarea><div class="dtl-btn-row" style="margin:0 0 4px">' + dtlBtn("🌐 " + t("detail.translateEnFi"), "window._launcher.detailTranslateDesc('en','fi')", { id: "detail-tr-enfi" }) + dtlBtn("🌐 " + t("detail.translateFiEn"), "window._launcher.detailTranslateDesc('fi','en')", { id: "detail-tr-fien" }) + '</div><div class="dtl-ai-status" id="detail-tr-status" style="margin:0 0 8px"></div><label class="dtl-stat-label" for="detail-icon-input">' + t("detail.iconLabel") + '</label><input id="detail-icon-input" class="modal-input" maxlength="4" value="' + escapeHtml(app.icon || "") + '" style="margin:4px 0 10px;text-align:center;font-size:1.2rem" /><label class="dtl-stat-label" for="detail-tags-input">' + t("detail.tagsLabel") + '</label><input id="detail-tags-input" class="modal-input" value="' + escapeHtml((app.tags || []).join(", ")) + '" placeholder="tools, productivity" style="margin:4px 0 8px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("detail.renameHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.detailAboutSave()", { variant: "primary" }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.detailAboutCancel()") + "</div>";
     } else {
-      aboutBody = (app.description ? '<p class="dtl-desc">' + escapeHtml(app.description) + "</p>" : "") + '<div class="dtl-meta-grid">' + metaItem(t("detail.category"), app.category || "utility") + metaItem(t("detail.tags"), tags) + metaItem(t("detail.sourceLabel"), sourceLabelText(app.source)) + metaItem(t("detail.size"), app.blob ? fmtSize(localBytes) : "—") + metaItem(t("detail.created"), created) + metaItem(t("detail.usesCortex"), cortex) + // Provenance: if this app was forked from another, credit the source app.
+      var shownDesc = app.descriptions && app.descriptions[getLang()] || app.description || "";
+      aboutBody = (shownDesc ? '<p class="dtl-desc">' + escapeHtml(shownDesc) + "</p>" : "") + '<div class="dtl-meta-grid">' + metaItem(t("detail.category"), app.category || "utility") + metaItem(t("detail.tags"), tags) + metaItem(t("detail.sourceLabel"), sourceLabelText(app.source)) + metaItem(t("detail.size"), app.blob ? fmtSize(localBytes) : "—") + metaItem(t("detail.created"), created) + metaItem(t("detail.usesCortex"), cortex) + // Provenance: if this app was forked from another, credit the source app.
       (app.forkedFrom && app.forkedFrom.owner && app.forkedFrom.filename ? metaItem(t("detail.forkedFrom"), app.forkedFrom.owner + "/" + app.forkedFrom.filename + (app.forkedFrom.version ? " v" + app.forkedFrom.version : "")) : "") + "</div>";
     }
     var aboutHtml = '<div class="dtl-section">' + aboutHeader + aboutBody + "</div>";
@@ -5574,11 +5594,17 @@
     var app = detailGetApp();
     if (!app) return;
     var nameEl = document.getElementById("detail-name-input");
-    var descEl = document.getElementById("detail-desc-input");
+    var enEl = document.getElementById("detail-desc-en");
+    var fiEl = document.getElementById("detail-desc-fi");
     var iconEl = document.getElementById("detail-icon-input");
     var tagsEl = document.getElementById("detail-tags-input");
     var newName = nameEl ? nameEl.value.trim() : "";
-    var newDesc = descEl ? descEl.value.trim() : "";
+    var enDesc = enEl ? enEl.value.trim() : "";
+    var fiDesc = fiEl ? fiEl.value.trim() : "";
+    var newDescriptions = {};
+    if (enDesc) newDescriptions.en = enDesc;
+    if (fiDesc) newDescriptions.fi = fiDesc;
+    var newDesc = enDesc || fiDesc || "";
     var newIcon = iconEl ? iconEl.value.trim() : app.icon || "";
     var newTags = tagsEl ? tagsEl.value.split(",").map(function(s) {
       return s.trim();
@@ -5590,12 +5616,13 @@
     }
     if (app.published && !newDesc) {
       showNotice(t("detail.descRequired") || "Description cannot be empty.");
-      if (descEl) descEl.focus();
+      if (enEl) enEl.focus();
       return;
     }
     function finishLocal() {
       app.name = newName;
       app.description = newDesc;
+      app.descriptions = newDescriptions;
       app.icon = newIcon;
       app.tags = newTags;
       saveApp(app).then(function() {
@@ -5621,7 +5648,7 @@
     fetch(aimeatUrl + "/v1/apps/" + encodeURIComponent(filename), {
       method: "PATCH",
       headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newName, description: newDesc })
+      body: JSON.stringify({ name: newName, description: newDesc, descriptions: newDescriptions })
     }).then(function(resp) {
       return resp.json().then(function(j) {
         return { ok: resp.ok, j };
@@ -5632,12 +5659,83 @@
         getServerManifests2()[key] = getServerManifests2()[key] || {};
         getServerManifests2()[key].name = newName;
         getServerManifests2()[key].description = newDesc;
+        getServerManifests2()[key].descriptions = newDescriptions;
         finishLocal();
       } else {
         showNotice("Failed: " + (res.j && res.j.error && res.j.error.message || "Unknown error"));
       }
     }).catch(function(err) {
       showNotice("Error: " + (err.message || err));
+    });
+  }
+  function detailTranslateDesc(srcLang, dstLang) {
+    var srcEl = document.getElementById("detail-desc-" + srcLang);
+    var dstEl = document.getElementById("detail-desc-" + dstLang);
+    var statusEl = document.getElementById("detail-tr-status");
+    if (!srcEl || !dstEl) return;
+    var text = (srcEl.value || "").trim();
+    if (!text) {
+      if (statusEl) statusEl.textContent = t("detail.trNeedSource");
+      return;
+    }
+    var token = getCortexOwnerToken2();
+    if (!token) {
+      if (statusEl) statusEl.textContent = t("detail.aiLoginNeeded");
+      return;
+    }
+    var config = loadConfig();
+    var aimeatUrl = (config.aimeatUrl || "").replace(/\/+$/, "");
+    if (!aimeatUrl) {
+      if (statusEl) statusEl.textContent = t("detail.aiUnavailable");
+      return;
+    }
+    var langName = { en: "English", fi: "Finnish" };
+    var enfiBtn = document.getElementById("detail-tr-enfi");
+    var fienBtn = document.getElementById("detail-tr-fien");
+    if (enfiBtn) enfiBtn.disabled = true;
+    if (fienBtn) fienBtn.disabled = true;
+    if (statusEl) {
+      statusEl.style.color = "var(--text-muted)";
+      statusEl.textContent = t("detail.translating");
+    }
+    var systemPrompt = "You are a professional translator for short app-store descriptions. Translate the text from " + (langName[srcLang] || srcLang) + " to " + (langName[dstLang] || dstLang) + ". Return ONLY the translated text — no quotes, no notes, no explanation. Keep it concise and natural.";
+    fetch(aimeatUrl + "/v1/ai/complete", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({ prompt: text, systemPrompt, app_id: "app-catalog" })
+    }).then(function(resp) {
+      return resp.json();
+    }).then(function(json) {
+      if (enfiBtn) enfiBtn.disabled = false;
+      if (fienBtn) fienBtn.disabled = false;
+      if (!json || !json.ok) {
+        var msg = json && json.error && json.error.message || "Translation failed";
+        if (statusEl) {
+          statusEl.style.color = "var(--accent)";
+          statusEl.textContent = "✘ " + msg;
+        }
+        return;
+      }
+      var out = (json.data && json.data.content ? json.data.content : "").trim();
+      if (!out) {
+        if (statusEl) {
+          statusEl.style.color = "var(--accent)";
+          statusEl.textContent = "✘ " + t("detail.trEmpty");
+        }
+        return;
+      }
+      dstEl.value = out;
+      if (statusEl) {
+        statusEl.style.color = "#34d399";
+        statusEl.textContent = "✔ " + t("detail.trDone");
+      }
+    }).catch(function(err) {
+      if (enfiBtn) enfiBtn.disabled = false;
+      if (fienBtn) fienBtn.disabled = false;
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + (err.message || "Translation failed");
+      }
     });
   }
   function detailSetScreenshot() {
@@ -6124,6 +6222,7 @@
         id: generateId2(),
         name: meta.name || filename.replace(/\.html?$/i, ""),
         description: meta.description || "",
+        descriptions: meta.descriptions || null,
         category: meta.category || "utility",
         tags: meta.tags || [],
         usesCortex: meta.usesCortex || [],
@@ -6357,6 +6456,7 @@
         mime_type: "text/html",
         name: meta.name || filename.replace(/\.html?$/i, ""),
         description: meta.description || "",
+        descriptions: meta.descriptions || null,
         category: meta.category || "utility",
         tags: meta.tags || [],
         uses_cortex: meta.usesCortex || []
@@ -7854,6 +7954,7 @@
           name: sa.manifest && sa.manifest.name || fn,
           icon: "🌐",
           description: sa.manifest && sa.manifest.description || "",
+          descriptions: sa.manifest && sa.manifest.descriptions || null,
           tags: sa.manifest && sa.manifest.tags || [],
           favorite: false,
           sortOrder: void 0,
@@ -7962,7 +8063,10 @@
     var st = libStatus(e);
     var dragAttrs = e.hasLocal ? ' draggable="true" ondragstart="window._launcher.onCardDragStart(event)" ondragend="window._launcher.onCardDragEnd(event)" ondragover="window._launcher.onCardDragOver(event)" ondrop="window._launcher.onCardDrop(event)"' : "";
     var menuBtn = e.hasLocal ? `<button class="card-menu-btn" onclick="event.stopPropagation(); window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')" title="` + escapeHtml(t("common.menu")) + '">⋮</button>' : "";
-    return '<div class="app-card' + (e.hasLocal ? "" : " server-only") + '" data-id="' + idAttr + '"' + dragAttrs + filterAttr(e.name, e.tags) + ' onclick="' + detailCall + '"' + (e.hasLocal ? ` oncontextmenu="window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')"` : "") + ' style="animation-delay:' + i * 0.04 + 's"><span class="app-status-badge st-' + st + '">' + escapeHtml(libStatusLabel(e)) + "</span>" + (e.hasDraft ? '<span class="app-staging-badge" title="' + escapeHtml(t("card.stagingHint")) + '">' + escapeHtml(t("card.stagingBadge")) + "</span>" : "") + menuBtn + '<div class="app-icon">' + escapeHtml(e.icon || "📝") + '</div><div class="app-name">' + escapeHtml(e.name) + (e.origin === "ai-published" ? ' <span class="ai-origin-badge">AI</span>' : "") + (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">🤖</span>' : "") + "</div>" + (e.description ? '<div class="app-source">' + escapeHtml(e.description) + "</div>" : '<div class="app-source">' + sourceLabel(e.source) + "</div>") + '<div class="app-actions">' + openBtns + '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t("ctx.details")) + "</button></div>" + (e.favorite ? '<span class="fav-star visible">⭐</span>' : "") + "</div>";
+    return '<div class="app-card' + (e.hasLocal ? "" : " server-only") + '" data-id="' + idAttr + '"' + dragAttrs + filterAttr(e.name, e.tags) + ' onclick="' + detailCall + '"' + (e.hasLocal ? ` oncontextmenu="window._launcher.showContextMenu(event, '` + jsArg(e.localId) + `')"` : "") + ' style="animation-delay:' + i * 0.04 + 's"><span class="app-status-badge st-' + st + '">' + escapeHtml(libStatusLabel(e)) + "</span>" + (e.hasDraft ? '<span class="app-staging-badge" title="' + escapeHtml(t("card.stagingHint")) + '">' + escapeHtml(t("card.stagingBadge")) + "</span>" : "") + menuBtn + '<div class="app-icon">' + escapeHtml(e.icon || "📝") + '</div><div class="app-name">' + escapeHtml(e.name) + (e.origin === "ai-published" ? ' <span class="ai-origin-badge">AI</span>' : "") + (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t("card.agentHint")) + '">🤖</span>' : "") + "</div>" + (function() {
+      var d = e.descriptions && e.descriptions[getLang()] || e.description || "";
+      return d ? '<div class="app-source">' + escapeHtml(d) + "</div>" : '<div class="app-source">' + sourceLabel(e.source) + "</div>";
+    })() + '<div class="app-actions">' + openBtns + '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t("ctx.details")) + "</button></div>" + (e.favorite ? '<span class="fav-star visible">⭐</span>' : "") + "</div>";
   }
   var currentIframeUrl = "";
   function closeIframe() {
@@ -8320,6 +8424,7 @@
     detailAboutEdit,
     detailAboutCancel,
     detailAboutSave,
+    detailTranslateDesc,
     detailToggleFavorite,
     detailAccessCodeEdit,
     detailAccessCodeCancel,

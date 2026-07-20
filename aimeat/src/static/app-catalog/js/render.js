@@ -20,7 +20,7 @@ import { escapeHtml, jsArg, sourceLabel, filterAttr, isSameOriginUrl } from './u
 import { getAllApps, saveApp, deleteApp } from './db.js';
 import { showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
-import { t } from './i18n.js';
+import { t, getLang } from './i18n.js';
 import { setEditingAppId, switchTab } from './apps-io.js';
 import { openPromptBuilder } from './cortex.js';
 import { openDetailView, openPublishedDetail } from './detail.js';
@@ -252,6 +252,7 @@ function buildLibraryEntries(localApps, serverApps) {
         name: (sa.manifest && sa.manifest.name) || fn,
         icon: '\u{1F310}',
         description: (sa.manifest && sa.manifest.description) || '',
+        descriptions: (sa.manifest && sa.manifest.descriptions) || null,
         tags: (sa.manifest && sa.manifest.tags) || [],
         favorite: false, sortOrder: undefined, openMode: 'tab',
         source: 'server', origin: null,
@@ -407,9 +408,13 @@ function libraryCardHtml(e, i) {
       '<div class="app-name">' + escapeHtml(e.name) +
         (e.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') +
         (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') + '</div>' +
-      (e.description
-        ? '<div class="app-source">' + escapeHtml(e.description) + '</div>'
-        : '<div class="app-source">' + sourceLabel(e.source) + '</div>') +
+      (function () {
+        // Show the description in the current UI language, falling back to the canonical one.
+        var d = (e.descriptions && e.descriptions[getLang()]) || e.description || '';
+        return d
+          ? '<div class="app-source">' + escapeHtml(d) + '</div>'
+          : '<div class="app-source">' + sourceLabel(e.source) + '</div>';
+      })() +
       '<div class="app-actions">' +
         openBtns +
         '<button onclick="event.stopPropagation(); ' + detailCall + '">' + escapeHtml(t('ctx.details')) + '</button>' +

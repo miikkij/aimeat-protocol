@@ -36,6 +36,7 @@ const ALL_SUITES = [
     'test/e2e-app-draft.ts',
     'test/e2e-app-fork.ts',
     'test/e2e-app-protect.ts',
+    'test/e2e-app-descriptions.ts',
     'test/e2e-app-copyscan.ts',
     'test/e2e-apps-moderation.ts',
     // Self-spawns its own server with the app-origin flag ON (the shared server keeps it
