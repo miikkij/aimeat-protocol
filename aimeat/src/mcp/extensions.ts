@@ -25,6 +25,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mc
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { parse as parseYaml } from 'yaml';
+import { validateActionPricing } from '../routes/extensions/manifest.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
@@ -465,6 +466,12 @@ export function registerExtensionsTools(
                         isError: true,
                     };
                 }
+                // Per-action pricing (tollMorsels / commercial) — validate here so the MCP install path
+                // matches REST (C1/M1); without this the fields were silently dropped and calls ran free.
+                const pricingErr = validateActionPricing(action, action.id as string);
+                if (pricingErr && !pricingErr.ok) {
+                    return { content: [{ type: 'text' as const, text: pricingErr.message }], isError: true };
+                }
             }
 
             // Check if extension already exists
@@ -502,6 +509,10 @@ export function registerExtensionsTools(
                     inputSchema: (a.input as Record<string, unknown>) ?? {},
                     outputSchema: (a.output as Record<string, unknown>) ?? {},
                     scriptContent: scripts[a.script as string],
+                    // Carry per-action pricing through (validated above) — priced EXCHANGE providers must
+                    // survive an MCP/Claude-chat install, not just the REST path.
+                    ...(a.tollMorsels !== undefined ? { tollMorsels: a.tollMorsels as number } : {}),
+                    ...(a.commercial !== undefined ? { commercial: a.commercial as ExtensionRecord['actions'][number]['commercial'] } : {}),
                 })),
                 config: {
                     ...(manifestConfig
