@@ -163,7 +163,7 @@ export async function listOrders(storage: Storage, sellerGhii: string, limit = 5
  * dashboard can total the operator's real-money cut per currency. `mode` notes how it is collected:
  * `connect` when the Stripe handler routed an application-fee, otherwise `receivable` (invoice).
  */
-async function recordMoneyPlatformFee(
+export async function recordMoneyPlatformFee(
   storage: Storage,
   config: AimeatConfig,
   args: { fee: number; currency: string; sellerGhii: string; buyerGhii: string; trackingCode: string; handler: string },
