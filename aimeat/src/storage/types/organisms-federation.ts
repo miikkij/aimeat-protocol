@@ -270,6 +270,18 @@ export interface ExtensionRecord {
     commercial?: {
       payMorsels: number;                                    // morsels credited to owner (0 = money-only)
       payMoney?: { amount: number; currency: string };       // 6-decimal micro-units, PSP-settled to owner
+      /**
+       * Optional EXCHANGE pricing PLANS the provider offers beyond the base per-call price (TARGET-045
+       * Phase B). A consumer accepts one by `plan_id`; amounts are in the action's unit (morsels when
+       * payMorsels>0, else payMoney micros). Absent => only the base per-call plan is available.
+       *   - bundle:       { id, model:'bundle', blockSize, blockPrice }               — N calls for a price
+       *   - subscription: { id, model:'subscription', periodSeconds, periodPrice,     — flat fee per period,
+       *                     callsPerWindow, windowSeconds }                             rate-limited N/window
+       */
+      plans?: Array<
+        | { id: string; model: 'bundle'; blockSize: number; blockPrice: number }
+        | { id: string; model: 'subscription'; periodSeconds: number; periodPrice: number; callsPerWindow: number; windowSeconds: number }
+      >;
     };
   }>;
   config: Record<string, unknown>;

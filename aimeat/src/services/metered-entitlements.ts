@@ -33,6 +33,32 @@ const NS = 'metered-entitlement';
  *  atomic settlement); the `money` rail (Stripe Connect, EE) is the identical seam. */
 export type EntitlementUnit = 'money' | 'morsels';
 
+/**
+ * The PRICING MODEL — what triggers a charge, orthogonal to the settlement rail (unit). Carries its own
+ * mutable state so the gateway can advance it per call. Amounts are in the entitlement's `unit`.
+ *   - `per_call`      — charge `pricePerCall` every call (the base model).
+ *   - `bundle`        — buy a block of `blockSize` calls for `blockPrice`; each call draws down
+ *     `callsRemaining`; hitting 0 refills (charges another `blockPrice`).
+ *   - `subscription`  — pay `periodPrice` per `periodSeconds` window; within the period calls are free but
+ *     rate-limited to `callsPerWindow` per `windowSeconds`; period expiry renews (charges again).
+ */
+export type PricingSpec =
+  | { model: 'per_call' }
+  | { model: 'bundle'; blockSize: number; blockPrice: number; callsRemaining: number }
+  | {
+      model: 'subscription'; periodSeconds: number; periodPrice: number;
+      callsPerWindow: number; windowSeconds: number;
+      validUntil: string; windowStart: string; windowCount: number;
+    };
+
+/** What to charge for ONE call + the advanced pricing state to persist (computed by {@link computeCharge}). */
+export interface ChargeDecision {
+  allowed: boolean;
+  reason?: string;      // when !allowed, e.g. 'rate_limited'
+  chargeUnits: number;  // amount to settle for THIS call (0 within a bundle quota / subscription period)
+  pricing: PricingSpec; // updated state to persist on commit
+}
+
 /** Per-entitlement spend ceiling, expressed in the entitlement's `unit`. `capUnits: null` = uncapped. */
 export interface EntitlementBudget {
   capUnits: number | null;
@@ -56,10 +82,13 @@ export interface MeteredEntitlement {
   capabilityLabel: string;
   /** The unit price + budget are expressed in. */
   unit: EntitlementUnit;
-  /** Price for ONE call, in `unit` (micros for money, whole morsels for morsels). */
+  /** Base per-call price, in `unit` (micros for money, whole morsels for morsels). Charged directly for
+   *  `per_call`; the reference/base for other models (bundle/subscription set their own amounts). */
   pricePerCall: number;
   /** Currency when `unit === 'money'` (e.g. EUR/USD); ignored for morsels. */
   currency: string | null;
+  /** The pricing model + its mutable state. Defaults to `{ model: 'per_call' }`. */
+  pricing: PricingSpec;
   budget: EntitlementBudget;
   /** Platform cut override (0–100). `null` = use the node's configured marketplace fee. */
   rakePercent: number | null;
@@ -114,7 +143,7 @@ export async function createEntitlement(
   storage: Storage,
   input: {
     consumerGaii: string; appId?: string | null; providerGhii: string; ext: string; action: string; capabilityLabel?: string;
-    unit: EntitlementUnit; pricePerCall: number; currency?: string | null;
+    unit: EntitlementUnit; pricePerCall: number; currency?: string | null; pricing?: PricingSpec | null;
     capUnits?: number | null; rakePercent?: number | null; contractRef: string;
     escrowParty?: 'consumer' | 'provider' | null; createdBy: string; carrySpend?: MeteredEntitlement | null;
   },
@@ -131,6 +160,7 @@ export async function createEntitlement(
     unit: input.unit,
     pricePerCall: input.pricePerCall,
     currency: input.unit === 'money' ? (input.currency ?? 'EUR') : null,
+    pricing: input.pricing ?? input.carrySpend?.pricing ?? { model: 'per_call' },
     budget: {
       capUnits: input.capUnits ?? null,
       spentUnits: input.carrySpend?.budget.spentUnits ?? 0,
@@ -186,33 +216,67 @@ export async function authorizeAndCharge(
   return { ok: true, entitlement: ent };
 }
 
-/** Peek: would ONE more call fit under the cap right now? (No mutation — the G2 gate checks this BEFORE
- *  moving money, then calls {@link commitSpend} only after settlement succeeds, so a failed debit never
- *  leaves a phantom spend.) */
-export function budgetAllows(ent: MeteredEntitlement): boolean {
-  if (ent.state !== 'active') return false;
-  const price = Math.max(0, ent.pricePerCall);
-  return ent.budget.capUnits === null || ent.budget.spentUnits + price <= ent.budget.capUnits;
+/**
+ * Compute what THIS call costs + the advanced pricing state, per the entitlement's pricing model. Pure —
+ * no mutation, no I/O (`nowMs` is passed in so it stays testable). The gate uses the result to check the
+ * budget, settle `chargeUnits`, and then {@link commitSpend} the advanced `pricing`. `allowed:false` means
+ * the call is refused without charge (a subscription rate-limit window is full).
+ */
+export function computeCharge(ent: MeteredEntitlement, nowMs: number): ChargeDecision {
+  const p = ent.pricing ?? { model: 'per_call' };
+  if (p.model === 'bundle') {
+    if (p.callsRemaining > 0) {
+      return { allowed: true, chargeUnits: 0, pricing: { ...p, callsRemaining: p.callsRemaining - 1 } };
+    }
+    // Quota drained → refill: charge one more block and consume a call from it.
+    return { allowed: true, chargeUnits: Math.max(0, p.blockPrice), pricing: { ...p, callsRemaining: Math.max(0, p.blockSize - 1) } };
+  }
+  if (p.model === 'subscription') {
+    const nowIso = new Date(nowMs).toISOString();
+    let validUntil = p.validUntil, windowStart = p.windowStart, windowCount = p.windowCount, charge = 0;
+    if (nowMs >= new Date(validUntil).getTime()) {           // period expired → renew (charge the period fee)
+      charge = Math.max(0, p.periodPrice);
+      validUntil = new Date(nowMs + p.periodSeconds * 1000).toISOString();
+      windowStart = nowIso; windowCount = 0;
+    }
+    if (nowMs >= new Date(windowStart).getTime() + p.windowSeconds * 1000) { // rate window rolled over
+      windowStart = nowIso; windowCount = 0;
+    }
+    if (windowCount >= p.callsPerWindow) {                   // rate limit hit — refuse without charge
+      return { allowed: false, reason: 'rate_limited', chargeUnits: 0, pricing: { ...p, validUntil, windowStart, windowCount } };
+    }
+    return { allowed: true, chargeUnits: charge, pricing: { ...p, validUntil, windowStart, windowCount: windowCount + 1 } };
+  }
+  return { allowed: true, chargeUnits: Math.max(0, ent.pricePerCall), pricing: { model: 'per_call' } };
 }
 
-/** Commit one call's spend AFTER settlement succeeded: increment spent + calls, flip to `exhausted` when
- *  the cap is reached. (Read-modify-write — see the concurrency note on {@link authorizeAndCharge}.) */
-export async function commitSpend(storage: Storage, ent: MeteredEntitlement): Promise<MeteredEntitlement> {
-  ent.budget.spentUnits += Math.max(0, ent.pricePerCall);
+/** Peek: would a charge of `chargeUnits` fit under the cap right now? (No mutation — the G2 gate checks this
+ *  BEFORE moving money, then calls {@link commitSpend} only after settlement succeeds, so a failed debit
+ *  never leaves a phantom spend.) */
+export function budgetAllows(ent: MeteredEntitlement, chargeUnits: number): boolean {
+  if (ent.state !== 'active') return false;
+  return ent.budget.capUnits === null || ent.budget.spentUnits + Math.max(0, chargeUnits) <= ent.budget.capUnits;
+}
+
+/** Commit one call AFTER settlement succeeded: add `chargeUnits` to spend, bump calls, advance the pricing
+ *  state, flip to `exhausted` at the cap. (Read-modify-write — see the concurrency note on {@link authorizeAndCharge}.) */
+export async function commitSpend(storage: Storage, ent: MeteredEntitlement, chargeUnits: number, pricing?: PricingSpec): Promise<MeteredEntitlement> {
+  ent.budget.spentUnits += Math.max(0, chargeUnits);
   ent.budget.calls += 1;
+  if (pricing) ent.pricing = pricing;
   if (ent.budget.capUnits !== null && ent.budget.spentUnits >= ent.budget.capUnits) ent.state = 'exhausted';
   ent.updatedAt = new Date().toISOString();
   await persist(storage, ent);
   return ent;
 }
 
-/** Roll back one call's spend (the G2 gate calls this when the sandbox script throws AFTER settlement, in
- *  lockstep with the money refund). Decrements spent + calls (floored at 0) and un-exhausts if this frees
- *  headroom. No-op if the entitlement vanished. */
-export async function refundSpend(storage: Storage, consumerGaii: string, ext: string, action: string): Promise<void> {
+/** Roll back one call's spend by `chargeUnits` (the gate calls this when the sandbox script throws AFTER
+ *  settlement, in lockstep with the money refund). Floors at 0 and un-exhausts if this frees headroom. Does
+ *  NOT rewind the pricing quota/window (a thrown call still consumed its slot — conservative). No-op if gone. */
+export async function refundSpend(storage: Storage, consumerGaii: string, ext: string, action: string, chargeUnits: number): Promise<void> {
   const e = await readEntitlementForCall(storage, consumerGaii, ext, action);
   if (!e) return;
-  e.budget.spentUnits = Math.max(0, e.budget.spentUnits - Math.max(0, e.pricePerCall));
+  e.budget.spentUnits = Math.max(0, e.budget.spentUnits - Math.max(0, chargeUnits));
   e.budget.calls = Math.max(0, e.budget.calls - 1);
   if (e.state === 'exhausted' && (e.budget.capUnits === null || e.budget.spentUnits < e.budget.capUnits)) {
     e.state = 'active';
