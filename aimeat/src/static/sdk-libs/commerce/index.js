@@ -15,7 +15,8 @@
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-commerce.ts (SDK-libs migration Phase 2).
  */
 import { APEX_URL } from '../_core/config.js';
-import { authFetch } from '../_core/session.js';
+import { makeSession } from '../_core/session.js';
+const { authFetch } = makeSession('aimeat-commerce.js');
 import { attach } from '../_core/namespace.js';
 
 const NODE_URL = APEX_URL;

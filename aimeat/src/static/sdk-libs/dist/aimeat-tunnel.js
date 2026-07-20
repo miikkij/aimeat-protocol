@@ -18,14 +18,23 @@
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
   // src/static/sdk-libs/_core/session.js
-  function getSession() {
+  function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
-      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before this library.");
+      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before " + (libLabel || "this library"));
     }
     const s = auth.getSession();
     if (!s) throw new Error("Not logged in. Call AIMEAT.auth.login() first.");
     return s;
+  }
+  function authFetch(path, opts, libLabel) {
+    return getSession(libLabel).fetch(path, opts);
+  }
+  function makeSession(libLabel) {
+    return {
+      getSession: () => getSession(libLabel),
+      authFetch: (path, opts) => authFetch(path, opts, libLabel)
+    };
   }
 
   // src/static/sdk-libs/_core/namespace.js
@@ -40,6 +49,7 @@
   }
 
   // src/static/sdk-libs/tunnel/index.js
+  var { getSession: getSession2 } = makeSession("aimeat-tunnel.js");
   function uuid() {
     return crypto.randomUUID ? crypto.randomUUID() : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, function(c) {
       var r = Math.random() * 16 | 0;
@@ -91,7 +101,7 @@
   TunnelClient.prototype.connect = function() {
     if (this._closed) return;
     this._setStatus("connecting");
-    var session = getSession();
+    var session = getSession2();
     var wsUrl = NODE_URL.replace(/^http/, "ws") + "/v1/personal/tunnel?token=" + encodeURIComponent(session.jwt);
     var self = this;
     try {

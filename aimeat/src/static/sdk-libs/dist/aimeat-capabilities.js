@@ -3,17 +3,23 @@
 "use strict";
 (() => {
   // src/static/sdk-libs/_core/session.js
-  function getSession() {
+  function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
-      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before this library.");
+      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before " + (libLabel || "this library"));
     }
     const s = auth.getSession();
     if (!s) throw new Error("Not logged in. Call AIMEAT.auth.login() first.");
     return s;
   }
-  function authFetch(path, opts) {
-    return getSession().fetch(path, opts);
+  function authFetch(path, opts, libLabel) {
+    return getSession(libLabel).fetch(path, opts);
+  }
+  function makeSession(libLabel) {
+    return {
+      getSession: () => getSession(libLabel),
+      authFetch: (path, opts) => authFetch(path, opts, libLabel)
+    };
   }
 
   // src/static/sdk-libs/_core/namespace.js
@@ -28,6 +34,7 @@
   }
 
   // src/static/sdk-libs/capabilities/index.js
+  var { getSession: getSession2, authFetch: authFetch2 } = makeSession("aimeat-capabilities.js");
   var _loadedCortex = {};
   async function loadCortexLib(url) {
     if (_loadedCortex[url]) return;
@@ -59,7 +66,7 @@
         if (filters.per_page) params.set("per_page", String(filters.per_page));
       }
       var qs = params.toString();
-      var res = await authFetch("/v1/capabilities" + (qs ? "?" + qs : ""));
+      var res = await authFetch2("/v1/capabilities" + (qs ? "?" + qs : ""));
       if (!res.ok) throw new Error(res.error?.message || "Failed to list capabilities");
       return res.data;
     },
@@ -67,7 +74,7 @@
       return capabilities.list({ search: query });
     },
     async get(id) {
-      var res = await authFetch("/v1/capabilities/" + encodeURIComponent(id));
+      var res = await authFetch2("/v1/capabilities/" + encodeURIComponent(id));
       if (!res.ok) throw new Error(res.error?.message || "Capability not found");
       return res.data;
     },
@@ -91,7 +98,7 @@
               var result = await fn(input);
               var duration = Math.round(performance.now() - start);
               try {
-                authFetch("/v1/capabilities/" + encodeURIComponent(id) + "/telemetry", {
+                authFetch2("/v1/capabilities/" + encodeURIComponent(id) + "/telemetry", {
                   method: "POST",
                   body: JSON.stringify({ duration_ms: duration, status: "success" })
                 }).catch(function() {
@@ -104,7 +111,7 @@
         }
         throw new Error("Cortex capability loaded but export function not found. Use direct loadScript() instead.");
       }
-      var res = await authFetch("/v1/capabilities/" + encodeURIComponent(id) + "/invoke" + (mode === "raw" ? "?mode=raw" : ""), {
+      var res = await authFetch2("/v1/capabilities/" + encodeURIComponent(id) + "/invoke" + (mode === "raw" ? "?mode=raw" : ""), {
         method: "POST",
         body: JSON.stringify({ input: input || {} })
       });
@@ -113,7 +120,7 @@
     },
     // ── Management ──
     async create(record) {
-      var res = await authFetch("/v1/capabilities", {
+      var res = await authFetch2("/v1/capabilities", {
         method: "POST",
         body: JSON.stringify(record)
       });
@@ -121,7 +128,7 @@
       return res.data;
     },
     async update(id, updates) {
-      var res = await authFetch("/v1/capabilities/" + encodeURIComponent(id), {
+      var res = await authFetch2("/v1/capabilities/" + encodeURIComponent(id), {
         method: "PUT",
         body: JSON.stringify(updates)
       });
@@ -129,19 +136,19 @@
       return res.data;
     },
     async delete(id) {
-      var res = await authFetch("/v1/capabilities/" + encodeURIComponent(id), {
+      var res = await authFetch2("/v1/capabilities/" + encodeURIComponent(id), {
         method: "DELETE"
       });
       if (!res.ok) throw new Error(res.error?.message || "Failed to delete capability");
       return res.data;
     },
     async mine() {
-      var session = getSession();
+      var session = getSession2();
       return capabilities.list({ owner: session.ghii || session.owner });
     },
     // ── Testing ──
     async test(id, input) {
-      var res = await authFetch("/v1/capabilities/" + encodeURIComponent(id) + "/test", {
+      var res = await authFetch2("/v1/capabilities/" + encodeURIComponent(id) + "/test", {
         method: "POST",
         body: JSON.stringify({ input: input || {} })
       });
@@ -151,7 +158,7 @@
     // ── Vouching ──
     async vouch(id, comment) {
       var body = comment ? { comment } : {};
-      var res = await authFetch("/v1/capabilities/" + encodeURIComponent(id) + "/vouch", {
+      var res = await authFetch2("/v1/capabilities/" + encodeURIComponent(id) + "/vouch", {
         method: "POST",
         body: JSON.stringify(body)
       });
@@ -159,7 +166,7 @@
       return res.data;
     },
     async unvouch(id) {
-      var res = await authFetch("/v1/capabilities/" + encodeURIComponent(id) + "/vouch", {
+      var res = await authFetch2("/v1/capabilities/" + encodeURIComponent(id) + "/vouch", {
         method: "DELETE"
       });
       if (!res.ok) throw new Error(res.error?.message || "Unvouch failed");

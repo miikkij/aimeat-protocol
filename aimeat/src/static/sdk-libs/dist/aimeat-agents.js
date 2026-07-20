@@ -3,17 +3,23 @@
 "use strict";
 (() => {
   // src/static/sdk-libs/_core/session.js
-  function getSession() {
+  function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
-      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before this library.");
+      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before " + (libLabel || "this library"));
     }
     const s = auth.getSession();
     if (!s) throw new Error("Not logged in. Call AIMEAT.auth.login() first.");
     return s;
   }
-  function authFetch(path, opts) {
-    return getSession().fetch(path, opts);
+  function authFetch(path, opts, libLabel) {
+    return getSession(libLabel).fetch(path, opts);
+  }
+  function makeSession(libLabel) {
+    return {
+      getSession: () => getSession(libLabel),
+      authFetch: (path, opts) => authFetch(path, opts, libLabel)
+    };
   }
 
   // src/static/sdk-libs/_core/namespace.js
@@ -28,6 +34,7 @@
   }
 
   // src/static/sdk-libs/agents/index.js
+  var { authFetch: authFetch2 } = makeSession("aimeat-agents.js");
   var enc = encodeURIComponent;
   function unwrap(r, action) {
     if (!r || !r.ok) {
@@ -48,7 +55,7 @@
     async list(opts) {
       var now = Date.now();
       if (!(opts && opts.fresh) && _agentsCache && now - _agentsCache.t < 3e4) return _agentsCache.v;
-      var data = unwrap(await authFetch("/v1/agents"), "list agents");
+      var data = unwrap(await authFetch2("/v1/agents"), "list agents");
       var v = data.agents || [];
       _agentsCache = { v, t: now };
       return opts && opts.activeOnly ? v.filter(function(a) {
@@ -71,7 +78,7 @@
         description: task.description,
         status: task.status || "queued"
       };
-      var data = unwrap(await authFetch("/v1/agents/" + enc(name) + "/tasks", {
+      var data = unwrap(await authFetch2("/v1/agents/" + enc(name) + "/tasks", {
         method: "POST",
         body: JSON.stringify(body)
       }), "create task");
@@ -79,16 +86,16 @@
     },
     /** Get a single task. */
     async getTask(name, id) {
-      return unwrap(await authFetch("/v1/agents/" + enc(name) + "/tasks/" + enc(id)), "get task").task;
+      return unwrap(await authFetch2("/v1/agents/" + enc(name) + "/tasks/" + enc(id)), "get task").task;
     },
     /** List an agent's tasks. opts.status filters (queued|active|done|failed|...). */
     async tasks(name, opts) {
       var q = "?per_page=100" + (opts && opts.status ? "&status=" + enc(opts.status) : "");
-      return unwrap(await authFetch("/v1/agents/" + enc(name) + "/tasks" + q), "list tasks").tasks || [];
+      return unwrap(await authFetch2("/v1/agents/" + enc(name) + "/tasks" + q), "list tasks").tasks || [];
     },
     /** The task's event log (oldest-first). */
     async events(name, id) {
-      return unwrap(await authFetch("/v1/agents/" + enc(name) + "/tasks/" + enc(id) + "/events"), "list events").events || [];
+      return unwrap(await authFetch2("/v1/agents/" + enc(name) + "/tasks/" + enc(id) + "/events"), "list events").events || [];
     },
     /** Live-watch a task: calls onUpdate(task, events) on every server change
      *  (SSE) plus a periodic poll as a safety net. Returns an unsubscribe fn. */
@@ -112,7 +119,7 @@
       pollTimer = setInterval(refresh, pollMs);
       (async function() {
         try {
-          var tk = unwrap(await authFetch("/v1/events/ticket", { method: "POST" }), "open event stream");
+          var tk = unwrap(await authFetch2("/v1/events/ticket", { method: "POST" }), "open event stream");
           if (stopped || !tk || !tk.ticket) return;
           es = new EventSource("/v1/events?ticket=" + enc(tk.ticket));
           es.onmessage = debounced;
@@ -138,7 +145,7 @@
       var task = await agents.getTask(name, id);
       var key = task && task.deliverableKey;
       if (!key) return null;
-      var data = unwrap(await authFetch("/v1/memory?agent=" + enc(task.agentGaii) + "&prefix=" + enc(key) + "&per_page=20"), "read deliverable");
+      var data = unwrap(await authFetch2("/v1/memory?agent=" + enc(task.agentGaii) + "&prefix=" + enc(key) + "&per_page=20"), "read deliverable");
       var items = data.items || [];
       var found = items.find(function(i) {
         return i.key === key;
@@ -149,7 +156,7 @@
     async memory(name, key) {
       var a = await agents.get(name);
       var gaii = a && a.gaii || name;
-      var data = unwrap(await authFetch("/v1/memory?agent=" + enc(gaii) + "&prefix=" + enc(key) + "&per_page=20"), "read agent memory");
+      var data = unwrap(await authFetch2("/v1/memory?agent=" + enc(gaii) + "&prefix=" + enc(key) + "&per_page=20"), "read agent memory");
       var items = data.items || [];
       var found = items.find(function(i) {
         return i.key === key;
@@ -159,7 +166,7 @@
     /** Agent questions awaiting an answer: outbound option-prompts with no reply
      *  yet. Each is { message_id, prompt_id, question, options, allow_other }. */
     async pendingPrompts(name) {
-      var data = unwrap(await authFetch("/v1/agents/" + enc(name) + "/messages?per_page=100"), "list messages");
+      var data = unwrap(await authFetch2("/v1/agents/" + enc(name) + "/messages?per_page=100"), "list messages");
       var msgs = data.messages || [];
       var answered = {};
       msgs.forEach(function(m) {
@@ -188,7 +195,7 @@
      *  option text, or free text when is_other is true. */
     async answerPrompt(name, ans) {
       if (!ans || !ans.prompt_id || !ans.choice) throw new Error("answerPrompt requires { prompt_id, choice }");
-      return unwrap(await authFetch("/v1/agents/" + enc(name) + "/messages", {
+      return unwrap(await authFetch2("/v1/agents/" + enc(name) + "/messages", {
         method: "POST",
         body: JSON.stringify({
           content: ans.choice,
@@ -245,7 +252,7 @@
      *  deletes a queued one (owner-only ops; best-effort). Returns
      *  { marked:true, native:'paused'|'deleted'|null }. */
     async cancelTask(name, taskId, opts) {
-      await authFetch("/v1/memory", { method: "POST", body: JSON.stringify({
+      await authFetch2("/v1/memory", { method: "POST", body: JSON.stringify({
         key: "agents.cancel.task." + taskId,
         value: [taskId],
         visibility: "owner"
@@ -255,10 +262,10 @@
         var t = await agents.getTask(name, taskId);
         var st = t && t.status;
         if (st === "active") {
-          var r = await authFetch("/v1/agents/" + enc(name) + "/tasks/" + enc(taskId) + "/pause", { method: "POST" });
+          var r = await authFetch2("/v1/agents/" + enc(name) + "/tasks/" + enc(taskId) + "/pause", { method: "POST" });
           if (r && r.ok) native = "paused";
         } else if (st === "queued" || st === "draft") {
-          var r2 = await authFetch("/v1/agents/" + enc(name) + "/tasks/" + enc(taskId), { method: "DELETE" });
+          var r2 = await authFetch2("/v1/agents/" + enc(name) + "/tasks/" + enc(taskId), { method: "DELETE" });
           if (r2 && r2.ok) native = "deleted";
         }
       } catch {
@@ -270,7 +277,7 @@
      *  (key agents.cancel.run.<run>). Workers union all agents.cancel.* markers. */
     async cancelRun(run, taskIds) {
       if (!run || !Array.isArray(taskIds)) throw new Error("cancelRun requires (run, taskIds[])");
-      await authFetch("/v1/memory", { method: "POST", body: JSON.stringify({
+      await authFetch2("/v1/memory", { method: "POST", body: JSON.stringify({
         key: "agents.cancel.run." + run,
         value: taskIds.map(String),
         visibility: "owner"
@@ -283,7 +290,7 @@
     async cancelledTaskIds(opts) {
       var now = Date.now();
       if (!(opts && opts.fresh) && _cancelSetCache && now - _cancelSetCache.t < 1e4) return _cancelSetCache.v;
-      var data = unwrap(await authFetch("/v1/memory?owner_scope=true&prefix=" + enc("agents.cancel.") + "&per_page=100"), "read cancel markers");
+      var data = unwrap(await authFetch2("/v1/memory?owner_scope=true&prefix=" + enc("agents.cancel.") + "&per_page=100"), "read cancel markers");
       var set = {};
       (data.items || []).forEach(function(it) {
         var v2 = it.value;

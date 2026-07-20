@@ -18,17 +18,23 @@
   var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
 
   // src/static/sdk-libs/_core/session.js
-  function getSession() {
+  function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
-      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before this library.");
+      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before " + (libLabel || "this library"));
     }
     const s = auth.getSession();
     if (!s) throw new Error("Not logged in. Call AIMEAT.auth.login() first.");
     return s;
   }
-  function authFetch(path, opts) {
-    return getSession().fetch(path, opts);
+  function authFetch(path, opts, libLabel) {
+    return getSession(libLabel).fetch(path, opts);
+  }
+  function makeSession(libLabel) {
+    return {
+      getSession: () => getSession(libLabel),
+      authFetch: (path, opts) => authFetch(path, opts, libLabel)
+    };
   }
 
   // src/static/sdk-libs/_core/namespace.js
@@ -43,6 +49,7 @@
   }
 
   // src/static/sdk-libs/work/index.js
+  var { authFetch: authFetch2 } = makeSession("aimeat-work.js");
   async function publicFetch(path) {
     const r = await fetch(NODE_URL + path);
     return r.json();
@@ -101,7 +108,7 @@
         input,
         ...opts
       };
-      const res = await authFetch("/v1/work/request", {
+      const res = await authFetch2("/v1/work/request", {
         method: "POST",
         body: JSON.stringify(body)
       });
@@ -110,7 +117,7 @@
     },
     // Submit batch work requests
     async batch(requests) {
-      const res = await authFetch("/v1/work/batch", {
+      const res = await authFetch2("/v1/work/batch", {
         method: "POST",
         body: JSON.stringify({ requests })
       });
@@ -120,20 +127,20 @@
     // ── Provider Inbox ──
     // Get pending work items (provider perspective)
     async inbox() {
-      const res = await authFetch("/v1/work/inbox");
+      const res = await authFetch2("/v1/work/inbox");
       if (!res.ok) throw new Error(res.error?.message || "Failed to get inbox");
       return res.data;
     },
     // ── Work Status & Actions ──
     // Get work status by tracking code
     async status(trackingCode) {
-      const res = await authFetch("/v1/work/" + encodeURIComponent(trackingCode));
+      const res = await authFetch2("/v1/work/" + encodeURIComponent(trackingCode));
       if (!res.ok) throw new Error(res.error?.message || "Failed to get work status");
       return res.data;
     },
     // Accept work (provider)
     async accept(trackingCode) {
-      const res = await authFetch("/v1/work/" + encodeURIComponent(trackingCode) + "/accept", {
+      const res = await authFetch2("/v1/work/" + encodeURIComponent(trackingCode) + "/accept", {
         method: "POST"
       });
       if (!res.ok) throw new Error(res.error?.message || "Failed to accept work");
@@ -141,7 +148,7 @@
     },
     // Mark work as in_progress (provider)
     async progress(trackingCode) {
-      const res = await authFetch("/v1/work/" + encodeURIComponent(trackingCode) + "/progress", {
+      const res = await authFetch2("/v1/work/" + encodeURIComponent(trackingCode) + "/progress", {
         method: "POST"
       });
       if (!res.ok) throw new Error(res.error?.message || "Failed to update progress");
@@ -149,7 +156,7 @@
     },
     // Reject work (provider)
     async reject(trackingCode, reason) {
-      const res = await authFetch("/v1/work/" + encodeURIComponent(trackingCode) + "/reject", {
+      const res = await authFetch2("/v1/work/" + encodeURIComponent(trackingCode) + "/reject", {
         method: "POST",
         body: JSON.stringify({ reason })
       });
@@ -163,7 +170,7 @@
         { output }
       );
       if (metadata) body.metadata = metadata;
-      const res = await authFetch("/v1/work/" + encodeURIComponent(trackingCode) + "/deliver", {
+      const res = await authFetch2("/v1/work/" + encodeURIComponent(trackingCode) + "/deliver", {
         method: "POST",
         body: JSON.stringify(body)
       });
@@ -177,7 +184,7 @@
         { rating }
       );
       if (comment) body.comment = comment;
-      const res = await authFetch("/v1/work/" + encodeURIComponent(trackingCode) + "/rate", {
+      const res = await authFetch2("/v1/work/" + encodeURIComponent(trackingCode) + "/rate", {
         method: "POST",
         body: JSON.stringify(body)
       });

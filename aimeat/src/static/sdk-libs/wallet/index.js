@@ -12,7 +12,8 @@
  * @version-history
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-wallet.ts (SDK-libs migration Phase 1).
  */
-import { authFetch } from '../_core/session.js';
+import { makeSession } from '../_core/session.js';
+const { authFetch } = makeSession('aimeat-wallet.js');
 import { attach } from '../_core/namespace.js';
 
 const wallet = {

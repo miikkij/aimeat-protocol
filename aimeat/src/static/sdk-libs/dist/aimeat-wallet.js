@@ -3,17 +3,23 @@
 "use strict";
 (() => {
   // src/static/sdk-libs/_core/session.js
-  function getSession() {
+  function getSession(libLabel) {
     const auth = window.AIMEAT && window.AIMEAT.auth;
     if (!auth) {
-      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before this library.");
+      throw new Error("AIMEAT.auth is required. Include aimeat-auth.js before " + (libLabel || "this library"));
     }
     const s = auth.getSession();
     if (!s) throw new Error("Not logged in. Call AIMEAT.auth.login() first.");
     return s;
   }
-  function authFetch(path, opts) {
-    return getSession().fetch(path, opts);
+  function authFetch(path, opts, libLabel) {
+    return getSession(libLabel).fetch(path, opts);
+  }
+  function makeSession(libLabel) {
+    return {
+      getSession: () => getSession(libLabel),
+      authFetch: (path, opts) => authFetch(path, opts, libLabel)
+    };
   }
 
   // src/static/sdk-libs/_core/namespace.js
@@ -28,10 +34,11 @@
   }
 
   // src/static/sdk-libs/wallet/index.js
+  var { authFetch: authFetch2 } = makeSession("aimeat-wallet.js");
   var wallet = {
     // Get current balance
     async balance() {
-      const res = await authFetch("/v1/wallet");
+      const res = await authFetch2("/v1/wallet");
       if (!res.ok) throw new Error(res.error?.message || "Failed to get balance");
       return res.data;
     },
@@ -43,7 +50,7 @@
       if (opts?.per_page) params.set("per_page", String(opts.per_page));
       if (opts?.limit) params.set("limit", String(opts.limit));
       const qs = params.toString();
-      const res = await authFetch("/v1/wallet/transactions" + (qs ? "?" + qs : ""));
+      const res = await authFetch2("/v1/wallet/transactions" + (qs ? "?" + qs : ""));
       if (!res.ok) throw new Error(res.error?.message || "Failed to get transactions");
       return res.data;
     },
@@ -52,13 +59,13 @@
       const params = new URLSearchParams();
       if (opts?.limit) params.set("limit", String(opts.limit));
       const qs = params.toString();
-      const res = await authFetch("/v1/wallet/history" + (qs ? "?" + qs : ""));
+      const res = await authFetch2("/v1/wallet/history" + (qs ? "?" + qs : ""));
       if (!res.ok) throw new Error(res.error?.message || "Failed to get history");
       return res.data;
     },
     // Request morsels (e.g. daily allowance)
     async request(amount, reason) {
-      const res = await authFetch("/v1/wallet/request", {
+      const res = await authFetch2("/v1/wallet/request", {
         method: "POST",
         body: JSON.stringify({ amount, reason })
       });
