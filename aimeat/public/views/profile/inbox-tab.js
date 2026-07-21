@@ -570,21 +570,21 @@ export default function InboxTab({ showToast }) {
     if (tr.state === 'awaiting-approval') await startSuggestedReply(tr);
   };
 
-  // Open a specific thread when arriving from a notification deep-link (sessionStorage hint set by
-  // the notification bell). 'requests' just lands on the inbox (requests show at the top of the list).
+  // Open a specific thread from a notification deep-link (sessionStorage hint set by the bell).
+  // 'requests' lands on the inbox list; 'req:<id>' (a "wants to message you" request notif) opens the
+  // thread once accepted, else falls back to the list (sender still pending accept/block).
   const consumeDeepLink = useCallback(async () => {
     let target = null;
     try { target = sessionStorage.getItem('aimeat.inbox.open'); } catch { /* noop */ }
     if (!target) return;
     try { sessionStorage.removeItem('aimeat.inbox.open'); } catch { /* noop */ }
     if (target === 'requests') { await loadLists(); return; }
+    const fromRequest = target.startsWith('req:'); if (fromRequest) target = target.slice(4);
     const convs = await messages.listConversations().catch(() => []);
     const conv = convs.find(c => c.conversationId === target);
-    if (conv) openConversation(conv);
-    // openConversation is a non-memoized handler invoked imperatively here with its `conv` argument; it
-    // uses only stable setters/refs, so no stale-closure risk. Keeping it out of deps preserves
-    // consumeDeepLink's stability (loadLists is a []-useCallback) so the two subscribing effects below
-    // don't re-run every render.
+    if (conv) openConversation(conv); else if (fromRequest) await loadLists();
+    // openConversation uses only stable setters/refs (no stale-closure risk); keeping it out of deps
+    // keeps consumeDeepLink stable (loadLists is a []-useCallback) so the two effects below don't re-run.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loadLists]);
   useEffect(() => { consumeDeepLink(); }, [consumeDeepLink]);

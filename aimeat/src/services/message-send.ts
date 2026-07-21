@@ -184,7 +184,10 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
         type: isRequest ? 'direct_message_request' : 'direct_message',
         title: isRequest ? `${senderGhii} wants to message you` : `New message from ${senderGhii}`,
         body: messagePreview(body),
-        link: isRequest ? '/v1/profile#inbox/requests' : `/v1/profile#inbox/${conversationId}`,
+        // Request → 'req:<conversationId>': while pending it lands on the inbox requests list, but once
+        // the request is accepted the same notification opens the now-existing thread (see inbox-tab
+        // consumeDeepLink). A delivered DM deep-links straight to its conversation.
+        link: isRequest ? `/v1/profile#inbox/req:${conversationId}` : `/v1/profile#inbox/${conversationId}`,
         // A delivered DM gets an inline reply box in the bell (POST /v1/messages back to the sender).
         // A pending request has no thread to reply into yet — it keeps its navigate-to-requests link.
         actions: isRequest ? undefined : [
