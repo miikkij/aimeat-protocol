@@ -505,5 +505,101 @@ await test('FREEZE: a schema change mints interface v2; the consumer’s contrac
   assert(e?.surface?.ifaceVersion === 1, `consumer contract must stay pinned to v1 after provider ships v2, got ${e?.surface?.ifaceVersion}`);
 });
 
+// ── RENEGOTIATION (proposals) + HISTORY + NEEDS APP-CONTEXT ──
+const consumerGaii = `${consumer.name}@${NODE_ID}`;
+const propose = (token: string, body: Record<string, unknown>) =>
+  json('/v1/exchange/proposals', { method: 'POST', headers: auth(token), body: JSON.stringify(body) });
+let propId = '';
+
+await test('A non-party cannot propose a change to a contract → 403/404', async () => {
+  // `buyer` is party to its OWN bid contract, but NOT to the consumer's 'cheap' contract → must be refused.
+  const r = await propose(buyer.token, { consumer_gaii: consumerGaii, ext: EXT, action: 'cheap', new_price_per_call: 9 });
+  assert(r.status === 403 || r.status === 404, `a non-party must not propose, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Provider proposes a price change on the consumer’s contract → pending + a message is delivered', async () => {
+  const r = await propose(provider.token, { consumer_gaii: consumerGaii, ext: EXT, action: 'cheap', new_price_per_call: 6, note: 'Upstream API got pricier' });
+  assert(r.status === 201, `propose ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const p = r.body.data.proposal;
+  assert(p.status === 'pending' && p.proposed_by === 'provider' && p.new_price_per_call === 6, `proposal: ${JSON.stringify(p)}`);
+  assert(p.current_terms.pricePerCall === 4, `current terms snapshot: ${JSON.stringify(p.current_terms)}`);
+  propId = p.proposal_id;
+  // The counterparty (consumer) receives an inbox message about it.
+  const inbox = await json('/v1/messages/inbox', { headers: auth(consumer.token) });
+  assert(inbox.status === 200 && JSON.stringify(inbox.body).includes('contract change proposed'), 'consumer should get a proposal message in their inbox');
+});
+
+await test('The proposer cannot accept their own proposal; only the counterparty can', async () => {
+  const r = await json(`/v1/exchange/proposals/${propId}/accept`, { method: 'POST', headers: auth(provider.token), body: '{}' });
+  assert(r.status === 403, `proposer accepting must 403, got ${r.status}`);
+});
+
+await test('Consumer sees the incoming proposal in their list', async () => {
+  const r = await json('/v1/exchange/proposals', { headers: auth(consumer.token) });
+  assert(r.status === 200 && r.body.data.proposals.some((p: any) => p.proposal_id === propId && p.status === 'pending'), 'proposal not in consumer list');
+});
+
+await test('Consumer ACCEPTS → contract supersedes at the new price (6); the old one is archived to history', async () => {
+  const r = await json(`/v1/exchange/proposals/${propId}/accept`, { method: 'POST', headers: auth(consumer.token), body: '{}' });
+  assert(r.status === 200, `accept ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.entitlement.price_per_call === 6, `new price should be 6, got ${r.body.data.entitlement.price_per_call}`);
+  assert(r.body.data.entitlement.budget.spent_units === 0, 'renegotiated contract starts a fresh meter');
+  // The live contract now prices at 6.
+  const list = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+  const e = list.body.data.entitlements.find((x: any) => x.action === 'cheap');
+  assert(e.price_per_call === 6, `live contract must be 6, got ${e.price_per_call}`);
+  // The old contract (price 4) is in history.
+  const hist = await json('/v1/exchange/entitlements/history', { headers: auth(consumer.token) });
+  assert(hist.status === 200, `history ${hist.status}`);
+  assert(hist.body.data.history.some((h: any) => h.action === 'cheap' && h.price_per_call === 4 && h.archive_reason === 'superseded'), `superseded old contract not in history: ${JSON.stringify(hist.body.data.history)}`);
+});
+
+await test('A metered call after renegotiation is priced at the NEW rate (6)', async () => {
+  // The renegotiated price (6) is what the gateway charges. Prove it robustly against the long suite's
+  // depleted balance: either the call succeeds and debits exactly 6, or it is refused for insufficient
+  // funds with a message that states the 6-morsel price — both confirm the new rate is in force.
+  const cb = await balance(consumer.token);
+  const r = await invoke(consumer.token, 'cheap');
+  if (r.status === 200) {
+    assert(await balance(consumer.token) === cb - 6, `the renegotiated price (6) is charged, balance moved ${cb - await balance(consumer.token)}`);
+  } else {
+    assert(r.status === 402 && /6 morsels/.test(JSON.stringify(r.body?.error)), `expected a 6-morsel charge or a 6-morsel insufficient-funds notice, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+  }
+});
+
+await test('Provider’s history view also shows the superseded contract', async () => {
+  const r = await json('/v1/exchange/provider/history', { headers: auth(provider.token) });
+  assert(r.status === 200 && r.body.data.history.some((h: any) => h.action === 'cheap' && h.price_per_call === 4), `provider history: ${JSON.stringify(r.body.data.history)}`);
+});
+
+await test('DECLINE: a new proposal declined by the consumer leaves the contract unchanged', async () => {
+  const p = await propose(provider.token, { consumer_gaii: consumerGaii, ext: EXT, action: 'cheap', new_price_per_call: 5 });
+  const id = p.body.data.proposal.proposal_id;
+  const dec = await json(`/v1/exchange/proposals/${id}/decline`, { method: 'POST', headers: auth(consumer.token), body: '{}' });
+  assert(dec.status === 200 && dec.body.data.proposal.status === 'declined', `decline ${dec.status}`);
+  const list = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+  const e = list.body.data.entitlements.find((x: any) => x.action === 'cheap');
+  assert(e.price_per_call === 6, 'declined proposal must not change the price (still 6)');
+});
+
+await test('WITHDRAW: the proposer can withdraw their own pending proposal', async () => {
+  const p = await propose(provider.token, { consumer_gaii: consumerGaii, ext: EXT, action: 'cheap', new_price_per_call: 7 });
+  const id = p.body.data.proposal.proposal_id;
+  const wd = await json(`/v1/exchange/proposals/${id}/withdraw`, { method: 'POST', headers: auth(provider.token), body: '{}' });
+  assert(wd.status === 200 && wd.body.data.proposal.status === 'withdrawn', `withdraw ${wd.status}`);
+  const cannotAccept = await json(`/v1/exchange/proposals/${id}/accept`, { method: 'POST', headers: auth(consumer.token), body: '{}' });
+  assert(cannotAccept.status === 404, 'a withdrawn proposal cannot be accepted');
+});
+
+await test('Needs carry usage-intent + an appContext field (provider can judge who they’d serve)', async () => {
+  const r = await json('/v1/exchange/needs', { method: 'POST', headers: auth(buyer.token),
+    body: JSON.stringify({ description: 'Company registry lookups for a CRM enrichment app', app_id: `${buyer.name}/crm-enrich`, usage_intent: 'Enrich CRM contacts nightly; internal use only, no resale', budget_unit: 'morsels', budget_cap: 40 }) });
+  assert(r.status === 201, `need w/ intent ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.need.usageIntent && r.body.data.need.usageIntent.includes('CRM'), `usageIntent roundtrip: ${r.body.data.need.usageIntent}`);
+  const list = await json('/v1/exchange/needs?open=1');
+  const n = list.body.data.needs.find((x: any) => x.needId === r.body.data.need.needId);
+  assert(n && 'appContext' in n && n.usageIntent, `enriched need must carry usageIntent + appContext field: ${JSON.stringify({ ac: n?.appContext, ui: n?.usageIntent })}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

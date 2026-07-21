@@ -16,6 +16,8 @@
  *   const gate = await authorizeAndCharge(storage, consumerGaii, ext, action, priceMicros);
  *   if (!gate.ok) return res.status(402)...;
  * @version-history
+ *   v1.3.0 — 2026-07-21 — Contract history: archiveEntitlement + listEntitlementHistoryByConsumer/ByProvider
+ *     (superseded contracts survive the live-key overwrite for the "past contracts" view — renegotiation).
  *   v1.2.0 — 2026-07-21 — Add optional `surface` (AppToolSurface) so a contract can bind an app-tool's pinned
  *     interface version (Gap 1 cross-app selling); the (ext, action) coordinate stays the shared key.
  *   v1.1.0 — 2026-07-20 — Add `appId` dimension + listEntitlementsByApp for the per-app cost surface (G3)
@@ -28,6 +30,9 @@ import type { Storage } from '../storage/interface.js';
 
 /** System namespace — server-side only, never surfaced to a client (mirrors `ext-pay-token`). */
 const NS = 'metered-entitlement';
+/** History namespace — superseded (renegotiated) contracts are archived here so the record survives the
+ *  live-key overwrite; the consumer/provider "past contracts" views read it. Append-only. */
+const NS_HISTORY = 'metered-entitlement-history';
 
 /** The unit an entitlement is priced + budgeted in. Kept single-unit-per-entitlement so money micros and
  *  morsels are NEVER conflated (commerce `money.ts` micros ≠ morsel counts). `money` prices are integer
@@ -338,4 +343,47 @@ async function persist(storage: Storage, value: MeteredEntitlement): Promise<voi
     createdAt: value.createdAt,
     updatedAt: value.updatedAt,
   });
+}
+
+/** An archived (past) contract — a superseded entitlement snapshot kept for the history view. */
+export interface EntitlementHistoryEntry extends MeteredEntitlement {
+  archivedId: string;
+  archivedAt: string;
+  archiveReason: 'superseded' | 'revoked';
+  supersededByProposal: string | null;
+}
+
+/**
+ * Archive a copy of an entitlement to history (append-only) before the live record is overwritten by a
+ * renegotiation (supersede) — so the old terms + final spend/period survive for the "past contracts" view.
+ * Does NOT touch the live record. The `from → to` period is `createdAt → archivedAt`.
+ */
+export async function archiveEntitlement(
+  storage: Storage, ent: MeteredEntitlement, reason: 'superseded' | 'revoked', proposalId?: string | null,
+): Promise<void> {
+  const now = new Date().toISOString();
+  const archivedId = randomUUID();
+  const entry: EntitlementHistoryEntry = {
+    ...ent, archivedId, archivedAt: now, archiveReason: reason, supersededByProposal: proposalId ?? null,
+  };
+  await storage.setMemory({
+    key: `me-hist.${archivedId}`, ownerGaii: NS_HISTORY, value: entry,
+    visibility: 'private', tags: ['metered-entitlement-history'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+  });
+}
+
+/** Past (archived) contracts a consumer held — newest first. */
+export async function listEntitlementHistoryByConsumer(storage: Storage, consumerGaii: string): Promise<EntitlementHistoryEntry[]> {
+  const { items } = await storage.listAllMemory({ prefix: 'me-hist.', limit: 5000 });
+  return items.map(r => r.value as EntitlementHistoryEntry)
+    .filter(v => v && v.archivedId && v.consumerGaii === consumerGaii)
+    .sort((a, b) => (a.archivedAt < b.archivedAt ? 1 : -1));
+}
+
+/** Past (archived) contracts a provider sold — newest first. */
+export async function listEntitlementHistoryByProvider(storage: Storage, providerGhii: string): Promise<EntitlementHistoryEntry[]> {
+  const { items } = await storage.listAllMemory({ prefix: 'me-hist.', limit: 5000 });
+  return items.map(r => r.value as EntitlementHistoryEntry)
+    .filter(v => v && v.archivedId && v.providerGhii === providerGhii)
+    .sort((a, b) => (a.archivedAt < b.archivedAt ? 1 : -1));
 }

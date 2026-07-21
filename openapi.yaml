@@ -8153,6 +8153,100 @@ paths:
         '404':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/exchange/proposals:
+    post:
+      operationId: exchangeProposeChange
+      summary: Propose new terms for a live contract — renegotiation (EXCHANGE / TARGET-045)
+      description: >
+        Either party renegotiates instead of blindly revoking + re-accepting. A consumer renegotiates their
+        own contract; a PROVIDER renegotiates a specific consumer's contract (pass `consumer_gaii`). Propose a
+        new per-call price and/or a new budget cap + a note. A message is delivered to the counterparty
+        (Profile > Messages); nothing changes until they accept. Mutual consent is the authority. Body:
+        `{ ext, action, consumer_gaii?, new_price_per_call?, new_cap_units?, note? }`. Returns `{ proposal }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [ext, action], properties: {
+          ext: { type: string }, action: { type: string },
+          consumer_gaii: { type: string, description: "Provider-side: the consumer whose contract to renegotiate. Omit when you are the consumer." },
+          new_price_per_call: { type: integer, description: "New per-call price in the contract's unit (morsels, or money micro-units). Omit to leave unchanged." },
+          new_cap_units: { type: integer, description: "New budget cap. Omit to leave unchanged." },
+          note: { type: string } } } } }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+    get:
+      operationId: exchangeListProposals
+      summary: List contract-change proposals you are party to (EXCHANGE / TARGET-045)
+      description: "Every renegotiation proposal the caller is party to (incoming + outgoing), newest first. Returns `{ proposals, count }`."
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
+  /v1/exchange/proposals/{id}/accept:
+    post:
+      operationId: exchangeAcceptProposal
+      summary: Accept a proposed contract change — supersede (EXCHANGE / TARGET-045)
+      description: "The COUNTERPARTY accepts: the old contract is archived to history (with its final spend + period) and a fresh one takes effect at the agreed terms. Returns `{ proposal, entitlement }`."
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+        '409': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/exchange/proposals/{id}/decline:
+    post:
+      operationId: exchangeDeclineProposal
+      summary: Decline a proposed contract change (EXCHANGE / TARGET-045)
+      description: "The counterparty declines; the contract is unchanged. Returns `{ proposal }`."
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/exchange/proposals/{id}/withdraw:
+    post:
+      operationId: exchangeWithdrawProposal
+      summary: Withdraw your own pending contract-change proposal (EXCHANGE / TARGET-045)
+      description: "The PROPOSER withdraws a pending proposal. Returns `{ proposal }`."
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/exchange/entitlements/history:
+    get:
+      operationId: exchangeEntitlementHistory
+      summary: Your PAST (archived / superseded) contracts as consumer (EXCHANGE / TARGET-045)
+      description: "Contracts that were superseded by a renegotiation, with the old terms + final spend + archived_at. Returns `{ history, count }`."
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
+  /v1/exchange/provider/history:
+    get:
+      operationId: exchangeProviderHistory
+      summary: Your PAST (archived / superseded) contracts as provider (EXCHANGE / TARGET-045)
+      description: "Superseded contracts you sold, with the old terms + final spend. Returns `{ history, count }`."
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
   /v1/exchange/info:
     get:
       operationId: exchangeInfo
@@ -8260,7 +8354,7 @@ paths:
       operationId: exchangePostNeed
       summary: Post an open NEED (demand) providers can bid on (EXCHANGE marketplace / TARGET-045)
       description: >
-        Publish a demand. Body: `{ description, ext?, action?, spec?, budget_unit?, budget_cap?, autonomy?, app_id? }`.
+        Publish a demand. Body: `{ description, ext?, action?, spec?, usage_intent?, budget_unit?, budget_cap?, autonomy?, app_id? }`.
         `spec` = `{ requiredFields?, format?, sample?, notes? }` — the minimum shape a fulfilment must return,
         so a provider (or an AI assessing candidates) can judge fit. Returns `{ need, matches }` (offerings
         already satisfying it, so you can accept directly).
@@ -8273,6 +8367,7 @@ paths:
           spec: { type: object, properties: {
             requiredFields: { type: array, items: { type: string } }, format: { type: string },
             sample: { type: string }, notes: { type: string } } },
+          usage_intent: { type: string, description: "How the requester will USE the data — lets a provider judge before serving." },
           budget_unit: { type: string, enum: [money, morsels] }, budget_cap: { type: integer },
           autonomy: { type: string, enum: [supervised, auto] }, app_id: { type: string } } } } }
       responses:

@@ -16,6 +16,8 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.2.0 — 2026-07-21 — need_post carries usage_intent; needs listings enriched with the requesting app's
+ *     name/description (enrichNeeds) so a provider can judge who they'd serve.
  *   v1.1.0 — 2026-07-21 — accept by `offering_id` (ext-action AND app-tool kinds, via resolveOfferingPricing);
  *     offering_get surfaces the pinned app-tool interface schema + WebMCP call recipe (Gap 1 cross-app selling).
  *   v1.0.0 — 2026-07-20 — Initial EXCHANGE MCP surface (offerings/accept/contracts/off/needs/bid/consumers)
@@ -39,7 +41,7 @@ import {
     resolveActionPricing, resolveOfferingPricing, newNeedId, newBidId,
     getOffering, listOfferings, matchOfferings,
     putNeed, getNeed, listNeeds, putBid, getBid,
-    offeringStats, offeringConsumers,
+    offeringStats, offeringConsumers, enrichNeeds,
 } from '../services/exchange-market.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 
@@ -291,7 +293,7 @@ export function registerExchangeTools(
         },
         annotationsFor('aimeat_exchange_needs'),
         async ({ open, mine }) => {
-            const needs = await listNeeds(storage, { openOnly: !!open, owner: mine ? owner : undefined });
+            const needs = await enrichNeeds(storage, await listNeeds(storage, { openOnly: !!open, owner: mine ? owner : undefined }));
             return ok({ needs, count: needs.length });
         },
     );
@@ -305,13 +307,14 @@ export function registerExchangeTools(
             ext: z.string().max(120).optional(),
             action: z.string().max(120).optional(),
             spec: z.record(z.string(), z.unknown()).optional(),
+            usage_intent: z.string().max(2000).optional(),
             budget_unit: z.enum(['morsels', 'money']).optional(),
             budget_cap: z.number().int().nonnegative().optional(),
             app_id: z.string().max(300).optional(),
             autonomy: z.enum(['supervised', 'auto']).optional(),
         },
         annotationsFor('aimeat_exchange_need_post'),
-        async ({ description, ext, action, spec, budget_unit, budget_cap, app_id, autonomy }) => {
+        async ({ description, ext, action, spec, usage_intent, budget_unit, budget_cap, app_id, autonomy }) => {
             const now = new Date().toISOString();
             const need: Need = {
                 needId: newNeedId(),
@@ -321,6 +324,7 @@ export function registerExchangeTools(
                 ext: ext || null, action: action || null,
                 description,
                 spec: parseNeedSpec(spec),
+                usageIntent: usage_intent || null,
                 budgetUnit: budget_unit ?? null, budgetCap: budget_cap !== undefined ? Math.floor(budget_cap) : null,
                 autonomy: autonomy === 'auto' ? 'auto' : 'supervised',
                 state: 'open', createdAt: now, updatedAt: now,

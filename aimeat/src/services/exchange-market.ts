@@ -16,6 +16,8 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.3.0 — 2026-07-21 — Needs app-context: Need.usageIntent + enrichNeeds (resolve the requesting app's
+ *     name/description so a provider can judge who they'd serve before offering).
  *   v1.2.0 — 2026-07-21 — Cross-app selling (Gap 1): Offering.kind ('ext-action'|'app-tool') + AppToolSurface
  *     (pinned interface); appToolCoordinate + offeringToCommercial + resolveOfferingPricing (shared mint path).
  *   v1.1.0 — 2026-07-20 — Legibility layer: UsageTerms + NeedSpec on records; offeringStats (usage/reputation)
@@ -189,12 +191,48 @@ export interface Need {
   action: string | null;
   description: string;
   spec: NeedSpec | null;        // the minimum shape a fulfilment must return (makes the need answerable)
+  usageIntent: string | null;   // how the requester will USE the data — lets a provider judge before serving
   budgetUnit: EntitlementUnit | null;
   budgetCap: number | null;
   autonomy: 'supervised' | 'auto';
   state: 'open' | 'matched' | 'closed';
   createdAt: string;
   updatedAt: string;
+}
+
+/** A need enriched with the requesting app's identity + purpose, so a provider knows WHO/WHAT they'd serve. */
+export interface NeedWithContext extends Need {
+  appContext: { app: string; name: string; description: string } | null;
+}
+
+/**
+ * Attach app context to needs: when a need names a requesting app (`appId` = "owner/filename" or a bare
+ * filename under the requester), resolve that app's published name + description so a provider can judge the
+ * consumer before offering (per "do I even want to serve an app that misuses the data?"). Best-effort — a
+ * need without a resolvable app gets `appContext: null` and is grouped under its requester instead.
+ */
+export async function enrichNeeds(storage: Storage, needs: Need[]): Promise<NeedWithContext[]> {
+  const cache = new Map<string, { app: string; name: string; description: string } | null>();
+  const out: NeedWithContext[] = [];
+  for (const n of needs) {
+    let appContext: NeedWithContext['appContext'] = null;
+    if (n.appId) {
+      const ref = n.appId.includes('/') ? n.appId : `${n.requesterOwner}/${n.appId}`;
+      if (cache.has(ref)) { appContext = cache.get(ref) ?? null; }
+      else {
+        const [owner, filename] = ref.split('/');
+        let resolved: NeedWithContext['appContext'] = null;
+        try {
+          const rec = owner && filename ? await storage.getAppByOwnerName(owner, filename) : null;
+          const m = (rec?.manifest ?? {}) as { name?: string; description?: string };
+          if (rec) resolved = { app: ref, name: m.name || filename, description: m.description || '' };
+        } catch { /* unresolved app → null context */ }
+        cache.set(ref, resolved); appContext = resolved;
+      }
+    }
+    out.push({ ...n, appContext });
+  }
+  return out;
 }
 
 /** A provider's bid against a NEED. */
