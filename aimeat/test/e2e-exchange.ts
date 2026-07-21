@@ -260,7 +260,7 @@ await test('A non-owner cannot list someone else’s extension as an offering �
 await test('Consumer posts a NEED → open, and matches surface the offering', async () => {
   buyer = await setupOwner('buy');
   const r = await json('/v1/exchange/needs', { method: 'POST', headers: auth(buyer.token),
-    body: JSON.stringify({ ext: EXT, action: 'validate', description: 'Need Finnish company lookups', budget_unit: 'morsels', budget_cap: 50 }) });
+    body: JSON.stringify({ ext: EXT, action: 'validate', description: 'Need Finnish company lookups', app_id: `${buyer.name}/lookup-app`, budget_unit: 'morsels', budget_cap: 50 }) });
   assert(r.status === 201, `post need ${r.status}: ${JSON.stringify(r.body?.error)}`);
   needId = r.body.data.need.needId;
   assert(r.body.data.matches.some((o: any) => o.offeringId === offeringId), 'offering should match the need');
@@ -309,10 +309,17 @@ await test('Offering carries provider USAGE TERMS (derivatives/resale/attributio
 
 await test('Need carries a MIN-SPEC (required fields + format) so a provider can judge fit', async () => {
   const r = await json('/v1/exchange/needs', { method: 'POST', headers: auth(buyer.token),
-    body: JSON.stringify({ description: 'Company registry with VAT status', spec: { requiredFields: ['name', 'vatValid'], format: 'JSON { name, vatValid }' }, budget_unit: 'morsels', budget_cap: 40 }) });
+    body: JSON.stringify({ description: 'Company registry with VAT status', app_id: `${buyer.name}/vat-app`, spec: { requiredFields: ['name', 'vatValid'], format: 'JSON { name, vatValid }', inputSchema: { type: 'object', properties: { businessId: { type: 'string' } } }, outputSchema: { type: 'object', properties: { name: {}, vatValid: { type: 'boolean' } } } }, budget_unit: 'morsels', budget_cap: 40 }) });
   assert(r.status === 201, `need w/ spec ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const s = r.body.data.need.spec;
   assert(s && Array.isArray(s.requiredFields) && s.requiredFields.includes('vatValid') && s.format, `need spec roundtrip: ${JSON.stringify(s)}`);
+  assert(s.inputSchema && s.outputSchema && s.outputSchema.properties, `need I/O interface schema roundtrip: ${JSON.stringify({ i: s.inputSchema, o: s.outputSchema })}`);
+});
+
+await test('A need REQUIRES a requesting app → 400 NEED_APP_REQUIRED without app_id', async () => {
+  const r = await json('/v1/exchange/needs', { method: 'POST', headers: auth(buyer.token),
+    body: JSON.stringify({ description: 'orphan need with no app', budget_unit: 'morsels', budget_cap: 10 }) });
+  assert(r.status === 400 && r.body?.error?.code === 'NEED_APP_REQUIRED', `expected NEED_APP_REQUIRED, got ${r.status}/${JSON.stringify(r.body?.error)}`);
 });
 
 await test('Provider LINEAGE: the offering owner sees who holds contracts; a stranger gets 404', async () => {

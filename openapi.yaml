@@ -8354,7 +8354,8 @@ paths:
       operationId: exchangePostNeed
       summary: Post an open NEED (demand) providers can bid on (EXCHANGE marketplace / TARGET-045)
       description: >
-        Publish a demand. Body: `{ description, ext?, action?, spec?, usage_intent?, budget_unit?, budget_cap?, autonomy?, app_id? }`.
+        Publish a demand on behalf of a specific app. `app_id` is REQUIRED (a need is always app-bound). Body:
+        `{ description, app_id, ext?, action?, spec?, usage_intent?, budget_unit?, budget_cap?, autonomy? }`.
         `spec` = `{ requiredFields?, format?, sample?, notes? }` — the minimum shape a fulfilment must return,
         so a provider (or an AI assessing candidates) can judge fit. Returns `{ need, matches }` (offerings
         already satisfying it, so you can accept directly).
@@ -8362,14 +8363,18 @@ paths:
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, required: [description], properties: {
-          description: { type: string }, ext: { type: string }, action: { type: string },
-          spec: { type: object, properties: {
+        content: { application/json: { schema: { type: object, required: [description, app_id], properties: {
+          description: { type: string },
+          app_id: { type: string, description: "REQUIRED — the requesting app (owner/filename). A need is always posted on behalf of the app that needs the data." },
+          ext: { type: string }, action: { type: string },
+          spec: { type: object, description: "The interface the app is waiting to call.", properties: {
             requiredFields: { type: array, items: { type: string } }, format: { type: string },
-            sample: { type: string }, notes: { type: string } } },
+            sample: { type: string }, notes: { type: string },
+            inputSchema: { type: object, description: "The shape the app will SEND on each call." },
+            outputSchema: { type: object, description: "The shape the app EXPECTS back (a provider builds a matching app-tool)." } } },
           usage_intent: { type: string, description: "How the requester will USE the data — lets a provider judge before serving." },
           budget_unit: { type: string, enum: [money, morsels] }, budget_cap: { type: integer },
-          autonomy: { type: string, enum: [supervised, auto] }, app_id: { type: string } } } } }
+          autonomy: { type: string, enum: [supervised, auto] } } } } }
       responses:
         '201': { $ref: '#/components/responses/AimeatSuccess' }
         '400': { $ref: '#/components/responses/AimeatError' }

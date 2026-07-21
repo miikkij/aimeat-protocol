@@ -16,6 +16,8 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.4.0 — 2026-07-21 — Demand side as an emergent interface request: NeedSpec gains input/outputSchema
+ *     (the shape the app sends/expects — a provider builds a matching app-tool). A need is app-bound.
  *   v1.3.0 — 2026-07-21 — Needs app-context: Need.usageIntent + enrichNeeds (resolve the requesting app's
  *     name/description so a provider can judge who they'd serve before offering).
  *   v1.2.0 — 2026-07-21 — Cross-app selling (Gap 1): Offering.kind ('ext-action'|'app-tool') + AppToolSurface
@@ -97,15 +99,18 @@ export interface UsageTerms {
 }
 
 /**
- * The MINIMUM a requester needs from a fulfilment — lets a provider (or an AI assessing candidates) judge
- * FIT without guessing from a one-line description. This is what makes a NEED answerable: "here is the
- * shape I must get back", not just "I want company data".
+ * The interface a requesting app is WAITING to call — what makes a NEED an emergent, machine-matchable
+ * data-API request rather than a wish. The app declares the exact shape it will SEND and the shape it EXPECTS
+ * back; a provider builds a matching app-tool (or extension) whose I/O satisfies it. `inputSchema`/`outputSchema`
+ * are the precise contract (like an offering's); `requiredFields`/`format`/`sample` are the light human hints.
  */
 export interface NeedSpec {
-  requiredFields: string[];    // fields the output MUST contain to be acceptable
-  format?: string;             // desired shape, e.g. 'JSON array of { name, businessId }'
+  requiredFields: string[];    // fields the output MUST contain to be acceptable (light hint)
+  format?: string;             // desired shape, e.g. 'JSON array of { name, businessId }' (light hint)
   sample?: string;             // an example of an acceptable response (illustrative)
   notes?: string;              // constraints (freshness, coverage, rate) the fulfilment must meet
+  inputSchema?: Record<string, unknown>;   // the shape the app will SEND on each call (the request contract)
+  outputSchema?: Record<string, unknown>;  // the shape the app EXPECTS back (the response contract to match)
 }
 
 /** A public supply listing. `kind` distinguishes a raw extension action (the original surface) from an
