@@ -305,6 +305,12 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_exchange_bid: { title: 'Bid on Exchange Need', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_exchange_bid_accept: { title: 'Accept Exchange Bid (mint contract)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
     aimeat_exchange_consumers: { title: 'List Offering Consumers (provider lineage)', readOnlyHint: true },
+    aimeat_app_tool_invoke: { title: 'Invoke App Tool (metered, via contract)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
+    aimeat_exchange_work: { title: 'Start Agent Work (async task)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_exchange_work_deliver: { title: 'Deliver Agent Work (settle on delivery)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_exchange_work_list: { title: 'List Agent Work Items', readOnlyHint: true },
+    aimeat_exchange_proposals: { title: 'List Renegotiation Proposals', readOnlyHint: true },
+    aimeat_exchange_proposal_decide: { title: 'Decide Renegotiation Proposal', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
 };
 
 /**
