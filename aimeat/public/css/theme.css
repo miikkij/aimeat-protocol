@@ -435,6 +435,10 @@ a { color: inherit; text-decoration: none; }
   z-index: 100;
   flex: 0 0 auto;
   height: var(--nav-height);
+  /* border-box so the 1px border-bottom is INCLUDED in --nav-height — otherwise the
+     header renders 1px taller than the token and every `100dvh - var(--nav-height)`
+     scroll region (sidebars) is 1px too tall and can't stay pinned. */
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   justify-content: space-between;

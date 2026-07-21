@@ -2248,8 +2248,12 @@
   width: 240px; flex: 0 0 240px;
   /* App-shell: the scroll region is now .page-content (the header lives OUTSIDE
      it), so the sidebar sticks to the top of that region (top:0), not below the
-     header. Height caps at the region's height so its own nav list scrolls. */
+     header. Height caps at the region's height so its own nav list scrolls.
+     border-box folds the vertical padding INTO max-height — without it the padding
+     stacks on top, making the sidebar taller than the scroll region so sticky can't
+     hold it (it drifts up and the identity slides under the header when you scroll). */
   position: sticky; top: 0;
+  box-sizing: border-box;
   max-height: calc(100dvh - var(--nav-height, 56px));
   overflow-y: auto;
   padding: 0.75rem 0.5rem 2rem;
