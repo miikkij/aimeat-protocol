@@ -6,6 +6,9 @@
  *   provider lineage locally. Thin REST proxies over the /v1/exchange/* routes (src/routes/exchange.ts +
  *   exchange-market.ts) — server-side authz + authoritative pricing unchanged.
  * @version-history
+ *   v1.1.0 — 2026-07-21 — Act-on-exchange parity (tunnelled fleet agents get the same generic tools as the
+ *     server MCP): app_tool_invoke (call an app tool via contract) + work start/deliver/list + proposals +
+ *     proposal_decide — thin REST proxies over the app-tool WebMCP invoke, /v1/exchange/work, and proposals routes.
  *   v1.0.0 — 2026-07-20 — Initial: offerings, offering_get, accept, contracts, contract_off, needs,
  *     need_post, bid, bid_accept, consumers — connector-surface coverage.
  */
@@ -126,5 +129,55 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
     offering_id: z.string().describe('One of your own offering ids.'),
   }, annotationsFor('aimeat_exchange_consumers'), async ({ offering_id }) => {
     return out(await client.get(`/v1/exchange/offerings/${encodeURIComponent(offering_id)}/consumers`));
+  });
+
+  // ── Act-on-exchange (generic, tunnelled fleet parity with the server MCP) ──────────────────────────
+  mcp.tool('aimeat_app_tool_invoke', descriptionFor('aimeat_app_tool_invoke'), {
+    owner: z.string().describe('The provider app\'s owner (bare name or GHII).'),
+    app: z.string().describe('The provider app filename (e.g. "company-brief").'),
+    tool: z.string().describe('The tool name to call (e.g. "getCompanyBrief").'),
+    input: z.record(z.string(), z.unknown()).optional().describe('The tool input object (matching the offering input_schema).'),
+  }, annotationsFor('aimeat_app_tool_invoke'), async ({ owner, app, tool, input }) => {
+    const o = owner.split('@')[0];
+    return out(await client.post(`/v1/apps/${encodeURIComponent(o)}/${encodeURIComponent(app)}/webmcp/tools/${encodeURIComponent(tool)}`, { input: input ?? {} }));
+  });
+
+  mcp.tool('aimeat_exchange_work', descriptionFor('aimeat_exchange_work'), {
+    offering_id: z.string().describe('The agent-work offering id you hold a contract for.'),
+    input: z.record(z.string(), z.unknown()).optional().describe('The task input.'),
+    note: z.string().optional().describe('An optional note to the provider.'),
+  }, annotationsFor('aimeat_exchange_work'), async ({ offering_id, input, note }) => {
+    const body: Record<string, unknown> = { offering_id };
+    if (input) body.input = input;
+    if (note) body.note = note;
+    return out(await client.post('/v1/exchange/work', body));
+  });
+
+  mcp.tool('aimeat_exchange_work_deliver', descriptionFor('aimeat_exchange_work_deliver'), {
+    work_id: z.string().describe('The open work item to deliver.'),
+    output: z.unknown().optional().describe('The delivered result.'),
+    note: z.string().optional().describe('An optional delivery note.'),
+  }, annotationsFor('aimeat_exchange_work_deliver'), async ({ work_id, output, note }) => {
+    const body: Record<string, unknown> = {};
+    if (output !== undefined) body.output = output;
+    if (note) body.note = note;
+    return out(await client.post(`/v1/exchange/work/${encodeURIComponent(work_id)}/deliver`, body));
+  });
+
+  mcp.tool('aimeat_exchange_work_list', descriptionFor('aimeat_exchange_work_list'), {
+    role: z.enum(['consumer', 'provider']).optional().describe('consumer (default) or provider.'),
+  }, annotationsFor('aimeat_exchange_work_list'), async ({ role }) => {
+    return out(await client.get(`/v1/exchange/work${role ? `?role=${encodeURIComponent(role)}` : ''}`));
+  });
+
+  mcp.tool('aimeat_exchange_proposals', descriptionFor('aimeat_exchange_proposals'), {}, annotationsFor('aimeat_exchange_proposals'), async () => {
+    return out(await client.get('/v1/exchange/proposals'));
+  });
+
+  mcp.tool('aimeat_exchange_proposal_decide', descriptionFor('aimeat_exchange_proposal_decide'), {
+    proposal_id: z.string().describe('The pending proposal id.'),
+    decision: z.enum(['accept', 'decline', 'withdraw']).describe('accept / decline (counterparty) or withdraw (proposer).'),
+  }, annotationsFor('aimeat_exchange_proposal_decide'), async ({ proposal_id, decision }) => {
+    return out(await client.post(`/v1/exchange/proposals/${encodeURIComponent(proposal_id)}/${decision}`, {}));
   });
 }

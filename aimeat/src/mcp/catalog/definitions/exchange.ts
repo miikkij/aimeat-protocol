@@ -16,10 +16,11 @@
 import type { AimeatToolDefinition, ToolVisibility } from './types.js';
 import { agentEverywhere } from './types.js';
 
-/** The "act on EXCHANGE" tools (invoke/work/proposals) live on the PUBLIC server MCP only — the app-tool
- *  invoke needs the caller's session token (server-side), and the whole point is that any /v1/mcp client
- *  (Claude chat, an agent) can act, not just a local connector fleet. Not a connector/CLI fallback. */
-const serverAgent: ToolVisibility = { publicMcp: true, connectorMcp: false, cliFallback: false };
+/** The "act on EXCHANGE" tools (invoke/work/proposals) are on BOTH MCP surfaces so ANY agent can act: the
+ *  PUBLIC /v1/mcp (hosted clients like Claude chat — the server tool threads the session token so app-tool
+ *  invoke can run the backing capability) AND the CONNECTOR MCP (`aimeat connect serve` — tunnelled fleet
+ *  agents get them as thin REST proxies over the same routes). Not a CLI fallback. */
+const agentMcp: ToolVisibility = { publicMcp: true, connectorMcp: true, cliFallback: false };
 
 export const exchangeTools: AimeatToolDefinition[] = [
     {
@@ -139,7 +140,7 @@ export const exchangeTools: AimeatToolDefinition[] = [
         name: 'aimeat_app_tool_invoke',
         description: 'CALL an app\'s offered tool (a method like getCompanyBrief) through YOUR metered contract — the generic "one app/agent calls another app\'s function" channel. You must already hold a contract for this app-tool (accept its offering with aimeat_exchange_accept). The call is metered + charged to your budget at the provider price (+ platform rake), routed to the pinned interface version\'s backing capability; the provider\'s own upstream API keys stay server-side (you never see or need them). Returns the tool\'s result. If the invocation throws you are refunded.',
         caller: 'agent',
-        visibility: serverAgent,
+        visibility: agentMcp,
         input: {
             owner: { type: 'string', required: true, description: 'The provider app\'s owner (bare name or GHII).' },
             app: { type: 'string', required: true, description: 'The provider app filename (e.g. "company-brief").' },
@@ -151,7 +152,7 @@ export const exchangeTools: AimeatToolDefinition[] = [
         name: 'aimeat_exchange_work',
         description: 'Start an async AGENT-WORK task under a contract you hold: the provider agent performs it out-of-band and DELIVERS later, and you are charged the per-task price ON DELIVERY (metered + rake). Requires an active contract for the agent-work offering (accept it first with aimeat_exchange_accept). Nothing is charged now. Track it with aimeat_exchange_work_list.',
         caller: 'agent',
-        visibility: serverAgent,
+        visibility: agentMcp,
         input: {
             offering_id: { type: 'string', required: true, description: 'The agent-work offering id you hold a contract for.' },
             input: { type: 'object', required: false, description: 'The task input (matching the offering\'s task input_schema).' },
@@ -162,7 +163,7 @@ export const exchangeTools: AimeatToolDefinition[] = [
         name: 'aimeat_exchange_work_deliver',
         description: 'As the PROVIDER of an agent-work task, deliver the result → settle ON DELIVERY: charge the consumer the per-task price, credit you, route the rake, decrement their budget. Only the work\'s own provider may. A budget/rate failure leaves the work open and unpaid (you are told why).',
         caller: 'agent',
-        visibility: serverAgent,
+        visibility: agentMcp,
         input: {
             work_id: { type: 'string', required: true, description: 'The open work item to deliver (from aimeat_exchange_work_list role=provider).' },
             output: { type: 'object', required: false, description: 'The delivered result (matching the offering\'s task output_schema).' },
@@ -173,7 +174,7 @@ export const exchangeTools: AimeatToolDefinition[] = [
         name: 'aimeat_exchange_work_list',
         description: 'List your AGENT-WORK items — as the consumer (tasks you started, default) or the provider (`role:"provider"` — tasks to deliver + delivered), newest first, with input/output, state, and what was charged on delivery.',
         caller: 'agent',
-        visibility: serverAgent,
+        visibility: agentMcp,
         input: {
             role: { type: 'string', required: false, description: 'consumer (default — your started tasks) or provider (tasks to deliver).', enum: ['consumer', 'provider'] },
         },
@@ -182,14 +183,14 @@ export const exchangeTools: AimeatToolDefinition[] = [
         name: 'aimeat_exchange_proposals',
         description: 'List the contract-RENEGOTIATION proposals you are party to (incoming to accept/decline, and your own outgoing), with the proposed new price/cap, a snapshot of the current terms, who proposed it, and status. Decide one with aimeat_exchange_proposal_decide.',
         caller: 'agent',
-        visibility: serverAgent,
+        visibility: agentMcp,
         input: {},
     },
     {
         name: 'aimeat_exchange_proposal_decide',
         description: 'Decide a renegotiation proposal: `accept` (as the counterparty → supersede the live contract at the agreed terms; the old one is archived to history), `decline` (as the counterparty → no change), or `withdraw` (as the proposer → cancel your own pending proposal). Mutual consent is the authority — a proposed price only binds once the OTHER party accepts.',
         caller: 'agent',
-        visibility: serverAgent,
+        visibility: agentMcp,
         input: {
             proposal_id: { type: 'string', required: true, description: 'The pending proposal id (from aimeat_exchange_proposals).' },
             decision: { type: 'string', required: true, description: 'accept / decline (counterparty) or withdraw (proposer).', enum: ['accept', 'decline', 'withdraw'] },
