@@ -229,7 +229,9 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                 type: isRequest ? 'direct_message_request' : 'direct_message',
                 title: isRequest ? `${message.senderGhii} wants to message you` : `New message from ${message.senderGhii}`,
                 body: messagePreview(message.body ?? ''),
-                link: isRequest ? '/v1/profile#inbox/requests' : `/v1/profile#inbox/${message.conversationId}`,
+                // Request → 'req:<conversationId>': lands on the requests list while pending, opens the
+                // thread once accepted (see inbox-tab consumeDeepLink). Delivered DM → its conversation.
+                link: isRequest ? `/v1/profile#inbox/req:${message.conversationId}` : `/v1/profile#inbox/${message.conversationId}`,
                 // Same inline reply as the local path — a delivered cross-node DM replies straight from the bell.
                 actions: isRequest ? undefined : [
                     { id: 'reply', label: 'Reply', kind: 'reply', to: message.senderGhii, conversationId: message.conversationId, subject: message.subject || undefined, replyTo: message.id },
