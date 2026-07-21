@@ -16,13 +16,17 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.2.0 — 2026-07-21 — Cross-app selling (Gap 1): Offering.kind ('ext-action'|'app-tool') + AppToolSurface
+ *     (pinned interface); appToolCoordinate + offeringToCommercial + resolveOfferingPricing (shared mint path).
  *   v1.1.0 — 2026-07-20 — Legibility layer: UsageTerms + NeedSpec on records; offeringStats (usage/reputation)
  *     + offeringConsumers (provider lineage) derived from entitlements (no metrics table).
  *   v1.0.0 — 2026-07-20 — Initial marketplace records (offering/need/bid) + capability matching (Phase C).
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
-import { listEntitlementsByProvider, type EntitlementUnit, type PricingSpec } from './metered-entitlements.js';
+import { listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface } from './metered-entitlements.js';
+
+export type { AppToolSurface };
 
 /** The action `commercial` block an offering/contract prices against. */
 export interface ActionCommercial {
@@ -102,13 +106,17 @@ export interface NeedSpec {
   notes?: string;              // constraints (freshness, coverage, rate) the fulfilment must meet
 }
 
-/** A public supply listing. */
+/** A public supply listing. `kind` distinguishes a raw extension action (the original surface) from an
+ *  app-tool (a method a provider app sells cross-app). For BOTH, `ext`/`action` hold the metered COORDINATE
+ *  (app-tool uses `apptool:{owner}/{appId}` + the tool name) so the entitlement + stats machinery is shared. */
 export interface Offering {
   offeringId: string;
   providerGhii: string;
   providerOwner: string;
+  kind: 'ext-action' | 'app-tool';
   ext: string;
   action: string;
+  surface: AppToolSurface | null;   // set for kind==='app-tool' (the pinned interface); null for ext-action
   title: string;
   description: string;
   unit: EntitlementUnit;
@@ -121,6 +129,54 @@ export interface Offering {
   state: 'listed' | 'delisted';
   createdAt: string;
   updatedAt: string;
+}
+
+/** The metered coordinate for an app-tool surface — the (ext, action) pair the entitlement + gate key on. */
+export function appToolCoordinate(ownerName: string, appId: string, tool: string): { ext: string; action: string } {
+  return { ext: `apptool:${ownerName}/${appId}`, action: tool };
+}
+
+/** Build an ActionCommercial from an offering's stored price/plans, so the shared pricing resolver
+ *  (resolveActionPricing) works for app-tool offerings too — the offering's listing IS the authoritative price. */
+export function offeringToCommercial(o: Offering): ActionCommercial {
+  return {
+    payMorsels: o.unit === 'morsels' ? o.basePrice : undefined,
+    payMoney: o.unit === 'money' ? { amount: o.basePrice, currency: o.currency ?? 'EUR' } : undefined,
+    plans: o.plans,
+  };
+}
+
+/**
+ * Resolve the authoritative pricing + metered coordinate to mint a contract from an offering — shared by the
+ * REST and MCP accept flows, for BOTH kinds. For app-tool the price comes from the offering's own listing;
+ * for ext-action it comes LIVE from the provider's extension action (so the provider's current price wins).
+ */
+export async function resolveOfferingPricing(
+  storage: Storage, o: Offering, planId: string | null,
+): Promise<
+  | { ok: true; unit: EntitlementUnit; pricePerCall: number; currency: string | null; pricing: PricingSpec | null;
+      providerGhii: string; ext: string; action: string; capabilityLabel: string; surface: AppToolSurface | null }
+  | { ok: false; status: number; code: string; message: string }
+> {
+  if (o.kind === 'app-tool' && o.surface) {
+    const priced = resolveActionPricing(offeringToCommercial(o), planId);
+    if (!priced.ok) return { ok: false, status: 400, code: priced.code, message: priced.message };
+    return {
+      ok: true, unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
+      providerGhii: o.providerGhii, ext: o.ext, action: o.action,
+      capabilityLabel: `${o.surface.appId}/${o.surface.tool} v${o.surface.ifaceVersion}`, surface: o.surface,
+    };
+  }
+  // ext-action: authoritative LIVE price from the provider's extension action.
+  const extRec = await storage.getExtension(o.ext);
+  const act = extRec?.actions.find(a => a.id === o.action);
+  if (!extRec || !act) return { ok: false, status: 404, code: 'NOT_FOUND', message: 'Offering capability no longer exists' };
+  const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, planId);
+  if (!priced.ok) return { ok: false, status: 400, code: priced.code, message: priced.message };
+  return {
+    ok: true, unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
+    providerGhii: o.providerGhii, ext: o.ext, action: o.action, capabilityLabel: `${o.ext}/${o.action}`, surface: null,
+  };
 }
 
 /** A public demand posting. */

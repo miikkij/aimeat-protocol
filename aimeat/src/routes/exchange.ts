@@ -18,6 +18,8 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-07-21 — Accept by `offering_id` (works for ext-action AND app-tool kinds; app-tool contract
+ *     pins the offering's interface version) via the shared resolveOfferingPricing; legacy ext+action retained.
  *   v1.0.0 — 2026-07-20 — Initial acceptance surface: mint (authoritative price) / list mine / pause+revoke.
  */
 import { Router } from 'express';
@@ -33,7 +35,7 @@ import {
   createEntitlement, readEntitlementForCall, listEntitlementsByConsumer,
   pauseEntitlement, revokeEntitlement, type MeteredEntitlement,
 } from '../services/metered-entitlements.js';
-import { resolveActionPricing, type ActionCommercial } from '../services/exchange-market.js';
+import { resolveActionPricing, resolveOfferingPricing, getOffering, type ActionCommercial } from '../services/exchange-market.js';
 
 function ownerOf(gaii: string): string {
   return gaii.split('@')[0].split('#').pop() ?? gaii;
@@ -48,6 +50,7 @@ function view(config: AimeatConfig, e: MeteredEntitlement) {
     provider: e.providerGhii,
     ext: e.ext,
     action: e.action,
+    surface: e.surface ?? null,
     capability: e.capabilityLabel,
     unit: e.unit,
     currency: e.currency,
@@ -79,16 +82,44 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const consumerGaii = resolveIdentity(req.auth!, config.nodeId);
     const owner = req.auth!.owner;
     const b = (req.body ?? {}) as Record<string, unknown>;
-    const ext = typeof b.ext === 'string' ? b.ext : '';
-    const action = typeof b.action === 'string' ? b.action : '';
-    const contractRef = typeof b.contract_ref === 'string' ? b.contract_ref : '';
-    if (!ext || !action || !contractRef) {
-      return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext, action and contract_ref are required'));
-    }
     const capUnits = typeof b.cap_units === 'number' && Number.isFinite(b.cap_units) && b.cap_units >= 0
       ? Math.floor(b.cap_units) : null;
     const appId = typeof b.app_id === 'string' && b.app_id ? b.app_id : null;
     const escrowParty = b.escrow_party === 'consumer' || b.escrow_party === 'provider' ? b.escrow_party : null;
+    const planId = typeof b.plan_id === 'string' && b.plan_id ? b.plan_id : null;
+
+    // ── Preferred path: accept an OFFERING by id (works for BOTH ext-action and app-tool kinds). The
+    // offering pins the metered coordinate (+ the app-tool interface version); pricing is authoritative. ──
+    if (typeof b.offering_id === 'string' && b.offering_id) {
+      const contractRef = typeof b.contract_ref === 'string' && b.contract_ref ? b.contract_ref : `offering:${b.offering_id}`;
+      const o = await getOffering(storage, b.offering_id);
+      if (!o || o.state !== 'listed') return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such listed offering'));
+      const priced = await resolveOfferingPricing(storage, o, planId);
+      if (!priced.ok) return res.status(priced.status).json(error(config.nodeId, priced.code, priced.message));
+      const minCharge = priced.pricing?.model === 'bundle' ? priced.pricing.blockPrice : priced.pricing?.model === 'subscription' ? priced.pricing.periodPrice : priced.pricePerCall;
+      if (capUnits !== null && capUnits < minCharge) {
+        return res.status(400).json(error(config.nodeId, 'BUDGET_TOO_LOW',
+          `Budget cap (${capUnits}) is below the ${minCharge}-${priced.unit === 'money' ? priced.currency : 'morsel'} minimum charge`));
+      }
+      const existing = await readEntitlementForCall(storage, consumerGaii, priced.ext, priced.action);
+      const ent = await createEntitlement(storage, {
+        consumerGaii, appId, providerGhii: priced.providerGhii, ext: priced.ext, action: priced.action,
+        capabilityLabel: priced.capabilityLabel, unit: priced.unit, pricePerCall: priced.pricePerCall,
+        currency: priced.currency, pricing: priced.pricing, capUnits, contractRef, surface: priced.surface,
+        escrowParty, createdBy: owner, carrySpend: existing,
+      });
+      return res.status(201).json(success(config.nodeId, { entitlement: view(config, ent) }, [
+        { description: 'This app’s cost & contracts', method: 'GET', url: appId ? `/v1/apps/cost?app_id=${encodeURIComponent(appId)}` : '/v1/exchange/entitlements' },
+      ]));
+    }
+
+    // ── Legacy path: accept a raw ext-action directly by (ext, action). ──
+    const ext = typeof b.ext === 'string' ? b.ext : '';
+    const action = typeof b.action === 'string' ? b.action : '';
+    const contractRef = typeof b.contract_ref === 'string' ? b.contract_ref : '';
+    if (!ext || !action || !contractRef) {
+      return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext, action and contract_ref are required (or pass offering_id)'));
+    }
 
     // Resolve the provider + AUTHORITATIVE price from the extension action.
     const extRec = await storage.getExtension(ext);
@@ -98,7 +129,6 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
 
     // AUTHORITATIVE price + unit + (optional plan) pricing — shared resolver, so a consumer can never
     // undercut the provider. `plan_id` picks a provider-declared bundle/subscription plan; none → per_call.
-    const planId = typeof b.plan_id === 'string' && b.plan_id ? b.plan_id : null;
     const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, planId);
     if (!priced.ok) return res.status(priced.code === 'NOT_PRICED' ? 400 : 404).json(error(config.nodeId, priced.code, `Action "${ext}/${action}": ${priced.message}`));
     const { unit, pricePerCall, currency, pricing } = priced;

@@ -8003,11 +8003,13 @@ paths:
       description: >
         The WRITE side of the metered entitlement. The caller's owner accepts a negotiated contract to
         call a provider's extension action at a metered price. The per-call PRICE is read authoritatively
-        from the provider's ext action (`commercial.payMorsels`) — the request supplies only the BUDGET
+        from the provider (the ext action, or the app-tool's listing) — the request supplies only the BUDGET
         cap and the contract ref, so a consumer can neither undercut the provider nor be charged an
         unaccepted price. The entitlement's consumer is always the caller's own owner (strictly
-        cross-owner). Slice-1 covers morsel-priced actions. Body: `{ ext, action, contract_ref,
-        cap_units?, app_id?, escrow_party? }`. Response `data`: `{ entitlement: {...} }`.
+        cross-owner). PREFERRED: pass `offering_id` (works for both ext-action and app-tool offerings; an
+        app-tool contract is pinned to the offering's interface version). LEGACY: pass `ext` + `action` +
+        `contract_ref` for a raw ext-action. Body: `{ offering_id?, ext?, action?, contract_ref?,
+        cap_units?, plan_id?, app_id?, escrow_party? }`. Response `data`: `{ entitlement: {...} }`.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -8017,15 +8019,15 @@ paths:
           application/json:
             schema:
               type: object
-              required: [ext, action, contract_ref]
               properties:
-                ext: { type: string }
+                offering_id: { type: string, description: "Preferred — contract an offering by id (ext-action or app-tool). Pins the app-tool interface version." }
+                ext: { type: string, description: Legacy path — raw ext-action; required with action + contract_ref when offering_id is omitted. }
                 action: { type: string }
                 contract_ref: { type: string }
                 cap_units: { type: integer, description: Spend cap in the price unit (morsels, or money micro-units). Omit for uncapped. }
                 app_id: { type: string, description: Consuming app id ("owner/filename") for the per-app cost surface. }
                 escrow_party: { type: string, enum: [consumer, provider] }
-                plan_id: { type: string, description: "Optional provider pricing plan (bundle / subscription) from the action's commercial.plans; omit for per-call at the base price." }
+                plan_id: { type: string, description: "Optional provider pricing plan (bundle / subscription); omit for per-call at the base price." }
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -8095,21 +8097,29 @@ paths:
   /v1/exchange/offerings:
     post:
       operationId: exchangeListOffering
-      summary: List a supply OFFERING for an action your extension owns (EXCHANGE marketplace / TARGET-045)
+      summary: List a supply OFFERING — an ext action or an app-tool you own (EXCHANGE marketplace / TARGET-045)
       description: >
-        Publish a public supply listing for a priced action of an extension you own. Price + plans are read
-        AUTHORITATIVELY from the action (`commercial`); you add title/description/provenance/tags and a usage
-        licence (`usage_terms`). Body: `{ ext, action, title?, description?, provenance?, usage_terms, tags? }`.
-        LEGIBILITY GATE: the action MUST publish a non-empty input AND output schema (else 400 SCHEMA_REQUIRED),
-        and `usage_terms` is REQUIRED (else 400 USAGE_TERMS_REQUIRED) — so every listing is integrable and
-        governed. `usage_terms` = `{ derivatives?, resale?, attribution?, note? }` — the provider's promise on
-        how the consumer may use the output. Returns `{ offering }`.
+        Publish a public supply listing. Two kinds. DEFAULT `kind: ext-action` — a priced action of an
+        extension you own; price + plans read AUTHORITATIVELY from the action (`commercial`); body
+        `{ ext, action, title?, description?, provenance?, usage_terms, tags? }`. `kind: app-tool` — a
+        method your APP sells cross-app (a getCompanyBrief-style tool from your `apps.{appId}.tools`
+        manifest); price + plans read from the tool; the tool MUST be bound to a capability (`action_id`)
+        and is snapshot into an immutable, pinned INTERFACE VERSION (a schema/binding change mints a new
+        version; existing contracts stay pinned to theirs); body `{ kind: 'app-tool', app_id, tool, title?,
+        description?, provenance?, usage_terms, tags? }`. LEGIBILITY GATE (both): a non-empty input AND
+        output schema is required (else 400 SCHEMA_REQUIRED) and `usage_terms` is required (else 400
+        USAGE_TERMS_REQUIRED). `usage_terms` = `{ derivatives?, resale?, attribution?, note? }`. Returns `{ offering }`.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:
         required: true
-        content: { application/json: { schema: { type: object, required: [ext, action, usage_terms], properties: {
-          ext: { type: string }, action: { type: string }, title: { type: string }, description: { type: string },
+        content: { application/json: { schema: { type: object, required: [usage_terms], properties: {
+          kind: { type: string, enum: [ext-action, app-tool], default: ext-action },
+          ext: { type: string, description: "ext-action kind — the extension name." },
+          action: { type: string, description: "ext-action kind — the action id." },
+          app_id: { type: string, description: "app-tool kind — the app filename whose manifest holds the tool." },
+          tool: { type: string, description: "app-tool kind — the tool name in apps.{app_id}.tools." },
+          title: { type: string }, description: { type: string },
           provenance: { type: object }, tags: { type: array, items: { type: string } },
           usage_terms: { type: object, properties: {
             derivatives: { type: boolean }, resale: { type: boolean }, attribution: { type: boolean }, note: { type: string } } } } } } }

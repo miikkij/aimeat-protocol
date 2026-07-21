@@ -6,17 +6,31 @@
  *   resolve time — a malformed manifest fails the checkout loudly (422), never silently.
  *   Prices follow the node-wide convention: morsels are plain integers, money is 6-decimal
  *   micro-units (offer-schemas precedent).
- * @structure AppToolSchema · AppToolsDocSchema · appToolsKey · AppTool · AppToolsDoc
+ * @structure AppToolSchema · AppToolPlanSchema · AppToolsDocSchema · appToolsKey · AppTool · AppToolsDoc
  * @usage
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
  * @version-history
+ *   v1.2.0 — 2026-07-21 — EXCHANGE cross-app selling (Gap 1): optional `outputSchema` (mandatory to LIST an
+ *     app-tool offering — the legibility gate) + `plans` (per_call/bundle/subscription volume pricing).
  *   v1.1.0 — 2026-07-14 — Task path (phase B): optional `agent` (task assignee); tools without an
  *     action_id binding are now purchasable — fulfilled as an agent TASK instead of a capability call
  *   v1.0.0 — 2026-07-14 — Initial app-tool manifest schema (TARGET-034 phase A)
  */
 import { z } from 'zod';
 import { MONEY_CURRENCIES } from '../commerce/money.js';
+
+/** A provider pricing plan on a sellable tool — mirrors exchange-market OfferingPlan so a tool can carry
+ *  per-call / volume-bundle / subscription pricing surfaced on its EXCHANGE offering. */
+export const AppToolPlanSchema = z.discriminatedUnion('model', [
+  z.object({ id: z.string().min(1).max(60), model: z.literal('per_call') }),
+  z.object({ id: z.string().min(1).max(60), model: z.literal('bundle'), blockSize: z.number().int().positive(), blockPrice: z.number().int().positive() }),
+  z.object({
+    id: z.string().min(1).max(60), model: z.literal('subscription'),
+    periodSeconds: z.number().int().positive(), periodPrice: z.number().int().positive(),
+    callsPerWindow: z.number().int().positive(), windowSeconds: z.number().int().positive(),
+  }),
+]);
 
 /** One sellable tool call on an agent-faced app. */
 export const AppToolSchema = z.object({
@@ -25,6 +39,12 @@ export const AppToolSchema = z.object({
   description: z.string().max(500).optional(),
   /** Free-form JSON-schema-ish shape of the tool input (documentation for buyers). */
   inputSchema: z.record(z.string(), z.unknown()).optional(),
+  /** Free-form JSON-schema-ish shape of the tool OUTPUT — what a caller gets back. Mandatory (non-empty)
+   *  to LIST the tool as an EXCHANGE offering (the legibility gate): a consumer must know what returns. */
+  outputSchema: z.record(z.string(), z.unknown()).optional(),
+  /** EXCHANGE pricing plans (per_call / bundle / subscription) surfaced on the tool's offering. The base
+   *  per-call price stays in `price`/`priceMoney`; a plan lets a volume consumer prepay or subscribe. */
+  plans: z.array(AppToolPlanSchema).max(12).optional(),
   /**
    * Callable fulfillment binding: the backing capability invoked on checkout completion
    * (e.g. "ext:my-extension:summarize"). Without a binding the tool is fulfilled as an agent

@@ -11,6 +11,8 @@
  *   needs (POST/GET/close) · bids (POST/GET/accept)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-07-21 — Cross-app selling (Gap 1): `kind: 'app-tool'` listing branch (a provider app sells a
+ *     tool as a pinned-interface metered offering) + app-tool offering DETAIL (frozen schema + WebMCP recipe).
  *   v1.2.0 — 2026-07-20 — Legibility GATE: listing an offering now REQUIRES a published input+output schema
  *     (400 SCHEMA_REQUIRED) and usage_terms (400 USAGE_TERMS_REQUIRED) — every listing integrable + governed.
  *   v1.1.0 — 2026-07-20 — Legibility: offering detail (I/O schema + call-recipe + stats), provider consumers
@@ -27,12 +29,14 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { createEntitlement, readEntitlementForCall } from '../services/metered-entitlements.js';
 import {
-  type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type NeedSpec,
-  resolveActionPricing, newOfferingId, newNeedId, newBidId,
+  type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type NeedSpec, type OfferingPlan,
+  resolveActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate,
   putOffering, getOffering, listOfferings, deleteOffering, matchOfferings,
   putNeed, getNeed, listNeeds, putBid, listBids, getBid,
   offeringStats, offeringConsumers,
 } from '../services/exchange-market.js';
+import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
+import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app-tool-interfaces.js';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const posOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
@@ -78,10 +82,67 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
   });
 
   // ── OFFERINGS (supply) ─────────────────────────────────────────────────────
-  /** List a supply offering for an action the caller's extension owns. Pricing is read from the action. */
+  /** List a supply offering. Two kinds: an extension action (the raw data-service surface, default) or an
+   *  `app-tool` (a method a provider app sells cross-app — a pinned interface version). Pricing is always
+   *  authoritative from the provider. Both require a published I/O schema + usage terms (the legibility gate). */
   router.post('/v1/exchange/offerings', requireAuth(), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const b = (req.body ?? {}) as Record<string, unknown>;
+
+    // ── kind: app-tool — a provider app sells one of its tools (cross-app selling, Gap 1) ──
+    if (b.kind === 'app-tool') {
+      const appId = str(b.app_id), toolName = str(b.tool);
+      if (!appId || !toolName) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'app_id and tool are required for an app-tool offering'));
+      const providerGhii = resolveIdentity(req.auth!, config.nodeId);
+      const manifestRec = await storage.getMemory(providerGhii, appToolsKey(appId));
+      if (!manifestRec) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `App "${appId}" declares no tool manifest (${appToolsKey(appId)}) under your account`));
+      const parsed = AppToolsDocSchema.safeParse(manifestRec.value);
+      if (!parsed.success) return res.status(422).json(error(config.nodeId, 'INVALID_TOOL_MANIFEST', `App "${appId}" has a malformed tool manifest: ${parsed.error.message}`));
+      const tool = parsed.data.tools.find(t => t.name === toolName);
+      if (!tool) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Tool "${toolName}" not found on app "${appId}"`));
+      // Gap 1 = synchronous metered calls → the tool MUST be bound to a capability. Unbound (task) tools are
+      // agent-work (metered-per-task, Gap 2) and are offered through the agent-work path, not here.
+      if (!tool.action_id) return res.status(400).json(error(config.nodeId, 'TOOL_UNBOUND', `Tool "${toolName}" has no capability binding (action_id); only callable tools can be offered as a metered service today`));
+      // LEGIBILITY GATE (same as ext-action): input + output schema + usage terms are mandatory to list.
+      if (!hasSchema(tool.inputSchema) || !hasSchema(tool.outputSchema)) {
+        return res.status(400).json(error(config.nodeId, 'SCHEMA_REQUIRED',
+          `Tool "${appId}/${toolName}" must declare a non-empty inputSchema AND outputSchema before it can be offered on EXCHANGE (a consumer must know what to send and receive)`));
+      }
+      const usageTerms = parseUsageTerms(b.usage_terms);
+      if (!usageTerms) return res.status(400).json(error(config.nodeId, 'USAGE_TERMS_REQUIRED',
+        'usage_terms is required to list an offering — state { derivatives, resale, attribution, note? } so a consumer knows how they may use the output'));
+      // Authoritative pricing from the tool's own price/plans.
+      const commercial: ActionCommercial = {
+        payMorsels: tool.price && tool.price.morsels > 0 ? tool.price.morsels : undefined,
+        payMoney: tool.priceMoney ?? undefined,
+        plans: tool.plans as OfferingPlan[] | undefined,
+      };
+      const priced = resolveActionPricing(commercial, null);
+      if (!priced.ok) return res.status(400).json(error(config.nodeId, priced.code, `Tool "${appId}/${toolName}": ${priced.message}`));
+      // Snapshot / pin the interface version (idempotent when unchanged; a schema/binding change mints v+1).
+      const iface = await ensureInterfaceVersion(storage, providerGhii, appId, toolName, {
+        inputSchema: tool.inputSchema ?? {}, outputSchema: tool.outputSchema ?? {}, binding: tool.action_id,
+      });
+      const coord = appToolCoordinate(owner, appId, toolName);
+      const now = new Date().toISOString();
+      const offering: Offering = {
+        offeringId: newOfferingId(), providerGhii, providerOwner: owner,
+        kind: 'app-tool', ext: coord.ext, action: coord.action,
+        surface: { kind: 'app-tool', ownerName: owner, appId, tool: toolName, ifaceVersion: iface.ifaceVersion },
+        title: str(b.title) || `${appId} · ${toolName}`,
+        description: str(b.description) || tool.description || '',
+        unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,
+        plans: commercial.plans ?? [],
+        provenance: (b.provenance && typeof b.provenance === 'object') ? b.provenance as Offering['provenance'] : null,
+        usageTerms,
+        tags: Array.isArray(b.tags) ? (b.tags as unknown[]).filter(t => typeof t === 'string') as string[] : [],
+        state: 'listed', createdAt: now, updatedAt: now,
+      };
+      await putOffering(storage, offering);
+      return res.status(201).json(success(config.nodeId, { offering }));
+    }
+
+    // ── kind: ext-action (default) — the raw data-service surface ──
     const ext = str(b.ext), action = str(b.action);
     if (!ext || !action) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext and action are required'));
     const extRec = await storage.getExtension(ext);
@@ -108,6 +169,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       offeringId: newOfferingId(),
       providerGhii: resolveIdentity(req.auth!, config.nodeId),
       providerOwner: owner,
+      kind: 'ext-action', surface: null,
       ext, action,
       title: str(b.title) || `${ext}/${action}`,
       description: str(b.description),
@@ -130,9 +192,33 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
   router.get('/v1/exchange/offerings/:id', async (req: Request, res: Response) => {
     const o = await getOffering(storage, str(req.params.id));
     if (!o) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering'));
+    const stats = await offeringStats(storage, o);
+
+    // app-tool: the capability schema is the PINNED interface snapshot; the call goes to the WebMCP invoke
+    // endpoint (the accepted contract meters it). This is the freeze made visible — the version is explicit.
+    if (o.kind === 'app-tool' && o.surface) {
+      const s = o.surface;
+      const iface = await getInterfaceVersion(storage, o.providerGhii, s.appId, s.tool, s.ifaceVersion);
+      return res.json(success(config.nodeId, {
+        offering: o,
+        capability: iface ? {
+          kind: 'app-tool', app: `${s.ownerName}/${s.appId}`, tool: s.tool, iface_version: s.ifaceVersion,
+          input_schema: iface.inputSchema, output_schema: iface.outputSchema,
+        } : null,
+        call_recipe: {
+          method: 'POST',
+          url: `/v1/apps/${encodeURIComponent(s.ownerName)}/${encodeURIComponent(s.appId)}/webmcp/tools/${encodeURIComponent(s.tool)}`,
+          auth: 'Your own AIMEAT token — the accepted contract (metered entitlement) authorises the call; no separate API key is issued.',
+          note: `Each call is metered + charged to your budget at the provider price. The contract is pinned to interface v${s.ifaceVersion}; the provider may ship newer app versions without breaking your integration.`,
+          body: '{ "input": { … } }',
+        },
+        stats,
+      }));
+    }
+
+    // ext-action: schema comes live from the provider's extension action.
     const extRec = await storage.getExtension(o.ext);
     const act = extRec?.actions.find(a => a.id === o.action);
-    const stats = await offeringStats(storage, o);
     return res.json(success(config.nodeId, {
       offering: o,
       capability: act ? {
