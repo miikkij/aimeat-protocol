@@ -317,6 +317,52 @@
   margin-bottom: 0.5rem;
 }
 
+/* ── Promoted apps (public profile) ── */
+.portfolio-profile-head {
+  text-align: center;
+  padding: 3rem 2rem 1rem;
+  color: var(--text-dim, #6B7280);
+}
+.portfolio-profile-head h2 { color: var(--text, #1A1A2E); margin-bottom: 0.5rem; }
+.portfolio-promoted {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 0 1.5rem 1rem;
+}
+.portfolio-promoted-title {
+  font-size: 1rem;
+  color: var(--text, #1A1A2E);
+  margin: 0 0 0.75rem;
+}
+.portfolio-promoted-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 0.75rem;
+}
+.portfolio-promoted-card {
+  display: block;
+  text-decoration: none;
+  border: 1px solid var(--border, #E5E7EB);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  background: var(--card, #fff);
+  transition: border-color 0.15s, transform 0.15s;
+}
+.portfolio-promoted-card:hover {
+  border-color: var(--accent, #E8564A);
+  transform: translateY(-1px);
+}
+.portfolio-promoted-name {
+  font-weight: 700;
+  color: var(--text, #1A1A2E);
+  margin-bottom: 0.3rem;
+}
+.portfolio-promoted-pitch {
+  font-size: 0.85rem;
+  color: var(--text-dim, #6B7280);
+  line-height: 1.4;
+}
+
 /* ── Upload Section ── */
 .portfolio-upload-zone {
   border: 2px dashed var(--border, #E5E7EB);

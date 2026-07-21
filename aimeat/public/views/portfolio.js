@@ -45,8 +45,9 @@ import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
+import { listApps } from '/js/services/apps.js';
 import { NODE_URL, tr, stampCspNonce, getSession } from './portfolio/shared.js';
 import { PortfolioBuilder } from './portfolio/builder.js';
 
@@ -56,6 +57,8 @@ function PortfolioViewer({ username, navigate }) {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [errMsg, setErrMsg] = useState(null);
+  // Apps the owner promoted (their PUBLIC app-catalog.promoted doc), joined to app metadata.
+  const [promotedApps, setPromotedApps] = useState([]);
   const frameRef = useRef(null);
 
   // ── Portfolio bridge ──
@@ -144,6 +147,56 @@ function PortfolioViewer({ username, navigate }) {
       });
   }, [username]);
 
+  // Load the owner's promoted apps once we know their GHII (data.owner_gaiis[0]). The doc is PUBLIC,
+  // read anonymously via /v1/memory/:gaii/:key; app names/icons come from the public /v1/apps list.
+  useEffect(() => {
+    const ownerGhii = Array.isArray(data?.owner_gaiis) ? data.owner_gaiis[0] : null;
+    if (!ownerGhii) { setPromotedApps([]); return undefined; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const resp = await fetch(`${NODE_URL}/v1/memory/${encodeURIComponent(ownerGhii)}/${encodeURIComponent('app-catalog.promoted')}?soft=1`);
+        const j = await resp.json().catch(() => null);
+        const items = (j && j.data && j.data.value && Array.isArray(j.data.value.items)) ? j.data.value.items : [];
+        if (!items.length) { if (!cancelled) setPromotedApps([]); return; }
+        let byRef = {};
+        try {
+          const apps = await listApps();
+          (apps || []).forEach(a => { byRef[`${a.owner}/${a.filename || a.name}`] = a; });
+        } catch { /* names fall back to the filename */ }
+        const cards = items.filter(it => it && typeof it.ref === 'string').map(it => {
+          const slash = it.ref.indexOf('/');
+          const owner = it.ref.slice(0, slash);
+          const filename = it.ref.slice(slash + 1);
+          const app = byRef[it.ref];
+          return {
+            ref: it.ref, owner, filename, text: it.text || {},
+            name: (app && app.manifest && app.manifest.name) || filename.replace(/\.html?$/i, ''),
+            icon: (app && app.manifest && app.manifest.icon) || '\u{1F4E6}',
+          };
+        });
+        if (!cancelled) setPromotedApps(cards);
+      } catch { if (!cancelled) setPromotedApps([]); }
+    })();
+    return () => { cancelled = true; };
+  }, [data]);
+
+  // The "Promoted apps" block — the owner's showcased apps with their per-language pitch.
+  const promotedBlock = promotedApps.length ? html`
+    <div class="portfolio-promoted">
+      <h3 class="portfolio-promoted-title">\u{1F4E3} ${tr('portfolio.viewer.promoted', 'Promoted apps')}</h3>
+      <div class="portfolio-promoted-grid">
+        ${promotedApps.map(p => {
+          const pitch = p.text[getLocale()] || p.text.en || p.text.fi || '';
+          return html`
+            <a class="portfolio-promoted-card" href=${`${NODE_URL}/v1/apps/${encodeURIComponent(p.owner)}/${encodeURIComponent(p.filename)}?mode=inline`} target="_blank" rel="noopener">
+              <div class="portfolio-promoted-name">${p.icon} ${escHtml(p.name)}</div>
+              ${pitch ? html`<div class="portfolio-promoted-pitch">${escHtml(pitch)}</div>` : ''}
+            </a>`;
+        })}
+      </div>
+    </div>` : '';
+
   if (loading) return html`<div class="portfolio-container"><div class="view-loading">Loading portfolio...</div></div>`;
 
   if (errMsg || !data) {
@@ -183,6 +236,7 @@ function PortfolioViewer({ username, navigate }) {
             ⛶ ${tr('portfolio.viewer.fullscreen', 'Fullscreen')}
           </button>
         </div>
+        ${promotedBlock}
         <iframe ref=${frameRef} class="portfolio-viewer-frame portfolio-viewer-frame-full"
           srcdoc=${stampCspNonce(data.portfolio_html)} sandbox="allow-scripts"
           onLoad=${(e) => postAuthState(e.target.contentWindow)}></iframe>
@@ -190,16 +244,17 @@ function PortfolioViewer({ username, navigate }) {
     `;
   }
 
-  // No portfolio HTML — show basic profile info
+  // No portfolio HTML — show basic profile info + any promoted apps.
   return html`
     <div class="portfolio-container">
-      <div class="portfolio-not-found">
+      <div class="portfolio-profile-head">
         <h2>${escHtml(data.display_name || username)}</h2>
         <p>${data.bio ? escHtml(data.bio) : t('portfolio.viewer.notFoundDesc')}</p>
-        <button class="btn-ghost" style="margin-top:1rem;" onClick=${() => navigate('/v1/portal')}>
-          ${t('portfolio.viewer.backToPortal')}
-        </button>
       </div>
+      ${promotedBlock}
+      <button class="btn-ghost" style="margin-top:1rem;" onClick=${() => navigate('/v1/portal')}>
+        ${t('portfolio.viewer.backToPortal')}
+      </button>
     </div>
   `;
 }
