@@ -14,6 +14,9 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.25.0 -- 2026-07-21 -- Thread history is no longer capped at the newest 50: a header "Show all
+ *     messages / Last 50" toggle (threadAll) loads the FULL conversation via getConversation(all).
+ *     loadThread's attachment-URL resolution extracted to helpers.resolveThreadAttachmentUrls.
  *   v1.24.0 -- 2026-07-19 -- Conversation → Notebook (📓 on the thread head next to ✨): summarize the
  *     whole thread — with its images — and park it into the Notebook for filing/enrichment. Three modes:
  *     server-side AI summary (owner's OpenRouter key, vision-aware), copy-prompt (own chat), or raw.
@@ -131,7 +134,7 @@ import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
 import { peerLabel } from '/js/services/messages-ai-prompts.js';
-import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary } from './inbox-tab/helpers.js';
+import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls } from './inbox-tab/helpers.js';
 import { Composer, PollBuilder, MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { buildConversationReplyProps, buildMessageReplyProps, buildConversationNotebookProps } from './inbox-tab/ai-actions.js';
 import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel } from './inbox-tab/panels.js';
@@ -329,34 +332,24 @@ export default function InboxTab({ showToast }) {
   // markRead=true ONLY when the user opens the conversation. Marking read POSTs a receipt which itself
   // emits a 'messages' change → SSE → live refresh; doing it on every live refresh creates a
   // self-sustaining request loop. So live refreshes reload the thread WITHOUT marking read.
+  // Per-conversation "show all vs newest 50" mode. A ref (read at call time) keeps loadThread []-memoized;
+  // the state drives the header toggle button. Resets to 50 whenever a different thread opens.
+  const [threadAll, setThreadAll] = useState(false);
+  const threadAllRef = useRef(false); threadAllRef.current = threadAll;
   const loadThread = useCallback(async (conv, markRead = false) => {
     if (!conv) return;
-    const msgs = (await messages.getConversation(conv.conversationId, conv.viaAgent).catch(() => [])).slice().reverse();
+    // threadAllRef: false = newest 50 (fast default); true = the FULL history (header "All messages" toggle).
+    const msgs = (await messages.getConversation(conv.conversationId, conv.viaAgent, threadAllRef.current).catch(() => [])).slice().reverse();
     setThread(msgs);
-    // REUSE already-resolved attachment URLs for the SAME conversation: a refresh / new message must NOT
-    // re-resolve (and thus re-download via a fresh presigned URL) every existing image. Only fetch URLs
-    // for attachments we haven't resolved yet. A different conversation starts a fresh cache.
-    const sameConv = urlCacheRef.current.convId === conv.conversationId;
-    const prev = sameConv ? urlCacheRef.current.map : {};
-    const map = {};
-    await Promise.all(msgs.flatMap(m => (m.attachments || [])
-      .filter(a => !a.inline)
-      .map(async a => {
-        // Key by messageId::attachmentId — per-message ids (at0, at1…) repeat, so a flat a.id map made every message's `at0` share one image.
-        const uk = `${m.id}::${a.id}`;
-        if (prev[uk]) { map[uk] = prev[uk]; return; } // cached → browser won't re-fetch
-        // Inbound: only the recipient's duplicated local copy is fetchable. Outbound: resolve the original.
-        const key = (a.mode === 'duplicate' && a.localKey) ? a.localKey
-          : (m.direction === 'outbound' && a.storageKey) ? a.storageKey : null;
-        if (!key) return;
-        const u = await messages.attachmentUrl(key).catch(() => null);
-        if (u) map[uk] = u;
-      })));
-    urlCacheRef.current = { convId: conv.conversationId, map };
-    setUrlMap(map);
+    // Reuse already-resolved attachment URLs for the same conversation (a refresh must not re-download
+    // every image); a different conversation starts a fresh cache.
+    const cache = await resolveThreadAttachmentUrls(msgs, conv.conversationId, urlCacheRef.current, messages.attachmentUrl);
+    urlCacheRef.current = cache;
+    setUrlMap(cache.map);
     // Agent-owned ("via <agent>") threads are read-only for the owner — don't post a read receipt as them.
     if (markRead && !conv.viaAgent) await messages.markConversationRead(conv.conversationId).catch(() => {});
   }, []);
+  const toggleThreadAll = () => setThreadAll(v => { const nv = !v; threadAllRef.current = nv; if (activeConv) loadThread(activeConv); return nv; });
 
   // Mount: one composite call seeds all six sections (requests/conversations/important/tracked/agents/groups).
   useEffect(() => { loadOverview(); }, [loadOverview]);
@@ -463,6 +456,7 @@ export default function InboxTab({ showToast }) {
 
   const openConversation = async (conv) => {
     setActiveConv(conv); setMode('thread');
+    setThreadAll(false); threadAllRef.current = false;   // each thread opens at the fast newest-50 view
     setDraftPrefill(''); setReplyingTrId(null); setReplyQuote(null);   // don't leak a suggested reply / quote across threads
     await loadThread(conv, true);                 // mark read only on explicit open (avoids a refresh loop)
     loadLists();
@@ -774,7 +768,8 @@ export default function InboxTab({ showToast }) {
           replyQuote=${replyQuote} setReplyQuote=${setReplyQuote} onQuoteReply=${startQuoteReply} composerFocus=${composerFocus}
           onTrackMsg=${onTrackMsg} onParkMsg=${onParkMsg} openMessageAi=${openMessageAi} submitInteractiveAnswers=${submitInteractiveAnswers}
           setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} openConversationNotebook=${openConversationNotebook} insertCommand=${insertCommand} setCmdFill=${setCmdFill}
-          cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} showLinkPreviews=${showLinkPreviews} toggleLinkPreviews=${toggleLinkPreviews} />` : null}
+          cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} showLinkPreviews=${showLinkPreviews} toggleLinkPreviews=${toggleLinkPreviews}
+          threadAll=${threadAll} toggleThreadAll=${toggleThreadAll} />` : null}
 
         ${mode === 'tracked' ? html`<${TrackedPanel} activeTracked=${activeTracked} doneCount=${doneCount}
           openRecord=${openRecord} openTracked=${openTracked} cancelTracked=${cancelTracked} />` : null}

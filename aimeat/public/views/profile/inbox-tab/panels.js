@@ -6,6 +6,9 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-07-21 — ThreadPanel head: "Show all messages / Last 50" toggle (threadAll/
+ *     toggleThreadAll), shown when the thread is all-loaded or a full 50-page (i.e. more may exist),
+ *     so long histories aren't stuck at the newest 50.
  *   v1.3.0 — 2026-07-21 — ThreadPanel: link-preview toggle button in the head (showLinkPreviews /
  *     toggleLinkPreviews) + passes the flag down to each MessageBubble.
  *   v1.2.0 — 2026-07-18 — Clicking ↩ Reply on a bubble now focuses the composer (via `onQuoteReply` +
@@ -103,6 +106,7 @@ export function ThreadPanel({
   peerDisplay, showToast, toggleImportant, onTrackMsg, onParkMsg, openMessageAi, submitInteractiveAnswers,
   setMdViewer, openConversationAi, openConversationNotebook, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
   replyQuote, setReplyQuote, onQuoteReply, composerFocus, showLinkPreviews, toggleLinkPreviews,
+  threadAll, toggleThreadAll,
 }) {
   let lastDay = '';
   // Reply-to quotes: resolve a message's `replyToId` to the original within the loaded page (a parent
@@ -149,6 +153,10 @@ export function ThreadPanel({
           aria-pressed=${!!showLinkPreviews} onClick=${toggleLinkPreviews}
           title=${showLinkPreviews ? t('inbox.linkPreview.hideAll') : t('inbox.linkPreview.showAll')}>
           <span class="inbox-ai-btn-label">${t('inbox.linkPreview.label')}</span></button>
+        ${(threadAll || thread.length >= 50) ? html`<button class=${`btn-ghost btn-sm inbox-linkprev-toggle${threadAll ? ' inbox-linkprev-toggle--on' : ''}`}
+          aria-pressed=${!!threadAll} onClick=${toggleThreadAll}
+          title=${threadAll ? t('inbox.thread.showRecent') : t('inbox.thread.showAll')}>
+          <span class="inbox-ai-btn-label">${threadAll ? t('inbox.thread.showRecent') : t('inbox.thread.showAll')}</span></button>` : null}
         ${peerIsMyAgent && !viaAgentName ? html`<button class=${`btn-ghost btn-sm inbox-sched-btn${schedOpen ? ' inbox-sched-btn--on' : ''}`}
           onClick=${() => setSchedOpen(o => !o)} title=${t('inbox.schedTitle')}>📅</button>` : null}
       </div>
