@@ -6,6 +6,8 @@
  *   chat.commands), SchedulePanel (own-agent scheduler), and ReplyWithAiPopover (TARGET-031). Each is
  *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.8.0 — 2026-07-21 — MessageBubble renders link-preview cards under the body (MessageLinkPreviews),
+ *     gated by the `showLinkPreviews` prop (the persisted thread-head toggle).
  *   v1.0.0 — 2026-07-13 — Extracted from inbox-tab.js (max-file-lines)
  *   v1.1.0 — 2026-07-14 — Composer: pasted/dropped images route to the file-attachment path (upload +
  *     shown as an image) instead of Toast UI base64-inlining them into the body (which blew the 50k
@@ -35,6 +37,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Markdown } from '/components/Markdown.js';
+import { MessageLinkPreviews } from '/components/LinkPreview.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 import * as schedules from '/js/services/schedules.js';
 import { MODES } from '/js/services/messages-ai-prompts.js';
@@ -248,7 +251,7 @@ export function PollBuilder({ questions, setQuestions }) {
     </div>`;
 }
 
-export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting }) {
+export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews }) {
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   // urlMap is keyed by `${messageId}::${attachmentId}` because per-message attachment ids (at0, at1…)
@@ -282,6 +285,7 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
           <span class="inbox-quote-text">${escHtml(quoteSnippet(quoted.body))}</span>
         </button>` : null}
         <div class="inbox-bubble-body"><${Markdown} text=${prepareBody(msg.body, urls, expiredIds)} /></div>
+        ${showLinkPreviews ? html`<${MessageLinkPreviews} msg=${msg} />` : null}
         ${msg.interactive?.role === 'questions' ? (
           answeredWith
             ? html`<${InteractiveAnswered} spec=${msg.interactive} answers=${answeredWith.answers || {}} />`
