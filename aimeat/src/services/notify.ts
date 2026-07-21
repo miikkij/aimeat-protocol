@@ -9,6 +9,8 @@
  *   browser push (best-effort) whose click deep-links to the same target as the bell entry.
  * @structure
  *   - notify(storage, recipientGhii, { type, title, body?, link?, actions? })
+ *   - dismissConversationNotifications(storage, recipientGhii, conversationId) — delete the bell
+ *     notifications deep-linking to a conversation once its owner has read that thread
  *   - setNotifyPushService(push) — wired once at boot so notify() can bridge to web push
  *   - notifLinkToUrl(link) — bell link vocabulary ('/v1/profile#inbox/<id>') → openable URL
  *   - NotifAction — an inline action a notification carries (reply | api | navigate), rendered as a
@@ -23,6 +25,9 @@
  *   v1.1.0 -- 2026-07-02 -- Bridge bell notifications to web push with deep-link URL translation.
  *   v1.2.0 -- 2026-07-18 -- Inline notification actions (reply/api/navigate); mirror up to two into
  *     the web-push payload so the SW can offer OS-level action buttons.
+ *   v1.3.0 -- 2026-07-21 -- dismissConversationNotifications(): reading a DM thread deletes its bell
+ *     notifications (delivered #inbox/<id> + request #inbox/req:<id> links) so a seen message stops
+ *     lingering in the header bell. Called from POST /v1/messages/conversations/:id/read.
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
@@ -58,6 +63,30 @@ export function isSafeNotifActionEndpoint(path: unknown): path is string {
 let pushService: PushService | null = null;
 export function setNotifyPushService(push: PushService | null): void {
   pushService = push;
+}
+
+/**
+ * Delete the recipient's bell notifications that deep-link to a given conversation — called when they
+ * open/read that thread, so a message they've now seen stops nagging from the header bell. Matches both
+ * the delivered-message link (#inbox/<id>) and the "wants to message you" request link (#inbox/req:<id>).
+ * Best-effort: never throws into the caller. Returns the number removed (0 if none / on any error).
+ */
+export async function dismissConversationNotifications(storage: Storage, recipientGhii: string, conversationId: string): Promise<number> {
+  if (!conversationId) return 0;
+  try {
+    const links = new Set([`/v1/profile#inbox/${conversationId}`, `/v1/profile#inbox/req:${conversationId}`]);
+    const mine = await storage.listMemory(recipientGhii, { prefix: NOTIF_PREFIX });
+    const refs = mine
+      .filter(r => { const v = r.value as { link?: string } | null; return !!v && typeof v.link === 'string' && links.has(v.link); })
+      .map(r => ({ ownerGaii: recipientGhii, key: r.key }));
+    if (!refs.length) return 0;
+    if (storage.bulkDeleteMemory) return await storage.bulkDeleteMemory(refs);
+    let removed = 0;
+    for (const ref of refs) { if (await storage.deleteMemory(ref.ownerGaii, ref.key)) removed++; }
+    return removed;
+  } catch {
+    return 0;
+  }
 }
 
 export interface NotifyInput {
