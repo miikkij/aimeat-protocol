@@ -24,11 +24,12 @@ import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { escHtml, handleImgError, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { listApps, uploadApp, deleteApp, patchApp, deployAppAgent, undeployAppAgent, appAgentStatus } from '/js/services/apps.js';
+import { getMemory } from '/js/services/memory.js';
 import { listAgents } from '/js/services/agents.js';
 import { listOrganisms } from '/js/services/organisms.js';
 import * as skillsService from '/js/services/skills.js';
@@ -289,6 +290,8 @@ export default function AppsTab({ session, showToast, onStats }) {
   const [editDesc, setEditDesc] = useState('');
   const [editingAgents, setEditingAgents] = useState(null);
   const [agentsJson, setAgentsJson] = useState('');
+  // Promoted apps (from the owner's public app-catalog.promoted doc), keyed by "owner/filename".
+  const [promoted, setPromoted] = useState({});
 
   // Reload the app lists when the session becomes available / changes. loadData closes over the
   // optional onStats prop (not guaranteed memoized), so we key on session only to avoid re-running
@@ -306,6 +309,14 @@ export default function AppsTab({ session, showToast, onStats }) {
       setAllApps(list);
       onStats?.({ apps: own.length });
     } catch { setMyApps([]); setAllApps([]); }
+    // Promoted apps: read the owner's own app-catalog.promoted doc (soft = no 404 when unset).
+    try {
+      const res = await getMemory('app-catalog.promoted', { soft: true });
+      const items = res?.data?.value?.items;
+      const map = {};
+      if (Array.isArray(items)) items.forEach(it => { if (it && it.ref) map[it.ref] = it.text || {}; });
+      setPromoted(map);
+    } catch { setPromoted({}); }
   }
 
   async function handleUpload(file, description, screenshot, accessCode) {
@@ -480,12 +491,18 @@ export default function AppsTab({ session, showToast, onStats }) {
               ${a.protected ? html`<span class="badge badge-warn">\u{1F512}</span>` : ''}
               ${a.parked ? html`<span class="badge badge-dim">\u{1F17F}️ ${t('profile.apps.parkedBadge') || 'Parked'}</span>` : ''}
               ${a.manifest?.cortex?.agents?.length ? html`<span class="badge badge-info" title=${t('profile.apps.agentBadgeHint') || 'This app ships its own agent — deploy it onto your fleet below'}>\u{1F916} ${t('profile.apps.agentBadge') || 'Ships an agent'}</span>` : ''}
+              ${promoted[`${a.owner || session.owner}/${a.filename || a.name}`] ? html`<span class="badge badge-success" title=${t('profile.apps.promotedBadgeHint') || 'Promoted on your public profile — manage the pitch in the app catalog'}>\u{1F4E3} ${t('profile.apps.promotedBadge') || 'Promoted'}</span>` : ''}
               ${a.operator_hidden ? html`<span class="badge badge-danger">\u{1F6AB} ${t('profile.apps.operatorHiddenBadge') || 'Moderated by operator: hidden'}</span>` : ''}
             </div>
           </div>
           ${a.operator_hidden ? html`<div class="text-meta-sm mb-half">${t('profile.apps.operatorHiddenHint') || 'An operator has hidden this app from public view. Only you can still see it. Contact the operator to appeal.'}${a.operator_hide_reason ? ' — ' + escHtml(a.operator_hide_reason) : ''}</div>` : ''}
           ${a.parked ? html`<div class="text-meta-sm mb-half">${t('profile.apps.parkedHint') || 'Only you can see and use this — hidden from the public catalogue.'}</div>` : ''}
           ${a.manifest?.description ? html`<div class="text-meta mb-half">${escHtml(a.manifest.description)}</div>` : ''}
+          ${(() => {
+            const pt = promoted[`${a.owner || session.owner}/${a.filename || a.name}`];
+            const txt = pt ? (pt[getLocale()] || pt.en || pt.fi || '') : '';
+            return txt ? html`<div class="text-meta-sm mb-half">\u{1F4E3} ${escHtml(txt)}</div>` : '';
+          })()}
           <div class="card-subtitle">
             <a href="${NODE_URL}/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}" target="_blank">${t('profile.apps.download')}</a>
             ${a.size ? ' \u2022 ' + Math.round(a.size / 1024) + ' KB' : ''}

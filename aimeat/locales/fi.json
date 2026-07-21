@@ -2911,6 +2911,8 @@
       "operatorHiddenHint": "Operaattori on piilottanut tämän sovelluksen julkisesta näkymästä. Vain sinä näet sen edelleen. Ota yhteyttä operaattoriin valittaaksesi.",
       "agentBadge": "Sisältää agentin",
       "agentBadgeHint": "Tämä sovellus tuo mukanaan oman agentin - ota se käyttöön omaan laivueeseesi alta",
+      "promotedBadge": "Nostettu",
+      "promotedBadgeHint": "Nostettu julkiseen profiiliisi — hallitse myyntipuhetta sovelluskatalogissa",
       "agentsLabel": "Mukana tulevat agentit",
       "agentDeploy": "Ota käyttöön laivueeseeni",
       "agentUndeploy": "Poista käytöstä",
@@ -6472,6 +6474,7 @@
       "notFound": "Portfoliota ei löytynyt",
       "notFoundDesc": "Tämä käyttäjä ei ole julkaissut portfoliota.",
       "loginToSeeMore": "Kirjaudu sisään nähdäksesi lisää",
+      "promoted": "Nostetut sovellukset",
       "backToPortal": "Koti",
       "fullscreen": "Koko näyttö",
       "standalone": "Oma osoite"
