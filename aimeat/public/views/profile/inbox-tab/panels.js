@@ -6,6 +6,8 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-07-21 — ThreadPanel: link-preview toggle button in the head (showLinkPreviews /
+ *     toggleLinkPreviews) + passes the flag down to each MessageBubble.
  *   v1.2.0 — 2026-07-18 — Clicking ↩ Reply on a bubble now focuses the composer (via `onQuoteReply` +
  *     `composerFocus` bump) so the cursor lands in the input; the ✕ cancel still uses the raw setter.
  *   v1.1.0 — 2026-07-17 — Reply-to with quote: ThreadPanel resolves each message's `replyToId` to the
@@ -100,7 +102,7 @@ export function ThreadPanel({
   schedOpen, setSchedOpen, cmdFill, agentCommands, sending, draftPrefill, prefillNonce, msgsRef,
   peerDisplay, showToast, toggleImportant, onTrackMsg, onParkMsg, openMessageAi, submitInteractiveAnswers,
   setMdViewer, openConversationAi, openConversationNotebook, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
-  replyQuote, setReplyQuote, onQuoteReply, composerFocus,
+  replyQuote, setReplyQuote, onQuoteReply, composerFocus, showLinkPreviews, toggleLinkPreviews,
 }) {
   let lastDay = '';
   // Reply-to quotes: resolve a message's `replyToId` to the original within the loaded page (a parent
@@ -143,6 +145,10 @@ export function ThreadPanel({
         </div>
         ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}>✨ <span class="inbox-ai-btn-label">${t('inbox.ai.replyWithAi')}</span></button>` : null}
         ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationNotebook} title=${t('inbox.notebook.toNotebook')}>📓 <span class="inbox-ai-btn-label">${t('inbox.notebook.toNotebookShort')}</span></button>` : null}
+        <button class=${`btn-ghost btn-sm inbox-linkprev-toggle${showLinkPreviews ? ' inbox-linkprev-toggle--on' : ''}`}
+          aria-pressed=${!!showLinkPreviews} onClick=${toggleLinkPreviews}
+          title=${showLinkPreviews ? t('inbox.linkPreview.hideAll') : t('inbox.linkPreview.showAll')}>
+          <span class="inbox-ai-btn-label">${t('inbox.linkPreview.label')}</span></button>
         ${peerIsMyAgent && !viaAgentName ? html`<button class=${`btn-ghost btn-sm inbox-sched-btn${schedOpen ? ' inbox-sched-btn--on' : ''}`}
           onClick=${() => setSchedOpen(o => !o)} title=${t('inbox.schedTitle')}>📅</button>` : null}
       </div>
@@ -160,7 +166,7 @@ export function ThreadPanel({
               onQuote=${(onQuoteReply && !activeConv.viaAgent) ? onQuoteReply : null}
               starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} onPark=${onParkMsg} onReplyAi=${openMessageAi} tracked=${trackedByMsg[m.id]}
               answeredWith=${m.interactive?.role === 'questions' ? answersByQ[m.id] : null}
-              onAnswer=${submitInteractiveAnswers} submitting=${sending}
+              onAnswer=${submitInteractiveAnswers} submitting=${sending} showLinkPreviews=${showLinkPreviews}
               onOpenMarkdown=${(url, name) => setMdViewer({ url, name })} />`;
         })}
       </div>

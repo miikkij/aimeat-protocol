@@ -4602,6 +4602,77 @@ paths:
         '200':
           description: Documentation page
 
+  /v1/unfurl:
+    get:
+      operationId: unfurlLink
+      summary: Link preview (unfurl) metadata for a URL
+      description: |
+        Fetch a URL server-side (SSRF-safe via safeFetch) and return its OpenGraph/Twitter-card
+        metadata so a pasted link can render as a rich preview card. Generic — usable by any client
+        (message threads, notebook, workspace docs). The page fetch is size-capped and content-type
+        checked; results are cached (~1h). A non-HTML target returns a hostname-only preview.
+      tags: [Bootstrap]
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+          description: The http(s) URL to unfurl.
+      responses:
+        '200':
+          description: Preview metadata
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          url: { type: string }
+                          resolvedUrl: { type: string }
+                          title: { type: string, nullable: true }
+                          description: { type: string, nullable: true }
+                          image: { type: string, nullable: true, description: 'Absolute image URL; fetch it via /v1/unfurl/image (the SPA CSP forbids remote image hosts).' }
+                          siteName: { type: string, nullable: true }
+        '400':
+          description: Missing or non-http(s) url parameter
+        '422':
+          description: The link could not be fetched (blocked by the SSRF guard, timeout, or network error)
+      security:
+        - bearerAuth: []
+  /v1/unfurl/image:
+    get:
+      operationId: unfurlImage
+      summary: Proxy a link-preview image same-origin
+      description: |
+        Fetch a preview image (typically the `image` from GET /v1/unfurl) THROUGH the node and stream
+        it back. Same-origin so the SPA's `img-src 'self' data: blob:` CSP is satisfied, and the
+        viewer's IP never reaches the third-party site. SSRF-safe, content-type checked (image/*), and
+        size-capped.
+      tags: [Bootstrap]
+      parameters:
+        - name: url
+          in: query
+          required: true
+          schema: { type: string, format: uri }
+          description: The http(s) image URL to proxy.
+      responses:
+        '200':
+          description: The image bytes
+          content:
+            image/*:
+              schema: { type: string, format: binary }
+        '400':
+          description: Missing or non-http(s) url parameter
+        '415':
+          description: The URL did not resolve to an image
+        '422':
+          description: The image could not be fetched (blocked, timeout, or network error)
+      security:
+        - bearerAuth: []
   /v1/validate:
     post:
       operationId: validateRequest

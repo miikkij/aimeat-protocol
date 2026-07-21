@@ -135,7 +135,7 @@ import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary } from './inbox-t
 import { Composer, PollBuilder, MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { buildConversationReplyProps, buildMessageReplyProps, buildConversationNotebookProps } from './inbox-tab/ai-actions.js';
 import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel } from './inbox-tab/panels.js';
-import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
+import { useThreadAutoScroll, useMobileComposerKeyboard, useLinkPreviewToggle } from './inbox-tab/use-thread-ux.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 
 export default function InboxTab({ showToast }) {
@@ -144,7 +144,7 @@ export default function InboxTab({ showToast }) {
   const [activeConv, setActiveConv] = useState(null);     // { conversationId, peerGhii }
   const [thread, setThread] = useState([]);
   const [urlMap, setUrlMap] = useState({});
-  const [mdViewer, setMdViewer] = useState(null);         // { url, name } — open markdown attachment viewer
+  const { showLinkPreviews, toggleLinkPreviews } = useLinkPreviewToggle(); const [mdViewer, setMdViewer] = useState(null); // link-preview toggle (persisted) + markdown viewer state
   const [aiReply, setAiReply] = useState(null);           // { title, build } — Reply with AI popover (TARGET-031)
   const [nbConv, setNbConv] = useState(null);             // { title, promptText, runServerSummary, parkConversation } — Conversation → Notebook popover
   const [peerNames, setPeerNames] = useState({});         // id (GHII/GAII or owner@node) → resolved display name
@@ -774,7 +774,7 @@ export default function InboxTab({ showToast }) {
           replyQuote=${replyQuote} setReplyQuote=${setReplyQuote} onQuoteReply=${startQuoteReply} composerFocus=${composerFocus}
           onTrackMsg=${onTrackMsg} onParkMsg=${onParkMsg} openMessageAi=${openMessageAi} submitInteractiveAnswers=${submitInteractiveAnswers}
           setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} openConversationNotebook=${openConversationNotebook} insertCommand=${insertCommand} setCmdFill=${setCmdFill}
-          cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} />` : null}
+          cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} showLinkPreviews=${showLinkPreviews} toggleLinkPreviews=${toggleLinkPreviews} />` : null}
 
         ${mode === 'tracked' ? html`<${TrackedPanel} activeTracked=${activeTracked} doneCount=${doneCount}
           openRecord=${openRecord} openTracked=${openTracked} cancelTracked=${cancelTracked} />` : null}

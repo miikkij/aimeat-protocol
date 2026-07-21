@@ -7,6 +7,8 @@
  *   Extracted from inbox-tab.js to satisfy max-file-lines.
  * @usage import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
  * @version-history
+ *   v1.3.0 — 2026-07-21 — Add useLinkPreviewToggle: persisted global on/off for the message link-preview
+ *     cards (default ON); the ThreadPanel head button flips it.
  *   v1.2.0 — 2026-07-19 — useThreadAutoScroll now suppresses the one-time new-message jump while the
  *     composer is focused (near-bottom follow still applies). This lets the inbox reload the open thread
  *     on EVERY 'messages' live-update — so incoming messages render immediately even while you're typing
@@ -17,7 +19,22 @@
  *     visualViewport bottom) as `--inbox-avail` instead of the `dvh − keyboard` double-count that collapsed
  *     the messenger on Android Chrome; drop the composer scrollIntoView(center) that left a dead gap.
  */
-import { useEffect, useRef } from 'preact/hooks';
+import { useEffect, useRef, useState } from 'preact/hooks';
+
+const LINK_PREVIEWS_KEY = 'aimeat.inbox.linkPreviews';
+
+/** Persisted global toggle for the link-preview cards (default ON). Returns the flag + a toggler that
+ *  writes the choice to localStorage. Per-card dismissal is owned separately by /components/LinkPreview.js. */
+export function useLinkPreviewToggle() {
+  const [showLinkPreviews, setShow] = useState(() => {
+    try { return localStorage.getItem(LINK_PREVIEWS_KEY) !== 'off'; } catch { return true; }
+  });
+  const toggleLinkPreviews = () => setShow((v) => {
+    try { localStorage.setItem(LINK_PREVIEWS_KEY, v ? 'off' : 'on'); } catch { /* quota */ }
+    return !v;
+  });
+  return { showLinkPreviews, toggleLinkPreviews };
+}
 
 /** Auto-scroll policy for the open thread: jump to the latest message when a thread is OPENED, follow
  *  when the reader is already near the bottom, and when a genuinely NEW message arrives (last message

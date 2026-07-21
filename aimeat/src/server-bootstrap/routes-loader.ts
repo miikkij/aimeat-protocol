@@ -9,6 +9,7 @@
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.6.0 — 2026-07-21 — Mount unfurlRouter (GET /v1/unfurl(/image) — link-preview cards)
  *   v1.5.0 — 2026-07-19 — Mount appdevPitfallsRouter (/v1/appdev/pitfalls, AppDev KB Phase 1)
  *   v1.4.0 — 2026-07-14 — Mount agentSkillsDiscoveryRouter (/.well-known/agent-skills, RFC v0.2.0)
  *   v1.3.0 — 2026-07-14 — Register the app-tool sellable resolver (TARGET-034 phase A)
@@ -79,6 +80,7 @@ import { disputesRouter } from '../routes/disputes.js';
 import { microMemoryRouter } from '../routes/micro-memory.js';
 import { storageFilesRouter } from '../routes/storage-files.js';
 import { validateRouter } from '../routes/validate.js';
+import { unfurlRouter } from '../routes/unfurl.js';
 import { mcpRouter } from '../mcp/index.js';
 import { portalRouter } from '../routes/portal.js';
 import { publicStatsRouter } from '../routes/public-stats.js';
@@ -481,6 +483,7 @@ export async function mountRoutes(
   app.use(microMemoryRouter(config, storage));
   app.use(storageFilesRouter(config, storage));
   app.use(validateRouter(config));
+  app.use(unfurlRouter(config));                        // GET /v1/unfurl(/image) — link previews
   app.use(mcpRouter(config, storage, peers));
   app.use(siteRouter(config, storage, siteService));    // Node Portal — GET / + /v1/site/*
 
