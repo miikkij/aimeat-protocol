@@ -13,6 +13,8 @@
  *   v1.1.0 -- 2026-06-23 -- send() carries the optional `interactive` payload (federated AskUserQuestion).
  *   v1.1.1 -- 2026-07-17 -- uploadAttachment: add a random suffix to the storage key so same-named files
  *     uploaded in the same millisecond (two clipboard "image.png" pastes) don't overwrite each other.
+ *   v1.2.0 -- 2026-07-21 -- getConversation(…, all): default loads the newest 50 (server page); all=true
+ *     walks every page (per_page=200) so long threads show their FULL history instead of only the last 50.
  */
 import { api, apiGet } from '/js/api.js';
 
@@ -54,10 +56,30 @@ export async function listConversations() {
   return r?.data?.conversations || [];
 }
 
-export async function getConversation(conversationId, viaAgent) {
-  const q = viaAgent ? `?agent=${enc(viaAgent)}` : '';
-  const r = await apiGet(`/v1/messages/conversations/${enc(conversationId)}${q}`);
-  return r?.data?.messages || [];
+/**
+ * Fetch a conversation thread. Default = the newest page (server default 50). Pass all=true to load the
+ * ENTIRE history: it walks every page (per_page=200) so long threads are never truncated — no message is
+ * hidden, only paged. Returns the messages array newest-first (the caller reverses for chat display);
+ * dedupes by id so a message arriving mid-walk can't double-render.
+ */
+export async function getConversation(conversationId, viaAgent, all = false) {
+  const base = `/v1/messages/conversations/${enc(conversationId)}`;
+  const agent = viaAgent ? `&agent=${enc(viaAgent)}` : '';
+  const perPage = all ? 200 : 50;
+  const first = await apiGet(`${base}?per_page=${perPage}&page=1${agent}`);
+  const data = first?.data || {};
+  let messages = data.messages || [];
+  const total = Number(data.total) || messages.length;
+  if (all && total > messages.length) {
+    const pages = Math.ceil(total / perPage);
+    for (let p = 2; p <= pages; p++) {
+      const r = await apiGet(`${base}?per_page=${perPage}&page=${p}${agent}`);
+      messages = messages.concat(r?.data?.messages || []);
+    }
+    const seen = new Set();
+    messages = messages.filter(m => m && m.id && !seen.has(m.id) && seen.add(m.id));
+  }
+  return messages;
 }
 
 export async function markConversationRead(conversationId) {

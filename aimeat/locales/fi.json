@@ -18,6 +18,8 @@
   "inbox.linkPreview.hide": "Piilota tämä esikatselu",
   "inbox.linkPreview.hideAll": "Piilota linkkien esikatselut",
   "inbox.linkPreview.showAll": "Näytä linkkien esikatselut",
+  "inbox.thread.showAll": "Näytä kaikki viestit",
+  "inbox.thread.showRecent": "Näytä viimeiset 50",
   "inbox.attachmentRemove": "Poista liite",
   "inbox.contactAgentSuffix": "(agenttisi)",
   "inbox.messageThis": "Lähetä viesti",

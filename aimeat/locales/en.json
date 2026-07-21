@@ -18,6 +18,8 @@
   "inbox.linkPreview.hide": "Hide this preview",
   "inbox.linkPreview.hideAll": "Hide link previews",
   "inbox.linkPreview.showAll": "Show link previews",
+  "inbox.thread.showAll": "Show all messages",
+  "inbox.thread.showRecent": "Show last 50",
   "inbox.attachmentRemove": "Remove attachment",
   "inbox.contactAgentSuffix": "(your agent)",
   "inbox.messageThis": "Send a message",

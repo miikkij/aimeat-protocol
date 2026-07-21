@@ -5,10 +5,36 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-07-21 — resolveThreadAttachmentUrls(): resolve non-inline attachment URLs for a loaded
+ *     thread (reusing the previous conversation's cache), extracted from inbox-tab loadThread.
  *   v1.1.0 — 2026-07-17 — quoteSnippet(): one-line plain-text excerpt of a message body for reply-quotes.
  *   v1.0.0 — 2026-07-13 — Extracted from inbox-tab.js (max-file-lines)
  */
 import { t, getLocale } from '/js/i18n.js';
+
+/**
+ * Resolve presigned URLs for a thread's non-inline attachments, reusing already-resolved URLs from the
+ * SAME conversation's previous cache (a refresh/new message must not re-download every existing image).
+ * Keyed by `${messageId}::${attachmentId}` (per-message ids repeat across messages). Inbound resolves the
+ * recipient's duplicated local copy; outbound resolves the original. `resolveUrl` = messages.attachmentUrl.
+ * Returns { convId, map } to store as the new cache.
+ */
+export async function resolveThreadAttachmentUrls(msgs, conversationId, prevCache, resolveUrl) {
+  const prev = prevCache?.convId === conversationId ? (prevCache.map || {}) : {};
+  const map = {};
+  await Promise.all(msgs.flatMap(m => (m.attachments || [])
+    .filter(a => !a.inline)
+    .map(async a => {
+      const uk = `${m.id}::${a.id}`;
+      if (prev[uk]) { map[uk] = prev[uk]; return; }
+      const key = (a.mode === 'duplicate' && a.localKey) ? a.localKey
+        : (m.direction === 'outbound' && a.storageKey) ? a.storageKey : null;
+      if (!key) return;
+      const u = await resolveUrl(key).catch(() => null);
+      if (u) map[uk] = u;
+    })));
+  return { convId: conversationId, map };
+}
 
 /* Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) — the same editor the workspace
  * document space uses, so composing a message feels like editing a document (Markdown⇄WYSIWYG).
