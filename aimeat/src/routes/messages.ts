@@ -31,6 +31,9 @@
  *     read (getDirectMessagesByIds) instead of getDirectMessage per pending contact.
  *   v1.5.0 -- 2026-07-16 -- GET /messages/overview: the inbox mount's 6-request fan-out folded into one
  *     composite (MessagesInboxService, Phase 4). Individual list endpoints stay for interactive re-fetch.
+ *   v1.6.0 -- 2026-07-21 -- Reading a thread (POST /conversations/:id/read) now also dismisses that
+ *     conversation's header-bell notifications (dismissConversationNotifications), so a message you've
+ *     opened stops lingering in the bell; owner-scoped 'notifications' emit refreshes the bell live.
  */
 
 import { Router } from 'express';
@@ -42,6 +45,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, parseGaiiLoose } from '../utils/gaii.js';
 import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/messaging.js';
 import { emitChange } from '../services/event-bus.js';
+import { dismissConversationNotifications } from '../services/notify.js';
 import { MessageSendSchema, BroadcastSendSchema } from '../models/message-schemas.js';
 import { propagateReadReceipt } from '../services/message-delivery.js';
 import { sendDirectMessage, mapMessageAttachments } from '../services/message-send.js';
@@ -310,7 +314,11 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const count = await storage.markConversationRead(ghii, conversationId);
     const now = new Date().toISOString();
     for (const m of unread) await propagateReadReceipt(deliveryCtx, m, now);
+    // Reading the thread clears its header-bell notifications — a message you've now seen shouldn't
+    // keep nagging. Owner-scoped 'notifications' emit so the bell refreshes live for THIS owner.
+    const dismissed = await dismissConversationNotifications(storage, ghii, conversationId);
     emitChange('messages');
+    if (dismissed) emitChange('notifications', ghii);
     res.json(success(config.nodeId, { read: count }));
   });
 

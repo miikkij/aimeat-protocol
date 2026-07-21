@@ -9,6 +9,8 @@
  *   v1.0.0 — 2026-07-02 — Initial: self-notify create/validate/scope-gate/read flow.
  *   v1.1.0 — 2026-07-18 — Inline actions: reject client-supplied actions (403/400 invariant) +
  *     a delivered DM carries a reply action whose params drive a working POST /v1/messages reply.
+ *   v1.2.0 — 2026-07-21 — Reading a thread dismisses its bell notifications (happy path) + the delete
+ *     is owner-scoped (B reading its copy leaves A's notification for the same conversation intact).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=notifications
 
@@ -152,12 +154,34 @@ await test('11. Using the reply action, B replies and A receives it', async () =
     assert(seen, 'A sees B\'s bell reply in the inbox');
 });
 
+// ── Reading a thread dismisses its header-bell notifications (a seen message stops nagging). ──
+await test('12. Reading the conversation clears B\'s bell notifications for that thread', async () => {
+    const linkDelivered = `/v1/profile#inbox/${convId}`;
+    const linkRequest = `/v1/profile#inbox/req:${convId}`;
+    const forConv = (list: any) => (list.body.data.notifications || []).filter((n: any) => n.link === linkDelivered || n.link === linkRequest);
+    const before = await json('/v1/notifications', { headers: auth(B.token) });
+    assert(forConv(before).length > 0, 'B has bell notification(s) deep-linking to the conversation before reading');
+    const read = await json(`/v1/messages/conversations/${encodeURIComponent(convId)}/read`, { method: 'POST', headers: auth(B.token) });
+    assert(read.status === 200, `read ${read.status}: ${JSON.stringify(read.body.error)}`);
+    const after = await json('/v1/notifications', { headers: auth(B.token) });
+    assert(forConv(after).length === 0, `the thread's bell notifications are gone after reading (still ${forConv(after).length})`);
+});
+
+await test('13. Dismiss is owner-scoped: A\'s own notification for the same thread is untouched', async () => {
+    // A received B's reply (test 11) → A holds its OWN bell notification for this conversation. B reading
+    // its copy must not touch A's inbox (owner-scoped delete).
+    const link = `/v1/profile#inbox/${convId}`;
+    const aList = await json('/v1/notifications', { headers: auth(A.token) });
+    const aStill = (aList.body.data.notifications || []).some((n: any) => n.link === link);
+    assert(aStill, 'A still has its notification for the thread (B reading did not touch A\'s inbox)');
+});
+
 // ── Regression: recent notifications must show even past the old 500-row global window ──
 // The bell used to fetch `listAllMemory({prefix:'notif.', limit:500})` — the node's OLDEST
 // 500 notification keys across ALL owners — then filter to the caller. Once >500 existed,
 // every recent notification fell outside the window and the bell silently froze. This seeds
 // one owner past that threshold and asserts their newest notification is still returned.
-await test('12. REGRESSION: the newest notification is returned even with >500 total', async () => {
+await test('14. REGRESSION: the newest notification is returned even with >500 total', async () => {
     const C = await setupOwner('c');
     const TARGET = 520; // comfortably over the old 500-row global cap
     const chunk = 20;
