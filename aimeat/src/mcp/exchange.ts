@@ -83,12 +83,15 @@ function entitlementView(config: AimeatConfig, e: MeteredEntitlement) {
 function parseNeedSpec(v: unknown): NeedSpec | null {
     if (!v || typeof v !== 'object') return null;
     const o = v as Record<string, unknown>;
+    const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
     const requiredFields = Array.isArray(o.requiredFields) ? (o.requiredFields as unknown[]).filter(f => typeof f === 'string') as string[] : [];
     const spec: NeedSpec = { requiredFields };
     if (typeof o.format === 'string') spec.format = o.format;
     if (typeof o.sample === 'string') spec.sample = o.sample;
     if (typeof o.notes === 'string') spec.notes = o.notes;
-    return (requiredFields.length || spec.format || spec.sample || spec.notes) ? spec : null;
+    if (isObj(o.inputSchema)) spec.inputSchema = o.inputSchema;
+    if (isObj(o.outputSchema)) spec.outputSchema = o.outputSchema;
+    return (requiredFields.length || spec.format || spec.sample || spec.notes || spec.inputSchema || spec.outputSchema) ? spec : null;
 }
 
 export function registerExchangeTools(
@@ -304,23 +307,23 @@ export function registerExchangeTools(
         descriptionFor('aimeat_exchange_need_post'),
         {
             description: z.string().min(1).max(4000),
+            app_id: z.string().min(1).max(300),
             ext: z.string().max(120).optional(),
             action: z.string().max(120).optional(),
             spec: z.record(z.string(), z.unknown()).optional(),
             usage_intent: z.string().max(2000).optional(),
             budget_unit: z.enum(['morsels', 'money']).optional(),
             budget_cap: z.number().int().nonnegative().optional(),
-            app_id: z.string().max(300).optional(),
             autonomy: z.enum(['supervised', 'auto']).optional(),
         },
         annotationsFor('aimeat_exchange_need_post'),
-        async ({ description, ext, action, spec, usage_intent, budget_unit, budget_cap, app_id, autonomy }) => {
+        async ({ description, app_id, ext, action, spec, usage_intent, budget_unit, budget_cap, autonomy }) => {
             const now = new Date().toISOString();
             const need: Need = {
                 needId: newNeedId(),
                 requesterGaii: consumerGaii,
                 requesterOwner: owner,
-                appId: app_id || null,
+                appId: app_id,
                 ext: ext || null, action: action || null,
                 description,
                 spec: parseNeedSpec(spec),

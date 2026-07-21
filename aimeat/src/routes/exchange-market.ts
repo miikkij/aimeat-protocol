@@ -11,6 +11,8 @@
  *   needs (POST/GET/close) · bids (POST/GET/accept)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-07-21 — Needs are app-bound (app_id required → 400 NEED_APP_REQUIRED) + carry an I/O
+ *     interface spec (inputSchema/outputSchema) — the emergent app-to-app data-API request.
  *   v1.3.0 — 2026-07-21 — Cross-app selling (Gap 1): `kind: 'app-tool'` listing branch (a provider app sells a
  *     tool as a pinned-interface metered offering) + app-tool offering DETAIL (frozen schema + WebMCP recipe).
  *   v1.2.0 — 2026-07-20 — Legibility GATE: listing an offering now REQUIRES a published input+output schema
@@ -55,16 +57,19 @@ function parseUsageTerms(v: unknown): UsageTerms | null {
   };
 }
 
-/** Parse a need's minimum-spec (required output fields + desired shape) from a request body. */
+/** Parse a need's interface-spec (the shape it sends/expects + light hints) from a request body. */
 function parseNeedSpec(v: unknown): NeedSpec | null {
   if (!v || typeof v !== 'object') return null;
   const o = v as Record<string, unknown>;
+  const isObj = (x: unknown): x is Record<string, unknown> => !!x && typeof x === 'object' && !Array.isArray(x);
   const requiredFields = Array.isArray(o.requiredFields) ? (o.requiredFields as unknown[]).filter(f => typeof f === 'string') as string[] : [];
   const spec: NeedSpec = { requiredFields };
   if (typeof o.format === 'string') spec.format = o.format;
   if (typeof o.sample === 'string') spec.sample = o.sample;
   if (typeof o.notes === 'string') spec.notes = o.notes;
-  return (requiredFields.length || spec.format || spec.sample || spec.notes) ? spec : null;
+  if (isObj(o.inputSchema)) spec.inputSchema = o.inputSchema;
+  if (isObj(o.outputSchema)) spec.outputSchema = o.outputSchema;
+  return (requiredFields.length || spec.format || spec.sample || spec.notes || spec.inputSchema || spec.outputSchema) ? spec : null;
 }
 
 export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Router {
@@ -275,13 +280,18 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     const b = (req.body ?? {}) as Record<string, unknown>;
     const description = str(b.description);
     if (!description) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'description is required'));
+    // A need is ALWAYS posted on behalf of a specific app — the app that needs data/a method it can't produce
+    // itself. This binds the demand to a requester a provider can judge (per the emergent app-to-app market).
+    const appId = str(b.app_id);
+    if (!appId) return res.status(400).json(error(config.nodeId, 'NEED_APP_REQUIRED',
+      'app_id is required — a need is posted on behalf of the specific app that needs the data (owner/filename)'));
     const budgetUnit = b.budget_unit === 'money' || b.budget_unit === 'morsels' ? b.budget_unit : null;
     const now = new Date().toISOString();
     const need: Need = {
       needId: newNeedId(),
       requesterGaii: resolveIdentity(req.auth!, config.nodeId),
       requesterOwner: req.auth!.owner,
-      appId: str(b.app_id) || null,
+      appId,
       ext: str(b.ext) || null, action: str(b.action) || null,
       description,
       spec: parseNeedSpec(b.spec),
