@@ -14,7 +14,7 @@
  * @structure
  *   - agentFaceKey(filename)             — the convention memory key
  *   - AGENT_FACE_MAX_BYTES               — 256 KB cap on the served face
- *   - loadPublicAgentFace(storage, ownerGaii, filename) — the record, or null (private = absent)
+ *   - loadPublicAgentFace(storage, nodeId, ownerName, filename) — the record, or null (private = absent)
  *   - buildAgentAffordances(config, ownerName, filename) — the footer both variants carry
  *   - serveAppAgentFace(res, config, storage, app) — negotiate + send; false = caller serves bytes
  * @usage
@@ -24,12 +24,16 @@
  *   }
  * @version-history
  *   v1.0.0 — 2026-07-14 — Initial: Agent Face convention serving (phase 1)
+ *   v1.1.0 — 2026-07-21 — Resolve the face across owner-scope (GHII + the owner's agents/eco apps) so an
+ *     owner's AGENT can publish a face for the owner's app — memory is keyed by the writer, so an
+ *     MCP-agent write lands under its GAII; the serve path now finds the first PUBLIC copy in the union.
  */
 import type { Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import { sendMarkdown, htmlToMarkdown } from './markdown-negotiation.js';
 import { cached, TTL } from './cache.js';
+import { getOwnerScopePublicMemory } from './owner-memory.js';
 
 /** The memory key an app's agent face lives under (PUBLIC record, app owner's GHII) —
  *  same identifier family as the WebMCP tool manifest `apps.{filename}.tools`. */
@@ -43,14 +47,20 @@ export const AGENT_FACE_MAX_BYTES = 256 * 1024;
  * markdown string body ≤ 256 KB — missing key, any non-public visibility, a non-string value,
  * oversize — returns null identically, so an anonymous reader cannot distinguish "no face" from
  * "private face" (Rule 10: no existence disclosure on anonymous reads).
+ *
+ * The record is resolved across the app owner's OWNER-SCOPE union (the owner's GHII + all the owner's
+ * agents + eco apps), first PUBLIC copy GHII-first — memory is keyed by the writer, so an owner's agent
+ * that publishes the face via MCP `memory_write` lands it under its own GAII; without the union the
+ * owner-GHII-only lookup would miss it. A private copy on the same key never shadows a public one.
  */
 export async function loadPublicAgentFace(
   storage: Storage,
-  ownerGaii: string,
+  nodeId: string,
+  ownerName: string,
   filename: string,
 ): Promise<string | null> {
-  const rec = await storage.getMemory(ownerGaii, agentFaceKey(filename));
-  if (!rec || rec.visibility !== 'public') return null;
+  const rec = await getOwnerScopePublicMemory(storage, nodeId, ownerName, agentFaceKey(filename));
+  if (!rec) return null;
   if (typeof rec.value !== 'string' || rec.value.length === 0) return null;
   if (Buffer.byteLength(rec.value, 'utf-8') > AGENT_FACE_MAX_BYTES) return null;
   return rec.value;
@@ -104,7 +114,7 @@ export async function serveAppAgentFace(
     `agentface:${app.ownerName}/${app.filename}:v${app.versionNumber}`,
     TTL.public,
     async (): Promise<{ markdown: string; fromFace: boolean } | null> => {
-      const face = await loadPublicAgentFace(storage, app.ownerGaii, app.filename);
+      const face = await loadPublicAgentFace(storage, config.nodeId, app.ownerName, app.filename);
       if (face === null && !isHtml) return null;
       const footer = buildAgentAffordances(config, app.ownerName, app.filename);
       const body = face ?? htmlToMarkdown(appHtml(app)).trimEnd();
