@@ -56,6 +56,7 @@ import { registerWalletExtendedTools } from './wallet-extended.js';
 import { registerConsentTools } from './consent.js';
 import { registerCommerceTools } from './commerce.js';
 import { registerExchangeTools } from './exchange.js';
+import { registerExchangeRunTools } from './exchange-run.js';
 import { registerEnterpriseMcpTools } from './enterprise-tools.js';
 import { registerChatInstancesTools } from './chat-instances.js';
 import { registerFlagsTools } from './flags.js';
@@ -113,7 +114,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     // Map MCP session IDs to ChatInstance IDs for heartbeat tracking
     const sessionChatInstances = new Map<string, string>();
 
-    function createMcpServer(agentGaii: string, scopes: string[], role: SurfaceRole | 'all' = 'all'): McpServer {
+    function createMcpServer(agentGaii: string, scopes: string[], role: SurfaceRole | 'all' = 'all', token?: string): McpServer {
         const mcp = new McpServer(
             { name: `AIMEAT Node ${config.nodeId}`, version: '1.2.0' },
             { capabilities: { tools: {}, resources: { subscribe: true, listChanged: true } } },
@@ -160,6 +161,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerConsentTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerCommerceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerExchangeTools(mcp, storage, config, () => agentGaii);
+        registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => token);
         // Edition-contributed tools (EnterpriseProvider.getMcpTools, installed at boot) — same
         // scope gate via the dynamic map; no-op on Community.
         registerEnterpriseMcpTools(mcp, storage, config, () => agentGaii);
@@ -376,7 +378,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             sessionIdGenerator: () => `mcp-${randomBytes(16).toString('hex')}`,
         });
 
-        const mcpServer = createMcpServer(authenticatedGaii, sessionScopes, serverRole);
+        const mcpServer = createMcpServer(authenticatedGaii, sessionScopes, serverRole, token);
 
         transport.onclose = () => {
             if (transport.sessionId) {

@@ -153,6 +153,13 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_exchange_need_post: 'exchange:write',
     aimeat_exchange_bid: 'exchange:write',
     aimeat_exchange_bid_accept: 'exchange:write',
+    // Act-on-exchange (invoke/work/proposals): read = list; write = invoke/start/deliver/decide (spends or changes a contract).
+    aimeat_exchange_work_list: 'exchange:read',
+    aimeat_exchange_proposals: 'exchange:read',
+    aimeat_app_tool_invoke: 'exchange:write',
+    aimeat_exchange_work: 'exchange:write',
+    aimeat_exchange_work_deliver: 'exchange:write',
+    aimeat_exchange_proposal_decide: 'exchange:write',
 };
 
 /**

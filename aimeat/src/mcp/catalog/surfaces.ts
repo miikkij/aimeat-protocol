@@ -98,6 +98,9 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_exchange_offerings', 'aimeat_exchange_offering_get', 'aimeat_exchange_accept',
         'aimeat_exchange_contracts', 'aimeat_exchange_contract_off', 'aimeat_exchange_needs',
         'aimeat_exchange_need_post', 'aimeat_exchange_bid', 'aimeat_exchange_bid_accept', 'aimeat_exchange_consumers',
+        // Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
+        'aimeat_app_tool_invoke', 'aimeat_exchange_work', 'aimeat_exchange_work_deliver', 'aimeat_exchange_work_list',
+        'aimeat_exchange_proposals', 'aimeat_exchange_proposal_decide',
     ],
     service: [
         'aimeat_discover',
@@ -129,6 +132,9 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_exchange_offerings', 'aimeat_exchange_offering_get', 'aimeat_exchange_accept',
         'aimeat_exchange_contracts', 'aimeat_exchange_contract_off', 'aimeat_exchange_needs',
         'aimeat_exchange_need_post', 'aimeat_exchange_bid', 'aimeat_exchange_bid_accept', 'aimeat_exchange_consumers',
+        // Act on EXCHANGE (generic, any MCP client): call an app-tool, run agent-work, renegotiate.
+        'aimeat_app_tool_invoke', 'aimeat_exchange_work', 'aimeat_exchange_work_deliver', 'aimeat_exchange_work_list',
+        'aimeat_exchange_proposals', 'aimeat_exchange_proposal_decide',
     ],
     admin: [
         'aimeat_admin_stats', 'aimeat_admin_agents', 'aimeat_admin_config', 'aimeat_admin_mint',
