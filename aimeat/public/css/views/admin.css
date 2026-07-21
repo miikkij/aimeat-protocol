@@ -4,6 +4,9 @@
  *   its distinct indigo accent and a permanently-dark sidebar, but all content
  *   surfaces map to global theme.css tokens so they flip with dark/light mode.
  * @version-history
+ *   v1.10.0 — 2026-07-21 — App-shell scroll model (theme.css v1.24.0): .adm-sidebar height 100vh →
+ *     calc(100dvh − nav-height) so the sticky sidebar fills the .page-content scroll region instead of
+ *     overflowing the frame by the header's height.
  *   v1.9.0 — 2026-07-16 — Drop the dead .adm-nav-item .icon rule (nav is label-only now).
  *   v1.8.0 — 2026-06-25 — Applications tab: .adm-apps-rowactions (Hide/Restore + Delete row).
  *   v1.7.0 — 2026-06-24 — Applications moderation tab: .adm-apps-* (filters row,
@@ -53,9 +56,13 @@
   border-right: none;
   padding: 16px 0;
   flex-shrink: 0;
+  /* App-shell: sticks to the top of the .page-content scroll region; height caps
+     at that region (viewport minus the fixed header) so the sidebar's own nav
+     scrolls instead of overflowing past the frame by the header's height. */
   position: sticky;
   top: 0;
-  height: 100vh;
+  height: calc(100dvh - var(--nav-height, 56px));
+  box-sizing: border-box; /* fold the 16px vertical padding into the height so it fits the scroll region */
   overflow-y: auto;
   display: flex;
   flex-direction: column;

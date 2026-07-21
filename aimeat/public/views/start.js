@@ -159,7 +159,8 @@ export default function StartView() {
   const [idx, setIdx] = useState(0);
   const [answers, setAnswers] = useState({});
 
-  useEffect(() => { window.scrollTo(0, 0); }, [phase, idx]);
+  // App-shell: .page-content owns the scroll (window no longer scrolls). Reset it to the top on step change.
+  useEffect(() => { (document.querySelector('.page-content') || window).scrollTo(0, 0); }, [phase, idx]);
 
   // Mark the body while this view is mounted so start.css's print rules (which blank everything
   // except .st-print-area) apply only on this page — view CSS is preloaded globally in spa.html,

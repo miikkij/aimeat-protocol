@@ -10,6 +10,11 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.24.0 — 2026-07-21 — App-shell scroll model: html/body no longer scroll (height:100%;
+       overflow:hidden); #app is a full-viewport (100dvh) flex column with the topnav as a fixed-height
+       row and .page-content as the sole overflow-y:auto scroll region. Removes the ~nav-height phantom
+       overscroll and stops view content sliding under the (formerly sticky, now in-frame) header. Coupled
+       offset fixes: .pf-sidebar/.adm-sidebar stick to top:0 of the region and cap at 100dvh−nav-height.
      v1.23.1 — 2026-07-20 — Mobile: pin .notif-dropdown to fixed viewport insets under 560px (the
        320px, right:0-anchored panel ran off the LEFT edge — the bell sits mid-right of the bar — and
        got clipped by body{overflow-x:hidden}); long notif titles/bodies wrap (overflow-wrap:anywhere).
@@ -310,15 +315,22 @@
 }
 
 /* ── Base ── */
-html { scroll-behavior: smooth; }
+html { scroll-behavior: smooth; height: 100%; }
 
 body {
   font-family: var(--font);
   background: var(--bg);
   color: var(--text);
   line-height: 1.6;
-  min-height: 100vh;
-  overflow-x: hidden;
+  height: 100%;
+  margin: 0; /* zero the UA default 8px — with the fixed app-shell frame it would push #app past the viewport */
+  /* App-shell: the page (html/body) never scrolls. The topnav is a fixed-height
+     flex row and .page-content owns the ONLY scroll region (see #app +
+     .page-content). This is what stops view content sliding under the header and
+     removes the ~nav-height phantom overscroll that body-scroll + an in-flow
+     (sticky) header produced — the content fills the space below the header and
+     scrolls within it. overflow:hidden also subsumes the old overflow-x clip. */
+  overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -405,13 +417,23 @@ a { color: inherit; text-decoration: none; }
 #app {
   position: relative;
   z-index: 1;
+  /* App-shell frame: a full-viewport flex column — topnav (fixed height) on top,
+     .page-content (the scroll region) filling the rest. dvh keeps the frame flush
+     with the visual viewport as mobile browser chrome shows/hides. */
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 
 /* ── Top Navigation ── */
 .topnav {
-  position: sticky;
-  top: 0;
+  /* App-shell: a fixed-height flex row inside #app (no longer sticky — #app
+     itself doesn't scroll, so the header stays put for free). z-index keeps the
+     header's own dropdowns (notifications, mobile menu) above .page-content. */
+  position: relative;
   z-index: 100;
+  flex: 0 0 auto;
   height: var(--nav-height);
   display: flex;
   align-items: center;
@@ -1298,7 +1320,10 @@ select.input-field { cursor: pointer; }
 }
 
 /* ── Page entrance ── */
-.page-content { animation: pageIn 0.8s ease; }
+/* App-shell scroll region: fills the space under the topnav and owns the only
+   scroll. min-height:0 lets the flex child shrink so overflow-y actually scrolls;
+   overflow-x:hidden replaces the clip that used to live on body. */
+.page-content { flex: 1 1 auto; min-height: 0; overflow-y: auto; overflow-x: hidden; animation: pageIn 0.8s ease; }
 
 /* ── Responsive ── */
 @media (max-width: 480px) {
