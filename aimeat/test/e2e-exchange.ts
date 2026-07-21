@@ -608,5 +608,74 @@ await test('Needs carry usage-intent + an appContext field (provider can judge w
   assert(n && 'appContext' in n && n.usageIntent, `enriched need must carry usageIntent + appContext field: ${JSON.stringify({ ac: n?.appContext, ui: n?.usageIntent })}`);
 });
 
+// ── AGENT WORK (async third surface — metered per delivered task, Gap 2) ──
+let awOfferingId = '', awWorkId = '', awRake = 5;
+await test('Provider registers a worker agent + lists an AGENT-WORK offering (task type, priced)', async () => {
+  const reg = await json('/v1/agents', { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ name: 'worker', owner: provider.name, capabilities: ['actions'] }) });
+  assert(reg.status === 201, `agent register ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+  awRake = ((await json('/v1/exchange/info')).body.data.rake_percent) || 5;
+  const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ kind: 'agent-work', agent_name: 'worker', task_type: 'summarize', title: 'Doc summarization',
+      price_morsels: 12, usage_terms: validTerms,
+      input_schema: { type: 'object', required: ['text'], properties: { text: { type: 'string' } } },
+      output_schema: { type: 'object', properties: { summary: { type: 'string' } } } }) });
+  assert(r.status === 201, `list agent-work ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const o = r.body.data.offering;
+  assert(o.kind === 'agent-work' && o.surface?.kind === 'agent-work' && o.surface.taskType === 'summarize', `surface: ${JSON.stringify(o.surface)}`);
+  assert(o.basePrice === 12 && o.ext === `agentwork:${provider.name}/worker` && o.action === 'summarize', `price/coordinate: ${JSON.stringify({ p: o.basePrice, ext: o.ext, action: o.action })}`);
+  assert(o.taskSpec && o.taskSpec.inputSchema && o.taskSpec.outputSchema, `task spec stored: ${JSON.stringify(o.taskSpec)}`);
+  awOfferingId = o.offeringId;
+});
+
+await test('Agent-work legibility gate: no output schema → 400 SCHEMA_REQUIRED', async () => {
+  const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ kind: 'agent-work', agent_name: 'worker', task_type: 'noout', price_morsels: 5, usage_terms: validTerms, input_schema: { type: 'object', properties: { x: {} } } }) });
+  assert(r.status === 400 && r.body?.error?.code === 'SCHEMA_REQUIRED', `expected SCHEMA_REQUIRED, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Starting work without a contract → 402 NO_CONTRACT', async () => {
+  const r = await json('/v1/exchange/work', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: awOfferingId, input: { text: 'hi' } }) });
+  assert(r.status === 402 && r.body?.error?.code === 'NO_CONTRACT', `expected NO_CONTRACT, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Consumer contracts the agent-work offering, then STARTS a task (nothing charged yet)', async () => {
+  const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: awOfferingId, cap_units: 50 }) });
+  assert(acc.status === 201 && acc.body.data.entitlement.price_per_call === 12, `contract ${acc.status}: ${JSON.stringify(acc.body?.error || acc.body.data.entitlement)}`);
+  const cb = await balance(buyer.token);
+  const st = await json('/v1/exchange/work', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: awOfferingId, input: { text: 'a long document to summarize' } }) });
+  assert(st.status === 201 && st.body.data.work.state === 'open' && st.body.data.work.charged_units === 0, `start work ${st.status}: ${JSON.stringify(st.body?.error || st.body.data.work)}`);
+  awWorkId = st.body.data.work.work_id;
+  assert(await balance(buyer.token) === cb, 'nothing is charged when work is started — only on delivery');
+});
+
+await test('A non-provider cannot deliver the work → 404', async () => {
+  const r = await json(`/v1/exchange/work/${awWorkId}/deliver`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ output: { summary: 'x' } }) });
+  assert(r.status === 404, `a non-provider must not deliver, got ${r.status}`);
+});
+
+await test('Provider DELIVERS → consumer charged 12 ON DELIVERY, provider +(12−rake), output stored', async () => {
+  const cb = await balance(buyer.token), pb = await balance(provider.token);
+  const r = await json(`/v1/exchange/work/${awWorkId}/deliver`, { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ output: { summary: 'A short summary.' } }) });
+  assert(r.status === 200 && r.body.data.work.state === 'delivered', `deliver ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.work.charged_units === 12, `charged 12 on delivery, got ${r.body.data.work.charged_units}`);
+  const fee = Math.ceil(12 * awRake / 100);
+  assert(await balance(buyer.token) === cb - 12, 'consumer charged the 12-morsel task price on delivery');
+  assert(await balance(provider.token) === pb + (12 - fee), `provider credited its cut (12−${fee})`);
+  assert(JSON.stringify(r.body.data.work.output).includes('A short summary'), `delivered output stored: ${JSON.stringify(r.body.data.work.output)}`);
+});
+
+await test('Re-delivering the same work → 409 WORK_NOT_OPEN', async () => {
+  const r = await json(`/v1/exchange/work/${awWorkId}/deliver`, { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ output: {} }) });
+  assert(r.status === 409 && r.body?.error?.code === 'WORK_NOT_OPEN', `expected WORK_NOT_OPEN, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Work lists: consumer sees it (consumer role); provider sees it delivered (provider role)', async () => {
+  const cw = await json('/v1/exchange/work', { headers: auth(buyer.token) });
+  assert(cw.status === 200 && cw.body.data.work.some((w: any) => w.work_id === awWorkId), 'consumer work list');
+  const pw = await json('/v1/exchange/work?role=provider', { headers: auth(provider.token) });
+  assert(pw.status === 200 && pw.body.data.work.some((w: any) => w.work_id === awWorkId && w.state === 'delivered'), 'provider work list shows delivered');
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

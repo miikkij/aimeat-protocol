@@ -32,7 +32,7 @@ import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { createEntitlement, readEntitlementForCall } from '../services/metered-entitlements.js';
 import {
   type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type NeedSpec, type OfferingPlan,
-  resolveActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate,
+  resolveActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate, agentWorkCoordinate,
   putOffering, getOffering, listOfferings, deleteOffering, matchOfferings,
   putNeed, getNeed, listNeeds, putBid, listBids, getBid,
   offeringStats, offeringConsumers, enrichNeeds,
@@ -147,6 +147,52 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       return res.status(201).json(success(config.nodeId, { offering }));
     }
 
+    // ── kind: agent-work — a provider AGENT sells a task type it performs (metered per delivered task, Gap 2) ──
+    if (b.kind === 'agent-work') {
+      const agentName = str(b.agent_name), taskType = str(b.task_type);
+      if (!agentName || !taskType) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'agent_name and task_type are required for an agent-work offering'));
+      const agentGaii = `${agentName}#${owner}@${config.nodeId}`;
+      const agent = await storage.getAgent(agentGaii);
+      if (!agent) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Agent "${agentName}" not found under your account`));
+      // Legibility gate: the task interface (what you send / what the agent delivers) + usage terms are mandatory.
+      const inSchema = (b.input_schema && typeof b.input_schema === 'object') ? b.input_schema as Record<string, unknown> : {};
+      const outSchema = (b.output_schema && typeof b.output_schema === 'object') ? b.output_schema as Record<string, unknown> : {};
+      if (!hasSchema(inSchema) || !hasSchema(outSchema)) {
+        return res.status(400).json(error(config.nodeId, 'SCHEMA_REQUIRED',
+          `Agent-work "${agentName}:${taskType}" must declare a non-empty input_schema AND output_schema (a consumer must know what to send and what the agent delivers)`));
+      }
+      const usageTerms = parseUsageTerms(b.usage_terms);
+      if (!usageTerms) return res.status(400).json(error(config.nodeId, 'USAGE_TERMS_REQUIRED',
+        'usage_terms is required to list an offering — state { derivatives, resale, attribution, note? }'));
+      // Pricing is authoritative from the provider (set on the listing): per-task morsels or money + optional plans.
+      const commercial: ActionCommercial = {
+        payMorsels: typeof b.price_morsels === 'number' && b.price_morsels > 0 ? Math.floor(b.price_morsels) : undefined,
+        payMoney: (b.price_money && typeof b.price_money === 'object') ? b.price_money as ActionCommercial['payMoney'] : undefined,
+        plans: Array.isArray(b.plans) ? b.plans as OfferingPlan[] : undefined,
+      };
+      const priced = resolveActionPricing(commercial, null);
+      if (!priced.ok) return res.status(400).json(error(config.nodeId, priced.code, `Agent-work "${agentName}:${taskType}": ${priced.message}`));
+      const providerGhii = resolveIdentity(req.auth!, config.nodeId);
+      const coord = agentWorkCoordinate(owner, agentName, taskType);
+      const now = new Date().toISOString();
+      const offering: Offering = {
+        offeringId: newOfferingId(), providerGhii, providerOwner: owner,
+        kind: 'agent-work', ext: coord.ext, action: coord.action,
+        surface: { kind: 'agent-work', ownerName: owner, agentName, taskType },
+        title: str(b.title) || `${agentName}: ${taskType}`,
+        description: str(b.description) || agent.description || '',
+        unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,
+        plans: commercial.plans ?? [],
+        taskSpec: { inputSchema: inSchema, outputSchema: outSchema },
+        provenance: (b.provenance && typeof b.provenance === 'object') ? b.provenance as Offering['provenance'] : null,
+        usageTerms,
+        tags: Array.isArray(b.tags) ? (b.tags as unknown[]).filter(t => typeof t === 'string') as string[] : [],
+        state: 'listed', createdAt: now, updatedAt: now,
+      };
+      await putOffering(storage, offering);
+      return res.status(201).json(success(config.nodeId, { offering }));
+    }
+
     // ── kind: ext-action (default) — the raw data-service surface ──
     const ext = str(b.ext), action = str(b.action);
     if (!ext || !action) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext and action are required'));
@@ -201,7 +247,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
 
     // app-tool: the capability schema is the PINNED interface snapshot; the call goes to the WebMCP invoke
     // endpoint (the accepted contract meters it). This is the freeze made visible — the version is explicit.
-    if (o.kind === 'app-tool' && o.surface) {
+    if (o.kind === 'app-tool' && o.surface && o.surface.kind === 'app-tool') {
       const s = o.surface;
       const iface = await getInterfaceVersion(storage, o.providerGhii, s.appId, s.tool, s.ifaceVersion);
       return res.json(success(config.nodeId, {
@@ -216,6 +262,23 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
           auth: 'Your own AIMEAT token — the accepted contract (metered entitlement) authorises the call; no separate API key is issued.',
           note: `Each call is metered + charged to your budget at the provider price. The contract is pinned to interface v${s.ifaceVersion}; the provider may ship newer app versions without breaking your integration.`,
           body: '{ "input": { … } }',
+        },
+        stats,
+      }));
+    }
+
+    // agent-work: the "capability" is the task interface; the call recipe is "start work → agent delivers".
+    if (o.kind === 'agent-work' && o.surface && o.surface.kind === 'agent-work') {
+      const s = o.surface;
+      return res.json(success(config.nodeId, {
+        offering: o,
+        capability: o.taskSpec ? { kind: 'agent-work', agent: `${s.ownerName}/${s.agentName}`, task_type: s.taskType,
+          input_schema: o.taskSpec.inputSchema, output_schema: o.taskSpec.outputSchema } : null,
+        call_recipe: {
+          method: 'POST', url: '/v1/exchange/work',
+          body: `{ "offering_id": "${o.offeringId}", "input": { … } }`,
+          auth: 'Your own AIMEAT token — the accepted contract authorises starting work; no separate API key.',
+          note: `Async: you START a task, the provider agent (${s.agentName}) DELIVERS, and you are charged the per-task price ON DELIVERY (metered + rake against your budget).`,
         },
         stats,
       }));

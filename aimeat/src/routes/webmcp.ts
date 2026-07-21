@@ -140,7 +140,7 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
       if (ent) {
         // Resolve the binding from the PINNED interface snapshot (the freeze); fall back to the tool's
         // current binding only if the pinned snapshot is unexpectedly missing.
-        const pinnedVersion = ent.surface?.ifaceVersion;
+        const pinnedVersion = ent.surface && ent.surface.kind === 'app-tool' ? ent.surface.ifaceVersion : undefined;
         const iface = pinnedVersion ? await getInterfaceVersion(storage, ent.providerGhii, filename, toolName, pinnedVersion) : null;
         const binding = iface?.binding ?? tool.action_id ?? null;
         if (!binding) {
