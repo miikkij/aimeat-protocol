@@ -16,6 +16,8 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.5.0 — 2026-07-21 — Agent-work surface (Gap 2): Offering.kind gains 'agent-work' + AgentWorkSurface +
+ *     agentWorkCoordinate + Offering.taskSpec; resolveOfferingPricing covers agent-work (DATA/SERVICES/AGENT WORK).
  *   v1.4.0 — 2026-07-21 — Demand side as an emergent interface request: NeedSpec gains input/outputSchema
  *     (the shape the app sends/expects — a provider builds a matching app-tool). A need is app-bound.
  *   v1.3.0 — 2026-07-21 — Needs app-context: Need.usageIntent + enrichNeeds (resolve the requesting app's
@@ -28,9 +30,9 @@
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
-import { listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface } from './metered-entitlements.js';
+import { listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from './metered-entitlements.js';
 
-export type { AppToolSurface };
+export type { AppToolSurface, AgentWorkSurface, SellableSurface };
 
 /** The action `commercial` block an offering/contract prices against. */
 export interface ActionCommercial {
@@ -120,16 +122,18 @@ export interface Offering {
   offeringId: string;
   providerGhii: string;
   providerOwner: string;
-  kind: 'ext-action' | 'app-tool';
+  kind: 'ext-action' | 'app-tool' | 'agent-work';
   ext: string;
   action: string;
-  surface: AppToolSurface | null;   // set for kind==='app-tool' (the pinned interface); null for ext-action
+  surface: SellableSurface | null;   // app-tool (pinned interface) or agent-work (task type); null for ext-action
   title: string;
   description: string;
   unit: EntitlementUnit;
-  basePrice: number;            // per-call, in `unit` (micros for money, morsels otherwise)
+  basePrice: number;            // per-call/task, in `unit` (micros for money, morsels otherwise)
   currency: string | null;
   plans: OfferingPlan[];
+  /** For kind==='agent-work': the task interface (what the consumer sends / the agent delivers). */
+  taskSpec?: { inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> } | null;
   provenance: Provenance | null;
   usageTerms: UsageTerms | null;   // how the consumer may use the output (derivatives/resale/attribution)
   tags: string[];
@@ -141,6 +145,11 @@ export interface Offering {
 /** The metered coordinate for an app-tool surface — the (ext, action) pair the entitlement + gate key on. */
 export function appToolCoordinate(ownerName: string, appId: string, tool: string): { ext: string; action: string } {
   return { ext: `apptool:${ownerName}/${appId}`, action: tool };
+}
+
+/** The metered coordinate for an agent-work surface (a provider agent's task type; settled per delivered task). */
+export function agentWorkCoordinate(ownerName: string, agentName: string, taskType: string): { ext: string; action: string } {
+  return { ext: `agentwork:${ownerName}/${agentName}`, action: taskType };
 }
 
 /** Build an ActionCommercial from an offering's stored price/plans, so the shared pricing resolver
@@ -162,16 +171,19 @@ export async function resolveOfferingPricing(
   storage: Storage, o: Offering, planId: string | null,
 ): Promise<
   | { ok: true; unit: EntitlementUnit; pricePerCall: number; currency: string | null; pricing: PricingSpec | null;
-      providerGhii: string; ext: string; action: string; capabilityLabel: string; surface: AppToolSurface | null }
+      providerGhii: string; ext: string; action: string; capabilityLabel: string; surface: SellableSurface | null }
   | { ok: false; status: number; code: string; message: string }
 > {
-  if (o.kind === 'app-tool' && o.surface) {
+  // app-tool + agent-work both price from the offering's own listing (the provider authored it).
+  if ((o.kind === 'app-tool' || o.kind === 'agent-work') && o.surface) {
     const priced = resolveActionPricing(offeringToCommercial(o), planId);
     if (!priced.ok) return { ok: false, status: 400, code: priced.code, message: priced.message };
+    const label = o.surface.kind === 'app-tool'
+      ? `${o.surface.appId}/${o.surface.tool} v${o.surface.ifaceVersion}`
+      : `${o.surface.agentName}:${o.surface.taskType}`;
     return {
       ok: true, unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
-      providerGhii: o.providerGhii, ext: o.ext, action: o.action,
-      capabilityLabel: `${o.surface.appId}/${o.surface.tool} v${o.surface.ifaceVersion}`, surface: o.surface,
+      providerGhii: o.providerGhii, ext: o.ext, action: o.action, capabilityLabel: label, surface: o.surface,
     };
   }
   // ext-action: authoritative LIVE price from the provider's extension action.

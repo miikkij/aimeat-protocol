@@ -145,7 +145,7 @@ export function registerExchangeTools(
             if (!o) return fail(`NOT_FOUND: no such offering "${offering_id}"`);
             const stats = await offeringStats(storage, o);
 
-            if (o.kind === 'app-tool' && o.surface) {
+            if (o.kind === 'app-tool' && o.surface && o.surface.kind === 'app-tool') {
                 const s = o.surface;
                 const iface = await getInterfaceVersion(storage, o.providerGhii, s.appId, s.tool, s.ifaceVersion);
                 return ok({

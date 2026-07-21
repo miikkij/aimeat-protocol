@@ -18,6 +18,8 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-07-21 — Agent work (Gap 2): POST /work (start) + /work/:id/deliver (settle on delivery) +
+ *     GET /work — the async third sellable surface, metered per delivered task via the shared settlement.
  *   v1.2.0 — 2026-07-21 — Renegotiation + history: POST/GET /proposals (+ accept/decline/withdraw) with a
  *     Profile>Messages notification; GET /entitlements/history + /provider/history (superseded contracts).
  *   v1.1.0 — 2026-07-21 — Accept by `offering_id` (works for ext-action AND app-tool kinds; app-tool contract
@@ -46,6 +48,10 @@ import {
 } from '../services/exchange-proposals.js';
 import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
+import { settleMeteredCoordinate } from './extensions/entitlement-gate.js';
+import {
+  type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider,
+} from '../services/exchange-work.js';
 
 function ownerOf(gaii: string): string {
   return gaii.split('@')[0].split('#').pop() ?? gaii;
@@ -309,6 +315,91 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const providerGhii = resolveIdentity(req.auth!, config.nodeId);
     const past = await listEntitlementHistoryByProvider(storage, providerGhii);
     return res.json(success(config.nodeId, { history: past.map(e => historyView(config, e)), count: past.length }));
+  });
+
+  // ── AGENT WORK (async surface — settled per delivered task, Gap 2) ───────────
+  function workView(w: AgentWork) {
+    return {
+      work_id: w.workId, offering_id: w.offeringId, consumer: w.consumerGaii, provider: w.providerGhii,
+      agent: w.agentGaii, task_type: w.taskType, ext: w.ext, action: w.action, input: w.input, output: w.output,
+      note: w.note, state: w.state, unit: w.unit, currency: w.currency, charged_units: w.chargedUnits,
+      created_at: w.createdAt, delivered_at: w.deliveredAt,
+    };
+  }
+
+  /**
+   * POST /v1/exchange/work — the CONSUMER starts a task under an agent-work contract. Body:
+   * `{ offering_id, input, note? }`. Requires an active metered entitlement for the offering's coordinate
+   * (contract first). Nothing is charged yet — the per-task price is metered when the provider DELIVERS.
+   */
+  router.post('/v1/exchange/work', requireAuth(), async (req: Request, res: Response) => {
+    const consumerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const owner = req.auth!.owner;
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const offeringId = typeof b.offering_id === 'string' ? b.offering_id : '';
+    if (!offeringId) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'offering_id is required'));
+    const o = await getOffering(storage, offeringId);
+    if (!o || o.state !== 'listed' || o.kind !== 'agent-work' || !o.surface || o.surface.kind !== 'agent-work') {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such listed agent-work offering'));
+    }
+    const ent = await readEntitlementForCall(storage, consumerGaii, o.ext, o.action);
+    if (!ent || ent.state !== 'active') {
+      return res.status(402).json(error(config.nodeId, 'NO_CONTRACT', 'Accept a contract for this agent-work offering before starting a task'));
+    }
+    const s = o.surface;
+    const now = new Date().toISOString();
+    const work: AgentWork = {
+      workId: newWorkId(), offeringId, consumerGaii, consumerOwner: owner,
+      providerGhii: o.providerGhii, providerOwner: o.providerOwner,
+      agentGaii: `${s.agentName}#${o.providerOwner}@${config.nodeId}`, taskType: s.taskType,
+      ext: o.ext, action: o.action, input: b.input ?? {}, output: null,
+      note: typeof b.note === 'string' ? b.note.slice(0, 2000) : '',
+      state: 'open', unit: ent.unit, currency: ent.currency, chargedUnits: 0, createdAt: now, deliveredAt: null,
+    };
+    await putWork(storage, work);
+    await notify(owner, o.providerOwner, 'EXCHANGE — new agent work started',
+      `${owner} started a "${s.taskType}" task for your agent ${s.agentName} (work ${work.workId}). Deliver it in the EXCHANGE app to get paid.`);
+    return res.status(201).json(success(config.nodeId, { work: workView(work) }));
+  });
+
+  /**
+   * POST /v1/exchange/work/:id/deliver — the PROVIDER delivers a task → settle ON DELIVERY (charge the
+   * consumer the per-task price, credit the provider, route the rake, decrement the budget). Body:
+   * `{ output, note? }`. A 402/429 (budget/rate) leaves the work open and unpaid.
+   */
+  router.post('/v1/exchange/work/:id/deliver', requireAuth(), async (req: Request, res: Response) => {
+    const owner = req.auth!.owner;
+    const w = await getWork(storage, typeof req.params.id === 'string' ? req.params.id : '');
+    if (!w || w.providerOwner !== owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such work of yours to deliver'));
+    if (w.state !== 'open') return res.status(409).json(error(config.nodeId, 'WORK_NOT_OPEN', `Work is ${w.state}`));
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    // Settle the per-task price against the CONSUMER's contract (the consumer pays; the provider is credited).
+    const before = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
+    if (!before || before.state !== 'active') {
+      return res.status(402).json(error(config.nodeId, 'CONTRACT_INACTIVE', 'The consumer contract is no longer active — cannot settle this delivery'));
+    }
+    const outcome = await settleMeteredCoordinate({
+      config, storage, coordExt: w.ext, coordAction: w.action, label: `${w.agentGaii}:${w.taskType}`,
+      callerGaii: w.consumerGaii, res,
+    });
+    if (!outcome) return res.status(402).json(error(config.nodeId, 'NO_CONTRACT', 'No active contract to settle against'));
+    if (!outcome.ok) return; // 402/429 already sent (budget/rate) — work stays open
+    const after = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
+    const charged = after && before ? Math.max(0, (after.budget.spentUnits) - (before.budget.spentUnits)) : 0;
+    w.state = 'delivered'; w.output = b.output ?? null; w.chargedUnits = charged; w.deliveredAt = new Date().toISOString();
+    if (typeof b.note === 'string' && b.note) w.note = b.note.slice(0, 2000);
+    await putWork(storage, w);
+    await notify(owner, w.consumerOwner, 'EXCHANGE — your agent work was delivered',
+      `Your "${w.taskType}" task (work ${w.workId}) was delivered by ${owner} and charged to your contract. See it in the EXCHANGE app.`);
+    return res.json(success(config.nodeId, { work: workView(w) }));
+  });
+
+  /** GET /v1/exchange/work?role=consumer|provider — the caller-owner's agent-work items (default: consumer). */
+  router.get('/v1/exchange/work', requireAuth(), async (req: Request, res: Response) => {
+    const owner = req.auth!.owner;
+    const role = req.query.role === 'provider' ? 'provider' : 'consumer';
+    const items = role === 'provider' ? await listWorkByProvider(storage, owner) : await listWorkByConsumer(storage, owner);
+    return res.json(success(config.nodeId, { work: items.map(workView), count: items.length, role }));
   });
 
   return router;

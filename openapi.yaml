@@ -8247,6 +8247,55 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
 
+  /v1/exchange/work:
+    post:
+      operationId: exchangeStartWork
+      summary: Start an AGENT-WORK task under a contract — async, settled on delivery (EXCHANGE / TARGET-045 Gap 2)
+      description: >
+        The CONSUMER starts a task against an agent-work offering they hold an active contract for. Body:
+        `{ offering_id, input, note? }`. Nothing is charged yet — the per-task price is metered when the
+        provider DELIVERS. Requires a contract first (else 402 NO_CONTRACT). Returns `{ work }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [offering_id], properties: {
+          offering_id: { type: string }, input: {}, note: { type: string } } } } }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '402': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+    get:
+      operationId: exchangeListWork
+      summary: List your AGENT-WORK items (EXCHANGE / TARGET-045 Gap 2)
+      description: "`?role=consumer` (default) or `?role=provider`. Returns `{ work, count, role }`."
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: role, in: query, schema: { type: string, enum: [consumer, provider] } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+
+  /v1/exchange/work/{id}/deliver:
+    post:
+      operationId: exchangeDeliverWork
+      summary: Deliver an agent-work task → settle on delivery (EXCHANGE / TARGET-045 Gap 2)
+      description: >
+        The PROVIDER delivers a task and is paid: the consumer is charged the per-task price, the provider is
+        credited its cut, the platform rake is routed, the budget decremented — all ON DELIVERY. Body:
+        `{ output, note? }`. A 402/429 (budget/rate) leaves the work open + unpaid. Returns `{ work }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, properties: { output: {}, note: { type: string } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '402': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+        '409': { $ref: '#/components/responses/AimeatError' }
+
   /v1/exchange/info:
     get:
       operationId: exchangeInfo
@@ -8279,11 +8328,18 @@ paths:
       requestBody:
         required: true
         content: { application/json: { schema: { type: object, required: [usage_terms], properties: {
-          kind: { type: string, enum: [ext-action, app-tool], default: ext-action },
+          kind: { type: string, enum: [ext-action, app-tool, agent-work], default: ext-action },
           ext: { type: string, description: "ext-action kind — the extension name." },
           action: { type: string, description: "ext-action kind — the action id." },
           app_id: { type: string, description: "app-tool kind — the app filename whose manifest holds the tool." },
           tool: { type: string, description: "app-tool kind — the tool name in apps.{app_id}.tools." },
+          agent_name: { type: string, description: "agent-work kind — your agent that performs the task." },
+          task_type: { type: string, description: "agent-work kind — the task type it performs." },
+          input_schema: { type: object, description: "agent-work kind — what the consumer sends (required)." },
+          output_schema: { type: object, description: "agent-work kind — what the agent delivers (required)." },
+          price_morsels: { type: integer, description: "agent-work kind — per-task morsel price." },
+          price_money: { type: object, description: "agent-work kind — per-task money price { amount (micros), currency }." },
+          plans: { type: array, items: { type: object }, description: "agent-work kind — optional bundle/subscription plans." },
           title: { type: string }, description: { type: string },
           provenance: { type: object }, tags: { type: array, items: { type: string } },
           usage_terms: { type: object, properties: {

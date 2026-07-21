@@ -87,6 +87,21 @@ export interface AppToolSurface {
   ifaceVersion: number;
 }
 
+/**
+ * The sellable surface for AGENT WORK (TARGET-045 Gap 2) — a provider agent sells a TASK TYPE it performs.
+ * Unlike a data/app-tool call (synchronous), agent work is ASYNC: a task is started, the agent delivers, and
+ * the per-task price is metered ON DELIVERY. The metered coordinate is `agentwork:{owner}/{agent}` + taskType.
+ */
+export interface AgentWorkSurface {
+  kind: 'agent-work';
+  ownerName: string;
+  agentName: string;
+  taskType: string;
+}
+
+/** The sellable surface a contract binds to when it is not a raw ext-action. */
+export type SellableSurface = AppToolSurface | AgentWorkSurface;
+
 /** The stored shape of one entitlement (the `value` of the memory record). */
 export interface MeteredEntitlement {
   entitlementId: string;
@@ -113,9 +128,9 @@ export interface MeteredEntitlement {
   budget: EntitlementBudget;
   /** Platform cut override (0–100). `null` = use the node's configured marketplace fee. */
   rakePercent: number | null;
-  /** The pinned sellable surface when this contract is for an app-tool (Gap 1); absent for a raw ext-action.
-   *  The metered call routes to `surface.ifaceVersion`'s frozen binding — the freeze that protects the integration. */
-  surface?: AppToolSurface | null;
+  /** The sellable surface when this contract is for an app-tool (Gap 1) or agent-work (Gap 2); absent for a
+   *  raw ext-action. App-tool calls route to the pinned interface binding; agent-work settles on delivery. */
+  surface?: SellableSurface | null;
   /** The contract this entitlement was minted under (an EXCHANGE contract or a `wsengage.*` id). */
   contractRef: string;
   /** Who carries the trust-ramp / escrow risk, per the contract. */
@@ -168,7 +183,7 @@ export async function createEntitlement(
   input: {
     consumerGaii: string; appId?: string | null; providerGhii: string; ext: string; action: string; capabilityLabel?: string;
     unit: EntitlementUnit; pricePerCall: number; currency?: string | null; pricing?: PricingSpec | null;
-    capUnits?: number | null; rakePercent?: number | null; contractRef: string; surface?: AppToolSurface | null;
+    capUnits?: number | null; rakePercent?: number | null; contractRef: string; surface?: SellableSurface | null;
     escrowParty?: 'consumer' | 'provider' | null; createdBy: string; carrySpend?: MeteredEntitlement | null;
   },
 ): Promise<MeteredEntitlement> {
