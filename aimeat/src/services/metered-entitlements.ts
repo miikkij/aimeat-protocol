@@ -16,6 +16,8 @@
  *   const gate = await authorizeAndCharge(storage, consumerGaii, ext, action, priceMicros);
  *   if (!gate.ok) return res.status(402)...;
  * @version-history
+ *   v1.2.0 — 2026-07-21 — Add optional `surface` (AppToolSurface) so a contract can bind an app-tool's pinned
+ *     interface version (Gap 1 cross-app selling); the (ext, action) coordinate stays the shared key.
  *   v1.1.0 — 2026-07-20 — Add `appId` dimension + listEntitlementsByApp for the per-app cost surface (G3)
  *   v1.0.0 — 2026-07-20 — Initial G1 entitlement object (EXCHANGE slice-1): create / lookup-by-call /
  *     authorize+charge (budget decrement) / pause / revoke. Read-modify-write budget counter — see the
@@ -66,6 +68,20 @@ export interface EntitlementBudget {
   calls: number;
 }
 
+/**
+ * The sellable surface a contract binds to when it is NOT a raw extension action — an app-tool a provider
+ * app sells cross-app (TARGET-045 Gap 1). The metered coordinate (`ext`/`action`) stays the shared key; this
+ * pins the immutable INTERFACE VERSION so the metered call routes to the frozen snapshot's binding even after
+ * the provider ships a new app version. `null`/absent = the classic ext-action surface.
+ */
+export interface AppToolSurface {
+  kind: 'app-tool';
+  ownerName: string;
+  appId: string;
+  tool: string;
+  ifaceVersion: number;
+}
+
 /** The stored shape of one entitlement (the `value` of the memory record). */
 export interface MeteredEntitlement {
   entitlementId: string;
@@ -92,6 +108,9 @@ export interface MeteredEntitlement {
   budget: EntitlementBudget;
   /** Platform cut override (0–100). `null` = use the node's configured marketplace fee. */
   rakePercent: number | null;
+  /** The pinned sellable surface when this contract is for an app-tool (Gap 1); absent for a raw ext-action.
+   *  The metered call routes to `surface.ifaceVersion`'s frozen binding — the freeze that protects the integration. */
+  surface?: AppToolSurface | null;
   /** The contract this entitlement was minted under (an EXCHANGE contract or a `wsengage.*` id). */
   contractRef: string;
   /** Who carries the trust-ramp / escrow risk, per the contract. */
@@ -144,7 +163,7 @@ export async function createEntitlement(
   input: {
     consumerGaii: string; appId?: string | null; providerGhii: string; ext: string; action: string; capabilityLabel?: string;
     unit: EntitlementUnit; pricePerCall: number; currency?: string | null; pricing?: PricingSpec | null;
-    capUnits?: number | null; rakePercent?: number | null; contractRef: string;
+    capUnits?: number | null; rakePercent?: number | null; contractRef: string; surface?: AppToolSurface | null;
     escrowParty?: 'consumer' | 'provider' | null; createdBy: string; carrySpend?: MeteredEntitlement | null;
   },
 ): Promise<MeteredEntitlement> {
@@ -161,6 +180,7 @@ export async function createEntitlement(
     pricePerCall: input.pricePerCall,
     currency: input.unit === 'money' ? (input.currency ?? 'EUR') : null,
     pricing: input.pricing ?? input.carrySpend?.pricing ?? { model: 'per_call' },
+    surface: input.surface ?? input.carrySpend?.surface ?? null,
     budget: {
       capUnits: input.capUnits ?? null,
       spentUnits: input.carrySpend?.budget.spentUnits ?? 0,

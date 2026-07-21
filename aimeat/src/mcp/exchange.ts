@@ -16,6 +16,8 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.1.0 — 2026-07-21 — accept by `offering_id` (ext-action AND app-tool kinds, via resolveOfferingPricing);
+ *     offering_get surfaces the pinned app-tool interface schema + WebMCP call recipe (Gap 1 cross-app selling).
  *   v1.0.0 — 2026-07-20 — Initial EXCHANGE MCP surface (offerings/accept/contracts/off/needs/bid/consumers)
  */
 import { randomUUID } from 'node:crypto';
@@ -34,11 +36,12 @@ import {
 } from '../services/metered-entitlements.js';
 import {
     type Offering, type Need, type Bid, type ActionCommercial, type NeedSpec,
-    resolveActionPricing, newNeedId, newBidId,
+    resolveActionPricing, resolveOfferingPricing, newNeedId, newBidId,
     getOffering, listOfferings, matchOfferings,
     putNeed, getNeed, listNeeds, putBid, getBid,
     offeringStats, offeringConsumers,
 } from '../services/exchange-market.js';
+import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 
 function ownerOf(gaii: string): string {
     return gaii.split('@')[0].split('#').pop() ?? gaii;
@@ -54,6 +57,7 @@ function entitlementView(config: AimeatConfig, e: MeteredEntitlement) {
         provider: e.providerGhii,
         ext: e.ext,
         action: e.action,
+        surface: e.surface ?? null,
         capability: e.capabilityLabel,
         unit: e.unit,
         currency: e.currency,
@@ -134,9 +138,30 @@ export function registerExchangeTools(
         async ({ offering_id }) => {
             const o = await getOffering(storage, offering_id);
             if (!o) return fail(`NOT_FOUND: no such offering "${offering_id}"`);
+            const stats = await offeringStats(storage, o);
+
+            if (o.kind === 'app-tool' && o.surface) {
+                const s = o.surface;
+                const iface = await getInterfaceVersion(storage, o.providerGhii, s.appId, s.tool, s.ifaceVersion);
+                return ok({
+                    offering: o,
+                    capability: iface ? {
+                        kind: 'app-tool', app: `${s.ownerName}/${s.appId}`, tool: s.tool, iface_version: s.ifaceVersion,
+                        input_schema: iface.inputSchema, output_schema: iface.outputSchema,
+                    } : null,
+                    call_recipe: {
+                        method: 'POST',
+                        url: `/v1/apps/${encodeURIComponent(s.ownerName)}/${encodeURIComponent(s.appId)}/webmcp/tools/${encodeURIComponent(s.tool)}`,
+                        auth: 'Your own AIMEAT token — the accepted contract (metered entitlement) authorises the call; no separate API key is issued.',
+                        note: `Metered + charged to your budget. Pinned to interface v${s.ifaceVersion}; the provider may ship newer app versions without breaking your integration.`,
+                        body: '{ "input": { … } }',
+                    },
+                    stats,
+                });
+            }
+
             const extRec = await storage.getExtension(o.ext);
             const act = extRec?.actions.find(a => a.id === o.action);
-            const stats = await offeringStats(storage, o);
             return ok({
                 offering: o,
                 capability: act ? {
@@ -161,15 +186,40 @@ export function registerExchangeTools(
         'aimeat_exchange_accept',
         descriptionFor('aimeat_exchange_accept'),
         {
-            ext: z.string().min(1).max(120),
-            action: z.string().min(1).max(120),
+            offering_id: z.string().min(1).max(120).optional(),
+            ext: z.string().min(1).max(120).optional(),
+            action: z.string().min(1).max(120).optional(),
             contract_ref: z.string().min(1).max(200).optional(),
             cap_units: z.number().int().nonnegative().optional(),
             plan_id: z.string().min(1).max(120).optional(),
             app_id: z.string().min(1).max(300).optional(),
         },
         annotationsFor('aimeat_exchange_accept'),
-        async ({ ext, action, contract_ref, cap_units, plan_id, app_id }) => {
+        async ({ offering_id, ext, action, contract_ref, cap_units, plan_id, app_id }) => {
+            const capUnits = cap_units !== undefined ? Math.floor(cap_units) : null;
+
+            // Preferred: accept an OFFERING by id (works for ext-action AND app-tool kinds).
+            if (offering_id) {
+                const o = await getOffering(storage, offering_id);
+                if (!o || o.state !== 'listed') return fail('NOT_FOUND: no such listed offering');
+                const priced = await resolveOfferingPricing(storage, o, plan_id ?? null);
+                if (!priced.ok) return fail(`${priced.code}: ${priced.message}`);
+                const minCharge = priced.pricing?.model === 'bundle' ? priced.pricing.blockPrice : priced.pricing?.model === 'subscription' ? priced.pricing.periodPrice : priced.pricePerCall;
+                if (capUnits !== null && capUnits < minCharge) {
+                    return fail(`BUDGET_TOO_LOW: budget cap (${capUnits}) is below the ${minCharge}-${priced.unit === 'money' ? priced.currency : 'morsel'} minimum charge`);
+                }
+                const existing = await readEntitlementForCall(storage, consumerGaii, priced.ext, priced.action);
+                const ent = await createEntitlement(storage, {
+                    consumerGaii, appId: app_id ?? null, providerGhii: priced.providerGhii, ext: priced.ext, action: priced.action,
+                    capabilityLabel: priced.capabilityLabel, unit: priced.unit, pricePerCall: priced.pricePerCall,
+                    currency: priced.currency, pricing: priced.pricing, capUnits, contractRef: contract_ref || `offering:${offering_id}`,
+                    surface: priced.surface, createdBy: owner, carrySpend: existing,
+                });
+                return ok({ entitlement: entitlementView(config, ent) });
+            }
+
+            // Legacy: accept a raw ext-action directly.
+            if (!ext || !action) return fail('BAD_REQUEST: pass offering_id, or both ext and action');
             const contractRef = contract_ref || `mcp:${randomUUID()}`;
             const extRec = await storage.getExtension(ext);
             if (!extRec) return fail(`NOT_FOUND: extension "${ext}" not found`);
@@ -181,7 +231,6 @@ export function registerExchangeTools(
             const priced = resolveActionPricing(act.commercial as ActionCommercial | undefined, plan_id ?? null);
             if (!priced.ok) return fail(`${priced.code}: action "${ext}/${action}": ${priced.message}`);
             const { unit, pricePerCall, currency, pricing } = priced;
-            const capUnits = cap_units !== undefined ? Math.floor(cap_units) : null;
             const minCharge = pricing?.model === 'bundle' ? pricing.blockPrice : pricing?.model === 'subscription' ? pricing.periodPrice : pricePerCall;
             if (capUnits !== null && capUnits < minCharge) {
                 return fail(`BUDGET_TOO_LOW: budget cap (${capUnits}) is below the ${minCharge}-${unit === 'money' ? currency : 'morsel'} minimum charge`);

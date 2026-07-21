@@ -12,8 +12,10 @@
  *   on renewal). The SETTLEMENT RAIL (the entitlement `unit`) decides how that amount moves:
  *     - `morsels` — atomic in-repo debit/credit + rake via {@link settleMarketplaceFee}.
  *     - `money`   — real EUR/USD accrual via {@link settleEntitlementMoney} (off the morsel ledger).
- * @structure settleViaEntitlement · settleMorsels · settleMoney
+ * @structure settleMeteredCoordinate · settleViaEntitlement (ext wrapper) · settleMorsels · settleMoney
  * @version-history
+ *   v1.3.0 — 2026-07-21 — Generalised to a metered COORDINATE (ext, action strings) so it settles app-tool
+ *     calls too (EXCHANGE cross-app selling, Gap 1); settleViaEntitlement is now the ext wrapper.
  *   v1.2.0 — 2026-07-20 — Pricing models (Phase B): computeCharge drives per-call amount (bundle/subscription + rate limit).
  *   v1.1.0 — 2026-07-20 — Wire the money unit to the accrual rail (real EUR/USD); split morsel/money settlement.
  *   v1.0.0 — 2026-07-20 — Initial G2 gateway: entitlement authorise + morsel settlement + platform rake.
@@ -39,8 +41,9 @@ type ExtAction = ExtensionRecord['actions'][number];
 interface SettleArgs {
   config: AimeatConfig;
   storage: Storage;
-  ext: ExtensionRecord;
-  action: ExtAction;
+  coordExt: string;       // metered coordinate — ext name, or `apptool:{owner}/{appId}` for an app-tool
+  coordAction: string;    // metered coordinate — action id, or the tool name for an app-tool
+  label: string;          // human label for messages, e.g. `prh-data/search` or `prh.html/getCompanyBrief`
   callerGaii: string;
   res: Response;
   ent: MeteredEntitlement;
@@ -49,19 +52,20 @@ interface SettleArgs {
 }
 
 /**
- * Settle a raw invoke through a durable entitlement, or return `null` to fall through to the standard
- * paywall. On an `ok:false` outcome a 402/429/500 has already been sent (the caller must `return`).
+ * Settle a metered call at a COORDINATE (ext/action strings) through a durable entitlement, or return `null`
+ * to fall through to the standard paywall. Shared by the ext raw-invoke path and the app-tool WebMCP invoke
+ * path (EXCHANGE cross-app selling). On an `ok:false` outcome a 402/429/500 has already been sent.
  */
-export async function settleViaEntitlement(args: {
-  config: AimeatConfig; storage: Storage; ext: ExtensionRecord; action: ExtAction; callerGaii: string; res: Response;
+export async function settleMeteredCoordinate(args: {
+  config: AimeatConfig; storage: Storage; coordExt: string; coordAction: string; label: string; callerGaii: string; res: Response;
 }): Promise<PaywallOutcome | null> {
-  const { config, storage, ext, action, callerGaii, res } = args;
-  const ent = await readEntitlementForCall(storage, callerGaii, ext.name, action.id);
+  const { config, storage, coordExt, coordAction, label, callerGaii, res } = args;
+  const ent = await readEntitlementForCall(storage, callerGaii, coordExt, coordAction);
   if (!ent) return null;                       // no contract for this call → standard paywall applies
 
   if (ent.state !== 'active') {
     res.status(402).json({ ...error(config.nodeId, 'ENTITLEMENT_INACTIVE',
-      `Your EXCHANGE entitlement for ${ext.name}/${action.id} is ${ent.state} (contract ${ent.contractRef}).`),
+      `Your EXCHANGE entitlement for ${label} is ${ent.state} (contract ${ent.contractRef}).`),
       ...paymentChallenge(config) });
     return { ok: false };
   }
@@ -70,29 +74,43 @@ export async function settleViaEntitlement(args: {
   const decision = computeCharge(ent, Date.now());
   if (!decision.allowed) {
     res.status(429).json(error(config.nodeId, 'RATE_LIMITED',
-      `Your EXCHANGE subscription for ${ext.name}/${action.id} is over its rate limit — retry shortly (contract ${ent.contractRef}).`));
+      `Your EXCHANGE subscription for ${label} is over its rate limit — retry shortly (contract ${ent.contractRef}).`));
     return { ok: false };
   }
   // Budget cap is checked against THIS call's charge (a refill/renewal may cost a block/period fee).
   if (!budgetAllows(ent, decision.chargeUnits)) {
     const cap = ent.unit === 'money' ? `${formatMoneyMajor(ent.budget.capUnits ?? 0)} ${ent.currency ?? ''}`.trim() : `${ent.budget.capUnits} morsel`;
     res.status(402).json({ ...error(config.nodeId, 'BUDGET_EXHAUSTED',
-      `Your EXCHANGE entitlement for ${ext.name}/${action.id} has spent its ${cap} budget (contract ${ent.contractRef}).`),
+      `Your EXCHANGE entitlement for ${label} has spent its ${cap} budget (contract ${ent.contractRef}).`),
       ...paymentChallenge(config) });
     return { ok: false };
   }
 
-  const settleArgs: SettleArgs = { config, storage, ext, action, callerGaii, res, ent, charge: decision.chargeUnits, newPricing: decision.pricing };
+  const settleArgs: SettleArgs = { config, storage, coordExt, coordAction, label, callerGaii, res, ent, charge: decision.chargeUnits, newPricing: decision.pricing };
   return ent.unit === 'money' ? settleMoney(settleArgs) : settleMorsels(settleArgs);
 }
 
+/**
+ * Settle a raw extension invoke through a durable entitlement (the ext-action path wrapper), or return
+ * `null` to fall through to the standard paywall.
+ */
+export async function settleViaEntitlement(args: {
+  config: AimeatConfig; storage: Storage; ext: ExtensionRecord; action: ExtAction; callerGaii: string; res: Response;
+}): Promise<PaywallOutcome | null> {
+  return settleMeteredCoordinate({
+    config: args.config, storage: args.storage,
+    coordExt: args.ext.name, coordAction: args.action.id, label: `${args.ext.name}/${args.action.id}`,
+    callerGaii: args.callerGaii, res: args.res,
+  });
+}
+
 /** Morsel rail: atomic debit caller / credit provider cut / route rake for THIS call's charge, then commit. */
-async function settleMorsels({ config, storage, ext, action, callerGaii, res, ent, charge, newPricing }: SettleArgs): Promise<PaywallOutcome> {
+async function settleMorsels({ config, storage, coordExt, coordAction, label, callerGaii, res, ent, charge, newPricing }: SettleArgs): Promise<PaywallOutcome> {
   const price = Math.max(0, charge);
   const rakePct = ent.rakePercent ?? commerceFeePercent(config);
   const fee = percentFee(price, rakePct);          // ceils — a positive charge always carries its rake
   const providerCut = price - fee;
-  const track = `exchange:${ext.name}:${action.id}:${ent.contractRef}`;
+  const track = `exchange:${coordExt}:${coordAction}:${ent.contractRef}`;
   const ts = new Date().toISOString();
 
   if (price > 0) {
@@ -106,7 +124,7 @@ async function settleMorsels({ config, storage, ext, action, callerGaii, res, en
       const credited = await storage.creditBalance(ent.providerGhii, providerCut);
       if (!credited) {
         await storage.creditBalance(callerGaii, price);
-        logger.error('[entitlement-gate] provider credit failed; refunded caller', { ext: ext.name, action: action.id, provider: ent.providerGhii });
+        logger.error('[entitlement-gate] provider credit failed; refunded caller', { label, provider: ent.providerGhii });
         res.status(500).json(error(config.nodeId, 'SETTLEMENT_FAILED', 'Payment could not be settled to the provider; you were not charged'));
         return { ok: false };
       }
@@ -124,18 +142,18 @@ async function settleMorsels({ config, storage, ext, action, callerGaii, res, en
         if (providerCut > 0) await storage.debitBalance(ent.providerGhii, providerCut);
         await storage.creditBalance(callerGaii, price);
       }
-      await refundSpend(storage, callerGaii, ext.name, action.id, price);
-      logger.warn(`[entitlement-gate] refunded ${price} morsels (script threw after payment)`, { ext: ext.name, action: action.id });
+      await refundSpend(storage, callerGaii, coordExt, coordAction, price);
+      logger.warn(`[entitlement-gate] refunded ${price} morsels (script threw after payment)`, { label });
     },
   };
 }
 
 /** Money rail: accrue a REAL currency obligation for THIS call's charge (buyer → provider, minus rake), then commit. */
-async function settleMoney({ config, storage, ext, action, callerGaii, res, ent, charge, newPricing }: SettleArgs): Promise<PaywallOutcome> {
+async function settleMoney({ config, storage, coordExt, coordAction, label, callerGaii, res, ent, charge, newPricing }: SettleArgs): Promise<PaywallOutcome> {
   const price = Math.max(0, charge);   // micro-units
   const currency = ent.currency ?? 'EUR';
   const rakePct = ent.rakePercent ?? commerceFeePercent(config);
-  const reference = `exchange:${ext.name}:${action.id}:${ent.contractRef}`;
+  const reference = `exchange:${coordExt}:${coordAction}:${ent.contractRef}`;
   let trackingCode = '';
 
   if (price > 0) {
@@ -156,8 +174,8 @@ async function settleMoney({ config, storage, ext, action, callerGaii, res, ent,
     ok: true,
     refund: async () => {
       if (price > 0) await refundEntitlementMoney(storage, config, { consumerGhii: callerGaii, providerGhii: ent.providerGhii, priceMicros: price, currency, trackingCode });
-      await refundSpend(storage, callerGaii, ext.name, action.id, price);
-      logger.warn(`[entitlement-gate] refunded ${formatMoneyMajor(price)} ${currency} (script threw after payment)`, { ext: ext.name, action: action.id });
+      await refundSpend(storage, callerGaii, coordExt, coordAction, price);
+      logger.warn(`[entitlement-gate] refunded ${formatMoneyMajor(price)} ${currency} (script threw after payment)`, { label });
     },
   };
 }

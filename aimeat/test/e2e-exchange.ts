@@ -77,11 +77,12 @@ const manifest = (name: string) => JSON.stringify({
 
 let provider: Awaited<ReturnType<typeof setupOwner>>;
 let consumer: Awaited<ReturnType<typeof setupOwner>>;
+let operator: Awaited<ReturnType<typeof setupOwner>>;
 let appId = '';
 let rakePerCall = 0;
 
 await test('Setup: provider installs a morsel-priced extension; consumer registered', async () => {
-  await setupOwner('neutral'); // absorb any first-owner operator self-heal on a fresh DB
+  operator = await setupOwner('neutral'); // the FIRST owner on a fresh DB auto-becomes operator
   provider = await setupOwner('prov');
   consumer = await setupOwner('cons');
   appId = `${consumer.name}/exchangeapp`;
@@ -373,6 +374,136 @@ if (!moneyEnabled) {
     assert(r.body.data.totals.money.spent_units === 200000 && r.body.data.totals.money.calls === 2, `money totals: ${JSON.stringify(r.body.data.totals.money)}`);
   });
 }
+
+// ── GAP 1: APP-TOOL OFFERINGS (cross-app selling) — pinned interface + metered call + freeze ──
+// A provider APP sells one of its tools (e.g. getCompanyBrief) as a durable metered offering. The tool binds
+// to a capability; a consumer contracts it and calls it repeatedly, metered + raked, routed to a PINNED
+// interface version so the provider can ship new app versions without breaking the integration.
+const APP_ID = 'briefapp';
+const IN_SCHEMA = { type: 'object', properties: { businessId: { type: 'string' } } };
+const OUT_SCHEMA = { type: 'object', properties: { echo: {}, caller: { type: 'string' } } };
+const capId = `ext:${EXT}:free`; // the auto-aggregated capability wrapping the unpriced `free` echo action
+let appToolOfferingId = '';
+
+const writeManifest = (token: string, tools: unknown[]) =>
+  json('/v1/memory', { method: 'POST', headers: auth(token),
+    body: JSON.stringify({ key: `apps.${APP_ID}.tools`, visibility: 'public', value: { version: 1, tools } }) });
+const listAppTool = (token: string, body: Record<string, unknown>) =>
+  json('/v1/exchange/offerings', { method: 'POST', headers: auth(token), body: JSON.stringify({ kind: 'app-tool', app_id: APP_ID, ...body }) });
+const callTool = (token: string, tool = 'getbrief') =>
+  json(`/v1/apps/${provider.name}/${APP_ID}/webmcp/tools/${tool}`, { method: 'POST', headers: auth(token), body: JSON.stringify({ input: { businessId: '2145874-6' } }) });
+
+await test('Setup: aggregate the backing capability + provider publishes an app-tool manifest', async () => {
+  // The metered call routes to the tool's bound capability; aggregation turns the unpriced `free` ext action
+  // into a callable capability (`ext:{EXT}:free`). Operator-only — the first owner is operator on a fresh DB.
+  const agg = await json('/v1/admin/capabilities/aggregate', { method: 'POST', headers: auth(operator.token) });
+  assert(agg.status === 200, `aggregate ${agg.status}: ${JSON.stringify(agg.body?.error)} — first owner must be operator`);
+  const cap = await json(`/v1/capabilities/${encodeURIComponent(capId)}`);
+  assert(cap.status === 200 && cap.body.data?.callable, `backing capability ${capId} must exist + be callable: ${cap.status}`);
+  // A well-formed sellable tool + a couple of gate-probe tools.
+  const w = await writeManifest(provider.token, [
+    { name: 'getbrief', description: 'Company brief', action_id: capId, inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA,
+      price: { morsels: 8 }, plans: [{ id: 'pack5', model: 'bundle', blockSize: 5, blockPrice: 30 }] },
+    { name: 'noout', description: 'missing output schema', action_id: capId, inputSchema: IN_SCHEMA, price: { morsels: 3 } },
+    { name: 'unbound', description: 'no binding', inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, price: { morsels: 3 } },
+  ]);
+  assert(w.status === 200 || w.status === 201, `write manifest ${w.status}: ${JSON.stringify(w.body?.error)}`);
+});
+
+await test('List an app-tool offering → kind=app-tool, pinned interface v1, authoritative price 8', async () => {
+  const r = await listAppTool(provider.token, { tool: 'getbrief', title: 'Company brief', usage_terms: validTerms, tags: ['prh', 'brief'] });
+  assert(r.status === 201, `list app-tool ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const o = r.body.data.offering;
+  assert(o.kind === 'app-tool' && o.surface?.ifaceVersion === 1, `kind/surface: ${JSON.stringify(o.surface)}`);
+  assert(o.unit === 'morsels' && o.basePrice === 8, `authoritative price: ${JSON.stringify({ unit: o.unit, basePrice: o.basePrice })}`);
+  assert(o.ext === `apptool:${provider.name}/${APP_ID}` && o.action === 'getbrief', `coordinate: ${o.ext}/${o.action}`);
+  appToolOfferingId = o.offeringId;
+});
+
+await test('Legibility gate (app-tool): a tool with no outputSchema → 400 SCHEMA_REQUIRED', async () => {
+  const r = await listAppTool(provider.token, { tool: 'noout', usage_terms: validTerms });
+  assert(r.status === 400 && r.body?.error?.code === 'SCHEMA_REQUIRED', `expected SCHEMA_REQUIRED, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Legibility gate (app-tool): listing without usage_terms → 400 USAGE_TERMS_REQUIRED', async () => {
+  const r = await listAppTool(provider.token, { tool: 'getbrief' });
+  assert(r.status === 400 && r.body?.error?.code === 'USAGE_TERMS_REQUIRED', `expected USAGE_TERMS_REQUIRED, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+});
+
+await test('An unbound (no action_id) tool cannot be offered as a metered service → 400 TOOL_UNBOUND', async () => {
+  const r = await listAppTool(provider.token, { tool: 'unbound', usage_terms: validTerms });
+  assert(r.status === 400 && r.body?.error?.code === 'TOOL_UNBOUND', `expected TOOL_UNBOUND, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Offering DETAIL exposes the PINNED interface schema + the WebMCP call recipe', async () => {
+  const r = await json(`/v1/exchange/offerings/${appToolOfferingId}`);
+  assert(r.status === 200, `detail ${r.status}`);
+  const d = r.body.data;
+  assert(d.capability?.kind === 'app-tool' && d.capability.iface_version === 1, `pinned iface in detail: ${JSON.stringify(d.capability)}`);
+  assert(typeof d.capability.output_schema === 'object' && d.capability.output_schema.properties, 'detail carries the frozen output schema');
+  assert(d.call_recipe?.url === `/v1/apps/${provider.name}/${APP_ID}/webmcp/tools/getbrief`, `call recipe url: ${d.call_recipe?.url}`);
+});
+
+await test('A non-contracted caller hitting the priced tool → 402 (payment required), not a free call', async () => {
+  const r = await callTool(consumer.token);
+  assert(r.status === 402, `expected 402 without a contract, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+});
+
+await test('Consumer contracts the app-tool offering (by offering_id) → entitlement pinned to v1', async () => {
+  const r = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(consumer.token),
+    body: JSON.stringify({ offering_id: appToolOfferingId, cap_units: 20, app_id: appId }) });
+  assert(r.status === 201, `contract ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const e = r.body.data.entitlement;
+  assert(e.price_per_call === 8 && e.unit === 'morsels' && e.state === 'active', `entitlement: ${JSON.stringify(e)}`);
+  assert(e.surface?.kind === 'app-tool' && e.surface.ifaceVersion === 1, `pinned surface: ${JSON.stringify(e.surface)}`);
+});
+
+await test('Metered app-tool call: caller −8, provider +(8−rake), routed to pinned v1, budget spent=8', async () => {
+  const cb = await balance(consumer.token);
+  const pb = await balance(provider.token);
+  const r = await callTool(consumer.token);
+  assert(r.status === 200, `metered call ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.metered === true && r.body.data.iface_version === 1, `metered/pinned in response: ${JSON.stringify({ metered: r.body.data.metered, v: r.body.data.iface_version })}`);
+  const fee = Math.ceil(8 * 5 / 100); // default 5% rake, ceils
+  assert(await balance(consumer.token) === cb - 8, 'consumer debited the 8-morsel app-tool price');
+  assert(await balance(provider.token) === pb + (8 - fee), `provider credited its cut (8−${fee})`);
+});
+
+await test('App-tool budget CAP hard-stops: after 2 calls (16/20), the 3rd → 402 BUDGET_EXHAUSTED', async () => {
+  const two = await callTool(consumer.token);       // spent → 16, under 20
+  assert(two.status === 200, `2nd app-tool call ${two.status}`);
+  const cb = await balance(consumer.token);
+  const three = await callTool(consumer.token);      // 24 > 20 cap → denied, no debit
+  assert(three.status === 402 && three.body?.error?.code === 'BUDGET_EXHAUSTED', `expected BUDGET_EXHAUSTED, got ${three.status}/${JSON.stringify(three.body?.error)}`);
+  assert(await balance(consumer.token) === cb, 'no morsels move when the app-tool budget cap is hit');
+});
+
+await test('Provider lineage reflects the app-tool consumer (calls + spend)', async () => {
+  const r = await json(`/v1/exchange/offerings/${appToolOfferingId}/consumers`, { headers: auth(provider.token) });
+  assert(r.status === 200, `consumers ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.consumers.some((c: any) => c.calls >= 2), `app-tool consumer lineage: ${JSON.stringify(r.body.data.consumers)}`);
+});
+
+await test('FREEZE: re-list with an UNCHANGED interface is idempotent (still v1)', async () => {
+  const r = await listAppTool(provider.token, { tool: 'getbrief', usage_terms: validTerms });
+  assert(r.status === 201 && r.body.data.offering.surface.ifaceVersion === 1, `unchanged relist should stay v1, got ${r.body.data.offering.surface?.ifaceVersion}`);
+});
+
+await test('FREEZE: a schema change mints interface v2; the consumer’s contract stays pinned to v1', async () => {
+  // Provider ships a new interface (adds an output field) — the app product evolves.
+  const w = await writeManifest(provider.token, [
+    { name: 'getbrief', description: 'Company brief v2', action_id: capId, inputSchema: IN_SCHEMA,
+      outputSchema: { type: 'object', properties: { echo: {}, caller: { type: 'string' }, score: { type: 'number' } } },
+      price: { morsels: 8 }, plans: [{ id: 'pack5', model: 'bundle', blockSize: 5, blockPrice: 30 }] },
+  ]);
+  assert(w.status === 200 || w.status === 201, `rewrite manifest ${w.status}`);
+  const r = await listAppTool(provider.token, { tool: 'getbrief', usage_terms: validTerms });
+  assert(r.status === 201 && r.body.data.offering.surface.ifaceVersion === 2, `schema change should mint v2, got ${r.body.data.offering.surface?.ifaceVersion}`);
+  // The consumer's existing contract is still pinned to v1 (the freeze) — a NEW contract would get v2.
+  const list = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+  const e = list.body.data.entitlements.find((x: any) => x.action === 'getbrief');
+  assert(e?.surface?.ifaceVersion === 1, `consumer contract must stay pinned to v1 after provider ships v2, got ${e?.surface?.ifaceVersion}`);
+});
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

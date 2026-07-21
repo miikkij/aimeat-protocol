@@ -14,6 +14,9 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
  * @version-history
+ *   v1.1.0 — 2026-07-21 — EXCHANGE metered path (Gap 1): an authenticated caller holding a durable app-tool
+ *     CONTRACT gets the call metered (+ rake) and routed to the PINNED interface binding; no contract → the
+ *     existing checkout (priced) / free (unpriced) paths run unchanged.
  *   v1.0.0 — 2026-07-14 — Initial WebMCP bridge server surface (TARGET-034 phase C)
  */
 import { Router } from 'express';
@@ -25,6 +28,9 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { AppToolsDocSchema, appToolsKey, type AppTool } from '../models/app-tool-schemas.js';
 import { paymentChallenge } from '../commerce/x402.js';
+import { readEntitlementForCall } from '../services/metered-entitlements.js';
+import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
+import { settleMeteredCoordinate } from './extensions/entitlement-gate.js';
 
 /** The WebMCP draft this bridge mirrors (W3C Web Machine Learning CG). */
 const WEBMCP_SPEC = 'https://github.com/webmachinelearning/webmcp';
@@ -121,6 +127,53 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
     const appRef = `${ownerName}/${filename}`;
+
+    // ── EXCHANGE metered path (Gap 1 — cross-app selling) ──
+    // If an authenticated caller holds an active durable CONTRACT for this app-tool, the call is metered
+    // against their budget (+ platform rake) and routed to the PINNED interface version's binding — so a
+    // provider can ship a newer app version without breaking a live integration. No contract → fall through
+    // to the checkout (priced) / free (unpriced) paths below.
+    if (req.auth && !req.auth.anonymous) {
+      const callerGaii = resolveIdentity(req.auth, config.nodeId);
+      const coordExt = `apptool:${ownerName}/${filename}`;
+      const ent = await readEntitlementForCall(storage, callerGaii, coordExt, toolName);
+      if (ent) {
+        // Resolve the binding from the PINNED interface snapshot (the freeze); fall back to the tool's
+        // current binding only if the pinned snapshot is unexpectedly missing.
+        const pinnedVersion = ent.surface?.ifaceVersion;
+        const iface = pinnedVersion ? await getInterfaceVersion(storage, ent.providerGhii, filename, toolName, pinnedVersion) : null;
+        const binding = iface?.binding ?? tool.action_id ?? null;
+        if (!binding) {
+          res.status(422).json(error(config.nodeId, 'TOOL_NOT_INVOKABLE', 'This tool has no capability binding to invoke'));
+          return;
+        }
+        const cap = await storage.getCapability(binding);
+        if (!cap) {
+          res.status(404).json(error(config.nodeId, 'CAPABILITY_NOT_FOUND', `Backing capability not found: ${binding}`));
+          return;
+        }
+        // Authorize + settle + rake (validated target above, so a failure here never leaves a phantom charge).
+        const outcome = await settleMeteredCoordinate({
+          config, storage, coordExt, coordAction: toolName,
+          label: `${filename}/${toolName}${pinnedVersion ? ` v${pinnedVersion}` : ''}`, callerGaii, res,
+        });
+        if (outcome && !outcome.ok) return;                 // 402/429 already sent
+        if (outcome) {                                       // settled → invoke, refund on throw
+          const jwt = (req.headers.authorization || '').replace('Bearer ', '');
+          try {
+            const { invokeCapability } = await import('../services/capability-invoke.js');
+            const invoked = await invokeCapability(config, storage, cap, req.body?.input ?? req.body ?? {}, callerGaii, jwt, 'normal');
+            res.json(success(config.nodeId, { app: appRef, tool: toolName, iface_version: pinnedVersion ?? null, metered: true, result: invoked.result }));
+          } catch (err) {
+            if (outcome.refund) await outcome.refund();
+            const e = err as { statusCode?: number; code?: string; message?: string };
+            res.status(e.statusCode || 502).json(error(config.nodeId, e.code || 'TOOL_INVOKE_FAILED', e.message || 'Tool invocation failed'));
+          }
+          return;
+        }
+        // outcome === null: entitlement vanished between read and settle (race) → fall through.
+      }
+    }
 
     if (isPriced(tool)) {
       if (!config.commerceEnabled) {
