@@ -4,6 +4,9 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.16.2 — 2026-07-21 — App-shell scroll model (theme.css v1.24.0): .pf-sidebar sticks to top:0 of
+ *     the new .page-content scroll region (was top:var(--nav-height) against the window) and caps at
+ *     calc(100dvh − nav-height) so its nav list scrolls without a header-height gap.
  *   v2.16.1 — 2026-07-20 — Mobile home-dashboard overflow fix: .pf-home-card (and the spend/quota
  *     tiles, chips, and long app-name row) get min-width:0 so unbreakable inner content no longer
  *     forces a card — and the whole home grid — wider than a narrow phone (content ran off the right
@@ -2243,8 +2246,11 @@
 
 .pf-sidebar {
   width: 240px; flex: 0 0 240px;
-  position: sticky; top: var(--nav-height, 56px);
-  max-height: calc(100vh - var(--nav-height, 56px));
+  /* App-shell: the scroll region is now .page-content (the header lives OUTSIDE
+     it), so the sidebar sticks to the top of that region (top:0), not below the
+     header. Height caps at the region's height so its own nav list scrolls. */
+  position: sticky; top: 0;
+  max-height: calc(100dvh - var(--nav-height, 56px));
   overflow-y: auto;
   padding: 0.75rem 0.5rem 2rem;
   border-right: 1px solid var(--border);

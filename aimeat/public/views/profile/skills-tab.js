@@ -91,7 +91,7 @@ export default function SkillsTab({ showToast }) {
       setEditorMd(full?.fileContents?.['SKILL.md'] ?? SKILL_TEMPLATE);
       setEditorVisibility(skill.visibility === 'public' ? 'public' : skill.visibility === 'members' ? 'members' : 'owner');
       setEditorOpen(true);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      (document.querySelector('.page-content') || window).scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err) {
       showToast(t('skills.loadFailed') + ': ' + err.message, true);
     }

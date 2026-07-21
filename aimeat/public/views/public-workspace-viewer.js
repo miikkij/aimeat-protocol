@@ -146,7 +146,7 @@ export default function PublicWorkspaceViewer() {
     const el = document.getElementById(anchorId(d));
     if (el) { el.scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
     // Isolated single-page view: the picked page renders on the next tick; jump back to the top.
-    setTimeout(() => window.scrollTo({ top: 0, behavior: 'smooth' }), 0);
+    setTimeout(() => (document.querySelector('.page-content') || window).scrollTo({ top: 0, behavior: 'smooth' }), 0);
   }, []);
 
   // On first load of the whole-space view, if a page was deep-linked, scroll to it.
