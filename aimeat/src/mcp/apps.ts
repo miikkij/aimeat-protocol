@@ -38,6 +38,7 @@ import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { agentFaceKey } from '../services/agent-face.js';
+import { getOwnerScopePublicMemory } from '../services/owner-memory.js';
 import { listSkillsByBinding } from '../services/skills.js';
 
 export function registerAppsTools(
@@ -52,10 +53,13 @@ export function registerAppsTools(
     // Post-publish reflection nudge (AppDev KB Phase 6): report whether the app already has an
     // agent face + bound skills, and hint at proposing a template. Best-effort — a publish must
     // NEVER fail because this enrichment does.
-    async function buildNextSteps(ownerGaii: string, ownerName: string, filename: string): Promise<Record<string, unknown> | undefined> {
+    async function buildNextSteps(ownerName: string, filename: string): Promise<Record<string, unknown> | undefined> {
         try {
+            // Resolve the face across the owner's whole keyspace (GHII + the owner's agents), matching what
+            // the anonymous serve path serves — so an agent that published the face under its own GAII still
+            // reports agent_face_present:true here.
             const [faceRec, boundSkills] = await Promise.all([
-                storage.getMemory(ownerGaii, agentFaceKey(filename)).catch(() => null),
+                getOwnerScopePublicMemory(storage, config.nodeId, ownerName, agentFaceKey(filename)).catch(() => null),
                 listSkillsByBinding(storage, config, `app:${ownerName}/${filename}`, { ownerName }).catch(() => []),
             ]);
             return {
@@ -228,7 +232,7 @@ export function registerAppsTools(
                             is_update: isUpdate,
                             download_url: downloadUrl,
                             inline_url: `${downloadUrl}?mode=inline`,
-                            next_steps: await buildNextSteps(ownerGaii, parsed.owner, filename),
+                            next_steps: await buildNextSteps(parsed.owner, filename),
                         }, null, 2),
                     }],
                 };
@@ -358,7 +362,7 @@ export function registerAppsTools(
                             filename, version_number: newVersion, is_update: isUpdate,
                             parked: parkedState, download_url: downloadUrl, inline_url: `${downloadUrl}?mode=inline`,
                             note: 'Draft published as the new live version; the draft slot is cleared.',
-                            next_steps: await buildNextSteps(ownerGaii, parsed.owner, filename),
+                            next_steps: await buildNextSteps(parsed.owner, filename),
                         }, null, 2),
                     }],
                 };

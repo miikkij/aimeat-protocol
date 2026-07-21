@@ -9,6 +9,8 @@
  * @structure
  *   - listOwnerScopeMemory(storage, nodeId, ownerName, opts) — aggregated list (deduped, GHII-first)
  *   - getOwnerScopeMemory(storage, nodeId, ownerName, key) — one key across owner+agents (GHII-first)
+ *   - getOwnerScopePublicMemory(storage, nodeId, ownerName, key) — first PUBLIC record for a key across
+ *       owner+agents (GHII-first); a non-public record never shadows a public one (anonymous serve paths)
  * @usage import { listOwnerScopeMemory, getOwnerScopeMemory } from '../services/owner-memory.js';
  * @version-history
  *   v1.0.0 — 2026-06-13 — Extracted from routes/memory.ts owner-scope branch; reused by the workflow
@@ -16,6 +18,9 @@
  *   v1.1.0 — 2026-06-14 — Fold the owner's ecosystem apps (GEAIs) into the owner-scope union
  *     (ecosystem-apps foundation, chunk 1).
  *   v1.2.0 — 2026-07-14 — Add listOwnerScopeMemoryMeta (value-free owner-scope listing) for ?include=meta.
+ *   v1.3.0 — 2026-07-21 — Add getOwnerScopePublicMemory so anonymous public-serve paths (agent face) can
+ *     resolve a record an owner's AGENT published under its own GAII — a non-public record never shadows
+ *     a public one on the same key.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { MemoryMetaRow } from '../storage/repositories/memory.repository.js';
@@ -97,5 +102,30 @@ export async function getOwnerScopeMemory(
   if (!rows.length) return null;
   const priority = new Map(others.map((id, i) => [id, i]));
   rows.sort((a, b) => (priority.get(a.ownerGaii) ?? others.length) - (priority.get(b.ownerGaii) ?? others.length));
+  return rows[0];
+}
+
+/**
+ * Read the first PUBLIC record for an exact key across the owner's GHII + all the owner's agents + eco
+ * apps, GHII-first. Unlike {@link getOwnerScopeMemory}, a NON-public record on the same key never
+ * shadows a public one — so this must NOT short-circuit on the GHII copy (a private GHII record must not
+ * hide a public agent record). One query across the whole union, then filter to `visibility === 'public'`
+ * and pick the highest-priority (GHII-first) survivor. null if no public copy exists anywhere.
+ *
+ * Used by anonymous public-serve paths (the Agent Face) where only `visibility:'public'` is servable and
+ * an owner's agent may have written the record under its own GAII (memory is keyed by the writer).
+ */
+export async function getOwnerScopePublicMemory(
+  storage: Storage, nodeId: string, ownerName: string, key: string,
+): Promise<MemoryRecord | null> {
+  const ownerGhii = `${ownerName}@${nodeId}`;
+  const agents = await storage.getAgentsByOwner(ownerName);
+  const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
+  const identities = [ownerGhii, ...agents.map(a => a.gaii), ...ecoApps.map(e => e.geai)];
+  const rows = (await storage.listMemoryForOwners(identities, { prefix: key, visibility: 'public' }))
+    .filter(r => r.key === key);
+  if (!rows.length) return null;
+  const priority = new Map(identities.map((id, i) => [id, i]));
+  rows.sort((a, b) => (priority.get(a.ownerGaii) ?? identities.length) - (priority.get(b.ownerGaii) ?? identities.length));
   return rows[0];
 }

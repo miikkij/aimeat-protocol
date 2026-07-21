@@ -40,6 +40,9 @@
  *     listed in the /v1/libs catalogue.
  *   v1.10.0 — 2026-07-16 — Phase 10 regression: badge injection must survive '</body>' inside app
  *     JavaScript (last-match injection; first-match silently broke such apps).
+ *   v1.11.0 — 2026-07-21 — Phase 11 owner-scope face: an owner's AGENT can publish the face under its
+ *     own GAII and it resolves for the owner's app (a private owner-GHII copy doesn't shadow the public
+ *     agent copy); a non-public agent face still falls back like no face.
  */
 
 import * as ed from '@noble/ed25519';
@@ -689,6 +692,42 @@ await test("A non-public face ('owner' visibility) behaves exactly like no face"
     assert(res.status === 200, `status ${res.status}`);
     const text = await res.text();
     assert(!text.includes('# Versions Demo — agent view'), 'non-public face content is NOT served');
+    assert(text.includes('# version one'), 'falls back to converted HTML (indistinguishable from no face)');
+    assert(text.includes('## Agent affordances'), 'affordances footer present on the fallback');
+});
+
+await test("An owner's AGENT can publish the face under its OWN GAII — resolves for the owner's app (private owner copy doesn't shadow the public agent copy)", async () => {
+    // At this point the owner-GHII copy of FACE_KEY is a NON-public ('owner') record (previous test).
+    // The agent writes a PUBLIC face under its own GAII (memory is keyed by the writer). The serve path
+    // resolves across owner-scope and must serve the agent's PUBLIC copy, not be shadowed by the private
+    // owner-GHII copy on the same key.
+    const AGENT_FACE_MD = '# Versions Demo — agent-published view\n\nWritten by the owner\'s agent under its GAII.\n';
+    const write = await json('/v1/memory', agentAuthed({
+        method: 'POST',
+        body: JSON.stringify({ key: FACE_KEY, value: AGENT_FACE_MD, visibility: 'public' }),
+    }));
+    assert(write.status === 200 || write.status === 201, `agent face write status ${write.status}: ${JSON.stringify(write.body)}`);
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}`, { headers: mdHeaders });
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    assert(text.includes('# Versions Demo — agent-published view'), 'serves the agent-published face across owner-scope');
+    assert(!text.includes('# version one'), 'converted HTML body no longer served');
+    assert(text.includes('## Agent affordances'), 'affordances footer still appended to the agent face');
+});
+
+await test("A NON-public agent face behaves like no face (owner + agent copies both non-public → fallback)", async () => {
+    // Downgrade the agent's copy to 'owner'; the owner-GHII copy is already non-public. No PUBLIC copy
+    // exists anywhere in the owner-scope union, so the anonymous serve must fall back (no existence
+    // disclosure) exactly as if no face were declared.
+    const write = await json('/v1/memory', agentAuthed({
+        method: 'POST',
+        body: JSON.stringify({ key: FACE_KEY, value: FACE_MD, visibility: 'owner' }),
+    }));
+    assert(write.status === 200 || write.status === 201, `agent face downgrade status ${write.status}: ${JSON.stringify(write.body)}`);
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}`, { headers: mdHeaders });
+    assert(res.status === 200, `status ${res.status}`);
+    const text = await res.text();
+    assert(!text.includes('agent-published view'), 'non-public agent face content is NOT served');
     assert(text.includes('# version one'), 'falls back to converted HTML (indistinguishable from no face)');
     assert(text.includes('## Agent affordances'), 'affordances footer present on the fallback');
 });
