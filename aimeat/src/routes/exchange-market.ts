@@ -33,7 +33,7 @@ import {
   resolveActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate,
   putOffering, getOffering, listOfferings, deleteOffering, matchOfferings,
   putNeed, getNeed, listNeeds, putBid, listBids, getBid,
-  offeringStats, offeringConsumers,
+  offeringStats, offeringConsumers, enrichNeeds,
 } from '../services/exchange-market.js';
 import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
 import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app-tool-interfaces.js';
@@ -285,6 +285,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       ext: str(b.ext) || null, action: str(b.action) || null,
       description,
       spec: parseNeedSpec(b.spec),
+      usageIntent: str(b.usage_intent) || null,
       budgetUnit, budgetCap: posOrNull(b.budget_cap),
       autonomy: b.autonomy === 'auto' ? 'auto' : 'supervised',
       state: 'open', createdAt: now, updatedAt: now,
@@ -300,7 +301,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     const openOnly = str(req.query.open) === '1';
     const mine = str(req.query.mine) === '1';
     const owner = mine ? (req.auth?.owner ?? undefined) : undefined;
-    const needs = await listNeeds(storage, { openOnly, owner });
+    const needs = await enrichNeeds(storage, await listNeeds(storage, { openOnly, owner }));
     return res.json(success(config.nodeId, { needs, count: needs.length }));
   });
 
