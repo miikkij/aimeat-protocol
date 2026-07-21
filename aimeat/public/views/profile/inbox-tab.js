@@ -14,9 +14,10 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
- *   v1.25.0 -- 2026-07-21 -- Thread history is no longer capped at the newest 50: a header "Show all
- *     messages / Last 50" toggle (threadAll) loads the FULL conversation via getConversation(all).
- *     loadThread's attachment-URL resolution extracted to helpers.resolveThreadAttachmentUrls.
+ *   v1.25.0 -- 2026-07-21 -- Thread history is no longer capped at the newest 50: threads open showing
+ *     their FULL history by default (getConversation(all)); a header "Show last 50 / all" toggle
+ *     (threadAll) collapses/expands. loadThread's attachment-URL resolution extracted to
+ *     helpers.resolveThreadAttachmentUrls.
  *   v1.24.0 -- 2026-07-19 -- Conversation → Notebook (📓 on the thread head next to ✨): summarize the
  *     whole thread — with its images — and park it into the Notebook for filing/enrichment. Three modes:
  *     server-side AI summary (owner's OpenRouter key, vision-aware), copy-prompt (own chat), or raw.
@@ -332,10 +333,11 @@ export default function InboxTab({ showToast }) {
   // markRead=true ONLY when the user opens the conversation. Marking read POSTs a receipt which itself
   // emits a 'messages' change → SSE → live refresh; doing it on every live refresh creates a
   // self-sustaining request loop. So live refreshes reload the thread WITHOUT marking read.
-  // Per-conversation "show all vs newest 50" mode. A ref (read at call time) keeps loadThread []-memoized;
-  // the state drives the header toggle button. Resets to 50 whenever a different thread opens.
-  const [threadAll, setThreadAll] = useState(false);
-  const threadAllRef = useRef(false); threadAllRef.current = threadAll;
+  // Per-conversation "show all vs newest 50" mode. Defaults to ALL (show the full history on open so
+  // nothing looks lost); the header toggle collapses to the newest 50. A ref (read at call time) keeps
+  // loadThread []-memoized; the state drives the button. Re-defaults to ALL whenever a thread opens.
+  const [threadAll, setThreadAll] = useState(true);
+  const threadAllRef = useRef(true); threadAllRef.current = threadAll;
   const loadThread = useCallback(async (conv, markRead = false) => {
     if (!conv) return;
     // threadAllRef: false = newest 50 (fast default); true = the FULL history (header "All messages" toggle).
@@ -456,7 +458,7 @@ export default function InboxTab({ showToast }) {
 
   const openConversation = async (conv) => {
     setActiveConv(conv); setMode('thread');
-    setThreadAll(false); threadAllRef.current = false;   // each thread opens at the fast newest-50 view
+    setThreadAll(true); threadAllRef.current = true;   // each thread opens showing its FULL history
     setDraftPrefill(''); setReplyingTrId(null); setReplyQuote(null);   // don't leak a suggested reply / quote across threads
     await loadThread(conv, true);                 // mark read only on explicit open (avoids a refresh loop)
     loadLists();
