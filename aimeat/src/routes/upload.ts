@@ -28,6 +28,12 @@
  *     (mirrors POST /v1/apps; pitfall publish/new-app-subdomain-provisioning-lag).
  *   v1.6.0 — 2026-07-19 — handleAppUpload adds non-blocking `mobile_hints` (lintAppHtmlForMobile),
  *     mirroring the inline publish path, so presigned publishes get the same phone-overflow hints.
+ *   v1.7.0 — 2026-07-22 — handleAppUpload full metadata carry-forward on update: description,
+ *     per-locale descriptions, category, tags, icon, priceMorsels/licenseType, copy-protection,
+ *     forkable and the operator-hidden state survive a presigned re-publish that omits them
+ *     (previously an MCP update without a description BLANKED the catalog description, reset the
+ *     category to 'tool', dropped the icon/tags and cleared forkable+protection). Also invalidates
+ *     the protection cache on re-publish, mirroring POST /v1/apps.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -40,6 +46,7 @@ import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.j
 import { publishSkill, type SkillScope } from '../services/skills.js';
 import { parseGAII } from '../utils/gaii.js';
 import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
+import { invalidateProtectionCache } from '../utils/app-protect.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
@@ -145,28 +152,42 @@ async function handleAppUpload(
     const newVersion = existingVersion + 1;
     const isUpdate = existingVersion > 0;
 
+    // On an UPDATE, a presigned publish that omits metadata must NEVER blank what the live
+    // app already declares — MCP callers rarely resend every field, and the presigned meta
+    // cannot express some of them at all. Mirrors POST /v1/apps: description, per-locale
+    // descriptions, category, tags, icon, pricing, copy-protection, forkable and the
+    // operator-hidden state all carry forward when the meta leaves them out.
+    const existingApp = isUpdate ? await storage.getApp(ownerGaii, filename) : null;
+    const prev = existingApp?.manifest;
+
+    const metaDescription = typeof meta.description === 'string' ? meta.description.trim() : '';
+    const metaTags = Array.isArray(meta.tags)
+        ? (meta.tags as unknown[]).filter((t): t is string => typeof t === 'string')
+        : undefined;
+
     const manifest: AppManifest = {
-        name: meta.name as string,
-        description: (meta.description as string) ?? '',
+        name: (meta.name as string) ?? filename.replace(/\.html?$/i, ''),
+        description: metaDescription || (prev?.description ?? ''),
         version: (meta.version as string) ?? `1.0.${newVersion - 1}`,
-        category: (meta.category as string) ?? 'tool',
-        tags: (meta.tags as string[]) ?? [],
+        category: (meta.category as string) ?? prev?.category ?? 'tool',
+        tags: metaTags ?? prev?.tags ?? [],
         authorDisplay: ownerName,
         usesCortex: [],
     };
     if (meta.icon) manifest.icon = meta.icon as string;
+    else if (prev?.icon) manifest.icon = prev.icon;
+    if (prev?.descriptions) manifest.descriptions = prev.descriptions;
+    if (typeof prev?.priceMorsels === 'number' && prev.priceMorsels > 0) manifest.priceMorsels = prev.priceMorsels;
+    if (prev?.licenseType) manifest.licenseType = prev.licenseType;
+    if (prev?.protection && Object.values(prev.protection).some(Boolean)) manifest.protection = prev.protection;
 
-    // Carry the parked state forward across re-publishes (a parked app stays hidden
-    // when updated). Mirrors POST /v1/apps. The presigned meta cannot carry cortex refs
-    // or crew-defs, so usesCortex + cortex.agents are ALWAYS carried from the live app —
-    // a presigned re-upload never silently strips the app's cortex deps or bundled agents.
-    let parkedState = false;
-    if (isUpdate) {
-        const existingApp = await storage.getApp(ownerGaii, filename);
-        parkedState = !!existingApp?.parked;
-        if (existingApp?.manifest?.usesCortex?.length) manifest.usesCortex = existingApp.manifest.usesCortex;
-        if (existingApp?.manifest?.cortex?.agents?.length) manifest.cortex = existingApp.manifest.cortex;
-    }
+    // The presigned meta cannot carry cortex refs or crew-defs, so usesCortex + cortex.agents
+    // are ALWAYS carried from the live app — a re-upload never silently strips them.
+    if (prev?.usesCortex?.length) manifest.usesCortex = prev.usesCortex;
+    if (prev?.cortex?.agents?.length) manifest.cortex = prev.cortex;
+
+    // A re-publish changes the bytes → drop any cached obfuscated/locked base.
+    invalidateProtectionCache(ownerName, filename);
 
     await storage.createApp({
         ownerGaii,
@@ -177,7 +198,12 @@ async function handleAppUpload(
         mimeType: 'text/html',
         size: data.length,
         data,
-        parked: parkedState,
+        parked: !!existingApp?.parked,
+        forkable: !!existingApp?.forkable,
+        operatorHidden: !!existingApp?.operatorHidden,
+        operatorHiddenBy: existingApp?.operatorHiddenBy,
+        operatorHiddenAt: existingApp?.operatorHiddenAt,
+        operatorHideReason: existingApp?.operatorHideReason,
         createdAt: new Date().toISOString(),
     });
 
