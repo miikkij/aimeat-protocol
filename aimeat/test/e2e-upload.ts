@@ -199,6 +199,50 @@ await test('Upload second version via presigned URL', async () => {
     assert(result.is_update === true, 'is_update should be true');
 });
 
+// A presigned UPDATE that omits metadata must never blank what the live app declares:
+// the v2 publish above sent only filename+name, so v1's description must survive.
+await test('Presigned update without description keeps the existing one', async () => {
+    const { status, body } = await json('/v1/apps?limit=200', authed());
+    assert(status === 200, `list status ${status}`);
+    const app = (body.data?.apps ?? []).find((a: any) => a.filename === 'upload-test.html');
+    assert(!!app, 'upload-test.html should be listed');
+    assert(app.manifest?.description === 'Testing presigned upload',
+        `description should carry forward, got "${app.manifest?.description}"`);
+});
+
+await test('Presigned update carries category, tags and icon forward', async () => {
+    // v1 with full metadata
+    const p1 = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({
+            filename: 'carry-test.html', name: 'Carry Test', description: 'Carry me',
+            category: 'game', tags: ['alpha', 'beta'], icon: '🧪', mode: 'presigned',
+        }),
+    }));
+    const put1 = await fetch(p1.body.data.upload_url, {
+        method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: '<html><body>v1</body></html>',
+    });
+    assert(put1.status === 200, `v1 PUT status ${put1.status}`);
+    // v2 with NO metadata beyond filename+name
+    const p2 = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: 'carry-test.html', name: 'Carry Test', mode: 'presigned' }),
+    }));
+    const put2 = await fetch(p2.body.data.upload_url, {
+        method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: '<html><body>v2</body></html>',
+    });
+    assert(put2.status === 200, `v2 PUT status ${put2.status}`);
+    const { body } = await json('/v1/apps?limit=200', authed());
+    const app = (body.data?.apps ?? []).find((a: any) => a.filename === 'carry-test.html');
+    assert(!!app, 'carry-test.html should be listed');
+    const m = app.manifest ?? {};
+    assert(app.version_number === 2, `should be v2, got ${app.version_number}`);
+    assert(m.description === 'Carry me', `description lost: "${m.description}"`);
+    assert(m.category === 'game', `category lost: "${m.category}"`);
+    assert(Array.isArray(m.tags) && m.tags.join(',') === 'alpha,beta', `tags lost: ${JSON.stringify(m.tags)}`);
+    assert(m.icon === '🧪', `icon lost: "${m.icon}"`);
+});
+
 // ── Phase 2: Storage Upload ──
 console.log('\nPhase 2: Storage presigned upload');
 

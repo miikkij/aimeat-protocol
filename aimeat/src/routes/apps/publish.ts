@@ -12,6 +12,8 @@
  *     so a new app's vanity URL works immediately (pitfall publish/new-app-subdomain-provisioning-lag).
  *   v1.3.0 — 2026-07-19 — non-blocking `mobile_hints` in the publish response (lintAppHtmlForMobile):
  *     catches the recurring phone-overflow bugs (missing viewport meta, grid 1fr blowout) at publish.
+ *   v1.4.0 — 2026-07-22 — priceMorsels + licenseType carry forward on an update that omits them
+ *     (an update must never silently turn a paid app free; price_morsels: 0 unprices explicitly).
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -187,6 +189,10 @@ export function registerPublishRoutes(
         // Per-locale descriptions survive a re-publish too (an update never silently drops them)
         // unless the caller sends a new `descriptions` map.
         let carriedDescriptions: Record<string, string> | undefined;
+        // Pricing survives a re-publish too: an update that omits price_morsels must never
+        // silently turn a paid app free.
+        let carriedPriceMorsels: number | undefined;
+        let carriedLicenseType: AppManifest['licenseType'] | undefined;
         if (isUpdate) {
             const existingApp = await storage.getApp(ownerGhii, filename);
             parkedState = !!existingApp?.parked;
@@ -201,6 +207,8 @@ export function registerPublishRoutes(
             carriedIcon = existingApp?.manifest?.icon;
             carriedCortex = existingApp?.manifest?.cortex;
             carriedDescriptions = existingApp?.manifest?.descriptions;
+            carriedPriceMorsels = existingApp?.manifest?.priceMorsels;
+            carriedLicenseType = existingApp?.manifest?.licenseType;
         }
 
         // Sanitize an optional per-locale descriptions map ({ locale: text }); drop blanks, cap 2000
@@ -236,8 +244,15 @@ export function registerPublishRoutes(
         } else if (cortex === undefined && carriedCortex?.agents?.length) {
             manifest.cortex = carriedCortex;
         }
-        if (typeof price_morsels === 'number' && price_morsels > 0) manifest.priceMorsels = price_morsels;
+        // Pricing carries forward on an update like description/icon: an update that omits
+        // price_morsels must never silently turn a paid app free. Send price_morsels: 0 to unprice.
+        if (typeof price_morsels === 'number') {
+            if (price_morsels > 0) manifest.priceMorsels = price_morsels;
+        } else if (typeof carriedPriceMorsels === 'number' && carriedPriceMorsels > 0) {
+            manifest.priceMorsels = carriedPriceMorsels;
+        }
         if (license_type === 'single' || license_type === 'lifetime') manifest.licenseType = license_type;
+        else if (license_type === undefined && carriedLicenseType) manifest.licenseType = carriedLicenseType;
         // Opt-in copy-protection: use the body's `protection` when provided, else carry
         // the existing flags forward on an update. Only stored when at least one is on.
         const effectiveProtection = sanitizeProtection(protection) ?? protectionState;
