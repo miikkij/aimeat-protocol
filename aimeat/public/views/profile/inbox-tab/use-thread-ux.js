@@ -7,6 +7,10 @@
  *   Extracted from inbox-tab.js to satisfy max-file-lines.
  * @usage import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
  * @version-history
+ *   v1.4.0 — 2026-07-21 — useThreadAutoScroll: on OPEN, keep re-pinning to the bottom for ~2.5s while late
+ *     content (images, link previews, long histories) grows the thread, instead of a single jump that left
+ *     a big thread stuck partway up. Re-pins only on real height growth; aborts the moment the reader
+ *     scrolls up.
  *   v1.3.0 — 2026-07-21 — Add useLinkPreviewToggle: persisted global on/off for the message link-preview
  *     cards (default ON); the ThreadPanel head button flips it.
  *   v1.2.0 — 2026-07-19 — useThreadAutoScroll now suppresses the one-time new-message jump while the
@@ -47,7 +51,7 @@ export function useThreadAutoScroll(msgsRef, mode, thread, activeConv) {
   const lastMsgIdRef = useRef(null);
   useEffect(() => {
     const el = msgsRef.current;
-    if (mode !== 'thread' || !el || thread.length === 0) return;
+    if (mode !== 'thread' || !el || thread.length === 0) return undefined;
     const convKey = activeConv?.peerGhii ?? activeConv?.id ?? null;
     const lastId = thread[thread.length - 1]?.id ?? null;
     const isNewOpen = lastScrolledConvRef.current !== convKey;
@@ -58,9 +62,32 @@ export function useThreadAutoScroll(msgsRef, mode, thread, activeConv) {
     // focused (near-bottom follow still applies: if you were already at the bottom you keep following).
     const ae = typeof document !== 'undefined' ? document.activeElement : null;
     const composing = ae instanceof HTMLElement && !!ae.closest('.inbox-composer');
-    if (isNewOpen || nearBottom || (hasNewMsg && !composing)) el.scrollTop = el.scrollHeight;
     lastScrolledConvRef.current = convKey;
     lastMsgIdRef.current = lastId;
+
+    if (isNewOpen) {
+      // Opening a thread: jump to the newest message, then KEEP re-pinning to the bottom for a short
+      // window. The final bottom isn't known yet at this point — late content grows the thread (images,
+      // link-preview cards, markdown) AND the pane's own height changes as the composer/keyboard settle,
+      // either of which opens a gap the single jump can't catch (and the effect won't re-fire — urlMap
+      // isn't a dep). So each frame: if a gap has opened, re-pin. `expected` tracks our own set so a real
+      // user scroll (which moves away from it) aborts the loop instead of being fought.
+      el.scrollTop = el.scrollHeight;
+      let raf = 0, expected = el.scrollTop, aborted = false;
+      const deadline = performance.now() + 2500;
+      const onScroll = () => { if (Math.abs(el.scrollTop - expected) > 40) aborted = true; };
+      el.addEventListener('scroll', onScroll, { passive: true });
+      const stop = () => { cancelAnimationFrame(raf); el.removeEventListener('scroll', onScroll); };
+      const step = (now) => {
+        if (aborted) { stop(); return; }
+        if (el.scrollHeight - el.scrollTop - el.clientHeight > 4) { el.scrollTop = el.scrollHeight; expected = el.scrollTop; }
+        if (now < deadline) raf = requestAnimationFrame(step); else stop();
+      };
+      raf = requestAnimationFrame(step);
+      return stop;   // cancel the pin loop if the thread changes / unmounts
+    }
+    if (nearBottom || (hasNewMsg && !composing)) el.scrollTop = el.scrollHeight;
+    return undefined;
     // msgsRef is a stable ref object — the content deps below are the real triggers.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [thread, mode, activeConv]);
