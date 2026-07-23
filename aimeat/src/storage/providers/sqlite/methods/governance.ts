@@ -4,6 +4,7 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — listConsentsForAgents batch primitive.
+ *   v1.2.0 — 2026-07-23 — listOrganisms member-scoped queries return ALL matches (no default 20-item page cap).
  */
 import type {
   ArchiveFilter, SchemaRecord, ConsentRecord, ConsentAuditEntry, CsmRecord, MsmRecord,
@@ -654,7 +655,10 @@ export const governanceMethods = {
 
   async listOrganisms(this: SqliteStorage, opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number; archived?: ArchiveFilter }): Promise<OrganismRecord[]> {
     const page = opts?.page ?? 1;
-    const perPage = opts?.perPage ?? 20;
+    // Member-scoped queries return ALL matches by default (an owner's membership set is naturally bounded);
+    // never silently truncate to a page, which drops the owner's oldest organisms from "My Organisms" once
+    // they belong to more than one page. Only browse/discovery (no member filter) page-caps by default.
+    const perPage = opts?.perPage ?? (opts?.member ? Number.MAX_SAFE_INTEGER : 20);
 
     const rows = this.db.prepare('SELECT * FROM organisms ORDER BY createdAt DESC').all() as Record<string, unknown>[];
     let results = rows.map(r => this.deserializeOrganism(r));

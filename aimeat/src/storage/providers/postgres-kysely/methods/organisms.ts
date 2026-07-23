@@ -5,6 +5,8 @@
  *   from the Prisma implementation against the same tables. deleteOrganism cascades to memberships /
  *   join-requests / reputation / board rows / all `organism.{id}.*` memory + versions + schema locks.
  * @version-history
+ *   v1.3.0 — 2026-07-23 — listOrganisms member-scoped queries return ALL matches (no default 20-item page cap);
+ *     fixes an owner's oldest organisms silently dropping out of "My Organisms" past 20 memberships.
  *   v1.2.0 — 2026-07-16 — Memberships carry invitedWorkspaces (jsonb, migration 0006): ws grants chosen at invite time.
  *   v1.1.0 — 2026-07-16 — Add listPendingApprovalsForOrgs batch (Phase 3): pending approvals for many orgs
  *     in one organismId-IN query.
@@ -70,7 +72,11 @@ export const organismMethods = {
     return r ? toOrg(r) : null;
   },
   async listOrganisms(this: PostgresKyselyStorage, opts?: { type?: string; city?: string; interest?: string; visibility?: string; member?: string; page?: number; perPage?: number; archived?: ArchiveFilter }): Promise<OrganismRecord[]> {
-    const page = opts?.page ?? 1, perPage = opts?.perPage ?? 20;
+    // A member-scoped query is naturally bounded (an owner belongs to a finite set of organisms), so it
+    // must return ALL matches by default — never silently truncate to a page, which would drop the owner's
+    // oldest organisms out of their "My Organisms" list once they belong to more than a page. Only
+    // browse/discovery queries (no member filter) page-cap by default.
+    const page = opts?.page ?? 1, perPage = opts?.perPage ?? (opts?.member ? Number.MAX_SAFE_INTEGER : 20);
     let q = this.db.selectFrom('Organism').selectAll();
     if (opts?.type) q = q.where('type', '=', opts.type);
     if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
