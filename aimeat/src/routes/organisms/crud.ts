@@ -4,6 +4,9 @@
  *   detail, update, delete, join and leave. Extracted from src/routes/organisms.ts to satisfy
  *   max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-07-23 — buildOrganismList no longer forces perPage=20: a member-scoped list (the owner's own
+ *     organisms, e.g. the /tab "mine" list and /waiting) returns ALL matches so old organisms stop dropping into
+ *     Discover once the owner belongs to 20+. Discovery (no member filter) still page-caps at the storage default.
  *   v1.3.0 — 2026-07-16 — Add GET /v1/organisms/tab composite (my orgs + counts + public + list-order prefs);
  *     extracted buildOrganismList shared with GET /v1/organisms (redaction chain unchanged, Rule 10 preserved).
  *   v1.2.0 — 2026-07-16 — /waiting batches pending approvals (listPendingApprovalsForOrgs) + ws-name lookups
@@ -136,8 +139,11 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       interest: params.interest,
       member: memberBare,
       visibility: params.member ? (selfOrOperator ? params.visibility : 'public') : (params.visibility || 'public'),
-      page: params.page ?? 1,
-      perPage: params.perPage ?? 20,
+      // Pass pagination through untouched: a member-scoped list (the owner's own organisms) must return ALL
+      // of them — the storage layer only page-caps browse/discovery (no member filter). Forcing perPage here
+      // silently dropped the owner's oldest organisms out of "My Organisms" once they belonged to 20+.
+      page: params.page,
+      perPage: params.perPage,
       // The owner's OWN list includes archived (the client splits them into an "Archived" section);
       // browsing/discovery excludes archived — retired organisms are read-only and not discoverable.
       archived: (params.member && selfOrOperator) ? 'include' : 'exclude',

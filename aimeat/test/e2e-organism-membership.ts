@@ -8,6 +8,8 @@
  *   v1.0.0 — 2026-06-09 — Initial: join-request notify + review + remove-member (revoke) flow.
  *   v1.1.0 — 2026-07-10 — Tests 25-27: invitee normalization/validation (nonexistent → 404, remote
  *     identity → 400, UPPERCASE/@node/whitespace forms land on the real lowercase owner).
+ *   v1.2.0 — 2026-07-23 — Test 28: an owner in 20+ organisms gets ALL of them in /tab mine (regression for
+ *     the member-scoped page cap that dropped the owner's oldest organisms into Discover).
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=organism-membership
 
@@ -311,6 +313,30 @@ await test('26. agent rosters are NOT exposed to non-members', async () => {
     const r = await json(`/v1/organisms/${org2}/members`, { headers: auth(C.token) });   // C is not a member of org2
     assert(r.status === 200, `members ${r.status}`);
     assert(r.body.data.agents_included !== true && (r.body.data.members || []).every((m: any) => m.agents === undefined), 'non-member sees the legacy shape without agents');
+});
+
+// ── Regression: the owner's OWN organism list must not be page-capped. Ordered createdAt DESC and
+// sliced to a 20-item page, the owner's OLDEST organisms silently dropped out of "My Organisms" (and,
+// being public, resurfaced under Discover) once the owner belonged to more than one page. ──
+await test('28. Owner in 20+ organisms: /tab mine returns ALL of them (no 20-item page cap)', async () => {
+    const D = await setupOwner('d');
+    const N = 22;   // > one 20-item page
+    const ids: string[] = [];
+    for (let i = 0; i < N; i++) {
+        const o = await json('/v1/organisms', { method: 'POST', headers: auth(D.token), body: JSON.stringify({ name: `Cap Org ${i}`, type: 'project', join_policy: 'invite_only', visibility: 'private' }) });
+        assert(o.status === 201, `org ${i} ${o.status}: ${JSON.stringify(o.body.error)}`);
+        ids.push(o.body.data.organism.id);
+    }
+    // The first-created org has the oldest createdAt → last in DESC order → the one a 20-cap drops.
+    const oldest = ids[0];
+    const tab = await json('/v1/organisms/tab', { headers: auth(D.token) });
+    assert(tab.status === 200, `tab ${tab.status}: ${JSON.stringify(tab.body)}`);
+    const mineIds = new Set((tab.body.data.mine || []).map((o: any) => o.id));
+    assert(mineIds.size >= N, `mine should hold all ${N} organisms, got ${mineIds.size} (page cap not removed?)`);
+    assert(mineIds.has(oldest), 'the oldest organism must still be in mine (not dropped past the page cap)');
+    // The plain member-filtered list (GET /v1/organisms?member=self) must agree — no cap there either.
+    const list = await json(`/v1/organisms?member=${encodeURIComponent(D.name)}`, { headers: auth(D.token) });
+    assert((list.body.data.organisms || []).some((o: any) => o.id === oldest), 'oldest present in ?member= list too');
 });
 
 console.log(`\n${passed} passed, ${failed} failed, ${passed + failed} total`);
