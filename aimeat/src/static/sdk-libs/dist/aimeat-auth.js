@@ -384,7 +384,14 @@
     render(true);
     loadModalI18n(lang).then(function(fresh) {
       if (!fresh || !Object.keys(fresh).length) return;
-      if (fresh.signInBtn === i.signInBtn && fresh.descNew === i.descNew) return;
+      var differs = false;
+      for (var k in fresh) {
+        if (Object.prototype.hasOwnProperty.call(fresh, k) && fresh[k] !== i[k]) {
+          differs = true;
+          break;
+        }
+      }
+      if (!differs) return;
       var vals = captureInputs();
       i = fresh;
       render(false);
