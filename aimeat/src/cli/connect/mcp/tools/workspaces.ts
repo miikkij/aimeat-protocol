@@ -18,13 +18,16 @@
  *     small instead of dumping every object in one blob.
  *   v1.3.0 -- 2026-07-11 -- TARGET-028: _member_grant / _member_revoke (multi-workspace, REST-wrapped) +
  *     _members; _access decide passes an optional `role`. Parity with the server MCP surface.
+ *   v1.4.0 -- 2026-07-25 -- _create backfills the whole manifest envelope (manifestVersion/id/name/kind/
+ *     status) via backfillManifestEnvelope() instead of only id+status, matching the server MCP fix so a
+ *     create supplying just objectTypes validates first try over the connector too.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
-import { normalizeObjectTypes, isMemoryBackedSpace, WorkspaceMetaError } from '../../../../services/workspace-meta.js';
+import { normalizeObjectTypes, isMemoryBackedSpace, WorkspaceMetaError, backfillManifestEnvelope } from '../../../../services/workspace-meta.js';
 import { entryTitle } from '../../../../services/structure-overview.js';
 
 export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry): void {
@@ -293,7 +296,9 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
         const r = await client.put(`/v1/memory/${encodeURIComponent(`${base}.${namespace}`)}/schema`, { schema, apply_to: 'prefix', schema_mode: 'strict' });
         schemaResults.push({ namespace, locked: r.ok !== false, error: r.ok === false ? r.error?.message : undefined });
       }
-      const manifestValue = { ...man, id: organism_id, status: man.status || 'active' };
+      // Backfill the envelope the model routinely omits (manifestVersion/id/name/kind/status) so a
+      // create with just objectTypes validates on the first call (mirrors the server MCP _create).
+      const manifestValue = backfillManifestEnvelope(man, { orgId: organism_id, fallbackName: name });
       const mr = await client.post('/v1/memory', { key: `${base}.meta.manifest`, value: manifestValue, visibility: 'private' });
       if (mr.ok === false) return text(mr.error ?? mr, true);
       const summary = man.summary;

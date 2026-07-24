@@ -77,6 +77,11 @@
  *     (they were loaded with full values then discarded), _publish computes maxN value-free and
  *     prunes history beyond the retention window (services/workspace-versions; append-only spaces
  *     are never pruned).
+ *   v1.17.0 -- 2026-07-25 -- _create backfills the whole manifest envelope (manifestVersion/id/name/
+ *     kind/status) via the shared backfillManifestEnvelope() instead of only id+status — so a create
+ *     supplying just objectTypes validates on the first call (the missing manifestVersion default was
+ *     the recurring "workspace create stumbles at the start" cause). The top-level `name` param now
+ *     backfills manifest.name too.
  */
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { randomUUID } from 'node:crypto';
@@ -93,7 +98,7 @@ import { exportWorkspace } from '../services/workspace-export.js';
 import { buildOrganismOverview, buildWorkspaceOverview, entryTitle } from '../services/structure-overview.js';
 import { importWorkspace } from '../services/workspace-import.js';
 import { ZipSecurityError } from '../services/safe-zip.js';
-import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemoryBackedSpace, listOrganismWorkspaceEntries } from '../services/workspace-meta.js';
+import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemoryBackedSpace, listOrganismWorkspaceEntries, backfillManifestEnvelope } from '../services/workspace-meta.js';
 import { recordSecurityIncident } from '../services/security-incident.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
@@ -649,8 +654,10 @@ export function registerWorkspaceTools(
                 if (!schema || typeof schema !== 'object') continue;
                 await storage.setSchema({ keyPattern: `${root}.${namespace}`, applyTo: 'prefix', schemaJson: schema, schemaMode: 'strict', lockedBy: ownerGhii, setAt: now, updatedAt: now });
             }
-            // 2. Write the manifest (validated against the manifest meta-schema).
-            const manifestValue = { ...man, id: organism_id, status: man.status || 'active' };
+            // 2. Write the manifest (validated against the manifest meta-schema). Backfill the envelope
+            //    (manifestVersion/id/name/kind/status) the model routinely omits — so a create with just
+            //    objectTypes validates first try instead of bouncing off the required-field check.
+            const manifestValue = backfillManifestEnvelope(man as Record<string, unknown>, { orgId: organism_id, fallbackName: name });
             const mkey = `${root}.meta.manifest`;
             const valid = await validateMemoryWrite(mkey, manifestValue, storage);
             if (!valid.valid) return fail('Manifest rejected by schema: ' + JSON.stringify(valid.errors));

@@ -25,6 +25,11 @@
  *   v1.5.0 — 2026-07-10 — Add listOrganismWorkspaceEntries(): THE shared cross-member aggregation of
  *     the per-creator workspace registry (dedupe by id). Organism export read only the exporter's own
  *     registry record and produced empty bundles for promoted admins / transferred creators.
+ *   v1.6.0 — 2026-07-25 — Add backfillManifestEnvelope(): the shared "fill the envelope the model omits"
+ *     helper (manifestVersion/id/name/kind/status). Every create path (server MCP, connector MCP, REST
+ *     provision) used to backfill only id+status, so a manifest built from the tool's own documented
+ *     example — which never showed manifestVersion — was rejected on the first call and agents had to
+ *     iterate. A create with just objectTypes now validates first try.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -65,6 +70,27 @@ export function normalizeObjectTypes(objectTypes: Array<Record<string, unknown>>
     if (!ot.mode && ot.kind === 'document') return { ...ot, mode: 'document' };
     return ot;
   });
+}
+
+/** Backfill the manifest envelope fields a model routinely omits — manifestVersion, id, name, kind,
+ *  status — so a create/replace that supplies only `objectTypes` validates on the FIRST call instead
+ *  of bouncing off the meta-schema's required-field check (organism.*.meta.manifest requires all five).
+ *  The same defaults-are-filled contract that `addObjectTypes` already offers per space. An
+ *  agent-supplied value ALWAYS wins; `id` is forced to the organism id. `fallbackName` is the create
+ *  tool's separate workspace-name param, used when the manifest itself omits a name. */
+export function backfillManifestEnvelope(
+  man: Record<string, unknown>,
+  opts: { orgId: string; fallbackName?: string },
+): Record<string, unknown> {
+  const nonEmpty = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+  return {
+    ...man,
+    manifestVersion: nonEmpty(man.manifestVersion) ?? '1.0',
+    id: opts.orgId,
+    name: nonEmpty(man.name) ?? nonEmpty(opts.fallbackName) ?? 'Workspace',
+    kind: nonEmpty(man.kind) ?? 'project',
+    status: nonEmpty(man.status) ?? 'active',
+  };
 }
 
 /** One entry in the organism's workspace registry (`organism.{id}.meta.workspaces`). */

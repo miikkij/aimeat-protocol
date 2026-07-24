@@ -11,10 +11,13 @@
  * @version-history
  *   v1.0.0 -- 2026-07-14 -- Extracted from mcp/workspaces.ts _create; adds a REST provisioning path so
  *     published apps can create their own structured data space (multi-tenant apps) under the owner.
+ *   v1.1.0 -- 2026-07-25 -- Backfill the full manifest envelope (manifestVersion/id/name/kind/status)
+ *     via the shared backfillManifestEnvelope() instead of only id+status, so a provision with just
+ *     objectTypes validates first try (matches the MCP _create fix).
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { normalizeObjectTypes, WorkspaceMetaError } from './workspace-meta.js';
+import { normalizeObjectTypes, WorkspaceMetaError, backfillManifestEnvelope } from './workspace-meta.js';
 import { validateMemoryWrite } from './schema-validator.js';
 
 export class WorkspaceProvisionError extends Error {
@@ -73,8 +76,10 @@ export async function provisionWorkspace(
     if (!schema || typeof schema !== 'object') continue;
     await storage.setSchema({ keyPattern: `${root}.${namespace}`, applyTo: 'prefix', schemaJson: schema, schemaMode: 'strict', lockedBy: input.ownerGhii, setAt: now, updatedAt: now });
   }
-  // 2. Manifest (validated against the manifest meta-schema).
-  const manifestValue = { ...man, id: input.orgId, status: (typeof man.status === 'string' ? man.status : undefined) || 'active' };
+  // 2. Manifest (validated against the manifest meta-schema). Backfill the envelope
+  //    (manifestVersion/id/name/kind/status) the model routinely omits so a manifest with just
+  //    objectTypes validates on the first call instead of being rejected for a missing required field.
+  const manifestValue = backfillManifestEnvelope(man as Record<string, unknown>, { orgId: input.orgId, fallbackName: input.name });
   const mkey = `${root}.meta.manifest`;
   const valid = await validateMemoryWrite(mkey, manifestValue, storage);
   if (!valid.valid) throw new WorkspaceProvisionError('Manifest rejected by schema: ' + JSON.stringify(valid.errors));
