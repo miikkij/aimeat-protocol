@@ -138,6 +138,15 @@ export interface Offering {
   usageTerms: UsageTerms | null;   // how the consumer may use the output (derivatives/resale/attribution)
   tags: string[];
   state: 'listed' | 'delisted';
+  /**
+   * TARGET-050 — this listing is a PROJECTION of its source (the app-tool manifest, the extension action
+   * or the agent's offer), not a hand-authored snapshot: the source's `exchange` flag put it here and the
+   * source's price/labels flow into it. `sourceHash` is the content identity of that source at the last
+   * reconcile, so a change is detectable without re-writing every listing. A CONTRACT is never a
+   * projection — it stays pinned to the interface version and price it was signed at.
+   */
+  auto?: boolean;
+  sourceHash?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -291,6 +300,11 @@ export async function getOffering(storage: Storage, id: string): Promise<Offerin
 export async function listOfferings(storage: Storage): Promise<Offering[]> {
   const { items } = await storage.listAllMemory({ prefix: OFFERING_PREFIX, limit: 5000 });
   return items.map(r => r.value as Offering).filter(v => v && v.offeringId && v.state === 'listed');
+}
+/** Every offering including delisted ones — the reconcile needs to revive a listing rather than duplicate it. */
+export async function listAllOfferings(storage: Storage): Promise<Offering[]> {
+  const { items } = await storage.listAllMemory({ prefix: OFFERING_PREFIX, limit: 5000 });
+  return items.map(r => r.value as Offering).filter(v => v && v.offeringId);
 }
 export async function deleteOffering(storage: Storage, id: string): Promise<boolean> {
   const o = await getOffering(storage, id);

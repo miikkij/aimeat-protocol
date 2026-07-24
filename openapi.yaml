@@ -8383,12 +8383,56 @@ paths:
     delete:
       operationId: exchangeDelistOffering
       summary: Delist one of your EXCHANGE offerings (TARGET-045)
+      description: >
+        Delists a hand-authored listing. A PROJECTED listing (`auto: true`, TARGET-050) exists because its
+        SOURCE says so — the app-tool manifest's `exchange` flag, the extension action's
+        `commercial.exchange`, or the agent offer's `exchange` — so delisting it here would simply come back
+        on the next reconcile: this returns 409 `SOURCE_MANAGED` and names the source to turn off instead.
+        Pass `?force=1` to delist anyway (until the next reconcile). Delisting never affects a CONTRACT.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
-      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: force, in: query, required: false, schema: { type: string, enum: ['1'] },
+            description: "Delist a source-managed listing anyway (it returns on the next reconcile)." }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '409': { $ref: '#/components/responses/AimeatError' }
         '404': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/exchange/reconcile:
+    post:
+      operationId: exchangeReconcileOfferings
+      summary: Reconcile your EXCHANGE listings against their sources (TARGET-050)
+      description: >
+        The EXCHANGE listing is a PROJECTION of its source: an app-tool manifest entry with `exchange: true`,
+        an extension action with `commercial.exchange: true`, or an agent offer with `exchange: true` (and
+        visibility `public`). Writing any of those projects it automatically — this is the explicit handle.
+        `dry_run` reports what WOULD change and writes nothing (not even an interface snapshot). `migrate`
+        adopts hand-authored listings into the model: it flips the flag ON in their source and keeps their
+        `offeringId`, so existing entitlements referencing `offering:{id}` keep resolving; a listing whose
+        source is gone is reported as an orphan and left untouched. Scope a run with `app_id`/`ext`/`agent`.
+        Idempotent. A CONTRACT is never touched — entitlements keep the interface version and the price they
+        were signed at. Returns `{ owner, dryRun, changes[], created, updated, adopted, delisted, unchanged,
+        skipped }` (+ `orphans`, `flagged` when migrating); each change carries `action`, `offeringId`,
+        `kind`, `label`, `unit`, `currency` and, for a skip, the `reason` (SCHEMA_REQUIRED, NOT_PRICED,
+        TOOL_UNBOUND, NOT_PUBLIC, INVALID_TOOL_MANIFEST, INVALID_OFFERS_DOC).
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: dry_run, in: query, required: false, schema: { type: string, enum: ['1'] } }
+        - { name: migrate, in: query, required: false, schema: { type: string, enum: ['1'] } }
+      requestBody:
+        required: false
+        content: { application/json: { schema: { type: object, properties: {
+          dry_run: { type: boolean, description: "Report only; write nothing." },
+          migrate: { type: boolean, description: "Adopt hand-authored listings (flag their source, keep the offeringId)." },
+          app_id: { type: string, description: "Reconcile only this app's tool manifest." },
+          ext: { type: string, description: "Reconcile only this extension's actions." },
+          agent: { type: string, description: "Reconcile only this agent's offers." } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
 
   /v1/exchange/offerings/{id}/consumers:
     get:

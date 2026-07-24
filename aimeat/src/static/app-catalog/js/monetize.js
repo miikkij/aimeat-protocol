@@ -10,6 +10,11 @@
  *   this module re-renders #detail-monetize in place after loads/saves.
  * @usage import { monetizeSectionInner, monetizeOnOpen, monetizeAddTool, ... } from './monetize.js'
  * @version-history
+ *   v1.2.0 — 2026-07-25 — TARGET-050: the manifest is the SOURCE OF TRUTH for the EXCHANGE listing —
+ *     a "List in EXCHANGE" toggle and a second money price (EUR *and* USD) live here, and the node
+ *     projects the marketplace listing from this record on every write. No second listing step.
+ *   v1.1.0 — 2026-07-25 — TARGET-050 slice 0: readEditor merges over the edited tool instead of rebuilding
+ *     it, so inputSchema/outputSchema/plans survive a price edit (they were silently dropped on every save).
  *   v1.0.0 — 2026-07-14 — Initial Monetize tool editor (TARGET-034 phase B)
  */
 import { escapeHtml } from './util.js';
@@ -22,6 +27,7 @@ import { getCortexOwnerToken } from './cortex.js';
 // (src/models/app-tool-schemas.ts) enforces at resolve time.
 var NAME_RE = /^[a-z0-9][a-z0-9._-]*$/i;
 var MONEY_UNIT = 1000000; // 6-decimal micro-units, the node-wide money convention
+var CURRENCIES = ['EUR', 'USD']; // mirrors MONEY_CURRENCIES in src/commerce/money.ts
 
 var mzOwner = '';        // app owner (bare name) — the signed-in user for own apps
 var mzAppId = '';        // published filename = the appId of the manifest key
@@ -68,9 +74,14 @@ export function monetizeOnOpen(owner, appId, isOwn) {
 
 function priceLabel(tool) {
   var parts = [];
+  var seen = {};
   if (tool.price && tool.price.morsels > 0) parts.push(tool.price.morsels + ' morsels');
-  if (tool.priceMoney && tool.priceMoney.amount > 0) {
-    parts.push((tool.priceMoney.amount / MONEY_UNIT) + ' ' + tool.priceMoney.currency);
+  var money = [tool.priceMoney].concat(tool.pricesMoney || []);
+  for (var i = 0; i < money.length; i++) {
+    var m = money[i];
+    if (!m || !(m.amount > 0) || seen[m.currency]) continue;
+    seen[m.currency] = true;
+    parts.push((m.amount / MONEY_UNIT) + ' ' + m.currency);
   }
   return parts.length ? parts.join(' · ') : t('monetize.notForSale');
 }
@@ -85,7 +96,8 @@ function toolRow(tool, i) {
         '<span class="dtl-stat-val">' + escapeHtml(tool.name) + '</span>' +
         (tool.description ? '<span class="dtl-stat-label">' + escapeHtml(tool.description) + '</span>' : '') +
       '</div>' +
-      '<div class="dtl-stat"><span class="dtl-stat-label">' + t('monetize.priceCol') + '</span><span class="dtl-stat-val">' + escapeHtml(priceLabel(tool)) + '</span></div>' +
+      '<div class="dtl-stat"><span class="dtl-stat-label">' + t('monetize.priceCol') + '</span><span class="dtl-stat-val">' + escapeHtml(priceLabel(tool)) +
+        (tool.exchange ? ' <span class="dtl-sync ok" style="display:inline">' + t('monetize.exchangeOn') + '</span>' : '') + '</span></div>' +
       '<div class="dtl-stat"><span class="dtl-stat-label">' + mode + '</span><span class="dtl-stat-val" style="font-size:.8rem">' + binding + '</span></div>' +
       '<div class="dtl-btn-row" style="margin:0">' +
         dtlBtn(t('detail.editDetails'), 'window._launcher.monetizeEditTool(' + i + ')') +
@@ -94,9 +106,22 @@ function toolRow(tool, i) {
     '</div>';
 }
 
+/** A currency picker over the node's supported money currencies. */
+function currencySelect(id, selected) {
+  var html = '<select id="' + id + '" class="modal-input" style="margin:4px 0 8px">';
+  for (var i = 0; i < CURRENCIES.length; i++) {
+    html += '<option value="' + CURRENCIES[i] + '"' + (selected === CURRENCIES[i] ? ' selected' : '') + '>' + CURRENCIES[i] + '</option>';
+  }
+  return html + '</select>';
+}
+
 function editorHtml(tool) {
   var moneyMajor = (tool.priceMoney && tool.priceMoney.amount > 0) ? String(tool.priceMoney.amount / MONEY_UNIT) : '';
   var cur = (tool.priceMoney && tool.priceMoney.currency) || 'EUR';
+  // The second money price is any declared currency that is not the primary one.
+  var second = (tool.pricesMoney || []).filter(function (p) { return p && p.currency !== cur && p.amount > 0; })[0];
+  var money2Major = second ? String(second.amount / MONEY_UNIT) : '';
+  var cur2 = (second && second.currency) || (cur === 'EUR' ? 'USD' : 'EUR');
   return '<div class="dtl-ac-editor" style="margin-top:10px">' +
       '<label class="dtl-stat-label" for="mz-name">' + t('monetize.name') + '</label>' +
       '<input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || '') + '" placeholder="summarize" style="margin:4px 0 8px" />' +
@@ -113,12 +138,25 @@ function editorHtml(tool) {
         '</div>' +
         '<div style="min-width:90px">' +
           '<label class="dtl-stat-label" for="mz-currency">' + t('monetize.currency') + '</label>' +
-          '<select id="mz-currency" class="modal-input" style="margin:4px 0 8px">' +
-            '<option value="EUR"' + (cur === 'EUR' ? ' selected' : '') + '>EUR</option>' +
-            '<option value="USD"' + (cur === 'USD' ? ' selected' : '') + '>USD</option>' +
-          '</select>' +
+          currencySelect('mz-currency', cur) +
         '</div>' +
       '</div>' +
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">' +
+        '<div style="flex:1;min-width:130px">' +
+          '<label class="dtl-stat-label" for="mz-money2">' + t('monetize.money2') + '</label>' +
+          '<input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" style="margin:4px 0 4px" />' +
+        '</div>' +
+        '<div style="min-width:90px">' +
+          '<label class="dtl-stat-label" for="mz-currency2">' + t('monetize.currency2') + '</label>' +
+          currencySelect('mz-currency2', cur2) +
+        '</div>' +
+      '</div>' +
+      '<div class="dtl-sync none" style="margin:0 0 8px">' + t('monetize.money2Hint') + '</div>' +
+      '<label class="dtl-stat-label" style="display:flex;align-items:center;gap:8px;cursor:pointer">' +
+        '<input id="mz-exchange" type="checkbox"' + (tool.exchange ? ' checked' : '') + ' />' +
+        t('monetize.exchange') +
+      '</label>' +
+      '<div class="dtl-sync none" style="margin:4px 0 8px">' + t('monetize.exchangeHint') + '</div>' +
       '<label class="dtl-stat-label" for="mz-action">' + t('monetize.actionId') + '</label>' +
       '<input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || '') + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" />' +
       '<div class="dtl-sync none" style="margin:0 0 8px">' + t('monetize.actionIdHint') + '</div>' +
@@ -163,25 +201,50 @@ export function monetizeAddTool() { mzEditing = -2; rerender(); }
 export function monetizeEditTool(i) { mzEditing = i; rerender(); }
 export function monetizeCancelEdit() { mzEditing = -1; rerender(); }
 
-/** Read the editor fields into a manifest tool entry; null (+ notice) when invalid. */
-function readEditor() {
+/**
+ * Read the editor fields into a manifest tool entry, MERGED OVER the tool being edited so that fields
+ * this editor does not surface survive the save — `inputSchema`/`outputSchema` (mandatory for an EXCHANGE
+ * listing), `plans`, `exchange`, and anything added later. Building the entry from scratch silently
+ * destroyed those on every price edit (TARGET-050 slice 0). Clearing a field the editor DOES own removes
+ * it, so "delete the money price" still works. Returns null (+ notice) when invalid.
+ */
+function readEditor(base) {
   var name = (document.getElementById('mz-name').value || '').trim();
   if (!NAME_RE.test(name)) { showNotice(t('monetize.nameInvalid'), 'error'); return null; }
-  var tool = { name: name };
+  var tool = Object.assign({}, base || {});
+  tool.name = name;
   var desc = (document.getElementById('mz-desc').value || '').trim();
-  if (desc) tool.description = desc;
+  if (desc) tool.description = desc; else delete tool.description;
   var morsels = parseInt(document.getElementById('mz-morsels').value, 10);
   if (Number.isFinite(morsels) && morsels > 0) tool.price = { morsels: morsels, unit: 'per-call' };
+  else delete tool.price;
   var moneyRaw = (document.getElementById('mz-money').value || '').trim();
   if (moneyRaw) {
     var major = parseFloat(moneyRaw.replace(',', '.'));
     if (!Number.isFinite(major) || major <= 0) { showNotice(t('monetize.moneyInvalid'), 'error'); return null; }
     tool.priceMoney = { amount: Math.round(major * MONEY_UNIT), currency: document.getElementById('mz-currency').value };
+  } else delete tool.priceMoney;
+  // Second money price (TARGET-050): the same call sold in another currency. `pricesMoney` carries the
+  // full set the EXCHANGE projection lists from; `priceMoney` stays the primary for every other reader.
+  var money2Raw = (document.getElementById('mz-money2').value || '').trim();
+  var cur2 = document.getElementById('mz-currency2').value;
+  var money2 = null;
+  if (money2Raw) {
+    var major2 = parseFloat(money2Raw.replace(',', '.'));
+    if (!Number.isFinite(major2) || major2 <= 0) { showNotice(t('monetize.moneyInvalid'), 'error'); return null; }
+    money2 = { amount: Math.round(major2 * MONEY_UNIT), currency: cur2 };
   }
+  var moneySet = [];
+  if (tool.priceMoney) moneySet.push(tool.priceMoney);
+  if (money2 && (!tool.priceMoney || tool.priceMoney.currency !== money2.currency)) moneySet.push(money2);
+  if (moneySet.length > 1) tool.pricesMoney = moneySet; else delete tool.pricesMoney;
+  // The EXCHANGE listing exists because this flag says so; turning it off removes the listing (never a contract).
+  var ex = document.getElementById('mz-exchange');
+  if (ex && ex.checked) tool.exchange = true; else delete tool.exchange;
   var actionId = (document.getElementById('mz-action').value || '').trim();
-  if (actionId) tool.action_id = actionId;
+  if (actionId) tool.action_id = actionId; else delete tool.action_id;
   var agent = (document.getElementById('mz-agent').value || '').trim();
-  if (agent) tool.agent = agent;
+  if (agent) tool.agent = agent; else delete tool.agent;
   return tool;
 }
 
@@ -203,7 +266,7 @@ function writeManifest(doc) {
 
 export function monetizeSaveTool() {
   if (mzBusy || !mzDoc) return;
-  var tool = readEditor();
+  var tool = readEditor(mzEditing >= 0 ? mzDoc.tools[mzEditing] : null);
   if (!tool) return;
   var tools = mzDoc.tools.slice();
   var dup = tools.findIndex(function (x, i) { return x.name === tool.name && i !== mzEditing; });

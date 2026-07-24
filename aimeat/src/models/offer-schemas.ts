@@ -27,6 +27,10 @@
  *   v2.3.0 -- 2026-06-16 -- Richer Offerings: deliverable `format` gains `'json'` (structured render of
  *     the sample + live deliverables); offers gain `dependsOn` (upstream-offer / signal prerequisites)
  *     surfaced + gated on the card. Both additive/optional → existing docs validate unchanged.
+ *   v2.5.0 -- 2026-07-25 -- TARGET-050: the offer becomes the SOURCE OF TRUTH for its EXCHANGE agent-work
+ *     listing -- `exchange` (sell on the marketplace, deliberately separate from `visibility`),
+ *     `pricesMoney` (EUR *and* USD), `inputSchema`/`outputSchema` + `usageTerms` (the legibility gate).
+ *     All additive/optional -> existing offer docs validate unchanged.
  *   v2.4.0 -- 2026-07-14 -- priceMoney currency enum sourced from the money.ts chokepoint
  *     (MONEY_CURRENCIES) instead of an inline ['EUR','USD'] literal. Same accepted values.
  */
@@ -156,6 +160,31 @@ export const OfferSchema = z.object({
     amount: z.number().int().positive(),
     currency: z.enum(MONEY_CURRENCIES),
   }).nullable().optional(),
+  /**
+   * Additional money prices, one per currency (TARGET-050) — the same work sold in EUR *and* USD.
+   * `priceMoney` stays the primary (existing readers unchanged); this is the set EXCHANGE lists from.
+   */
+  pricesMoney: z.array(z.object({
+    amount: z.number().int().positive(),
+    currency: z.enum(MONEY_CURRENCIES),
+  })).max(MONEY_CURRENCIES.length).optional(),
+  /**
+   * Sell this offer as EXCHANGE AGENT WORK (TARGET-050). Deliberately separate from `visibility`:
+   * public means "discoverable in the offers feed", this means "on the marketplace, metered and paid
+   * on delivery". Requires visibility 'public' + a price + the I/O schemas below (the legibility gate).
+   */
+  exchange: z.boolean().optional(),
+  /** What the buyer SENDS to start the task — required to list on EXCHANGE. */
+  inputSchema: z.record(z.string(), z.unknown()).optional(),
+  /** What the agent DELIVERS — required to list on EXCHANGE. */
+  outputSchema: z.record(z.string(), z.unknown()).optional(),
+  /** Usage licence surfaced on the projected offering (required to list). */
+  usageTerms: z.object({
+    derivatives: z.boolean().optional(),
+    resale: z.boolean().optional(),
+    attribution: z.boolean().optional(),
+    note: z.string().max(500).optional(),
+  }).optional(),
   visibility: z.enum(['private', 'unlisted', 'public']).optional(), // default 'private' at read/list time
   callable: CallableSchema.optional(),
 });

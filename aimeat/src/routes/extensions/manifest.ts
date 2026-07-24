@@ -168,7 +168,11 @@ export function buildExtensionRecordFromManifest(
     status: 'inactive',
     requiredApis: (manifest.required_apis as string[]) ?? [],
     actions: actions.map(a => {
-      const commercial = a.commercial as { payMorsels?: unknown; payMoney?: unknown; plans?: unknown } | undefined;
+      const commercial = a.commercial as {
+        payMorsels?: unknown; payMoney?: unknown; plans?: unknown;
+        pricesMoney?: unknown; exchange?: unknown; usageTerms?: unknown;
+      } | undefined;
+      type ActionCommercial = NonNullable<ExtensionRecord['actions'][number]['commercial']>;
       return {
         id: a.id as string,
         method: (a.method as string).toUpperCase(),
@@ -185,7 +189,15 @@ export function buildExtensionRecordFromManifest(
               ? { payMoney: commercial.payMoney as { amount: number; currency: string } }
               : {}),
             ...(commercial.plans !== undefined
-              ? { plans: commercial.plans as NonNullable<ExtensionRecord['actions'][number]['commercial']>['plans'] }
+              ? { plans: commercial.plans as ActionCommercial['plans'] }
+              : {}),
+            // TARGET-050: the action is the source of truth for its EXCHANGE listing.
+            ...(commercial.pricesMoney !== undefined
+              ? { pricesMoney: commercial.pricesMoney as ActionCommercial['pricesMoney'] }
+              : {}),
+            ...(commercial.exchange !== undefined ? { exchange: commercial.exchange === true } : {}),
+            ...(commercial.usageTerms !== undefined
+              ? { usageTerms: commercial.usageTerms as ActionCommercial['usageTerms'] }
               : {}),
           },
         } : {}),
