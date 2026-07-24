@@ -11,6 +11,8 @@
  * @usage import { showLoginModal } from './modal.js';
  * @version-history
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2/3.ts (SDK-libs migration Phase 3).
+ *   v1.0.1 — 2026-07-25 — Fix: adopt the node's full locale dict when any key differs, so newer modal
+ *     keys (email-step strings) missing from a host's opts.i18n no longer fall back to English.
  */
 import { auth, api } from './session.js';
 import { escHtml } from './theme.js';
@@ -61,10 +63,17 @@ export function showLoginModal(opts, renderBtn) {
   document.body.appendChild(modal);
   render(true);
 
-  // Correct the language if the host passed opts.i18n in the wrong one (standalone modal).
+  // Adopt the node's full, correct-language dictionary. `fresh` is authoritative: it corrects a
+  // wrong-language opts.i18n AND — the common case — fills newer keys the host's opts.i18n predates
+  // (e.g. the email-step strings), which a signInBtn/descNew-only guard would wrongly skip, leaving
+  // those keys undefined and rendering their English fallbacks.
   loadModalI18n(lang).then(function (fresh) {
     if (!fresh || !Object.keys(fresh).length) return;
-    if (fresh.signInBtn === i.signInBtn && fresh.descNew === i.descNew) return;
+    var differs = false;
+    for (var k in fresh) {
+      if (Object.prototype.hasOwnProperty.call(fresh, k) && fresh[k] !== i[k]) { differs = true; break; }
+    }
+    if (!differs) return;
     var vals = captureInputs();
     i = fresh;
     render(false);
