@@ -136,8 +136,18 @@ async function main() {
         assert(r.status === 403, `expected 403, got ${r.status}`);
     });
 
-    await test('a malformed manifest (no manifestVersion) → 400', async () => {
-        const bad = { name: 'X', kind: 'project', objectTypes: [{ name: 'contact', namespace: 'crm.contacts', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:contact@1' }] };
+    await test('an envelope-less manifest (only objectTypes) → 201 (the envelope is backfilled)', async () => {
+        // The manifest envelope (manifestVersion/id/name/kind/status) the model routinely omits is now
+        // backfilled, so an objectTypes-only manifest provisions on the first call instead of 400ing on
+        // a missing required field (the recurring "workspace create stumbles at the start" cause).
+        const envelopeless = { objectTypes: [{ name: 'contact', namespace: 'crm.contacts', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:contact@1' }] };
+        const r = await json(`/v1/organisms/${orgId}/workspaces`, { method: 'POST', headers: { Authorization: `Bearer ${appWrite}` }, body: JSON.stringify({ name: 'Envelope Backfill', manifest: envelopeless, schemas: CRM_SCHEMAS }) });
+        assert(r.status === 201, `expected 201, got ${r.status}`);
+    });
+
+    await test('a genuinely malformed manifest (no objectTypes at all) → 400', async () => {
+        // objectTypes is the one thing that cannot be defaulted — a manifest without it is still rejected.
+        const bad = { name: 'X', kind: 'project' };
         const r = await json(`/v1/organisms/${orgId}/workspaces`, { method: 'POST', headers: { Authorization: `Bearer ${appWrite}` }, body: JSON.stringify({ name: 'Bad', manifest: bad, schemas: CRM_SCHEMAS }) });
         assert(r.status === 400, `expected 400, got ${r.status}`);
     });

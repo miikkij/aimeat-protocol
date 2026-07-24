@@ -410,6 +410,30 @@ await test('12. workspace_create with a custom manifest + schema locks the schem
     assert(typeof bootWs.id === 'string' && bootWs.id.startsWith('ws-'), 'returns ws id');
 });
 
+await test('12b. workspace_create with an objectTypes-ONLY manifest backfills the envelope (first-call success)', async () => {
+    // Regression: the tool's own documented manifest example never showed `manifestVersion` (a
+    // meta-schema required field), and _create backfilled only id+status — so a manifest built from
+    // the docs was rejected on the first call and agents had to iterate. The envelope
+    // (manifestVersion/id/name/kind/status) is now backfilled: an objectTypes-only manifest succeeds.
+    const manifest = {
+        objectTypes: [
+            { name: 'note', schemaRef: 'schema:note@1', namespace: 'shared.notes', backing: 'memory', writeRole: 'member', cardinality: 'many', versioned: true, mode: 'records' },
+        ],
+    };
+    const b = await A.client.call('aimeat_workspace_create', { organism_id: bootOrgId, name: 'Envelope Backfill', manifest }, 1120);
+    assert(b.result.isError !== true, `objectTypes-only manifest must be accepted first try: ${b.result.content?.[0]?.text}`);
+    const wsId = JSON.parse(b.result.content[0].text).ws;
+    assert(typeof wsId === 'string' && wsId.startsWith('ws-'), 'returns ws id');
+    // Read it back: the envelope was filled — manifestVersion default, kind default, name from the param.
+    const r = await A.client.call('aimeat_workspace_read', { organism_id: bootOrgId, ws: wsId }, 1121);
+    const man = JSON.parse(r.result.content[0].text).manifest;
+    assert(man.manifestVersion === '1.0', `manifestVersion backfilled to 1.0, got ${man.manifestVersion}`);
+    assert(man.kind === 'project', `kind backfilled to project, got ${man.kind}`);
+    assert(man.name === 'Envelope Backfill', `name backfilled from the tool's name param, got ${man.name}`);
+    assert(man.status === 'active', `status backfilled to active, got ${man.status}`);
+    assert(man.id === bootOrgId, `id forced to the organism id, got ${man.id}`);
+});
+
 await test('13. created workspace is listed + readable', async () => {
     const l = await A.client.call('aimeat_workspace_list', { organism_id: bootOrgId }, 113);
     assert(JSON.parse(l.result.content[0].text).workspaces.some((w: any) => w.id === bootWs.id), 'in registry');
