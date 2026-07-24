@@ -282,6 +282,20 @@ export interface ExtensionRecord {
         | { id: string; model: 'bundle'; blockSize: number; blockPrice: number }
         | { id: string; model: 'subscription'; periodSeconds: number; periodPrice: number; callsPerWindow: number; windowSeconds: number }
       >;
+      /**
+       * Additional money prices, one per currency (TARGET-050) — the action sells in EUR *and* USD.
+       * `payMoney` stays the primary (all existing readers unchanged); this is the full set the
+       * EXCHANGE projection lists from.
+       */
+      pricesMoney?: Array<{ amount: number; currency: string }>;
+      /**
+       * List this action publicly on EXCHANGE (TARGET-050). The extension record is the SOURCE OF TRUTH
+       * for its marketplace listing: flag on + a price → projected onto the market, price/labels track
+       * this action; flag off → the projected listing is delisted. CONTRACTS are never affected.
+       */
+      exchange?: boolean;
+      /** Usage licence surfaced on the projected offering (required to list — the legibility gate). */
+      usageTerms?: { derivatives?: boolean; resale?: boolean; attribution?: boolean; note?: string };
     };
   }>;
   config: Record<string, unknown>;

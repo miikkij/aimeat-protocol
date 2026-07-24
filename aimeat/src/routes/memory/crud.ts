@@ -21,6 +21,7 @@ import { parseGaiiLoose } from '../../utils/gaii.js';
 import { cached, TTL } from '../../services/cache.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
+import { reconcileAfterSourceWrite } from '../../services/exchange-projection.js';
 import { getActiveWorkflowEngine } from '../../services/workflow/engine.js';
 import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../../services/ecosystem-automation.js';
@@ -215,6 +216,10 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // Memory Contracts (reactive): a write to a watched key fires Tracked Response evaluation. The
     // subscriber gates on the track-registry (O(1)) so non-watched writes do no work.
     emitMemoryWritten(gaii, key, existing ? 'updated' : 'created');
+
+    // TARGET-050: an app-tool manifest / agent offers doc IS the source of truth for its EXCHANGE
+    // listing — reprice a tool here and the market follows, with no separate listing step.
+    reconcileAfterSourceWrite(storage, gaii, key);
 
     res.status(existing ? 200 : 201).json(success(config.nodeId, {
       key: record.key,

@@ -39,6 +39,7 @@ import {
 } from '../services/exchange-market.js';
 import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
 import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app-tool-interfaces.js';
+import { reconcileOwnerOfferings, migrateLegacyOfferings } from '../services/exchange-projection.js';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const posOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
@@ -318,6 +319,12 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
 
   /** Browse listed offerings (matching a capability or free text). Public. `?stats=1` folds in usage/reputation. */
   router.get('/v1/exchange/offerings', async (req: Request, res: Response) => {
+    // Safety net for the source-of-truth model: bring the CALLER's own projections up to date before
+    // they read the market (bounded to one owner — a browse never reconciles the whole node).
+    if (req.auth) {
+      await reconcileOwnerOfferings(storage, resolveIdentity(req.auth, config.nodeId))
+        .catch(() => { /* a stale projection must never break browsing */ });
+    }
     const ext = str(req.query.ext), action = str(req.query.action), q = str(req.query.q);
     const offerings = (ext && action) || q
       ? await matchOfferings(storage, { ext: ext || null, action: action || null, text: q || null })
@@ -329,12 +336,44 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     return res.json(success(config.nodeId, { offerings, count: offerings.length }));
   });
 
-  /** Delist an offering (owner only). */
+  /**
+   * Delist an offering (owner only). A PROJECTED listing (`auto`) exists because its source says so, so
+   * delisting it by hand would come straight back on the next reconcile — the honest answer is to turn the
+   * source's `exchange` flag off, and that is what this reports (409) instead of lying about the outcome.
+   */
   router.delete('/v1/exchange/offerings/:id', requireAuth(), async (req: Request, res: Response) => {
     const o = await getOffering(storage, str(req.params.id));
     if (!o || o.providerOwner !== req.auth!.owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering of yours'));
+    if (o.auto && str(req.query.force) !== '1') {
+      return res.status(409).json(error(config.nodeId, 'SOURCE_MANAGED',
+        `This listing is projected from its source (${o.ext}/${o.action}). Turn "exchange" off there (app-catalog → app details → app tools, the extension action, or the agent offer) and it is removed. Pass ?force=1 to delist until the next reconcile.`));
+    }
     await deleteOffering(storage, o.offeringId);
     return res.json(success(config.nodeId, { offeringId: o.offeringId, state: 'delisted' }));
+  });
+
+  /**
+   * Reconcile the caller's own listings against their sources (TARGET-050). Normally automatic — writing a
+   * tool manifest, an extension or an offer projects it — this is the explicit handle: a `dry_run` report
+   * before anything changes, and `migrate` to adopt hand-authored listings into the projection model
+   * (flag their source, keep their offeringId so existing contracts keep resolving).
+   */
+  router.post('/v1/exchange/reconcile', requireAuth(), async (req: Request, res: Response) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const dryRun = b.dry_run === true || str(req.query.dry_run) === '1';
+    const migrate = b.migrate === true || str(req.query.migrate) === '1';
+    const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
+    const report = migrate
+      ? await migrateLegacyOfferings(storage, ownerGhii, { dryRun })
+      : await reconcileOwnerOfferings(storage, ownerGhii, {
+          dryRun,
+          ...(str(b.app_id) ? { appId: str(b.app_id) } : {}),
+          ...(str(b.ext) ? { extName: str(b.ext) } : {}),
+          ...(str(b.agent) ? { agentName: str(b.agent) } : {}),
+        });
+    return res.json(success(config.nodeId, report, [
+      { description: 'Browse the marketplace', method: 'GET', url: '/v1/exchange/offerings' },
+    ]));
   });
 
   // ── NEEDS (demand) ──────────────────────────────────────────────────────────

@@ -3010,6 +3010,13 @@
       "monetize.priceMorsels": "Price (morsels)",
       "monetize.priceMoney": "Money price",
       "monetize.currency": "Currency",
+      "monetize.money2": "Second money price",
+      "monetize.currency2": "Currency",
+      "monetize.money2Hint": "Optional: sell the same call in a second currency. Buyers pick one when they open a contract.",
+      "monetize.exchange": "List in EXCHANGE",
+      "monetize.exchangeHint": "On: this tool is offered publicly on the marketplace and its listing follows the price you set here. Off: it is removed from the marketplace. Contracts already agreed are unaffected.",
+      "monetize.exchangeOn": "in EXCHANGE",
+      "monetize.exchangeNeedsSchema": "To list in EXCHANGE the tool needs an input and output schema plus a capability binding. Publish those first (MCP: aimeat_app_tools_publish).",
       "monetize.actionId": "Capability binding (action id)",
       "monetize.actionIdHint": "Optional. A capability id (e.g. ext:my-extension:summarize) invoked instantly on purchase. Leave empty to fulfill as an agent task instead.",
       "monetize.agent": "Fulfilling agent",
@@ -3475,6 +3482,13 @@
       "monetize.priceMorsels": "Hinta (morselit)",
       "monetize.priceMoney": "Rahahinta",
       "monetize.currency": "Valuutta",
+      "monetize.money2": "Toinen rahahinta",
+      "monetize.currency2": "Valuutta",
+      "monetize.money2Hint": "Valinnainen: myy sama kutsu toisessa valuutassa. Ostaja valitsee valuutan sopimusta avatessaan.",
+      "monetize.exchange": "Listaa EXCHANGEssa",
+      "monetize.exchangeHint": "Päällä: työkalu on julkisesti markkinalla ja listaus seuraa tässä asetettua hintaa. Pois: se poistuu markkinalta. Jo sovitut sopimukset eivät muutu.",
+      "monetize.exchangeOn": "EXCHANGEssa",
+      "monetize.exchangeNeedsSchema": "EXCHANGE-listaus vaatii työkalulta syöte- ja tulosskeeman sekä kyvykkyyssidonnan. Julkaise ne ensin (MCP: aimeat_app_tools_publish).",
       "monetize.actionId": "Kyvykkyyssidonta (action id)",
       "monetize.actionIdHint": "Valinnainen. Kyvykkyyden id (esim. ext:oma-laajennus:summarize), joka ajetaan heti oston yhteydessä. Jätä tyhjäksi, jos haluat toimittaa agenttitehtävänä.",
       "monetize.agent": "Toimittava agentti",
@@ -4724,6 +4738,7 @@
   // src/static/app-catalog/js/monetize.js
   var NAME_RE = /^[a-z0-9][a-z0-9._-]*$/i;
   var MONEY_UNIT = 1e6;
+  var CURRENCIES = ["EUR", "USD"];
   var mzOwner = "";
   var mzAppId = "";
   var mzDoc = null;
@@ -4772,21 +4787,38 @@
   }
   function priceLabel(tool) {
     var parts = [];
+    var seen = {};
     if (tool.price && tool.price.morsels > 0) parts.push(tool.price.morsels + " morsels");
-    if (tool.priceMoney && tool.priceMoney.amount > 0) {
-      parts.push(tool.priceMoney.amount / MONEY_UNIT + " " + tool.priceMoney.currency);
+    var money = [tool.priceMoney].concat(tool.pricesMoney || []);
+    for (var i = 0; i < money.length; i++) {
+      var m = money[i];
+      if (!m || !(m.amount > 0) || seen[m.currency]) continue;
+      seen[m.currency] = true;
+      parts.push(m.amount / MONEY_UNIT + " " + m.currency);
     }
     return parts.length ? parts.join(" · ") : t("monetize.notForSale");
   }
   function toolRow(tool, i) {
     var mode = tool.action_id ? t("monetize.fulfillCall") : t("monetize.fulfillTask");
     var binding = tool.action_id ? escapeHtml(tool.action_id) : tool.agent ? "→ " + escapeHtml(tool.agent) : t("monetize.taskToOwner");
-    return '<div class="dtl-status-row" style="align-items:center;gap:10px;flex-wrap:wrap"><div class="dtl-stat" style="flex:1;min-width:160px"><span class="dtl-stat-val">' + escapeHtml(tool.name) + "</span>" + (tool.description ? '<span class="dtl-stat-label">' + escapeHtml(tool.description) + "</span>" : "") + '</div><div class="dtl-stat"><span class="dtl-stat-label">' + t("monetize.priceCol") + '</span><span class="dtl-stat-val">' + escapeHtml(priceLabel(tool)) + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + mode + '</span><span class="dtl-stat-val" style="font-size:.8rem">' + binding + '</span></div><div class="dtl-btn-row" style="margin:0">' + dtlBtn(t("detail.editDetails"), "window._launcher.monetizeEditTool(" + i + ")") + dtlBtn("✕", "window._launcher.monetizeDeleteTool(" + i + ")", { variant: "danger", title: t("monetize.deleteHint") }) + "</div></div>";
+    return '<div class="dtl-status-row" style="align-items:center;gap:10px;flex-wrap:wrap"><div class="dtl-stat" style="flex:1;min-width:160px"><span class="dtl-stat-val">' + escapeHtml(tool.name) + "</span>" + (tool.description ? '<span class="dtl-stat-label">' + escapeHtml(tool.description) + "</span>" : "") + '</div><div class="dtl-stat"><span class="dtl-stat-label">' + t("monetize.priceCol") + '</span><span class="dtl-stat-val">' + escapeHtml(priceLabel(tool)) + (tool.exchange ? ' <span class="dtl-sync ok" style="display:inline">' + t("monetize.exchangeOn") + "</span>" : "") + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + mode + '</span><span class="dtl-stat-val" style="font-size:.8rem">' + binding + '</span></div><div class="dtl-btn-row" style="margin:0">' + dtlBtn(t("detail.editDetails"), "window._launcher.monetizeEditTool(" + i + ")") + dtlBtn("✕", "window._launcher.monetizeDeleteTool(" + i + ")", { variant: "danger", title: t("monetize.deleteHint") }) + "</div></div>";
+  }
+  function currencySelect(id, selected) {
+    var html = '<select id="' + id + '" class="modal-input" style="margin:4px 0 8px">';
+    for (var i = 0; i < CURRENCIES.length; i++) {
+      html += '<option value="' + CURRENCIES[i] + '"' + (selected === CURRENCIES[i] ? " selected" : "") + ">" + CURRENCIES[i] + "</option>";
+    }
+    return html + "</select>";
   }
   function editorHtml(tool) {
     var moneyMajor = tool.priceMoney && tool.priceMoney.amount > 0 ? String(tool.priceMoney.amount / MONEY_UNIT) : "";
     var cur = tool.priceMoney && tool.priceMoney.currency || "EUR";
-    return '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="mz-name">' + t("monetize.name") + '</label><input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || "") + '" placeholder="summarize" style="margin:4px 0 8px" /><label class="dtl-stat-label" for="mz-desc">' + t("monetize.desc") + '</label><input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || "") + '" style="margin:4px 0 8px" /><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-morsels">' + t("monetize.priceMorsels") + '</label><input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" style="margin:4px 0 8px" /></div><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money">' + t("monetize.priceMoney") + '</label><input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" style="margin:4px 0 8px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency">' + t("monetize.currency") + '</label><select id="mz-currency" class="modal-input" style="margin:4px 0 8px"><option value="EUR"' + (cur === "EUR" ? " selected" : "") + '>EUR</option><option value="USD"' + (cur === "USD" ? " selected" : "") + '>USD</option></select></div></div><label class="dtl-stat-label" for="mz-action">' + t("monetize.actionId") + '</label><input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || "") + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.actionIdHint") + '</div><label class="dtl-stat-label" for="mz-agent">' + t("monetize.agent") + '</label><input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || "") + '" placeholder="assistant" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("monetize.agentHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.monetizeSaveTool()", { variant: "primary", disabled: mzBusy }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.monetizeCancelEdit()") + '</div><div class="dtl-ai-status" id="mz-status"></div></div>';
+    var second = (tool.pricesMoney || []).filter(function(p) {
+      return p && p.currency !== cur && p.amount > 0;
+    })[0];
+    var money2Major = second ? String(second.amount / MONEY_UNIT) : "";
+    var cur2 = second && second.currency || (cur === "EUR" ? "USD" : "EUR");
+    return '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="mz-name">' + t("monetize.name") + '</label><input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || "") + '" placeholder="summarize" style="margin:4px 0 8px" /><label class="dtl-stat-label" for="mz-desc">' + t("monetize.desc") + '</label><input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || "") + '" style="margin:4px 0 8px" /><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-morsels">' + t("monetize.priceMorsels") + '</label><input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" style="margin:4px 0 8px" /></div><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money">' + t("monetize.priceMoney") + '</label><input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" style="margin:4px 0 8px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency">' + t("monetize.currency") + "</label>" + currencySelect("mz-currency", cur) + '</div></div><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money2">' + t("monetize.money2") + '</label><input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" style="margin:4px 0 4px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency2">' + t("monetize.currency2") + "</label>" + currencySelect("mz-currency2", cur2) + '</div></div><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.money2Hint") + '</div><label class="dtl-stat-label" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? " checked" : "") + " />" + t("monetize.exchange") + '</label><div class="dtl-sync none" style="margin:4px 0 8px">' + t("monetize.exchangeHint") + '</div><label class="dtl-stat-label" for="mz-action">' + t("monetize.actionId") + '</label><input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || "") + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.actionIdHint") + '</div><label class="dtl-stat-label" for="mz-agent">' + t("monetize.agent") + '</label><input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || "") + '" placeholder="assistant" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("monetize.agentHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.monetizeSaveTool()", { variant: "primary", disabled: mzBusy }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.monetizeCancelEdit()") + '</div><div class="dtl-ai-status" id="mz-status"></div></div>';
   }
   function monetizeSectionInner() {
     if (mzState === "off") return "";
@@ -4821,17 +4853,20 @@
     mzEditing = -1;
     rerender();
   }
-  function readEditor() {
+  function readEditor(base3) {
     var name = (document.getElementById("mz-name").value || "").trim();
     if (!NAME_RE.test(name)) {
       showNotice(t("monetize.nameInvalid"), "error");
       return null;
     }
-    var tool = { name };
+    var tool = Object.assign({}, base3 || {});
+    tool.name = name;
     var desc = (document.getElementById("mz-desc").value || "").trim();
     if (desc) tool.description = desc;
+    else delete tool.description;
     var morsels = parseInt(document.getElementById("mz-morsels").value, 10);
     if (Number.isFinite(morsels) && morsels > 0) tool.price = { morsels, unit: "per-call" };
+    else delete tool.price;
     var moneyRaw = (document.getElementById("mz-money").value || "").trim();
     if (moneyRaw) {
       var major = parseFloat(moneyRaw.replace(",", "."));
@@ -4840,11 +4875,32 @@
         return null;
       }
       tool.priceMoney = { amount: Math.round(major * MONEY_UNIT), currency: document.getElementById("mz-currency").value };
+    } else delete tool.priceMoney;
+    var money2Raw = (document.getElementById("mz-money2").value || "").trim();
+    var cur2 = document.getElementById("mz-currency2").value;
+    var money2 = null;
+    if (money2Raw) {
+      var major2 = parseFloat(money2Raw.replace(",", "."));
+      if (!Number.isFinite(major2) || major2 <= 0) {
+        showNotice(t("monetize.moneyInvalid"), "error");
+        return null;
+      }
+      money2 = { amount: Math.round(major2 * MONEY_UNIT), currency: cur2 };
     }
+    var moneySet = [];
+    if (tool.priceMoney) moneySet.push(tool.priceMoney);
+    if (money2 && (!tool.priceMoney || tool.priceMoney.currency !== money2.currency)) moneySet.push(money2);
+    if (moneySet.length > 1) tool.pricesMoney = moneySet;
+    else delete tool.pricesMoney;
+    var ex = document.getElementById("mz-exchange");
+    if (ex && ex.checked) tool.exchange = true;
+    else delete tool.exchange;
     var actionId = (document.getElementById("mz-action").value || "").trim();
     if (actionId) tool.action_id = actionId;
+    else delete tool.action_id;
     var agent = (document.getElementById("mz-agent").value || "").trim();
     if (agent) tool.agent = agent;
+    else delete tool.agent;
     return tool;
   }
   function writeManifest(doc) {
@@ -4865,7 +4921,7 @@
   }
   function monetizeSaveTool() {
     if (mzBusy || !mzDoc) return;
-    var tool = readEditor();
+    var tool = readEditor(mzEditing >= 0 ? mzDoc.tools[mzEditing] : null);
     if (!tool) return;
     var tools = mzDoc.tools.slice();
     var dup = tools.findIndex(function(x, i) {

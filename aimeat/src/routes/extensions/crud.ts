@@ -14,6 +14,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import type { Scheduler } from '../../services/scheduler.js';
 import { logger } from '../../utils/logger.js';
+import { reconcileAfterExtensionWrite } from '../../services/exchange-projection.js';
 import { stableStringify } from '../../utils/stable-json.js';
 import { ExtensionInstallSchema, validateBody } from '../../models/schemas.js';
 import { getEncryptionKey } from '../../services/encryption.js';
@@ -129,6 +130,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
 
       const created = await storage.createExtension(record);
       logger.info(`Extension installed: ${created.name}`, { version: created.version, by: req.auth!.owner });
+      // TARGET-050: an action flagged `commercial.exchange` is projected onto the market from here.
+      reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, created.name);
 
       res.status(201).json(success(config.nodeId, { extension: created }, [
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
@@ -211,6 +214,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         record.config = encConfig;
         const created = await storage.createExtension(record);
         logger.info(`Extension installed via upsert: ${created.name}`, { version: created.version, by: req.auth!.owner });
+        reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, created.name);
         res.status(201).json(success(config.nodeId, { extension: created, action: 'created' }, [
           { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
           { description: 'View extension details', method: 'GET', url: `/v1/extensions/${created.name}` },
@@ -263,6 +267,8 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         federation: record.federation,
         instances: record.instances,
       });
+      // TARGET-050: re-project the listings this extension's actions declare (price/flag may have changed).
+      reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, name);
 
       // Re-run init for an active extension: re-register schedules from the (possibly changed)
       // manifest and re-run @activate jobs. New action scriptContent is already live — each

@@ -27,6 +27,7 @@ import { annotationsFor } from './annotations.js';
 import { descriptionFor, responseFormatSchema, shapeResponse } from './catalog/shape.js';
 import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
 import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
+import { reconcileAfterSourceWrite } from '../services/exchange-projection.js';
 import { integerMicros, isSupportedMoneyCurrency } from '../commerce/money.js';
 import { createSession, getSession, completeSession, listSessions, CommerceError } from '../commerce/session-service.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
@@ -138,6 +139,8 @@ export function registerCommerceTools(
                 tools: parsed.data.tools,
             };
             await putOwnerRecord(key, doc, 'public', ['commerce', 'app-tools']);
+            // TARGET-050: the manifest is the source of truth for the EXCHANGE listing — project it now.
+            reconcileAfterSourceWrite(storage, ownerGhii, key);
             return ok({
                 app: `${owner}/${app_id}`,
                 version: doc.version,
@@ -222,6 +225,8 @@ export function registerCommerceTools(
                 version: (rec?.version ?? 0) + 1, createdAt: rec?.createdAt ?? now, updatedAt: now,
             });
             emitChange('agents');
+            // TARGET-050: an offer flagged `exchange` is projected onto the market from here.
+            reconcileAfterSourceWrite(storage, targetGaii, key);
             return ok({
                 agent: agent_name, offer: offer_id,
                 price: offer.price ?? null, priceMoney: offer.priceMoney ?? null,

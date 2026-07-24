@@ -11,6 +11,9 @@
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
  * @version-history
+ *   v1.3.0 — 2026-07-25 — TARGET-050: the manifest becomes the SOURCE OF TRUTH for the EXCHANGE listing —
+ *     `exchange` (list publicly), `pricesMoney` (EUR *and* USD on one tool) and `usageTerms` (the licence,
+ *     so listing needs no second authoring step). All additive; existing manifests validate unchanged.
  *   v1.2.0 — 2026-07-21 — EXCHANGE cross-app selling (Gap 1): optional `outputSchema` (mandatory to LIST an
  *     app-tool offering — the legibility gate) + `plans` (per_call/bundle/subscription volume pricing).
  *   v1.1.0 — 2026-07-14 — Task path (phase B): optional `agent` (task assignee); tools without an
@@ -66,6 +69,29 @@ export const AppToolSchema = z.object({
     amount: z.number().int().positive(),
     currency: z.enum(MONEY_CURRENCIES),
   }).nullable().optional(),
+  /**
+   * Additional money prices, one per currency (TARGET-050) — lets one tool be bought in EUR *and* USD.
+   * `priceMoney` stays the primary (every existing reader keeps working unchanged); `pricesMoney` is the
+   * full set the EXCHANGE projection lists from. Writers keep `priceMoney` equal to the first entry.
+   */
+  pricesMoney: z.array(z.object({
+    amount: z.number().int().positive(),
+    currency: z.enum(MONEY_CURRENCIES),
+  })).max(MONEY_CURRENCIES.length).optional(),
+  /**
+   * List this tool publicly on EXCHANGE (TARGET-050). The manifest is the SOURCE OF TRUTH for the
+   * marketplace listing: flag on + a price → the tool is projected onto the market and its price/labels
+   * track this manifest; flag off → the projected listing is delisted. Existing CONTRACTS are never
+   * affected — they stay pinned to the interface version and price they were signed at.
+   */
+  exchange: z.boolean().optional(),
+  /** Usage licence surfaced on the projected offering (mandatory to list — the legibility gate). */
+  usageTerms: z.object({
+    derivatives: z.boolean().optional(),
+    resale: z.boolean().optional(),
+    attribution: z.boolean().optional(),
+    note: z.string().max(500).optional(),
+  }).optional(),
 });
 
 /** The `apps.{appId}.tools` record body. */
