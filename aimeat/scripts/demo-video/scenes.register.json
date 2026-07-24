@@ -1,0 +1,80 @@
+{
+  "name": "register",
+  "baseUrl": "http://localhost:40050",
+  "locale": "fi-FI",
+  "viewport": { "width": 432, "height": 768, "deviceScaleFactor": 1 },
+  "output": { "width": 1080, "height": 1920 },
+  "intro": {
+    "title": "AIMEAT",
+    "subtitle": "Oma tili minuutissa",
+    "seconds": 2.0,
+    "bg": "0x0B0D11"
+  },
+  "outro": {
+    "title": "Kokeile itse",
+    "subtitle": "aimeat.io",
+    "seconds": 2.4,
+    "bg": "0x0B0D11"
+  },
+  "scenes": [
+    {
+      "label": "Saapuminen",
+      "steps": [
+        { "type": "goto", "path": "/v1/portal" },
+        { "type": "wait", "ms": 1200 },
+        { "type": "caption", "title": "Rakenna tekoälylläsi oikea sovellus", "subtitle": "Minuuteissa, ja se on sinun." },
+        { "type": "wait", "ms": 2600 },
+        { "type": "scroll", "byPx": 260 },
+        { "type": "wait", "ms": 1500 },
+        { "type": "scroll", "byPx": -260 },
+        { "type": "wait", "ms": 600 },
+        { "type": "captionHide" }
+      ]
+    },
+    {
+      "label": "Avaa rekisteroityminen",
+      "steps": [
+        { "type": "caption", "title": "Luo oma tili", "subtitle": "Tunnus, salasana ja sähköposti." },
+        { "type": "wait", "ms": 500 },
+        { "type": "click", "selector": "button:has-text('Kirjaudu / Rekisteröidy')" },
+        { "type": "wait", "ms": 1400 }
+      ]
+    },
+    {
+      "label": "Tayta tunnus",
+      "steps": [
+        { "type": "caption", "title": "Valitse tunnus ja salasana", "subtitle": "Iso kirjain salasanaan." },
+        { "type": "type", "selector": "#aimeat-username", "text": "veeti", "delayMs": 95 },
+        { "type": "wait", "ms": 400 },
+        { "type": "type", "selector": "#aimeat-password", "text": "Demo1234", "delayMs": 95 },
+        { "type": "wait", "ms": 400 },
+        { "type": "type", "selector": "#aimeat-displayname", "text": "Veeti", "delayMs": 95 },
+        { "type": "wait", "ms": 700 },
+        { "type": "click", "selector": "#aimeat-go-btn" },
+        { "type": "waitFor", "selector": "#aimeat-em-email", "ms": 8000 },
+        { "type": "wait", "ms": 800 }
+      ]
+    },
+    {
+      "label": "Anna sahkoposti",
+      "steps": [
+        { "type": "caption", "title": "Anna sähköpostisi", "subtitle": "Se pitää tilisi turvassa." },
+        { "type": "type", "selector": "#aimeat-em-email", "text": "veeti@example.com", "delayMs": 80 },
+        { "type": "wait", "ms": 700 },
+        { "type": "click", "selector": "#aimeat-em-send" },
+        { "type": "waitFor", "selector": "#aimeat-em-code", "ms": 8000 },
+        { "type": "wait", "ms": 900 }
+      ]
+    },
+    {
+      "label": "Vahvista sahkoposti",
+      "steps": [
+        { "type": "caption", "title": "Vahvista sähköposti", "subtitle": "Lähetimme sinulle 6-numeroisen koodin." },
+        { "type": "hover", "selector": "#aimeat-em-code" },
+        { "type": "wait", "ms": 3200 },
+        { "type": "captionHide" },
+        { "type": "wait", "ms": 500 }
+      ]
+    }
+  ]
+}
