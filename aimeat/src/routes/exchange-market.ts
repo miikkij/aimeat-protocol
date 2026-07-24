@@ -39,7 +39,7 @@ import {
 } from '../services/exchange-market.js';
 import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
 import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app-tool-interfaces.js';
-import { reconcileOwnerOfferings, migrateLegacyOfferings } from '../services/exchange-projection.js';
+import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled, migrateLegacyOfferings } from '../services/exchange-projection.js';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const posOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
@@ -322,7 +322,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     // Safety net for the source-of-truth model: bring the CALLER's own projections up to date before
     // they read the market (bounded to one owner — a browse never reconciles the whole node).
     if (req.auth) {
-      await reconcileOwnerOfferings(storage, resolveIdentity(req.auth, config.nodeId))
+      await reconcileOwnerOfferingsThrottled(storage, resolveIdentity(req.auth, config.nodeId))
         .catch(() => { /* a stale projection must never break browsing */ });
     }
     const ext = str(req.query.ext), action = str(req.query.action), q = str(req.query.q);

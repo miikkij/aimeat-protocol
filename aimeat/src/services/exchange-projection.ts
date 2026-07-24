@@ -364,6 +364,21 @@ function summarise(owner: string, dryRun: boolean, changes: ReconcileChange[]): 
 }
 
 /**
+ * Browsing the market refreshes the CALLER's own projections, but a browse must not pay for a full source
+ * scan every time: writes already reconcile eagerly, so this is only a safety net. One pass per owner per
+ * window is plenty. In-process (like the node's other read caches) — a restart just re-arms it.
+ */
+const RECONCILE_WINDOW_MS = 30_000;
+const lastReconcile = new Map<string, number>();
+export async function reconcileOwnerOfferingsThrottled(storage: Storage, ownerGhii: string): Promise<void> {
+  const now = Date.now();
+  const prev = lastReconcile.get(ownerGhii) ?? 0;
+  if (now - prev < RECONCILE_WINDOW_MS) return;
+  lastReconcile.set(ownerGhii, now);
+  await reconcileOwnerOfferings(storage, ownerGhii);
+}
+
+/**
  * Fire-and-forget reconcile after a SOURCE record was written, so pricing a tool in the app-catalog (or
  * via MCP) shows on the market immediately with no second step. Recognises the two memory-backed sources
  * (`apps.{appId}.tools`, `agents.{agent}.offers`); anything else is ignored. Never rejects into the
