@@ -31,6 +31,7 @@ import { paymentChallenge } from '../commerce/x402.js';
 import { readEntitlementForCall } from '../services/metered-entitlements.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { settleMeteredCoordinate } from './extensions/entitlement-gate.js';
+import { recordCallDuration } from '../services/call-timing.js';
 
 /** The WebMCP draft this bridge mirrors (W3C Web Machine Learning CG). */
 const WEBMCP_SPEC = 'https://github.com/webmachinelearning/webmcp';
@@ -162,7 +163,10 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
           const jwt = (req.headers.authorization || '').replace('Bearer ', '');
           try {
             const { invokeCapability } = await import('../services/capability-invoke.js');
+            const startedAt = Date.now();
             const invoked = await invokeCapability(config, storage, cap, req.body?.input ?? req.body ?? {}, callerGaii, jwt, 'normal');
+            // Measured so the provider can propose a service commitment from evidence (call-timing.ts).
+            recordCallDuration(storage, ent.providerGhii, coordExt, toolName, Date.now() - startedAt);
             res.json(success(config.nodeId, { app: appRef, tool: toolName, iface_version: pinnedVersion ?? null, metered: true, result: invoked.result }));
           } catch (err) {
             if (outcome.refund) await outcome.refund();

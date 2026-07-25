@@ -23,6 +23,7 @@ import type { ExtensionCtx } from '../../services/extension-runtime.js';
 import { logger } from '../../utils/logger.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { enforcePaywall } from './paywall.js';
+import { recordCallDuration } from '../../services/call-timing.js';
 import { safeFetch } from '../../utils/url-validator.js';
 import { enforceExtensionMemoryLimits } from '../../services/quota.js';
 import { getEncryptionKey } from '../../services/encryption.js';
@@ -285,12 +286,16 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         maxApiCalls: Math.min(Math.max(ext.limits.maxApiCalls, 10), config.extensionMaxApiCalls),
       };
       let result;
+      // Time the DELIVERY, not the gate: what a buyer experiences is how long the answer takes, and a
+      // provider can only commit to a service level from what was actually measured (call-timing.ts).
+      const startedAt = Date.now();
       try {
         result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
       } catch (execErr) {
         if (pay.refund) await pay.refund();   // never keep payment for a call that didn't deliver
         throw execErr;
       }
+      recordCallDuration(storage, `${ext.installedBy}@${config.nodeId}`, ext.name, action.id, Date.now() - startedAt);
 
       res.json(success(config.nodeId, result, [
         { description: 'View extension', method: 'GET', url: `/v1/extensions/${extName}` },
@@ -555,12 +560,16 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
         maxApiCalls: Math.min(Math.max(ext.limits.maxApiCalls, 10), config.extensionMaxApiCalls),
       };
       let result;
+      // Time the DELIVERY, not the gate: what a buyer experiences is how long the answer takes, and a
+      // provider can only commit to a service level from what was actually measured (call-timing.ts).
+      const startedAt = Date.now();
       try {
         result = await executeExtensionAction(action.scriptContent, ctx, req.body as Record<string, unknown>, limits);
       } catch (execErr) {
         if (pay.refund) await pay.refund();   // never keep payment for a call that didn't deliver
         throw execErr;
       }
+      recordCallDuration(storage, `${ext.installedBy}@${config.nodeId}`, ext.name, action.id, Date.now() - startedAt);
 
       res.json(success(config.nodeId, result, [
         { description: 'View extension', method: 'GET', url: `/v1/extensions/${extName}` },

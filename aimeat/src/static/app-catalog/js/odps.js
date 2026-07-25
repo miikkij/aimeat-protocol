@@ -250,9 +250,12 @@ export function readOdpsAppDefaults() {
 // ── Tool level: the ODPS descriptor of one capability ─────────────────────────
 
 /** The per-tool ODPS block rendered inside the Monetize tool editor. */
-export function odpsToolFieldsHtml(tool, offeringId) {
+export function odpsToolFieldsHtml(tool, offeringId, ctx) {
+  ctx = ctx || {};
   var o = (tool && tool.odps) || {};
   var p = (tool && tool.provenance) || {};
+  var inherited = ctx.appProvenance || {};      // what the app-level attestation would supply
+  var timing = ctx.timing || null;              // observed delivery time, if this capability has served calls
   var head = '<div class="od-tool-head">' +
     dtlBtn((odToolOpen ? '▾ ' : '▸ ') + t('odps.toolTitle'), 'window._launcher.odpsToggleTool()') +
     (offeringId
@@ -277,13 +280,39 @@ export function odpsToolFieldsHtml(tool, offeringId) {
       return u.title + (u.description ? ' | ' + u.description : '') + (u.url ? ' | ' + u.url : '');
     }).join('\n'), t('odps.useCasesPlaceholder'), 2) +
     input('odt-sample', t('odps.contentSample'), o.contentSample, 'https://example.org/sample.json', 'url') +
+    // A sample a buyer can open beats a sentence claiming one exists. Run the capability once, store the
+    // answer as a public file, put its URL here. Nothing is invented: it IS the output.
+    (ctx.actionId
+      ? '<div class="dtl-btn-row od-actions">'
+        + dtlBtn(t('odps.genSample'), 'window._launcher.odpsGenerateSample()', { disabled: odBusy })
+        + '</div>'
+        + '<div class="dtl-sync none od-note">' + escapeHtml(t('odps.genSampleHint')) + '</div>'
+        + '<textarea id="odt-sample-input" class="modal-input od-input" rows="2" placeholder="'
+        + escapeHtml(t('odps.genSampleInput')) + '">' + escapeHtml(ctx.sampleInput || '') + '</textarea>'
+        + '<div class="dtl-ai-status" id="od-sample-status"></div>'
+      : '') +
     textarea('odt-sla', t('odps.sla'), dimsToText(o.sla), t('odps.slaPlaceholder'), 2) +
+    // Measured, then committed — in that order. The node reports what this capability actually does;
+    // the number that becomes a promise is still chosen by a person.
+    (timing && timing.count > 0
+      ? '<div class="od-measured">'
+        + escapeHtml(t('odps.measured')
+            .replace('{n}', String(timing.count))
+            .replace('{p50}', String(timing.p50Ms))
+            .replace('{p95}', String(timing.p95Ms)))
+        + ' ' + dtlBtn(t('odps.useMeasured'), 'window._launcher.odpsUseMeasured(' + Math.ceil(timing.p95Ms * 1.3) + ')')
+        + '</div>'
+      : '<div class="dtl-sync none od-note">' + escapeHtml(t('odps.noMeasurement')) + '</div>') +
     textarea('odt-quality', t('odps.quality'), dimsToText(o.dataQuality), t('odps.qualityPlaceholder'), 2) +
     '<div class="od-attest">' +
       '<div class="dtl-stat-label od-attest-head">' + escapeHtml(t('odps.toolAttestation')) + '</div>' +
       '<div class="dtl-sync none od-note">' + escapeHtml(t('odps.toolAttestationHint')) + '</div>' +
-      input('odt-source', t('odps.source'), p.source, t('odps.inherited')) +
+      input('odt-source', t('odps.source'), p.source,
+        inherited.source ? (t('odps.inheritedIs') + ' ' + inherited.source) : t('odps.inheritedNone')) +
       textarea('odt-transformations', t('odps.transformations'), p.transformations, t('odps.transformationsPlaceholder'), 2) +
+      '<div class="dtl-btn-row od-actions">'
+        + dtlBtn(t('odps.openAppDefaults'), 'window._launcher.odpsToggleDefaults()')
+        + '</div>' +
     '</div>' +
   '</div>';
 }
@@ -321,6 +350,67 @@ export function readOdpsToolFields(base) {
     odps: Object.keys(odps).length ? odps : undefined,
     provenance: Object.keys(prov).length ? prov : undefined,
   };
+}
+
+/** Fill the service-commitment box from what was measured, with headroom the provider can live with. */
+export function odpsUseMeasured(ms) {
+  var el = document.getElementById('odt-sla');
+  if (!el) return;
+  var line = 'responseTime ' + ms + ' milliseconds — ' + t('odps.measuredNote');
+  el.value = el.value.trim() ? (el.value.trim() + '\n' + line) : line;
+}
+
+/**
+ * Produce the sample by CALLING the capability once and storing what comes back as a public file.
+ * The owner calls their own capability free of charge, so this costs nothing and, more importantly,
+ * the resulting URL is a real answer rather than a claim about one.
+ */
+export function odpsGenerateSample(ctx, rerender) {
+  var statusEl = document.getElementById('od-sample-status');
+  var token = getCortexOwnerToken();
+  if (!token) { if (statusEl) statusEl.textContent = t('odps.needLogin'); return; }
+  var base = apiBase();
+  var raw = (document.getElementById('odt-sample-input') || {}).value || '{}';
+  var input;
+  try { input = JSON.parse(raw); }
+  catch (e) { if (statusEl) { statusEl.className = 'dtl-ai-status od-err'; statusEl.textContent = t('odps.genSampleBadJson'); } return; }
+  var m = /^ext:([^:]+):(.+)$/.exec(ctx.actionId || '');
+  if (!m) { if (statusEl) statusEl.textContent = t('odps.genSampleNoBinding'); return; }
+  odBusy = true;
+  if (statusEl) { statusEl.className = 'dtl-ai-status'; statusEl.textContent = t('odps.genSampleRunning'); }
+  fetch(base + '/v1/ext/' + encodeURIComponent(m[1]) + '/' + encodeURIComponent(m[2]), {
+    method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  })
+    .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+    .then(function (res) {
+      if (!res.ok || !res.j || res.j.ok === false) {
+        var msg = (res.j && res.j.error && res.j.error.message) || t('odps.genSampleFailed');
+        throw new Error(msg);
+      }
+      var payload = JSON.stringify(res.j.data !== undefined ? res.j.data : res.j, null, 2);
+      var key = 'odps.sample.' + (ctx.appId || 'app') + '.' + (ctx.toolName || 'tool') + '.json';
+      return fetch(base + '/v1/storage', {
+        method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          key: key, visibility: 'public', mime_type: 'application/json',
+          data: btoa(unescape(encodeURIComponent(payload))),
+        }),
+      }).then(function (r) { return r.json(); }).then(function (up) {
+        if (!up || up.ok === false) throw new Error((up && up.error && up.error.message) || t('odps.genSampleFailed'));
+        var url = base + '/v1/pub/' + encodeURIComponent(ctx.ownerGhii || '') + '/' + key;
+        var field = document.getElementById('odt-sample');
+        if (field) field.value = url;
+        var st = document.getElementById('od-sample-status');
+        if (st) { st.className = 'dtl-ai-status od-ok'; st.textContent = '✔ ' + t('odps.genSampleDone'); }
+        odBusy = false;
+      });
+    })
+    .catch(function (e) {
+      odBusy = false;
+      var st = document.getElementById('od-sample-status');
+      if (st) { st.className = 'dtl-ai-status od-err'; st.textContent = '✘ ' + (e.message || t('odps.genSampleFailed')); }
+    });
 }
 
 export function odpsToggleDefaults(rerender) { odDefaultsOpen = !odDefaultsOpen; if (rerender) rerender(); }

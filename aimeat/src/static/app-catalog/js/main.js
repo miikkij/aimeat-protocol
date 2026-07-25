@@ -18,7 +18,8 @@ import { loadConfig, saveConfig } from './config.js';
 import { extractZip, bundleZip } from './zip.js';
 import { initDetail, refreshServerMgmt, openDetailView, editAppDetails, closeDetailView, detailLaunch, mountLoginPill, detailAboutEdit, detailAboutCancel, detailAboutSave, detailTranslateDesc, detailPromoteSave, detailPromoteClear, detailToggleFavorite, detailAccessCodeEdit, detailAccessCodeCancel, detailAccessCodeSave, detailSkillAttachToggle, detailSkillAttach, detailSkillDetach, detailSetScreenshot, detailRefreshScreenshot, detailAiRun, detailAiTest, detailAiKeep, detailAiDiscard, detailTestDraftLive, detailPublishTestedDraft, detailWorkTry, detailWorkPublish, detailWorkDiscard, detailCheckpointPreview, detailCheckpointRestore, detailCheckpointDelete, saveSourceAsWorkingCopy, openStagingPreview, sourceTestDraftLive, sourcePublishTested, detailEditSource, detailImproveExternal, detailSharePrompt, detailPublish, detailDelete, openPublishedDetail, fetchAppContentBase64, showLineageModal, showProtectionModal, saveProtection, showVersionsModal, restoreVersion, forkVersion } from './detail.js';
 import { monetizeAddTool, monetizeEditTool, monetizeCancelEdit, monetizeSaveTool, monetizeDeleteTool,
-  odpsToggleDefaultsUi, odpsToggleToolUi, odpsSuggestUi, odpsSaveDefaults } from './monetize.js';
+  odpsToggleDefaultsUi, odpsToggleToolUi, odpsSuggestUi, odpsSaveDefaults,
+  odpsGenerateSampleUi, odpsUseMeasuredUi } from './monetize.js';
 import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken, openCortexEditor, cortexEditorAddLib, cortexEditorSave, cortexEditorExport, closeCortexEditor, openPromptBuilder, closePbPanel, buildPromptFromBuilder, updatePbPreview } from './cortex.js';
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp } from './settings.js';
 import { initAppsIo, setEditingAppId, showModal, requireSignInThen, parseAppMeta, closeModal, switchTab, handleFileDrop, handleSave } from './apps-io.js';
@@ -145,6 +146,8 @@ import { toggleFavorite } from './favorites.js';
     odpsToggleTool: odpsToggleToolUi,
     odpsSuggest: odpsSuggestUi,
     odpsSaveDefaults: odpsSaveDefaults,
+    odpsGenerateSample: odpsGenerateSampleUi,
+    odpsUseMeasured: odpsUseMeasuredUi,
     editAppDetails: editAppDetails,
     showSubdomainModal: showSubdomainModal,
     openConsents: openConsents,

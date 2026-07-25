@@ -16,9 +16,11 @@
  *   pnpm check:viewport    # verify, non-zero exit on drift
  * @version-history
  *   v1.0.0 — 2026-07-25 — Initial (TARGET-051 Slice 1): aimeat-dag embeds aimeat-viewport.
+ *   v1.1.0 — 2026-07-25 — Also assert every pack's VERSION constant matches its manifest;
+ *     they crossed once already (constant 1.0.1 while the manifest said 1.0.2).
  */
 
-import { readFileSync, writeFileSync } from 'node:fs';
+import { readFileSync, writeFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -78,13 +80,47 @@ function main(): void {
     }
   }
 
+  drifted += checkVersions(check);
+
   if (check) {
     if (drifted > 0) {
-      console.error(`\n${drifted} file(s) out of sync. Run: pnpm sync:viewport`);
+      console.error(`\n${drifted} problem(s). Run: pnpm sync:viewport (embed) and align the versions by hand.`);
       process.exit(1);
     }
-    console.log('✓ embedded aimeat-viewport is in sync');
+    console.log('✓ embedded aimeat-viewport is in sync; pack VERSION constants match their manifests');
   }
+}
+
+/**
+ * A cortex pack that exposes a VERSION constant must report the version its manifest declares.
+ * These drift trivially — the manifest gets bumped to make the seeder republish, the constant is
+ * forgotten, and from then on the lib lies to anyone reading it from the console. Checking it is
+ * three lines; noticing it in production is not.
+ */
+function checkVersions(check: boolean): number {
+  let bad = 0;
+  for (const file of readdirSync(BUNDLED)) {
+    if (!file.endsWith('.js')) continue;
+    const js = readFileSync(join(BUNDLED, file), 'utf-8');
+    const yamlPath = join(BUNDLED, file.replace(/\.js$/, '.yaml'));
+    if (!existsSync(yamlPath)) continue;
+
+    // Only the pack's OWN constant, not one embedded from another pack.
+    const own = js.split(BEGIN)[0] + (js.includes(END) ? js.split(END).slice(1).join(END) : '');
+    const m = own.match(/VERSION:\s*'([\d.]+)'/);
+    if (!m) continue;
+
+    const y = readFileSync(yamlPath, 'utf-8').match(/^\s*version:\s*"([\d.]+)"/m);
+    if (!y) continue;
+
+    if (m[1] !== y[1]) {
+      bad++;
+      console.error(`✗ ${file}: VERSION constant is ${m[1]} but ${file.replace(/\.js$/, '.yaml')} declares ${y[1]}`);
+    } else if (!check) {
+      console.log(`✓ ${file}: VERSION ${m[1]} matches its manifest`);
+    }
+  }
+  return bad;
 }
 
 main();
