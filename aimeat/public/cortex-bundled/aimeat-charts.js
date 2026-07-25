@@ -11,6 +11,16 @@
  * Usage:
  *   AIMEAT.charts.ChartBuilder({ elementId: 'my-chart', type: 'bar', data: {...} })
  *   AIMEAT.charts.ChartPanel({ elementId: 'my-chart', chartKey: 'chart:sales-2024', nodeUrl: '...' })
+ *
+ * @version-history
+ *   v1.1.0 — 2026-07-25 — Charts follow the theme. The palette is resolved from the theme tokens
+ *     when a chart is drawn, and every chart this lib owns is repainted when the palette or the
+ *     light/dark mode changes. The old list called itself "the AIMEAT brand palette" and was
+ *     Tailwind's indigo/violet default: it was neither the house coral nor aware of the five
+ *     palettes the theme system ships, so every chart in every app was off-brand and stayed that
+ *     way when the reader switched look. A canvas cannot inherit a CSS variable the way a div can,
+ *     which is why this needs resolving at draw time plus a repaint, not a stylesheet rule.
+ *     Datasets that carry their own colours are still left alone.
  */
 (function (AIMEAT) {
   'use strict';
@@ -22,12 +32,47 @@
   /** Supported Chart.js chart types. */
   var TYPES = ['bar', 'line', 'pie', 'doughnut', 'radar', 'scatter', 'bubble'];
 
-  /** AIMEAT brand palette — used as default colours when datasets omit backgroundColor. */
-  var PALETTE = [
+  /**
+   * Used when the page has no AIMEAT theme loaded, so a bare Chart.js page still gets a chart
+   * with distinguishable series rather than ten black bars.
+   */
+  var FALLBACK_PALETTE = [
     '#6366f1', '#8b5cf6', '#a78bfa', '#c4b5fd',
     '#f59e0b', '#10b981', '#ef4444', '#3b82f6',
     '#ec4899', '#14b8a6'
   ];
+
+  /** The theme tokens a chart draws from, in the order a reader should see them. */
+  var PALETTE_TOKENS = [
+    '--color-primary', '--color-secondary', '--color-accent', '--color-info',
+    '--color-success', '--color-warning', '--color-error'
+  ];
+
+  /**
+   * The palette in effect right now, read from the theme.
+   *
+   * Resolved per draw rather than once at load: the theme has two axes (light/dark and five
+   * palettes) and both can change while the page is open.
+   *
+   * @param {Element=} host element to resolve against — the tokens live on :root, but resolving
+   *   against the chart's own container lets a scoped override win.
+   * @returns {string[]} colours, or FALLBACK_PALETTE when no theme is present.
+   */
+  function themePalette(host) {
+    try {
+      var cs = window.getComputedStyle(host || document.documentElement);
+      var out = [];
+      PALETTE_TOKENS.forEach(function (name) {
+        var v = String(cs.getPropertyValue(name) || '').trim();
+        if (v && out.indexOf(v) === -1) out.push(v);
+      });
+      /* Two colours cannot carry a multi-series chart, so a half-defined theme falls back whole
+         rather than mixing house colours with Tailwind defaults. */
+      return out.length >= 3 ? out : FALLBACK_PALETTE;
+    } catch (_e) {
+      return FALLBACK_PALETTE;
+    }
+  }
 
   /** Chart types where each data-point gets its own colour slice. */
   var SLICE_TYPES = ['pie', 'doughnut'];
@@ -132,11 +177,13 @@
    *
    * @param {object} data  Chart.js data object ({ labels, datasets }).
    * @param {string} type  Chart type string (e.g. 'bar', 'pie').
+   * @param {Element=} host container to resolve the theme against.
    * @returns {object} Cloned data with palette applied.
    */
-  function applyPalette(data, type) {
+  function applyPalette(data, type, host) {
     var d = JSON.parse(JSON.stringify(data));
     var isSlice = SLICE_TYPES.indexOf(type) !== -1;
+    var PALETTE = themePalette(host);
 
     d.datasets.forEach(function (ds, i) {
       if (!ds.backgroundColor) {
@@ -158,6 +205,65 @@
     });
 
     return d;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Following the theme
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Every chart this lib currently owns, with the data the CALLER passed.
+   *
+   * The caller's data is what gets kept, not the drawn data: applyPalette fills in a colour where
+   * one was missing, so re-applying it to already-drawn data would find every dataset "already
+   * coloured" and change nothing. Recolouring has to start from the original each time, which
+   * also keeps the promise that a dataset with its own colour is never overridden.
+   */
+  var live = [];
+  var watching = false;
+
+  /** Drop charts whose canvas has left the document, so a long-lived page does not accumulate. */
+  function pruneLive() {
+    live = live.filter(function (rec) {
+      var c = rec.chart;
+      return c && c.canvas && c.canvas.isConnected;
+    });
+  }
+
+  /** Repaint every live chart against the theme as it is now. */
+  function repaintAll() {
+    pruneLive();
+    live.forEach(function (rec) {
+      try {
+        var next = applyPalette(rec.data, rec.type, rec.el);
+        rec.chart.data.datasets.forEach(function (ds, i) {
+          var src = next.datasets[i];
+          if (!src) return;
+          ds.backgroundColor = src.backgroundColor;
+          ds.borderColor = src.borderColor;
+        });
+        /* A plain update(), not update('none'): the 'none' mode skips the element style cache
+           as well as the animation, so a bar chart kept its old fill while its own legend showed
+           the new one. Measured on canvas pixels, not inferred. The colour transition it animates
+           instead is the right feel for a palette change. */
+        rec.chart.update();
+      } catch (_e) { /* one bad chart must not stop the rest */ }
+    });
+  }
+
+  /**
+   * Watch the theme. A MutationObserver on the two attributes rather than the
+   * 'aimeat-palette-change' event, because light/dark has no event of its own and an app is free
+   * to set either attribute directly — the attribute is the thing that is actually true.
+   */
+  function watchTheme() {
+    if (watching || typeof MutationObserver === 'undefined') return;
+    watching = true;
+    try {
+      new MutationObserver(repaintAll).observe(document.documentElement, {
+        attributes: true, attributeFilter: ['data-theme', 'data-palette']
+      });
+    } catch (_e) { watching = false; }
   }
 
   /**
@@ -293,7 +399,7 @@
 
     try {
       var canvas = createCanvas(el);
-      var chartData = applyPalette(opts.data, opts.type);
+      var chartData = applyPalette(opts.data, opts.type, el);
       var chartOptions = buildOptions(opts.title, opts.options);
 
       var chart = new window.Chart(canvas, {
@@ -303,6 +409,9 @@
       });
 
       observeResize(chart, el);
+      pruneLive();
+      live.push({ chart: chart, el: el, data: opts.data, type: opts.type });
+      watchTheme();
       return chart;
     } catch (err) {
       showError(el, 'Failed to render chart: ' + (err.message || String(err)));
@@ -441,7 +550,10 @@
   var exports = {
     ChartPanel: ChartPanel,
     ChartBuilder: ChartBuilder,
-    TYPES: TYPES
+    TYPES: TYPES,
+    VERSION: '1.1.0',
+    /** The palette a chart would draw with right now, for legends and non-canvas visuals. */
+    palette: themePalette
   };
 
   AIMEAT.register('aimeat-charts', exports);
