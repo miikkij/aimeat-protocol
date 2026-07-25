@@ -36,10 +36,6 @@
  *   v1.7.0 — 2026-07-14 — Agent Face: the subdomain app root negotiates text/markdown (Accept
  *     or ?format=md) — serves the public apps.{filename}.agentface record (else converted app
  *     HTML) with the agent-affordances footer; browsers keep the exact HTML behavior.
- *   v1.8.0 — 2026-07-25 — frame-ancestors also lists the OWNER'S OTHER app origins, so one of a
- *     person's apps may frame another (a design surface showing their own apps and working-copy
- *     previews). Same-owner only — no cross-tenant framing. The legacy X-Frame-Options is dropped
- *     on these responses, since it would veto the CSP in browsers that honour it.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -70,22 +66,9 @@ export const SUBDOMAIN_RE = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/;
  * also allows the apex origin: the in-SPA sandboxed viewer (on the apex) frames the app
  * cross-origin (H-2), so without the apex here the browser would block it. `'self'` keeps the
  * app frameable within its own origin; we do NOT open it to `*` (clickjacking).
- *
- * `siblingOrigins` are the app origins of the SAME OWNER, and they are the only addition beyond
- * that. The risk in letting one app origin frame another is clickjacking — cross-origin framing
- * cannot read the framed DOM — and clickjacking presupposes two parties. Between two apps the
- * same person published there is no boundary to cross, so this grants no capability anyone did
- * not already have, while a design surface like ORIGAMI can render the owner's own apps (and
- * their working-copy previews) instead of resorting to running their HTML in its own origin.
- * Deliberately NOT extended to other owners' apps: that would be a real cross-tenant
- * clickjacking surface, and no feature so far needs it.
  */
-function appCsp(apexOrigin: string, siblingOrigins: string[] = []): string {
-  const ancestors = [
-    "'self'",
-    ...(apexOrigin ? [apexOrigin] : []),
-    ...siblingOrigins,
-  ].join(' ');
+function appCsp(apexOrigin: string): string {
+  const ancestors = apexOrigin ? `'self' ${apexOrigin}` : "'self'";
   // The app frames the apex silent-SSO bridge (hidden iframe → apex/app-silent.html), so frame-src
   // must allow the apex origin explicitly (https://aimeat.io is also covered by `https:`, but an http
   // dev apex like http://localtest.me is not — include it so seamless SSO works there too).
@@ -129,25 +112,6 @@ export async function ensureAppSubdomain(storage: Storage, config: AimeatConfig,
     // Race: a concurrent request created the mapping — re-resolve.
     const after = (await storage.listSubdomainSites()).find(s => s.enabled && s.kind === 'app' && s.target === target);
     return after?.subdomain ?? null;
-  }
-}
-
-/**
- * The app origins belonging to one owner, for frame-ancestors. Subdomain targets are
- * "owner/filename", so the owner's own apps are exactly the enabled app sites whose target starts
- * with `${ownerBare}/`. Returns [] when app origins are not configured. Never throws: a failure
- * here must fall back to the strict CSP, not to no CSP.
- */
-async function siblingAppOrigins(storage: Storage, config: AimeatConfig, ownerBare: string, scheme: string, portSuffix: string): Promise<string[]> {
-  if (!config.appHost || !ownerBare) return [];
-  try {
-    const sites = await storage.listSubdomainSites();
-    const prefix = `${ownerBare}/`;
-    return sites
-      .filter(s => s.enabled && s.kind === 'app' && typeof s.target === 'string' && s.target.startsWith(prefix))
-      .map(s => `${scheme}://${s.subdomain}.${config.appHost}${portSuffix}`);
-  } catch {
-    return [];
   }
 }
 
@@ -358,25 +322,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
   // Apex origin allowed to frame app-origin apps (the in-SPA sandboxed viewer).
   let apexOrigin = '';
   try { apexOrigin = new URL(config.baseUrl).origin; } catch { /* no apex frame-ancestor */ }
-  let originScheme = 'https', originPort = '';
-  try { const b = new URL(config.baseUrl); originScheme = b.protocol.replace(':', ''); originPort = b.port ? `:${b.port}` : ''; } catch { /* keep https */ }
-  // Base CSP (no siblings) — used by the portfolio origin, which has no app owner.
   const csp = appCsp(apexOrigin);
-
-  /**
-   * The CSP for one app, widened to that owner's OTHER app origins. Per-request because it
-   * depends on who owns the app; the header is what tells the browser who may frame it, and the
-   * browser asks before any framer identifies itself.
-   */
-  const cspForOwner = async (ownerBare: string): Promise<string> =>
-    appCsp(apexOrigin, await siblingAppOrigins(storage, config, ownerBare, originScheme, originPort));
-
-  /**
-   * A global X-Frame-Options: SAMEORIGIN is set for the whole node. Where frame-ancestors is the
-   * real policy it has to go: the two disagree, and a browser that honours the legacy header
-   * blocks the frame no matter what the CSP says.
-   */
-  const dropLegacyFrameOptions = (res: Response) => res.removeHeader('X-Frame-Options');
 
   router.get('/', async (req: Request, res: Response, next) => {
     const sub = req.subdomain;
@@ -428,9 +374,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     // session); it is scoped to exactly this app (owner + filename).
     const previewToken = req.query.preview as string | undefined;
     if (previewToken) {
-      const pOwner = site.target.slice(0, Math.max(0, site.target.indexOf('/')));
-      dropLegacyFrameOptions(res);
-      await serveDraftPreview(res, storage, config, site.target, previewToken, await cspForOwner(pOwner), apexOrigin);
+      await serveDraftPreview(res, storage, config, site.target, previewToken, csp, apexOrigin);
       return;
     }
 
@@ -444,8 +388,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (await serveAppAgentFace(res, config, storage, app)) return;
     }
 
-    dropLegacyFrameOptions(res);
-    serveApp(res, storage, app, await cspForOwner(app.ownerName), apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' });  // the SDK (aimeat-auth.js) does the silent SSO itself
+    serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' });  // the SDK (aimeat-auth.js) does the silent SSO itself
   });
 
   // App-origin path form: `apps.<apex>/<owner>/<filename>` on the bare app host. Apps need their
@@ -474,8 +417,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       res.redirect(302, `${scheme}://${sub}.${config.appHost}${portSuffix}/`);
       return;
     }
-    dropLegacyFrameOptions(res);
-    serveApp(res, storage, app, await cspForOwner(app.ownerName), apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }); // no subdomain available → serve on the shared host (no SSO)
+    serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }); // no subdomain available → serve on the shared host (no SSO)
   });
 
   return router;

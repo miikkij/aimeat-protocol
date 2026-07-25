@@ -2324,7 +2324,6 @@ components:
         forks: { type: integer, description: Number of direct forks of this app }
         download_url: { type: string }
         screenshot_url: { type: string, nullable: true }
-        app_origin_url: { type: string, nullable: true, description: Absolute URL of the app's own origin, when a per-app subdomain has already been assigned. A client that embeds an app must point at this — the relative inline path would execute the app's HTML in the CLIENT's origin. Read-only, so it is null until the app has been opened at least once; null also when app origins are disabled on the node. }
         created_at: { type: string, format: date-time }
 
     # === Package & Template Schemas ===
