@@ -15,6 +15,7 @@
 import { auth, refreshOnFocus } from './session.js';
 import { maybeShowGoogleSignup } from './signup.js';
 import { attach } from '../_core/namespace.js';
+import { readLocales, aimeatReadLang, aimeatApplyLang } from './locale.js';
 
 // ── Boot: first-time OIDC signup prompt (after the callback bounced back with ?aimeat_signup=1) ──
 if (typeof document !== 'undefined' && document.addEventListener) {
@@ -33,5 +34,12 @@ if (typeof window !== 'undefined' && window.addEventListener) {
 }
 
 // ── Expose globally ──
+// Locale, resolved the ONE way this platform resolves it ('aimeat-lang': ?lang= -> localStorage
+// -> cookie -> navigator). The pill renders the control; these let an app read and set the same
+// value without re-implementing the lookup and drifting from it. They hang off `auth` (NOT the
+// return of attach(), which is the whole window.AIMEAT namespace) so they land on AIMEAT.auth.
+auth.getLang = function (locales) { return aimeatReadLang(readLocales({ locales: locales })); };
+auth.setLang = function (lang) { aimeatApplyLang(String(lang).toLowerCase()); };
+
 const ns = attach('auth', auth);
-ns.version = '2026-07-02-001';
+ns.version = '2026-07-25-001';

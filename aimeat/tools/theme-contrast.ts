@@ -70,16 +70,17 @@ function parseThemes(css: string): { light: Theme; dark: Theme } {
 
 const SEMANTIC = ['primary', 'secondary', 'accent', 'neutral', 'info', 'success', 'warning', 'error'];
 /**
- * A card has to be TELLABLE from the page. Contrast ratio is a text metric and a blunt tool for
- * two adjacent surfaces, so the boundary may come from either mechanism:
- *   - a luminance STEP between base-200 and base-100, or
- *   - an EDGE: base-300 readable against both the card it outlines and the page behind it.
- * Satisfying neither is the daisyUI dark failure (1.05 step, 1.03 edge: nothing is visible).
- * AIMEAT light leans on the edge (1.05 step but a 1.24 hairline), which is why the bridge gives
- * every `.card` a base-300 border by default rather than trusting the step alone.
+ * A card has to be TELLABLE from the page, and BOTH mechanisms are required — this check used to
+ * accept either, which let the light theme ship with a 1.05 step behind a 1.24 hairline. The result
+ * was the reported bug: white cards you could not see against a near-white page, and form controls
+ * (daisyUI fills them with base-100) invisible inside the card they sat on. Loosening the test was
+ * the wrong move; the palette had to change.
+ *   - STEP: base-200 vs base-100 — enough that a card reads as raised with no border at all.
+ *   - EDGE: base-300 against the card it outlines and the page behind it — a hairline you can see.
+ * daisyUI's own dark theme fails both (1.05 step, 1.03 edge).
  */
-const MIN_SURFACE_STEP = 1.2;
-const MIN_EDGE_VS_CARD = 1.2;
+const MIN_SURFACE_STEP = 1.12;
+const MIN_EDGE_VS_CARD = 1.35;
 const MIN_EDGE_VS_PAGE = 1.15;
 /** Rounded claims are stated to one decimal, so allow half of that. */
 const CLAIM_TOLERANCE = 0.05;
@@ -118,18 +119,20 @@ function checkTheme(name: string, theme: Theme): Result[] {
   const step = ratio(hex('base-200'), hex('base-100'));
   const edgeCard = ratio(hex('base-300'), hex('base-200'));
   const edgePage = ratio(hex('base-300'), hex('base-100'));
-  const byStep = step >= MIN_SURFACE_STEP;
-  const byEdge = edgeCard >= MIN_EDGE_VS_CARD && edgePage >= MIN_EDGE_VS_PAGE;
   out.push({
-    theme: name,
-    label: byStep
-      ? 'card boundary (luminance step)'
-      : `card boundary (edge required: step is only ${step.toFixed(2)})`,
-    actual: byStep ? step : edgeCard,
-    min: byStep ? MIN_SURFACE_STEP : MIN_EDGE_VS_CARD,
-    claim: null,
-    ok: byStep || byEdge,
-    why: `neither a step (${step.toFixed(2)}) nor an edge (${edgeCard.toFixed(2)} on the card, ${edgePage.toFixed(2)} on the page) separates the card`,
+    theme: name, label: 'card boundary: step (base-200 vs base-100)', actual: step,
+    min: MIN_SURFACE_STEP, claim: null, ok: step >= MIN_SURFACE_STEP,
+    why: 'a card with no border would be invisible on the page',
+  });
+  out.push({
+    theme: name, label: 'card boundary: edge (base-300 vs base-200)', actual: edgeCard,
+    min: MIN_EDGE_VS_CARD, claim: null, ok: edgeCard >= MIN_EDGE_VS_CARD,
+    why: 'the hairline that outlines a card cannot be seen on it',
+  });
+  out.push({
+    theme: name, label: 'card boundary: edge (base-300 vs base-100)', actual: edgePage,
+    min: MIN_EDGE_VS_PAGE, claim: null, ok: edgePage >= MIN_EDGE_VS_PAGE,
+    why: 'the hairline cannot be seen against the page',
   });
   return out;
 }

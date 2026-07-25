@@ -13,7 +13,10 @@
   'use strict';
 
   var state = { keyBase: null, localeList: [], locale: 'en', dicts: {}, fallback: 'en' };
-  var STORE_KEY = 'aimeat-i18n-locale';
+  // THE platform locale key — same as the SPA (public/js/utils.js), the sign-in modal and the
+  // login pill's language control. A private 'aimeat-i18n-locale' was a third convention that
+  // silently disagreed with the other two.
+  var STORE_KEY = 'aimeat-lang';
   var styled = false;
 
   function injectStyles() {
@@ -80,6 +83,8 @@
     return loadDict(locale).then(function () {
       state.locale = locale;
       try { window.localStorage.setItem(STORE_KEY, locale); } catch (e) { /* ignore */ }
+      try { document.cookie = 'aimeat-lang=' + locale + ';path=/;max-age=31536000;SameSite=Lax'; } catch (e) { /* ignore */ }
+      try { window.dispatchEvent(new CustomEvent('aimeat-lang-change', { detail: { lang: locale } })); } catch (e) { /* ignore */ }
       try { window.dispatchEvent(new CustomEvent('aimeat-i18n-changed', { detail: { locale: locale } })); } catch (e) { /* ignore */ }
       return locale;
     });

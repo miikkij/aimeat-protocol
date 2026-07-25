@@ -126,6 +126,21 @@ export function buildAppPrompt(
   body += '```\n\n';
 
   // App permissions — the scope vocabulary, generated from the authorize endpoint's own constant
+  // The language control. Every app used to hand-roll its own EN/FI switch — a text button here, a
+  // select there, a pair of links elsewhere — against three different storage keys. It now travels
+  // in the login pill exactly as the theme toggle does. (Reported 2026-07-25: "it is ALWAYS
+  // different in every single app".)
+  body += '### Language: declare it, never build the switch\n';
+  body += 'A bilingual app does NOT build its own language button. The control travels inside the login pill, next to the light/dark toggle, so every app on the node has the identical one in the identical place. You declare which languages you have and react to the change:\n';
+  body += '```html\n';
+  body += '<meta name="aimeat-locales" content="en fi">\n';
+  body += '```\n';
+  body += '```javascript\n';
+  body += 'var lang = AIMEAT.auth.getLang();                 // "en" | "fi" — resolved ?lang= > localStorage > cookie > navigator\n';
+  body += 'window.addEventListener("aimeat-lang-change", function (e) { lang = e.detail.lang; render(); });\n';
+  body += '```\n';
+  body += 'Declare one language (or none) and no control renders. The choice is stored under the ONE platform key `aimeat-lang`, the same one the AIMEAT SPA and the sign-in modal use, so an app and the site agree. `AIMEAT.auth.setLang("fi")` sets it programmatically. Do not invent a second key, a second control, or a `?locale=` parameter.\n\n';
+
   body += '### App permissions (scopes)\n';
   body += 'An app that declares nothing gets the DEFAULT grant: `memory:read memory:write storage:read storage:write`. If the app needs more, declare EVERY scope it uses in the head — the user approves them at sign-in:\n';
   body += '```html\n';
@@ -268,7 +283,7 @@ export function buildAppPrompt(
   body += '- **One focal point per screen.** Decide the single most important thing (the verdict, the number, the next action) and make it visually dominant — bigger, heavier, or the only saturated colour in view. If everything is the same weight, the eye has nowhere to land and the page reads as a wall.\n';
   body += '- **Use at least three type steps, and mean them.** A key metric set in the same 14px run as the sentence around it is invisible. Give numbers that matter display treatment: large, `font-semibold`, `tabular-nums`, tight tracking. Labels go small and `uppercase tracking-wide opacity-60`. Body text stays one comfortable size.\n';
   body += '- **Colour carries meaning or it carries nothing.** Default to neutral surfaces and reserve saturation for state and the primary action. Prefer the quiet variants (`badge-soft`, `alert-soft`, `btn-soft`, `badge-outline`) and keep ONE solid fill for the thing that genuinely has to shout.\n';
-  body += '- **Group, do not stack.** Related facts belong in ONE card with internal structure, not one card each. A vertical run of more than about five sibling cards is a sign the content was never grouped. Give cards an edge (`card-border` / `border border-base-300`) or a shadow: in light theme `base-200` is only a 1.05 luminance step off `base-100`, so a bare card has no visible boundary.\n';
+  body += '- **Group, do not stack.** Related facts belong in ONE card with internal structure, not one card each. A vertical run of more than about five sibling cards is a sign the content was never grouped. Give cards an edge (`card-border` / `border border-base-300`): the surface step alone makes a card read as a lighter patch, the hairline makes it read as a card.\n';
   body += '- **Cap the measure, use the space.** Long prose past ~70 characters per line is tiring, and a single `max-w-5xl` column on a wide screen is mostly empty gutters. Either keep the container narrower or put the freed width to work (a summary rail, a two-column split via `AIMEAT.ui.layout`).\n';
   body += '- **Design the empty, loading and error states.** They are most of what a new user sees. Use `AIMEAT.ui.motion.skeleton()` rather than a spinner (shimmer in the SHAPE of the coming content reads as fast; a spinner reads as stuck), and say what an empty state means plus what to do about it.\n';
   body += 'Reach for the cortex UI packs before hand-rolling: `aimeat-ui-motion` (`statTiles()` for a KPI row with count-up numbers and sparklines, `skeleton()`, `staggerIn()` for lists), `aimeat-ui-viewers` (`DataTable`, `List`, `Timeline`), `aimeat-ui-layout` (`MainDetail`, `DashboardGrid`, `Split`). Hand-rolling a `<ul>` where `statTiles` was one script tag away is the single most common reason an AIMEAT app looks poorer than it is.\n\n';
