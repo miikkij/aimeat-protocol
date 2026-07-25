@@ -22,7 +22,7 @@ import type { Request, Response } from 'express';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import {
@@ -82,6 +82,26 @@ function sendCommerceError(res: Response, config: AimeatConfig, err: unknown, ex
   res.status(500).json(error(config.nodeId, 'COMMERCE_ERROR', e.message ?? 'Unexpected commerce error'));
 }
 
+/** The seller's opaque payment-settings record. Holds the Stripe credentials AND the x402 payout
+ *  address side by side, so every write MERGES: one rail's settings must never delete the other's. */
+const PSP_KEY = 'commerce.psp';
+/** An EVM account address — the only shape an x402 USDC settlement can pay out to. */
+const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
+
+type PspRecord = { provider?: string; secretKey?: unknown; payTo?: string; address?: string; x402?: { address?: string; payTo?: string } };
+
+/** Read the seller's payment settings record (private, owner-scoped). */
+async function readPsp(storage: Storage, ownerGhii: string): Promise<PspRecord> {
+  const rec = await storage.getMemory(ownerGhii, PSP_KEY);
+  return (rec?.value as PspRecord | undefined) ?? {};
+}
+
+/** The x402 payout address in any of the shapes the facilitator accepts (extractPayTo mirrors this). */
+function payToOf(psp: PspRecord): string | null {
+  const candidate = psp.payTo ?? psp.address ?? psp.x402?.address ?? psp.x402?.payTo;
+  return typeof candidate === 'string' && EVM_ADDRESS.test(candidate.trim()) ? candidate.trim() : null;
+}
+
 export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
@@ -104,6 +124,72 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   }
 
   // POST /v1/commerce/checkout-sessions — open a session against one seller's offers.
+  /* ── Seller payout settings ────────────────────────────────────────────────────────────────────
+   * Which rails can actually pay this seller, and the one setting the seller owns for each. The two
+   * rails are deliberately reported apart: Stripe moves fiat (EUR/USD) to a connected account, x402
+   * moves USDC on-chain to an address the seller controls. Reading tells you which of your money
+   * listings can settle at all — an x402 sale without an address fails with SELLER_NO_X402_ADDRESS. */
+  router.get('/v1/commerce/payout', requireAuth(), requireRole('owner'), async (req, res) => {
+    const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
+    const psp = await readPsp(storage, ownerGhii);
+    const address = payToOf(psp);
+    return res.json(success(config.nodeId, {
+      x402: {
+        enabled: config.x402Enabled,
+        network: config.x402Network,
+        testnet: config.x402Network !== 'base',
+        configured: !!address,
+        address,
+        currency: 'USDC',
+        note: config.x402Enabled
+          ? 'Stablecoin settlement: the buyer signs a USDC payment and the facilitator settles it straight to this address. No key is held by the node.'
+          : 'The node operator has not enabled x402 on this node (AIMEAT_X402_ENABLED).',
+      },
+      stripe: {
+        configured: !!psp.secretKey,
+        provider: psp.provider ?? null,
+        currencies: ['EUR', 'USD'],
+        note: 'Card and invoice settlement in real currency, paid out to your connected account.',
+      },
+    }));
+  });
+
+  /** Set the x402 USDC payout address. Merges into the record — the Stripe credentials survive. */
+  router.put('/v1/commerce/payout/x402', requireAuth(), requireRole('owner'), async (req, res) => {
+    const raw = (req.body ?? {}) as { address?: unknown };
+    const address = typeof raw.address === 'string' ? raw.address.trim() : '';
+    if (!EVM_ADDRESS.test(address)) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_ADDRESS',
+        'address must be an EVM account address: 0x followed by 40 hex characters'));
+    }
+    const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
+    const psp = await readPsp(storage, ownerGhii);
+    const now = new Date().toISOString();
+    await storage.setMemory({
+      key: PSP_KEY, ownerGaii: ownerGhii, value: { ...psp, payTo: address },
+      visibility: 'private', tags: ['commerce'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+    });
+    return res.json(success(config.nodeId, {
+      configured: true, address, network: config.x402Network, currency: 'USDC',
+      enabled: config.x402Enabled,
+    }));
+  });
+
+  /** Remove the payout address only — Stripe credentials in the same record are untouched. */
+  router.delete('/v1/commerce/payout/x402', requireAuth(), requireRole('owner'), async (req, res) => {
+    const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
+    const psp = await readPsp(storage, ownerGhii);
+    const next: PspRecord = { ...psp };
+    delete next.payTo; delete next.address;
+    if (next.x402) { const x = { ...next.x402 }; delete x.address; delete x.payTo; next.x402 = x; }
+    const now = new Date().toISOString();
+    await storage.setMemory({
+      key: PSP_KEY, ownerGaii: ownerGhii, value: next,
+      visibility: 'private', tags: ['commerce'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+    });
+    return res.json(success(config.nodeId, { configured: false, note: 'USDC sales now fail until an address is set again. Card/invoice settlement is unaffected.' }));
+  });
+
   router.post('/v1/commerce/checkout-sessions', requireAuth(), async (req, res) => {
     const parsed = CreateSchema.safeParse(req.body);
     if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_CHECKOUT', parsed.error.message)); return; }

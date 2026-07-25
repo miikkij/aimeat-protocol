@@ -199,6 +199,39 @@ await test('7. Parameterization: the exact scheme network + asset come from the 
         `asset + EIP-712 domain from the base-sepolia registry entry: ${JSON.stringify({ asset: requirements.asset, extra: requirements.extra })}`);
 });
 
+// -- Payout settings surface (the endpoint the Wallet tab uses): the two rails are reported apart,
+// and a write to one never deletes the other's setting -- they share one opaque record.
+await test('Payout status reports the x402 rail and its network', async () => {
+  const r = await json('/v1/commerce/payout', { headers: auth(seller.token) });
+  assert(r.status === 200, `payout status ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const x = r.body.data.x402;
+  assert(x && x.currency === 'USDC' && typeof x.network === 'string', `x402 block: ${JSON.stringify(x)}`);
+  assert(r.body.data.stripe && Array.isArray(r.body.data.stripe.currencies), 'the fiat rail is reported separately');
+});
+
+await test('Setting the payout address is validated and merged, keeping the Stripe credential', async () => {
+  const bad = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ address: 'not-an-address' }) });
+  assert(bad.status === 400 && bad.body?.error?.code === 'INVALID_ADDRESS', `expected INVALID_ADDRESS, got ${bad.status}`);
+  const seeded = await json('/v1/memory', { method: 'POST', headers: auth(seller.token),
+    body: JSON.stringify({ key: 'commerce.psp', value: { provider: 'stripe', secretKey: 'sk_test_kept' }, visibility: 'private' }) });
+  assert(seeded.status === 200 || seeded.status === 201, `seed ${seeded.status}`);
+  const addr = '0x' + 'a1b2c3d4'.repeat(5);
+  const ok = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ address: addr }) });
+  assert(ok.status === 200 && ok.body.data.configured === true, `set address ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+  const rec = await json('/v1/memory/commerce.psp', { headers: auth(seller.token) });
+  const v = (rec.body.data?.value ?? rec.body.data?.record?.value) as any;
+  assert(v.payTo === addr, `address stored: ${JSON.stringify(v)}`);
+  assert(v.secretKey === 'sk_test_kept', `the other rail credential survived: ${JSON.stringify(v)}`);
+});
+
+await test('Removing the payout address leaves the fiat rail intact', async () => {
+  const del = await json('/v1/commerce/payout/x402', { method: 'DELETE', headers: auth(seller.token) });
+  assert(del.status === 200 && del.body.data.configured === false, `delete ${del.status}`);
+  const rec = await json('/v1/memory/commerce.psp', { headers: auth(seller.token) });
+  const v = (rec.body.data?.value ?? rec.body.data?.record?.value) as any;
+  assert(!v.payTo && v.secretKey === 'sk_test_kept', `only the address was cleared: ${JSON.stringify(v)}`);
+});
+
 console.log(`\n${'═'.repeat(50)}`);
 console.log(`x402 E2E: ${passed} passed, ${failed} failed (${passed + failed} total)`);
 console.log('═'.repeat(50));
