@@ -103,6 +103,8 @@ export async function supersedeWithProposal(
     pricing: priceChanged ? { model: 'per_call' } : existing.pricing,
     capUnits: newCap, rakePercent: existing.rakePercent, contractRef: `proposal:${proposal.proposalId}`,
     surface: existing.surface, escrowParty: existing.escrowParty, createdBy: proposal.counterpartyOwner,
+    // Renegotiating a price does not renegotiate the brake: pacing carries across unchanged.
+    tollMorsels: existing.tollMorsels ?? null,
     carrySpend: null,   // renegotiation = a fresh meter; the old spend is preserved in the archive
   });
 }

@@ -12,6 +12,7 @@
  * @usage import { OffersDocSchema } from '../models/offer-schemas.js';
  *   const parsed = OffersDocSchema.safeParse(req.body);
  * @version-history
+ *   v2.5.0 -- 2026-07-25 -- `tollMorsels`: an offer declares its own pacing burn (see AppTool).
  *   v1.0.0 -- 2026-06-12 -- Initial: offer descriptor (Agent Offers surface v1).
  *   v2.0.0 -- 2026-06-12 -- Billable offers: price + visibility + callable binding. An offer is a
  *     billable capability — free for the owner's own use, debited (morsels owner→provider) when a
@@ -152,6 +153,8 @@ export const OfferSchema = z.object({
   // `required_to_function` (the workflow consumer gate): dependsOn is the human-facing "needs first".
   dependsOn: z.array(DependencySchema).max(20).optional(),
   // ── v2 billable/listable/callable (all optional; default to private, not-for-sale, human-driven) ──
+  /** Morsels burned per delivered task to pace consumption — a brake, never revenue (see AppTool). */
+  tollMorsels: z.number().int().min(0).max(100).optional(),
   price: PriceSchema.optional(),
   // Money price (TARGET-033 phase 6): amount in 6-decimal MICRO-UNITS (1 EUR = 1_000_000 micros;
   // matches USDC/x402, covers sub-cent per-call pricing) + ISO code. Sellable through the commerce

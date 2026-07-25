@@ -203,6 +203,12 @@ function editorHtml(tool) {
         t('monetize.exchange') +
       '</label>' +
       '<div class="dtl-sync none" style="margin:4px 0 8px">' + t('monetize.exchangeHint') + '</div>' +
+      // Pacing, not price: this is what a call BURNS to bound how fast the tool can be consumed. It is
+      // separate from every price above precisely because it is not revenue — nobody is credited it.
+      '<label class="dtl-stat-label" for="mz-toll">' + t('monetize.toll') + '</label>' +
+      '<input id="mz-toll" class="modal-input" type="number" min="0" max="100" step="1" value="'
+        + (typeof tool.tollMorsels === 'number' ? tool.tollMorsels : '') + '" placeholder="0" style="margin:4px 0 4px" />' +
+      '<div class="dtl-sync none" style="margin:0 0 8px">' + t('monetize.tollHint') + '</div>' +
       odpsToolFieldsHtml(tool, mzOfferings[tool.name || ''] || '', {
         appId: mzAppId, ownerGhii: mzOwnerGhiiOf(), toolName: tool.name || '', actionId: tool.action_id || '',
         appProvenance: (mzDoc && mzDoc.provenance) || null, timing: mzTiming[tool.name || ''] || null,
@@ -346,6 +352,15 @@ function readEditor(base) {
   // The EXCHANGE listing exists because this flag says so; turning it off removes the listing (never a contract).
   var ex = document.getElementById('mz-exchange');
   if (ex && ex.checked) tool.exchange = true; else delete tool.exchange;
+  // An empty box means "whatever the node decides", which is not the same as an explicit 0 ("never pace
+  // this one") — so the field is deleted when blank rather than written as zero.
+  var tollRaw = (document.getElementById('mz-toll').value || '').trim();
+  if (tollRaw === '') delete tool.tollMorsels;
+  else {
+    var toll = parseInt(tollRaw, 10);
+    if (!Number.isFinite(toll) || toll < 0 || toll > 100) { showNotice(t('monetize.tollInvalid'), 'error'); return null; }
+    tool.tollMorsels = toll;
+  }
   var actionId = (document.getElementById('mz-action').value || '').trim();
   if (actionId) tool.action_id = actionId; else delete tool.action_id;
   var agent = (document.getElementById('mz-agent').value || '').trim();

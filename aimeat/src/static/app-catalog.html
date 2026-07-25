@@ -3149,6 +3149,9 @@
       "odps.blockedBinding": "Cannot be listed: the tool needs a capability binding (action_id).",
       "odps.blockedPrice": "Cannot be listed: the tool needs a price.",
       "monetize.exchange": "List in EXCHANGE",
+      "monetize.toll": "Pacing burn per call (morsels)",
+      "monetize.tollHint": "Not a price: morsels burned per call to cap how fast this tool can be consumed. Nobody is credited them, and your own calls are free. Leave empty to use the node default; set 0 to switch pacing off for this tool.",
+      "monetize.tollInvalid": "Pacing burn must be a whole number between 0 and 100.",
       "monetize.exchangeHint": "On: this tool is offered publicly on the marketplace and its listing follows the price you set here. Off: it is removed from the marketplace. Contracts already agreed are unaffected.",
       "monetize.exchangeOn": "in EXCHANGE",
       "monetize.exchangeNeedsSchema": "To list in EXCHANGE the tool needs an input and output schema plus a capability binding. Publish those first (MCP: aimeat_app_tools_publish).",
@@ -3746,6 +3749,9 @@
       "odps.blockedBinding": "Ei listaudu: työkalu tarvitsee kyvykkyyssidonnan (action_id).",
       "odps.blockedPrice": "Ei listaudu: työkalu tarvitsee hinnan.",
       "monetize.exchange": "Listaa EXCHANGEssa",
+      "monetize.toll": "Tahdistuspoltto per kutsu (morselia)",
+      "monetize.tollHint": "Ei hinta: morselit jotka palavat jokaisella kutsulla ja rajaavat kuinka nopeasti työkalua voi kuluttaa. Niitä ei hyvitetä kenellekään, ja omat kutsusi ovat ilmaisia. Jätä tyhjäksi niin noden oletus pätee; 0 poistaa tahdistuksen tästä työkalusta.",
+      "monetize.tollInvalid": "Tahdistuspoltto on kokonaisluku väliltä 0-100.",
       "monetize.exchangeHint": "Päällä: työkalu on julkisesti markkinalla ja listaus seuraa tässä asetettua hintaa. Pois: se poistuu markkinalta. Jo sovitut sopimukset eivät muutu.",
       "monetize.exchangeOn": "EXCHANGEssa",
       "monetize.exchangeNeedsSchema": "EXCHANGE-listaus vaatii työkalulta syöte- ja tulosskeeman sekä kyvykkyyssidonnan. Julkaise ne ensin (MCP: aimeat_app_tools_publish).",
@@ -5558,7 +5564,7 @@
     })[0];
     var money2Major = second ? String(second.amount / MONEY_UNIT) : "";
     var cur2 = second && second.currency || (cur === "EUR" ? "USD" : "EUR");
-    return '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="mz-name">' + t("monetize.name") + '</label><input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || "") + '" placeholder="summarize" style="margin:4px 0 8px" /><label class="dtl-stat-label" for="mz-desc">' + t("monetize.desc") + '</label><input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || "") + '" style="margin:4px 0 8px" /><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-morsels">' + t("monetize.priceMorsels") + '</label><input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" style="margin:4px 0 8px" /></div><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money">' + t("monetize.priceMoney") + '</label><input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" style="margin:4px 0 8px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency">' + t("monetize.currency") + "</label>" + currencySelect("mz-currency", cur) + '</div></div><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money2">' + t("monetize.money2") + '</label><input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" style="margin:4px 0 4px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency2">' + t("monetize.currency2") + "</label>" + currencySelect("mz-currency2", cur2) + '</div></div><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.money2Hint") + '</div><label class="dtl-stat-label" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? " checked" : "") + " />" + t("monetize.exchange") + '</label><div class="dtl-sync none" style="margin:4px 0 8px">' + t("monetize.exchangeHint") + "</div>" + odpsToolFieldsHtml(tool, mzOfferings[tool.name || ""] || "", {
+    return '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="mz-name">' + t("monetize.name") + '</label><input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || "") + '" placeholder="summarize" style="margin:4px 0 8px" /><label class="dtl-stat-label" for="mz-desc">' + t("monetize.desc") + '</label><input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || "") + '" style="margin:4px 0 8px" /><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-morsels">' + t("monetize.priceMorsels") + '</label><input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" style="margin:4px 0 8px" /></div><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money">' + t("monetize.priceMoney") + '</label><input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" style="margin:4px 0 8px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency">' + t("monetize.currency") + "</label>" + currencySelect("mz-currency", cur) + '</div></div><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money2">' + t("monetize.money2") + '</label><input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" style="margin:4px 0 4px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency2">' + t("monetize.currency2") + "</label>" + currencySelect("mz-currency2", cur2) + '</div></div><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.money2Hint") + '</div><label class="dtl-stat-label" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? " checked" : "") + " />" + t("monetize.exchange") + '</label><div class="dtl-sync none" style="margin:4px 0 8px">' + t("monetize.exchangeHint") + '</div><label class="dtl-stat-label" for="mz-toll">' + t("monetize.toll") + '</label><input id="mz-toll" class="modal-input" type="number" min="0" max="100" step="1" value="' + (typeof tool.tollMorsels === "number" ? tool.tollMorsels : "") + '" placeholder="0" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.tollHint") + "</div>" + odpsToolFieldsHtml(tool, mzOfferings[tool.name || ""] || "", {
       appId: mzAppId,
       ownerGhii: mzOwnerGhiiOf(),
       toolName: tool.name || "",
@@ -5698,6 +5704,16 @@
     var ex = document.getElementById("mz-exchange");
     if (ex && ex.checked) tool.exchange = true;
     else delete tool.exchange;
+    var tollRaw = (document.getElementById("mz-toll").value || "").trim();
+    if (tollRaw === "") delete tool.tollMorsels;
+    else {
+      var toll = parseInt(tollRaw, 10);
+      if (!Number.isFinite(toll) || toll < 0 || toll > 100) {
+        showNotice(t("monetize.tollInvalid"), "error");
+        return null;
+      }
+      tool.tollMorsels = toll;
+    }
     var actionId = (document.getElementById("mz-action").value || "").trim();
     if (actionId) tool.action_id = actionId;
     else delete tool.action_id;

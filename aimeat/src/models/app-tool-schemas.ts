@@ -11,6 +11,8 @@
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
  * @version-history
+ *   v1.4.0 — 2026-07-25 — `tollMorsels`: a tool declares its own pacing burn, so a node default of 0
+ *     means "paced only where a provider asked for it" instead of "never paced".
  *   v1.4.0 — 2026-07-25 — ODPS: per-tool `provenance` + `odps` (the authoring block projected into the
  *     tool's ODPS v4.1 document) and APP-LEVEL defaults of both on the manifest root, inherited by every
  *     tool. Additive; existing manifests validate unchanged.
@@ -63,6 +65,13 @@ export const AppToolSchema = z.object({
    * fulfillment TASK when the tool has no action_id binding. Ignored for callable tools.
    */
   agent: z.string().max(100).optional(),
+  /**
+   * Morsels burned per call to bound the RATE this tool can be consumed at — a brake, never revenue
+   * (invariant M1: the burn is not credited to anyone). Independent of `price`/`priceMoney`: a tool sold
+   * for money is still paced when this is set, which is the only way a money-priced capability gets a
+   * ceiling that a budget alone cannot give it. Absent = the node's default (shipped at 0).
+   */
+  tollMorsels: z.number().int().min(0).max(100).optional(),
   /** Morsel price per call. Absent/0 = not for sale cross-owner in morsels. */
   price: z.object({
     morsels: z.number().int().nonnegative(),
