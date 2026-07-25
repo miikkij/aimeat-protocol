@@ -10,6 +10,10 @@
  *   this module re-renders #detail-monetize in place after loads/saves.
  * @usage import { monetizeSectionInner, monetizeOnOpen, monetizeAddTool, ... } from './monetize.js'
  * @version-history
+ *   v1.3.0 — 2026-07-25 — ODPS: the app-level EXCHANGE status + ODPS defaults section, the per-tool ODPS
+ *     descriptor block (with an AI draft and a link to the live odps.yaml), and the blocked-listing reason
+ *     on a tool row. Also fixes a data loss of the same family as v1.1.0: a tool save rebuilt the manifest
+ *     root from three fields and dropped the app-level `odps`/`provenance` defaults.
  *   v1.2.0 — 2026-07-25 — TARGET-050: the manifest is the SOURCE OF TRUTH for the EXCHANGE listing —
  *     a "List in EXCHANGE" toggle and a second money price (EUR *and* USD) live here, and the node
  *     projects the marketplace listing from this record on every write. No second listing step.
@@ -22,6 +26,10 @@ import { dtlBtn, showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t } from './i18n.js';
 import { getCortexOwnerToken } from './cortex.js';
+import {
+  odpsStatusInner, odpsToolFieldsHtml, readOdpsToolFields, readOdpsAppDefaults,
+  odpsToggleDefaults, odpsToggleTool, odpsSuggestForTool, odpsBlockedReason,
+} from './odps.js';
 
 // Tool names become sku segments (app-tool:<owner>/<appId>:<name>) — same rule the node schema
 // (src/models/app-tool-schemas.ts) enforces at resolve time.
@@ -35,6 +43,7 @@ var mzDoc = null;        // { version?, updatedAt?, tools: [] } or null while lo
 var mzState = 'off';     // 'off' | 'loading' | 'ready' | 'error'
 var mzEditing = -1;      // -1 closed · -2 new tool · >=0 editing tools[i]
 var mzBusy = false;      // guards Save/Delete while a write is in flight
+var mzOfferings = {};    // tool name → offeringId, so a listed tool can link to its live odps.yaml
 
 function apiBase() {
   var cfg = loadConfig();
@@ -46,6 +55,8 @@ function toolsKey() { return 'apps.' + mzAppId + '.tools'; }
 function rerender() {
   var el = document.getElementById('detail-monetize');
   if (el) el.innerHTML = monetizeSectionInner();
+  var od = document.getElementById('detail-odps');
+  if (od) od.innerHTML = odpsStatusInner(mzDoc, mzState);
 }
 
 /** Reset + async-load the manifest when a detail view opens. No-op for non-own apps. */
@@ -63,6 +74,7 @@ export function monetizeOnOpen(owner, appId, isOwn) {
       mzDoc = (value && Array.isArray(value.tools)) ? value : { tools: [] };
       mzState = 'ready';
       rerender();
+      loadOfferings();
     })
     .catch(function () {
       // A missing record is a normal "no tools yet" state; only a hard fetch error lands here.
@@ -70,6 +82,26 @@ export function monetizeOnOpen(owner, appId, isOwn) {
       mzState = 'ready';
       rerender();
     });
+}
+
+/**
+ * Map this app's tools to their live EXCHANGE listings, so a listed tool can link straight to its ODPS
+ * document. Best effort: the market is public, and a missing listing simply means no link.
+ */
+function loadOfferings() {
+  var ext = 'apptool:' + mzOwner + '/' + mzAppId;
+  fetch(apiBase() + '/v1/exchange/offerings?q=' + encodeURIComponent(mzAppId))
+    .then(function (r) { return r.json(); })
+    .then(function (res) {
+      var list = (res && res.ok && res.data && res.data.offerings) || [];
+      var next = {};
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].ext === ext && list[i].state === 'listed') next[list[i].action] = list[i].offeringId;
+      }
+      mzOfferings = next;
+      rerender();
+    })
+    .catch(function () { /* no market link is a cosmetic loss, never an error */ });
 }
 
 function priceLabel(tool) {
@@ -103,6 +135,9 @@ function toolRow(tool, i) {
         dtlBtn(t('detail.editDetails'), 'window._launcher.monetizeEditTool(' + i + ')') +
         dtlBtn('✕', 'window._launcher.monetizeDeleteTool(' + i + ')', { variant: 'danger', title: t('monetize.deleteHint') }) +
       '</div>' +
+      // A tool flagged for EXCHANGE that the projection will skip: say so here instead of leaving the
+      // owner with a ticked box and an empty marketplace.
+      (odpsBlockedReason(tool) ? '<div class="od-blocked">⚠ ' + escapeHtml(odpsBlockedReason(tool)) + '</div>' : '') +
     '</div>';
 }
 
@@ -157,6 +192,7 @@ function editorHtml(tool) {
         t('monetize.exchange') +
       '</label>' +
       '<div class="dtl-sync none" style="margin:4px 0 8px">' + t('monetize.exchangeHint') + '</div>' +
+      odpsToolFieldsHtml(tool, mzOfferings[tool.name || ''] || '') +
       '<label class="dtl-stat-label" for="mz-action">' + t('monetize.actionId') + '</label>' +
       '<input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || '') + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" />' +
       '<div class="dtl-sync none" style="margin:0 0 8px">' + t('monetize.actionIdHint') + '</div>' +
@@ -195,6 +231,50 @@ export function monetizeSectionInner() {
     '</div>';
   }
   return html;
+}
+
+/** Inner HTML of the app-level EXCHANGE & ODPS section — detail.js wraps it in #detail-odps. */
+export function odpsSectionInner() { return odpsStatusInner(mzDoc, mzState); }
+
+export function odpsToggleDefaultsUi() { odpsToggleDefaults(rerender); }
+export function odpsToggleToolUi() { odpsToggleTool(rerender); }
+
+/** Draft the tool's descriptive ODPS fields with the owner's own AI key (attestations stay untouched). */
+export function odpsSuggestUi() {
+  var tool = (mzEditing >= 0 && mzDoc && mzDoc.tools[mzEditing]) ? mzDoc.tools[mzEditing] : {};
+  odpsSuggestForTool({
+    appId: mzAppId,
+    appName: mzAppId,
+    toolName: (document.getElementById('mz-name') || {}).value || tool.name || '',
+    toolDescription: (document.getElementById('mz-desc') || {}).value || tool.description || '',
+    inputSchema: tool.inputSchema,
+    outputSchema: tool.outputSchema,
+    price: priceLabel(tool),
+  }, rerender);
+}
+
+/** Save the app-level ODPS defaults onto the manifest root (they inherit into every tool). */
+export function odpsSaveDefaults() {
+  if (mzBusy || !mzDoc) return;
+  var vals = readOdpsAppDefaults();
+  var next = Object.assign({}, mzDoc, { tools: mzDoc.tools.slice() });
+  if (vals.odps) next.odps = vals.odps; else delete next.odps;
+  if (vals.provenance) next.provenance = vals.provenance; else delete next.provenance;
+  mzBusy = true;
+  var el = document.getElementById('od-status');
+  if (el) el.textContent = '…';
+  writeManifest(next)
+    .then(function () {
+      mzDoc = next; mzBusy = false;
+      rerender();
+      showNotice(t('odps.defaultsSaved'), 'success');
+    })
+    .catch(function (e) {
+      mzBusy = false;
+      var st = document.getElementById('od-status');
+      if (st) st.textContent = t('monetize.saveFailed') + ': ' + e.message;
+      showNotice(t('monetize.saveFailed') + ': ' + e.message, 'error');
+    });
 }
 
 export function monetizeAddTool() { mzEditing = -2; rerender(); }
@@ -245,6 +325,9 @@ function readEditor(base) {
   if (actionId) tool.action_id = actionId; else delete tool.action_id;
   var agent = (document.getElementById('mz-agent').value || '').trim();
   if (agent) tool.agent = agent; else delete tool.agent;
+  var od = readOdpsToolFields(base);
+  if (od.odps) tool.odps = od.odps; else delete tool.odps;
+  if (od.provenance) tool.provenance = od.provenance; else delete tool.provenance;
   return tool;
 }
 
@@ -275,7 +358,9 @@ export function monetizeSaveTool() {
   mzBusy = true;
   var el = document.getElementById('mz-status');
   if (el) el.textContent = '…';
-  var next = { version: mzDoc.version, updatedAt: mzDoc.updatedAt, tools: tools };
+  // Object.assign over the loaded doc: the manifest root also carries the app-level `odps`/`provenance`
+  // defaults, and rebuilding it from three fields would drop them on every tool save.
+  var next = Object.assign({}, mzDoc, { tools: tools });
   writeManifest(next)
     .then(function () {
       mzDoc = next; mzEditing = -1; mzBusy = false;
@@ -296,7 +381,7 @@ export async function monetizeDeleteTool(i) {
   var tools = mzDoc.tools.slice();
   tools.splice(i, 1);
   mzBusy = true;
-  var next = { version: mzDoc.version, updatedAt: mzDoc.updatedAt, tools: tools };
+  var next = Object.assign({}, mzDoc, { tools: tools });
   writeManifest(next)
     .then(function () {
       mzDoc = next; mzEditing = -1; mzBusy = false;

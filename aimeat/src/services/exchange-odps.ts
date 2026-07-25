@@ -21,6 +21,7 @@
  *      root forbids unknown keys (`additionalProperties: false`), `product` does not, so the extension sits
  *      there and the document still validates against the official schema.
  * @structure ODPS_VERSION/ODPS_SCHEMA_URL · OdpsDocument types · offeringToOdps() · odpsToYaml() ·
+ *   mergeOdpsExtras/mergeProvenance (app-level defaults → tool) ·
  *   helpers (product type · price plans · licence rights · data access · payment gateway)
  * @usage
  *   const doc = offeringToOdps({ offering, iface, callRecipe, stats, rakePercent, baseUrl, nodeId });
@@ -35,7 +36,7 @@
 import { stringify as yamlStringify } from 'yaml';
 import { formatMoneyMajor } from '../commerce/money.js';
 import type { Offering, OfferingStats } from './exchange-market.js';
-import type { OdpsExtras, OdpsSlaDimension, OdpsQualityDimension } from '../models/odps-schemas.js';
+import type { OdpsExtras, OdpsSlaDimension, OdpsQualityDimension, Provenance } from '../models/odps-schemas.js';
 
 /** The ODPS version this node speaks. Pinned per the TARGET-045 addendum (Q2: pin ODPS v4.x, v4.1 current). */
 export const ODPS_VERSION = '4.1';
@@ -73,6 +74,25 @@ export interface OdpsProjectionInput {
   rakePercent: number;
   baseUrl: string;
   nodeId: string;
+}
+
+/**
+ * Inherit an app-level ODPS block into one of its tools. The app carries what is the same for every
+ * capability it sells (data holder, logo, brand, governance profile, jurisdiction); the tool overrides
+ * what is its own (value proposition, use cases, SLA commitments). Field by field, so a tool can restate
+ * one thing without losing the rest. Returns null when neither side says anything.
+ */
+export function mergeOdpsExtras(base: OdpsExtras | null | undefined, own: OdpsExtras | null | undefined): OdpsExtras | null {
+  if (!base && !own) return null;
+  const merged = { ...(base ?? {}), ...(own ?? {}) } as OdpsExtras;
+  return Object.keys(merged).length ? merged : null;
+}
+
+/** Same inheritance for the provenance attestation (the app states its source once, a tool may refine it). */
+export function mergeProvenance(base: Provenance | null | undefined, own: Provenance | null | undefined): Provenance | null {
+  if (!base && !own) return null;
+  const merged = { ...(base ?? {}), ...(own ?? {}) } as Provenance;
+  return Object.keys(merged).length ? merged : null;
 }
 
 /** ODPS `details.type` for an offering that did not declare one: what the surface actually is. */

@@ -26,6 +26,8 @@
  *   const report = await reconcileOwnerOfferings(storage, ownerGhii, { dryRun: true });
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  * @version-history
+ *   v1.2.0 — 2026-07-25 — App-level ODPS defaults: the tool manifest's root `odps`/`provenance` are
+ *     inherited by every tool of that app (tool overrides field by field) and folded into the sourceHash.
  *   v1.1.0 — 2026-07-25 — Sources carry their own descriptor data: `provenance` + `odps` (the ODPS v4.0
  *     authoring block) project from the manifest/action/offer onto the listing and into its sourceHash.
  *   v1.0.0 — 2026-07-25 — Initial projection + reconcile + legacy adoption (TARGET-050 slices 1 & 3).
@@ -41,7 +43,7 @@ import {
 } from './exchange-market.js';
 import type { EntitlementUnit } from './metered-entitlements.js';
 import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
-import { ODPS_VERSION } from './exchange-odps.js';
+import { ODPS_VERSION, mergeOdpsExtras, mergeProvenance } from './exchange-odps.js';
 
 /** One outcome line of a reconcile — the dry-run report is exactly this list. */
 export interface ReconcileChange {
@@ -166,7 +168,9 @@ async function desiredFromAppTools(
         surface: { kind: 'app-tool' as const, ownerName, appId, tool: tool.name, ifaceVersion },
         title: `${appId} · ${tool.name}`, description: tool.description ?? '',
         plans: (tool.plans ?? []) as OfferingPlan[], usageTerms: usageTermsOf(tool.usageTerms), tags: [] as string[],
-        provenance: provenanceOf(tool.provenance), odps: tool.odps ?? null,
+        // App-level defaults (manifest root) are inherited by every tool; the tool overrides field by field.
+        provenance: provenanceOf(mergeProvenance(parsed.data.provenance, tool.provenance) ?? undefined),
+        odps: mergeOdpsExtras(parsed.data.odps, tool.odps),
       };
       for (const p of prices(morsels, money)) {
         out.push({

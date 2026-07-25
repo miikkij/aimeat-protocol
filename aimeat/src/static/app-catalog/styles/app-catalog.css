@@ -2220,3 +2220,27 @@
 .aga-deploy-btn { white-space: nowrap; }
 .aga-btn-sm { padding: 2px 10px; font-size: .75rem; margin-left: auto; }
 .published-card-badgerow .pcb-agent { cursor: default; }
+
+/* ── EXCHANGE & ODPS (app detail) ──────────────────────────────────────────────
+   The app-level marketplace status plus the ODPS authoring forms (app defaults and the per-tool
+   descriptor). Themed through the same variables as the rest of the detail view; the attestation
+   block is set apart on purpose, because those fields are legal promises rather than marketing copy. */
+.od-status { font-size: .86rem; font-weight: 600; padding: 6px 10px; border-radius: 8px; display: inline-block; }
+.od-status-on { background: rgba(52,211,153,.12); color: #34d399; }
+.od-status-none { background: var(--bg-subtle); color: var(--text-muted); }
+.od-note { margin: 6px 0 8px; }
+.od-muted { color: var(--text-muted); font-size: .85rem; }
+.od-actions { margin-top: 10px; }
+.od-form { margin-top: 10px; }
+.od-input { margin: 4px 0 8px; }
+.od-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.od-col { flex: 1; min-width: 150px; }
+.od-col-narrow { flex: 0 0 110px; min-width: 90px; }
+.od-attest { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 8px 0; background: var(--bg-subtle); }
+.od-attest-head { font-weight: 600; margin-bottom: 2px; }
+.od-tool-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 4px; }
+.od-link { font-size: .8rem; color: var(--accent); text-decoration: none; }
+.od-link:hover { text-decoration: underline; }
+.od-blocked { flex-basis: 100%; font-size: .8rem; color: #f59e0b; margin-top: 4px; }
+.od-ok { color: #34d399; }
+.od-err { color: var(--accent); }
