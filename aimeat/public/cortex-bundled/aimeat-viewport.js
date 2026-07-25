@@ -23,6 +23,9 @@
  *   });
  *   vp.world.appendChild(frameEl);   // children live in world space
  * @version-history
+ *   v1.0.1 — 2026-07-25 — Fix: do not force position:relative on the host (it beat a consumer's
+ *     own position:fixed at the same specificity and collapsed a full-screen board to 0px);
+ *     create() promotes the host only when its computed position is static.
  *   v1.0.0 — 2026-07-25 — Initial (TARGET-051 Slice 1): camera extracted from aimeat-dag v1.0.1.
  *     Behaviour-preserving for dag (same gesture semantics, same zoom clamps as defaults, same
  *     easing and reduced-motion handling); new for other consumers are classPrefix, configurable
@@ -386,6 +389,6 @@
     };
   }
 
-  AIMEAT.viewport = { create: create, VERSION: '1.0.0' };
+  AIMEAT.viewport = { create: create, VERSION: '1.0.1' };
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);
