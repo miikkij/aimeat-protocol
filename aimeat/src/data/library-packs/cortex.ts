@@ -273,9 +273,10 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-viewport/libs/aimeat-viewport.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-viewport/libs/aimeat-viewport.js"></script>'],
     requires: [],
-    version: '1.0.0',
+    version: '1.0.1',
     license: 'MIT',
     apiSurface: 'AIMEAT.viewport',
+    apiCaveat: 'The host must have a SIZE. A full-screen board is `position: fixed; inset: 0` on the host itself — the viewport only promotes a STATIC host to relative, so your positioning is never overwritten.',
     aiDoc: [
       'Reach for this ONLY for a movable surface of the app\'s OWN content (arbitrary children, the',
       'app\'s own layout). An auto-laid-out graph to READ → aimeat-dag. A user-drawn node-and-wire',
@@ -305,6 +306,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     ].join('\n'),
     changelog: [
       { version: '1.0.0', date: '2026-07-25', summary: 'Initial release (TARGET-051). Extracted from aimeat-dag v1.0.1 so a second consumer does not mean a third pan/zoom implementation. Behaviour-preserving for dag; new here are classPrefix, configurable zoom bounds, the pointer-claim delegate, clientToWorld/worldToClient as public API (dead code in dag), and the navigate/interact capture overlays. aimeat-dag embeds a byte-identical copy so it keeps shipping as one script tag — loading both packs is safe (idempotent namespace guard).' },
+      { version: '1.0.1', date: '2026-07-25', summary: 'Fix: the injected CSS no longer forces position:relative on the host. Same-specificity, it silently beat a consumer’s own position:fixed, and a full-screen board (position:fixed; inset:0) collapsed to ZERO height — fit() then clamped to minZoom and every pointer event landed on nothing. create() now promotes the host only when its computed position is static, so an existing fixed/absolute/sticky host is left alone. Found by the first real consumer of the two-mode model.' },
     ],
     tierHint: 'T2',
     interviewTriggers: ['canvas', 'pan', 'zoom', 'viewport', 'infinite canvas', 'board', 'kangas', 'lauta', 'zoomaus'],
@@ -364,7 +366,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-dag/libs/aimeat-dag.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-dag/libs/aimeat-dag.js"></script>'],
     requires: [],
-    version: '1.0.1',
+    version: '1.1.1',
     license: 'MIT',
     apiSurface: 'AIMEAT.dag',
     aiDoc: [
@@ -385,6 +387,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
       { version: '1.0.0', date: '2026-07-16', summary: 'Initial release: layered auto-layout (longest-path + barycenter), pointer-events pan/zoom/pinch, selection, node drag with position persistence hook, live state layer, prefers-reduced-motion support.' },
       { version: '1.0.1', date: '2026-07-16', summary: 'Fix: setPointerCapture is now best-effort (try/catch) — synthetic PointerEvents (tests/automation) and pointers released mid-dispatch threw NotFoundError and swallowed the whole pointerdown, breaking selection.' },
       { version: '1.1.0', date: '2026-07-25', summary: 'Camera extracted to the aimeat-viewport pack (TARGET-051) and embedded here verbatim, so this pack still ships as ONE script tag with no requires — existing apps need no change. API-preserving and behaviour-preserving: same public surface, same ad-* class names, same gesture semantics, same 0.2–2.5 zoom clamp, same fit padding and easing. Additive: dag.viewport exposes the camera. Dead code removed (clientToWorld was defined and never called; it is now real public API on the viewport). Drift between the embedded copy and its source is blocked by check:viewport in the pre-commit gate and CI.' },
+      { version: '1.1.1', date: '2026-07-25', summary: 'Picks up aimeat-viewport 1.0.1 (the host no longer has position:relative forced on it). No change for dag consumers, whose hosts are static and are still promoted to relative exactly as before.' },
     ],
     tierHint: 'T2',
     interviewTriggers: ['dag', 'graph', 'pipeline', 'workflow canvas', 'org chart', 'blueprint'],
