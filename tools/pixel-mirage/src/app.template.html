@@ -1,0 +1,961 @@
+<!DOCTYPE html>
+<!-- AIMEAT App Manifest
+name: Pixel Mirage
+version: 2.0.0
+description: Optical dither studio. Turn a photo into a limited-palette illusion, sweep variants side by side, and sell the same render to agents.
+entry: index.html
+-->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="aimeat-scopes" content="memory:read memory:write" />
+  <meta name="theme-color" content="#fffaf2" />
+  <title>Pixel Mirage</title>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/tailwindcss@4.js"></script>
+  <style>
+    :root{
+      --bg:#fffaf2;--card:#ffffff;--surface:#f6f1e8;--text:#182033;--muted:#667085;--line:#e8e2d8;
+      --hot:#ff4d8d;--cyan:#00c9b8;--ink:#182033;--shadow:7px 7px 0 var(--ink);--radius:18px;
+    }
+    :root[data-theme="dark"]{
+      --bg:#12131b;--card:#1d1f2b;--surface:#252836;--text:#f8f7ff;--muted:#b7b9c9;--line:#343746;
+      --hot:#ff67aa;--cyan:#00f0d8;--ink:#f8f7ff;--shadow:7px 7px 0 var(--cyan);
+    }
+    *{box-sizing:border-box}
+    body{margin:0;background:var(--bg);color:var(--text);overflow-x:clip;font-family:ui-rounded,"Arial Rounded MT Bold",system-ui,sans-serif}
+    .brand{letter-spacing:-.04em}.dot{color:var(--hot)}
+    .studio{max-width:1620px;margin:auto;display:grid;grid-template-columns:minmax(280px,360px) minmax(0,1fr);gap:18px;padding:18px;width:100%;min-width:0}
+    .panel{background:var(--card);border:2px solid var(--ink);border-radius:var(--radius);box-shadow:var(--shadow);min-width:0}
+    .controls{padding:16px;align-self:start;max-height:calc(100vh - 120px);overflow-y:auto}
+    .viewer-panel{padding:12px;min-width:0}
+    .section{padding:13px 0;border-bottom:1px solid var(--line)}.section:last-child{border:0}
+    .section-title{font-size:.8rem;font-weight:900;text-transform:uppercase;letter-spacing:.12em;margin:0 0 10px;color:var(--muted)}
+    .section-desc{font-size:.78rem;color:var(--muted);line-height:1.45;margin:-4px 0 10px}
+
+    .upload{display:grid;place-items:center;text-align:center;border:2px dashed var(--hot);border-radius:15px;padding:16px;background:color-mix(in srgb,var(--hot) 7%,transparent);cursor:pointer;min-height:104px;transition:.15s}
+    .upload:hover{transform:translateY(-2px);background:color-mix(in srgb,var(--hot) 12%,transparent)}
+    .upload input{position:absolute;opacity:0;pointer-events:none}.upload strong{display:block;font-size:1rem}.upload small{color:var(--muted)}
+
+    .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:9px}
+    .control{margin:9px 0}
+    .control label{display:flex;justify-content:space-between;gap:12px;font-size:.84rem;font-weight:750;margin-bottom:5px}
+    .value{color:var(--hot);font-variant-numeric:tabular-nums}
+    input[type="range"]{width:100%;accent-color:var(--hot)}
+    select,input[type="text"],input[type="number"]{width:100%;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:9px;min-width:0;font-size:.9rem}
+    .swatches{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+    .swatch{height:34px;border:2px solid var(--ink);border-radius:9px;cursor:pointer;padding:0;display:flex;overflow:hidden}
+    .swatch i{flex:1;display:block}
+    .swatch.active{outline:3px solid var(--hot);outline-offset:2px}
+    .inks{display:flex;gap:5px;flex-wrap:wrap;align-items:center}
+    .ink{position:relative;width:38px;height:38px;border:2px solid var(--ink);border-radius:9px;padding:2px;background:transparent;cursor:pointer}
+    .ink input{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer}
+    .ink em{position:absolute;inset:0;border-radius:6px;display:block}
+    .chip{font-size:.72rem;font-weight:800;padding:4px 8px;border-radius:999px;background:var(--surface);color:var(--muted);border:1px solid var(--line)}
+
+    .btnx{appearance:none;border:2px solid var(--ink);border-radius:12px;background:var(--card);color:var(--text);font-weight:850;padding:8px 11px;cursor:pointer;box-shadow:3px 3px 0 var(--ink);transition:.12s;white-space:nowrap;font-size:.86rem}
+    .btnx:hover{transform:translate(-1px,-1px);box-shadow:5px 5px 0 var(--ink)}
+    .btnx:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+    .btnx.primary{background:var(--hot);color:#fff}
+    .btnx.cyan{background:var(--cyan);color:#071c1a}
+    .btnx.small{padding:5px 8px;font-size:.78rem;box-shadow:2px 2px 0 var(--ink)}
+    .btnx:disabled{opacity:.45;cursor:not-allowed;transform:none;box-shadow:none}
+
+    .tabs-x{display:flex;gap:6px;flex-wrap:wrap}
+    .tab-x{appearance:none;border:2px solid var(--ink);background:var(--card);color:var(--text);font-weight:850;padding:6px 12px;border-radius:999px;cursor:pointer;font-size:.82rem}
+    .tab-x.active{background:var(--ink);color:var(--card)}
+
+    .topbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px;min-width:0}
+    .toolbar{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+    .zoom-label{min-width:52px;text-align:center;font-size:.8rem;font-weight:800}
+
+    .stage{position:relative;height:min(74vh,860px);min-height:min(400px,58vh);overflow:hidden;border:3px solid var(--ink);border-radius:15px;background-color:#dce0e8;background-image:linear-gradient(45deg,#c8ced8 25%,transparent 25%),linear-gradient(-45deg,#c8ced8 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#c8ced8 75%),linear-gradient(-45deg,transparent 75%,#c8ced8 75%);background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0;touch-action:none;cursor:grab}
+    .stage.dragging{cursor:grabbing}
+    .artboard{position:absolute;left:50%;top:50%;transform-origin:center;will-change:transform;box-shadow:0 20px 60px rgba(0,0,0,.2)}
+    .artboard canvas{position:absolute;inset:0;width:100%;height:100%;display:block;image-rendering:pixelated}
+    .compare-line{position:absolute;top:0;bottom:0;width:3px;background:#fff;box-shadow:0 0 0 1px #111;pointer-events:none}
+    .compare-knob{position:absolute;top:50%;margin:-19px 0 0 -18px;width:38px;height:38px;border-radius:50%;display:grid;place-items:center;background:#fff;color:#111;border:2px solid #111;font-weight:900;pointer-events:none}
+    .compare{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:ew-resize;z-index:5}
+    .tag{position:absolute;top:11px;padding:5px 9px;border-radius:999px;background:rgba(0,0,0,.72);color:#fff;font-size:.7rem;font-weight:850;pointer-events:none;z-index:4}
+    .tag.before{left:11px}.tag.after{right:11px}
+    .empty{position:absolute;inset:0;display:grid;place-items:center;padding:20px;text-align:center;z-index:8;background:color-mix(in srgb,var(--bg) 92%,transparent)}
+    .empty.hidden{display:none}
+    .busy::after{content:"";position:absolute;inset:0;background:color-mix(in srgb,var(--bg) 30%,transparent);z-index:12;cursor:wait}
+
+    .status{font-size:.78rem;color:var(--muted);min-height:1.2em;margin-top:8px}
+    .tip{font-size:.78rem;color:var(--muted);line-height:1.45}
+    .projects{display:grid;gap:6px;max-height:180px;overflow:auto;margin-top:8px}
+    .project{display:flex;gap:6px;align-items:center;padding:7px;border:1px solid var(--line);border-radius:10px}
+    .project span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.8rem}
+
+    .sheet{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px}
+    .frame{border:2px solid var(--ink);border-radius:13px;overflow:hidden;background:var(--surface);cursor:pointer;transition:.12s;box-shadow:3px 3px 0 var(--ink)}
+    .frame:hover{transform:translate(-2px,-2px);box-shadow:6px 6px 0 var(--ink)}
+    .frame canvas{width:100%;display:block;image-rendering:pixelated;background:var(--surface)}
+    .frame figcaption{padding:7px 9px;font-size:.76rem;font-weight:800;display:flex;justify-content:space-between;gap:8px;align-items:center}
+    .frame figcaption em{font-style:normal;color:var(--muted);font-weight:650}
+    .pane{display:none}.pane.active{display:block}
+
+    .code{background:var(--surface);border:1px solid var(--line);border-radius:11px;padding:11px;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.76rem;white-space:pre-wrap;word-break:break-word;overflow-x:auto;line-height:1.5}
+    .kv{display:grid;grid-template-columns:auto 1fr;gap:6px 12px;font-size:.83rem;align-items:baseline}
+    .kv dt{color:var(--muted);font-weight:750}.kv dd{margin:0;font-weight:750}
+
+    dialog{border:2px solid var(--ink);border-radius:18px;background:var(--card);color:var(--text);max-width:min(92vw,520px);box-shadow:var(--shadow);padding:20px}
+    dialog::backdrop{background:rgba(10,12,20,.68)}
+    .fullscreen-view{position:fixed!important;inset:0!important;z-index:1000!important;border-radius:0!important;height:100vh!important;max-height:none!important}
+    .fullscreen-view .stage{height:calc(100vh - 76px);border:0;border-radius:0}
+    .fullscreen-close{display:none}.fullscreen-view .fullscreen-close{display:inline-block}
+
+    @media(max-width:900px){
+      .studio{grid-template-columns:minmax(0,1fr);padding:11px;gap:12px}
+      .controls{order:2;max-height:none;overflow:visible}
+      .viewer-panel{order:1}
+      .stage{height:56vh;min-height:min(340px,52vh)}
+      .panel{box-shadow:4px 4px 0 var(--ink)}
+    }
+    @media(max-width:480px){
+      .split{grid-template-columns:minmax(0,1fr)}
+      .stage{min-height:min(300px,50vh)}
+      .studio{gap:11px}
+      .viewer-panel{padding:9px}
+      .sheet{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col overflow-x-clip">
+  <nav class="navbar px-4 sticky top-0 z-50" style="background:var(--card);border-bottom:2px solid var(--ink)">
+    <div class="flex-1 min-w-0">
+      <span class="brand text-xl font-black">PIXEL<span class="dot">•</span>MIRAGE</span>
+      <span class="hidden sm:inline text-xs ml-3 opacity-60">Optical dither studio</span>
+    </div>
+    <div class="flex-none"><span id="login"></span></div>
+  </nav>
+
+  <main id="app" class="studio flex-1">
+    <aside class="panel controls">
+      <section class="section">
+        <h2 class="section-title">1. Source image</h2>
+        <label class="upload" id="dropZone">
+          <input id="fileInput" type="file" accept="image/png,image/jpeg,image/webp" />
+          <span><strong>Drop a photo or browse</strong><small>PNG, JPEG or WebP, processed in your browser</small></span>
+        </label>
+        <div class="split mt-3">
+          <div class="control"><label for="zoom">Crop zoom <span id="zoomV" class="value">100%</span></label><input id="zoom" type="range" min="100" max="400" value="100" /></div>
+          <div class="control"><label for="rotate">Rotation <span id="rotateV" class="value">0&deg;</span></label><input id="rotate" type="range" min="-180" max="180" value="0" /></div>
+        </div>
+        <div class="split">
+          <div class="control"><label for="offsetX">Position X <span id="offsetXV" class="value">0</span></label><input id="offsetX" type="range" min="-100" max="100" value="0" /></div>
+          <div class="control"><label for="offsetY">Position Y <span id="offsetYV" class="value">0</span></label><input id="offsetY" type="range" min="-100" max="100" value="0" /></div>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">2. Palette</h2>
+        <p class="section-desc">Two inks give the classic illusion. Three or more turn it into risograph and poster territory.</p>
+        <div class="row" style="margin-bottom:8px">
+          <select id="paletteFilter" style="flex:1">
+            <option value="">All palettes</option>
+            <option value="duotone">Two inks</option>
+            <option value="print">Print and riso</option>
+            <option value="artistic">Artistic</option>
+            <option value="retro">Retro hardware</option>
+            <option value="photo">Photographic</option>
+          </select>
+        </div>
+        <div class="swatches" id="swatches"></div>
+        <div class="control mt-3">
+          <label>Inks <span id="inkCount" class="value">2</span></label>
+          <div class="inks" id="inks"></div>
+        </div>
+        <div class="row mt-2">
+          <button class="btnx small" id="addInk">Add ink</button>
+          <button class="btnx small" id="removeInk">Remove ink</button>
+          <button class="btnx small cyan" id="extractBtn">Take palette from photo</button>
+        </div>
+        <div class="control"><label for="colorCount">Inks to extract <span id="colorCountV" class="value">6</span></label><input id="colorCount" type="range" min="2" max="16" value="6" /></div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">3. Dither</h2>
+        <div class="control">
+          <label for="algorithm">Algorithm</label>
+          <select id="algorithm"></select>
+          <p class="tip mt-2" id="algoNote"></p>
+        </div>
+        <div class="split">
+          <div class="control"><label for="scale">Pattern scale <span id="scaleV" class="value">2 px</span></label><input id="scale" type="range" min="1" max="24" value="2" /></div>
+          <div class="control"><label for="strength">Strength <span id="strengthV" class="value">100%</span></label><input id="strength" type="range" min="0" max="200" value="100" /></div>
+        </div>
+        <div class="split">
+          <div class="control" id="angleWrap"><label for="angle">Screen angle <span id="angleV" class="value">45&deg;</span></label><input id="angle" type="range" min="0" max="180" value="45" /></div>
+          <div class="control"><label for="bias">Threshold bias <span id="biasV" class="value">0</span></label><input id="bias" type="range" min="-100" max="100" value="0" /></div>
+        </div>
+        <div class="row">
+          <label class="row" style="gap:6px;font-size:.83rem;font-weight:750"><input type="checkbox" id="pixelate" /> Chunky pixels</label>
+          <label class="row" style="gap:6px;font-size:.83rem;font-weight:750"><input type="checkbox" id="serpentine" checked /> Serpentine</label>
+        </div>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">4. Adjust</h2>
+        <div class="split">
+          <div class="control"><label for="brightness">Brightness <span id="brightnessV" class="value">0</span></label><input id="brightness" type="range" min="-100" max="100" value="0" /></div>
+          <div class="control"><label for="contrast">Contrast <span id="contrastV" class="value">20</span></label><input id="contrast" type="range" min="-100" max="100" value="20" /></div>
+        </div>
+        <div class="split">
+          <div class="control"><label for="gamma">Gamma <span id="gammaV" class="value">1.00</span></label><input id="gamma" type="range" min="10" max="300" value="100" /></div>
+          <div class="control"><label for="saturation">Saturation <span id="saturationV" class="value">0</span></label><input id="saturation" type="range" min="-100" max="200" value="0" /></div>
+        </div>
+        <div class="split">
+          <div class="control"><label for="hue">Hue shift <span id="hueV" class="value">0&deg;</span></label><input id="hue" type="range" min="-180" max="180" value="0" /></div>
+          <div class="control"><label for="sharpen">Sharpen <span id="sharpenV" class="value">0</span></label><input id="sharpen" type="range" min="0" max="100" value="0" /></div>
+        </div>
+        <div class="split">
+          <div class="control"><label for="posterize">Posterize <span id="posterizeV" class="value">off</span></label><input id="posterize" type="range" min="0" max="16" value="0" /></div>
+          <div class="control" style="display:flex;align-items:flex-end;padding-bottom:6px">
+            <label class="row" style="gap:6px;font-size:.83rem;font-weight:750"><input type="checkbox" id="invert" /> Invert</label>
+          </div>
+        </div>
+        <button class="btnx small" id="resetAdjust">Reset adjustments</button>
+      </section>
+
+      <section class="section">
+        <h2 class="section-title">5. Output</h2>
+        <div class="split">
+          <div class="control">
+            <label for="size">Size <span id="sizeV" class="value">1024 px</span></label>
+            <select id="size">
+              <option value="512">512 px</option>
+              <option value="768">768 px</option>
+              <option value="1024" selected>1024 px</option>
+              <option value="1600">1600 px</option>
+              <option value="2048">2048 px</option>
+            </select>
+          </div>
+          <div class="control">
+            <label for="fit">Framing</label>
+            <select id="fit"><option value="cover">Fill the frame</option><option value="contain">Fit inside</option></select>
+          </div>
+        </div>
+        <div class="row">
+          <button id="downloadBtn" class="btnx primary" disabled>Download PNG</button>
+          <button id="saveBtn" class="btnx" disabled>Save recipe</button>
+          <button id="copyBtn" class="btnx small">Copy recipe</button>
+        </div>
+        <p id="saveHint" class="tip mt-3">Sign in to save recipes. Editing and PNG export work without signing in.</p>
+        <div id="projects" class="projects"></div>
+        <div id="status" class="status" role="status" aria-live="polite">Choose a photo to begin.</div>
+      </section>
+    </aside>
+
+    <section class="panel viewer-panel" id="viewerPanel">
+      <div class="topbar">
+        <div class="tabs-x">
+          <button class="tab-x active" data-pane="preview">Preview</button>
+          <button class="tab-x" data-pane="variants">Variants</button>
+          <button class="tab-x" data-pane="agent">For agents</button>
+        </div>
+        <div class="toolbar" id="previewTools">
+          <button class="btnx small" id="zoomOut" aria-label="Zoom out">&minus;</button>
+          <span id="zoomLabel" class="zoom-label">100%</span>
+          <button class="btnx small" id="zoomIn" aria-label="Zoom in">+</button>
+          <button class="btnx small" id="fitBtn">Fit</button>
+          <button class="btnx small cyan" id="fullBtn">Full screen</button>
+          <button class="btnx small fullscreen-close" id="fullClose">Close</button>
+        </div>
+      </div>
+
+      <div class="pane active" id="pane-preview">
+        <div class="stage" id="stage">
+          <div class="empty" id="empty">
+            <div>
+              <h2 class="text-2xl font-black">Make pixels play tricks</h2>
+              <p class="tip">Upload a photo, then tune the palette and pattern. Step back for the illusion, zoom in to reveal the pure colours.</p>
+            </div>
+          </div>
+          <div class="artboard" id="artboard">
+            <canvas id="afterCanvas"></canvas><canvas id="beforeCanvas"></canvas>
+            <div class="compare-line" id="compareLine"></div><div class="compare-knob" id="compareKnob">&harr;</div>
+          </div>
+          <input class="compare" id="compare" type="range" min="0" max="100" value="50" aria-label="Before and after comparison" />
+          <span class="tag before">Original</span><span class="tag after">Mirage</span>
+        </div>
+        <p class="tip mt-2">Drag to pan, wheel or pinch to zoom, move the divider to compare.</p>
+      </div>
+
+      <div class="pane" id="pane-variants">
+        <div class="row" style="margin-bottom:12px">
+          <select id="sweepDim" style="max-width:220px">
+            <option value="palette">Sweep: palette</option>
+            <option value="algorithm">Sweep: algorithm</option>
+            <option value="scale">Sweep: pattern scale</option>
+            <option value="strength">Sweep: strength</option>
+            <option value="colorCount">Sweep: number of inks</option>
+            <option value="contrast">Sweep: contrast</option>
+          </select>
+          <button class="btnx small" id="sweepAgain">Shuffle</button>
+          <span class="chip" id="sweepNote">Click any frame to load it into the studio.</span>
+        </div>
+        <div class="sheet" id="sheet"></div>
+      </div>
+
+      <div class="pane" id="pane-agent">
+        <h3 class="text-lg font-black" style="margin:0 0 4px">Your agent can render these too</h3>
+        <p class="tip" style="margin-bottom:14px">The studio and the agent tool run the same engine, so a recipe you tune here produces exactly the picture an agent gets back.</p>
+        <dl class="kv" style="margin-bottom:14px">
+          <dt>Tool</dt><dd id="agentTool">pixel-mirage.html / dither</dd>
+          <dt>Price</dt><dd id="agentPrice">1 morsel per render</dd>
+          <dt>Returns</dt><dd>A PNG, plus the exact recipe that produced it</dd>
+          <dt>Also</dt><dd>variants, up to six renders of one photo in one call</dd>
+        </dl>
+        <h4 class="section-title">Current recipe as a tool call</h4>
+        <div class="code" id="agentCall">&nbsp;</div>
+        <div class="row mt-3">
+          <button class="btnx small" id="copyCall">Copy call</button>
+          <button class="btnx small cyan" id="shareBtn" disabled>Publish this photo for my agent</button>
+        </div>
+        <p class="tip mt-2" id="shareHint">Publishing stores a downscaled copy as a public record, so an agent can reference it by key instead of pasting megabytes of base64.</p>
+        <div class="code mt-2" id="shareOut" style="display:none"></div>
+        <h4 class="section-title mt-4">Skill</h4>
+        <p class="tip">Ask your agent to load the <strong>pixel-mirage</strong> skill. It carries every palette id, every algorithm, and the recipe grammar.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer footer-center p-4 text-xs opacity-60">Pixel Mirage, pure colours and impossible tones</footer>
+
+  <dialog id="saveDialog">
+    <h2 class="text-xl font-black mb-2">Save recipe</h2>
+    <p class="tip mb-3">The recipe is saved to your AIMEAT account. The source photo stays in this browser.</p>
+    <input type="text" id="projectName" maxlength="60" placeholder="Recipe name" />
+    <div class="row mt-4" style="justify-content:flex-end">
+      <button class="btnx" id="cancelSave">Cancel</button>
+      <button class="btnx primary" id="confirmSave">Save</button>
+    </div>
+  </dialog>
+
+  <script src="/v1/libs/aimeat-auth.js"></script>
+  <script src="/v1/libs/aimeat-data.js"></script>
+  <script>
+/*__ENGINE__*/
+  </script>
+  <script>
+  (function () {
+    'use strict';
+
+    function applyTheme(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
+    applyTheme(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+    addEventListener('storage', function (e) { if (e.key === 'aimeat-theme' && e.newValue) applyTheme(e.newValue); });
+
+    var $ = function (id) { return document.getElementById(id); };
+    var APP_MAX_SIZE = 2048;      // the browser has no 5 s sandbox ceiling; the agent tool caps at 768
+    var TOOL_MAX_SIZE = 768;
+
+    var session = null, sourceImage = null, sourceData = null, renderTimer = null;
+    var zoom = 1, panX = 0, panY = 0, dragging = false, lastX = 0, lastY = 0;
+    var projects = [], inks = ['#111111', '#00e5d0'], activePalette = 'ink-cyan', lastResult = null;
+
+    var stage = $('stage'), artboard = $('artboard'), before = $('beforeCanvas'), after = $('afterCanvas');
+
+    var SLIDERS = ['zoom', 'rotate', 'offsetX', 'offsetY', 'scale', 'strength', 'angle', 'bias',
+      'brightness', 'contrast', 'gamma', 'saturation', 'hue', 'sharpen', 'posterize', 'colorCount'];
+    var CHECKS = ['pixelate', 'serpentine', 'invert'];
+    var SELECTS = ['algorithm', 'size', 'fit'];
+
+    function status(msg) { $('status').textContent = msg; }
+
+    /* ---------------------------------------------------------------- recipe */
+
+    function currentRecipe(overrides) {
+      var r = {};
+      SLIDERS.forEach(function (id) { r[id] = +$(id).value; });
+      CHECKS.forEach(function (id) { r[id] = $(id).checked; });
+      r.algorithm = $('algorithm').value;
+      r.size = +$('size').value;
+      r.fit = $('fit').value;
+      r.palette = activePalette;
+      r.colors = inks.slice();
+      if (overrides) for (var k in overrides) if (Object.prototype.hasOwnProperty.call(overrides, k)) r[k] = overrides[k];
+      return r;
+    }
+
+    function applyRecipe(raw) {
+      var r = migrate(raw);
+      SLIDERS.forEach(function (id) { if (r[id] !== undefined && r[id] !== null) $(id).value = r[id]; });
+      CHECKS.forEach(function (id) { if (r[id] !== undefined) $(id).checked = !!r[id]; });
+      if (r.algorithm) $('algorithm').value = r.algorithm;
+      if (r.size) $('size').value = String(Math.min(APP_MAX_SIZE, r.size));
+      if (r.fit) $('fit').value = r.fit;
+      if (Array.isArray(r.colors) && r.colors.length >= 2) { inks = r.colors.slice(); activePalette = r.palette || 'custom'; }
+      else if (r.palette) { selectPalette(r.palette, true); }
+      drawInks(); markPalette(); updateLabels(); queueRender();
+    }
+
+    /** Recipes saved by version 1 used a different vocabulary; read them rather than lose them. */
+    function migrate(r) {
+      if (!r || r.cropZoom === undefined) return r || {};
+      var out = {
+        zoom: +r.cropZoom || 100, rotate: +r.rotation || 0, offsetX: +r.posX || 0, offsetY: +r.posY || 0,
+        scale: +r.pixelSize || 2, contrast: +r.contrast || 0, bias: +r.bias || 0,
+        size: +r.resolution || 1024, colors: [r.colorA || '#111111', r.colorB || '#00e5d0'],
+        palette: 'custom', algorithm: 'bayer' + (r.matrix || 4),
+      };
+      return out;
+    }
+
+    /* --------------------------------------------------------------- palettes */
+
+    function drawSwatches() {
+      var wrap = $('swatches'), filter = $('paletteFilter').value;
+      wrap.replaceChildren();
+      PM.PALETTES.forEach(function (p) {
+        if (filter && p.tags.indexOf(filter) < 0) return;
+        var b = document.createElement('button');
+        b.className = 'swatch' + (p.id === activePalette ? ' active' : '');
+        b.type = 'button';
+        b.dataset.palette = p.id;
+        b.title = p.name + ' (' + p.colors.length + ' inks)';
+        p.colors.forEach(function (c) { var i = document.createElement('i'); i.style.background = c; b.appendChild(i); });
+        b.addEventListener('click', function () { selectPalette(p.id); });
+        wrap.appendChild(b);
+      });
+    }
+
+    function markPalette() {
+      Array.prototype.forEach.call(document.querySelectorAll('.swatch'), function (s) {
+        s.classList.toggle('active', s.dataset.palette === activePalette);
+      });
+    }
+
+    function selectPalette(id, silent) {
+      var p = null;
+      for (var i = 0; i < PM.PALETTES.length; i++) if (PM.PALETTES[i].id === id) p = PM.PALETTES[i];
+      if (!p) return;
+      activePalette = id;
+      inks = p.colors.slice();
+      drawInks(); markPalette();
+      if (!silent) queueRender();
+    }
+
+    function drawInks() {
+      var wrap = $('inks');
+      wrap.replaceChildren();
+      inks.forEach(function (c, i) {
+        var box = document.createElement('span');
+        box.className = 'ink';
+        var em = document.createElement('em');
+        em.style.background = c;
+        var input = document.createElement('input');
+        input.type = 'color';
+        input.value = c;
+        input.setAttribute('aria-label', 'Ink ' + (i + 1));
+        input.addEventListener('input', function () {
+          inks[i] = input.value; em.style.background = input.value;
+          activePalette = 'custom'; markPalette(); queueRender();
+        });
+        box.append(em, input);
+        wrap.appendChild(box);
+      });
+      $('inkCount').textContent = String(inks.length);
+    }
+
+    /* ------------------------------------------------------------------ image */
+
+    function loadFile(file) {
+      if (!file || !/^image\/(png|jpeg|webp)$/.test(file.type)) { status('Please choose a PNG, JPEG or WebP image.'); return; }
+      status('Loading image...');
+      var url = URL.createObjectURL(file), img = new Image();
+      img.onload = function () {
+        if (sourceImage && sourceImage._url) URL.revokeObjectURL(sourceImage._url);
+        img._url = url; sourceImage = img;
+        sourceData = null;
+        localStorage.setItem('pixel-mirage-last-name', file.name);
+        $('shareBtn').disabled = !session;
+        render();
+      };
+      img.onerror = function () { URL.revokeObjectURL(url); status('That image could not be opened.'); };
+      img.src = url;
+    }
+
+    /** Decode once into an RGBA buffer the engine can work from, capped so huge photos stay quick. */
+    function sourcePixels() {
+      if (sourceData) return sourceData;
+      var maxEdge = 2400;
+      var w = sourceImage.naturalWidth, h = sourceImage.naturalHeight;
+      var s = Math.min(1, maxEdge / Math.max(w, h));
+      var dw = Math.max(1, Math.round(w * s)), dh = Math.max(1, Math.round(h * s));
+      var c = document.createElement('canvas');
+      c.width = dw; c.height = dh;
+      var cx = c.getContext('2d', { willReadFrequently: true });
+      cx.drawImage(sourceImage, 0, 0, dw, dh);
+      var d = cx.getImageData(0, 0, dw, dh);
+      sourceData = { rgba: d.data, width: dw, height: dh };
+      return sourceData;
+    }
+
+    /* ----------------------------------------------------------------- render */
+
+    function render() {
+      if (!sourceImage) return;
+      stage.classList.add('busy');
+      requestAnimationFrame(function () {
+        try {
+          var src = sourcePixels();
+          var recipe = PM.normalizeRecipe(currentRecipe(), APP_MAX_SIZE);
+          var t0 = performance.now();
+          var out = PM.render(src.rgba, src.width, src.height, recipe);
+          lastResult = out;
+
+          var w = out.width, h = out.height;
+          before.width = after.width = w; before.height = after.height = h;
+          artboard.style.width = w + 'px'; artboard.style.height = h + 'px';
+
+          var bc = before.getContext('2d');
+          bc.drawImage(sourceImage, 0, 0, w, h);
+          drawOriginal(bc, src, recipe, w, h);
+
+          var ac = after.getContext('2d');
+          var id = ac.createImageData(w, h);
+          id.data.set(PM.toRgba(out));
+          ac.putImageData(id, 0, 0);
+
+          $('empty').classList.add('hidden');
+          $('downloadBtn').disabled = false;
+          $('saveBtn').disabled = !session;
+          fit(false);
+          updateAgentCall(recipe);
+          if (activePane === 'variants') renderSheet();
+          status('Rendered ' + w + ' x ' + h + ' px in ' + Math.round(performance.now() - t0) + ' ms, '
+            + out.colors.length + ' inks, ' + algoName(recipe.algorithm) + '.');
+        } catch (e) {
+          console.error(e);
+          status('Could not render this image. Try a smaller photo.');
+        } finally {
+          stage.classList.remove('busy');
+        }
+      });
+    }
+
+    /** The "before" side has to go through the same geometry, or the compare slider lies. */
+    function drawOriginal(ctx, src, recipe, w, h) {
+      var geoOnly = PM.normalizeRecipe({
+        size: recipe.size, zoom: recipe.zoom, offsetX: recipe.offsetX, offsetY: recipe.offsetY,
+        rotate: recipe.rotate, fit: recipe.fit,
+      }, APP_MAX_SIZE);
+      var buf = PM.resample(src.rgba, src.width, src.height, w, h, geoOnly);
+      var id = ctx.createImageData(w, h);
+      id.data.set(buf);
+      ctx.putImageData(id, 0, 0);
+    }
+
+    function queueRender() { if (!sourceImage) { updateAgentCall(PM.normalizeRecipe(currentRecipe(), APP_MAX_SIZE)); return; } clearTimeout(renderTimer); renderTimer = setTimeout(render, 90); }
+
+    function algoName(id) {
+      for (var i = 0; i < PM.ALGORITHMS.length; i++) if (PM.ALGORITHMS[i].id === id) return PM.ALGORITHMS[i].name;
+      return id;
+    }
+
+    function updateLabels() {
+      $('zoomV').textContent = $('zoom').value + '%';
+      $('rotateV').textContent = $('rotate').value + '°';
+      $('offsetXV').textContent = $('offsetX').value;
+      $('offsetYV').textContent = $('offsetY').value;
+      $('scaleV').textContent = $('scale').value + ' px';
+      $('strengthV').textContent = $('strength').value + '%';
+      $('angleV').textContent = $('angle').value + '°';
+      $('biasV').textContent = (+$('bias').value > 0 ? '+' : '') + $('bias').value;
+      $('brightnessV').textContent = $('brightness').value;
+      $('contrastV').textContent = $('contrast').value;
+      $('gammaV').textContent = (+$('gamma').value / 100).toFixed(2);
+      $('saturationV').textContent = $('saturation').value;
+      $('hueV').textContent = $('hue').value + '°';
+      $('sharpenV').textContent = $('sharpen').value;
+      $('posterizeV').textContent = +$('posterize').value < 2 ? 'off' : $('posterize').value + ' levels';
+      $('colorCountV').textContent = $('colorCount').value;
+      $('sizeV').textContent = $('size').value + ' px';
+      var kind = 'ordered';
+      for (var i = 0; i < PM.ALGORITHMS.length; i++) {
+        if (PM.ALGORITHMS[i].id === $('algorithm').value) { $('algoNote').textContent = PM.ALGORITHMS[i].note; kind = PM.ALGORITHMS[i].kind; }
+      }
+      $('angleWrap').style.opacity = kind === 'halftone' ? '1' : '.4';
+      $('inkCount').textContent = String(inks.length);
+    }
+
+    /* ---------------------------------------------------------------- variants */
+
+    var activePane = 'preview';
+    var SWEEPS = {
+      palette: function () {
+        var ids = [], i;
+        for (i = 0; i < PM.PALETTES.length; i++) ids.push(PM.PALETTES[i].id);
+        return pick(ids, 8).map(function (id) { return { label: paletteName(id), overrides: { palette: id, colors: paletteColors(id) } }; });
+      },
+      algorithm: function () {
+        var ids = [], i;
+        for (i = 0; i < PM.ALGORITHMS.length; i++) ids.push(PM.ALGORITHMS[i].id);
+        return pick(ids, 8).map(function (id) { return { label: algoName(id), overrides: { algorithm: id } }; });
+      },
+      scale: function () {
+        return [1, 2, 3, 4, 6, 8, 12, 16].map(function (v) { return { label: v + ' px', overrides: { scale: v } }; });
+      },
+      strength: function () {
+        return [20, 50, 80, 100, 130, 160, 200].map(function (v) { return { label: v + '%', overrides: { strength: v } }; });
+      },
+      colorCount: function () {
+        return [2, 3, 4, 5, 6, 8, 12, 16].map(function (v) { return { label: v + ' inks', overrides: { palette: 'auto', colors: null, colorCount: v } }; });
+      },
+      contrast: function () {
+        return [-40, -20, 0, 20, 40, 60, 80].map(function (v) { return { label: String(v), overrides: { contrast: v } }; });
+      },
+    };
+
+    function paletteName(id) { for (var i = 0; i < PM.PALETTES.length; i++) if (PM.PALETTES[i].id === id) return PM.PALETTES[i].name; return id; }
+    function paletteColors(id) { for (var i = 0; i < PM.PALETTES.length; i++) if (PM.PALETTES[i].id === id) return PM.PALETTES[i].colors.slice(); return null; }
+
+    function pick(list, n) {
+      var copy = list.slice(), out = [];
+      while (copy.length && out.length < n) out.push(copy.splice(Math.floor(Math.random() * copy.length), 1)[0]);
+      return out;
+    }
+
+    function renderSheet() {
+      var sheet = $('sheet');
+      sheet.replaceChildren();
+      if (!sourceImage) {
+        var p = document.createElement('p');
+        p.className = 'tip';
+        p.textContent = 'Upload a photo first. Every frame here is the same photo under a different setting.';
+        sheet.appendChild(p);
+        return;
+      }
+      var src = sourcePixels();
+      var list = SWEEPS[$('sweepDim').value]();
+      list.forEach(function (v) {
+        var recipe = PM.normalizeRecipe(currentRecipe(Object.assign({ size: 300 }, v.overrides)), APP_MAX_SIZE);
+        var out = PM.render(src.rgba, src.width, src.height, recipe);
+        var fig = document.createElement('figure');
+        fig.className = 'frame';
+        var c = document.createElement('canvas');
+        c.width = out.width; c.height = out.height;
+        var id = c.getContext('2d').createImageData(out.width, out.height);
+        id.data.set(PM.toRgba(out));
+        c.getContext('2d').putImageData(id, 0, 0);
+        var cap = document.createElement('figcaption');
+        var name = document.createElement('span');
+        name.textContent = v.label;
+        var em = document.createElement('em');
+        em.textContent = out.colors.length + ' inks';
+        cap.append(name, em);
+        fig.append(c, cap);
+        fig.addEventListener('click', function () {
+          applyRecipe(currentRecipe(v.overrides));
+          setPane('preview');
+          status('Loaded variant "' + v.label + '" into the studio.');
+        });
+        sheet.appendChild(fig);
+      });
+    }
+
+    function setPane(name) {
+      activePane = name;
+      Array.prototype.forEach.call(document.querySelectorAll('.tab-x'), function (t) { t.classList.toggle('active', t.dataset.pane === name); });
+      Array.prototype.forEach.call(document.querySelectorAll('.pane'), function (p) { p.classList.toggle('active', p.id === 'pane-' + name); });
+      $('previewTools').style.display = name === 'preview' ? 'flex' : 'none';
+      if (name === 'variants') renderSheet();
+      if (name === 'preview' && sourceImage) fit(true);
+    }
+
+    /* ------------------------------------------------------------------ agent */
+
+    function toolRecipe(recipe) {
+      var out = {}, keep = ['palette', 'colors', 'colorCount', 'algorithm', 'size', 'scale', 'strength',
+        'serpentine', 'pixelate', 'angle', 'brightness', 'contrast', 'gamma', 'saturation', 'hue',
+        'sharpen', 'invert', 'posterize', 'bias', 'zoom', 'offsetX', 'offsetY', 'rotate', 'fit'];
+      var defaults = PM.DEFAULTS;
+      keep.forEach(function (k) {
+        var v = recipe[k];
+        if (v === null || v === undefined) return;
+        if (k === 'palette') return;   // handled below: "custom" is an app-side marker, not a preset id
+        if (k === 'colors') { if (recipe.palette === 'custom') out.colors = v; return; }
+        if (k === 'size') { out.size = Math.min(TOOL_MAX_SIZE, v); return; }
+        if (JSON.stringify(v) !== JSON.stringify(defaults[k])) out[k] = v;
+      });
+      if (recipe.palette && recipe.palette !== 'custom') out.palette = recipe.palette;
+      return out;
+    }
+
+    function updateAgentCall(recipe) {
+      var body = Object.assign({ image_base64: '<data: URL or base64 of a PNG or baseline JPEG>' }, toolRecipe(recipe));
+      $('agentCall').textContent =
+        'aimeat_app_tool_invoke\n'
+        + '  owner: "happydude500001"\n'
+        + '  app:   "pixel-mirage.html"\n'
+        + '  tool:  "dither"\n'
+        + '  input: ' + JSON.stringify(body, null, 2).split('\n').join('\n         ');
+    }
+
+    /* --------------------------------------------------------------- projects */
+
+    async function loadProjects() {
+      if (!session) return;
+      try {
+        var v = await AIMEAT.data.get('pixel-mirage.projects');
+        projects = Array.isArray(v) ? v : ((v && Array.isArray(v.value)) ? v.value : []);
+        renderProjects();
+        status(sourceImage ? 'Ready.' : 'Signed in, choose a photo to begin.');
+      } catch (e) {
+        if (e && e.status === 404) { projects = []; renderProjects(); status('Signed in, no saved recipes yet.'); }
+        else { console.error(e); status('Could not load saved recipes.'); }
+      }
+    }
+
+    function renderProjects() {
+      var box = $('projects');
+      box.replaceChildren();
+      projects.forEach(function (p) {
+        var row = document.createElement('div');
+        row.className = 'project';
+        var name = document.createElement('span');
+        name.textContent = p.name;
+        var load = document.createElement('button');
+        load.className = 'btnx small';
+        load.textContent = 'Load';
+        load.addEventListener('click', function () { applyRecipe(p.recipe); status('Loaded recipe "' + p.name + '".'); });
+        var del = document.createElement('button');
+        del.className = 'btnx small';
+        del.textContent = 'x';
+        del.title = 'Delete recipe';
+        del.addEventListener('click', async function () {
+          projects = projects.filter(function (x) { return x.id !== p.id; });
+          await persistProjects(); renderProjects();
+        });
+        row.append(name, load, del);
+        box.appendChild(row);
+      });
+    }
+
+    async function persistProjects() {
+      status('Saving...');
+      await AIMEAT.data.set('pixel-mirage.projects', projects, { visibility: 'private', tags: ['pixel-mirage'] });
+      var check = await AIMEAT.data.get('pixel-mirage.projects');
+      if (!check) throw new Error('Save verification failed');
+      status('Recipes saved.');
+    }
+
+    /* ------------------------------------------------------------------- wire */
+
+    PM.ALGORITHMS.forEach(function (a) {
+      var o = document.createElement('option');
+      o.value = a.id; o.textContent = a.name;
+      $('algorithm').appendChild(o);
+    });
+    $('algorithm').value = 'bayer4';
+
+    drawSwatches(); drawInks(); updateLabels(); setCompare(50); updateAgentCall(PM.normalizeRecipe(currentRecipe(), APP_MAX_SIZE));
+
+    SLIDERS.concat(SELECTS).forEach(function (id) {
+      $(id).addEventListener('input', function () { updateLabels(); queueRender(); });
+      $(id).addEventListener('change', function () { updateLabels(); queueRender(); });
+    });
+    CHECKS.forEach(function (id) { $(id).addEventListener('change', function () { queueRender(); }); });
+    $('paletteFilter').addEventListener('change', drawSwatches);
+
+    $('addInk').addEventListener('click', function () {
+      if (inks.length >= 16) { status('Sixteen inks is the ceiling.'); return; }
+      inks.push(inks[inks.length - 1]); activePalette = 'custom';
+      drawInks(); markPalette(); queueRender();
+    });
+    $('removeInk').addEventListener('click', function () {
+      if (inks.length <= 2) { status('Two inks is the minimum.'); return; }
+      inks.pop(); activePalette = 'custom';
+      drawInks(); markPalette(); queueRender();
+    });
+    $('extractBtn').addEventListener('click', function () {
+      if (!sourceImage) { status('Upload a photo first.'); return; }
+      var src = sourcePixels();
+      inks = PM.extractPalette(src.rgba, src.width, src.height, +$('colorCount').value);
+      activePalette = 'custom';
+      drawInks(); markPalette(); queueRender();
+      status('Took ' + inks.length + ' inks from the photo.');
+    });
+    $('resetAdjust').addEventListener('click', function () {
+      ['brightness', 'saturation', 'hue', 'sharpen', 'posterize', 'bias'].forEach(function (id) { $(id).value = 0; });
+      $('contrast').value = 20; $('gamma').value = 100; $('invert').checked = false;
+      updateLabels(); queueRender();
+    });
+
+    $('fileInput').addEventListener('change', function (e) { loadFile(e.target.files[0]); });
+    var dz = $('dropZone');
+    ['dragenter', 'dragover'].forEach(function (t) { dz.addEventListener(t, function (e) { e.preventDefault(); dz.style.transform = 'scale(1.02)'; }); });
+    ['dragleave', 'drop'].forEach(function (t) {
+      dz.addEventListener(t, function (e) { e.preventDefault(); dz.style.transform = ''; if (t === 'drop') loadFile(e.dataTransfer.files[0]); });
+    });
+
+    Array.prototype.forEach.call(document.querySelectorAll('.tab-x'), function (t) {
+      t.addEventListener('click', function () { setPane(t.dataset.pane); });
+    });
+    $('sweepDim').addEventListener('change', renderSheet);
+    $('sweepAgain').addEventListener('click', renderSheet);
+
+    function setCompare(v) {
+      before.style.clipPath = 'inset(0 ' + (100 - v) + '% 0 0)';
+      $('compareLine').style.left = v + '%';
+      $('compareKnob').style.left = v + '%';
+    }
+    $('compare').addEventListener('input', function () { setCompare(+this.value); });
+
+    function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+    function fit(resetPan) {
+      if (!sourceImage) return;
+      var pad = 34, sx = (stage.clientWidth - pad) / after.width, sy = (stage.clientHeight - pad) / after.height;
+      zoom = Math.min(sx, sy);
+      if (resetPan !== false) { panX = 0; panY = 0; }
+      applyTransform();
+    }
+    function applyTransform() {
+      artboard.style.transform = 'translate(calc(-50% + ' + panX + 'px),calc(-50% + ' + panY + 'px)) scale(' + zoom + ')';
+      $('zoomLabel').textContent = Math.round(zoom * 100) + '%';
+    }
+    $('zoomIn').onclick = function () { zoom = clamp(zoom * 1.2, .05, 20); applyTransform(); };
+    $('zoomOut').onclick = function () { zoom = clamp(zoom / 1.2, .05, 20); applyTransform(); };
+    $('fitBtn').onclick = function () { fit(true); };
+
+    stage.addEventListener('wheel', function (e) {
+      if (!sourceImage) return;
+      e.preventDefault();
+      var old = zoom;
+      zoom = clamp(zoom * (e.deltaY < 0 ? 1.12 : .89), .05, 20);
+      var r = stage.getBoundingClientRect(), mx = e.clientX - r.left - r.width / 2, my = e.clientY - r.top - r.height / 2;
+      panX = mx - (mx - panX) * (zoom / old);
+      panY = my - (my - panY) * (zoom / old);
+      applyTransform();
+    }, { passive: false });
+    stage.addEventListener('pointerdown', function (e) {
+      if (e.target === $('compare') || !sourceImage) return;
+      dragging = true; lastX = e.clientX; lastY = e.clientY;
+      stage.classList.add('dragging'); stage.setPointerCapture(e.pointerId);
+    });
+    stage.addEventListener('pointermove', function (e) {
+      if (!dragging) return;
+      panX += e.clientX - lastX; panY += e.clientY - lastY;
+      lastX = e.clientX; lastY = e.clientY; applyTransform();
+    });
+    stage.addEventListener('pointerup', function () { dragging = false; stage.classList.remove('dragging'); });
+
+    $('downloadBtn').onclick = function () {
+      if (!lastResult) return;
+      var a = document.createElement('a');
+      a.download = 'pixel-mirage-' + (activePalette || 'custom') + '.png';
+      a.href = after.toDataURL('image/png');
+      a.click();
+      status('PNG downloaded.');
+    };
+    $('copyBtn').onclick = function () {
+      var text = JSON.stringify(toolRecipe(PM.normalizeRecipe(currentRecipe(), APP_MAX_SIZE)), null, 2);
+      copy(text, 'Recipe copied.');
+    };
+    $('copyCall').onclick = function () { copy($('agentCall').textContent, 'Tool call copied.'); };
+
+    function copy(text, ok) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(function () { status(ok); }, function () { status('Copying was blocked, select the text instead.'); });
+      } else { status('Copying is not available in this browser.'); }
+    }
+
+    $('saveBtn').onclick = function () {
+      if (!session) { status('Sign in to save recipes.'); return; }
+      $('projectName').value = (localStorage.getItem('pixel-mirage-last-name') || 'Untitled').replace(/\.[^.]+$/, '') + ' mirage';
+      $('saveDialog').showModal();
+    };
+    $('cancelSave').addEventListener('click', function () { $('saveDialog').close(); });
+    $('confirmSave').addEventListener('click', async function () {
+      var name = $('projectName').value.trim() || 'Untitled mirage';
+      projects.unshift({
+        id: Date.now().toString(36), name: name,
+        recipe: PM.normalizeRecipe(currentRecipe(), APP_MAX_SIZE),
+        sourceName: localStorage.getItem('pixel-mirage-last-name') || '',
+        savedAt: new Date().toISOString(),
+      });
+      try { await persistProjects(); renderProjects(); $('saveDialog').close(); }
+      catch (err) { console.error(err); projects.shift(); status('Save failed. Please try again.'); }
+    });
+
+    $('shareBtn').addEventListener('click', async function () {
+      if (!session || !sourceImage) return;
+      status('Publishing a copy for your agent...');
+      try {
+        var maxEdge = 1400, w = sourceImage.naturalWidth, h = sourceImage.naturalHeight;
+        var s = Math.min(1, maxEdge / Math.max(w, h));
+        var c = document.createElement('canvas');
+        c.width = Math.round(w * s); c.height = Math.round(h * s);
+        c.getContext('2d').drawImage(sourceImage, 0, 0, c.width, c.height);
+        var b64 = c.toDataURL('image/jpeg', 0.85);
+        var key = 'pixel-mirage.share.' + Date.now().toString(36);
+        await AIMEAT.data.set(key, { b64: b64, width: c.width, height: c.height, at: new Date().toISOString() }, { visibility: 'public' });
+        var ghii = (session && (session.ghii || session.gaii)) || '';
+        $('shareOut').style.display = 'block';
+        $('shareOut').textContent = 'image_ref: "' + ghii + '/' + key + '"';
+        status('Published. Your agent can now pass that image_ref instead of base64.');
+      } catch (e) {
+        console.error(e);
+        status('Publishing failed. Check that you are signed in.');
+      }
+    });
+
+    function openFull() {
+      // The class goes on either way. Native fullscreen alone leaves the close control hidden,
+      // which strands anyone who does not know that Escape is the way out.
+      var vp = $('viewerPanel');
+      vp.classList.add('fullscreen-view');
+      if (document.fullscreenEnabled) vp.requestFullscreen().catch(function () {});
+      setTimeout(function () { fit(true); }, 120);
+    }
+    function closeFull() {
+      if (document.fullscreenElement) document.exitFullscreen();
+      $('viewerPanel').classList.remove('fullscreen-view');
+      setTimeout(function () { fit(true); }, 120);
+    }
+    $('fullBtn').onclick = openFull;
+    $('fullClose').onclick = closeFull;
+    document.addEventListener('fullscreenchange', function () {
+      if (!document.fullscreenElement) $('viewerPanel').classList.remove('fullscreen-view');
+      setTimeout(function () { fit(true); }, 120);
+    });
+    addEventListener('resize', function () { if (sourceImage && activePane === 'preview') fit(true); });
+
+    /* ------------------------------------------------------------------- auth */
+
+    function boot(s) {
+      session = s;
+      $('saveBtn').disabled = !sourceImage;
+      $('shareBtn').disabled = !sourceImage;
+      $('saveHint').textContent = 'Recipes are private to your AIMEAT account. Source photos stay in this browser.';
+      loadProjects();
+    }
+    function hideApp() {
+      session = null;
+      $('saveBtn').disabled = true;
+      $('shareBtn').disabled = true;
+      $('saveHint').textContent = 'Sign in to save recipes. Editing and PNG export work without signing in.';
+      $('projects').replaceChildren();
+      status(sourceImage ? 'Editing locally, sign in to save.' : 'Choose a photo to begin.');
+    }
+    var booted = false;
+    function tryBoot() {
+      if (booted) return;
+      var s = AIMEAT.auth.getSession && AIMEAT.auth.getSession();
+      if (s && s.jwt) { booted = true; boot(s); }
+    }
+    AIMEAT.auth.mountLoginButton('#login', { onLogin: function () { tryBoot(); }, onLogout: function () { booted = false; hideApp(); } });
+    AIMEAT.auth.login().then(function (s) { if (s && !booted) { booted = true; boot(s); } }).catch(function () { hideApp(); });
+    AIMEAT.auth.on('login', function (s) { if (!booted) { booted = true; boot(s); } });
+    AIMEAT.auth.on('logout', function () { booted = false; hideApp(); });
+    var iv = setInterval(function () { tryBoot(); if (booted) clearInterval(iv); }, 300);
+    tryBoot();
+  })();
+  </script>
+</body>
+</html>
