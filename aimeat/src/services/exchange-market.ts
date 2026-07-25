@@ -5,7 +5,8 @@
  *   marketplace app + agents read/write; matching + negotiation live in the app/agent layer (this service
  *   is the generic store + a simple capability match, per "node holds refined data, not orchestration"):
  *     - OFFERING — a provider's public supply listing: a capability (ext/action) + pricing (base + plans) +
- *       ODPS-style provenance. Discoverable by any consumer.
+ *       provenance + an optional ODPS authoring block. Discoverable by any consumer, and projectable into
+ *       a full ODPS v4.0 document (services/exchange-odps.ts).
  *     - NEED — a consumer/app's open demand: a wanted capability + budget + autonomy. Providers browse open
  *       needs and BID.
  *     - BID — a provider's offer against a NEED (links an OFFERING + proposed terms). The requester accepts
@@ -16,6 +17,9 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.6.0 — 2026-07-25 — ODPS v4.0 adoption (TARGET-045 §4 / addendum Q2+Q3): Provenance (now with
+ *     transformations + SHA-256 snapshot hash + lineage) and the new `odps` authoring block move to
+ *     models/odps-schemas.ts as validated schemas; Offering gains `odps`.
  *   v1.5.0 — 2026-07-21 — Agent-work surface (Gap 2): Offering.kind gains 'agent-work' + AgentWorkSurface +
  *     agentWorkCoordinate + Offering.taskSpec; resolveOfferingPricing covers agent-work (DATA/SERVICES/AGENT WORK).
  *   v1.4.0 — 2026-07-21 — Demand side as an emergent interface request: NeedSpec gains input/outputSchema
@@ -31,6 +35,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from './metered-entitlements.js';
+import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
 
 export type { AppToolSurface, AgentWorkSurface, SellableSurface };
 
@@ -79,14 +84,13 @@ export type OfferingPlan =
   | { id: string; model: 'bundle'; blockSize: number; blockPrice: number }
   | { id: string; model: 'subscription'; periodSeconds: number; periodPrice: number; callsPerWindow: number; windowSeconds: number };
 
-/** ODPS-style provenance attestation (a PROMISE by the provider, not a platform guarantee). */
-export interface Provenance {
-  source?: string;
-  legalBasis?: string;
-  consentStatus?: string;
-  retention?: string;
-  odpsVersion?: string;
-}
+/**
+ * Provenance attestation + the ODPS authoring block. Both are defined (and validated) in
+ * `models/odps-schemas.ts` and re-exported here so the offering record stays the single import site.
+ * A PROMISE by the provider, not a platform guarantee — but structured, attributed and projectable
+ * into the ODPS v4.0 document served at `/v1/exchange/offerings/{id}/odps.yaml`.
+ */
+export type { Provenance, OdpsExtras };
 
 /**
  * How a consumer may use the delivered data — the consent-forward half of provenance. A provider PROMISE
@@ -136,6 +140,13 @@ export interface Offering {
   taskSpec?: { inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> } | null;
   provenance: Provenance | null;
   usageTerms: UsageTerms | null;   // how the consumer may use the output (derivatives/resale/attribution)
+  /**
+   * The provider's ODPS authoring block — the Open Data Product Specification fields the node cannot derive
+   * (value proposition, categories, standards, use cases, sample, SLA + data-quality COMMITMENTS, the legal
+   * data holder, jurisdiction/exit terms). Optional: without it the listing still projects a valid, thinner
+   * ODPS v4.0 document at `/v1/exchange/offerings/{id}/odps.yaml`.
+   */
+  odps?: OdpsExtras | null;
   tags: string[];
   state: 'listed' | 'delisted';
   /**

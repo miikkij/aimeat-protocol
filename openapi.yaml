@@ -8341,7 +8341,11 @@ paths:
           price_money: { type: object, description: "agent-work kind — per-task money price { amount (micros), currency }." },
           plans: { type: array, items: { type: object }, description: "agent-work kind — optional bundle/subscription plans." },
           title: { type: string }, description: { type: string },
-          provenance: { type: object }, tags: { type: array, items: { type: string } },
+          provenance: { type: object, description: "Provider attestation, validated (400 INVALID_PROVENANCE): { source, legalBasis, consentStatus, retention, transformations, snapshotHash (SHA-256), lineage[{source,transform,at}] }. The node stamps odpsVersion.", properties: {
+            source: { type: string }, legalBasis: { type: string }, consentStatus: { type: string }, retention: { type: string },
+            transformations: { type: string }, snapshotHash: { type: string }, lineage: { type: array, items: { type: object } } } },
+          odps: { type: object, description: "ODPS v4.0 fields the node cannot derive, validated (400 INVALID_ODPS): productType, valueProposition, categories, standards, useCases, contentSample, logoURL, sla[{dimension,objective,unit}], dataQuality[{dimension,objective,unit}], dataHolder{legalName,…}, license{geographicalArea,applicableLaws,exclusive,…}. Surfaced at GET /v1/exchange/offerings/{id}/odps.yaml." },
+          tags: { type: array, items: { type: string } },
           usage_terms: { type: object, properties: {
             derivatives: { type: boolean }, resale: { type: boolean }, attribution: { type: boolean }, note: { type: string } } } } } } }
       responses:
@@ -8374,7 +8378,8 @@ paths:
         Everything a human or agent needs to judge fit and integrate: the offering, the capability's
         `input_schema`/`output_schema`, a `call_recipe` (the contract IS the access — you call `POST
         /v1/ext/{ext}/{action}` as yourself, no separate API key), and usage `stats` (reputation). Public.
-        Returns `{ offering, capability, call_recipe, stats }`.
+        Returns `{ offering, capability, call_recipe, stats, odps }`, where `odps` points at the same listing
+        rendered as an Open Data Product Specification v4.0 document.
       tags: [Commerce]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses:
@@ -8398,6 +8403,47 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '409': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/exchange/offerings/{id}/odps:
+    get:
+      operationId: exchangeOfferingOdps
+      summary: One EXCHANGE offering as an Open Data Product Specification v4.0 document (public) (TARGET-045)
+      description: >
+        The listing rendered in the Linux Foundation's **Open Data Product Specification** (ODPS) v4.0 —
+        the interoperable descriptor an outside catalogue or a negotiating agent can read without knowing
+        anything about AIMEAT. Derived on read from the offering (never stored in ODPS form), so it cannot
+        drift from the listing it describes. Carries `product.details`, `dataAccess` (the metered REST call
+        plus the MCP surface), `pricingPlans` (base price + every bundle/subscription plan), `license`
+        (AIMEAT usage terms as ODPS rights + restrictions), `dataHolder`, `paymentGateways`, and — when the
+        provider committed to them — `SLA` and `dataQuality`. AIMEAT-specific truth (metered coordinate,
+        pinned interface + I/O schema, call recipe, provenance, projection source, OBSERVED usage) travels
+        under `product.x-aimeat`, which keeps the document valid against the official ODPS schema.
+        Returns `{ odps_version, odps }` in the AIMEAT envelope; `?format=yaml` serves the raw YAML instead.
+      tags: [Commerce]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: format, in: query, required: false, schema: { type: string, enum: [yaml] },
+            description: "Serve the raw ODPS YAML document instead of the JSON envelope." }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/exchange/offerings/{id}/odps.yaml:
+    get:
+      operationId: exchangeOfferingOdpsYaml
+      summary: One EXCHANGE offering as an ODPS v4.0 YAML document (public) (TARGET-045)
+      description: >
+        Same document as `GET /v1/exchange/offerings/{id}/odps`, served raw as `text/yaml` — the format the
+        Open Data Product Specification leads with, so the URL can be handed straight to an ODPS-aware tool.
+      tags: [Commerce]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200':
+          description: The ODPS v4.0 document.
+          content:
+            text/yaml:
+              schema: { type: string }
         '404': { $ref: '#/components/responses/AimeatError' }
 
   /v1/exchange/reconcile:

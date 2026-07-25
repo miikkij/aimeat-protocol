@@ -22,6 +22,7 @@
  */
 import { z } from 'zod';
 import { MONEY_CURRENCIES } from '../commerce/money.js';
+import { ProvenanceSchema, OdpsExtrasSchema } from './odps-schemas.js';
 
 /** A provider pricing plan on a sellable tool — mirrors exchange-market OfferingPlan so a tool can carry
  *  per-call / volume-bundle / subscription pricing surfaced on its EXCHANGE offering. */
@@ -92,6 +93,10 @@ export const AppToolSchema = z.object({
     attribution: z.boolean().optional(),
     note: z.string().max(500).optional(),
   }).optional(),
+  /** Provenance attestation carried onto the projected offering + its ODPS document. */
+  provenance: ProvenanceSchema.optional(),
+  /** ODPS v4.0 fields the node cannot derive (value proposition, SLA/quality commitments, data holder…). */
+  odps: OdpsExtrasSchema.optional(),
 });
 
 /** The `apps.{appId}.tools` record body. */

@@ -7,10 +7,14 @@
  *   direct acceptance route). Records are public (browsable); writes are owner-authorised. The heavy
  *   orchestration (agent negotiation, composite assembly) lives in the marketplace app/agent — this router
  *   is the generic store + capability match.
- * @structure exchangeMarketRouter — offerings (POST/GET/GET :id detail/GET :id/consumers/DELETE) ·
- *   needs (POST/GET/close) · bids (POST/GET/accept)
+ * @structure exchangeMarketRouter — offerings (POST/GET/GET :id detail/GET :id/odps(.yaml)/GET :id/consumers/
+ *   DELETE) · needs (POST/GET/close) · bids (POST/GET/accept) · offeringContext (shared detail/ODPS builder)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
+ *   v1.5.0 — 2026-07-25 — ODPS v4.0 (TARGET-045 §4): GET /v1/exchange/offerings/{id}/odps(.yaml) projects the
+ *     listing as an Open Data Product Specification document; `provenance` is now VALIDATED (400
+ *     INVALID_PROVENANCE) instead of cast, and a new `odps` authoring block carries the standard fields the
+ *     node cannot derive (400 INVALID_ODPS). Detail + ODPS share one context builder.
  *   v1.4.0 — 2026-07-21 — Needs are app-bound (app_id required → 400 NEED_APP_REQUIRED) + carry an I/O
  *     interface spec (inputSchema/outputSchema) — the emergent app-to-app data-API request.
  *   v1.3.0 — 2026-07-21 — Cross-app selling (Gap 1): `kind: 'app-tool'` listing branch (a provider app sells a
@@ -37,6 +41,8 @@ import {
   putNeed, getNeed, listNeeds, putBid, listBids, getBid,
   offeringStats, offeringConsumers, enrichNeeds,
 } from '../services/exchange-market.js';
+import { ProvenanceSchema, OdpsExtrasSchema, type Provenance, type OdpsExtras } from '../models/odps-schemas.js';
+import { offeringToOdps, odpsToYaml, ODPS_VERSION } from '../services/exchange-odps.js';
 import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
 import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled, migrateLegacyOfferings } from '../services/exchange-projection.js';
@@ -56,6 +62,28 @@ function parseUsageTerms(v: unknown): UsageTerms | null {
     attribution: o.attribution !== false,
     note: typeof o.note === 'string' ? o.note : undefined,
   };
+}
+
+/**
+ * Parse the provider's provenance attestation. Validated (not cast) because it lands in a PUBLIC record and
+ * is republished as ODPS: an unchecked object here would let a provider write arbitrary keys into the market.
+ * The node stamps `odpsVersion` so the descriptor always says which ODPS version it follows.
+ */
+function parseProvenance(v: unknown): { ok: true; value: Provenance | null } | { ok: false; message: string } {
+  if (v === undefined || v === null) return { ok: true, value: null };
+  const parsed = ProvenanceSchema.safeParse(v);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues.map(i => `${i.path.join('.') || 'provenance'}: ${i.message}`).join('; ') };
+  const value = parsed.data;
+  if (!Object.keys(value).length) return { ok: true, value: null };
+  return { ok: true, value: { ...value, odpsVersion: value.odpsVersion ?? ODPS_VERSION } };
+}
+
+/** Parse the provider's ODPS authoring block (the standard fields the node cannot derive). */
+function parseOdpsExtras(v: unknown): { ok: true; value: OdpsExtras | null } | { ok: false; message: string } {
+  if (v === undefined || v === null) return { ok: true, value: null };
+  const parsed = OdpsExtrasSchema.safeParse(v);
+  if (!parsed.success) return { ok: false, message: parsed.error.issues.map(i => `${i.path.join('.') || 'odps'}: ${i.message}`).join('; ') };
+  return { ok: true, value: Object.keys(parsed.data).length ? parsed.data : null };
 }
 
 /** Parse a need's interface-spec (the shape it sends/expects + light hints) from a request body. */
@@ -94,6 +122,13 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
   router.post('/v1/exchange/offerings', requireAuth(), async (req: Request, res: Response) => {
     const owner = req.auth!.owner;
     const b = (req.body ?? {}) as Record<string, unknown>;
+
+    // Provenance + the ODPS authoring block are validated once, before any kind branch: both are provider
+    // promises that get republished as an ODPS document, so a malformed one fails the listing loudly (400).
+    const prov = parseProvenance(b.provenance);
+    if (!prov.ok) return res.status(400).json(error(config.nodeId, 'INVALID_PROVENANCE', `provenance is malformed — ${prov.message}`));
+    const odps = parseOdpsExtras(b.odps);
+    if (!odps.ok) return res.status(400).json(error(config.nodeId, 'INVALID_ODPS', `odps is malformed — ${odps.message}`));
 
     // ── kind: app-tool — a provider app sells one of its tools (cross-app selling, Gap 1) ──
     if (b.kind === 'app-tool') {
@@ -139,7 +174,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
         description: str(b.description) || tool.description || '',
         unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,
         plans: commercial.plans ?? [],
-        provenance: (b.provenance && typeof b.provenance === 'object') ? b.provenance as Offering['provenance'] : null,
+        provenance: prov.value, odps: odps.value,
         usageTerms,
         tags: Array.isArray(b.tags) ? (b.tags as unknown[]).filter(t => typeof t === 'string') as string[] : [],
         state: 'listed', createdAt: now, updatedAt: now,
@@ -185,7 +220,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
         unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,
         plans: commercial.plans ?? [],
         taskSpec: { inputSchema: inSchema, outputSchema: outSchema },
-        provenance: (b.provenance && typeof b.provenance === 'object') ? b.provenance as Offering['provenance'] : null,
+        provenance: prov.value, odps: odps.value,
         usageTerms,
         tags: Array.isArray(b.tags) ? (b.tags as unknown[]).filter(t => typeof t === 'string') as string[] : [],
         state: 'listed', createdAt: now, updatedAt: now,
@@ -227,7 +262,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       description: str(b.description),
       unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,
       plans: (act.commercial as ActionCommercial | undefined)?.plans ?? [],
-      provenance: (b.provenance && typeof b.provenance === 'object') ? b.provenance as Offering['provenance'] : null,
+      provenance: prov.value, odps: odps.value,
       usageTerms,
       tags: Array.isArray(b.tags) ? (b.tags as unknown[]).filter(t => typeof t === 'string') as string[] : [],
       state: 'listed', createdAt: now, updatedAt: now,
@@ -237,13 +272,16 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
   });
 
   /**
-   * Offering DETAIL (public) — everything a human or agent needs to decide + integrate: the I/O SCHEMA of
-   * the underlying action, the CALL RECIPE (the contract IS the access — you call as yourself, no API key),
-   * usage terms, provenance, and usage STATS (reputation). One call, so the app/agent needn't stitch it.
+   * The full decision + integration context for one offering: the capability's I/O SCHEMA, the CALL RECIPE
+   * (the contract IS the access — you call as yourself, no API key) and the usage STATS. Shared by the JSON
+   * detail route and the ODPS projection, so the two can never describe the same offering differently.
    */
-  router.get('/v1/exchange/offerings/:id', async (req: Request, res: Response) => {
-    const o = await getOffering(storage, str(req.params.id));
-    if (!o) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering'));
+  async function offeringContext(o: Offering): Promise<{
+    capability: Record<string, unknown> | null;
+    iface: { inputSchema?: Record<string, unknown>; outputSchema?: Record<string, unknown> } | null;
+    callRecipe: Record<string, unknown> & { method: string; url: string; mcp?: string; note?: string };
+    stats: Awaited<ReturnType<typeof offeringStats>>;
+  }> {
     const stats = await offeringStats(storage, o);
 
     // app-tool: the capability schema is the PINNED interface snapshot; the call goes to the WebMCP invoke
@@ -251,13 +289,13 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     if (o.kind === 'app-tool' && o.surface && o.surface.kind === 'app-tool') {
       const s = o.surface;
       const iface = await getInterfaceVersion(storage, o.providerGhii, s.appId, s.tool, s.ifaceVersion);
-      return res.json(success(config.nodeId, {
-        offering: o,
+      return {
         capability: iface ? {
           kind: 'app-tool', app: `${s.ownerName}/${s.appId}`, tool: s.tool, iface_version: s.ifaceVersion,
           input_schema: iface.inputSchema, output_schema: iface.outputSchema,
         } : null,
-        call_recipe: {
+        iface: iface ? { inputSchema: iface.inputSchema, outputSchema: iface.outputSchema } : null,
+        callRecipe: {
           method: 'POST',
           url: `/v1/apps/${encodeURIComponent(s.ownerName)}/${encodeURIComponent(s.appId)}/webmcp/tools/${encodeURIComponent(s.tool)}`,
           auth: 'Your own AIMEAT token — the accepted contract (metered entitlement) authorises the call; no separate API key is issued.',
@@ -265,37 +303,37 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
           body: '{ "input": { … } }',
         },
         stats,
-      }));
+      };
     }
 
     // agent-work: the "capability" is the task interface; the call recipe is "start work → agent delivers".
     if (o.kind === 'agent-work' && o.surface && o.surface.kind === 'agent-work') {
       const s = o.surface;
-      return res.json(success(config.nodeId, {
-        offering: o,
+      return {
         capability: o.taskSpec ? { kind: 'agent-work', agent: `${s.ownerName}/${s.agentName}`, task_type: s.taskType,
           input_schema: o.taskSpec.inputSchema, output_schema: o.taskSpec.outputSchema } : null,
-        call_recipe: {
+        iface: o.taskSpec ? { inputSchema: o.taskSpec.inputSchema, outputSchema: o.taskSpec.outputSchema } : null,
+        callRecipe: {
           method: 'POST', url: '/v1/exchange/work',
           body: `{ "offering_id": "${o.offeringId}", "input": { … } }`,
           auth: 'Your own AIMEAT token — the accepted contract authorises starting work; no separate API key.',
           note: `Async: you START a task, the provider agent (${s.agentName}) DELIVERS, and you are charged the per-task price ON DELIVERY (metered + rake against your budget).`,
         },
         stats,
-      }));
+      };
     }
 
     // ext-action: schema comes live from the provider's extension action.
     const extRec = await storage.getExtension(o.ext);
     const act = extRec?.actions.find(a => a.id === o.action);
-    return res.json(success(config.nodeId, {
-      offering: o,
+    return {
       capability: act ? {
         input_schema: act.inputSchema ?? {},
         output_schema: act.outputSchema ?? {},
         toll_morsels: act.tollMorsels ?? 0,
       } : null,
-      call_recipe: {
+      iface: act ? { inputSchema: (act.inputSchema ?? {}) as Record<string, unknown>, outputSchema: (act.outputSchema ?? {}) as Record<string, unknown> } : null,
+      callRecipe: {
         method: 'POST',
         url: `/v1/ext/${o.ext}/${o.action}`,
         auth: 'Your own AIMEAT token — the accepted contract (metered entitlement) authorises the call; no separate API key is issued.',
@@ -303,8 +341,49 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
         mcp: `aimeat_extension_invoke { "name": "${o.ext}", "action": "${o.action}", "input": { … } }`,
       },
       stats,
+    };
+  }
+
+  /**
+   * Offering DETAIL (public) — everything a human or agent needs to decide + integrate: the I/O SCHEMA of
+   * the underlying action, the CALL RECIPE (the contract IS the access — you call as yourself, no API key),
+   * usage terms, provenance, and usage STATS (reputation). One call, so the app/agent needn't stitch it.
+   */
+  router.get('/v1/exchange/offerings/:id', async (req: Request, res: Response) => {
+    const o = await getOffering(storage, str(req.params.id));
+    if (!o) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering'));
+    const ctx = await offeringContext(o);
+    return res.json(success(config.nodeId, {
+      offering: o, capability: ctx.capability, call_recipe: ctx.callRecipe, stats: ctx.stats,
+      odps: { version: ODPS_VERSION, url: `/v1/exchange/offerings/${o.offeringId}/odps.yaml` },
     }));
   });
+
+  /**
+   * The offering as an **Open Data Product Specification v4.0** document (opendataproducts.org, Linux
+   * Foundation) — the interoperable descriptor an outside catalogue or a negotiating agent can read without
+   * knowing anything about AIMEAT. Public, like the listing itself. Derived on read (never stored in ODPS
+   * form), so it cannot drift from the offering it describes. `.yaml` serves the spec's native format;
+   * `/odps` serves the same document as JSON inside the standard AIMEAT envelope (`?format=yaml` for raw).
+   * AIMEAT-specific truth (metered coordinate, pinned interface, provenance, observed usage) travels under
+   * `product.x-aimeat`, which keeps the document valid against the official schema.
+   */
+  async function serveOdps(req: Request, res: Response, format: 'yaml' | 'json'): Promise<Response> {
+    const o = await getOffering(storage, str(req.params.id));
+    if (!o) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering'));
+    const ctx = await offeringContext(o);
+    const doc = offeringToOdps({
+      offering: o, iface: ctx.iface, callRecipe: ctx.callRecipe, stats: ctx.stats,
+      rakePercent: commerceFeePercent(config), baseUrl: config.baseUrl, nodeId: config.nodeId,
+    });
+    if (format === 'json') return res.json(success(config.nodeId, { odps_version: ODPS_VERSION, odps: doc }));
+    res.type('text/yaml; charset=utf-8');
+    return res.send(odpsToYaml(doc));
+  }
+
+  router.get('/v1/exchange/offerings/:id/odps.yaml', (req: Request, res: Response) => serveOdps(req, res, 'yaml'));
+  router.get('/v1/exchange/offerings/:id/odps', (req: Request, res: Response) =>
+    serveOdps(req, res, str(req.query.format) === 'yaml' ? 'yaml' : 'json'));
 
   /**
    * Offering CONSUMERS (provider lineage) — who holds a contract against my offering, how much they consumed,
