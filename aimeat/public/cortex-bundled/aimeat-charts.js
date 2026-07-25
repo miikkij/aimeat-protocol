@@ -13,6 +13,15 @@
  *   AIMEAT.charts.ChartPanel({ elementId: 'my-chart', chartKey: 'chart:sales-2024', nodeUrl: '...' })
  *
  * @version-history
+ *   v1.1.2 — 2026-07-25 — One observer, not two. This lib attached its own ResizeObserver that
+ *     called `chart.resize()` with no arguments; Chart.js already watches the same container and
+ *     already resizes from the observer entry's contentRect. The two disagree wherever an
+ *     ancestor carries `transform: scale(k)` — the no-argument call measures with
+ *     getBoundingClientRect(), which is k times the layout size. Measured while dragging a frame
+ *     on a zoomable board: 30 canvas style writes for 15 pointer moves, alternating between the
+ *     right height and exactly k x it (k = 0.31, 0.99, 1.87 all reproduce); a chart left holding
+ *     the scaled answer stayed at 31% of its box for good. Now the observer exists only for
+ *     non-responsive charts, and it passes layout pixels instead of re-measuring.
  *   v1.1.1 — 2026-07-25 — Give the canvas size back to Chart.js. The injected
  *     `.aimeat-chart-container canvas { width:100%!important; height:auto!important }` overrode the
  *     inline height Chart.js writes and then watches, so in any height-constrained container the
@@ -294,18 +303,35 @@
   }
 
   /**
-   * Attach a ResizeObserver to the chart's parent so Chart.js can re-draw when
-   * the container size changes (e.g. responsive layout, collapsible panels).
+   * Keep a chart sized to its container.
+   *
+   * A responsive chart is already watched by Chart.js itself, and Chart.js measures the right
+   * thing: its own ResizeObserver hands `resize()` the entry's contentRect, which is layout
+   * pixels. `chart.resize()` with no arguments measures the container with
+   * getBoundingClientRect() instead — and inside an ancestor carrying `transform: scale(k)`, as
+   * every zoomable board has, that rect is k times the layout size. Two observers, two answers,
+   * one canvas: measured on ORIGAMI while dragging a frame's resize grip, the canvas got two
+   * style writes per pointer move, one correct and one exactly k x correct — 30 writes for 15
+   * moves at k=0.31, k=0.99 and k=1.87 alike. Without this second observer: 15 writes, one size.
+   * A chart left holding the scaled answer stayed at 31% of its box and never recovered.
+   *
+   * So the observer is only for the non-responsive case, where Chart.js watches nothing — and
+   * even there it passes layout pixels explicitly rather than asking for a fresh measurement.
    *
    * @param {object}      chart Chart.js instance.
    * @param {HTMLElement}  el    The outer container element.
    */
   function observeResize(chart, el) {
     if (typeof ResizeObserver === 'undefined') return;
+    if (!chart.options || chart.options.responsive !== false) return;
 
     var observer = new ResizeObserver(function () {
       try {
-        chart.resize();
+        /* clientWidth/clientHeight, never the no-argument resize(): these are layout pixels and
+           stay true inside a scaled ancestor. The box is the canvas's own parent, which is what
+           Chart.js measures. */
+        var box = chart.canvas && chart.canvas.parentElement;
+        if (box) chart.resize(box.clientWidth, box.clientHeight);
       } catch (_e) {
         // Chart may have been destroyed — silently ignore.
       }
@@ -561,7 +587,7 @@
     ChartPanel: ChartPanel,
     ChartBuilder: ChartBuilder,
     TYPES: TYPES,
-    VERSION: '1.1.1',
+    VERSION: '1.1.2',
     /** The palette a chart would draw with right now, for legends and non-canvas visuals. */
     palette: themePalette
   };
