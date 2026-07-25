@@ -1,0 +1,107 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-surface
+  namespace: aimeat
+  description: "The panel-spec surface engine: turn a plain-language request into ONE panel spec, resolve its data source into rows, and render them through the node's UI packs (stats / table / chart / timeline / brief / options). Data sources are plugins — memory and inline ship built in, the app registers the rest, and the registered sources assemble the composer's own prompt. Renders the panel BODY only; card, frame and persistence belong to the host."
+  author: AIMEAT
+  tags: [surface, panel, spec, ai, compose, dashboard, living-surface, ui]
+  labels:
+    domain: ui
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: surface-assistant
+      content: |
+        You are a living-surface assistant for an AIMEAT app. The user's node is at {{node_url}}.
+
+        aimeat-surface turns "show me X" into a rendered panel. The app never hand-builds a
+        dashboard: it composes a PANEL SPEC, resolves the spec's source into rows, and renders.
+        The same spec can be a card in one product and a frame on a canvas in another, because
+        the engine renders the BODY only.
+
+        Include the packs it renders through, then this one:
+        <script src="{{node_url}}/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></script>
+        <script src="{{node_url}}/v1/cortex/aimeat-ui-motion/libs/aimeat-ui-motion.js"></script>
+        <script src="{{node_url}}/lib/chartjs@4.js"></script>
+        <script src="{{node_url}}/v1/cortex/aimeat-charts/libs/aimeat-charts.js"></script>
+        <script src="{{node_url}}/v1/cortex/aimeat-surface/libs/aimeat-surface.js"></script>
+        Every pack call has a plain-DOM fallback, so a missing pack degrades instead of blanking
+        the panel — but load them and the surface looks like one product.
+
+        const surface = AIMEAT.surface.create({ appId: APP_ID, locale: 'fi' });
+
+        THE PANEL SPEC is the whole contract:
+          { id, title, kind, intent, source, view, needsYou, updatedAt, author }
+          kind:   stats | table | chart | timeline | brief | options
+          source: { type, ... }        resolved by a registered source
+          view:   per kind —
+            table    {"columns":[{"key","label"}]}        (omit and columns are auto-picked)
+            chart    {"chartType":"bar|line|pie|doughnut","labelKey","valueKeys":[]}
+            stats    {"tiles":[{"label","key","agg":"count|sum|avg|latest","format":"usd|eur","sparkKey"}]}
+            timeline {"tsKey","textKey"}
+            brief    {"markdown":"…"}
+            options  {"items":[{"title","body"}],"chosen":{…}}
+
+        DATA SOURCES ARE PLUGINS. Built in: memory (owner-scope read by key prefix, which also
+        picks up what the owner's AGENTS wrote) and inline. Register anything else the app can
+        fetch — and note the consequence: a source you do not register is a source the composer
+        is never told about, because the registered sources assemble its prompt.
+          surface.registerSource('companies', {
+            hint: '  {"type":"companies","names":["Nokia"]}   Finnish trade-register companies',
+            fields: 'name, businessId, form, line, registered, lastChange, website, city',
+            resolve: async (src, ctx) => rowsFor(src),
+            normalize: (src) => ({ names: src.names || src.companies || [], ids: src.ids || [] }),
+            claims: (src) => !!(src.names || src.companies || src.ids),
+          })
+        `claims` matters: models rename and drop the type field, so each source gets to claim a
+        malformed source object by SHAPE before the engine falls back to inline.
+
+        THE LOOP:
+          const spec = await surface.compose(text, { prefixes });   // request → spec
+          const rows = await surface.resolve(spec, { session });    // spec → rows
+          surface.renderBody(boxEl, spec, rows, { onPick });        // rows → DOM
+          const next = await surface.reshape(spec, 'make it a chart by month');
+          const better = await surface.refine(spec, rows);          // SECOND PASS, see below
+          spec.view.markdown = await surface.writeBrief(spec, rows);
+
+        RUN refine() AFTER THE ROWS ARRIVE when the composer had to guess the data shape blind
+        (memory sources above all). It re-picks kind + view against the REAL field names, and it
+        is the difference between "my AI spend per day" arriving as a chart of the right column
+        and as a table of plumbing. Keep the source pinned — refine() does.
+
+        writeBrief() runs AFTER resolve() on purpose: the model only ever sees fetched rows, so a
+        brief cannot invent data.
+
+        Helpers you may want directly: AIMEAT.surface.flatten(obj), .autoColumns(rows),
+        .agg(rows, key, how), .num(v); on an engine, .fmtNum(n, 'usd'|'eur') and .specHint().
+
+        The engine does NOT persist anything. Store specs where they belong for your product —
+        an app memory key, a workspace record, a board — and pass them back in.
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-surface
+      filename: aimeat-surface.js
+      exports:
+        - create
+      api_surface: |
+        AIMEAT.surface.create({ appId?, locale?: 'fi'|'en', strings?, ai?, scrollClass? })
+          -> { KINDS, registerSource(type, def), resolve(spec, ctx), renderBody(box, spec, rows, opts?),
+               specHint(), normalizeSpec(out, intent), compose(text, ctx), reshape(spec, text),
+               refine(spec, rows), writeBrief(spec, rows), autoColumns(rows), fmtNum(n, format), t(key) }
+        AIMEAT.surface.{ KINDS, flatten, autoColumns, agg, num, VERSION }
+
+        Panel spec: { id, title, kind, intent, source, view, needsYou, updatedAt, author }
+        kind: stats | table | chart | timeline | brief | options
+        Built-in sources: memory ({type,prefix}, owner-scope, includes agent writes) · inline ({type,rows}).
+        registerSource def: { resolve(src, ctx), hint, fields?, normalize?(src), claims?(src) }.
+
+        Renders the panel BODY into the element you pass; chrome and persistence are the host's.
+        Rendering degrades gracefully when a UI pack is absent (statTiles → daisyUI stats,
+        ChartBuilder → warning, Timeline → list, markdown → escaped text, DataTable → table).
+        renderBody opts: { onPick(index, spec), pageSize }.

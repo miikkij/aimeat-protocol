@@ -3,6 +3,8 @@
  * @description Profile tab for morsel wallet: balance overview, lifetime stats,
  *   morsel request form, and transaction history with expandable details.
  * @version-history
+ *   v1.5.1 — 2026-07-25 — The x402 chip reports every currency → token pair the node can settle
+ *     (USD → USDC, EUR → EURC) instead of a single hardcoded token (TARGET-042).
  *   v1.5.0 — 2026-07-25 — Payout rails: an x402 USDC payout-address section beside the Stripe one, so a
  *     seller can set the address a stablecoin sale settles to and tell the two rails apart (Stripe moves
  *     fiat through a provider; x402 settles USDC on-chain to an address the seller controls).
@@ -86,10 +88,12 @@ function PspSection() {
     </div>`;
 }
 
-/* "Stablecoin payouts (x402)" — the seller's USDC payout address.
+/* "Stablecoin payouts (x402)" — the seller's on-chain payout address.
  * A different rail from Stripe, and the difference matters at sale time: Stripe settles EUR/USD to a
- * connected account through a provider that holds the funds; x402 settles USDC on-chain straight to
- * this address, non-custodially, with the node holding no key. A money sale over x402 without an
+ * connected account through a provider that holds the funds; x402 settles a stablecoin on-chain
+ * straight to this address, non-custodially, with the node holding no key. The token follows the
+ * price (USD → USDC, EUR → EURC) and ONE address receives them all, so the chip reports the pairs
+ * the node can actually settle rather than naming a single token. A money sale over x402 without an
  * address fails with SELLER_NO_X402_ADDRESS, which is exactly what this section prevents. */
 function X402Section() {
   const [state, setState] = useState(null);
@@ -129,7 +133,7 @@ function X402Section() {
         ${x.configured
           ? html`<span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.x402Configured')} <code>${x.address}</code></span>`
           : html`<span class="pf-psp-chip pf-psp-chip--warn">${t('profile.wallet.x402Missing')}</span>`}
-        <span class="pf-psp-chip">${x.currency} · ${x.network}${x.testnet ? ` · ${t('profile.wallet.x402Testnet')}` : ''}</span>
+        <span class="pf-psp-chip">${(x.assets || []).map(a => `${a.currency} → ${a.symbol}`).join(' · ')} · ${x.network}${x.testnet ? ` · ${t('profile.wallet.x402Testnet')}` : ''}</span>
       </div>
       <div class="wallet-psp-row">
         <input class="input-field input-sm wallet-psp-input" type="text" spellcheck="false" placeholder="0x…"

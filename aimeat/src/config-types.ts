@@ -288,6 +288,12 @@ export interface AimeatConfig {
   x402Network: string;
   /** Facilitator base URL whose /verify + /settle endpoints check + settle the onchain payment. */
   x402FacilitatorUrl: string;
+  /**
+   * OPTIONAL read-only JSON-RPC endpoint used to check that a seller's payout address is an ACCOUNT
+   * and not a contract before it is saved. Empty (the default) skips the check: configuring a payout
+   * address must not depend on a third party being reachable.
+   */
+  x402RpcUrl: string;
   /** TEST ONLY: swap the real facilitator for an off-chain double so the x402 chain is E2E-provable. */
   x402TestFacilitator: boolean;
 
@@ -477,6 +483,12 @@ export interface AimeatConfig {
   extensionTimeoutMs: number;
   extensionMaxApiCalls: number;
   extensionMaxDebitPerCall: number;
+  /**
+   * Morsels burned per METERED call when the capability declares no toll of its own — the node-wide
+   * pacing floor. Applies on every metered path (app tools, exchange runs, agent work, raw extension
+   * invokes) and in every unit, so a money-priced capability is rate-bounded too. 0 disables it.
+   */
+  pacingTollDefault: number;
   extensionMaxCodeSizeKb: number;
   extensionMaxInstalled: number;
   maxExtensionsPerOwner: number;

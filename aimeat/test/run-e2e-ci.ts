@@ -66,6 +66,9 @@ const ALL_SUITES = [
     'test/e2e-login-attach-email.ts',
     'test/e2e-extensions.ts',
     'test/e2e-ext-paywall.ts',
+    // Self-spawns its own node with AIMEAT_PACING_TOLL_DEFAULT set: the feature IS the node-wide
+    // default, so it cannot be proven on the shared server.
+    'test/e2e-pacing.ts',
     'test/e2e-exchange.ts',
     'test/e2e-exchange-projection.ts',
     'test/e2e-extension-secrets.ts',

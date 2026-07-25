@@ -25,6 +25,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { isEvmAddressShape, toChecksumAddress, checksumIsWrong, settlementAssetMatch, probeIsContract } from '../commerce/evm-address.js';
 import {
   createSession, getSession, updateSessionItems, cancelSession, completeSession, CommerceError,
   listSessions, listOrders,
@@ -32,7 +33,7 @@ import {
 import type { CheckoutSessionRecord } from '../commerce/types.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
 import { paymentChallenge, x402ExactAccepts } from '../commerce/x402.js';
-import { decodeXPayment } from '../commerce/x402-facilitator.js';
+import { decodeXPayment, getX402Network, getX402Asset, x402SettlementCurrencies } from '../commerce/x402-facilitator.js';
 import { X402_HANDLER_ID } from '../commerce/x402-handler.js';
 
 const ItemsSchema = z.array(z.object({
@@ -85,7 +86,7 @@ function sendCommerceError(res: Response, config: AimeatConfig, err: unknown, ex
 /** The seller's opaque payment-settings record. Holds the Stripe credentials AND the x402 payout
  *  address side by side, so every write MERGES: one rail's settings must never delete the other's. */
 const PSP_KEY = 'commerce.psp';
-/** An EVM account address — the only shape an x402 USDC settlement can pay out to. */
+/** An EVM account address — the only shape an x402 stablecoin settlement can pay out to. */
 const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
 type PspRecord = { provider?: string; secretKey?: unknown; payTo?: string; address?: string; x402?: { address?: string; payTo?: string } };
@@ -127,12 +128,20 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
   /* ── Seller payout settings ────────────────────────────────────────────────────────────────────
    * Which rails can actually pay this seller, and the one setting the seller owns for each. The two
    * rails are deliberately reported apart: Stripe moves fiat (EUR/USD) to a connected account, x402
-   * moves USDC on-chain to an address the seller controls. Reading tells you which of your money
+   * moves a stablecoin on-chain to an address the seller controls. Reading tells you which of your money
    * listings can settle at all — an x402 sale without an address fails with SELLER_NO_X402_ADDRESS. */
   router.get('/v1/commerce/payout', requireAuth(), requireRole('owner'), async (req, res) => {
     const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
     const psp = await readPsp(storage, ownerGhii);
     const address = payToOf(psp);
+    // What the stablecoin rail can settle is READ FROM THE NETWORK REGISTRY, never hardcoded: the
+    // seller is told the real currency list for the network this node runs on, and which token each
+    // one settles in. One address receives them all, so a new currency asks for no new setting.
+    const network = getX402Network(config.x402Network);
+    const assets = x402SettlementCurrencies(network).map((currency) => {
+      const asset = getX402Asset(network, currency)!;
+      return { currency, symbol: asset.symbol, address: asset.address, decimals: asset.decimals };
+    });
     return res.json(success(config.nodeId, {
       x402: {
         enabled: config.x402Enabled,
@@ -140,9 +149,10 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
         testnet: config.x402Network !== 'base',
         configured: !!address,
         address,
-        currency: 'USDC',
+        currencies: assets.map((a) => a.currency),
+        assets,
         note: config.x402Enabled
-          ? 'Stablecoin settlement: the buyer signs a USDC payment and the facilitator settles it straight to this address. No key is held by the node.'
+          ? `Stablecoin settlement: the buyer signs a payment in the token matching the price (${assets.map((a) => `${a.currency} → ${a.symbol}`).join(', ')}) and the facilitator settles it straight to this address. No key is held by the node.`
           : 'The node operator has not enabled x402 on this node (AIMEAT_X402_ENABLED).',
       },
       stripe: {
@@ -154,24 +164,54 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     }));
   });
 
-  /** Set the x402 USDC payout address. Merges into the record — the Stripe credentials survive. */
+  /**
+   * Set the x402 payout address. Guarded, because this is the one hand-typed value in the whole
+   * stablecoin flow and a settlement to the wrong target is irreversible: the shape, then the EIP-55
+   * checksum (catches a typo the eye cannot), then a check that it is not one of our own settlement
+   * TOKEN contracts (the address most likely to be on a seller's clipboard while setting this up),
+   * then — when the operator configured an RPC — whether the chain says it holds contract code.
+   * Merges into the record, so the Stripe credentials survive.
+   */
   router.put('/v1/commerce/payout/x402', requireAuth(), requireRole('owner'), async (req, res) => {
     const raw = (req.body ?? {}) as { address?: unknown };
     const address = typeof raw.address === 'string' ? raw.address.trim() : '';
-    if (!EVM_ADDRESS.test(address)) {
+    if (!isEvmAddressShape(address)) {
       return res.status(400).json(error(config.nodeId, 'INVALID_ADDRESS',
         'address must be an EVM account address: 0x followed by 40 hex characters'));
     }
+    if (checksumIsWrong(address)) {
+      return res.status(400).json(error(config.nodeId, 'ADDRESS_CHECKSUM',
+        'This address fails its EIP-55 checksum, which almost always means a character was mistyped or lost in copying. '
+        + 'Paste it again from your wallet, or send it in all lowercase if your wallet does not use mixed case.'));
+    }
+    const token = settlementAssetMatch(address);
+    if (token) {
+      return res.status(400).json(error(config.nodeId, 'ADDRESS_IS_TOKEN_CONTRACT',
+        `That is the ${token.currency === 'EUR' ? 'EURC' : 'USDC'} token contract on ${token.network}, not a wallet. `
+        + 'Funds settled there cannot be recovered. Use the address of an account you hold the key for.'));
+    }
+    const isContract = await probeIsContract(config.x402RpcUrl, address);
+    if (isContract === true) {
+      return res.status(400).json(error(config.nodeId, 'ADDRESS_IS_CONTRACT',
+        'The chain reports contract code at this address, so it is not a wallet you hold a key for. '
+        + 'If this is a smart-contract wallet you control, ask the operator to allow it.'));
+    }
+    // Store the canonical EIP-55 form: mixed case is what a wallet shows, so the seller can compare.
+    const canonical = toChecksumAddress(address);
     const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
     const psp = await readPsp(storage, ownerGhii);
     const now = new Date().toISOString();
     await storage.setMemory({
-      key: PSP_KEY, ownerGaii: ownerGhii, value: { ...psp, payTo: address },
+      key: PSP_KEY, ownerGaii: ownerGhii, value: { ...psp, payTo: canonical },
       visibility: 'private', tags: ['commerce'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });
     return res.json(success(config.nodeId, {
-      configured: true, address, network: config.x402Network, currency: 'USDC',
+      configured: true, address: canonical, network: config.x402Network,
+      // One address receives every settlement asset this network carries — report them all, so the
+      // seller sees that the same setting covers both a USD sale and a EUR one.
+      currencies: x402SettlementCurrencies(getX402Network(config.x402Network)),
       enabled: config.x402Enabled,
+      checked: { shape: true, checksum: true, notTokenContract: true, onChain: isContract === null ? 'skipped' : 'account' },
     }));
   });
 
@@ -187,7 +227,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
       key: PSP_KEY, ownerGaii: ownerGhii, value: next,
       visibility: 'private', tags: ['commerce'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });
-    return res.json(success(config.nodeId, { configured: false, note: 'USDC sales now fail until an address is set again. Card/invoice settlement is unaffected.' }));
+    return res.json(success(config.nodeId, { configured: false, note: 'Stablecoin sales now fail until an address is set again. Card/invoice settlement is unaffected.' }));
   });
 
   router.post('/v1/commerce/checkout-sessions', requireAuth(), async (req, res) => {

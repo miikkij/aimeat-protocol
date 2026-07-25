@@ -10,9 +10,15 @@
  *   morsel movement; a seller without a USDC address is refused; and the exact scheme's network/asset
  *   come from the configured network registry (parameterization).
  *
+ *   Since EURC joined the rail it also proves the SECOND settlement asset: a EUR-priced offering is
+ *   offered in EURC (asset + EIP-712 domain), settles, and stays a EUR session; both currencies are
+ *   advertised and reported; and — the assertion that protects buyers — EVERY currency the node
+ *   advertises really produces a settleable exact scheme, so nothing is offered that cannot be paid.
+ *
  *   Requires the run env: AIMEAT_X402_ENABLED=true AIMEAT_X402_TEST_FACILITATOR=true.
  * @usage cd aimeat && AIMEAT_X402_ENABLED=true AIMEAT_X402_TEST_FACILITATOR=true pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=x402
  * @version-history
+ *   v1.1.0 — 2026-07-25 — EUR/EURC settlement + the advertise-only-what-can-settle round trip (TARGET-042)
  *   v1.0.0 — 2026-07-18 — Initial x402 settlement suite (TARGET-042)
  */
 
@@ -52,15 +58,15 @@ async function balance(token: string): Promise<number> {
     return Number(r.body.data?.balance ?? r.body.data?.total ?? 0);
 }
 
-/** A seller publishes one PUBLIC, USD-priced offer and stores a commerce.psp with a payout address. */
-async function sellerWithUsdOffer(label: string, offerId: string, amountMicros: number, psp: unknown) {
+/** A seller publishes one PUBLIC, money-priced offer and stores a commerce.psp with a payout address. */
+async function sellerWithUsdOffer(label: string, offerId: string, amountMicros: number, psp: unknown, currency: 'USD' | 'EUR' = 'USD') {
     const seller = await setupOwner(label);
     const ag = await json('/v1/agents', { method: 'POST', headers: auth(seller.token), body: JSON.stringify({ name: 'vendor', owner: seller.name, capabilities: ['social'] }) });
     assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body.error || ag.body)}`);
     const offers = { offers: [{
-        id: offerId, title: 'USD service', ask: 'A service priced in dollars, payable in USDC.',
+        id: offerId, title: `${currency} service`, ask: `A service priced in ${currency}, payable in the matching stablecoin.`,
         deliverable: { format: 'document', sample: 'untested' },
-        priceMoney: { amount: amountMicros, currency: 'USD' }, visibility: 'public',
+        priceMoney: { amount: amountMicros, currency }, visibility: 'public',
     }] };
     const pub = await json('/v1/agents/vendor/offers', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify(offers) });
     assert(pub.status === 200, `publish offers ${pub.status}: ${JSON.stringify(pub.body.error)}`);
@@ -98,12 +104,17 @@ await test('Setup: seller (USD offer + x402 payout address) + buyer', async () =
     buyer = await setupOwner('b');
 });
 
-await test('1. /.well-known/ucp advertises the x402 handler with the USD currency', async () => {
+let advertised: string[] = [];
+await test('1. /.well-known/ucp advertises the x402 handler with BOTH settleable currencies', async () => {
     const profile = await (await fetch(`${BASE}/.well-known/ucp`)).json() as any;
     const handlers = (profile.ucp?.payment_handlers || []).map((h: any) => h.id);
     assert(handlers.includes('com.coinbase.x402'), `x402 handler advertised: ${JSON.stringify(handlers)}`);
     const x402 = (profile.ucp.payment_handlers || []).find((h: any) => h.id === 'com.coinbase.x402');
-    assert((x402.currencies || []).includes('USD'), `x402 settles USD: ${JSON.stringify(x402.currencies)}`);
+    advertised = x402.currencies || [];
+    // The UCP profile derives its currency list straight from the handler, so adding EURC to the
+    // network registry propagates here with no change to wellknown.ts — this asserts that it does.
+    assert(advertised.includes('USD'), `x402 settles USD: ${JSON.stringify(advertised)}`);
+    assert(advertised.includes('EUR'), `x402 settles EUR via EURC: ${JSON.stringify(advertised)}`);
 });
 
 let sessionId = '';
@@ -150,7 +161,8 @@ await test('4. Retry with X-PAYMENT → verified + settled, resource returned, U
     const s = r.body.data.session;
     assert(s.status === 'completed', `status ${s.status}`);
     assert(s.receipt?.handler === 'com.coinbase.x402', `receipt handler: ${JSON.stringify(s.receipt)}`);
-    assert(String(s.receipt?.trackingCode).startsWith('x402_'), `x402 tracking code: ${s.receipt?.trackingCode}`);
+    // The tracking code names the token that moved, so a USD sale is visibly settled in USDC.
+    assert(String(s.receipt?.trackingCode).startsWith('x402_USDC_'), `x402 tracking code names the asset: ${s.receipt?.trackingCode}`);
     // Model 2: the session settled but its currency is still USD, never USDC.
     assert(s.currency === 'USD', `session currency stays USD (model 2): ${s.currency}`);
     // Non-custodial + off-ledger: no morsel balances moved for either party.
@@ -199,13 +211,119 @@ await test('7. Parameterization: the exact scheme network + asset come from the 
         `asset + EIP-712 domain from the base-sepolia registry entry: ${JSON.stringify({ asset: requirements.asset, extra: requirements.extra })}`);
 });
 
+/* ── EUR settles in EURC on the SAME rail (TARGET-042) ─────────────────────────────────────────────
+ * The second settlement asset, proving the model-2 claim twice over: the session currency stays EUR
+ * and only the instrument changes. The registry's EURC entry (address, decimals, EIP-712 domain) was
+ * verified against the live Base Sepolia contract and against the public facilitator before shipping;
+ * these tests keep it honest end to end. */
+
+const BASE_SEPOLIA_USDC = '0x036CbD53842c5426634e7929541eC2318f3dCF7e';
+const BASE_SEPOLIA_EURC = '0x808456652fdb597867f38412077A9182bf77359F';
+const EUR_PRICE_MICROS = 2_400_000; // 2.40 EUR
+
+let eurSeller: Awaited<ReturnType<typeof sellerWithUsdOffer>>;
+let eurSessionId = '';
+let eurRequirements: any;
+
+await test('8. A EUR-priced offering yields a 402 whose exact scheme carries the EURC asset + domain', async () => {
+    eurSeller = await sellerWithUsdOffer('e', 'eur-service', EUR_PRICE_MICROS, { provider: 'x402', address: SELLER_ADDR }, 'EUR');
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ currency: 'EUR', items: [{ agent: eurSeller.vendorGaii, offer_id: 'eur-service' }] }),
+    });
+    assert(create.status === 201, `create ${create.status}: ${JSON.stringify(create.body.error)}`);
+    const s = create.body.data.session;
+    eurSessionId = s.id;
+    assert(s.currency === 'EUR' && s.total === EUR_PRICE_MICROS, `session: currency ${s.currency}, total ${s.total}`);
+
+    const r = await json(`/v1/commerce/checkout-sessions/${eurSessionId}/complete`, {
+        method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment: { handler: 'com.coinbase.x402' } }),
+    });
+    assert(r.status === 402, `expected 402, got ${r.status}: ${JSON.stringify(r.body).slice(0, 200)}`);
+    eurRequirements = (r.body.accepts || []).find((a: any) => a.scheme === 'exact');
+    assert(!!eurRequirements, `exact scheme present for a EUR session: ${JSON.stringify(r.body.accepts?.map((a: any) => a.scheme))}`);
+    // THE assertion the whole change turns on: a euro price is offered in EURC, never in USDC.
+    assert(eurRequirements.asset === BASE_SEPOLIA_EURC, `asset is Base Sepolia EURC: ${eurRequirements.asset}`);
+    assert(eurRequirements.asset !== BASE_SEPOLIA_USDC, 'a EUR price is never offered in the USD token');
+    // The EIP-712 domain the buyer signs against — a wrong value invalidates every signature.
+    assert(eurRequirements.extra?.name === 'EURC' && eurRequirements.extra?.version === '2',
+        `EURC EIP-712 domain: ${JSON.stringify(eurRequirements.extra)}`);
+    // EURC carries 6 decimals like USDC, so micros map 1:1 — 2.40 EUR asks for 2.40 EURC.
+    assert(eurRequirements.maxAmountRequired === String(EUR_PRICE_MICROS), `maxAmountRequired: ${eurRequirements.maxAmountRequired}`);
+    assert(eurRequirements.network === 'base-sepolia' && eurRequirements.payTo === SELLER_ADDR,
+        `same network + the seller's one address: ${eurRequirements.network} ${eurRequirements.payTo}`);
+});
+
+await test('9. The EUR session settles through the facilitator and the tracking code says EURC', async () => {
+    const buyerMorselsBefore = await balance(buyer.token);
+    const r = await json(`/v1/commerce/checkout-sessions/${eurSessionId}/complete`, {
+        method: 'POST', headers: { ...auth(buyer.token), 'X-PAYMENT': buildXPayment(eurRequirements, BUYER_WALLET, freshNonce()) },
+        body: JSON.stringify({}),
+    });
+    assert(r.status === 200, `complete ${r.status}: ${JSON.stringify(r.body.error)}`);
+    const s = r.body.data.session;
+    assert(s.status === 'completed', `status ${s.status}`);
+    assert(s.receipt?.handler === 'com.coinbase.x402', `receipt handler: ${JSON.stringify(s.receipt)}`);
+    assert(String(s.receipt?.trackingCode).startsWith('x402_EURC_'), `tracking code names EURC: ${s.receipt?.trackingCode}`);
+    // Model 2: the money that settled was EURC, but the session is still a EUR session.
+    assert(s.currency === 'EUR', `session currency stays EUR (model 2): ${s.currency}`);
+    assert(await balance(buyer.token) === buyerMorselsBefore, 'no morsel balance moved on a money sale');
+});
+
+await test('10. Every ADVERTISED currency really settles — nothing is offered that cannot be paid', async () => {
+    // The rule this whole change is governed by, asserted end to end: for each currency the node
+    // advertises in /.well-known/ucp, a session in that currency must produce a usable exact scheme.
+    // A currency advertised without a working asset fails HERE rather than at a buyer's wallet.
+    assert(advertised.length > 0, 'the handler advertises at least one currency');
+    // Reuse the sellers already standing (registration is rate limited, and these are exactly the
+    // fixtures the advertised currencies need). A NEW advertised currency with no fixture fails here
+    // loudly — which is the point: an unproven currency must never reach a buyer unnoticed.
+    const fixtures: Record<string, { gaii: string; offerId: string }> = {
+        USD: { gaii: seller.vendorGaii, offerId: 'usd-service' },
+        EUR: { gaii: eurSeller.vendorGaii, offerId: 'eur-service' },
+    };
+    for (const currency of advertised) {
+        const fixture = fixtures[currency];
+        assert(!!fixture, `${currency} is advertised but this suite has no seller proving it settles — add one`);
+        const create = await json('/v1/commerce/checkout-sessions', {
+            method: 'POST', headers: auth(buyer.token),
+            body: JSON.stringify({ currency, items: [{ agent: fixture.gaii, offer_id: fixture.offerId }] }),
+        });
+        assert(create.status === 201, `${currency}: create ${create.status}: ${JSON.stringify(create.body.error)}`);
+        const r = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, {
+            method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment: { handler: 'com.coinbase.x402' } }),
+        });
+        const exact = (r.body.accepts || []).find((a: any) => a.scheme === 'exact');
+        assert(!!exact, `${currency} is advertised, so it must carry an exact scheme: ${JSON.stringify(r.body.accepts?.map((a: any) => a.scheme))}`);
+        assert(/^0x[a-fA-F0-9]{40}$/.test(exact.asset) && !!exact.extra?.name && !!exact.extra?.version,
+            `${currency} resolves to a real asset with an EIP-712 domain: ${JSON.stringify({ asset: exact.asset, extra: exact.extra })}`);
+        // And it settles, not merely parses.
+        const settled = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, {
+            method: 'POST', headers: { ...auth(buyer.token), 'X-PAYMENT': buildXPayment(exact, BUYER_WALLET, freshNonce()) }, body: JSON.stringify({}),
+        });
+        assert(settled.status === 200, `${currency} settles: ${settled.status} ${JSON.stringify(settled.body.error)}`);
+    }
+});
+
 // -- Payout settings surface (the endpoint the Wallet tab uses): the two rails are reported apart,
 // and a write to one never deletes the other's setting -- they share one opaque record.
 await test('Payout status reports the x402 rail and its network', async () => {
   const r = await json('/v1/commerce/payout', { headers: auth(seller.token) });
   assert(r.status === 200, `payout status ${r.status}: ${JSON.stringify(r.body?.error)}`);
   const x = r.body.data.x402;
-  assert(x && x.currency === 'USDC' && typeof x.network === 'string', `x402 block: ${JSON.stringify(x)}`);
+  // The rail reports what it can settle for THIS network; the currency list grew with EURC.
+  assert(x && typeof x.network === 'string' && Array.isArray(x.currencies) && x.currencies.includes('USD'),
+    `x402 block: ${JSON.stringify(x)}`);
+  // Both currencies are reported once EURC resolves, each with the token it settles in, so the
+  // seller sees that ONE address covers a dollar sale and a euro sale alike.
+  assert(x.currencies.includes('EUR'), `EUR is reported as settleable: ${JSON.stringify(x.currencies)}`);
+  const symbols = (x.assets || []).map((a: any) => `${a.currency}:${a.symbol}`);
+  assert(symbols.includes('USD:USDC') && symbols.includes('EUR:EURC'), `assets name their tokens: ${JSON.stringify(x.assets)}`);
+  assert((x.assets || []).every((a: any) => a.decimals === 6 && /^0x[a-fA-F0-9]{40}$/.test(a.address)),
+    `every asset carries a real contract + decimals: ${JSON.stringify(x.assets)}`);
+  // It must match what the node actually advertises to buyers — one truth, two surfaces.
+  assert(JSON.stringify([...x.currencies].sort()) === JSON.stringify([...advertised].sort()),
+    `payout currencies match the UCP profile: ${JSON.stringify(x.currencies)} vs ${JSON.stringify(advertised)}`);
   assert(r.body.data.stripe && Array.isArray(r.body.data.stripe.currencies), 'the fiat rail is reported separately');
 });
 
@@ -220,8 +338,33 @@ await test('Setting the payout address is validated and merged, keeping the Stri
   assert(ok.status === 200 && ok.body.data.configured === true, `set address ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
   const rec = await json('/v1/memory/commerce.psp', { headers: auth(seller.token) });
   const v = (rec.body.data?.value ?? rec.body.data?.record?.value) as any;
-  assert(v.payTo === addr, `address stored: ${JSON.stringify(v)}`);
+  // Stored in canonical EIP-55 form (mixed case is what a wallet shows, so it can be eyeballed).
+  assert(String(v.payTo).toLowerCase() === addr.toLowerCase(), `address stored: ${JSON.stringify(v)}`);
   assert(v.secretKey === 'sk_test_kept', `the other rail credential survived: ${JSON.stringify(v)}`);
+});
+
+await test('The USDC token contract is refused as a payout address', async () => {
+  // The real misconfiguration this guards: the settlement asset from our own network registry is the
+  // address most likely to be on a seller's clipboard, and funds sent there are unrecoverable.
+  const r = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token),
+    body: JSON.stringify({ address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e' }) });
+  assert(r.status === 400 && r.body?.error?.code === 'ADDRESS_IS_TOKEN_CONTRACT',
+    `expected ADDRESS_IS_TOKEN_CONTRACT, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+  assert(/USDC/.test(r.body.error.message), `the message names the token: ${r.body.error.message}`);
+});
+
+await test('A mistyped address is caught by its EIP-55 checksum', async () => {
+  // Same address as the good one below with a single character case-flipped: the shape still passes,
+  // the checksum does not. This is the class of error a human cannot proof-read.
+  const bad = '0xF0A131F770018639DE3Da1D64F2C70aA295a685C';
+  const r = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ address: bad }) });
+  assert(r.status === 400 && r.body?.error?.code === 'ADDRESS_CHECKSUM', `expected ADDRESS_CHECKSUM, got ${r.status}/${JSON.stringify(r.body?.error)}`);
+  // An all-lowercase address carries no checksum at all, so it must be accepted and normalised.
+  const lower = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token),
+    body: JSON.stringify({ address: '0xf0a131f770018639de3da1d64f2c70aa295a685c' }) });
+  assert(lower.status === 200, `lowercase accepted: ${lower.status}/${JSON.stringify(lower.body?.error)}`);
+  assert(lower.body.data.address === '0xf0A131F770018639DE3Da1D64F2C70aA295a685C',
+    `stored in canonical EIP-55 form so it can be compared against a wallet: ${lower.body.data.address}`);
 });
 
 await test('Removing the payout address leaves the fiat rail intact', async () => {
