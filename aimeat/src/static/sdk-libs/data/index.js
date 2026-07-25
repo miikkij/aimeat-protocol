@@ -13,11 +13,43 @@
  *   await AIMEAT.data.set('key', { value }); await AIMEAT.data.get('key');
  * @version-history
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-data.ts; NODE_URL/NODE_ID now from _core/config.
+ *   v1.1.0 — 2026-07-25 — Cross-namespace reads: get/getEntry/list/search take { agent, ownerScope };
+ *     list takes { meta, count } (+ data.count()). Agent-published keys live under the agent's GAII,
+ *     and an app-grant token gets no automatic owner-scope broadening, so apps had to bypass this
+ *     library entirely to read their own owner's fleet output. All options are additive.
  */
 import { NODE_URL, NODE_ID } from '../_core/config.js';
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-data.js');
 import { attach } from '../_core/namespace.js';
+
+/**
+ * Cross-namespace read scoping, shared by get/getEntry/list/search.
+ *
+ * Agents publish under their OWN namespace (`name#owner@node`), not the owner's GHII.
+ * An owner SESSION gets owner-scope broadening automatically server-side, but an
+ * app-grant token (roles:['app']) does not — so an app reading its owner's fleet
+ * output must say so explicitly. Before these options the only way to do that was
+ * to bypass this library and hand-roll session.fetch calls.
+ *
+ * @param {{agent?: string, ownerScope?: boolean}} [opts]
+ * @returns {URLSearchParams}
+ */
+function scopeParams(opts) {
+  const p = new URLSearchParams();
+  if (opts?.agent) p.set('agent', opts.agent);
+  // `agent` already targets one namespace; sending both is contradictory (the server
+  // ignores owner_scope when agent is present), so only one goes on the wire.
+  else if (opts?.ownerScope) p.set('owner_scope', 'true');
+  return p;
+}
+
+/** Append params to a path, preserving any query string already on it. */
+function withParams(path, params) {
+  const qs = params.toString();
+  if (!qs) return path;
+  return path + (path.indexOf('?') >= 0 ? '&' : '?') + qs;
+}
 
 // ── Memory API (Tier 1, JWT auth) ──
 
@@ -33,11 +65,17 @@ const data = {
   // Read a single entry (falls back to public read from app creator if not found or empty).
   // Uses ?soft=1 so a missing key is a clean 200 (value null) — no browser-console 404 noise;
   // the contract is unchanged: resolves null when the key does not exist.
-  async get(key) {
-    const res = await authFetch('/v1/memory/' + encodeURIComponent(key) + '?soft=1');
+  // opts: { agent, ownerScope } — read from one of the owner's agents' namespaces, or
+  // across the owner's whole set (GHII + agents). Omitted → unchanged behaviour.
+  async get(key, opts) {
+    const res = await authFetch(withParams(
+      '/v1/memory/' + encodeURIComponent(key) + '?soft=1', scopeParams(opts)));
     var val = res.ok ? res.data.value : null;
     var isEmpty = val == null || (typeof val === 'object' && Object.keys(val).length === 0);
     if (!isEmpty) return val;
+    // A scoped read is explicit about where to look; do not silently widen it to the
+    // app-creator's public namespace.
+    if (opts?.agent || opts?.ownerScope) return val;
     // Fallback: try public read from app creator's namespace
     var creator = document.querySelector('meta[name="aimeat-creator"]')?.getAttribute('content');
     if (!creator) {
@@ -56,9 +94,10 @@ const data = {
     return val;
   },
 
-  // Read full entry metadata
-  async getEntry(key) {
-    const res = await authFetch('/v1/memory/' + encodeURIComponent(key));
+  // Read full entry metadata. opts: { agent, ownerScope } as in get().
+  async getEntry(key, opts) {
+    const res = await authFetch(withParams(
+      '/v1/memory/' + encodeURIComponent(key), scopeParams(opts)));
     if (!res.ok) {
       if (res.error?.code === 'NOT_FOUND') return null;
       throw new Error(res.error?.message || 'Failed to get memory');
@@ -83,21 +122,44 @@ const data = {
     return res.data;
   },
 
-  // List all memory keys
+  /**
+   * List memory keys.
+   *
+   * opts:
+   *   prefix, visibility, tags   — as before
+   *   agent      — list ONE of the owner's agents' namespaces (full GAII `name#owner@node`)
+   *   ownerScope — list across the owner's GHII + every same-owner agent. An owner session
+   *                already gets this server-side; an app-grant token needs it stated.
+   *   meta       — omit every `value` and report each entry's `bytes` instead. Use this for
+   *                any listing you render as a table/board: the default response inlines
+   *                every value, so a fleet-wide prefix can be megabytes per call.
+   *   count      — return only `{ count }` (server-side COUNT, no values). A cheap
+   *                "did anything change?" probe; its cache is dropped by any memory write.
+   */
   async list(opts) {
-    const params = new URLSearchParams();
+    const params = scopeParams(opts);
     if (opts?.prefix) params.set('prefix', opts.prefix);
     if (opts?.visibility) params.set('visibility', opts.visibility);
     if (opts?.tags) params.set('tags', opts.tags.join(','));
+    if (opts?.meta) params.set('include', 'meta');
+    if (opts?.count) params.set('count', 'true');
     const qs = params.toString();
     const res = await authFetch('/v1/memory' + (qs ? '?' + qs : ''));
     if (!res.ok) throw new Error(res.error?.message || 'Failed to list memory');
     return res.data;
   },
 
+  /** Cheap change probe: the number of keys under a prefix, no values transferred. */
+  async count(opts) {
+    const d = await data.list({ ...(opts || {}), count: true });
+    return (d && typeof d.count === 'number') ? d.count : null;
+  },
+
   // Search memory entries
+  // opts: { visibility, agent, ownerScope } — scoping as in list().
   async search(query, opts) {
-    const params = new URLSearchParams({ q: query });
+    const params = scopeParams(opts);
+    params.set('q', query);
     if (opts?.visibility) params.set('visibility', opts.visibility);
     const res = await authFetch('/v1/memory/search?' + params.toString());
     if (!res.ok) throw new Error(res.error?.message || 'Failed to search memory');

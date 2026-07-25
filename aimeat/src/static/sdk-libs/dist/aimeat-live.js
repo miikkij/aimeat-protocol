@@ -238,12 +238,64 @@
       hadHiddenUpdate = false;
     }
   }
-  function subscribe(domains, fn) {
+  function subscribe(domains, fn, opts) {
     if (typeof domains === "function") {
+      opts = fn;
       fn = domains;
       domains = null;
     }
-    var entry = { domains: domains ? new Set(domains) : null, fn };
+    opts = opts || {};
+    var prefixes = opts.keyPrefix ? Array.isArray(opts.keyPrefix) ? opts.keyPrefix.slice() : [opts.keyPrefix] : null;
+    var minInterval = opts.minIntervalMs > 0 ? opts.minIntervalMs : 0;
+    var counts = /* @__PURE__ */ Object.create(null);
+    var lastCall = 0;
+    var probing = false;
+    var primed = !prefixes;
+    function pass(dset) {
+      lastCall = Date.now();
+      try {
+        fn(dset);
+      } catch {
+      }
+    }
+    function gate(dset) {
+      if (minInterval && Date.now() - lastCall < minInterval) return;
+      if (!prefixes) {
+        pass(dset);
+        return;
+      }
+      if (probing) return;
+      probing = true;
+      Promise.all(prefixes.map(function(p) {
+        var qs = "count=true&prefix=" + encodeURIComponent(p) + (opts.agent ? "&agent=" + encodeURIComponent(opts.agent) : opts.ownerScope ? "&owner_scope=true" : "");
+        return getSession2().fetch("/v1/memory?" + qs).then(function(r) {
+          var c = r && r.data && typeof r.data.count === "number" ? r.data.count : null;
+          return { prefix: p, count: c };
+        }).catch(function() {
+          return { prefix: p, count: null };
+        });
+      })).then(function(res) {
+        probing = false;
+        var changed = false;
+        res.forEach(function(r) {
+          if (r.count == null) return;
+          if (counts[r.prefix] !== r.count) {
+            changed = true;
+            counts[r.prefix] = r.count;
+          }
+        });
+        if (!primed) {
+          primed = true;
+          if (res.every(function(r) {
+            return r.count != null;
+          })) return;
+        }
+        if (changed) pass(dset);
+      }).catch(function() {
+        probing = false;
+      });
+    }
+    var entry = { domains: domains ? new Set(domains) : null, fn: gate };
     subscribers.push(entry);
     connect();
     return function() {

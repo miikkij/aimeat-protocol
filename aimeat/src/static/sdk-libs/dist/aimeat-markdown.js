@@ -598,5 +598,36 @@
     (document.head || document.documentElement).appendChild(s);
   }
   injectCss();
-  attach("md", { render, renderToString, renderRich, sanitizeHref, sanitizeImgSrc });
+  var CITE_URL_RE = /https?:\/\/[^\s,;)\]}"'【】]+/g;
+  var SHORTENERS = ["lnkd.in", "bit.ly", "t.co", "ow.ly", "tinyurl.com", "buff.ly", "goo.gl", "is.gd", "rb.gy"];
+  function citations(text, opts) {
+    var strip = !opts || opts.stripInline !== false;
+    var body = String(text == null ? "" : text);
+    var seen = /* @__PURE__ */ Object.create(null);
+    var out = [];
+    function push(u) {
+      u = String(u).replace(/[.,;:]+$/, "");
+      if (!u || seen[u]) return;
+      seen[u] = 1;
+      var host;
+      try {
+        host = new URL(u).hostname.replace(/^www\./, "");
+      } catch {
+        host = "";
+      }
+      out.push({ url: u, host, shortened: SHORTENERS.indexOf(host) >= 0 });
+    }
+    body = body.replace(/【\s*(https?:\/\/[^】\s]+)\s*】/g, function(m, u) {
+      push(u);
+      return strip ? "" : m;
+    });
+    body = body.replace(/^[ \t]*Sources?[ \t]*:[ \t]*(.*)$/gim, function(m, rest) {
+      (String(rest).match(CITE_URL_RE) || []).forEach(push);
+      return strip ? "" : m;
+    });
+    (body.match(CITE_URL_RE) || []).forEach(push);
+    if (strip) body = body.replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n").trim();
+    return { body, sources: out };
+  }
+  attach("md", { render, renderToString, renderRich, sanitizeHref, sanitizeImgSrc, citations });
 })();
