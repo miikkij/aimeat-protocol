@@ -1,0 +1,147 @@
+metadata:
+  name: pixel-mirage
+  version: 1.0.0
+  description: >-
+    Server-side dither renderer for the Pixel Mirage studio. Give it a PNG or baseline JPEG plus a
+    recipe (palette, algorithm, size, adjustments) and it returns the dithered picture as a PNG.
+    Same engine the studio runs in the browser, so a preview and a bought render are one image.
+  author: happydude500001
+
+required_apis: []
+
+limits:
+  memory_mb: 64
+  timeout_ms: 5000
+  max_api_calls: 10
+
+config:
+  public_access: false
+
+actions:
+  - id: dither
+    method: POST
+    path: /dither
+    script: dither.js
+    input:
+      type: object
+      properties:
+        image_base64:
+          type: string
+          description: 'PNG or baseline JPEG as a data: URL or bare base64. Max 3 MB of base64; a PNG source is also capped at 0.9 MP because it cannot be decoded at reduced scale.'
+        image_ref:
+          type: string
+          description: 'Alternative to image_base64: "<gaii>/<memory-key>" of a PUBLIC memory record holding the base64.'
+        palette:
+          type: string
+          description: Preset id (see the styles action), or "auto" to extract a palette from the image itself.
+        colors:
+          type: array
+          items: { type: string }
+          description: 2-16 hex colours, overrides `palette`.
+        colorCount:
+          type: integer
+          description: How many colours to extract when palette is "auto" (2-16).
+        algorithm:
+          type: string
+          description: bayer2/4/8/16, void-cluster, white-noise, spiral, halftone-dot/line/cross, floyd-steinberg, jarvis, stucki, burkes, sierra, sierra-lite, atkinson, threshold.
+        size:
+          type: integer
+          description: Longest edge of the output in pixels, 64-768 (default 512).
+        scale:
+          type: integer
+          description: Dither cell size in pixels, 1-24.
+        strength:
+          type: integer
+          description: Dither strength percent, 0-200.
+        angle:
+          type: integer
+          description: Halftone screen angle in degrees, 0-180.
+        pixelate:
+          type: boolean
+          description: Average each scale x scale block first, for chunky pixel art.
+        serpentine:
+          type: boolean
+        brightness: { type: integer }
+        contrast: { type: integer }
+        gamma: { type: integer }
+        saturation: { type: integer }
+        hue: { type: integer }
+        sharpen: { type: integer }
+        posterize: { type: integer }
+        invert: { type: boolean }
+        bias: { type: integer }
+        zoom: { type: integer }
+        offsetX: { type: integer }
+        offsetY: { type: integer }
+        rotate: { type: integer }
+        fit:
+          type: string
+          description: cover (default) or contain.
+        recipe:
+          type: object
+          description: Any of the above as one object. Flat fields win over nested ones.
+        return:
+          type: string
+          description: data_url (default) or png for bare base64.
+    output:
+      type: object
+      properties:
+        image: { type: string, description: 'PNG as a data: URL (or bare base64 when return=png).' }
+        format: { type: string }
+        width: { type: integer }
+        height: { type: integer }
+        bytes: { type: integer }
+        palette: { type: object, description: '{ id, colors, count } — exactly the inks used.' }
+        recipe: { type: object, description: The fully normalised recipe, replayable verbatim. }
+        source: { type: object, description: '{ width, height, format } of the decoded source.' }
+        timing_ms: { type: object }
+
+  - id: variants
+    method: POST
+    path: /variants
+    script: variants.js
+    input:
+      type: object
+      required: [variants]
+      properties:
+        image_base64: { type: string }
+        image_ref: { type: string }
+        recipe:
+          type: object
+          description: The base recipe every variant starts from.
+        variants:
+          type: array
+          maxItems: 6
+          description: Up to 6 override objects, each optionally with a `label`. Same keys as the dither action.
+          items: { type: object }
+    output:
+      type: object
+      properties:
+        variants:
+          type: array
+          description: 'One entry per variant: { label, overrides, image, width, height, bytes, palette, recipe, render_ms }.'
+          items: { type: object }
+        count: { type: integer }
+        base_recipe: { type: object }
+        source: { type: object }
+        timing_ms: { type: object }
+
+  - id: styles
+    method: POST
+    path: /styles
+    script: styles.js
+    input:
+      type: object
+      properties: {}
+    output:
+      type: object
+      properties:
+        palettes: { type: array, items: { type: object } }
+        algorithms: { type: array, items: { type: object } }
+        defaults: { type: object }
+        limits: { type: object }
+        recipe_keys: { type: array, items: { type: string } }
+
+federation:
+  advertise: false
+  capabilities: []
