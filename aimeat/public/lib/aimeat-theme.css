@@ -10,7 +10,7 @@
  *
  *   Palettes (each with a personality beyond colour — its own display face, radii and border
  *   weight; body text is Inter everywhere so content stays quiet and legible):
- *     aimeat    coral + slate, Space Grotesk display        (the house default)
+ *     aimeat    coral + slate steel, Inter, crisp 6px controls   (the house default)
  *     paper     warm editorial: cream/ink, bordeaux, Fraunces serif display
  *     circuit   cold technical: steel/blueprint, cyan, JetBrains Mono display
  *     contrast  high-contrast accessible: black/white, 2px borders, every pair >= 4.5:1
@@ -37,6 +37,11 @@
  *   Deliberately UNLAYERED: daisyUI declares its themes inside `@layer base`, and any unlayered
  *   rule beats every layered one regardless of order or specificity.
  * @version-history
+ *   v2.1.0 — 2026-07-25 — Owner review round: the default (and mist) display face is Inter — the
+ *     geometric Space Grotesk read wrong in the hero sizes (the faces stay vendored for apps);
+ *     aimeat secondary is slate steel #45637A/#9AB8D0 (full 4.5:1+ pairs) instead of the purple;
+ *     aimeat controls take circuit's crisper shape (field 6px, selector 4px); every block declares
+ *     --border-w, the width mirror the bridge uses to undo its aui --border colour scoping.
  *   v2.0.0 — 2026-07-25 — The theme SYSTEM: data-palette axis (paper/circuit/contrast/mist next
  *     to the aimeat default), per-palette display faces (self-hosted OFL fonts), elevation/motion/
  *     type-scale tokens, and typography application (body=Inter, headings=palette display face).
@@ -141,8 +146,8 @@
   /* Brand. Coral is the AIMEAT heart. */
   --color-primary: #e8564a;
   --color-primary-content: #ffffff;           /* 3.6:1 — large/bold UI text only, per the SPA */
-  --color-secondary: #8b5cf6;
-  --color-secondary-content: #ffffff;         /* 4.2:1 — large/bold UI text only */
+  --color-secondary: #45637a;
+  --color-secondary-content: #ffffff;         /* 6.3:1 */
   --color-accent: #06b6d4;
   --color-accent-content: #06253a;            /* 6.5:1 — teal needs DARK content; white is 2.4:1 */
   --color-neutral: #1a1a2e;
@@ -160,15 +165,16 @@
 
   /* Shape + type. AIMEAT is generous on boxes, tighter on controls, flat + shadow. */
   --radius-box: 16px;
-  --radius-field: 10px;
-  --radius-selector: 6px;
+  --radius-field: 6px;
+  --radius-selector: 4px;
   --border: 1px;
+  --border-w: 1px;
   --depth: 0;
   --noise: 0;
-  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
-  --display-tracking: -0.015em;
+  --display-tracking: -0.01em;
 }
 
 /* @theme-block aimeat dark */
@@ -184,8 +190,8 @@
   /* Brand. Coral is brightened for dark surfaces — the brand stays coral, the contrast holds. */
   --color-primary: #ff6f62;                   /* 6.7:1 as text/icon on base-100 */
   --color-primary-content: #14151a;           /* 6.7:1 — white on this coral FAILS at 2.7:1 */
-  --color-secondary: #a78bfa;
-  --color-secondary-content: #14151a;         /* 6.7:1 */
+  --color-secondary: #9ab8d0;
+  --color-secondary-content: #14151a;         /* 8.8:1 */
   --color-accent: #22d3ee;
   --color-accent-content: #06253a;            /* 8.7:1 */
   --color-neutral: #23262f;
@@ -202,15 +208,16 @@
   --color-error-content: #2a0a0a;             /* 6.6:1 */
 
   --radius-box: 16px;
-  --radius-field: 10px;
-  --radius-selector: 6px;
+  --radius-field: 6px;
+  --radius-selector: 4px;
   --border: 1px;
+  --border-w: 1px;
   --depth: 0;
   --noise: 0;
-  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
-  --display-tracking: -0.015em;
+  --display-tracking: -0.01em;
 }
 
 /* ═══ PALETTE: paper (warm editorial — cream/ink, bordeaux, Fraunces display) ═
@@ -245,6 +252,7 @@ html[data-palette='paper'] {
   --radius-field: 8px;
   --radius-selector: 4px;
   --border: 1px;
+  --border-w: 1px;
   --depth: 0;
   --noise: 0;
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
@@ -280,6 +288,7 @@ html[data-palette='paper'][data-theme='dark'] {
   --radius-field: 8px;
   --radius-selector: 4px;
   --border: 1px;
+  --border-w: 1px;
   --depth: 0;
   --noise: 0;
   --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
@@ -317,6 +326,7 @@ html[data-palette='circuit'] {
   --radius-field: 6px;
   --radius-selector: 3px;
   --border: 1px;
+  --border-w: 1px;
   --depth: 0;
   --noise: 0;
   --font-display: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
@@ -352,6 +362,7 @@ html[data-palette='circuit'][data-theme='dark'] {
   --radius-field: 6px;
   --radius-selector: 3px;
   --border: 1px;
+  --border-w: 1px;
   --depth: 0;
   --noise: 0;
   --font-display: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
@@ -391,6 +402,7 @@ html[data-palette='contrast'] {
   --radius-field: 8px;
   --radius-selector: 4px;
   --border: 2px;
+  --border-w: 2px;
   --depth: 0;
   --noise: 0;
   --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
@@ -426,6 +438,7 @@ html[data-palette='contrast'][data-theme='dark'] {
   --radius-field: 8px;
   --radius-selector: 4px;
   --border: 2px;
+  --border-w: 2px;
   --depth: 0;
   --noise: 0;
   --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
@@ -463,9 +476,10 @@ html[data-palette='mist'] {
   --radius-field: 12px;
   --radius-selector: 8px;
   --border: 1px;
+  --border-w: 1px;
   --depth: 0;
   --noise: 0;
-  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   --display-tracking: 0;
@@ -498,9 +512,10 @@ html[data-palette='mist'][data-theme='dark'] {
   --radius-field: 12px;
   --radius-selector: 8px;
   --border: 1px;
+  --border-w: 1px;
   --depth: 0;
   --noise: 0;
-  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
   --display-tracking: 0;

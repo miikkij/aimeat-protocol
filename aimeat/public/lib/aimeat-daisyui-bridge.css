@@ -20,6 +20,11 @@
  * @usage  <link href="/lib/daisyui@5.css" rel="stylesheet" />
  *         <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" />
  * @version-history
+ *   v1.3.0 — 2026-07-25 — FIX the --border collision: the bridge mapped --border to a COLOUR at
+ *     :root for the aui-* cortex components, while daisyUI 5 uses the same name as a border WIDTH
+ *     inside calc() on nearly every component — the invalid calc collapsed badge/input paddings to
+ *     0 and toggles to slivers on every bridge-loading page since v1.0.0. The colour mapping is now
+ *     scoped to aui-* elements, with a --border-w restore for daisyUI components nested inside.
  *   v1.2.0 — 2026-07-25 — @import the AIMEAT daisyUI theme, so the house palette reaches every
  *     app that already loads the bridge. Contrast + surface ramp verified by
  *     `pnpm check:theme` (tools/theme-contrast.ts).
@@ -41,13 +46,28 @@
   --bg-surface-dim: color-mix(in oklab, var(--color-base-content, #111827) 5%, var(--color-base-100, #ffffff));
   --bg-dim:         var(--color-base-200, #f3f4f6);
   --surface:        var(--color-base-200, #f3f4f6);
-  --border:         var(--color-base-300, #e5e7eb);
   --accent:         var(--color-primary, #e8564a);
   --blue:           var(--color-info, #3b82f6);
   --danger:         var(--color-error, #ef4444);
   --success:        var(--color-success, #10b981);
   --warn:           var(--color-warning, #f59e0b);
   --warning:        var(--color-warning, #f59e0b);
+}
+
+/* ── The --border name collision, fixed. The cortex `aui-*` components read `var(--border)` as a
+      border COLOUR; daisyUI 5 reads the same name as a border WIDTH in calc() maths on nearly every
+      component (`padding-inline: calc(var(--size)/2 - var(--border))` on .badge, toggle geometry,
+      input paddings…). Mapping the colour at :root (bridge v1.0.0–v1.2.0) made those calcs invalid
+      at computed-value time, so paddings collapsed to 0 and toggles rendered as slivers on EVERY
+      page that loaded this bridge. The colour is now scoped to elements that actually carry an
+      aui-* class, and daisyUI components nested inside an aui container get the palette's width
+      back via --border-w (declared per theme block in aimeat-theme.css). ── */
+[class^='aui-'], [class*=' aui-'] {
+  --border: var(--color-base-300, #e5e7eb);
+}
+[class^='aui-'] :where(.btn, .badge, .toggle, .checkbox, .radio, .input, .select, .textarea, .file-input, .range, .tab, .tabs, .card, .alert, .table, .kbd, .status, .divider, .menu, .modal-box, .stats, .progress),
+[class*=' aui-'] :where(.btn, .badge, .toggle, .checkbox, .radio, .input, .select, .textarea, .file-input, .range, .tab, .tabs, .card, .alert, .table, .kbd, .status, .divider, .menu, .modal-box, .stats, .progress) {
+  --border: var(--border-w, 1px);
 }
 
 /* ── Dark-mode polish: override the cortex libs' hardcoded light colors with theme-aware

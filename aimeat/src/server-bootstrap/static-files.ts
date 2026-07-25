@@ -32,6 +32,10 @@
  *     registered before express.static like robots.txt.
  *   v1.7.0 -- 2026-07-14 -- Serve /robots.txt with the Content Signals Policy directive
  *     (contentsignals.org), operator-overridable via AIMEAT_CONTENT_SIGNAL ('off' removes it).
+ *   v1.9.0 -- 2026-07-25 -- Access-Control-Allow-Origin: * on font files (woff2/ttf/otf): font
+ *     fetches are CORS-gated even between our own subdomains, so published apps on
+ *     <name>.apps.<domain> could never load /lib/fonts/* from the apex and silently fell back
+ *     to system faces (visible since the fonts pack; blocking for the theme-system faces).
  */
 import express from 'express';
 import { existsSync, readFileSync } from 'node:fs';
@@ -189,6 +193,13 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       setHeaders: (res, filePath) => {
         if (/\.(js|css|html)$/.test(filePath)) {
           res.setHeader('Cache-Control', 'no-cache');
+        }
+        // Fonts are CORS-gated by the font-fetch spec even between our own subdomains: a published
+        // app on <name>.apps.<domain> loads /lib/aimeat-theme.css (or /lib/fonts.css) from the apex,
+        // and without this header the browser refuses every woff2 — apps silently fell back to
+        // system faces since the fonts pack shipped. Public static assets; wildcard is correct.
+        if (/\.(woff2?|ttf|otf)$/.test(filePath)) {
+          res.setHeader('Access-Control-Allow-Origin', '*');
         }
       },
     }));
