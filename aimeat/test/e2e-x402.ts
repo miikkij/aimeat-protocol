@@ -15,9 +15,14 @@
  *   advertised and reported; and — the assertion that protects buyers — EVERY currency the node
  *   advertises really produces a settleable exact scheme, so nothing is offered that cannot be paid.
  *
- *   Requires the run env: AIMEAT_X402_ENABLED=true AIMEAT_X402_TEST_FACILITATOR=true.
- * @usage cd aimeat && AIMEAT_X402_ENABLED=true AIMEAT_X402_TEST_FACILITATOR=true pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=x402
+ *   The run env (AIMEAT_X402_ENABLED + AIMEAT_X402_TEST_FACILITATOR) is PINNED ON by the runner, so
+ *   the suite is deterministic on any machine and needs no network. Do not point it at a real
+ *   facilitator: the X-PAYMENT proofs below carry a fixed placeholder signature, which a real one
+ *   correctly rejects with `invalid_exact_evm_signature`. Real-network acceptance lives in
+ *   e2e-x402-testnet.ts, opted into by setting AIMEAT_X402_TEST_FACILITATOR=false.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=x402
  * @version-history
+ *   v1.1.1 — 2026-07-25 — Runner pins the x402 env, so the suite no longer inherits the dev .env
  *   v1.1.0 — 2026-07-25 — EUR/EURC settlement + the advertise-only-what-can-settle round trip (TARGET-042)
  *   v1.0.0 — 2026-07-18 — Initial x402 settlement suite (TARGET-042)
  */
