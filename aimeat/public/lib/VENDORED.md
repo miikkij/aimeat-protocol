@@ -11,7 +11,7 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 |------|---------|---------|---------|--------|---------|
 | `tailwindcss@4.js` | `@tailwindcss/browser` | 4.3.1 | `styling` | `https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4` | MIT |
 | `daisyui@5.css` | `daisyui` | 5.5.23 | `styling` | `https://cdn.jsdelivr.net/npm/daisyui@5` | MIT |
-| `aimeat-theme.css` | AIMEAT-local (the house daisyUI theme) | 1.0.0 | `styling` | this repo (palette from `public/css/theme.css`) | MIT |
+| `aimeat-theme.css` | AIMEAT-local (the theme SYSTEM: 5 palettes × light+dark on the `data-theme` × `data-palette` axes, self-hosted faces, elevation/motion/type tokens; verified by `pnpm check:theme`) | 2.0.0 | `styling` | this repo | MIT |
 | `aimeat-daisyui-bridge.css` | AIMEAT-local (theme bridge; `@import`s the theme) | — | `styling` | this repo | MIT |
 | `chartjs@4.js` | `chart.js` (UMD) | 4.5.1 | `chartjs` | `https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js` | MIT |
 | `mermaid/mermaid.min.js` | `mermaid` (UMD) | 11.15.0 | `mermaid` | `node_modules/mermaid/dist` (see mermaid/README.md) | MIT |
@@ -21,7 +21,7 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 | `pixi-unsafe-eval@8.min.js` | `pixi.js` (unsafe-eval companion — REQUIRED after pixi under the app CSP) | 8.19.0 | `pixi` | `https://cdn.jsdelivr.net/npm/pixi.js@8/dist/packages/unsafe-eval.min.js` | MIT |
 | `phaser@3.min.js` | `phaser` | 3.90.0 | `phaser` | `https://cdn.jsdelivr.net/npm/phaser@3/dist/phaser.min.js` | MIT |
 | `drawflow@0.min.js` + `.min.css` | `drawflow` (engine INSIDE the aimeat-flow cortex — apps use AIMEAT.flow, never Drawflow directly) | 0.0.60 | `aimeat-flow` | `https://cdn.jsdelivr.net/npm/drawflow@0.0.60/dist/` | MIT |
-| `fonts.css` + `fonts/*.woff2` | Baloo 2 (variable 400–800) + Bangers display fonts, latin + latin-ext (ä/ö) | Baloo 2 v23 · Bangers v25 | `fonts` | Google Fonts CDN (see `fonts/LICENSE.md`) | OFL-1.1 |
+| `fonts.css` + `fonts/*.woff2` | Baloo 2 + Bangers display fonts (the `fonts` pack, via `fonts.css`) AND the theme-system faces Inter, Space Grotesk, Fraunces, JetBrains Mono (declared by `aimeat-theme.css`, lazy-loaded per family). All latin + latin-ext (ä/ö); see `fonts/LICENSE.md` | Baloo 2 v23 · Bangers v25 · Inter v20 · Space Grotesk v22 · Fraunces v38 · JetBrains Mono v24 | `fonts` / `styling` | Google Fonts CDN (see `fonts/LICENSE.md`) | OFL-1.1 |
 | `realtime.js` | AIMEAT-local (WS/WebRTC/Yjs client + `SharedClock` synced timeline) | 1 | `realtime` | this repo | MIT |
 | `toastui/toastui-editor-all.min.js` + `.min.css` | TOAST UI Editor | (SPA-internal) | — | `https://uicdn.toast.com` | MIT |
 | `yaml.mjs` | `yaml` (ESM) | 2.x | `yaml` | jsdelivr | ISC |

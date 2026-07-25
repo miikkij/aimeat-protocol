@@ -10,12 +10,17 @@
  * @structure mountPill(auth, selector, opts) → render() + event wiring.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v1.1.0 — 2026-07-25 — The in-pill controls become the platform control cluster (segmented
+ *     language switch + segmented ☀|☾ mode switch + palette swatch picker, styled by cluster.js),
+ *     with outside-click/Escape closers for the cluster popovers.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2.ts (SDK-libs migration Phase 3).
  */
 import { isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
 import { showLoginModal } from './modal.js';
-import { escHtml, themeToggleHtml, wireThemeToggle, ensureAuthPillStyles, pillInitials } from './theme.js';
-import { readLocales, langToggleHtml, wireLangToggle } from './locale.js';
+import { escHtml, modeSwitchHtml, wireModeSwitch, ensureAuthPillStyles, pillInitials } from './theme.js';
+import { readLocales, langSwitchHtml, wireLangSwitch } from './locale.js';
+import { paletteControlHtml, wirePaletteControl } from './palette.js';
+import { ensureClusterStyles, clampPopover } from './cluster.js';
 import { load, remove } from './crypto.js';
 import { emit } from './events.js';
 
@@ -70,10 +75,9 @@ export function mountPill(auth, selector, opts = {}) {
             + 'background:rgba(90,65,20,.18);color:#5a4114;border:1px solid rgba(120,85,20,.35);'
             + 'border-radius:6px;padding:3px 8px;cursor:pointer;font-size:13px;line-height:1">⚙️</button>'
           : '')
-        // Language + light/dark, both inside the pill so embedding apps inherit them for free
-        // and every app on the node ends up with the SAME two controls.
-        + langToggleHtml(i, locales)
-        + themeToggleHtml(i)
+        // The control cluster — language, light/dark mode, palette — inside the pill so every
+        // embedding app inherits the SAME three controls for free.
+        + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span>'
         + '<button id="aimeat-logout-btn" class="aimeat-auth-logout" style="'
         + 'background:radial-gradient(ellipse at 50% 30%,#ff6b6b 0%,#dc2626 35%,#991b1b 70%,#7f1d1d 100%);'
         + 'color:#ffd7d7;border:1px solid rgba(220,38,38,.6);border-top-color:rgba(255,130,130,.4);border-bottom-color:rgba(100,20,20,.8);'
@@ -127,10 +131,9 @@ export function mountPill(auth, selector, opts = {}) {
         + 'transition:transform .15s,box-shadow .15s}'
         + '.aimeat-sign-btn:hover{transform:translateY(-1px);box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 5px 16px rgba(0,0,0,.5),0 0 30px rgba(201,168,76,.3)}'
         + '</style>'
-        // Keep language + light/dark reachable even when signed out.
+        // Keep the whole cluster (language + mode + palette) reachable even when signed out.
         + '<span style="display:inline-flex;align-items:center;gap:10px">'
-        + langToggleHtml(i, locales)
-        + themeToggleHtml(i)
+        + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span>'
         + '<button id="aimeat-login-btn" class="aimeat-sign-btn">'
         + (opts.buttonText || i.signInBtn || '❤️ Sign In') + '</button>'
         + '</span>';
@@ -141,10 +144,30 @@ export function mountPill(auth, selector, opts = {}) {
         else { showLoginModal(opts, render); }
       });
     }
-    wireThemeToggle(container, i); // present in both signed-in and signed-out markup
-    wireLangToggle(container, i, locales);
+    wireModeSwitch(container); // the cluster is present in both signed-in and signed-out markup
+    wireLangSwitch(container, i, locales);
+    wirePaletteControl(container, clampPopover);
   }
+  ensureClusterStyles();
   render();
+  // Close any open cluster popover (palette / language list) on an outside click or Escape.
+  document.addEventListener('click', (ev) => {
+    container.querySelectorAll('.aimeat-pop-wrap.aimeat-open').forEach((w) => {
+      if (!w.contains(/** @type {Node} */ (ev.target))) {
+        w.classList.remove('aimeat-open');
+        var b = w.querySelector('.aimeat-pop-btn');
+        if (b) b.setAttribute('aria-expanded', 'false');
+      }
+    });
+  });
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key !== 'Escape') return;
+    container.querySelectorAll('.aimeat-pop-wrap.aimeat-open').forEach((w) => {
+      w.classList.remove('aimeat-open');
+      var b = w.querySelector('.aimeat-pop-btn');
+      if (b) b.setAttribute('aria-expanded', 'false');
+    });
+  });
   // Close the compact popover on an outside click or Escape (registered ONCE per mount).
   if (useCompact) {
     var closeCompact = () => {
