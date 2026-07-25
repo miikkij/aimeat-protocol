@@ -2541,7 +2541,7 @@
       "pspSaved": "Maksuavain tallennettu",
       "pspRemoved": "Maksuavain poistettu",
       "x402Title": "Stablecoin-tilitykset (x402)",
-      "x402Desc": "Eri raide kuin Stripe: ostaja allekirjoittaa USDC-maksun ja fasilitaattori tilittää sen ketjussa suoraan tähän osoitteeseen. Ei-säilytyksellinen — noodi ei pidä avainta eikä varoja. Ilman osoitetta USDC-myyntisi kaatuu.",
+      "x402Desc": "Eri raide kuin Stripe: ostaja allekirjoittaa stablecoin-maksun ja fasilitaattori tilittää sen ketjussa suoraan tähän osoitteeseen. Rahake määräytyy hinnan mukaan: dollarihinta tilittyy USDC:nä ja eurohinta EURC:nä, ja sama osoite ottaa vastaan molemmat. Ei-säilytyksellinen: noodi ei pidä avainta eikä varoja. Ilman osoitetta stablecoin-myyntisi kaatuu.",
       "x402Configured": "Tilitysosoite asetettu",
       "x402Missing": "Ei tilitysosoitetta",
       "x402Save": "Tallenna osoite",
