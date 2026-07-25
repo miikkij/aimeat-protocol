@@ -13,6 +13,11 @@
  *   AIMEAT.charts.ChartPanel({ elementId: 'my-chart', chartKey: 'chart:sales-2024', nodeUrl: '...' })
  *
  * @version-history
+ *   v1.1.1 — 2026-07-25 — Give the canvas size back to Chart.js. The injected
+ *     `.aimeat-chart-container canvas { width:100%!important; height:auto!important }` overrode the
+ *     inline height Chart.js writes and then watches, so in any height-constrained container the
+ *     two fought: measured 14 distinct canvas sizes in 3 seconds, visible as a fast flicker between
+ *     two renderings. Only display:block and max-width remain.
  *   v1.1.0 — 2026-07-25 — Charts follow the theme. The palette is resolved from the theme tokens
  *     when a chart is drawn, and every chart this lib owns is repainted when the palette or the
  *     light/dark mode changes. The old list called itself "the AIMEAT brand palette" and was
@@ -98,10 +103,15 @@
       '  max-width: 100%;' +
       '  box-sizing: border-box;' +
       '}' +
+      /* Chart.js owns the canvas size in responsive mode: it writes style.width/height inline
+         and watches the result. These two !important rules overrode that inline height, so the
+         canvas rendered at the backing store's own ratio instead, Chart.js's ResizeObserver saw a
+         different size and wrote the height again — a two-state oscillation, several times a
+         second, whenever the container height was constrained. Two authorities for one value.
+         display:block stays (it removes the inline-element baseline gap); the sizing is Chart.js's. */
       '.aimeat-chart-container canvas {' +
       '  display: block;' +
-      '  width: 100% !important;' +
-      '  height: auto !important;' +
+      '  max-width: 100%;' +
       '}' +
       '.aimeat-chart-error {' +
       '  padding: 20px;' +
@@ -551,7 +561,7 @@
     ChartPanel: ChartPanel,
     ChartBuilder: ChartBuilder,
     TYPES: TYPES,
-    VERSION: '1.1.0',
+    VERSION: '1.1.1',
     /** The palette a chart would draw with right now, for legends and non-canvas visuals. */
     palette: themePalette
   };
