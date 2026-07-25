@@ -40,6 +40,8 @@ import type { OdpsExtras, OdpsSlaDimension, OdpsQualityDimension } from '../mode
 /** The ODPS version this node speaks. Pinned per the TARGET-045 addendum (Q2: pin ODPS v4.x, v4.1 current). */
 export const ODPS_VERSION = '4.1';
 export const ODPS_SCHEMA_URL = 'https://opendataproducts.org/v4.1/schema/odps.json';
+/** The same schema in YAML. A YAML document points at the YAML schema, as the spec's own examples do. */
+export const ODPS_SCHEMA_URL_YAML = 'https://opendataproducts.org/v4.1/schema/odps.yaml';
 
 /** ISO 639-1 code used when a provider has not declared what language its listing text is in. */
 const DEFAULT_LANGUAGE = 'en';
@@ -401,7 +403,11 @@ export function offeringToOdps(input: OdpsProjectionInput): OdpsDocument {
   };
 }
 
-/** Serialise an ODPS document as YAML — the format the specification leads with. */
+/**
+ * Serialise an ODPS document as YAML — the format the specification leads with. The `schema` pointer is
+ * swapped to the YAML flavour of the same schema, matching the spec's own examples: a YAML document that
+ * points a validator at a JSON schema file is needlessly awkward for the consumer.
+ */
 export function odpsToYaml(doc: OdpsDocument): string {
-  return yamlStringify(doc, { lineWidth: 0 });
+  return yamlStringify({ ...doc, schema: ODPS_SCHEMA_URL_YAML }, { lineWidth: 0 });
 }

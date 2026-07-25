@@ -756,7 +756,8 @@ await test('GET /odps.yaml serves YAML that VALIDATES against the official ODPS 
   delete validatable.product.paymentGateways;
   const ok = validator.validate(odpsSchema, validatable);
   assert(ok === true, `ODPS schema validation failed: ${JSON.stringify(validator.errors?.slice(0, 4))}`);
-  assert(doc.version === '4.1' && String(doc.schema).includes('opendataproducts.org/v4.1'), `root: ${JSON.stringify({ v: doc.version, s: doc.schema })}`);
+  // A YAML document points at the YAML schema (as the spec's own examples do); the JSON route keeps odps.json.
+  assert(doc.version === '4.1' && String(doc.schema) === 'https://opendataproducts.org/v4.1/schema/odps.yaml', `root: ${JSON.stringify({ v: doc.version, s: doc.schema })}`);
   // Tripwire: the contradiction is still present in the pinned schema fixture.
   const daProp = odpsSchema.properties.product.properties.dataAccess;
   const daDef = odpsSchema.$defs.DataAccess;
@@ -800,6 +801,7 @@ await test('GET /odps returns the same document as JSON in the envelope; unknown
   const r = await json(`/v1/exchange/offerings/${odpsOfferingId}/odps`);
   assert(r.status === 200 && r.body.data.odps_version === '4.1', `odps json ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.odps.product.details.en.productID === odpsOfferingId, 'same document as JSON');
+  assert(String(r.body.data.odps.schema).endsWith('odps.json'), `the JSON rendering points at the JSON schema: ${r.body.data.odps.schema}`);
   const missing = await json('/v1/exchange/offerings/off-does-not-exist/odps.yaml');
   assert(missing.status === 404, `unknown offering should 404, got ${missing.status}`);
 });
