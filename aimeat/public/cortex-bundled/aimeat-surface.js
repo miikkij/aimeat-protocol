@@ -28,6 +28,10 @@
  *   const rows = await surface.resolve(spec, { session });
  *   surface.renderBody(boxEl, spec, rows);
  * @version-history
+ *   v1.1.0 — 2026-07-25 — Charts are left uncoloured so aimeat-charts can theme them: the engine
+ *     hardcoded four Tailwind colours over the chart lib's palette, which pinned every surface
+ *     chart to indigo no matter which of the five palettes the reader had chosen, or whether they
+ *     were in light or dark mode.
  *   v1.0.0 — 2026-07-25 — Initial (TARGET-051 Slice 1): engine lifted out of tila.html v0.2.6
  *     behaviour-for-behaviour, including every graceful fallback (statTiles → daisyUI stats,
  *     ChartBuilder → warning, Timeline → <ul>, markdown → escaped <br>, DataTable → <table>).
@@ -312,9 +316,11 @@
             type: view.chartType || 'bar',
             data: {
               labels: rows.map(function (r) { return String(r[labelKey]); }),
-              datasets: valueKeys.map(function (k, i) {
-                var pal = ['#6366f1', '#8b5cf6', '#f59e0b', '#10b981'];
-                return { label: k, data: rows.map(function (r) { return num(r[k]); }), backgroundColor: pal[i % 4], borderColor: pal[i % 4] };
+              /* No colours here on purpose: aimeat-charts resolves them from the theme tokens and
+                 repaints when the palette or light/dark changes. Naming a colour here would pin
+                 the series to it forever, which is exactly what used to happen. */
+              datasets: valueKeys.map(function (k) {
+                return { label: k, data: rows.map(function (r) { return num(r[k]); }) };
               }),
             },
             /* The lib keeps the aspect ratio and pins canvas{height:auto!important}, so a fixed
@@ -565,7 +571,7 @@
     autoColumns: autoColumns,
     agg: agg,
     num: num,
-    VERSION: '1.0.0',
+    VERSION: '1.1.0',
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);
