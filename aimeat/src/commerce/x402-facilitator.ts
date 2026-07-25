@@ -1,56 +1,124 @@
 /**
  * @file src/commerce/x402-facilitator.ts
  * @description The x402 network registry, wire types, and facilitator client for the non-custodial
- *   USDC settlement handler (TARGET-042). The heavy crypto (EIP-3009 signing by the buyer's wallet,
+ *   stablecoin settlement handler (TARGET-042). The heavy crypto (EIP-3009 signing by the buyer's wallet,
  *   signature + onchain verification, the settling transfer) lives in the buyer's wallet and in the
  *   Coinbase-style FACILITATOR — never here. AIMEAT only (1) serializes the x402 `exact`
  *   PaymentRequirements a 402 advertises, (2) decodes the buyer's base64 X-PAYMENT proof, and (3)
  *   forwards both to the facilitator's /verify + /settle over safeFetch (Rule 10). That is why this
  *   handler needs no @x402 / viem dependency: there is no EIP-3009 serialization to hand-write on the
  *   server side. The NETWORK REGISTRY is the one place a chain + asset is defined, so Base, Solana, or
- *   another network is a data entry, not a code change (TARGET-042: network is a parameter).
- * @structure X402Network · X402_NETWORKS · getX402Network · X402PaymentRequirements ·
- *   X402PaymentPayload · X402VerifyResult · X402SettleResult · X402Facilitator · httpFacilitator ·
- *   testFacilitator · decodeXPayment · buildExactRequirements · extractPayTo
+ *   another network is a data entry, not a code change (TARGET-042: network is a parameter). The
+ *   registry is CURRENCY-AWARE: each network carries one settlement asset per money currency (USD →
+ *   USDC, EUR → EURC), and a pair with no asset is absent, which is the gate that keeps a currency
+ *   from ever being advertised as settleable.
+ * @structure X402Asset · X402Network · X402_NETWORKS · getX402Network · getX402Asset ·
+ *   x402SettlementCurrencies · X402PaymentRequirements · X402PaymentPayload · X402VerifyResult ·
+ *   X402SettleResult · X402Facilitator · httpFacilitator · testFacilitator · decodeXPayment ·
+ *   buildExactRequirements · extractPayTo
  * @usage
  *   const fac = config.x402TestFacilitator ? testFacilitator() : httpFacilitator(config.x402FacilitatorUrl);
- *   const reqs = buildExactRequirements({ network, payTo, amountMicros, resource, description });
+ *   const asset = getX402Asset(network, session.currency);   // undefined → this currency cannot settle
+ *   const reqs = buildExactRequirements({ network, asset, payTo, amountMicros, resource, description });
  * @version-history
+ *   v1.1.0 — 2026-07-25 — Currency-aware asset registry: EURC joins USDC as a settlement asset on
+ *     both Base networks, decimals carried per asset (TARGET-042)
  *   v1.0.0 — 2026-07-18 — Initial x402 facilitator client + network registry + test double (TARGET-042)
  */
 import { safeFetch } from '../utils/url-validator.js';
-import { microsToUsdcRaw } from './money.js';
+import { microsToTokenRaw, isSupportedMoneyCurrency, MONEY_CURRENCIES, type MoneyCurrency } from './money.js';
 
-/** One network the x402 handler can settle on: the chain id x402 uses + the settlement asset. */
+/** One settlement token: the contract, its precision, and the EIP-712 domain the buyer signs against. */
+export interface X402Asset {
+  /** The token contract address on the owning network. */
+  address: string;
+  /** Ticker, for human-facing surfaces (payout settings, tracking codes) — never for identity. */
+  symbol: string;
+  /**
+   * Decimals the token carries onchain. Drives the micros → atomic-unit conversion, so a token that
+   * is NOT 6-decimal converts correctly instead of silently mispricing by orders of magnitude.
+   */
+  decimals: number;
+  /**
+   * The token's EIP-712 domain (name + version) — the exact scheme `extra`. The buyer signs
+   * TransferWithAuthorization against it, so a wrong value invalidates every signature. Each entry
+   * below is verified against the live contract (see the registry comment).
+   */
+  extra: { name: string; version: string };
+}
+
+/** One network the x402 handler can settle on: the chain id x402 uses + its settlement assets. */
 export interface X402Network {
   /** x402 `network` id echoed in the accepts[] exact scheme and the X-PAYMENT payload. */
   id: string;
-  /** The settlement asset (USDC) contract address on this network. */
-  asset: string;
-  /** The asset's EIP-712 domain (name + version) the buyer signs against — the exact scheme `extra`. */
-  extra: { name: string; version: string };
+  /**
+   * One settlement asset per MONEY currency (model 2: the fiat price picks its stablecoin
+   * instrument). A (network, currency) pair with no asset is ABSENT from this map, never an empty
+   * entry — that absence is exactly what stops the currency being advertised as settleable.
+   */
+  assets: Partial<Record<MoneyCurrency, X402Asset>>;
 }
 
 /**
  * The network registry — the ONE place a chain/asset is defined. Adding Base mainnet, Solana, or
  * another network is a new entry here, never a change to the handler or the commerce core
- * (TARGET-042: network is a parameter, selected by config.x402Network).
+ * (TARGET-042: network is a parameter, selected by config.x402Network). A currency joins a network
+ * by gaining an entry in `assets` — that is the whole of "AIMEAT can settle EUR here".
+ *
+ * VERIFICATION (2026-07-25). Addresses from Circle's own documentation
+ * (https://developers.circle.com/stablecoins/usdc-contract-addresses and
+ * .../eurc-contract-addresses); `symbol`, `decimals` and the EIP-712 domain (`extra`) were then read
+ * from the live contracts and PROVEN by recomputing each contract's own DOMAIN_SEPARATOR from
+ * (name, version, chainId, address) — all four match. Note the domain `name` is the ERC-20 `name()`,
+ * which is NOT uniform: Base mainnet USDC is "USD Coin" while every other entry equals its ticker.
+ * The public x402.org facilitator was probed with a real EIP-3009 signature over each asset: EURC
+ * verifies identically to USDC (both reaching `invalid_exact_evm_insufficient_balance` on an unfunded
+ * signer), and a deliberately wrong domain name is rejected with `invalid_exact_evm_token_name_mismatch`
+ * — so a mistake here fails loudly rather than hiding behind a generic signature error.
  */
 export const X402_NETWORKS: Record<string, X402Network> = {
   'base-sepolia': {
     id: 'base-sepolia',
-    asset: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', // USDC on Base Sepolia (testnet)
-    extra: { name: 'USDC', version: '2' },
+    assets: {
+      // USDC on Base Sepolia (testnet).
+      USD: { address: '0x036CbD53842c5426634e7929541eC2318f3dCF7e', symbol: 'USDC', decimals: 6, extra: { name: 'USDC', version: '2' } },
+      // EURC on Base Sepolia (testnet).
+      EUR: { address: '0x808456652fdb597867f38412077A9182bf77359F', symbol: 'EURC', decimals: 6, extra: { name: 'EURC', version: '2' } },
+    },
   },
   'base': {
     id: 'base',
-    asset: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', // USDC on Base mainnet
-    extra: { name: 'USD Coin', version: '2' },
+    assets: {
+      // USDC on Base mainnet — domain name is "USD Coin", not the ticker.
+      USD: { address: '0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913', symbol: 'USDC', decimals: 6, extra: { name: 'USD Coin', version: '2' } },
+      // EURC on Base mainnet.
+      EUR: { address: '0x60a3E35Cc302bFA44Cb288Bc5a4F316Fdb1adb42', symbol: 'EURC', decimals: 6, extra: { name: 'EURC', version: '2' } },
+    },
   },
 };
 
 export function getX402Network(id: string): X402Network | undefined {
   return X402_NETWORKS[id];
+}
+
+/**
+ * The settlement asset for one (network, currency) pair, or undefined when the pair cannot settle.
+ * THE gate behind the advertising rule: every surface that names a currency resolves it through
+ * here first, so a currency is only ever offered when a real asset backs it.
+ */
+export function getX402Asset(network: X402Network | undefined, currency: string): X402Asset | undefined {
+  if (!network || !isSupportedMoneyCurrency(currency)) return undefined;
+  return network.assets[currency];
+}
+
+/**
+ * The money currencies a network can actually settle — derived from the assets that exist, never a
+ * hardcoded list. An unknown network yields [], so a misconfigured node advertises nothing rather
+ * than promising a rail it has no asset for. Ordered by MONEY_CURRENCIES for a stable response.
+ */
+export function x402SettlementCurrencies(network: X402Network | undefined): MoneyCurrency[] {
+  if (!network) return [];
+  return MONEY_CURRENCIES.filter((c) => !!network.assets[c]);
 }
 
 // ── x402 protocol wire types (x402 v1). Written to the spec so a real x402 client interoperates. ──
@@ -59,7 +127,7 @@ export function getX402Network(id: string): X402Network | undefined {
 export interface X402PaymentRequirements {
   scheme: 'exact';
   network: string;
-  /** Atomic units of the asset (USDC has 6 decimals, matching AIMEAT money micros) as a string. */
+  /** Atomic units of the asset (USDC and EURC both carry 6 decimals, matching money micros) as a string. */
   maxAmountRequired: string;
   resource: string;
   description: string;
@@ -166,29 +234,34 @@ export function decodeXPayment(header: string | undefined): X402PaymentPayload |
 }
 
 /**
- * Build the exact-scheme PaymentRequirements for a MONEY amount. money micros → USDC atomic units is
- * the identity (both carry 6 decimals), so a 1.50 USD price (1_500_000 micros) is 1.50 USDC — this is
- * model 2 made concrete: the price is USD, the settlement instrument is USDC, one to one.
+ * Build the exact-scheme PaymentRequirements for a MONEY amount in ONE settlement asset. The caller
+ * resolves the asset via {@link getX402Asset} first, so a currency with no asset can never reach
+ * here. Model 2 made concrete: a 1.50 USD price (1_500_000 micros) asks for 1.50 USDC, and a 1.50 EUR
+ * price asks for 1.50 EURC — the price stays fiat, the token is only the instrument. The amount goes
+ * through the money chokepoint with the asset's own decimals, so a token that is not 6-decimal is
+ * converted rather than mispriced.
  */
 export function buildExactRequirements(args: {
-  network: X402Network; payTo: string; amountMicros: number; resource: string; description: string;
+  network: X402Network; asset: X402Asset; payTo: string; amountMicros: number; resource: string; description: string;
 }): X402PaymentRequirements {
   return {
     scheme: 'exact',
     network: args.network.id,
-    maxAmountRequired: String(microsToUsdcRaw(args.amountMicros)),
+    maxAmountRequired: microsToTokenRaw(args.amountMicros, args.asset.decimals),
     resource: args.resource,
     description: args.description,
     mimeType: 'application/json',
     payTo: args.payTo,
     maxTimeoutSeconds: 120,
-    asset: args.network.asset,
-    extra: args.network.extra,
+    asset: args.asset.address,
+    extra: args.asset.extra,
   };
 }
 
 /**
- * Pull the seller's USDC payout address (payTo) from their opaque `commerce.psp` record. Accepts a
+ * Pull the seller's stablecoin payout address (payTo) from their opaque `commerce.psp` record. ONE
+ * EVM address receives every settlement asset — USDC and EURC are both ERC-20s on the same chain —
+ * so adding a currency never asks the seller for another field. Accepts a
  * few shapes — `{ payTo }`, `{ address }`, `{ x402: { address } }` — and returns it only when it is a
  * well-formed EVM address, so a Stripe-only psp (no address) simply yields undefined and the handler
  * answers "seller has no x402 address" rather than settling to a bad target.

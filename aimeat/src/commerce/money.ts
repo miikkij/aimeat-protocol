@@ -12,14 +12,16 @@
  *   ROUNDING POLICY for both ledgers (fee always ceils, cut always floors) — they operate on one
  *   integer amount of either unit at a time, which is policy sharing, not unit mixing.
  * @structure MONEY_SCALE · MONEY_UNIT · MONEY_CURRENCIES · isMoneyCurrency ·
- *   isSupportedMoneyCurrency · microsToStripeMinor · stripeMinorToMicros · microsToUsdcRaw ·
- *   usdcRawToMicros · integerMicros · percentFee · percentCut · roundToMoneyScale ·
- *   formatMoneyMajor
+ *   isSupportedMoneyCurrency · microsToStripeMinor · stripeMinorToMicros · microsToTokenRaw ·
+ *   microsToUsdcRaw · usdcRawToMicros · integerMicros · percentFee · percentCut ·
+ *   roundToMoneyScale · formatMoneyMajor
  * @usage
  *   import { isMoneyCurrency, microsToStripeMinor, percentFee } from './money.js';
  *   if (isMoneyCurrency(session.currency)) stripeAmount = microsToStripeMinor(micros); // → cents
  *   const fee = percentFee(gross, commerceFeePercent(config));
  * @version-history
+ *   v1.2.0 — 2026-07-25 — microsToTokenRaw: decimals-aware micros → token atomic units, so a second
+ *     settlement asset (EURC) crosses the chokepoint on its own precision (TARGET-042)
  *   v1.1.0 — 2026-07-14 — Chokepoint completion: currency allowlist, Stripe-minor + USDC-raw
  *     round-trips, percent fee/cut rounding policy, major-unit scale rounding (TARGET-033 phase 7c)
  *   v1.0.0 — 2026-07-14 — Initial 6-decimal micro-unit money representation (TARGET-033 phase 7b)
@@ -63,12 +65,30 @@ export function stripeMinorToMicros(minor: number): number {
 }
 
 /**
- * Convert micro-units to USDC raw units (the x402 stablecoin rail). USDC also carries 6 decimals,
- * so the conversion is the identity on integers — the function exists so the settlement rail still
+ * Convert micro-units to a settlement token's ATOMIC units, honouring that token's own decimals
+ * (the x402 stablecoin rail). Returns a decimal STRING because an 18-decimal token overflows the
+ * safe-integer range — x402 carries `maxAmountRequired` as a string for exactly this reason.
+ *
+ * Every asset AIMEAT settles today (USDC and EURC, on both Base networks) carries 6 decimals, so
+ * this is the identity in practice; the branches exist so a token with a different precision is
+ * CONVERTED rather than mispriced by orders of magnitude. Scaling DOWN (a sub-6-decimal token)
+ * rounds up, the only direction that never hands the seller less than the price.
+ */
+export function microsToTokenRaw(micros: number, decimals: number): string {
+  const amount = BigInt(Math.trunc(micros));
+  if (decimals === MONEY_SCALE) return amount.toString();
+  if (decimals > MONEY_SCALE) return (amount * 10n ** BigInt(decimals - MONEY_SCALE)).toString();
+  const divisor = 10n ** BigInt(MONEY_SCALE - decimals);
+  return ((amount + divisor - 1n) / divisor).toString(); // ceil — never under-charge the buyer
+}
+
+/**
+ * Convert micro-units to USDC raw units (the 6-decimal special case of {@link microsToTokenRaw}).
+ * The conversion is the identity on integers — the function exists so the settlement rail still
  * crosses the chokepoint (and keeps working if MONEY_SCALE ever diverges from the rail's).
  */
 export function microsToUsdcRaw(micros: number): number {
-  return Math.trunc(micros);
+  return Number(microsToTokenRaw(micros, MONEY_SCALE));
 }
 
 /** Convert USDC raw units (6 decimals) back to micro-units. Identity on integers. */

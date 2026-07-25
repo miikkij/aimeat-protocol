@@ -2541,7 +2541,7 @@
       "pspSaved": "Payment key saved",
       "pspRemoved": "Payment key removed",
       "x402Title": "Stablecoin payouts (x402)",
-      "x402Desc": "A different rail from Stripe: a buyer signs a USDC payment and the facilitator settles it on-chain straight to this address. Non-custodial — the node holds no key and no funds. Without an address, a USDC sale of yours fails.",
+      "x402Desc": "A different rail from Stripe: a buyer signs a stablecoin payment and the facilitator settles it on-chain straight to this address. The token follows the price — a dollar price settles in USDC, a euro price in EURC — and the same address receives both. Non-custodial: the node holds no key and no funds. Without an address, a stablecoin sale of yours fails.",
       "x402Configured": "Payout address set",
       "x402Missing": "No payout address",
       "x402Save": "Save address",
