@@ -11,7 +11,7 @@
  *   1. THE DARK RAMP. daisyUI's dark theme is base-100 oklch(25.33%) / base-200 oklch(23.26%) /
  *      base-300 oklch(21.15%) — two points of perceptual lightness apart, so a `card bg-base-200`
  *      on a `bg-base-100` page is very nearly invisible. AIMEAT uses the SPA's designed ramp
- *      (#14151A page / #1C1E26 card / #33363F edge) with real separation.
+ *      (#14151A page / #21232E card / #383C46 edge) with real separation.
  *
  *   2. THE `-content` PAIRS. daisyUI ships ONE value per semantic colour for BOTH themes, so a
  *      `badge-warning` is the same solid amber block on a near-black page as on a white one, and
@@ -42,11 +42,15 @@
 [data-theme='light'] {
   color-scheme: light;
 
-  /* Surfaces. base-100 = page, base-200 = card (elevated), base-300 = wells + borders. */
-  --color-base-100: #fafaf8;
+  /* Surfaces. base-100 = page AND the default form-control fill, base-200 = card (elevated),
+     base-300 = wells + borders. The page was #FAFAF8 (the SPA's value) until 2026-07-25, but that
+     is 1.05:1 off a white card: cards read as one continuous white field, and daisyUI inputs — which
+     fill with base-100 — vanished into the card they sat on. The SPA gets away with it because it
+     draws a border on everything; a bare daisyUI card does not. */
+  --color-base-100: #efeee8;
   --color-base-200: #ffffff;
-  --color-base-300: #e5e7eb;
-  --color-base-content: #1a1a2e;              /* 16.3:1 on base-100, 17.1:1 on base-200 */
+  --color-base-300: #d9dbe1;
+  --color-base-content: #1a1a2e;              /* 14.7:1 on base-100, 17.1:1 on base-200 */
 
   /* Brand. Coral is the AIMEAT heart. */
   --color-primary: #e8564a;
@@ -83,9 +87,9 @@
 
   /* The point of this file. Real separation between page, card and edge. */
   --color-base-100: #14151a;
-  --color-base-200: #1c1e26;
-  --color-base-300: #33363f;
-  --color-base-content: #edeef2;              /* 15.7:1 on base-100, 14.3:1 on base-200 */
+  --color-base-200: #21232e;
+  --color-base-300: #383c46;
+  --color-base-content: #edeef2;              /* 15.7:1 on base-100, 13.5:1 on base-200 */
 
   /* Brand. Coral is brightened for dark surfaces — the brand stays coral, the contrast holds. */
   --color-primary: #ff6f62;                   /* 6.7:1 as text/icon on base-100 */

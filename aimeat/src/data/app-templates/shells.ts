@@ -33,6 +33,8 @@ entry: index.html
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <!-- Bilingual? Declare it and the login pill renders the language button. Delete this line if not. -->
+  <meta name="aimeat-locales" content="en fi" />
   <title>{{App Title}}</title>
   <!-- Self-hosted Tailwind v4 + daisyUI 5 + theme bridge (served by the node, not a CDN) -->
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
@@ -87,6 +89,9 @@ entry: index.html
       onLogin: function () { tryBoot(); },
       onLogout: function () { booted = false; setStatus('Log in to continue.', 'alert-warning'); }
     });
+    // The language button lives in the pill (from the aimeat-locales meta above). React to it.
+    var lang = AIMEAT.auth.getLang();
+    window.addEventListener('aimeat-lang-change', function (e) { lang = e.detail.lang; /* {{RE-RENDER}} */ });
     // App origin: the silent/grant login resolves async and may not call onLogin — poll getSession.
     var _iv = setInterval(function () { tryBoot(); if (booted) clearInterval(_iv); }, 300);
     tryBoot();
@@ -109,6 +114,8 @@ entry: index.html
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <!-- Bilingual? Declare it and the login pill renders the language button. Delete this line if not. -->
+  <meta name="aimeat-locales" content="en fi" />
   <title>{{App Title}}</title>
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
@@ -132,7 +139,7 @@ entry: index.html
     <div id="status" class="alert">Loading…</div>
     <!-- The numbers that matter, above the detail. Fill via AIMEAT.ui.motion.statTiles(). -->
     <div id="kpis"></div>
-    <!-- Cards need an edge: base-200 is only a 1.05 luminance step off base-100 in light theme. -->
+    <!-- Cards get an edge: the step alone reads as a lighter patch, the hairline reads as a card. -->
     <section class="card bg-base-200 card-border border-base-300">
       <div class="card-body gap-3">
         <div id="view"></div>
@@ -195,6 +202,8 @@ entry: index.html
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
+  <!-- Bilingual? Declare it and the login pill renders the language button. Delete this line if not. -->
+  <meta name="aimeat-locales" content="en fi" />
   <title>{{App Title}}</title>
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />

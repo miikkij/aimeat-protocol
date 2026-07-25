@@ -15,6 +15,7 @@
 import { isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
 import { showLoginModal } from './modal.js';
 import { escHtml, themeToggleHtml, wireThemeToggle, ensureAuthPillStyles, pillInitials } from './theme.js';
+import { readLocales, langToggleHtml, wireLangToggle } from './locale.js';
 import { load, remove } from './crypto.js';
 import { emit } from './events.js';
 
@@ -34,6 +35,9 @@ export function mountPill(auth, selector, opts = {}) {
   }
 
   const i = opts.i18n || {};
+  // Languages the APP says it has: opts.locales, else <meta name="aimeat-locales" content="en fi">.
+  // Empty when the app declares none or only one, and then no language control renders at all.
+  const locales = readLocales(opts);
   // Compact pill (account button + popover on ≤600px) is the mobile-safe DEFAULT on app origins.
   const useCompact = opts.compact !== undefined ? !!opts.compact : isAppOrigin();
 
@@ -66,7 +70,9 @@ export function mountPill(auth, selector, opts = {}) {
             + 'background:rgba(90,65,20,.18);color:#5a4114;border:1px solid rgba(120,85,20,.35);'
             + 'border-radius:6px;padding:3px 8px;cursor:pointer;font-size:13px;line-height:1">⚙️</button>'
           : '')
-        // Light/dark toggle — lives inside the pill so embedding apps inherit it for free.
+        // Language + light/dark, both inside the pill so embedding apps inherit them for free
+        // and every app on the node ends up with the SAME two controls.
+        + langToggleHtml(i, locales)
         + themeToggleHtml(i)
         + '<button id="aimeat-logout-btn" class="aimeat-auth-logout" style="'
         + 'background:radial-gradient(ellipse at 50% 30%,#ff6b6b 0%,#dc2626 35%,#991b1b 70%,#7f1d1d 100%);'
@@ -121,8 +127,9 @@ export function mountPill(auth, selector, opts = {}) {
         + 'transition:transform .15s,box-shadow .15s}'
         + '.aimeat-sign-btn:hover{transform:translateY(-1px);box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 5px 16px rgba(0,0,0,.5),0 0 30px rgba(201,168,76,.3)}'
         + '</style>'
-        // Keep the light/dark toggle reachable even when signed out.
+        // Keep language + light/dark reachable even when signed out.
         + '<span style="display:inline-flex;align-items:center;gap:10px">'
+        + langToggleHtml(i, locales)
         + themeToggleHtml(i)
         + '<button id="aimeat-login-btn" class="aimeat-sign-btn">'
         + (opts.buttonText || i.signInBtn || '❤️ Sign In') + '</button>'
@@ -135,6 +142,7 @@ export function mountPill(auth, selector, opts = {}) {
       });
     }
     wireThemeToggle(container, i); // present in both signed-in and signed-out markup
+    wireLangToggle(container, i, locales);
   }
   render();
   // Close the compact popover on an outside click or Escape (registered ONCE per mount).
