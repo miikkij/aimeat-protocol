@@ -1,0 +1,100 @@
+apiVersion: cortex.aimeat.org/v1
+kind: Extension
+metadata:
+  name: aimeat-viewport
+  namespace: aimeat
+  description: "The camera primitive for movable surfaces: pan, zoom-at-cursor, pinch, drag delegation, animated fit/centerOn, and the navigate/interact capture-overlay model that keeps panning working over iframes. Owns the camera and nothing about content — the consumer answers what is draggable via a hit-test delegate. Zero dependencies, theme-agnostic, reduced-motion safe."
+  author: AIMEAT
+  tags: [viewport, camera, canvas, pan, zoom, pinch, surface, ui]
+  labels:
+    domain: canvas
+
+spec:
+  version: "1.0.0"
+  license: MIT
+  components:
+    - type: prompt
+      name: viewport-assistant
+      content: |
+        You are a canvas-surface assistant for an AIMEAT app. The user's node is at {{node_url}}.
+
+        aimeat-viewport is the CAMERA ONLY. Reach for it when the app needs a movable surface of
+        its OWN content — arbitrary children, the app's own layout, pan/zoom/pinch. If the app
+        wants an auto-laid-out graph to read use aimeat-dag; a user-drawn node-and-wire diagram
+        use aimeat-flow; freehand drawing use aimeat-canvas; a static text-defined diagram use
+        mermaid. Choosing this pack for those means reimplementing what they already do.
+
+        Include ONE tag:
+        <script src="{{node_url}}/v1/cortex/aimeat-viewport/libs/aimeat-viewport.js"></script>
+
+        API:
+
+        const vp = AIMEAT.viewport.create(elOrSelector, {
+          classPrefix?: 'av',            // host/world/panning/capture class prefix
+          minZoom?: 0.2, maxZoom?: 2.5,
+          initial?: { x: 40, y: 40, k: 1 },
+          fitPadding?: 36, fitMaxZoom?: 1.4, centerMinZoom?: 1, dragThreshold?: 4,
+          contentBBox?: () => ({ x, y, w, h }),      // world units; fit() asks for this
+          onClaimPointer?: (ev) => null | {          // null => the viewport pans
+            onMove(worldDx, worldDy, ev, cam), onEnd(movedPastThreshold, ev) },
+          onTap?: (ev) => {},                        // pan gesture that never moved
+          onCameraChange?: (cam) => {},
+          captureSelector?: '[data-frame]',          // opts in to the navigate/interact model
+          mode?: 'navigate' | 'interact',
+        })
+
+        vp.world                     // append your content here; position it in WORLD coordinates
+        vp.cam() -> {x,y,k}          // copy; vp.scale() -> k
+        vp.setCamera({x,y,k}, animated) · vp.fit(animated) · vp.centerOn({x,y,w,h}, animated)
+        vp.clientToWorld(cx, cy) · vp.worldToClient(wx, wy)
+        vp.setMode('navigate'|'interact') · vp.getMode() · vp.refreshCaptures() · vp.destroy()
+
+        THE HOST ELEMENT MUST HAVE A SIZE (e.g. style="height:480px" or position:fixed;inset:0).
+        A zero-height host silently swallows every pointer event — this is the single most common
+        mistake with canvas packs.
+
+        The viewport supplies only STRUCTURAL css (positioning, transform, cursor, touch-action).
+        The app owns cosmetics — size, background, border-radius — so the two never fight.
+
+        THE POINTER-CLAIM DELEGATE is the whole content contract: on pointerdown the viewport asks
+        onClaimPointer whether you claim this event. Return a drag handle and you drive the drag
+        (deltas arrive in WORLD units, already divided by the zoom); return null and the viewport
+        pans. Keep any "did it actually move" state in the handle closure when your own rule for
+        that differs from the viewport's threshold.
+
+        NAVIGATE VS INTERACT — only needed when children swallow pointer events (iframes, or
+        anything with its own handlers). Pass captureSelector and in navigate mode each matching
+        child gets a transparent overlay so panning works over it; setMode('interact') removes the
+        overlays so the child behaves normally (forms, scroll, microphone). Holding space is a
+        temporary navigate, middle-mouse always pans, Escape returns to navigate. Call
+        refreshCaptures() after adding or removing children. Omit captureSelector entirely and no
+        window listeners are attached at all — plain DOM children you render yourself need none of
+        this.
+
+        Persist the camera from onCameraChange to an app memory key and pass it back as `initial`
+        on the next mount, the same way aimeat-dag persists node positions.
+      variables:
+        - "{{node_url}}"
+
+    - type: lib
+      name: aimeat-viewport
+      filename: aimeat-viewport.js
+      exports:
+        - create
+      api_surface: |
+        AIMEAT.viewport.create(elOrSelector, { classPrefix?, minZoom?, maxZoom?, initial?,
+          fitPadding?, fitMaxZoom?, centerMinZoom?, dragThreshold?, contentBBox?, onClaimPointer?,
+          onTap?, onCameraChange?, captureSelector?, mode? })
+          -> { host, world, cam(), scale(), setCamera(cam, animated), fit(animated),
+               centerOn(rect, animated), clientToWorld(cx,cy), worldToClient(wx,wy),
+               setMode('navigate'|'interact'), getMode(), refreshCaptures(), destroy() }
+
+        The consumer appends content to `world` in world coordinates and answers onClaimPointer
+        for anything draggable. Gestures: drag to pan, wheel to zoom at the cursor, two-finger
+        pinch to zoom about the midpoint. With captureSelector set, children that swallow pointer
+        events get a transparent overlay in navigate mode; space-hold, middle-mouse and Escape
+        behave as in other canvas tools.
+
+        Zero dependencies. Structural CSS only (the app owns cosmetics).
+        prefers-reduced-motion safe. Idempotent namespace guard: aimeat-dag embeds a
+        byte-identical copy so it can ship as a single script tag, and loading both is safe.
