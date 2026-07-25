@@ -36,6 +36,10 @@
  *   v1.7.0 — 2026-07-14 — Agent Face: the subdomain app root negotiates text/markdown (Accept
  *     or ?format=md) — serves the public apps.{filename}.agentface record (else converted app
  *     HTML) with the agent-affordances footer; browsers keep the exact HTML behavior.
+ *   v1.8.0 — 2026-07-25 — Frame grants: ?frame=<token> adds the ONE origin the grant names to
+ *     frame-ancestors for that response (and drops the legacy X-Frame-Options, which would veto
+ *     it). Fails closed on a bad grant. Constant header size — the earlier attempt listed the
+ *     owner's app origins and 502'd production at 76 apps.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -46,7 +50,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { injectAimeatBadge } from '../utils/app-badge.js';
-import { verifyDraftToken, DraftTokenError } from '../services/draft-token.js';
+import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { prefersMarkdown } from '../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../services/agent-face.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
@@ -66,9 +70,20 @@ export const SUBDOMAIN_RE = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/;
  * also allows the apex origin: the in-SPA sandboxed viewer (on the apex) frames the app
  * cross-origin (H-2), so without the apex here the browser would block it. `'self'` keeps the
  * app frameable within its own origin; we do NOT open it to `*` (clickjacking).
+ *
+ * `grantedOrigin` is the single origin named by a verified frame grant (?frame=<token>), when one
+ * is present on this request. One origin, per response, authorized — not a standing list.
  */
-function appCsp(apexOrigin: string): string {
-  const ancestors = apexOrigin ? `'self' ${apexOrigin}` : "'self'";
+function appCsp(apexOrigin: string, grantedOrigin?: string): string {
+  // At most ONE granted origin, from a verified frame grant. Never a list: an earlier attempt
+  // enumerated the owner's app origins here, and at 76 apps the header outgrew the reverse
+  // proxy's buffer and every app subdomain answered 502. Size here must not depend on how much
+  // the user has accumulated.
+  const ancestors = [
+    "'self'",
+    ...(apexOrigin ? [apexOrigin] : []),
+    ...(grantedOrigin ? [grantedOrigin] : []),
+  ].join(' ');
   // The app frames the apex silent-SSO bridge (hidden iframe → apex/app-silent.html), so frame-src
   // must allow the apex origin explicitly (https://aimeat.io is also covered by `https:`, but an http
   // dev apex like http://localtest.me is not — include it so seamless SSO works there too).
@@ -372,9 +387,29 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     // version on this real, isolated, session-less origin (mic/camera work) while the
     // live app stays untouched. The token is the authorization (this origin has no
     // session); it is scoped to exactly this app (owner + filename).
+    // A frame grant (?frame=<token>) widens frame-ancestors by exactly the one origin it names,
+    // and only for this response. An absent, malformed, expired or mismatched grant simply
+    // leaves the strict CSP in place — framing fails closed, it never errors the page.
+    let grantedOrigin: string | undefined;
+    const frameToken = req.query.frame as string | undefined;
+    if (frameToken) {
+      const slash = site.target.indexOf('/');
+      const tOwner = slash > 0 ? site.target.slice(0, slash) : '';
+      const tFile = slash > 0 ? site.target.slice(slash + 1) : '';
+      try {
+        const grant = await verifyFrameToken(frameToken);
+        const grantOwner = grant.sub.includes('@') ? grant.sub.split('@')[0] : grant.sub;
+        if (grantOwner === tOwner && grant.filename === tFile) grantedOrigin = grant.origin;
+      } catch { /* not a usable grant → strict CSP */ }
+    }
+    const appCspForRequest = appCsp(apexOrigin, grantedOrigin);
+    // X-Frame-Options is SAMEORIGIN node-wide; where a grant is the policy the legacy header
+    // would veto it in browsers that honour it, so it goes — but only when a grant applies.
+    if (grantedOrigin) res.removeHeader('X-Frame-Options');
+
     const previewToken = req.query.preview as string | undefined;
     if (previewToken) {
-      await serveDraftPreview(res, storage, config, site.target, previewToken, csp, apexOrigin);
+      await serveDraftPreview(res, storage, config, site.target, previewToken, appCspForRequest, apexOrigin);
       return;
     }
 
@@ -388,7 +423,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (await serveAppAgentFace(res, config, storage, app)) return;
     }
 
-    serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' });  // the SDK (aimeat-auth.js) does the silent SSO itself
+    serveApp(res, storage, app, appCspForRequest, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' });  // the SDK (aimeat-auth.js) does the silent SSO itself
   });
 
   // App-origin path form: `apps.<apex>/<owner>/<filename>` on the bare app host. Apps need their
