@@ -12,6 +12,10 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-07-25 — Theme system v2: the two-axis model (data-theme mode × data-palette look, five
+ *     designed palettes), the head restore snippet covers both axes, typography/elevation/motion
+ *     tokens documented, the control-cluster rule (language + mode + palette all live in the pill),
+ *     and the visual audit gains a non-default-palette spot check.
  *   2026-07-25 — Visual design sections. The prompt's only real design content used to be the GAME
  *     form-language block, which ended by telling every non-game app that a flat daisyUI page was
  *     "the right default" — so the paved path reliably produced identical grey cards, one type size
@@ -131,7 +135,7 @@ export function buildAppPrompt(
   // in the login pill exactly as the theme toggle does. (Reported 2026-07-25: "it is ALWAYS
   // different in every single app".)
   body += '### Language: declare it, never build the switch\n';
-  body += 'A bilingual app does NOT build its own language button. The control travels inside the login pill, next to the light/dark toggle, so every app on the node has the identical one in the identical place. You declare which languages you have and react to the change:\n';
+  body += 'A bilingual app does NOT build its own language button. The login pill carries the platform control cluster — a segmented language switch (every declared language visible, one click to any), the light/dark switch and the palette picker — so every app on the node has the identical controls in the identical place. You declare which languages you have and react to the change:\n';
   body += '```html\n';
   body += '<meta name="aimeat-locales" content="en fi">\n';
   body += '```\n';
@@ -261,17 +265,18 @@ export function buildAppPrompt(
   // Design guidelines
   body += '### Design Guidelines\n';
   body += 'For rich UIs use the self-hosted styling stack (the same one the app-shell templates use) instead of hand-rolling a CSS framework: the `styling` capability pack — daisyUI v5 components + Tailwind v4 utilities + the AIMEAT daisyUI theme + the cortex theme bridge, all loaded from this node (see the capability packs list above). For minimal pages plain CSS variables are fine.\n';
-  body += '**The brand is a token, never a hex.** The theme sets `--color-primary` to the AIMEAT coral (#E8564A light, #FF6F62 dark, each with the right readable text colour on top). Write `btn-primary`, `text-primary`, `border-primary` and the brand appears correctly in BOTH themes. If you find yourself typing a brand hex into an app, you are creating something that will be wrong in one theme and stale when the brand moves.\n';
-  body += "Use CSS variables so the app themes cleanly, and RESPECT the user's AIMEAT theme: the light/dark choice they made in the AIMEAT pill is saved in localStorage \"aimeat-theme\" (\"light\"|\"dark\"). Define light as the default and dark under [data-theme=\"dark\"], then set that attribute from the saved choice on load (fall back to the OS preference, and live-update if it changes):\n";
-  body += '```css\n';
-  body += ':root { --bg:#fafaf8; --card:#fff; --text:#1a1a2e; --accent:#e8564a; --border:#e5e7eb; --radius:12px; }\n';
-  body += ':root[data-theme="dark"] { --bg:#14141c; --card:#1e1e2a; --text:#ececf4; --border:#2e2e40; }\n';
-  body += '```\n';
+  body += '**The brand is a token, never a hex.** The theme sets `--color-primary` to the AIMEAT coral (#E8564A light, #FF6F62 dark, each with the right readable text colour on top). Write `btn-primary`, `text-primary`, `border-primary` and the brand appears correctly in BOTH modes and under EVERY palette. If you find yourself typing a brand hex into an app, you are creating something that will be wrong the moment the user switches look.\n';
+  body += "**The theme system has two axes, and both belong to the user.** `data-theme` on `<html>` is the light/dark MODE (localStorage `aimeat-theme`); `data-palette` is the designed LOOK (localStorage `aimeat-palette`: `aimeat` coral default, `paper` warm editorial serif, `circuit` cold technical mono, `contrast` high-contrast accessible, `mist` quiet neutral — every one defines both modes, its own display face and radii, all contrast-verified; preview them at /lib/samples/themes.html). Style with the daisyUI/theme tokens and all ten combinations work for free. Restore both axes in <head> so there is no flash of the wrong look:\n";
   body += '```js\n';
-  body += '(function(){ function apply(t){ document.documentElement.setAttribute("data-theme", t==="dark"?"dark":"light"); }\n';
-  body += '  apply(localStorage.getItem("aimeat-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));\n';
-  body += '  addEventListener("storage", function(e){ if(e.key==="aimeat-theme" && e.newValue) apply(e.newValue); }); })();\n';
+  body += '(function(){ function mode(t){ document.documentElement.setAttribute("data-theme", t==="dark"?"dark":"light"); }\n';
+  body += '  function pal(p){ if(p && p!=="aimeat") document.documentElement.setAttribute("data-palette", p); else document.documentElement.removeAttribute("data-palette"); }\n';
+  body += '  mode(localStorage.getItem("aimeat-theme") || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light"));\n';
+  body += '  pal(localStorage.getItem("aimeat-palette"));\n';
+  body += '  addEventListener("storage", function(e){ if(e.key==="aimeat-theme" && e.newValue) mode(e.newValue);\n';
+  body += '    if(e.key==="aimeat-palette" && e.newValue) pal(e.newValue); }); })();\n';
   body += '```\n';
+  body += 'An app may SUGGEST a palette that fits its character (a reading app might default to `paper` for first-time visitors via `AIMEAT.auth.setPalette("paper")` before any stored choice exists) — but it never overrides a stored user choice and never builds its own picker: the login pill already carries one.\n';
+  body += '**Typography is part of the theme.** Body text is Inter, headings and `.card-title` get the palette display face, `code`/`pre` get JetBrains Mono — automatically, self-hosted, with Finnish ä/ö covered. Never link an external font CDN (the app CSP forbids it) and never fight the display face with a hardcoded `font-family` on headings. Type-scale tokens when you size things yourself: `var(--text-hero)` for the one biggest thing on the page, `--text-title`, `--text-body`, `--text-fine` (13px floor). Elevation tokens for depth: `box-shadow: var(--elev-card)` resting, `--elev-raise` on hover, `--elev-pop` for menus/dialogs. Motion tokens: `var(--motion-fast|base|slow)` with `var(--ease-out)`.\n';
   body += 'Always include the viewport meta: `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">` (the last part makes the on-screen keyboard resize the layout instead of hiding bottom inputs). Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
 
   // Visual design for NON-game apps. Before this section the prompt's only real design content was
@@ -305,7 +310,7 @@ export function buildAppPrompt(
   // functional test and still ship an unreadable dark theme, because nobody ever opened it.
   body += '### Verify what it LOOKS like, not just that it works\n';
   body += 'An app can pass every functional check and still be unreadable, because the builder developed in one theme and never opened the other. Before calling a UI finished, run these on the real page:\n';
-  body += '- **Open BOTH themes.** Set `data-theme` to `light` AND `dark` and look at each. A dark screenshot is not optional — it is where hardcoded colours, invisible card edges and solid-fill badges go wrong.\n';
+  body += '- **Open BOTH modes.** Set `data-theme` to `light` AND `dark` and look at each. A dark screenshot is not optional — it is where hardcoded colours, invisible card edges and solid-fill badges go wrong. If you used only tokens, spot-check one non-default palette too (`document.documentElement.setAttribute("data-palette","circuit")`): a token-clean app passes every palette for free, and a hardcoded colour shows up immediately.\n';
   body += '- **Contrast**: body text ≥ 4.5:1 against its own background, large/bold text and UI components ≥ 3:1. The AIMEAT theme tokens are pre-verified in both themes, so if you only used tokens you are done; the moment you hardcode a colour you own its contrast.\n';
   body += '- **Brand present**: `getComputedStyle(document.documentElement).getPropertyValue("--color-primary")` resolves to the AIMEAT coral, and the primary action on screen actually uses it.\n';
   body += '- **Type scale real**: at least three distinct rendered font sizes, and the largest one is on the thing that matters most — not on a decorative page title above a wall of identical 14px text.\n';
@@ -321,7 +326,7 @@ export function buildAppPrompt(
   body += '    typeSteps: sizes, biggestText: el.find(e => px(e) === sizes[0])?.textContent.trim().slice(0,60),\n';
   body += '    smallestText: sizes[sizes.length-1], overflowPx: d.scrollWidth - d.clientWidth }; })()\n';
   body += '```\n';
-  body += 'Pass: `typeSteps.length >= 3`, `overflowPx === 0`, `primary` is the coral, `biggestText` is genuinely the most important thing on the page (if it is a decorative glyph or the page title, your hierarchy is upside down), and `smallestText >= 11` — note daisyUI renders `badge-xs` at 10px, so prefer `badge-sm` for anything a user has to read.\n\n';
+  body += 'Pass: `typeSteps.length >= 3`, `overflowPx === 0`, `primary` resolves to the active palette\'s brand token (the coral under the default palette), `biggestText` is genuinely the most important thing on the page (if it is a decorative glyph or the page title, your hierarchy is upside down), and `smallestText >= 11` — note daisyUI renders `badge-xs` at 10px, so prefer `badge-sm` for anything a user has to read.\n\n';
 
   // Game form language — palette alone reads as a dashboard; the FORM LANGUAGE makes the game.
   // Born from pitfall app/candy-palette-alone-is-not-a-game-look (TOWER TETRIS, 2026-07-19).
@@ -341,7 +346,7 @@ export function buildAppPrompt(
   body += '- Keep it as a single self-contained HTML file\n';
   body += '- Load only the libraries you actually use; load aimeat-auth before libs that need a session\n';
   body += '- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n';
-  body += "- Theme with CSS variables; respect the user's AIMEAT light/dark choice (localStorage \"aimeat-theme\") with an OS-preference fallback\n";
+  body += "- Theme with the platform tokens; respect BOTH user choices — light/dark mode (localStorage \"aimeat-theme\", OS-preference fallback) and palette (localStorage \"aimeat-palette\") — and never build your own theme/language/palette control (the login pill carries the cluster)\n";
   body += '- Include error handling and loading states for API calls\n\n';
 
   // Conscious-upgrade rule (improve mode): library packs version consciously, never silently.
