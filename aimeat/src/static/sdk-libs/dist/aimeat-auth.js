@@ -229,22 +229,33 @@
     } catch {
     }
   }
-  function themeToggleHtml(i) {
-    var dark = aimeatReadTheme() === "dark";
-    var title = dark ? i.themeToLight || "Switch to light mode" : i.themeToDark || "Switch to dark mode";
-    return '<button id="aimeat-theme-toggle" class="aimeat-theme-toggle" title="' + escHtml(title) + '" aria-label="' + escHtml(title) + '" style="display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;flex:0 0 auto;background:transparent;border:1px solid rgba(127,127,127,.4);border-radius:8px;cursor:pointer;font-size:15px;line-height:1;padding:0;color:currentColor">' + (dark ? "☀" : "☾") + "</button>";
+  function modeSwitchHtml(i) {
+    var cur = aimeatReadTheme();
+    var light = i.lightMode || "Light mode";
+    var dark = i.darkMode || "Dark mode";
+    return '<span id="aimeat-mode-switch" class="aimeat-seg" role="group" aria-label="' + escHtml(i.themeLabel || "Theme") + '"><button type="button" data-mode="light" aria-pressed="' + (cur === "light") + '" title="' + escHtml(light) + '" aria-label="' + escHtml(light) + '"><span class="seg-ico" aria-hidden="true">☀</span></button><button type="button" data-mode="dark" aria-pressed="' + (cur === "dark") + '" title="' + escHtml(dark) + '" aria-label="' + escHtml(dark) + '"><span class="seg-ico" aria-hidden="true">☾</span></button></span>';
   }
-  function wireThemeToggle(container, i) {
-    var btn = container.querySelector("#aimeat-theme-toggle");
-    if (!btn) return;
-    btn.addEventListener("click", function() {
-      var next = aimeatReadTheme() === "dark" ? "light" : "dark";
-      aimeatApplyTheme(next);
-      var dark = next === "dark";
-      btn.textContent = dark ? "☀" : "☾";
-      var title = dark ? i.themeToLight || "Switch to light mode" : i.themeToDark || "Switch to dark mode";
-      btn.title = title;
-      btn.setAttribute("aria-label", title);
+  function wireModeSwitch(container) {
+    var root = container.querySelector("#aimeat-mode-switch");
+    if (!root) return;
+    function sync(cur) {
+      root.querySelectorAll("button[data-mode]").forEach(function(b) {
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-mode") === cur));
+      });
+    }
+    root.querySelectorAll("button[data-mode]").forEach(function(b) {
+      b.addEventListener("click", function() {
+        var m = b.getAttribute("data-mode");
+        aimeatApplyTheme(m);
+        sync(m);
+      });
+    });
+    window.addEventListener("aimeat-theme-change", function(ev) {
+      var e = (
+        /** @type {CustomEvent} */
+        ev
+      );
+      if (e && e.detail && e.detail.theme) sync(e.detail.theme);
     });
   }
   function ensureAuthPillStyles() {
@@ -764,6 +775,75 @@
     }
   }
 
+  // src/static/sdk-libs/auth/cluster.js
+  function ensureClusterStyles() {
+    if (document.getElementById("aimeat-cluster-css")) return;
+    var st = document.createElement("style");
+    st.id = "aimeat-cluster-css";
+    st.textContent = [
+      /* The cluster row. Inherits text colour from its host (gold pill or page header). */
+      ".aimeat-ctl{display:inline-flex;align-items:center;gap:6px}",
+      /* Segmented group: one bordered pill, every option a button. */
+      ".aimeat-seg{display:inline-flex;align-items:stretch;height:30px;flex:0 0 auto;",
+      "border:1px solid color-mix(in oklab,currentColor 38%,transparent);border-radius:999px;",
+      "overflow:hidden;background:color-mix(in oklab,currentColor 5%,transparent)}",
+      ".aimeat-seg button{appearance:none;border:0;background:transparent;color:currentColor;",
+      'opacity:.6;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
+      "padding:0 10px;margin:0;cursor:pointer;display:inline-flex;align-items:center;gap:4px;",
+      "transition:opacity var(--motion-fast,120ms) ease,background var(--motion-fast,120ms) ease}",
+      ".aimeat-seg button:hover{opacity:.9}",
+      ".aimeat-seg button:focus-visible{outline:2px solid currentColor;outline-offset:-2px;opacity:1}",
+      '.aimeat-seg button[aria-pressed="true"]{opacity:1;',
+      "background:color-mix(in oklab,currentColor 16%,transparent)}",
+      ".aimeat-seg button+button{border-left:1px solid color-mix(in oklab,currentColor 22%,transparent)}",
+      ".aimeat-seg .seg-ico{font-size:13px;line-height:1}",
+      /* Popover trigger (palette picker; language picker when 4+ languages). */
+      ".aimeat-pop-wrap{position:relative;display:inline-flex;flex:0 0 auto}",
+      ".aimeat-pop-btn{appearance:none;display:inline-flex;align-items:center;justify-content:center;",
+      "gap:5px;height:30px;min-width:30px;padding:0 7px;background:color-mix(in oklab,currentColor 5%,transparent);",
+      "border:1px solid color-mix(in oklab,currentColor 38%,transparent);border-radius:999px;",
+      'cursor:pointer;color:currentColor;font:700 11px/1 "Inter","Segoe UI",system-ui,sans-serif;letter-spacing:.4px;',
+      "transition:background var(--motion-fast,120ms) ease}",
+      ".aimeat-pop-btn:hover{background:color-mix(in oklab,currentColor 12%,transparent)}",
+      ".aimeat-pop-btn:focus-visible{outline:2px solid currentColor;outline-offset:-2px}",
+      /* The popover panel: a real themed surface (not the host pill), so swatches read true. */
+      ".aimeat-pop{position:absolute;top:calc(100% + 8px);right:0;z-index:1200;display:none;",
+      "background:var(--color-base-200,#ffffff);color:var(--color-base-content,#1a1a2e);",
+      "border:1px solid var(--color-base-300,#d9dbe1);border-radius:var(--radius-box,14px);",
+      "box-shadow:var(--elev-pop,0 4px 10px rgb(15 18 25 / .1),0 18px 44px rgb(15 18 25 / .16));",
+      "padding:8px;width:max-content;max-width:calc(100vw - 24px)}",
+      ".aimeat-pop-wrap.aimeat-open .aimeat-pop{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px}",
+      ".aimeat-pop.aimeat-pop-list{grid-template-columns:minmax(0,1fr)}",
+      ".aimeat-pop button{appearance:none;display:flex;align-items:center;gap:8px;padding:7px 9px;margin:0;",
+      "background:transparent;border:1px solid transparent;border-radius:calc(var(--radius-box,14px) - 6px);",
+      'cursor:pointer;color:inherit;font:600 12px/1.1 "Inter","Segoe UI",system-ui,sans-serif;text-align:left;',
+      "transition:background var(--motion-fast,120ms) ease}",
+      ".aimeat-pop button:hover{background:color-mix(in oklab,currentColor 8%,transparent)}",
+      ".aimeat-pop button:focus-visible{outline:2px solid var(--color-primary,#e8564a);outline-offset:-2px}",
+      '.aimeat-pop button[aria-pressed="true"]{border-color:var(--color-primary,#e8564a)}',
+      /* Palette swatch chips: page/card/accent of the palette IN THE CURRENT MODE. The three
+         colours are data (they vary per palette), so they arrive as inline background values on
+         these spans — layout and everything else stays here. */
+      ".aimeat-pal-chip{position:relative;flex:0 0 auto;width:26px;height:20px;border-radius:5px;",
+      "border:1px solid color-mix(in oklab,currentColor 25%,transparent);overflow:hidden}",
+      ".aimeat-pal-chip .pc-card{position:absolute;inset:5px 5px 3px 5px;border-radius:3px}",
+      ".aimeat-pal-chip .pc-acc{position:absolute;right:3px;bottom:3px;width:7px;height:7px;border-radius:50%}",
+      /* The trigger's miniature: the active palette's accent as a dot. */
+      ".aimeat-pal-dot{width:12px;height:12px;border-radius:50%;flex:0 0 auto;",
+      "border:1px solid color-mix(in oklab,currentColor 30%,transparent)}"
+    ].join("");
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function clampPopover(pop) {
+    pop.style.transform = "";
+    var r = pop.getBoundingClientRect();
+    var pad = 12;
+    var shift = 0;
+    if (r.left < pad) shift = pad - r.left;
+    else if (r.right > window.innerWidth - pad) shift = window.innerWidth - pad - r.right;
+    if (shift) pop.style.transform = "translateX(" + Math.round(shift) + "px)";
+  }
+
   // src/static/sdk-libs/auth/locale.js
   var AIMEAT_LANG_KEY = "aimeat-lang";
   function readLocales(opts) {
@@ -820,28 +900,52 @@
     } catch {
     }
   }
-  function langToggleHtml(i, locales) {
+  function langName(code) {
+    try {
+      var dn = new Intl.DisplayNames([code], { type: "language" });
+      var n = dn.of(code);
+      if (n && n !== code) return n.charAt(0).toUpperCase() + n.slice(1);
+    } catch {
+    }
+    return code.toUpperCase();
+  }
+  var SEGMENT_MAX = 3;
+  function langSwitchHtml(i, locales) {
     if (!locales.length) return "";
     var cur = aimeatReadLang(locales);
-    var next = locales[(locales.indexOf(cur) + 1) % locales.length];
-    var title = (i && i.switchLanguage ? i.switchLanguage : "Switch language") + ": " + next.toUpperCase();
-    return '<button id="aimeat-lang-toggle" class="aimeat-lang-toggle" title="' + escHtml(title) + '" aria-label="' + escHtml(title) + '" data-next="' + escHtml(next) + '" style="display:inline-flex;align-items:center;justify-content:center;height:30px;min-width:30px;padding:0 7px;flex:0 0 auto;background:transparent;border:1px solid rgba(127,127,127,.4);border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;letter-spacing:.4px;line-height:1;color:currentColor;font-family:system-ui">' + escHtml(cur.toUpperCase()) + "</button>";
-  }
-  function wireLangToggle(container, i, locales) {
-    var btn = container.querySelector("#aimeat-lang-toggle");
-    if (!btn || !locales.length) return;
-    function sync(cur) {
-      var after = locales[(locales.indexOf(cur) + 1) % locales.length];
-      btn.textContent = cur.toUpperCase();
-      btn.setAttribute("data-next", after);
-      var title = (i && i.switchLanguage ? i.switchLanguage : "Switch language") + ": " + after.toUpperCase();
-      btn.title = title;
-      btn.setAttribute("aria-label", title);
+    var group = i && i.switchLanguage ? i.switchLanguage : "Language";
+    if (locales.length <= SEGMENT_MAX) {
+      return '<span id="aimeat-lang-switch" class="aimeat-seg" role="group" aria-label="' + escHtml(group) + '">' + locales.map(function(c) {
+        return '<button type="button" data-lang="' + escHtml(c) + '" aria-pressed="' + (c === cur) + '" title="' + escHtml(langName(c)) + '" aria-label="' + escHtml(langName(c)) + '">' + escHtml(c.toUpperCase()) + "</button>";
+      }).join("") + "</span>";
     }
-    btn.addEventListener("click", function() {
-      var next = btn.getAttribute("data-next");
-      aimeatApplyLang(next);
-      sync(next);
+    return '<span id="aimeat-lang-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + escHtml(group) + '" aria-label="' + escHtml(group) + '">' + escHtml(cur.toUpperCase()) + ' <span aria-hidden="true">▾</span></button><span class="aimeat-pop aimeat-pop-list" role="listbox">' + locales.map(function(c) {
+      return '<button type="button" role="option" data-lang="' + escHtml(c) + '" aria-pressed="' + (c === cur) + '">' + escHtml(c.toUpperCase()) + " · " + escHtml(langName(c)) + "</button>";
+    }).join("") + "</span></span>";
+  }
+  function wireLangSwitch(container, i, locales) {
+    var root = container.querySelector("#aimeat-lang-switch");
+    if (!root || !locales.length) return;
+    var trigger = root.querySelector(".aimeat-pop-btn");
+    function sync(cur) {
+      root.querySelectorAll("button[data-lang]").forEach(function(b) {
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-lang") === cur));
+      });
+      if (trigger) trigger.childNodes[0].textContent = cur.toUpperCase() + " ";
+    }
+    root.querySelectorAll("button[data-lang]").forEach(function(b) {
+      b.addEventListener("click", function() {
+        aimeatApplyLang(b.getAttribute("data-lang"));
+        sync(b.getAttribute("data-lang"));
+        root.classList.remove("aimeat-open");
+        if (trigger) trigger.setAttribute("aria-expanded", "false");
+      });
+    });
+    if (trigger) trigger.addEventListener("click", function(ev) {
+      ev.stopPropagation();
+      var open = root.classList.toggle("aimeat-open");
+      trigger.setAttribute("aria-expanded", String(open));
+      if (open) clampPopover(root.querySelector(".aimeat-pop"));
     });
     window.addEventListener("aimeat-lang-change", function(ev) {
       var e = (
@@ -849,8 +953,146 @@
         ev
       );
       var lang = e && e.detail && e.detail.lang;
-      if (lang && locales.indexOf(lang) >= 0 && lang !== btn.textContent.toLowerCase()) sync(lang);
+      if (lang && locales.indexOf(lang) >= 0) sync(lang);
     });
+  }
+
+  // src/static/sdk-libs/auth/palette.js
+  var AIMEAT_PALETTE_KEY = "aimeat-palette";
+  var PALETTES = [
+    { id: "aimeat", label: "AIMEAT", swatch: {
+      light: { bg: "#efeee8", card: "#ffffff", accent: "#e8564a" },
+      dark: { bg: "#14151a", card: "#21232e", accent: "#ff6f62" }
+    } },
+    { id: "paper", label: "Paper", swatch: {
+      light: { bg: "#eae2cf", card: "#fdfaf1", accent: "#a03040" },
+      dark: { bg: "#151110", card: "#282017", accent: "#e08590" }
+    } },
+    { id: "circuit", label: "Circuit", swatch: {
+      light: { bg: "#e9edf1", card: "#ffffff", accent: "#0e7290" },
+      dark: { bg: "#0a0f14", card: "#18202b", accent: "#4fd2f2" }
+    } },
+    { id: "contrast", label: "Contrast", swatch: {
+      light: { bg: "#e9e9e9", card: "#ffffff", accent: "#1d4ed8" },
+      dark: { bg: "#000000", card: "#17171c", accent: "#99c2ff" }
+    } },
+    { id: "mist", label: "Mist", swatch: {
+      light: { bg: "#e6eae4", card: "#fbfcfa", accent: "#47695a" },
+      dark: { bg: "#141715", card: "#252b27", accent: "#9cc0ae" }
+    } }
+  ];
+  function aimeatReadPalette() {
+    var ids = PALETTES.map(function(p) {
+      return p.id;
+    });
+    try {
+      var s = localStorage.getItem(AIMEAT_PALETTE_KEY);
+      if (s && ids.indexOf(s) >= 0) return s;
+    } catch {
+    }
+    var attr = document.documentElement.getAttribute("data-palette");
+    return attr && ids.indexOf(attr) >= 0 ? attr : PALETTES[0].id;
+  }
+  function aimeatApplyPalette(id) {
+    if (id === PALETTES[0].id) document.documentElement.removeAttribute("data-palette");
+    else document.documentElement.setAttribute("data-palette", id);
+    try {
+      localStorage.setItem(AIMEAT_PALETTE_KEY, id);
+    } catch {
+    }
+    try {
+      window.dispatchEvent(new CustomEvent("aimeat-palette-change", { detail: { palette: id } }));
+    } catch {
+    }
+  }
+  function aimeatRestorePalette() {
+    var cur = aimeatReadPalette();
+    if (cur !== PALETTES[0].id) document.documentElement.setAttribute("data-palette", cur);
+    try {
+      window.addEventListener("storage", function(e) {
+        if (e.key === AIMEAT_PALETTE_KEY && e.newValue) aimeatApplyPalette(e.newValue);
+      });
+    } catch {
+    }
+  }
+  function paletteControlHtml(i) {
+    var cur = aimeatReadPalette();
+    var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    var curAcc = (PALETTES.find(function(p) {
+      return p.id === cur;
+    }) || PALETTES[0]).swatch[mode].accent;
+    var label = i && i.chooseLook || "Choose look";
+    return '<span id="aimeat-palette-switch" class="aimeat-pop-wrap"><button type="button" class="aimeat-pop-btn" aria-haspopup="listbox" aria-expanded="false" title="' + esc(label) + '" aria-label="' + esc(label) + '"><span class="aimeat-pal-dot" style="background:' + esc(curAcc) + '"></span></button><span class="aimeat-pop" role="listbox">' + PALETTES.map(function(p) {
+      var s = p.swatch[mode];
+      return '<button type="button" role="option" data-palette="' + esc(p.id) + '" aria-pressed="' + (p.id === cur) + '"><span class="aimeat-pal-chip" style="background:' + esc(s.bg) + '"><span class="pc-card" style="background:' + esc(s.card) + '"></span><span class="pc-acc" style="background:' + esc(s.accent) + '"></span></span>' + esc(p.label) + "</button>";
+    }).join("") + "</span></span>";
+  }
+  function wirePaletteControl(container, clampPopover2) {
+    var root = container.querySelector("#aimeat-palette-switch");
+    if (!root) return;
+    var trigger = (
+      /** @type {HTMLElement} */
+      root.querySelector(".aimeat-pop-btn")
+    );
+    function syncDot() {
+      var cur = aimeatReadPalette();
+      var mode = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+      var p = PALETTES.find(function(x) {
+        return x.id === cur;
+      }) || PALETTES[0];
+      var dot = (
+        /** @type {HTMLElement|null} */
+        root.querySelector(".aimeat-pal-dot")
+      );
+      if (dot) dot.style.background = p.swatch[mode].accent;
+      root.querySelectorAll("button[data-palette]").forEach(function(b) {
+        b.setAttribute("aria-pressed", String(b.getAttribute("data-palette") === cur));
+        var pp = PALETTES.find(function(x) {
+          return x.id === b.getAttribute("data-palette");
+        });
+        if (!pp) return;
+        var s = pp.swatch[mode];
+        var chip = (
+          /** @type {HTMLElement|null} */
+          b.querySelector(".aimeat-pal-chip")
+        );
+        var card = (
+          /** @type {HTMLElement|null} */
+          b.querySelector(".pc-card")
+        );
+        var acc = (
+          /** @type {HTMLElement|null} */
+          b.querySelector(".pc-acc")
+        );
+        if (chip) chip.style.background = s.bg;
+        if (card) card.style.background = s.card;
+        if (acc) acc.style.background = s.accent;
+      });
+    }
+    root.querySelectorAll("button[data-palette]").forEach(function(b) {
+      b.addEventListener("click", function() {
+        aimeatApplyPalette(b.getAttribute("data-palette") || PALETTES[0].id);
+        syncDot();
+        root.classList.remove("aimeat-open");
+        trigger.setAttribute("aria-expanded", "false");
+      });
+    });
+    trigger.addEventListener("click", function(ev) {
+      ev.stopPropagation();
+      var open = root.classList.toggle("aimeat-open");
+      trigger.setAttribute("aria-expanded", String(open));
+      if (open) clampPopover2(
+        /** @type {HTMLElement} */
+        root.querySelector(".aimeat-pop")
+      );
+    });
+    window.addEventListener("aimeat-palette-change", syncDot);
+    window.addEventListener("aimeat-theme-change", syncDot);
+  }
+  function esc(s) {
+    var d = document.createElement("div");
+    d.textContent = s;
+    return d.innerHTML;
   }
 
   // src/static/sdk-libs/auth/pill.js
@@ -879,7 +1121,7 @@
     function render() {
       const stored = auth2.getSession() || load("session");
       if (stored) {
-        var pillHtml = '<div class="aimeat-auth-pill" style="display:inline-flex;align-items:center;gap:10px;padding:8px 18px;background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);border-radius:10px;box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4),0 0 20px rgba(201,168,76,.15);font-family:system-ui;font-size:14px"><span class="aimeat-auth-dot" style="display:inline-block;flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#b0ffc8,#00c853 40%,#00802e 80%,#003d15);box-shadow:0 0 5px rgba(0,200,83,.7),0 0 12px rgba(0,200,83,.3),inset 0 -1px 2px rgba(0,0,0,.3)"></span><span class="aimeat-auth-label" style="display:inline-flex;align-items:center;font-size:12px;font-weight:600;letter-spacing:.5px;color:#a0ffb8;text-shadow:0 0 4px rgba(0,210,80,.6),0 0 10px rgba(0,180,70,.3)">' + escHtml(i.loggedIn || "logged in") + '</span><span class="aimeat-auth-ghii" style="color:rgba(90,65,20,.7);font-weight:700;letter-spacing:.5px;font-size:13px;text-shadow:0 1px 0 rgba(245,230,163,.6),0 -1px 0 rgba(50,35,10,.3);-webkit-text-stroke:.2px rgba(120,85,20,.3)">' + escHtml(stored.displayName || stored.ghii || stored.owner) + "</span>" + (stored.federated ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.5px;color:#7dd3fc;background:rgba(56,189,248,.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(56,189,248,.3)">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '" style="background:rgba(90,65,20,.18);color:#5a4114;border:1px solid rgba(120,85,20,.35);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:13px;line-height:1">⚙️</button>' : "") + langToggleHtml(i, locales) + themeToggleHtml(i) + '<button id="aimeat-logout-btn" class="aimeat-auth-logout" style="background:radial-gradient(ellipse at 50% 30%,#ff6b6b 0%,#dc2626 35%,#991b1b 70%,#7f1d1d 100%);color:#ffd7d7;border:1px solid rgba(220,38,38,.6);border-top-color:rgba(255,130,130,.4);border-bottom-color:rgba(100,20,20,.8);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.3px;box-shadow:0 1px 0 rgba(255,140,140,.25) inset,0 -1px 0 rgba(80,10,10,.4) inset,0 2px 6px rgba(153,27,27,.5);text-shadow:0 1px 1px rgba(0,0,0,.4)">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
+        var pillHtml = '<div class="aimeat-auth-pill" style="display:inline-flex;align-items:center;gap:10px;padding:8px 18px;background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);border-radius:10px;box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4),0 0 20px rgba(201,168,76,.15);font-family:system-ui;font-size:14px"><span class="aimeat-auth-dot" style="display:inline-block;flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#b0ffc8,#00c853 40%,#00802e 80%,#003d15);box-shadow:0 0 5px rgba(0,200,83,.7),0 0 12px rgba(0,200,83,.3),inset 0 -1px 2px rgba(0,0,0,.3)"></span><span class="aimeat-auth-label" style="display:inline-flex;align-items:center;font-size:12px;font-weight:600;letter-spacing:.5px;color:#a0ffb8;text-shadow:0 0 4px rgba(0,210,80,.6),0 0 10px rgba(0,180,70,.3)">' + escHtml(i.loggedIn || "logged in") + '</span><span class="aimeat-auth-ghii" style="color:rgba(90,65,20,.7);font-weight:700;letter-spacing:.5px;font-size:13px;text-shadow:0 1px 0 rgba(245,230,163,.6),0 -1px 0 rgba(50,35,10,.3);-webkit-text-stroke:.2px rgba(120,85,20,.3)">' + escHtml(stored.displayName || stored.ghii || stored.owner) + "</span>" + (stored.federated ? '<span style="display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:700;letter-spacing:.5px;color:#7dd3fc;background:rgba(56,189,248,.15);padding:2px 6px;border-radius:4px;border:1px solid rgba(56,189,248,.3)">🌐 ' + escHtml(i.federated || "Federated") + "</span>" : "") + (stored._appOrigin && stored._app && !stored._own ? '<button id="aimeat-grant-gear" title="' + escHtml(i.manageAccess || "Manage permissions") + '" aria-label="' + escHtml(i.manageAccess || "Manage permissions") + '" style="background:rgba(90,65,20,.18);color:#5a4114;border:1px solid rgba(120,85,20,.35);border-radius:6px;padding:3px 8px;cursor:pointer;font-size:13px;line-height:1">⚙️</button>' : "") + '<span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-logout-btn" class="aimeat-auth-logout" style="background:radial-gradient(ellipse at 50% 30%,#ff6b6b 0%,#dc2626 35%,#991b1b 70%,#7f1d1d 100%);color:#ffd7d7;border:1px solid rgba(220,38,38,.6);border-top-color:rgba(255,130,130,.4);border-bottom-color:rgba(100,20,20,.8);border-radius:6px;padding:3px 10px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.3px;box-shadow:0 1px 0 rgba(255,140,140,.25) inset,0 -1px 0 rgba(80,10,10,.4) inset,0 2px 6px rgba(153,27,27,.5);text-shadow:0 1px 1px rgba(0,0,0,.4)">' + escHtml(i.logoutBtn || "Logout") + "</button></div>";
         if (useCompact) {
           ensureAuthPillStyles();
           var ini = pillInitials(stored.displayName || stored.ghii || stored.owner);
@@ -909,7 +1151,7 @@
           compactBtn.setAttribute("aria-expanded", open ? "true" : "false");
         });
       } else {
-        container.innerHTML = '<style>.aimeat-sign-btn{padding:8px 18px;background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);color:#2a1800;border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);border-radius:10px;cursor:pointer;font-weight:800;font-family:system-ui;font-size:14px;letter-spacing:.3px;box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4),0 0 20px rgba(201,168,76,.15);text-shadow:0 1px 0 rgba(245,230,163,.5);transition:transform .15s,box-shadow .15s}.aimeat-sign-btn:hover{transform:translateY(-1px);box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 5px 16px rgba(0,0,0,.5),0 0 30px rgba(201,168,76,.3)}</style><span style="display:inline-flex;align-items:center;gap:10px">' + langToggleHtml(i, locales) + themeToggleHtml(i) + '<button id="aimeat-login-btn" class="aimeat-sign-btn">' + (opts.buttonText || i.signInBtn || "❤️ Sign In") + "</button></span>";
+        container.innerHTML = '<style>.aimeat-sign-btn{padding:8px 18px;background:linear-gradient(160deg,#3d2e1a 0%,#6b4c2a 15%,#c9a84c 30%,#f5e6a3 45%,#c9a84c 55%,#8b6914 70%,#4a3520 100%);color:#2a1800;border:1px solid rgba(201,168,76,.6);border-top-color:rgba(245,230,163,.5);border-bottom-color:rgba(75,53,32,.8);border-radius:10px;cursor:pointer;font-weight:800;font-family:system-ui;font-size:14px;letter-spacing:.3px;box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 3px 10px rgba(0,0,0,.4),0 0 20px rgba(201,168,76,.15);text-shadow:0 1px 0 rgba(245,230,163,.5);transition:transform .15s,box-shadow .15s}.aimeat-sign-btn:hover{transform:translateY(-1px);box-shadow:0 1px 0 rgba(245,230,163,.3) inset,0 -1px 0 rgba(75,53,32,.5) inset,0 5px 16px rgba(0,0,0,.5),0 0 30px rgba(201,168,76,.3)}</style><span style="display:inline-flex;align-items:center;gap:10px"><span class="aimeat-ctl">' + langSwitchHtml(i, locales) + modeSwitchHtml(i) + paletteControlHtml(i) + '</span><button id="aimeat-login-btn" class="aimeat-sign-btn">' + (opts.buttonText || i.signInBtn || "❤️ Sign In") + "</button></span>";
         document.getElementById("aimeat-login-btn").addEventListener("click", () => {
           if (isAppOrigin()) {
             restoreSessionFromAppOrigin(true).then((s) => {
@@ -921,10 +1163,32 @@
           }
         });
       }
-      wireThemeToggle(container, i);
-      wireLangToggle(container, i, locales);
+      wireModeSwitch(container);
+      wireLangSwitch(container, i, locales);
+      wirePaletteControl(container, clampPopover);
     }
+    ensureClusterStyles();
     render();
+    document.addEventListener("click", (ev) => {
+      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open").forEach((w) => {
+        if (!w.contains(
+          /** @type {Node} */
+          ev.target
+        )) {
+          w.classList.remove("aimeat-open");
+          var b = w.querySelector(".aimeat-pop-btn");
+          if (b) b.setAttribute("aria-expanded", "false");
+        }
+      });
+    });
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key !== "Escape") return;
+      container.querySelectorAll(".aimeat-pop-wrap.aimeat-open").forEach((w) => {
+        w.classList.remove("aimeat-open");
+        var b = w.querySelector(".aimeat-pop-btn");
+        if (b) b.setAttribute("aria-expanded", "false");
+      });
+    });
     if (useCompact) {
       var closeCompact = () => {
         var w = container.querySelector(".aimeat-auth-wrap.aimeat-open");
@@ -1930,6 +2194,18 @@
   auth.setLang = function(lang) {
     aimeatApplyLang(String(lang).toLowerCase());
   };
+  auth.getPalette = function() {
+    return aimeatReadPalette();
+  };
+  auth.setPalette = function(id) {
+    aimeatApplyPalette(String(id).toLowerCase());
+  };
+  auth.getPalettes = function() {
+    return PALETTES.map(function(p) {
+      return { id: p.id, label: p.label, swatch: p.swatch };
+    });
+  };
+  if (typeof document !== "undefined") aimeatRestorePalette();
   var ns = attach("auth", auth);
-  ns.version = "2026-07-25-001";
+  ns.version = "2026-07-25-002";
 })();

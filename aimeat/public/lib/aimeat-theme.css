@@ -1,52 +1,138 @@
 /*
  * @file aimeat-theme.css
- * @description THE AIMEAT daisyUI theme — the house palette expressed as daisyUI 5 theme
- *   variables, so a published app gets AIMEAT's brand instead of daisyUI's defaults without
- *   hardcoding a single hex value. Before this file existed, every good-looking app on the
- *   node copy-pasted `#E8564A` by hand (prh.html 3x, tila.html 3x, experience-center.html 12x)
- *   because `--color-primary` was daisyUI's indigo and the bridge's coral fallback never fired.
+ * @description THE AIMEAT theme system — five designed palettes, each defining BOTH light and
+ *   dark, expressed as daisyUI 5 theme variables so a published app gets a finished look without
+ *   hardcoding a single hex value. Two orthogonal axes (the model proven by aimeat-tdr-cortex):
  *
- *   Two things it fixes that a hand-rolled app cannot easily get right:
+ *     data-theme="light" | "dark"       MODE  — the user's light/dark choice ('aimeat-theme' key)
+ *     data-palette="paper" | ...        PALETTE — which designed look ('aimeat-palette' key;
+ *                                       absent = the default AIMEAT coral palette)
  *
- *   1. THE DARK RAMP. daisyUI's dark theme is base-100 oklch(25.33%) / base-200 oklch(23.26%) /
- *      base-300 oklch(21.15%) — two points of perceptual lightness apart, so a `card bg-base-200`
- *      on a `bg-base-100` page is very nearly invisible. AIMEAT uses the SPA's designed ramp
- *      (#14151A page / #21232E card / #383C46 edge) with real separation.
+ *   Palettes (each with a personality beyond colour — its own display face, radii and border
+ *   weight; body text is Inter everywhere so content stays quiet and legible):
+ *     aimeat    coral + slate, Space Grotesk display        (the house default)
+ *     paper     warm editorial: cream/ink, bordeaux, Fraunces serif display
+ *     circuit   cold technical: steel/blueprint, cyan, JetBrains Mono display
+ *     contrast  high-contrast accessible: black/white, 2px borders, every pair >= 4.5:1
+ *     mist      quiet neutral: low-chroma sage/grey, soft 20px radii
  *
- *   2. THE `-content` PAIRS. daisyUI ships ONE value per semantic colour for BOTH themes, so a
- *      `badge-warning` is the same solid amber block on a near-black page as on a white one, and
- *      its brown-on-amber label reads as a highlighter smear. Every pair here is chosen against
- *      its own surface and the ratio is stated. Where a pair is below 4.5:1 it is marked as
- *      large/bold-UI-text only (WCAG 1.4.3 large text + 1.4.11 non-text contrast, both 3:1).
+ *   Every colour pair is verified by `pnpm check:theme` (tools/theme-contrast.ts), which parses
+ *   the `@theme-block` markers below and holds each block to: -content pairs (4.5:1, or 3:1 when
+ *   marked large/bold-UI-only), body text 4.5:1 on page AND card, the card-boundary step + edge,
+ *   primary >= 3:1 against page and card (WCAG 1.4.11 — a button must be discernible), and the
+ *   accuracy of every ratio claimed in a comment. Do not edit a colour without re-running it.
  *
- *   ELEVATION DIRECTION — deliberately inverted vs daisyUI. Here `base-200` is ELEVATED above
- *   `base-100`: cards float above the page (lighter in dark, whiter in light), matching the
- *   AIMEAT SPA. daisyUI recesses it instead. `base-300` is the strongest separation in both
- *   themes: a recessed well in light, a raised edge in dark. Use it for borders and dividers.
- * @structure light block (:root, [data-theme=light]) · dark block ([data-theme=dark]) ·
- *   surface ramp · brand · semantic colours + their content pairs · radii/border/depth
+ *   ELEVATION DIRECTION — deliberately inverted vs daisyUI: base-200 (card) is ELEVATED above
+ *   base-100 (page) in both modes. base-300 is the strongest separation — borders and dividers.
+ *
+ *   FONTS are self-hosted at /lib/fonts/ (SIL OFL 1.1, latin + latin-ext so ä/ö render) and
+ *   lazy-load per family: a page only downloads the faces its palette actually uses.
+ * @structure @font-face (Inter, Space Grotesk, Fraunces, JetBrains Mono) · shared tokens
+ *   (type scale, motion, spacing) · per-mode elevation · 5 palettes x 2 modes (each tagged
+ *   `@theme-block <palette> <mode>` for the verifier) · typography application rules
  * @usage  <link href="/lib/daisyui@5.css" rel="stylesheet" />
  *         <link href="/lib/aimeat-theme.css" rel="stylesheet" />        <-- after daisyUI
  *         <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" />
- *   The bridge @imports this file, so an app that already loads the bridge gets the theme
- *   automatically. Loading it explicitly (as the `styling` pack now does) is a no-op duplicate.
+ *   The bridge @imports this file, so an app that already loads the bridge gets it with no edit.
  *   Deliberately UNLAYERED: daisyUI declares its themes inside `@layer base`, and any unlayered
  *   rule beats every layered one regardless of order or specificity.
  * @version-history
- *   v1.0.0 — 2026-07-25 — Initial AIMEAT daisyUI theme. Palette lifted from public/css/theme.css
- *     (the SPA's canonical light/dark ramps) so apps and the SPA read as one product.
+ *   v2.0.0 — 2026-07-25 — The theme SYSTEM: data-palette axis (paper/circuit/contrast/mist next
+ *     to the aimeat default), per-palette display faces (self-hosted OFL fonts), elevation/motion/
+ *     type-scale tokens, and typography application (body=Inter, headings=palette display face).
+ *     Additive: the default palette's colour values are unchanged from v1.0.0.
+ *   v1.0.0 — 2026-07-25 — Initial AIMEAT daisyUI theme (single coral palette, light + dark).
  */
 
-/* ── LIGHT ───────────────────────────────────────────────────────────────────── */
+/* ── SELF-HOSTED FACES (/lib/fonts/, SIL OFL 1.1 — see /lib/fonts/LICENSE.md) ──
+   Variable fonts, latin + latin-ext subsets. Browsers fetch a face only when a rendered
+   element actually uses it, so unused palettes cost nothing. */
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url('/lib/fonts/inter-var-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url('/lib/fonts/inter-var-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Space Grotesk'; font-style: normal; font-weight: 300 700; font-display: swap;
+  src: url('/lib/fonts/space-grotesk-var-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Space Grotesk'; font-style: normal; font-weight: 300 700; font-display: swap;
+  src: url('/lib/fonts/space-grotesk-var-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'Fraunces'; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url('/lib/fonts/fraunces-var-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Fraunces'; font-style: normal; font-weight: 100 900; font-display: swap;
+  src: url('/lib/fonts/fraunces-var-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap;
+  src: url('/lib/fonts/jetbrains-mono-var-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap;
+  src: url('/lib/fonts/jetbrains-mono-var-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* ── SHARED TOKENS (palette-independent) ─────────────────────────────────────
+   Type scale: a real hierarchy an app can lean on instead of inventing sizes.
+   Motion: durations + easings for the cortex libs and app transitions.
+   Spacing rhythm: gaps that make unrelated apps read as one product. */
+:root {
+  --text-hero: clamp(1.9rem, 1.3rem + 2.4vw, 2.75rem);  /* the one biggest thing on the page */
+  --text-title: 1.375rem;                               /* section/card titles */
+  --text-body: 0.9375rem;                               /* default reading size (15px) */
+  --text-fine: 0.8125rem;                               /* captions/meta — never smaller (13px) */
+
+  --motion-fast: 120ms;
+  --motion-base: 200ms;
+  --motion-slow: 320ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.3, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+
+  --gap-card: 1rem;        /* inside a card */
+  --gap-section: 1.5rem;   /* between cards/sections */
+}
+
+/* ── ELEVATION (follows MODE, not palette) ───────────────────────────────────
+   Three steps: card (resting), raise (hover/dragging), pop (menus/dialogs). Dark shadows in
+   both modes — light-on-dark "glow" shadows read as smears. */
+:root,
+[data-theme='light'] {
+  --elev-card: 0 1px 2px rgb(15 18 25 / 0.06), 0 4px 14px rgb(15 18 25 / 0.05);
+  --elev-raise: 0 2px 4px rgb(15 18 25 / 0.08), 0 10px 24px rgb(15 18 25 / 0.09);
+  --elev-pop: 0 4px 10px rgb(15 18 25 / 0.10), 0 18px 44px rgb(15 18 25 / 0.16);
+}
+[data-theme='dark'] {
+  --elev-card: 0 1px 2px rgb(0 0 0 / 0.45), 0 5px 16px rgb(0 0 0 / 0.30);
+  --elev-raise: 0 2px 5px rgb(0 0 0 / 0.50), 0 12px 28px rgb(0 0 0 / 0.38);
+  --elev-pop: 0 5px 12px rgb(0 0 0 / 0.55), 0 22px 52px rgb(0 0 0 / 0.48);
+}
+
+/* ═══ PALETTE: aimeat (default — coral + slate, Space Grotesk display) ═══════ */
+
+/* @theme-block aimeat light */
 :root,
 [data-theme='light'] {
   color-scheme: light;
 
   /* Surfaces. base-100 = page AND the default form-control fill, base-200 = card (elevated),
-     base-300 = wells + borders. The page was #FAFAF8 (the SPA's value) until 2026-07-25, but that
-     is 1.05:1 off a white card: cards read as one continuous white field, and daisyUI inputs — which
-     fill with base-100 — vanished into the card they sat on. The SPA gets away with it because it
-     draws a border on everything; a bare daisyUI card does not. */
+     base-300 = wells + borders. The page must be a real step off a white card, or cards and the
+     inputs daisyUI fills with base-100 vanish (the v1.0.0 lesson — see check:theme). */
   --color-base-100: #efeee8;
   --color-base-200: #ffffff;
   --color-base-300: #d9dbe1;
@@ -72,20 +158,24 @@
   --color-error: #ef4444;
   --color-error-content: #ffffff;             /* 3.8:1 — large/bold UI text only */
 
-  /* Shape. AIMEAT is generous on boxes, tighter on controls. */
+  /* Shape + type. AIMEAT is generous on boxes, tighter on controls, flat + shadow. */
   --radius-box: 16px;
   --radius-field: 10px;
   --radius-selector: 6px;
   --border: 1px;
-  --depth: 0;                                 /* AIMEAT is flat + shadow, not embossed */
+  --depth: 0;
   --noise: 0;
+  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: -0.015em;
 }
 
-/* ── DARK ────────────────────────────────────────────────────────────────────── */
+/* @theme-block aimeat dark */
 [data-theme='dark'] {
   color-scheme: dark;
 
-  /* The point of this file. Real separation between page, card and edge. */
+  /* The designed dark ramp: real separation between page, card and edge. */
   --color-base-100: #14151a;
   --color-base-200: #21232e;
   --color-base-300: #383c46;
@@ -117,4 +207,317 @@
   --border: 1px;
   --depth: 0;
   --noise: 0;
+  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: -0.015em;
+}
+
+/* ═══ PALETTE: paper (warm editorial — cream/ink, bordeaux, Fraunces display) ═
+   The `html[data-palette]` prefix outranks the base blocks (0,1,1 vs 0,1,0), and the
+   palette-dark block outranks palette-light (0,2,1) — so the cascade is decided by
+   specificity, never by source order. Every block is COMPLETE: all tokens, both modes. */
+
+/* @theme-block paper light */
+html[data-palette='paper'] {
+  color-scheme: light;
+  --color-base-100: #eae2cf;
+  --color-base-200: #fdfaf1;
+  --color-base-300: #d2c6aa;
+  --color-base-content: #26201a;              /* 12.5:1 on base-100, 15.4:1 on base-200 */
+  --color-primary: #a03040;
+  --color-primary-content: #ffffff;           /* 7.0:1 */
+  --color-secondary: #7d5a3c;
+  --color-secondary-content: #ffffff;         /* 6.2:1 */
+  --color-accent: #3f6e58;
+  --color-accent-content: #ffffff;            /* 5.9:1 */
+  --color-neutral: #26201a;
+  --color-neutral-content: #f7f2e8;           /* 14.4:1 */
+  --color-info: #2f6da8;
+  --color-info-content: #ffffff;              /* 5.4:1 */
+  --color-success: #2f7d4f;
+  --color-success-content: #ffffff;           /* 5.0:1 */
+  --color-warning: #b9770a;
+  --color-warning-content: #26140a;           /* 4.8:1 */
+  --color-error: #b03028;
+  --color-error-content: #ffffff;             /* 6.4:1 */
+  --radius-box: 10px;
+  --radius-field: 8px;
+  --radius-selector: 4px;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: 0;
+}
+
+/* @theme-block paper dark */
+html[data-palette='paper'][data-theme='dark'] {
+  color-scheme: dark;
+  --color-base-100: #151110;
+  --color-base-200: #282017;
+  --color-base-300: #453b2d;
+  --color-base-content: #ece4d4;              /* 14.8:1 on base-100, 12.7:1 on base-200 */
+  --color-primary: #e08590;
+  --color-primary-content: #2a0e14;           /* 6.8:1 */
+  --color-secondary: #c9a06a;
+  --color-secondary-content: #241708;         /* 7.3:1 */
+  --color-accent: #86c2a5;
+  --color-accent-content: #0c2a1c;            /* 7.5:1 */
+  --color-neutral: #241e18;
+  --color-neutral-content: #ece4d4;           /* 13.0:1 */
+  --color-info: #7fb3e3;
+  --color-info-content: #0d2135;              /* 7.4:1 */
+  --color-success: #7fce9f;
+  --color-success-content: #0b2a18;           /* 8.3:1 */
+  --color-warning: #e6b45a;
+  --color-warning-content: #2a1d05;           /* 8.7:1 */
+  --color-error: #ee8f85;
+  --color-error-content: #2c0d0a;             /* 7.6:1 */
+  --radius-box: 10px;
+  --radius-field: 8px;
+  --radius-selector: 4px;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: 0;
+}
+
+/* ═══ PALETTE: circuit (cold technical — steel/blueprint, cyan, mono display) ═ */
+
+/* @theme-block circuit light */
+html[data-palette='circuit'] {
+  color-scheme: light;
+  --color-base-100: #e9edf1;
+  --color-base-200: #ffffff;
+  --color-base-300: #c3cdd8;
+  --color-base-content: #10181f;              /* 15.2:1 on base-100, 17.9:1 on base-200 */
+  --color-primary: #0e7290;
+  --color-primary-content: #ffffff;           /* 5.5:1 */
+  --color-secondary: #47566b;
+  --color-secondary-content: #ffffff;         /* 7.5:1 */
+  --color-accent: #9a5b00;
+  --color-accent-content: #ffffff;            /* 5.4:1 */
+  --color-neutral: #10181f;
+  --color-neutral-content: #e9edf1;           /* 15.2:1 */
+  --color-info: #2563eb;
+  --color-info-content: #ffffff;              /* 5.2:1 */
+  --color-success: #177245;
+  --color-success-content: #ffffff;           /* 6.0:1 */
+  --color-warning: #a16207;
+  --color-warning-content: #ffffff;           /* 4.9:1 */
+  --color-error: #c62828;
+  --color-error-content: #ffffff;             /* 5.6:1 */
+  --radius-box: 8px;
+  --radius-field: 6px;
+  --radius-selector: 3px;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+  --font-display: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: -0.02em;
+}
+
+/* @theme-block circuit dark */
+html[data-palette='circuit'][data-theme='dark'] {
+  color-scheme: dark;
+  --color-base-100: #0a0f14;
+  --color-base-200: #18202b;
+  --color-base-300: #31404f;
+  --color-base-content: #d9e4ee;              /* 14.9:1 on base-100, 12.7:1 on base-200 */
+  --color-primary: #4fd2f2;
+  --color-primary-content: #062a35;           /* 8.5:1 */
+  --color-secondary: #93a7c0;
+  --color-secondary-content: #101823;         /* 7.2:1 */
+  --color-accent: #ffb454;
+  --color-accent-content: #2a1a02;            /* 9.5:1 */
+  --color-neutral: #151c25;
+  --color-neutral-content: #d9e4ee;           /* 13.3:1 */
+  --color-info: #74a9f7;
+  --color-info-content: #0c1b33;              /* 7.2:1 */
+  --color-success: #56d493;
+  --color-success-content: #06281a;           /* 8.5:1 */
+  --color-warning: #f2c14e;
+  --color-warning-content: #271d04;           /* 9.9:1 */
+  --color-error: #f28b82;
+  --color-error-content: #2b0d09;             /* 7.6:1 */
+  --radius-box: 8px;
+  --radius-field: 6px;
+  --radius-selector: 3px;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+  --font-display: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: -0.02em;
+}
+
+/* ═══ PALETTE: contrast (high-contrast accessible — black/white, 2px borders) ═
+   Every -content pair >= 4.5:1 in both modes; edges are BOLD (>= 2.8:1 against both
+   neighbours) so boundaries survive low-vision and bright-sunlight conditions. */
+
+/* @theme-block contrast light */
+html[data-palette='contrast'] {
+  color-scheme: light;
+  --color-base-100: #e9e9e9;
+  --color-base-200: #ffffff;
+  --color-base-300: #8a8a8a;
+  --color-base-content: #000000;              /* 17.3:1 on base-100, 21.0:1 on base-200 */
+  --color-primary: #1d4ed8;
+  --color-primary-content: #ffffff;           /* 6.7:1 */
+  --color-secondary: #6d28d9;
+  --color-secondary-content: #ffffff;         /* 7.1:1 */
+  --color-accent: #0e7490;
+  --color-accent-content: #ffffff;            /* 5.4:1 */
+  --color-neutral: #000000;
+  --color-neutral-content: #ffffff;           /* 21.0:1 */
+  --color-info: #1e5fa8;
+  --color-info-content: #ffffff;              /* 6.4:1 */
+  --color-success: #15803d;
+  --color-success-content: #ffffff;           /* 5.0:1 */
+  --color-warning: #ffd60a;
+  --color-warning-content: #241a00;           /* 12.2:1 */
+  --color-error: #b91c1c;
+  --color-error-content: #ffffff;             /* 6.5:1 */
+  --radius-box: 12px;
+  --radius-field: 8px;
+  --radius-selector: 4px;
+  --border: 2px;
+  --depth: 0;
+  --noise: 0;
+  --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: -0.01em;
+}
+
+/* @theme-block contrast dark */
+html[data-palette='contrast'][data-theme='dark'] {
+  color-scheme: dark;
+  --color-base-100: #000000;
+  --color-base-200: #17171c;
+  --color-base-300: #62626c;
+  --color-base-content: #ffffff;              /* 21.0:1 on base-100, 17.9:1 on base-200 */
+  --color-primary: #99c2ff;
+  --color-primary-content: #001433;           /* 10.0:1 */
+  --color-secondary: #cdb1ff;
+  --color-secondary-content: #1d0a40;         /* 9.7:1 */
+  --color-accent: #6fe3ff;
+  --color-accent-content: #003040;            /* 9.4:1 */
+  --color-neutral: #ffffff;
+  --color-neutral-content: #000000;           /* 21.0:1 */
+  --color-info: #8ab8ff;
+  --color-info-content: #001b3d;              /* 8.5:1 */
+  --color-success: #6fe3a1;
+  --color-success-content: #00250f;           /* 10.4:1 */
+  --color-warning: #ffd60a;
+  --color-warning-content: #241a00;           /* 12.2:1 */
+  --color-error: #ff9d94;
+  --color-error-content: #300500;             /* 9.2:1 */
+  --radius-box: 12px;
+  --radius-field: 8px;
+  --radius-selector: 4px;
+  --border: 2px;
+  --depth: 0;
+  --noise: 0;
+  --font-display: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: -0.01em;
+}
+
+/* ═══ PALETTE: mist (quiet neutral — low-chroma sage/grey, soft radii) ═══════ */
+
+/* @theme-block mist light */
+html[data-palette='mist'] {
+  color-scheme: light;
+  --color-base-100: #e6eae4;
+  --color-base-200: #fbfcfa;
+  --color-base-300: #c6cec4;
+  --color-base-content: #2b322d;              /* 10.8:1 on base-100, 12.8:1 on base-200 */
+  --color-primary: #47695a;
+  --color-primary-content: #ffffff;           /* 6.1:1 */
+  --color-secondary: #5c6470;
+  --color-secondary-content: #ffffff;         /* 6.0:1 */
+  --color-accent: #7a6455;
+  --color-accent-content: #ffffff;            /* 5.6:1 */
+  --color-neutral: #2b322d;
+  --color-neutral-content: #f4f6f3;           /* 12.1:1 */
+  --color-info: #4a7196;
+  --color-info-content: #ffffff;              /* 5.1:1 */
+  --color-success: #4d7d5f;
+  --color-success-content: #ffffff;           /* 4.8:1 */
+  --color-warning: #8a6d2f;
+  --color-warning-content: #ffffff;           /* 4.9:1 */
+  --color-error: #9c4f47;
+  --color-error-content: #ffffff;             /* 5.8:1 */
+  --radius-box: 20px;
+  --radius-field: 12px;
+  --radius-selector: 8px;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: 0;
+}
+
+/* @theme-block mist dark */
+html[data-palette='mist'][data-theme='dark'] {
+  color-scheme: dark;
+  --color-base-100: #141715;
+  --color-base-200: #252b27;
+  --color-base-300: #414a44;
+  --color-base-content: #e2e6e2;              /* 14.3:1 on base-100, 11.5:1 on base-200 */
+  --color-primary: #9cc0ae;
+  --color-primary-content: #10241a;           /* 8.2:1 */
+  --color-secondary: #aeb6c0;
+  --color-secondary-content: #171b20;         /* 8.4:1 */
+  --color-accent: #c2ab97;
+  --color-accent-content: #241a0e;            /* 7.8:1 */
+  --color-neutral: #212523;
+  --color-neutral-content: #e2e6e2;           /* 12.3:1 */
+  --color-info: #93b3d1;
+  --color-info-content: #101f2e;              /* 7.6:1 */
+  --color-success: #97c6a6;
+  --color-success-content: #10241a;           /* 8.5:1 */
+  --color-warning: #d3b878;
+  --color-warning-content: #241c08;           /* 8.8:1 */
+  --color-error: #d49a92;
+  --color-error-content: #2a100c;             /* 7.5:1 */
+  --radius-box: 20px;
+  --radius-field: 12px;
+  --radius-selector: 8px;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+  --font-display: 'Space Grotesk', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  --display-tracking: 0;
+}
+
+/* ── TYPOGRAPHY APPLICATION ──────────────────────────────────────────────────
+   Font FAMILY only — never size or weight, which stay with the app's utility classes
+   (an unlayered `h1 { font-weight }` would silently override every `font-bold`).
+   Body text is the palette's body face; headings + .card-title get the display face,
+   which is where a palette's personality lives; code gets the mono face. */
+body {
+  font-family: var(--font-body, 'Inter', 'Segoe UI', system-ui, sans-serif);
+}
+h1, h2, h3, h4, h5, h6, .card-title {
+  font-family: var(--font-display, 'Inter', 'Segoe UI', system-ui, sans-serif);
+  letter-spacing: var(--display-tracking, 0);
+}
+code, pre, kbd, samp {
+  font-family: var(--font-mono, 'JetBrains Mono', Consolas, monospace);
 }

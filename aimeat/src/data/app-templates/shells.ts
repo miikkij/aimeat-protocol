@@ -5,6 +5,9 @@
  *   from scratch. Consumed by ../app-templates.ts which assembles the TEMPLATES registry.
  * @structure SHELL_PURE_CLIENT · SHELL_CORTEX · SHELL_EXTENSION
  * @version-history
+ *   v1.3.0 — 2026-07-25 — Theme system v2: the head snippet restores the user's PALETTE
+ *     (data-palette / 'aimeat-palette') next to the light/dark mode, so a generated app opens in
+ *     the chosen look with no flash and no app code.
  *   v1.2.0 — 2026-07-25 — Themed by construction: all three shells link /lib/aimeat-theme.css and
  *     restore the user's light/dark choice in <head> (they used to hardcode data-theme="dark" and
  *     never load the theme, so an app opened in daisyUI indigo and ignored the AIMEAT pill). T2
@@ -41,12 +44,18 @@ entry: index.html
   <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
   <script src="/lib/tailwindcss@4.js"></script>
-  <!-- Follow the user's AIMEAT light/dark choice. In <head> so there is no flash of the wrong theme. -->
+  <!-- Follow the user's AIMEAT choices — light/dark MODE and PALETTE — in <head> so there is
+       no flash of the wrong look. aimeat-auth keeps both live after load; this covers first paint. -->
   <script>
     (function () {
-      function apply(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
-      apply(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-      addEventListener('storage', function (e) { if (e.key === 'aimeat-theme' && e.newValue) apply(e.newValue); });
+      function mode(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
+      function pal(p) { if (p && p !== 'aimeat') document.documentElement.setAttribute('data-palette', p); else document.documentElement.removeAttribute('data-palette'); }
+      mode(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+      pal(localStorage.getItem('aimeat-palette'));
+      addEventListener('storage', function (e) {
+        if (e.key === 'aimeat-theme' && e.newValue) mode(e.newValue);
+        if (e.key === 'aimeat-palette' && e.newValue) pal(e.newValue);
+      });
     })();
   </script>
 </head>
@@ -121,12 +130,18 @@ entry: index.html
   <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
   <script src="/lib/tailwindcss@4.js"></script>
-  <!-- Follow the user's AIMEAT light/dark choice. In <head> so there is no flash of the wrong theme. -->
+  <!-- Follow the user's AIMEAT choices — light/dark MODE and PALETTE — in <head> so there is
+       no flash of the wrong look. aimeat-auth keeps both live after load; this covers first paint. -->
   <script>
     (function () {
-      function apply(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
-      apply(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-      addEventListener('storage', function (e) { if (e.key === 'aimeat-theme' && e.newValue) apply(e.newValue); });
+      function mode(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
+      function pal(p) { if (p && p !== 'aimeat') document.documentElement.setAttribute('data-palette', p); else document.documentElement.removeAttribute('data-palette'); }
+      mode(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+      pal(localStorage.getItem('aimeat-palette'));
+      addEventListener('storage', function (e) {
+        if (e.key === 'aimeat-theme' && e.newValue) mode(e.newValue);
+        if (e.key === 'aimeat-palette' && e.newValue) pal(e.newValue);
+      });
     })();
   </script>
 </head>
@@ -209,12 +224,18 @@ entry: index.html
   <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
   <script src="/lib/tailwindcss@4.js"></script>
-  <!-- Follow the user's AIMEAT light/dark choice. In <head> so there is no flash of the wrong theme. -->
+  <!-- Follow the user's AIMEAT choices — light/dark MODE and PALETTE — in <head> so there is
+       no flash of the wrong look. aimeat-auth keeps both live after load; this covers first paint. -->
   <script>
     (function () {
-      function apply(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
-      apply(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
-      addEventListener('storage', function (e) { if (e.key === 'aimeat-theme' && e.newValue) apply(e.newValue); });
+      function mode(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
+      function pal(p) { if (p && p !== 'aimeat') document.documentElement.setAttribute('data-palette', p); else document.documentElement.removeAttribute('data-palette'); }
+      mode(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+      pal(localStorage.getItem('aimeat-palette'));
+      addEventListener('storage', function (e) {
+        if (e.key === 'aimeat-theme' && e.newValue) mode(e.newValue);
+        if (e.key === 'aimeat-palette' && e.newValue) pal(e.newValue);
+      });
     })();
   </script>
 </head>

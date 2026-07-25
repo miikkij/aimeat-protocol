@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<!--
+  @file themes.html
+  @description The theme-system showroom: every AIMEAT palette in both modes, on real daisyUI
+    components — typography specimen, buttons, badges, alerts, stats, forms, table, elevation.
+    Loads the styling stack exactly as a published app does (daisyUI + theme + bridge) plus
+    aimeat-auth, whose login pill carries the REAL control cluster (language + mode + palette) —
+    so this page demos the controls users actually get, and the palette strip is read from
+    AIMEAT.auth.getPalettes() so it can never drift from the shipped registry.
+  @usage open /lib/samples/themes.html on any AIMEAT node; switch mode + palette from the pill
+    (or the in-page duplicates). window.THEME_CHECK.read() returns computed tokens for audits.
+  @version-history
+    v1.0.0 — 2026-07-25 — Born with the theme system (aimeat-theme.css v2).
+-->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="aimeat-locales" content="en fi" />
+  <title>AIMEAT themes</title>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/tailwindcss@4.js"></script>
+  <!-- External (not inline): /lib/ pages run under a script-src 'self' CSP. -->
+  <script src="/lib/samples/themes-boot.js"></script>
+  <style>
+    /* Showroom-only helpers, all token-driven — no hardcoded colours. */
+    .sr-hero { font-size: var(--text-hero); font-weight: 700; line-height: 1.1;
+      font-family: var(--font-display); letter-spacing: var(--display-tracking, 0); }
+    .sr-fine { font-size: var(--text-fine); opacity: 0.65; }
+    .sr-card { box-shadow: var(--elev-card); transition: box-shadow var(--motion-base) var(--ease-out), transform var(--motion-base) var(--ease-out); }
+    .sr-card:hover { box-shadow: var(--elev-raise); transform: translateY(-2px); }
+    .sr-chip { width: 34px; height: 26px; border-radius: 6px; border: 1px solid var(--color-base-300); position: relative; overflow: hidden; flex: 0 0 auto; }
+    .sr-chip i { position: absolute; inset: 6px 6px 4px 6px; border-radius: 3px; display: block; }
+    .sr-chip b { position: absolute; right: 4px; bottom: 4px; width: 8px; height: 8px; border-radius: 50%; display: block; }
+  </style>
+</head>
+<body class="bg-base-100 text-base-content min-h-screen flex flex-col overflow-x-clip">
+  <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50 border-b border-base-300">
+    <div class="flex-1 min-w-0"><span class="text-lg font-bold">AIMEAT themes</span></div>
+    <div class="flex-none"><span id="login"></span></div>
+  </nav>
+
+  <main class="flex-1 w-full max-w-4xl mx-auto p-4 flex flex-col gap-5">
+    <!-- Hero: the display face + hero size of the ACTIVE palette. -->
+    <header class="pt-4">
+      <div class="sr-hero">Näin sovelluksesi näyttää<span class="text-primary">.</span></div>
+      <p class="mt-2 max-w-prose opacity-80">Five designed palettes, each with a light and a dark mode, its own
+        typeface, radii and verified contrast. Switch the look from the pill above — every AIMEAT app follows
+        the same choice. Ä and ö render in every face.</p>
+      <div class="sr-fine mt-1">Palette: <span id="which-pal" class="font-semibold"></span> · mode:
+        <span id="which-mode" class="font-semibold"></span></div>
+    </header>
+
+    <!-- All palettes, both modes, straight from the registry (never drifts). -->
+    <section class="card bg-base-200 card-border border-base-300 sr-card">
+      <div class="card-body gap-3">
+        <h2 class="card-title text-base">Every palette, both modes</h2>
+        <div id="pal-strip" class="flex flex-col gap-2"></div>
+      </div>
+    </section>
+
+    <!-- Typography specimen. -->
+    <section class="card bg-base-200 card-border border-base-300 sr-card">
+      <div class="card-body gap-2">
+        <h2 class="card-title text-base">Typography</h2>
+        <div class="sr-hero">Hero 123 äö</div>
+        <h3 style="font-size: var(--text-title)" class="font-semibold">Title — Otsikko käyttöliittymälle</h3>
+        <p style="font-size: var(--text-body)" class="max-w-prose">Body text is Inter in every palette, so
+          content stays quiet and legible while the display face above carries the personality.</p>
+        <p class="sr-fine">Fine print stays at a 13px floor, never smaller.</p>
+        <pre class="text-sm bg-base-100 rounded-box p-3 overflow-x-auto"><code>const mono = "JetBrains Mono — koodi näyttää koodilta";</code></pre>
+      </div>
+    </section>
+
+    <!-- Actions + status colours: quiet variants first, one solid shout. -->
+    <section class="card bg-base-200 card-border border-base-300 sr-card">
+      <div class="card-body gap-3">
+        <h2 class="card-title text-base">Actions and status</h2>
+        <div class="flex flex-wrap gap-2">
+          <button class="btn btn-primary btn-sm" type="button">Primary</button>
+          <button class="btn btn-soft btn-primary btn-sm" type="button">Soft</button>
+          <button class="btn btn-outline btn-primary btn-sm" type="button">Outline</button>
+          <button class="btn btn-secondary btn-sm" type="button">Secondary</button>
+          <button class="btn btn-accent btn-sm" type="button">Accent</button>
+          <button class="btn btn-ghost btn-sm" type="button">Ghost</button>
+        </div>
+        <div class="flex flex-wrap gap-2 items-center">
+          <span class="badge badge-soft badge-success badge-sm">valmis</span>
+          <span class="badge badge-soft badge-warning badge-sm">odottaa</span>
+          <span class="badge badge-soft badge-info badge-sm">tiedoksi</span>
+          <span class="badge badge-error badge-sm">virhe</span>
+          <span class="badge badge-outline badge-sm">neutraali</span>
+        </div>
+        <div class="alert alert-soft alert-info text-sm">Soft alerts read as information, not as alarms.</div>
+      </div>
+    </section>
+
+    <!-- Numbers that matter + a form + a table. -->
+    <section class="grid gap-5 md:grid-cols-2" style="grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr))">
+      <div class="card bg-base-200 card-border border-base-300 sr-card">
+        <div class="card-body gap-3">
+          <h2 class="card-title text-base">Stats</h2>
+          <div class="stats stats-vertical sm:stats-horizontal bg-base-100 border border-base-300 rounded-box">
+            <div class="stat py-3">
+              <div class="stat-title sr-fine">Jäseniä</div>
+              <div class="stat-value text-2xl tabular-nums">1 208</div>
+            </div>
+            <div class="stat py-3">
+              <div class="stat-title sr-fine">Tänään</div>
+              <div class="stat-value text-2xl tabular-nums text-primary">+37</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card bg-base-200 card-border border-base-300 sr-card">
+        <div class="card-body gap-3">
+          <h2 class="card-title text-base">Form controls</h2>
+          <input class="input input-bordered w-full" placeholder="Nimi tai sähköposti" />
+          <select class="select select-bordered w-full"><option>Suomi</option><option>English</option></select>
+          <label class="label cursor-pointer justify-start gap-3">
+            <input type="checkbox" class="toggle toggle-primary" checked />
+            <span class="label-text">Ilmoitukset päällä</span>
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="card bg-base-200 card-border border-base-300 sr-card">
+      <div class="card-body gap-2">
+        <h2 class="card-title text-base">Table</h2>
+        <div class="overflow-x-auto">
+          <table class="table table-zebra table-sm">
+            <thead><tr><th>Sovellus</th><th>Paletti</th><th class="text-right">Käyttäjiä</th></tr></thead>
+            <tbody>
+              <tr><td>ODPS</td><td><span class="badge badge-soft badge-sm">aimeat</span></td><td class="text-right tabular-nums">412</td></tr>
+              <tr><td>TILA</td><td><span class="badge badge-soft badge-sm">mist</span></td><td class="text-right tabular-nums">918</td></tr>
+              <tr><td>LOOM</td><td><span class="badge badge-soft badge-sm">circuit</span></td><td class="text-right tabular-nums">245</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="footer footer-center p-4 sr-fine">
+    aimeat-theme.css v2 · verified by pnpm check:theme · fonts self-hosted (SIL OFL 1.1)
+  </footer>
+
+  <script src="/v1/libs/aimeat-auth.js"></script>
+  <script src="/lib/samples/themes.js"></script>
+</body>
+</html>
