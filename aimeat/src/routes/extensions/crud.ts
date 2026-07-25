@@ -131,7 +131,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       const created = await storage.createExtension(record);
       logger.info(`Extension installed: ${created.name}`, { version: created.version, by: req.auth!.owner });
       // TARGET-050: an action flagged `commercial.exchange` is projected onto the market from here.
-      reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, created.name);
+      await reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, created.name);
 
       res.status(201).json(success(config.nodeId, { extension: created }, [
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
@@ -214,7 +214,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         record.config = encConfig;
         const created = await storage.createExtension(record);
         logger.info(`Extension installed via upsert: ${created.name}`, { version: created.version, by: req.auth!.owner });
-        reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, created.name);
+        await reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, created.name);
         res.status(201).json(success(config.nodeId, { extension: created, action: 'created' }, [
           { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
           { description: 'View extension details', method: 'GET', url: `/v1/extensions/${created.name}` },
@@ -268,7 +268,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         instances: record.instances,
       });
       // TARGET-050: re-project the listings this extension's actions declare (price/flag may have changed).
-      reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, name);
+      await reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, name);
 
       // Re-run init for an active extension: re-register schedules from the (possibly changed)
       // manifest and re-run @activate jobs. New action scriptContent is already live — each

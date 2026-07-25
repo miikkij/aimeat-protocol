@@ -219,7 +219,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     // TARGET-050: an app-tool manifest / agent offers doc IS the source of truth for its EXCHANGE
     // listing — reprice a tool here and the market follows, with no separate listing step.
-    reconcileAfterSourceWrite(storage, gaii, key);
+    await reconcileAfterSourceWrite(storage, gaii, key);
 
     res.status(existing ? 200 : 201).json(success(config.nodeId, {
       key: record.key,
