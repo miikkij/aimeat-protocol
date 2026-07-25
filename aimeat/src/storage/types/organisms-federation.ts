@@ -2,8 +2,12 @@
  * @file src/storage/types/organisms-federation.ts
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-25 — Extension action commercial gains `provenance` + `odps` (ODPS v4.0 adoption,
+ *     TARGET-045 §4): the source of a projected EXCHANGE listing carries its own descriptor data.
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  */
+import type { Provenance, OdpsExtras } from '../../models/odps-schemas.js';
+
 export interface PeeringRequestRecord {
   id: string;
   fromNodeUrl: string;
@@ -296,6 +300,10 @@ export interface ExtensionRecord {
       exchange?: boolean;
       /** Usage licence surfaced on the projected offering (required to list — the legibility gate). */
       usageTerms?: { derivatives?: boolean; resale?: boolean; attribution?: boolean; note?: string };
+      /** Provenance attestation carried onto the projected offering + its ODPS v4.0 document. */
+      provenance?: Provenance;
+      /** ODPS fields the node cannot derive (value proposition, SLA/quality commitments, data holder…). */
+      odps?: OdpsExtras;
     };
   }>;
   config: Record<string, unknown>;

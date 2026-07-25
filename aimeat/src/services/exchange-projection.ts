@@ -26,6 +26,8 @@
  *   const report = await reconcileOwnerOfferings(storage, ownerGhii, { dryRun: true });
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  * @version-history
+ *   v1.1.0 — 2026-07-25 — Sources carry their own descriptor data: `provenance` + `odps` (the ODPS v4.0
+ *     authoring block) project from the manifest/action/offer onto the listing and into its sourceHash.
  *   v1.0.0 — 2026-07-25 — Initial projection + reconcile + legacy adoption (TARGET-050 slices 1 & 3).
  */
 import { createHash } from 'node:crypto';
@@ -38,6 +40,8 @@ import {
   type Offering, type OfferingPlan, type UsageTerms,
 } from './exchange-market.js';
 import type { EntitlementUnit } from './metered-entitlements.js';
+import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
+import { ODPS_VERSION } from './exchange-odps.js';
 
 /** One outcome line of a reconcile — the dry-run report is exactly this list. */
 export interface ReconcileChange {
@@ -72,6 +76,9 @@ interface DesiredListing {
   plans: OfferingPlan[];
   taskSpec?: Offering['taskSpec'];
   usageTerms: UsageTerms;
+  /** Provider descriptor data carried from the source onto the listing + its ODPS document. */
+  provenance: Provenance | null;
+  odps: OdpsExtras | null;
   tags: string[];
   sourceHash: string;
 }
@@ -92,6 +99,12 @@ function usageTermsOf(src: { derivatives?: boolean; resale?: boolean; attributio
     attribution: src?.attribution !== false,
     ...(src?.note ? { note: src.note } : {}),
   };
+}
+
+/** Stamp the ODPS version onto a source-declared provenance, so every descriptor says which version it follows. */
+function provenanceOf(src: Provenance | undefined): Provenance | null {
+  if (!src || !Object.keys(src).length) return null;
+  return { ...src, odpsVersion: src.odpsVersion ?? ODPS_VERSION };
 }
 
 /** Every money price a source declares, `priceMoney` first, de-duplicated by currency. */
@@ -153,12 +166,13 @@ async function desiredFromAppTools(
         surface: { kind: 'app-tool' as const, ownerName, appId, tool: tool.name, ifaceVersion },
         title: `${appId} · ${tool.name}`, description: tool.description ?? '',
         plans: (tool.plans ?? []) as OfferingPlan[], usageTerms: usageTermsOf(tool.usageTerms), tags: [] as string[],
+        provenance: provenanceOf(tool.provenance), odps: tool.odps ?? null,
       };
       for (const p of prices(morsels, money)) {
         out.push({
           ...base, ...p,
           key: listingKey('app-tool', coord.ext, coord.action, p.unit, p.currency),
-          sourceHash: contentHash([base.title, base.description, base.plans, base.usageTerms, ifaceVersion, p]),
+          sourceHash: contentHash([base.title, base.description, base.plans, base.usageTerms, base.provenance, base.odps, ifaceVersion, p]),
         });
       }
     }
@@ -188,12 +202,13 @@ async function desiredFromExtActions(
         kind: 'ext-action' as const, ext: ext.name, action: act.id, surface: null,
         title: `${ext.name} · ${act.id}`, description: ext.description ?? '',
         plans: (comm.plans ?? []) as OfferingPlan[], usageTerms: usageTermsOf(comm.usageTerms), tags: [] as string[],
+        provenance: provenanceOf(comm.provenance), odps: comm.odps ?? null,
       };
       for (const p of prices(morsels, money)) {
         out.push({
           ...base, ...p,
           key: listingKey('ext-action', ext.name, act.id, p.unit, p.currency),
-          sourceHash: contentHash([base.title, base.description, base.plans, base.usageTerms, p]),
+          sourceHash: contentHash([base.title, base.description, base.plans, base.usageTerms, base.provenance, base.odps, p]),
         });
       }
     }
@@ -231,13 +246,14 @@ async function desiredFromAgentOffers(
         surface: { kind: 'agent-work' as const, ownerName, agentName: agent.name, taskType: offer.id },
         title: offer.title || `${agent.name}: ${offer.id}`, description: offer.ask ?? '',
         plans: [] as OfferingPlan[], usageTerms: usageTermsOf(offer.usageTerms), tags: (offer.tags ?? []) as string[],
+        provenance: provenanceOf(offer.provenance), odps: offer.odps ?? null,
         taskSpec: { inputSchema: offer.inputSchema ?? {}, outputSchema: offer.outputSchema ?? {} },
       };
       for (const p of prices(morsels, money)) {
         out.push({
           ...base, ...p,
           key: listingKey('agent-work', coord.ext, coord.action, p.unit, p.currency),
-          sourceHash: contentHash([base.title, base.description, base.taskSpec, base.usageTerms, base.tags, p]),
+          sourceHash: contentHash([base.title, base.description, base.taskSpec, base.usageTerms, base.provenance, base.odps, base.tags, p]),
         });
       }
     }
@@ -297,7 +313,7 @@ export async function reconcileOwnerOfferings(
         title: d.title, description: d.description,
         unit: d.unit, basePrice: d.basePrice, currency: d.currency, plans: d.plans,
         ...(d.taskSpec ? { taskSpec: d.taskSpec } : {}),
-        provenance: null, usageTerms: d.usageTerms, tags: d.tags,
+        provenance: d.provenance, odps: d.odps, usageTerms: d.usageTerms, tags: d.tags,
         state: 'listed', auto: true, sourceHash: d.sourceHash, createdAt: now, updatedAt: now,
       };
       if (!dryRun) await putOffering(storage, offering);
@@ -318,7 +334,7 @@ export async function reconcileOwnerOfferings(
       title: d.title, description: d.description,
       unit: d.unit, basePrice: d.basePrice, currency: d.currency, plans: d.plans,
       ...(d.taskSpec ? { taskSpec: d.taskSpec } : {}),
-      usageTerms: d.usageTerms, tags: d.tags,
+      usageTerms: d.usageTerms, provenance: d.provenance, odps: d.odps, tags: d.tags,
       state: 'listed', auto: true, sourceHash: d.sourceHash, updatedAt: now,
     };
     if (!dryRun) await putOffering(storage, updated);
