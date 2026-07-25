@@ -7,6 +7,8 @@
  *   is a native Postgres text[] column; timestamps are ISO on the record, Date in the column.
  * @version-history
  *   v1.0.0 — 2026-07-16 — Phase 5: app-grant tokens on Postgres+Kysely.
+ *   v1.1.0 — 2026-07-25 — Add getAppGrantByOwnerAndApp for the one-live-grant-per-(owner, app)
+ *     invariant (migration 0012 dedupes + enforces it with a partial unique index).
  */
 import type { Selectable } from 'kysely';
 import type { AppGrantRecord } from '../../../interface.js';
@@ -40,6 +42,16 @@ export const appGrantMethods = {
   },
   async getAppGrantByRefreshHash(this: PostgresKyselyStorage, tokenHash: string): Promise<AppGrantRecord | null> {
     const r = await this.db.selectFrom('AppGrant').selectAll().where('refreshTokenHash', '=', tokenHash).executeTakeFirst();
+    return r ? toGrant(r) : null;
+  },
+  async getAppGrantByOwnerAndApp(this: PostgresKyselyStorage, owner: string, app: string): Promise<AppGrantRecord | null> {
+    // Ordered + first rather than a bare lookup: the partial unique index guarantees at most one live
+    // row, but a DB that predates the index (pre-dedupe boot) must still resolve deterministically to
+    // the freshest grant instead of an arbitrary leftover. NULLS LAST — an unused grant never wins.
+    const r = await this.db.selectFrom('AppGrant').selectAll()
+      .where('owner', '=', owner).where('app', '=', app).where('revoked', '=', false)
+      .orderBy('lastUsedAt', (ob) => ob.desc().nullsLast()).orderBy('createdAt', 'desc')
+      .executeTakeFirst();
     return r ? toGrant(r) : null;
   },
   async listAppGrantsByOwner(this: PostgresKyselyStorage, owner: string): Promise<AppGrantRecord[]> {

@@ -9,6 +9,10 @@
  *   test/run-e2e-ci.ts --test=e2e-app-grants
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 3).
+ *   v1.2.0 — 2026-07-25 — Add Phase 2d: one live grant per (owner, app). Re-consent updates the
+ *     live grant instead of stacking a duplicate (the bug that grew one account to 86 grants),
+ *     REPLACES scopes so a narrower approval narrows access, and kills the previous refresh token.
+ *     A revoked grant is never resurrected — the next approval is a fresh authorization.
  *   v1.1.0 — 2026-07-10 — Add Phase 2c: reserved-key guard — a granted app with memory:write cannot
  *     write server-trusted owner keys (openrouter.*, ai-usage.*, profile.*) on POST/PUT/import; the
  *     owner is unaffected (guard is app-scoped). Closes the C-2 app-grant key-exfil class.
@@ -45,14 +49,16 @@ const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
 let ownerToken = '';
 let appAccess = '';
 let appRefresh = '';
+let appRefreshBeforeReconsent = '';
 let grantId = '';
 
 // PKCE
 const codeVerifier = randomBytes(32).toString('base64url');
 const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
 
-/** Run the full authorize→consent→token flow and return a scoped app access token (role 'app'). */
-async function grantAppToken(scope: string): Promise<string> {
+/** Run the full authorize→consent→token flow and return the whole token payload (access_token,
+ *  refresh_token, grant_id, scope). Callers that only want the access token read .access_token. */
+async function grantAppToken(scope: string): Promise<any> {
     const q = new URLSearchParams({
         app: `${owner}/${FILENAME}`, response_type: 'code', scope,
         redirect_uri: REDIRECT, code_challenge: codeChallenge, code_challenge_method: 'S256',
@@ -67,7 +73,13 @@ async function grantAppToken(scope: string): Promise<string> {
     const tok = await json('/v1/app-grants/token', {
         method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: codeVerifier, redirect_uri: REDIRECT }),
     });
-    return tok.body.data.access_token as string;
+    return tok.body.data;
+}
+
+/** How many live grants the owner holds for the app under test. */
+async function liveGrantsForApp(): Promise<any[]> {
+    const r = await json('/v1/app-grants', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    return (r.body.data.grants as any[]).filter(g => g.app === `${owner}/${FILENAME}`);
 }
 
 async function main() {
@@ -158,6 +170,7 @@ async function main() {
         assert(r.status === 200 && r.body.ok, `token: ${r.status} ${JSON.stringify(r.body)}`);
         appAccess = r.body.data.access_token;
         appRefresh = r.body.data.refresh_token;
+        appRefreshBeforeReconsent = appRefresh; // Phase 2d proves re-consent kills this one
         grantId = r.body.data.grant_id;
         assert(!!appAccess && !!appRefresh && !!grantId, 'access+refresh+grant_id present');
         assert(r.body.data.scope === 'memory:read', 'scope echoed');
@@ -212,13 +225,42 @@ async function main() {
         });
         assert(tok.status === 200 && tok.body.ok, `token: ${tok.status} ${JSON.stringify(tok.body)}`);
         assert(tok.body.data.scope === 'storage:read', `granted subset only (storage:read), got "${tok.body.data.scope}"`);
+        // Re-consent UPDATES the owner's live grant for this app instead of stacking a second one.
+        assert(tok.body.data.grant_id === grantId, `expected the live grant ${grantId} to be reused, got ${tok.body.data.grant_id}`);
+        appRefresh = tok.body.data.refresh_token;
+    });
+
+    console.log('\nPhase 2d: One live grant per (owner, app)');
+    await test('a second consent does NOT create a duplicate — exactly one live grant for the app', async () => {
+        const grants = await liveGrantsForApp();
+        assert(grants.length === 1, `expected exactly 1 live grant, got ${grants.length}: ${JSON.stringify(grants.map(g => g.grant_id))}`);
+        assert(grants[0].grant_id === grantId, 'the single live grant is the original one');
+    });
+
+    await test('re-consent REPLACES scopes (a narrower approval narrows the grant)', async () => {
+        // Phase 2 granted memory:read; Phase 2b approved only storage:read. A union would have kept
+        // memory:read alive — the Advanced subset must be able to take access AWAY, not just add.
+        const [g] = await liveGrantsForApp();
+        assert(g.scopes.length === 1 && g.scopes[0] === 'storage:read', `expected exactly ["storage:read"], got ${JSON.stringify(g.scopes)}`);
+    });
+
+    await test('re-consent rotates the refresh token: the pre-consent one is dead (401)', async () => {
+        // The trade-off of one live grant per app: the previous refresh token stops working. Apps
+        // self-heal (silent bridge / consent re-issues), but the old token must NOT survive.
+        const r = await json('/v1/app-grants/token', {
+            method: 'POST', body: JSON.stringify({ grant_type: 'refresh_token', refresh_token: appRefreshBeforeReconsent }),
+        });
+        assert(r.status === 401, `stale refresh token should be 401, got ${r.status} ${JSON.stringify(r.body)}`);
     });
 
     console.log('\nPhase 2c: Reserved-key guard (a granted app cannot poison server-trusted owner keys)');
     let writeToken = '';
     await test('mint an app token WITH memory:write', async () => {
-        writeToken = await grantAppToken('memory:write');
+        const d = await grantAppToken('memory:write');
+        writeToken = d.access_token;
+        appRefresh = d.refresh_token;
         assert(!!writeToken, 'memory:write app token minted');
+        assert(d.grant_id === grantId, `still the same live grant, got ${d.grant_id}`);
     });
     await test('app with memory:write CAN write a normal (non-reserved) key', async () => {
         const r = await json('/v1/memory', {
@@ -276,7 +318,8 @@ async function main() {
         assert(r.status === 200 && r.body.ok, `list: ${r.status}`);
         const g = r.body.data.grants.find((x: any) => x.grant_id === grantId);
         assert(!!g, 'grant present in owner list');
-        assert(g.app === `${owner}/${FILENAME}` && g.scopes.includes('memory:read'), 'grant shows app + scopes');
+        // Scopes are whatever the LAST consent approved (Phase 2c: memory:write) — see Phase 2d.
+        assert(g.app === `${owner}/${FILENAME}` && g.scopes.includes('memory:write'), `grant shows app + last-approved scopes, got ${JSON.stringify(g.scopes)}`);
     });
 
     await test('owner revokes the grant', async () => {
@@ -289,6 +332,15 @@ async function main() {
         assert(ref.status === 401, `refresh after revoke should be 401, got ${ref.status}`);
         const list = await json('/v1/app-grants', { headers: { Authorization: `Bearer ${ownerToken}` } });
         assert(!list.body.data.grants.find((x: any) => x.grant_id === grantId), 'revoked grant no longer listed');
+    });
+
+    await test('after revoke, consenting again creates a NEW grant (reuse covers live grants only)', async () => {
+        // The one-live-grant rule must not resurrect a revoked grant: the owner said no, so the next
+        // approval is a fresh authorization with its own id, and there is still exactly one live row.
+        const d = await grantAppToken('memory:read');
+        assert(!!d.grant_id && d.grant_id !== grantId, `expected a new grant id, got ${d.grant_id} (old ${grantId})`);
+        const grants = await liveGrantsForApp();
+        assert(grants.length === 1, `expected exactly 1 live grant after re-grant, got ${grants.length}`);
     });
 
     console.log('\n─────────────────────────────────────');

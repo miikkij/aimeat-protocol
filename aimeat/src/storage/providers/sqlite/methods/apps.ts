@@ -3,6 +3,8 @@
  * @description Token-revocation, App-catalog, Subdomain, App-grant, App-draft, App-marketplace, Config, Knowledge-link methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-25 — Add getAppGrantByOwnerAndApp for the one-live-grant-per-(owner, app)
+ *     invariant (schema.ts dedupes + enforces it with a partial unique index).
  */
 import type {
   AppRecord, AppDraftRecord, AppManifest, AppManifestCortex, AppListOptions, AppPurchaseRecord, AppForkRecord,
@@ -389,6 +391,16 @@ export const appsMethods = {
   async getAppGrantByRefreshHash(this: SqliteStorage, tokenHash: string): Promise<AppGrantRecord | null> {
     const row = this.db.prepare('SELECT * FROM app_grants WHERE refreshTokenHash = ?')
       .get(tokenHash) as Record<string, unknown> | undefined;
+    return row ? this.deserializeAppGrant(row) : null;
+  },
+
+  async getAppGrantByOwnerAndApp(this: SqliteStorage, owner: string, app: string): Promise<AppGrantRecord | null> {
+    // Ordered + LIMIT 1 rather than a bare get: the partial unique index guarantees at most one live
+    // row, but a DB that predates the index (pre-dedupe boot) must still resolve deterministically to
+    // the freshest grant instead of an arbitrary leftover.
+    const row = this.db.prepare(
+      'SELECT * FROM app_grants WHERE owner = ? AND app = ? AND revoked = 0 ORDER BY lastUsedAt DESC, createdAt DESC LIMIT 1'
+    ).get(owner, app) as Record<string, unknown> | undefined;
     return row ? this.deserializeAppGrant(row) : null;
   },
 
