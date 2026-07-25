@@ -10,12 +10,15 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.1.0 — 2026-07-25 — Palette surface: AIMEAT.auth.getPalette/setPalette/getPalettes + the
+ *     stored palette applied at parse time (theme system v2).
  *   v1.0.0 — 2026-07-19 — Componentized rewrite of src/routes/libs/auth-lib*.ts (SDK-libs migration Phase 3).
  */
 import { auth, refreshOnFocus } from './session.js';
 import { maybeShowGoogleSignup } from './signup.js';
 import { attach } from '../_core/namespace.js';
 import { readLocales, aimeatReadLang, aimeatApplyLang } from './locale.js';
+import { PALETTES, aimeatReadPalette, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
 
 // ── Boot: first-time OIDC signup prompt (after the callback bounced back with ?aimeat_signup=1) ──
 if (typeof document !== 'undefined' && document.addEventListener) {
@@ -40,6 +43,15 @@ if (typeof window !== 'undefined' && window.addEventListener) {
 // return of attach(), which is the whole window.AIMEAT namespace) so they land on AIMEAT.auth.
 auth.getLang = function (locales) { return aimeatReadLang(readLocales({ locales: locales })); };
 auth.setLang = function (lang) { aimeatApplyLang(String(lang).toLowerCase()); };
+// Palette (the designed look, orthogonal to light/dark — 'aimeat-palette' + <html data-palette>).
+// The pill renders the picker; these let an app read/set/enumerate the same value.
+auth.getPalette = function () { return aimeatReadPalette(); };
+auth.setPalette = function (id) { aimeatApplyPalette(String(id).toLowerCase()); };
+auth.getPalettes = function () { return PALETTES.map(function (p) { return { id: p.id, label: p.label, swatch: p.swatch }; }); };
+
+// Apply the stored palette at parse time (before any UI mounts), so a published app follows the
+// user's chosen look with zero app code — the same free ride the mode snippet gives light/dark.
+if (typeof document !== 'undefined') aimeatRestorePalette();
 
 const ns = attach('auth', auth);
-ns.version = '2026-07-25-001';
+ns.version = '2026-07-25-002';

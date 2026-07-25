@@ -5,10 +5,12 @@
  *   writes the same 'aimeat-theme' localStorage key + <html data-theme> the SPA uses, and fires an
  *   'aimeat-theme-change' window event), plus escHtml, the compact-pill CSS injector, and the
  *   two-letter pill initials. Extracted from auth-lib-part2.ts.
- * @structure escHtml · aimeatReadTheme/aimeatApplyTheme · themeToggleHtml/wireThemeToggle ·
+ * @structure escHtml · aimeatReadTheme/aimeatApplyTheme · modeSwitchHtml/wireModeSwitch ·
  *   ensureAuthPillStyles · pillInitials.
- * @usage import { escHtml, themeToggleHtml, wireThemeToggle } from './theme.js';
+ * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v1.1.0 — 2026-07-25 — The lone ☾/☀ toggle becomes a segmented ☀|☾ mode switch (both options
+ *     visible, active marked), styled by cluster.js instead of inline styles.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2.ts (SDK-libs migration Phase 3).
  */
 
@@ -30,26 +32,42 @@ export function aimeatApplyTheme(t) {
   try { window.dispatchEvent(new CustomEvent('aimeat-theme-change', { detail: { theme: t } })); } catch { /* no window */ }
 }
 
-export function themeToggleHtml(i) {
-  var dark = aimeatReadTheme() === 'dark';
-  var title = dark ? (i.themeToLight || 'Switch to light mode') : (i.themeToDark || 'Switch to dark mode');
-  return '<button id="aimeat-theme-toggle" class="aimeat-theme-toggle" title="' + escHtml(title) + '" '
-    + 'aria-label="' + escHtml(title) + '" style="display:inline-flex;align-items:center;justify-content:center;'
-    + 'width:30px;height:30px;flex:0 0 auto;background:transparent;border:1px solid rgba(127,127,127,.4);'
-    + 'border-radius:8px;cursor:pointer;font-size:15px;line-height:1;padding:0;color:currentColor">'
-    + (dark ? '☀' : '☾') + '</button>';
+/**
+ * The MODE control: a segmented ☀ | ☾ where both options are visible and the active one is
+ * marked — the same pattern as the language switch, so the cluster reads as one instrument.
+ * Cluster classes come from cluster.js (ensureClusterStyles).
+ */
+export function modeSwitchHtml(i) {
+  var cur = aimeatReadTheme();
+  var light = i.lightMode || 'Light mode';
+  var dark = i.darkMode || 'Dark mode';
+  return '<span id="aimeat-mode-switch" class="aimeat-seg" role="group" aria-label="' + escHtml(i.themeLabel || 'Theme') + '">'
+    + '<button type="button" data-mode="light" aria-pressed="' + (cur === 'light') + '" title="' + escHtml(light) + '" aria-label="' + escHtml(light) + '">'
+    + '<span class="seg-ico" aria-hidden="true">☀</span></button>'
+    + '<button type="button" data-mode="dark" aria-pressed="' + (cur === 'dark') + '" title="' + escHtml(dark) + '" aria-label="' + escHtml(dark) + '">'
+    + '<span class="seg-ico" aria-hidden="true">☾</span></button>'
+    + '</span>';
 }
 
-export function wireThemeToggle(container, i) {
-  var btn = container.querySelector('#aimeat-theme-toggle');
-  if (!btn) return;
-  btn.addEventListener('click', function () {
-    var next = aimeatReadTheme() === 'dark' ? 'light' : 'dark';
-    aimeatApplyTheme(next);
-    var dark = next === 'dark';
-    btn.textContent = dark ? '☀' : '☾';
-    var title = dark ? (i.themeToLight || 'Switch to light mode') : (i.themeToDark || 'Switch to dark mode');
-    btn.title = title; btn.setAttribute('aria-label', title);
+export function wireModeSwitch(container) {
+  var root = container.querySelector('#aimeat-mode-switch');
+  if (!root) return;
+  function sync(cur) {
+    root.querySelectorAll('button[data-mode]').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.getAttribute('data-mode') === cur));
+    });
+  }
+  root.querySelectorAll('button[data-mode]').forEach(function (b) {
+    b.addEventListener('click', function () {
+      var m = b.getAttribute('data-mode');
+      aimeatApplyTheme(m);
+      sync(m);
+    });
+  });
+  // Follow out-of-band changes (the app's own logic, another control instance, the SPA).
+  window.addEventListener('aimeat-theme-change', function (ev) {
+    var e = /** @type {CustomEvent} */ (ev);
+    if (e && e.detail && e.detail.theme) sync(e.detail.theme);
   });
 }
 
