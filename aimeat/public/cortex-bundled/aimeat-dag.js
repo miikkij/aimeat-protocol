@@ -67,6 +67,8 @@
  *   });
  *   vp.world.appendChild(frameEl);   // children live in world space
  * @version-history
+ *   v1.0.3 — 2026-07-25 — Report the version the manifest declares; the constant and the
+ *     manifest had crossed. pnpm check:viewport now asserts they match.
  *   v1.0.1 — 2026-07-25 — Fix: do not force position:relative on the host (it beat a consumer's
  *     own position:fixed at the same specificity and collapsed a full-screen board to 0px);
  *     create() promotes the host only when its computed position is static.
@@ -433,7 +435,7 @@
     };
   }
 
-  AIMEAT.viewport = { create: create, VERSION: '1.0.1' };
+  AIMEAT.viewport = { create: create, VERSION: '1.0.3' };
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);
 /* END embedded aimeat-viewport */

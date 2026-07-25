@@ -29,6 +29,7 @@ import { getCortexOwnerToken } from './cortex.js';
 import {
   odpsStatusInner, odpsToolFieldsHtml, readOdpsToolFields, readOdpsAppDefaults,
   odpsToggleDefaults, odpsToggleTool, odpsSuggestForTool, odpsBlockedReason,
+  odpsGenerateSample, odpsUseMeasured,
 } from './odps.js';
 
 // Tool names become sku segments (app-tool:<owner>/<appId>:<name>) — same rule the node schema
@@ -44,6 +45,10 @@ var mzState = 'off';     // 'off' | 'loading' | 'ready' | 'error'
 var mzEditing = -1;      // -1 closed · -2 new tool · >=0 editing tools[i]
 var mzBusy = false;      // guards Save/Delete while a write is in flight
 var mzOfferings = {};    // tool name → offeringId, so a listed tool can link to its live odps.yaml
+var mzTiming = {};       // tool name → observed delivery time, so a commitment can be proposed from data
+var mzNodeId = '';       // captured from an API envelope: every response carries the node it came from
+/** The public file URL form is /v1/pub/{GHII}/{key}, so the sample generator needs the full identity. */
+function mzOwnerGhiiOf() { return (mzOwner && mzNodeId) ? (mzOwner + '@' + mzNodeId) : ''; }
 
 function apiBase() {
   var cfg = loadConfig();
@@ -90,15 +95,21 @@ export function monetizeOnOpen(owner, appId, isOwn) {
  */
 function loadOfferings() {
   var ext = 'apptool:' + mzOwner + '/' + mzAppId;
-  fetch(apiBase() + '/v1/exchange/offerings?q=' + encodeURIComponent(mzAppId))
+  fetch(apiBase() + '/v1/exchange/offerings?stats=1&q=' + encodeURIComponent(mzAppId))
     .then(function (r) { return r.json(); })
     .then(function (res) {
+      if (res && res.node) mzNodeId = res.node;
       var list = (res && res.ok && res.data && res.data.offerings) || [];
       var next = {};
+      var timing = {};
       for (var i = 0; i < list.length; i++) {
-        if (list[i].ext === ext && list[i].state === 'listed') next[list[i].action] = list[i].offeringId;
+        if (list[i].ext === ext && list[i].state === 'listed') {
+          next[list[i].action] = list[i].offeringId;
+          if (list[i].stats && list[i].stats.timing) timing[list[i].action] = list[i].stats.timing;
+        }
       }
       mzOfferings = next;
+      mzTiming = timing;
       rerender();
     })
     .catch(function () { /* no market link is a cosmetic loss, never an error */ });
@@ -192,7 +203,10 @@ function editorHtml(tool) {
         t('monetize.exchange') +
       '</label>' +
       '<div class="dtl-sync none" style="margin:4px 0 8px">' + t('monetize.exchangeHint') + '</div>' +
-      odpsToolFieldsHtml(tool, mzOfferings[tool.name || ''] || '') +
+      odpsToolFieldsHtml(tool, mzOfferings[tool.name || ''] || '', {
+        appId: mzAppId, ownerGhii: mzOwnerGhiiOf(), toolName: tool.name || '', actionId: tool.action_id || '',
+        appProvenance: (mzDoc && mzDoc.provenance) || null, timing: mzTiming[tool.name || ''] || null,
+      }) +
       '<label class="dtl-stat-label" for="mz-action">' + t('monetize.actionId') + '</label>' +
       '<input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || '') + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" />' +
       '<div class="dtl-sync none" style="margin:0 0 8px">' + t('monetize.actionIdHint') + '</div>' +
@@ -240,6 +254,17 @@ export function odpsToggleDefaultsUi() { odpsToggleDefaults(rerender); }
 export function odpsToggleToolUi() { odpsToggleTool(rerender); }
 
 /** Draft the tool's descriptive ODPS fields with the owner's own AI key (attestations stay untouched). */
+/** Run the capability once and store the answer as the public sample this listing points at. */
+export function odpsGenerateSampleUi() {
+  var tool = (mzEditing >= 0 && mzDoc && mzDoc.tools[mzEditing]) ? mzDoc.tools[mzEditing] : {};
+  odpsGenerateSample({
+    appId: mzAppId, ownerGhii: mzOwnerGhiiOf(), toolName: (document.getElementById('mz-name') || {}).value || tool.name || '',
+    actionId: (document.getElementById('mz-action') || {}).value || tool.action_id || '',
+  }, rerender);
+}
+
+export function odpsUseMeasuredUi(ms) { odpsUseMeasured(ms); }
+
 export function odpsSuggestUi() {
   var tool = (mzEditing >= 0 && mzDoc && mzDoc.tools[mzEditing]) ? mzDoc.tools[mzEditing] : {};
   odpsSuggestForTool({
