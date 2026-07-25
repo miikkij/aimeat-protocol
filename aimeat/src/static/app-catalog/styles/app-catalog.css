@@ -610,6 +610,13 @@
     .fav-toggle.on { opacity: 1; }
     .published-card { position: relative; }
     .published-card .fav-toggle { left: auto; right: 8px; top: 8px; }
+    /* Library/community cards already own the top-LEFT corner with the Listed/Unlisted badge, so
+       the star sits top-RIGHT instead of on top of it. Keep clear of the ⋮ menu button, which only
+       local cards render: :has() pulls the star back to the edge when there is no menu. Where
+       :has() is unsupported that selector is simply dropped and the star keeps the wider offset —
+       a little gap, never an overlap. */
+    .app-card .fav-toggle { left: auto; right: 40px; top: 6px; }
+    .app-card:not(:has(.card-menu-btn)) .fav-toggle { right: 8px; }
     .fav-section-title {
       font-size: 1rem;
       font-weight: 700;
