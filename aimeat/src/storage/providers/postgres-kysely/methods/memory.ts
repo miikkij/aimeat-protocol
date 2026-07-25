@@ -7,6 +7,9 @@
  *   upsert is one multi-row INSERT … ON CONFLICT, and searchText uses the GENERATED tsvector + GIN
  *   (ranked, best-first). Bound to PostgresKyselyStorage via the prototype merge in ../index.ts.
  * @version-history
+ *   v1.2.0 — 2026-07-25 — listAllMemory gains excludeOwnerPrefix (filters in SQL, so a windowed read
+ *     is not emptied by rows it was going to drop) and newestFirst (key order made `limit` return an
+ *     alphabetical slice here while SQLite returned the newest rows for the same call).
  *   v1.1.0 — 2026-07-16 — Add getMemoryByKeysAnyOwner (Phase 2 N×M): many keys across ALL owners in one query.
  *   v1.0.0 — 2026-07-15 — Phase 5: memory domain on Postgres+Kysely.
  */
@@ -286,15 +289,22 @@ export const memoryMethods = {
     return rows.filter(isLive).map(r => ({ record: rowToRecord(r), score: Number((r as { score: number }).score) }));
   },
 
-  async listAllMemory(this: PostgresKyselyStorage, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean }): Promise<{ items: MemoryRecord[]; total: number }> {
+  async listAllMemory(this: PostgresKyselyStorage, opts?: { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean }): Promise<{ items: MemoryRecord[]; total: number }> {
     let q = this.db.selectFrom('Memory').selectAll();
     if (opts?.prefix) q = q.where('key', 'like', opts.prefix + '%');
     if (opts?.ownerPrefix) q = q.where('ownerGaii', 'like', opts.ownerPrefix + '%');
+    // Excluded IN SQL, not after the slice: a windowed read whose window is entirely unwanted
+    // rows would otherwise come back empty (how the landing ticker emptied itself).
+    if (opts?.excludeOwnerPrefix) q = q.where('ownerGaii', 'not like', opts.excludeOwnerPrefix + '%');
     if (opts?.visibility) q = q.where('visibility', '=', opts.visibility);
     // Drop `.version.N` workspace history rows in SQL (hot read paths always discard them).
     if (opts?.excludeVersionRows) q = q.where('key', 'not like', '%.version.%');
     q = applyArchive(q, opts?.archived);
-    const all = (await q.orderBy('key').execute()).filter(isLive);
+    // Default stays key order (many callers enumerate rather than page); newestFirst is what a
+    // limited "most recent" read must ask for — key order made `limit` return an alphabetical
+    // slice here while SQLite returned the newest rows for the same call.
+    const ordered = opts?.newestFirst ? q.orderBy('updatedAt', 'desc') : q.orderBy('key');
+    const all = (await ordered.execute()).filter(isLive);
     const total = all.length;
     const start = opts?.offset ?? 0;
     const items = (opts?.limit ? all.slice(start, start + opts.limit) : all).map(rowToRecord);

@@ -186,7 +186,19 @@ export interface MemoryRepository {
    * full-copy value was pure waste that grew with publish count. Callers that genuinely consume
    * history (activity feed, object delete, export) must NOT set it.
    */
-  listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean }): Promise<{ items: MemoryRecord[]; total: number }>;
+  /**
+   * Admin-wide enumeration.
+   *
+   * `excludeOwnerPrefix` filters IN SQL, which matters for windowed reads: a caller that fetches
+   * N rows and drops unwanted ones afterwards gets whatever survives — nothing at all once the
+   * unwanted rows fill the whole window. The public activity feed (`system@…`) does exactly that
+   * on a busy node, which is what emptied the landing ticker.
+   *
+   * `newestFirst` orders by updatedAt DESC. Postgres otherwise orders by key and SQLite by
+   * updatedAt, so a windowed call without this flag returns DIFFERENT rows per backend; set it
+   * whenever `limit` is used and recency is what you meant.
+   */
+  listAllMemory(opts?: { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean }): Promise<{ items: MemoryRecord[]; total: number }>;
   /**
    * List archived prior versions of a TRACKABLE memory key, newest version first. Only keys marked
    * `trackable` accumulate history (the latest value always lives in `getMemory`). Empty for keys that

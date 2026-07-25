@@ -5,6 +5,9 @@
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  *   v1.1.0 — 2026-07-14 — Perf: add listMemoryMeta (metadata + byteSize projection, no value column)
  *     backing ?include=meta.
+ *   v1.2.0 — 2026-07-25 — listAllMemory gains excludeOwnerPrefix (filters in SQL, so a windowed read
+ *     is not emptied by rows it was going to drop); newestFirst is accepted for Postgres parity and
+ *     is already this backend's ordering.
  */
 import type {
   OwnerRecord, AgentRecord, MemoryRecord, ArchiveFilter
@@ -590,13 +593,19 @@ export const ownerMethods = {
     return sumMemoryBytesForOwnersRepo(this.db, ownerGaiis);
   },
 
-  async listAllMemory(this: SqliteStorage, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean }): Promise<{ items: MemoryRecord[]; total: number }> {
+  async listAllMemory(this: SqliteStorage, opts?: { prefix?: string; ownerPrefix?: string; excludeOwnerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean; newestFirst?: boolean }): Promise<{ items: MemoryRecord[]; total: number }> {
     let whereClauses = '';
     const params: unknown[] = [];
 
     if (opts?.ownerPrefix) {
       whereClauses += ' AND ownerGaii LIKE ?';
       params.push(opts.ownerPrefix + '%');
+    }
+    // Excluded IN SQL, not after the slice: a windowed read whose window is entirely unwanted
+    // rows would otherwise come back empty (how the landing ticker emptied itself).
+    if (opts?.excludeOwnerPrefix) {
+      whereClauses += ' AND ownerGaii NOT LIKE ?';
+      params.push(opts.excludeOwnerPrefix + '%');
     }
     if (opts?.prefix) {
       whereClauses += ' AND key LIKE ?';
@@ -620,6 +629,8 @@ export const ownerMethods = {
 
     const limit = opts?.limit ?? 50;
     const offset = opts?.offset ?? 0;
+    // Always newest-first here; `newestFirst` is accepted for parity with the Postgres backend,
+    // which defaults to key order and needs the flag to page by recency (see memory.repository.ts).
     const rows = this.db.prepare('SELECT * FROM memory' + whereStr + ' ORDER BY updatedAt DESC LIMIT ? OFFSET ?').all(...params, limit, offset) as Record<string, unknown>[];
 
     const items: MemoryRecord[] = [];

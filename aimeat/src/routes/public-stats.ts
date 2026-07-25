@@ -17,6 +17,13 @@
  *   v1.3.1 — 2026-06-28 — Fix node-totals knowledge_packages reading 0 on busy nodes: scope the
  *     count query to the packages/ prefix so it isn't swamped out of the recent-1000 window by
  *     public activity-feed writes.
+ *   v1.4.0 — 2026-07-25 — Ticker + today's public_writes exclude the reserved system@{nodeId}
+ *     identity in SQL instead of post-filtering the 'activity/' key prefix. The prefix test
+ *     missed the seeded built-in skills (public since 2026-07-14), which are the newest public
+ *     writes on a fresh node and filled the ticker with `system` rows; and post-filtering a
+ *     windowed read returned NOTHING on a busy node, where the window is all activity rows
+ *     (aimeat.io served items: [] because of it). Reads are newestFirst so the window is the
+ *     recent one on both backends — Postgres paged by key order.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -30,6 +37,9 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
 
   const agentNameOf = (gaii: string) => (gaii.includes('#') ? gaii.split('#')[0] : gaii.split('@')[0]);
   const isToday = (iso?: string) => !!iso && iso.slice(0, 10) === new Date().toISOString().slice(0, 10);
+  // The reserved non-actor identity: activity-feed entries, seeded built-in skills, ecosystem
+  // subscriptions. Nothing it owns is somebody DOING something, so no public counter counts it.
+  const SYSTEM_OWNER = `system@${config.nodeId}`;
 
   // GET /v1/public/activity-ticker — newest public memory writes + agents-online count.
   // Cached 10s; invalidated when public memory or agents change.
@@ -38,11 +48,18 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
       let items: Array<{ actor: string; key: string; at: string }> = [];
       let agentsOnline = 0;
       try {
-        const result = await storage.listAllMemory({ visibility: 'public', limit: 100 });
+        // Exclude the reserved system identity, not one key prefix. `system@` is not an actor:
+        // besides the public-activity feed (activity/…) it owns the seeded built-in skills
+        // (skills.…, three of them public) and ecosystem subscriptions. Filtering on the
+        // 'activity/' key alone let the skill seeds through, and on a fresh node they are the
+        // newest public writes, so the ticker showed ten rows of `system` seeding itself.
+        // Excluding in SQL also fixes the opposite symptom on a busy node, where the whole
+        // fetched window was activity rows and post-filtering emptied the ticker completely.
+        const result = await storage.listAllMemory({
+          visibility: 'public', excludeOwnerPrefix: SYSTEM_OWNER, newestFirst: true, limit: 100,
+        });
         items = result.items
-          // Exclude synthetic public-activity-feed entries (system@; key 'activity/…') —
-          // they have their own feed and would otherwise double-up in this ticker.
-          .filter(m => m.updatedAt && !m.key.startsWith('activity/'))
+          .filter(m => m.updatedAt)
           .sort((a, b) => String(b.updatedAt).localeCompare(String(a.updatedAt)))
           .slice(0, 10)
           .map(m => ({
@@ -70,9 +87,13 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
       let schedulesFired = 0;
       let tasksCompleted = 0;
       try {
-        const mem = await storage.listAllMemory({ visibility: 'public', limit: 500 });
-        // Exclude synthetic public-activity-feed entries — they would inflate the count.
-        publicWrites = mem.items.filter(m => isToday(m.updatedAt) && !m.key.startsWith('activity/')).length;
+        // Same reasoning as the ticker: exclude the whole system identity in SQL. Post-filtering
+        // a key prefix both let the seeded skills inflate the count and let activity rows crowd
+        // real writes out of the window entirely.
+        const mem = await storage.listAllMemory({
+          visibility: 'public', excludeOwnerPrefix: SYSTEM_OWNER, newestFirst: true, limit: 500,
+        });
+        publicWrites = mem.items.filter(m => isToday(m.updatedAt)).length;
       } catch { /* 0 */ }
       try {
         const jobs = await storage.listScheduledJobs();
