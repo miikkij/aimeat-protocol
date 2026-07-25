@@ -5,6 +5,8 @@
  * @version-history
  *   v1.0.0 - 2026-05-02 - Initial invoke proxy for extensions and manual webhooks
  *   v1.1.0 - 2026-06-14 - Add `case 'ecosystem'`: route invocation over the tunnel to a bound GEAI.
+ *   v1.2.0 - 2026-07-25 - Name the caller-token failures (CALLER_TOKEN_MISSING / CALLER_TOKEN_INVALID)
+ *     instead of reporting the route's AUTH_REQUIRED as an opaque EXTENSION_ERROR.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
@@ -56,6 +58,17 @@ export async function invokeCapability(
       const extName = parts[1];
       const actionId = parts[2];
 
+      // The extension runs behind the node's own AUTHENTICATED HTTP surface, so the caller's token
+      // travels with the invocation. A caller that hands us no token cannot be served here — say so
+      // before the round trip, because the route's generic AUTH_REQUIRED surfaces as an opaque
+      // "extension failed" and sends the reader hunting inside the extension instead.
+      if (!jwt) {
+        throw Object.assign(
+          new Error(`Cannot invoke "${capability.id}": no caller token was supplied. An extension-backed capability runs as the caller, so the invocation needs the caller's current bearer token.`),
+          { statusCode: 401, code: 'CALLER_TOKEN_MISSING' },
+        );
+      }
+
       const response = await fetch(`http://127.0.0.1:${config.port}/v1/ext/${extName}/${actionId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}` },
@@ -64,6 +77,12 @@ export async function invokeCapability(
       const body = await response.json() as Record<string, unknown>;
 
       if (!body.ok) {
+        if (response.status === 401) {
+          throw Object.assign(
+            new Error(`Cannot invoke "${capability.id}": the caller's token was rejected (expired or revoked). Refresh the session token and call again.`),
+            { statusCode: 401, code: 'CALLER_TOKEN_INVALID' },
+          );
+        }
         throw Object.assign(new Error((body.error as { message?: string } | undefined)?.message || 'Extension invoke failed'), { statusCode: response.status, code: 'EXTENSION_ERROR' });
       }
       result = mode === 'raw' ? body : body.data;

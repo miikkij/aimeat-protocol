@@ -26,6 +26,11 @@
  *     cleaned up on close) is intentional, not a leak — silences MaxListenersExceededWarning while
  *     keeping headroom for 128 concurrent agents and still flagging a genuine cleanup leak.
  *   v1.8.2 — 2026-07-13 — Extracted the OAuth 2.1 endpoints to ./oauth.ts (max-file-lines); no behavior change.
+ *   v1.9.0 — 2026-07-25 — Per-session bearer token is now LIVE (sessionTokens box refreshed from every
+ *     request) instead of frozen at initialize. An MCP session outlives its access token (jwtTtlSeconds,
+ *     1 h default, rotated by the client via refresh_token), so capability invocation — the only path
+ *     that re-presents the caller's token to the node's own HTTP surface — was answering AUTH_REQUIRED
+ *     for the whole remainder of every session older than an hour. createMcpServer now takes a getter.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -113,8 +118,19 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     const transports = new Map<string, StreamableHTTPServerTransport>();
     // Map MCP session IDs to ChatInstance IDs for heartbeat tracking
     const sessionChatInstances = new Map<string, string>();
+    // Per-session BEARER TOKEN, kept live. A session outlives its access token: the OAuth token
+    // has jwtTtlSeconds (1 h default) and the client silently rotates it via refresh_token, sending
+    // the new one on every subsequent request. The few tools that re-present the caller's token to
+    // the node's own HTTP surface (capability invocation) must use the CURRENT one, not the one
+    // captured at initialize — otherwise they start answering AUTH_REQUIRED an hour into a session.
+    const sessionTokens = new Map<string, { current: string | undefined }>();
 
-    function createMcpServer(agentGaii: string, scopes: string[], role: SurfaceRole | 'all' = 'all', token?: string): McpServer {
+    function createMcpServer(
+        agentGaii: string,
+        scopes: string[],
+        role: SurfaceRole | 'all' = 'all',
+        getToken: () => string | undefined = () => undefined,
+    ): McpServer {
         const mcp = new McpServer(
             { name: `AIMEAT Node ${config.nodeId}`, version: '1.2.0' },
             { capabilities: { tools: {}, resources: { subscribe: true, listChanged: true } } },
@@ -161,7 +177,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerConsentTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerCommerceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerExchangeTools(mcp, storage, config, () => agentGaii);
-        registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => token);
+        registerExchangeRunTools(mcp, storage, config, () => agentGaii, getToken);
         // Edition-contributed tools (EnterpriseProvider.getMcpTools, installed at boot) — same
         // scope gate via the dynamic map; no-op on Community.
         registerEnterpriseMcpTools(mcp, storage, config, () => agentGaii);
@@ -169,7 +185,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerFlagsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerFeedbackTools(mcp, storage, config, () => agentGaii);
         registerPromptsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
-        registerCapabilitiesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerCapabilitiesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, getToken);
         registerCortexTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAppsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerSharingGroupTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
@@ -226,6 +242,10 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             if (ciId) {
                 storage.updateChatInstance(ciId, { lastSeen: new Date().toISOString() }).catch(() => { });
             }
+            // Refresh the session's bearer token from THIS request before dispatching: the client
+            // rotates its access token mid-session, and capability invocation re-presents it.
+            const box = sessionTokens.get(sessionId);
+            if (box && token) box.current = token;
             const transport = transports.get(sessionId)!;
             await transport.handleRequest(req as unknown as IncomingMessage, res as unknown as ServerResponse, req.body);
             return;
@@ -378,12 +398,14 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             sessionIdGenerator: () => `mcp-${randomBytes(16).toString('hex')}`,
         });
 
-        const mcpServer = createMcpServer(authenticatedGaii, sessionScopes, serverRole, token);
+        const tokenBox: { current: string | undefined } = { current: token };
+        const mcpServer = createMcpServer(authenticatedGaii, sessionScopes, serverRole, () => tokenBox.current);
 
         transport.onclose = () => {
             if (transport.sessionId) {
                 transports.delete(transport.sessionId);
                 sessionChatInstances.delete(transport.sessionId);
+                sessionTokens.delete(transport.sessionId);
             }
         };
 
@@ -394,6 +416,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         // Store transport for session reuse (sessionId is generated during handleRequest)
         if (transport.sessionId) {
             transports.set(transport.sessionId, transport);
+            sessionTokens.set(transport.sessionId, tokenBox);
             if (chatInstanceId) {
                 sessionChatInstances.set(transport.sessionId, chatInstanceId);
             }

@@ -71,6 +71,10 @@ const ALL_SUITES = [
     'test/e2e-pacing.ts',
     'test/e2e-exchange.ts',
     'test/e2e-exchange-projection.ts',
+    // The MCP half of EXCHANGE (act-on-exchange tools). It existed unregistered, so nothing was
+    // guarding the metered app-tool call an MCP client makes — which is how a stale session token
+    // silently broke every one of them.
+    'test/e2e-exchange-mcp.ts',
     'test/e2e-extension-secrets.ts',
     'test/e2e-iam-extension.ts',
     'test/e2e-upsert.ts',
