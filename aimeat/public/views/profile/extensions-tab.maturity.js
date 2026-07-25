@@ -36,5 +36,8 @@ export function maturityBadge(html, t, ledger, name) {
   const proven = proofs.map(pr => `${pr.model} → ${pr.verdict}${pr.tokens ? ' (' + Math.round(pr.tokens / 1000) + 'k)' : ''}`).join(', ');
   const title = t('profile.extensions.tier.' + p.modelTier)
     + ' · ' + (proofs.length ? t('profile.extensions.measuredOn') + ' ' + proven : t('profile.extensions.notMeasured'));
-  return html`<span class="ext-tier ext-tier-${p.modelTier}${proofs.length ? ' ext-tier-measured' : ''}" title=${title}>${p.modelTier}${proofs.length ? ' ✓' : ''}</span>`;
+  // Show the instruction ("READ THE DOC"), not the raw key — `needs-doc` reads as
+  // "documentation missing", which is the opposite of what the tier means.
+  const label = t('profile.extensions.tierLabel.' + p.modelTier) || p.modelTier;
+  return html`<span class="ext-tier ext-tier-${p.modelTier}${proofs.length ? ' ext-tier-measured' : ''}" title=${title}>${label}${proofs.length ? ' ✓' : ''}</span>`;
 }

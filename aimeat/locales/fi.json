@@ -3403,6 +3403,11 @@
         "frontier": "Vahvoille malleille turvallinen — versioansa heikommille; niiden on luettava dokumentaatio",
         "needs-doc": "AIMEAT:n oma wrapper — tekoälyn on haettava dokumentaatio käyttääkseen sitä (ei ennakkotietoa)"
       },
+      "tierLabel": {
+        "any": "KAIKILLE MALLEILLE",
+        "frontier": "VERSIOANSA",
+        "needs-doc": "LUE DOKUMENTTI"
+      },
       "heroDesc": "Cortexeilla saat enemmän aikaiseksi vähemmällä. AI Chat suoriutuu isommista sovelluksista kun annat sille valmiita cortex-rakennuspalikoita — uudelleenkäytettäviä UI-kirjastoja, skeemoja ja prompteja. Voit käyttää samaa cortexia useassa sovelluksessa.",
       "visibility": {
         "private": "Yksityinen",

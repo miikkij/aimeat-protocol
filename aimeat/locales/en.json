@@ -3403,6 +3403,11 @@
         "frontier": "Frontier-safe — a version-drift trap for weaker models; they must read its doc",
         "needs-doc": "AIMEAT-authored wrapper — the AI must fetch its doc to use it (no priors)"
       },
+      "tierLabel": {
+        "any": "ANY MODEL",
+        "frontier": "VERSION TRAP",
+        "needs-doc": "READ THE DOC"
+      },
       "heroDesc": "Get more done with less. AI Chat can handle bigger apps when you hand it ready-made cortex building blocks — reusable UI libraries, schemas, and prompts. Use the same cortex across multiple apps.",
       "visibility": {
         "private": "Private",

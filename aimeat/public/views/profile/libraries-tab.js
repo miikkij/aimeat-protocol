@@ -32,11 +32,19 @@ const KIND_GROUPS = [
 ];
 const TIER_FILTERS = ['all', 'any', 'frontier', 'needs-doc'];
 
+// The tier is an INSTRUCTION to the reader ("this API has no training-data priors, so an
+// AI must fetch its doc"), not a statement that documentation is missing. The raw key
+// `needs-doc` read as "docs missing" to everyone including the registry's own author, so
+// the badge shows the instruction and keeps the key only as a CSS/filter value.
+function tierLabel(tier) {
+  return t('profile.extensions.tierLabel.' + tier) || tier;
+}
+
 function tierBadge(p) {
   if (!p.modelTier) return null;
   const measured = p.proofs && p.proofs.length;
   return html`<span class="ext-tier ext-tier-${p.modelTier}${measured ? ' ext-tier-measured' : ''}"
-    title=${t('profile.extensions.tier.' + p.modelTier)}>${p.modelTier}</span>`;
+    title=${t('profile.extensions.tier.' + p.modelTier)}>${tierLabel(p.modelTier)}</span>`;
 }
 
 function statusBadge(p) {
@@ -157,7 +165,7 @@ export default function LibrariesTab() {
         <div class="lib-tier-filters">
           ${TIER_FILTERS.map(tf => html`
             <button class=${'btn-ghost lib-tier-btn' + (tier === tf ? ' lib-tier-active' : '')}
-              onClick=${() => setTier(tf)}>${tf === 'all' ? t('librariesTab.tierAll') : tf}</button>`)}
+              onClick=${() => setTier(tf)}>${tf === 'all' ? t('librariesTab.tierAll') : tierLabel(tf)}</button>`)}
         </div>
         <label class="lib-measured-toggle">
           <input type="checkbox" checked=${measuredOnly} onChange=${e => setMeasuredOnly(e.target.checked)} />
