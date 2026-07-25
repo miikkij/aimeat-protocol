@@ -86,7 +86,7 @@ jobs:
         working-directory: aimeat
         run: pnpm check:mcp-tools
 
-      - name: Embedded aimeat-viewport in sync with its source
+      - name: Cortex pack integrity (embedded viewport + VERSION constants)
         working-directory: aimeat
         run: pnpm check:viewport
 
