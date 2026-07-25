@@ -218,7 +218,7 @@ export function registerExchangeTools(
                     consumerGaii, appId: app_id ?? null, providerGhii: priced.providerGhii, ext: priced.ext, action: priced.action,
                     capabilityLabel: priced.capabilityLabel, unit: priced.unit, pricePerCall: priced.pricePerCall,
                     currency: priced.currency, pricing: priced.pricing, capUnits, contractRef: contract_ref || `offering:${offering_id}`,
-                    surface: priced.surface, createdBy: owner, carrySpend: existing,
+                    surface: priced.surface, tollMorsels: priced.tollMorsels, createdBy: owner, carrySpend: existing,
                 });
                 return ok({ entitlement: entitlementView(config, ent) });
             }
@@ -246,7 +246,8 @@ export function registerExchangeTools(
             const existing = await readEntitlementForCall(storage, consumerGaii, ext, action);
             const ent = await createEntitlement(storage, {
                 consumerGaii, appId: app_id ?? null, providerGhii, ext, action, capabilityLabel: `${ext}/${action}`,
-                unit, pricePerCall, currency, pricing, capUnits, contractRef, createdBy: owner, carrySpend: existing,
+                unit, pricePerCall, currency, pricing, capUnits, contractRef, tollMorsels: act.tollMorsels ?? null,
+                createdBy: owner, carrySpend: existing,
             });
             return ok({ entitlement: entitlementView(config, ent) });
         },

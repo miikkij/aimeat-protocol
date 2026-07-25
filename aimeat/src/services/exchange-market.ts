@@ -17,6 +17,8 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.7.0 — 2026-07-25 — Pacing is per capability: Offering carries `tollMorsels` and the pricing
+ *     resolver hands it to the contract, so a provider — not only the node — sets the brake.
  *   v1.6.0 — 2026-07-25 — ODPS v4.1 adoption (TARGET-045 §4 / addendum Q2+Q3): Provenance (now with
  *     transformations + SHA-256 snapshot hash + lineage) and the new `odps` authoring block move to
  *     models/odps-schemas.ts as validated schemas; Offering gains `odps`.
@@ -140,6 +142,12 @@ export interface Offering {
   /** For kind==='agent-work': the task interface (what the consumer sends / the agent delivers). */
   taskSpec?: { inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> } | null;
   provenance: Provenance | null;
+  /**
+   * Morsels burned per call on top of whatever this offering is paid in — the provider's own pacing.
+   * Projected from the source and captured into the contract at accept, so changing it later governs
+   * new contracts while existing ones keep the terms they were signed at.
+   */
+  tollMorsels?: number | null;
   usageTerms: UsageTerms | null;   // how the consumer may use the output (derivatives/resale/attribution)
   /**
    * The provider's ODPS authoring block — the Open Data Product Specification fields the node cannot derive
@@ -192,7 +200,8 @@ export async function resolveOfferingPricing(
   storage: Storage, o: Offering, planId: string | null,
 ): Promise<
   | { ok: true; unit: EntitlementUnit; pricePerCall: number; currency: string | null; pricing: PricingSpec | null;
-      providerGhii: string; ext: string; action: string; capabilityLabel: string; surface: SellableSurface | null }
+      providerGhii: string; ext: string; action: string; capabilityLabel: string; surface: SellableSurface | null;
+      tollMorsels: number | null }
   | { ok: false; status: number; code: string; message: string }
 > {
   // app-tool + agent-work both price from the offering's own listing (the provider authored it).
@@ -205,6 +214,7 @@ export async function resolveOfferingPricing(
     return {
       ok: true, unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
       providerGhii: o.providerGhii, ext: o.ext, action: o.action, capabilityLabel: label, surface: o.surface,
+      tollMorsels: o.tollMorsels ?? null,
     };
   }
   // ext-action: authoritative LIVE price from the provider's extension action.
@@ -216,6 +226,8 @@ export async function resolveOfferingPricing(
   return {
     ok: true, unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
     providerGhii: o.providerGhii, ext: o.ext, action: o.action, capabilityLabel: `${o.ext}/${o.action}`, surface: null,
+    // The action is the live source for a raw ext offering — its declared toll, not the listing's copy.
+    tollMorsels: act.tollMorsels ?? null,
   };
 }
 

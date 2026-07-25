@@ -32,6 +32,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { resolvePacingToll } from './extensions/pacing.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { createEntitlement, readEntitlementForCall } from '../services/metered-entitlements.js';
 import {
@@ -281,8 +282,13 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     iface: { inputSchema?: Record<string, unknown>; outputSchema?: Record<string, unknown> } | null;
     callRecipe: Record<string, unknown> & { method: string; url: string; mcp?: string; note?: string };
     stats: Awaited<ReturnType<typeof offeringStats>>;
+    /** The provider's declared pacing burn, read live from the source (null = the node's default). */
+    tollMorsels: number | null;
   }> {
     const stats = await offeringStats(storage, o);
+    // The listing is the source for app-tool and agent-work (the provider authored it there); a raw ext
+    // action is read live from the extension below, the same way its price is.
+    const tollMorsels = o.tollMorsels ?? null;
 
     // app-tool: the capability schema is the PINNED interface snapshot; the call goes to the WebMCP invoke
     // endpoint (the accepted contract meters it). This is the freeze made visible — the version is explicit.
@@ -302,7 +308,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
           note: `Each call is metered + charged to your budget at the provider price. The contract is pinned to interface v${s.ifaceVersion}; the provider may ship newer app versions without breaking your integration.`,
           body: '{ "input": { … } }',
         },
-        stats,
+        stats, tollMorsels,
       };
     }
 
@@ -319,7 +325,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
           auth: 'Your own AIMEAT token — the accepted contract authorises starting work; no separate API key.',
           note: `Async: you START a task, the provider agent (${s.agentName}) DELIVERS, and you are charged the per-task price ON DELIVERY (metered + rake against your budget).`,
         },
-        stats,
+        stats, tollMorsels,
       };
     }
 
@@ -340,7 +346,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
         note: 'Each call is metered + charged to your budget at the provider price; the provider’s own upstream keys stay server-side.',
         mcp: `aimeat_extension_invoke { "name": "${o.ext}", "action": "${o.action}", "input": { … } }`,
       },
-      stats,
+      stats, tollMorsels: act?.tollMorsels ?? null,
     };
   }
 
@@ -355,6 +361,14 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     const ctx = await offeringContext(o);
     return res.json(success(config.nodeId, {
       offering: o, capability: ctx.capability, call_recipe: ctx.callRecipe, stats: ctx.stats,
+      // Stated before the contract is signed, because it changes what a call costs the CONSUMER even
+      // though it moves nothing to the provider. `source` says who set it: the seller, or the node.
+      pacing: {
+        toll_morsels: resolvePacingToll(config, ctx.tollMorsels),
+        source: typeof ctx.tollMorsels === 'number' && ctx.tollMorsels >= 0 ? 'capability' : 'node',
+        note: 'Morsels burned per call to bound consumption rate. A burn, not revenue: nobody is credited it, '
+          + 'and calling your own capability is free.',
+      },
       odps: { version: ODPS_VERSION, url: `/v1/exchange/offerings/${o.offeringId}/odps.yaml` },
     }));
   });
@@ -556,7 +570,8 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       consumerGaii, appId: n.appId, providerGhii: `${extRec.installedBy}@${config.nodeId}`,
       ext: bid.ext, action: bid.action, capabilityLabel: `${bid.ext}/${bid.action}`,
       unit: priced.unit, pricePerCall: priced.pricePerCall, currency: priced.currency, pricing: priced.pricing,
-      capUnits: capCap, contractRef: `bid:${bid.bidId}`, createdBy: owner, carrySpend: existing,
+      capUnits: capCap, contractRef: `bid:${bid.bidId}`, tollMorsels: act.tollMorsels ?? null,
+      createdBy: owner, carrySpend: existing,
     });
     // Mark the bid accepted + the need matched (append updates; other bids stay for the record).
     bid.state = 'accepted'; await putBid(storage, bid);

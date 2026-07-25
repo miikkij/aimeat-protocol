@@ -71,6 +71,9 @@ function view(config: AimeatConfig, e: MeteredEntitlement) {
     unit: e.unit,
     currency: e.currency,
     price_per_call: e.pricePerCall,
+    // The pacing burn this contract was signed at — a cost to the consumer that is not a payment, so it
+    // belongs beside the price rather than inside it.
+    toll_morsels: e.tollMorsels ?? null,
     pricing: e.pricing ?? { model: 'per_call' },
     rake_percent: rakePct,
     rake_per_call: percentFee(e.pricePerCall, rakePct),
@@ -122,7 +125,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
         consumerGaii, appId, providerGhii: priced.providerGhii, ext: priced.ext, action: priced.action,
         capabilityLabel: priced.capabilityLabel, unit: priced.unit, pricePerCall: priced.pricePerCall,
         currency: priced.currency, pricing: priced.pricing, capUnits, contractRef, surface: priced.surface,
-        escrowParty, createdBy: owner, carrySpend: existing,
+        tollMorsels: priced.tollMorsels, escrowParty, createdBy: owner, carrySpend: existing,
       });
       return res.status(201).json(success(config.nodeId, { entitlement: view(config, ent) }, [
         { description: 'This app’s cost & contracts', method: 'GET', url: appId ? `/v1/apps/cost?app_id=${encodeURIComponent(appId)}` : '/v1/exchange/entitlements' },
@@ -161,7 +164,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const ent = await createEntitlement(storage, {
       consumerGaii, appId, providerGhii, ext, action, capabilityLabel: `${ext}/${action}`,
       unit, pricePerCall, currency, pricing, capUnits, contractRef, escrowParty, createdBy: owner,
-      carrySpend: existing,
+      tollMorsels: act.tollMorsels ?? null, carrySpend: existing,
     });
     return res.status(201).json(success(config.nodeId, { entitlement: view(config, ent) }, [
       { description: 'This app’s cost & contracts', method: 'GET', url: appId ? `/v1/apps/cost?app_id=${encodeURIComponent(appId)}` : '/v1/exchange/entitlements' },

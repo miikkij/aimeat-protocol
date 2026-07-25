@@ -8378,7 +8378,11 @@ paths:
         Everything a human or agent needs to judge fit and integrate: the offering, the capability's
         `input_schema`/`output_schema`, a `call_recipe` (the contract IS the access — you call `POST
         /v1/ext/{ext}/{action}` as yourself, no separate API key), and usage `stats` (reputation). Public.
-        Returns `{ offering, capability, call_recipe, stats, odps }`, where `odps` points at the same listing
+        Returns `{ offering, capability, call_recipe, stats, pacing, odps }`. `pacing.toll_morsels` is the
+        morsel BURN each call costs the consumer to bound consumption rate — not a price: nobody is
+        credited it, and calling your own capability is free. `pacing.source` is `capability` when the
+        provider declared it (`tollMorsels` on the tool/action/offer) and `node` when the node default
+        applies. `odps` points at the same listing
         rendered as an Open Data Product Specification v4.1 document.
       tags: [Commerce]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]

@@ -138,6 +138,74 @@ await test('The provider calling their own capability is never paced', async () 
   assert(await balance(provider.token) === before, 'the owner burned nothing on their own capability');
 });
 
+// ── The provider's own dial. The node default exists so pacing is never simply absent; a provider who
+// has an opinion about their own capability must be able to state it, in BOTH directions — a stricter
+// brake on something expensive to serve, and none at all on something cheap. Without this the default
+// is the only setting there is, which makes a default of 0 mean "nobody may pace anything".
+async function listExtAction(token: string, name: string, toll: number | undefined): Promise<string> {
+  const manifest = JSON.stringify({
+    metadata: { name, version: '1.0.0', description: 'pacing dial probe', author: 'e2e' },
+    actions: [{
+      id: 'run', method: 'POST', path: '/run', script: 'echo', input: SCHEMA, output: SCHEMA,
+      ...(toll === undefined ? {} : { tollMorsels: toll }),
+      commercial: { payMorsels: 0, payMoney: { amount: 20000, currency: 'EUR' }, exchange: true,
+        usageTerms: { derivatives: true, resale: false, attribution: true } },
+    }],
+  });
+  const ins = await json('/v1/extensions', { method: 'POST', headers: auth(token),
+    body: JSON.stringify({ manifest, scripts: { echo: 'export default async function(ctx, input){ return { q: "ok" }; }' } }) });
+  assert(ins.status === 201 || ins.status === 200, `install ${name}: ${ins.status} ${JSON.stringify(ins.body?.error)}`);
+  await json(`/v1/extensions/${name}/activate`, { method: 'POST', headers: auth(token) });
+  const list = await json('/v1/exchange/offerings');
+  const o = (list.body.data.offerings as any[]).find(x => x.ext === name && x.action === 'run' && x.unit === 'money');
+  assert(!!o, `listing projected for ${name}`);
+  return o.offeringId;
+}
+
+async function burnOfOneCall(offering: string, ext: string): Promise<number> {
+  const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(dialConsumer.token),
+    body: JSON.stringify({ offering_id: offering, cap_units: 100_000_000 }) });
+  assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
+  const before = await balance(dialConsumer.token);
+  const call = await json(`/v1/ext/${ext}/run`, { method: 'POST', headers: auth(dialConsumer.token), body: JSON.stringify({ q: 'x' }) });
+  assert(call.status === 200, `call ${call.status}: ${JSON.stringify(call.body?.error)}`);
+  return before - await balance(dialConsumer.token);
+}
+
+// A consumer with a full balance: the runaway-loop test above emptied the first one on purpose.
+const dialConsumer = await setupOwner('dial');
+const EXT_HIGH = `pacehi${Date.now().toString().slice(-6)}`;
+const EXT_ZERO = `pacezr${Date.now().toString().slice(-6)}`;
+
+await test('A capability that declares its own toll is paced at THAT rate, not the node default', async () => {
+  const off = await listExtAction(provider.token, EXT_HIGH, 7);
+  const burned = await burnOfOneCall(off, EXT_HIGH);
+  assert(burned === 7, `the provider's own 7 governs, not the node's ${TOLL}: burned ${burned}`);
+});
+
+await test('A declared 0 switches pacing OFF for that capability, whatever the node default is', async () => {
+  const off = await listExtAction(provider.token, EXT_ZERO, 0);
+  const burned = await burnOfOneCall(off, EXT_ZERO);
+  assert(burned === 0, `an explicit 0 means no pacing even under a node default of ${TOLL}: burned ${burned}`);
+});
+
+await test('The declared toll is stated on the listing BEFORE a buyer signs', async () => {
+  const list = await json('/v1/exchange/offerings');
+  const o = (list.body.data.offerings as any[]).find(x => x.ext === EXT_HIGH && x.unit === 'money');
+  const detail = await json(`/v1/exchange/offerings/${o.offeringId}`);
+  const pacing = detail.body.data.pacing;
+  assert(pacing?.toll_morsels === 7, `detail states the real burn: ${JSON.stringify(pacing)}`);
+  assert(pacing?.source === 'capability', `and says who set it: ${JSON.stringify(pacing)}`);
+});
+
+await test('The contract remembers the toll it was signed at', async () => {
+  const contracts = await json('/v1/exchange/entitlements', { headers: auth(dialConsumer.token) });
+  const list = (contracts.body.data.entitlements ?? contracts.body.data.contracts ?? []) as any[];
+  const ent = list.find(c => c.ext === EXT_HIGH);
+  assert(ent, 'the contract exists');
+  assert((ent.tollMorsels ?? ent.toll_morsels) === 7, `captured at signature: ${JSON.stringify(ent.tollMorsels ?? ent.toll_morsels)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 server.kill('SIGTERM');
 process.exit(failed > 0 ? 1 : 0);

@@ -26,6 +26,8 @@
  *   const report = await reconcileOwnerOfferings(storage, ownerGhii, { dryRun: true });
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  * @version-history
+ *   v1.3.0 — 2026-07-25 — Pacing projects too: the source's `tollMorsels` reaches the listing (and is
+ *     overwritten when cleared, unlike an attestation — a stale brake keeps charging consumers).
  *   v1.2.0 — 2026-07-25 — App-level ODPS defaults: the tool manifest's root `odps`/`provenance` are
  *     inherited by every tool of that app (tool overrides field by field) and folded into the sourceHash.
  *   v1.1.0 — 2026-07-25 — Sources carry their own descriptor data: `provenance` + `odps` (the ODPS v4.0
@@ -81,6 +83,8 @@ interface DesiredListing {
   /** Provider descriptor data carried from the source onto the listing + its ODPS document. */
   provenance: Provenance | null;
   odps: OdpsExtras | null;
+  /** The provider's declared pacing burn, projected so a contract can capture it at accept. */
+  tollMorsels: number | null;
   tags: string[];
   sourceHash: string;
 }
@@ -171,12 +175,13 @@ async function desiredFromAppTools(
         // App-level defaults (manifest root) are inherited by every tool; the tool overrides field by field.
         provenance: provenanceOf(mergeProvenance(parsed.data.provenance, tool.provenance) ?? undefined),
         odps: mergeOdpsExtras(parsed.data.odps, tool.odps),
+        tollMorsels: tool.tollMorsels ?? null,
       };
       for (const p of prices(morsels, money)) {
         out.push({
           ...base, ...p,
           key: listingKey('app-tool', coord.ext, coord.action, p.unit, p.currency),
-          sourceHash: contentHash([base.title, base.description, base.plans, base.usageTerms, base.provenance, base.odps, ifaceVersion, p]),
+          sourceHash: contentHash([base.title, base.description, base.plans, base.usageTerms, base.provenance, base.odps, base.tollMorsels, ifaceVersion, p]),
         });
       }
     }
@@ -207,12 +212,13 @@ async function desiredFromExtActions(
         title: `${ext.name} · ${act.id}`, description: ext.description ?? '',
         plans: (comm.plans ?? []) as OfferingPlan[], usageTerms: usageTermsOf(comm.usageTerms), tags: [] as string[],
         provenance: provenanceOf(comm.provenance), odps: comm.odps ?? null,
+        tollMorsels: act.tollMorsels ?? null,
       };
       for (const p of prices(morsels, money)) {
         out.push({
           ...base, ...p,
           key: listingKey('ext-action', ext.name, act.id, p.unit, p.currency),
-          sourceHash: contentHash([base.title, base.description, base.plans, base.usageTerms, base.provenance, base.odps, p]),
+          sourceHash: contentHash([base.title, base.description, base.plans, base.usageTerms, base.provenance, base.odps, base.tollMorsels, p]),
         });
       }
     }
@@ -251,13 +257,14 @@ async function desiredFromAgentOffers(
         title: offer.title || `${agent.name}: ${offer.id}`, description: offer.ask ?? '',
         plans: [] as OfferingPlan[], usageTerms: usageTermsOf(offer.usageTerms), tags: (offer.tags ?? []) as string[],
         provenance: provenanceOf(offer.provenance), odps: offer.odps ?? null,
+        tollMorsels: offer.tollMorsels ?? null,
         taskSpec: { inputSchema: offer.inputSchema ?? {}, outputSchema: offer.outputSchema ?? {} },
       };
       for (const p of prices(morsels, money)) {
         out.push({
           ...base, ...p,
           key: listingKey('agent-work', coord.ext, coord.action, p.unit, p.currency),
-          sourceHash: contentHash([base.title, base.description, base.taskSpec, base.usageTerms, base.provenance, base.odps, base.tags, p]),
+          sourceHash: contentHash([base.title, base.description, base.taskSpec, base.usageTerms, base.provenance, base.odps, base.tollMorsels, base.tags, p]),
         });
       }
     }
@@ -317,7 +324,7 @@ export async function reconcileOwnerOfferings(
         title: d.title, description: d.description,
         unit: d.unit, basePrice: d.basePrice, currency: d.currency, plans: d.plans,
         ...(d.taskSpec ? { taskSpec: d.taskSpec } : {}),
-        provenance: d.provenance, odps: d.odps, usageTerms: d.usageTerms, tags: d.tags,
+        provenance: d.provenance, odps: d.odps, tollMorsels: d.tollMorsels, usageTerms: d.usageTerms, tags: d.tags,
         state: 'listed', auto: true, sourceHash: d.sourceHash, createdAt: now, updatedAt: now,
       };
       if (!dryRun) await putOffering(storage, offering);
@@ -344,6 +351,9 @@ export async function reconcileOwnerOfferings(
       // the provider already made — an emptied legal basis is worse than a stale one.
       ...(d.provenance ? { provenance: d.provenance } : {}),
       ...(d.odps ? { odps: d.odps } : {}),
+      // Pacing IS overwritten from the source even when cleared: unlike an attestation, a stale brake
+      // the provider has since removed keeps charging consumers for a limit nobody asked for.
+      tollMorsels: d.tollMorsels,
       state: 'listed', auto: true, sourceHash: d.sourceHash, updatedAt: now,
     };
     if (!dryRun) await putOffering(storage, updated);

@@ -16,6 +16,8 @@
  *   const gate = await authorizeAndCharge(storage, consumerGaii, ext, action, priceMicros);
  *   if (!gate.ok) return res.status(402)...;
  * @version-history
+ *   v1.4.0 — 2026-07-25 — Contracts capture `tollMorsels` at signature: raising the pacing burn later
+ *     governs new contracts, never ones already agreed.
  *   v1.3.0 — 2026-07-21 — Contract history: archiveEntitlement + listEntitlementHistoryByConsumer/ByProvider
  *     (superseded contracts survive the live-key overwrite for the "past contracts" view — renegotiation).
  *   v1.2.0 — 2026-07-21 — Add optional `surface` (AppToolSurface) so a contract can bind an app-tool's pinned
@@ -190,6 +192,7 @@ export async function createEntitlement(
     consumerGaii: string; appId?: string | null; providerGhii: string; ext: string; action: string; capabilityLabel?: string;
     unit: EntitlementUnit; pricePerCall: number; currency?: string | null; pricing?: PricingSpec | null;
     capUnits?: number | null; rakePercent?: number | null; contractRef: string; surface?: SellableSurface | null;
+    tollMorsels?: number | null;
     escrowParty?: 'consumer' | 'provider' | null; createdBy: string; carrySpend?: MeteredEntitlement | null;
   },
 ): Promise<MeteredEntitlement> {
@@ -213,6 +216,8 @@ export async function createEntitlement(
       calls: input.carrySpend?.budget.calls ?? 0,
     },
     rakePercent: input.rakePercent ?? null,
+    // Captured at signature, like the price: a provider raising their pacing later governs NEW contracts.
+    tollMorsels: input.tollMorsels ?? input.carrySpend?.tollMorsels ?? null,
     contractRef: input.contractRef,
     escrowParty: input.escrowParty ?? null,
     state: 'active',
