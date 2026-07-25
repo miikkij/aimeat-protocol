@@ -60,6 +60,12 @@ export const CONFIG_FIELDS: ConfigFieldDef[] = [
   // ── Morsel Policy (mutable) ──
   { key: 'welcomeBonus', dotPath: 'morsel_policy.welcome_bonus', envVar: 'AIMEAT_WELCOME_BONUS', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Morsels granted to new agents', range: '0-10000' },
   { key: 'dailyAllowance', dotPath: 'morsel_policy.daily_allowance', envVar: 'AIMEAT_DAILY_ALLOWANCE', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Daily morsel allowance per agent', range: '0-10000' },
+  // The pacing floor sits with the morsel policy because that is what it is: how fast the daily
+  // allowance lets anyone consume a capability, whatever they pay for it in.
+  { key: 'pacingTollDefault', dotPath: 'morsel_policy.pacing_toll_default', envVar: 'AIMEAT_PACING_TOLL_DEFAULT', type: 'number',
+    validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0 && (v as number) <= 100, immutable: false,
+    description: 'Morsels burned per metered call when a capability declares no toll of its own. Bounds the call RATE for every capability, including money-priced ones. 0 = off; at 1 a consumer can make about 500 calls a day.',
+    range: '0-100' },
   { key: 'dailyAllowanceCap', dotPath: 'morsel_policy.daily_allowance_cap', envVar: 'AIMEAT_DAILY_ALLOWANCE_CAP', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Max balance for daily allowance eligibility', range: '0-100000' },
   { key: 'burnRate', dotPath: 'morsel_policy.burn_rate', envVar: 'AIMEAT_BURN_RATE', type: 'float', validate: v => typeof v === 'number' && (v as number) >= 0 && (v as number) <= 1, immutable: false, description: 'Fraction of network fees burned', range: '0.0-1.0' },
   { key: 'maxOperatorMintPerDay', dotPath: 'morsel_policy.max_operator_mint_per_day', envVar: 'AIMEAT_MAX_OPERATOR_MINT_PER_DAY', type: 'number', validate: v => typeof v === 'number' && Number.isInteger(v) && (v as number) >= 0, immutable: false, description: 'Max morsels operator can mint per day', range: '0-1000000' },
