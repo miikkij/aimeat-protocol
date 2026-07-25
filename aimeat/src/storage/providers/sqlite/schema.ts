@@ -19,6 +19,9 @@
  *     active rows only, archived rows in memory_archive_fts, trigger-routed by archived).
  *   v1.2.0 — 2026-07-13 — Split DDL into schema-tables-1/2/3.ts (max-file-lines); pure
  *     extraction — table/index creation order and every SQL string are unchanged.
+ *   v1.3.0 — 2026-07-25 — One-live-grant-per-(owner, app): dedupe app_grants (revoke every
+ *     stale duplicate) then enforce it with a partial unique index. Mirrors Postgres
+ *     migration 0012. Dedupe must precede the index or boot crashes on existing data.
  */
 import type Database from 'better-sqlite3';
 import { applySchemaTables1 } from './schema-tables-1.js';
@@ -184,6 +187,27 @@ export function initializeSchema(db: Database.Database): void {
                ) ranked WHERE ranked.rn = 1
              )`);
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_ghii_emailHash ON ghiis(emailHash) WHERE emailHash IS NOT NULL');
+
+  // One-live-grant-per-(owner, app) invariant. The authorization_code exchange used to INSERT
+  // unconditionally while the silent SSO bridge upserted, so every pass through the consent flow
+  // (which auto-approves an own app with no visible prompt) stacked another row: one account reached
+  // 86 grants with the same app listed many times. Worse than untidy — only the newest row keeps a
+  // live refresh hash, so the stale ones sat at revoked=0 and the Access tab presented dead grants as
+  // active access. Dedupe FIRST (a duplicate would make CREATE UNIQUE INDEX throw and crash boot):
+  // per (owner, app) keep the freshest live row (most recently used, then most recently created) and
+  // revoke the losers exactly the way DELETE /v1/app-grants/:id does — revoked + refresh hash nulled.
+  db.exec(`UPDATE app_grants SET revoked = 1, refreshTokenHash = NULL
+           WHERE revoked = 0
+             AND grantId NOT IN (
+               SELECT grantId FROM (
+                 SELECT grantId, ROW_NUMBER() OVER (
+                   PARTITION BY owner, app
+                   ORDER BY lastUsedAt DESC, createdAt DESC, grantId DESC
+                 ) AS rn
+                 FROM app_grants WHERE revoked = 0
+               ) ranked WHERE ranked.rn = 1
+             )`);
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_app_grants_owner_app ON app_grants(owner, app) WHERE revoked = 0');
 
   // Organism archive — partial index over the ACTIVE working set only. Keeps the live owner/prefix
   // scans (the AI-material reads) physically small as archived rows accumulate. Created AFTER the

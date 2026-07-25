@@ -4,6 +4,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.17.0 — 2026-07-25 — .ag-scope-toggle: the Connected Apps scope count is now the disclosure
+ *     button for its badge list (button reset so it still renders as a plain .badge).
  *   v2.16.2 — 2026-07-21 — App-shell scroll model (theme.css v1.24.0): .pf-sidebar sticks to top:0 of
  *     the new .page-content scroll region (was top:var(--nav-height) against the window) and caps at
  *     calc(100dvh − nav-height) so its nav list scrolls without a header-height gap.
@@ -1618,6 +1620,10 @@
 
 /* ── Access tab ── */
 .pf .access-mono     { font-family: monospace; font-size: .75rem; word-break: break-all; color: var(--muted); }
+/* Scope count doubles as the disclosure control for the badge list it summarises: button reset so a
+   <button> carrying .badge looks exactly like the static badges elsewhere in the card. */
+.pf .ag-scope-toggle { border: 0; font-family: inherit; font-size: .66rem; font-weight: 600; cursor: pointer; }
+.pf .ag-scope-toggle:hover { filter: brightness(1.1); }
 .pf .access-key-blur { filter: blur(4px); transition: filter .2s; }
 .pf .access-key-blur.revealed { filter: none; }
 .pf .access-card-warn { border-color: var(--warn); cursor: pointer; }

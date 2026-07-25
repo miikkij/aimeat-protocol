@@ -38,6 +38,12 @@
  *     originBound; GET /request/:id exposes app_owner + origin_bound so the consent page can
  *     auto-approve the owner's OWN app (silent-bridge policy); the authorization_code token
  *     response carries app + own so the SDK's pill/gear metadata stays correct via this path too.
+ *   v1.6.0 — 2026-07-25 — One live grant per (owner, app). The authorization_code exchange upserts
+ *     instead of always creating: it used to stack a new row on every silent auto-approval (own app
+ *     / already-covered scopes), so grants accumulated — 86 on one account — and since only the
+ *     newest row kept a live refresh hash, the stale ones showed in the Access tab as active access
+ *     that nothing could use. Both consent paths now resolve the live grant via a direct
+ *     getAppGrantByOwnerAndApp lookup, and a partial unique index enforces the invariant in the DB.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -315,6 +321,46 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     res.json(success(config.nodeId, { redirect_url: url.toString() }));
   });
 
+  /**
+   * Establish the owner's SINGLE live grant for an app: refresh the existing one, else create it.
+   * Both consent paths (silent SSO bridge, authorization_code exchange) go through here so neither
+   * can stack duplicates. `existing` is passed in because callers have already looked it up to make
+   * their own policy decision — no second query on the hot silent path.
+   *
+   * Scopes are replaced by what was just approved, never unioned: the consent screen's Advanced
+   * subset must be able to take access away, not only add it.
+   *
+   * The partial unique index on (owner, app) WHERE NOT revoked makes the invariant a DB guarantee,
+   * so two simultaneous first-time consents surface as a constraint violation instead of a duplicate
+   * row. Rather than failing the exchange, adopt the row that won the race.
+   */
+  async function upsertGrant(
+    spec: { app: string; appName: string; appOrigin: string; owner: string; gaii: string; scopes: string[] },
+    existing: { grantId: string } | null,
+  ): Promise<{ grantId: string; rawRefresh: string }> {
+    const rawRefresh = randomBytes(32).toString('hex');
+    const now = new Date().toISOString();
+    const patch = { refreshTokenHash: hashToken(rawRefresh), lastUsedAt: now, scopes: spec.scopes };
+    if (existing) {
+      await storage.updateAppGrant(existing.grantId, patch);
+      return { grantId: existing.grantId, rawRefresh };
+    }
+    const grantId = `appgrant-${randomBytes(16).toString('hex')}`;
+    try {
+      await storage.createAppGrant({
+        grantId, app: spec.app, appName: spec.appName, appOrigin: spec.appOrigin,
+        owner: spec.owner, gaii: spec.gaii, scopes: spec.scopes,
+        refreshTokenHash: patch.refreshTokenHash, createdAt: now, lastUsedAt: now, revoked: false,
+      });
+      return { grantId, rawRefresh };
+    } catch (err) {
+      const raced = await storage.getAppGrantByOwnerAndApp(spec.owner, spec.app);
+      if (!raced) throw err; // a genuine storage failure, not the unique-index race
+      await storage.updateAppGrant(raced.grantId, patch);
+      return { grantId: raced.grantId, rawRefresh };
+    }
+  }
+
   /** Mint a scoped access JWT for a grant: sub = owner GHII, role 'app', granted scopes only. */
   async function issueAccessToken(grant: { gaii: string; owner: string; scopes: string[]; grantId: string }): Promise<{ token: string; expiresIn: number }> {
     const token = await issueJWT(
@@ -394,7 +440,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     // Policy: own app → auto-approve requested scopes; otherwise require a prior non-revoked grant
     // that already covers them (remembered approval). Anything else needs the visible consent.
     const isOwnApp = owner === grantOwner;
-    const existing = (await storage.listAppGrantsByOwner(owner)).find(g => !g.revoked && g.app === grantTarget);
+    const existing = await storage.getAppGrantByOwnerAndApp(owner, grantTarget);
     let scopes: string[];
     if (isOwnApp) {
       scopes = requested.length ? requested : ['memory:read', 'memory:write', 'storage:read', 'storage:write'];
@@ -408,22 +454,12 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       return reply({ ok: false, error: 'consent_required', app: grantTarget, app_name: grantName, scope: requested.join(' ') });
     }
 
-    // Mint: reuse this owner's existing grant for the app, else create one.
+    // Mint: reuse this owner's live grant for the app, else create one (one live grant per app).
     const ownerGhii = `${owner}@${config.nodeId}`;
-    const rawRefresh = randomBytes(32).toString('hex');
-    const ts = new Date().toISOString();
-    let grantId: string;
-    if (existing) {
-      grantId = existing.grantId;
-      await storage.updateAppGrant(grantId, { refreshTokenHash: hashToken(rawRefresh), lastUsedAt: ts, scopes });
-    } else {
-      grantId = `appgrant-${randomBytes(16).toString('hex')}`;
-      await storage.createAppGrant({
-        grantId, app: grantTarget, appName: grantName, appOrigin: `https://${host}`,
-        owner, gaii: ownerGhii, scopes, refreshTokenHash: hashToken(rawRefresh),
-        createdAt: ts, lastUsedAt: ts, revoked: false,
-      });
-    }
+    const { grantId, rawRefresh } = await upsertGrant(
+      { app: grantTarget, appName: grantName, appOrigin: `https://${host}`, owner, gaii: ownerGhii, scopes },
+      existing,
+    );
     const { token, expiresIn } = await issueAccessToken({ gaii: ownerGhii, owner, scopes, grantId });
     // The owner's display name (if set) so the app's login pill can show a human label instead of the
     // raw GHII. Non-sensitive (it's the public profile name); falls back to '' → the SDK shows the GHII.
@@ -452,14 +488,17 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
         return res.status(400).json(error(config.nodeId, 'INVALID_GRANT', 'PKCE verification failed'));
       }
 
-      const grantId = `appgrant-${randomBytes(16).toString('hex')}`;
-      const rawRefresh = randomBytes(32).toString('hex');
-      const now = new Date().toISOString();
-      await storage.createAppGrant({
-        grantId, app: ac.app, appName: ac.appName, appOrigin: ac.appOrigin,
-        owner: ac.owner, gaii: ac.gaii, scopes: ac.scopes,
-        refreshTokenHash: hashToken(rawRefresh), createdAt: now, lastUsedAt: now, revoked: false,
-      });
+      // Upsert, never blind insert. The consent page auto-approves an owner's OWN app and any app
+      // whose live grant already covers the requested scopes, both with no visible prompt — so an
+      // unconditional create stacked a fresh row on every app load that missed the silent bridge
+      // (no apex session yet, a scope upgrade, or a path-form app with no per-app subdomain). One
+      // account reached 86 grants that way, and because only the newest row keeps a live refresh
+      // hash, the leftovers stayed revoked=false and the Access tab showed dead grants as live
+      // access. One live grant per (owner, app) — a partial unique index enforces it in the DB too.
+      const { grantId, rawRefresh } = await upsertGrant(
+        { app: ac.app, appName: ac.appName, appOrigin: ac.appOrigin, owner: ac.owner, gaii: ac.gaii, scopes: ac.scopes },
+        await storage.getAppGrantByOwnerAndApp(ac.owner, ac.app),
+      );
       const { token, expiresIn } = await issueAccessToken({ gaii: ac.gaii, owner: ac.owner, scopes: ac.scopes, grantId });
       // app + own: same metadata the silent bridge returns, so the SDK keeps the login pill's
       // grant-gear state correct when the session came through the visible consent flow instead.
