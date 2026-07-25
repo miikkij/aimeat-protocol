@@ -374,6 +374,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     x402Enabled: process.env.AIMEAT_X402_ENABLED === 'true',
     x402Network: process.env.AIMEAT_X402_NETWORK ?? 'base-sepolia',
     x402FacilitatorUrl: process.env.AIMEAT_X402_FACILITATOR_URL ?? 'https://x402.org/facilitator',
+    // OPTIONAL read-only RPC used to check that a seller's payout address is an account and not a
+    // contract. Unset = the check is skipped (a save never depends on a third party being up).
+    x402RpcUrl: process.env.AIMEAT_X402_RPC_URL ?? '',
     x402TestFacilitator: process.env.AIMEAT_X402_TEST_FACILITATOR === 'true',
     // Web Bot Auth (RFC 9421): sign the node's outbound safeFetch traffic with the node Ed25519
     // key so peers/CDNs can verify AIMEAT's agent traffic against the key directory at
@@ -494,6 +497,11 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     extensionTimeoutMs: parseInt(process.env.AIMEAT_EXT_TIMEOUT_MS ?? '5000', 10),
     extensionMaxApiCalls: parseInt(process.env.AIMEAT_EXT_MAX_API_CALLS ?? '500', 10),
     extensionMaxDebitPerCall: parseInt(process.env.AIMEAT_EXT_MAX_DEBIT ?? '100', 10),
+    // Morsels burned per metered call when the capability declares no toll of its own. Morsels
+    // replenish daily with a hard ceiling, so a non-zero value puts an absolute rate floor under
+    // every capability — including money-priced ones, whose only other brake is the buyer's budget.
+    // 0 (the default) keeps existing billing unchanged; raising it is an operator decision.
+    pacingTollDefault: parseInt(process.env.AIMEAT_PACING_TOLL_DEFAULT ?? '0', 10),
     extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
     maxExtensionsPerOwner: parseInt(process.env.AIMEAT_MAX_EXTENSIONS_PER_OWNER || '10', 10),
