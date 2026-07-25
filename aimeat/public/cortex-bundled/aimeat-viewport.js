@@ -163,6 +163,15 @@
     function refreshCaptures() {
       if (!twoMode) return;
       var wants = (mode === 'navigate') || spaceHeld;
+      /* Sweep first. The selector decides WHO gets an overlay, so an element that has left the set
+         must lose the one it already has. Only matching elements were visited, so a consumer that
+         excludes a frame at runtime — "let me use just this one" — kept a dead overlay sitting on
+         top of it and the frame stayed unclickable with no way to tell why. */
+      var stale = world.querySelectorAll('.' + P + '-capture');
+      for (var k = 0; k < stale.length; k++) {
+        var owner = stale[k].parentElement;
+        if (owner && owner.matches && !owner.matches(opts.captureSelector)) stale[k].remove();
+      }
       var targets = world.querySelectorAll(opts.captureSelector);
       for (var i = 0; i < targets.length; i++) {
         var el = targets[i];
@@ -391,6 +400,6 @@
     };
   }
 
-  AIMEAT.viewport = { create: create, VERSION: '1.0.3' };
+  AIMEAT.viewport = { create: create, VERSION: '1.0.4' };
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);

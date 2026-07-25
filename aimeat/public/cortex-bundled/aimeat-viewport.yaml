@@ -10,7 +10,7 @@ metadata:
     domain: canvas
 
 spec:
-  version: "1.0.3"
+  version: "1.0.4"
   license: MIT
   components:
     - type: prompt
