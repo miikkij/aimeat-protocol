@@ -47,6 +47,9 @@ const ALL_SUITES = [
     'test/e2e-app-grants.ts',
     'test/e2e-app-grants-tasks.ts',
     'test/e2e-app-silent.ts',
+    // Self-spawns with the app-origin flag ON: it needs a real app-grant token to prove the
+    // SSE change domains are scope-gated (an app must not learn what it has no scope for).
+    'test/e2e-sse.ts',
     'test/e2e-apps-backup.ts',
     'test/e2e-board-access.ts',
     'test/e2e-board-ttl.ts',
