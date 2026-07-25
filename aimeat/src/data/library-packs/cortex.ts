@@ -168,7 +168,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
       '<script src="{{BASE_URL}}/v1/cortex/aimeat-charts/libs/aimeat-charts.js"></script>',
     ],
     requires: ['chartjs'],
-    version: '1.1.0',
+    version: '1.1.1',
     license: 'MIT',
     apiSurface: 'AIMEAT.charts',
     aiDoc: [

@@ -10,7 +10,7 @@ metadata:
     domain: visualization
 
 spec:
-  version: "1.1.0"
+  version: "1.1.1"
   license: MIT
   components:
     - type: schema
