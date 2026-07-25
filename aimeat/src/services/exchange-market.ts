@@ -36,6 +36,7 @@ import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import { listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from './metered-entitlements.js';
 import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
+import { readCallTiming } from './call-timing.js';
 
 export type { AppToolSurface, AgentWorkSurface, SellableSurface };
 
@@ -390,6 +391,9 @@ export interface OfferingStats {
   consumers: number;           // distinct consuming identities
   listedAt: string;            // when the offering was first listed
   lastUsedAt: string | null;   // most recent contract activity (proxy: latest entitlement update with calls)
+  /** Observed delivery time, so a service commitment can be proposed from evidence rather than guessed.
+   *  Null until the capability has actually served calls (call-timing.ts). */
+  timing: { count: number; p50Ms: number; p95Ms: number; maxMs: number } | null;
 }
 
 /** Compute an offering's usage stats from the entitlements minted against its (provider, ext, action). */
@@ -403,7 +407,14 @@ export async function offeringStats(storage: Storage, o: Offering): Promise<Offe
     if (e.state === 'active') activeContracts += 1;
     if (e.budget.calls > 0 && (!lastUsedAt || e.updatedAt > lastUsedAt)) lastUsedAt = e.updatedAt;
   }
-  return { activeContracts, totalContracts: ents.length, totalCalls, totalSettledUnits, consumers: consumers.size, listedAt: o.createdAt, lastUsedAt };
+  // Observed delivery time comes from the timing record, not from the entitlements: a contract knows what
+  // it paid, only the call itself knows how long it took.
+  const t = await readCallTiming(storage, o.providerGhii, o.ext, o.action);
+  return {
+    activeContracts, totalContracts: ents.length, totalCalls, totalSettledUnits,
+    consumers: consumers.size, listedAt: o.createdAt, lastUsedAt,
+    timing: t ? { count: t.count, p50Ms: t.p50Ms, p95Ms: t.p95Ms, maxMs: t.maxMs } : null,
+  };
 }
 
 /**

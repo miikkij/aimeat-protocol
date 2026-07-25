@@ -2252,6 +2252,8 @@
 .od-blocked { flex-basis: 100%; font-size: .8rem; color: #f59e0b; margin-top: 4px; }
 .od-ok { color: #34d399; }
 .od-err { color: var(--accent); }
+/* Measured delivery time offered as the basis for a commitment (never as the commitment itself). */
+.od-measured { font-size: 12px; color: var(--text-muted); margin: 4px 0 8px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 </style>
 </head>
 <body data-active-view="library">
@@ -3128,6 +3130,21 @@
       "odps.suggestUnparseable": "The model did not return usable JSON",
       "odps.needLogin": "Sign in to use your own AI key",
       "odps.aiUnavailable": "AI is not available here",
+      "odps.genSample": "Generate from a real call",
+      "odps.genSampleHint": "Runs this capability once as you (free on your own capability), stores the answer as a public file, and puts its URL above. A buyer can then open the sample instead of taking your word for it.",
+      "odps.genSampleInput": '{ "query": "Nokia" }  — the input to call with',
+      "odps.genSampleRunning": "Calling the capability…",
+      "odps.genSampleDone": "Sample stored and linked",
+      "odps.genSampleFailed": "The call did not produce a sample",
+      "odps.genSampleBadJson": "That input is not valid JSON.",
+      "odps.genSampleNoBinding": "This tool has no capability binding to call.",
+      "odps.measured": "Measured: {n} calls, median {p50} ms, p95 {p95} ms.",
+      "odps.measuredNote": "measured p95 with headroom",
+      "odps.useMeasured": "Use measured + 30%",
+      "odps.noMeasurement": "No delivery time measured yet. Serve some calls first, then commit to a number you can keep.",
+      "odps.inheritedIs": "inherited:",
+      "odps.inheritedNone": "no app-level attestation set yet",
+      "odps.openAppDefaults": "Edit app-level defaults",
       "odps.blockedSchema": "Cannot be listed: the tool needs a non-empty input AND output schema.",
       "odps.blockedBinding": "Cannot be listed: the tool needs a capability binding (action_id).",
       "odps.blockedPrice": "Cannot be listed: the tool needs a price.",
@@ -3710,6 +3727,21 @@
       "odps.suggestUnparseable": "Malli ei palauttanut käyttökelpoista JSONia",
       "odps.needLogin": "Kirjaudu sisään käyttääksesi omaa AI-avaintasi",
       "odps.aiUnavailable": "Tekoäly ei ole käytettävissä täällä",
+      "odps.genSample": "Luo oikeasta kutsusta",
+      "odps.genSampleHint": "Ajaa tämän kyvykkyyden kerran sinuna (oma kyvykkyys on maksuton), tallentaa vastauksen julkiseksi tiedostoksi ja asettaa sen osoitteen yllä olevaan kenttään. Ostaja voi silloin avata näytteen sen sijaan että uskoisi sanaasi.",
+      "odps.genSampleInput": '{ "query": "Nokia" }  — syöte jolla kutsutaan',
+      "odps.genSampleRunning": "Kutsutaan kyvykkyyttä…",
+      "odps.genSampleDone": "Näyte tallennettu ja linkitetty",
+      "odps.genSampleFailed": "Kutsu ei tuottanut näytettä",
+      "odps.genSampleBadJson": "Syöte ei ole kelvollista JSONia.",
+      "odps.genSampleNoBinding": "Tällä työkalulla ei ole kyvykkyyssidontaa jota kutsua.",
+      "odps.measured": "Mitattu: {n} kutsua, mediaani {p50} ms, p95 {p95} ms.",
+      "odps.measuredNote": "mitattu p95 pelivaralla",
+      "odps.useMeasured": "Käytä mitattua + 30 %",
+      "odps.noMeasurement": "Toimitusaikaa ei ole vielä mitattu. Palvele ensin kutsuja, sitoudu vasta sitten lukuun jonka pystyt pitämään.",
+      "odps.inheritedIs": "peritään:",
+      "odps.inheritedNone": "appitason vakuutusta ei ole vielä asetettu",
+      "odps.openAppDefaults": "Muokkaa appitason oletuksia",
       "odps.blockedSchema": "Ei listaudu: työkalu tarvitsee ei-tyhjän syöte- JA tulosskeeman.",
       "odps.blockedBinding": "Ei listaudu: työkalu tarvitsee kyvykkyyssidonnan (action_id).",
       "odps.blockedPrice": "Ei listaudu: työkalu tarvitsee hinnan.",
@@ -5179,14 +5211,26 @@
       provenance: Object.keys(prov).length ? prov : void 0
     };
   }
-  function odpsToolFieldsHtml(tool, offeringId) {
+  function odpsToolFieldsHtml(tool, offeringId, ctx) {
+    ctx = ctx || {};
     var o = tool && tool.odps || {};
     var p = tool && tool.provenance || {};
+    var inherited = ctx.appProvenance || {};
+    var timing = ctx.timing || null;
     var head = '<div class="od-tool-head">' + dtlBtn((odToolOpen ? "▾ " : "▸ ") + t("odps.toolTitle"), "window._launcher.odpsToggleTool()") + (offeringId ? '<a class="od-link" href="' + apiBase() + "/v1/exchange/offerings/" + encodeURIComponent(offeringId) + '/odps.yaml" target="_blank" rel="noopener">' + escapeHtml(t("odps.viewYaml")) + "</a>" : "") + "</div>";
     if (!odToolOpen) return head;
     return head + '<div class="od-form"><div class="dtl-sync none od-note">' + escapeHtml(t("odps.toolHint")) + '</div><div class="dtl-btn-row od-actions">' + dtlBtn(t("odps.suggest"), "window._launcher.odpsSuggest()", { variant: "primary", disabled: odBusy }) + '</div><div class="dtl-ai-status" id="od-tool-status"></div>' + select("odt-type", t("odps.productType"), PRODUCT_TYPES, o.productType || "") + textarea("odt-value", t("odps.valueProposition"), o.valueProposition, t("odps.valuePlaceholder"), 2) + '<div class="od-grid"><div class="od-col">' + input("odt-categories", t("odps.categories"), (o.categories || []).join(", "), "company data, finland") + '</div><div class="od-col">' + input("odt-standards", t("odps.standards"), (o.standards || []).join(", "), "ISO 8000") + "</div></div>" + textarea("odt-usecases", t("odps.useCases"), (o.useCases || []).map(function(u) {
       return u.title + (u.description ? " | " + u.description : "") + (u.url ? " | " + u.url : "");
-    }).join("\n"), t("odps.useCasesPlaceholder"), 2) + input("odt-sample", t("odps.contentSample"), o.contentSample, "https://example.org/sample.json", "url") + textarea("odt-sla", t("odps.sla"), dimsToText(o.sla), t("odps.slaPlaceholder"), 2) + textarea("odt-quality", t("odps.quality"), dimsToText(o.dataQuality), t("odps.qualityPlaceholder"), 2) + '<div class="od-attest"><div class="dtl-stat-label od-attest-head">' + escapeHtml(t("odps.toolAttestation")) + '</div><div class="dtl-sync none od-note">' + escapeHtml(t("odps.toolAttestationHint")) + "</div>" + input("odt-source", t("odps.source"), p.source, t("odps.inherited")) + textarea("odt-transformations", t("odps.transformations"), p.transformations, t("odps.transformationsPlaceholder"), 2) + "</div></div>";
+    }).join("\n"), t("odps.useCasesPlaceholder"), 2) + input("odt-sample", t("odps.contentSample"), o.contentSample, "https://example.org/sample.json", "url") + // A sample a buyer can open beats a sentence claiming one exists. Run the capability once, store the
+    // answer as a public file, put its URL here. Nothing is invented: it IS the output.
+    (ctx.actionId ? '<div class="dtl-btn-row od-actions">' + dtlBtn(t("odps.genSample"), "window._launcher.odpsGenerateSample()", { disabled: odBusy }) + '</div><div class="dtl-sync none od-note">' + escapeHtml(t("odps.genSampleHint")) + '</div><textarea id="odt-sample-input" class="modal-input od-input" rows="2" placeholder="' + escapeHtml(t("odps.genSampleInput")) + '">' + escapeHtml(ctx.sampleInput || "") + '</textarea><div class="dtl-ai-status" id="od-sample-status"></div>' : "") + textarea("odt-sla", t("odps.sla"), dimsToText(o.sla), t("odps.slaPlaceholder"), 2) + // Measured, then committed — in that order. The node reports what this capability actually does;
+    // the number that becomes a promise is still chosen by a person.
+    (timing && timing.count > 0 ? '<div class="od-measured">' + escapeHtml(t("odps.measured").replace("{n}", String(timing.count)).replace("{p50}", String(timing.p50Ms)).replace("{p95}", String(timing.p95Ms))) + " " + dtlBtn(t("odps.useMeasured"), "window._launcher.odpsUseMeasured(" + Math.ceil(timing.p95Ms * 1.3) + ")") + "</div>" : '<div class="dtl-sync none od-note">' + escapeHtml(t("odps.noMeasurement")) + "</div>") + textarea("odt-quality", t("odps.quality"), dimsToText(o.dataQuality), t("odps.qualityPlaceholder"), 2) + '<div class="od-attest"><div class="dtl-stat-label od-attest-head">' + escapeHtml(t("odps.toolAttestation")) + '</div><div class="dtl-sync none od-note">' + escapeHtml(t("odps.toolAttestationHint")) + "</div>" + input(
+      "odt-source",
+      t("odps.source"),
+      p.source,
+      inherited.source ? t("odps.inheritedIs") + " " + inherited.source : t("odps.inheritedNone")
+    ) + textarea("odt-transformations", t("odps.transformations"), p.transformations, t("odps.transformationsPlaceholder"), 2) + '<div class="dtl-btn-row od-actions">' + dtlBtn(t("odps.openAppDefaults"), "window._launcher.odpsToggleDefaults()") + "</div></div></div>";
   }
   function readOdpsToolFields(base4) {
     if (!odToolOpen) {
@@ -5231,6 +5275,88 @@
       odps: Object.keys(odps).length ? odps : void 0,
       provenance: Object.keys(prov).length ? prov : void 0
     };
+  }
+  function odpsUseMeasured(ms) {
+    var el = document.getElementById("odt-sla");
+    if (!el) return;
+    var line = "responseTime " + ms + " milliseconds — " + t("odps.measuredNote");
+    el.value = el.value.trim() ? el.value.trim() + "\n" + line : line;
+  }
+  function odpsGenerateSample(ctx, rerender3) {
+    var statusEl = document.getElementById("od-sample-status");
+    var token = getCortexOwnerToken();
+    if (!token) {
+      if (statusEl) statusEl.textContent = t("odps.needLogin");
+      return;
+    }
+    var base4 = apiBase();
+    var raw = (document.getElementById("odt-sample-input") || {}).value || "{}";
+    var input2;
+    try {
+      input2 = JSON.parse(raw);
+    } catch (e) {
+      if (statusEl) {
+        statusEl.className = "dtl-ai-status od-err";
+        statusEl.textContent = t("odps.genSampleBadJson");
+      }
+      return;
+    }
+    var m = /^ext:([^:]+):(.+)$/.exec(ctx.actionId || "");
+    if (!m) {
+      if (statusEl) statusEl.textContent = t("odps.genSampleNoBinding");
+      return;
+    }
+    odBusy = true;
+    if (statusEl) {
+      statusEl.className = "dtl-ai-status";
+      statusEl.textContent = t("odps.genSampleRunning");
+    }
+    fetch(base4 + "/v1/ext/" + encodeURIComponent(m[1]) + "/" + encodeURIComponent(m[2]), {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify(input2)
+    }).then(function(r) {
+      return r.json().then(function(j) {
+        return { ok: r.ok, j };
+      });
+    }).then(function(res) {
+      if (!res.ok || !res.j || res.j.ok === false) {
+        var msg = res.j && res.j.error && res.j.error.message || t("odps.genSampleFailed");
+        throw new Error(msg);
+      }
+      var payload = JSON.stringify(res.j.data !== void 0 ? res.j.data : res.j, null, 2);
+      var key = "odps.sample." + (ctx.appId || "app") + "." + (ctx.toolName || "tool") + ".json";
+      return fetch(base4 + "/v1/storage", {
+        method: "POST",
+        headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key,
+          visibility: "public",
+          mime_type: "application/json",
+          data: btoa(unescape(encodeURIComponent(payload)))
+        })
+      }).then(function(r) {
+        return r.json();
+      }).then(function(up) {
+        if (!up || up.ok === false) throw new Error(up && up.error && up.error.message || t("odps.genSampleFailed"));
+        var url = base4 + "/v1/pub/" + encodeURIComponent(ctx.ownerGhii || "") + "/" + key;
+        var field = document.getElementById("odt-sample");
+        if (field) field.value = url;
+        var st = document.getElementById("od-sample-status");
+        if (st) {
+          st.className = "dtl-ai-status od-ok";
+          st.textContent = "✔ " + t("odps.genSampleDone");
+        }
+        odBusy = false;
+      });
+    }).catch(function(e) {
+      odBusy = false;
+      var st = document.getElementById("od-sample-status");
+      if (st) {
+        st.className = "dtl-ai-status od-err";
+        st.textContent = "✘ " + (e.message || t("odps.genSampleFailed"));
+      }
+    });
   }
   function odpsToggleDefaults(rerender3) {
     odDefaultsOpen = !odDefaultsOpen;
@@ -5328,6 +5454,11 @@
   var mzEditing = -1;
   var mzBusy = false;
   var mzOfferings = {};
+  var mzTiming = {};
+  var mzNodeId = "";
+  function mzOwnerGhiiOf() {
+    return mzOwner && mzNodeId ? mzOwner + "@" + mzNodeId : "";
+  }
   function apiBase2() {
     var cfg = loadConfig();
     return (cfg.aimeatUrl || "").replace(/\/+$/, "");
@@ -5373,15 +5504,21 @@
   }
   function loadOfferings() {
     var ext = "apptool:" + mzOwner + "/" + mzAppId;
-    fetch(apiBase2() + "/v1/exchange/offerings?q=" + encodeURIComponent(mzAppId)).then(function(r) {
+    fetch(apiBase2() + "/v1/exchange/offerings?stats=1&q=" + encodeURIComponent(mzAppId)).then(function(r) {
       return r.json();
     }).then(function(res) {
+      if (res && res.node) mzNodeId = res.node;
       var list = res && res.ok && res.data && res.data.offerings || [];
       var next = {};
+      var timing = {};
       for (var i = 0; i < list.length; i++) {
-        if (list[i].ext === ext && list[i].state === "listed") next[list[i].action] = list[i].offeringId;
+        if (list[i].ext === ext && list[i].state === "listed") {
+          next[list[i].action] = list[i].offeringId;
+          if (list[i].stats && list[i].stats.timing) timing[list[i].action] = list[i].stats.timing;
+        }
       }
       mzOfferings = next;
+      mzTiming = timing;
       rerender();
     }).catch(function() {
     });
@@ -5421,7 +5558,14 @@
     })[0];
     var money2Major = second ? String(second.amount / MONEY_UNIT) : "";
     var cur2 = second && second.currency || (cur === "EUR" ? "USD" : "EUR");
-    return '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="mz-name">' + t("monetize.name") + '</label><input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || "") + '" placeholder="summarize" style="margin:4px 0 8px" /><label class="dtl-stat-label" for="mz-desc">' + t("monetize.desc") + '</label><input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || "") + '" style="margin:4px 0 8px" /><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-morsels">' + t("monetize.priceMorsels") + '</label><input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" style="margin:4px 0 8px" /></div><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money">' + t("monetize.priceMoney") + '</label><input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" style="margin:4px 0 8px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency">' + t("monetize.currency") + "</label>" + currencySelect("mz-currency", cur) + '</div></div><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money2">' + t("monetize.money2") + '</label><input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" style="margin:4px 0 4px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency2">' + t("monetize.currency2") + "</label>" + currencySelect("mz-currency2", cur2) + '</div></div><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.money2Hint") + '</div><label class="dtl-stat-label" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? " checked" : "") + " />" + t("monetize.exchange") + '</label><div class="dtl-sync none" style="margin:4px 0 8px">' + t("monetize.exchangeHint") + "</div>" + odpsToolFieldsHtml(tool, mzOfferings[tool.name || ""] || "") + '<label class="dtl-stat-label" for="mz-action">' + t("monetize.actionId") + '</label><input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || "") + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.actionIdHint") + '</div><label class="dtl-stat-label" for="mz-agent">' + t("monetize.agent") + '</label><input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || "") + '" placeholder="assistant" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("monetize.agentHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.monetizeSaveTool()", { variant: "primary", disabled: mzBusy }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.monetizeCancelEdit()") + '</div><div class="dtl-ai-status" id="mz-status"></div></div>';
+    return '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="mz-name">' + t("monetize.name") + '</label><input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || "") + '" placeholder="summarize" style="margin:4px 0 8px" /><label class="dtl-stat-label" for="mz-desc">' + t("monetize.desc") + '</label><input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || "") + '" style="margin:4px 0 8px" /><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-morsels">' + t("monetize.priceMorsels") + '</label><input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" style="margin:4px 0 8px" /></div><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money">' + t("monetize.priceMoney") + '</label><input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" style="margin:4px 0 8px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency">' + t("monetize.currency") + "</label>" + currencySelect("mz-currency", cur) + '</div></div><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money2">' + t("monetize.money2") + '</label><input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" style="margin:4px 0 4px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency2">' + t("monetize.currency2") + "</label>" + currencySelect("mz-currency2", cur2) + '</div></div><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.money2Hint") + '</div><label class="dtl-stat-label" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? " checked" : "") + " />" + t("monetize.exchange") + '</label><div class="dtl-sync none" style="margin:4px 0 8px">' + t("monetize.exchangeHint") + "</div>" + odpsToolFieldsHtml(tool, mzOfferings[tool.name || ""] || "", {
+      appId: mzAppId,
+      ownerGhii: mzOwnerGhiiOf(),
+      toolName: tool.name || "",
+      actionId: tool.action_id || "",
+      appProvenance: mzDoc && mzDoc.provenance || null,
+      timing: mzTiming[tool.name || ""] || null
+    }) + '<label class="dtl-stat-label" for="mz-action">' + t("monetize.actionId") + '</label><input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || "") + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.actionIdHint") + '</div><label class="dtl-stat-label" for="mz-agent">' + t("monetize.agent") + '</label><input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || "") + '" placeholder="assistant" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("monetize.agentHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.monetizeSaveTool()", { variant: "primary", disabled: mzBusy }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.monetizeCancelEdit()") + '</div><div class="dtl-ai-status" id="mz-status"></div></div>';
   }
   function monetizeSectionInner() {
     if (mzState === "off") return "";
@@ -5452,6 +5596,18 @@
   }
   function odpsToggleToolUi() {
     odpsToggleTool(rerender);
+  }
+  function odpsGenerateSampleUi() {
+    var tool = mzEditing >= 0 && mzDoc && mzDoc.tools[mzEditing] ? mzDoc.tools[mzEditing] : {};
+    odpsGenerateSample({
+      appId: mzAppId,
+      ownerGhii: mzOwnerGhiiOf(),
+      toolName: (document.getElementById("mz-name") || {}).value || tool.name || "",
+      actionId: (document.getElementById("mz-action") || {}).value || tool.action_id || ""
+    }, rerender);
+  }
+  function odpsUseMeasuredUi(ms) {
+    odpsUseMeasured(ms);
   }
   function odpsSuggestUi() {
     var tool = mzEditing >= 0 && mzDoc && mzDoc.tools[mzEditing] ? mzDoc.tools[mzEditing] : {};
@@ -9866,6 +10022,8 @@
     odpsToggleTool: odpsToggleToolUi,
     odpsSuggest: odpsSuggestUi,
     odpsSaveDefaults,
+    odpsGenerateSample: odpsGenerateSampleUi,
+    odpsUseMeasured: odpsUseMeasuredUi,
     editAppDetails,
     showSubdomainModal,
     openConsents,
