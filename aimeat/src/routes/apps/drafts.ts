@@ -7,6 +7,9 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — Draft save carries the live app's cortex.agents (bundled crew-defs)
  *     into the draft manifest so a draft-publish never drops them (Agent-Bundled Apps).
+ *   v1.2.0 — 2026-07-25 — POST .../frame-token: a frame grant naming the CALLER'S origin as the
+ *     one page allowed to embed this app. Owner-only. Constant-size, unlike listing origins in
+ *     frame-ancestors, which scaled with the owner's app count and 502'd production.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -15,7 +18,7 @@ import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
-import { generateDraftToken } from '../../services/draft-token.js';
+import { generateDraftToken, generateFrameToken } from '../../services/draft-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
 import { decodeStrictBase64 } from '../../utils/base64.js';
@@ -161,6 +164,48 @@ export function registerDraftRoutes(
             token,
             expires_in_seconds: ttlSeconds,
             note: 'Open this URL in a new top-level tab to test the draft on a real origin (mic/camera prompts work). The link is single-app, owner-only, and expires shortly.',
+        }));
+    });
+
+    // POST /v1/apps/:owner/:filename/frame-token — mint a FRAME GRANT: permission for ONE origin
+    // to embed this app. The caller's own Origin is what gets written into the grant; a body
+    // field would let a page ask for permission on someone else's behalf. Owner-only, because a
+    // grant to frame an app you do not own is a clickjacking primitive.
+    //
+    // Why a grant at all, rather than listing allowed origins in the app's frame-ancestors: that
+    // list grows with how many apps the owner has, and at 76 it overran the reverse proxy's
+    // header buffer and 502'd every app subdomain. A grant puts exactly one origin in the header,
+    // so its size does not depend on anything the user accumulates.
+    router.post('/v1/apps/:owner/:filename/frame-token', requireAuth(), async (req, res) => {
+        const filename = req.params.filename as string;
+        const { owner, ownerGhii } = await canonicalOwner(req);
+
+        const app = await storage.getAppByOwnerName(owner, filename);
+        if (!app) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No app "${filename}" you own`));
+            return;
+        }
+        if (!config.appOriginEnabled || !config.appHost) {
+            res.status(409).json(error(config.nodeId, 'APP_ORIGIN_DISABLED', 'App origins are not enabled on this node, so there is nothing to frame.'));
+            return;
+        }
+
+        const requester = String(req.get('origin') ?? '');
+        if (!/^https?:\/\/[a-z0-9.-]+(:\d+)?$/i.test(requester)) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A frame grant is issued to the calling page\'s Origin, and this request carried none.'));
+            return;
+        }
+
+        const ttlSeconds = 43200;
+        const token = await generateFrameToken({ sub: ownerGhii, filename, origin: requester }, ttlSeconds);
+        const originBase = await appOriginUrl(config, storage, owner, filename);
+        const sep = originBase.includes('?') ? '&' : '?';
+        res.json(success(config.nodeId, {
+            frame_url: `${originBase}${sep}frame=${encodeURIComponent(token)}`,
+            app_origin_url: originBase,
+            granted_to: requester,
+            expires_in_seconds: ttlSeconds,
+            note: 'Use frame_url as an iframe src. The grant names this one origin and no other, and it expires.',
         }));
     });
 

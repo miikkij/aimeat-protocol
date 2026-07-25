@@ -61,7 +61,12 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_APP_HOST: APP_HOST,
         AIMEAT_APP_ORIGIN_ENABLED: 'true',
         AIMEAT_RL_GLOBAL: '10000', AIMEAT_RL_AUTH: '1000', AIMEAT_RL_WORK: '1000',
-        AIMEAT_RL_MEMORY: '1000', AIMEAT_RL_BOARDS: '1000',
+        // Phase 4 publishes 100 apps on purpose; the catalogue limiter must not be the thing
+        // that stops it, or the scale assertion silently measures a smaller number.
+        AIMEAT_RL_MEMORY: '1000', AIMEAT_RL_BOARDS: '1000', AIMEAT_RL_CATALOGUE: '10000',
+        // The per-owner app quota defaults to 50, and production is already past that (76), so a
+        // scale test capped at 50 would measure less than reality. 200 keeps the headroom honest.
+        AIMEAT_MAX_APPS_PER_AGENT: '200',
         AIMEAT_DEFAULT_AGENT_SCOPES: '*',
     };
     const child = spawn('node', ['--import', 'tsx', 'src/index.ts', 'start', '--db', 'sqlite', '--db-path', DB_PATH],
@@ -108,6 +113,17 @@ async function main() {
 
         // The app auto-gets a per-app subdomain derived from its filename ("origin-demo.html").
         const SUB = 'origin-demo';
+        const sibFile = 'origin-sibling.html';
+        const SUB2 = 'origin-sibling';
+
+        await test('publish a second app for the same owner (the framer in Phase 5)', async () => {
+            const r = await json('/v1/apps', {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ filename: sibFile, content: b64(HTML), name: 'Sibling', description: 'd', category: 'utility', tags: [] }),
+            });
+            assert(r.status === 201, `sibling publish: ${r.status}`);
+            await fetch(`${BASE}/v1/apps/${owner}/${sibFile}?mode=inline`, { redirect: 'manual' });
+        });
 
         console.log('\nPhase 1: apex inline → 301 to the AUTO-ASSIGNED per-app subdomain (no manual step)');
         await test('apex GET ?mode=inline 301s to <auto-sub>.appHost', async () => {
@@ -142,6 +158,126 @@ async function main() {
             assert(res.status === 200, `expected 200, got ${res.status}`);
             const body = await res.text();
             assert(body.includes('app origin demo'), 'subdomain-served body contains the app content');
+        });
+
+        // ── Phase 4: the header must not grow with what the owner accumulates ───────────────
+        // This is the test that was missing when frame-ancestors listed the owner's app origins:
+        // it passed with two apps and took production down at 76, because the CSP header outgrew
+        // the reverse proxy's buffer. The assertion is therefore a NUMBER and a COMPARISON, not
+        // "the feature works".
+        console.log('\nPhase 4: CSP header size is bounded and does NOT scale with app count');
+
+        const cspOf = async (sub: string, query = '') => {
+            const res = await fetch(`${BASE}/${query}`, { headers: { 'x-app-origin': '1', 'x-subdomain': sub } });
+            return { csp: res.headers.get('content-security-policy') ?? '', res };
+        };
+        const headerBytes = (res: Response) => {
+            let n = 0;
+            res.headers.forEach((v, k) => { n += k.length + v.length + 4; });
+            return n;
+        };
+
+        let cspSmall = '';
+        await test('baseline CSP with few apps', async () => {
+            const { csp } = await cspOf(SUB);
+            cspSmall = csp;
+            assert(csp.length > 0, 'expected a CSP header');
+        });
+
+        await test('publish 100 more apps for the SAME owner', async () => {
+            for (let i = 0; i < 100; i++) {
+                const f = `scale-${i}.html`;
+                const r = await json('/v1/apps', {
+                    method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                    body: JSON.stringify({ filename: f, content: b64(HTML), name: `S${i}`, description: 'd', category: 'utility', tags: [] }),
+                });
+                assert(r.status === 201, `scale publish ${i}: ${r.status}`);
+                // Assign each a subdomain, so they exist as potential ancestors.
+                await fetch(`${BASE}/v1/apps/${owner}/${f}?mode=inline`, { redirect: 'manual' });
+            }
+        });
+
+        await test('the CSP is BYTE-IDENTICAL at 100+ apps (nothing enumerated)', async () => {
+            const { csp } = await cspOf(SUB);
+            assert(csp === cspSmall, `CSP changed with app count.\n  before: ${cspSmall.length}B\n  after:  ${csp.length}B`);
+        });
+
+        await test('CSP stays under 2 KB and the whole header block under 4 KB (proxy buffer)', async () => {
+            const { csp, res } = await cspOf(SUB);
+            const total = headerBytes(res);
+            // Printed, not just asserted: the previous failure was invisible precisely because
+            // nothing ever reported a number.
+            console.log(`     measured: CSP ${csp.length}B / 2048B budget · headers ${total}B / 4096B proxy buffer · 102 apps owned`);
+            assert(csp.length < 2048, `CSP is ${csp.length}B, budget 2048B`);
+            assert(total < 4096, `response headers total ${total}B, nginx default proxy_buffer_size is 4096B`);
+        });
+
+        // ── Phase 5: what a frame grant does, and what it refuses ──────────────────────────
+        console.log('\nPhase 5: a frame grant names ONE origin, and fails closed');
+
+        const FRAMER = `http://${SUB2}.${APP_HOST}:${PORT}`;
+        let grantUrl = '';
+
+        await test('minting a grant requires an Origin and returns a frame_url', async () => {
+            const r = await json(`/v1/apps/${owner}/${filename}/frame-token`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}`, Origin: FRAMER }, body: '{}',
+            });
+            assert(r.status === 200, `status ${r.status}: ${JSON.stringify(r.body.error)}`);
+            assert(r.body.data.granted_to === FRAMER, `granted_to ${r.body.data.granted_to}`);
+            grantUrl = r.body.data.frame_url;
+            assert(grantUrl.includes('frame='), `frame_url missing token: ${grantUrl}`);
+        });
+
+        await test('no Origin header → 400, never a grant to nobody', async () => {
+            const r = await json(`/v1/apps/${owner}/${filename}/frame-token`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` }, body: '{}',
+            });
+            assert(r.status === 400, `expected 400, got ${r.status}`);
+        });
+
+        await test('a valid grant adds EXACTLY ONE ancestor', async () => {
+            const q = '?' + grantUrl.split('?')[1];
+            const { csp } = await cspOf(SUB, q);
+            const fa = (csp.match(/frame-ancestors ([^;]*)/) ?? ['', ''])[1].trim();
+            assert(fa.includes(FRAMER), `granted origin missing: ${fa}`);
+            assert(fa.split(/\s+/).length === 3, `expected self + apex + one grant, got: ${fa}`);
+        });
+
+        await test('a grant for ANOTHER app does not widen this one', async () => {
+            const r = await json(`/v1/apps/${owner}/${sibFile}/frame-token`, {
+                method: 'POST', headers: { Authorization: `Bearer ${token}`, Origin: FRAMER }, body: '{}',
+            });
+            const otherToken = r.body.data.frame_url.split('frame=')[1];
+            const { csp } = await cspOf(SUB, `?frame=${otherToken}`);
+            const fa = (csp.match(/frame-ancestors ([^;]*)/) ?? ['', ''])[1].trim();
+            assert(!fa.includes(FRAMER), `a grant for a different app must not apply here: ${fa}`);
+        });
+
+        await test('a garbage grant fails CLOSED (strict CSP, page still serves)', async () => {
+            const { csp, res } = await cspOf(SUB, '?frame=not-a-token');
+            assert(res.status === 200, `page must still serve, got ${res.status}`);
+            const fa = (csp.match(/frame-ancestors ([^;]*)/) ?? ['', ''])[1].trim();
+            assert(fa.split(/\s+/).length === 2, `expected self + apex only, got: ${fa}`);
+        });
+
+        await test('X-Frame-Options is dropped only WHEN a grant applies', async () => {
+            const granted = await fetch(`${BASE}/?${grantUrl.split('?')[1]}`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            assert(granted.headers.get('x-frame-options') === null, 'with a grant the legacy header must be gone');
+            const plain = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            assert(plain.headers.get('x-frame-options') !== null, 'without a grant it must stay');
+        });
+
+        await test('another owner cannot mint a grant for someone else\'s app', async () => {
+            const nm = `outsider${Date.now() % 100000}`;
+            const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: nm, public_key: 'placeholder' }) });
+            assert(reg.status === 201, `outsider register: ${reg.status} ${JSON.stringify(reg.body.error ?? '')}`);
+            const ts = new Date().toISOString();
+            const sig = await signMsg(reg.body.data.private_key, nm + NODE_ID + ts);
+            const tk = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: nm, timestamp: ts, signature: sig }) });
+            const r = await json(`/v1/apps/${owner}/${filename}/frame-token`, {
+                method: 'POST', headers: { Authorization: `Bearer ${tk.body.data.token}`, Origin: FRAMER }, body: '{}',
+            });
+            assert(r.status === 404, `outsider must not mint (expected 404, got ${r.status})`);
         });
 
         console.log('\n─────────────────────────────────────');

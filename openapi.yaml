@@ -14777,6 +14777,52 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { description: No draft exists to preview }
 
+  /v1/apps/{owner}/{filename}/frame-token:
+    post:
+      operationId: mintAppFrameToken
+      summary: Mint a frame grant letting ONE origin embed this app
+      description: |
+        Returns a `frame_url` usable as an `iframe` src. An app origin refuses framing by default
+        (`frame-ancestors 'self' <apex>`); a frame grant widens that by exactly the ONE origin named
+        in the token, and only for responses carrying it.
+
+        The grant is issued to the CALLING page's `Origin` header — never to an origin supplied in the
+        body, which would let a page request permission on someone else's behalf. Owner-only: a grant
+        to frame an app you do not own is a clickjacking primitive. A malformed, expired or
+        wrong-app grant simply leaves the strict policy in place, so framing fails closed.
+
+        Deliberately one origin per grant rather than a list of allowed origins on the app: a list
+        grows with how many apps the owner has, and past roughly seventy it overruns a typical reverse
+        proxy's header buffer and every app origin starts answering 502.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Frame grant minted
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          frame_url: { type: string, description: Use as an iframe src }
+                          app_origin_url: { type: string, description: The app's own origin, without the grant }
+                          granted_to: { type: string, description: The one origin this grant names }
+                          expires_in_seconds: { type: integer }
+                          note: { type: string }
+        '400': { description: The request carried no usable Origin header }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { description: No such app owned by the caller }
+        '409': { description: App origins are disabled on this node }
+
   /v1/apps/{owner}/{filename}/publish-draft:
     post:
       operationId: publishAppDraft
