@@ -1,12 +1,12 @@
 /**
  * @file src/models/odps-schemas.ts
  * @description The ODPS (Open Data Product Specification, Linux Foundation) authoring contract for an
- *   EXCHANGE offering. AIMEAT derives most of an ODPS v4.0 document from what the node already knows
+ *   EXCHANGE offering. AIMEAT derives most of an ODPS v4.1 document from what the node already knows
  *   (title, price, plans, licence, provider, observed usage — see services/exchange-odps.ts); these are the
  *   fields ODPS defines that the node CANNOT derive and a provider may therefore declare on the listing:
  *   the product framing (value proposition, categories, standards, use cases, sample), the SLA + data-quality
  *   COMMITMENTS (objectives, which are promises no observation can substitute for), and the legal data holder.
- *   Everything here is optional — an offering without it still projects a valid ODPS document.
+ *   Everything here is optional — an offering without it still projects a valid ODPS v4.1 document.
  *   PROVENANCE lives here too: the provider's attestation about where the data came from, on what legal
  *   basis, how long it is kept, and (for derived data) the upstream lineage it was built from.
  * @structure ODPS enums (product type · SLA/DQ dimensions + units) · ProvenanceSchema · OdpsExtrasSchema ·
@@ -15,36 +15,44 @@
  *   const parsed = OdpsExtrasSchema.safeParse(req.body.odps);
  *   if (!parsed.success) return res.status(400).json(error(nodeId, 'INVALID_ODPS', parsed.error.message));
  * @version-history
- *   v1.0.0 — 2026-07-25 — Initial ODPS v4.0 authoring contract + provenance attestation (TARGET-045 §4,
+ *   v1.1.0 — 2026-07-25 — Pinned to ODPS v4.1 (the version the addendum's Q2 named): `language` (v4.1
+ *     keys details + pricing by ISO 639-1 code), `governanceProfile`, `portfolioPriority`, TOON format.
+ *   v1.0.0 — 2026-07-25 — Initial ODPS authoring contract + provenance attestation (TARGET-045 §4,
  *     addendum Q2/Q3): closes the drift where `odpsVersion` was declared but never written.
  */
 import { z } from 'zod';
 
-/** ODPS v4.0 `product.details.type` — what KIND of data product this is. */
+/** ODPS v4.1 `product.details.type` — what KIND of data product this is. */
 export const ODPS_PRODUCT_TYPES = [
   'raw data', 'derived data', 'dataset', 'reports', 'analytic view', '3D visualisation', 'algorithm',
   'decision support', 'automated decision-making', 'data-enhanced product', 'data-driven service',
   'data-enabled performance', 'bi-directional',
 ] as const;
 
-/** ODPS v4.0 SLA dimensions (`product.SLA.declarative[].dimensions[].dimension`). */
+/** ODPS v4.1 SLA dimensions (`product.SLA.declarative[].dimensions[].dimension`). */
 export const ODPS_SLA_DIMENSIONS = [
   'latency', 'uptime', 'responseTime', 'errorRate', 'endOfSupport', 'endOfLife', 'updateFrequency',
   'timeToDetect', 'timeToNotify', 'timeToRepair', 'emailResponseTime',
 ] as const;
 
-/** ODPS v4.0 SLA objective units. */
+/** ODPS v4.1 SLA objective units. */
 export const ODPS_SLA_UNITS = [
   'percent', 'milliseconds', 'seconds', 'minutes', 'days', 'weeks', 'months', 'years', 'never', 'date', 'null',
 ] as const;
 
-/** ODPS v4.0 data-quality dimensions. */
+/** ODPS v4.1 data-quality dimensions. */
 export const ODPS_QUALITY_DIMENSIONS = [
   'accuracy', 'completeness', 'conformity', 'consistency', 'coverage', 'timeliness', 'validity', 'uniqueness',
 ] as const;
 
-/** ODPS v4.0 output file formats a data product can be delivered in. */
-export const ODPS_OUTPUT_FORMATS = ['JSON', 'XML', 'CSV', 'Excel', 'zip', 'plain text', 'GraphQL', 'MCP'] as const;
+/** ODPS v4.1 output file formats a data product can be delivered in (v4.1 adds TOON). */
+export const ODPS_OUTPUT_FORMATS = ['TOON', 'JSON', 'XML', 'CSV', 'Excel', 'zip', 'plain text', 'GraphQL', 'MCP'] as const;
+
+/** ODPS v4.1 `details.governanceProfile` — how strictly the product is governed. */
+export const ODPS_GOVERNANCE_PROFILES = ['structured', 'enforced', 'automated', 'audit_ready'] as const;
+
+/** ODPS v4.1 `details.portfolioPriority` — how important the product is in its owner's portfolio. */
+export const ODPS_PORTFOLIO_PRIORITIES = ['critical', 'high', 'medium', 'low'] as const;
 
 const shortText = z.string().trim().min(1).max(400);
 const longText = z.string().trim().min(1).max(4000);
@@ -138,11 +146,22 @@ export const OdpsLicenseExtrasSchema = z.object({
 
 /**
  * Everything ODPS defines that the node cannot derive from the offering itself. All optional: a listing
- * without any of it still projects a schema-valid ODPS v4.0 document, just a thinner one.
+ * without any of it still projects a schema-valid ODPS v4.1 document, just a thinner one.
  */
 export const OdpsExtrasSchema = z.object({
+  /**
+   * ISO 639-1 code for the language the listing text is written in. ODPS v4.1 keys `details` and
+   * `pricingPlans.declarative` by language; AIMEAT carries one free-text title/description, so this says
+   * which key it belongs under. Defaults to `en`. The same string is never duplicated under a second
+   * language — a claimed translation that does not exist is worse than none.
+   */
+  language: z.string().trim().regex(/^[a-z]{2}$/, 'language must be an ISO 639-1 two-letter code').optional(),
   /** Overrides the node's default product type (derived from the offering kind). */
   productType: z.enum(ODPS_PRODUCT_TYPES).optional(),
+  /** v4.1: governance maturity applied to this product. */
+  governanceProfile: z.enum(ODPS_GOVERNANCE_PROFILES).optional(),
+  /** v4.1: importance of this product in the provider's portfolio. */
+  portfolioPriority: z.enum(ODPS_PORTFOLIO_PRIORITIES).optional(),
   /** ODPS caps the value proposition at 512 characters. */
   valueProposition: z.string().trim().min(1).max(512).optional(),
   productSeries: shortText.optional(),

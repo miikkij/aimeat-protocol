@@ -11,7 +11,7 @@
  *   DELETE) · needs (POST/GET/close) · bids (POST/GET/accept) · offeringContext (shared detail/ODPS builder)
  * @usage import { exchangeMarketRouter } from './routes/exchange-market.js'; app.use(exchangeMarketRouter(config, storage));
  * @version-history
- *   v1.5.0 — 2026-07-25 — ODPS v4.0 (TARGET-045 §4): GET /v1/exchange/offerings/{id}/odps(.yaml) projects the
+ *   v1.5.0 — 2026-07-25 — ODPS v4.1 (TARGET-045 §4): GET /v1/exchange/offerings/{id}/odps(.yaml) projects the
  *     listing as an Open Data Product Specification document; `provenance` is now VALIDATED (400
  *     INVALID_PROVENANCE) instead of cast, and a new `odps` authoring block carries the standard fields the
  *     node cannot derive (400 INVALID_ODPS). Detail + ODPS share one context builder.
@@ -360,7 +360,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
   });
 
   /**
-   * The offering as an **Open Data Product Specification v4.0** document (opendataproducts.org, Linux
+   * The offering as an **Open Data Product Specification v4.1** document (opendataproducts.org, Linux
    * Foundation) — the interoperable descriptor an outside catalogue or a negotiating agent can read without
    * knowing anything about AIMEAT. Public, like the listing itself. Derived on read (never stored in ODPS
    * form), so it cannot drift from the offering it describes. `.yaml` serves the spec's native format;

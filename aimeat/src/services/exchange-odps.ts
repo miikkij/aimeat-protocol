@@ -1,6 +1,6 @@
 /**
  * @file src/services/exchange-odps.ts
- * @description Projects an EXCHANGE offering into an **Open Data Product Specification v4.0** document
+ * @description Projects an EXCHANGE offering into an **Open Data Product Specification v4.1** document
  *   (opendataproducts.org, Linux Foundation, Apache-2.0) — the interoperable, machine-parsable descriptor a
  *   negotiating agent or an outside catalogue can read without knowing AIMEAT. This is a PROJECTION, exactly
  *   like the listing itself is a projection of its source (TARGET-050): nothing is stored in ODPS form, the
@@ -10,6 +10,12 @@
  *   Two rules keep it honest:
  *   1. **Nothing is invented.** A field the node cannot know is omitted, never filled with a plausible value.
  *      An unstated SLA is an absent SLA block, not a promise of 99.9 %.
+ *   v4.1 keeps text multilingual: `product.details` and `product.pricingPlans.declarative` are keyed by
+ *   ISO 639-1 language code, and several name/description fields are language maps. AIMEAT listings carry
+ *   ONE free-text title/description in whatever language the provider wrote, so everything is emitted under
+ *   a single key — `odps.language` when the provider declares it, `en` otherwise. We never duplicate the
+ *   same string under a second language: a claimed translation that does not exist is worse than none.
+ *
  *   2. **AIMEAT-specific truth lives under `product.x-aimeat`** — the metered coordinate, the pinned interface
  *      + I/O schema, the call recipe, provenance, the projection source and the OBSERVED reputation. The ODPS
  *      root forbids unknown keys (`additionalProperties: false`), `product` does not, so the extension sits
@@ -20,7 +26,10 @@
  *   const doc = offeringToOdps({ offering, iface, callRecipe, stats, rakePercent, baseUrl, nodeId });
  *   res.type('text/yaml').send(odpsToYaml(doc));
  * @version-history
- *   v1.0.0 — 2026-07-25 — Initial ODPS v4.0 projection (TARGET-045 §4 + addendum Q2): the listing format
+ *   v1.1.0 — 2026-07-25 — Pinned to ODPS **v4.1** (what the addendum's Q2 actually named; v4.0 was a
+ *     miss on my part). v4.1 is structural, not cosmetic: language-keyed `details` + `pricingPlans`,
+ *     `Languages` maps on access/gateway/SLA labels, `governanceProfile`/`portfolioPriority`, TOON format.
+ *   v1.0.0 — 2026-07-25 — Initial ODPS projection (TARGET-045 §4 + addendum Q2): the listing format
  *     decision from the spec, implemented as a mapping over the native offering record.
  */
 import { stringify as yamlStringify } from 'yaml';
@@ -28,14 +37,22 @@ import { formatMoneyMajor } from '../commerce/money.js';
 import type { Offering, OfferingStats } from './exchange-market.js';
 import type { OdpsExtras, OdpsSlaDimension, OdpsQualityDimension } from '../models/odps-schemas.js';
 
-/** The ODPS version this node speaks. Pinned per the TARGET-045 addendum (Q2: pin ODPS v4.x). */
-export const ODPS_VERSION = '4.0';
-export const ODPS_SCHEMA_URL = 'https://opendataproducts.org/v4.0/schema/odps.json';
+/** The ODPS version this node speaks. Pinned per the TARGET-045 addendum (Q2: pin ODPS v4.x, v4.1 current). */
+export const ODPS_VERSION = '4.1';
+export const ODPS_SCHEMA_URL = 'https://opendataproducts.org/v4.1/schema/odps.json';
+
+/** ISO 639-1 code used when a provider has not declared what language its listing text is in. */
+const DEFAULT_LANGUAGE = 'en';
+
+/** v4.1 wraps several free-text fields in a language-keyed object (`$defs.Languages`). */
+function localized(lang: string, text: string): Json {
+  return { [lang]: text };
+}
 
 type Json = Record<string, unknown>;
 
-/** An ODPS v4.0 document. Loosely typed on purpose — the authority is the published JSON Schema, which the
- *  E2E suite validates the generated document against (test/fixtures/odps-v4.0.schema.json). */
+/** An ODPS v4.1 document. Loosely typed on purpose — the authority is the published JSON Schema, which the
+ *  E2E suite validates the generated document against (test/fixtures/odps-v4.1.schema.json). */
 export interface OdpsDocument {
   schema: string;
   version: string;
@@ -81,7 +98,7 @@ function billingDuration(periodSeconds: number): 'day' | 'week' | 'month' | 'yea
 }
 
 /** The pricing plans block: the per-call base price plus every volume/subscription plan on the listing. */
-function pricingPlans(o: Offering, extras: OdpsExtras | null): Json {
+function pricingPlans(o: Offering, extras: OdpsExtras | null, lang: string): Json {
   const base = priceFields(o, o.basePrice);
   // The listed price is the one in force since the listing last changed — ODPS states that as a validity window.
   const validity: Json = {
@@ -125,7 +142,7 @@ function pricingPlans(o: Offering, extras: OdpsExtras | null): Json {
       });
     }
   }
-  return { declarative };
+  return { declarative: { [lang]: declarative } };   // v4.1: declarative is keyed by language
 }
 
 /** AIMEAT's three usage flags expressed as ODPS licence rights (what the buyer MAY do with the output). */
@@ -179,16 +196,16 @@ function licence(o: Offering, extras: OdpsExtras | null): Json {
 /**
  * How the product is actually delivered: the metered REST call, and the MCP surface when the node exposes
  * one. ODPS models `dataAccess` as a MAPPING of named access blocks (`default`, then whatever else the
- * product offers) — see the v4.0 examples. The published JSON Schema is self-contradictory here (the
+ * product offers) — see the v4.1 examples. The published JSON Schema is self-contradictory here (the
  * `product.dataAccess` property is `type: object` while it `$ref`s an array-typed definition), so the
  * documented shape is the one to follow; the E2E suite validates around that known schema bug.
  */
-function dataAccess(input: OdpsProjectionInput): Json {
+function dataAccess(input: OdpsProjectionInput, lang: string): Json {
   const { offering: o, callRecipe, baseUrl } = input;
   const ports: Json = {};
   ports.default = {
-    name: 'Metered AIMEAT call',
-    description: 'The accepted contract IS the access — the consumer calls with their own AIMEAT token and no separate API key is issued; each call is metered, charged and rake-split by the node.',
+    name: localized(lang, 'Metered AIMEAT call'),
+    description: localized(lang, 'The accepted contract IS the access — the consumer calls with their own AIMEAT token and no separate API key is issued; each call is metered, charged and rake-split by the node.'),
     outputPortType: 'API',
     format: 'JSON',
     authenticationMethod: 'Token',
@@ -201,8 +218,8 @@ function dataAccess(input: OdpsProjectionInput): Json {
   };
   if (callRecipe?.mcp) {
     ports.mcp = {
-      name: 'MCP',
-      description: `Same capability over MCP: ${callRecipe.mcp}`,
+      name: localized(lang, 'MCP'),
+      description: localized(lang, `Same capability over MCP: ${callRecipe.mcp}`),
       outputPortType: 'AI',
       format: 'MCP',
       authenticationMethod: 'Token',
@@ -216,12 +233,12 @@ function dataAccess(input: OdpsProjectionInput): Json {
 
 /** Which rail settles this offering. Money goes out over the platform's connected-account rail; morsels never
  *  leave. Same named-mapping shape (and the same published-schema caveat) as `dataAccess`. */
-function paymentGateways(o: Offering, rakePercent: number, baseUrl: string): Json {
+function paymentGateways(o: Offering, rakePercent: number, baseUrl: string, lang: string): Json {
   if (o.unit === 'money') {
     return {
       default: {
         type: 'Stripe',
-        description: `Settled to the provider’s connected account through the AIMEAT platform rail (${o.currency ?? 'EUR'}); the platform retains ${rakePercent}% of each metered call.`,
+        description: localized(lang, `Settled to the provider’s connected account through the AIMEAT platform rail (${o.currency ?? 'EUR'}); the platform retains ${rakePercent}% of each metered call.`),
         reference: `${baseUrl}/v1/exchange/info`,
       },
     };
@@ -229,14 +246,14 @@ function paymentGateways(o: Offering, rakePercent: number, baseUrl: string): Jso
   return {
     default: {
       type: 'Custom',
-      description: `Morsel meter — the AIMEAT node’s internal throttle unit. Each metered call debits the consumer’s morsel balance and credits the provider; the platform retains ${rakePercent}%. No external payment rail is involved.`,
+      description: localized(lang, `Morsel meter — the AIMEAT node’s internal throttle unit. Each metered call debits the consumer’s morsel balance and credits the provider; the platform retains ${rakePercent}%. No external payment rail is involved.`),
       reference: `${baseUrl}/v1/exchange/info`,
     },
   };
 }
 
 /** Provider SLA commitments (declarative). Absent unless the provider actually committed to something. */
-function slaBlock(extras: OdpsExtras | null): Json | null {
+function slaBlock(extras: OdpsExtras | null, lang: string): Json | null {
   const dims = extras?.sla ?? [];
   if (!dims.length) return null;
   const support: Json = {
@@ -246,8 +263,8 @@ function slaBlock(extras: OdpsExtras | null): Json | null {
   };
   return {
     declarative: [{
-      name: 'Provider commitment',
-      description: 'Service levels the provider commits to for this offering.',
+      name: localized(lang, 'Provider commitment'),
+      description: localized(lang, 'Service levels the provider commits to for this offering.'),
       ...(Object.keys(support).length ? { support } : {}),
       dimensions: dims.map((d: OdpsSlaDimension) => ({
         dimension: d.dimension, objective: String(d.objective), unit: d.unit,
@@ -258,12 +275,12 @@ function slaBlock(extras: OdpsExtras | null): Json | null {
 }
 
 /** Provider data-quality commitments (declarative). */
-function qualityBlock(extras: OdpsExtras | null): Json | null {
+function qualityBlock(extras: OdpsExtras | null, lang: string): Json | null {
   const dims = extras?.dataQuality ?? [];
   if (!dims.length) return null;
   return {
     declarative: [{
-      displayTitle: 'Provider commitment',
+      displayTitle: [localized(lang, 'Provider commitment')],   // v4.1: an ARRAY of language maps here
       description: 'Data-quality levels the provider commits to for this offering.',
       dimensions: dims.map((d: OdpsQualityDimension) => ({
         dimension: d.dimension, objective: Math.round(d.objective), unit: d.unit,
@@ -283,11 +300,12 @@ function dataHolder(o: Offering, extras: OdpsExtras | null, baseUrl: string): Js
   };
 }
 
-/** The AIMEAT extension block: everything true about this offering that ODPS v4.0 has no slot for. */
+/** The AIMEAT extension block: everything true about this offering that ODPS v4.1 has no slot for. */
 function aimeatExtension(input: OdpsProjectionInput): Json {
   const { offering: o, iface, callRecipe, stats, rakePercent, nodeId } = input;
   return {
     node_id: nodeId,
+    language: (o.odps as OdpsExtras | null)?.language ?? DEFAULT_LANGUAGE,
     offering_id: o.offeringId,
     kind: o.kind,
     provider: { ghii: o.providerGhii, owner: o.providerOwner },
@@ -318,12 +336,13 @@ function aimeatExtension(input: OdpsProjectionInput): Json {
 }
 
 /**
- * Project one offering into an ODPS v4.0 document. Pure: no storage, no clock — everything comes from the
+ * Project one offering into an ODPS v4.1 document. Pure: no storage, no clock — everything comes from the
  * inputs, so the same offering always yields the same document.
  */
 export function offeringToOdps(input: OdpsProjectionInput): OdpsDocument {
   const o = input.offering;
   const extras = (o.odps ?? null) as OdpsExtras | null;
+  const lang = extras?.language ?? DEFAULT_LANGUAGE;
   const ifaceVersion = o.surface && o.surface.kind === 'app-tool' ? o.surface.ifaceVersion : null;
 
   const details: Json = {
@@ -358,21 +377,23 @@ export function offeringToOdps(input: OdpsProjectionInput): OdpsDocument {
     ...(extras?.versionNotes ? { versionNotes: extras.versionNotes } : {}),
     ...(extras?.issues ? { issues: extras.issues } : {}),
     ...(extras?.recommendedDataProducts ? { recommendedDataProducts: extras.recommendedDataProducts } : {}),
+    ...(extras?.governanceProfile ? { governanceProfile: extras.governanceProfile } : {}),
+    ...(extras?.portfolioPriority ? { portfolioPriority: extras.portfolioPriority } : {}),
   };
 
-  const sla = slaBlock(extras);
-  const quality = qualityBlock(extras);
+  const sla = slaBlock(extras, lang);
+  const quality = qualityBlock(extras, lang);
 
   return {
     schema: ODPS_SCHEMA_URL,
     version: ODPS_VERSION,
     product: {
-      details,
-      dataAccess: dataAccess(input),
-      pricingPlans: pricingPlans(o, extras),
+      details: { [lang]: details },   // v4.1: details is keyed by ISO 639-1 language
+      dataAccess: dataAccess(input, lang),
+      pricingPlans: pricingPlans(o, extras, lang),
       license: licence(o, extras),
       dataHolder: dataHolder(o, extras, input.baseUrl),
-      paymentGateways: paymentGateways(o, input.rakePercent, input.baseUrl),
+      paymentGateways: paymentGateways(o, input.rakePercent, input.baseUrl, lang),
       ...(sla ? { SLA: sla } : {}),
       ...(quality ? { dataQuality: quality } : {}),
       'x-aimeat': aimeatExtension(input),

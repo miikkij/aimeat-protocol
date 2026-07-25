@@ -8344,7 +8344,7 @@ paths:
           provenance: { type: object, description: "Provider attestation, validated (400 INVALID_PROVENANCE): { source, legalBasis, consentStatus, retention, transformations, snapshotHash (SHA-256), lineage[{source,transform,at}] }. The node stamps odpsVersion.", properties: {
             source: { type: string }, legalBasis: { type: string }, consentStatus: { type: string }, retention: { type: string },
             transformations: { type: string }, snapshotHash: { type: string }, lineage: { type: array, items: { type: object } } } },
-          odps: { type: object, description: "ODPS v4.0 fields the node cannot derive, validated (400 INVALID_ODPS): productType, valueProposition, categories, standards, useCases, contentSample, logoURL, sla[{dimension,objective,unit}], dataQuality[{dimension,objective,unit}], dataHolder{legalName,…}, license{geographicalArea,applicableLaws,exclusive,…}. Surfaced at GET /v1/exchange/offerings/{id}/odps.yaml." },
+          odps: { type: object, description: "ODPS v4.1 fields the node cannot derive, validated (400 INVALID_ODPS): productType, valueProposition, categories, standards, useCases, contentSample, logoURL, sla[{dimension,objective,unit}], dataQuality[{dimension,objective,unit}], dataHolder{legalName,…}, license{geographicalArea,applicableLaws,exclusive,…}. Surfaced at GET /v1/exchange/offerings/{id}/odps.yaml." },
           tags: { type: array, items: { type: string } },
           usage_terms: { type: object, properties: {
             derivatives: { type: boolean }, resale: { type: boolean }, attribution: { type: boolean }, note: { type: string } } } } } } }
@@ -8379,7 +8379,7 @@ paths:
         `input_schema`/`output_schema`, a `call_recipe` (the contract IS the access — you call `POST
         /v1/ext/{ext}/{action}` as yourself, no separate API key), and usage `stats` (reputation). Public.
         Returns `{ offering, capability, call_recipe, stats, odps }`, where `odps` points at the same listing
-        rendered as an Open Data Product Specification v4.0 document.
+        rendered as an Open Data Product Specification v4.1 document.
       tags: [Commerce]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses:
@@ -8408,9 +8408,9 @@ paths:
   /v1/exchange/offerings/{id}/odps:
     get:
       operationId: exchangeOfferingOdps
-      summary: One EXCHANGE offering as an Open Data Product Specification v4.0 document (public) (TARGET-045)
+      summary: One EXCHANGE offering as an Open Data Product Specification v4.1 document (public) (TARGET-045)
       description: >
-        The listing rendered in the Linux Foundation's **Open Data Product Specification** (ODPS) v4.0 —
+        The listing rendered in the Linux Foundation's **Open Data Product Specification** (ODPS) v4.1 —
         the interoperable descriptor an outside catalogue or a negotiating agent can read without knowing
         anything about AIMEAT. Derived on read from the offering (never stored in ODPS form), so it cannot
         drift from the listing it describes. Carries `product.details`, `dataAccess` (the metered REST call
@@ -8432,7 +8432,7 @@ paths:
   /v1/exchange/offerings/{id}/odps.yaml:
     get:
       operationId: exchangeOfferingOdpsYaml
-      summary: One EXCHANGE offering as an ODPS v4.0 YAML document (public) (TARGET-045)
+      summary: One EXCHANGE offering as an ODPS v4.1 YAML document (public) (TARGET-045)
       description: >
         Same document as `GET /v1/exchange/offerings/{id}/odps`, served raw as `text/yaml` — the format the
         Open Data Product Specification leads with, so the URL can be handed straight to an ODPS-aware tool.
@@ -8440,7 +8440,7 @@ paths:
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       responses:
         '200':
-          description: The ODPS v4.0 document.
+          description: The ODPS v4.1 document.
           content:
             text/yaml:
               schema: { type: string }

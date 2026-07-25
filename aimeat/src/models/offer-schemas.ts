@@ -188,7 +188,7 @@ export const OfferSchema = z.object({
   }).optional(),
   /** Provenance attestation carried onto the projected offering + its ODPS document. */
   provenance: ProvenanceSchema.optional(),
-  /** ODPS v4.0 fields the node cannot derive (value proposition, SLA/quality commitments, data holder…). */
+  /** ODPS v4.1 fields the node cannot derive (value proposition, SLA/quality commitments, data holder…). */
   odps: OdpsExtrasSchema.optional(),
   visibility: z.enum(['private', 'unlisted', 'public']).optional(), // default 'private' at read/list time
   callable: CallableSchema.optional(),
