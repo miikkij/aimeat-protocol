@@ -103,6 +103,12 @@ python scripts/gen_image.py --out app/logo --upload "the DROP app logo, minimal 
 - Every `--upload` is logged to `genimages/uploads.json` (URL, storage key, account GHII, model, prompt) — **read it** before re-generating, so we reuse an already-uploaded image instead of paying for it twice.
 - The house style (coral-red `#E8564A` + slate/near-black, premium/geometric) is applied automatically; pass `--no-style` only when a specific look demands it.
 
+### Rule 13: Research First When Creating an AIMEAT Application
+
+When creating an application to AIMEAT: **You have `aimeat_*` MCP tools — follow the research-first flow: load the skill `node:aimeat-app-builder` and call `aimeat_appdev_overview` first.**
+
+This is a hard precondition of the build, not an optional preamble, and it comes **before** reading repo source: existing published apps and the KB show which libs/patterns are already proven, so reuse beats re-deriving from lib sources. Full non-negotiables (theme vars, `<meta name="aimeat-scopes">`, `/v1/libs/` vs `/lib/`, reuse over duplicate): see **App-building prompt system** below.
+
 ---
 
 ## Coding Guidelines Reference
