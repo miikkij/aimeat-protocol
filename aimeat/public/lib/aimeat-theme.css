@@ -1,0 +1,116 @@
+/*
+ * @file aimeat-theme.css
+ * @description THE AIMEAT daisyUI theme — the house palette expressed as daisyUI 5 theme
+ *   variables, so a published app gets AIMEAT's brand instead of daisyUI's defaults without
+ *   hardcoding a single hex value. Before this file existed, every good-looking app on the
+ *   node copy-pasted `#E8564A` by hand (prh.html 3x, tila.html 3x, experience-center.html 12x)
+ *   because `--color-primary` was daisyUI's indigo and the bridge's coral fallback never fired.
+ *
+ *   Two things it fixes that a hand-rolled app cannot easily get right:
+ *
+ *   1. THE DARK RAMP. daisyUI's dark theme is base-100 oklch(25.33%) / base-200 oklch(23.26%) /
+ *      base-300 oklch(21.15%) — two points of perceptual lightness apart, so a `card bg-base-200`
+ *      on a `bg-base-100` page is very nearly invisible. AIMEAT uses the SPA's designed ramp
+ *      (#14151A page / #1C1E26 card / #33363F edge) with real separation.
+ *
+ *   2. THE `-content` PAIRS. daisyUI ships ONE value per semantic colour for BOTH themes, so a
+ *      `badge-warning` is the same solid amber block on a near-black page as on a white one, and
+ *      its brown-on-amber label reads as a highlighter smear. Every pair here is chosen against
+ *      its own surface and the ratio is stated. Where a pair is below 4.5:1 it is marked as
+ *      large/bold-UI-text only (WCAG 1.4.3 large text + 1.4.11 non-text contrast, both 3:1).
+ *
+ *   ELEVATION DIRECTION — deliberately inverted vs daisyUI. Here `base-200` is ELEVATED above
+ *   `base-100`: cards float above the page (lighter in dark, whiter in light), matching the
+ *   AIMEAT SPA. daisyUI recesses it instead. `base-300` is the strongest separation in both
+ *   themes: a recessed well in light, a raised edge in dark. Use it for borders and dividers.
+ * @structure light block (:root, [data-theme=light]) · dark block ([data-theme=dark]) ·
+ *   surface ramp · brand · semantic colours + their content pairs · radii/border/depth
+ * @usage  <link href="/lib/daisyui@5.css" rel="stylesheet" />
+ *         <link href="/lib/aimeat-theme.css" rel="stylesheet" />        <-- after daisyUI
+ *         <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" />
+ *   The bridge @imports this file, so an app that already loads the bridge gets the theme
+ *   automatically. Loading it explicitly (as the `styling` pack now does) is a no-op duplicate.
+ *   Deliberately UNLAYERED: daisyUI declares its themes inside `@layer base`, and any unlayered
+ *   rule beats every layered one regardless of order or specificity.
+ * @version-history
+ *   v1.0.0 — 2026-07-25 — Initial AIMEAT daisyUI theme. Palette lifted from public/css/theme.css
+ *     (the SPA's canonical light/dark ramps) so apps and the SPA read as one product.
+ */
+
+/* ── LIGHT ───────────────────────────────────────────────────────────────────── */
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+
+  /* Surfaces. base-100 = page, base-200 = card (elevated), base-300 = wells + borders. */
+  --color-base-100: #fafaf8;
+  --color-base-200: #ffffff;
+  --color-base-300: #e5e7eb;
+  --color-base-content: #1a1a2e;              /* 16.3:1 on base-100, 17.1:1 on base-200 */
+
+  /* Brand. Coral is the AIMEAT heart. */
+  --color-primary: #e8564a;
+  --color-primary-content: #ffffff;           /* 3.6:1 — large/bold UI text only, per the SPA */
+  --color-secondary: #8b5cf6;
+  --color-secondary-content: #ffffff;         /* 4.2:1 — large/bold UI text only */
+  --color-accent: #06b6d4;
+  --color-accent-content: #06253a;            /* 6.5:1 — teal needs DARK content; white is 2.4:1 */
+  --color-neutral: #1a1a2e;
+  --color-neutral-content: #ffffff;           /* 17.1:1 */
+
+  /* Semantic. */
+  --color-info: #3b82f6;
+  --color-info-content: #ffffff;              /* 3.7:1 — large/bold UI text only */
+  --color-success: #10b981;
+  --color-success-content: #05271c;           /* 6.3:1 — green is LIGHT; white fails at 2.5:1 */
+  --color-warning: #f59e0b;
+  --color-warning-content: #1a1a2e;           /* 7.9:1 — amber is LIGHT; white fails at 2.2:1 */
+  --color-error: #ef4444;
+  --color-error-content: #ffffff;             /* 3.8:1 — large/bold UI text only */
+
+  /* Shape. AIMEAT is generous on boxes, tighter on controls. */
+  --radius-box: 16px;
+  --radius-field: 10px;
+  --radius-selector: 6px;
+  --border: 1px;
+  --depth: 0;                                 /* AIMEAT is flat + shadow, not embossed */
+  --noise: 0;
+}
+
+/* ── DARK ────────────────────────────────────────────────────────────────────── */
+[data-theme='dark'] {
+  color-scheme: dark;
+
+  /* The point of this file. Real separation between page, card and edge. */
+  --color-base-100: #14151a;
+  --color-base-200: #1c1e26;
+  --color-base-300: #33363f;
+  --color-base-content: #edeef2;              /* 15.7:1 on base-100, 14.3:1 on base-200 */
+
+  /* Brand. Coral is brightened for dark surfaces — the brand stays coral, the contrast holds. */
+  --color-primary: #ff6f62;                   /* 6.7:1 as text/icon on base-100 */
+  --color-primary-content: #14151a;           /* 6.7:1 — white on this coral FAILS at 2.7:1 */
+  --color-secondary: #a78bfa;
+  --color-secondary-content: #14151a;         /* 6.7:1 */
+  --color-accent: #22d3ee;
+  --color-accent-content: #06253a;            /* 8.7:1 */
+  --color-neutral: #23262f;
+  --color-neutral-content: #edeef2;           /* 13.0:1 */
+
+  /* Semantic — brightened so they read as light-on-dark, with dark content on every fill. */
+  --color-info: #60a5fa;
+  --color-info-content: #0b1b33;              /* 6.8:1 */
+  --color-success: #34d399;
+  --color-success-content: #05271c;           /* 8.3:1 */
+  --color-warning: #fbbf24;
+  --color-warning-content: #1a1a2e;           /* 10.2:1 */
+  --color-error: #f87171;
+  --color-error-content: #2a0a0a;             /* 6.6:1 */
+
+  --radius-box: 16px;
+  --radius-field: 10px;
+  --radius-selector: 6px;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}

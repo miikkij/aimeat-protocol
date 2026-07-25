@@ -11,7 +11,8 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 |------|---------|---------|---------|--------|---------|
 | `tailwindcss@4.js` | `@tailwindcss/browser` | 4.3.1 | `styling` | `https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4` | MIT |
 | `daisyui@5.css` | `daisyui` | 5.5.23 | `styling` | `https://cdn.jsdelivr.net/npm/daisyui@5` | MIT |
-| `aimeat-daisyui-bridge.css` | AIMEAT-local (theme bridge) | — | `styling` | this repo | MIT |
+| `aimeat-theme.css` | AIMEAT-local (the house daisyUI theme) | 1.0.0 | `styling` | this repo (palette from `public/css/theme.css`) | MIT |
+| `aimeat-daisyui-bridge.css` | AIMEAT-local (theme bridge; `@import`s the theme) | — | `styling` | this repo | MIT |
 | `chartjs@4.js` | `chart.js` (UMD) | 4.5.1 | `chartjs` | `https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js` | MIT |
 | `mermaid/mermaid.min.js` | `mermaid` (UMD) | 11.15.0 | `mermaid` | `node_modules/mermaid/dist` (see mermaid/README.md) | MIT |
 | `three.min.js` | `three` (r128 UMD) | r128 | `three` | `https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js` | MIT |
@@ -23,7 +24,8 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 | `fonts.css` + `fonts/*.woff2` | Baloo 2 (variable 400–800) + Bangers display fonts, latin + latin-ext (ä/ö) | Baloo 2 v23 · Bangers v25 | `fonts` | Google Fonts CDN (see `fonts/LICENSE.md`) | OFL-1.1 |
 | `realtime.js` | AIMEAT-local (WS/WebRTC/Yjs client + `SharedClock` synced timeline) | 1 | `realtime` | this repo | MIT |
 | `toastui/toastui-editor-all.min.js` + `.min.css` | TOAST UI Editor | (SPA-internal) | — | `https://uicdn.toast.com` | MIT |
-| `preact.mjs`, `preact-hooks.mjs`, `htm.mjs`, `yaml.mjs`, `minidenticons.min.js` | preact / htm / yaml / minidenticons (ESM) | (SPA-internal, importmap) | — | jsdelivr | MIT |
+| `yaml.mjs` | `yaml` (ESM) | 2.x | `yaml` | jsdelivr | ISC |
+| `preact.mjs`, `preact-hooks.mjs`, `htm.mjs`, `minidenticons.min.js` | preact / htm / minidenticons (ESM) | (SPA-internal, importmap) | — | jsdelivr | MIT |
 | `live-updates.js` | AIMEAT-local (SSE ESM wrapper) | (SPA-internal) | — | this repo | MIT |
 | `samples/` | audio samples for aimeat-audio | — | — | CC | CC |
 
@@ -51,6 +53,7 @@ The same append-only rule applies to the node-bundled cortex wrappers
 
 ```html
 <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+<link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
 <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
 <script src="/lib/tailwindcss@4.js"></script>
 <!-- charts: <script src="/lib/chartjs@4.js"></script> before aimeat-charts -->

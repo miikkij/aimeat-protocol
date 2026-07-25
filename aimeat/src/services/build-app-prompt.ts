@@ -12,6 +12,14 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-07-25 — Visual design sections. The prompt's only real design content used to be the GAME
+ *     form-language block, which ended by telling every non-game app that a flat daisyUI page was
+ *     "the right default" — so the paved path reliably produced identical grey cards, one type size
+ *     and no focal point. Adds "Visual design: components are not a design" (focal point, type
+ *     scale, colour as meaning, grouping, measure, designed empty/loading states, and the cortex
+ *     packs to reach for) and "Verify what it LOOKS like" (both themes, contrast, brand token,
+ *     type scale, with a runnable audit snippet). Design Guidelines now states the brand-is-a-token
+ *     rule, since /lib/aimeat-theme.css makes --color-primary the coral.
  *   2026-07-19 — Mobile safety checklist section (overflow-x:clip, minmax(0,1fr)+min-width:0,
  *     wrap-wide-content, verify scrollWidth===clientWidth) + viewport meta gains viewport-fit=cover
  *     + interactive-widget=resizes-content. Prevention baked into the paved path.
@@ -237,7 +245,8 @@ export function buildAppPrompt(
 
   // Design guidelines
   body += '### Design Guidelines\n';
-  body += 'For rich UIs use the self-hosted styling stack (the same one the app-shell templates use) instead of hand-rolling a CSS framework: the `styling` capability pack — daisyUI v5 components + Tailwind v4 utilities + the AIMEAT theme bridge, all loaded from this node (see the capability packs list above). For minimal pages plain CSS variables are fine.\n';
+  body += 'For rich UIs use the self-hosted styling stack (the same one the app-shell templates use) instead of hand-rolling a CSS framework: the `styling` capability pack — daisyUI v5 components + Tailwind v4 utilities + the AIMEAT daisyUI theme + the cortex theme bridge, all loaded from this node (see the capability packs list above). For minimal pages plain CSS variables are fine.\n';
+  body += '**The brand is a token, never a hex.** The theme sets `--color-primary` to the AIMEAT coral (#E8564A light, #FF6F62 dark, each with the right readable text colour on top). Write `btn-primary`, `text-primary`, `border-primary` and the brand appears correctly in BOTH themes. If you find yourself typing a brand hex into an app, you are creating something that will be wrong in one theme and stale when the brand moves.\n';
   body += "Use CSS variables so the app themes cleanly, and RESPECT the user's AIMEAT theme: the light/dark choice they made in the AIMEAT pill is saved in localStorage \"aimeat-theme\" (\"light\"|\"dark\"). Define light as the default and dark under [data-theme=\"dark\"], then set that attribute from the saved choice on load (fall back to the OS preference, and live-update if it changes):\n";
   body += '```css\n';
   body += ':root { --bg:#fafaf8; --card:#fff; --text:#1a1a2e; --accent:#e8564a; --border:#e5e7eb; --radius:12px; }\n';
@@ -249,6 +258,20 @@ export function buildAppPrompt(
   body += '  addEventListener("storage", function(e){ if(e.key==="aimeat-theme" && e.newValue) apply(e.newValue); }); })();\n';
   body += '```\n';
   body += 'Always include the viewport meta: `<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">` (the last part makes the on-screen keyboard resize the layout instead of hiding bottom inputs). Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
+
+  // Visual design for NON-game apps. Before this section the prompt's only real design content was
+  // the game form-language block, which ended by telling every tool app that a flat daisyUI page was
+  // "the right default" — so the paved path reliably produced nine identical grey cards with one type
+  // size and no focal point. Components are not design; hierarchy is. (ODPS app review, 2026-07-25.)
+  body += '### Visual design — components are not a design\n';
+  body += 'daisyUI gives you correct, accessible COMPONENTS. It does not give you a design, and a page of stacked `card bg-base-200` blocks with one type size reads as unfinished no matter how good the logic underneath is. Six rules turn components into something worth looking at. They cost minutes, not hours:\n';
+  body += '- **One focal point per screen.** Decide the single most important thing (the verdict, the number, the next action) and make it visually dominant — bigger, heavier, or the only saturated colour in view. If everything is the same weight, the eye has nowhere to land and the page reads as a wall.\n';
+  body += '- **Use at least three type steps, and mean them.** A key metric set in the same 14px run as the sentence around it is invisible. Give numbers that matter display treatment: large, `font-semibold`, `tabular-nums`, tight tracking. Labels go small and `uppercase tracking-wide opacity-60`. Body text stays one comfortable size.\n';
+  body += '- **Colour carries meaning or it carries nothing.** Default to neutral surfaces and reserve saturation for state and the primary action. Prefer the quiet variants (`badge-soft`, `alert-soft`, `btn-soft`, `badge-outline`) and keep ONE solid fill for the thing that genuinely has to shout.\n';
+  body += '- **Group, do not stack.** Related facts belong in ONE card with internal structure, not one card each. A vertical run of more than about five sibling cards is a sign the content was never grouped. Give cards an edge (`card-border` / `border border-base-300`) or a shadow: in light theme `base-200` is only a 1.05 luminance step off `base-100`, so a bare card has no visible boundary.\n';
+  body += '- **Cap the measure, use the space.** Long prose past ~70 characters per line is tiring, and a single `max-w-5xl` column on a wide screen is mostly empty gutters. Either keep the container narrower or put the freed width to work (a summary rail, a two-column split via `AIMEAT.ui.layout`).\n';
+  body += '- **Design the empty, loading and error states.** They are most of what a new user sees. Use `AIMEAT.ui.motion.skeleton()` rather than a spinner (shimmer in the SHAPE of the coming content reads as fast; a spinner reads as stuck), and say what an empty state means plus what to do about it.\n';
+  body += 'Reach for the cortex UI packs before hand-rolling: `aimeat-ui-motion` (`statTiles()` for a KPI row with count-up numbers and sparklines, `skeleton()`, `staggerIn()` for lists), `aimeat-ui-viewers` (`DataTable`, `List`, `Timeline`), `aimeat-ui-layout` (`MainDetail`, `DashboardGrid`, `Split`). Hand-rolling a `<ul>` where `statTiles` was one script tag away is the single most common reason an AIMEAT app looks poorer than it is.\n\n';
 
   // Mobile safety checklist — the recurring "it looks tiny / overflows on a phone" class of bug,
   // as positive DO-rules. The app-shell templates already bake these in; hand-rolled layouts must
@@ -262,6 +285,29 @@ export function buildAppPrompt(
   body += '- **Verify**: at 390px (portrait) AND ~844px (landscape), `document.documentElement.scrollWidth === clientWidth` (zero horizontal overflow) and body text stays ≥14px.\n';
   body += 'For a focused view (chat/editor/wizard) on ≤760px, go full-screen (`position:fixed; inset:0` gated on an is-active class) with a Back affordance, rather than sharing the screen with app chrome.\n\n';
 
+  // Visual verification. The mobile checklist proved a machine-checkable rule beats good intentions
+  // (scrollWidth === clientWidth). These are the same idea for appearance: an app can pass every
+  // functional test and still ship an unreadable dark theme, because nobody ever opened it.
+  body += '### Verify what it LOOKS like, not just that it works\n';
+  body += 'An app can pass every functional check and still be unreadable, because the builder developed in one theme and never opened the other. Before calling a UI finished, run these on the real page:\n';
+  body += '- **Open BOTH themes.** Set `data-theme` to `light` AND `dark` and look at each. A dark screenshot is not optional — it is where hardcoded colours, invisible card edges and solid-fill badges go wrong.\n';
+  body += '- **Contrast**: body text ≥ 4.5:1 against its own background, large/bold text and UI components ≥ 3:1. The AIMEAT theme tokens are pre-verified in both themes, so if you only used tokens you are done; the moment you hardcode a colour you own its contrast.\n';
+  body += '- **Brand present**: `getComputedStyle(document.documentElement).getPropertyValue("--color-primary")` resolves to the AIMEAT coral, and the primary action on screen actually uses it.\n';
+  body += '- **Type scale real**: at least three distinct rendered font sizes, and the largest one is on the thing that matters most — not on a decorative page title above a wall of identical 14px text.\n';
+  body += '- **No horizontal overflow** at 390px and ~844px (the mobile checklist above).\n';
+  body += 'This one-liner returns the audit; run it in each theme:\n';
+  body += '```js\n';
+  body += '(() => { // elements carrying their OWN text — a leaf-only filter misses "31" inside <div>31<span>%</span></div>\n';
+  body += '  const el = [...document.querySelectorAll("body *")].filter(e => [...e.childNodes].some(n => n.nodeType === 3 && n.textContent.trim()));\n';
+  body += '  const px = e => parseFloat(getComputedStyle(e).fontSize);\n';
+  body += '  const sizes = [...new Set(el.map(px))].sort((a,b) => b-a);\n';
+  body += '  const d = document.documentElement;\n';
+  body += '  return { theme: d.getAttribute("data-theme"), primary: getComputedStyle(d).getPropertyValue("--color-primary").trim(),\n';
+  body += '    typeSteps: sizes, biggestText: el.find(e => px(e) === sizes[0])?.textContent.trim().slice(0,60),\n';
+  body += '    smallestText: sizes[sizes.length-1], overflowPx: d.scrollWidth - d.clientWidth }; })()\n';
+  body += '```\n';
+  body += 'Pass: `typeSteps.length >= 3`, `overflowPx === 0`, `primary` is the coral, `biggestText` is genuinely the most important thing on the page (if it is a decorative glyph or the page title, your hierarchy is upside down), and `smallestText >= 11` — note daisyUI renders `badge-xs` at 10px, so prefer `badge-sm` for anything a user has to read.\n\n';
+
   // Game form language — palette alone reads as a dashboard; the FORM LANGUAGE makes the game.
   // Born from pitfall app/candy-palette-alone-is-not-a-game-look (TOWER TETRIS, 2026-07-19).
   body += '### Game / playful look — form language, not just palette\n';
@@ -271,7 +317,7 @@ export function buildAppPrompt(
   body += '- **Frame the play area**: wrap the game canvas in a gradient border div; give its interior life (checkerboard tint, inner glow) instead of a plain background.\n';
   body += "- **Juice**: screen-shake keyframes on big events, scale-pop on changing numbers, a shine-sweep ::after on primary buttons, floating combo text. Small, cheap, and they carry most of the game feel.\n";
   body += '- **Ambient life lives IN the scene**: with a 3D/canvas view, decorations must be world objects (orbiting meshes, drifting sprites INSIDE the canvas) — never flat absolutely-positioned CSS elements over the canvas; those do not parallax and read as mistakes. CSS sky layers (clouds/stars) BEHIND a transparent canvas are fine.\n';
-  body += 'Non-game apps: skip this section — the styling pack + clean CSS variables are the right default.\n\n';
+  body += 'Non-game apps: skip THIS section, but do not skip design — apply "Visual design: components are not a design" above. A tool app still needs a focal point, a real type scale and grouped content; it just gets there with restraint instead of stickers and juice.\n\n';
 
   // Rules
   body += '### Important Rules\n';

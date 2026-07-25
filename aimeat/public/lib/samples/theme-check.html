@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<!--
+  @file theme-check.html
+  @description Visual + computed proof that /lib/aimeat-theme.css reaches an app through the
+    bridge alone (the bridge @imports it), and that both themes resolve to the AIMEAT palette
+    rather than daisyUI's defaults. Loads ONLY the bridge on purpose — no explicit theme link —
+    because that is the path every already-published app is on.
+  @usage open /lib/samples/theme-check.html on any AIMEAT node; toggle the two themes.
+    window.THEME_CHECK.read() returns the computed tokens for an automated check.
+  @version-history
+    v1.0.0 — 2026-07-25 — Initial theme proof page.
+-->
+<html lang="en" data-theme="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>AIMEAT theme check</title>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <!-- Deliberately NOT linking aimeat-theme.css: the bridge must pull it in. -->
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/tailwindcss@4.js"></script>
+</head>
+<body class="bg-base-100 text-base-content min-h-screen p-6 flex flex-col gap-5">
+  <div class="flex items-center gap-3 flex-wrap">
+    <h1 class="text-xl font-bold">AIMEAT theme check</h1>
+    <button id="toggle" class="btn btn-sm btn-primary" type="button">Toggle theme</button>
+    <span id="which" class="badge badge-soft"></span>
+  </div>
+
+  <section class="card bg-base-200 card-border border-base-300">
+    <div class="card-body gap-3">
+      <h2 class="card-title text-base">Cards must be tellable from the page</h2>
+      <p class="text-sm opacity-70">This card is <code>bg-base-200</code> with <code>card-border</code>.
+        The one below has no edge, which is what a bare card looks like.</p>
+      <div class="bg-base-200 rounded-box p-3 text-sm">No edge: relies on the surface step alone.</div>
+    </div>
+  </section>
+
+  <section class="card bg-base-200 card-border border-base-300">
+    <div class="card-body gap-3">
+      <h2 class="card-title text-base">Solid vs soft</h2>
+      <div class="flex flex-wrap gap-2 items-center">
+        <span class="badge badge-warning">badge-warning</span>
+        <span class="badge badge-soft badge-warning">badge-soft warning</span>
+        <span class="badge badge-success">badge-success</span>
+        <span class="badge badge-soft badge-success">badge-soft success</span>
+        <span class="badge badge-primary">badge-primary</span>
+        <span class="badge badge-soft badge-primary">badge-soft primary</span>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button class="btn btn-primary btn-sm" type="button">btn-primary</button>
+        <button class="btn btn-soft btn-primary btn-sm" type="button">btn-soft</button>
+        <button class="btn btn-outline btn-primary btn-sm" type="button">btn-outline</button>
+      </div>
+      <div class="alert alert-soft alert-info text-sm">alert-soft info</div>
+    </div>
+  </section>
+
+  <section class="card bg-base-200 card-border border-base-300">
+    <div class="card-body gap-2">
+      <h2 class="card-title text-base">Resolved tokens</h2>
+      <pre id="tokens" class="text-xs overflow-x-auto"></pre>
+    </div>
+  </section>
+
+  <script>
+    var TOKENS = ['--color-base-100', '--color-base-200', '--color-base-300', '--color-base-content',
+      '--color-primary', '--color-primary-content', '--color-warning', '--color-warning-content'];
+
+    function read() {
+      var cs = getComputedStyle(document.documentElement);
+      var out = {};
+      TOKENS.forEach(function (t) { out[t] = cs.getPropertyValue(t).trim(); });
+      out.theme = document.documentElement.getAttribute('data-theme');
+      return out;
+    }
+    function render() {
+      var v = read();
+      document.getElementById('which').textContent = v.theme;
+      document.getElementById('tokens').textContent =
+        TOKENS.map(function (t) { return t.padEnd(26) + v[t]; }).join('\n');
+    }
+    document.getElementById('toggle').onclick = function () {
+      var next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      render();
+    };
+    window.THEME_CHECK = { read: read };
+    render();
+  </script>
+</body>
+</html>

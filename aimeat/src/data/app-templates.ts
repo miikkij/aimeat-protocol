@@ -85,8 +85,8 @@ const TEMPLATES: AppTemplate[] = [
     kind: 'app-shell',
     tier: 'T2',
     title: 'Data app — built-in tables, forms & charts',
-    description: 'Standard app plus the bundled cortex UI libraries (DataTable, forms, layouts, charts) for richer structured UIs without hand-rolling components.',
-    libs: ['aimeat-auth', 'aimeat-data', 'aimeat-ui-viewers', 'aimeat-ui-forms'],
+    description: 'Standard app plus the bundled cortex UI libraries (DataTable, forms, KPI tiles, skeletons) for richer structured UIs without hand-rolling components.',
+    libs: ['aimeat-auth', 'aimeat-data', 'aimeat-ui-viewers', 'aimeat-ui-forms', 'aimeat-ui-motion'],
     content: SHELL_CORTEX,
   },
   {

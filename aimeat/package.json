@@ -112,7 +112,8 @@
     "perf:bench": "node --import tsx tools/perf-bench/bench.ts",
     "perf:bench:backends": "node --import tsx tools/perf-bench/bench-backends.ts",
     "sync:viewport": "tsx scripts/embed-viewport.ts",
-    "check:viewport": "tsx scripts/embed-viewport.ts --check"
+    "check:viewport": "tsx scripts/embed-viewport.ts --check",
+    "check:theme": "tsx tools/theme-contrast.ts"
   },
   "keywords": [
     "aimeat",
