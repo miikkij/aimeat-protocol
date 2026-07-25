@@ -16,7 +16,7 @@ import { getAllApps, saveApp, deleteApp } from './db.js';
 import { showConfirm, closeConfirm, showNotice, dismissNotice, dtlBtn } from './ui.js';
 import { loadConfig, saveConfig } from './config.js';
 import { extractZip, bundleZip } from './zip.js';
-import { initDetail, refreshServerMgmt, openDetailView, editAppDetails, closeDetailView, detailLaunch, mountLoginPill, detailAboutEdit, detailAboutCancel, detailAboutSave, detailTranslateDesc, detailPromoteSave, detailPromoteClear, detailToggleFavorite, detailAccessCodeEdit, detailAccessCodeCancel, detailAccessCodeSave, detailSkillAttachToggle, detailSkillAttach, detailSkillDetach, detailSetScreenshot, detailRefreshScreenshot, detailAiRun, detailAiTest, detailAiKeep, detailAiDiscard, detailTestDraftLive, detailPublishTestedDraft, openStagingPreview, sourceTestDraftLive, sourcePublishTested, detailEditSource, detailImproveExternal, detailSharePrompt, detailPublish, detailDelete, openPublishedDetail, fetchAppContentBase64, showLineageModal, showProtectionModal, saveProtection, showVersionsModal, restoreVersion, forkVersion } from './detail.js';
+import { initDetail, refreshServerMgmt, openDetailView, editAppDetails, closeDetailView, detailLaunch, mountLoginPill, detailAboutEdit, detailAboutCancel, detailAboutSave, detailTranslateDesc, detailPromoteSave, detailPromoteClear, detailToggleFavorite, detailAccessCodeEdit, detailAccessCodeCancel, detailAccessCodeSave, detailSkillAttachToggle, detailSkillAttach, detailSkillDetach, detailSetScreenshot, detailRefreshScreenshot, detailAiRun, detailAiTest, detailAiKeep, detailAiDiscard, detailTestDraftLive, detailPublishTestedDraft, detailWorkTry, detailWorkPublish, detailWorkDiscard, detailCheckpointPreview, detailCheckpointRestore, detailCheckpointDelete, saveSourceAsWorkingCopy, openStagingPreview, sourceTestDraftLive, sourcePublishTested, detailEditSource, detailImproveExternal, detailSharePrompt, detailPublish, detailDelete, openPublishedDetail, fetchAppContentBase64, showLineageModal, showProtectionModal, saveProtection, showVersionsModal, restoreVersion, forkVersion } from './detail.js';
 import { monetizeAddTool, monetizeEditTool, monetizeCancelEdit, monetizeSaveTool, monetizeDeleteTool } from './monetize.js';
 import { loadCortexExtensions, showCortexPopup, cortexCopy, getCortexOwnerToken, openCortexEditor, cortexEditorAddLib, cortexEditorSave, cortexEditorExport, closeCortexEditor, openPromptBuilder, closePbPanel, buildPromptFromBuilder, updatePbPreview } from './cortex.js';
 import { initSettings, applyTheme, updateThemeToggle, toggleTheme, getThemePref, openSettings, saveSettings, syncConfigToServer, loadConfigFromServer, closeSettings, openHelp, closeHelp } from './settings.js';
@@ -173,6 +173,12 @@ import { toggleFavorite } from './favorites.js';
     detailAiDiscard: detailAiDiscard,
     detailTestDraftLive: detailTestDraftLive,
     detailPublishTestedDraft: detailPublishTestedDraft,
+    detailWorkTry: detailWorkTry,
+    detailWorkPublish: detailWorkPublish,
+    detailWorkDiscard: detailWorkDiscard,
+    detailCheckpointPreview: detailCheckpointPreview,
+    detailCheckpointRestore: detailCheckpointRestore,
+    detailCheckpointDelete: detailCheckpointDelete,
     openStagingPreview: openStagingPreview,
     detailEditSource: detailEditSource,
     detailImproveExternal: detailImproveExternal,
@@ -604,52 +610,29 @@ import { toggleFavorite } from './favorites.js';
       saveBtn.disabled = (this.value === original);
     });
 
-    // ── Save Changes button ──────────────────────────
+    // ── Save working copy ────────────────────────────
+    // Delegates to detail.js saveSourceAsWorkingCopy: checkpoint the replaced bytes, then persist
+    // to the app's server draft slot. (It used to only overwrite a transient in-memory blob, which
+    // a reload discarded — the root of "my edits kept disappearing".)
     document.getElementById('save-source-btn').addEventListener('click', function() {
       var overlay = document.getElementById('source-overlay');
       var textarea = document.getElementById('source-code');
-      var appId = overlay.dataset.appId;
       var btn = this;
-
-      if (!appId) {
-        showNotice('Cannot save: no app ID found.');
-        return;
-      }
+      if (!overlay.dataset.appId) { showNotice('Cannot save: no app ID found.'); return; }
 
       var newSource = textarea.value;
-      // Encode to base64 blob
-      var newBlob = btoa(unescape(encodeURIComponent(newSource)));
-
-      // Find the app in allApps and update it
-      var app = null;
-      for (var i = 0; i < allApps.length; i++) {
-        if (allApps[i].id === appId) {
-          app = allApps[i];
-          break;
-        }
-      }
-
-      if (!app) {
-        showNotice('App not found in library.');
-        return;
-      }
-
-      app.blob = newBlob;
-      btn.textContent = 'Saving...';
+      var idle = t('source.save');
+      btn.textContent = t('wc.saving');
       btn.disabled = true;
 
-      saveApp(app).then(function() {
-        btn.textContent = 'Saved!';
+      saveSourceAsWorkingCopy().then(function() {
+        btn.textContent = t('wc.savedShort');
         overlay.dataset.originalSource = newSource;
-        setTimeout(function() {
-          btn.textContent = 'Save Changes';
-          btn.disabled = true;
-        }, 1500);
-        renderApps();
+        setTimeout(function() { btn.textContent = idle; btn.disabled = true; }, 1500);
       }).catch(function(err) {
-        btn.textContent = 'Save Changes';
+        btn.textContent = idle;
         btn.disabled = false;
-        showNotice('Failed to save: ' + (err.message || err));
+        showNotice((t('wc.saveFailed') || 'Failed to save') + ': ' + ((err && err.message) || err));
       });
     });
 

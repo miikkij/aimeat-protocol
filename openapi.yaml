@@ -14507,6 +14507,44 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/apps/{owner}/{filename}/draft:
+    get:
+      operationId: getAppDraft
+      summary: Read the app's unpublished draft (staging) content
+      description: |
+        Returns the current draft slot for `{owner}/{filename}` — the base64 content plus its size,
+        mime type and manifest. Owner-only; the caller is resolved from the token, so a draft is
+        never readable by anyone else. This is the read side of the draft slot: an editing client
+        that reloads must be able to load the working copy BACK, otherwise it can only re-fetch the
+        LIVE bytes and would silently overwrite the draft on its next save. The `?preview=` URL is
+        not usable for this — on an app-origin node it redirects to the isolated (CORS-less) origin.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { in: path, name: owner, required: true, schema: { type: string } }
+        - { in: path, name: filename, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: The draft content
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          filename: { type: string }
+                          content: { type: string, description: base64-encoded draft HTML }
+                          mime_type: { type: string }
+                          size: { type: integer }
+                          updated_at: { type: string, format: date-time }
+                          manifest: { type: object }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: No draft exists for this app
     put:
       operationId: saveAppDraft
       summary: Save the app's unpublished draft (staging)

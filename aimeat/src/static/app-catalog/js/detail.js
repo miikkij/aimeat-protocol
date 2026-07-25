@@ -8,6 +8,10 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   v1.5.0 — 2026-07-25 — TARGET-048 edit-model clarity: the STATUS card becomes a WORKING COPY →
+ *     PUBLISHED lifecycle band, saving persists (server draft slot) instead of only touching a
+ *     transient blob, every save leaves a restorable checkpoint ("Working-copy history"), and the
+ *     three meanings of "draft" are split into working copy / try-it / published version.
  *   v1.4.0 — 2026-07-20 — Server-only cutover: drop the local-only favourite star; the detail view
  *     always operates on a server app (materialized in memory on demand for editing).
  *   v1.3.0 — 2026-07-16 — Add openStagingPreview(owner, filename): mint a preview token for an
@@ -30,6 +34,7 @@ import { getPromotion, setPromotion, loadPromoted } from './promote.js';
 import { monetizeSectionInner, monetizeOnOpen } from './monetize.js';
 import { costSectionInner, costOnOpen } from './cost.js';
 import { appManifestAgents } from './app-agents.js';
+import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, deleteCheckpoint, discardWorkingCopy, getDraft } from './workcopy.js';
 
 // Injected once at bootstrap by main.js. Functions are main-local; the get* return main's LIVE
 // state (so reads + in-place mutations propagate across the reassignments main does each render).
@@ -56,6 +61,19 @@ var detailSkillPickerOpen = false;   // true while the "attach a skill" picker i
 var detailMySkills = null;           // cached list of the user's own UNBOUND skills (attach options)
 var detailBoundSkills = [];          // refs of the skills currently bound to this app (filters the options)
 var detailSkillBusy = false;         // guards the Attach button while a bind/unbind republish is in flight
+// ── Working copy (TARGET-048) ──
+// The working copy is the app's SERVER DRAFT SLOT, not a browser blob: saving persists it, so it
+// survives a reload and can be tested on a real origin before it ever becomes a published version.
+var detailWorkSavedAt = null;   // ISO time this session last persisted the working copy (null = not yet here)
+var detailHasWorkCopy = false;  // a saved (unpublished) working copy exists on the server for this app
+var detailCheckpointsHtml = null; // cached rendered checkpoint list, survives re-renders
+var detailCheckpointBusy = false; // guards restore/delete while a memory round-trip is in flight
+var detailLastChangeNote = '';  // the change request behind the pending AI proposal — labels the checkpoint it replaces
+// Bumped whenever the working-copy state changes underneath in-flight async loads (open a different
+// app, publish, discard). A late-resolving loader compares the epoch it captured and bails instead
+// of writing stale state back — otherwise a draft fetch started before a publish lands after it and
+// resurrects "working copy saved" for an app that no longer has one.
+var detailEpoch = 0;
 
 function detailGetApp() {
   for (var i = 0; i < getMainApps().length; i++) {
@@ -164,8 +182,15 @@ function openDetailView(appId) {
   detailSkillPickerOpen = false;
   detailMySkills = null;
   detailBoundSkills = [];
+  detailWorkSavedAt = null;
+  detailCheckpointsHtml = null;
+  detailCheckpointBusy = false;
+  detailEpoch++;
   var app = detailGetApp();
   if (!app) return;
+  // A working copy saved in an EARLIER session shows up in the server listing as has_draft.
+  var wcState = (app.publishedFilename && getServerState()[app.publishedFilename]) || null;
+  detailHasWorkCopy = !!(wcState && wcState.hasDraft);
   // Monetize (TARGET-034): reset + async-load the apps.{appId}.tools manifest for OWN published
   // apps before the first render so the section shell picks up the loading state.
   monetizeOnOpen(detailServerOwner(app), app.publishedFilename || '', detailIsOwnPublished(app));
@@ -179,6 +204,11 @@ function openDetailView(appId) {
   if (app.published && app.publishedFilename && owner) {
     detailLoadVersions(owner, app.publishedFilename);
     detailLoadSkills(detailServerOwner(app) || owner, app.publishedFilename);
+    detailLoadCheckpoints(detailServerOwner(app) || owner, app.publishedFilename);
+    // A working copy saved earlier lives on the server, but the in-memory blob was materialized
+    // from the PUBLISHED bytes. Pull the real working copy in, so the source editor and the AI
+    // loop operate on YOUR work — not on the live app wearing its name.
+    if (detailHasWorkCopy) detailLoadWorkingCopy(app, detailServerOwner(app) || owner);
   }
   // Opened via a pencil ("edit the name") → jump straight into the About editor.
   if (detailEditAboutOnOpen) {
@@ -297,13 +327,30 @@ function renderDetailView() {
     '<span style="font-size:1.3rem">' + escapeHtml(icon) + '</span> ' + escapeHtml(app.name || 'App') +
     ((canEditAbout && !detailEditingAbout) ? ' <button class="rename-pencil" style="font-size:1rem" title="' + escapeHtml(t('detail.editDetails')) + '" onclick="window._launcher.detailAboutEdit()">✏️</button>' : '');
 
-  // ── STATUS ──
+  // ── LIFECYCLE (TARGET-048) ──
+  // Replaces the old two-number STATUS card. One band answers the question the old card never did:
+  // WHERE is my work right now — in an unsaved proposal, in a saved (private) working copy, or
+  // published for everyone? Each stop says what it means in plain words; one sentence says what to
+  // do next. "Draft" is deliberately absent: it used to mean three different things here.
   var localBytes = app.blob ? Math.round(app.blob.length * 0.75) : 0; // base64 → bytes approx
-  var publishedV = app.publishedVersionNumber ? ('v' + app.publishedVersionNumber) : (app.published ? 'v?' : t('detail.notPublished'));
-  var syncClass, syncText;
-  if (!app.published) { syncClass = 'none'; syncText = t('detail.notPublished'); }
-  else if (detailDraftBlob) { syncClass = 'diff'; syncText = t('detail.localNewer'); }
-  else { syncClass = 'ok'; syncText = t('detail.inSync'); }
+  var publishedV = app.publishedVersionNumber ? ('v' + app.publishedVersionNumber) : '';
+  // Three mutually exclusive working-copy states, in the order the user moves through them.
+  var wcState = detailDraftBlob ? 'pending' : (detailHasWorkCopy ? 'saved' : 'clean');
+  var wcValue, wcExplain;
+  if (wcState === 'pending') {
+    wcValue = t('wc.pending');
+    wcExplain = t('wc.explainPending');
+  } else if (wcState === 'saved') {
+    wcValue = detailWorkSavedAt
+      ? t('wc.savedAt').replace('{t}', new Date(detailWorkSavedAt).toLocaleTimeString())
+      : t('wc.savedEarlier');
+    wcExplain = app.published
+      ? t('wc.explainSaved').replace('{v}', String((app.publishedVersionNumber || 0) + 1))
+      : t('wc.explainSavedUnpublished');
+  } else {
+    wcValue = app.published ? t('wc.sameAsPublished') : t('wc.nothingYet');
+    wcExplain = app.published ? t('wc.explainClean') : t('wc.explainUnpublished');
+  }
 
   // App thumbnail (right side of the Status card). Built from the published path; hides itself if
   // the app has no screenshot yet. Cache-busted so a freshly (re)captured shot isn't shown stale.
@@ -319,17 +366,34 @@ function renderDetailView() {
 
   var statusHtml =
     '<div class="dtl-section">' +
-      '<h3>' + t('detail.status') + '</h3>' +
-      '<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">' +
-        '<div style="flex:1;min-width:200px">' +
-          '<div class="dtl-status-row">' +
-            '<div class="dtl-stat"><span class="dtl-stat-label">' + t('detail.statusLocal') + '</span><span class="dtl-stat-val">' + (app.blob ? fmtSize(localBytes) : (isUrlApp ? 'URL' : '—')) + '</span></div>' +
-            '<div class="dtl-stat"><span class="dtl-stat-label">' + t('detail.statusPublished') + '</span><span class="dtl-stat-val">' + escapeHtml(publishedV) + '</span></div>' +
+      '<h3>' + t('wc.lifecycle') + '</h3>' +
+      '<div class="wc-row">' +
+        '<div class="wc-band">' +
+          '<div class="wc-stop ' + (wcState === 'clean' ? 'is-idle' : 'is-active') + '">' +
+            '<span class="wc-stop-label">' + t('wc.title') + '</span>' +
+            '<span class="wc-stop-val">' + escapeHtml(wcValue) + '</span>' +
+            '<span class="wc-stop-note">' + t('wc.privateNote') + '</span>' +
           '</div>' +
-          '<span class="dtl-sync ' + syncClass + '">' + escapeHtml(syncText) + '</span>' +
+          '<span class="wc-arrow" aria-hidden="true">→</span>' +
+          '<div class="wc-stop ' + (app.published ? 'is-live' : 'is-idle') + '">' +
+            '<span class="wc-stop-label">' + t('wc.published') + '</span>' +
+            '<span class="wc-stop-val">' + escapeHtml(app.published ? (publishedV || 'v?') : t('wc.notPublishedYet')) + '</span>' +
+            '<span class="wc-stop-note">' + (app.published ? t('wc.visibleToOthers') : t('wc.notVisibleYet')) + '</span>' +
+          '</div>' +
         '</div>' +
         shotImg +
       '</div>' +
+      '<p class="wc-explain">' + escapeHtml(wcExplain) + '</p>' +
+      // A saved working copy must never be a dead end: the same three verbs are available right
+      // here, so you can try it, publish it, or throw it away without hunting through other menus.
+      (wcState === 'saved' && app.published && !isUrlApp
+        ? '<div class="dtl-btn-row">' +
+            dtlBtn(t('wc.try'), 'window._launcher.detailWorkTry()') +
+            dtlBtn(t('wc.publishAs').replace('{v}', String((app.publishedVersionNumber || 0) + 1)), 'window._launcher.detailWorkPublish()', {variant:'success'}) +
+            dtlBtn(t('wc.discardWork'), 'window._launcher.detailWorkDiscard()') +
+          '</div>'
+        : '') +
+      (app.blob && !isUrlApp ? '<p class="wc-size">' + escapeHtml(t('detail.size') + ': ' + fmtSize(localBytes)) + '</p>' : '') +
     '</div>';
 
   // ── ABOUT ──
@@ -416,26 +480,44 @@ function renderDetailView() {
       '</div>' +
       '<div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? '' : escapeHtml(detailAiUnavailableMsg())) + '</div>' +
       '<div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? '' : ' hidden') + '>' +
-        '<div class="dtl-ai-status" style="margin:0 0 8px">' + t('detail.draftReady') + '</div>' +
+        '<div class="dtl-ai-status wc-proposal-head">' + t('detail.draftReady') + '</div>' +
+        // The SAME three verbs the source editor uses, in the order you actually move through them:
+        // save (private, reversible) → try (real origin, live untouched) → publish (others see it).
         '<div class="dtl-btn-row">' +
-          // PUBLISHED app → the real-origin staging path (mic/camera work); the old opaque-
-          // sandbox "Test" is dropped here to avoid two near-identical "Test" buttons. An
-          // UNPUBLISHED app has no server draft slot yet, so it keeps the quick sandbox preview.
+          dtlBtn(t('wc.save'), 'window._launcher.detailAiKeep()', {variant:'primary'}) +
           (app.published
-            ? dtlBtn(t('detail.testLive'), 'window._launcher.detailTestDraftLive()', {variant:'primary'}) +
-              dtlBtn(t('detail.publishTested'), 'window._launcher.detailPublishTestedDraft()', {variant:'success'})
-            : dtlBtn(t('detail.test'), 'window._launcher.detailAiTest()', {variant:'primary'})) +
-          dtlBtn(t('detail.keep'), 'window._launcher.detailAiKeep()') +
-          dtlBtn(t('detail.discard'), 'window._launcher.detailAiDiscard()') +
+            ? dtlBtn(t('wc.try'), 'window._launcher.detailTestDraftLive()') +
+              dtlBtn(t('wc.publishAs').replace('{v}', String((app.publishedVersionNumber || 0) + 1)), 'window._launcher.detailPublishTestedDraft()', {variant:'success'})
+            // No published app yet → no server slot to stage into; keep the quick sandbox preview.
+            : dtlBtn(t('wc.tryLocal'), 'window._launcher.detailAiTest()')) +
+          dtlBtn(t('wc.discardProposal'), 'window._launcher.detailAiDiscard()') +
         '</div>' +
+        '<p class="wc-verbs-hint">' + t('wc.verbsHint') + '</p>' +
       '</div>';
   }
   aiHtml += '</div>';
+
+  // ── WORKING-COPY HISTORY (checkpoints, TARGET-048) ──
+  // Every save leaves the bytes it replaced here, so iterating can never lose earlier work. Kept
+  // visually and verbally separate from the published versions below — that pair of look-alike
+  // lists was itself a source of the confusion, so each one states who can see it.
+  var historyHtml = '';
+  if (!isUrlApp && app.published) {
+    historyHtml =
+      '<div class="dtl-section">' +
+        '<h3>' + t('wc.history') + '</h3>' +
+        '<p class="dtl-desc">' + t('wc.historyHint') + '</p>' +
+        '<div id="detail-checkpoints">' +
+          (detailCheckpointsHtml !== null ? detailCheckpointsHtml : '<span class="wc-muted">…</span>') +
+        '</div>' +
+      '</div>';
+  }
 
   // ── VERSIONS ──
   var versionsHtml =
     '<div class="dtl-section">' +
       '<h3>' + t('detail.versions') + '</h3>' +
+      '<p class="dtl-desc">' + t('versions.publishedHint') + '</p>' +
       '<div id="detail-versions-list">' +
         (detailVersionsHtml !== null ? detailVersionsHtml :
           (!hasServer ? '<span class="dtl-sync none">' + t('detail.needServerVersions') + '</span>'
@@ -528,7 +610,131 @@ function renderDetailView() {
   }
 
   document.getElementById('detail-body').innerHTML =
-    statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+    statusHtml + aboutHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+}
+
+// ── Working-copy history (checkpoints) ────────────────────────────────────────
+// Rendered from the cached index (workcopy.js); each row can be previewed in the sandbox or
+// restored. Restoring is itself a save, so the state you restore FROM is checkpointed too — there
+// is no way to lose work by clicking around in here.
+
+function detailCheckpointRows(app) {
+  var owner = detailServerOwner(app);
+  var list = getCheckpoints(owner, app.publishedFilename || '');
+  if (!list.length) return '<span class="wc-muted">' + t('wc.none') + '</span>';
+  var out = '';
+  for (var i = 0; i < list.length; i++) {
+    var c = list[i];
+    var when = c.at ? new Date(c.at).toLocaleString() : '';
+    var kb = c.size ? (Math.round(c.size / 102.4) / 10) + ' KB' : '';
+    var note = c.note ? t('wc.before').replace('{note}', c.note) : t('wc.beforeUnnamed');
+    out +=
+      '<div class="dtl-version-row">' +
+        '<div class="version-meta">' +
+          '<span class="wc-ckpt-when">' + escapeHtml(when) + '</span>' +
+          '<span class="wc-ckpt-note">' + escapeHtml(note) + (kb ? ' · ' + kb : '') + '</span>' +
+        '</div>' +
+        '<div class="dtl-btn-row">' +
+          dtlBtn(t('wc.preview'), 'window._launcher.detailCheckpointPreview(\'' + jsArg(c.id) + '\')') +
+          dtlBtn(t('wc.restore'), 'window._launcher.detailCheckpointRestore(\'' + jsArg(c.id) + '\')', {variant:'primary', disabled: detailCheckpointBusy}) +
+          dtlBtn(t('wc.delete'), 'window._launcher.detailCheckpointDelete(\'' + jsArg(c.id) + '\')', {disabled: detailCheckpointBusy}) +
+        '</div>' +
+      '</div>';
+  }
+  return out;
+}
+
+// Re-render ONLY the checkpoint list in place (keeps scroll + the rest of the detail intact).
+function refreshCheckpoints() {
+  var app = detailGetApp();
+  if (!app) return;
+  detailCheckpointsHtml = detailCheckpointRows(app);
+  var el = document.getElementById('detail-checkpoints');
+  if (el) el.innerHTML = detailCheckpointsHtml;
+}
+
+// Load the saved working copy over the materialized published bytes (see the call site). Silent on
+// failure: the band still says "saved earlier", and the worst case is the previous behaviour.
+function detailLoadWorkingCopy(app, owner) {
+  var epoch = detailEpoch;
+  getDraft(owner, app.publishedFilename).then(function (d) {
+    // Bail if a publish/discard/app-switch happened while this was in flight (see detailEpoch).
+    if (!d || !d.content || detailAppId !== app.id || epoch !== detailEpoch) return;
+    app.blob = d.content;
+    if (d.updated_at) detailWorkSavedAt = d.updated_at;
+    saveApp(app).then(function () { if (detailAppId === app.id) renderDetailView(); });
+  });
+}
+
+function detailLoadCheckpoints(owner, filename) {
+  loadCheckpoints(owner, filename)
+    .then(function () { if (detailAppId) refreshCheckpoints(); })
+    .catch(function () { if (detailAppId) refreshCheckpoints(); });
+}
+
+// Open a stored checkpoint in the sandbox overlay WITHOUT touching the working copy.
+function detailCheckpointPreview(id) {
+  var app = detailGetApp();
+  if (!app) return;
+  readCheckpoint(detailServerOwner(app), app.publishedFilename || '', id).then(function (b64) {
+    if (!b64) { showNotice(t('wc.gone')); return; }
+    var view = document.getElementById('iframe-view');
+    var iframe = document.getElementById('app-iframe');
+    document.getElementById('iframe-title').textContent = (app.name || 'App') + ' — ' + t('wc.previewTitle');
+    iframe.removeAttribute('src');
+    iframe.srcdoc = blobToHtml(b64);
+    setIframeUrl('');
+    delete iframe.dataset.appId;
+    view.hidden = false;
+  });
+}
+
+// Restore = save the checkpoint's bytes AS the working copy (which checkpoints the current bytes
+// first). The published app is untouched until you publish.
+async function detailCheckpointRestore(id) {
+  var app = detailGetApp();
+  if (!app || detailCheckpointBusy) return;
+  if (!getCortexOwnerToken()) { showNotice(t('wc.loginNeeded')); return; }
+  if (!(await showConfirm(t('wc.confirmRestore')))) return;
+  var owner = detailServerOwner(app);
+  var filename = app.publishedFilename || '';
+  detailCheckpointBusy = true;
+  refreshCheckpoints();
+  readCheckpoint(owner, filename, id)
+    .then(function (b64) {
+      if (!b64) throw new Error(t('wc.gone'));
+      return saveWorkingCopy({
+        owner: owner, filename: filename,
+        previousB64: app.blob, nextB64: b64, note: t('wc.noteRestore'),
+      }).then(function () { return b64; });
+    })
+    .then(function (b64) {
+      app.blob = b64;
+      detailCheckpointBusy = false;
+      detailHasWorkCopy = true;
+      detailWorkSavedAt = new Date().toISOString();
+      return saveApp(app).then(function () {
+        renderDetailView();
+        refreshCheckpoints();
+        showNotice(t('wc.restored'));
+      });
+    })
+    .catch(function (err) {
+      detailCheckpointBusy = false;
+      refreshCheckpoints();
+      showNotice((err && err.message) || t('wc.saveFailed'));
+    });
+}
+
+async function detailCheckpointDelete(id) {
+  var app = detailGetApp();
+  if (!app || detailCheckpointBusy) return;
+  if (!(await showConfirm(t('wc.confirmDelete')))) return;
+  detailCheckpointBusy = true;
+  refreshCheckpoints();
+  deleteCheckpoint(detailServerOwner(app), app.publishedFilename || '', id)
+    .catch(function () { /* index already updated locally */ })
+    .then(function () { detailCheckpointBusy = false; refreshCheckpoints(); });
 }
 
 // The Promote section: a short EN/FI pitch that surfaces this app on the owner's public profile.
@@ -1218,6 +1424,7 @@ function detailAiRun() {
         return;
       }
       detailDraftBlob = htmlToBlob(newHtml);
+      detailLastChangeNote = change;
       statusEl.style.color = '#34d399';
       var usage = json.data && json.data.budget && typeof json.data.budget.spent_today_usd !== 'undefined'
         ? (' · ' + t('detail.aiUsage') + ': $' + Number(json.data.budget.spent_today_usd).toFixed(3)) : '';
@@ -1249,19 +1456,58 @@ function detailAiTest() {
   view.hidden = false;
 }
 
+// Accept the AI proposal INTO the working copy. This used to only overwrite the in-memory blob —
+// which a reload silently threw away. Now it checkpoints the bytes being replaced and persists the
+// new ones to the server draft slot, so "saved" actually means saved. The live app is untouched.
 function detailAiKeep() {
   var app = detailGetApp();
   if (!app || !detailDraftBlob) return;
-  app.blob = detailDraftBlob;
-  app.source = app.source === 'url' ? 'paste' : (app.source || 'paste');
-  app.url = app.url || null;
-  detailDraftBlob = null;
-  saveApp(app).then(function() {
-    renderApps();
-    renderDetailView();
-    var s2 = document.getElementById('detail-ai-status');
-    if (s2) { s2.style.color = '#34d399'; s2.textContent = '✔ ' + t('detail.kept'); }
-  });
+  var next = detailDraftBlob;
+  var prev = app.blob;
+  var statusEl = document.getElementById('detail-ai-status');
+
+  function finishLocal() {
+    app.blob = next;
+    app.source = app.source === 'url' ? 'paste' : (app.source || 'paste');
+    app.url = app.url || null;
+    detailDraftBlob = null;
+    return saveApp(app).then(function () {
+      renderApps();
+      renderDetailView();
+    });
+  }
+
+  // No published app (no server slot) or signed out → in-memory only, and say so plainly.
+  if (!app.published || !app.publishedFilename || !getCortexOwnerToken()) {
+    finishLocal().then(function () {
+      var s2 = document.getElementById('detail-ai-status');
+      if (s2) { s2.style.color = 'var(--text-muted)'; s2.textContent = t('wc.keptLocalOnly'); }
+    });
+    return;
+  }
+
+  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('wc.saving'); }
+  saveWorkingCopy({
+    owner: detailServerOwner(app),
+    filename: app.publishedFilename,
+    previousB64: prev,
+    nextB64: next,
+    note: detailLastChangeNote,
+  })
+    .then(function () {
+      detailHasWorkCopy = true;
+      detailWorkSavedAt = new Date().toISOString();
+      return finishLocal();
+    })
+    .then(function () {
+      refreshCheckpoints();
+      var s2 = document.getElementById('detail-ai-status');
+      if (s2) { s2.style.color = '#34d399'; s2.textContent = '✔ ' + t('wc.saved'); }
+    })
+    .catch(function (err) {
+      var s2 = document.getElementById('detail-ai-status');
+      if (s2) { s2.style.color = 'var(--accent)'; s2.textContent = '✘ ' + ((err && err.message) || t('wc.saveFailed')); }
+    });
 }
 
 function detailAiDiscard() {
@@ -1365,6 +1611,63 @@ function publishDraftBytes(app, contentB64, statusEl, onDone) {
   });
 }
 
+// ── Saved working copy: try / publish / discard ───────────────────────────────
+// These act on the SERVER draft slot, which is authoritative. Publishing must NOT re-upload
+// app.blob: after a reload the in-memory blob is materialized from the PUBLISHED bytes, so
+// PUT-then-publish would silently overwrite the saved working copy with the live version. The
+// AI-proposal path is the only one that stages bytes first (they are not on the server yet).
+
+function detailWorkTry() {
+  var app = detailGetApp();
+  if (!app || !app.publishedFilename) return;
+  openStagingPreview(detailServerOwner(app), app.publishedFilename);
+}
+
+async function detailWorkPublish() {
+  var app = detailGetApp();
+  if (!app || !app.publishedFilename) return;
+  if (!getCortexOwnerToken()) { showNotice(t('wc.loginNeeded')); return; }
+  if (!(await showConfirm(t('detail.draftPublishConfirm')))) return;
+  var owner = detailServerOwner(app);
+  draftApi('POST', owner, app.publishedFilename, 'publish-draft')
+    .then(function (data) {
+      detailEpoch++;
+      detailHasWorkCopy = false;
+      detailWorkSavedAt = null;
+      app.publishedVersionNumber = data.version_number || app.publishedVersionNumber;
+      showNotice(t('detail.draftPublished').replace('{v}', data.version_number));
+      // Render BEFORE refreshAll: it empties the working set synchronously, after which
+      // detailGetApp() is null and renderDetailView() bails, leaving the pre-publish DOM on screen.
+      renderDetailView();
+      detailLoadVersions(owner, app.publishedFilename);
+      refreshAll();
+    })
+    .catch(function (err) { showNotice('✘ ' + ((err && err.message) || 'Publish failed')); });
+}
+
+// Throw the working copy away and pull the live bytes back in, so what you see afterwards really
+// IS the published app (rather than a stale in-memory copy of what you just discarded).
+async function detailWorkDiscard() {
+  var app = detailGetApp();
+  if (!app || !app.publishedFilename) return;
+  if (!(await showConfirm(t('wc.confirmDiscardWork')))) return;
+  var owner = detailServerOwner(app);
+  var cfg = loadConfig();
+  var aimeatUrl = (cfg.aimeatUrl || '').replace(/\/+$/, '');
+  discardWorkingCopy(owner, app.publishedFilename)
+    .then(function () { return fetchAppContentBase64(aimeatUrl, owner, app.publishedFilename); })
+    .then(function (b64) { app.blob = b64; return saveApp(app); })
+    .catch(function () { /* keep whatever we have if the re-fetch fails */ })
+    .then(function () {
+      detailEpoch++;
+      detailHasWorkCopy = false;
+      detailWorkSavedAt = null;
+      renderDetailView(); // before refreshAll — see detailWorkPublish
+      refreshAll();
+      showNotice(t('wc.discardedWork'));
+    });
+}
+
 // ── AI-loop wrappers (stage the pending AI candidate `detailDraftBlob`) ──
 function detailTestDraftLive() {
   var app = detailGetApp();
@@ -1374,10 +1677,17 @@ function detailTestDraftLive() {
 function detailPublishTestedDraft() {
   var app = detailGetApp();
   if (!app || !detailDraftBlob) return;
-  publishDraftBytes(app, detailDraftBlob, document.getElementById('detail-ai-status'), function () {
+  publishDraftBytes(app, detailDraftBlob, document.getElementById('detail-ai-status'), function (data) {
+    // Published: the slot is cleared server-side, so the working copy is level with the live app.
+    detailEpoch++;
+    app.blob = detailDraftBlob;
     detailDraftBlob = null;
+    detailHasWorkCopy = false;
+    detailWorkSavedAt = null;
+    if (data && data.version_number) app.publishedVersionNumber = data.version_number;
+    saveApp(app);
+    renderDetailView(); // before refreshAll — see detailWorkPublish
     refreshAll();
-    renderDetailView();
   });
 }
 
@@ -1397,6 +1707,57 @@ function sourceCurrentB64() {
   if (!ta) return null;
   try { return btoa(unescape(encodeURIComponent(ta.value))); } catch (e) { return null; }
 }
+// "Save working copy" in the source editor — the SAME contract as the AI loop's save: checkpoint
+// the bytes being replaced, then persist to the server draft slot. Previously this button only
+// reassigned a transient in-memory blob, so the edit was gone on the next reload. Returns a promise
+// so main.js can drive the button's label/disabled state.
+function saveSourceAsWorkingCopy() {
+  var app = sourceOverlayApp();
+  var b64 = sourceCurrentB64();
+  if (!app || b64 == null) return Promise.reject(new Error('No app'));
+  var statusEl = document.getElementById('source-draft-status');
+  var prev = app.blob;
+  var isOpenInDetail = (detailAppId === app.id);
+
+  function localOnly() {
+    app.blob = b64;
+    return saveApp(app).then(function () { renderApps(); });
+  }
+
+  // Unpublished app or signed out → no server slot exists; keep the old in-memory behaviour but
+  // say plainly that it will not survive a reload.
+  if (!app.published || !app.publishedFilename || !getCortexOwnerToken()) {
+    return localOnly().then(function () {
+      if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('wc.keptLocalOnly'); }
+      return { persisted: false };
+    });
+  }
+
+  if (statusEl) { statusEl.style.color = 'var(--text-muted)'; statusEl.textContent = t('wc.saving'); }
+  return saveWorkingCopy({
+    owner: detailServerOwner(app),
+    filename: app.publishedFilename,
+    previousB64: prev,
+    nextB64: b64,
+    note: t('wc.noteManual'),
+  })
+    .then(function () { return localOnly(); })
+    .then(function () {
+      if (isOpenInDetail) {
+        detailHasWorkCopy = true;
+        detailWorkSavedAt = new Date().toISOString();
+        renderDetailView();
+        refreshCheckpoints();
+      }
+      if (statusEl) { statusEl.style.color = '#34d399'; statusEl.textContent = '✔ ' + t('wc.saved'); }
+      return { persisted: true };
+    })
+    .catch(function (err) {
+      if (statusEl) { statusEl.style.color = 'var(--accent)'; statusEl.textContent = '✘ ' + ((err && err.message) || t('wc.saveFailed')); }
+      throw err;
+    });
+}
+
 function sourceTestDraftLive() {
   var app = sourceOverlayApp();
   var c = sourceCurrentB64();
@@ -1796,6 +2157,13 @@ export {
   detailAiDiscard,
   detailTestDraftLive,
   detailPublishTestedDraft,
+  detailWorkTry,
+  detailWorkPublish,
+  detailWorkDiscard,
+  detailCheckpointPreview,
+  detailCheckpointRestore,
+  detailCheckpointDelete,
+  saveSourceAsWorkingCopy,
   openStagingPreview,
   sourceTestDraftLive,
   sourcePublishTested,
