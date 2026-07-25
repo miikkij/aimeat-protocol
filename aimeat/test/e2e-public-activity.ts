@@ -15,6 +15,10 @@
  *     test/run-e2e-ci.ts --test=public-activity
  * @version-history
  *   v1.0.0 — 2026-06-16 — Initial: feed recording + category routing + negative cases.
+ *   v1.1.0 — 2026-07-25 — Phase 4 now says what it actually checks: NOTHING owned by system@ may
+ *     appear in the ticker. The old name blamed the activity feed, which was always filtered
+ *     correctly; the real leak was the seeded built-in skills (public since 2026-07-14), so a
+ *     dedicated regression case names them.
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -163,15 +167,29 @@ await test('Importing a non-catalog knowledge package does NOT appear in the fee
   assert(!leaked, 'non-catalog knowledge must not be announced publicly');
 });
 
-console.log('\nPhase 4: No leak into the legacy ticker');
+console.log('\nPhase 4: The system identity is not an actor');
 
-await test('Synthetic activity entries do not leak into /v1/public/activity-ticker', async () => {
+await test('Nothing owned by system@ leaks into /v1/public/activity-ticker', async () => {
   const { body } = await json('/v1/public/activity-ticker');
   const items = body?.data?.items ?? [];
-  // Activity entries are owned by system@nodeId → actor would reduce to "system".
+  // system@nodeId owns the activity feed AND the seeded built-in skills AND ecosystem
+  // subscriptions; all reduce to actor "system". None of them is somebody DOING something.
   const leaked = items.find((it: any) => it.actor === 'system');
-  assert(!leaked, 'activity-feed entries must be excluded from the ticker');
+  assert(!leaked, `system-owned entries must be excluded from the ticker, got ${JSON.stringify(leaked)}`);
 });
+
+await test('The seeded built-in skills specifically are not ticker items', async () => {
+  // The regression this guards: the ticker used to drop only the 'activity/' key prefix, so the
+  // public skill seeds (newest public writes on a fresh node) filled all ten rows.
+  const { body } = await json('/v1/public/activity-ticker');
+  const items = body?.data?.items ?? [];
+  const skillRow = items.find((it: any) => typeof it.key === 'string' && /skills?\./.test(it.key));
+  assert(!skillRow, `seeded skills must not appear as activity, got ${JSON.stringify(skillRow)}`);
+});
+
+// node-stats-today's public_writes uses the SAME exclusion, but a count assertion is not
+// deterministic on a shared test database (other suites write public memory too), so it is
+// deliberately not asserted here rather than shipping a flaky test.
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);
