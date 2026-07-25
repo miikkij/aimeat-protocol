@@ -319,5 +319,72 @@ await test('Editing the ODPS descriptor changes the listing without touching the
   assert(after.odps.valueProposition.startsWith('Company identity'), 'the new description is live');
 });
 
+await test('An EXTENSION ACTION carries its own ODPS descriptor from the manifest to the document', async () => {
+  // The extension manifest normaliser whitelists `commercial` fields; before this it dropped the ODPS
+  // blocks, so an ext-action listing — the original EXCHANGE surface — could not be described at all.
+  const EXT2 = `xodps${Date.now()}`;
+  const m = JSON.stringify({
+    metadata: { name: EXT2, version: '1.0.0', description: 'ODPS ext source', author: 'e2e' },
+    actions: [{
+      id: 'search', method: 'POST', path: '/search', script: 'echo',
+      input: IN_SCHEMA, output: OUT_SCHEMA,
+      commercial: {
+        payMorsels: 3, exchange: true, usageTerms: TERMS,
+        provenance: { source: 'PRH open register', legalBasis: 'CC BY 4.0 open data' },
+        odps: { productType: 'derived data', valueProposition: 'Company identity from the register.',
+          dataHolder: { legalName: 'Overscale Solutions Oy' } },
+      },
+    }],
+  });
+  const ins = await json('/v1/extensions', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ manifest: m, scripts: { echo: 'export default async function(ctx, input){ return { echo: input }; }' } }),
+  });
+  assert(ins.status === 201 || ins.status === 200, `install ${ins.status}: ${JSON.stringify(ins.body?.error)}`);
+  await json(`/v1/extensions/${EXT2}/activate`, { method: 'POST', headers: auth(provider.token) });
+  const listing = (await myOfferings(provider.token)).find((o: any) => o.ext === EXT2 && o.action === 'search');
+  assert(listing, 'the flagged action is listed');
+  assert(listing.provenance?.legalBasis === 'CC BY 4.0 open data' && listing.provenance?.odpsVersion === '4.1',
+    `manifest provenance reached the listing: ${JSON.stringify(listing.provenance)}`);
+  assert(listing.odps?.dataHolder?.legalName === 'Overscale Solutions Oy', `manifest odps reached the listing: ${JSON.stringify(listing.odps)}`);
+  const doc = await (await fetch(`${BASE}/v1/exchange/offerings/${listing.offeringId}/odps.yaml`)).text();
+  assert(doc.includes('Company identity from the register.') && doc.includes('Overscale Solutions Oy'),
+    'and the ODPS document carries it');
+});
+
+await test('Adopting a hand-authored listing never erases an attestation its source cannot express', async () => {
+  // Turning `exchange` on for a capability that already had a hand-authored listing must keep the
+  // provenance the provider stated: an emptied legal basis is worse than a stale one.
+  // A priced action that is NOT flagged for EXCHANGE: the pre-projection way of listing by hand.
+  const EXT3 = `xhand${Date.now()}`;
+  const m3 = JSON.stringify({
+    metadata: { name: EXT3, version: '1.0.0', description: 'hand-listed source', author: 'e2e' },
+    actions: [{ id: 'lookup', method: 'POST', path: '/lookup', script: 'echo', input: IN_SCHEMA, output: OUT_SCHEMA, commercial: { payMorsels: 4 } }],
+  });
+  const i3 = await json('/v1/extensions', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ manifest: m3, scripts: { echo: 'export default async function(ctx, input){ return { echo: input }; }' } }),
+  });
+  assert(i3.status === 201 || i3.status === 200, `install ${i3.status}: ${JSON.stringify(i3.body?.error)}`);
+  await json(`/v1/extensions/${EXT3}/activate`, { method: 'POST', headers: auth(provider.token) });
+  const acted = await json('/v1/exchange/offerings', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({
+      ext: EXT3, action: 'lookup', title: 'Hand-authored with provenance', usage_terms: TERMS,
+      provenance: { source: 'Stated by hand', legalBasis: 'Legitimate interest' },
+    }),
+  });
+  assert(acted.status === 201, `hand-listed ${acted.status}: ${JSON.stringify(acted.body?.error)}`);
+  const id = acted.body.data.offering.offeringId;
+  const mig = await json('/v1/exchange/reconcile', {
+    method: 'POST', headers: auth(provider.token), body: JSON.stringify({ migrate: true }),
+  });
+  assert(mig.status === 200, `migrate ${mig.status}`);
+  const after = (await myOfferings(provider.token)).find((o: any) => o.offeringId === id);
+  assert(after, 'the adopted listing kept its id');
+  assert(after.provenance?.legalBasis === 'Legitimate interest',
+    `the hand-stated attestation survived adoption: ${JSON.stringify(after.provenance)}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

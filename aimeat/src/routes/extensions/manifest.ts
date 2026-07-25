@@ -171,6 +171,7 @@ export function buildExtensionRecordFromManifest(
       const commercial = a.commercial as {
         payMorsels?: unknown; payMoney?: unknown; plans?: unknown;
         pricesMoney?: unknown; exchange?: unknown; usageTerms?: unknown;
+        provenance?: unknown; odps?: unknown;
       } | undefined;
       type ActionCommercial = NonNullable<ExtensionRecord['actions'][number]['commercial']>;
       return {
@@ -198,6 +199,14 @@ export function buildExtensionRecordFromManifest(
             ...(commercial.exchange !== undefined ? { exchange: commercial.exchange === true } : {}),
             ...(commercial.usageTerms !== undefined
               ? { usageTerms: commercial.usageTerms as ActionCommercial['usageTerms'] }
+              : {}),
+            // ODPS: the action is also the source of its listing's Open Data Product Specification
+            // document, so the descriptor travels with the manifest that declares the capability.
+            ...(commercial.provenance !== undefined
+              ? { provenance: commercial.provenance as ActionCommercial['provenance'] }
+              : {}),
+            ...(commercial.odps !== undefined
+              ? { odps: commercial.odps as ActionCommercial['odps'] }
               : {}),
           },
         } : {}),

@@ -338,7 +338,12 @@ export async function reconcileOwnerOfferings(
       title: d.title, description: d.description,
       unit: d.unit, basePrice: d.basePrice, currency: d.currency, plans: d.plans,
       ...(d.taskSpec ? { taskSpec: d.taskSpec } : {}),
-      usageTerms: d.usageTerms, provenance: d.provenance, odps: d.odps, tags: d.tags,
+      usageTerms: d.usageTerms, tags: d.tags,
+      // The descriptor is only overwritten when the SOURCE actually states one. Adopting a
+      // hand-authored listing whose source carries no provenance must not erase the attestation
+      // the provider already made — an emptied legal basis is worse than a stale one.
+      ...(d.provenance ? { provenance: d.provenance } : {}),
+      ...(d.odps ? { odps: d.odps } : {}),
       state: 'listed', auto: true, sourceHash: d.sourceHash, updatedAt: now,
     };
     if (!dryRun) await putOffering(storage, updated);
