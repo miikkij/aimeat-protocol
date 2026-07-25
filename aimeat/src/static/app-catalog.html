@@ -2228,6 +2228,30 @@
 .aga-deploy-btn { white-space: nowrap; }
 .aga-btn-sm { padding: 2px 10px; font-size: .75rem; margin-left: auto; }
 .published-card-badgerow .pcb-agent { cursor: default; }
+
+/* ── EXCHANGE & ODPS (app detail) ──────────────────────────────────────────────
+   The app-level marketplace status plus the ODPS authoring forms (app defaults and the per-tool
+   descriptor). Themed through the same variables as the rest of the detail view; the attestation
+   block is set apart on purpose, because those fields are legal promises rather than marketing copy. */
+.od-status { font-size: .86rem; font-weight: 600; padding: 6px 10px; border-radius: 8px; display: inline-block; }
+.od-status-on { background: rgba(52,211,153,.12); color: #34d399; }
+.od-status-none { background: var(--bg-subtle); color: var(--text-muted); }
+.od-note { margin: 6px 0 8px; }
+.od-muted { color: var(--text-muted); font-size: .85rem; }
+.od-actions { margin-top: 10px; }
+.od-form { margin-top: 10px; }
+.od-input { margin: 4px 0 8px; }
+.od-grid { display: flex; gap: 10px; flex-wrap: wrap; }
+.od-col { flex: 1; min-width: 150px; }
+.od-col-narrow { flex: 0 0 110px; min-width: 90px; }
+.od-attest { border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin: 8px 0; background: var(--bg-subtle); }
+.od-attest-head { font-weight: 600; margin-bottom: 2px; }
+.od-tool-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 8px 0 4px; }
+.od-link { font-size: .8rem; color: var(--accent); text-decoration: none; }
+.od-link:hover { text-decoration: underline; }
+.od-blocked { flex-basis: 100%; font-size: .8rem; color: #f59e0b; margin-top: 4px; }
+.od-ok { color: #34d399; }
+.od-err { color: var(--accent); }
 </style>
 </head>
 <body data-active-view="library">
@@ -3048,6 +3072,65 @@
       "monetize.money2": "Second money price",
       "monetize.currency2": "Currency",
       "monetize.money2Hint": "Optional: sell the same call in a second currency. Buyers pick one when they open a contract.",
+      "odps.title": "EXCHANGE & ODPS",
+      "odps.hint": "Whether this app sells anything on the marketplace, and the product description every listing carries. A listed tool is published as an Open Data Product Specification v4.1 document that outside catalogues and buying agents can read.",
+      "odps.statusOn": "On the marketplace: {live} of {total} tools",
+      "odps.statusOff": "Not on the marketplace ({total} tools declared)",
+      "odps.statusBlocked": "{n} tool(s) are flagged for EXCHANGE but cannot be listed yet — see the reason on the tool.",
+      "odps.noTools": "This app declares no sellable tools yet. Add one under Monetize to sell a capability on the marketplace.",
+      "odps.editDefaults": "ODPS defaults for this app",
+      "odps.close": "Close",
+      "odps.defaultsHint": "Filled once per app and inherited by every tool it sells. A tool can override any of it.",
+      "odps.legalName": "Legal entity (data holder)",
+      "odps.businessId": "Business ID",
+      "odps.holderEmail": "Contact email",
+      "odps.holderUrl": "Website",
+      "odps.country": "Country",
+      "odps.logoUrl": "Logo URL",
+      "odps.brandSlogan": "Brand slogan",
+      "odps.governance": "Governance profile",
+      "odps.priority": "Portfolio priority",
+      "odps.language": "Language",
+      "odps.geoArea": "Licence area",
+      "odps.applicableLaws": "Applicable law",
+      "odps.attestation": "Provenance (your attestation)",
+      "odps.attestationHint": "Where the material comes from and on what basis you may sell it. These are promises with legal weight, so AI never fills them — you state them.",
+      "odps.source": "Source",
+      "odps.legalBasis": "Legal basis",
+      "odps.consentStatus": "Consent status",
+      "odps.retention": "Retention",
+      "odps.saveDefaults": "Save defaults",
+      "odps.defaultsSaved": "ODPS defaults saved",
+      "odps.toolTitle": "ODPS description",
+      "odps.toolHint": "What a buyer sees before contracting. The node fills price, access, licence rights and measured use by itself.",
+      "odps.viewYaml": "View odps.yaml",
+      "odps.productType": "Product type",
+      "odps.valueProposition": "Value proposition",
+      "odps.valuePlaceholder": "One sentence: what does the buyer get?",
+      "odps.categories": "Categories (comma separated)",
+      "odps.standards": "Standards (comma separated)",
+      "odps.useCases": "Use cases (one per line: title | description | url)",
+      "odps.useCasesPlaceholder": "KYB onboarding | Verify a counterparty before opening an account",
+      "odps.contentSample": "Sample output URL",
+      "odps.sla": "Service commitments (one per line: dimension value unit — description)",
+      "odps.slaPlaceholder": "uptime 99.5 percent — Monthly availability",
+      "odps.quality": "Quality commitments (one per line: dimension value unit — description)",
+      "odps.qualityPlaceholder": "accuracy 99 percentage — Names match the register",
+      "odps.toolAttestation": "Provenance for this capability",
+      "odps.toolAttestationHint": "Only what differs from the app defaults. Left empty, the app-level attestation applies.",
+      "odps.inherited": "inherited from the app",
+      "odps.transformations": "What was done to the raw material",
+      "odps.transformationsPlaceholder": "Normalised names, joined municipality codes, dropped discontinued companies.",
+      "odps.suggest": "Draft with AI",
+      "odps.suggesting": "Drafting…",
+      "odps.suggestDone": "Draft ready — review it before saving",
+      "odps.suggestFailed": "Draft failed",
+      "odps.suggestUnparseable": "The model did not return usable JSON",
+      "odps.needLogin": "Sign in to use your own AI key",
+      "odps.aiUnavailable": "AI is not available here",
+      "odps.blockedSchema": "Cannot be listed: the tool needs a non-empty input AND output schema.",
+      "odps.blockedBinding": "Cannot be listed: the tool needs a capability binding (action_id).",
+      "odps.blockedPrice": "Cannot be listed: the tool needs a price.",
       "monetize.exchange": "List in EXCHANGE",
       "monetize.exchangeHint": "On: this tool is offered publicly on the marketplace and its listing follows the price you set here. Off: it is removed from the marketplace. Contracts already agreed are unaffected.",
       "monetize.exchangeOn": "in EXCHANGE",
@@ -3571,6 +3654,65 @@
       "monetize.money2": "Toinen rahahinta",
       "monetize.currency2": "Valuutta",
       "monetize.money2Hint": "Valinnainen: myy sama kutsu toisessa valuutassa. Ostaja valitsee valuutan sopimusta avatessaan.",
+      "odps.title": "EXCHANGE ja ODPS",
+      "odps.hint": "Myykö tämä appi jotain markkinalla, ja mikä tuotekuvaus jokaisen listauksen mukana kulkee. Listattu työkalu julkaistaan Open Data Product Specification v4.1 -dokumenttina, jota ulkoiset katalogit ja ostavat agentit osaavat lukea.",
+      "odps.statusOn": "Markkinalla: {live} / {total} työkalua",
+      "odps.statusOff": "Ei markkinalla ({total} työkalua määritelty)",
+      "odps.statusBlocked": "{n} työkalua on merkitty EXCHANGEen mutta ei vielä listaudu — syy näkyy työkalun kohdalla.",
+      "odps.noTools": "Tällä apilla ei ole vielä myytäviä työkaluja. Lisää työkalu Monetize-osiossa, niin voit myydä kyvykkyyden markkinalla.",
+      "odps.editDefaults": "Appin ODPS-oletukset",
+      "odps.close": "Sulje",
+      "odps.defaultsHint": "Täytetään kerran appille ja periytyy jokaiselle sen myymälle työkalulle. Työkalu voi ylikirjoittaa minkä tahansa niistä.",
+      "odps.legalName": "Juridinen yhtiö (datan haltija)",
+      "odps.businessId": "Y-tunnus",
+      "odps.holderEmail": "Yhteyssähköposti",
+      "odps.holderUrl": "Verkkosivu",
+      "odps.country": "Maa",
+      "odps.logoUrl": "Logon URL",
+      "odps.brandSlogan": "Brändislogan",
+      "odps.governance": "Hallintaprofiili",
+      "odps.priority": "Portfolioprioriteetti",
+      "odps.language": "Kieli",
+      "odps.geoArea": "Lisenssialue",
+      "odps.applicableLaws": "Sovellettava laki",
+      "odps.attestation": "Provenienssi (sinun vakuutuksesi)",
+      "odps.attestationHint": "Mistä aineisto tulee ja millä perusteella saat myydä sitä. Nämä ovat lupauksia joilla on oikeudellinen paino, joten tekoäly ei täytä niitä koskaan — sinä ilmoitat ne.",
+      "odps.source": "Lähde",
+      "odps.legalBasis": "Oikeusperuste",
+      "odps.consentStatus": "Suostumuksen tila",
+      "odps.retention": "Säilytysaika",
+      "odps.saveDefaults": "Tallenna oletukset",
+      "odps.defaultsSaved": "ODPS-oletukset tallennettu",
+      "odps.toolTitle": "ODPS-kuvaus",
+      "odps.toolHint": "Se mitä ostaja näkee ennen sopimusta. Hinnan, pääsyn, lisenssioikeudet ja mitatun käytön node täyttää itse.",
+      "odps.viewYaml": "Näytä odps.yaml",
+      "odps.productType": "Tuotetyyppi",
+      "odps.valueProposition": "Arvolupaus",
+      "odps.valuePlaceholder": "Yksi lause: mitä ostaja saa?",
+      "odps.categories": "Kategoriat (pilkulla eroteltuna)",
+      "odps.standards": "Standardit (pilkulla eroteltuna)",
+      "odps.useCases": "Käyttötapaukset (yksi riviä kohti: otsikko | kuvaus | url)",
+      "odps.useCasesPlaceholder": "KYB-onboarding | Varmenna vastapuoli ennen tilin avaamista",
+      "odps.contentSample": "Näytetulosteen URL",
+      "odps.sla": "Palvelulupaukset (yksi riviä kohti: ulottuvuus arvo yksikkö — kuvaus)",
+      "odps.slaPlaceholder": "uptime 99.5 percent — Kuukausittainen saatavuus",
+      "odps.quality": "Laatulupaukset (yksi riviä kohti: ulottuvuus arvo yksikkö — kuvaus)",
+      "odps.qualityPlaceholder": "accuracy 99 percentage — Nimet täsmäävät rekisteriin",
+      "odps.toolAttestation": "Tämän kyvykkyyden provenienssi",
+      "odps.toolAttestationHint": "Vain se mikä poikkeaa appin oletuksista. Tyhjänä appitason vakuutus pätee.",
+      "odps.inherited": "peritään apilta",
+      "odps.transformations": "Mitä raaka-aineelle tehtiin",
+      "odps.transformationsPlaceholder": "Nimet normalisoitu, kuntakoodit liitetty, lakanneet yritykset poistettu.",
+      "odps.suggest": "Luonnostele tekoälyllä",
+      "odps.suggesting": "Luonnostellaan…",
+      "odps.suggestDone": "Luonnos valmis — tarkista ennen tallennusta",
+      "odps.suggestFailed": "Luonnostelu epäonnistui",
+      "odps.suggestUnparseable": "Malli ei palauttanut käyttökelpoista JSONia",
+      "odps.needLogin": "Kirjaudu sisään käyttääksesi omaa AI-avaintasi",
+      "odps.aiUnavailable": "Tekoäly ei ole käytettävissä täällä",
+      "odps.blockedSchema": "Ei listaudu: työkalu tarvitsee ei-tyhjän syöte- JA tulosskeeman.",
+      "odps.blockedBinding": "Ei listaudu: työkalu tarvitsee kyvykkyyssidonnan (action_id).",
+      "odps.blockedPrice": "Ei listaudu: työkalu tarvitsee hinnan.",
       "monetize.exchange": "Listaa EXCHANGEssa",
       "monetize.exchangeHint": "Päällä: työkalu on julkisesti markkinalla ja listaus seuraa tässä asetettua hintaa. Pois: se poistuu markkinalta. Jo sovitut sopimukset eivät muutu.",
       "monetize.exchangeOn": "EXCHANGEssa",
@@ -4872,6 +5014,309 @@
     });
   }
 
+  // src/static/app-catalog/js/odps.js
+  var PRODUCT_TYPES = [
+    "",
+    "raw data",
+    "derived data",
+    "dataset",
+    "reports",
+    "analytic view",
+    "algorithm",
+    "decision support",
+    "automated decision-making",
+    "data-enhanced product",
+    "data-driven service",
+    "data-enabled performance",
+    "bi-directional"
+  ];
+  var GOVERNANCE = ["", "structured", "enforced", "automated", "audit_ready"];
+  var PRIORITIES = ["", "critical", "high", "medium", "low"];
+  var SLA_DIMENSIONS = [
+    "latency",
+    "uptime",
+    "responseTime",
+    "errorRate",
+    "endOfSupport",
+    "endOfLife",
+    "updateFrequency",
+    "timeToDetect",
+    "timeToNotify",
+    "timeToRepair",
+    "emailResponseTime"
+  ];
+  var SLA_UNITS = ["percent", "milliseconds", "seconds", "minutes", "days", "weeks", "months", "years", "never", "date"];
+  var QUALITY_DIMENSIONS = ["accuracy", "completeness", "conformity", "consistency", "coverage", "timeliness", "validity", "uniqueness"];
+  var QUALITY_UNITS = ["percentage", "number"];
+  var odDefaultsOpen = false;
+  var odToolOpen = false;
+  var odBusy = false;
+  function apiBase() {
+    var cfg = loadConfig();
+    return (cfg.aimeatUrl || "").replace(/\/+$/, "");
+  }
+  function val(id) {
+    var el = document.getElementById(id);
+    return el ? (el.value || "").trim() : "";
+  }
+  function setVal(id, v) {
+    var el = document.getElementById(id);
+    if (el && v !== void 0 && v !== null) el.value = String(v);
+  }
+  function listOf(id) {
+    return val(id).split(",").map(function(x) {
+      return x.trim();
+    }).filter(Boolean);
+  }
+  function input(id, label, value, placeholder, type) {
+    return '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label) + '</label><input id="' + id + '" class="modal-input od-input" ' + (type ? 'type="' + type + '" ' : "") + 'value="' + escapeHtml(value || "") + '" placeholder="' + escapeHtml(placeholder || "") + '" />';
+  }
+  function textarea(id, label, value, placeholder, rows) {
+    return '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label) + '</label><textarea id="' + id + '" class="modal-input od-input" rows="' + (rows || 2) + '" placeholder="' + escapeHtml(placeholder || "") + '">' + escapeHtml(value || "") + "</textarea>";
+  }
+  function select(id, label, options, selected) {
+    var html = '<label class="dtl-stat-label" for="' + id + '">' + escapeHtml(label) + '</label><select id="' + id + '" class="modal-input od-input">';
+    for (var i = 0; i < options.length; i++) {
+      var o = options[i];
+      html += '<option value="' + escapeHtml(o) + '"' + (selected === o ? " selected" : "") + ">" + escapeHtml(o || "—") + "</option>";
+    }
+    return html + "</select>";
+  }
+  function dimsToText(dims) {
+    return (dims || []).map(function(d) {
+      return d.dimension + " " + d.objective + " " + d.unit + (d.description ? " — " + d.description : "");
+    }).join("\n");
+  }
+  function textToDims(text, dimensions, units) {
+    var out = [];
+    var lines = (text || "").split("\n");
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i].trim();
+      if (!line) continue;
+      var parts = line.split("—");
+      var head = parts[0].trim().split(/\s+/);
+      var desc = parts.length > 1 ? parts.slice(1).join("—").trim() : "";
+      if (head.length < 3) continue;
+      var dim = head[0], objective = parseFloat(String(head[1]).replace(",", ".")), unit = head[2];
+      if (dimensions.indexOf(dim) === -1 || units.indexOf(unit) === -1 || !Number.isFinite(objective)) continue;
+      var entry = { dimension: dim, objective, unit };
+      if (desc) entry.description = desc;
+      out.push(entry);
+    }
+    return out;
+  }
+  function odpsBlockedReason(tool) {
+    if (!tool || !tool.exchange) return "";
+    var hasIn = tool.inputSchema && Object.keys(tool.inputSchema).length;
+    var hasOut = tool.outputSchema && Object.keys(tool.outputSchema).length;
+    if (!hasIn || !hasOut) return t("odps.blockedSchema");
+    if (!tool.action_id) return t("odps.blockedBinding");
+    var priced = tool.price && tool.price.morsels > 0 || tool.priceMoney && tool.priceMoney.amount > 0;
+    if (!priced) return t("odps.blockedPrice");
+    return "";
+  }
+  function statusLine(doc) {
+    var tools = doc && doc.tools || [];
+    var flagged = tools.filter(function(x) {
+      return x.exchange;
+    });
+    var blocked = flagged.filter(function(x) {
+      return !!odpsBlockedReason(x);
+    });
+    var live = flagged.length - blocked.length;
+    if (!tools.length) {
+      return '<div class="od-status od-status-none">' + escapeHtml(t("odps.noTools")) + "</div>";
+    }
+    var cls = live > 0 ? "od-status-on" : "od-status-none";
+    var label = live > 0 ? t("odps.statusOn").replace("{live}", String(live)).replace("{total}", String(tools.length)) : t("odps.statusOff").replace("{total}", String(tools.length));
+    var html = '<div class="od-status ' + cls + '">' + escapeHtml(label) + "</div>";
+    if (blocked.length) {
+      html += '<div class="dtl-sync none od-note">' + escapeHtml(t("odps.statusBlocked").replace("{n}", String(blocked.length))) + "</div>";
+    }
+    return html;
+  }
+  function defaultsForm(doc) {
+    var o = doc && doc.odps || {};
+    var h = o.dataHolder || {};
+    var lic = o.license || {};
+    var p = doc && doc.provenance || {};
+    return '<div class="od-form"><div class="dtl-sync none od-note">' + escapeHtml(t("odps.defaultsHint")) + '</div><div class="od-grid"><div class="od-col">' + input("od-legalname", t("odps.legalName"), h.legalName, "Overscale Solutions Oy") + '</div><div class="od-col">' + input("od-businessid", t("odps.businessId"), h.businessID, "3312345-6") + '</div></div><div class="od-grid"><div class="od-col">' + input("od-holderemail", t("odps.holderEmail"), h.email, "sales@example.org", "email") + '</div><div class="od-col">' + input("od-holderurl", t("odps.holderUrl"), h.URL, "https://example.org", "url") + '</div><div class="od-col od-col-narrow">' + input("od-country", t("odps.country"), h.addressCountry, "FI") + '</div></div><div class="od-grid"><div class="od-col">' + input("od-logo", t("odps.logoUrl"), o.logoURL, "https://example.org/logo.png", "url") + '</div><div class="od-col">' + input("od-slogan", t("odps.brandSlogan"), o.brandSlogan, "") + '</div></div><div class="od-grid"><div class="od-col">' + select("od-governance", t("odps.governance"), GOVERNANCE, o.governanceProfile || "") + '</div><div class="od-col">' + select("od-priority", t("odps.priority"), PRIORITIES, o.portfolioPriority || "") + '</div><div class="od-col od-col-narrow">' + input("od-language", t("odps.language"), o.language || "en", "en") + '</div></div><div class="od-grid"><div class="od-col">' + input("od-geo", t("odps.geoArea"), (lic.geographicalArea || []).join(", "), "EU, EEA") + '</div><div class="od-col">' + input("od-laws", t("odps.applicableLaws"), lic.applicableLaws, "Finnish law") + '</div></div><div class="od-attest"><div class="dtl-stat-label od-attest-head">' + escapeHtml(t("odps.attestation")) + '</div><div class="dtl-sync none od-note">' + escapeHtml(t("odps.attestationHint")) + '</div><div class="od-grid"><div class="od-col">' + input("od-source", t("odps.source"), p.source, "PRH open company register (YTJ v3)") + '</div><div class="od-col">' + input("od-legalbasis", t("odps.legalBasis"), p.legalBasis, "Public register") + '</div></div><div class="od-grid"><div class="od-col">' + input("od-consent", t("odps.consentStatus"), p.consentStatus, "not applicable") + '</div><div class="od-col">' + input("od-retention", t("odps.retention"), p.retention, "30 days") + '</div></div></div><div class="dtl-btn-row od-actions">' + dtlBtn(t("odps.saveDefaults"), "window._launcher.odpsSaveDefaults()", { variant: "primary" }) + dtlBtn(t("odps.close"), "window._launcher.odpsToggleDefaults()") + '</div><div class="dtl-ai-status" id="od-status"></div></div>';
+  }
+  function odpsStatusInner(doc, state) {
+    if (state === "off") return "";
+    var html = "<h3>" + escapeHtml(t("odps.title")) + '</h3><p class="dtl-desc">' + escapeHtml(t("odps.hint")) + "</p>";
+    if (state === "loading") return html + '<span class="od-muted">…</span>';
+    html += statusLine(doc);
+    html += '<div class="dtl-btn-row od-actions">' + dtlBtn(odDefaultsOpen ? t("odps.close") : t("odps.editDefaults"), "window._launcher.odpsToggleDefaults()") + "</div>";
+    if (odDefaultsOpen) html += defaultsForm(doc);
+    return html;
+  }
+  function readOdpsAppDefaults() {
+    var holder = {};
+    if (val("od-legalname")) holder.legalName = val("od-legalname");
+    if (val("od-businessid")) holder.businessID = val("od-businessid");
+    if (val("od-holderemail")) holder.email = val("od-holderemail");
+    if (val("od-holderurl")) holder.URL = val("od-holderurl");
+    if (val("od-country")) holder.addressCountry = val("od-country");
+    var license = {};
+    if (listOf("od-geo").length) license.geographicalArea = listOf("od-geo");
+    if (val("od-laws")) license.applicableLaws = val("od-laws");
+    var odps = {};
+    if (holder.legalName) odps.dataHolder = holder;
+    if (Object.keys(license).length) odps.license = license;
+    if (val("od-logo")) odps.logoURL = val("od-logo");
+    if (val("od-slogan")) odps.brandSlogan = val("od-slogan");
+    if (val("od-governance")) odps.governanceProfile = val("od-governance");
+    if (val("od-priority")) odps.portfolioPriority = val("od-priority");
+    if (/^[a-z]{2}$/.test(val("od-language"))) odps.language = val("od-language");
+    var prov = {};
+    if (val("od-source")) prov.source = val("od-source");
+    if (val("od-legalbasis")) prov.legalBasis = val("od-legalbasis");
+    if (val("od-consent")) prov.consentStatus = val("od-consent");
+    if (val("od-retention")) prov.retention = val("od-retention");
+    return {
+      odps: Object.keys(odps).length ? odps : void 0,
+      provenance: Object.keys(prov).length ? prov : void 0
+    };
+  }
+  function odpsToolFieldsHtml(tool, offeringId) {
+    var o = tool && tool.odps || {};
+    var p = tool && tool.provenance || {};
+    var head = '<div class="od-tool-head">' + dtlBtn((odToolOpen ? "▾ " : "▸ ") + t("odps.toolTitle"), "window._launcher.odpsToggleTool()") + (offeringId ? '<a class="od-link" href="' + apiBase() + "/v1/exchange/offerings/" + encodeURIComponent(offeringId) + '/odps.yaml" target="_blank" rel="noopener">' + escapeHtml(t("odps.viewYaml")) + "</a>" : "") + "</div>";
+    if (!odToolOpen) return head;
+    return head + '<div class="od-form"><div class="dtl-sync none od-note">' + escapeHtml(t("odps.toolHint")) + '</div><div class="dtl-btn-row od-actions">' + dtlBtn(t("odps.suggest"), "window._launcher.odpsSuggest()", { variant: "primary", disabled: odBusy }) + '</div><div class="dtl-ai-status" id="od-tool-status"></div>' + select("odt-type", t("odps.productType"), PRODUCT_TYPES, o.productType || "") + textarea("odt-value", t("odps.valueProposition"), o.valueProposition, t("odps.valuePlaceholder"), 2) + '<div class="od-grid"><div class="od-col">' + input("odt-categories", t("odps.categories"), (o.categories || []).join(", "), "company data, finland") + '</div><div class="od-col">' + input("odt-standards", t("odps.standards"), (o.standards || []).join(", "), "ISO 8000") + "</div></div>" + textarea("odt-usecases", t("odps.useCases"), (o.useCases || []).map(function(u) {
+      return u.title + (u.description ? " | " + u.description : "") + (u.url ? " | " + u.url : "");
+    }).join("\n"), t("odps.useCasesPlaceholder"), 2) + input("odt-sample", t("odps.contentSample"), o.contentSample, "https://example.org/sample.json", "url") + textarea("odt-sla", t("odps.sla"), dimsToText(o.sla), t("odps.slaPlaceholder"), 2) + textarea("odt-quality", t("odps.quality"), dimsToText(o.dataQuality), t("odps.qualityPlaceholder"), 2) + '<div class="od-attest"><div class="dtl-stat-label od-attest-head">' + escapeHtml(t("odps.toolAttestation")) + '</div><div class="dtl-sync none od-note">' + escapeHtml(t("odps.toolAttestationHint")) + "</div>" + input("odt-source", t("odps.source"), p.source, t("odps.inherited")) + textarea("odt-transformations", t("odps.transformations"), p.transformations, t("odps.transformationsPlaceholder"), 2) + "</div></div>";
+  }
+  function readOdpsToolFields(base4) {
+    if (!odToolOpen) {
+      return { odps: base4 && base4.odps, provenance: base4 && base4.provenance };
+    }
+    var odps = Object.assign({}, base4 && base4.odps || {});
+    var prov = Object.assign({}, base4 && base4.provenance || {});
+    var set = function(obj, key, v) {
+      if (v) obj[key] = v;
+      else delete obj[key];
+    };
+    set(odps, "productType", val("odt-type"));
+    set(odps, "valueProposition", val("odt-value"));
+    var cats = listOf("odt-categories");
+    if (cats.length) odps.categories = cats;
+    else delete odps.categories;
+    var stds = listOf("odt-standards");
+    if (stds.length) odps.standards = stds;
+    else delete odps.standards;
+    var uc = val("odt-usecases").split("\n").map(function(line) {
+      var parts = line.split("|").map(function(x) {
+        return x.trim();
+      });
+      if (!parts[0]) return null;
+      var entry = { title: parts[0] };
+      if (parts[1]) entry.description = parts[1];
+      if (parts[2]) entry.url = parts[2];
+      return entry;
+    }).filter(Boolean);
+    if (uc.length) odps.useCases = uc;
+    else delete odps.useCases;
+    set(odps, "contentSample", val("odt-sample"));
+    var sla = textToDims(val("odt-sla"), SLA_DIMENSIONS, SLA_UNITS);
+    if (sla.length) odps.sla = sla;
+    else delete odps.sla;
+    var dq = textToDims(val("odt-quality"), QUALITY_DIMENSIONS, QUALITY_UNITS);
+    if (dq.length) odps.dataQuality = dq;
+    else delete odps.dataQuality;
+    set(prov, "source", val("odt-source"));
+    set(prov, "transformations", val("odt-transformations"));
+    return {
+      odps: Object.keys(odps).length ? odps : void 0,
+      provenance: Object.keys(prov).length ? prov : void 0
+    };
+  }
+  function odpsToggleDefaults(rerender3) {
+    odDefaultsOpen = !odDefaultsOpen;
+    if (rerender3) rerender3();
+  }
+  function odpsToggleTool(rerender3) {
+    odToolOpen = !odToolOpen;
+    if (rerender3) rerender3();
+  }
+  function odpsSuggestForTool(ctx, rerender3) {
+    var statusEl = document.getElementById("od-tool-status");
+    var token = getCortexOwnerToken();
+    if (!token) {
+      if (statusEl) statusEl.textContent = t("odps.needLogin");
+      return;
+    }
+    var base4 = apiBase();
+    if (!base4) {
+      if (statusEl) statusEl.textContent = t("odps.aiUnavailable");
+      return;
+    }
+    odBusy = true;
+    if (statusEl) {
+      statusEl.className = "dtl-ai-status";
+      statusEl.textContent = t("odps.suggesting");
+    }
+    var system = `You write the descriptive half of an Open Data Product Specification (ODPS v4.1) entry for a capability sold on a marketplace. Return ONLY a JSON object with these keys: "productType" (one of: raw data, derived data, dataset, reports, analytic view, algorithm, decision support, automated decision-making, data-enhanced product, data-driven service, data-enabled performance, bi-directional), "valueProposition" (one sentence, max 400 characters, what a buyer gets), "categories" (2-4 short strings), "standards" (0-3 recognised standards that genuinely apply, else []), "useCases" (1-3 objects with "title" and "description"). Base every word on the material given. Do NOT state where the data comes from, its legal basis, consent, retention, service levels, uptime, accuracy or the selling company — those are the owner's own attestations and inventing them would be a false claim. No markdown, no commentary, JSON only.`;
+    var prompt2 = "App: " + (ctx.appName || ctx.appId) + "\n" + (ctx.appDescription ? "App description: " + ctx.appDescription + "\n" : "") + "Capability (tool) name: " + (ctx.toolName || "") + "\n" + (ctx.toolDescription ? "Capability description: " + ctx.toolDescription + "\n" : "") + (ctx.inputSchema ? "Input schema: " + JSON.stringify(ctx.inputSchema).slice(0, 1500) + "\n" : "") + (ctx.outputSchema ? "Output schema: " + JSON.stringify(ctx.outputSchema).slice(0, 1500) + "\n" : "") + (ctx.price ? "Price: " + ctx.price + "\n" : "") + "Write the ODPS descriptive fields for this capability.";
+    fetch(base4 + "/v1/ai/complete", {
+      method: "POST",
+      headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt: prompt2, systemPrompt: system, app_id: "app-catalog" })
+    }).then(function(r) {
+      return r.json();
+    }).then(function(json) {
+      odBusy = false;
+      var st = document.getElementById("od-tool-status");
+      if (!json || !json.ok) {
+        var msg = json && json.error && json.error.message || t("odps.suggestFailed");
+        if (st) {
+          st.className = "dtl-ai-status od-err";
+          st.textContent = "✘ " + msg;
+        }
+        return;
+      }
+      var raw = json.data && json.data.content || "";
+      var m = raw.match(/\{[\s\S]*\}/);
+      var parsed = null;
+      try {
+        parsed = m ? JSON.parse(m[0]) : null;
+      } catch (e) {
+        parsed = null;
+      }
+      if (!parsed) {
+        if (st) {
+          st.className = "dtl-ai-status od-err";
+          st.textContent = "✘ " + t("odps.suggestUnparseable");
+        }
+        return;
+      }
+      if (PRODUCT_TYPES.indexOf(parsed.productType) !== -1) setVal("odt-type", parsed.productType);
+      if (parsed.valueProposition) setVal("odt-value", String(parsed.valueProposition).slice(0, 512));
+      if (Array.isArray(parsed.categories)) setVal("odt-categories", parsed.categories.join(", "));
+      if (Array.isArray(parsed.standards)) setVal("odt-standards", parsed.standards.join(", "));
+      if (Array.isArray(parsed.useCases)) {
+        setVal("odt-usecases", parsed.useCases.map(function(u) {
+          return (u.title || "") + (u.description ? " | " + u.description : "");
+        }).filter(Boolean).join("\n"));
+      }
+      if (st) {
+        st.className = "dtl-ai-status od-ok";
+        st.textContent = "✔ " + t("odps.suggestDone");
+      }
+      showNotice(t("odps.suggestDone"), "success");
+      if (rerender3) {
+      }
+    }).catch(function(e) {
+      odBusy = false;
+      var st = document.getElementById("od-tool-status");
+      if (st) {
+        st.className = "dtl-ai-status od-err";
+        st.textContent = "✘ " + (e.message || t("odps.suggestFailed"));
+      }
+    });
+  }
+
   // src/static/app-catalog/js/monetize.js
   var NAME_RE = /^[a-z0-9][a-z0-9._-]*$/i;
   var MONEY_UNIT = 1e6;
@@ -4882,7 +5327,8 @@
   var mzState = "off";
   var mzEditing = -1;
   var mzBusy = false;
-  function apiBase() {
+  var mzOfferings = {};
+  function apiBase2() {
     var cfg = loadConfig();
     return (cfg.aimeatUrl || "").replace(/\/+$/, "");
   }
@@ -4892,6 +5338,8 @@
   function rerender() {
     var el = document.getElementById("detail-monetize");
     if (el) el.innerHTML = monetizeSectionInner();
+    var od = document.getElementById("detail-odps");
+    if (od) od.innerHTML = odpsStatusInner(mzDoc, mzState);
   }
   function monetizeOnOpen(owner, appId, isOwn) {
     mzEditing = -1;
@@ -4907,7 +5355,7 @@
     mzAppId = appId;
     mzState = "loading";
     var token = getCortexOwnerToken();
-    fetch(apiBase() + "/v1/memory/" + encodeURIComponent(toolsKey()), {
+    fetch(apiBase2() + "/v1/memory/" + encodeURIComponent(toolsKey()), {
       headers: token ? { "Authorization": "Bearer " + token } : {}
     }).then(function(r) {
       return r.json();
@@ -4916,10 +5364,26 @@
       mzDoc = value && Array.isArray(value.tools) ? value : { tools: [] };
       mzState = "ready";
       rerender();
+      loadOfferings();
     }).catch(function() {
       mzDoc = { tools: [] };
       mzState = "ready";
       rerender();
+    });
+  }
+  function loadOfferings() {
+    var ext = "apptool:" + mzOwner + "/" + mzAppId;
+    fetch(apiBase2() + "/v1/exchange/offerings?q=" + encodeURIComponent(mzAppId)).then(function(r) {
+      return r.json();
+    }).then(function(res) {
+      var list = res && res.ok && res.data && res.data.offerings || [];
+      var next = {};
+      for (var i = 0; i < list.length; i++) {
+        if (list[i].ext === ext && list[i].state === "listed") next[list[i].action] = list[i].offeringId;
+      }
+      mzOfferings = next;
+      rerender();
+    }).catch(function() {
     });
   }
   function priceLabel(tool) {
@@ -4938,7 +5402,9 @@
   function toolRow(tool, i) {
     var mode = tool.action_id ? t("monetize.fulfillCall") : t("monetize.fulfillTask");
     var binding = tool.action_id ? escapeHtml(tool.action_id) : tool.agent ? "→ " + escapeHtml(tool.agent) : t("monetize.taskToOwner");
-    return '<div class="dtl-status-row" style="align-items:center;gap:10px;flex-wrap:wrap"><div class="dtl-stat" style="flex:1;min-width:160px"><span class="dtl-stat-val">' + escapeHtml(tool.name) + "</span>" + (tool.description ? '<span class="dtl-stat-label">' + escapeHtml(tool.description) + "</span>" : "") + '</div><div class="dtl-stat"><span class="dtl-stat-label">' + t("monetize.priceCol") + '</span><span class="dtl-stat-val">' + escapeHtml(priceLabel(tool)) + (tool.exchange ? ' <span class="dtl-sync ok" style="display:inline">' + t("monetize.exchangeOn") + "</span>" : "") + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + mode + '</span><span class="dtl-stat-val" style="font-size:.8rem">' + binding + '</span></div><div class="dtl-btn-row" style="margin:0">' + dtlBtn(t("detail.editDetails"), "window._launcher.monetizeEditTool(" + i + ")") + dtlBtn("✕", "window._launcher.monetizeDeleteTool(" + i + ")", { variant: "danger", title: t("monetize.deleteHint") }) + "</div></div>";
+    return '<div class="dtl-status-row" style="align-items:center;gap:10px;flex-wrap:wrap"><div class="dtl-stat" style="flex:1;min-width:160px"><span class="dtl-stat-val">' + escapeHtml(tool.name) + "</span>" + (tool.description ? '<span class="dtl-stat-label">' + escapeHtml(tool.description) + "</span>" : "") + '</div><div class="dtl-stat"><span class="dtl-stat-label">' + t("monetize.priceCol") + '</span><span class="dtl-stat-val">' + escapeHtml(priceLabel(tool)) + (tool.exchange ? ' <span class="dtl-sync ok" style="display:inline">' + t("monetize.exchangeOn") + "</span>" : "") + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + mode + '</span><span class="dtl-stat-val" style="font-size:.8rem">' + binding + '</span></div><div class="dtl-btn-row" style="margin:0">' + dtlBtn(t("detail.editDetails"), "window._launcher.monetizeEditTool(" + i + ")") + dtlBtn("✕", "window._launcher.monetizeDeleteTool(" + i + ")", { variant: "danger", title: t("monetize.deleteHint") }) + "</div>" + // A tool flagged for EXCHANGE that the projection will skip: say so here instead of leaving the
+    // owner with a ticked box and an empty marketplace.
+    (odpsBlockedReason(tool) ? '<div class="od-blocked">⚠ ' + escapeHtml(odpsBlockedReason(tool)) + "</div>" : "") + "</div>";
   }
   function currencySelect(id, selected) {
     var html = '<select id="' + id + '" class="modal-input" style="margin:4px 0 8px">';
@@ -4955,7 +5421,7 @@
     })[0];
     var money2Major = second ? String(second.amount / MONEY_UNIT) : "";
     var cur2 = second && second.currency || (cur === "EUR" ? "USD" : "EUR");
-    return '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="mz-name">' + t("monetize.name") + '</label><input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || "") + '" placeholder="summarize" style="margin:4px 0 8px" /><label class="dtl-stat-label" for="mz-desc">' + t("monetize.desc") + '</label><input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || "") + '" style="margin:4px 0 8px" /><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-morsels">' + t("monetize.priceMorsels") + '</label><input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" style="margin:4px 0 8px" /></div><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money">' + t("monetize.priceMoney") + '</label><input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" style="margin:4px 0 8px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency">' + t("monetize.currency") + "</label>" + currencySelect("mz-currency", cur) + '</div></div><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money2">' + t("monetize.money2") + '</label><input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" style="margin:4px 0 4px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency2">' + t("monetize.currency2") + "</label>" + currencySelect("mz-currency2", cur2) + '</div></div><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.money2Hint") + '</div><label class="dtl-stat-label" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? " checked" : "") + " />" + t("monetize.exchange") + '</label><div class="dtl-sync none" style="margin:4px 0 8px">' + t("monetize.exchangeHint") + '</div><label class="dtl-stat-label" for="mz-action">' + t("monetize.actionId") + '</label><input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || "") + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.actionIdHint") + '</div><label class="dtl-stat-label" for="mz-agent">' + t("monetize.agent") + '</label><input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || "") + '" placeholder="assistant" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("monetize.agentHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.monetizeSaveTool()", { variant: "primary", disabled: mzBusy }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.monetizeCancelEdit()") + '</div><div class="dtl-ai-status" id="mz-status"></div></div>';
+    return '<div class="dtl-ac-editor" style="margin-top:10px"><label class="dtl-stat-label" for="mz-name">' + t("monetize.name") + '</label><input id="mz-name" class="modal-input" maxlength="80" value="' + escapeHtml(tool.name || "") + '" placeholder="summarize" style="margin:4px 0 8px" /><label class="dtl-stat-label" for="mz-desc">' + t("monetize.desc") + '</label><input id="mz-desc" class="modal-input" maxlength="500" value="' + escapeHtml(tool.description || "") + '" style="margin:4px 0 8px" /><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-morsels">' + t("monetize.priceMorsels") + '</label><input id="mz-morsels" class="modal-input" type="number" min="0" step="1" value="' + (tool.price && tool.price.morsels || "") + '" placeholder="0" style="margin:4px 0 8px" /></div><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money">' + t("monetize.priceMoney") + '</label><input id="mz-money" class="modal-input" inputmode="decimal" value="' + escapeHtml(moneyMajor) + '" placeholder="0.002" style="margin:4px 0 8px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency">' + t("monetize.currency") + "</label>" + currencySelect("mz-currency", cur) + '</div></div><div style="display:flex;gap:10px;flex-wrap:wrap"><div style="flex:1;min-width:130px"><label class="dtl-stat-label" for="mz-money2">' + t("monetize.money2") + '</label><input id="mz-money2" class="modal-input" inputmode="decimal" value="' + escapeHtml(money2Major) + '" placeholder="0.002" style="margin:4px 0 4px" /></div><div style="min-width:90px"><label class="dtl-stat-label" for="mz-currency2">' + t("monetize.currency2") + "</label>" + currencySelect("mz-currency2", cur2) + '</div></div><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.money2Hint") + '</div><label class="dtl-stat-label" style="display:flex;align-items:center;gap:8px;cursor:pointer"><input id="mz-exchange" type="checkbox"' + (tool.exchange ? " checked" : "") + " />" + t("monetize.exchange") + '</label><div class="dtl-sync none" style="margin:4px 0 8px">' + t("monetize.exchangeHint") + "</div>" + odpsToolFieldsHtml(tool, mzOfferings[tool.name || ""] || "") + '<label class="dtl-stat-label" for="mz-action">' + t("monetize.actionId") + '</label><input id="mz-action" class="modal-input" maxlength="200" value="' + escapeHtml(tool.action_id || "") + '" placeholder="ext:my-extension:summarize" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 8px">' + t("monetize.actionIdHint") + '</div><label class="dtl-stat-label" for="mz-agent">' + t("monetize.agent") + '</label><input id="mz-agent" class="modal-input" maxlength="100" value="' + escapeHtml(tool.agent || "") + '" placeholder="assistant" style="margin:4px 0 4px" /><div class="dtl-sync none" style="margin:0 0 10px">' + t("monetize.agentHint") + '</div><div class="dtl-btn-row">' + dtlBtn(t("detail.saveDetails"), "window._launcher.monetizeSaveTool()", { variant: "primary", disabled: mzBusy }) + dtlBtn(t("detail.cancelEdit"), "window._launcher.monetizeCancelEdit()") + '</div><div class="dtl-ai-status" id="mz-status"></div></div>';
   }
   function monetizeSectionInner() {
     if (mzState === "off") return "";
@@ -4977,6 +5443,50 @@
       html += '<div class="dtl-btn-row" style="margin-top:10px">' + dtlBtn(t("monetize.addTool"), "window._launcher.monetizeAddTool()", { variant: "primary" }) + "</div>";
     }
     return html;
+  }
+  function odpsSectionInner() {
+    return odpsStatusInner(mzDoc, mzState);
+  }
+  function odpsToggleDefaultsUi() {
+    odpsToggleDefaults(rerender);
+  }
+  function odpsToggleToolUi() {
+    odpsToggleTool(rerender);
+  }
+  function odpsSuggestUi() {
+    var tool = mzEditing >= 0 && mzDoc && mzDoc.tools[mzEditing] ? mzDoc.tools[mzEditing] : {};
+    odpsSuggestForTool({
+      appId: mzAppId,
+      appName: mzAppId,
+      toolName: (document.getElementById("mz-name") || {}).value || tool.name || "",
+      toolDescription: (document.getElementById("mz-desc") || {}).value || tool.description || "",
+      inputSchema: tool.inputSchema,
+      outputSchema: tool.outputSchema,
+      price: priceLabel(tool)
+    }, rerender);
+  }
+  function odpsSaveDefaults() {
+    if (mzBusy || !mzDoc) return;
+    var vals = readOdpsAppDefaults();
+    var next = Object.assign({}, mzDoc, { tools: mzDoc.tools.slice() });
+    if (vals.odps) next.odps = vals.odps;
+    else delete next.odps;
+    if (vals.provenance) next.provenance = vals.provenance;
+    else delete next.provenance;
+    mzBusy = true;
+    var el = document.getElementById("od-status");
+    if (el) el.textContent = "…";
+    writeManifest(next).then(function() {
+      mzDoc = next;
+      mzBusy = false;
+      rerender();
+      showNotice(t("odps.defaultsSaved"), "success");
+    }).catch(function(e) {
+      mzBusy = false;
+      var st = document.getElementById("od-status");
+      if (st) st.textContent = t("monetize.saveFailed") + ": " + e.message;
+      showNotice(t("monetize.saveFailed") + ": " + e.message, "error");
+    });
   }
   function monetizeAddTool() {
     mzEditing = -2;
@@ -5038,6 +5548,11 @@
     var agent = (document.getElementById("mz-agent").value || "").trim();
     if (agent) tool.agent = agent;
     else delete tool.agent;
+    var od = readOdpsToolFields(base4);
+    if (od.odps) tool.odps = od.odps;
+    else delete tool.odps;
+    if (od.provenance) tool.provenance = od.provenance;
+    else delete tool.provenance;
     return tool;
   }
   function writeManifest(doc) {
@@ -5045,7 +5560,7 @@
     if (!token) return Promise.reject(new Error(t("monetize.needLogin")));
     doc.version = (doc.version || 0) + 1;
     doc.updatedAt = (/* @__PURE__ */ new Date()).toISOString();
-    return fetch(apiBase() + "/v1/memory", {
+    return fetch(apiBase2() + "/v1/memory", {
       method: "POST",
       headers: { "Authorization": "Bearer " + token, "Content-Type": "application/json" },
       body: JSON.stringify({ key: toolsKey(), value: doc, visibility: "public" })
@@ -5073,7 +5588,7 @@
     mzBusy = true;
     var el = document.getElementById("mz-status");
     if (el) el.textContent = "…";
-    var next = { version: mzDoc.version, updatedAt: mzDoc.updatedAt, tools };
+    var next = Object.assign({}, mzDoc, { tools });
     writeManifest(next).then(function() {
       mzDoc = next;
       mzEditing = -1;
@@ -5093,7 +5608,7 @@
     var tools = mzDoc.tools.slice();
     tools.splice(i, 1);
     mzBusy = true;
-    var next = { version: mzDoc.version, updatedAt: mzDoc.updatedAt, tools };
+    var next = Object.assign({}, mzDoc, { tools });
     writeManifest(next).then(function() {
       mzDoc = next;
       mzEditing = -1;
@@ -5110,7 +5625,7 @@
   var cState = "off";
   var cData = null;
   var cAppId = "";
-  function apiBase2() {
+  function apiBase3() {
     var cfg = loadConfig();
     return (cfg.aimeatUrl || "").replace(/\/+$/, "");
   }
@@ -5133,7 +5648,7 @@
       cData = { _needLogin: true };
       return;
     }
-    fetch(apiBase2() + "/v1/apps/cost?app_id=" + encodeURIComponent(cAppId), {
+    fetch(apiBase3() + "/v1/apps/cost?app_id=" + encodeURIComponent(cAppId), {
       headers: { "Authorization": "Bearer " + token }
     }).then(function(r) {
       return r.json();
@@ -5787,6 +6302,7 @@
       // on each user-scope skill is rendered by detailLoadSkills into the list above.
       (ownPub ? '<div id="detail-skill-attach" style="margin-top:8px">' + detailSkillAttachInner() + "</div>" : "") + "</div>";
     }
+    var odpsHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-odps">' + odpsSectionInner() + "</div>" : "";
     var monetizeHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-monetize">' + monetizeSectionInner() + "</div>" : "";
     var costHtml = app.published && detailIsOwnPublished(app) ? '<div class="dtl-section" id="detail-cost">' + costSectionInner() + "</div>" : "";
     var promoteHtml = app.published && detailIsOwnPublished(app) ? buildPromoteSection(app) : "";
@@ -5804,7 +6320,7 @@
         ) + "</div>";
       }
     }
-    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + odpsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
   }
   function detailCheckpointRows(app) {
     var owner = detailServerOwner(app);
@@ -6011,9 +6527,9 @@
       showNotice(t("common.loginRequired") || "You must be logged in. Sign in first.");
       return;
     }
-    var input = document.getElementById("detail-ac-input");
+    var input2 = document.getElementById("detail-ac-input");
     var statusEl = document.getElementById("detail-ac-status");
-    var code = input ? input.value.trim() : "";
+    var code = input2 ? input2.value.trim() : "";
     if (code && (code.length < 4 || code.length > 64)) {
       if (statusEl) {
         statusEl.style.color = "var(--accent)";
@@ -6400,11 +6916,11 @@
       showNotice("No server configured.");
       return;
     }
-    var input = document.createElement("input");
-    input.type = "file";
-    input.accept = "image/*";
-    input.onchange = function() {
-      var file = input.files && input.files[0];
+    var input2 = document.createElement("input");
+    input2.type = "file";
+    input2.accept = "image/*";
+    input2.onchange = function() {
+      var file = input2.files && input2.files[0];
       if (!file) return;
       if (file.size > 2 * 1024 * 1024) {
         showNotice("Image too large (max 2 MB).");
@@ -6434,7 +6950,7 @@
       };
       reader.readAsDataURL(file);
     };
-    input.click();
+    input2.click();
   }
   async function detailRefreshScreenshot() {
     var app = detailGetApp();
@@ -6479,8 +6995,8 @@
       showNotice("Failed: " + e.message);
     });
   }
-  function metaItem(label, val) {
-    return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div><div class="dtl-meta-val">' + escapeHtml(val || "—") + "</div></div>";
+  function metaItem(label, val2) {
+    return '<div class="dtl-meta-item"><div class="dtl-meta-label">' + escapeHtml(label) + '</div><div class="dtl-meta-val">' + escapeHtml(val2 || "—") + "</div></div>";
   }
   function detailAiUnavailableMsg() {
     return getCortexOwnerToken2() ? t("detail.aiUnavailable") : t("detail.aiLoginNeeded");
@@ -9060,19 +9576,19 @@
   }
   function viewSource2(app) {
     var overlay = document.getElementById("source-overlay");
-    var textarea = document.getElementById("source-code");
+    var textarea2 = document.getElementById("source-code");
     var title = document.getElementById("source-title");
     var saveBtn = document.getElementById("save-source-btn");
     title.textContent = "View / Edit Source: " + (app.name || "App");
     var isEditable = !!app.blob;
     if (app.blob) {
-      textarea.value = decodeURIComponent(escape(atob(app.blob)));
+      textarea2.value = decodeURIComponent(escape(atob(app.blob)));
     } else if (app.url) {
-      textarea.value = "// This app is URL-based (" + app.url + ")\n// Source code is not stored locally.\n// Open the URL to view the app.";
+      textarea2.value = "// This app is URL-based (" + app.url + ")\n// Source code is not stored locally.\n// Open the URL to view the app.";
     } else {
-      textarea.value = "// No source available";
+      textarea2.value = "// No source available";
     }
-    textarea.readOnly = !isEditable;
+    textarea2.readOnly = !isEditable;
     saveBtn.disabled = true;
     saveBtn.style.display = isEditable ? "" : "none";
     var canStage = isEditable && !!app.published;
@@ -9085,7 +9601,7 @@
     overlay.hidden = false;
     overlay.dataset.appName = app.name || "App";
     overlay.dataset.appId = app.id || "";
-    overlay.dataset.originalSource = textarea.value;
+    overlay.dataset.originalSource = textarea2.value;
   }
   function generateSharePrompt2(app) {
     if (!app || !app.blob) {
@@ -9105,12 +9621,12 @@
       showNotice("Share prompt copied! Paste it into any AI chat to recreate this app.");
     }).catch(function() {
       var overlay = document.getElementById("source-overlay");
-      var textarea = document.getElementById("source-code");
+      var textarea2 = document.getElementById("source-code");
       var title = document.getElementById("source-title");
       var saveBtn = document.getElementById("save-source-btn");
       title.textContent = "Share Prompt: " + (app.name || "App");
-      textarea.value = prompt2;
-      textarea.readOnly = true;
+      textarea2.value = prompt2;
+      textarea2.readOnly = true;
       saveBtn.style.display = "none";
       overlay.hidden = false;
       overlay.dataset.appId = "";
@@ -9133,10 +9649,10 @@
     }).join("\n");
     var prompt2 = "Create a single HTML file that serves as my personal homepage/dashboard.\n\nMy apps:\n" + appList + "\n\nRequirements:\n- Show each app as a clickable card with its icon and name\n- For URL-based apps, clicking opens the URL in a new tab\n- For local apps, show a note that they can be opened from the App Launcher\n- Modern, responsive design with light theme\n- Group apps by their tags if they have tags\n- Everything in one self-contained HTML file, no external dependencies\n- Add a header with my name/title (I will customize this)\n- Make it visually distinctive and professional";
     var overlay = document.getElementById("source-overlay");
-    var textarea = document.getElementById("source-code");
+    var textarea2 = document.getElementById("source-code");
     var title = document.getElementById("source-title");
     title.textContent = "Generate Homepage - Copy this prompt to AI";
-    textarea.value = prompt2;
+    textarea2.value = prompt2;
     overlay.dataset.appName = "Homepage";
     overlay.hidden = false;
   }
@@ -9346,6 +9862,10 @@
     monetizeCancelEdit,
     monetizeSaveTool,
     monetizeDeleteTool,
+    odpsToggleDefaults: odpsToggleDefaultsUi,
+    odpsToggleTool: odpsToggleToolUi,
+    odpsSuggest: odpsSuggestUi,
+    odpsSaveDefaults,
     editAppDetails,
     showSubdomainModal,
     openConsents,
@@ -9789,13 +10309,13 @@
     });
     document.getElementById("save-source-btn").addEventListener("click", function() {
       var overlay = document.getElementById("source-overlay");
-      var textarea = document.getElementById("source-code");
+      var textarea2 = document.getElementById("source-code");
       var btn = this;
       if (!overlay.dataset.appId) {
         showNotice("Cannot save: no app ID found.");
         return;
       }
-      var newSource = textarea.value;
+      var newSource = textarea2.value;
       var idle = t("source.save");
       btn.textContent = t("wc.saving");
       btn.disabled = true;

@@ -126,16 +126,20 @@ export function registerCommerceTools(
         {
             app_id: z.string().min(1).max(120).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/),
             tools: z.array(z.record(z.string(), z.unknown())).max(40),
+            odps: z.record(z.string(), z.unknown()).optional(),
+            provenance: z.record(z.string(), z.unknown()).optional(),
         },
         annotationsFor('aimeat_app_tools_publish'),
-        async ({ app_id, tools }) => {
-            const parsed = AppToolsDocSchema.safeParse({ tools });
+        async ({ app_id, tools, odps, provenance }) => {
+            const parsed = AppToolsDocSchema.safeParse({ tools, ...(odps ? { odps } : {}), ...(provenance ? { provenance } : {}) });
             if (!parsed.success) return fail(`INVALID_TOOL_MANIFEST: ${parsed.error.message}`);
             const key = appToolsKey(app_id);
             const existing = await storage.getMemory(ownerGhii, key);
             const doc = {
                 version: ((existing?.value as { version?: number } | undefined)?.version ?? 0) + 1,
                 updatedAt: new Date().toISOString(),
+                ...(parsed.data.odps ? { odps: parsed.data.odps } : {}),
+                ...(parsed.data.provenance ? { provenance: parsed.data.provenance } : {}),
                 tools: parsed.data.tools,
             };
             await putOwnerRecord(key, doc, 'public', ['commerce', 'app-tools']);

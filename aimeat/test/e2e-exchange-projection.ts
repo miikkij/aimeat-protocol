@@ -10,6 +10,8 @@
  *   projection-aware delist guard.
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange-projection.ts
  * @version-history
+ *   v1.1.0 — 2026-07-25 — ODPS: app-level defaults on the manifest root inherit into every tool, a tool
+ *     overrides field by field, and both reach the listing's ODPS v4.1 document.
  *   v1.0.0 — 2026-07-25 — Initial projection proof (TARGET-050 slices 1 + 3).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -61,10 +63,10 @@ const IN_SCHEMA = { type: 'object', properties: { businessId: { type: 'string' }
 const OUT_SCHEMA = { type: 'object', properties: { echo: {}, caller: { type: 'string' } } };
 const TERMS = { derivatives: true, resale: false, attribution: true, note: 'e2e' };
 
-const writeManifest = (token: string, tools: unknown[]) =>
+const writeManifest = (token: string, tools: unknown[], docExtras: Record<string, unknown> = {}) =>
   json('/v1/memory', {
     method: 'POST', headers: auth(token),
-    body: JSON.stringify({ key: `apps.${APP_ID}.tools`, visibility: 'public', value: { version: 1, tools } }),
+    body: JSON.stringify({ key: `apps.${APP_ID}.tools`, visibility: 'public', value: { version: 1, tools, ...docExtras } }),
   });
 const myOfferings = async (token: string) => {
   const r = await json('/v1/exchange/offerings', { headers: auth(token) });
@@ -261,6 +263,60 @@ await test('A tool flagged but missing its schemas is skipped with a reason, nev
   const skipped = (r.body.data.changes as any[]).filter(c => c.action === 'skipped' && c.label.endsWith('/noschema'));
   assert(skipped.length === 1 && skipped[0].reason === 'SCHEMA_REQUIRED', `skipped with a reason: ${JSON.stringify(r.body.data.changes)}`);
   assert(forTool(await myOfferings(provider.token), 'noschema').length === 0, 'and nothing was listed for it');
+});
+
+// ── ODPS: the app owns its descriptor. App-level defaults on the manifest root are inherited by every
+// tool; the tool overrides field by field; and the whole thing surfaces as the listing's ODPS document.
+await test('App-level ODPS defaults are inherited by every tool of that app', async () => {
+  const w = await writeManifest(provider.token, [tool({ name: 'brief' })], {
+    odps: {
+      dataHolder: { legalName: 'Overscale Solutions Oy', businessID: '3312345-6' },
+      governanceProfile: 'audit_ready', brandSlogan: 'Know your counterparty',
+    },
+    provenance: { source: 'PRH open register', legalBasis: 'Public register' },
+  });
+  assert(w.status === 200 || w.status === 201, `write ${w.status}`);
+  const listing = forTool(await myOfferings(provider.token), 'brief')[0];
+  assert(listing, 'the tool is listed');
+  assert(listing.odps?.dataHolder?.legalName === 'Overscale Solutions Oy', `app defaults inherited: ${JSON.stringify(listing.odps)}`);
+  assert(listing.provenance?.legalBasis === 'Public register' && listing.provenance?.odpsVersion === '4.1',
+    `provenance inherited + stamped: ${JSON.stringify(listing.provenance)}`);
+  const res = await fetch(`${BASE}/v1/exchange/offerings/${listing.offeringId}/odps.yaml`);
+  const doc = await res.text();
+  assert(res.status === 200 && doc.includes('Overscale Solutions Oy'), 'the ODPS document carries the app-level data holder');
+  assert(doc.includes('governanceProfile: audit_ready'), `governance profile projected: ${doc.slice(0, 200)}`);
+});
+
+await test('A tool overrides the app default field by field, keeping the rest', async () => {
+  const w = await writeManifest(provider.token, [tool({
+    name: 'brief',
+    odps: { valueProposition: 'Verified company identity in one call.', productType: 'derived data' },
+    provenance: { transformations: 'Normalised names.' },
+  })], {
+    odps: { dataHolder: { legalName: 'Overscale Solutions Oy' }, brandSlogan: 'Know your counterparty' },
+    provenance: { source: 'PRH open register', legalBasis: 'Public register' },
+  });
+  assert(w.status === 200 || w.status === 201, `write ${w.status}`);
+  const listing = forTool(await myOfferings(provider.token), 'brief')[0];
+  assert(listing.odps?.valueProposition?.startsWith('Verified'), `tool field applied: ${JSON.stringify(listing.odps)}`);
+  assert(listing.odps?.dataHolder?.legalName === 'Overscale Solutions Oy', 'app default still inherited');
+  assert(listing.provenance?.source === 'PRH open register' && listing.provenance?.transformations === 'Normalised names.',
+    `provenance merged both ways: ${JSON.stringify(listing.provenance)}`);
+  const doc = await (await fetch(`${BASE}/v1/exchange/offerings/${listing.offeringId}/odps.yaml`)).text();
+  assert(doc.includes('Verified company identity') && doc.includes('type: derived data'), 'tool-level ODPS reached the document');
+});
+
+await test('Editing the ODPS descriptor changes the listing without touching the price', async () => {
+  const before = forTool(await myOfferings(provider.token), 'brief')[0];
+  const w = await writeManifest(provider.token, [tool({
+    name: 'brief',
+    odps: { valueProposition: 'Company identity, verified against the register.', productType: 'derived data' },
+  })], { odps: { dataHolder: { legalName: 'Overscale Solutions Oy' } } });
+  assert(w.status === 200 || w.status === 201, `write ${w.status}`);
+  const after = forTool(await myOfferings(provider.token), 'brief')[0];
+  assert(after.offeringId === before.offeringId, 'the same listing is updated, not a rival one');
+  assert(after.basePrice === before.basePrice, 'the price is untouched by a description edit');
+  assert(after.odps.valueProposition.startsWith('Company identity'), 'the new description is live');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

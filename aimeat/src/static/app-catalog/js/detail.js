@@ -31,7 +31,7 @@ import { dtlBtn, showConfirm, showNotice } from './ui.js';
 import { loadConfig } from './config.js';
 import { t, getLang } from './i18n.js';
 import { getPromotion, setPromotion, loadPromoted } from './promote.js';
-import { monetizeSectionInner, monetizeOnOpen } from './monetize.js';
+import { monetizeSectionInner, monetizeOnOpen, odpsSectionInner } from './monetize.js';
 import { costSectionInner, costOnOpen } from './cost.js';
 import { appManifestAgents } from './app-agents.js';
 import { saveWorkingCopy, loadCheckpoints, getCheckpoints, readCheckpoint, deleteCheckpoint, discardWorkingCopy, getDraft } from './workcopy.js';
@@ -570,6 +570,13 @@ function renderDetailView() {
       '</div>';
   }
 
+  // ── EXCHANGE & ODPS — is this app on the marketplace, and the ODPS defaults every tool inherits.
+  // Sits above Monetize because it frames it: the app-level answer to "is this product for sale".
+  // Stable container: monetize.js re-renders #detail-odps in place alongside #detail-monetize.
+  var odpsHtml = (app.published && detailIsOwnPublished(app))
+    ? '<div class="dtl-section" id="detail-odps">' + odpsSectionInner() + '</div>'
+    : '';
+
   // ── MONETIZE (TARGET-034) — sell tool calls on this app (own published apps only) ──
   // Stable container: monetize.js re-renders #detail-monetize in place after loads/saves.
   var monetizeHtml = (app.published && detailIsOwnPublished(app))
@@ -610,7 +617,7 @@ function renderDetailView() {
   }
 
   document.getElementById('detail-body').innerHTML =
-    statusHtml + aboutHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+    statusHtml + aboutHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + odpsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
 }
 
 // ── Working-copy history (checkpoints) ────────────────────────────────────────

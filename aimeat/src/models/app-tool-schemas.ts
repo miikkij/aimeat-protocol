@@ -11,6 +11,9 @@
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
  * @version-history
+ *   v1.4.0 — 2026-07-25 — ODPS: per-tool `provenance` + `odps` (the authoring block projected into the
+ *     tool's ODPS v4.1 document) and APP-LEVEL defaults of both on the manifest root, inherited by every
+ *     tool. Additive; existing manifests validate unchanged.
  *   v1.3.0 — 2026-07-25 — TARGET-050: the manifest becomes the SOURCE OF TRUTH for the EXCHANGE listing —
  *     `exchange` (list publicly), `pricesMoney` (EUR *and* USD on one tool) and `usageTerms` (the licence,
  *     so listing needs no second authoring step). All additive; existing manifests validate unchanged.
@@ -99,10 +102,19 @@ export const AppToolSchema = z.object({
   odps: OdpsExtrasSchema.optional(),
 });
 
-/** The `apps.{appId}.tools` record body. */
+/**
+ * The `apps.{appId}.tools` record body. `odps`/`provenance` at THIS level are the app's defaults —
+ * the company-and-brand half of an ODPS descriptor (data holder, logo, governance profile, jurisdiction,
+ * provenance of the app's data) that is the same for every tool the app sells. A tool inherits them and
+ * overrides field by field, so a Y-tunnus is typed once per app rather than once per capability.
+ */
 export const AppToolsDocSchema = z.object({
   version: z.number().int().nonnegative().optional(),
   updatedAt: z.string().max(40).optional(),
+  /** App-level ODPS defaults inherited by every tool (overridable per tool). */
+  odps: OdpsExtrasSchema.optional(),
+  /** App-level provenance attestation inherited by every tool (overridable per tool). */
+  provenance: ProvenanceSchema.optional(),
   tools: z.array(AppToolSchema).max(40),
 });
 
