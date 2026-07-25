@@ -440,7 +440,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-i18n/libs/aimeat-i18n.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-i18n/libs/aimeat-i18n.js"></script>'],
     requires: [],
-    version: '1.0.0',
+    version: '1.1.0',
     license: 'MIT',
     apiSurface: 'AIMEAT.i18n',
     aiDoc: 'AIMEAT.i18n — init(dictionaries), t(key), setLocale/getLocale, locales(), available(), LanguageSwitcher component, apply() over [data-i18n] elements.',
