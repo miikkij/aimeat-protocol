@@ -50,7 +50,12 @@
   function injectCss(p) {
     if (injected[p]) return;
     var css = [
-      '.' + p + '-host { position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }',
+      /* NOTE: `position` is deliberately NOT set here. The host only has to be a positioning
+         context, and a consumer may already be one in a way that matters — a full-screen board is
+         `position: fixed; inset: 0`, and a same-specificity `position: relative` from this
+         stylesheet would silently win, collapse the host to zero height and leave every pointer
+         event landing on nothing. create() promotes the host only when it is actually static. */
+      '.' + p + '-host { overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }',
       '.' + p + '-host.' + p + '-panning { cursor: grabbing; }',
       '.' + p + '-host.' + p + '-interact { cursor: default; }',
       '.' + p + '-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }',
@@ -120,6 +125,10 @@
 
     injectCss(P);
     host.classList.add(P + '-host');
+    /* The world is absolutely positioned, so the host must be a positioning context — but only
+       promote it when it is static. Overwriting an existing fixed/absolute/sticky host is how a
+       full-screen board ends up 0px tall. */
+    if (global.getComputedStyle(host).position === 'static') host.style.position = 'relative';
 
     var world = document.createElement('div');
     world.className = P + '-world';
