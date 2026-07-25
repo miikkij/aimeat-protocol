@@ -492,7 +492,9 @@ function loadPbPacks() {
         if (p.modelTier) {
           var badge = document.createElement('span');
           badge.className = 'pb-pack-tier pb-tier-' + p.modelTier;
-          badge.textContent = p.modelTier;
+          // The label is the INSTRUCTION, not the raw key: `needs-doc` reads as
+          // "documentation missing" when it means "no priors — the AI must read the doc".
+          badge.textContent = t('pb.tier.' + p.modelTier) || p.modelTier;
           var proven = (p.proofs || []).map(function (pr) { return pr.model + '→' + pr.verdict; }).join(', ');
           badge.title = 'AEB reliability tier: ' + p.modelTier
             + (proven ? ' · proven on ' + proven : ' · not yet AEB-run')
