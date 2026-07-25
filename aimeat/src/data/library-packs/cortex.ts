@@ -276,7 +276,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-viewport/libs/aimeat-viewport.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-viewport/libs/aimeat-viewport.js"></script>'],
     requires: [],
-    version: '1.0.3',
+    version: '1.0.4',
     license: 'MIT',
     apiSurface: 'AIMEAT.viewport',
     apiCaveat: 'The host must have a SIZE. A full-screen board is `position: fixed; inset: 0` on the host itself — the viewport only promotes a STATIC host to relative, so your positioning is never overwritten.',
@@ -369,7 +369,7 @@ export const CORTEX_PACKS: LibraryPack[] = [
     url: '/v1/cortex/aimeat-dag/libs/aimeat-dag.js',
     include: ['<script src="{{BASE_URL}}/v1/cortex/aimeat-dag/libs/aimeat-dag.js"></script>'],
     requires: [],
-    version: '1.1.3',
+    version: '1.1.4',
     license: 'MIT',
     apiSurface: 'AIMEAT.dag',
     aiDoc: [
