@@ -7,6 +7,9 @@
  *   v1.2.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.3.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.4.0 -- 2026-07-25 -- aimeat_capabilities_invoke forwards the caller's CURRENT session token; it
+ *     passed a hardcoded empty string, so invoking any extension-backed capability over MCP always
+ *     failed with the route's AUTH_REQUIRED.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -23,6 +26,9 @@ export function registerCapabilitiesTools(
     getAgentGaii: () => string,
     _emitResourceUpdated: (agentGaii: string, uri: string) => void,
     _emitResourceListChanged: (agentGaii: string) => void,
+    /** The session's CURRENT bearer token. An extension-backed capability runs behind the node's own
+     *  authenticated HTTP surface, so the caller's token has to travel with the invocation. */
+    getToken: () => string | undefined = () => undefined,
 ): void {
 
     mcp.tool(
@@ -89,7 +95,7 @@ export function registerCapabilitiesTools(
 
             try {
                 const { invokeCapability } = await import('../services/capability-invoke.js');
-                const result = await invokeCapability(config, storage, cap, args.input || {}, getAgentGaii(), '', args.mode || 'normal');
+                const result = await invokeCapability(config, storage, cap, args.input || {}, getAgentGaii(), getToken() ?? '', args.mode || 'normal');
 
                 storage.incrementCapabilityStats(cap.id, { success: 1, error: 0, totalMs: result.duration_ms }).catch(() => {});
 

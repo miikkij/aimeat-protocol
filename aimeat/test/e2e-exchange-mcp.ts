@@ -11,11 +11,15 @@
  *     - aimeat_exchange_work_list      consumer + provider views
  *     - aimeat_exchange_proposals      list a renegotiation proposal (seeded over REST)
  *     - aimeat_exchange_proposal_decide accept → supersede (price changes on the live contract)
- *     - aimeat_app_tool_invoke         NO_CONTRACT failure (the happy path is the identical WebMCP invoke,
- *                                      covered by e2e-exchange's metered app-tool call)
+ *     - aimeat_app_tool_invoke         NO_CONTRACT failure · the metered HAPPY path (result rides back,
+ *                                      consumer debited) · and a STALE session token (named error, no charge)
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/e2e-exchange-mcp.ts
  * @version-history
  *   v1.0.0 — 2026-07-21 — Initial: MCP parity for the act-on-exchange tools (work / proposals / app-tool invoke).
+ *   v1.1.0 — 2026-07-25 — Cover aimeat_app_tool_invoke's happy path and its stale-token failure. The suite
+ *     previously treated the happy path as "identical to the WebMCP invoke" and skipped it — but WebMCP reads
+ *     the token off the live request while the MCP tool replays its session's token, and that one difference
+ *     is what broke every metered app-tool call an hour into any MCP session.
  */
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
@@ -175,6 +179,83 @@ await test('aimeat_app_tool_invoke — no contract for the app-tool → NO_CONTR
     assert(put.status === 200 || put.status === 201, `manifest put ${put.status}`);
     const res = parse(await C()['aimeat_app_tool_invoke']({ owner: provider.name, app: 'brief', tool: 'getBrief', input: {} }));
     assert(!!res.error && res.error.includes('NO_CONTRACT'), `expected NO_CONTRACT, got ${JSON.stringify(res)}`);
+});
+
+// ── The happy path, and the token that goes stale under it ────────────────────────────────────────
+// This was the coverage hole: the MCP happy path was assumed identical to the WebMCP route, but the
+// two differ in exactly one respect — WebMCP reads the bearer token off the LIVE request, while the
+// MCP tool replays whatever token its session was handed. An MCP session outlives its access token
+// (jwtTtlSeconds, rotated by the client), so a replayed-stale token made every metered app-tool call
+// fail with the route's AUTH_REQUIRED for the rest of the session. Both cases are pinned here.
+const EXT = `xmcpext${Date.now()}`;
+await test('Setup: provider installs a priced extension and sells it as an app-tool', async () => {
+    const inst = await json('/v1/extensions', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
+        manifest: JSON.stringify({
+            metadata: { name: EXT, version: '1.0.0', description: 'app-tool invoke e2e provider', author: 'e2e' },
+            // No `commercial` block on the action ON PURPOSE: the price lives on the app-tool
+            // manifest. Pricing the raw action too would meter the SAME call twice — once by the
+            // app-tool contract, once by the extension route's own paywall underneath it.
+            actions: [{
+                id: 'echo', method: 'POST', path: '/echo', script: 'echo',
+                input: { type: 'object', properties: { q: { type: 'string' } } },
+                output: { type: 'object', properties: { echo: {} } },
+            }],
+            config: { public_access: { default: true } },
+            limits: { timeout_ms: 5000, max_api_calls: 1 },
+        }),
+        scripts: { echo: 'export default async function(ctx, input){ return { echo: input, caller: ctx.caller.owner }; }' },
+    }) });
+    assert(inst.status === 201 || inst.status === 200, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+    const act = await json(`/v1/extensions/${EXT}/activate`, { method: 'POST', headers: auth(provider.token) });
+    assert(act.status === 200, `activate ${act.status}: ${JSON.stringify(act.body?.error)}`);
+    // The aggregator that mints `ext:{name}:{action}` capability records runs on a schedule; drive it
+    // now so the app-tool has something to bind to.
+    const { runCapabilityAggregation } = await import('../src/services/capability-aggregator.js');
+    await runCapabilityAggregation(config, storage);
+    assert(!!(await storage.getCapability(`ext:${EXT}:echo`)), 'capability must be registered for the action');
+
+    const put = await json('/v1/memory', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
+        key: 'apps.plotter.tools', visibility: 'public',
+        value: { tools: [{
+            name: 'run', action_id: `ext:${EXT}:echo`, description: 'echo the input',
+            price: { morsels: 3, unit: 'per-call' },
+            inputSchema: { type: 'object' }, outputSchema: { type: 'object' },
+        }] },
+    }) });
+    assert(put.status === 200 || put.status === 201, `manifest put ${put.status}`);
+
+    // List it on EXCHANGE, then contract against the offering (an app-tool coordinate is only
+    // contractable through its listing — the offering carries the authoritative price).
+    const off = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({
+        kind: 'app-tool', app_id: 'plotter', tool: 'run', usage_terms: validTerms,
+    }) });
+    assert(off.status === 201, `offering ${off.status}: ${JSON.stringify(off.body?.error)}`);
+    const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({
+        offering_id: off.body.data.offering.offeringId, cap_units: 30, contract_ref: 'c-apptool',
+    }) });
+    assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
+});
+
+await test('aimeat_app_tool_invoke — with a live token the metered call returns the capability result', async () => {
+    const before = await balance(consumer.token);
+    const res = parse(await C()['aimeat_app_tool_invoke']({ owner: provider.name, app: 'plotter', tool: 'run', input: { q: 'hello' } }));
+    assert(!res.error, `expected a result, got ${JSON.stringify(res)}`);
+    assert(res.data?.metered === true, `call must be metered: ${JSON.stringify(res.data)}`);
+    assert(res.data?.result?.echo?.q === 'hello', `capability output must ride back: ${JSON.stringify(res.data?.result)}`);
+    const after = await balance(consumer.token);
+    assert(after === before - 3, `consumer debited the 3-morsel price (before ${before}, after ${after})`);
+});
+
+await test('aimeat_app_tool_invoke — a session token that went stale fails by NAME, and refunds', async () => {
+    // Drive the same handler with an empty token, which is what a session captured at initialize
+    // degrades to once its access token has rotated. The caller must learn it is a TOKEN problem.
+    const staleHandlers = captureTools(consumer.gaii, '');
+    const before = await balance(consumer.token);
+    const res = parse(await staleHandlers['aimeat_app_tool_invoke']({ owner: provider.name, app: 'plotter', tool: 'run', input: { q: 'hello' } }));
+    assert(!!res.error, `expected a failure, got ${JSON.stringify(res)}`);
+    assert(res.error!.includes('CALLER_TOKEN'), `the error must name the token, got: ${res.error}`);
+    const after = await balance(consumer.token);
+    assert(after === before, `a failed invoke must leave no charge (before ${before}, after ${after})`);
 });
 
 console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
