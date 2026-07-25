@@ -128,6 +128,12 @@ export interface MeteredEntitlement {
   budget: EntitlementBudget;
   /** Platform cut override (0–100). `null` = use the node's configured marketplace fee. */
   rakePercent: number | null;
+  /**
+   * Morsels burned per call to PACE this contract, pinned at accept time like the price is. Null
+   * means the capability declared none and the node's default applies. A burn, never revenue: it
+   * bounds the call RATE, which is the one thing a money budget cannot do.
+   */
+  tollMorsels?: number | null;
   /** The sellable surface when this contract is for an app-tool (Gap 1) or agent-work (Gap 2); absent for a
    *  raw ext-action. App-tool calls route to the pinned interface binding; agent-work settles on delivery. */
   surface?: SellableSurface | null;

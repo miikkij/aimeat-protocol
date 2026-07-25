@@ -24,6 +24,7 @@ import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { consumeExtPayToken } from '../../services/ext-pay-token.js';
 import { settleViaEntitlement } from './entitlement-gate.js';
+import { burnPacingToll, resolvePacingToll } from './pacing.js';
 import { logger } from '../../utils/logger.js';
 
 type ExtAction = ExtensionRecord['actions'][number];
@@ -63,7 +64,8 @@ export async function enforcePaywall(args: {
   // 1. Owner (and their own principals) always free — no toll, no payment.
   if (callerOwner === ownerName) return { ok: true };
 
-  // 2. Anti-abuse toll — ALWAYS a burn (debit caller, never credit owner). M1.
+  // 2. Declared toll bounds this action's call rate. Validated here (it is extension config); the burn
+  //    itself happens once, either inside the entitlement chokepoint below or on the uncontracted path.
   const toll = action.tollMorsels ?? 0;
   if (toll > 0) {
     if (!isPosInt(toll)) {
@@ -75,27 +77,24 @@ export async function enforcePaywall(args: {
         `tollMorsels (${toll}) exceeds the per-call cap (${config.extensionMaxDebitPerCall})`));
       return { ok: false };
     }
-    const burned = await storage.debitBalance(callerGaii, toll);
-    if (!burned) {
-      res.status(402).json({ ...error(config.nodeId, 'INSUFFICIENT_MORSELS',
-        `This call requires a ${toll}-morsel anti-abuse toll and your balance does not cover it`), ...paymentChallenge(config) });
-      return { ok: false };
-    }
-    await storage.addTransaction({
-      id: `ext-toll-${randomUUID()}`, gaii: callerGaii, type: 'extension_toll', amount: -toll,
-      trackingCode: `ext:${ext.name}:${action.id}:toll`, timestamp: new Date().toISOString(),
-    });
   }
 
-  // 3. Not commercial → free public call (the script's own public_access decides who may read).
-  if (!action.commercial) return { ok: true };
-
-  // 3.5 EXCHANGE metered-call gateway (G2, TARGET-045): when the caller holds a durable entitlement for
-  //     this exact (ext, action), it takes over the commercial settlement — budget cap + platform rake —
-  //     so a negotiated contract flows without a per-call checkout. Additive: null → no entitlement, fall
-  //     through to the one-time money-token + morsel channels below (unchanged pre-EXCHANGE behaviour).
+  // 3. EXCHANGE metered-call gateway (G2, TARGET-045): when the caller holds a durable entitlement for
+  //    this exact (ext, action), it takes over BOTH the pacing burn and the commercial settlement —
+  //    budget cap + platform rake — so a negotiated contract flows without a per-call checkout.
+  //    Consulted before the pacing burn below so the toll is never charged twice for one call.
   const viaEntitlement = await settleViaEntitlement({ config, storage, ext, action, callerGaii, res });
   if (viaEntitlement) return viaEntitlement;
+
+  // 3.1 Uncontracted call: pace it here. Same burn, same rule — a burn, never revenue (M1).
+  const paced = await burnPacingToll({
+    config, storage, callerGaii, providerOwner: ownerName,
+    label: `ext:${ext.name}:${action.id}`, toll: resolvePacingToll(config, toll), res,
+  });
+  if (!paced.ok) return { ok: false };
+
+  // 3.5 Not commercial → free public call (the script's own public_access decides who may read).
+  if (!action.commercial) return { ok: true };
 
   // 4. Money channel (D1/D3): require a one-time token minted by a settled ext-call checkout.
   //    Checked BEFORE the morsel debit so a combo-2 caller without money is never charged morsels.

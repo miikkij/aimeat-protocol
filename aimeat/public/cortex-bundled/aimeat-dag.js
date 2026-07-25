@@ -67,6 +67,9 @@
  *   });
  *   vp.world.appendChild(frameEl);   // children live in world space
  * @version-history
+ *   v1.0.1 — 2026-07-25 — Fix: do not force position:relative on the host (it beat a consumer's
+ *     own position:fixed at the same specificity and collapsed a full-screen board to 0px);
+ *     create() promotes the host only when its computed position is static.
  *   v1.0.0 — 2026-07-25 — Initial (TARGET-051 Slice 1): camera extracted from aimeat-dag v1.0.1.
  *     Behaviour-preserving for dag (same gesture semantics, same zoom clamps as defaults, same
  *     easing and reduced-motion handling); new for other consumers are classPrefix, configurable
@@ -94,7 +97,12 @@
   function injectCss(p) {
     if (injected[p]) return;
     var css = [
-      '.' + p + '-host { position: relative; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }',
+      /* NOTE: `position` is deliberately NOT set here. The host only has to be a positioning
+         context, and a consumer may already be one in a way that matters — a full-screen board is
+         `position: fixed; inset: 0`, and a same-specificity `position: relative` from this
+         stylesheet would silently win, collapse the host to zero height and leave every pointer
+         event landing on nothing. create() promotes the host only when it is actually static. */
+      '.' + p + '-host { overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; cursor: grab; }',
       '.' + p + '-host.' + p + '-panning { cursor: grabbing; }',
       '.' + p + '-host.' + p + '-interact { cursor: default; }',
       '.' + p + '-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; will-change: transform; }',
@@ -164,6 +172,10 @@
 
     injectCss(P);
     host.classList.add(P + '-host');
+    /* The world is absolutely positioned, so the host must be a positioning context — but only
+       promote it when it is static. Overwriting an existing fixed/absolute/sticky host is how a
+       full-screen board ends up 0px tall. */
+    if (global.getComputedStyle(host).position === 'static') host.style.position = 'relative';
 
     var world = document.createElement('div');
     world.className = P + '-world';
@@ -421,7 +433,7 @@
     };
   }
 
-  AIMEAT.viewport = { create: create, VERSION: '1.0.0' };
+  AIMEAT.viewport = { create: create, VERSION: '1.0.1' };
 
 })(typeof globalThis !== 'undefined' ? globalThis : typeof window !== 'undefined' ? window : this);
 /* END embedded aimeat-viewport */
