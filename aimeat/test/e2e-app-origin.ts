@@ -11,6 +11,8 @@
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phases 1–2).
+ *   v1.1.0 — 2026-07-25 — Phase 4: frame-ancestors lists the owner's other app origins and
+ *     nobody else's, and the legacy X-Frame-Options is gone where the CSP is the policy.
  */
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
@@ -142,6 +144,67 @@ async function main() {
             assert(res.status === 200, `expected 200, got ${res.status}`);
             const body = await res.text();
             assert(body.includes('app origin demo'), 'subdomain-served body contains the app content');
+        });
+
+        console.log('\nPhase 4: frame-ancestors lists the owner\'s OTHER apps, and nobody else\'s');
+
+        const sibFile = 'origin-sibling.html', SIB = 'origin-sibling';
+        const otherOwner = `apporigin2${Date.now() % 100000}`;
+        const otherFile = 'origin-other.html', OTHER = 'origin-other';
+
+        await test('publish a SECOND app for the same owner, and one for a DIFFERENT owner', async () => {
+            const a = await json('/v1/apps', {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ filename: sibFile, content: b64(HTML), name: 'Sibling', description: 'd', category: 'utility', tags: ['demo'] }),
+            });
+            assert(a.status === 201, `sibling publish: ${a.status}`);
+
+            const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: otherOwner, public_key: 'placeholder' }) });
+            assert(reg.status === 201, `other owner: ${reg.status}`);
+            const ts = new Date().toISOString();
+            const sig = await signMsg(reg.body.data.private_key, otherOwner + NODE_ID + ts);
+            const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: otherOwner, timestamp: ts, signature: sig }) });
+            const b = await json('/v1/apps', {
+                method: 'POST', headers: { Authorization: `Bearer ${tok.body.data.token}` },
+                body: JSON.stringify({ filename: otherFile, content: b64(HTML), name: 'Other', description: 'd', category: 'utility', tags: ['demo'] }),
+            });
+            assert(b.status === 201, `other publish: ${b.status}`);
+
+            // Subdomains are assigned on first open; touch each so the mappings exist.
+            for (const [o, f] of [[owner, sibFile], [otherOwner, otherFile]]) {
+                await fetch(`${BASE}/v1/apps/${o}/${f}?mode=inline`, { redirect: 'manual' });
+            }
+        });
+
+        await test('the app CSP allows self + apex + the SAME owner\'s other app origin', async () => {
+            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            const csp = res.headers.get('content-security-policy') ?? '';
+            const fa = (csp.match(/frame-ancestors ([^;]*)/) ?? ['', ''])[1].trim();
+            assert(fa.includes("'self'"), `frame-ancestors must keep 'self': ${fa}`);
+            assert(fa.includes(BASE), `frame-ancestors must keep the apex (${BASE}): ${fa}`);
+            assert(fa.includes(`http://${SIB}.${APP_HOST}:${PORT}`), `sibling origin missing: ${fa}`);
+        });
+
+        await test('the app CSP does NOT allow another owner\'s app origin (no cross-tenant framing)', async () => {
+            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            const csp = res.headers.get('content-security-policy') ?? '';
+            const fa = (csp.match(/frame-ancestors ([^;]*)/) ?? ['', ''])[1].trim();
+            assert(!fa.includes(`${OTHER}.${APP_HOST}`), `another owner's origin must NOT be framable: ${fa}`);
+            assert(!fa.includes('*'), `no wildcard ancestor: ${fa}`);
+        });
+
+        await test('X-Frame-Options is dropped where frame-ancestors is the policy', async () => {
+            // The legacy header is SAMEORIGIN node-wide; left in place a browser honouring it
+            // would veto the CSP and the frame would be blank whatever the CSP says.
+            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            assert(res.headers.get('x-frame-options') === null, `X-Frame-Options should be absent, got ${res.headers.get('x-frame-options')}`);
+        });
+
+        await test('the apex still frames apps (H-2 in-SPA viewer keeps working)', async () => {
+            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': OTHER } });
+            const fa = ((res.headers.get('content-security-policy') ?? '').match(/frame-ancestors ([^;]*)/) ?? ['', ''])[1];
+            assert(fa.includes(BASE), `apex must remain a frame-ancestor for every app: ${fa}`);
         });
 
         console.log('\n─────────────────────────────────────');

@@ -73,6 +73,22 @@ export function registerCatalogueAdminRoutes(
             for (const f of files) if (f.key.startsWith('apps/screenshots/')) screenshotKeys.add(`${gaii} ${f.key}`);
         }
 
+        // "owner/filename" → the app's own origin, from the subdomain mappings that already exist.
+        // One query for the whole page, and no writes: assigning subdomains is the job of actually
+        // opening an app, not of listing it.
+        const appOriginByTarget = new Map<string, string>();
+        if (config.appOriginEnabled && config.appHost) {
+            let scheme = 'https', portSuffix = '';
+            try { const b = new URL(config.baseUrl); scheme = b.protocol.replace(':', ''); portSuffix = b.port ? `:${b.port}` : ''; } catch { /* keep https */ }
+            try {
+                for (const site of await storage.listSubdomainSites()) {
+                    if (site.enabled && site.kind === 'app' && typeof site.target === 'string') {
+                        appOriginByTarget.set(site.target, `${scheme}://${site.subdomain}.${config.appHost}${portSuffix}/`);
+                    }
+                }
+            } catch { /* no mappings → the field is simply null everywhere */ }
+        }
+
         const result = apps.map((app) => {
             const metricKey = `${app.ownerGaii} ${app.filename}`;
             const downloads = downloadsByApp[metricKey] ?? 0;
@@ -96,6 +112,12 @@ export function registerCatalogueAdminRoutes(
                 forks,
                 download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                 screenshot_url: hasScreenshot ? `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}/screenshot` : null,
+                // Absolute URL of the app's OWN origin, when one is already assigned. A client that
+                // wants to embed an app has to send it to that origin — the relative inline path
+                // would run the app's HTML in the CLIENT's origin instead. Read-only: this never
+                // assigns a subdomain (a catalogue listing must not write 100+ mappings), so it is
+                // null until the app has been opened once.
+                app_origin_url: appOriginByTarget.get(`${app.ownerName}/${app.filename}`) ?? null,
                 created_at: app.createdAt,
             };
         });
