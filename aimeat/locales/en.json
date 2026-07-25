@@ -10,6 +10,8 @@
   "inbox.sending": "Sending…",
   "inbox.reply": "Reply",
   "inbox.quoteReply": "Reply to this message",
+  "inbox.copyMessage": "Copy this message to the clipboard",
+  "inbox.copied": "Copied",
   "inbox.quoteJump": "Show the original message",
   "inbox.quoteYou": "You",
   "inbox.replyingTo": "Replying to",

@@ -528,7 +528,7 @@
   box-shadow: var(--shadow-md);
 }
 .inbox-row:hover .inbox-bubble-actions { opacity: 1; pointer-events: auto; }
-/* Touch devices have no hover — the per-message actions (↩ reply, ⭐, 🔗, 📓, ✨) would be unreachable.
+/* Touch devices have no hover — the per-message actions (↩ reply, ⧉ copy, ⭐, 🔗, 📓, ✨) would be unreachable.
    Reveal them permanently there so a phone user can actually reply to / act on a message by tapping. */
 @media (hover: none) {
   .inbox-bubble-actions { opacity: 1; pointer-events: auto; }

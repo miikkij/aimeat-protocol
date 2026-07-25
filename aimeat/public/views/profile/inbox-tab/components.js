@@ -6,6 +6,8 @@
  *   chat.commands), SchedulePanel (own-agent scheduler), and ReplyWithAiPopover (TARGET-031). Each is
  *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.9.0 — 2026-07-25 — MessageBubble gets a ⧉ copy action next to the other bubble buttons: copies the
+ *     message's raw markdown to the clipboard (✓ for ~1.6s as feedback).
  *   v1.8.0 — 2026-07-21 — MessageBubble renders link-preview cards under the body (MessageLinkPreviews),
  *     gated by the `showLinkPreviews` prop (the persisted thread-head toggle).
  *   v1.0.0 — 2026-07-13 — Extracted from inbox-tab.js (max-file-lines)
@@ -35,7 +37,7 @@ import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
+import { escHtml, copyToClipboard } from '/js/utils.js';
 import { Markdown } from '/components/Markdown.js';
 import { MessageLinkPreviews } from '/components/LinkPreview.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
@@ -252,6 +254,17 @@ export function PollBuilder({ questions, setQuestions }) {
 }
 
 export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews }) {
+  // Copy the message text to the clipboard (the raw markdown the sender wrote — that's what pastes
+  // usefully into an AI chat or a document; the rendered body's presigned image URLs are transient).
+  const [copied, setCopied] = useState(false);
+  const copyTimer = useRef(null);
+  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
+  const copyBody = async () => {
+    await copyToClipboard(String(msg.body || ''));
+    setCopied(true);
+    if (copyTimer.current) clearTimeout(copyTimer.current);
+    copyTimer.current = setTimeout(() => setCopied(false), 1600);
+  };
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   // urlMap is keyed by `${messageId}::${attachmentId}` because per-message attachment ids (at0, at1…)
@@ -270,6 +283,9 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
         <div class="inbox-bubble-actions">
           ${onQuote ? html`<button class="inbox-bubble-act" title=${t('inbox.quoteReply')}
             onClick=${() => onQuote(msg)}>↩</button>` : null}
+          <button class=${`inbox-bubble-act${copied ? ' inbox-bubble-act--on' : ''}`}
+            title=${copied ? t('inbox.copied') : t('inbox.copyMessage')}
+            aria-label=${t('inbox.copyMessage')} onClick=${copyBody}>${copied ? '✓' : '⧉'}</button>
           <button class=${`inbox-bubble-act${starred ? ' inbox-bubble-act--on' : ''}`} title=${t('inbox.markImportant')}
             onClick=${() => onStar?.(msg)}>${starred ? '⭐' : '☆'}</button>
           <button class=${`inbox-bubble-act${tracked ? ' inbox-bubble-act--on' : ''}`}

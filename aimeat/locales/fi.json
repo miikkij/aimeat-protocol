@@ -10,6 +10,8 @@
   "inbox.sending": "Lähetetään…",
   "inbox.reply": "Vastaa",
   "inbox.quoteReply": "Vastaa tähän viestiin",
+  "inbox.copyMessage": "Kopioi tämä viesti leikepöydälle",
+  "inbox.copied": "Kopioitu",
   "inbox.quoteJump": "Näytä alkuperäinen viesti",
   "inbox.quoteYou": "Sinä",
   "inbox.replyingTo": "Vastataan:",
