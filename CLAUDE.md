@@ -96,6 +96,24 @@ Full guide: `docs/coding-guidelines/security-development-dna.md`
 
 Author **new design specs, plans, and roadmap items as documents/records in the relevant AIMEAT organism on aimeat.io** (appdev/AIMEAT MCP) — **not** in repo `docs/`. This is deliberate dogfooding: we run our own knowledge work on our own product, surface what works and what breaks, and keep the data in the service we own. Route to the organism where that product's roadmap is tracked (each MACHINE ROOM app → its own organism/FABRIC; the AIMEAT platform itself, incl. `app-catalog`, → the FABRIC roadmap hub). Publishing such a record is a **gate** — draft freely, publish only on the developer's explicit go-ahead in this session (dogfood rituals below; cf. Rule 9). **Canonical in the repo, unchanged:** `openapi.yaml`, the RFC sections + coding-guideline references under `docs/`, `CLAUDE.md`, and `docs/known_gaps.md`.
 
+### Rule 11b: ODPS Provider Identity Is Known — Fill It In
+
+When an EXCHANGE listing's ODPS descriptor asks for the provider's legal identity or jurisdiction and the
+creator is **Jouni / `happydude500001`**, these are the values — use them, do not leave the fields blank
+and do not ask:
+
+```json
+"dataHolder": { "legalName": "Overscale Solutions Oy", "businessID": "3323553-5",
+                "URL": "https://www.overscalesolutions.com",
+                "addressCountry": "FI", "addressLocality": "Espoo" },
+"license":    { "geographicalArea": ["Worldwide"], "applicableLaws": "Finnish law" }
+```
+
+Same block as the PRH app-tools already use. With it a listing validates at 100% completeness; without it
+the validator reports `dataHolder` + `applicableLaws` missing. Everything else in the descriptor
+(valueProposition, SLA, dataQuality, provenance) is still stated from what you actually KNOW about the
+capability — invent nothing there.
+
 ### Rule 12: Imagery Is Generated, Never Placeholder Junk
 
 **No bland stock/clip-art/placeholder images — ever.** When a task needs an image (an app icon, a banner, a hero graphic, an illustration, an og-image), **generate a proper AIMEAT-quality one** with `scripts/gen_image.py` instead of shipping something generic.
