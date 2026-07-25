@@ -14,7 +14,7 @@ import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope } from '../../auth/middleware.js';
 import { resolveIdentity, isSameOwner, isGEAI } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { ecoMayReadKey } from '../../services/ecosystem-access.js';
@@ -400,7 +400,12 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
    * content; a comment can be deleted by its author or a creator/admin. */
 
   /* POST /v1/organisms/:id/comments — add a comment */
-  router.post('/v1/organisms/:id/comments', requireAuth(), requireRole('agent'), async (req, res) => {
+  /* An APP grant carries role 'app', which satisfies neither 'owner' nor 'agent', so a board
+   * rendering its own workspace record could read the thread and never add to it. organism:write
+   * is the right key: it is already in APP_GRANTABLE_SCOPES and it already lets a granted app
+   * write the RECORD itself, so refusing it a comment on that record protected nothing. The
+   * membership gate below is unchanged and still decides who may comment where. */
+  router.post('/v1/organisms/:id/comments', requireAuth(), requireRoleOrScope('agent', 'organism:write'), async (req, res) => {
     const id = req.params.id as string;
     const { ws, space, instance_id, body, anchor, parent_id } = req.body ?? {};
     if (!ws || !space || !instance_id || typeof body !== 'string' || !body.trim()) {
