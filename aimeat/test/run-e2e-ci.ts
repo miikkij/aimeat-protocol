@@ -333,6 +333,19 @@ async function startServer(): Promise<ChildProcess> {
         // ENTERPRISE_REQUIRED behavior is deterministic in both CI and local. The ee/ module has
         // its own tests in its own (private) repo.
         AIMEAT_EE_DISABLED: process.env.AIMEAT_EE_DISABLED ?? 'true',
+        // x402 settlement: pin the rail ON and settle against the OFF-CHAIN double. e2e-x402 needs
+        // the handler registered, and its X-PAYMENT proofs carry a FIXED placeholder signature
+        // (`0x` + 'ab' × 65) from an address nobody holds a key for — a real facilitator rejects
+        // that with `invalid_exact_evm_signature`, by design. Without these pins the outcome
+        // depended on the developer's own .env, which the server loads itself (src/index.ts): a
+        // machine whose .env sets AIMEAT_X402_ENABLED=true ran the suite against the LIVE
+        // x402.org facilitator and failed the settling tests, while a machine without it failed
+        // the earlier ones for want of a registered handler. Neither is a regression, and both
+        // read like one. Set either var explicitly to override — e2e-x402-testnet self-skips
+        // unless AIMEAT_X402_TEST_FACILITATOR is turned off, which is how the real-network
+        // acceptance run is opted into.
+        AIMEAT_X402_ENABLED: process.env.AIMEAT_X402_ENABLED ?? 'true',
+        AIMEAT_X402_TEST_FACILITATOR: process.env.AIMEAT_X402_TEST_FACILITATOR ?? 'true',
     };
 
     const serverArgs = ['--import', 'tsx', 'src/index.ts', 'start', '--db', DB_TYPE];
