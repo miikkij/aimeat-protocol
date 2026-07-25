@@ -1152,6 +1152,33 @@
     .dtl-sync.diff { background: rgba(245,158,11,.14); color: #f59e0b; }
     .dtl-sync.none { background: var(--bg-subtle); color: var(--text-muted); }
 
+    /* ── Working copy → published lifecycle band (TARGET-048) ──────────────────
+       Replaces the old two-number STATUS card: two labelled stops that say, in plain words, who
+       can see what. The active stop is highlighted so "where is my work" is answerable at a glance. */
+    .wc-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+    .wc-band { flex: 1; min-width: 240px; display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+    .wc-stop {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--border-subtle); background: var(--bg-subtle);
+      min-width: 150px; flex: 1;
+    }
+    .wc-stop.is-active { border-color: rgba(245, 158, 11, .55); background: rgba(245, 158, 11, .10); }
+    .wc-stop.is-live { border-color: rgba(52, 211, 153, .45); background: rgba(52, 211, 153, .10); }
+    .wc-stop-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+    .wc-stop-val { font-size: .95rem; font-weight: 700; color: var(--text); }
+    .wc-stop-note { font-size: .75rem; color: var(--text-muted); }
+    .wc-arrow { align-self: center; color: var(--text-muted); font-size: 1.1rem; }
+    .wc-explain { font-size: .88rem; color: var(--text); line-height: 1.5; margin: 12px 0 10px; }
+    .wc-size { font-size: .75rem; color: var(--text-muted); margin: 8px 0 0; }
+    .wc-muted { color: var(--text-muted); font-size: .85rem; }
+    /* One-line reminder of what the three verbs do — shown under both button rows so the source
+       editor and the AI loop explain themselves identically. */
+    .wc-verbs-hint { font-size: .78rem; color: var(--text-muted); line-height: 1.45; margin: 10px 0 0; }
+    .wc-proposal-head { margin: 0 0 8px; }
+    .wc-ckpt-when { display: block; font-size: .85rem; font-weight: 600; color: var(--text); }
+    .wc-ckpt-note { display: block; font-size: .78rem; color: var(--text-muted); }
+
     .dtl-meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
     .dtl-meta-item .dtl-meta-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
     .dtl-meta-item .dtl-meta-val { font-size: .9rem; color: var(--text); word-break: break-word; }
@@ -2500,13 +2527,14 @@
       <div class="modal-actions">
         <button class="modal-btn secondary" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
         <button class="modal-btn primary" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
-        <button class="modal-btn secondary" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
-        <!-- Real-origin staging (published apps only; toggled in viewSource). Same server-draft
-             path as the AI loop: test the edited source on a real origin, then publish it. -->
-        <button class="modal-btn primary" id="source-test-live-btn" hidden data-i18n="detail.testLive">Test on real origin</button>
-        <button class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="detail.publishTested">Publish tested version</button>
+        <!-- The three canonical verbs, identical to the detail view's AI loop (TARGET-048):
+             save (private, checkpointed) → try (real origin, live untouched) → publish (public). -->
+        <button class="modal-btn primary" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
+        <button class="modal-btn secondary" id="source-test-live-btn" hidden data-i18n="wc.try">Try it safely</button>
+        <button class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="wc.publishNew">Publish as a new version</button>
         <button class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
       </div>
+      <p class="wc-verbs-hint" data-i18n="wc.verbsHint">Save keeps it for you only. Try opens it on its real address without changing the live app. Publish is what other people see.</p>
     </div>
   </div>
 
@@ -3058,7 +3086,7 @@
       "detail.accessCodeCleared": "Access code removed — this app is public again.",
       "detail.needServerVersions": "Set the AIMEAT server URL in Settings to see published versions.",
       "detail.editAi": "✨ Edit with AI",
-      "detail.editAiHint": "Describe a change. The AI rewrites the app using your own OpenRouter key, saves a draft you can test, then keep or discard.",
+      "detail.editAiHint": "Describe a change. The AI rewrites the app with your own OpenRouter key and proposes it — nothing changes until you save it to your working copy.",
       "detail.editAiPh": "e.g. add a dark mode toggle in the top-right corner",
       "detail.run": "✨ Generate change",
       "detail.running": "Generating…",
@@ -3067,7 +3095,7 @@
       "detail.publishTested": "🚀 Publish tested version",
       "detail.keep": "✔ Keep draft",
       "detail.discard": "✕ Discard",
-      "detail.draftReady": "Draft ready — test it, then keep or discard.",
+      "detail.draftReady": "AI proposal ready — nothing is saved yet.",
       "detail.draftUploading": "Preparing your test version…",
       "detail.draftOpened": "Draft opened in a new tab — it runs just like the published app. Your live app is unchanged.",
       "detail.draftNeedsPublished": "Publish this app first, then you can test edits before they go live.",
@@ -3075,6 +3103,57 @@
       "detail.draftPublishConfirm": "Publish the tested draft as the new live version?",
       "detail.draftPublished": "✔ Published as v{v}. It is now the live app.",
       "detail.kept": "Draft kept as your local copy.",
+      // ── Working copy → published (TARGET-048). One vocabulary for the whole edit loop: the
+      //    word "draft" is deliberately gone — it used to mean three different things here. ──
+      "wc.lifecycle": "Where your work is",
+      "wc.title": "Working copy",
+      "wc.published": "Published",
+      "wc.privateNote": "only you can see it",
+      "wc.visibleToOthers": "everyone can see it",
+      "wc.notVisibleYet": "nobody can see it yet",
+      "wc.notPublishedYet": "not published",
+      "wc.sameAsPublished": "same as published",
+      "wc.nothingYet": "nothing saved yet",
+      "wc.savedAt": "saved {t}",
+      "wc.savedEarlier": "saved earlier",
+      "wc.pending": "AI proposal waiting",
+      "wc.explainPending": "The AI wrote a change but nothing is saved yet. Save it to your working copy — you can always get back to where you are now.",
+      "wc.explainSaved": "You have a saved working copy that nobody else can see. Publish it as v{v} when it is ready.",
+      "wc.explainSavedUnpublished": "You have a saved working copy. Publish it when it is ready.",
+      "wc.explainClean": "Your working copy matches the published app. Edit it below — every save keeps the previous state, so nothing gets lost.",
+      "wc.explainUnpublished": "This app is not published yet. Publish it to give it a version other people can open.",
+      "wc.save": "💾 Save to working copy",
+      "wc.saving": "Saving…",
+      "wc.saved": "Saved to your working copy — it survives a reload and stays private until you publish.",
+      "wc.savedShort": "Saved!",
+      "wc.saveFailed": "Could not save",
+      "wc.keptLocalOnly": "Kept in this tab only — publish the app first to get a working copy that lasts.",
+      "wc.try": "▶ Try it safely",
+      "wc.tryLocal": "▶ Quick preview",
+      "wc.publishAs": "🚀 Publish as v{v}",
+      "wc.publishNew": "🚀 Publish as a new version",
+      "wc.discardProposal": "✕ Discard proposal",
+      "wc.discardWork": "✕ Discard working copy",
+      "wc.confirmDiscardWork": "Throw away your saved working copy and go back to the published app?",
+      "wc.discardedWork": "Working copy discarded — you are back on the published app.",
+      "wc.verbsHint": "Save keeps it for you only. Try opens it on its real address without changing the live app. Publish is what other people see.",
+      "wc.history": "Working-copy history",
+      "wc.historyHint": "Every save leaves a checkpoint here, so you can always go back. These are private to you — the published versions below are the ones other people see.",
+      "wc.none": "No checkpoints yet — your first save creates one.",
+      "wc.before": "before: {note}",
+      "wc.beforeUnnamed": "before an edit",
+      "wc.preview": "Preview",
+      "wc.restore": "Restore",
+      "wc.delete": "Delete",
+      "wc.previewTitle": "checkpoint preview",
+      "wc.confirmRestore": "Restore this checkpoint into your working copy? The current working copy is checkpointed first, so you can undo this.",
+      "wc.confirmDelete": "Delete this checkpoint permanently?",
+      "wc.restored": "Restored into your working copy. The published app is unchanged.",
+      "wc.gone": "That checkpoint is no longer stored.",
+      "wc.loginNeeded": "Sign in to save a working copy.",
+      "wc.noteManual": "manual source edit",
+      "wc.noteRestore": "restored an earlier checkpoint",
+      "versions.publishedHint": "Published versions — these are what other people see.",
       "detail.discarded": "Draft discarded.",
       "detail.aiUnavailable": "AI editing needs an OpenRouter key. Add one in AIMEAT settings, then reload.",
       "detail.aiLoginNeeded": "Sign in to your AIMEAT node to use AI editing.",
@@ -3541,7 +3620,7 @@
       "detail.publishTested": "🚀 Julkaise testattu versio",
       "detail.keep": "✔ Säilytä luonnos",
       "detail.discard": "✕ Hylkää",
-      "detail.draftReady": "Luonnos valmis — testaa, sitten säilytä tai hylkää.",
+      "detail.draftReady": "AI-ehdotus valmis — mitään ei ole vielä tallennettu.",
       "detail.draftUploading": "Valmistellaan testiversiota…",
       "detail.draftOpened": "Luonnos avattu uuteen välilehteen — toimii kuten julkaistu appi. Live-appi pysyy ennallaan.",
       "detail.draftNeedsPublished": "Julkaise appi ensin, niin voit testata muutoksia ennen kuin ne menevät liveksi.",
@@ -3549,6 +3628,57 @@
       "detail.draftPublishConfirm": "Julkaistaanko testattu luonnos uutena live-versiona?",
       "detail.draftPublished": "✔ Julkaistu versiona v{v}. Se on nyt live-appi.",
       "detail.kept": "Luonnos säilytetty paikallisena kopiona.",
+      // ── Työkopio → julkaistu (TARGET-048). Yksi sanasto koko muokkaussilmukalle: sana
+      //    "luonnos" on tarkoituksella poissa — se tarkoitti täällä kolmea eri asiaa. ──
+      "wc.lifecycle": "Missä työsi on",
+      "wc.title": "Työkopio",
+      "wc.published": "Julkaistu",
+      "wc.privateNote": "vain sinä näet",
+      "wc.visibleToOthers": "kaikki näkevät",
+      "wc.notVisibleYet": "kukaan ei näe vielä",
+      "wc.notPublishedYet": "ei julkaistu",
+      "wc.sameAsPublished": "sama kuin julkaistu",
+      "wc.nothingYet": "ei vielä tallennettu",
+      "wc.savedAt": "tallennettu {t}",
+      "wc.savedEarlier": "tallennettu aiemmin",
+      "wc.pending": "AI-ehdotus odottaa",
+      "wc.explainPending": "Tekoäly kirjoitti muutoksen, mutta mitään ei ole vielä tallennettu. Tallenna se työkopioon — pääset aina takaisin nykyiseen tilaan.",
+      "wc.explainSaved": "Sinulla on tallennettu työkopio, jota kukaan muu ei näe. Julkaise se versiona v{v}, kun se on valmis.",
+      "wc.explainSavedUnpublished": "Sinulla on tallennettu työkopio. Julkaise se, kun se on valmis.",
+      "wc.explainClean": "Työkopiosi on sama kuin julkaistu appi. Muokkaa alla — jokainen tallennus säilyttää edellisen tilan, joten mikään ei katoa.",
+      "wc.explainUnpublished": "Tätä appia ei ole vielä julkaistu. Julkaise se, niin sillä on versio jonka muut voivat avata.",
+      "wc.save": "💾 Tallenna työkopioon",
+      "wc.saving": "Tallennetaan…",
+      "wc.saved": "Tallennettu työkopioon — säilyy sivun päivityksen yli ja pysyy yksityisenä kunnes julkaiset.",
+      "wc.savedShort": "Tallennettu!",
+      "wc.saveFailed": "Tallennus ei onnistunut",
+      "wc.keptLocalOnly": "Säilytetty vain tässä välilehdessä — julkaise appi ensin, niin saat pysyvän työkopion.",
+      "wc.try": "▶ Kokeile turvallisesti",
+      "wc.tryLocal": "▶ Pikaesikatselu",
+      "wc.publishAs": "🚀 Julkaise versiona v{v}",
+      "wc.publishNew": "🚀 Julkaise uutena versiona",
+      "wc.discardProposal": "✕ Hylkää ehdotus",
+      "wc.discardWork": "✕ Hylkää työkopio",
+      "wc.confirmDiscardWork": "Heitetäänkö tallennettu työkopio pois ja palataan julkaistuun appiin?",
+      "wc.discardedWork": "Työkopio hylätty — olet takaisin julkaistussa apissa.",
+      "wc.verbsHint": "Tallenna säilyttää muutoksen vain sinulle. Kokeile avaa sen oikeassa osoitteessa muuttamatta live-appia. Julkaise on se minkä muut näkevät.",
+      "wc.history": "Työkopion historia",
+      "wc.historyHint": "Jokainen tallennus jättää tänne tarkistuspisteen, joten voit aina palata taaksepäin. Nämä ovat vain sinun — julkaistut versiot alempana ovat ne jotka muut näkevät.",
+      "wc.none": "Ei vielä tarkistuspisteitä — ensimmäinen tallennus luo sellaisen.",
+      "wc.before": "ennen muutosta: {note}",
+      "wc.beforeUnnamed": "ennen muokkausta",
+      "wc.preview": "Esikatsele",
+      "wc.restore": "Palauta",
+      "wc.delete": "Poista",
+      "wc.previewTitle": "tarkistuspisteen esikatselu",
+      "wc.confirmRestore": "Palautetaanko tämä tarkistuspiste työkopioon? Nykyisestä työkopiosta tehdään ensin tarkistuspiste, joten voit kumota tämän.",
+      "wc.confirmDelete": "Poistetaanko tämä tarkistuspiste pysyvästi?",
+      "wc.restored": "Palautettu työkopioon. Julkaistu appi on ennallaan.",
+      "wc.gone": "Tätä tarkistuspistettä ei ole enää tallessa.",
+      "wc.loginNeeded": "Kirjaudu sisään tallentaaksesi työkopion.",
+      "wc.noteManual": "käsin muokattu lähdekoodi",
+      "wc.noteRestore": "palautettu aiempi tarkistuspiste",
+      "versions.publishedHint": "Julkaistut versiot — nämä muut näkevät.",
       "detail.discarded": "Luonnos hylätty.",
       "detail.aiUnavailable": "Tekoälymuokkaus vaatii OpenRouter-avaimen. Lisää se AIMEAT-asetuksiin ja lataa sivu uudelleen.",
       "detail.aiLoginNeeded": "Kirjaudu AIMEAT-nodeen käyttääksesi tekoälymuokkausta.",
@@ -4332,9 +4462,9 @@
   function loadPbCore() {
     var config = loadConfig();
     if (!config.aimeatUrl) return;
-    var base3 = config.aimeatUrl.replace(/\/+$/, "");
+    var base4 = config.aimeatUrl.replace(/\/+$/, "");
     ["new", "improve"].forEach(function(mode) {
-      fetch(base3 + "/v1/prompts/build-app?mode=" + mode + "&lang=" + encodeURIComponent(getLang())).then(function(r) {
+      fetch(base4 + "/v1/prompts/build-app?mode=" + mode + "&lang=" + encodeURIComponent(getLang())).then(function(r) {
         return r.json();
       }).then(function(d) {
         var body = d && d.data && d.data.body;
@@ -4351,8 +4481,8 @@
     if (!sel) return;
     var config = loadConfig();
     if (!config.aimeatUrl) return;
-    var base3 = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(base3 + "/v1/app-templates?lang=" + encodeURIComponent(getLang())).then(function(r) {
+    var base4 = config.aimeatUrl.replace(/\/+$/, "");
+    fetch(base4 + "/v1/app-templates?lang=" + encodeURIComponent(getLang())).then(function(r) {
       return r.json();
     }).then(function(d) {
       var list = (d.data && d.data.templates || []).filter(function(t2) {
@@ -4376,7 +4506,7 @@
           updatePbPreview();
           return;
         }
-        fetch(base3 + "/v1/app-templates/" + encodeURIComponent(id)).then(function(r) {
+        fetch(base4 + "/v1/app-templates/" + encodeURIComponent(id)).then(function(r) {
           return r.json();
         }).then(function(d2) {
           window.pbTemplate = d2.data && d2.data.template || null;
@@ -4402,8 +4532,8 @@
     if (!wrap) return;
     var config = loadConfig();
     if (!config.aimeatUrl) return;
-    var base3 = config.aimeatUrl.replace(/\/+$/, "");
-    fetch(base3 + "/v1/library-packs?lang=" + encodeURIComponent(getLang())).then(function(r) {
+    var base4 = config.aimeatUrl.replace(/\/+$/, "");
+    fetch(base4 + "/v1/library-packs?lang=" + encodeURIComponent(getLang())).then(function(r) {
       return r.json();
     }).then(function(d) {
       var all = d.data && d.data.packs || [];
@@ -4424,7 +4554,7 @@
         cb.value = p.id;
         cb.onchange = function() {
           pbPackTouched[p.id] = true;
-          if (cb.checked) loadPbPackDoc(base3, p.id);
+          if (cb.checked) loadPbPackDoc(base4, p.id);
           else updatePbPreview();
         };
         var span = document.createElement("span");
@@ -4447,14 +4577,14 @@
       if (desc && !desc._pbPackListener) {
         desc._pbPackListener = true;
         desc.addEventListener("input", function() {
-          pbMatchPacksToIdea(base3);
+          pbMatchPacksToIdea(base4);
         });
       }
-      pbMatchPacksToIdea(base3);
+      pbMatchPacksToIdea(base4);
     }).catch(function() {
     });
   }
-  function pbMatchPacksToIdea(base3) {
+  function pbMatchPacksToIdea(base4) {
     var desc = document.getElementById("pb-description");
     var text = (desc && desc.value || "").toLowerCase();
     pbPacks.forEach(function(p) {
@@ -4467,19 +4597,19 @@
       });
       if (hit && !cb.checked) {
         cb.checked = true;
-        loadPbPackDoc(base3, p.id);
+        loadPbPackDoc(base4, p.id);
       } else if (!hit && cb.checked) {
         cb.checked = false;
         updatePbPreview();
       }
     });
   }
-  function loadPbPackDoc(base3, id) {
+  function loadPbPackDoc(base4, id) {
     if (pbPackDocs[id]) {
       updatePbPreview();
       return;
     }
-    fetch(base3 + "/v1/library-packs/" + encodeURIComponent(id)).then(function(r) {
+    fetch(base4 + "/v1/library-packs/" + encodeURIComponent(id)).then(function(r) {
       return r.json();
     }).then(function(d) {
       var pack = d.data && d.data.pack;
@@ -4853,13 +4983,13 @@
     mzEditing = -1;
     rerender();
   }
-  function readEditor(base3) {
+  function readEditor(base4) {
     var name = (document.getElementById("mz-name").value || "").trim();
     if (!NAME_RE.test(name)) {
       showNotice(t("monetize.nameInvalid"), "error");
       return null;
     }
-    var tool = Object.assign({}, base3 || {});
+    var tool = Object.assign({}, base4 || {});
     tool.name = name;
     var desc = (document.getElementById("mz-desc").value || "").trim();
     if (desc) tool.description = desc;
@@ -5097,8 +5227,8 @@
       showNotice(t("agents.none"));
       return;
     }
-    var base3 = aimeatBase();
-    if (!base3) {
+    var base4 = aimeatBase();
+    if (!base4) {
       showNotice("Set AIMEAT server URL in Settings first");
       return;
     }
@@ -5114,7 +5244,7 @@
     document.getElementById("agents-overlay").hidden = false;
     defs.forEach(function(def2, i2) {
       var headers = token ? { "Authorization": "Bearer " + token } : {};
-      fetch(base3 + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/agents/" + encodeURIComponent(def2.agent_name) + "/instances", { headers }).then(function(r) {
+      fetch(base4 + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/agents/" + encodeURIComponent(def2.agent_name) + "/instances", { headers }).then(function(r) {
         return r.json();
       }).then(function(json) {
         var el = document.getElementById("aga-instances-" + i2);
@@ -5130,7 +5260,7 @@
       });
     });
     if (token) {
-      fetch(base3 + "/v1/agents", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+      fetch(base4 + "/v1/agents", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
         return r.json();
       }).then(function(json) {
         var agents = json.data && json.data.agents || [];
@@ -5157,7 +5287,7 @@
       } catch (e) {
       }
       if (me) {
-        fetch(base3 + "/v1/organisms?member=" + encodeURIComponent(me), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+        fetch(base4 + "/v1/organisms?member=" + encodeURIComponent(me), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
           return r.json();
         }).then(function(json) {
           var orgs = json.data && json.data.organisms || [];
@@ -5212,6 +5342,157 @@
     });
   }
 
+  // src/static/app-catalog/js/workcopy.js
+  var MAX_CHECKPOINTS = 8;
+  var PREFIX = "app-catalog.wc";
+  var cache = {};
+  function base2() {
+    return (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+  }
+  function tok() {
+    return getCortexOwnerToken();
+  }
+  function slugFor(owner, filename) {
+    return (String(owner || "") + "-" + String(filename || "")).replace(/[^a-zA-Z0-9]+/g, "-").replace(/^-+|-+$/g, "").toLowerCase().slice(0, 80);
+  }
+  function indexKey(slug) {
+    return PREFIX + "." + slug;
+  }
+  function bodyKey(slug, id) {
+    return PREFIX + "." + slug + ".b" + id;
+  }
+  function memGet(key) {
+    var b = base2(), token = tok();
+    if (!b || !token) return Promise.resolve(null);
+    return fetch(b + "/v1/memory/" + encodeURIComponent(key), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+      return r.ok ? r.json() : null;
+    }).then(function(j) {
+      return j && j.data && j.data.value || null;
+    }).catch(function() {
+      return null;
+    });
+  }
+  function memPut(key, value) {
+    var b = base2(), token = tok();
+    if (!b || !token) return Promise.reject(new Error("not signed in"));
+    return fetch(b + "/v1/memory", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({ key, value, visibility: "private" })
+    }).then(function(r) {
+      return r.json().then(function(j) {
+        if (!r.ok || j && j.ok === false) throw new Error(j && j.error && j.error.message || "HTTP " + r.status);
+        return j;
+      });
+    });
+  }
+  function memDelete(key) {
+    var b = base2(), token = tok();
+    if (!b || !token) return Promise.resolve();
+    return fetch(b + "/v1/memory/" + encodeURIComponent(key), {
+      method: "DELETE",
+      headers: { "Authorization": "Bearer " + token }
+    }).catch(function() {
+    });
+  }
+  function getCheckpoints(owner, filename) {
+    return cache[slugFor(owner, filename)] || [];
+  }
+  function loadCheckpoints(owner, filename) {
+    var slug = slugFor(owner, filename);
+    return memGet(indexKey(slug)).then(function(v) {
+      var items = v && Array.isArray(v.items) ? v.items : [];
+      cache[slug] = items;
+      return items;
+    });
+  }
+  function pushCheckpoint(slug, b64, note) {
+    var id = String(Date.now());
+    return memPut(bodyKey(slug, id), { html: b64 }).then(function() {
+      var entry = {
+        id,
+        at: (/* @__PURE__ */ new Date()).toISOString(),
+        note: String(note || "").slice(0, 160),
+        size: Math.round(b64.length * 0.75)
+      };
+      var all = [entry].concat(cache[slug] || []);
+      var keep = all.slice(0, MAX_CHECKPOINTS);
+      var prune = all.slice(MAX_CHECKPOINTS);
+      cache[slug] = keep;
+      return memPut(indexKey(slug), { version: 1, updatedAt: entry.at, items: keep }).then(function() {
+        return Promise.all(prune.map(function(p) {
+          return memDelete(bodyKey(slug, p.id));
+        }));
+      }).then(function() {
+        return entry;
+      });
+    });
+  }
+  function getDraft(owner, filename) {
+    var b = base2(), token = tok();
+    if (!b || !token) return Promise.resolve(null);
+    return fetch(b + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/draft", {
+      headers: { "Authorization": "Bearer " + token }
+    }).then(function(r) {
+      return r.ok ? r.json() : null;
+    }).then(function(j) {
+      return j && j.data && typeof j.data.content === "string" ? j.data : null;
+    }).catch(function() {
+      return null;
+    });
+  }
+  function putDraft(owner, filename, b64) {
+    var b = base2(), token = tok();
+    if (!b || !token) return Promise.reject(new Error("not signed in"));
+    return fetch(b + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/draft", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json", "Authorization": "Bearer " + token },
+      body: JSON.stringify({ content: b64 })
+    }).then(function(r) {
+      return r.json().then(function(j) {
+        if (!j.ok) throw new Error(j.error && (j.error.message || j.error.code) || "HTTP " + r.status);
+        return j.data;
+      });
+    });
+  }
+  function discardWorkingCopy(owner, filename) {
+    var b = base2(), token = tok();
+    if (!b || !token) return Promise.resolve();
+    return fetch(b + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/draft", {
+      method: "DELETE",
+      headers: { "Authorization": "Bearer " + token }
+    }).catch(function() {
+    });
+  }
+  function saveWorkingCopy(opts) {
+    var owner = opts.owner, filename = opts.filename;
+    var slug = slugFor(owner, filename);
+    var shouldCheckpoint = !!opts.previousB64 && opts.previousB64 !== opts.nextB64;
+    var chain = shouldCheckpoint ? pushCheckpoint(slug, opts.previousB64, opts.note).catch(function() {
+      return null;
+    }) : Promise.resolve(null);
+    return chain.then(function(entry) {
+      return putDraft(owner, filename, opts.nextB64).then(function(draft) {
+        return { checkpointed: !!entry, draft };
+      });
+    });
+  }
+  function readCheckpoint(owner, filename, id) {
+    return memGet(bodyKey(slugFor(owner, filename), id)).then(function(v) {
+      return v && typeof v.html === "string" ? v.html : null;
+    });
+  }
+  function deleteCheckpoint(owner, filename, id) {
+    var slug = slugFor(owner, filename);
+    var items = (cache[slug] || []).filter(function(c) {
+      return c.id !== id;
+    });
+    cache[slug] = items;
+    return memPut(indexKey(slug), { version: 1, updatedAt: (/* @__PURE__ */ new Date()).toISOString(), items }).then(function() {
+      return memDelete(bodyKey(slug, id));
+    });
+  }
+
   // src/static/app-catalog/js/detail.js
   var refreshAll;
   var loadPublishedApps;
@@ -5246,6 +5527,12 @@
   var detailMySkills = null;
   var detailBoundSkills = [];
   var detailSkillBusy = false;
+  var detailWorkSavedAt = null;
+  var detailHasWorkCopy = false;
+  var detailCheckpointsHtml = null;
+  var detailCheckpointBusy = false;
+  var detailLastChangeNote = "";
+  var detailEpoch = 0;
   function detailGetApp() {
     for (var i = 0; i < getMainApps().length; i++) {
       if (getMainApps()[i].id === detailAppId) return getMainApps()[i];
@@ -5306,8 +5593,14 @@
     detailSkillPickerOpen = false;
     detailMySkills = null;
     detailBoundSkills = [];
+    detailWorkSavedAt = null;
+    detailCheckpointsHtml = null;
+    detailCheckpointBusy = false;
+    detailEpoch++;
     var app = detailGetApp();
     if (!app) return;
+    var wcState = app.publishedFilename && getServerState()[app.publishedFilename] || null;
+    detailHasWorkCopy = !!(wcState && wcState.hasDraft);
     monetizeOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     costOnOpen(detailServerOwner(app), app.publishedFilename || "", detailIsOwnPublished(app));
     document.getElementById("detail-view").hidden = false;
@@ -5317,6 +5610,8 @@
     if (app.published && app.publishedFilename && owner) {
       detailLoadVersions(owner, app.publishedFilename);
       detailLoadSkills(detailServerOwner(app) || owner, app.publishedFilename);
+      detailLoadCheckpoints(detailServerOwner(app) || owner, app.publishedFilename);
+      if (detailHasWorkCopy) detailLoadWorkingCopy(app, detailServerOwner(app) || owner);
     }
     if (detailEditAboutOnOpen) {
       detailEditAboutOnOpen = false;
@@ -5336,14 +5631,14 @@
     var app = detailGetApp();
     if (!app) return;
     if (app.published && (app.publishedUrl || app.publishedFilename)) {
-      var base3 = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+      var base4 = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
       var url;
       if (app.publishedUrl) {
-        url = base3 + app.publishedUrl;
+        url = base4 + app.publishedUrl;
       } else {
         var st = getServerState()[app.publishedFilename] || {};
         var owner = st.owner || currentOwnerName() || "";
-        url = base3 + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(app.publishedFilename);
+        url = base4 + "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(app.publishedFilename);
       }
       viewPublished(url + "?mode=inline", app.name);
     } else {
@@ -5425,24 +5720,27 @@
     var canEditAbout = !!app.id && !isUrlApp;
     document.getElementById("detail-title").innerHTML = '<span style="font-size:1.3rem">' + escapeHtml(icon) + "</span> " + escapeHtml(app.name || "App") + (canEditAbout && !detailEditingAbout ? ' <button class="rename-pencil" style="font-size:1rem" title="' + escapeHtml(t("detail.editDetails")) + '" onclick="window._launcher.detailAboutEdit()">✏️</button>' : "");
     var localBytes = app.blob ? Math.round(app.blob.length * 0.75) : 0;
-    var publishedV = app.publishedVersionNumber ? "v" + app.publishedVersionNumber : app.published ? "v?" : t("detail.notPublished");
-    var syncClass, syncText;
-    if (!app.published) {
-      syncClass = "none";
-      syncText = t("detail.notPublished");
-    } else if (detailDraftBlob) {
-      syncClass = "diff";
-      syncText = t("detail.localNewer");
+    var publishedV = app.publishedVersionNumber ? "v" + app.publishedVersionNumber : "";
+    var wcState = detailDraftBlob ? "pending" : detailHasWorkCopy ? "saved" : "clean";
+    var wcValue, wcExplain;
+    if (wcState === "pending") {
+      wcValue = t("wc.pending");
+      wcExplain = t("wc.explainPending");
+    } else if (wcState === "saved") {
+      wcValue = detailWorkSavedAt ? t("wc.savedAt").replace("{t}", new Date(detailWorkSavedAt).toLocaleTimeString()) : t("wc.savedEarlier");
+      wcExplain = app.published ? t("wc.explainSaved").replace("{v}", String((app.publishedVersionNumber || 0) + 1)) : t("wc.explainSavedUnpublished");
     } else {
-      syncClass = "ok";
-      syncText = t("detail.inSync");
+      wcValue = app.published ? t("wc.sameAsPublished") : t("wc.nothingYet");
+      wcExplain = app.published ? t("wc.explainClean") : t("wc.explainUnpublished");
     }
     var aimeatBase2 = config.aimeatUrl ? config.aimeatUrl.replace(/\/+$/, "") : "";
     var shotOwner = detailServerOwner(app);
     var shotFile = app.publishedFilename || "";
     var shotUrl = app.published && shotOwner && shotFile && aimeatBase2 ? aimeatBase2 + "/v1/apps/" + encodeURIComponent(shotOwner) + "/" + encodeURIComponent(shotFile) + "/screenshot?t=" + Date.now() : "";
     var shotImg = shotUrl ? '<img src="' + escapeHtml(shotUrl) + `" alt="App screenshot" loading="lazy" onerror="this.style.display='none'" style="max-width:260px;max-height:160px;border-radius:8px;border:1px solid var(--border-subtle);object-fit:cover;object-position:top center;flex:none" />` : "";
-    var statusHtml = '<div class="dtl-section"><h3>' + t("detail.status") + '</h3><div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap"><div style="flex:1;min-width:200px"><div class="dtl-status-row"><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusLocal") + '</span><span class="dtl-stat-val">' + (app.blob ? fmtSize(localBytes) : isUrlApp ? "URL" : "—") + '</span></div><div class="dtl-stat"><span class="dtl-stat-label">' + t("detail.statusPublished") + '</span><span class="dtl-stat-val">' + escapeHtml(publishedV) + '</span></div></div><span class="dtl-sync ' + syncClass + '">' + escapeHtml(syncText) + "</span></div>" + shotImg + "</div></div>";
+    var statusHtml = '<div class="dtl-section"><h3>' + t("wc.lifecycle") + '</h3><div class="wc-row"><div class="wc-band"><div class="wc-stop ' + (wcState === "clean" ? "is-idle" : "is-active") + '"><span class="wc-stop-label">' + t("wc.title") + '</span><span class="wc-stop-val">' + escapeHtml(wcValue) + '</span><span class="wc-stop-note">' + t("wc.privateNote") + '</span></div><span class="wc-arrow" aria-hidden="true">→</span><div class="wc-stop ' + (app.published ? "is-live" : "is-idle") + '"><span class="wc-stop-label">' + t("wc.published") + '</span><span class="wc-stop-val">' + escapeHtml(app.published ? publishedV || "v?" : t("wc.notPublishedYet")) + '</span><span class="wc-stop-note">' + (app.published ? t("wc.visibleToOthers") : t("wc.notVisibleYet")) + "</span></div></div>" + shotImg + '</div><p class="wc-explain">' + escapeHtml(wcExplain) + "</p>" + // A saved working copy must never be a dead end: the same three verbs are available right
+    // here, so you can try it, publish it, or throw it away without hunting through other menus.
+    (wcState === "saved" && app.published && !isUrlApp ? '<div class="dtl-btn-row">' + dtlBtn(t("wc.try"), "window._launcher.detailWorkTry()") + dtlBtn(t("wc.publishAs").replace("{v}", String((app.publishedVersionNumber || 0) + 1)), "window._launcher.detailWorkPublish()", { variant: "success" }) + dtlBtn(t("wc.discardWork"), "window._launcher.detailWorkDiscard()") + "</div>" : "") + (app.blob && !isUrlApp ? '<p class="wc-size">' + escapeHtml(t("detail.size") + ": " + fmtSize(localBytes)) + "</p>" : "") + "</div>";
     var tags = app.tags && app.tags.length ? app.tags.join(", ") : "—";
     var cortex = app.usesCortex && app.usesCortex.length ? app.usesCortex.join(", ") : "—";
     var created = app.addedAt ? new Date(app.addedAt).toLocaleString() : "—";
@@ -5464,13 +5762,14 @@
     if (isUrlApp) {
       aiHtml += '<span class="dtl-sync none">' + t("detail.urlCantEdit") + "</span>";
     } else {
-      aiHtml += '<div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status" style="margin:0 0 8px">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + // PUBLISHED app → the real-origin staging path (mic/camera work); the old opaque-
-      // sandbox "Test" is dropped here to avoid two near-identical "Test" buttons. An
-      // UNPUBLISHED app has no server draft slot yet, so it keeps the quick sandbox preview.
-      (app.published ? dtlBtn(t("detail.testLive"), "window._launcher.detailTestDraftLive()", { variant: "primary" }) + dtlBtn(t("detail.publishTested"), "window._launcher.detailPublishTestedDraft()", { variant: "success" }) : dtlBtn(t("detail.test"), "window._launcher.detailAiTest()", { variant: "primary" })) + dtlBtn(t("detail.keep"), "window._launcher.detailAiKeep()") + dtlBtn(t("detail.discard"), "window._launcher.detailAiDiscard()") + "</div></div>";
+      aiHtml += '<div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status wc-proposal-head">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + dtlBtn(t("wc.save"), "window._launcher.detailAiKeep()", { variant: "primary" }) + (app.published ? dtlBtn(t("wc.try"), "window._launcher.detailTestDraftLive()") + dtlBtn(t("wc.publishAs").replace("{v}", String((app.publishedVersionNumber || 0) + 1)), "window._launcher.detailPublishTestedDraft()", { variant: "success" }) : dtlBtn(t("wc.tryLocal"), "window._launcher.detailAiTest()")) + dtlBtn(t("wc.discardProposal"), "window._launcher.detailAiDiscard()") + '</div><p class="wc-verbs-hint">' + t("wc.verbsHint") + "</p></div>";
     }
     aiHtml += "</div>";
-    var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
+    var historyHtml = "";
+    if (!isUrlApp && app.published) {
+      historyHtml = '<div class="dtl-section"><h3>' + t("wc.history") + '</h3><p class="dtl-desc">' + t("wc.historyHint") + '</p><div id="detail-checkpoints">' + (detailCheckpointsHtml !== null ? detailCheckpointsHtml : '<span class="wc-muted">…</span>') + "</div></div>";
+    }
+    var versionsHtml = '<div class="dtl-section"><h3>' + t("detail.versions") + '</h3><p class="dtl-desc">' + t("versions.publishedHint") + '</p><div id="detail-versions-list">' + (detailVersionsHtml !== null ? detailVersionsHtml : !hasServer ? '<span class="dtl-sync none">' + t("detail.needServerVersions") + "</span>" : app.published ? '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.loadingVersions") + "</span>" : '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>") + "</div></div>";
     var publishLabel = app.published && app.publishedVersionNumber ? t("detail.publishAs") + " v" + (app.publishedVersionNumber + 1) : t("detail.publish");
     var actionsHtml = '<div class="dtl-section"><h3>' + t("detail.actions") + '</h3><div class="dtl-btn-row">' + (isUrlApp ? "" : dtlBtn(t("ctx.viewSource"), "window._launcher.detailEditSource()")) + (isUrlApp ? "" : dtlBtn(t("ctx.improveAi"), "window._launcher.detailImproveExternal()")) + dtlBtn(t("ctx.sharePrompt"), "window._launcher.detailSharePrompt()") + (isUrlApp ? "" : dtlBtn(escapeHtml(publishLabel), "window._launcher.detailPublish()", { variant: "primary" })) + (app.published && !isUrlApp ? dtlBtn("📷 " + t("detail.setScreenshot"), "window._launcher.detailSetScreenshot()", { title: "Upload a custom thumbnail for this app" }) : "") + (app.published && !isUrlApp ? dtlBtn("🔄 " + t("detail.refreshScreenshot"), "window._launcher.detailRefreshScreenshot()", { title: "Clear the screenshot; the node re-takes it on its next scheduled run" }) : "") + dtlBtn(t("ctx.delete"), "window._launcher.detailDelete()", { variant: "danger" }) + "</div></div>";
     var mgmtHtml = '<div id="detail-server-mgmt">' + serverMgmtInner(app) + "</div>";
@@ -5498,7 +5797,115 @@
         ) + "</div>";
       }
     }
-    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+    document.getElementById("detail-body").innerHTML = statusHtml + aboutHtml + aiHtml + historyHtml + versionsHtml + skillsHtml + agentsHtml + monetizeHtml + costHtml + promoteHtml + mgmtHtml + actionsHtml;
+  }
+  function detailCheckpointRows(app) {
+    var owner = detailServerOwner(app);
+    var list = getCheckpoints(owner, app.publishedFilename || "");
+    if (!list.length) return '<span class="wc-muted">' + t("wc.none") + "</span>";
+    var out = "";
+    for (var i = 0; i < list.length; i++) {
+      var c = list[i];
+      var when = c.at ? new Date(c.at).toLocaleString() : "";
+      var kb = c.size ? Math.round(c.size / 102.4) / 10 + " KB" : "";
+      var note = c.note ? t("wc.before").replace("{note}", c.note) : t("wc.beforeUnnamed");
+      out += '<div class="dtl-version-row"><div class="version-meta"><span class="wc-ckpt-when">' + escapeHtml(when) + '</span><span class="wc-ckpt-note">' + escapeHtml(note) + (kb ? " · " + kb : "") + '</span></div><div class="dtl-btn-row">' + dtlBtn(t("wc.preview"), "window._launcher.detailCheckpointPreview('" + jsArg(c.id) + "')") + dtlBtn(t("wc.restore"), "window._launcher.detailCheckpointRestore('" + jsArg(c.id) + "')", { variant: "primary", disabled: detailCheckpointBusy }) + dtlBtn(t("wc.delete"), "window._launcher.detailCheckpointDelete('" + jsArg(c.id) + "')", { disabled: detailCheckpointBusy }) + "</div></div>";
+    }
+    return out;
+  }
+  function refreshCheckpoints() {
+    var app = detailGetApp();
+    if (!app) return;
+    detailCheckpointsHtml = detailCheckpointRows(app);
+    var el = document.getElementById("detail-checkpoints");
+    if (el) el.innerHTML = detailCheckpointsHtml;
+  }
+  function detailLoadWorkingCopy(app, owner) {
+    var epoch = detailEpoch;
+    getDraft(owner, app.publishedFilename).then(function(d) {
+      if (!d || !d.content || detailAppId !== app.id || epoch !== detailEpoch) return;
+      app.blob = d.content;
+      if (d.updated_at) detailWorkSavedAt = d.updated_at;
+      saveApp(app).then(function() {
+        if (detailAppId === app.id) renderDetailView();
+      });
+    });
+  }
+  function detailLoadCheckpoints(owner, filename) {
+    loadCheckpoints(owner, filename).then(function() {
+      if (detailAppId) refreshCheckpoints();
+    }).catch(function() {
+      if (detailAppId) refreshCheckpoints();
+    });
+  }
+  function detailCheckpointPreview(id) {
+    var app = detailGetApp();
+    if (!app) return;
+    readCheckpoint(detailServerOwner(app), app.publishedFilename || "", id).then(function(b64) {
+      if (!b64) {
+        showNotice(t("wc.gone"));
+        return;
+      }
+      var view = document.getElementById("iframe-view");
+      var iframe = document.getElementById("app-iframe");
+      document.getElementById("iframe-title").textContent = (app.name || "App") + " — " + t("wc.previewTitle");
+      iframe.removeAttribute("src");
+      iframe.srcdoc = blobToHtml(b64);
+      setIframeUrl("");
+      delete iframe.dataset.appId;
+      view.hidden = false;
+    });
+  }
+  async function detailCheckpointRestore(id) {
+    var app = detailGetApp();
+    if (!app || detailCheckpointBusy) return;
+    if (!getCortexOwnerToken2()) {
+      showNotice(t("wc.loginNeeded"));
+      return;
+    }
+    if (!await showConfirm(t("wc.confirmRestore"))) return;
+    var owner = detailServerOwner(app);
+    var filename = app.publishedFilename || "";
+    detailCheckpointBusy = true;
+    refreshCheckpoints();
+    readCheckpoint(owner, filename, id).then(function(b64) {
+      if (!b64) throw new Error(t("wc.gone"));
+      return saveWorkingCopy({
+        owner,
+        filename,
+        previousB64: app.blob,
+        nextB64: b64,
+        note: t("wc.noteRestore")
+      }).then(function() {
+        return b64;
+      });
+    }).then(function(b64) {
+      app.blob = b64;
+      detailCheckpointBusy = false;
+      detailHasWorkCopy = true;
+      detailWorkSavedAt = (/* @__PURE__ */ new Date()).toISOString();
+      return saveApp(app).then(function() {
+        renderDetailView();
+        refreshCheckpoints();
+        showNotice(t("wc.restored"));
+      });
+    }).catch(function(err) {
+      detailCheckpointBusy = false;
+      refreshCheckpoints();
+      showNotice(err && err.message || t("wc.saveFailed"));
+    });
+  }
+  async function detailCheckpointDelete(id) {
+    var app = detailGetApp();
+    if (!app || detailCheckpointBusy) return;
+    if (!await showConfirm(t("wc.confirmDelete"))) return;
+    detailCheckpointBusy = true;
+    refreshCheckpoints();
+    deleteCheckpoint(detailServerOwner(app), app.publishedFilename || "", id).catch(function() {
+    }).then(function() {
+      detailCheckpointBusy = false;
+      refreshCheckpoints();
+    });
   }
   function promoteRef(app) {
     return detailServerOwner(app) + "/" + (app.publishedFilename || "");
@@ -5740,33 +6147,33 @@
   }
   function skillAuthHeaders(withJson) {
     var h = {};
-    var tok = getCortexOwnerToken2();
-    if (tok) h["Authorization"] = "Bearer " + tok;
+    var tok2 = getCortexOwnerToken2();
+    if (tok2) h["Authorization"] = "Bearer " + tok2;
     if (withJson) h["Content-Type"] = "application/json";
     return h;
   }
   function skillListMine() {
-    var base3 = skillApiBase();
-    if (!base3) return Promise.reject(new Error("No server configured"));
-    return fetch(base3 + "/v1/skills?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
+    var base4 = skillApiBase();
+    if (!base4) return Promise.reject(new Error("No server configured"));
+    return fetch(base4 + "/v1/skills?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
       return r.json();
     }).then(function(j) {
       return j.data && j.data.skills ? j.data.skills : [];
     });
   }
   function skillGetMine(name) {
-    var base3 = skillApiBase();
-    return fetch(base3 + "/v1/skills/" + encodeURIComponent(name) + "?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
+    var base4 = skillApiBase();
+    return fetch(base4 + "/v1/skills/" + encodeURIComponent(name) + "?scope=user", { headers: skillAuthHeaders(false) }).then(function(r) {
       return r.json();
     }).then(function(j) {
       return j.data && j.data.skill || null;
     });
   }
   function skillPublish(skillMd, files) {
-    var base3 = skillApiBase();
+    var base4 = skillApiBase();
     var body = { skill_md: skillMd };
     if (files && Object.keys(files).length) body.files = files;
-    return fetch(base3 + "/v1/skills", { method: "POST", headers: skillAuthHeaders(true), body: JSON.stringify(body) }).then(function(r) {
+    return fetch(base4 + "/v1/skills", { method: "POST", headers: skillAuthHeaders(true), body: JSON.stringify(body) }).then(function(r) {
       return r.json().then(function(j) {
         if (!j.ok) throw new Error(j.error && (j.error.message || j.error.code) || "HTTP " + r.status);
         return j.data && j.data.skill || null;
@@ -6199,6 +6606,7 @@
         return;
       }
       detailDraftBlob = htmlToBlob(newHtml);
+      detailLastChangeNote = change;
       statusEl.style.color = "#34d399";
       var usage = json.data && json.data.budget && typeof json.data.budget.spent_today_usd !== "undefined" ? " · " + t("detail.aiUsage") + ": $" + Number(json.data.budget.spent_today_usd).toFixed(3) : "";
       statusEl.textContent = "✔ " + t("detail.draftReady") + usage;
@@ -6230,17 +6638,55 @@
   function detailAiKeep() {
     var app = detailGetApp();
     if (!app || !detailDraftBlob) return;
-    app.blob = detailDraftBlob;
-    app.source = app.source === "url" ? "paste" : app.source || "paste";
-    app.url = app.url || null;
-    detailDraftBlob = null;
-    saveApp(app).then(function() {
-      renderApps();
-      renderDetailView();
+    var next = detailDraftBlob;
+    var prev = app.blob;
+    var statusEl = document.getElementById("detail-ai-status");
+    function finishLocal() {
+      app.blob = next;
+      app.source = app.source === "url" ? "paste" : app.source || "paste";
+      app.url = app.url || null;
+      detailDraftBlob = null;
+      return saveApp(app).then(function() {
+        renderApps();
+        renderDetailView();
+      });
+    }
+    if (!app.published || !app.publishedFilename || !getCortexOwnerToken2()) {
+      finishLocal().then(function() {
+        var s2 = document.getElementById("detail-ai-status");
+        if (s2) {
+          s2.style.color = "var(--text-muted)";
+          s2.textContent = t("wc.keptLocalOnly");
+        }
+      });
+      return;
+    }
+    if (statusEl) {
+      statusEl.style.color = "var(--text-muted)";
+      statusEl.textContent = t("wc.saving");
+    }
+    saveWorkingCopy({
+      owner: detailServerOwner(app),
+      filename: app.publishedFilename,
+      previousB64: prev,
+      nextB64: next,
+      note: detailLastChangeNote
+    }).then(function() {
+      detailHasWorkCopy = true;
+      detailWorkSavedAt = (/* @__PURE__ */ new Date()).toISOString();
+      return finishLocal();
+    }).then(function() {
+      refreshCheckpoints();
       var s2 = document.getElementById("detail-ai-status");
       if (s2) {
         s2.style.color = "#34d399";
-        s2.textContent = "✔ " + t("detail.kept");
+        s2.textContent = "✔ " + t("wc.saved");
+      }
+    }).catch(function(err) {
+      var s2 = document.getElementById("detail-ai-status");
+      if (s2) {
+        s2.style.color = "var(--accent)";
+        s2.textContent = "✘ " + (err && err.message || t("wc.saveFailed"));
       }
     });
   }
@@ -6253,9 +6699,9 @@
   function draftApi(method, owner, filename, sub, body) {
     var cfg = loadConfig();
     if (!cfg.aimeatUrl) return Promise.reject(new Error("Set the AIMEAT server URL in Settings first"));
-    var base3 = cfg.aimeatUrl.replace(/\/+$/, "");
+    var base4 = cfg.aimeatUrl.replace(/\/+$/, "");
     var path = "/v1/apps/" + encodeURIComponent(owner) + "/" + encodeURIComponent(filename) + "/" + sub;
-    return fetch(base3 + path, {
+    return fetch(base4 + path, {
       method,
       headers: { "Authorization": "Bearer " + getCortexOwnerToken2(), "Content-Type": "application/json" },
       body: body ? JSON.stringify(body) : void 0
@@ -6347,6 +6793,55 @@
       });
     });
   }
+  function detailWorkTry() {
+    var app = detailGetApp();
+    if (!app || !app.publishedFilename) return;
+    openStagingPreview(detailServerOwner(app), app.publishedFilename);
+  }
+  async function detailWorkPublish() {
+    var app = detailGetApp();
+    if (!app || !app.publishedFilename) return;
+    if (!getCortexOwnerToken2()) {
+      showNotice(t("wc.loginNeeded"));
+      return;
+    }
+    if (!await showConfirm(t("detail.draftPublishConfirm"))) return;
+    var owner = detailServerOwner(app);
+    draftApi("POST", owner, app.publishedFilename, "publish-draft").then(function(data) {
+      detailEpoch++;
+      detailHasWorkCopy = false;
+      detailWorkSavedAt = null;
+      app.publishedVersionNumber = data.version_number || app.publishedVersionNumber;
+      showNotice(t("detail.draftPublished").replace("{v}", data.version_number));
+      renderDetailView();
+      detailLoadVersions(owner, app.publishedFilename);
+      refreshAll();
+    }).catch(function(err) {
+      showNotice("✘ " + (err && err.message || "Publish failed"));
+    });
+  }
+  async function detailWorkDiscard() {
+    var app = detailGetApp();
+    if (!app || !app.publishedFilename) return;
+    if (!await showConfirm(t("wc.confirmDiscardWork"))) return;
+    var owner = detailServerOwner(app);
+    var cfg = loadConfig();
+    var aimeatUrl = (cfg.aimeatUrl || "").replace(/\/+$/, "");
+    discardWorkingCopy(owner, app.publishedFilename).then(function() {
+      return fetchAppContentBase64(aimeatUrl, owner, app.publishedFilename);
+    }).then(function(b64) {
+      app.blob = b64;
+      return saveApp(app);
+    }).catch(function() {
+    }).then(function() {
+      detailEpoch++;
+      detailHasWorkCopy = false;
+      detailWorkSavedAt = null;
+      renderDetailView();
+      refreshAll();
+      showNotice(t("wc.discardedWork"));
+    });
+  }
   function detailTestDraftLive() {
     var app = detailGetApp();
     if (!app || !detailDraftBlob) return;
@@ -6355,10 +6850,16 @@
   function detailPublishTestedDraft() {
     var app = detailGetApp();
     if (!app || !detailDraftBlob) return;
-    publishDraftBytes(app, detailDraftBlob, document.getElementById("detail-ai-status"), function() {
+    publishDraftBytes(app, detailDraftBlob, document.getElementById("detail-ai-status"), function(data) {
+      detailEpoch++;
+      app.blob = detailDraftBlob;
       detailDraftBlob = null;
-      refreshAll();
+      detailHasWorkCopy = false;
+      detailWorkSavedAt = null;
+      if (data && data.version_number) app.publishedVersionNumber = data.version_number;
+      saveApp(app);
       renderDetailView();
+      refreshAll();
     });
   }
   function sourceOverlayApp() {
@@ -6377,6 +6878,60 @@
     } catch (e) {
       return null;
     }
+  }
+  function saveSourceAsWorkingCopy() {
+    var app = sourceOverlayApp();
+    var b64 = sourceCurrentB64();
+    if (!app || b64 == null) return Promise.reject(new Error("No app"));
+    var statusEl = document.getElementById("source-draft-status");
+    var prev = app.blob;
+    var isOpenInDetail = detailAppId === app.id;
+    function localOnly() {
+      app.blob = b64;
+      return saveApp(app).then(function() {
+        renderApps();
+      });
+    }
+    if (!app.published || !app.publishedFilename || !getCortexOwnerToken2()) {
+      return localOnly().then(function() {
+        if (statusEl) {
+          statusEl.style.color = "var(--text-muted)";
+          statusEl.textContent = t("wc.keptLocalOnly");
+        }
+        return { persisted: false };
+      });
+    }
+    if (statusEl) {
+      statusEl.style.color = "var(--text-muted)";
+      statusEl.textContent = t("wc.saving");
+    }
+    return saveWorkingCopy({
+      owner: detailServerOwner(app),
+      filename: app.publishedFilename,
+      previousB64: prev,
+      nextB64: b64,
+      note: t("wc.noteManual")
+    }).then(function() {
+      return localOnly();
+    }).then(function() {
+      if (isOpenInDetail) {
+        detailHasWorkCopy = true;
+        detailWorkSavedAt = (/* @__PURE__ */ new Date()).toISOString();
+        renderDetailView();
+        refreshCheckpoints();
+      }
+      if (statusEl) {
+        statusEl.style.color = "#34d399";
+        statusEl.textContent = "✔ " + t("wc.saved");
+      }
+      return { persisted: true };
+    }).catch(function(err) {
+      if (statusEl) {
+        statusEl.style.color = "var(--accent)";
+        statusEl.textContent = "✘ " + (err && err.message || t("wc.saveFailed"));
+      }
+      throw err;
+    });
   }
   function sourceTestDraftLive() {
     var app = sourceOverlayApp();
@@ -6715,8 +7270,8 @@
       showNotice(t("common.loginRequired") || "You must be logged in to fork an app into your own catalogue. Sign in first.");
       return;
     }
-    var base3 = (filename || "app").replace(/\.html?$/i, "");
-    var suggested = base3 + "-fork.html";
+    var base4 = (filename || "app").replace(/\.html?$/i, "");
+    var suggested = base4 + "-fork.html";
     var newName = prompt(t("fork.prompt") || 'Fork "' + filename + '" into a new app.\n\nNew filename:', suggested);
     if (!newName) return;
     newName = newName.trim();
@@ -7122,7 +7677,7 @@
   // src/static/app-catalog/js/favorites.js
   var KEY2 = "app-catalog.favorites";
   var favSet = /* @__PURE__ */ new Set();
-  function base2() {
+  function base3() {
     return (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
   }
   function isFavorite(ref) {
@@ -7130,7 +7685,7 @@
   }
   function loadFavorites() {
     var token = getCortexOwnerToken();
-    var b = base2();
+    var b = base3();
     if (!token || !b) {
       favSet = /* @__PURE__ */ new Set();
       return Promise.resolve();
@@ -7147,7 +7702,7 @@
   }
   function persist2() {
     var token = getCortexOwnerToken();
-    var b = base2();
+    var b = base3();
     if (!token || !b) return Promise.resolve();
     return fetch(b + "/v1/memory", {
       method: "POST",
@@ -8224,7 +8779,7 @@
     }
   }
   function buildLibraryEntries(localApps, serverApps) {
-    var base3 = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
+    var base4 = (loadConfig().aimeatUrl || "").replace(/\/+$/, "");
     var byFilename = {};
     var entries = [];
     serverStateByFilename = {};
@@ -8254,7 +8809,7 @@
         filename: la.publishedFilename || null,
         owner: null,
         versionNumber: la.publishedVersionNumber || null,
-        viewUrl: la.publishedUrl ? base3 + la.publishedUrl : "",
+        viewUrl: la.publishedUrl ? base4 + la.publishedUrl : "",
         forkable: false,
         forks: 0
       };
@@ -8277,7 +8832,7 @@
         m.hasDraft = !!sa.has_draft;
         m.hasAgents = shipsAgent;
         m.protection = prot;
-        m.viewUrl = base3 + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn);
+        m.viewUrl = base4 + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn);
         if (!m.description && sa.manifest && sa.manifest.description) m.description = sa.manifest.description;
       } else {
         var se = {
@@ -8302,7 +8857,7 @@
           filename: fn,
           owner: sa.owner || "",
           versionNumber: sa.version_number || null,
-          viewUrl: base3 && fn ? base3 + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn) : "",
+          viewUrl: base4 && fn ? base4 + "/v1/apps/" + encodeURIComponent(sa.owner || "") + "/" + encodeURIComponent(fn) : "",
           forkable: !!sa.forkable,
           forks: sa.forks || 0,
           protection: prot,
@@ -8319,6 +8874,9 @@
           owner: sa.owner || "",
           versionNumber: sa.version_number || null,
           protection: prot,
+          // A saved (unpublished) working copy from ANY earlier session — the detail view's
+          // lifecycle band reads this to say "working copy saved" instead of "same as published".
+          hasDraft: !!sa.has_draft,
           // `protected` is the ACCESS-CODE flag (distinct from copy-`protection`); the detail view's
           // access-code editor reads it to show whether the app currently requires a code.
           accessCode: !!sa.protected
@@ -8814,6 +9372,12 @@
     detailAiDiscard,
     detailTestDraftLive,
     detailPublishTestedDraft,
+    detailWorkTry,
+    detailWorkPublish,
+    detailWorkDiscard,
+    detailCheckpointPreview,
+    detailCheckpointRestore,
+    detailCheckpointDelete,
     openStagingPreview,
     detailEditSource,
     detailImproveExternal,
@@ -9219,40 +9783,26 @@
     document.getElementById("save-source-btn").addEventListener("click", function() {
       var overlay = document.getElementById("source-overlay");
       var textarea = document.getElementById("source-code");
-      var appId = overlay.dataset.appId;
       var btn = this;
-      if (!appId) {
+      if (!overlay.dataset.appId) {
         showNotice("Cannot save: no app ID found.");
         return;
       }
       var newSource = textarea.value;
-      var newBlob = btoa(unescape(encodeURIComponent(newSource)));
-      var app = null;
-      for (var i = 0; i < allApps.length; i++) {
-        if (allApps[i].id === appId) {
-          app = allApps[i];
-          break;
-        }
-      }
-      if (!app) {
-        showNotice("App not found in library.");
-        return;
-      }
-      app.blob = newBlob;
-      btn.textContent = "Saving...";
+      var idle = t("source.save");
+      btn.textContent = t("wc.saving");
       btn.disabled = true;
-      saveApp(app).then(function() {
-        btn.textContent = "Saved!";
+      saveSourceAsWorkingCopy().then(function() {
+        btn.textContent = t("wc.savedShort");
         overlay.dataset.originalSource = newSource;
         setTimeout(function() {
-          btn.textContent = "Save Changes";
+          btn.textContent = idle;
           btn.disabled = true;
         }, 1500);
-        renderApps4();
       }).catch(function(err) {
-        btn.textContent = "Save Changes";
+        btn.textContent = idle;
         btn.disabled = false;
-        showNotice("Failed to save: " + (err.message || err));
+        showNotice((t("wc.saveFailed") || "Failed to save") + ": " + (err && err.message || err));
       });
     });
     async function closeSourceModal() {

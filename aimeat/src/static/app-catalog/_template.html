@@ -311,13 +311,14 @@
       <div class="modal-actions">
         <button class="modal-btn secondary" id="copy-source-btn" data-i18n="source.copy">Copy Source</button>
         <button class="modal-btn primary" id="copy-prompt-btn" data-i18n="source.copyPrompt">Copy with AI Prompt</button>
-        <button class="modal-btn secondary" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
-        <!-- Real-origin staging (published apps only; toggled in viewSource). Same server-draft
-             path as the AI loop: test the edited source on a real origin, then publish it. -->
-        <button class="modal-btn primary" id="source-test-live-btn" hidden data-i18n="detail.testLive">Test on real origin</button>
-        <button class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="detail.publishTested">Publish tested version</button>
+        <!-- The three canonical verbs, identical to the detail view's AI loop (TARGET-048):
+             save (private, checkpointed) → try (real origin, live untouched) → publish (public). -->
+        <button class="modal-btn primary" id="save-source-btn" disabled data-i18n="source.save">Save working copy</button>
+        <button class="modal-btn secondary" id="source-test-live-btn" hidden data-i18n="wc.try">Try it safely</button>
+        <button class="modal-btn success" id="source-publish-tested-btn" hidden data-i18n="wc.publishNew">Publish as a new version</button>
         <button class="modal-btn secondary" id="close-source-btn" data-i18n="common.close">Close</button>
       </div>
+      <p class="wc-verbs-hint" data-i18n="wc.verbsHint">Save keeps it for you only. Try opens it on its real address without changing the live app. Publish is what other people see.</p>
     </div>
   </div>
 

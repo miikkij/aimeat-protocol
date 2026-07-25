@@ -1144,6 +1144,33 @@
     .dtl-sync.diff { background: rgba(245,158,11,.14); color: #f59e0b; }
     .dtl-sync.none { background: var(--bg-subtle); color: var(--text-muted); }
 
+    /* ── Working copy → published lifecycle band (TARGET-048) ──────────────────
+       Replaces the old two-number STATUS card: two labelled stops that say, in plain words, who
+       can see what. The active stop is highlighted so "where is my work" is answerable at a glance. */
+    .wc-row { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+    .wc-band { flex: 1; min-width: 240px; display: flex; align-items: stretch; gap: 10px; flex-wrap: wrap; }
+    .wc-stop {
+      display: flex; flex-direction: column; gap: 2px;
+      padding: 10px 12px; border-radius: 10px;
+      border: 1px solid var(--border-subtle); background: var(--bg-subtle);
+      min-width: 150px; flex: 1;
+    }
+    .wc-stop.is-active { border-color: rgba(245, 158, 11, .55); background: rgba(245, 158, 11, .10); }
+    .wc-stop.is-live { border-color: rgba(52, 211, 153, .45); background: rgba(52, 211, 153, .10); }
+    .wc-stop-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
+    .wc-stop-val { font-size: .95rem; font-weight: 700; color: var(--text); }
+    .wc-stop-note { font-size: .75rem; color: var(--text-muted); }
+    .wc-arrow { align-self: center; color: var(--text-muted); font-size: 1.1rem; }
+    .wc-explain { font-size: .88rem; color: var(--text); line-height: 1.5; margin: 12px 0 10px; }
+    .wc-size { font-size: .75rem; color: var(--text-muted); margin: 8px 0 0; }
+    .wc-muted { color: var(--text-muted); font-size: .85rem; }
+    /* One-line reminder of what the three verbs do — shown under both button rows so the source
+       editor and the AI loop explain themselves identically. */
+    .wc-verbs-hint { font-size: .78rem; color: var(--text-muted); line-height: 1.45; margin: 10px 0 0; }
+    .wc-proposal-head { margin: 0 0 8px; }
+    .wc-ckpt-when { display: block; font-size: .85rem; font-weight: 600; color: var(--text); }
+    .wc-ckpt-note { display: block; font-size: .78rem; color: var(--text-muted); }
+
     .dtl-meta-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 12px; }
     .dtl-meta-item .dtl-meta-label { font-size: .7rem; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); }
     .dtl-meta-item .dtl-meta-val { font-size: .9rem; color: var(--text); word-break: break-word; }

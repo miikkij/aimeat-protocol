@@ -109,6 +109,31 @@ export function registerDraftRoutes(
         ]));
     });
 
+    // GET /v1/apps/:owner/:filename/draft — read your OWN draft back (base64). The write side has
+    // always existed (PUT/publish/discard) but there was no way to READ the slot, so a client that
+    // reloaded could only re-fetch the LIVE bytes — and would then show the published app while
+    // calling it "your working copy", silently overwriting the real draft on the next save. Serving
+    // it through the ?preview= URL is not an option for a client: on an app-origin node that path
+    // 301s to the isolated origin, which is deliberately cross-origin and CORS-less.
+    // Owner-only: canonicalOwner resolves the caller, so a draft is never readable by anyone else.
+    router.get('/v1/apps/:owner/:filename/draft', requireAuth(), async (req, res) => {
+        const filename = req.params.filename as string;
+        const { ownerGhii } = await canonicalOwner(req);
+        const draft = await storage.getAppDraft(ownerGhii, filename);
+        if (!draft) {
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft exists for "${filename}".`));
+            return;
+        }
+        res.json(success(config.nodeId, {
+            filename,
+            content: Buffer.from(draft.data).toString('base64'),
+            mime_type: draft.mimeType,
+            size: draft.size,
+            updated_at: draft.updatedAt,
+            manifest: draft.manifest,
+        }));
+    });
+
     // POST /v1/apps/:owner/:filename/draft/preview-token — mint a short-lived preview
     // URL for the draft. On a node with the app origin ON, the URL points at the
     // isolated app origin (a real, session-less origin where getUserMedia works); with

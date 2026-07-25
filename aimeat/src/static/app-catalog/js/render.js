@@ -272,6 +272,9 @@ function buildLibraryEntries(localApps, serverApps) {
       serverStateByFilename[fn] = {
         parked: !!sa.parked, forkable: !!sa.forkable, forks: sa.forks || 0,
         owner: sa.owner || '', versionNumber: sa.version_number || null, protection: prot,
+        // A saved (unpublished) working copy from ANY earlier session — the detail view's
+        // lifecycle band reads this to say "working copy saved" instead of "same as published".
+        hasDraft: !!sa.has_draft,
         // `protected` is the ACCESS-CODE flag (distinct from copy-`protection`); the detail view's
         // access-code editor reads it to show whether the app currently requires a code.
         accessCode: !!sa.protected
