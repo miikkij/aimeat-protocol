@@ -14,6 +14,10 @@
  * @usage <script src="/v1/libs/aimeat-markdown.js"></script>  AIMEAT.md.render(md, '#out')
  * @version-history
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-markdown.ts (SDK-libs migration Phase 2).
+ *   v1.1.0 — 2026-07-25 — Added AIMEAT.md.citations(text): pulls `Source:`/`Sources:` lines, inline
+ *     lenticular 【url】 citations and bare URLs out of LLM prose into one source list (host +
+ *     shortener flag). Every app rendering agent output had hand-rolled this, and the hand-rolled
+ *     URL regexes kept including the closing 】 in the href.
  */
 import { NODE_URL } from '../_core/config.js';
 import { attach } from '../_core/namespace.js';
@@ -519,4 +523,48 @@ function injectCss() {
 }
 injectCss();
 
-attach('md', { render: render, renderToString: renderToString, renderRich: renderRich, sanitizeHref: sanitizeHref, sanitizeImgSrc: sanitizeImgSrc });
+// ── citations ───────────────────────────────────────────────────────────────
+// LLM-written prose cites its sources in at least three conventions, often mixed
+// inside ONE document: a trailing `Source:`/`Sources:` line, inline lenticular
+// 【https://…】 brackets (a model artifact no markdown renderer linkifies, so it
+// renders as literal junk), and bare inline URLs. Every app that displays agent
+// output re-invented this parse, and the hand-rolled URL regexes kept forgetting
+// to exclude 】 — which silently puts the bracket inside the href and breaks the
+// link. One implementation, here, next to the renderer that consumes it.
+var CITE_URL_RE = /https?:\/\/[^\s,;)\]}"'【】]+/g;
+
+// Link shorteners hide their destination, so a UI cannot show a trustworthy
+// publisher name for them. Reported separately rather than silently.
+var SHORTENERS = ['lnkd.in', 'bit.ly', 't.co', 'ow.ly', 'tinyurl.com', 'buff.ly', 'goo.gl', 'is.gd', 'rb.gy'];
+
+/**
+ * Split cited sources out of prose.
+ * @param {string} text
+ * @param {{stripInline?: boolean}} [opts] stripInline (default true): remove the
+ *   bracketed/trailing citation noise from `body`. Bare inline URLs are left in place.
+ * @returns {{body: string, sources: Array<{url: string, host: string, shortened: boolean}>}}
+ */
+function citations(text, opts) {
+  var strip = !opts || opts.stripInline !== false;
+  var body = String(text == null ? '' : text);
+  var seen = Object.create(null);
+  var out = [];
+  function push(u) {
+    u = String(u).replace(/[.,;:]+$/, '');
+    if (!u || seen[u]) return;
+    seen[u] = 1;
+    var host;
+    try { host = new URL(u).hostname.replace(/^www\./, ''); } catch { host = ''; }
+    out.push({ url: u, host: host, shortened: SHORTENERS.indexOf(host) >= 0 });
+  }
+  body = body.replace(/【\s*(https?:\/\/[^】\s]+)\s*】/g, function (m, u) { push(u); return strip ? '' : m; });
+  body = body.replace(/^[ \t]*Sources?[ \t]*:[ \t]*(.*)$/gim, function (m, rest) {
+    (String(rest).match(CITE_URL_RE) || []).forEach(push);
+    return strip ? '' : m;
+  });
+  (body.match(CITE_URL_RE) || []).forEach(push);
+  if (strip) body = body.replace(/[ \t]+$/gm, '').replace(/\n{3,}/g, '\n\n').trim();
+  return { body: body, sources: out };
+}
+
+attach('md', { render: render, renderToString: renderToString, renderRich: renderRich, sanitizeHref: sanitizeHref, sanitizeImgSrc: sanitizeImgSrc, citations: citations });

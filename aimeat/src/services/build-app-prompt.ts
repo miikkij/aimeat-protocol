@@ -12,6 +12,13 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-07-25 — Fleet-facing app sections, all three born from real DESK build failures: "Reading
+ *     data your AGENTS produced" (agent keys live under the agent GAII; an app-grant token needs
+ *     ownerScope/agent explicitly, so an unscoped list() returns [] and the app looks empty; meta/
+ *     count for listings; the task:<id> tag rather than the optional deliverableKey), "Live updates
+ *     without a firehose" (the memory domain is continuous on an active fleet; keyPrefix/minIntervalMs
+ *     gates; never repaint a surface the user is reading), and "Before you call it done" (three
+ *     viewports incl. 1280x460, repaint count on the open dialog, network log after idle).
  *   2026-07-25 — Theme system v2: the two-axis model (data-theme mode × data-palette look, five
  *     designed palettes), the head restore snippet covers both axes, typography/elevation/motion
  *     tokens documented, the control-cluster rule (language + mode + palette all live in the pill),
@@ -172,6 +179,21 @@ export function buildAppPrompt(
   body += 'A key is a plain string: `get(key)` / `getPublic(gaii, key)` always return the LATEST value — never append a version, index or `:0`/`:N` suffix to a key, and read back the SAME key you wrote (a store-as-`x` / read-as-`x:0` mismatch just 404s and your UI shows nothing). To page a large list, store it as ONE array under one key (or shard with your OWN explicit id scheme), not a magic version suffix.\n';
   body += 'Shared feeds, journals, comments and discussions are ALL built this way — one public key per entry, `getPublic()` to read others\'. Never reach for Boards (deprecated, removal-bound) or organism workspaces as an app\'s data layer. When a rule must be enforced server-side (only-author-can-delete, one-vote-per-user), that logic goes into an extension — see the extension guide, not into boards/organisms.\n\n';
 
+  // Reading what the owner's AGENTS produced. This is the single most common "my app shows
+  // nothing" cause for fleet-facing apps: agent output is NOT in the owner's namespace, and an
+  // app-grant token gets no automatic broadening, so an unscoped list() legitimately returns [].
+  body += '### Reading data your AGENTS produced (not your own keys)\n';
+  body += 'An agent publishes under **its own** namespace (`agentname#owner@node`), NOT the owner\'s. Your app token is role `app`, which gets no automatic owner-scope broadening — so a plain `list({prefix})` returns NOTHING for agent data and the app looks empty while the data is right there. Say which namespace you mean:\n';
+  body += '```javascript\n';
+  body += '// every same-owner namespace (owner GHII + all their agents) — the usual choice:\n';
+  body += 'const { items } = await AIMEAT.data.list({ prefix: "crews.", ownerScope: true, meta: true });\n';
+  body += '// one specific agent (full GAII), e.g. from AIMEAT.agents.list():\n';
+  body += 'const mine = await AIMEAT.data.list({ prefix: "watch.", agent: "uutisankka#alice@node-id" });\n';
+  body += 'const value = await AIMEAT.data.get(items[0].key, { agent: items[0].owner_gaii });\n';
+  body += '```\n';
+  body += '**`meta: true` on any listing you render as a table/board/archive.** The default response inlines EVERY value, so a fleet-wide prefix can be megabytes on each load; `meta` returns keys + `bytes` + `tags` + `updated_at` and you fetch a value only when the user opens that row. `count: true` (or `AIMEAT.data.count({prefix})`) returns just a number — the cheap way to ask "did anything change?".\n';
+  body += 'Each listed item carries `owner_gaii` (which namespace it lives in) and `tags`. Agent task-runners commonly tag their published output `task:<taskId>`, which is how you tie a record back to the task that produced it — `task.deliverableKey` is OPTIONAL and many agents never set it, so never require that field to find a result. `AIMEAT.agents.deliverable()` already falls back to the tag.\n\n';
+
   // Public Intake — the ONLY way an anonymous (not-logged-in) visitor can submit data into an owner's
   // space. Every other write path requires auth, so lead/contact/feedback/RSVP/survey forms need this.
   body += '### Collecting input from anonymous visitors (Public Intake)\n';
@@ -232,6 +254,18 @@ export function buildAppPrompt(
   body += '// 3) for low-latency P2P, GET /v1/realtime/ice-servers and use WebRTC\n';
   body += '```\n';
   body += 'Simpler apps can skip rooms and just observe shared AIMEAT.data keys on a timer.\n\n';
+
+  // Live updates — the firehose trap. Correct-looking code that makes the app poll forever
+  // and repaint over the user, on any account with more than a couple of active agents.
+  body += '### Live updates without a firehose (aimeat-live.js)\n';
+  body += '`AIMEAT.live.subscribe(["memory"], reload)` means "call me whenever ANY of this owner\'s memory changed". On an account with an active agent fleet that is near-continuous, so a handler that re-fetches a full listing turns one agent\'s activity into a permanent poll. Gate it:\n';
+  body += '```javascript\n';
+  body += '// fire only when the number of keys under a prefix actually changed:\n';
+  body += 'AIMEAT.live.subscribe(["memory"], reload, { keyPrefix: "crews.", ownerScope: true });\n';
+  body += 'AIMEAT.live.subscribe(["memory"], reload, { minIntervalMs: 10000 });   // or just rate-limit\n';
+  body += '```\n';
+  body += 'The change frame carries a DOMAIN name, never the key that changed, so `keyPrefix` is a client-side count gate: it catches a NEW key, not an in-place update of an existing one. Use `minIntervalMs` for update-sensitive views.\n';
+  body += '**Never let a live event repaint a surface the user is currently reading.** If a dialog/detail view is open, refresh its data in the background and leave the visible content alone — only an explicit user action should replace it. Rebuilding a list or blanking a pane to "Loading…" on every event is what makes an app flicker, and it looks like a crash, not a refresh. Also: render into a detached element and swap it in one operation instead of clearing then filling.\n\n';
 
   // Agent face — the markdown read-surface agents get on the app URL
   body += '### Agent face (markdown read-surface for agents)\n';
@@ -327,6 +361,17 @@ export function buildAppPrompt(
   body += '    smallestText: sizes[sizes.length-1], overflowPx: d.scrollWidth - d.clientWidth }; })()\n';
   body += '```\n';
   body += 'Pass: `typeSteps.length >= 3`, `overflowPx === 0`, `primary` resolves to the active palette\'s brand token (the coral under the default palette), `biggestText` is genuinely the most important thing on the page (if it is a decorative glyph or the page title, your hierarchy is upside down), and `smallestText >= 11` — note daisyUI renders `badge-xs` at 10px, so prefer `badge-sm` for anything a user has to read.\n\n';
+
+  // Publish gate for dialogs + live data. Both bugs this encodes shipped from checks that
+  // PASSED: an overlay verified only at 390px (it rendered below the footer on desktop), and a
+  // "0 console errors" reading on an app that repainted its open dialog every second. Proxy
+  // measurements generalise badly; these three are the actual behaviours.
+  body += '### Before you call it done: measure it, do not glance at it\n';
+  body += 'A clean console, compiling JS and one screenshot at one size prove almost nothing. If the app has a **dialog/overlay** or reads **live data**, run these three and report the numbers:\n';
+  body += '1. **Three viewports, every interactive surface**: 390x844, 1280x900 and **1280x460**. The short one is the one that catches it: a centred/overlay panel that looks perfect at 900px high often clips its own top, becomes unscrollable, or renders below the page at 460px. Check `document.documentElement.scrollWidth - clientWidth === 0` at each, and that the dialog\'s top edge is >= 0 and its close control reachable.\n';
+  body += '2. **Live channel connected, dialog open, count the repaints.** Put a `MutationObserver` on the open panel\'s content node and watch for 20 seconds while other work is happening on the account. Expected: **zero**. Anything above zero means a live event is repainting a surface the user is reading.\n';
+  body += '3. **Read the network log after 60 idle seconds.** A repeating full listing is a bug even when nothing visibly breaks: it is a poll you did not intend. Gate it (see the live-updates section) so an idle app is idle.\n';
+  body += 'Verify the FEATURE too, not just the render: perform the real interaction (commission the thing, save the thing, delete the thing) and confirm the result actually appears and persists. "It did not crash" is not a pass.\n\n';
 
   // Game form language — palette alone reads as a dashboard; the FORM LANGUAGE makes the game.
   // Born from pitfall app/candy-palette-alone-is-not-a-game-look (TOWER TETRIS, 2026-07-19).

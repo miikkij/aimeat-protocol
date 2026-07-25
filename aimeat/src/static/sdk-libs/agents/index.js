@@ -12,6 +12,10 @@
  *   const { task, deliverable } = await AIMEAT.agents.run('my-agent', { description: '…' });
  * @version-history
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-agents.ts (SDK-libs migration Phase 1).
+ *   v1.1.0 — 2026-07-25 — createTask() forwards scope/verification/rules/resources (previously it
+ *     sent only title+description+status, so an app could not tag its own runs through this library
+ *     and had to hand-roll the POST). deliverable() falls back to the `task:<id>` memory tag when the
+ *     agent never set task.deliverableKey. Additive.
  */
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-agents.js');
@@ -53,7 +57,14 @@ var agents = {
   },
 
   /** Commission a task for an agent. Returns the created task ({ id, status, ... }).
-   *  Created 'queued' by default; task-runner agents auto-activate it. */
+   *  Created 'queued' by default; task-runner agents auto-activate it.
+   *
+   *  task.scope: [{ name, value, type }] — app-defined tags stored ON the task. This is how
+   *  an app finds its own runs again later: filter `tasks({status:'done'})` on a tag you set,
+   *  instead of trying to parse the agent's memory-key slug. Pass the same array in a
+   *  schedule's `task_template.scope` so scheduled runs carry it too.
+   *  task.verification: { user_expects, technical_checks } — what a good result looks like.
+   *  Both were silently dropped before v1.1.0. */
   async createTask(name, task) {
     if (!task || !task.description) throw new Error('createTask requires { description }');
     var body = {
@@ -61,6 +72,22 @@ var agents = {
       description: task.description,
       status: task.status || 'queued',
     };
+    if (Array.isArray(task.scope) && task.scope.length) {
+      body.scope = task.scope.map(function (s) {
+        return { name: s.name, value: String(s.value), type: s.type || 'text',
+          ...(s.description ? { description: s.description } : {}) };
+      });
+    }
+    if (task.verification) {
+      // Accept either casing; the route reads snake_case.
+      var v = task.verification;
+      body.verification = {
+        user_expects: v.user_expects != null ? v.user_expects : (v.userExpects || ''),
+        technical_checks: v.technical_checks || v.technicalChecks || [],
+      };
+    }
+    if (task.rules) body.rules = task.rules;
+    if (task.resources) body.resources = task.resources;
     var data = unwrap(await authFetch('/v1/agents/' + enc(name) + '/tasks', {
       method: 'POST', body: JSON.stringify(body),
     }), 'create task');
@@ -118,12 +145,23 @@ var agents = {
    *  agent's memory. Returns { key, value } | { key, gone:true } | null. */
   async deliverable(name, id) {
     var task = await agents.getTask(name, id);
-    var key = task && task.deliverableKey;
-    if (!key) return null;
-    var data = unwrap(await authFetch('/v1/memory?agent=' + enc(task.agentGaii) + '&prefix=' + enc(key) + '&per_page=20'), 'read deliverable');
-    var items = data.items || [];
-    var found = items.find(function (i) { return i.key === key; });
-    return found ? { key: key, value: found.value } : { key: key, gone: true };
+    if (!task) return null;
+    var key = task.deliverableKey;
+    if (key) {
+      var data = unwrap(await authFetch('/v1/memory?agent=' + enc(task.agentGaii) + '&prefix=' + enc(key) + '&per_page=20'), 'read deliverable');
+      var found = (data.items || []).find(function (i) { return i.key === key; });
+      return found ? { key: key, value: found.value } : { key: key, gone: true };
+    }
+    // deliverableKey is OPTIONAL and plenty of task-runner agents never set it — they just
+    // publish their output and tag the record `task:<taskId>`. Requiring the field made those
+    // results look like "no deliverable", so fall back to the tag.
+    var byTag = unwrap(await authFetch('/v1/memory?agent=' + enc(task.agentGaii) +
+      '&tags=' + enc('task:' + id) + '&per_page=20'), 'read deliverable by tag');
+    var items = (byTag.items || []).slice().sort(function (a, b) {
+      return String(b.updated_at || '').localeCompare(String(a.updated_at || ''));
+    });
+    if (items.length) return { key: items[0].key, value: items[0].value, viaTag: true };
+    return null;
   },
 
   /** Read a specific memory entry under an agent's namespace (or null). */

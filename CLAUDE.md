@@ -33,7 +33,15 @@ Full guide: `docs/coding-guidelines/testing-requirements.md`
 
 When a frontend change is **finished** (a view/component/feature is done, not mid-development): against the running dev server (`pnpm dev`, port 40050), navigate to the page, reach the authenticated state, perform the real interactions (click/type/submit), and confirm the expected result actually happens (elements appear, data persists, edits/deletes take effect) — not just that the page didn't crash. Screenshot as evidence when useful.
 
-**Trigger:** any completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `public/locales/`, or `*.html`. **Report what you actually observed**; if you couldn't drive the browser (MCP unavailable, server down, no creds), say so rather than claiming it works.
+**Trigger:** any completed change to `public/views/`, `public/components/`, `public/js/`, `public/css/`, `public/locales/`, or `*.html`, **or a published single-file AIMEAT app** (`aimeat_app_publish`). **Report what you actually observed**; if you couldn't drive the browser (MCP unavailable, server down, no creds), say so rather than claiming it works.
+
+**Measure, don't glance — mandatory when the surface has a dialog/overlay or reads live data.** A clean console, compiling JS and one screenshot at one size are proxies, and proxies generalise badly: an overlay verified only at 390px shipped rendering below the footer on desktop, and an app reported as "0 console errors" was repainting its open dialog every second. Run all three and report the numbers:
+
+1. **Three viewports, every interactive surface:** 390x844, 1280x900 and **1280x460**. The short viewport is the one that catches centring/overlay bugs (clipped top, unscrollable, rendered below the page). At each: `scrollWidth - clientWidth === 0`, dialog top edge >= 0, close control reachable.
+2. **Live channel connected, dialog open, count repaints:** `MutationObserver` on the open panel's content node, 20s while other activity happens on the account. **Expected zero.** Above zero = a live event is repainting what the user is reading.
+3. **Network log after 60 idle seconds:** a repeating full listing is a bug even when nothing visibly breaks — it's an unintended poll.
+
+Then verify the **feature**, not the render: perform the real interaction and confirm the result appears and persists. "It didn't crash" is not a pass. Same gate is served to app builders in `build-app-prompt.ts` ("Before you call it done").
 
 ### Rule 2: Source File Headers Required
 
