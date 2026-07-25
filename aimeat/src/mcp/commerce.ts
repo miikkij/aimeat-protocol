@@ -89,7 +89,10 @@ export function registerCommerceTools(
         },
         annotationsFor('aimeat_commerce_psp_set'),
         async ({ provider, secret_key }) => {
-            await putOwnerRecord(PSP_KEY, { provider, secretKey: secret_key }, 'private', ['commerce']);
+            // MERGE: the same record also holds the seller's x402 USDC payout address. Replacing it
+            // wholesale would silently delete the other rail's setting (and vice versa).
+            const existing = (await storage.getMemory(ownerGhii, PSP_KEY))?.value as Record<string, unknown> | undefined;
+            await putOwnerRecord(PSP_KEY, { ...(existing ?? {}), provider, secretKey: secret_key }, 'private', ['commerce']);
             return ok({ configured: true, provider, key_hint: maskSecret(secret_key), note: 'Stored server-side; money sales settle on this PSP account. The secret is never returned by any tool.' });
         },
     );

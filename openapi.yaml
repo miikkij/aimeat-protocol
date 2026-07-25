@@ -11654,6 +11654,53 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/commerce/payout:
+    get:
+      operationId: commercePayoutStatus
+      summary: Which payout rails can pay you, and what each needs (owner) (TARGET-042)
+      description: >
+        The seller's settlement rails reported apart, because they are different things: **Stripe** moves
+        real currency (EUR/USD) to a connected account through a provider that holds the funds, while
+        **x402** settles USDC on-chain straight to an address you control, non-custodially, with the node
+        holding no key. Returns `{ x402: { enabled, network, testnet, configured, address, currency, note },
+        stripe: { configured, provider, currencies, note } }`. A money sale over x402 with no address fails
+        with SELLER_NO_X402_ADDRESS — this is the read that tells you before it happens.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/commerce/payout/x402:
+    put:
+      operationId: commercePayoutX402Set
+      summary: Set your USDC (x402) payout address (owner) (TARGET-042)
+      description: >
+        Stores the EVM account address a stablecoin sale settles to. MERGED into your payment-settings
+        record: your Stripe credentials in the same record are untouched (and the reverse holds — setting
+        Stripe no longer clears this). 400 INVALID_ADDRESS unless the value is `0x` + 40 hex characters.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [address], properties: {
+          address: { type: string, description: "EVM account address: 0x followed by 40 hex characters." } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+    delete:
+      operationId: commercePayoutX402Clear
+      summary: Remove your USDC (x402) payout address (owner) (TARGET-042)
+      description: >
+        Clears only the payout address. Card and invoice settlement through your Stripe credentials is
+        unaffected; USDC sales fail until an address is set again.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+
   /v1/commerce/checkout-sessions:
     get:
       operationId: listCheckoutSessions

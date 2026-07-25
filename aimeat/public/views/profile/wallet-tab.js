@@ -3,6 +3,9 @@
  * @description Profile tab for morsel wallet: balance overview, lifetime stats,
  *   morsel request form, and transaction history with expandable details.
  * @version-history
+ *   v1.5.0 — 2026-07-25 — Payout rails: an x402 USDC payout-address section beside the Stripe one, so a
+ *     seller can set the address a stablecoin sale settles to and tell the two rails apart (Stripe moves
+ *     fiat through a provider; x402 settles USDC on-chain to an address the seller controls).
  *   v1.0.0 — 2026-03-16 — Initial wallet tab
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
  *   v1.2.0 — 2026-05-22 — Show info message for federated users instead of infinite spinner
@@ -79,6 +82,62 @@ function PspSection() {
         <button class="btn-primary btn-sm" disabled=${busy || keyIn.trim().length < 8} onClick=${save}>${t('profile.wallet.pspSave')}</button>
         ${psp.configured && html`<button class="btn-ghost btn-sm" disabled=${busy} onClick=${remove}>${t('profile.wallet.pspRemove')}</button>`}
       </div>
+      ${msg && html`<span class="text-meta">${msg}</span>`}
+    </div>`;
+}
+
+/* "Stablecoin payouts (x402)" — the seller's USDC payout address.
+ * A different rail from Stripe, and the difference matters at sale time: Stripe settles EUR/USD to a
+ * connected account through a provider that holds the funds; x402 settles USDC on-chain straight to
+ * this address, non-custodially, with the node holding no key. A money sale over x402 without an
+ * address fails with SELLER_NO_X402_ADDRESS, which is exactly what this section prevents. */
+function X402Section() {
+  const [state, setState] = useState(null);
+  const [addr, setAddr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const load = useCallback(() => {
+    apiGet('/v1/commerce/payout').then(r => setState(r.data ?? null)).catch(() => setState(false));
+  }, []);
+  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const handler = () => load();
+    window.addEventListener('aimeat-live-update', handler);
+    return () => window.removeEventListener('aimeat-live-update', handler);
+  }, [load]);
+  if (state === null || state === false) return null;
+  const x = state.x402 || {};
+  if (!x.enabled) return null;              // the operator has not enabled the rail on this node
+  const valid = /^0x[a-fA-F0-9]{40}$/.test(addr.trim());
+  async function save() {
+    setBusy(true); setMsg('');
+    try { await apiPut('/v1/commerce/payout/x402', { address: addr.trim() }); setAddr(''); setMsg(t('profile.wallet.x402Saved')); load(); }
+    catch (e) { setMsg(e.message || 'Save failed'); }
+    finally { setBusy(false); }
+  }
+  async function remove() {
+    setBusy(true); setMsg('');
+    try { await apiDelete('/v1/commerce/payout/x402'); setMsg(t('profile.wallet.x402Removed')); load(); }
+    catch (e) { setMsg(e.message || 'Remove failed'); }
+    finally { setBusy(false); }
+  }
+  return html`
+    <div class="section-title mt-2">${t('profile.wallet.x402Title')}</div>
+    <div class="section-desc">${t('profile.wallet.x402Desc')}</div>
+    <div class="card wallet-psp">
+      <div class="wallet-rail-row">
+        ${x.configured
+          ? html`<span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.x402Configured')} <code>${x.address}</code></span>`
+          : html`<span class="pf-psp-chip pf-psp-chip--warn">${t('profile.wallet.x402Missing')}</span>`}
+        <span class="pf-psp-chip">${x.currency} · ${x.network}${x.testnet ? ` · ${t('profile.wallet.x402Testnet')}` : ''}</span>
+      </div>
+      <div class="wallet-psp-row">
+        <input class="input-field input-sm wallet-psp-input" type="text" spellcheck="false" placeholder="0x…"
+               value=${addr} onInput=${(e) => setAddr(e.target.value)} />
+        <button class="btn-primary btn-sm" disabled=${busy || !valid} onClick=${save}>${t('profile.wallet.x402Save')}</button>
+        ${x.configured && html`<button class="btn-ghost btn-sm" disabled=${busy} onClick=${remove}>${t('profile.wallet.x402Remove')}</button>`}
+      </div>
+      ${addr.trim() && !valid && html`<span class="text-meta">${t('profile.wallet.x402Invalid')}</span>`}
       ${msg && html`<span class="text-meta">${msg}</span>`}
     </div>`;
 }
@@ -247,6 +306,7 @@ export default function WalletTab({ session, showToast, onStats }) {
 
     <!-- Selling & payment provider (individual seller's own Stripe key; EE nodes only) -->
     <${PspSection} />
+    <${X402Section} />
 
     <!-- Real-money (EUR/USD) purchases & sales, separate from the morsel ledger -->
     <${MoneyActivity} initial=${moneyInitial} />
