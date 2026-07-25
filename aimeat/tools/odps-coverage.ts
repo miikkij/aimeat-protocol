@@ -1,18 +1,21 @@
 /**
  * @file tools/odps-coverage.ts
- * @description Coverage report for the EXCHANGE → ODPS v4.0 projection: walks every field the published
- *   ODPS v4.0 JSON Schema defines and reports which ones a MAXIMALLY-filled AIMEAT offering can populate,
+ * @description Coverage report for the EXCHANGE → ODPS v4.1 projection: walks every field the published
+ *   ODPS v4.1 JSON Schema defines and reports which ones a MAXIMALLY-filled AIMEAT offering can populate,
  *   which the provider must author (and can, via the `odps` block), and which AIMEAT has no source for at
  *   all. Run it after changing services/exchange-odps.ts or models/odps-schemas.ts to see the honest gap.
+ *   v4.1 keys `details` and `pricingPlans.declarative` by language, so the walker follows patternProperties
+ *   and the probe treats a language key like an array member.
  * @usage cd aimeat && pnpm exec tsx tools/odps-coverage.ts
  * @version-history
+ *   v1.1.0 — 2026-07-25 — Follows ODPS v4.1 (language-keyed details/pricing via patternProperties).
  *   v1.0.0 — 2026-07-25 — Initial coverage report (TARGET-045 §4 ODPS adoption).
  */
 import { readFileSync } from 'node:fs';
-import { offeringToOdps } from '../src/services/exchange-odps.js';
+import { offeringToOdps, ODPS_VERSION } from '../src/services/exchange-odps.js';
 import type { Offering } from '../src/services/exchange-market.js';
 
-const schema = JSON.parse(readFileSync(new URL('../test/fixtures/odps-v4.0.schema.json', import.meta.url), 'utf8'));
+const schema = JSON.parse(readFileSync(new URL('../test/fixtures/odps-v4.1.schema.json', import.meta.url), 'utf8'));
 
 /** A listing with EVERY authorable field filled — the ceiling of what the projection can currently emit. */
 const offering = {
@@ -27,10 +30,11 @@ const offering = {
   provenance: {
     source: 'PRH', legalBasis: 'public register', consentStatus: 'n/a', retention: '30 days',
     transformations: 'normalised', snapshotHash: 'a'.repeat(64),
-    lineage: [{ source: 'avoindata.prh.fi', transform: 'fetch' }], odpsVersion: '4.0',
+    lineage: [{ source: 'avoindata.prh.fi', transform: 'fetch' }], odpsVersion: '4.1',
   },
   usageTerms: { derivatives: true, resale: true, attribution: true, note: 'Attribute PRH.' },
   odps: {
+    language: 'en', governanceProfile: 'audit_ready', portfolioPriority: 'high',
     productType: 'derived data', valueProposition: 'Verified company identity in one call.',
     productSeries: 'Finnish registers', categories: ['company data'], standards: ['ISO 8000'],
     useCases: [{ title: 'KYB onboarding', description: 'Verify a counterparty.', url: 'https://example.org/kyb' }],
@@ -70,11 +74,15 @@ const doc = offeringToOdps({
 function paths(node: any, prefix: string, out: string[], depth = 0): void {
   if (!node || depth > 6) return;
   const resolved = node.$ref ? { ...schema.$defs[String(node.$ref).split('/').pop()!], ...node } : node;
+  // v4.1 language keys (`^[a-z]{2}$`) are a transparent level: walk through them, do not name them.
+  if (resolved.patternProperties) {
+    for (const v of Object.values<any>(resolved.patternProperties)) paths(v, prefix, out, depth + 1);
+  }
   if (resolved.properties) {
     for (const [k, v] of Object.entries<any>(resolved.properties)) {
       const p = prefix ? `${prefix}.${k}` : k;
       const child = v.$ref ? { ...schema.$defs[String(v.$ref).split('/').pop()!], ...v } : v;
-      if (child.properties || child.items?.properties || child.items?.$ref) { out.push(p); paths(child, p, out, depth + 1); }
+      if (child.properties || child.patternProperties || child.items?.properties || child.items?.$ref) { out.push(p); paths(child, p, out, depth + 1); }
       else out.push(p);
     }
   }
@@ -93,8 +101,14 @@ function get(obj: any, path: string): unknown {
       if (n === undefined || n === null) continue;
       if (Array.isArray(n)) { for (const item of n) if (item?.[key] !== undefined) out.push(item[key]); continue; }
       if (n[key] !== undefined) { out.push(n[key]); continue; }
-      // dataAccess / paymentGateways are named mappings (default, mcp, …): look inside every entry.
-      if (typeof n === 'object') for (const v of Object.values<any>(n)) if (v && typeof v === 'object' && v[key] !== undefined) out.push(v[key]);
+      // Named mappings — dataAccess/paymentGateways entries (default, mcp, …) and v4.1 language keys
+      // (details.en, pricingPlans.declarative.fi) — are transparent: look inside every entry.
+      if (typeof n === 'object') {
+        for (const v of Object.values<any>(n)) {
+          if (Array.isArray(v)) { for (const item of v) if (item?.[key] !== undefined) out.push(item[key]); continue; }
+          if (v && typeof v === 'object' && v[key] !== undefined) out.push(v[key]);
+        }
+      }
     }
     return out;
   };
@@ -114,7 +128,7 @@ for (const p of all.filter(p => p.startsWith('product.'))) {
   (v === undefined || v === null || (Array.isArray(v) && !v.length) ? missing : filled).push(p);
 }
 
-console.log(`\nODPS v4.0 coverage — ${filled.length} filled, ${missing.length} not emitted\n`);
+console.log(`\nODPS v${ODPS_VERSION} coverage — ${filled.length} filled, ${missing.length} not emitted\n`);
 console.log('FILLED:\n  ' + filled.join('\n  '));
 console.log('\nNOT EMITTED:\n  ' + missing.join('\n  '));
 console.log('\n--- generated document (maximally filled offering) ---');
