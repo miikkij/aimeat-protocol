@@ -5,6 +5,11 @@
  *   from scratch. Consumed by ../app-templates.ts which assembles the TEMPLATES registry.
  * @structure SHELL_PURE_CLIENT · SHELL_CORTEX · SHELL_EXTENSION
  * @version-history
+ *   v1.2.0 — 2026-07-25 — Themed by construction: all three shells link /lib/aimeat-theme.css and
+ *     restore the user's light/dark choice in <head> (they used to hardcode data-theme="dark" and
+ *     never load the theme, so an app opened in daisyUI indigo and ignored the AIMEAT pill). T2
+ *     also loads aimeat-ui-motion and shows the two fixes that most change how a data app reads:
+ *     statTiles for the numbers, skeleton instead of a spinner. Cards get a visible edge.
  *   v1.1.0 — 2026-07-19 — Mobile-safe by construction: viewport meta gains viewport-fit=cover +
  *     interactive-widget=resizes-content (keyboard resizes the layout), and body gets overflow-x-clip
  *     (kills the horizontal-overflow / shrink-to-fit class of bug). The login pill is compact-by-
@@ -24,15 +29,24 @@ version: 1.0.0
 description: {{one-line description — REQUIRED for publishing}}
 entry: index.html
 -->
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>{{App Title}}</title>
   <!-- Self-hosted Tailwind v4 + daisyUI 5 + theme bridge (served by the node, not a CDN) -->
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
   <script src="/lib/tailwindcss@4.js"></script>
+  <!-- Follow the user's AIMEAT light/dark choice. In <head> so there is no flash of the wrong theme. -->
+  <script>
+    (function () {
+      function apply(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
+      apply(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+      addEventListener('storage', function (e) { if (e.key === 'aimeat-theme' && e.newValue) apply(e.newValue); });
+    })();
+  </script>
 </head>
 <body class="bg-base-100 text-base-content min-h-screen flex flex-col overflow-x-clip">
   <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50">
@@ -91,14 +105,23 @@ version: 1.0.0
 description: {{one-line description — REQUIRED for publishing}}
 entry: index.html
 -->
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>{{App Title}}</title>
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
   <script src="/lib/tailwindcss@4.js"></script>
+  <!-- Follow the user's AIMEAT light/dark choice. In <head> so there is no flash of the wrong theme. -->
+  <script>
+    (function () {
+      function apply(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
+      apply(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+      addEventListener('storage', function (e) { if (e.key === 'aimeat-theme' && e.newValue) apply(e.newValue); });
+    })();
+  </script>
 </head>
 <body class="bg-base-100 text-base-content min-h-screen flex flex-col overflow-x-clip">
   <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50">
@@ -107,7 +130,14 @@ entry: index.html
   </nav>
   <main id="app" class="flex-1 w-full max-w-4xl mx-auto p-4 flex flex-col gap-4">
     <div id="status" class="alert">Loading…</div>
-    <div id="view"></div>
+    <!-- The numbers that matter, above the detail. Fill via AIMEAT.ui.motion.statTiles(). -->
+    <div id="kpis"></div>
+    <!-- Cards need an edge: base-200 is only a 1.05 luminance step off base-100 in light theme. -->
+    <section class="card bg-base-200 card-border border-base-300">
+      <div class="card-body gap-3">
+        <div id="view"></div>
+      </div>
+    </section>
   </main>
 
   <script src="/v1/libs/aimeat-auth.js"></script>
@@ -115,6 +145,10 @@ entry: index.html
   <!-- Bundled cortex UI libraries (node-level — available on every AIMEAT node). Load only what you use. -->
   <script src="/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></script>
   <script src="/v1/cortex/aimeat-ui-forms/libs/aimeat-ui-forms.js"></script>
+  <!-- Motion: KPI tiles with count-up numbers, skeletons, staggered list reveals. A data app that
+       renders a metric as plain body text and a spinner while loading looks unfinished; these are
+       the two cheapest fixes there are. -->
+  <script src="/v1/cortex/aimeat-ui-motion/libs/aimeat-ui-motion.js"></script>
   <!-- Also available: aimeat-ui-layout, aimeat-ui-nav, aimeat-ui-dialogs, aimeat-charts, aimeat-canvas -->
   <script>
     var session = null;
@@ -122,8 +156,16 @@ entry: index.html
     function boot(s) {
       session = s;
       setStatus('Ready.', 'alert-success');
-      // Example — render structured data with the viewers cortex (replace with your data):
-      //   AIMEAT.ui.viewers.DataTable({ target: document.getElementById('view'),
+      var view = document.getElementById('view');
+
+      // Shimmer in the SHAPE of the coming content — reads as fast, where a spinner reads as stuck.
+      AIMEAT.ui.motion.skeleton(view, { lines: 4 });
+
+      // Example — the numbers that matter get tile treatment, not a sentence:
+      //   AIMEAT.ui.motion.statTiles(document.getElementById('kpis'), [
+      //     { label: 'Entries', value: rows.length }, { label: 'This week', value: 12, trend: { value: 3, dir: 'up' } }]);
+      // Example — structured data with the viewers cortex (replace with your data):
+      //   AIMEAT.ui.viewers.DataTable({ target: view,
       //     columns: [{key:'name',label:'Name'}], rows: [{name:'…'}], sortable:true, filterable:true });
       // Forms via AIMEAT.ui.forms.FormGroup({ target, fields:[…], onSubmit }).
       // {{BUILD YOUR VIEWS — load data from AIMEAT.data, render with the cortex libs}}
@@ -149,14 +191,23 @@ version: 1.0.0
 description: {{one-line description — REQUIRED for publishing}}
 entry: index.html
 -->
-<html lang="en" data-theme="dark">
+<html lang="en" data-theme="light">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content" />
   <title>{{App Title}}</title>
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-theme.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
   <script src="/lib/tailwindcss@4.js"></script>
+  <!-- Follow the user's AIMEAT light/dark choice. In <head> so there is no flash of the wrong theme. -->
+  <script>
+    (function () {
+      function apply(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
+      apply(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+      addEventListener('storage', function (e) { if (e.key === 'aimeat-theme' && e.newValue) apply(e.newValue); });
+    })();
+  </script>
 </head>
 <body class="bg-base-100 text-base-content min-h-screen flex flex-col overflow-x-clip">
   <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50">

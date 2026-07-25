@@ -61,6 +61,7 @@
     "generate:types": "cd aimeat && pnpm generate:types",
     "audit:mcp-tools": "cd aimeat && pnpm audit:mcp-tools",
     "sync:viewport": "cd aimeat && pnpm sync:viewport",
-    "check:viewport": "cd aimeat && pnpm check:viewport"
+    "check:viewport": "cd aimeat && pnpm check:viewport",
+    "check:theme": "cd aimeat && pnpm check:theme"
   }
 }

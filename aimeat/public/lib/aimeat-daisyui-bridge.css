@@ -1,6 +1,10 @@
 /*
  * @file aimeat-daisyui-bridge.css
  * @description Theme-compat layer so the bundled cortex UI libraries cohere with daisyUI.
+ *   (0) Pulls in the AIMEAT daisyUI theme (aimeat-theme.css) so any app already loading this
+ *       bridge gets the house palette — coral primary, the designed dark surface ramp and
+ *       correct `-content` pairs — without editing the app. Before this, `--color-primary` was
+ *       daisyUI's indigo and every branded app hardcoded `#E8564A` by hand.
  *   (1) Maps AIMEAT theme.css variable NAMES to daisyUI 5 theme variables so libs that read
  *       --text / --bg-card / --accent / … follow a daisyUI app's `data-theme` automatically.
  *   (2) Dark-mode polish: a few cortex components hardcode LIGHT colors (no var) — alerts,
@@ -8,12 +12,25 @@
  *       theme-aware tints (`:root .aui-*` wins on specificity). No changes to the libraries.
  *   Load this AFTER the daisyUI stylesheet. Hardcoded fallbacks keep it working if daisyUI
  *   vars are absent.
+ *
+ *   NOTE on daisyUI's OWN components: they are not overridden here. With the theme loaded they
+ *   are already theme-correct, and daisyUI 5 ships the quiet variants an app usually wants —
+ *   `badge-soft`, `alert-soft`, `btn-soft`, `card-border`. Reach for those instead of a solid
+ *   `badge-warning`, which is a loud block of amber on a dark page even when it is legible.
  * @usage  <link href="/lib/daisyui@5.css" rel="stylesheet" />
  *         <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" />
  * @version-history
- *   v1.0.0 — 2026-06-26 — Initial bridge (cortex libs follow daisyUI theme).
+ *   v1.2.0 — 2026-07-25 — @import the AIMEAT daisyUI theme, so the house palette reaches every
+ *     app that already loads the bridge. Contrast + surface ramp verified by
+ *     `pnpm check:theme` (tools/theme-contrast.ts).
  *   v1.1.0 — 2026-06-26 — Map --bg-surface-dim (table zebra) + theme-aware alert/badge tints.
+ *   v1.0.0 — 2026-06-26 — Initial bridge (cortex libs follow daisyUI theme).
  */
+
+/* MUST be the first rule: @import is only valid ahead of ordinary rules. Same-origin, cached
+   alongside this file, and a no-op duplicate when the app also links the theme directly. */
+@import url('/lib/aimeat-theme.css');
+
 :root {
   --text:           var(--color-base-content, #1A1A2E);
   --text-dim:       color-mix(in oklab, var(--color-base-content, #6B7280) 70%, transparent);
