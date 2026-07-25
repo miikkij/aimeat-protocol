@@ -27,6 +27,7 @@ import type { Storage, ExtensionRecord } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { percentFee, formatMoneyMajor } from '../../commerce/money.js';
+import { burnPacingToll, resolvePacingToll } from './pacing.js';
 import { commerceFeePercent, settleMarketplaceFee } from '../../services/marketplace-fee.js';
 import {
   readEntitlementForCall, budgetAllows, commitSpend, refundSpend, computeCharge,
@@ -62,6 +63,18 @@ export async function settleMeteredCoordinate(args: {
   const { config, storage, coordExt, coordAction, label, callerGaii, res } = args;
   const ent = await readEntitlementForCall(storage, callerGaii, coordExt, coordAction);
   if (!ent) return null;                       // no contract for this call → standard paywall applies
+
+  // PACING FIRST, before any authorisation or payment. Every metered path reaches settlement here —
+  // app tools, exchange runs, agent work, MCP runs, raw extension invokes — so this is the one place a
+  // rate ceiling can hold for all of them, whatever unit the contract settles in. A money-only contract
+  // was previously unpaced: its only brake was the buyer's total budget, which a loop empties at machine
+  // speed. Charged before the price so a paced-out call never has to be refunded.
+  const toll = resolvePacingToll(config, ent.tollMorsels);
+  const paced = await burnPacingToll({
+    config, storage, callerGaii, providerOwner: ent.providerGhii.split('@')[0] ?? null,
+    label, toll, res,
+  });
+  if (!paced.ok) return { ok: false };
 
   if (ent.state !== 'active') {
     res.status(402).json({ ...error(config.nodeId, 'ENTITLEMENT_INACTIVE',
