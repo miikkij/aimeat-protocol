@@ -379,12 +379,14 @@ export async function reconcileOwnerOfferingsThrottled(storage: Storage, ownerGh
 }
 
 /**
- * Fire-and-forget reconcile after a SOURCE record was written, so pricing a tool in the app-catalog (or
- * via MCP) shows on the market immediately with no second step. Recognises the two memory-backed sources
- * (`apps.{appId}.tools`, `agents.{agent}.offers`); anything else is ignored. Never rejects into the
- * caller's response path — a failed projection must not fail the write that triggered it.
+ * Reconcile after a SOURCE record was written, so pricing a tool in the app-catalog (or via MCP) is on the
+ * market when the save returns — no second step, and no race for the caller to lose. Recognises the two
+ * memory-backed sources (`apps.{appId}.tools`, `agents.{agent}.offers`); anything else returns immediately,
+ * so an ordinary memory write pays nothing. AWAITED on purpose: "I saved the price, is it live?" must have a
+ * definite answer, and these keys are written rarely. Never rejects into the caller's response path — a
+ * failed projection must not fail the write that triggered it.
  */
-export function reconcileAfterSourceWrite(storage: Storage, ownerGaii: string, key: string): void {
+export async function reconcileAfterSourceWrite(storage: Storage, ownerGaii: string, key: string): Promise<void> {
   const app = /^apps\.(.+)\.tools$/.exec(key);
   const offers = /^agents\.(.+)\.offers$/.exec(key);
   if (!app && !offers) return;
@@ -393,13 +395,19 @@ export function reconcileAfterSourceWrite(storage: Storage, ownerGaii: string, k
   const ownerName = namePart.includes('#') ? namePart.split('#')[1] : namePart;
   const ownerGhii = host ? `${ownerName}@${host}` : ownerName;
   const opts = app ? { appId: app[1] } : { agentName: offers![1] };
-  void reconcileOwnerOfferings(storage, ownerGhii, opts).catch(() => { /* projection is best-effort */ });
+  // A source write is the authoritative signal — clear the browse throttle so a later read cannot serve a
+  // view older than this write.
+  lastReconcile.delete(ownerGhii);
+  try { await reconcileOwnerOfferings(storage, ownerGhii, opts); }
+  catch { /* projection is best-effort: never fail the write that triggered it */ }
 }
 
 /** Same, for an extension whose actions may carry `commercial.exchange`. */
-export function reconcileAfterExtensionWrite(storage: Storage, ownerName: string, nodeId: string, extName: string): void {
-  void reconcileOwnerOfferings(storage, `${ownerName}@${nodeId}`, { extName })
-    .catch(() => { /* projection is best-effort */ });
+export async function reconcileAfterExtensionWrite(storage: Storage, ownerName: string, nodeId: string, extName: string): Promise<void> {
+  const ownerGhii = `${ownerName}@${nodeId}`;
+  lastReconcile.delete(ownerGhii);
+  try { await reconcileOwnerOfferings(storage, ownerGhii, { extName }); }
+  catch { /* projection is best-effort */ }
 }
 
 // ── MIGRATION (TARGET-050 slice 3) ───────────────────────────────────────────

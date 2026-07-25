@@ -140,7 +140,7 @@ export function registerCommerceTools(
             };
             await putOwnerRecord(key, doc, 'public', ['commerce', 'app-tools']);
             // TARGET-050: the manifest is the source of truth for the EXCHANGE listing — project it now.
-            reconcileAfterSourceWrite(storage, ownerGhii, key);
+            await reconcileAfterSourceWrite(storage, ownerGhii, key);
             return ok({
                 app: `${owner}/${app_id}`,
                 version: doc.version,
@@ -226,7 +226,7 @@ export function registerCommerceTools(
             });
             emitChange('agents');
             // TARGET-050: an offer flagged `exchange` is projected onto the market from here.
-            reconcileAfterSourceWrite(storage, targetGaii, key);
+            await reconcileAfterSourceWrite(storage, targetGaii, key);
             return ok({
                 agent: agent_name, offer: offer_id,
                 price: offer.price ?? null, priceMoney: offer.priceMoney ?? null,
