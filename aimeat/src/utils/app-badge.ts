@@ -20,6 +20,10 @@
  *   v1.3.0 — 2026-07-16 — Mobile: collapse to a small round ⚡ button that expands the full pill
  *     on tap (CSS-only checkbox toggle + media query — still zero script, covered by the same
  *     style-src 'unsafe-inline' the inline styles already need). Desktop look unchanged.
+ *   v1.4.0 — 2026-07-25 — Brand-as-token: the coral accents are var(--color-primary, #E8564A) so
+ *     the badge follows the app's palette (theme system v2); the hex remains only as the fallback
+ *     for pages that load no theme. This injector was why every served app measured 2-3 hardcoded
+ *     corals even when the app source had none.
  */
 import { injectBeforeClosingTag } from './html-inject.js';
 
@@ -60,7 +64,7 @@ export function injectAimeatBadge(data: Buffer | Uint8Array | string): Buffer {
         + '#aimeat-app-badge label{display:none!important;position:fixed!important;right:12px!important;'
         + 'bottom:12px!important;z-index:2147483647!important;width:34px!important;height:34px!important;'
         + 'align-items:center!important;justify-content:center!important;border-radius:50%!important;'
-        + 'color:#E8564A!important;font:600 16px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif!important;'
+        + 'color:var(--color-primary,#E8564A)!important;font:600 16px/1 system-ui,-apple-system,Segoe UI,Roboto,sans-serif!important;'
         + 'cursor:pointer!important;user-select:none!important;-webkit-user-select:none!important;' + surface + '}'
         // The full pill — the desktop default, unchanged look.
         + '#aimeat-app-badge a{position:fixed!important;right:12px!important;bottom:12px!important;'
@@ -68,9 +72,9 @@ export function injectAimeatBadge(data: Buffer | Uint8Array | string): Buffer {
         + 'gap:8px!important;padding:7px 12px!important;border-radius:9999px!important;color:#fff!important;'
         + 'font:600 12px/1.2 system-ui,-apple-system,Segoe UI,Roboto,sans-serif!important;'
         + 'text-decoration:none!important;letter-spacing:.1px!important;' + surface + '}'
-        + '#aimeat-app-badge a>span:first-child{color:#E8564A!important}'
+        + '#aimeat-app-badge a>span:first-child{color:var(--color-primary,#E8564A)!important}'
         + '#aimeat-app-badge a>span:last-child{opacity:.7!important;font-weight:500!important}'
-        + '#aimeat-app-badge input:focus-visible~label{outline:2px solid #E8564A!important;outline-offset:2px!important}'
+        + '#aimeat-app-badge input:focus-visible~label{outline:2px solid var(--color-primary,#E8564A)!important;outline-offset:2px!important}'
         // Narrow viewports: only the ⚡ button by default; checking the toggle reveals the pill
         // beside it (the button stays visible to collapse again; the pill drops its own ⚡).
         + '@media (max-width:640px){'

@@ -106,7 +106,7 @@ const CLAIM_TOLERANCE = 0.05;
 const REQUIRED_TOKENS = [
   'color-base-100', 'color-base-200', 'color-base-300', 'color-base-content',
   ...SEMANTIC.flatMap((s) => [`color-${s}`, `color-${s}-content`]),
-  'radius-box', 'radius-field', 'radius-selector', 'border',
+  'radius-box', 'radius-field', 'radius-selector', 'border', 'border-w',
   'font-display', 'font-body', 'font-mono',
 ];
 
