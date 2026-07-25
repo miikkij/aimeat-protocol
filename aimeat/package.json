@@ -110,7 +110,9 @@
     "eval:mcp-surface": "tsx test/eval-mcp/surface-weight.ts",
     "prepublishOnly": "node -e \"require('fs').copyFileSync('../README.md','README.md')\" && pnpm build",
     "perf:bench": "node --import tsx tools/perf-bench/bench.ts",
-    "perf:bench:backends": "node --import tsx tools/perf-bench/bench-backends.ts"
+    "perf:bench:backends": "node --import tsx tools/perf-bench/bench-backends.ts",
+    "sync:viewport": "tsx scripts/embed-viewport.ts",
+    "check:viewport": "tsx scripts/embed-viewport.ts --check"
   },
   "keywords": [
     "aimeat",

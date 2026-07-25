@@ -10,6 +10,7 @@
 #   7. app-catalog.html ↔ its sources    — pnpm check:app-catalog
 #   8. SDK-libs dist ↔ their sources     — pnpm check:sdk
 #   9. MCP tool surface/handler parity    — pnpm check:mcp-tools
+#  10. Embedded aimeat-viewport ↔ source  — pnpm check:viewport
 #
 # These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
 # (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
@@ -47,5 +48,8 @@ pnpm -s check:sdk
 
 echo "[pre-commit] MCP tool surface/handler parity (check:mcp-tools)…"
 pnpm -s check:mcp-tools
+
+echo "[pre-commit] Embedded aimeat-viewport ↔ source (check:viewport)…"
+pnpm -s check:viewport
 
 echo "[pre-commit] ✓ all checks passed"
