@@ -19,20 +19,15 @@
  *   v1.5.0 — 2026-07-19 — aimeat_extension_install gains update:true (in-place upsert preserving
  *     lifecycle + ext: memory, owner-gated) and activate:true (skip separate activate call);
  *     closes pitfall ext/extension-install-no-upsert
- *   v1.6.0 — 2026-07-26 — aimeat_extension_install: a failed upsert is reported as a failure (it used
- *     to answer with the record it MEANT to write, i.e. the new version number over unchanged code);
- *     `scripts` without `manifest` is an error instead of a silent fall-through to upload mode; the
- *     hand-rolled manifest→record copy is replaced by the shared buildExtensionRecordFromManifest,
- *     which adds ODPS/plans/secret-config/instances handling this path was missing.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { buildExtensionRecordFromManifest } from '../routes/extensions/manifest.js';
-import { getEncryptionKey } from '../services/encryption.js';
-import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
+import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields, maskSecretFields, prepareSecretConfigForWrite } from '../services/extension-secrets.js';
+import { getEncryptionKey } from '../services/encryption.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
@@ -310,11 +305,12 @@ export function registerExtensionsTools(
                     owner: parseGAII(agentGaii)?.owner ?? agentGaii,
                     roles: ['agent'],
                 },
-                config: ext.config,
+                // Decrypted for the VM as routes/extensions/actions.ts does; the { encrypted } wrapper would silently break the script.
+                config: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
                 ...(instance_id ? {
                     instance: {
                         id: instance_id,
-                        config: (await storage.getExtensionInstance(extension_name, instance_id))?.config ?? {},
+                        config: decryptSecretFields((await storage.getExtensionInstance(extension_name, instance_id))?.config ?? {}, getInstanceSecretKeys(ext), getEncryptionKey(config)),
                     },
                 } : {}),
                 log: {
@@ -457,8 +453,8 @@ export function registerExtensionsTools(
 
             // Validation + record building is the SHARED builder that REST (POST/PUT /v1/extensions)
             // and the ZIP upload path use. This tool used to carry its own thinner copy, which is how
-            // ODPS descriptors, `commercial.plans`/`pricesMoney`, the `type: secret` config marker and
-            // instances validation ended up applying on some install paths and not others.
+            // ODPS descriptors, commercial plans, instances validation and manifest field type-checking
+            // ended up applying on some install paths and not others.
             const callerOwner = parseGAII(getAgentGaii())?.owner
                 ?? (getAgentGaii().includes('@') ? getAgentGaii().split('@')[0] : 'mcp-agent');
             const built = buildExtensionRecordFromManifest(
@@ -481,15 +477,15 @@ export function registerExtensionsTools(
                 }
             }
 
-            // Encrypt `type: secret` config values before storing, as POST/PUT /v1/extensions do.
-            const encConfig = encryptSecretFields(record.config, getExtSecretKeys(record), getEncryptionKey(config));
-            if (encConfig === null) {
+            // Encrypt secrets before any write, as POST/PUT /v1/extensions do. This path wrote config straight to storage, so a `type: secret` value was persisted in the clear and served unauthenticated.
+            const preparedConfig = prepareSecretConfigForWrite(record.config, existingExt?.config, getEncryptionKey(config));
+            if (preparedConfig === null) {
                 return {
-                    content: [{ type: 'text' as const, text: 'ENCRYPTION_NOT_CONFIGURED: set AIMEAT_ENCRYPTION_KEY to install extensions with secret config.' }],
+                    content: [{ type: 'text' as const, text: 'ENCRYPTION_NOT_CONFIGURED: this manifest declares a secret config field but the node has no encryption key. Set AIMEAT_ENCRYPTION_KEY or drop the secret field; a secret is never stored in plaintext.' }],
                     isError: true,
                 };
             }
-            record.config = encConfig;
+            record.config = preparedConfig;
 
             try {
                 let result: ExtensionRecord;
@@ -531,18 +527,13 @@ export function registerExtensionsTools(
                 // Optional immediate activation (skips the separate activate call).
                 let status = result.status;
                 if (activate && status !== 'active') {
-                    const activated = await storage.updateExtension(name, { status: 'active', activatedAt: new Date().toISOString() });
-                    if (!activated) {
-                        return {
-                            content: [{ type: 'text' as const, text: `Extension "${name}" was ${action} but could NOT be activated — it is still ${status}. Retry with aimeat_extension_activate.` }],
-                            isError: true,
-                        };
-                    }
+                    await storage.updateExtension(name, { status: 'active', activatedAt: new Date().toISOString() });
                     status = 'active';
                 }
-                // Actions may have changed (or just went live) — refresh aggregated capabilities, and
-                // re-project any EXCHANGE listings the actions declare (parity with REST).
+                // Re-project any EXCHANGE listings the actions declare (price/flag may have changed) —
+                // parity with POST/PUT /v1/extensions, which have always done this.
                 await reconcileAfterExtensionWrite(storage, record.installedBy, config.nodeId, name);
+                // Actions may have changed (or just went live) — refresh aggregated capabilities.
                 if (status === 'active') {
                     import('../services/capability-aggregator.js')
                         .then(m => m.runCapabilityAggregation(config, storage))
@@ -598,7 +589,7 @@ export function registerExtensionsTools(
                 // Trigger capability aggregation so the extension appears immediately
                 import('../services/capability-aggregator.js')
                     .then(m => m.runCapabilityAggregation(config, storage))
-                    .catch(err => { logger.warn('scheduleNote: continuing after a suppressed failure', { error: String(err) }); });
+                    .catch(err => logger.error('Capability aggregation after MCP extension activate failed', { error: String(err) }));
 
                 logger.info(`Extension activated via MCP: ${name}`, { by: getAgentGaii() });
 
@@ -712,7 +703,8 @@ export function registerExtensionsTools(
                             input_schema: a.inputSchema,
                             output_schema: a.outputSchema,
                         })),
-                        config: ext.config,
+                        // Masked: an API surface returns the mask for a set secret, never the value.
+                        config: maskSecretFields(ext.config, getExtSecretKeys(ext)),
                         limits: ext.limits,
                         federation: ext.federation,
                         instances: ext.instances,
