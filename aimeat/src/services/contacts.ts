@@ -68,7 +68,7 @@ async function displayNames(storage: Storage, ids: string[]): Promise<Map<string
     try {
       const rec = await storage.getGHII(id);
       if (rec?.displayName) out.set(id, rec.displayName);
-    } catch { /* display names are best-effort */ }
+    } catch (err) { logger.warn('displayNames: display names are best-effort', { error: String(err) }); }
   }));
   return out;
 }
@@ -82,7 +82,7 @@ export async function listContactsMerged(
 ): Promise<ContactRow[]> {
   const [rows, conversations] = await Promise.all([
     storage.listContacts(ownerGhii, opts?.state ? { state: opts.state } : undefined),
-    storage.listConversations(ownerGhii).catch(() => []),
+    storage.listConversations(ownerGhii).catch(err => { logger.warn('listContactsMerged: continuing after a suppressed failure', { error: String(err) }); return []; }),
   ]);
   const byId = new Map(rows.map(c => [c.contactId, c]));
   const messaged = new Set(conversations.map(c => c.peerGhii).filter(Boolean));

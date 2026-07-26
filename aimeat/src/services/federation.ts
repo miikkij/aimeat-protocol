@@ -117,8 +117,9 @@ export async function resolveGaii(
                 gaiiCache.set(gaii, { nodeId: peer.nodeId, nodeUrl: peer.url, expiresAt: Date.now() + CACHE_TTL_MS });
                 return { nodeId: peer.nodeId, nodeUrl: peer.url, local: false };
             }
-        } catch {
+        } catch (err) {
             // Continue to next peer
+          logger.warn('resolveGaii: continuing after a suppressed failure', { error: String(err) });
         }
     }
 
@@ -176,7 +177,7 @@ export function startHeartbeatJob(
             const graceEnd = (peer as PeerInfo & { depeerGraceEnd?: string }).depeerGraceEnd;
             if (graceEnd && new Date(graceEnd).getTime() <= Date.now()) {
                 peers.delete(key);
-                storage.deleteFederationPeer(key).catch(() => {});
+                storage.deleteFederationPeer(key).catch(err => { logger.warn('graceEnd: continuing after a suppressed failure', { error: String(err) }); });
                 networkDirectory?.delete(key);
                 peerSummaryHashes.delete(key);
                 logger.info(`Peer ${peer.nodeId} purged after de-peering grace period expired`);
@@ -239,7 +240,7 @@ export function startHeartbeatJob(
                     peer.status = 'active';
                     peerFailures.set(key, 0);
                     recordHeartbeatOutcome(peer, true, new Date(), availOpts);
-                    storage.saveFederationPeer(peer).catch(() => {});
+                    storage.saveFederationPeer(peer).catch(err => { logger.warn('uptime_hours: continuing after a suppressed failure', { error: String(err) }); });
 
                     // Detect catalogue hash mismatch for sync triggering
                     const cachedHash = peerCatalogueHashes.get(key);
@@ -297,8 +298,9 @@ export function startHeartbeatJob(
                                     }
                                 }
                             }
-                        } catch {
+                        } catch (err) {
                             // Non-critical: ping response parse error for summary hash
+                          logger.warn('uptime_hours: continuing after a suppressed failure', { error: String(err) });
                         }
                     }
 
@@ -320,7 +322,7 @@ export function startHeartbeatJob(
                         logger.warn(`Peer ${peer.nodeId} degraded after ${failures} consecutive failures`);
                     }
                     recordHeartbeatOutcome(peer, false, new Date(), availOpts);
-                    storage.saveFederationPeer(peer).catch(() => {});
+                    storage.saveFederationPeer(peer).catch(err => { logger.warn('failures: continuing after a suppressed failure', { error: String(err) }); });
                 }
             } catch {
                 const failures = (peerFailures.get(key) ?? 0) + 1;
@@ -334,7 +336,7 @@ export function startHeartbeatJob(
                     peer.status = 'degraded';
                 }
                 recordHeartbeatOutcome(peer, false, new Date(), availOpts);
-                storage.saveFederationPeer(peer).catch(() => {});
+                storage.saveFederationPeer(peer).catch(err => { logger.warn('failures: continuing after a suppressed failure', { error: String(err) }); });
             }
         }
     }

@@ -58,6 +58,7 @@ export function isAllowedPushEndpoint(endpoint: string): boolean {
       url.hostname === domain || url.hostname.endsWith('.' + domain),
     );
   } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     return false;
   }
 }

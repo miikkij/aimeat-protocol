@@ -18,6 +18,7 @@ import { recordPublicActivity } from '../../services/public-activity.js';
 import { ManifestSchema } from '../../schemas/knowledge-package.js';
 import { createRequire } from 'node:module';
 import type { KnowledgeHelpers } from './helpers.js';
+import { logger } from '../../utils/logger.js';
 
 const require = createRequire(import.meta.url);
 
@@ -209,7 +210,7 @@ export function registerPackagesCoreRoutes(
         summary: `Knowledge package "${manifest.name}" published`,
         detail: manifest.synthesis?.description || '',
         link: `/v1/knowledge/${packageId}`,
-      }).catch(() => { /* feed is best-effort */ });
+      }).catch(err => { logger.warn('POST /v1/knowledge/import: feed is best-effort', { error: String(err) }); });
     }
   });
 

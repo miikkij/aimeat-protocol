@@ -70,6 +70,7 @@ import { notInYourNamespace, shadowedByOwnerCopy, OWNER_SCOPE_LIST_NOTE } from '
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
 import { registerCoreAdminTools } from './core-admin.js';
 import { registerCoreStorageTools } from './core-storage.js';
+import { logger } from '../utils/logger.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -156,12 +157,12 @@ export function registerCoreTools(
     // Forward resource:updated events to this session's SSE stream
     const onResourceUpdated = (evt: ResourceChangeEvent) => {
         if (evt.agentGaii === agentGaii) {
-            mcp.server.sendResourceUpdated({ uri: evt.uri }).catch(() => { });
+            mcp.server.sendResourceUpdated({ uri: evt.uri }).catch(err => { logger.warn('onResourceUpdated: continuing after a suppressed failure', { error: String(err) }); });
         }
     };
     const onResourceListChanged = (evt: { agentGaii: string }) => {
         if (evt.agentGaii === agentGaii) {
-            mcp.server.sendResourceListChanged().catch(() => { });
+            mcp.server.sendResourceListChanged().catch(err => { logger.warn('onResourceListChanged: continuing after a suppressed failure', { error: String(err) }); });
         }
     };
     resourceEvents.on('resource:updated', onResourceUpdated);

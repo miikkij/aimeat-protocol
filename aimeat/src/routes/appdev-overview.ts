@@ -17,6 +17,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { buildAppdevOverview } from '../services/appdev-overview.js';
+import { logger } from '../utils/logger.js';
 import {
   listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
 } from '../services/app-template-proposals.js';
@@ -58,7 +59,7 @@ export function appdevOverviewRouter(config: AimeatConfig, storage: Storage): Ro
     }
     const m = found.manifest;
     const sourceOwnerGhii = `${m.derivedFrom.owner}@${config.nodeId}`;
-    const app = await storage.getApp(sourceOwnerGhii, m.derivedFrom.filename).catch(() => null);
+    const app = await storage.getApp(sourceOwnerGhii, m.derivedFrom.filename).catch(err => { logger.warn('GET /v1/appdev/templates/:id: continuing after a suppressed failure', { error: String(err) }); return null; });
     res.json(success(config.nodeId, {
       template: m,
       source_app: app ? {

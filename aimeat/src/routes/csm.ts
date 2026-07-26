@@ -24,6 +24,7 @@ import { success, error } from '../middleware/envelope.js';
 import { parseCsm, validateCsm, csmToJsonSchema } from '../services/csm-parser.js';
 import { emitChange } from '../services/event-bus.js';
 import type { CsmDefinition } from '../services/csm-parser.js';
+import { logger } from '../utils/logger.js';
 
 // Load CSM templates at startup
 interface CsmTemplateMeta {
@@ -55,8 +56,9 @@ function loadCsmTemplates(): CsmTemplateMeta[] {
         schemaMode: parsed.schemaMode,
         yaml,
       });
-    } catch {
+    } catch (err) {
       // Skip templates that fail to parse
+      logger.warn('loadCsmTemplates: continuing after a suppressed failure', { error: String(err) });
     }
   }
 

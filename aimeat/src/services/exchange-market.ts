@@ -39,6 +39,7 @@ import type { Storage } from '../storage/interface.js';
 import { listEntitlementsByProvider, type EntitlementUnit, type PricingSpec, type AppToolSurface, type AgentWorkSurface, type SellableSurface } from './metered-entitlements.js';
 import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
 import { readCallTiming } from './call-timing.js';
+import { logger } from '../utils/logger.js';
 
 export type { AppToolSurface, AgentWorkSurface, SellableSurface };
 
@@ -276,7 +277,7 @@ export async function enrichNeeds(storage: Storage, needs: Need[]): Promise<Need
           const rec = owner && filename ? await storage.getAppByOwnerName(owner, filename) : null;
           const m = (rec?.manifest ?? {}) as { name?: string; description?: string };
           if (rec) resolved = { app: ref, name: m.name || filename, description: m.description || '' };
-        } catch { /* unresolved app → null context */ }
+        } catch (err) { logger.warn('m: unresolved app → null context', { error: String(err) }); }
         cache.set(ref, resolved); appContext = resolved;
       }
     }

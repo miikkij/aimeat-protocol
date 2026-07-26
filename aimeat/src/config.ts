@@ -77,6 +77,7 @@ function isPrivateHost(baseUrl: string): boolean {
  */
 function deriveAppHost(baseUrl: string): string {
   let host: string;
+  // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
   try { host = new URL(baseUrl).hostname.toLowerCase(); } catch { return ''; }
   if (!host || host === 'localhost' || /^[\d.]+$/.test(host) || host.endsWith('.localhost')) return '';
   return `apps.${host}`;
@@ -620,6 +621,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 // ── Database Config Overrides ──
 
 import type { Storage } from './storage/interface.js';
+import { logger } from './utils/logger.js';
 
 /**
  * Apply config overrides from database (called after storage is initialized).
@@ -652,7 +654,8 @@ export async function applyConfigOverrides(
       if (!field.validate(value)) { skipped.push(dotPath); continue; }
       (config as unknown as Record<string, unknown>)[field.key] = value;
       applied.push(dotPath);
-    } catch {
+    } catch (err) {
+      logger.warn('config: suppressed failure, continuing', { error: String(err) });
       skipped.push(dotPath);
     }
   }

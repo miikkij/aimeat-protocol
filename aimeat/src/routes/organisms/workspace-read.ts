@@ -27,6 +27,7 @@ import { buildOrganismOverview, buildWorkspaceOverview } from '../../services/st
 import { collectOrganismGraph, collectWorkspaceGraph } from '../../services/structure-graph.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { fresherRec } from './shared.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerOrganismWorkspaceReadRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   /* ── GET /v1/organisms/:id/workspace — Manifest-driven workspace read ──
@@ -194,8 +195,9 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       todos = tasks
         .filter(t => (t.resources?.memoryPrefixes ?? []).some(p => p.startsWith(`organism.${id}`)))
         .map(t => ({ id: t.id, title: t.title, status: t.status, todos: t.todos }));
-    } catch {
+    } catch (err) {
       /* best-effort: leave todos empty if the task store is unavailable */
+      logger.warn('withMeta: continuing after a suppressed failure', { error: String(err) });
     }
 
     res.json(success(config.nodeId, { manifest, readme, apps, objects, drafts, decisions, resources, todos }, [
@@ -337,7 +339,7 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
 
     // Safety net: record the current structure if it changed since the last snapshot (no-op via dedup).
-    await updateOrganismStructure(storage, config, id, { event: 'viewed', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(() => { /* best-effort */ });
+    await updateOrganismStructure(storage, config, id, { event: 'viewed', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(err => { logger.warn('GET /v1/organisms/:id/structure/history: best-effort', { error: String(err) }); });
 
     const creatorGhii = organism.creatorGhii.includes('@') ? organism.creatorGhii : `${organism.creatorGhii}@${config.nodeId}`;
     const key = `organism.${id}.meta.structure`;

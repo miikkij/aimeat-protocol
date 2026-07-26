@@ -9,6 +9,7 @@
 
 import { ALL_CONFIG_MAP, parseConfigValue } from '../services/config-schema.js';
 import { loadFileSource } from '../services/config-loader.js';
+import { logger } from '../utils/logger.js';
 
 interface ValidationResult {
   level: 'error' | 'warning' | 'info';
@@ -69,6 +70,7 @@ export function validateEnv(): ValidationResult[] {
       if (u.protocol === 'http:' && !['localhost', '127.0.0.1', '::1'].includes(u.hostname)) {
         results.push({ level: 'warning', variable: 'AIMEAT_BASE_URL', message: 'HTTP on a public address. Use HTTPS in production.' });
       }
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     } catch {
       results.push({ level: 'error', variable: 'AIMEAT_BASE_URL', message: `Invalid URL format: "${baseUrl}"` });
     }
@@ -103,6 +105,7 @@ export function validateEnv(): ValidationResult[] {
   } else if (dbUrl) {
     try {
       new URL(dbUrl);
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     } catch {
       results.push({ level: 'error', variable: 'DATABASE_URL', message: `Invalid URL format: "${dbUrl.replace(/\/\/.*@/, '//<credentials>@')}"` });
     }
@@ -347,7 +350,8 @@ export function validateEnv(): ValidationResult[] {
         if (!field.validate(parsed)) {
           results.push({ level: 'error', variable: `file:${dotPath}`, message: `Invalid value "${rawValue}" for ${dotPath} in ${fileSource.name}. Validation failed.` });
         }
-      } catch {
+      } catch (err) {
+        logger.warn('env-validator: suppressed failure, continuing', { error: String(err) });
         results.push({ level: 'error', variable: `file:${dotPath}`, message: `Cannot parse "${rawValue}" as ${field.type} for ${dotPath} in ${fileSource.name}.` });
       }
     }

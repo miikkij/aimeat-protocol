@@ -25,6 +25,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
+import { logger } from '../utils/logger.js';
 
 /** Matches an image embed whose URL is one of the three owner/storage forms. Groups: (1) `![alt](`,
  *  (2) the URL, (3) `)`. Kept in step with the frontend STORAGE_IMG_RE, broadened to also catch the
@@ -82,7 +83,7 @@ async function resolveEmbedUrl(
   // Prefer the owner already named in a /v1/pub URL (idempotent re-normalization), then the writer's own.
   const tryOwners = ownerInUrl ? [ownerInUrl, ...candidates.filter(c => c !== ownerInUrl)] : candidates;
   for (const owner of tryOwners) {
-    const file = await storage.getStorageFile(owner, key).catch(() => null);
+    const file = await storage.getStorageFile(owner, key).catch(err => { logger.warn('resolveEmbedUrl: continuing after a suppressed failure', { error: String(err) }); return null; });
     if (!file) continue;
     // Scope files under the writer's OWN owner to the doc's workspace so members (and only members) can
     // load them — never flip a third party's file, and never expose to the public internet.
@@ -93,7 +94,7 @@ async function resolveEmbedUrl(
         [file.visibility === 'workspace' ? (file.workspaceRef ?? '') : '', workspaceRef], undefined);
       const unchanged = file.visibility === 'workspace' && (file.workspaceRef ?? '') === merged;
       if (!unchanged && merged) {
-        await storage.updateFileVisibility(owner, key, 'workspace', merged).catch(() => { /* best-effort */ });
+        await storage.updateFileVisibility(owner, key, 'workspace', merged).catch(err => { logger.warn('resolveEmbedUrl: best-effort', { error: String(err) }); });
       }
     }
     return `/v1/pub/${encodeURIComponent(owner)}/${encodeKeyPath(key)}`;
@@ -117,13 +118,17 @@ export async function normalizeDocImageUrls(
   if (!urls.length) return markdown;
 
   const ownerGhii = `${ownerName}@${config.nodeId}`;
-  const agents = await storage.getAgentsByOwner(ownerName).catch(() => []);
+  const agents = await storage.getAgentsByOwner(ownerName).catch(err => { logger.warn('normalizeDocImageUrls: continuing after a suppressed failure', { error: String(err) }); return []; });
   const candidates = [ownerGhii, ...agents.map(a => a.gaii)];
 
   const rewrites = new Map<string, string>();
   for (const url of urls) {
     try { rewrites.set(url, await resolveEmbedUrl(storage, url, ownerName, candidates, workspaceRef)); }
-    catch { rewrites.set(url, url); }
+    catch (err) {
+      // Leaving the original URL means the image quietly does not render for members; say so.
+      logger.warn('doc image URL could not be resolved, keeping the original', { url, error: String(err) });
+      rewrites.set(url, url);
+    }
   }
   return markdown.replace(DOC_IMG_RE, (_full, pre, url, post) => `${pre}${rewrites.get(url) ?? url}${post}`);
 }

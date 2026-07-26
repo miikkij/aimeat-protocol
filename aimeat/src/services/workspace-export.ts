@@ -22,6 +22,7 @@ import { ZipArchive } from 'archiver';
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { authorizeRead } from './access-guard.js';
+import { logger } from '../utils/logger.js';
 
 export const WS_EXPORT_VERSION = '1.0';
 
@@ -121,12 +122,12 @@ export async function collectWorkspace(
   try {
     const files = await storage.listStorageFiles(exporterGaii);
     for (const f of files) if (f.key.startsWith(`${root}.`) || f.key.startsWith(`organism.${orgId}.img.`)) imageKeys.add(f.key);
-  } catch { /* listing is best-effort */ }
+  } catch (err) { logger.warn('md: listing is best-effort', { error: String(err) }); }
 
   const images = new Map<string, Buffer>();
   let imgN = 0;
   for (const key of imageKeys) {
-    const file = await storage.getStorageFile(exporterGaii, key).catch(() => null);
+    const file = await storage.getStorageFile(exporterGaii, key).catch(err => { logger.warn('md: continuing after a suppressed failure', { error: String(err) }); return null; });
     if (!file) continue;
     const ext = (file.mimeType.split('/')[1] || 'bin').replace(/[^a-z0-9]/gi, '').slice(0, 8) || 'bin';
     const fileName = `images/img-${imgN++}.${ext}`;

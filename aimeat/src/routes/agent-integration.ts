@@ -18,6 +18,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { buildGAII } from '../utils/gaii.js';
+import { logger } from '../utils/logger.js';
 
 /* ── Cursor helpers for inbox pagination ── */
 
@@ -321,8 +322,9 @@ export function agentIntegrationRouter(config: AimeatConfig, storage: Storage): 
             res.json(success(config.nodeId, { task: result.tasks[0] }));
             resolvePromise();
           }
-        } catch {
+        } catch (err) {
           // Ignore poll errors, will retry on next interval
+          logger.warn('GET /v1/agents/:name/tasks/wait: continuing after a suppressed failure', { error: String(err) });
         }
       }, pollIntervalMs);
 

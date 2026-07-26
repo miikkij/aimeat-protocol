@@ -23,6 +23,7 @@ import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
+import { logger } from '../utils/logger.js';
 
 function param(p: string | string[]): string {
   return Array.isArray(p) ? p[0] : p;
@@ -47,8 +48,9 @@ export function matchesRouter(config: AimeatConfig, storage: Storage): Router {
       if (ghiiRecord) {
         ghii = ghiiRecord.ghii;
       }
-    } catch {
+    } catch (err) {
       // Fall back to using the auth sub directly
+      logger.warn('GET /v1/matches: continuing after a suppressed failure', { error: String(err) });
     }
 
     const matches = await storage.listMatchesByProfile(ghii, { status, page, perPage });
@@ -71,7 +73,8 @@ export function matchesRouter(config: AimeatConfig, storage: Storage): Router {
         const allAgentGaiis = Object.values(agentsByOwner).flat().map(a => a.gaii);
         if (allAgentGaiis.length) consentsByAgent = await storage.listConsentsForAgents(allAgentGaiis, { status: 'active' });
       }
-    } catch {
+    } catch (err) {
+      logger.warn('matches: suppressed failure, continuing', { error: String(err) });
       ghiiRecords = {}; agentsByOwner = {}; consentsByAgent = {};
     }
 
@@ -198,8 +201,9 @@ export function matchesRouter(config: AimeatConfig, storage: Storage): Router {
       if (ghiiRecord) {
         callerGhii = ghiiRecord.ghii;
       }
-    } catch {
+    } catch (err) {
       // Fall back
+      logger.warn('POST /v1/matches/:id/respond: continuing after a suppressed failure', { error: String(err) });
     }
 
     if (match.profileA !== callerGhii && match.profileB !== callerGhii) {

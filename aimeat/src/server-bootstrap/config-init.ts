@@ -122,6 +122,7 @@ export async function initializeConfig(
               config.extensionHooks[hookName] = actions;
               hooksLoaded++;
             }
+          // eslint-disable-next-line aimeat/no-silent-catch -- skip malformed hook values
           } catch { /* skip malformed hook values */ }
         }
       }
@@ -129,6 +130,7 @@ export async function initializeConfig(
     if (hooksLoaded > 0) {
       logger.info(`Loaded ${hooksLoaded} persisted extension hook(s) from database`);
     }
+  // eslint-disable-next-line aimeat/no-silent-catch -- getAllConfigValues may fail for some backends — hooks stay at defaults
   } catch { /* getAllConfigValues may fail for some backends — hooks stay at defaults */ }
 
   // Wire storage into token revocation system for persistent revocation

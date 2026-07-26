@@ -39,6 +39,7 @@ import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../../service
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole, type WsGrantSource, type WsMemberRole } from '../../services/workspace-roles.js';
 import { listVersionRefs, versionRefsByBase, maxVersionOf, pruneVersionsAfterPublish, effectiveMaxVersions, versionRefsToPrune } from '../../services/workspace-versions.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
+import { logger } from '../../utils/logger.js';
 
 /** Whether a membership role satisfies an approval's required approverRole. */
 export function roleSatisfies(approverRole: string, membershipRole: string): boolean {
@@ -65,7 +66,7 @@ async function collapseKeyTo(storage: Storage, key: string, keepOwner: string): 
   const { items } = await storage.listAllMemory({ prefix: key, limit: 20 });
   await Promise.all(items
     .filter(r => r.key === key && r.ownerGaii !== keepOwner)
-    .map(r => storage.deleteMemory(r.ownerGaii, r.key).catch(() => { /* best-effort collapse */ })));
+    .map(r => storage.deleteMemory(r.ownerGaii, r.key).catch(err => { logger.warn('collapseKeyTo: best-effort collapse', { error: String(err) }); })));
 }
 
 export type ShareAccess = 'open' | 'password' | 'account';
@@ -136,7 +137,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       items.sort((a, b) => (a.createdAt < b.createdAt ? -1 : a.createdAt > b.createdAt ? 1 : 0));
       const toRemove = items.slice(0, Math.max(0, items.length - target)).map(r => ({ ownerGaii: r.ownerGaii, key: r.key }));
       if (toRemove.length) await storage.bulkDeleteMemory(toRemove);
-    } catch { /* best-effort: the audit write already succeeded; a prune failure must not fail the gate */ }
+    } catch (err) { logger.warn('pruneDecisionLog: best-effort: the audit write already succeeded; a prune failure must not fail the gate', { error: String(err) }); }
   };
 
   // Read the organism's runtime config entry (organism.{id}.meta.config) — UI-editable; absent = defaults.
@@ -552,6 +553,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
       try {
         const v = await verifyShareToken(token);
         if (v.org === id && v.ws === ws) return null;
+      // eslint-disable-next-line aimeat/no-silent-catch -- invalid/expired token falls through to the 401
       } catch { /* invalid/expired token falls through to the 401 */ }
     }
     if (authed && await memberRole(req, organism, id)) return null;
@@ -733,7 +735,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
         : await unarchiveTarget(storage, v.target, actor);
       res.json(success(config.nodeId, { [mode === 'archive' ? 'archived' : 'restored']: result.count, level: result.level, root: result.root }));
       emitChange('organisms');
-      void updateOrganismStructure(storage, config, id, { event: `${v.target.level} ${mode}d`, actor }).catch(() => { /* timeline best-effort */ });
+      void updateOrganismStructure(storage, config, id, { event: `${v.target.level} ${mode}d`, actor }).catch(err => { logger.warn('archiveHandler: timeline best-effort', { error: String(err) }); });
     } catch (e) {
       res.status(400).json(error(config.nodeId, 'ARCHIVE_FAILED', (e as Error).message || `Could not ${mode}`));
     }

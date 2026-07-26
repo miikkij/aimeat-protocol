@@ -230,6 +230,7 @@ export function decodeXPayment(header: string | undefined): X402PaymentPayload |
     const payload = JSON.parse(Buffer.from(header, 'base64').toString('utf8')) as X402PaymentPayload;
     if (!payload || payload.scheme !== 'exact' || !payload.payload?.authorization?.nonce) return null;
     return payload;
+  // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
   } catch { return null; }
 }
 

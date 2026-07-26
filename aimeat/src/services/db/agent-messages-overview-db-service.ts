@@ -13,6 +13,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { runInReadScope } from '../../storage/uow/unit-of-work.js';
+import { logger } from '../../utils/logger.js';
 
 export interface AgentMessagesOverview {
   commands: unknown;
@@ -43,7 +44,7 @@ export class AgentMessagesOverviewService {
       const taskCache = new Map<string, string | null>();
       const resolveTaskTitle = async (threadId: string): Promise<string | null> => {
         if (taskCache.has(threadId)) return taskCache.get(threadId) ?? null;
-        const task = await this.storage.getAgentTask(threadId).catch(() => null);
+        const task = await this.storage.getAgentTask(threadId).catch(err => { logger.warn('resolveTaskTitle: continuing after a suppressed failure', { error: String(err) }); return null; });
         const title = task?.title ?? null;
         taskCache.set(threadId, title);
         return title;

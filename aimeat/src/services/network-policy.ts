@@ -18,6 +18,7 @@
  *   v1.0.0 — 2026-06-19 — Initial network-policy doc + evaluators (genesis-defined criteria).
  */
 import type { Storage } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
 
 /** System identity + key the active network policy is stored under. */
 export const NETWORK_POLICY_GAII = '__network_policy__';
@@ -140,14 +141,14 @@ export async function getActivePolicy(storage: Storage): Promise<NetworkPolicyDo
   try {
     const rec = await storage.getMemory(NETWORK_POLICY_GAII, NETWORK_POLICY_KEY);
     if (rec) return coercePolicy(rec.value);
-  } catch { /* fall through to default */ }
+  } catch (err) { logger.warn('getActivePolicy: fall through to default', { error: String(err) }); }
   return DEFAULT_NETWORK_POLICY;
 }
 
 /** Persist the policy doc under the system identity. */
 export async function storeActivePolicy(storage: Storage, doc: NetworkPolicyDoc): Promise<void> {
   const now = new Date().toISOString();
-  const existing = await storage.getMemory(NETWORK_POLICY_GAII, NETWORK_POLICY_KEY).catch(() => null);
+  const existing = await storage.getMemory(NETWORK_POLICY_GAII, NETWORK_POLICY_KEY).catch(err => { logger.warn('storeActivePolicy: continuing after a suppressed failure', { error: String(err) }); return null; });
   await storage.setMemory({
     key: NETWORK_POLICY_KEY,
     ownerGaii: NETWORK_POLICY_GAII,
@@ -162,6 +163,7 @@ export async function storeActivePolicy(storage: Storage, doc: NetworkPolicyDoc)
 }
 
 function hostOf(url: string): string {
+  // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
   try { return new URL(url).host.toLowerCase(); } catch { return ''; }
 }
 

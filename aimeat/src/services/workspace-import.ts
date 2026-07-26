@@ -15,6 +15,7 @@ import type { AimeatConfig } from '../config.js';
 import type { WorkspaceExportJson, ExportObject, ExportImage } from './workspace-export.js';
 import { WS_EXPORT_VERSION } from './workspace-export.js';
 import { safeUnzip, BACKUP_ZIP_LIMITS } from './safe-zip.js';
+import { logger } from '../utils/logger.js';
 
 const STORAGE_URL_RE = /\/v1\/(?:storage|pub\/[^/)\s]+)\/([^\s)\]"'>]+)/g;
 
@@ -95,7 +96,7 @@ export async function restoreWorkspace(
     const isPublic = img.visibility === 'public';
     urlByOldKey.set(img.key, isPublic ? `/v1/pub/${importerGaii}/${newKey}` : `/v1/storage/${encodeURIComponent(newKey)}`);
     if (!bin) continue;
-    const existing = await storage.getStorageFile(importerGaii, newKey).catch(() => null);
+    const existing = await storage.getStorageFile(importerGaii, newKey).catch(err => { logger.warn('remapKey: continuing after a suppressed failure', { error: String(err) }); return null; });
     if (existing) { imagesDeduped++; continue; }   // already present — reuse, don't duplicate
     await storage.createStorageFile({
       key: newKey, ownerGaii: importerGaii, visibility: (img.visibility as 'private' | 'owner' | 'group' | 'public') || 'private',

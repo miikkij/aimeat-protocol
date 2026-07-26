@@ -108,7 +108,7 @@ export async function emitOutboundEcosystemEvent(
   const candidates = subs.filter(s => s.ownerGhii === ownerGhii && (s.event === event || s.event === '*') && matchPasses(s.match, payload));
   for (const sub of candidates) {
     // Live grant re-check — a revoked / missing GEAI stops receiving immediately.
-    const app = await storage.getEcosystemApp(sub.geai).catch(() => null);
+    const app = await storage.getEcosystemApp(sub.geai).catch(err => { logger.warn('emitOutboundEcosystemEvent: continuing after a suppressed failure', { error: String(err) }); return null; });
     if (!app || (app.status !== 'active' && app.status !== 'approved')) continue;
     if (!sub.transport.includes('tunnel')) continue; // webhook-only subs are no-ops this chunk (fallback deferred)
     const envelope = buildEcosystemEnvelope(event, config.nodeId, sub.geai, payload);

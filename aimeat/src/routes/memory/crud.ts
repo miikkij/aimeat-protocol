@@ -192,8 +192,10 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     // C.3: Event-driven replication queue integration
     if (peers) {
-      enqueueMemoryReplication(gaii, key, config, storage, peers).catch(() => {
-        // Non-critical — will be picked up by scheduled sync
+      enqueueMemoryReplication(gaii, key, config, storage, peers).catch(err => {
+        // Non-critical for THIS request: the scheduled sync picks the record up later. Logged because
+        // an enqueue that keeps failing means replication is running only at sync cadence.
+        logger.warn('memory write: replication enqueue failed, leaving it to the scheduled sync', { key, error: String(err) });
       });
     }
 

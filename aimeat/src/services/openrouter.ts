@@ -123,6 +123,7 @@ export async function complete(
     });
 
     if (!resp.ok) {
+      // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
       const body = await resp.text().catch(() => '');
       const err = new Error(`OpenRouter ${resp.status}: ${body}`) as Error & { status: number };
       err.status = resp.status;

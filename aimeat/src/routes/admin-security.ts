@@ -18,6 +18,7 @@ import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { SECURITY_INCIDENT_PREFIX, securityOwner } from '../services/security-incident.js';
+import { logger } from '../utils/logger.js';
 
 interface IncidentValue { id: string; type: string; code: string; actor: string; actor_name: string; detail: string; source: string; quarantine_key: string | null; size_bytes: number; status: string; createdAt: string }
 
@@ -71,7 +72,7 @@ export function adminSecurityRouter(config: AimeatConfig, storage: Storage): Rou
     const rec = await findIncident(req.params.id as string);
     if (!rec) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Incident not found')); return; }
     const qk = (rec.value as IncidentValue).quarantine_key;
-    if (qk) { try { await storage.deleteStorageFile(owner, qk); } catch { /* best-effort */ } }
+    if (qk) { try { await storage.deleteStorageFile(owner, qk); } catch (err) { logger.warn('qk: best-effort', { error: String(err) }); } }
     await storage.deleteMemory(owner, rec.key);
     res.json(success(config.nodeId, { deleted: true, id: req.params.id }));
   });

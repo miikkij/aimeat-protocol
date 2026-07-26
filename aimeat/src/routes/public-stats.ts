@@ -31,6 +31,7 @@ import type { Storage } from '../storage/interface.js';
 import { success } from '../middleware/envelope.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { cached, TTL } from '../services/cache.js';
+import { logger } from '../utils/logger.js';
 
 export function publicStatsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -68,12 +69,12 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
             key: m.key.split('.').slice(-2).join('.'),
             at: m.updatedAt!,
           }));
-      } catch { /* fall through to empty — frontend has a static fallback */ }
+      } catch (err) { logger.warn('GET /v1/public/activity-ticker: fall through to empty — frontend has a static fallback', { error: String(err) }); }
       try {
         const agents = await storage.listAgents();
         const cutoff = Date.now() - 10 * 60 * 1000;
         agentsOnline = agents.filter(a => a.lastSeen && new Date(a.lastSeen).getTime() > cutoff).length;
-      } catch { /* count stays 0 */ }
+      } catch (err) { logger.warn('GET /v1/public/activity-ticker: count stays 0', { error: String(err) }); }
       return { items, agents_online: agentsOnline };
     }, ['domain:memory', 'domain:agents']);
     res.json(success(config.nodeId, payload));
@@ -94,11 +95,11 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
           visibility: 'public', excludeOwnerPrefix: SYSTEM_OWNER, newestFirst: true, limit: 500,
         });
         publicWrites = mem.items.filter(m => isToday(m.updatedAt)).length;
-      } catch { /* 0 */ }
+      } catch (err) { logger.warn('GET /v1/public/node-stats-today: continuing after a suppressed failure', { error: String(err) }); }
       try {
         const jobs = await storage.listScheduledJobs();
         schedulesFired = jobs.filter(j => isToday((j as { lastRunAt?: string }).lastRunAt)).length;
-      } catch { /* 0 */ }
+      } catch (err) { logger.warn('GET /v1/public/node-stats-today: continuing after a suppressed failure', { error: String(err) }); }
       try {
         // Bounded sweep: first 50 agents × first 50 done tasks. The 60 s cache keeps
         // this cheap; on very large nodes the figure is a floor, not a lie.
@@ -107,7 +108,7 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
           const r = await storage.listAgentTasks(a.gaii, { status: 'done', perPage: 50 });
           tasksCompleted += r.tasks.filter(tk => isToday((tk as { completedAt?: string }).completedAt)).length;
         }
-      } catch { /* 0 */ }
+      } catch (err) { logger.warn('agents: continuing after a suppressed failure', { error: String(err) }); }
       return { public_writes: publicWrites, tasks_completed: tasksCompleted, schedules_fired: schedulesFired };
     }, ['domain:memory', 'domain:scheduler', 'domain:agent-tasks']);
     res.json(success(config.nodeId, payload));
@@ -124,20 +125,20 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
         const { apps: list, total } = await storage.listApps({ limit: 1000 });
         apps = total || list.length;
         const counts = await Promise.all(
-          list.map(a => storage.getAppDownloads(a.ownerGaii, a.filename).catch(() => 0)),
+          list.map(a => storage.getAppDownloads(a.ownerGaii, a.filename).catch(err => { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); return 0; })),
         );
         downloads = counts.reduce((s, n) => s + (Number(n) || 0), 0);
-      } catch { /* 0 */ }
+      } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
       try {
         const orgs = await storage.listOrganisms({ visibility: 'public', perPage: 1000, archived: 'exclude' });
         organisms = orgs.length;
-      } catch { /* 0 */ }
+      } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
       try {
         const all = await storage.listAgents();
         agents = all.length;
         const cutoff = Date.now() - 10 * 60 * 1000;
         agentsOnline = all.filter(a => a.lastSeen && new Date(a.lastSeen).getTime() > cutoff).length;
-      } catch { /* 0 */ }
+      } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
       try {
         // Public knowledge packages are public memory entries keyed packages/{id}/manifest.
         // Scope the query to the packages/ prefix — an unscoped recent-1000 scan of all public
@@ -146,7 +147,7 @@ export function publicStatsRouter(config: AimeatConfig, storage: Storage): Route
         // queries per-owner with the same prefix).
         const mem = await storage.listAllMemory({ visibility: 'public', prefix: 'packages/', limit: 1000 });
         knowledgePackages = mem.items.filter(m => /^packages\/[^/]+\/manifest$/.test(m.key)).length;
-      } catch { /* 0 */ }
+      } catch (err) { logger.warn('GET /v1/public/node-totals: continuing after a suppressed failure', { error: String(err) }); }
       return {
         apps, downloads, organisms,
         agents, agents_online: agentsOnline,

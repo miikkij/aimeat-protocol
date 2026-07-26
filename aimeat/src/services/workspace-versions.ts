@@ -200,7 +200,13 @@ export async function compactWorkspaceVersions(
       const mkey = `organism.${orgId}.w.${ws}.meta.manifest`;
       const { items } = await storage.listAllMemory({ prefix: mkey, limit: 10 });
       man = (items.find(r => r.key === mkey)?.value as Manifest | undefined) ?? null;
-    } catch { man = null; }
+    } catch (err) {
+      // Caching the null is deliberate (see above: unreadable == skip this workspace), but the read
+      // failure itself must be visible — otherwise a transient error is indistinguishable from a
+      // workspace that genuinely declares no manifest.
+      logger.warn('workspace manifest unreadable; treating the workspace as having none', { orgId, ws, error: String(err) });
+      man = null;
+    }
     manifests.set(cacheKey, man);
     return man;
   };

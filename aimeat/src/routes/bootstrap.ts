@@ -35,6 +35,7 @@ import { getSiteSyncState } from '../services/site-sync.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
+import { logger } from '../utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -685,7 +686,7 @@ export function bootstrapRouter(
           if (n.lastSeen && (!newest || n.lastSeen > newest)) newest = n.lastSeen;
         }
         if (newest) tunnelSub.last_connection_at = newest;
-      } catch { /* ignore — non-critical */ }
+      } catch (err) { logger.warn('GET /v1/health: ignore — non-critical', { error: String(err) }); }
       subsystems.tunnel = tunnelSub;
     }
 
@@ -714,7 +715,8 @@ export function bootstrapRouter(
           bytes_total: totalBytes,
           oldest_item_age_seconds: oldestAge,
         };
-      } catch {
+      } catch (err) {
+        logger.warn('bootstrap: suppressed failure, continuing', { error: String(err) });
         subsystems.mailbox = { healthy: false };
         degraded = true;
       }
@@ -724,7 +726,8 @@ export function bootstrapRouter(
     try {
       await storage.listOwners();
       subsystems.storage = { healthy: true };
-    } catch {
+    } catch (err) {
+      logger.warn('bootstrap: suppressed failure, continuing', { error: String(err) });
       subsystems.storage = { healthy: false };
       degraded = true;
     }

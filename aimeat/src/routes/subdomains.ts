@@ -54,6 +54,7 @@ import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services
 import { prefersMarkdown } from '../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../services/agent-face.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
+import { logger } from '../utils/logger.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -214,7 +215,7 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options', 'nosniff');
-  storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(() => { });
+  storage.incrementAppDownloads(app.ownerGaii, app.filename).catch(err => { logger.warn('serveApp: continuing after a suppressed failure', { error: String(err) }); });
 
   if (/text\/html/i.test(app.mimeType)) {
     // Relax the author's CSP meta so the H-2 SSO bridge works (only when apex framing is on),
@@ -336,6 +337,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
   const router = Router();
   // Apex origin allowed to frame app-origin apps (the in-SPA sandboxed viewer).
   let apexOrigin = '';
+  // eslint-disable-next-line aimeat/no-silent-catch -- no apex frame-ancestor
   try { apexOrigin = new URL(config.baseUrl).origin; } catch { /* no apex frame-ancestor */ }
   const csp = appCsp(apexOrigin);
 
@@ -400,7 +402,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
         const grant = await verifyFrameToken(frameToken);
         const grantOwner = grant.sub.includes('@') ? grant.sub.split('@')[0] : grant.sub;
         if (grantOwner === tOwner && grant.filename === tFile) grantedOrigin = grant.origin;
-      } catch { /* not a usable grant → strict CSP */ }
+      } catch (err) { logger.warn('notFound: not a usable grant → strict CSP', { error: String(err) }); }
     }
     const appCspForRequest = appCsp(apexOrigin, grantedOrigin);
     // X-Frame-Options is SAMEORIGIN node-wide; where a grant is the policy the legacy header
@@ -447,6 +449,7 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     const sub = await ensureAppSubdomain(storage, config, bareOwner, filename);
     if (sub) {
       let scheme = 'https', portSuffix = '';
+      // eslint-disable-next-line aimeat/no-silent-catch -- keep https
       try { const b = new URL(config.baseUrl); scheme = b.protocol.replace(':', ''); portSuffix = b.port ? `:${b.port}` : ''; } catch { /* keep https */ }
       res.setHeader('Cache-Control', 'no-store');
       res.redirect(302, `${scheme}://${sub}.${config.appHost}${portSuffix}/`);

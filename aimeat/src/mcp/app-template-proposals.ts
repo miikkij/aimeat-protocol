@@ -17,6 +17,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { logger } from '../utils/logger.js';
 import {
     proposeTemplate, listTemplateProposals, getTemplateProposal, deleteTemplateProposal,
 } from '../services/app-template-proposals.js';
@@ -94,7 +95,7 @@ export function registerAppTemplateProposalTools(
 
             // Live commerce/fork state of the source app so the next builder knows how to start.
             const sourceOwnerGhii = `${m.derivedFrom.owner}@${config.nodeId}`;
-            const app = await storage.getApp(sourceOwnerGhii, m.derivedFrom.filename).catch(() => null);
+            const app = await storage.getApp(sourceOwnerGhii, m.derivedFrom.filename).catch(err => { logger.warn('proofs: continuing after a suppressed failure', { error: String(err) }); return null; });
             const priceMorsels = (app?.manifest as { priceMorsels?: number } | undefined)?.priceMorsels ?? 0;
             const source_app = app ? {
                 exists: true,

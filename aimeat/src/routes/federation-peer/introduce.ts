@@ -22,6 +22,7 @@ import { performKeyExchange } from '../../services/federation-helpers.js';
 import { computeServiceSummary } from '../../utils/service-summary.js';
 import { deriveTierFlags } from '../../services/federation-tiers.js';
 import { getActivePolicy, evaluateAutoAdmit } from '../../services/network-policy.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerIntroduceRoutes(router: Router, config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): void {
     // GET /v1/federation/directory — public peer directory (Tier 0)
@@ -136,7 +137,8 @@ export function registerIntroduceRoutes(router: Router, config: AimeatConfig, st
         let valid: boolean;
         try {
             valid = await verify(public_key, messageToVerify, signature);
-        } catch {
+        } catch (err) {
+          logger.warn('introduce: suppressed failure, continuing', { error: String(err) });
             valid = false;
         }
         if (!valid) {

@@ -16,6 +16,7 @@ import { calculateTrustScore } from '../../services/trust.js';
 import { fireHook } from '../../utils/fire-hook.js';
 import { emitChange } from '../../services/event-bus.js';
 import { evictAgentTelemetry } from '../../services/telemetry-buffer.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerManagementRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // POST /v1/agents/:gaii/export — Export agent data for portability (owner auth)
@@ -167,7 +168,7 @@ export function registerManagementRoutes(router: Router, config: AimeatConfig, s
             updatedAt: now,
           });
           actionsImported++;
-        } catch { /* skip duplicates */ }
+        } catch (err) { logger.warn('POST /v1/agents/import: skip duplicates', { error: String(err) }); }
       }
     }
 

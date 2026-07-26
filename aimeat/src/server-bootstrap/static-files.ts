@@ -67,6 +67,7 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
   let appFrameSrc = '';
   if (config.appOriginEnabled && config.appHost) {
     let scheme = 'https';
+    // eslint-disable-next-line aimeat/no-silent-catch -- keep https
     try { scheme = new URL(config.baseUrl).protocol.replace(':', ''); } catch { /* keep https */ }
     const h = config.appHost;
     appFrameSrc = ` ${scheme}://${h} ${scheme}://*.${h} ${scheme}://${h}:* ${scheme}://*.${h}:*`;
@@ -261,6 +262,7 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     const appSilentPath = join(pwaStaticDir, 'app-silent.html');
     if ((config.appHost || (config.portfolioOriginEnabled && config.portfolioHost)) && existsSync(appSilentPath)) {
       let scheme = 'https';
+      // eslint-disable-next-line aimeat/no-silent-catch -- keep https
       try { scheme = new URL(config.baseUrl).protocol.replace(':', ''); } catch { /* keep https */ }
       const families = [
         ...(config.appHost ? [config.appHost] : []),

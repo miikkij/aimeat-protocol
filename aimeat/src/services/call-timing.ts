@@ -109,7 +109,8 @@ export async function readCallTiming(storage: Storage, providerGhii: string, ext
   let stored: CallTiming | null;
   try {
     stored = ((await storage.getMemory(providerGhii, timingKey(ext, action)))?.value as CallTiming | undefined) ?? null;
-  } catch {
+  } catch (err) {
+    logger.warn('call-timing: suppressed failure, continuing', { error: String(err) });
     stored = null;
   }
   const buffered = pending.get(`${providerGhii}|${ext}|${action}`)?.durations ?? [];

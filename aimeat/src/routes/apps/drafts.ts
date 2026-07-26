@@ -24,6 +24,7 @@ import { randomBytes } from 'node:crypto';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerDraftRoutes(
     router: Router,
@@ -305,7 +306,7 @@ export function registerDraftRoutes(
             summary: `App ${manifest.name || filename} ${isUpdate ? 'updated' : 'published'} (v${newVersion})`,
             detail: manifest.description || '',
             link: `${downloadUrl}?mode=inline`,
-        }).catch(() => { /* feed is best-effort */ });
+        }).catch(err => { logger.warn('POST /v1/apps/:owner/:filename/publish-draft: feed is best-effort', { error: String(err) }); });
 
         res.status(201).json(success(config.nodeId, {
             filename,

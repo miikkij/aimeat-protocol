@@ -31,6 +31,7 @@ import { createSecurityTabService } from '../services/db/security-tab-db-service
 import { randomBytes } from 'node:crypto';
 import { generateOtk } from '../utils/otk.js';
 import { AuthTokenRequestSchema, validateBody } from '../models/schemas.js';
+import { logger } from '../utils/logger.js';
 
 // In-memory challenge store
 const challenges = new Map<string, { challenge: string; expiresAt: number; owner: string }>();
@@ -755,7 +756,7 @@ export function authRouter(config: AimeatConfig, storage: Storage): Router {
     // Expire inactive sessions (5 min inactivity)
     for (const [sessionId, session] of sessions) {
       if (now - session.lastActivity > SESSION_INACTIVITY_MS) {
-        storage.expireSessionOtks(sessionId).catch(() => { });
+        storage.expireSessionOtks(sessionId).catch(err => { logger.warn('GET /v1/otk/:key: continuing after a suppressed failure', { error: String(err) }); });
         sessions.delete(sessionId);
       }
     }

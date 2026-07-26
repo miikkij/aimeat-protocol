@@ -34,6 +34,7 @@ function parseWindow(raw: string | null | undefined): DayBucket[] {
     const parsed = JSON.parse(raw) as { days?: DayBucket[] };
     return Array.isArray(parsed.days) ? parsed.days.filter(b => b && typeof b.d === 'string') : [];
   } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     return [];
   }
 }

@@ -23,6 +23,7 @@ import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../../services/agent-face.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerReadRoutes(
     router: Router,
@@ -449,7 +450,7 @@ export function registerReadRoutes(
         }
         res.setHeader('X-Content-Type-Options', 'nosniff');
 
-        storage.incrementAppDownloads(app.ownerGaii, filename).catch(() => { });
+        storage.incrementAppDownloads(app.ownerGaii, filename).catch(err => { logger.warn('body: continuing after a suppressed failure', { error: String(err) }); });
 
         res.send(body);
     });

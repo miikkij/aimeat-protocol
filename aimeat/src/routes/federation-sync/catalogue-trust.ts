@@ -102,7 +102,7 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
                 try {
                     await storage.createAction(actionData);
                     synced++;
-                } catch { /* skip if race condition */ }
+                } catch (err) { logger.warn('POST /v1/federation/catalogue-sync: skip if race condition', { error: String(err) }); }
             }
         }
 
@@ -149,7 +149,7 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
             const targetPeer = [...peers.entries()].find(([, p]) => p.nodeId === target_node);
             if (targetPeer) {
                 peers.delete(targetPeer[0]);
-                storage.deleteFederationPeer(targetPeer[1].nodeId).catch(() => {});
+                storage.deleteFederationPeer(targetPeer[1].nodeId).catch(err => { logger.warn('POST /v1/federation/trust-advisory: continuing after a suppressed failure', { error: String(err) }); });
             }
         }
 
@@ -163,7 +163,7 @@ export function registerCatalogueTrustRoutes(router: Router, config: AimeatConfi
                 if ((peer.tier ?? 'member') !== 'visiting') {
                     peer.tier = 'visiting';
                     Object.assign(peer, deriveTierFlags('visiting'));
-                    storage.saveFederationPeer(peer).catch(() => {});
+                    storage.saveFederationPeer(peer).catch(err => { logger.warn('POST /v1/federation/trust-advisory: continuing after a suppressed failure', { error: String(err) }); });
                     logger.warn(`Peer ${target_node} demoted to visiting after suspend advisory`, { reason });
                 }
             }

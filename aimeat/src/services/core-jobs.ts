@@ -122,7 +122,7 @@ async function runWorkTimeoutJob(_config: AimeatConfig, storage: Storage): Promi
             headers: { 'Content-Type': 'application/json' },
             body,
             signal: AbortSignal.timeout(10_000),
-          }).catch(() => { /* fire and forget */ });
+          }).catch(err => { logger.warn('runWorkTimeoutJob: fire and forget', { error: String(err) }); });
         }
 
         logger.info(`Work ${work.trackingCode} expired (TTL exceeded)`);

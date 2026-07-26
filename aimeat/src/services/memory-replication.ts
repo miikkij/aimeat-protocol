@@ -159,6 +159,7 @@ export async function replicateMemoryToPeer(
       replicationState.set(trackKey, new Date().toISOString());
       return { success: true };
     } else {
+      // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
       const body = await resp.text().catch(() => '');
       return { success: false, error: `HTTP ${resp.status}: ${body}` };
     }
@@ -223,8 +224,9 @@ export async function replicateMemoryToAllPeers(
             entriesFailed++;
           }
         }
-      } catch {
+      } catch (err) {
         // Skip agent on error
+        logger.warn('replicateMemoryToAllPeers: continuing after a suppressed failure', { error: String(err) });
       }
     }
 

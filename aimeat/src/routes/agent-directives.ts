@@ -39,6 +39,7 @@ import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentDirectivesSchema, OwnerAgentDefaultsSchema } from '../models/agent-directives-schemas.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { createAgentDataAccessOverviewService } from '../services/db/agent-data-access-overview-db-service.js';
+import { logger } from '../utils/logger.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -223,7 +224,7 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
         });
       }
     }
-    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/directives`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/directives`); } catch (err) { logger.warn('resources: MCP not connected', { error: String(err) }); }
 
     emitChange('agent-directives');
 

@@ -53,6 +53,7 @@ export function subdomainMiddleware(config: AimeatConfig) {
   let apexHost = '';
   try {
     apexHost = new URL(config.baseUrl).hostname.toLowerCase();
+  // eslint-disable-next-line aimeat/no-silent-catch -- no hostname fallback without a valid baseUrl
   } catch { /* no hostname fallback without a valid baseUrl */ }
   const appHost = (config.appHost || '').toLowerCase();
   const portfolioHost = (config.portfolioHost || '').toLowerCase();

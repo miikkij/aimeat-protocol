@@ -6,6 +6,7 @@
  */
 
 import { CONNECT_HELP_TEXT } from './index-help.js';
+import { logger } from './utils/logger.js';
 
 /**
  * Handle the `aimeat connect ...` subcommand family. Parses connector flags from raw
@@ -155,7 +156,7 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
     try {
       const dir = path.dirname(perAgentConfigPath(m.agent));
       if (fs.existsSync(dir)) fs.rmSync(dir, { recursive: true, force: true });
-    } catch { /* ignore */ }
+    } catch (err) { logger.warn('runConnectCli: ignore', { error: String(err) }); }
     console.log(`Removed ${m.agent}@${m.owner}.`);
   } else if (connectAction === 'add') {
     // Alias for the default `aimeat connect` flow -- explicit subcommand for clarity in docs.

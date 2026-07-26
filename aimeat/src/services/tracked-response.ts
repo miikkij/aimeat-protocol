@@ -206,7 +206,7 @@ async function evaluateContract(ctx: DeliveryCtx, c: TrackedResponse): Promise<v
         title: 'Reply ready to send',
         body: `"${c.title}" — the linked work is done; a suggested reply is ready.`,
         link: `/v1/profile#inbox/${c.source.conversationId}`,
-      }).catch(() => { /* notify best-effort */ });
+      }).catch(err => { logger.warn('evaluateContract: notify best-effort', { error: String(err) }); });
       return;
     }
 

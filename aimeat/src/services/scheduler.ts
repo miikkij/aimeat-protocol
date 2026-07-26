@@ -379,7 +379,7 @@ export class Scheduler {
       try {
         const agent = job.agentGaii ? await this.storage.getAgent(job.agentGaii) : null;
         updatedConstraints = await applyAfterRun(job, { storage: this.storage, config: this.config, ownerGaii: job.ownerScope, agent });
-      } catch { /* non-fatal */ }
+      } catch (err) { logger.warn('error: non-fatal', { error: String(err) }); }
     }
 
     await this.storage.updateScheduledJob(job.id, {
@@ -391,7 +391,7 @@ export class Scheduler {
       runCount: newRunCount,
       ...(updatedConstraints ? { constraints: updatedConstraints } : {}),
       updatedAt: new Date().toISOString(),
-    }).catch(() => { /* don't let update failure mask original error */ });
+    }).catch(err => { logger.warn('error: dont let update failure mask original error', { error: String(err) }); });
 
     // Core jobs run every 1-5 minutes; a successful (usually no-op) tick carries no
     // information and would dominate the execution log. Skip success rows for core jobs —
@@ -450,7 +450,7 @@ export class Scheduler {
   private async autoDisable(job: ScheduledJobRecord, reason: string): Promise<void> {
     this.removeJob(job.id);
     job.enabled = false;
-    await this.storage.updateScheduledJob(job.id, { enabled: false, updatedAt: new Date().toISOString() }).catch(() => {});
+    await this.storage.updateScheduledJob(job.id, { enabled: false, updatedAt: new Date().toISOString() }).catch(err => { logger.warn('error: continuing after a suppressed failure', { error: String(err) }); });
     emitChange('scheduler');
     this.notifyOwner(job, 'Schedule auto-paused', reason);
     logger.info(`Scheduler auto-disabled job ${job.id}: ${reason}`);
@@ -478,7 +478,7 @@ export class Scheduler {
       body: `${label}: ${body}`,
       url: '/v1/profile?tab=scheduler',
       tag: `schedule:${job.id}`,
-    }).catch(() => { /* push best-effort */ });
+    }).catch(err => { logger.warn('error: push best-effort', { error: String(err) }); });
   }
 
   /**
@@ -588,7 +588,7 @@ export class Scheduler {
         schedule_id: job.id,
       });
     }
-    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('cfg: MCP not connected', { error: String(err) }); }
     emitChange('agent-tasks');
 
     return { reads: [], writes: [], taskId: created.id };
@@ -652,7 +652,7 @@ export class Scheduler {
         type: 'started',
         message: `Task auto-activated from automation recipe "${args.parentRef}"`,
         timestamp: now,
-      }).catch(() => { /* best-effort */ });
+      }).catch(err => { logger.warn('cfg: best-effort', { error: String(err) }); });
     }
 
     const eventName = autoActivated ? 'task.approved' : 'task.queued';
@@ -668,7 +668,7 @@ export class Scheduler {
         auto_activated: autoActivated,
       });
     }
-    try { emitResourceUpdated(args.agentGaii, `aimeat://agents/${args.agentName}/tasks`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(args.agentGaii, `aimeat://agents/${args.agentName}/tasks`); } catch (err) { logger.warn('cfg: MCP not connected', { error: String(err) }); }
     emitChange('agent-tasks');
 
     return created.id;

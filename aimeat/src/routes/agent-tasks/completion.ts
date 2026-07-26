@@ -339,7 +339,7 @@ export function registerTaskCompletionRoutes(
 
     // Refresh the public statistics cache. Best-effort: a failure here must not
     // fail the rating write — the rollup is recomputable on demand anyway.
-    recomputeAndCacheStatistics(storage, task.agentGaii, config.nodeId).catch(() => {});
+    recomputeAndCacheStatistics(storage, task.agentGaii, config.nodeId).catch(err => { logger.warn('POST /v1/agents/:name/tasks/:id/rate: continuing after a suppressed failure', { error: String(err) }); });
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks', resolve(req));

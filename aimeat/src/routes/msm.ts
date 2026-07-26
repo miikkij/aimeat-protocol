@@ -24,6 +24,7 @@ import { success, error } from '../middleware/envelope.js';
 import { parseMsm, validateMsm } from '../services/msm-parser.js';
 import { emitChange } from '../services/event-bus.js';
 import type { MsmDefinition } from '../services/msm-parser.js';
+import { logger } from '../utils/logger.js';
 
 // Load MSM templates at startup
 interface MsmTemplateMeta {
@@ -57,8 +58,9 @@ function loadMsmTemplates(): MsmTemplateMeta[] {
         category: parsed.service.category,
         yaml,
       });
-    } catch {
+    } catch (err) {
       // Skip templates that fail to parse
+      logger.warn('loadMsmTemplates: continuing after a suppressed failure', { error: String(err) });
     }
   }
 

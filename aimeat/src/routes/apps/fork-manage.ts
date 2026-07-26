@@ -20,6 +20,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
 import type { CanonicalOwner } from './helpers.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerForkManageRoutes(
     router: Router,
@@ -143,7 +144,7 @@ export function registerForkManageRoutes(
                     createdAt: now,
                 });
             }
-        } catch { /* screenshot copy is non-critical */ }
+        } catch (err) { logger.warn('POST /v1/apps/:owner/:filename/fork: screenshot copy is non-critical', { error: String(err) }); }
 
         // Record the fork event — the source of truth for fork stats + lineage.
         await storage.recordAppFork({
@@ -188,7 +189,7 @@ export function registerForkManageRoutes(
             summary: `App ${forkedManifest.name} forked from ${source.ownerName}/${sourceFilename}`,
             detail: forkedManifest.description || '',
             link: `${downloadUrl}?mode=inline`,
-        }).catch(() => { /* feed is best-effort */ });
+        }).catch(err => { logger.warn('POST /v1/apps/:owner/:filename/fork: feed is best-effort', { error: String(err) }); });
     });
 
     // PATCH /v1/apps/:filename — Update an app you own (requires auth). Accepts
@@ -420,7 +421,7 @@ export function registerForkManageRoutes(
                 // ownerName as the key — but defense in depth.)
                 if (app.ownerName !== owner) break;
                 await storage.deleteApp(app.ownerGaii, filename);
-                await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`).catch(() => {});
+                await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`).catch(err => { logger.warn('DELETE /v1/apps/:filename: continuing after a suppressed failure', { error: String(err) }); });
                 sweepCount++;
                 if (sweepCount > 10) break; // safety cap, no real owner has >10 buckets
             }

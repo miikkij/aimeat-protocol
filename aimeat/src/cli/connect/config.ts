@@ -34,6 +34,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { parse, stringify } from 'yaml';
 import { listAllTokens } from './keychain.js';
+import { logger } from '../../utils/logger.js';
 
 // Connector home resolution (directory-scoped):
 //   1. AIMEAT_HOME env var — explicit override, always wins.
@@ -167,7 +168,8 @@ export function loadPerAgentConfig(agent: string): AimeatPerAgentConfig | null {
   if (!existsSync(p)) return null;
   try {
     return parse(readFileSync(p, 'utf-8')) as AimeatPerAgentConfig;
-  } catch {
+  } catch (err) {
+    logger.warn('config: suppressed failure, continuing', { error: String(err) });
     return null;
   }
 }

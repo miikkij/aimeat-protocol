@@ -16,6 +16,7 @@
  *   v1.0.0 -- 2026-06-07 -- Phase 4: durable pause — abort-on-deadline.
  */
 import type { Storage, PendingApprovalRecord } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
 
 export function isOverdue(a: PendingApprovalRecord, nowIso: string): boolean {
   return a.status === 'pending' && !!a.deadline && a.deadline < nowIso;
@@ -41,6 +42,6 @@ export async function expireOverdueApprovals(storage: Storage, nowIso: string): 
 /** Periodic backstop (every 10 minutes), mirroring the consent-expiry job. */
 export function startGateExpiryJob(storage: Storage): NodeJS.Timeout {
   return setInterval(() => {
-    expireOverdueApprovals(storage, new Date().toISOString()).catch(() => { /* background */ });
+    expireOverdueApprovals(storage, new Date().toISOString()).catch(err => { logger.warn('startGateExpiryJob: background', { error: String(err) }); });
   }, 10 * 60 * 1000);
 }

@@ -14,6 +14,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
+import { logger } from '../utils/logger.js';
 
 export const SECURITY_INCIDENT_PREFIX = 'security.incident.';
 export const SECURITY_QUARANTINE_PREFIX = 'security.quarantine.';
@@ -52,7 +53,7 @@ export async function recordSecurityIncident(
     try {
       await storage.createStorageFile({ key, ownerGaii: owner, visibility: 'private', mimeType: 'application/zip', size: input.blob.length, data: input.blob, createdAt: now });
       quarantineKey = key;
-    } catch { /* quarantine is best-effort */ }
+    } catch (err) { logger.warn('recordSecurityIncident: quarantine is best-effort', { error: String(err) }); }
   }
 
   try {
@@ -68,7 +69,7 @@ export async function recordSecurityIncident(
       },
       visibility: 'private', tags: ['security'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     });
-  } catch { /* incident logging is best-effort — must not fail the request */ }
+  } catch (err) { logger.warn('recordSecurityIncident: incident logging is best-effort — must not fail the request', { error: String(err) }); }
 
   return { id, quarantined: quarantineKey !== null };
 }

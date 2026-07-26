@@ -75,11 +75,15 @@ export default tseslint.config(
     // reads the absence value as "nothing to do here" and reports success. That is exactly how an
     // extension upsert came to answer `200 success:true` over code it never wrote (2026-07-26).
     //
-    // These areas are cleaned to zero and enforced. The rest of the codebase still carries a
-    // backlog — measure it with `pnpm check:silent-catch`, clean an area, then add it here. Do NOT
-    // add an area before it is at zero: the gate runs with --max-warnings 0, so a partial area
-    // cannot be introduced at any severity.
-    files: ['src/storage/**/*.ts', 'src/auth/**/*.ts', 'src/services/upload-zip.ts', 'src/routes/upload.ts', 'src/routes/extensions/**/*.ts'],
+    // The whole SERVER side is cleaned to zero and enforced. Two treatments were used: a handler that
+    // suppresses a real failure logs it (carrying the author's own comment as the message, so the
+    // reason why it was thought safe is what an operator reads when it was not), and a handler where
+    // the throw is expected control flow — "not a valid JWT, try the refresh path", "not JSON, store
+    // as string" — carries a disable stating that.
+    //
+    // The browser side (public/, src/static/) is enforced separately below: it has no `logger`, and
+    // its idioms differ, so it gets its own treatment rather than being forced into this one.
+    files: ['src/**/*.ts'],
     rules: {
       'aimeat/no-silent-catch': 'error',
     },

@@ -28,6 +28,7 @@ import { emitChange } from '../services/event-bus.js';
 import { createGenesisPeeringService } from '../services/genesis-peering.js';
 import { createOrganismReputationService } from '../services/organism-reputation.js';
 import { matchesKeyword, matchesActionKeyword, matchesGenesisKeyword, matchesLocation } from '../services/federation-helpers.js';
+import { logger } from '../utils/logger.js';
 
 export function federationGenesisRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>, networkDirectory?: Map<string, ServiceSummary>): Router {
     const router = Router();
@@ -191,8 +192,9 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                             ...val,
                         });
                     }
-                } catch {
+                } catch (err) {
                     // No genesis entries yet — that's fine
+                  logger.warn('GET /v1/federation/cross-catalogue: continuing after a suppressed failure', { error: String(err) });
                 }
             }
 
@@ -323,6 +325,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                         trustScore: 100,
                         morselBalance: 0,
                     });
+                // eslint-disable-next-line aimeat/no-silent-catch -- may already exist
                 } catch { /* may already exist */ }
             }
 
@@ -415,8 +418,9 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                         }));
                         return;
                     }
-                } catch {
+                } catch (err) {
                     // Cache miss — proceed to query peers
+                  logger.warn('POST /v1/federation/genesis-memory-read: continuing after a suppressed failure', { error: String(err) });
                 }
             }
 
@@ -459,8 +463,9 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                             });
                         }
                     }
-                } catch {
+                } catch (err) {
                     // Skip failed peer
+                  logger.warn('POST /v1/federation/genesis-memory-read: continuing after a suppressed failure', { error: String(err) });
                 }
             });
 
@@ -483,8 +488,9 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                             createdAt: now,
                             updatedAt: now,
                         });
-                    } catch {
+                    } catch (err) {
                         // Cache write failure is non-critical
+                      logger.warn('POST /v1/federation/genesis-memory-read: continuing after a suppressed failure', { error: String(err) });
                     }
                 }
             }
@@ -587,7 +593,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                                 updated_at: memory.updatedAt,
                             });
                         }
-                    } catch { /* skip agent */ }
+                    } catch (err) { logger.warn('GET /v1/federation/genesis-memory-read: skip agent', { error: String(err) }); }
                 }
             }
 
@@ -637,6 +643,7 @@ export function federationGenesisRouter(config: AimeatConfig, storage: Storage, 
                         trustScore: 100,
                         morselBalance: 0,
                     });
+                // eslint-disable-next-line aimeat/no-silent-catch -- may already exist
                 } catch { /* may already exist */ }
             }
 

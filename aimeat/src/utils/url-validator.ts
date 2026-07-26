@@ -21,6 +21,7 @@
  */
 import { URL } from 'node:url';
 import { lookup } from 'node:dns/promises';
+import { logger } from '../utils/logger.js';
 
 /**
  * Return a reason string if `ip` (a literal IPv4 or IPv6 address) is in a
@@ -162,7 +163,7 @@ export async function safeFetch(urlStr: string, init: SafeFetchInit = {}): Promi
           for (const [k, v] of Object.entries(sigHeaders)) headers.set(k, v);
           hopInit = { ...hopInit, headers };
         }
-      } catch { /* unsigned is fine — signing is additive, never a gate */ }
+      } catch (err) { logger.warn('safeFetch: unsigned is fine — signing is additive, never a gate', { error: String(err) }); }
     }
     const resp = await fetch(target, hopInit);
     if (resp.status >= 300 && resp.status < 400 && resp.headers.has('location')) {

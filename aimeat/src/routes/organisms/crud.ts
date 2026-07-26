@@ -30,6 +30,7 @@ import { canSeeMembers, redactOrganism, rosterCallerFromAuth, MEMBER_VISIBILITY_
 import { getOrganismReadme, setOrganismReadme } from '../../services/organism-readme.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import type { OrganismHelpers } from './shared.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { workspaceCountsByOrg, workspaceNamesByOrg } = H;
@@ -108,7 +109,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
       { description: 'List members', method: 'GET', url: `/v1/organisms/${id}/members` },
     ]));
     emitChange('organisms');
-    void updateOrganismStructure(storage, config, id, { event: 'organism created', actor: ghii }).catch(() => { /* timeline best-effort */ });
+    void updateOrganismStructure(storage, config, id, { event: 'organism created', actor: ghii }).catch(err => { logger.warn('POST /v1/organisms: timeline best-effort', { error: String(err) }); });
     // Public landing feed — only public organisms are discoverable, so only they announce.
     if (vis === 'public') {
       void recordPublicActivity(storage, config, {
@@ -117,7 +118,7 @@ export function registerOrganismCrudRoutes(router: Router, config: AimeatConfig,
         summary: `Organism "${name.trim()}" created`,
         detail: description || '',
         link: `/v1/organisms/${id}`,
-      }).catch(() => { /* feed is best-effort */ });
+      }).catch(err => { logger.warn('POST /v1/organisms: feed is best-effort', { error: String(err) }); });
     }
   });
 

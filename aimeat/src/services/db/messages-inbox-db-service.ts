@@ -17,6 +17,7 @@ import { runInReadScope } from '../../storage/uow/unit-of-work.js';
 import { conversationIdFor, messagePreview } from '../../utils/messaging.js';
 import { listTrackedResponses } from '../tracked-response.js';
 import { MessagingDbService, type OwnerConversation } from './messaging-db-service.js';
+import { logger } from '../../utils/logger.js';
 
 /** The `message-flag.<id>` key prefix marks a message the owner flagged "important" (record-presence =
  *  flagged; un-flag deletes it). Mirrors public/js/services/tracked-responses.js FLAG_PREFIX. */
@@ -51,8 +52,8 @@ export class MessagesInboxService {
         this.storage.listMemory(ownerGhii, { prefix: FLAG_PREFIX }),
         listTrackedResponses(this.storage, ownerGhii),
         this.storage.getAgentsByOwner(ownerName).catch(() => [] as AgentRecord[]),
-        this.storage.listSharingGroups(ownerGhii).catch(() => []),
-        this.storage.listSharingGroupsByMember(ownerGhii).catch(() => []),
+        this.storage.listSharingGroups(ownerGhii).catch(err => { logger.warn('overview: continuing after a suppressed failure', { error: String(err) }); return []; }),
+        this.storage.listSharingGroupsByMember(ownerGhii).catch(err => { logger.warn('overview: continuing after a suppressed failure', { error: String(err) }); return []; }),
       ]);
 
       // important = the message ids behind the flag keys (key = `message-flag.<id>`), same as the

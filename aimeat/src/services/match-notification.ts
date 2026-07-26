@@ -131,8 +131,9 @@ export function startMatchNotificationJob(
               matchCount: matches.length,
             });
           }
-        } catch {
+        } catch (err) {
           // Skip users we can't find email for
+          logger.warn('allEntries: continuing after a suppressed failure', { error: String(err) });
         }
       }
 

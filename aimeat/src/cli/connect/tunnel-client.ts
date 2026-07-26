@@ -38,6 +38,7 @@
  */
 import { WebSocket } from 'ws';
 import { randomUUID } from 'node:crypto';
+import { logger } from '../../utils/logger.js';
 
 /** Result of a forwarded API call — HTTP status + parsed (envelope) body. */
 export interface ForwardResult {
@@ -244,10 +245,11 @@ export class ConnectTunnelClient {
     const ws = this.ws;
     this.setStatus('stopped');
     if (ws && ws.readyState === WebSocket.OPEN) {
-      try { ws.send(JSON.stringify({ type: 'disconnect', id: randomUUID(), timestamp: new Date().toISOString() })); } catch { /* ignore */ }
+      try { ws.send(JSON.stringify({ type: 'disconnect', id: randomUUID(), timestamp: new Date().toISOString() })); } catch (err) { logger.warn('close: ignore', { error: String(err) }); }
       await new Promise<void>((resolve) => {
         const t = setTimeout(() => resolve(), 1_000);
         ws.once('close', () => { clearTimeout(t); resolve(); });
+        // eslint-disable-next-line aimeat/no-silent-catch -- closing a socket that is already being discarded; the catch completes the same teardown the success path does
         try { ws.close(1000, 'client_close'); } catch { clearTimeout(t); resolve(); }
       });
     }
@@ -258,7 +260,7 @@ export class ConnectTunnelClient {
   private setStatus(s: TunnelStatus): void {
     if (this.status === s) return;
     this.status = s;
-    try { this.opts.onStatusChange?.(s); } catch { /* listener error — ignore */ }
+    try { this.opts.onStatusChange?.(s); } catch (err) { logger.warn('close: listener error — ignore', { error: String(err) }); }
   }
 
   /** Stop permanently: no reconnects, timers cleared, pendings rejected. */
@@ -267,7 +269,7 @@ export class ConnectTunnelClient {
     this.clearTimers();
     this.rejectPending();
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-      try { this.ws.close(1000, 'stopped'); } catch { /* ignore */ }
+      try { this.ws.close(1000, 'stopped'); } catch (err) { logger.warn('close: ignore', { error: String(err) }); }
     }
     this.setStatus('stopped');
   }
@@ -291,7 +293,7 @@ export class ConnectTunnelClient {
     this.authFailed = true;
     console.error(`[${this.label}] Stopped: ${message}. ${RE_AUTH_GUIDANCE}`);
     this.stop();
-    try { this.opts.onAuthFailure?.(message); } catch { /* listener error — ignore */ }
+    try { this.opts.onAuthFailure?.(message); } catch (err) { logger.warn('close: listener error — ignore', { error: String(err) }); }
   }
 
   /**
@@ -327,7 +329,7 @@ export class ConnectTunnelClient {
       // Upgrade rejected with an HTTP status (server reachable, tunnel said no).
       ws.on('unexpected-response', (_req, res) => {
         const code = res.statusCode ?? 0;
-        try { ws.terminate(); } catch { /* ignore */ }
+        try { ws.terminate(); } catch (err) { logger.warn('settle: ignore', { error: String(err) }); }
         if (code === 401 || code === 403) {
           this.authFailure(`Tunnel upgrade rejected (${code})`);
           settle('auth_failed');
@@ -457,7 +459,7 @@ export class ConnectTunnelClient {
         break;
       }
       case 'disconnect': {
-        try { this.ws?.close(1000, 'server_disconnect'); } catch { /* ignore */ }
+        try { this.ws?.close(1000, 'server_disconnect'); } catch (err) { logger.warn('p: ignore', { error: String(err) }); }
         break;
       }
       default:
@@ -478,7 +480,7 @@ export class ConnectTunnelClient {
         // peer is gone) and let the close handler schedule the reconnect. The
         // server reaps at offline_threshold_ms (~90s); 3×interval stays under it.
         console.error(`[${this.label}] Heartbeat ack timeout (${sinceLast}ms), reconnecting...`);
-        try { this.ws.terminate(); } catch { /* ignore */ }
+        try { this.ws.terminate(); } catch (err) { logger.warn('p: ignore', { error: String(err) }); }
         return;
       }
       this.ws.send(JSON.stringify({ type: 'heartbeat', id: randomUUID(), timestamp: new Date().toISOString() }));
@@ -523,7 +525,7 @@ export class ConnectTunnelClient {
       // server does NOT auto-close at expiry; without this, forward calls
       // start 401-ing while the socket stays open.
       console.error(`[${this.label}] Token nearing expiry — reconnecting with a fresh token`);
-      try { this.ws?.terminate(); } catch { /* ignore */ }
+      try { this.ws?.terminate(); } catch (err) { logger.warn('p: ignore', { error: String(err) }); }
       return;
     }
     // Agent JWTs run ~90 days — past a single setTimeout's safe range. Chain

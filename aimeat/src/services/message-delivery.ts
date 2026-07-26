@@ -102,7 +102,7 @@ export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessa
     if (resp.status === 403) {
       // Recipient blocked the sender (or policy denied) — terminal, do not retry.
       let reason = 'rejected';
-      try { reason = ((await resp.json()) as { error?: { code?: string } })?.error?.code ?? 'rejected'; } catch { /* ignore */ }
+      try { reason = ((await resp.json()) as { error?: { code?: string } })?.error?.code ?? 'rejected'; } catch (err) { logger.warn('log: ignore', { error: String(err) }); }
       await storage.updateMessageDeliveryStatus(record.id, 'undeliverable', { error: reason });
       await log('undeliverable', { httpStatus: resp.status, errorMessage: reason });
       return 'undeliverable';
@@ -123,7 +123,7 @@ export async function deliverDirectMessage(ctx: DeliveryCtx, record: DirectMessa
 export async function logDelivery(ctx: DeliveryCtx, entry: Omit<MessageDeliveryLog, 'id' | 'createdAt'>): Promise<void> {
   try {
     await ctx.storage.appendMessageDeliveryLog({ ...entry, id: randomUUID(), createdAt: new Date().toISOString() });
-  } catch { /* telemetry is best-effort */ }
+  } catch (err) { logger.warn('logDelivery: telemetry is best-effort', { error: String(err) }); }
 }
 
 /**
@@ -150,8 +150,9 @@ export async function propagateReadReceipt(ctx: DeliveryCtx, message: DirectMess
       body: JSON.stringify({ ...payload, signature }),
       signal: AbortSignal.timeout(config.federationTimeoutMs),
     });
-  } catch {
+  } catch (err) {
     /* best-effort: a lost read receipt only affects the sender's UI, not correctness */
+    logger.warn('propagateReadReceipt: continuing after a suppressed failure', { error: String(err) });
   }
 }
 
@@ -179,7 +180,7 @@ export function startMessageRetryJob(config: AimeatConfig, storage: Storage, pee
     // Also re-attempt / expire held (reference) attachments on the recipient side (DECISION #10).
     await sweepReferenceAttachments(ctx).catch(err => logger.error('attachment sweep failed', { error: (err as Error).message }));
     // Cap the delivery-telemetry log so it can't grow unbounded.
-    await storage.pruneMessageDeliveryLogs(10000).catch(() => {});
+    await storage.pruneMessageDeliveryLogs(10000).catch(err => { logger.warn('sweep: continuing after a suppressed failure', { error: String(err) }); });
   }
 
   return setInterval(() => {

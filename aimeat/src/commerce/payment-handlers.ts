@@ -17,6 +17,7 @@
  */
 import { randomBytes, randomUUID } from 'node:crypto';
 import type { PaymentHandler, PaymentContext } from './types.js';
+import { logger } from '../utils/logger.js';
 
 const registry = new Map<string, PaymentHandler>();
 
@@ -88,7 +89,7 @@ export function morselPaymentHandler(): PaymentHandler {
           id: `tx-${randomUUID()}`, gaii: buyerGhii, type: 'commerce_refund', amount,
           trackingCode, timestamp: new Date().toISOString(),
         });
-      } catch { /* refund must never throw — the caller already carries the primary error */ }
+      } catch (err) { logger.warn('refund: refund must never throw — the caller already carries the primary error', { error: String(err) }); }
     },
   };
 }

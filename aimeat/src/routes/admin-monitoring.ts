@@ -250,22 +250,22 @@ export function adminMonitoringRouter(
 
         if (owners) {
             for (const o of owners) {
-                try { await storage.createOwner(o); imported.owners++; } catch { /* skip duplicates */ }
+                try { await storage.createOwner(o); imported.owners++; } catch (err) { logger.warn('POST /v1/admin/restore: skip duplicates', { error: String(err) }); }
             }
         }
         if (agents) {
             for (const a of agents) {
-                try { await storage.createAgent(a); imported.agents++; } catch { /* skip duplicates */ }
+                try { await storage.createAgent(a); imported.agents++; } catch (err) { logger.warn('POST /v1/admin/restore: skip duplicates', { error: String(err) }); }
             }
         }
         if (actions) {
             for (const a of actions) {
-                try { await storage.createAction(a); imported.actions++; } catch { /* skip duplicates */ }
+                try { await storage.createAction(a); imported.actions++; } catch (err) { logger.warn('POST /v1/admin/restore: skip duplicates', { error: String(err) }); }
             }
         }
         if (boards) {
             for (const b of boards) {
-                try { await storage.createBoard(b); imported.boards++; } catch { /* skip duplicates */ }
+                try { await storage.createBoard(b); imported.boards++; } catch (err) { logger.warn('POST /v1/admin/restore: skip duplicates', { error: String(err) }); }
             }
         }
         if (agent_data) {
@@ -508,8 +508,9 @@ function pollForApprovalAndComplete(
                 await storage.updatePeeringRequest(requestId, { status: 'rejected' });
                 emitChange('federation');
             }
-        } catch {
+        } catch (err) {
             // Network error during poll -- keep trying
+          logger.warn('pollForApprovalAndComplete: continuing after a suppressed failure', { error: String(err) });
         }
     }, POLL_INTERVAL_MS);
 }

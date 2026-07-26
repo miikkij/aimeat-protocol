@@ -80,14 +80,14 @@ export async function buildNodeCard(config: AimeatConfig, storage: Storage): Pro
   try {
     for (const o of await storage.listOwners()) {
       if (o.name === 'anonymous' || !o.roles?.includes('operator')) continue;
-      const ghii = await storage.getGHIIByOwner(o.name).catch(() => null);
+      const ghii = await storage.getGHIIByOwner(o.name).catch(err => { logger.warn('buildNodeCard: continuing after a suppressed failure', { error: String(err) }); return null; });
       operators.push({
         ghii: ghii?.ghii ?? `${o.name}@${config.nodeId}`,
         display_name: ghii?.displayName ?? o.displayName ?? o.name,
         avatar: ghii?.avatar ?? null,
       });
     }
-  } catch { /* operators best-effort */ }
+  } catch (err) { logger.warn('buildNodeCard: operators best-effort', { error: String(err) }); }
 
   let resources: NodeCardResources = { actions: 0, agents: 0, boards: 0, csms: 0, highlights: [] };
   try {
@@ -97,7 +97,7 @@ export async function buildNodeCard(config: AimeatConfig, storage: Storage): Pro
       ...(s.csms ?? []).slice(0, 2).map(c => c.name),
     ].filter(Boolean).slice(0, 5);
     resources = { actions: s.actions?.length ?? 0, agents: s.agents?.length ?? 0, boards: s.boards?.length ?? 0, csms: s.csms?.length ?? 0, highlights };
-  } catch { /* resources best-effort */ }
+  } catch (err) { logger.warn('buildNodeCard: resources best-effort', { error: String(err) }); }
 
   const card: NodeCard = {
     node_id: config.nodeId,
@@ -121,13 +121,13 @@ export async function getActiveBook(storage: Storage): Promise<FederationBook | 
   try {
     const rec = await storage.getMemory(FEDERATION_BOOK_GAII, FEDERATION_BOOK_KEY);
     if (rec) return rec.value as unknown as FederationBook;
-  } catch { /* none */ }
+  } catch (err) { logger.warn('getActiveBook: none', { error: String(err) }); }
   return null;
 }
 
 export async function storeActiveBook(storage: Storage, book: FederationBook): Promise<void> {
   const now = new Date().toISOString();
-  const existing = await storage.getMemory(FEDERATION_BOOK_GAII, FEDERATION_BOOK_KEY).catch(() => null);
+  const existing = await storage.getMemory(FEDERATION_BOOK_GAII, FEDERATION_BOOK_KEY).catch(err => { logger.warn('storeActiveBook: continuing after a suppressed failure', { error: String(err) }); return null; });
   await storage.setMemory({
     key: FEDERATION_BOOK_KEY,
     ownerGaii: FEDERATION_BOOK_GAII,
@@ -165,7 +165,7 @@ export async function assembleBook(config: AimeatConfig, storage: Storage, peers
         const p = peers.get(peer.nodeId);
         if (p && card.node_card_hash) p.nodeCardHash = card.node_card_hash;
       }
-    } catch { /* skip unreachable peer */ }
+    } catch (err) { logger.warn('assembleBook: skip unreachable peer', { error: String(err) }); }
   }
 
   nodes.sort((a, b) => a.node_id.localeCompare(b.node_id));
@@ -222,7 +222,7 @@ export async function pullBook(config: AimeatConfig, storage: Storage, peers: Ma
   const issuer = peers.get(book.issued_by) ?? [...peers.values()].find(p => p.nodeId === book.issued_by);
   const issuerKey = issuer?.publicKey || peerKeyCache.get(book.issued_by)?.publicKey;
   if (!issuerKey) return { ok: false, status: 403, code: 'UNKNOWN_ISSUER', message: `Book issuer ${book.issued_by} is not a known peer` };
-  const sigOk = book.signature ? await verify(issuerKey, bookSignString(book), book.signature).catch(() => false) : false;
+  const sigOk = book.signature ? await verify(issuerKey, bookSignString(book), book.signature).catch(err => { logger.warn('pullBook: continuing after a suppressed failure', { error: String(err) }); return false; }) : false;
   if (!sigOk) return { ok: false, status: 401, code: 'INVALID_SIGNATURE', message: 'Book signature verification failed' };
 
   const current = await getActiveBook(storage);

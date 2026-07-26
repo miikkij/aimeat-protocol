@@ -41,11 +41,13 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
    *  params) by parsing it, then stamp the instance id. */
   const coerceValue = (value: unknown, id: string): unknown => {
     let v = value;
+    // eslint-disable-next-line aimeat/no-silent-catch -- leave as string → schema rejects
     if (typeof v === 'string') { try { const p = JSON.parse(v); if (p && typeof p === 'object') v = p; } catch { /* leave as string → schema rejects */ } }
     return (v && typeof v === 'object' && !Array.isArray(v)) ? { ...(v as Record<string, unknown>), id } : v;
   };
   /** Parse a possibly-JSON-stringified object param (manifest / schemas) back to an object. */
   const parseObj = (v: unknown): unknown => {
+    // eslint-disable-next-line aimeat/no-silent-catch -- leave as-is
     if (typeof v === 'string') { try { const p = JSON.parse(v); if (p && typeof p === 'object') return p; } catch { /* leave as-is */ } }
     return v;
   };

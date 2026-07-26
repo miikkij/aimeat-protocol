@@ -20,6 +20,7 @@ import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { collectOrganismGraph, type OrganismGraph } from './structure-graph.js';
 import { stableStringify } from '../utils/stable-json.js';
+import { logger } from '../utils/logger.js';
 
 export function structureKey(orgId: string): string {
   return `organism.${orgId}.meta.structure`;
@@ -96,11 +97,11 @@ export async function updateOrganismStructure(
   opts: { event?: string; actor?: string } = {},
 ): Promise<void> {
   const prior = structureLocks.get(orgId) ?? Promise.resolve();
-  const run = prior.catch(() => { /* isolate the previous link's failure */ })
+  const run = prior.catch(err => { logger.warn('updateOrganismStructure: isolate the previous links failure', { error: String(err) }); })
     .then(() => updateOrganismStructureInner(storage, config, orgId, opts));
   // Chain tail becomes the new lock (failures swallowed so the chain never breaks). Drop the map entry
   // once this is still the tail, so idle organisms don't leak entries.
-  const tail = run.catch(() => { /* swallow for the chain */ });
+  const tail = run.catch(err => { logger.warn('updateOrganismStructure: swallow for the chain', { error: String(err) }); });
   structureLocks.set(orgId, tail);
   void tail.then(() => { if (structureLocks.get(orgId) === tail) structureLocks.delete(orgId); });
   return run;

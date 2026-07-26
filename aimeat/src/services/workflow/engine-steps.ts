@@ -136,10 +136,10 @@ export async function askHumanInput(
   const body = `${name}: step "${step.id}" — ${question.prompt} [${optionsSummary}]`;
   logger.info(`workflow ${run.workflowId} run ${run.runId}: step "${step.id}" waiting for human input`);
   try { await notify(deps.storage, ownerGhii, { type: 'workflow_input_needed', title, body, link: '/v1/profile?tab=workflows' }); }
-  catch { /* in-app notify best-effort */ }
+  catch (err) { logger.warn('askHumanInput: in-app notify best-effort', { error: String(err) }); }
   if (deps.pushService?.enabled) {
     deps.pushService.sendNotification(ownerGhii.split('@')[0], { title, body, url: '/v1/profile?tab=workflows', tag: `workflow:${run.workflowId}` })
-      .catch(() => { /* push best-effort */ });
+      .catch(err => { logger.warn('askHumanInput: push best-effort', { error: String(err) }); });
   }
   return { question, askedAt: now };
 }
@@ -159,7 +159,7 @@ export async function onStepFail(deps: StepDeps, ownerGhii: string, run: Workflo
       body: `${loc(run.defSnapshot.title) || run.workflowId}: step "${stepId}" → ${reason}`,
       url: '/v1/profile?tab=workflows',
       tag: `workflow:${run.workflowId}`,
-    }).catch(() => { /* push best-effort */ });
+    }).catch(err => { logger.warn('onStepFail: push best-effort', { error: String(err) }); });
   }
   // 2. Best-effort inspector dispatch (crew-owned; absent ⇒ skip silently, the push already fired).
   const taskId = await dispatchInspector(deps, ownerGhii, ownerName, run, stepId, reason);
@@ -227,10 +227,10 @@ export async function maybeAlertAgentOffline(deps: StepDeps, ownerGhii: string, 
   const body = `${name}: step "${step.id}" was dispatched but its agent (${agents}) looks offline — it will fail in ~${graceMin} min unless the agent connects.`;
   logger.warn(`workflow ${run.workflowId} run ${run.runId}: step "${step.id}" dispatched to offline agent(s) ${agents}`);
   try { await notify(deps.storage, ownerGhii, { type: 'workflow_agent_offline', title, body, link: '/v1/profile?tab=workflows' }); }
-  catch { /* in-app notify best-effort */ }
+  catch (err) { logger.warn('agents: in-app notify best-effort', { error: String(err) }); }
   if (deps.pushService?.enabled) {
     deps.pushService.sendNotification(ownerName, { title, body, url: '/v1/profile?tab=workflows', tag: `workflow:${run.workflowId}` })
-      .catch(() => { /* push best-effort */ });
+      .catch(err => { logger.warn('agents: push best-effort', { error: String(err) }); });
   }
 }
 
@@ -319,7 +319,13 @@ export async function clearRunOutputs(deps: StepDeps, ownerGhii: string, run: Wo
   let cleared = 0;
   for (const tmpl of produced) {
     let full: string;
-    try { full = prefix + template(tmpl, run.vars); } catch { continue; }
+    try {
+      full = prefix + template(tmpl, run.vars);
+    } catch (err) {
+      // Skipping silently makes the step look like it ran with nothing to do.
+      logger.warn('workflow step: key template failed to render, skipping it', { template: tmpl, error: String(err) });
+      continue;
+    }
     try {
       if (full.includes('*')) {
         const listPrefix = full.slice(0, full.indexOf('*'));

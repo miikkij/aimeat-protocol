@@ -102,8 +102,9 @@ export async function runCleanupCycle(
             }
           }
         }
-      } catch {
+      } catch (err) {
         // listMemory with prefix may yield no results — that's expected
+        logger.warn('runCleanupCycle: continuing after a suppressed failure', { error: String(err) });
       }
     }
   }

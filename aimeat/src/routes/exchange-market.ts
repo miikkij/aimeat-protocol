@@ -47,6 +47,7 @@ import { offeringToOdps, odpsToYaml, ODPS_VERSION } from '../services/exchange-o
 import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
 import { ensureInterfaceVersion, getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { reconcileOwnerOfferings, reconcileOwnerOfferingsThrottled, migrateLegacyOfferings } from '../services/exchange-projection.js';
+import { logger } from '../utils/logger.js';
 
 const str = (v: unknown): string => (typeof v === 'string' ? v : '');
 const posOrNull = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : null);
@@ -416,7 +417,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     // they read the market (bounded to one owner — a browse never reconciles the whole node).
     if (req.auth) {
       await reconcileOwnerOfferingsThrottled(storage, resolveIdentity(req.auth, config.nodeId))
-        .catch(() => { /* a stale projection must never break browsing */ });
+        .catch(err => { logger.warn('GET /v1/exchange/offerings: a stale projection must never break browsing', { error: String(err) }); });
     }
     const ext = str(req.query.ext), action = str(req.query.action), q = str(req.query.q);
     const offerings = (ext && action) || q

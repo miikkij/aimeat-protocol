@@ -21,6 +21,7 @@ import type { StatsCollector } from '../services/stats.js';
 import { success, error } from '../middleware/envelope.js';
 import { readActiveRuns, readEventTriggers } from '../services/workflow/lifecycle.js';
 import { cacheStats } from '../services/cache.js';
+import { logger } from '../utils/logger.js';
 
 export function statsRouter(
   config: AimeatConfig,
@@ -71,7 +72,7 @@ export function statsRouter(
           else permStats.by_gaii++;
           permStats.unique_patterns.add(c.dataPattern);
         }
-      } catch { /* skip owners without consents */ }
+      } catch (err) { logger.warn('gaii: skip owners without consents', { error: String(err) }); }
     }
 
     // Agent Workflows — node-global gauges, cheaply read from the system-namespace indexes
@@ -83,6 +84,7 @@ export function statsRouter(
         readEventTriggers(storage, config.nodeId),
       ]);
       workflowStats = { runs_active: activeRuns.length, event_triggers: eventTriggers.length };
+    // eslint-disable-next-line aimeat/no-silent-catch -- indexes absent / unreadable — leave zeros
     } catch { /* indexes absent / unreadable — leave zeros */ }
 
     // Shared fields included in both response paths

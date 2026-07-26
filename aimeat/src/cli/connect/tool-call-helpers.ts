@@ -99,6 +99,7 @@ export function query(params: Record<string, string | number | boolean | undefin
 export const wsRoot = (orgId: string, ws: string) => `organism.${orgId}.w.${ws}`;
 /** Parse a possibly-JSON-stringified object param (value/manifest/schemas) back to an object. */
 export function coerceObject(value: unknown): unknown {
+    // eslint-disable-next-line aimeat/no-silent-catch -- leave as-is
     if (typeof value === 'string') { try { const p = JSON.parse(value) as unknown; if (p && typeof p === 'object') return p; } catch { /* leave as-is */ } }
     return value;
 }

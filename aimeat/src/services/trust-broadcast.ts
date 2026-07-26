@@ -103,6 +103,7 @@ export async function broadcastTrustAdvisory(
           target_node: fullAdvisory.target_node,
         });
       } else {
+        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
         const body = await resp.text().catch(() => '');
         deliveries.push({ peer_node_id: peer.nodeId, success: false, error: `HTTP ${resp.status}: ${body}` });
         failed++;

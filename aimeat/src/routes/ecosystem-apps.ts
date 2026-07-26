@@ -57,6 +57,7 @@ import { issueJWT, generateSessionId } from '../auth/jwt.js';
 import { validateEcoManifest } from '../models/ecosystem-manifest.js';
 import { emitChange } from '../services/event-bus.js';
 import { emitEcosystemBindingRevoked } from '../services/ecosystem-events.js';
+import { logger } from '../utils/logger.js';
 import {
   deliverAdvisory, pendingKey, pendingPrefix, PENDING_TYPE,
   type PendingAdvisoryRecord,
@@ -763,27 +764,27 @@ export function ecosystemAppsRouter(config: AimeatConfig, storage: Storage, sche
 
     // 1) Lifecycle outbound event FIRST (best-effort) — emit while the grant is still present so the
     //    live grant re-check passes; the connected app/desk reacts to binding.revoked and drops its side.
-    await emitEcosystemBindingRevoked(storage, config, ownerGhii, record.geai, 'owner_revoked').catch(() => { /* best-effort */ });
+    await emitEcosystemBindingRevoked(storage, config, ownerGhii, record.geai, 'owner_revoked').catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: best-effort', { error: String(err) }); });
 
     // 2) Hard-delete the GEAI principal row → the app disappears from GET /v1/ecosystem-apps entirely.
     await storage.deleteEcosystemApp(record.geai);
 
     // 3a) Remove the app's automation recipe (the "data published → run agents" rule), if any.
-    await storage.deleteAutomationRecipe(owner, app).catch(() => { /* best-effort */ });
+    await storage.deleteAutomationRecipe(owner, app).catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: best-effort', { error: String(err) }); });
 
     // 3b) Remove the app's eco-capability schedules (cron jobs that invoke this app's capability).
-    const jobs = await storage.listScheduledJobs({ type: 'eco-capability', ownerScope: ownerGhii }).catch(() => []);
+    const jobs = await storage.listScheduledJobs({ type: 'eco-capability', ownerScope: ownerGhii }).catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: continuing after a suppressed failure', { error: String(err) }); return []; });
     for (const job of jobs) {
       if ((job.input as { app?: string } | undefined)?.app === app) {
         scheduler.removeJob(job.id);
-        await storage.deleteScheduledJob(job.id).catch(() => { /* best-effort */ });
+        await storage.deleteScheduledJob(job.id).catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: best-effort', { error: String(err) }); });
       }
     }
 
     // 3c) Drop any pending (awaiting-approval) advisories parked in owner memory for this app.
-    const pendingItems = await storage.listMemory(ownerGhii, { prefix: pendingPrefix(app) }).catch(() => []);
+    const pendingItems = await storage.listMemory(ownerGhii, { prefix: pendingPrefix(app) }).catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: continuing after a suppressed failure', { error: String(err) }); return []; });
     for (const item of pendingItems) {
-      await storage.deleteMemory(ownerGhii, item.key).catch(() => { /* best-effort */ });
+      await storage.deleteMemory(ownerGhii, item.key).catch(err => { logger.warn('DELETE /v1/ecosystem-apps/:app: best-effort', { error: String(err) }); });
     }
 
     // NOTE: the app's DEPOSITED insight data (its eco: namespace writes into the owner's Memory)

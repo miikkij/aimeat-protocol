@@ -29,6 +29,7 @@
 import { spawn } from 'node:child_process';
 import { readFileSync, existsSync } from 'node:fs';
 import type { RegisteredAgent } from './agent-registry.js';
+import { logger } from '../../utils/logger.js';
 
 const SUMMARY_MAX_BYTES = 64 * 1024;
 const STDERR_MAX_BYTES = 8 * 1024;
@@ -75,7 +76,7 @@ async function postEvent(agent: RegisteredAgent, taskId: string, type: string, m
   const enc = encodeURIComponent(agent.agent);
   try {
     await agent.client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(taskId)}/event`, { type, message });
-  } catch { /* best-effort */ }
+  } catch (err) { logger.warn('postEvent: best-effort', { error: String(err) }); }
 }
 
 /**
@@ -147,15 +148,15 @@ export async function launchTaskRunner(agent: RegisteredAgent, task: TaskRunnerI
   });
 
   const heartbeat = setInterval(() => {
-    postEvent(agent, task.id, 'progress', 'Runner still working').catch(() => {});
+    postEvent(agent, task.id, 'progress', 'Runner still working').catch(err => { logger.warn('launchTaskRunner: continuing after a suppressed failure', { error: String(err) }); });
   }, HEARTBEAT_INTERVAL_MS);
   heartbeat.unref();
 
   const timeoutTimer = setTimeout(() => {
     console.error(`[runner:${agent.agent}] task ${task.id} timed out after ${timeoutSec}s, sending SIGTERM`);
-    try { child.kill('SIGTERM'); } catch { /* ignore */ }
+    try { child.kill('SIGTERM'); } catch (err) { logger.warn('launchTaskRunner: ignore', { error: String(err) }); }
     // give it 10s grace then SIGKILL
-    setTimeout(() => { try { child.kill('SIGKILL'); } catch { /* ignore */ } }, 10_000).unref();
+    setTimeout(() => { try { child.kill('SIGKILL'); } catch (err) { logger.warn('launchTaskRunner: ignore', { error: String(err) }); } }, 10_000).unref();
   }, timeoutSec * 1000);
   timeoutTimer.unref();
 

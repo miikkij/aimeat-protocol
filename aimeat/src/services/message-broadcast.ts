@@ -89,7 +89,8 @@ export async function sendBroadcast(ctx: DeliveryCtx, input: BroadcastInput): Pr
       });
       if (result.ok) sent++;
       else failed.push({ recipient: recipientGhii, code: result.code });
-    } catch {
+    } catch (err) {
+      logger.warn('message-broadcast: suppressed failure, continuing', { error: String(err) });
       failed.push({ recipient: recipientGhii, code: 'SEND_FAILED' });
     }
   }

@@ -30,6 +30,7 @@ import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
 import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
 import { buildAppPrompt } from '../services/build-app-prompt.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
+import { logger } from '../utils/logger.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -209,7 +210,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     try {
       const parsed = parseGaiiLoose(gaii);
       if (parsed.agent) agentName = parsed.agent;
-    } catch { /* owner session — keep the owner name */ }
+    } catch (err) { logger.warn('GET /v1/prompts/draft-offer: owner session — keep the owner name', { error: String(err) }); }
 
     const prompt = substituteVariables(DRAFT_OFFER_PROMPT, {
       node_id: config.nodeId,
@@ -556,7 +557,7 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
           `- ${ext.name}: ${ext.description}`
         );
       }
-    } catch { /* cortex not available */ }
+    } catch (err) { logger.warn('GET /v1/portal/prompts/:promptId: cortex not available', { error: String(err) }); }
 
     const record = await storage.getSystemPrompt(promptId);
     if (!record || !record.active) {

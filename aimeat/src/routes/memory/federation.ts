@@ -67,6 +67,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
       });
 
       if (!response.ok) {
+        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
         const body = await response.text().catch(() => '');
         res.status(response.status).json(error(config.nodeId, 'FEDERATION_PULL_FAILED',
           `Home node returned ${response.status}: ${body.slice(0, 200)}`));
@@ -183,6 +184,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
       });
 
       if (!response.ok) {
+        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
         const body = await response.text().catch(() => '');
         res.status(response.status).json(error(config.nodeId, 'FEDERATION_PUSH_FAILED',
           `Home node returned ${response.status}: ${body.slice(0, 200)}`));
@@ -244,6 +246,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
       });
 
       if (!response.ok) {
+        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
         const body = await response.text().catch(() => '');
         res.status(response.status).json(error(config.nodeId, 'FEDERATION_LIST_FAILED',
           `Home node returned ${response.status}: ${body.slice(0, 200)}`));
@@ -309,6 +312,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
       });
 
       if (!response.ok) {
+        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
         const body = await response.text().catch(() => '');
         res.status(response.status).json(error(config.nodeId, 'FEDERATION_LIST_FAILED',
           `Peer node returned ${response.status}: ${body.slice(0, 200)}`));
@@ -377,6 +381,7 @@ export function registerFederationRoutes(router: Router, ctx: MemoryRouteCtx): v
       });
 
       if (!response.ok) {
+        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
         const body = await response.text().catch(() => '');
         res.status(response.status).json(error(config.nodeId, 'FEDERATION_PULL_FAILED',
           `Peer node returned ${response.status}: ${body.slice(0, 200)}`));

@@ -17,6 +17,7 @@ import type { Storage } from '../../storage/interface.js';
 import type { ConversationSummary } from '../../storage/repositories/direct-message.repository.js';
 import { runInReadScope } from '../../storage/uow/unit-of-work.js';
 import { parseGaiiLoose } from '../../utils/gaii.js';
+import { logger } from '../../utils/logger.js';
 
 /** A conversations-list row, optionally tagged with the owning agent when it is an agent's own thread. */
 export type OwnerConversation = ConversationSummary & { viaAgent?: string };
@@ -32,7 +33,7 @@ export class MessagingDbService {
    */
   ownerConversations(ownerGhii: string, ownerName: string): Promise<{ conversations: OwnerConversation[] }> {
     return runInReadScope(async () => {
-      const agents = await this.storage.getAgentsByOwner(ownerName).catch(() => []);
+      const agents = await this.storage.getAgentsByOwner(ownerName).catch(err => { logger.warn('ownerConversations: continuing after a suppressed failure', { error: String(err) }); return []; });
       const [contacts, byOwner] = await Promise.all([
         this.storage.listContacts(ownerGhii),
         this.batchConversations([ownerGhii, ...agents.map(a => a.gaii)]),
@@ -61,7 +62,7 @@ export class MessagingDbService {
     if (this.storage.listConversationsForOwners) return this.storage.listConversationsForOwners(gaiis);
     const out: Record<string, ConversationSummary[]> = {};
     await Promise.all(gaiis.map(async (g) => {
-      const convs = await this.storage.listConversations(g).catch(() => []);
+      const convs = await this.storage.listConversations(g).catch(err => { logger.warn('own: continuing after a suppressed failure', { error: String(err) }); return []; });
       if (convs.length) out[g] = convs;
     }));
     return out;

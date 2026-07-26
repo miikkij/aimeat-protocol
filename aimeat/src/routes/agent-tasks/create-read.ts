@@ -201,7 +201,7 @@ export function registerTaskCreateReadRoutes(
           auto_activated: autoActivated,
         });
       }
-      try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch { /* MCP not connected */ }
+      try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('scope_summary: MCP not connected', { error: String(err) }); }
       // Connector forward tunnel: realtime reverse delivery. If the agent holds
       // an open tunnel, the ConnectTunnelManager pushes the full task down the
       // socket immediately (zero round-trip); if offline, the task stays in the

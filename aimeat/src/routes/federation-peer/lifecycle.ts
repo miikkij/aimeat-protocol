@@ -175,7 +175,7 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
             peer.status = 'active';
             // Federation version visibility: record the peer's advertised AIMEAT version.
             if (typeof software_version === 'string') peer.softwareVersion = software_version;
-            storage.saveFederationPeer(peer).catch(() => {});
+            storage.saveFederationPeer(peer).catch(err => { logger.warn('fromId: continuing after a suppressed failure', { error: String(err) }); });
         }
 
         // Compute service summary hash with 60s cache
@@ -184,8 +184,9 @@ export function registerLifecycleRoutes(router: Router, config: AimeatConfig, st
                 const summary = await computeServiceSummary(config, storage);
                 cachedSummaryHash = summary.summary_hash;
                 summaryHashExpiry = Date.now() + 60_000;
-            } catch {
+            } catch (err) {
                 // Keep stale hash on error
+              logger.warn('fromId: continuing after a suppressed failure', { error: String(err) });
             }
         }
 

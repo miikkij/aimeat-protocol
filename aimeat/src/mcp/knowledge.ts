@@ -243,6 +243,7 @@ export function registerKnowledgeTools(
 
             // Parse content if JSON, otherwise store as plain string
             let value: unknown = content;
+            // eslint-disable-next-line aimeat/no-silent-catch -- store as string
             try { value = JSON.parse(content); } catch { /* store as string */ }
 
             // Check if entry exists to preserve version

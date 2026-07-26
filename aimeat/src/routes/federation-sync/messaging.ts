@@ -254,7 +254,7 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
                         interactive: message.interactive?.role ?? null,
                     },
                 });
-                try { emitResourceUpdated(recipientGhii, 'aimeat://dm/inbox'); } catch { /* no live MCP session */ }
+                try { emitResourceUpdated(recipientGhii, 'aimeat://dm/inbox'); } catch (err) { logger.warn('POST /v1/federation/message: no live MCP session', { error: String(err) }); }
             }
         }
 
@@ -294,12 +294,12 @@ export function registerMessagingRoutes(router: Router, config: AimeatConfig, st
             try {
                 if (g.ghii === senderGhii) continue; // don't deliver back to the sender if they're local
                 // Respect a block: a recipient who blocked the sender does NOT get the announcement.
-                const existing = await storage.getContact(g.ghii, senderGhii).catch(() => null);
+                const existing = await storage.getContact(g.ghii, senderGhii).catch(err => { logger.warn('POST /v1/federation/broadcast: continuing after a suppressed failure', { error: String(err) }); return null; });
                 if (existing?.state === 'blocked') continue;
                 const conversationId = conversationIdFor(senderGhii, g.ghii);
                 const id = randomUUID();
                 // Operator announcement: auto-accept a NEW contact so it lands in the inbox, not requests.
-                if (!existing) await storage.setContactState(g.ghii, senderGhii, 'accepted', id).catch(() => { /* best-effort */ });
+                if (!existing) await storage.setContactState(g.ghii, senderGhii, 'accepted', id).catch(err => { logger.warn('POST /v1/federation/broadcast: best-effort', { error: String(err) }); });
                 await storage.createDirectMessage({
                     id, ownerGhii: g.ghii, conversationId, senderGhii, recipientGhii: g.ghii,
                     body: broadcast.body ?? '', interactive: broadcast.interactive ?? undefined,

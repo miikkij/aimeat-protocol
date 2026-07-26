@@ -19,6 +19,7 @@ import { expireOverdueApprovals } from '../../services/gate-expiry.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { roleSatisfies, type OrganismHelpers } from './shared.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerOrganismGateRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const { memberRole, readManifest, writeDecision, readConfig, canWriteNamespace, publishDraft, publishDraftsBatch, revertToDraft } = H;
@@ -184,7 +185,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     ]));
     emitChange('organisms');
     // Content growth changes the structure fingerprint (doc/record counts) → record a timeline snapshot.
-    void updateOrganismStructure(storage, config, id, { event: 'content published', actor: publisher }).catch(() => { /* best-effort */ });
+    void updateOrganismStructure(storage, config, id, { event: 'content published', actor: publisher }).catch(err => { logger.warn('guardHit: best-effort', { error: String(err) }); });
   });
 
   // POST /v1/organisms/:id/workspace/records/publish — BATCH publish (Phase 2, data-access redesign).
@@ -251,7 +252,7 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     if (published.length > 0) {
       await writeDecision(id, publisher, `published ${published.length} record(s) in ${namespace}`, published.map(r => `${namespace}.${r.instance}`));
       emitChange('organisms');
-      void updateOrganismStructure(storage, config, id, { event: 'content published (batch)', actor: publisher }).catch(() => { /* best-effort */ });
+      void updateOrganismStructure(storage, config, id, { event: 'content published (batch)', actor: publisher }).catch(err => { logger.warn('expMap: best-effort', { error: String(err) }); });
     }
     res.json(success(config.nodeId, {
       published: published.length,

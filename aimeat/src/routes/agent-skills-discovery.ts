@@ -63,7 +63,8 @@ async function buildIndex(
     try {
       const resolved = await resolveSkillRef(storage, config, `node:${summary.name}`, ANONYMOUS);
       skillMd = resolved.fileContents['SKILL.md'];
-    } catch {
+    } catch (err) {
+      logger.warn('agent-skills-discovery: suppressed failure, continuing', { error: String(err) });
       continue; // gate or race — a skill we cannot serve anonymously is not indexed
     }
     if (typeof skillMd !== 'string' || skillMd.length === 0) continue;

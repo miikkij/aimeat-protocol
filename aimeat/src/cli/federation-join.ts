@@ -22,6 +22,7 @@ import * as p from '@clack/prompts';
 import { createT, type Locale, type TFunction } from '../i18n.js';
 import { generateKeyPair, sign } from '../auth/keypair.js';
 import type { AimeatConfig } from '../config.js';
+import { logger } from '../utils/logger.js';
 
 // Package root: from dist/src/cli/federation-join.js -> go up 3 levels to aimeat/
 const __pkgRoot = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
@@ -57,6 +58,7 @@ function loadPendingJoin(): PendingJoin | null {
   try {
     return JSON.parse(readFileSync(path, 'utf-8')) as PendingJoin;
   } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     return null;
   }
 }
@@ -71,8 +73,9 @@ function clearPendingJoin(): void {
       : existsSync(join(__pkgRoot, PENDING_JOIN_FILE)) ? join(__pkgRoot, PENDING_JOIN_FILE)
         : null;
     if (filePath) unlinkSync(filePath);
-  } catch {
+  } catch (err) {
     // Ignore cleanup errors
+    logger.warn('clearPendingJoin: continuing after a suppressed failure', { error: String(err) });
   }
 }
 
@@ -290,7 +293,7 @@ export async function runFederationJoin(
       const contentType = introResp.headers.get('content-type') ?? '';
       let msg = `HTTP ${introResp.status}`;
       if (contentType.includes('json')) {
-        const errBody = await introResp.json().catch(() => null) as { error?: { code?: string; message?: string } } | null;
+        const errBody = await introResp.json().catch(err => { logger.warn('validate: continuing after a suppressed failure', { error: String(err) }); return null; }) as { error?: { code?: string; message?: string } } | null;
         msg = errBody?.error?.message ?? msg;
         if (errBody?.error?.code === 'MAINTENANCE') {
           msg = t('join.targetMaintenance');
@@ -392,8 +395,9 @@ async function pollApproval(
           }
           // 'pending' — keep polling
         }
-      } catch {
+      } catch (err) {
         // Network error during poll — keep trying
+        logger.warn('onSigint: continuing after a suppressed failure', { error: String(err) });
       }
     }
 

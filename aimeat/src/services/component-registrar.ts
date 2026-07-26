@@ -24,6 +24,7 @@
 import { createHash } from 'node:crypto';
 import YAML from 'yaml';
 import type { Storage, PackageComponentType, CortexComponent } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
 
 // ── Types ────────────────────────────────────────────────────────────
 
@@ -148,9 +149,11 @@ export async function registerComponent(
         let definition: Record<string, unknown>;
         try {
           definition = YAML.parse(content) as Record<string, unknown>;
-        } catch {
+        } catch (err) {
+          logger.warn('component-registrar: suppressed failure, continuing', { error: String(err) });
           // Content might be JSON
           try { definition = JSON.parse(content) as Record<string, unknown>; }
+          // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
           catch { definition = { raw: content }; }
         }
         const serviceObj = definition.service as Record<string, unknown> | undefined;
@@ -171,6 +174,7 @@ export async function registerComponent(
         // Content: JSON { manifest: "YAML", scripts: { "name": "code" } } or raw string
         let parsed: { manifest?: string; scripts?: Record<string, string> };
         try { parsed = JSON.parse(content); }
+        // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
         catch { parsed = { manifest: content }; }
 
         const manifest = parsed.manifest ?? '';
@@ -178,7 +182,7 @@ export async function registerComponent(
 
         let meta: Record<string, unknown> = {};
         try { meta = (YAML.parse(manifest) as Record<string, unknown>) ?? {}; }
-        catch { /* use defaults */ }
+        catch (err) { logger.warn('serviceType: use defaults', { error: String(err) }); }
 
         const metadata = (meta.metadata ?? meta) as Record<string, unknown>;
         originalShortName = (metadata.name as string) || undefined;
@@ -214,6 +218,7 @@ export async function registerComponent(
         // Content: JSON { manifest: "YAML", libs: { "file.js": "code" } } or raw string
         let parsed: { manifest?: string; libs?: Record<string, string> };
         try { parsed = JSON.parse(content); }
+        // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
         catch { parsed = { manifest: content }; }
 
         const manifestStr = parsed.manifest ?? content;
@@ -221,7 +226,7 @@ export async function registerComponent(
 
         let meta: Record<string, unknown> = {};
         try { meta = (YAML.parse(manifestStr) as Record<string, unknown>) ?? {}; }
-        catch { /* use defaults */ }
+        catch (err) { logger.warn('config: use defaults', { error: String(err) }); }
 
         const metadata = (meta.metadata ?? meta) as Record<string, unknown>;
         originalShortName = (metadata.name as string) || undefined;
@@ -299,6 +304,7 @@ export async function registerComponent(
                 setAt: now,
                 updatedAt: now,
               });
+            // eslint-disable-next-line aimeat/no-silent-catch -- schema may already exist
             } catch { /* schema may already exist */ }
           } else if (compType === 'prompt' && comp.name) {
             const promptKey = `__cortex__/${registeredAs}/prompts/${comp.name}`;
@@ -354,8 +360,10 @@ export async function registerComponent(
       case 'msm': {
         let definition: Record<string, unknown>;
         try { definition = YAML.parse(content) as Record<string, unknown>; }
-        catch {
+        catch (err) {
+          logger.warn('component-registrar: suppressed failure, continuing', { error: String(err) });
           try { definition = JSON.parse(content) as Record<string, unknown>; }
+          // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
           catch { definition = { raw: content }; }
         }
         const auth = definition.auth as Record<string, unknown> | undefined;
@@ -379,6 +387,7 @@ export async function registerComponent(
         // Fallback: store entire content under registeredAs key.
         let parsed: { entries?: Array<{ key: string; value: unknown; visibility?: string; tags?: string[] }> };
         try { parsed = JSON.parse(content); }
+        // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
         catch { parsed = { entries: [{ key: registeredAs, value: content }] }; }
 
         const entries = parsed.entries ?? [{ key: registeredAs, value: parsed }];
@@ -419,6 +428,7 @@ export async function registerComponent(
         const memKey = `i18n.${registeredAs}`;
         let value: unknown;
         try { value = JSON.parse(content); }
+        // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
         catch { value = { raw: content }; }
         await storage.setMemory({
           key: memKey,
@@ -498,7 +508,8 @@ export async function deleteComponent(
       default:
         return false;
     }
-  } catch {
+  } catch (err) {
+    logger.warn('component-registrar: suppressed failure, continuing', { error: String(err) });
     return false;
   }
 }
@@ -565,7 +576,8 @@ export async function fetchComponentContent(
       default:
         return null;
     }
-  } catch {
+  } catch (err) {
+    logger.warn('component-registrar: suppressed failure, continuing', { error: String(err) });
     return null;
   }
 }

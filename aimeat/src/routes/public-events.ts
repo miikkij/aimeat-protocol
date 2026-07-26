@@ -22,6 +22,7 @@ import { onPublicActivityEvent, offPublicActivityEvent } from '../services/event
 import type { PublicActivityEvent } from '../services/event-bus.js';
 import { readPublicActivity } from '../services/public-activity.js';
 import type { PublicActivityCategory } from '../services/public-activity.js';
+import { logger } from '../utils/logger.js';
 
 const VALID_CATEGORIES = new Set<PublicActivityCategory>(['apps', 'organisms', 'agents']);
 const MAX_SSE_CONNECTIONS = 200; // cap concurrent public streams
@@ -52,7 +53,7 @@ export function publicEventsRouter(config: AimeatConfig, storage: Storage): Rout
     let items: PublicActivityEvent[] = [];
     try {
       items = await readPublicActivity(storage, config, { category, limit });
-    } catch { /* fall through to empty — frontend has an empty-state */ }
+    } catch (err) { logger.warn('GET /v1/public/activity-feed: fall through to empty — frontend has an empty-state', { error: String(err) }); }
 
     const payload = { items };
     feedCache.set(cacheKey, { at: Date.now(), value: payload });

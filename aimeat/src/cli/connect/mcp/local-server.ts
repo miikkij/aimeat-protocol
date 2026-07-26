@@ -68,6 +68,7 @@ import { wakeAgent } from './wakeup.js';
 import { startPollerForAgent, legacyWakeAdapter } from './poller.js';
 import { launchTaskRunner, isRunner } from '../task-runner.js';
 import { CONNECT_CLI_TOOLS } from '../tool-call.js';
+import { logger } from '../../../utils/logger.js';
 
 export const SERVE_DISCOVERY_SCHEMA_VERSION = 1;
 
@@ -339,6 +340,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
         console.error(`Stop it first, or delete ${discoveryFile} if it is stale.`);
         process.exit(1);
       }
+    // eslint-disable-next-line aimeat/no-silent-catch -- unreadable file — treat as stale and overwrite
     } catch { /* unreadable file — treat as stale and overwrite */ }
   }
 
@@ -700,6 +702,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       const r = await fetch(url, { method: req.method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
       const text = await r.text();
       let parsed: unknown;
+      // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
       try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
       res.status(r.status).json(parsed);
     } catch (err) {
@@ -747,10 +750,10 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   async function shutdown(code: number): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
-    try { if (existsSync(discoveryFile)) unlinkSync(discoveryFile); } catch { /* best effort */ }
+    try { if (existsSync(discoveryFile)) unlinkSync(discoveryFile); } catch (err) { logger.warn('shutdown: best effort', { error: String(err) }); }
     for (const ch of channels.values()) {
       ch.drainWaiters();
-      try { await ch.tunnel?.close(); } catch { /* ignore */ }
+      try { await ch.tunnel?.close(); } catch (err) { logger.warn('shutdown: ignore', { error: String(err) }); }
     }
     await new Promise<void>((resolve) => {
       const t = setTimeout(() => resolve(), 1_000);

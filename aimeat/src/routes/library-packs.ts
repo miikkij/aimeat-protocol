@@ -27,6 +27,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CortexExtensionRecord } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
 import { getLibraryPacks, getLibraryPackIndex, getLibraryPack, renderPackText } from '../data/library-packs.js';
+import { logger } from '../utils/logger.js';
 
 /** Known index categories a community pack may declare via labels.domain / tags. */
 const KNOWN_CATEGORIES = new Set(['core', 'ai', 'ui', 'visualization', 'diagrams', 'canvas', 'game', '3d', 'realtime', 'economy', 'media']);
@@ -100,7 +101,7 @@ async function loadCommunityProofs(storage: Storage): Promise<Map<string, unknow
       const v = rec.value as { packId?: string; proofs?: unknown[] } | null;
       if (v?.packId && Array.isArray(v.proofs)) out.set(v.packId, v.proofs);
     }
-  } catch { /* best-effort — packs serve without proofs */ }
+  } catch (err) { logger.warn('loadCommunityProofs: best-effort — packs serve without proofs', { error: String(err) }); }
   return out;
 }
 
@@ -137,7 +138,7 @@ export function libraryPacksRouter(config: AimeatConfig, storage: Storage): Rout
       const exts = await communityExtensions(storage);
       const proofsByPack = await loadCommunityProofs(storage);
       community = exts.map(e => withCommunityProofs(communityIndexEntry(e, config.baseUrl), proofsByPack));
-    } catch { /* community listing is best-effort — the curated index always serves */ }
+    } catch (err) { logger.warn('GET /v1/library-packs: community listing is best-effort — the curated index always serves', { error: String(err) }); }
 
     let packs: Array<Record<string, unknown>> = [...staticIndex, ...community];
     if (kind) packs = packs.filter(p => p.kind === kind);
@@ -165,7 +166,7 @@ export function libraryPacksRouter(config: AimeatConfig, storage: Storage): Rout
           }));
           return;
         }
-      } catch { /* fall through to 404 */ }
+      } catch (err) { logger.warn('ext: fall through to 404', { error: String(err) }); }
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No library pack "${id}"`));
       return;
     }

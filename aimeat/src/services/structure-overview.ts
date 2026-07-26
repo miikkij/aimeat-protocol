@@ -52,6 +52,7 @@ import { authorizeRead } from './access-guard.js';
 import { isSameOwner } from '../utils/gaii.js';
 import { isMemoryBackedSpace } from './workspace-meta.js';
 import { isRecordsSource, evaluateRecordsKpi } from './kpi-rollup.js';
+import { logger } from '../utils/logger.js';
 
 /** Recent entries listed per space in either overview. The total is always reported alongside. */
 export const MAX_ITEMS = 10;
@@ -180,7 +181,7 @@ export async function collectWorkspaceSummary(
   };
   if (!manRec) return summary;   // empty / non-existent workspace
   // Hint count of archived rows under this workspace (cheap aggregate; default-excluded everywhere else).
-  try { summary.archivedCount = (await storage.countArchivedByKeyPrefix(`${root}.`)).archived; } catch { /* best-effort */ }
+  try { summary.archivedCount = (await storage.countArchivedByKeyPrefix(`${root}.`)).archived; } catch (err) { logger.warn('collectWorkspaceSummary: best-effort', { error: String(err) }); }
 
   let readable = manRec.ownerGaii === viewerGaii || isSameOwner(manRec.ownerGaii, viewerGaii);
   if (!readable) {

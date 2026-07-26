@@ -65,6 +65,7 @@ export function getWebBotAuthState(storage: Storage, config: AimeatConfig): Prom
       const x = Buffer.from(nodeKey.publicKey, 'base64').toString('base64url');
       const kid = jwkThumbprint('Ed25519', 'OKP', x);
       let agentOrigin = config.baseUrl;
+      // eslint-disable-next-line aimeat/no-silent-catch -- keep baseUrl as-is
       try { agentOrigin = new URL(config.baseUrl).origin; } catch { /* keep baseUrl as-is */ }
       return { jwk: { kty: 'OKP', crv: 'Ed25519', x, kid, use: 'sig' }, keyid: kid, agentOrigin };
     })();

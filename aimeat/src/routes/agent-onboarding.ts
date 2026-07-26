@@ -45,6 +45,7 @@ import { calculateReadiness } from '../services/readiness-scorer.js';
 import { detectPlatform } from '../services/platform-detector.js';
 import { createT, detectLocale } from '../i18n.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Build the post-onboarding checklist surfaced via GET /onboarding. Mirrors the
@@ -162,7 +163,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
           healthRecalculatedAt: new Date().toISOString(),
         }))!;
         emitChange('agent-onboarding');
-        try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch { /* MCP not connected */ }
+        try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch (err) { logger.warn('GET /v1/agents/:name/onboarding: MCP not connected', { error: String(err) }); }
       } else {
         onboarding = (await storage.updateOnboarding(agentGaii, { steps: updatedSteps }))!;
       }
@@ -341,7 +342,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     }
 
     emitChange('agent-onboarding');
-    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch (err) { logger.warn('POST /v1/agents/:name/onboarding/start: MCP not connected', { error: String(err) }); }
     res.json(success(config.nodeId, { onboarding }, [
       { description: 'Check onboarding status', method: 'GET', url: `/v1/agents/${agentName}/onboarding` },
     ]));
@@ -465,7 +466,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
       });
     }
     emitChange('agent-onboarding');
-    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch (err) { logger.warn('POST /v1/agents/:name/onboarding/step/:id: MCP not connected', { error: String(err) }); }
 
     if (webhookDispatcher) {
       webhookDispatcher.dispatchWebhookEvent(agentGaii, 'onboarding.step', {
@@ -524,7 +525,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     });
 
     emitChange('agent-onboarding');
-    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch (err) { logger.warn('PUT /v1/agents/:name/onboarding/override: MCP not connected', { error: String(err) }); }
     res.json(success(config.nodeId, { onboarding: updated }));
   });
 
@@ -546,7 +547,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     });
 
     emitChange('agent-onboarding');
-    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch (err) { logger.warn('DELETE /v1/agents/:name/onboarding/override: MCP not connected', { error: String(err) }); }
     res.json(success(config.nodeId, { onboarding: updated }));
   });
 
@@ -562,7 +563,7 @@ export function agentOnboardingRouter(config: AimeatConfig, storage: Storage, we
     }
 
     emitChange('agent-onboarding');
-    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/onboarding`); } catch (err) { logger.warn('DELETE /v1/agents/:name/onboarding: MCP not connected', { error: String(err) }); }
     res.json(success(config.nodeId, { deleted: true }));
   });
 

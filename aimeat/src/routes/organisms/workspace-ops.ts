@@ -40,6 +40,7 @@ import { checkDeleteGuard } from '../../services/write-guards.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { isOrgManager } from '../../services/workspace-access.js';
 import type { OrganismHelpers, ShareMeta, ResolvedShare } from './shared.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerOrganismWorkspaceOpsRoutes(router: Router, config: AimeatConfig, storage: Storage, H: OrganismHelpers): void {
   const {
@@ -311,7 +312,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
       emitChange('organisms');
       res.json(success(config.nodeId, result));
       // Manifest/space/name edits change the structure → record a timeline snapshot (dedup handles no-ops).
-      void updateOrganismStructure(storage, config, id, { event: 'workspace updated', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(() => { /* best-effort */ });
+      void updateOrganismStructure(storage, config, id, { event: 'workspace updated', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(err => { logger.warn('PUT /v1/organisms/:id/workspace: best-effort', { error: String(err) }); });
     } catch (e) {
       if (e instanceof WorkspaceMetaError) {
         const status = e.code === 'WS_NOT_FOUND' ? 404 : e.code === 'NOT_CREATOR' ? 403 : 400;
@@ -342,7 +343,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
         name: name.trim(), manifest: req.body?.manifest, schemas: req.body?.schemas, readme: req.body?.readme,
       });
       emitChange('organisms');
-      void updateOrganismStructure(storage, config, id, { event: 'workspace created', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(() => { /* best-effort */ });
+      void updateOrganismStructure(storage, config, id, { event: 'workspace created', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(err => { logger.warn('POST /v1/organisms/:id/workspaces: best-effort', { error: String(err) }); });
       res.status(201).json(success(config.nodeId, { created: true, ...result }));
     } catch (e) {
       if (e instanceof WorkspaceProvisionError || e instanceof WorkspaceMetaError) {
@@ -522,7 +523,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
         summary: `Workspace "${entry.name ?? ws}" published publicly`,
         detail: organism.name ? `In organism "${organism.name}"` : '',
         link: `/v1/publicworkspaceviewer?org=${encodeURIComponent(id)}&ws=${encodeURIComponent(ws)}`,
-      }).catch(() => { /* feed is best-effort */ });
+      }).catch(err => { logger.warn('newlyPublic: feed is best-effort', { error: String(err) }); });
     }
   });
 
@@ -693,7 +694,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
     for (const s of await storage.listSchemas(prefix)) { if (await storage.deleteSchema(s.keyPattern)) schemas++; }
     res.json(success(config.nodeId, { deleted: true, memoryKeys, schemas }));
     emitChange('organisms');
-    if (ws) void updateOrganismStructure(storage, config, id, { event: 'workspace deleted', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(() => { /* timeline best-effort */ });
+    if (ws) void updateOrganismStructure(storage, config, id, { event: 'workspace deleted', actor: resolveIdentity(req.auth!, config.nodeId) }).catch(err => { logger.warn('DELETE /v1/organisms/:id/workspace: timeline best-effort', { error: String(err) }); });
   });
 
   /* ── POST /v1/organisms/:id/workspace/records/delete — BATCHED record-family delete (Phase 2, data-
@@ -771,7 +772,7 @@ export function registerOrganismWorkspaceOpsRoutes(router: Router, config: Aimea
 
     if (removed > 0) {
       emitChange('organisms');
-      void updateOrganismStructure(storage, config, id, { event: `deleted ${deleted.length} record(s) in ${namespace}`, actor: callerGhii }).catch(() => { /* timeline best-effort */ });
+      void updateOrganismStructure(storage, config, id, { event: `deleted ${deleted.length} record(s) in ${namespace}`, actor: callerGhii }).catch(err => { logger.warn('roleOk: timeline best-effort', { error: String(err) }); });
     }
     res.json(success(config.nodeId, { deleted, failed, rows_removed: removed }));
   });

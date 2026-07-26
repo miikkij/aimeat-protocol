@@ -79,6 +79,7 @@ export function resolveInvitationReturnTarget(raw: unknown, config: AimeatConfig
   }
 
   let url: URL;
+  // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
   try { url = new URL(candidate); } catch { return null; }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') return null;
 
@@ -88,6 +89,7 @@ export function resolveInvitationReturnTarget(raw: unknown, config: AimeatConfig
 
   // 1) The node's own origin (baseUrl host).
   let nodeHost = '';
+  // eslint-disable-next-line aimeat/no-silent-catch -- host-less baseUrl
   try { nodeHost = new URL(config.baseUrl).hostname.toLowerCase(); } catch { /* host-less baseUrl */ }
   if (nodeHost && host === nodeHost) return url.toString();
 
