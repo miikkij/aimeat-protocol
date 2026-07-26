@@ -20,6 +20,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { executeExtensionAction } from '../../services/extension-runtime.js';
 import type { ExtensionCtx } from '../../services/extension-runtime.js';
+import { makeExtensionFiles } from '../../services/extension-files.js';
 import { logger } from '../../utils/logger.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { enforcePaywall } from './paywall.js';
@@ -229,6 +230,10 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
             return agent?.trustScore ?? 0;
           },
         },
+        // The file half of the sandbox, authorized AS the caller (read) and landing in the
+        // caller's own storage under ext/{name}/ (write). Without it every byte-shaped capability
+        // has to move its bytes through the arguments and the result.
+        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, extName: ext.name }),
         caller: {
           gaii: callerGaii,
           owner: req.auth!.owner,
@@ -504,6 +509,10 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           },
           // trust.adjust removed — trust scores are system-computed only
         },
+        // The file half of the sandbox, authorized AS the caller (read) and landing in the
+        // caller's own storage under ext/{name}/ (write). Without it every byte-shaped capability
+        // has to move its bytes through the arguments and the result.
+        files: makeExtensionFiles({ config, storage, callerGaii, callerOwner: req.auth!.owner as string, extName: ext.name }),
         caller: {
           gaii: callerGaii,
           owner: req.auth!.owner,

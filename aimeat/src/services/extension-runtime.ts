@@ -39,6 +39,13 @@ export interface ExtensionCtx {
         getScore?(gaii: string): Promise<number>;
     };
     fetch(url: string, opts?: { method?: string; headers?: Record<string, string>; body?: string }): Promise<{ status: number; ok: boolean; text: string; headers: Record<string, string> }>;
+    /** Stored FILES, by reference. Optional the way notify/email are: a context that cannot offer
+     *  it (a scheduled run with no caller) simply does not, and the guest sees undefined. */
+    files?: {
+        read(ref: string): Promise<{ base64: string; mime: string; size: number; key: string } | null>;
+        write(key: string, base64: string, opts?: { mime?: string; visibility?: string }):
+            Promise<{ key: string; gaii: string; url: string; size: number }>;
+    };
     caller: { gaii: string; owner: string; roles: string[] };
     config: Record<string, unknown>;
     instance?: {
@@ -179,6 +186,10 @@ ${userFnDecl}
             getPublic: async (namespace, key) => __call(__memory_getPublic, [namespace, key]),
         },
         fetch: async (url, opts) => __call(__fetch, [url, opts ? JSON.stringify(opts) : '{}']),
+        files: __files_read ? {
+            read:  async (ref)              => __call(__files_read, [ref]),
+            write: async (key, b64, opts)   => __call(__files_write, [key, b64, opts ? JSON.stringify(opts) : '{}']),
+        } : undefined,
         wallet: {
             consume:    __wallet_consume    ? (async (amount, reason) => __call(__wallet_consume, [String(amount), reason]))  : undefined,
             getBalance: __wallet_balance    ? (async ()               => __call(__wallet_balance, []))                         : undefined,
@@ -384,6 +395,19 @@ export async function executeExtensionAction(
                 resp.headers.forEach((v, k) => { headers[k] = v; });
                 return { status: resp.status, ok: resp.ok, text, headers };
             },
+            counter, limits.maxApiCalls, inflight);
+
+        // ── Files API ─────────────────────────────────────────
+        // A capability that works on bytes takes a REFERENCE and answers with one. Both sides are
+        // size-capped in the factory before any base64 crosses this bridge.
+        registerAsyncHostFn(vm, '__files_read',
+            ctx.files ? async (ref) => ctx.files!.read(ref) : null,
+            counter, limits.maxApiCalls, inflight);
+
+        registerAsyncHostFn(vm, '__files_write',
+            ctx.files
+                ? async (key, b64, optsJson) => ctx.files!.write(key, b64, JSON.parse(optsJson || '{}') as { mime?: string; visibility?: string })
+                : null,
             counter, limits.maxApiCalls, inflight);
 
         // ── Wallet API ────────────────────────────────────────
