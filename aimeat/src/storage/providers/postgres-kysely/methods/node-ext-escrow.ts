@@ -7,6 +7,9 @@
  *   columns go through the shared `jsonb()` param helper; status/visibility unions are DB strings.
  * @version-history
  *   v1.0.0 — 2026-07-15 — Phase 5: node extension/instance/escrow/cortex on Postgres+Kysely.
+ *   v1.1.0 — 2026-07-26 — updateExtension no longer swallows write errors into `null` (see the note
+ *     on the method): a failed UPDATE was indistinguishable from a missing row, and callers reported
+ *     the resulting null as a successful no-op.
  */
 import type { Selectable } from 'kysely';
 import type {
@@ -79,21 +82,28 @@ export const nodeExtEscrowMethods = {
     if (opts?.status) q = q.where('status', '=', opts.status);
     return (await q.execute()).map(toExtension);
   },
+  /**
+   * NOTE: this method does NOT swallow write errors, and must not start doing so again.
+   *
+   * It used to end in `catch { return null; }`. Every caller reads `null` as "no such extension",
+   * so a failed UPDATE was indistinguishable from a missing row — and the presigned-upload handler
+   * turned that null into `200 {success:true}` over the OLD record. The extension kept running the
+   * previous code while every layer reported a successful upsert. `null` here means exactly one
+   * thing: no row named `name`. A failure throws and reaches the route's error handler.
+   */
   async updateExtension(this: PostgresKyselyStorage, name: string, updates: Partial<ExtensionRecord>): Promise<ExtensionRecord | null> {
-    try {
-      const data: Record<string, unknown> = { ...updates };
-      delete data.name;
-      if ('actions' in data) data.actions = jsonb(data.actions);
-      if ('config' in data) data.config = jsonb(data.config);
-      if ('limits' in data) data.limits = jsonb(data.limits);
-      if ('federation' in data) data.federation = jsonb(data.federation);
-      if ('instances' in data) data.instances = jsonb(data.instances ?? null);
-      if (typeof data.activatedAt === 'string') data.activatedAt = new Date(data.activatedAt);
-      if (typeof data.installedAt === 'string') data.installedAt = new Date(data.installedAt);
-      data.updatedAt = new Date();
-      const rows = await this.db.updateTable('Extension').set(data as never).where('name', '=', name).returningAll().execute();
-      return rows[0] ? toExtension(rows[0]) : null;
-    } catch { return null; }
+    const data: Record<string, unknown> = { ...updates };
+    delete data.name;
+    if ('actions' in data) data.actions = jsonb(data.actions);
+    if ('config' in data) data.config = jsonb(data.config);
+    if ('limits' in data) data.limits = jsonb(data.limits);
+    if ('federation' in data) data.federation = jsonb(data.federation);
+    if ('instances' in data) data.instances = jsonb(data.instances ?? null);
+    if (typeof data.activatedAt === 'string') data.activatedAt = new Date(data.activatedAt);
+    if (typeof data.installedAt === 'string') data.installedAt = new Date(data.installedAt);
+    data.updatedAt = new Date();
+    const rows = await this.db.updateTable('Extension').set(data as never).where('name', '=', name).returningAll().execute();
+    return rows[0] ? toExtension(rows[0]) : null;
   },
   async deleteExtension(this: PostgresKyselyStorage, name: string): Promise<boolean> {
     const r = await this.db.deleteFrom('Extension').where('name', '=', name).executeTakeFirst();

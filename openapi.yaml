@@ -9837,14 +9837,34 @@ paths:
                     type: string
                     enum: [app, storage, extension, cortex]
                 additionalProperties: true
+        '400':
+          description: |
+            The payload was rejected. `error` carries the reason code from the shared manifest
+            validator for extension/cortex ZIPs (`INVALID_MANIFEST`, `MISSING_SCRIPT`,
+            `CODE_TOO_LARGE`, …) and `message` names the offending field.
         '401':
           description: Invalid token
+        '403':
+          description: |
+            The target already exists and belongs to another owner (extension uploads). The token
+            subject is what identifies the uploader; ownership is always checked.
         '409':
-          description: Token already used (single-use)
+          description: |
+            Token already used (single-use), or — for an extension upload without `update:true` in
+            the token meta — an extension of that name is already installed (`ALREADY_EXISTS`).
         '410':
           description: Token expired (60 min TTL)
         '413':
           description: File exceeds size limit encoded in token
+        '500':
+          description: |
+            Processing failed. The body carries a `reason` naming the failure. An extension upsert
+            whose storage write did not apply answers `UPDATE_FAILED` and states that the installed
+            version is unchanged — this endpoint never reports an unapplied write as success.
+        '503':
+          description: |
+            The manifest declares `type: secret` config but no encryption key is configured
+            (`ENCRYPTION_NOT_CONFIGURED`); set AIMEAT_ENCRYPTION_KEY.
 
   /v1/download/{token}:
     get:

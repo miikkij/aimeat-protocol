@@ -14,7 +14,13 @@
  *      sandbox now ships ctx.hash()/ctx.now(), and install warns when a script reaches past them.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *   test/run-e2e-ci.ts --test=e2e-presigned-meta
+ *   3. SUCCESS REPORTED OVER A WRITE THAT NEVER HAPPENED. The upsert answered `200 success:true`
+ *      built from `updateExtension(...) ?? existing`, so a storage failure returned the OLD record
+ *      as proof of a new deployment. Phase 3 therefore reads the server back and INVOKES the action
+ *      after every upsert — the response is exactly the thing that was lying.
  * @version-history
+ *   v1.1.0 — 2026-07-26 — Prove the upsert by read-back + invoke (not by the response); Phase 4 adds
+ *     malformed-manifest, non-ZIP and cross-owner cases.
  *   v1.0.0 — 2026-07-26 — Initial.
  */
 import * as ed from '@noble/ed25519';
@@ -101,7 +107,16 @@ actions:
     output: { type: object }
 `;
 const PING_JS = `export default async function (ctx, input) {
-  return { hash: ctx.hash(String(input && input.s || '')), now: ctx.now(), twice: ctx.hash('x') === ctx.hash('x') };
+  return { hash: ctx.hash(String(input && input.s || '')), now: ctx.now(), twice: ctx.hash('x') === ctx.hash('x'), build: 'v1' };
+}`;
+/**
+ * The v2 script must be OBSERVABLY different from v1. An upsert test that ships identical code can
+ * only ever check what the response claims, and the response was the thing lying: a storage write
+ * that never applied was answered with `200 {success:true, updated:true}` over the old record, so
+ * the extension kept serving the previous script. Proving an upsert means invoking it afterwards.
+ */
+const PING_V2_JS = `export default async function (ctx, input) {
+  return { hash: ctx.hash(String(input && input.s || '')), now: ctx.now(), twice: true, build: 'v2' };
 }`;
 /** Reaches for things the sandbox does not have / that are non-deterministic — must warn. */
 const UNSAFE_JS = `export default async function (ctx, input) {
@@ -113,10 +128,11 @@ const UNSAFE_JS = `export default async function (ctx, input) {
 let ownerToken = '';
 
 /** Ask for a presigned extension upload URL through REST (same token mint the MCP tool uses). */
-async function presignedExtensionUrl(opts: { update?: boolean; activate?: boolean }): Promise<string> {
+async function presignedExtensionUrl(opts: { update?: boolean; activate?: boolean; as?: string }): Promise<string> {
+    const { as, ...body } = opts;
     const r = await json('/v1/extensions', {
-        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
-        body: JSON.stringify({ mode: 'presigned', ...opts }),
+        method: 'POST', headers: { Authorization: `Bearer ${as ?? ownerToken}` },
+        body: JSON.stringify({ mode: 'presigned', ...body }),
     });
     assert(r.status === 200 && r.body.data?.upload_url, `presigned mint: ${r.status} ${JSON.stringify(r.body)}`);
     return r.body.data.upload_url as string;
@@ -228,10 +244,29 @@ async function main() {
 
     await test('presigned upload WITH update:true upserts in place', async () => {
         const url = await presignedExtensionUrl({ update: true });
-        const r = await putZip(url, makeZip({ 'manifest.yaml': manifest('2.0.0'), 'scripts/ping.js': PING_JS }));
+        const r = await putZip(url, makeZip({ 'manifest.yaml': manifest('2.0.0'), 'scripts/ping.js': PING_V2_JS }));
         assert(r.status === 200 && r.body.success, `expected upsert, got ${r.status} ${JSON.stringify(r.body)}`);
         assert(r.body.updated === true, 'reported as an update');
         assert(r.body.version === '2.0.0', `new version applied, got ${r.body.version}`);
+    });
+
+    // The three assertions above all read the RESPONSE. The reported bug produced a perfectly
+    // well-formed success response over a database that had not changed, so the response cannot be
+    // the evidence. These two read the server back instead.
+    await test('the upsert really landed: the SERVER reports the new version', async () => {
+        const g = await json(`/v1/extensions/${EXT}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(g.body.data.extension.version === '2.0.0',
+            `stored version is still ${g.body.data.extension.version} — the write did not apply`);
+    });
+
+    await test('the upsert really landed: INVOKING the action runs the new script', async () => {
+        const r = await json(`/v1/ext/${EXT}/ping`, {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ s: 'x' }),
+        });
+        assert(r.status === 200 && r.body.ok, `invoke: ${r.status} ${JSON.stringify(r.body)}`);
+        assert(r.body.data.build === 'v2',
+            `the extension is still running the OLD script (build=${r.body.data.build}) despite a success response`);
     });
 
     await test('the upsert PRESERVED the active status (that is why it beats delete+reinstall)', async () => {
@@ -260,6 +295,52 @@ async function main() {
         assert(r.status === 200, `install: ${r.status} ${JSON.stringify(r.body)}`);
         assert(Array.isArray(r.body.warnings) && r.body.warnings.length >= 3,
             `ZIP path must warn too, got ${JSON.stringify(r.body.warnings)}`);
+    });
+
+    console.log('\nPhase 4: a broken upload says what is broken, and cannot cross owners');
+
+    await test('a manifest with a mis-typed field is a 400 naming the field, not a blank 500', async () => {
+        const url = await presignedExtensionUrl({});
+        const broken = manifest('1.0.0')
+            .replace(`name: ${EXT}`, `name: ${EXT}broken`)
+            .replace('method: POST', 'method: { a: 1 }');
+        const r = await putZip(url, makeZip({ 'manifest.yaml': broken, 'scripts/ping.js': PING_JS }));
+        assert(r.status === 400, `expected 400, got ${r.status} ${JSON.stringify(r.body)}`);
+        assert(String(r.body.message).includes('method'), `the error must name the field, got: ${r.body.message}`);
+    });
+
+    await test('a ZIP that is not a ZIP is refused with a reason', async () => {
+        const url = await presignedExtensionUrl({});
+        const res = await fetch(url, {
+            method: 'PUT', headers: { 'Content-Type': 'application/zip' },
+            body: new Uint8Array(Buffer.from('this is not a zip file')),
+        });
+        const body = await res.json() as any;
+        assert(res.status === 400, `expected 400, got ${res.status} ${JSON.stringify(body)}`);
+        assert(typeof body.message === 'string' && body.message.length > 0, 'the refusal carries a message');
+    });
+
+    await test('a DIFFERENT owner cannot overwrite an installed extension through a presigned ZIP', async () => {
+        const other = `pmother${Date.now() % 1000000}`;
+        const reg = await json('/v1/owners', { method: 'POST', body: JSON.stringify({ name: other, public_key: 'placeholder' }) });
+        assert(reg.status === 201, `register other owner: ${reg.status}`);
+        const otherToken = await getOwnerToken(other, reg.body.data.private_key);
+
+        const url = await presignedExtensionUrl({ update: true, as: otherToken });
+        const r = await putZip(url, makeZip({ 'manifest.yaml': manifest('9.9.9'), 'scripts/ping.js': PING_JS }));
+        assert(r.status === 403, `expected 403 for a cross-owner upsert, got ${r.status} ${JSON.stringify(r.body)}`);
+
+        // And the victim's extension is untouched.
+        const g = await json(`/v1/extensions/${EXT}`, { headers: { Authorization: `Bearer ${ownerToken}` } });
+        assert(g.body.data.extension.version === '2.0.0', `version changed to ${g.body.data.extension.version}`);
+    });
+
+    await test('inline install with scripts but no manifest is refused, not silently ignored', async () => {
+        const r = await json('/v1/extensions', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ scripts: { 'ping.js': PING_JS } }),
+        });
+        assert(r.status === 400, `expected 400, got ${r.status} ${JSON.stringify(r.body)}`);
     });
 
     console.log(`\n${passed} passed, ${failed} failed\n`);
