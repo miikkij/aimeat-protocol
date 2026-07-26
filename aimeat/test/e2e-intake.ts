@@ -204,6 +204,18 @@ async function main() {
         assert(forms.length >= 3 && forms.some(f => f.form_id === 'contact-us'), `lists forms (${forms.map(f => f.form_id).join(',')})`);
     });
 
+    // A NUL byte cannot be stored in a Postgres value, so before stripControls() it reached the
+    // write and answered an ANONYMOUS caller with 500. Found against the live public form: a
+    // public endpoint must never answer 'unexpected error' to input anyone can send.
+    await test('a control character is stripped, not a 500', async () => {
+        const r = await json(`/v1/intake/${orgId}/${ws}/${formId}`, {
+            method: 'POST',
+            body: JSON.stringify({ nimi: 'NUL\u0000byte', email: 'keeps\ttab@ex.fi' }),
+        });
+        assert(r.status === 200, `expected 200, got ${r.status}`);
+        const id = (r.body.data as { id?: string }).id;
+        assert(!!id, 'the record is still written');
+    });
     await test('delete a form → its public link stops working (404)', async () => {
         const del = await json(`/v1/intake/forms?organism_id=${orgId}&ws=${ws}&form_id=${disabledForm}`, { method: 'DELETE', headers: { Authorization: `Bearer ${ownerToken}` } });
         assert(del.status === 200 && (del.body.data as { deleted: boolean }).deleted === true, `delete: ${del.status}`);
