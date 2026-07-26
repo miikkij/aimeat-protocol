@@ -15,6 +15,10 @@
  * @usage import { PALETTES, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
  *   In the app: nothing — the login pill renders the picker and the CSS follows.
  * @version-history
+ *   v1.1.0 — 2026-07-26 — ?palette= is read first (the ?lang= door): an app EMBEDDED by another
+ *     page cannot see the look chosen on the embedder's origin, so the embedder says it in the URL
+ *     and the app inherits it. Never persisted — an embed decides how it looks while it is
+ *     embedded, not what the app remembers.
  *   v1.0.0 — 2026-07-25 — Initial palette registry + apply/restore + swatch picker, born with
  *     aimeat-theme.css v2.
  */
@@ -50,6 +54,15 @@ export var PALETTES = [
 export function aimeatReadPalette() {
   var ids = PALETTES.map(function (p) { return p.id; });
   try {
+    // ?palette= first, exactly where ?lang= sits in the locale lookup, and for the same reason:
+    // localStorage is per ORIGIN, so an app embedded by another page cannot see the look the
+    // reader chose there. The embedder says it in the URL and the app inherits it instead of
+    // rendering in a palette nobody picked. Not persisted — an embed decides how it looks while
+    // it is embedded, and must not overwrite the choice the app's own origin remembers.
+    var u = new URLSearchParams(location.search).get('palette');
+    if (u && ids.indexOf(u) >= 0) return u;
+  } catch { /* no location */ }
+  try {
     var s = localStorage.getItem(AIMEAT_PALETTE_KEY);
     if (s && ids.indexOf(s) >= 0) return s;
   } catch { /* storage blocked */ }
@@ -73,6 +86,7 @@ export function aimeatApplyPalette(id) {
 export function aimeatRestorePalette() {
   var cur = aimeatReadPalette();
   if (cur !== PALETTES[0].id) document.documentElement.setAttribute('data-palette', cur);
+  else document.documentElement.removeAttribute('data-palette');   // an embed may ask for the default
   try {
     window.addEventListener('storage', function (e) {
       if (e.key === AIMEAT_PALETTE_KEY && e.newValue) aimeatApplyPalette(e.newValue);

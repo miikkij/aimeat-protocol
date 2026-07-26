@@ -9,6 +9,9 @@
  *   ensureAuthPillStyles · pillInitials.
  * @usage import { escHtml, modeSwitchHtml, wireModeSwitch } from './theme.js';
  * @version-history
+ *   v1.2.0 — 2026-07-26 — ?mode= is read first and applied at parse time (aimeatRestoreMode), the
+ *     same door ?palette= and ?lang= use, so an embedded app follows the embedding page's light/
+ *     dark instead of its own origin's storage. Not persisted.
  *   v1.1.0 — 2026-07-25 — The lone ☾/☀ toggle becomes a segmented ☀|☾ mode switch (both options
  *     visible, active marked), styled by cluster.js instead of inline styles.
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2.ts (SDK-libs migration Phase 3).
@@ -20,6 +23,13 @@ export function escHtml(s) { const d = document.createElement('div'); d.textCont
 var AIMEAT_THEME_KEY = 'aimeat-theme';
 
 export function aimeatReadTheme() {
+  // ?mode= first, the same door ?palette= and ?lang= use: an app embedded by another page cannot
+  // read the choice made on the embedder's origin, so the embedder says it and the app follows.
+  // Deliberately not persisted — being embedded in a dark page is not a decision about the app.
+  try {
+    var u = new URLSearchParams(location.search).get('mode');
+    if (u === 'light' || u === 'dark') return u;
+  } catch { /* no location */ }
   try { var s = localStorage.getItem(AIMEAT_THEME_KEY); if (s === 'light' || s === 'dark') return s; } catch { /* storage blocked */ }
   var attr = document.documentElement.dataset.theme;
   if (attr === 'light' || attr === 'dark') return attr;
@@ -30,6 +40,19 @@ export function aimeatApplyTheme(t) {
   document.documentElement.dataset.theme = t;
   try { localStorage.setItem(AIMEAT_THEME_KEY, t); } catch { /* storage blocked */ }
   try { window.dispatchEvent(new CustomEvent('aimeat-theme-change', { detail: { theme: t } })); } catch { /* no window */ }
+}
+
+/**
+ * Adopt an embedder's ?mode= onto <html> at parse time, without persisting it. The app's own
+ * light/dark snippet reads localStorage and cannot know it is inside someone else's page; this
+ * runs after it and lets the embedding page win for as long as the embed lasts. No URL param
+ * means no opinion, so a normally-opened app is untouched.
+ */
+export function aimeatRestoreMode() {
+  try {
+    var u = new URLSearchParams(location.search).get('mode');
+    if (u === 'light' || u === 'dark') document.documentElement.dataset.theme = u;
+  } catch { /* no location */ }
 }
 
 /**
