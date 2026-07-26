@@ -20,6 +20,11 @@
  *     audited (consent audit now records only denials + grant/revoke mutations).
  *   v1.5.0 -- 2026-07-11 -- POST /v1/storage response carries owner_gaii + embed_url/embed_markdown so a
  *     caller can embed the file with the owner-addressed /v1/pub form (see services/doc-images).
+ *   v1.6.0 -- 2026-07-26 -- GET /v1/pub sends Access-Control-Allow-Origin: * and Cross-Origin-
+ *     Resource-Policy: cross-origin on the PUBLIC branch only. A public file could be displayed but
+ *     not read by script: the global CORS middleware resolves origins from the caller's identity and
+ *     a public read carries none, so it fell back to the node default. The gated branches below are
+ *     unchanged and keep the credentialed policy.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -528,6 +533,17 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 action: 'read',
             });
             res.setHeader('Cache-Control', 'public, max-age=300');
+            // A public file is world-readable by definition, and until now only by <img>: a script
+            // that fetched the same bytes got no Access-Control-Allow-Origin and was blocked. The
+            // global CORS middleware resolves allowed origins from the CALLER's identity, and a
+            // public read carries none, so it fell back to the node default and app origins missed.
+            // '*' is the honest answer for content that needs no credentials to read — the same
+            // header the app-template, library-pack and font routes already send — and it is set
+            // ONLY on this branch: the consent-gated paths below keep the credentialed policy.
+            res.setHeader('Access-Control-Allow-Origin', '*');
+            // Lets the bytes be drawn into a canvas and read back, which is what any app doing
+            // something WITH a public image (resize, re-encode, hand to a tool) has to do.
+            res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
             res.setHeader('Content-Type', file.mimeType);
             res.setHeader('Content-Length', file.size);
             res.end(file.data);
