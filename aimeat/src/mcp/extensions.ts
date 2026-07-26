@@ -26,6 +26,8 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { parse as parseYaml } from 'yaml';
 import { validateActionPricing } from '../routes/extensions/manifest.js';
+import { SECRET_KEYS_FIELD, computeManifestSecretKeys, getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields, maskSecretFields, prepareSecretConfigForWrite } from '../services/extension-secrets.js';
+import { getEncryptionKey } from '../services/encryption.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
@@ -303,11 +305,12 @@ export function registerExtensionsTools(
                     owner: parseGAII(agentGaii)?.owner ?? agentGaii,
                     roles: ['agent'],
                 },
-                config: ext.config,
+                // Decrypted for the VM as routes/extensions/actions.ts does; the { encrypted } wrapper would silently break the script.
+                config: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
                 ...(instance_id ? {
                     instance: {
                         id: instance_id,
-                        config: (await storage.getExtensionInstance(extension_name, instance_id))?.config ?? {},
+                        config: decryptSecretFields((await storage.getExtensionInstance(extension_name, instance_id))?.config ?? {}, getInstanceSecretKeys(ext), getEncryptionKey(config)),
                     },
                 } : {}),
                 log: {
@@ -530,6 +533,11 @@ export function registerExtensionsTools(
                         )
                         : {}),
                     ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
+                    // Mark `type: 'secret'` fields as the REST builder does; without it they are stored as the plaintext the flatten pulled from `default`.
+                    ...((): Record<string, unknown> => {
+                        const secretKeys = computeManifestSecretKeys(manifestConfig);
+                        return secretKeys.length ? { [SECRET_KEYS_FIELD]: secretKeys } : {};
+                    })(),
                 },
                 limits: {
                     memoryMb: Math.min(
@@ -558,6 +566,16 @@ export function registerExtensionsTools(
                 installedBy: parseGAII(getAgentGaii())?.owner ?? 'mcp-agent',
                 installedAt: new Date().toISOString(),
             };
+
+            // Encrypt secrets before any write, as POST/PUT /v1/extensions do. This path wrote config straight to storage, so a `type: secret` value was persisted in the clear and served unauthenticated.
+            const preparedConfig = prepareSecretConfigForWrite(record.config, existingExt?.config, getEncryptionKey(config));
+            if (preparedConfig === null) {
+                return {
+                    content: [{ type: 'text' as const, text: 'ENCRYPTION_NOT_CONFIGURED: this manifest declares a secret config field but the node has no encryption key. Set AIMEAT_ENCRYPTION_KEY or drop the secret field; a secret is never stored in plaintext.' }],
+                    isError: true,
+                };
+            }
+            record.config = preparedConfig;
 
             try {
                 let result: ExtensionRecord;
@@ -761,7 +779,8 @@ export function registerExtensionsTools(
                             input_schema: a.inputSchema,
                             output_schema: a.outputSchema,
                         })),
-                        config: ext.config,
+                        // Masked: an API surface returns the mask for a set secret, never the value.
+                        config: maskSecretFields(ext.config, getExtSecretKeys(ext)),
                         limits: ext.limits,
                         federation: ext.federation,
                         instances: ext.instances,

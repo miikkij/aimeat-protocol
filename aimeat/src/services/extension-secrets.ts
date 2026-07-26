@@ -119,6 +119,24 @@ export function maskSecretFields(
 }
 
 /**
+ * Prepare a freshly built record's config for storage: carry forward the encrypted secrets an
+ * incoming manifest omitted, then encrypt the plaintext ones. Returns `null` when a secret needs
+ * encrypting and the node has no key, which the caller must refuse on — a secret is never stored
+ * in the clear. Shared by the REST install/update routes and the MCP install tool; they did this
+ * separately once, and the MCP side simply did not do it at all.
+ */
+export function prepareSecretConfigForWrite(
+  incoming: Record<string, unknown>,
+  existing: Record<string, unknown> | undefined,
+  key: Buffer | null,
+): Record<string, unknown> | null {
+  const secretKeys = getExtSecretKeys({ config: incoming });
+  if (!secretKeys.length) return incoming;
+  const merged = existing ? preserveMaskedSecrets(incoming, existing, secretKeys) : incoming;
+  return encryptSecretFields(merged, secretKeys, key);
+}
+
+/**
  * On an update, carry forward existing encrypted secret values when the incoming config omits
  * them or submits the mask sentinel — so a masked UI never wipes a stored secret.
  */
