@@ -24,6 +24,7 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 | `fonts.css` + `fonts/*.woff2` | Baloo 2 + Bangers display fonts (the `fonts` pack, via `fonts.css`) AND the theme-system faces Inter, Space Grotesk, Fraunces, JetBrains Mono (declared by `aimeat-theme.css`, lazy-loaded per family). All latin + latin-ext (ä/ö); see `fonts/LICENSE.md` | Baloo 2 v23 · Bangers v25 · Inter v20 · Space Grotesk v22 · Fraunces v38 · JetBrains Mono v24 | `fonts` / `styling` | Google Fonts CDN (see `fonts/LICENSE.md`) | OFL-1.1 |
 | `realtime.js` | AIMEAT-local (WS/WebRTC/Yjs client + `SharedClock` synced timeline) | 1 | `realtime` | this repo | MIT |
 | `toastui/toastui-editor-all.min.js` + `.min.css` | TOAST UI Editor | (SPA-internal) | — | `https://uicdn.toast.com` | MIT |
+| `pdfjs@6/pdf.min.mjs` + `pdf.worker.min.mjs` | `pdfjs-dist` (ESM + worker) | 6.1.200 | `pdfjs` | `https://cdn.jsdelivr.net/npm/pdfjs-dist@6.1.200/build/` | Apache-2.0 |
 | `yaml.mjs` | `yaml` (ESM) | 2.x | `yaml` | jsdelivr | ISC |
 | `preact.mjs`, `preact-hooks.mjs`, `htm.mjs`, `minidenticons.min.js` | preact / htm / minidenticons (ESM) | (SPA-internal, importmap) | — | jsdelivr | MIT |
 | `live-updates.js` | AIMEAT-local (SSE ESM wrapper) | (SPA-internal) | — | this repo | MIT |
