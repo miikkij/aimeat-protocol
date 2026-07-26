@@ -17,6 +17,10 @@
  *     "Reply with AI"). Gated by the explicit messages:send-as-owner scope; sender is the agent's OWN
  *     owner, derived server-side (never a client id) so an agent can only speak as its own owner. The
  *     reply lands in the owner's thread, attributed to the owner; the acting agent is logged for audit.
+ *   v1.3.0 — 2026-07-26 — inbox/thread attachments carry `ref` (+ origin_ref, owner_ghii, size, mode).
+ *     They used to expose only a storage_key, and a key alone cannot be opened: storage is addressed by
+ *     (owner, key), so the agent looked in its own namespace and got "not found" for a file it had just
+ *     been sent. `ref` feeds aimeat_storage_download directly.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -30,7 +34,45 @@ import { MessageAttachmentInputSchema, InteractiveQuestionSchema } from '../mode
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
+import { fileRefFor } from '../services/file-refs.js';
+import type { DirectMessageAttachment } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+
+/**
+ * How ONE attachment is shown to the agent reading its inbox. `ref` is the point: the descriptor used
+ * to carry only a storage_key, and a key alone is unopenable — storage is addressed by (owner, key),
+ * so an agent that knew only the key looked in its OWN namespace and got "not found" for a file that
+ * was sitting right there. `ref` is exactly what aimeat_storage_download(owner=…, key=…) wants.
+ *
+ * Which ref: a delivered attachment is normally DUPLICATED into the recipient mailbox owner's storage,
+ * and that local copy is the one the recipient side reliably owns — so it becomes `ref` when present.
+ * A `reference`-mode attachment (own-agent handoff, or still awaiting quota) has only the sender's
+ * copy, whose readability depends on its visibility / a consent grant. `origin_ref` always names the
+ * sender's copy so the agent can tell the two apart.
+ */
+/** The GHII whose mailbox holds an agent's DMs — a message to `agent#alice@node` lands under `alice@node`. */
+function ownerGhiiOf(agentGaii: string): string {
+    const p = parseGaiiLoose(agentGaii);
+    return `${p.owner}@${p.node}`;
+}
+
+function attachmentView(a: DirectMessageAttachment, mailboxOwnerGhii: string): Record<string, unknown> {
+    const originRef = fileRefFor(a.ownerGhii, a.storageKey);
+    const localRef = a.mode === 'duplicate' && a.localKey ? fileRefFor(mailboxOwnerGhii, a.localKey) : undefined;
+    return {
+        ref: localRef ?? originRef,
+        origin_ref: originRef,
+        owner_ghii: a.ownerGhii,
+        storage_key: a.storageKey,
+        mime: a.mime,
+        kind: a.kind,
+        name: a.name,
+        size: a.size,
+        mode: a.mode,
+        expired: a.expired ?? false,
+        note: 'Open it with aimeat_storage_download using this ref (key="<owner@node>/<key>" or owner + key). MCP never carries the bytes.',
+    };
+}
 
 export function registerDmMessageTools(
     mcp: McpServer,
@@ -220,6 +262,7 @@ export function registerDmMessageTools(
         annotationsFor('aimeat_dm_inbox'),
         async ({ page, per_page }) => {
             const agentGaii = getAgentGaii();
+            const mailboxOwnerGhii = ownerGhiiOf(agentGaii);
             const { messages, total } = await storage.listDmsAddressedTo(agentGaii, { page: page ?? 1, perPage: per_page ?? 20 });
             return {
                 content: [{
@@ -231,7 +274,7 @@ export function registerDmMessageTools(
                             subject: m.subject ?? null,
                             from: m.senderGhii,
                             body: m.body,
-                            attachments: m.attachments?.map(a => ({ storage_key: a.storageKey, mime: a.mime, kind: a.kind, name: a.name })) ?? [],
+                            attachments: m.attachments?.map(a => attachmentView(a, mailboxOwnerGhii)) ?? [],
                             interactive: m.interactive ?? null,
                             created_at: m.createdAt,
                         })),
@@ -254,6 +297,7 @@ export function registerDmMessageTools(
         annotationsFor('aimeat_dm_thread'),
         async ({ conversation_id, page, per_page }) => {
             const agentGaii = getAgentGaii();
+            const mailboxOwnerGhii = ownerGhiiOf(agentGaii);
             const { messages, total } = await storage.listAgentDmThread(agentGaii, conversation_id, { page: page ?? 1, perPage: per_page ?? 50 });
             // Oldest-first so the agent reads the conversation in order.
             const ordered = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
@@ -268,7 +312,7 @@ export function registerDmMessageTools(
                             to: m.recipientGhii,
                             subject: m.subject ?? null,
                             body: m.body,
-                            attachments: m.attachments?.map(a => ({ storage_key: a.storageKey, mime: a.mime, kind: a.kind, name: a.name })) ?? [],
+                            attachments: m.attachments?.map(a => attachmentView(a, mailboxOwnerGhii)) ?? [],
                             interactive: m.interactive ?? null,
                             created_at: m.createdAt,
                         })),

@@ -276,14 +276,25 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
 
   mcp.tool('aimeat_storage_download', descriptionFor('aimeat_storage_download'), {
     agent_name: agentNameSchema,
-    key: z.string().describe('Storage key'),
+    key: z.string().describe('Storage key in the agent\'s own namespace, or a full "owner@node/key" reference.'),
+    owner: z.string().optional().describe('GHII/GAII that owns the file. Omit for the agent\'s own files; set it for the owner\'s uploads and for DM/task attachments.'),
     inline: z.boolean().optional().describe('Only for small text files (<= 32 KB): return content inline. Binaries always return a download handle, never base64 in context.'),
-  }, annotationsFor('aimeat_storage_download'), async ({ agent_name, key, inline }) => {
+  }, annotationsFor('aimeat_storage_download'), async ({ agent_name, key, owner, inline }) => {
     const { client } = pickAgent(registry, agent_name);
     // F11: never pull raw bytes through the model context — request a handle (presigned
     // download_url + metadata), or inline only for small text files.
     const mode = inline ? 'inline' : 'handle';
-    const resp = await client.get(`/v1/storage/${encodeURIComponent(key)}?mode=${mode}`);
+    // Two doors, by design: /v1/storage reads the agent's OWN namespace, /v1/pub reads a file
+    // someone else owns through the consent/visibility guard. A bare key with an owner-shaped
+    // head ("alice@node/report.pdf") is treated as a reference, matching the server tool.
+    const slash = key.indexOf('/');
+    const head = slash > 0 ? key.slice(0, slash) : '';
+    const refOwner = owner ?? (head.includes('@') || head.startsWith('ext:') ? head : '');
+    const refKey = owner ? key : (refOwner ? key.slice(slash + 1) : key);
+    const path = refOwner
+      ? `/v1/pub/${encodeURIComponent(refOwner)}/${refKey.split('/').map(encodeURIComponent).join('/')}?mode=handle`
+      : `/v1/storage/${encodeURIComponent(refKey)}?mode=${mode}`;
+    const resp = await client.get(path);
     return jsonContent(resp.data ?? resp);
   });
 

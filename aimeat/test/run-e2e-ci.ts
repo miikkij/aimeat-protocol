@@ -15,6 +15,8 @@
  *            (e2e-secretary, e2e-secretary-disabled, e2e-specialists, e2e-organism-templates,
  *            e2e-b2b-sales-hub-template) and the AIMEAT_SECRETARY_ENABLED env pin.
  *   v1.3.0 -- 2026-07-19 -- Add e2e-appdev-pitfalls.ts (AppDev Knowledge Base Phase 1).
+ *   v1.4.0 -- 2026-07-26 -- Add e2e-agent-file-handoff.ts (giving an agent a file: owner-visibility
+ *            read via /v1/pub, DM attachment refs, task attachments).
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -187,6 +189,7 @@ const ALL_SUITES = [
     'test/ai.ts',
     'test/e2e-sharing-groups.ts',
     'test/e2e-agent-tasks.ts',
+    'test/e2e-agent-file-handoff.ts',
     'test/e2e-agent-schedules.ts',
     'test/e2e-agent-quality.ts',
     'test/e2e-agent-directives.ts',

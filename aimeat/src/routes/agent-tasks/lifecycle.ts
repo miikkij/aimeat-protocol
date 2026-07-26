@@ -20,6 +20,7 @@ import { emitChange, emitDelivery } from '../../services/event-bus.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { recordTaskStarted } from '../../services/activity-recorder.js';
 import { AgentTaskUpdateSchema, AgentTaskRequestChangesSchema } from '../../models/agent-task-schemas.js';
+import { resolveTaskFileInputs } from '../../services/task-files.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
 import type { TaskRouteHelpers } from './helpers.js';
 
@@ -80,10 +81,19 @@ export function registerTaskLifecycleRoutes(
       };
     }
     if (body.resources !== undefined) {
+      // Same create-time rule for attachments: the caller must be able to read what it attaches.
+      const fileResult = await resolveTaskFileInputs(storage, config, body.resources.files, {
+        gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined,
+      });
+      if ('error' in fileResult) {
+        res.status(fileResult.error.status).json(error(config.nodeId, fileResult.error.code, fileResult.error.message));
+        return;
+      }
       updates.resources = {
         knowledgePackages: body.resources.knowledge_packages,
         memoryKeys: body.resources.memory_keys,
         memoryPrefixes: body.resources.memory_prefixes,
+        ...(fileResult.files.length ? { files: fileResult.files } : {}),
       };
     }
     if (body.todos !== undefined) {

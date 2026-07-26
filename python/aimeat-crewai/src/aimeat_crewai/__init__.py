@@ -75,13 +75,24 @@ from .messaging import (
     answers_from_dm,
     AimeatMessagingError,
 )
+from .files import (
+    AimeatFileError,
+    split_ref,
+    file_handle,
+    read_file,
+    upload_file,
+    attachments_of,
+    inbox_files,
+    task_files,
+    delegate_file,
+)
 from .usage_telemetry import (
     install_usage_telemetry,
     usage_run,
     build_llm_call_payload,
 )
 
-__version__ = "0.16.5"
+__version__ = "0.17.0"
 
 __all__ = [
     "__version__",
@@ -114,6 +125,16 @@ __all__ = [
     "offers_check",
     "offers_publish",
     "offers_tools",
+    # Files: getting a document to and from an agent (0.17.0)
+    "AimeatFileError",
+    "split_ref",
+    "file_handle",
+    "read_file",
+    "upload_file",
+    "attachments_of",
+    "inbox_files",
+    "task_files",
+    "delegate_file",
     # Deterministic Hello Integration driver (0.12.0)
     "run_hello_integration",
     "OnboardingError",

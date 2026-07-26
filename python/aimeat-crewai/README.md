@@ -287,6 +287,49 @@ normalized (a known routing prefix like `openrouter/`/`nvidia:` is moved into `p
 model shows as one ledger row instead of fragmenting across `openai/z-ai/glm-5.2`, `nvidia:z-ai/glm-5.2`,
 etc. When `usage.cost` is absent the node prices from its own table or records the call unpriced.
 
+## Files: give a crew a document (0.17.0+)
+
+A crew that has to read an invoice, fill a form or summarise a report needs the bytes. Two facts
+shape how that works, and both used to bite:
+
+- **Storage is keyed by (owner, key).** `GET /v1/storage/<key>` reads the *caller's* namespace only,
+  so a document the human owner uploaded answers **404** to that owner's own agent — regardless of
+  access rules. The door for a file someone else owns is `GET /v1/pub/{owner}/{key}`, which applies
+  the consent/visibility guard.
+- **The serve loopback is JSON/UTF-8.** Binary taken through it is corrupted irreversibly. So these
+  helpers never route bytes through the loopback: they ask for a small JSON **handle** and then fetch
+  the presigned `download_url` directly (that URL carries its own authorization — no token needed).
+
+```python
+from aimeat_crewai import serve_client, read_file, inbox_files, upload_file, delegate_file
+
+api = serve_client("company-crew")
+
+# 1. Read a document the owner uploaded (see the visibility note below)
+data, mime = read_file(api, "alice@aimeat-fi-001-genesis/invoices/2026-07.pdf")
+
+# 2. Read everything that arrived in the inbox as an attachment
+for f in inbox_files(api):
+    data, mime = read_file(api, f["ref"])          # f: {ref, mime, name, size, kind, ...}
+
+# 3. Publish a result the owner (and sibling agents) can actually open
+out = upload_file(api, "out/summary.pdf", pdf_bytes, mime="application/pdf")   # visibility='owner'
+
+# 4. Hand a file to another of the owner's agents, as a task
+delegate_file(api, "doc-crew", "Extract the total", ref=out["ref"])
+```
+
+**The one rule that decides whether this works:** the file must be readable by the agent. Uploading
+with `visibility="owner"` makes it readable by every agent and app of the same owner, which is the
+normal way to hand a document to your own crew (`upload_file` defaults to it for that reason). A
+`private` file is readable by its uploader alone — even the owner's own agents get 403 — unless there
+is an explicit consent grant. `read_file` reports which of the two happened instead of returning
+empty, because the fixes differ.
+
+Task attachments (`resources.files`) are re-authorized on every read: each entry comes back with
+`access` and, when granted, a fresh presigned `download_url`. Revoking access stops the URLs from the
+next read onward; the task keeps the reference.
+
 ## Compatibility
 
 | `aimeat-crewai` | AIMEAT node | CrewAI |
@@ -296,6 +339,7 @@ etc. When `usage.cost` is absent the node prices from its own table or records t
 | 0.3.x | 1.14.0+ (for `aimeat_task_create`) | 0.80+ |
 | 0.4.x | 1.21.0+ with `AIMEAT_CONNECT_TUNNEL_ENABLED=true` for the tunnel (degrades to direct HTTP on older nodes) | 0.80+ |
 | 0.16.x | 1.38.0+ for the usage ledger (older nodes accept the telemetry but record no ledger row) | 0.80+ |
+| 0.17.x | 2.1.0+ for file helpers (`?mode=handle` on `/v1/pub`, `resources.files` on tasks) | 0.80+ |
 
 ## License
 

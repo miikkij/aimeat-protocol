@@ -186,6 +186,17 @@ export interface AgentTaskRating {
   ratedAt: string;
 }
 
+/**
+ * One file attached to a task. `ref` is the canonical "<ownerGaii>/<key>" reference (see
+ * services/file-refs.ts) — the same form ctx.files.read and the DM attachment view use.
+ */
+export interface AgentTaskFileRef {
+  ref: string;
+  mime: string;
+  size: number;
+  name?: string;
+}
+
 export interface AgentTaskRecord {
   id: string;
   agentGaii: string;
@@ -202,6 +213,15 @@ export interface AgentTaskRecord {
     knowledgePackages?: string[];
     memoryKeys?: string[];
     memoryPrefixes?: string[];
+    /**
+     * FILES the agent needs in order to do the task — an invoice PDF, a form, a dataset. Each entry is
+     * a reference to a stored file, never its bytes; the agent turns one into a presigned URL through
+     * aimeat_storage_download / GET /v1/pub. mime + size are filled SERVER-SIDE from the stored file at
+     * create time (a client-supplied size or type is not trusted), and the read is authorized as the
+     * READING agent every time — assigning a task grants no bytes by itself. Rides in the existing
+     * `resources` JSON column, so both storage backends carry it without a migration.
+     */
+    files?: AgentTaskFileRef[];
   };
   todos: AgentTaskTodo[];
   // 'revision_requested' (since 1.14.5): the owner saw the agent's proposed

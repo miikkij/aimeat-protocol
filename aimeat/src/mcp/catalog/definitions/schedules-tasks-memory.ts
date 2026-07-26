@@ -127,7 +127,7 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_task_create',
-        description: 'Queue a task for one of your owner\'s agents (yourself or any same-owner agent). The owner sees it in their dashboard. Use this to ask another crew or worker to do something.',
+        description: 'Queue a task for one of your owner\'s agents (yourself or any same-owner agent). The owner sees it in their dashboard. Use this to ask another crew or worker to do something. Pass `files` to hand the target agent documents to work on (an invoice PDF, a form, a dataset) — references only, never bytes; it reads them as presigned URLs via aimeat_task_get.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
@@ -135,11 +135,12 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
             title: { type: 'string', required: true, description: 'Short human-readable title for the task.' },
             description: { type: 'string', required: true, description: 'The actual prompt / instruction for the target agent.' },
             status: { type: 'string', enum: ['draft', 'queued'], description: 'Default "queued" (visible to target immediately). Use "draft" for owner-review-first.' },
+            files: { type: 'array', description: 'Up to 20 file REFERENCES the target agent needs: "<owner@node>/<storage key>" each (a bare key means one of your own files). You must be able to read each file yourself.' },
         },
     },
     {
         name: 'aimeat_task_get',
-        description: 'Get the full detail of one task assigned to this agent: description, scope, rules, verification criteria, resources, and the ordered todo list with per-todo status. Only the agent the task belongs to may read it. Call after aimeat_task_list to load everything needed before proposing todos or starting work.',
+        description: 'Get the full detail of one task assigned to this agent: description, scope, rules, verification criteria, resources (including any attached FILES, each with a presigned download_url to fetch out-of-band), and the ordered todo list with per-todo status. Only the agent the task belongs to may read it. Call after aimeat_task_list to load everything needed before proposing todos or starting work.',
         caller: 'agent',
         visibility: agentEverywhere,
         input: { task_id: { type: 'string', required: true, description: 'Task identifier.' } },

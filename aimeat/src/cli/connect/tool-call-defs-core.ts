@@ -116,7 +116,18 @@ export const coreTools: ConnectCliToolDefinition[] = [
     },
     {
         name: 'aimeat_storage_download',
-        handler: ({ client }, input) => client.get(`/v1/storage/${encodeURIComponent(requiredString(input, 'key'))}`),
+        // `owner` (or an "owner@node/key" reference) reads a file the agent does NOT own — its owner's
+        // upload, a DM/task attachment — through /v1/pub, which runs the consent/visibility guard.
+        // Without it the read is namespaced to the agent and a perfectly readable file answers 404.
+        handler: ({ client }, input) => {
+            const key = requiredString(input, 'key');
+            const slash = key.indexOf('/');
+            const head = slash > 0 ? key.slice(0, slash) : '';
+            const owner = optionalString(input, 'owner') ?? (head.includes('@') || head.startsWith('ext:') ? head : '');
+            if (!owner) return client.get(`/v1/storage/${encodeURIComponent(key)}`);
+            const refKey = optionalString(input, 'owner') ? key : key.slice(slash + 1);
+            return client.get(`/v1/pub/${encodeURIComponent(owner)}/${refKey.split('/').map(encodeURIComponent).join('/')}?mode=handle`);
+        },
     },
     {
         name: 'aimeat_admin_stats',

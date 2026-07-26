@@ -51,11 +51,12 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
       title: z.string().describe('Short human-readable title for the task. Shows up in the owner\'s dashboard. Example: "Research 2026 agent orchestration trends".'),
       description: z.string().describe('The actual prompt / instruction for the target agent. This is what its liaison / runtime will read and act on.'),
       status: z.enum(['draft', 'queued']).optional().describe('Default "queued" (visible to the target agent immediately). Use "draft" if you want the owner to review before it goes live.'),
+      files: z.array(z.string()).max(20).optional().describe('Files the target agent needs, by REFERENCE: "<owner@node>/<storage key>" each (a bare key means a file the calling agent owns). The caller must be able to read each file itself; the target agent gets a presigned download_url from aimeat_task_get.'),
     },
     annotationsFor('aimeat_task_create'),
-    async ({ agent_name, target_agent, title, description, status }) => {
+    async ({ agent_name, target_agent, title, description, status, files }) => {
       const { client } = pickAgent(registry, agent_name);
-      const body = {
+      const body: Record<string, unknown> = {
         title,
         description,
         status: status ?? 'queued',
@@ -64,6 +65,7 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
         verification: { user_expects: '', technical_checks: [] },
         todos: [],
       };
+      if (files?.length) body.resources = { files: files.map(ref => ({ ref })) };
       const resp = await client.post(`/v1/agents/${encodeURIComponent(target_agent)}/tasks`, body);
       return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
     },
