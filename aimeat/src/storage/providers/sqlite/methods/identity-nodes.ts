@@ -325,7 +325,8 @@ export const identityNodesMethods = {
       `UPDATE ghiis SET username = ?, nodeId = ?, displayName = ?, bio = ?, avatar = ?, locale = ?,
        passwordHash = ?, verificationLevel = ?, ownerName = ?, createdAt = ?, updatedAt = ?,
        totpSecret = ?, totpEnabled = ?, totpBackupCodes = ?, totpLastUsedAt = ?,
-       totpLastUsedCode = ?, totpFailedAttempts = ?, totpLockedUntil = ?, semantic = ?,
+       totpLastUsedCode = ?, totpFailedAttempts = ?, totpLockedUntil = ?,
+       passwordFailedAttempts = ?, passwordLockedUntil = ?, semantic = ?,
        emailHash = ?, emailVerifiedAt = ?, verificationMethod = ?, magicLinkEnabled = ?,
        notificationEmail = ?, lastLoginAt = ?, loginCount = ?, verifiedAttributes = ?,
        verificationIssuer = ?, verificationCredentialHash = ?, ftnVerified = ?,
@@ -340,6 +341,7 @@ export const identityNodesMethods = {
       updated.totpBackupCodes ? JSON.stringify(updated.totpBackupCodes) : null,
       updated.totpLastUsedAt ?? null, updated.totpLastUsedCode ?? null,
       updated.totpFailedAttempts ?? 0, updated.totpLockedUntil ?? null,
+      updated.passwordFailedAttempts ?? 0, updated.passwordLockedUntil ?? null,
       updated.semantic ? JSON.stringify(updated.semantic) : null,
       updated.emailHash ?? null, updated.emailVerifiedAt ?? null,
       updated.verificationMethod ?? null, updated.magicLinkEnabled ? 1 : 0,
@@ -401,6 +403,10 @@ export const identityNodesMethods = {
     if (row.totpLastUsedCode) record.totpLastUsedCode = row.totpLastUsedCode as string;
     if (row.totpFailedAttempts) record.totpFailedAttempts = row.totpFailedAttempts as number;
     if (row.totpLockedUntil) record.totpLockedUntil = row.totpLockedUntil as string;
+    // Password lockout state — the columns existed but no provider read or wrote them, so
+    // config.passwordLockoutAttempts could never engage (every wrong password read back 0 attempts).
+    if (row.passwordFailedAttempts) record.passwordFailedAttempts = row.passwordFailedAttempts as number;
+    if (row.passwordLockedUntil) record.passwordLockedUntil = row.passwordLockedUntil as string;
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
     if (row.emailHash) record.emailHash = row.emailHash as string;
     if (row.emailVerifiedAt) record.emailVerifiedAt = row.emailVerifiedAt as string;

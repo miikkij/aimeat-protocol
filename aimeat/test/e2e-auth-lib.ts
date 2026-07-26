@@ -297,6 +297,57 @@ await test('POST /v1/ghii/login — wrong password rejected', async () => {
     assert(data._status === 401, `expected 401, got ${data._status}`);
 });
 
+/**
+ * The brute-force lockout was DEAD on BOTH backends and nothing noticed, because the only assertion
+ * about a wrong password was the 401 above. The counter is written by updateGHII: Postgres deleted
+ * passwordFailedAttempts/passwordLockedUntil as "not columns" (leaving an UPDATE with nothing to set,
+ * whose error was swallowed into null), and SQLite left both out of its UPDATE and its row
+ * deserializer. Every wrong password therefore read back "0 attempts so far" and
+ * config.passwordLockoutAttempts could never engage. Assert the LOCKOUT, not just the rejection.
+ *
+ * Uses its OWN account: a locked account refuses the correct password too, which would cascade into
+ * every later login test in this file.
+ */
+const lockUsername = `lockout${Date.now()}`;
+const lockPassword = 'LockoutPass123';
+
+await test('lockout fixture: register a throwaway password account', async () => {
+    const data = await api('/v1/ghii', {
+        method: 'POST',
+        body: JSON.stringify({ username: lockUsername, display_name: 'Lockout User', password: lockPassword }),
+    });
+    assert(data._status === 201, `expected 201, got ${data._status}: ${data.error?.message}`);
+});
+
+await test('POST /v1/ghii/login — repeated wrong passwords LOCK the account (brute-force guard)', async () => {
+    const attempts = 6;   // config default is 5 (AIMEAT_PASSWORD_LOCKOUT_ATTEMPTS)
+    let locked = false;
+    let lastStatus = 0;
+    let lastCode = '';
+    for (let i = 0; i < attempts; i++) {
+        const r = await api('/v1/ghii/login', {
+            method: 'POST',
+            body: JSON.stringify({ username: lockUsername, password: `wrongpass-${i}` }),
+        });
+        lastStatus = r._status;
+        lastCode = r.error?.code ?? '';
+        // Every attempt must be a clean rejection, never a 500 from a failed counter write.
+        assert(r._status === 401 || r._status === 423 || r._status === 429,
+            `attempt ${i + 1} returned ${r._status} (${lastCode}) — a failed lockout-counter write must not surface as a server error`);
+        if (r._status !== 401) { locked = true; break; }
+    }
+    assert(locked, `after ${attempts} wrong passwords the account was still not locked (last ${lastStatus} ${lastCode}) — the attempt counter is not persisting`);
+});
+
+await test('the lockout also refuses the CORRECT password while it holds', async () => {
+    const r = await api('/v1/ghii/login', {
+        method: 'POST',
+        body: JSON.stringify({ username: lockUsername, password: lockPassword }),
+    });
+    assert(r.ok === false, 'a locked account must refuse even the correct password');
+    assert(r._status !== 200, `expected a refusal, got ${r._status}`);
+});
+
 await test('POST /v1/ghii/login — nonexistent user rejected', async () => {
     const data = await api('/v1/ghii/login', {
         method: 'POST',

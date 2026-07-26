@@ -779,7 +779,9 @@ export interface Ghii {
   nodeId: string;
   notificationEmail: string | null;
   ownerName: string;
+  passwordFailedAttempts: Generated<number>;
   passwordHash: string | null;
+  passwordLockedUntil: string | null;
   totpBackupCodes: string[] | null;
   totpEnabled: Generated<boolean>;
   totpFailedAttempts: Generated<number>;
