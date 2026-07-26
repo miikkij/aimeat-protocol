@@ -1,0 +1,79 @@
+{
+  "name": "origami-live-fi",
+  "slides": [
+    {
+      "kind": "cover",
+      "title": "Tyhjä pinta toisessa päässä. Julkaistu appi toisessa.",
+      "lines": [
+        "paper.design sai 34 miljoonan dollarin rahoituksen siihen, että suunnitelma ja valmis tuote ovat sama asia.",
+        "Me teimme omamme ilman rahoitusta, ja se antaa tuloksen. Tässä yksi iltapäivä sillä."
+      ]
+    },
+    {
+      "kicker": "1 · pinta",
+      "title": "Alussa siinä ei ole mitään.",
+      "image": "empty.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "2 · yksi lause",
+      "title": "Pyysin AI-kulutukseni päivittäin ja kaavion samoista luvuista.",
+      "image": "request.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "3 · kaksi työtä",
+      "title": "Se näki lauseessa kaksi työtä, kysyi ensin ja teki sitten molemmat.",
+      "image": "chart.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "4 · samat luvut",
+      "title": "Taulukko ja kaavio tulevat omasta käytöstäni, eivät esimerkkidatasta.",
+      "image": "table.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "5 · kutsu",
+      "title": "Kuva, muutama rivi, yksi pinnalla oleva luku ja vastauslomake.",
+      "image": "invitation.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "6 · julkaisu",
+      "title": "Kutsusta tuli appi omaan osoitteeseensa, valmiina lähetettäväksi.",
+      "image": "app.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "7 · vastaus perille",
+      "title": "Vastaukset tulevat CADENCEen, omaan CRM:äämme, tapahtuman tunnisteella.",
+      "image": "cadence.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "8 · takaisin pinnalle",
+      "title": "Ja kutsun vieressä oleva paneeli listaa ketkä tulevat.",
+      "image": "panel.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "9 · kaikki kerralla",
+      "title": "Omat tiedot, kutsu, julkaistu appi ja CRM vierekkäin samalla pinnalla.",
+      "image": "board.png",
+      "fit": "contain"
+    },
+    {
+      "kind": "end",
+      "title": "Alle vartti, taite kerrallaan.",
+      "lines": [
+        "ORIGAMI on itsekin AIMEAT-appi AIMEATin päällä, samoilla rajapinnoilla kuin muillakin. Kaksi vikaa, joihin se tänään törmäsi, korjattiin alustaan kaikille.",
+        "Tule katsomaan sitä livenä perjantaina 14. elokuuta. Jätä tietosi kutsuun."
+      ],
+      "links": [
+        "origami-live-invitation.apps.aimeat.io",
+        "origami.apps.aimeat.io"
+      ]
+    }
+  ]
+}

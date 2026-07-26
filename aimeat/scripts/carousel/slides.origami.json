@@ -1,0 +1,79 @@
+{
+  "name": "origami-live",
+  "slides": [
+    {
+      "kind": "cover",
+      "title": "An empty surface at one end. A published app at the other.",
+      "lines": [
+        "paper.design raised $34M to make the design and the finished product the same thing.",
+        "We built ours with no funding at all, and it gives you the result. This is one afternoon on it."
+      ]
+    },
+    {
+      "kicker": "1 · the surface",
+      "title": "It starts with nothing on it.",
+      "image": "empty.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "2 · one sentence",
+      "title": "I asked for my AI spend per day and a chart of the same numbers.",
+      "image": "request.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "3 · two jobs",
+      "title": "It saw two jobs in that one sentence, said so, and did both.",
+      "image": "chart.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "4 · the same numbers",
+      "title": "The table and the chart come from my own usage, not a sample.",
+      "image": "table.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "5 · an invitation",
+      "title": "An image, a few lines, a number from the surface, and a reply form.",
+      "image": "invitation.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "6 · publish",
+      "title": "It became an app at its own address, ready to send to anyone.",
+      "image": "app.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "7 · the answer lands",
+      "title": "Replies arrive in CADENCE, our own CRM, tagged with the event.",
+      "image": "cadence.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "8 · back on the surface",
+      "title": "And the panel beside the invitation lists who is coming.",
+      "image": "panel.png",
+      "fit": "contain"
+    },
+    {
+      "kicker": "9 · all of it at once",
+      "title": "Data, invitation, published app and the CRM, side by side on one surface.",
+      "image": "board.png",
+      "fit": "contain"
+    },
+    {
+      "kind": "end",
+      "title": "Under fifteen minutes, one fold at a time.",
+      "lines": [
+        "ORIGAMI is itself an AIMEAT app running on AIMEAT, through the same interfaces everyone else gets. Two bugs it hit today were fixed in the platform for everybody.",
+        "Come and see it live on Friday 14 August. Leave your details in the invitation."
+      ],
+      "links": [
+        "origami-live-invitation.apps.aimeat.io",
+        "origami.apps.aimeat.io"
+      ]
+    }
+  ]
+}
