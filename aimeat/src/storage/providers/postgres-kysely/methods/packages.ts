@@ -140,12 +140,8 @@ export const packageMethods = {
     if (updates.components !== undefined) data.components = jsonb(updates.components);
     if (updates.manifest !== undefined) data.manifest = updates.manifest;
     data.updatedAt = new Date();
-    try {
-      const rows = await this.db.updateTable('Package').set(data as never).where('id', '=', id).returningAll().execute();
-      return rows[0] ? toPackage(rows[0]) : null;
-    } catch {
-      return null;
-    }
+    const rows = await this.db.updateTable('Package').set(data as never).where('id', '=', id).returningAll().execute();
+    return rows[0] ? toPackage(rows[0]) : null;
   },
 
   async archivePackage(this: PostgresKyselyStorage, id: string): Promise<boolean> {
@@ -202,12 +198,8 @@ export const packageMethods = {
     if (updates.packageVersion !== undefined) data.packageVersion = updates.packageVersion;
     if (updates.packageRecordId !== undefined) data.packageRecordId = updates.packageRecordId;
     data.updatedAt = new Date();
-    try {
-      const rows = await this.db.updateTable('PackageInstance').set(data as never).where('id', '=', id).returningAll().execute();
-      return rows[0] ? toInstance(rows[0]) : null;
-    } catch {
-      return null;
-    }
+    const rows = await this.db.updateTable('PackageInstance').set(data as never).where('id', '=', id).returningAll().execute();
+    return rows[0] ? toInstance(rows[0]) : null;
   },
 
   async deleteInstance(this: PostgresKyselyStorage, id: string): Promise<boolean> {

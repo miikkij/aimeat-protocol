@@ -14,6 +14,8 @@ import type {
   FederationPeerRecord, PeeringRequestRecord, PersonalNodeRecord, MailboxItemRecord, GenesisPeerRecord,
 } from '../../../interface.js';
 import type { FederationPeer, PeeringRequest, PersonalNode, MailboxItem, GenesisPeer } from '../db-types.js';
+import { dbError } from '../helpers.js';
+import { logger } from '../../../../utils/logger.js';
 import type { PostgresKyselyStorage } from '../index.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
@@ -117,7 +119,7 @@ export const federationMethods = {
       if (updates.status !== undefined) data.status = updates.status;
       const rows = await this.db.updateTable('PeeringRequest').set(data as never).where('requestId', '=', id).returningAll().execute();
       return rows[0] ? toPeeringRequest(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updatePeeringRequest', err); }
   },
   async deletePeeringRequest(this: PostgresKyselyStorage, id: string): Promise<boolean> {
     const r = await this.db.deleteFrom('PeeringRequest').where('requestId', '=', id).executeTakeFirst();
@@ -164,7 +166,7 @@ export const federationMethods = {
       data.updatedAt = updates.updatedAt ? new Date(updates.updatedAt) : new Date();
       const rows = await this.db.updateTable('PersonalNode').set(data as never).where('id', '=', nodeId).returningAll().execute();
       return rows[0] ? toPersonalNode(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updatePersonalNode', err); }
   },
   async deletePersonalNode(this: PostgresKyselyStorage, nodeId: string): Promise<boolean> {
     const r = await this.db.deleteFrom('PersonalNode').where('id', '=', nodeId).executeTakeFirst();
@@ -180,7 +182,7 @@ export const federationMethods = {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();
     await this.db.updateTable('PersonalNode').set({ mailboxUsedBytes: sql`"mailboxUsedBytes" + ${item.sizeBytes}` })
-      .where('id', '=', item.personalNodeId).execute().catch(() => {});
+      .where('id', '=', item.personalNodeId).execute().catch(err => logger.warn('createMailboxItem: side-effect update failed', { error: String(err) }));
     return item;
   },
   async getMailboxItem(this: PostgresKyselyStorage, id: string): Promise<MailboxItemRecord | null> {
@@ -199,12 +201,12 @@ export const federationMethods = {
     if (!item) return false;
     await this.db.deleteFrom('MailboxItem').where('id', '=', id).execute();
     await this.db.updateTable('PersonalNode').set({ mailboxUsedBytes: sql`"mailboxUsedBytes" - ${item.sizeBytes}` })
-      .where('id', '=', item.personalNodeId).execute().catch(() => {});
+      .where('id', '=', item.personalNodeId).execute().catch(err => logger.warn('deleteMailboxItem: side-effect update failed', { error: String(err) }));
     return true;
   },
   async deleteMailboxItemsByNode(this: PostgresKyselyStorage, personalNodeId: string): Promise<number> {
     const r = await this.db.deleteFrom('MailboxItem').where('personalNodeId', '=', personalNodeId).executeTakeFirst();
-    await this.db.updateTable('PersonalNode').set({ mailboxUsedBytes: 0 }).where('id', '=', personalNodeId).execute().catch(() => {});
+    await this.db.updateTable('PersonalNode').set({ mailboxUsedBytes: 0 }).where('id', '=', personalNodeId).execute().catch(err => logger.warn('deleteMailboxItemsByNode: side-effect update failed', { error: String(err) }));
     return Number(r.numDeletedRows ?? 0);
   },
   async getMailboxStats(this: PostgresKyselyStorage, personalNodeId: string): Promise<{ count: number; totalBytes: number }> {
@@ -221,7 +223,7 @@ export const federationMethods = {
     for (const item of expired) nodeBytes.set(item.personalNodeId, (nodeBytes.get(item.personalNodeId) ?? 0) + item.sizeBytes);
     for (const [nodeId, bytes] of nodeBytes) {
       await this.db.updateTable('PersonalNode').set({ mailboxUsedBytes: sql`"mailboxUsedBytes" - ${bytes}` })
-        .where('id', '=', nodeId).execute().catch(() => {});
+        .where('id', '=', nodeId).execute().catch(err => logger.warn('cleanExpiredMailboxItems: side-effect update failed', { error: String(err) }));
     }
     const r = await this.db.deleteFrom('MailboxItem').where('expiresAt', '<', now).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0);
@@ -263,7 +265,7 @@ export const federationMethods = {
       data.updatedAt = updates.updatedAt ? new Date(updates.updatedAt) : new Date();
       const rows = await this.db.updateTable('GenesisPeer').set(data as never).where('id', '=', id).returningAll().execute();
       return rows[0] ? toGenesisPeer(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updateGenesisPeer', err); }
   },
   async deleteGenesisPeer(this: PostgresKyselyStorage, id: string): Promise<boolean> {
     const r = await this.db.deleteFrom('GenesisPeer').where('id', '=', id).executeTakeFirst();

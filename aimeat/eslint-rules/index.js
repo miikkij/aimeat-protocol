@@ -6,6 +6,7 @@
  * @structure
  *   - fileHeader: Enforces @file + @description header comments
  *   - maxFileLines: Warns when files exceed configurable line limit
+ *   - noSilentCatch: A caught error must be logged, rethrown, or surfaced to the caller
  *
  * @usage
  *   import aimeatPlugin from './eslint-rules/index.js';
@@ -17,10 +18,12 @@
 
 import { fileHeader } from './file-header.js';
 import { maxFileLines } from './max-file-lines.js';
+import { noSilentCatch } from './no-silent-catch.js';
 
 export default {
   rules: {
     'file-header': fileHeader,
     'max-file-lines': maxFileLines,
+    'no-silent-catch': noSilentCatch,
   },
 };

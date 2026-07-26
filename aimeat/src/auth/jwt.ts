@@ -12,6 +12,7 @@
 import { SignJWT, jwtVerify } from 'jose';
 import { createHash, randomBytes } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
 
 // We use EdDSA JWTs signed with the node's private key
 // jose requires CryptoKey objects, so we convert from raw Ed25519 bytes
@@ -132,6 +133,9 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       app_grant: payload.app_grant as string | undefined,
     };
   } catch {
+    // Fail-closed by design: any verification error (bad signature, expiry, malformed claims) means
+    // "not authenticated". Logging every rejected token on a public endpoint is a flooding vector.
+    // eslint-disable-next-line aimeat/no-silent-catch -- null here means "not authenticated"
     return null;
   }
 }
@@ -164,8 +168,10 @@ export function initRevocationStorage(storage: Storage): void {
   _cleanupInterval = setInterval(async () => {
     try {
       await storage.cleanExpiredRevocations();
-    } catch {
-      // Swallow cleanup errors silently — non-critical
+    } catch (err) {
+      // Non-critical for the request path, but not free: a cleanup that keeps failing means the
+      // revoked-token table grows without bound, and nobody would ever find out.
+      logger.warn('Expired-revocation cleanup failed; revoked token rows are accumulating', { error: (err as Error).message });
     }
     // Also evict stale cache entries
     const now = Date.now();
@@ -194,7 +200,13 @@ export async function revokeToken(token: string, expiresAt: number): Promise<voi
   // P2: if this exact bearer holds a live connector tunnel, push `auth_revoked` + close it now so the
   // agent re-auths immediately instead of probing for liveness. Decoupled via a registered hook (the
   // tunnel manager registers it) so this foundational auth module never imports the tunnel.
-  try { _onTokenRevoked?.(token); } catch { /* tunnel optional */ }
+  try {
+    _onTokenRevoked?.(token);
+  } catch (err) {
+    // The hook is optional, but a failure here means a REVOKED bearer may still hold an open tunnel
+    // until it next probes — a security-relevant miss that must not be invisible.
+    logger.warn('Token revoked, but the tunnel-close hook failed; a revoked session may stay open', { error: (err as Error).message });
+  }
 }
 
 /**

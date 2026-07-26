@@ -62,6 +62,26 @@ export default tseslint.config(
       // was brought under 800 (large routes/services/views/storage-providers split into
       // sibling modules). New files over 800 now fail the pre-commit hook + CI.
       'aimeat/max-file-lines': ['error', { max: 800 }],
+
+      // A caught error must be rethrown with its cause attached, not replaced by a fresh one that
+      // loses the original. Already 'error' for public/ since 2026-07-13; extended to src/ as part
+      // of the silent-exception cleanup, since `{ cause }` is what makes a rethrown error traceable.
+      'preserve-caught-error': 'error',
+    },
+  },
+  {
+    // ── Silent-exception cleanup: ratchet by area ───────────────────────────────────────────────
+    // A swallowed error costs most where a WRITE or an identity decision is at stake: the caller
+    // reads the absence value as "nothing to do here" and reports success. That is exactly how an
+    // extension upsert came to answer `200 success:true` over code it never wrote (2026-07-26).
+    //
+    // These areas are cleaned to zero and enforced. The rest of the codebase still carries a
+    // backlog — measure it with `pnpm check:silent-catch`, clean an area, then add it here. Do NOT
+    // add an area before it is at zero: the gate runs with --max-warnings 0, so a partial area
+    // cannot be introduced at any severity.
+    files: ['src/storage/**/*.ts', 'src/auth/**/*.ts', 'src/services/upload-zip.ts', 'src/routes/upload.ts', 'src/routes/extensions/**/*.ts'],
+    rules: {
+      'aimeat/no-silent-catch': 'error',
     },
   },
   {

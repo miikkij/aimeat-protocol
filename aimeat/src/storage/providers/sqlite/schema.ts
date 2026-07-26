@@ -39,7 +39,17 @@ export function initializeSchema(db: Database.Database): void {
   // ALTER TABLE ADD COLUMN is idempotent-safe: if the column exists, it throws
   // "duplicate column name" which we catch and ignore.
   const safeAddColumn = (table: string, column: string, type: string) => {
-    try { db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`); } catch { /* column already exists */ }
+    try {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+    } catch (err) {
+      // "duplicate column name" is the expected, idempotent case. Anything else (a missing table, a
+      // locked database, a bad type) is a real schema failure, and swallowing it here meant the node
+      // booted with a column the code assumes exists — surfacing far away as a query error.
+      const message = (err as Error).message ?? '';
+      if (!/duplicate column name/i.test(message)) {
+        throw new Error(`schema migration failed: ALTER TABLE ${table} ADD COLUMN ${column} ${type} — ${message}`, { cause: err });
+      }
+    }
   };
 
   // Organism member-roster visibility (privacy fix 2026-07-03: rosters were world-readable).

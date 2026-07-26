@@ -12,6 +12,7 @@ import type {
   PushSubscriptionRecord, TrustedIssuerRecord, VerificationNonceRecord, GenesisPeerRecord, OrganismReputationRecord, RealtimeRoomRecord
 } from '../../../interface.js';
 import type { SqliteStorage } from '../index.js';
+import { logger } from '../../../../utils/logger.js';
 
 export const communityMethods = {
   // ── Memberships ──
@@ -79,7 +80,13 @@ export const communityMethods = {
     };
     if (row.invitedBy) record.invitedBy = row.invitedBy as string;
     if (row.invitedWorkspaces) {
-      try { record.invitedWorkspaces = JSON.parse(row.invitedWorkspaces as string); } catch { /* ignore malformed JSON */ }
+      try {
+        record.invitedWorkspaces = JSON.parse(row.invitedWorkspaces as string);
+      } catch (err) {
+        // Dropping this silently means an invite that grants NO workspaces looks like an invite
+        // that was never meant to grant any. Name the row instead.
+        logger.warn('Membership row has malformed invitedWorkspaces JSON; the invite grants no workspaces', { id: row.id, error: (err as Error).message });
+      }
     }
     return record;
   },

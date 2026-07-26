@@ -235,7 +235,14 @@ async function handleAppUpload(
     // only auto-assigned on the first path-form open, so a brand-new app's vanity subdomain
     // 404'd until someone hit the canonical URL. Best-effort: never fails the publish.
     if (/\.html?$/i.test(filename)) {
-        try { await ensureAppSubdomain(storage, config, ownerName, filename); } catch { /* best-effort */ }
+        try {
+            await ensureAppSubdomain(storage, config, ownerName, filename);
+        } catch (err) {
+            // Never fails the publish, but the app's vanity subdomain will 404 until someone opens
+            // the canonical path form — which reads as a broken app rather than a missing mapping.
+            logger.warn('Subdomain provisioning failed after publish; the vanity URL will 404 until the canonical path is opened',
+                { filename, owner: ownerName, error: (err as Error).message });
+        }
     }
 
     const downloadUrl = `/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}`;

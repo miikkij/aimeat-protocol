@@ -19,7 +19,8 @@ import type {
 } from '../../../interface.js';
 import type { JoinRequest, Organism, OrganismMembership, PendingApproval } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb } from '../helpers.js';
+import { logger } from '../../../../utils/logger.js';
+import { jsonb, dbError } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoOpt = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
@@ -100,24 +101,25 @@ export const organismMethods = {
       if (typeof data.archivedAt === 'string') data.archivedAt = new Date(data.archivedAt);
       const rows = await this.db.updateTable('Organism').set(data as never).where('id', '=', id).returningAll().execute();
       return rows[0] ? toOrg(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updateOrganism', err); }
   },
   async deleteOrganism(this: PostgresKyselyStorage, id: string): Promise<boolean> {
     const org = await this.db.selectFrom('Organism').select('boardId').where('id', '=', id).executeTakeFirst();
     await this.db.deleteFrom('OrganismMembership').where('organismId', '=', id).execute();
     await this.db.deleteFrom('JoinRequest').where('organismId', '=', id).execute();
-    await this.db.deleteFrom('OrganismReputation').where('organismId', '=', id).execute().catch(() => {});
+    await this.db.deleteFrom('OrganismReputation').where('organismId', '=', id).execute().catch(err => logger.warn('deleteOrganism: side-effect update failed', { error: String(err) }));
     if (org?.boardId) {
-      await this.db.deleteFrom('BoardPost').where('boardId', '=', org.boardId).execute().catch(() => {});
-      await this.db.deleteFrom('BoardSubscription').where('boardId', '=', org.boardId).execute().catch(() => {});
-      await this.db.deleteFrom('Board').where('boardId', '=', org.boardId).execute().catch(() => {});
+      await this.db.deleteFrom('BoardPost').where('boardId', '=', org.boardId).execute().catch(err => logger.warn('deleteOrganism: side-effect update failed', { error: String(err) }));
+      await this.db.deleteFrom('BoardSubscription').where('boardId', '=', org.boardId).execute().catch(err => logger.warn('deleteOrganism: side-effect update failed', { error: String(err) }));
+      await this.db.deleteFrom('Board').where('boardId', '=', org.boardId).execute().catch(err => logger.warn('deleteOrganism: side-effect update failed', { error: String(err) }));
     }
     const orgKey = `organism.${id}`;
     for (const tbl of ['Memory', 'MemoryVersion'] as const) {
       await this.db.deleteFrom(tbl).where(eb => eb.or([eb('key', '=', orgKey), eb('key', 'like', `${orgKey}.%`)])).execute();
     }
     await this.db.deleteFrom('SchemaLock').where(eb => eb.or([eb('keyPattern', '=', orgKey), eb('keyPattern', 'like', `${orgKey}.%`)])).execute();
-    try { await this.db.deleteFrom('Organism').where('id', '=', id).execute(); return true; } catch { return false; }
+    await this.db.deleteFrom('Organism').where('id', '=', id).execute();
+    return true;
   },
 
   async createMembership(this: PostgresKyselyStorage, r: OrganismMembershipRecord): Promise<OrganismMembershipRecord> {

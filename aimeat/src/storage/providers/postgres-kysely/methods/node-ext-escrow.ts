@@ -17,7 +17,7 @@ import type {
 } from '../../../interface.js';
 import type { CortexExtension, EscrowHold, Extension, ExtensionInstance } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb } from '../helpers.js';
+import { jsonb, dbError } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoOpt = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
@@ -184,7 +184,7 @@ export const nodeExtEscrowMethods = {
       if (typeof data.installedAt === 'string') data.installedAt = new Date(data.installedAt);
       const rows = await this.db.updateTable('CortexExtension').set(data as never).where('name', '=', name).returningAll().execute();
       return rows[0] ? toCortex(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updateCortexExtension', err); }
   },
   async deleteCortexExtension(this: PostgresKyselyStorage, name: string): Promise<boolean> {
     const r = await this.db.deleteFrom('CortexExtension').where('name', '=', name).executeTakeFirst();

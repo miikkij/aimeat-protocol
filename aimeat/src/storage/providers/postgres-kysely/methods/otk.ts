@@ -10,7 +10,7 @@ import type { Selectable } from 'kysely';
 import type { OtkRecord } from '../../../interface.js';
 import type { Otk } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb } from '../helpers.js';
+import { jsonb, dbError } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 
@@ -58,7 +58,7 @@ export const otkMethods = {
       }
       const [u] = await this.db.updateTable('Otk').set({ used: true, usedAt: new Date() }).where('key', '=', key).returningAll().execute();
       return toOtk(u);
-    } catch { return null; }
+    } catch (err) { throw dbError('consumeOtk', err); }
   },
   async listOtksBySession(this: PostgresKyselyStorage, sessionId: string): Promise<OtkRecord[]> {
     return (await this.db.selectFrom('Otk').selectAll().where('sessionId', '=', sessionId).execute()).map(toOtk);

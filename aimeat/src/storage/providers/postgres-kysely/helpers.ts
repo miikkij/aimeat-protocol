@@ -83,3 +83,18 @@ export function rowToMeta(r: Pick<Selectable<Memory>, 'key' | 'ownerGaii' | 'vis
 /** Whether a TTL'd row is still live (matches the other backends' expiry check). */
 export const isLive = (r: { ttlHours: number | null; createdAt: Date | string }): boolean =>
   !r.ttlHours || Date.now() <= (r.createdAt instanceof Date ? r.createdAt.getTime() : new Date(r.createdAt).getTime()) + r.ttlHours * 3600_000;
+
+/**
+ * Wrap a provider-level failure so it carries the method that failed, and rethrow it.
+ *
+ * Why this exists: these methods used to end in `catch { return null; }`. Every caller reads `null`
+ * as "no such row", so a failed write was indistinguishable from a missing record — on the PRIMARY
+ * production backend, while the SQLite provider (which throws) kept local tests green. That pairing
+ * is what let an extension upsert report `200 success:true` over code it never wrote. `null` now
+ * means exactly one thing: no row matched. Everything else reaches the route's error handler, which
+ * already turns it into a 500.
+ */
+export function dbError(method: string, err: unknown): Error {
+  const message = err instanceof Error ? err.message : String(err);
+  return new Error(`${method} failed: ${message}`, { cause: err });
+}

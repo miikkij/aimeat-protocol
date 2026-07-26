@@ -12,7 +12,7 @@ import type { Selectable } from 'kysely';
 import type { CapabilityRecord, CapabilityLogEntry, CapabilityOverride, CapabilityTrust, CapabilityFilter } from '../../../interface.js';
 import type { Capability } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb } from '../helpers.js';
+import { jsonb, dbError } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 
@@ -107,7 +107,7 @@ export const capabilityMethods = {
     try {
       const rows = await this.db.updateTable('Capability').set(data as never).where('id', '=', id).returningAll().execute();
       return rows[0] ? toCapability(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updateCapability', err); }
   },
 
   async deleteCapability(this: PostgresKyselyStorage, id: string): Promise<boolean> {

@@ -11,6 +11,11 @@
  *   - initializeNode(config, storage): resolve/generate keys and init all token signers
  *
  * @version-history
+ *   v1.1.0 — 2026-07-26 — loadPersistedNodeKey distinguishes "no key file" from "cannot read the key
+ *     file". It used to answer null to both, and the caller's answer to null is to generate a NEW
+ *     keypair — silently changing the node identity so issued JWTs and pinned peer keys stop
+ *     verifying. An unreadable/corrupt/undecryptable file now refuses to start. A failed persist is
+ *     logged at error, because the node is then one restart away from a new identity.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'node:fs';
@@ -86,27 +91,63 @@ function decryptNodeKey(
   return { publicKey: data.publicKey, privateKey: data.privateKey };
 }
 
+/**
+ * Read the persisted key file. `null` means ONE thing: there is no key file, so the caller may
+ * generate a fresh identity.
+ *
+ * Everything else is fatal on purpose. This function used to end in `catch { return null; }`, so a
+ * key file that existed but could not be read (permissions, truncation, a half-written file, invalid
+ * JSON) was indistinguishable from "no key yet" — and the caller's response to null is to GENERATE A
+ * NEW KEYPAIR. That silently changes the node's identity: every JWT it issued stops verifying and
+ * every federation peer that pinned the old public key rejects it. Refusing to start is recoverable;
+ * a new identity is not.
+ */
 function loadPersistedNodeKey(): { publicKey: string; privateKey: string } | null {
   const keyPath = getNodeKeyPath();
+  if (!existsSync(keyPath)) return null;
+
+  let raw: string;
   try {
-    if (!existsSync(keyPath)) return null;
-    const data = JSON.parse(readFileSync(keyPath, 'utf-8'));
-
-    // P3-8: Handle encrypted key file
-    if (data.encrypted) {
-      const passphrase = process.env.AIMEAT_KEY_PASSPHRASE;
-      if (!passphrase) {
-        logger.error('Node key file is encrypted but AIMEAT_KEY_PASSPHRASE is not set. Cannot decrypt.');
-        process.exit(1);
-      }
-      return decryptNodeKey(data, passphrase);
-    }
-
-    if (data.publicKey && data.privateKey) return data;
-    return null;
-  } catch {
-    return null;
+    raw = readFileSync(keyPath, 'utf-8');
+  } catch (err) {
+    logger.error('Node key file exists but could not be read. Refusing to start with a NEW identity — '
+      + 'fix the file permissions, or move the file aside if you intend to regenerate the node key.',
+      { path: keyPath, error: (err as Error).message });
+    process.exit(1);
   }
+
+  let data: { encrypted?: boolean; publicKey?: string; privateKey?: string };
+  try {
+    data = JSON.parse(raw);
+  } catch (err) {
+    logger.error('Node key file exists but is not valid JSON. Refusing to start with a NEW identity — '
+      + 'restore the file from backup, or move it aside if you intend to regenerate the node key.',
+      { path: keyPath, error: (err as Error).message });
+    process.exit(1);
+  }
+
+  // P3-8: Handle encrypted key file
+  if (data.encrypted) {
+    const passphrase = process.env.AIMEAT_KEY_PASSPHRASE;
+    if (!passphrase) {
+      logger.error('Node key file is encrypted but AIMEAT_KEY_PASSPHRASE is not set. Cannot decrypt.');
+      process.exit(1);
+    }
+    try {
+      return decryptNodeKey(data as EncryptedKeyFile, passphrase);
+    } catch (err) {
+      logger.error('Node key file could not be decrypted (wrong AIMEAT_KEY_PASSPHRASE, or the file is '
+        + 'corrupt). Refusing to start with a NEW identity.', { path: keyPath, error: (err as Error).message });
+      process.exit(1);
+    }
+  }
+
+  if (data.publicKey && data.privateKey) {
+    return { publicKey: data.publicKey, privateKey: data.privateKey };
+  }
+  logger.error('Node key file is present but holds no keypair. Refusing to start with a NEW identity — '
+    + 'move the file aside if you intend to regenerate the node key.', { path: keyPath });
+  process.exit(1);
 }
 
 function persistNodeKey(kp: { publicKey: string; privateKey: string }): void {
@@ -129,7 +170,13 @@ function persistNodeKey(kp: { publicKey: string; privateKey: string }): void {
       }
     }
   } catch (err) {
-    logger.warn('Could not persist node key', { path: keyPath, error: err });
+    // Not fatal (a read-only home directory is a legitimate deployment), but it MUST be loud: the
+    // node is now running on an in-memory key and will come back with a different identity after a
+    // restart, which looks like a federation/JWT bug hours later.
+    logger.error('Could not persist the node key. This node is running on an IN-MEMORY key and will '
+      + 'have a DIFFERENT identity after restart — previously issued tokens and pinned peer keys will '
+      + 'stop verifying. Fix the path permissions or set the key explicitly in config.',
+      { path: keyPath, error: (err as Error).message });
   }
 }
 
