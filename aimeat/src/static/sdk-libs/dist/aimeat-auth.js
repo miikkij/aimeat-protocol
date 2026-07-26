@@ -210,6 +210,11 @@
   var AIMEAT_THEME_KEY = "aimeat-theme";
   function aimeatReadTheme() {
     try {
+      var u = new URLSearchParams(location.search).get("mode");
+      if (u === "light" || u === "dark") return u;
+    } catch {
+    }
+    try {
       var s = localStorage.getItem(AIMEAT_THEME_KEY);
       if (s === "light" || s === "dark") return s;
     } catch {
@@ -226,6 +231,13 @@
     }
     try {
       window.dispatchEvent(new CustomEvent("aimeat-theme-change", { detail: { theme: t } }));
+    } catch {
+    }
+  }
+  function aimeatRestoreMode() {
+    try {
+      var u = new URLSearchParams(location.search).get("mode");
+      if (u === "light" || u === "dark") document.documentElement.dataset.theme = u;
     } catch {
     }
   }
@@ -986,6 +998,11 @@
       return p.id;
     });
     try {
+      var u = new URLSearchParams(location.search).get("palette");
+      if (u && ids.indexOf(u) >= 0) return u;
+    } catch {
+    }
+    try {
       var s = localStorage.getItem(AIMEAT_PALETTE_KEY);
       if (s && ids.indexOf(s) >= 0) return s;
     } catch {
@@ -1008,6 +1025,7 @@
   function aimeatRestorePalette() {
     var cur = aimeatReadPalette();
     if (cur !== PALETTES[0].id) document.documentElement.setAttribute("data-palette", cur);
+    else document.documentElement.removeAttribute("data-palette");
     try {
       window.addEventListener("storage", function(e) {
         if (e.key === AIMEAT_PALETTE_KEY && e.newValue) aimeatApplyPalette(e.newValue);
@@ -2205,7 +2223,10 @@
       return { id: p.id, label: p.label, swatch: p.swatch };
     });
   };
-  if (typeof document !== "undefined") aimeatRestorePalette();
+  if (typeof document !== "undefined") {
+    aimeatRestorePalette();
+    aimeatRestoreMode();
+  }
   var ns = attach("auth", auth);
   ns.version = "2026-07-25-002";
 })();

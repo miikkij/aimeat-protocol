@@ -10,6 +10,9 @@
  *   listeners; attach('auth', auth) + version.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script>  const s = await AIMEAT.auth.login();
  * @version-history
+ *   v1.2.0 — 2026-07-26 — An embedded app inherits the embedder's look: aimeatRestoreMode() joins
+ *     aimeatRestorePalette() at parse time, so ?mode= / ?palette= in the frame URL win over an
+ *     origin's own storage without overwriting it.
  *   v1.1.0 — 2026-07-25 — Palette surface: AIMEAT.auth.getPalette/setPalette/getPalettes + the
  *     stored palette applied at parse time (theme system v2).
  *   v1.0.0 — 2026-07-19 — Componentized rewrite of src/routes/libs/auth-lib*.ts (SDK-libs migration Phase 3).
@@ -19,6 +22,7 @@ import { maybeShowGoogleSignup } from './signup.js';
 import { attach } from '../_core/namespace.js';
 import { readLocales, aimeatReadLang, aimeatApplyLang } from './locale.js';
 import { PALETTES, aimeatReadPalette, aimeatApplyPalette, aimeatRestorePalette } from './palette.js';
+import { aimeatRestoreMode } from './theme.js';
 
 // ── Boot: first-time OIDC signup prompt (after the callback bounced back with ?aimeat_signup=1) ──
 if (typeof document !== 'undefined' && document.addEventListener) {
@@ -51,7 +55,7 @@ auth.getPalettes = function () { return PALETTES.map(function (p) { return { id:
 
 // Apply the stored palette at parse time (before any UI mounts), so a published app follows the
 // user's chosen look with zero app code — the same free ride the mode snippet gives light/dark.
-if (typeof document !== 'undefined') aimeatRestorePalette();
+if (typeof document !== 'undefined') { aimeatRestorePalette(); aimeatRestoreMode(); }
 
 const ns = attach('auth', auth);
 ns.version = '2026-07-25-002';
