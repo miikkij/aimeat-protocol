@@ -74,6 +74,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:packs-doc
 
+      - name: openapi.yaml parses + every $ref resolves (Rule 3 contract health)
+        working-directory: aimeat
+        run: pnpm check:openapi
+
       - name: app-catalog.html in sync with its sources
         working-directory: aimeat
         run: pnpm check:app-catalog
