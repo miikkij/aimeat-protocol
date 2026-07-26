@@ -339,7 +339,7 @@ next read onward; the task keeps the reference.
 | 0.3.x | 1.14.0+ (for `aimeat_task_create`) | 0.80+ |
 | 0.4.x | 1.21.0+ with `AIMEAT_CONNECT_TUNNEL_ENABLED=true` for the tunnel (degrades to direct HTTP on older nodes) | 0.80+ |
 | 0.16.x | 1.38.0+ for the usage ledger (older nodes accept the telemetry but record no ledger row) | 0.80+ |
-| 0.17.x | 2.1.0+ for file helpers (`?mode=handle` on `/v1/pub`, `resources.files` on tasks) | 0.80+ |
+| 0.17.x | 2.2.0+ for file helpers (`?mode=handle` on `/v1/pub`, `resources.files` on tasks). Against an older node, reading a file the owner shared still works over plain `GET /v1/pub/{owner}/{key}` — only the handle + task-attachment helpers need 2.2.0. | 0.80+ |
 
 ## License
 
