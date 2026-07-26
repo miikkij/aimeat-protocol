@@ -15,8 +15,14 @@
  *     uploaded in the same millisecond (two clipboard "image.png" pastes) don't overwrite each other.
  *   v1.2.0 -- 2026-07-21 -- getConversation(…, all): default loads the newest 50 (server page); all=true
  *     walks every page (per_page=200) so long threads show their FULL history instead of only the last 50.
+ *   v1.3.0 -- 2026-07-27 -- uploadAttachment goes through the PRESIGNED path (mint URL, then raw PUT)
+ *     instead of base64-inlining the file into a JSON body. Inlining inflated every attachment by 4/3
+ *     and forced it under security.json_body_limit_large_mb, a ceiling separate from the storage quota:
+ *     a 10.6 MB video failed to send while the operator raised quota.storage_max_file_size_mb and saw
+ *     no effect. Also surfaces the real reason (size / HTTP status) instead of an opaque failure.
  */
 import { api, apiGet } from '/js/api.js';
+import { t } from '/js/i18n.js';
 
 const enc = encodeURIComponent;
 
@@ -112,23 +118,62 @@ export async function listContacts(state) {
   return r?.data?.contacts || [];
 }
 
-/** Upload a file (base64 inline) to the caller's storage and return its descriptor for a message. */
+const mb = (bytes) => (bytes / (1024 * 1024)).toFixed(1);
+
+/** The node mints an ABSOLUTE upload URL from its configured base URL. Collapse it to a path when the
+ *  origin already matches, so the PUT stays a plain same-origin request instead of a preflighted one. */
+function uploadTarget(url) {
+  try {
+    const u = new URL(url, window.location.origin);
+    return u.origin === window.location.origin ? u.pathname + u.search : u.href;
+  } catch { return url; }   // an unparseable URL is used verbatim; the PUT below reports the failure
+}
+
+/** Upload a file to the caller's storage and return its descriptor for a message.
+ *
+ *  PRESIGNED, never inline. The bytes are PUT raw to a one-shot upload URL, so an attachment is capped
+ *  only by the node's storage limit (quota.storage_max_file_size_mb). The previous version base64'd the
+ *  whole file into a JSON body, which meant a second, invisible ceiling: base64 inflates by 4/3, so a
+ *  10.6 MB video became a ~14.8 MB request that had to fit inside security.json_body_limit_large_mb —
+ *  a limit nobody raising the *storage* quota would think to look at. /v1/upload/ skips body parsing
+ *  entirely (see server.ts) and streams instead, so neither the inflation nor that ceiling applies. */
 export async function uploadAttachment(file, kindOverride) {
-  const buf = await file.arrayBuffer();
-  const bytes = new Uint8Array(buf);
-  let binary = '';
-  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-  const data = btoa(binary);
   // A random suffix keeps the key unique even for same-named files uploaded in the same millisecond
   // (e.g. two clipboard "image.png" pastes) — without it the second upload would overwrite the first's
   // bytes, so both attachments showed the same picture.
   const rand = Math.random().toString(36).slice(2, 8);
   const key = `dm-out/${Date.now()}-${rand}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
   const mime = file.type || 'application/octet-stream';
-  await api('/v1/storage', {
+
+  const mint = await api('/v1/storage', {
     method: 'POST',
-    body: JSON.stringify({ key, data, mime_type: mime, visibility: 'private' }),
+    body: JSON.stringify({ key, mime_type: mime, visibility: 'private', mode: 'presigned' }),
   });
+  const uploadUrl = mint?.data?.upload_url;
+  if (!uploadUrl) throw new Error(t('inbox.attachNoUrl', { name: file.name }));
+
+  // Check the size against the node's own answer BEFORE spending the token. An oversized PUT is
+  // refused at 413 anyway, but the token is single-use, so failing here keeps the error specific
+  // (which file, how big, what the node accepts) instead of a bare HTTP status.
+  const maxBytes = Number(mint?.data?.max_size_bytes) || 0;
+  if (maxBytes && file.size > maxBytes) {
+    throw new Error(t('inbox.attachTooLarge', { name: file.name, size: mb(file.size), max: mb(maxBytes) }));
+  }
+
+  // Plain fetch, deliberately NOT api(): the presigned token IS the capability (no Authorization
+  // header), and api() retries 5xx — a retried PUT on a consumed one-shot token answers 409
+  // TOKEN_USED, which would report a transport hiccup as a failed upload. No timeout either; a large
+  // video on a slow uplink outlives api()'s 30 s default.
+  const resp = await fetch(uploadTarget(uploadUrl), {
+    method: 'PUT',
+    headers: { 'Content-Type': mime },
+    body: file,
+  });
+  if (!resp.ok) {
+    const detail = await resp.json().catch(() => null);   // eslint-disable-line aimeat/no-silent-catch -- non-JSON error body falls back to the status line below
+    throw new Error(detail?.message || t('inbox.attachFailed', { name: file.name, status: resp.status }));
+  }
+
   const kind = kindOverride || (mime.startsWith('image/') ? 'image'
     : mime.startsWith('audio/') ? 'audio'
     : mime.startsWith('video/') ? 'video' : 'file');

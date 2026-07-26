@@ -31,6 +31,10 @@
  *     Also removed the unreachable cross-owner branches from GET/HEAD /v1/storage: those look the key
  *     up in the CALLER's namespace, so `file.ownerGaii !== caller` could never be true and the
  *     authorizeRead() there never ran. Cross-namespace reads have exactly one door: /v1/pub.
+ *   v1.8.0 -- 2026-07-27 -- POST /v1/storage mode=presigned applies the anonymous-namespace fence
+ *     before minting the token. The check sat after the presigned early return, so asking for an
+ *     upload URL let an anonymous agent write outside anonymous/* — the gate belongs on the write,
+ *     not on the representation the caller happens to choose.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -150,6 +154,13 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             if (mode === 'presigned') {
                 if (!k) {
                     res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key is required'));
+                    return;
+                }
+                // Same namespace fence as the inline path below. It used to sit AFTER this early
+                // return, so minting a presigned URL was a way for an anonymous agent to write
+                // outside anonymous/* — the gate is on the representation, not on the write.
+                if (isAnonymousGaii(gaii) && !String(k).startsWith('anonymous/')) {
+                    res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Anonymous agents can only upload to keys prefixed with "anonymous/"'));
                     return;
                 }
                 const maxBytes = config.storageMaxFileSizeMb * 1024 * 1024;

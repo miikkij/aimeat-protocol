@@ -41,6 +41,10 @@
  *     subject recorded installedBy 'upload' and made the ownership check short-circuit away), secret
  *     config is encrypted as on the REST path, EXCHANGE re-projection + capability aggregation run,
  *     and the router's catch-all names the failure instead of answering a blank 500.
+ *   v1.10.0 - 2026-07-27 - handleStorageUpload enforces the account-wide storage quota + overage
+ *     charge, which only the inline POST /v1/storage ran. The token's maxBytes caps a single file, so
+ *     the presigned route was an unmetered way past the quota — and the SPA's DM attachments now take
+ *     exactly that route (see public/js/services/messages.js v1.3.0).
  *   v1.8.0 - 2026-07-26 - handleExtensionUpload honours the token meta's `update` and `activate`.
  *     It previously took no meta at all and answered a flat 409 on an existing name, so a caller
  *     that had explicitly requested an upsert was forced into delete + reinstall - which also
@@ -66,6 +70,7 @@ import { ensureAppSubdomain } from './subdomains.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
+import { checkStorageQuota, chargeOverage } from '../services/quota.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -124,7 +129,7 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
                     await handleAppUpload(res, config, storage, verified.sub, verified.meta, data);
                     return;
                 case 'storage':
-                    await handleStorageUpload(res, storage, verified.sub, verified.meta, data);
+                    await handleStorageUpload(res, config, storage, verified.sub, verified.meta, data);
                     return;
                 case 'extension':
                     await handleExtensionUpload(res, config, storage, verified.sub, verified.meta, data);
@@ -270,12 +275,21 @@ async function handleAppUpload(
 // ── Handler: Storage ──
 
 async function handleStorageUpload(
-    res: Response, storage: Storage,
+    res: Response, config: AimeatConfig, storage: Storage,
     sub: string, meta: Record<string, unknown>, data: Buffer,
 ): Promise<void> {
     const key = meta.key as string;
     const visibility = (meta.visibility as 'private' | 'owner' | 'public') ?? 'private';
     const mimeType = (meta.mime_type as string) ?? 'application/octet-stream';
+
+    // The token's maxBytes caps ONE file; the account-wide quota (M-2 §8.4) is a separate gate that
+    // only the inline POST /v1/storage used to run. Without it here, the presigned route was an
+    // unmetered way past the storage quota — and it is now the route the SPA's DM attachments take.
+    const quota = await checkStorageQuota(config, storage, sub, data.length);
+    if (!quota.allowed) {
+        res.status(413).json({ success: false, error: 'QUOTA_EXCEEDED', message: quota.reason });
+        return;
+    }
 
     const file = await storage.createStorageFile({
         key,
@@ -286,6 +300,11 @@ async function handleStorageUpload(
         data,
         createdAt: new Date().toISOString(),
     });
+
+    // M-3: charge overage morsels exactly as the inline path does (§15).
+    if (quota.overageMorsels > 0) {
+        await chargeOverage(storage, sub, quota.overageMorsels, 'storage_overage');
+    }
 
     emitResourceListChanged(sub);
 

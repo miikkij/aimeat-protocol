@@ -14,6 +14,7 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.26.0 -- 2026-07-27 -- Failed sends toast the thrown REASON (helpers.sendFailure); the flat generic line hid every actionable attachment error.
  *   v1.25.0 -- 2026-07-21 -- Thread history is no longer capped at the newest 50: threads open showing
  *     their FULL history by default (getConversation(all)); a header "Show last 50 / all" toggle
  *     (threadAll) collapses/expands. loadThread's attachment-URL resolution extracted to
@@ -135,7 +136,7 @@ import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
 import { peerLabel } from '/js/services/messages-ai-prompts.js';
-import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls } from './inbox-tab/helpers.js';
+import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure } from './inbox-tab/helpers.js';
 import { Composer, PollBuilder, MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { buildConversationReplyProps, buildMessageReplyProps, buildConversationNotebookProps } from './inbox-tab/ai-actions.js';
 import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel } from './inbox-tab/panels.js';
@@ -557,7 +558,7 @@ export default function InboxTab({ showToast }) {
         loadLists();
         if (id) openResults(id); else setMode('idle');
       }
-    } catch (err) { swallowed('inbox-tab', err); showToast?.(t('inbox.failed'), true); }
+    } catch (err) { swallowed('inbox-tab', err); showToast?.(sendFailure(err), true); }
     setSending(false);
   };
 
@@ -668,7 +669,7 @@ export default function InboxTab({ showToast }) {
         loadLists();
       }
     } catch (err) { swallowed('inbox-tab: replyTo', err);
-      showToast?.(t('inbox.failed'), true);
+      showToast?.(sendFailure(err), true);
     }
     setSending(false);
   };
