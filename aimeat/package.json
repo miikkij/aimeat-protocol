@@ -92,6 +92,7 @@
     "typecheck:sdk": "tsc --noEmit -p tsconfig.sdk.json",
     "check:importmap": "tsx scripts/check-importmap.ts",
     "check:no-max-tokens": "tsx scripts/check-no-max-tokens.ts",
+    "check:openapi": "tsx scripts/check-openapi.ts",
     "screenshot:worker": "tsx scripts/screenshot-worker.ts",
     "generate:types": "openapi-typescript ../openapi.yaml -o src/generated/api-types.ts",
     "db:reset": "node --env-file=.env --import tsx scripts/db-reset.ts",

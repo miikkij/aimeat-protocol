@@ -14643,7 +14643,7 @@ paths:
             application/json:
               schema:
                 allOf:
-                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
                       data:
@@ -19902,7 +19902,7 @@ paths:
             schema:
               type: object
               properties:
-                public: { type: boolean, description: Whole document portion public? }
+                public: { type: boolean, description: 'Whole document portion public?' }
                 spaces:
                   type: object
                   additionalProperties: { type: boolean }
