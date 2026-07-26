@@ -21,6 +21,7 @@ import type { AimeatConfig } from '../config.js';
 import type { ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
 import { parseCortexManifest } from './cortex-manifest.js';
 import { isUnsafeName } from './safe-zip.js';
+import { scanSandboxCapabilityWarnings } from '../routes/extensions/manifest.js';
 
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 const MAX_FILES = 50;
@@ -33,6 +34,8 @@ interface ExtensionZipResult {
     ok: boolean;
     error?: string;
     record?: ExtensionRecord;
+    /** Non-blocking sandbox-capability notes (crypto.subtle, Date.now, Math.random, eval). */
+    warnings?: string[];
 }
 
 export async function parseExtensionZip(buffer: Buffer, config: AimeatConfig): Promise<ExtensionZipResult> {
@@ -162,7 +165,10 @@ export async function parseExtensionZip(buffer: Buffer, config: AimeatConfig): P
         installedAt: new Date().toISOString(),
     };
 
-    return { ok: true, record };
+    // Same sandbox-capability scan the inline install path runs, so a ZIP upload is not a way
+    // to skip the warning.
+    const warnings = scanSandboxCapabilityWarnings(scripts);
+    return warnings.length ? { ok: true, record, warnings } : { ok: true, record };
 }
 
 // ── Cortex ZIP ──

@@ -33,6 +33,15 @@
  *     embed_markdown so an agent embeds images with the /v1/pub form, not a raw /v1/storage path.
  *   v1.9.1 -- 2026-07-13 -- Extracted the operator-only admin tools (15-18) to ./core-admin.ts
  *     (max-file-lines); registration order preserved (called last). No behavior change.
+ *   v1.10.0 -- 2026-07-26 -- Namespace legibility. Memory is keyed by the WRITER, and the tools hid
+ *     that: memory_read answered a bare "Memory not found" for a key an APP had saved under the
+ *     owner's GHII, memory_list dropped every value without saying so, and memory_write silently
+ *     accepted a write that owner-scope reads would then shadow. All three read as "the platform
+ *     cannot share this data" and cost real redesign time. Now: memory_read looks once across the
+ *     owner scope ON THE MISS PATH ONLY and returns NOT_IN_YOUR_NAMESPACE naming the holder, the
+ *     owner_scope read path and the app-grant route for writes; memory_list discloses
+ *     values_omitted + how to read one; memory_write returns SHADOWED_BY_OWNER_COPY when the
+ *     owner already holds the key. Covered by test/e2e-memory-namespaces.ts.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -52,6 +61,8 @@ import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema, struc
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { buildDiscoveryRegistry, runDiscovery, computeFacets, type DiscoveryType } from '../services/discovery/index.js';
 import { getAgentSkillLinks } from '../services/skills.js';
+import { getOwnerScopeMemory } from '../services/owner-memory.js';
+import { notInYourNamespace, shadowedByOwnerCopy, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
 import { registerCoreAdminTools } from './core-admin.js';
 
@@ -309,7 +320,28 @@ export function registerCoreTools(
         { description: descriptionFor('aimeat_memory_read'), inputSchema: { key: z.string(), response_format: responseFormatSchema }, outputSchema: memoryEntryOutput, annotations: annotationsFor('aimeat_memory_read') },
         async ({ key, response_format }) => {
             const record = await storage.getMemory(agentGaii, key);
-            if (!record) return { content: [{ type: 'text' as const, text: 'Memory not found' }], isError: true };
+            if (!record) {
+                // Memory is keyed by the WRITER, so a key an APP saved lives under the owner's GHII
+                // and a sibling agent's key lives under its GAII. A bare "Memory not found" here has
+                // repeatedly been read as "the platform cannot share this data" and sent callers off
+                // to redesign around a limitation that does not exist. Look once across the owner
+                // scope and, when the key does exist, say exactly where it lives and how to reach it.
+                // The extra query runs ONLY on the miss path, where the answer was an error anyway.
+                const parsed = parseGAII(agentGaii);
+                const elsewhere = parsed
+                    ? await getOwnerScopeMemory(storage, config.nodeId, parsed.owner, key)
+                    : null;
+                if (elsewhere) {
+                    return {
+                        content: [{
+                            type: 'text' as const,
+                            text: JSON.stringify(notInYourNamespace(key, agentGaii, elsewhere.ownerGaii), null, 2),
+                        }],
+                        isError: true,
+                    };
+                }
+                return { content: [{ type: 'text' as const, text: 'Memory not found' }], isError: true };
+            }
             return structuredResult('aimeat_memory_read', response_format, {
                 key: record.key,
                 value: record.value,
@@ -355,6 +387,19 @@ export function registerCoreTools(
                 };
             }
             const existing = await storage.getMemory(agentGaii, key);
+            // Writing a key the OWNER already holds is not an update: this copy lands in the agent's
+            // own namespace and owner-scope reads resolve GHII-first, so the owner's copy wins and
+            // this one becomes invisible — including in listings. Silently succeeding here is how
+            // "I saved it" turns into "the app never showed it". Warn, do not refuse: writing your
+            // own copy is legitimate, it just is not a way to update someone else's record.
+            let shadowedBy: string | null = null;
+            if (!existing) {
+                const parsedW = parseGAII(agentGaii);
+                if (parsedW) {
+                    const ownerCopy = await storage.getMemory(`${parsedW.owner}@${config.nodeId}`, key);
+                    if (ownerCopy) shadowedBy = ownerCopy.ownerGaii;
+                }
+            }
             const record = await storage.setMemory({
                 key,
                 ownerGaii: agentGaii,
@@ -372,7 +417,11 @@ export function registerCoreTools(
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify({ key: record.key, version: record.version, visibility: record.visibility, tags: record.tags, written: true }, null, 2),
+                    text: JSON.stringify({
+                        key: record.key, version: record.version, visibility: record.visibility,
+                        tags: record.tags, written: true, owner_gaii: agentGaii,
+                        ...(shadowedBy ? shadowedByOwnerCopy(key, agentGaii, shadowedBy) : {}),
+                    }, null, 2),
                 }],
             };
         },
@@ -424,8 +473,20 @@ export function registerCoreTools(
                 version: e.version,
                 updated_at: e.updatedAt,
             }));
-            const payload = truncated
-                ? { items, truncated: true, shown: items.length, hint: `Showing first ${cap}. Narrow with prefix/tags or raise limit (max ${MEMORY_LIST_MAX_LIMIT}).` }
+            // This listing is METADATA ONLY — no values, on either path. With owner_scope that is
+            // actively misleading: the caller sees a key it cannot then read, because
+            // aimeat_memory_read only ever reads its OWN namespace. Say both things in the reply
+            // rather than leaving the caller to conclude the data is unreachable.
+            const truncHint = `Showing first ${cap}. Narrow with prefix/tags or raise limit (max ${MEMORY_LIST_MAX_LIMIT}).`;
+            const scopeNote = owner_scope ? OWNER_SCOPE_LIST_NOTE : null;
+            const payload = (truncated || scopeNote)
+                ? {
+                    items,
+                    count: items.length,
+                    ...(truncated ? { truncated: true, shown: items.length } : {}),
+                    ...(scopeNote ? { values_omitted: true, note: scopeNote } : {}),
+                    ...(truncated ? { hint: truncHint } : {}),
+                }
                 : items;
             return structuredResult('aimeat_memory_list', response_format, payload);
         },

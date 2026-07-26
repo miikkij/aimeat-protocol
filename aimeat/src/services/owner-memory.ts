@@ -18,12 +18,25 @@
  *   v1.1.0 — 2026-06-14 — Fold the owner's ecosystem apps (GEAIs) into the owner-scope union
  *     (ecosystem-apps foundation, chunk 1).
  *   v1.2.0 — 2026-07-14 — Add listOwnerScopeMemoryMeta (value-free owner-scope listing) for ?include=meta.
+ *   v1.4.0 — 2026-07-26 — Collisions are visible: a shadowed same-key copy under another same-owner
+ *     identity is reported as `alsoUnder` on the survivor instead of vanishing from the result (that
+ *     silent drop is why an agent's newer write looked like it had never happened). The local
+ *     GHII-first loop was also a SECOND copy of MemoryRepository.dedupByKey — now delegated, so the
+ *     ranking rule exists once.
  *   v1.3.0 — 2026-07-21 — Add getOwnerScopePublicMemory so anonymous public-serve paths (agent face) can
  *     resolve a record an owner's AGENT published under its own GAII — a non-public record never shadows
  *     a public one on the same key.
  */
 import type { Storage, MemoryRecord } from '../storage/interface.js';
 import type { MemoryMetaRow } from '../storage/repositories/memory.repository.js';
+import { MemoryRepository } from '../storage/repositories-impl/memory-repository.js';
+
+/**
+ * A record from an owner-scope listing. `alsoUnder` names every OTHER same-owner identity holding
+ * the same key: those copies lost the GHII-first dedup and are absent from the result, so this is
+ * the only signal that a collision exists at all.
+ */
+export type OwnerScopeRecord = MemoryRecord & { alsoUnder?: string[] };
 
 export interface OwnerScopeListOpts {
   prefix?: string;
@@ -40,7 +53,7 @@ export interface OwnerScopeListOpts {
  */
 export async function listOwnerScopeMemory(
   storage: Storage, nodeId: string, ownerName: string, opts?: OwnerScopeListOpts,
-): Promise<MemoryRecord[]> {
+): Promise<OwnerScopeRecord[]> {
   const ownerGhii = `${ownerName}@${nodeId}`;
   const agents = await storage.getAgentsByOwner(ownerName);
   const ecoApps = await storage.getEcosystemAppsByOwner(ownerName);
@@ -53,16 +66,16 @@ export async function listOwnerScopeMemory(
   return dedupGhiiFirst(rows, identities);
 }
 
-/** Order rows by identity priority (GHII first, then agents, then eco apps — the `identities` order)
- *  and keep the first occurrence of each key, so the GHII copy wins when a key exists under several
- *  identities. Mirrors the old per-identity loop's GHII-first dedup. */
-function dedupGhiiFirst<T extends { key: string; ownerGaii: string }>(rows: T[], identities: string[]): T[] {
-  const priority = new Map(identities.map((id, i) => [id, i]));
-  const ranked = [...rows].sort((a, b) => (priority.get(a.ownerGaii) ?? identities.length) - (priority.get(b.ownerGaii) ?? identities.length));
-  const seen = new Set<string>();
-  const out: T[] = [];
-  for (const r of ranked) { if (!seen.has(r.key)) { seen.add(r.key); out.push(r); } }
-  return out;
+/**
+ * GHII-first key dedup. Delegates to {@link MemoryRepository.dedupByKey} — this module used to
+ * carry a second, independent copy of the same loop even though the repository's version says it
+ * was moved there "so every owner-scope read shares one implementation". Two copies of a ranking
+ * rule is exactly where behaviour drifts, so there is now one.
+ */
+function dedupGhiiFirst<T extends { key: string; ownerGaii: string }>(
+  rows: T[], identities: string[],
+): (T & { alsoUnder?: string[] })[] {
+  return MemoryRepository.dedupByKey(rows, identities);
 }
 
 /**

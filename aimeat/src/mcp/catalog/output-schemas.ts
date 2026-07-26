@@ -33,13 +33,18 @@ export const memoryEntryOutput = {
     updated_at: z.string().optional(),
 };
 
-/** aimeat_memory_list — { items, count } plus the Phase 2 truncation markers (all optional). */
+/** aimeat_memory_list — { items, count } plus the Phase 2 truncation markers and the
+ *  owner-scope disclosure (values_omitted + note), all optional. */
 export const memoryListOutput = {
     items: z.array(looseRecord).optional(),
     count: z.number().optional(),
     truncated: z.boolean().optional(),
     shown: z.number().optional(),
     hint: z.string().optional(),
+    /** True when the listing carries no values (always the case) and the caller spans identities. */
+    values_omitted: z.boolean().optional(),
+    /** How to actually read a value that belongs to another same-owner identity. */
+    note: z.string().optional(),
 };
 
 /** Generic { items, count } list output (work inbox, etc.). */

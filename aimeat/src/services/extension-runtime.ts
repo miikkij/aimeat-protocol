@@ -11,6 +11,12 @@
  *   v2.0.0 -- 2026-04-29 -- Replace isolated-vm with quickjs-emscripten (pure WASM, no C++ build tools)
  *   v2.1.0 -- 2026-07-07 -- Await/abort in-flight host calls before disposing the runtime; fixes JS_FreeRuntime gc assertion abort when a script rejects with sibling async calls still pending (e.g. multi-feed fetch, one feed fails)
  *   v2.2.0 -- 2026-07-08 -- Self-heal a poisoned WASM engine: detect an emscripten abort and rebuild the module singleton so one abort no longer fails every later run until a process restart
+ *   v2.4.0 -- 2026-07-26 -- Give the sandbox the two primitives every author was otherwise forced to
+ *     hand-roll: `ctx.hash(s)` (FNV-1a 64-bit, published as EXT_HASH_REFERENCE_JS so a browser app
+ *     can compute the SAME value -- there is no crypto.subtle in QuickJS, and an app/extension pair
+ *     that hashes differently silently recomputes and re-charges everything) and `ctx.now()` (the
+ *     run's start timestamp, fixed for the whole action so multi-record writes stay consistent).
+ *     Both are pure guest-side helpers: no host call, no API-budget cost.
  *   v2.3.0 -- 2026-07-18 -- transformScript preserves top-level helpers/consts declared ABOVE `export default` (rewrites the export in place instead of wrapping the whole script) -- fixes QuickJS "unexpected token 'const'" for actions that define a helper above the export, which the extension prompt explicitly permits
  */
 import { getQuickJS, newQuickJSWASMModule, shouldInterruptAfterDeadline } from 'quickjs-emscripten';
@@ -59,7 +65,35 @@ export interface ExtensionCtx {
     };
     notify?(message: string, opts?: { title?: string; priority?: string; channel?: string }): Promise<boolean>;
     email?(to: string, subject: string, body: string): Promise<boolean>;
+    // NOTE: the guest ctx also exposes two PURE helpers that need no host call and are therefore
+    // implemented inside buildSandboxScript rather than here:
+    //   ctx.hash(s) -> 16 hex chars, FNV-1a 64-bit (see EXT_HASH_REFERENCE_JS)
+    //   ctx.now()   -> the ISO timestamp captured when this action started (fixed for the run)
 }
+
+/**
+ * The EXACT source of `ctx.hash`, exported so an app that must agree with an extension on a
+ * derived value can run the identical function in the browser.
+ *
+ * Why this exists: the sandbox has no `crypto.subtle`, so an extension author reaches for a
+ * hand-rolled hash while the browser side reaches for SHA-256, and the two silently disagree. That
+ * is not hypothetical — it shipped: an app and its extension hashed the same spreadsheet inputs
+ * differently, so every value the app computed looked stale to the server and would have been
+ * recomputed and re-charged forever. One published function, usable verbatim on both sides.
+ *
+ * FNV-1a style, 64 bits as two 32-bit lanes. Not cryptographic: use it for cache keys, change
+ * detection and content identity, never for signatures or secrets.
+ */
+export const EXT_HASH_REFERENCE_JS = `function aimeatHash(s) {
+  s = String(s);
+  var h1 = 0x811c9dc5, h2 = 0x01000193;
+  for (var i = 0; i < s.length; i++) {
+    var ch = s.charCodeAt(i);
+    h1 = (h1 ^ ch) >>> 0; h1 = Math.imul(h1, 0x01000193) >>> 0;
+    h2 = (h2 ^ (ch + i)) >>> 0; h2 = Math.imul(h2, 0x85ebca6b) >>> 0;
+  }
+  return ('00000000' + h1.toString(16)).slice(-8) + ('00000000' + h2.toString(16)).slice(-8);
+}`;
 
 export interface ExtensionLimits {
     memoryMb: number;
@@ -177,7 +211,17 @@ ${userFnDecl}
         return JSON.parse(raw);
     }
 
+    // Pure helpers: no host round trip, so they cost no API-call budget and add no latency.
+    // ctx.hash is the node's PUBLISHED hash (EXT_HASH_REFERENCE_JS) so a browser app can compute
+    // the identical value; the sandbox has no crypto.subtle, and letting each author invent one is
+    // how an app and its extension end up disagreeing about what is up to date.
+    ${EXT_HASH_REFERENCE_JS.replace(/^function aimeatHash/, 'function __hash')}
+
     const ctx = {
+        // One timestamp for the whole action run: two calls cannot disagree, so an action that
+        // stamps several records stays internally consistent and replayable.
+        now: () => __runStartedAt,
+        hash: (s) => __hash(s),
         memory: {
             get:       async (key)            => __call(__memory_get, [key]),
             set:       async (key, value)     => __call(__memory_set, [key, JSON.stringify(value)]),
@@ -319,6 +363,8 @@ export async function executeExtensionAction(
 
         // ── Serialized data ──────────────────────────────────
         setStringGlobal(vm, '__inputJson', JSON.stringify(input));
+        // Captured ONCE here, so ctx.now() is stable across the whole action.
+        setStringGlobal(vm, '__runStartedAt', new Date().toISOString());
         setStringGlobal(vm, '__callerJson', JSON.stringify(ctx.caller));
         setStringGlobal(vm, '__configJson', JSON.stringify(ctx.config));
         setStringGlobal(vm, '__instanceJson', ctx.instance ? JSON.stringify(ctx.instance) : null);

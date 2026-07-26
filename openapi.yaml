@@ -583,6 +583,14 @@ components:
         owner_gaii:
           type: string
           description: GAII of the entry owner (included in public reads via /v1/memory/{gaii}/{key})
+        also_under:
+          type: array
+          items:
+            type: string
+          description: |
+            Owner-scope listings only. Other same-owner identities holding this SAME key. Memory is
+            keyed by the writer, and an owner-scope read resolves GHII-first, so those copies are
+            absent from the response — this names them instead of letting the collision be invisible.
         _ddc:
           type: object
           description: Data Decision Context — structured metadata for agent decision-making
@@ -22640,16 +22648,31 @@ paths:
           application/json:
             schema:
               type: object
-              required: [manifest, scripts]
               properties:
+                mode:
+                  type: string
+                  enum: [presigned]
+                  description: |
+                    Presigned mode: omit `manifest`/`scripts` and receive an `upload_url`; PUT a ZIP
+                    (manifest.yaml at root, scripts in scripts/) to it. Lets the mint and the upload
+                    happen in one command so the upload token is never transcribed.
                 manifest:
                   type: string
-                  description: YAML manifest defining the extension metadata, actions, and limits
+                  description: YAML manifest defining the extension metadata, actions, and limits (required unless mode=presigned)
                 scripts:
                   type: object
                   additionalProperties:
                     type: string
                   description: Key-value map of script filenames to JavaScript source code
+                update:
+                  type: boolean
+                  description: |
+                    Presigned only. Upsert an already-installed extension instead of 409. Activation
+                    status, lifecycle stamps and the ext:{name} memory are preserved. Carried in the
+                    upload token meta.
+                activate:
+                  type: boolean
+                  description: Presigned only. Activate immediately after install/update.
       responses:
         '201':
           description: Extension installed successfully

@@ -15,8 +15,57 @@ import { MONEY_CURRENCIES } from '../../commerce/money.js';
 
 /** Discriminated result of validating an extension install/upsert payload. */
 export type ExtBuildResult =
-  | { ok: true; record: ExtensionRecord }
+  | { ok: true; record: ExtensionRecord; warnings?: string[] }
   | { ok: false; status: number; code: string; message: string };
+
+/**
+ * APIs an author reaches for that the QuickJS sandbox either does NOT have, or that make an action
+ * non-deterministic. These are WARNINGS, never errors: the code still installs, but the author is
+ * told at install time instead of discovering it in production.
+ *
+ * This exists because of a real, expensive failure: a browser app hashed values with
+ * `crypto.subtle`, its extension could not (no WebCrypto in QuickJS) so it used a different
+ * algorithm, and every value the app computed then looked stale to the server — silently
+ * recomputing and re-charging AI work forever. `ctx.hash()` is the fix; this scan is what makes
+ * anyone reaching past it notice.
+ */
+const SANDBOX_CAPABILITY_WARNINGS: { pattern: RegExp; message: string }[] = [
+  {
+    pattern: /\bcrypto\s*\.\s*subtle\b/,
+    message: 'crypto.subtle is NOT available in the sandbox (no WebCrypto in QuickJS). Use ctx.hash(s) — the node publishes that exact function so a browser app can compute the identical value; a hand-rolled hash on one side only is how an app and its extension stop agreeing about what is up to date.',
+  },
+  {
+    pattern: /\bcrypto\s*\.\s*randomUUID\b|\brequire\s*\(\s*['"]node:crypto['"]/,
+    message: 'Node crypto is not available in the sandbox. Derive ids from your input with ctx.hash(s), or let the caller supply them.',
+  },
+  {
+    pattern: /\bDate\s*\.\s*now\s*\(|\bnew\s+Date\s*\(\s*\)/,
+    message: 'Date.now() / new Date() make the action non-deterministic and un-replayable. Use ctx.now() — one timestamp captured at the start of the run, stable across the whole action.',
+  },
+  {
+    pattern: /\bMath\s*\.\s*random\s*\(/,
+    message: 'Math.random() makes the action non-deterministic, so an identical request stops returning an identical result (and cannot be cached or sold with an accuracy claim). Derive from the input instead, e.g. ctx.hash(JSON.stringify(input)).',
+  },
+  {
+    pattern: /\beval\s*\(|\bnew\s+Function\s*\(/,
+    message: 'eval() / new Function() are refused by the app-origin CSP on the browser side and are a code-injection risk here. Parse explicitly instead.',
+  },
+];
+
+/**
+ * Scan every action script for sandbox-unavailable or non-deterministic APIs.
+ * Pure and side-effect free; returns one message per distinct problem found, naming the scripts.
+ */
+export function scanSandboxCapabilityWarnings(scripts: Record<string, string>): string[] {
+  const out: string[] = [];
+  for (const { pattern, message } of SANDBOX_CAPABILITY_WARNINGS) {
+    const hits = Object.entries(scripts)
+      .filter(([, content]) => pattern.test(content))
+      .map(([name]) => name);
+    if (hits.length) out.push(`${hits.join(', ')}: ${message}`);
+  }
+  return out;
+}
 
 const isNonNegInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && Number.isFinite(v);
 const fail = (message: string): ExtBuildResult => ({ ok: false, status: 400, code: 'INVALID_MANIFEST', message });
@@ -251,5 +300,8 @@ export function buildExtensionRecordFromManifest(
     installedAt,
   };
 
-  return { ok: true, record };
+  // Non-blocking: the extension installs either way, the author just learns now instead of in
+  // production. See SANDBOX_CAPABILITY_WARNINGS.
+  const warnings = scanSandboxCapabilityWarnings(scripts);
+  return warnings.length ? { ok: true, record, warnings } : { ok: true, record };
 }

@@ -353,6 +353,9 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
           flagCount: r.flagCount ?? 0,
           created_at: r.createdAt,
           updated_at: r.updatedAt,
+          // Same key under other same-owner identities; those copies are shadowed by this one
+          // and appear nowhere else in the response (owner-scope listings only).
+          ...((r as { alsoUnder?: string[] }).alsoUnder ? { also_under: (r as { alsoUnder?: string[] }).alsoUnder } : {}),
         })),
         total: metaRows.length,
         quota: {
@@ -403,6 +406,9 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         flagCount: r.flagCount ?? 0,
         created_at: r.createdAt,
         updated_at: r.updatedAt,
+        // Same key under other same-owner identities; those copies are shadowed by this one
+        // and appear nowhere else in the response (owner-scope listings only).
+        ...((r as { alsoUnder?: string[] }).alsoUnder ? { also_under: (r as { alsoUnder?: string[] }).alsoUnder } : {}),
       })),
       total: records.length,
       quota: {

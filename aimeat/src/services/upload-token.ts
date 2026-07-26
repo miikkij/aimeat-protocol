@@ -13,6 +13,11 @@
  *   v1.0.0 — 2026-05-02 — Initial implementation
  *   v1.1.0 — 2026-07-05 — Add 'skill' upload type; add a jti nonce (deterministic EdDSA made
  *     same-second identical mints collide with the single-use guard).
+ *   v1.2.0 — 2026-07-26 — PRESIGNED_META_KEYS + buildUploadMeta(): the options each upload type must
+ *     carry are declared once, next to the token, instead of a hand-written meta at every minting
+ *     site. Hand-written metas is how aimeat_extension_install's `update` flag was accepted and then
+ *     dropped (meta: {}), so a requested upsert failed ALREADY_EXISTS with nothing pointing at the
+ *     flag. Covered by test/e2e-presigned-meta.ts.
  */
 
 import { SignJWT, jwtVerify } from 'jose';
@@ -68,6 +73,43 @@ export class UploadTokenError extends Error {
         this.name = 'UploadTokenError';
         this.code = code;
     }
+}
+
+// ── Presigned option carry-over ──
+
+/**
+ * The options each presigned upload type MUST carry into its token `meta`.
+ *
+ * The trap this closes: a tool accepts an option, destructures it, and then mints the token with a
+ * hand-written `meta` that forgets it. The option is silently ignored and the failure surfaces far
+ * away — `aimeat_extension_install({ update: true })` returned an upload URL and then failed
+ * ALREADY_EXISTS, because `meta: {}` dropped the flag. The same shape of bug is on record for app
+ * publishing (cortex_agents). Declaring the carry-over list HERE, next to the token, means a new
+ * option is one edit away from being covered, and {@link buildUploadMeta} + its test make a
+ * forgotten key a test failure instead of a support ticket.
+ */
+export const PRESIGNED_META_KEYS = {
+    app: ['filename', 'name', 'description', 'category', 'tags', 'icon', 'version'],
+    storage: ['key', 'mime_type', 'visibility', 'group_id'],
+    extension: ['update', 'activate'],
+    cortex: ['update', 'activate'],
+    skill: ['scope', 'visibility', 'organism_id', 'workspace_id'],
+} as const satisfies Record<UploadTokenPayload['utype'], readonly string[]>;
+
+/**
+ * Build a token `meta` for `utype` by picking exactly the declared keys off the tool's own input.
+ * Undefined values are dropped so an omitted option stays omitted (the upload handlers treat
+ * "absent" as "unchanged"). Use this instead of writing a meta object by hand.
+ */
+export function buildUploadMeta(
+    utype: UploadTokenPayload['utype'],
+    input: Record<string, unknown>,
+): Record<string, unknown> {
+    const out: Record<string, unknown> = {};
+    for (const key of PRESIGNED_META_KEYS[utype] as readonly string[]) {
+        if (input[key] !== undefined) out[key] = input[key];
+    }
+    return out;
 }
 
 // ── Token generation ──

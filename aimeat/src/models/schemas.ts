@@ -412,6 +412,15 @@ export const FlagCreateSchema = z.object({
 // ── Extensions Install (security audit -- authenticated endpoints) ──
 
 export const ExtensionInstallSchema = z.object({
-    manifest: z.string().min(1).max(100_000),
+    // Presigned mode carries no manifest: the ZIP does. `mode:'presigned'` returns an upload_url
+    // and the install happens on PUT /v1/upload/:token (mirrors POST /v1/apps).
+    mode: z.literal('presigned').optional(),
+    manifest: z.string().min(1).max(100_000).optional(),
     scripts: z.record(z.string(), z.string().max(512_000)).optional(),
+    /** Presigned only: upsert an existing extension instead of 409 (carried in the token meta). */
+    update: z.boolean().optional(),
+    /** Presigned only: activate immediately after install/update. */
+    activate: z.boolean().optional(),
+}).refine(v => v.mode === 'presigned' || (typeof v.manifest === 'string' && v.manifest.length > 0), {
+    message: 'manifest is required unless mode is "presigned"', path: ['manifest'],
 });

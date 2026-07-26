@@ -151,15 +151,28 @@ export class MemoryRepository {
    * `identities`). This is the owner-scope rule: a key present under both the GHII and an agent resolves
    * to the GHII copy. Pure — moved here from services/owner-memory.ts so every owner-scope read shares
    * one implementation.
+   *
+   * The losing copies are REMOVED, not reordered, so an agent's newer write can vanish from an
+   * owner-scope read with nothing to show a collision occurred. The survivor therefore carries
+   * `alsoUnder`: the other identities holding the same key. Additive and present only on an actual
+   * collision, so every existing caller is unaffected.
    */
-  static dedupByKey<T extends KeyedRow>(rows: T[], identities: string[]): T[] {
+  static dedupByKey<T extends KeyedRow>(rows: T[], identities: string[]): (T & { alsoUnder?: string[] })[] {
     const priority = new Map(identities.map((id, i) => [id, i]));
     const rank = (r: T): number => priority.get(r.ownerGaii) ?? identities.length;
     const ranked = [...rows].sort((a, b) => rank(a) - rank(b));
-    const seen = new Set<string>();
-    const out: T[] = [];
+    const winners = new Map<string, T & { alsoUnder?: string[] }>();
+    const out: (T & { alsoUnder?: string[] })[] = [];
     for (const r of ranked) {
-      if (!seen.has(r.key)) { seen.add(r.key); out.push(r); }
+      const winner = winners.get(r.key);
+      if (!winner) {
+        // Shallow copy: never annotate a row the adapter handed us.
+        const entry = { ...r } as T & { alsoUnder?: string[] };
+        winners.set(r.key, entry);
+        out.push(entry);
+      } else if (winner.ownerGaii !== r.ownerGaii) {
+        (winner.alsoUnder ??= []).push(r.ownerGaii);
+      }
     }
     return out;
   }
