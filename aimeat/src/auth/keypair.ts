@@ -43,6 +43,9 @@ export async function verify(publicKeyBase64: string, message: string, signature
     const signature = Buffer.from(signatureBase64, 'base64');
     return await ed.verifyAsync(signature, msgBytes, publicKey);
   } catch {
+    // Fail-closed by design: a malformed key or signature means the signature does NOT verify.
+    // Logging every bad signature on a public endpoint is a flooding vector.
+    // eslint-disable-next-line aimeat/no-silent-catch -- false here means "did not verify"
     return false;
   }
 }

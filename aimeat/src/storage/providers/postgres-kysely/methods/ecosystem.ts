@@ -12,7 +12,7 @@ import { sql, type Selectable } from 'kysely';
 import type { EcosystemAppRecord, EcoAuthorizationRecord, EcoAutomationRecipe } from '../../../interface.js';
 import type { EcosystemApp, EcoAuth, EcoAutomationRecipe as EcoAutomationRecipeTable } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb } from '../helpers.js';
+import { jsonb, dbError } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoOpt = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
@@ -101,7 +101,7 @@ export const ecosystemMethods = {
     try {
       const rows = await this.db.updateTable('EcosystemApp').set(data as never).where('geai', '=', geai).returningAll().execute();
       return rows[0] ? toEcosystemApp(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updateEcosystemApp', err); }
   },
   async deleteEcosystemApp(this: PostgresKyselyStorage, geai: string): Promise<boolean> {
     const r = await this.db.deleteFrom('EcosystemApp').where('geai', '=', geai).executeTakeFirst();

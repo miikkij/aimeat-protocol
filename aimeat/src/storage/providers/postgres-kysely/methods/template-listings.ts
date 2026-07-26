@@ -13,6 +13,7 @@ import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type { TemplateListingRecord, TemplateReview, TemplateDiscussion, TemplateFilter } from '../../../interface.js';
 import type { TemplateListing, TemplateReview as TemplateReviewRow, TemplateDiscussion as TemplateDiscussionRow } from '../db-types.js';
+import { dbError } from '../helpers.js';
 import type { PostgresKyselyStorage } from '../index.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
@@ -146,7 +147,7 @@ export const templateListingMethods = {
     try {
       const rows = await this.db.updateTable('TemplateListing').set(data as never).where('id', '=', id).returningAll().execute();
       return rows[0] ? toTemplateListing(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updateTemplateListing', err); }
   },
 
   async deleteTemplateListing(this: PostgresKyselyStorage, id: string): Promise<boolean> {
@@ -155,7 +156,7 @@ export const templateListingMethods = {
       await this.db.deleteFrom('TemplateDiscussion').where('listingId', '=', id).execute();
       const r = await this.db.deleteFrom('TemplateListing').where('id', '=', id).executeTakeFirst();
       return Number(r.numDeletedRows ?? 0) > 0;
-    } catch { return false; }
+    } catch (err) { throw dbError('deleteTemplateListing', err); }
   },
 
   async incrementInstallCount(this: PostgresKyselyStorage, listingId: string): Promise<void> {
@@ -213,7 +214,7 @@ export const templateListingMethods = {
       if (!rows[0]) return null;
       await templateListingMethods.recalculateRating.call(this, rows[0].listingId);
       return toTemplateReview(rows[0]);
-    } catch { return null; }
+    } catch (err) { throw dbError('updateReview', err); }
   },
 
   async deleteReview(this: PostgresKyselyStorage, id: string): Promise<boolean> {
@@ -223,7 +224,7 @@ export const templateListingMethods = {
       await this.db.deleteFrom('TemplateReview').where('id', '=', id).execute();
       await templateListingMethods.recalculateRating.call(this, row.listingId);
       return true;
-    } catch { return false; }
+    } catch (err) { throw dbError('deleteReview', err); }
   },
 
   async recalculateRating(this: PostgresKyselyStorage, listingId: string): Promise<{ rating: number; reviewCount: number }> {
@@ -263,6 +264,6 @@ export const templateListingMethods = {
     try {
       const r = await this.db.deleteFrom('TemplateDiscussion').where('id', '=', id).executeTakeFirst();
       return Number(r.numDeletedRows ?? 0) > 0;
-    } catch { return false; }
+    } catch (err) { throw dbError('deleteDiscussion', err); }
   },
 };

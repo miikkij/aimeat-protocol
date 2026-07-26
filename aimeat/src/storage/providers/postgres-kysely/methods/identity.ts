@@ -14,7 +14,7 @@ import type { Selectable } from 'kysely';
 import type { AgentRecord, GHIIRecord, OwnerRecord } from '../../../interface.js';
 import type { Agent, Ghii, Owner } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb } from '../helpers.js';
+import { jsonb, dbError } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoOpt = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
@@ -100,7 +100,7 @@ export const identityMethods = {
       await this.db.deleteFrom('Session').where('owner', '=', name).execute();
       const r = await this.db.deleteFrom('Owner').where('name', '=', name).executeTakeFirst();
       return Number(r.numDeletedRows ?? 0) > 0;
-    } catch { return false; }
+    } catch (err) { throw dbError('deleteOwner', err); }
   },
 
   // ── Agents ──
@@ -162,14 +162,14 @@ export const identityMethods = {
     try {
       const rows = await this.db.updateTable('Agent').set(data as never).where('gaii', '=', gaii).returningAll().execute();
       return rows[0] ? toAgentRecord(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updateAgent', err); }
   },
   async deleteAgent(this: PostgresKyselyStorage, gaii: string): Promise<boolean> {
     try {
       await this.db.deleteFrom('Memory').where('ownerGaii', '=', gaii).execute();
       const r = await this.db.deleteFrom('Agent').where('gaii', '=', gaii).executeTakeFirst();
       return Number(r.numDeletedRows ?? 0) > 0;
-    } catch { return false; }
+    } catch (err) { throw dbError('deleteAgent', err); }
   },
 
   // ── GHIIs ──
@@ -256,7 +256,7 @@ export const identityMethods = {
       if ('externalIdentities' in data) data.externalIdentities = jsonb((data.externalIdentities ?? null) as Parameters<typeof jsonb>[0]);   // Json column
       const rows = await this.db.updateTable('Ghii').set(data as never).where('ghii', '=', ghii).returningAll().execute();
       return rows[0] ? toGHIIRecord(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updateGHII', err); }
   },
 
   // ── Token revocation (RevokedToken) ──

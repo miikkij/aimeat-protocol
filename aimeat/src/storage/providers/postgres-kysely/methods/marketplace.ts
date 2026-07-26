@@ -11,7 +11,7 @@ import type { Selectable } from 'kysely';
 import type { ListingRecord, PurchaseRecord } from '../../../interface.js';
 import type { Listing, Purchase } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
-import { jsonb } from '../helpers.js';
+import { jsonb, dbError } from '../helpers.js';
 
 const iso = (t: Date | string): string => (t instanceof Date ? t : new Date(t)).toISOString();
 const isoOpt = (t: Date | string | null | undefined): string | undefined => (t == null ? undefined : iso(t));
@@ -73,7 +73,7 @@ export const marketplaceMethods = {
       if (typeof data.updatedAt === 'string') data.updatedAt = new Date(data.updatedAt);
       const rows = await this.db.updateTable('Listing').set(data as never).where('id', '=', id).returningAll().execute();
       return rows[0] ? toListing(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updateListing', err); }
   },
   async deleteListing(this: PostgresKyselyStorage, id: string): Promise<boolean> {
     const r = await this.db.deleteFrom('Listing').where('id', '=', id).executeTakeFirst();
@@ -111,6 +111,6 @@ export const marketplaceMethods = {
       if (Object.keys(data).length === 0) return this.getPurchase(id);
       const rows = await this.db.updateTable('Purchase').set(data as never).where('id', '=', id).returningAll().execute();
       return rows[0] ? toPurchase(rows[0]) : null;
-    } catch { return null; }
+    } catch (err) { throw dbError('updatePurchase', err); }
   },
 };

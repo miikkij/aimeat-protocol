@@ -30,6 +30,9 @@ export async function runMigrations(pool: pg.Pool): Promise<void> {
       await client.query('INSERT INTO "_kysely_migrations"(name) VALUES ($1)', [file]);
       await client.query('COMMIT');
     } catch (err) {
+      // The migration error thrown on the next line is the one that matters. A ROLLBACK that also
+      // fails adds nothing an operator can act on, and reporting it would replace the real cause.
+      // eslint-disable-next-line aimeat/no-silent-catch -- the real error is thrown immediately below
       await client.query('ROLLBACK').catch(() => { /* already broken */ });
       throw new Error(`migration ${file} failed: ${(err as Error).message}`, { cause: err });
     } finally {

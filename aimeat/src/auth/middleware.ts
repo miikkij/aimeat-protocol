@@ -47,10 +47,15 @@ function touchAgentLastSeen(auth: VerifiedToken): void {
   if (now - last < LAST_SEEN_THROTTLE_MS) return;
   _lastSeenCache.set(id, now);
   const iso = new Date(now).toISOString();
+  // Best-effort liveness bookkeeping on the hot auth path: a failure must not fail the request, but
+  // it must not be invisible either — a lastSeen that silently stops updating reads as "the agent is
+  // gone" in every fleet view. The throttle above bounds how often this can log.
+  const lastSeenFailed = (err: unknown) =>
+    logger.warn('lastSeen update failed; fleet views will show this principal as stale', { id, error: String(err) });
   if (isEco) {
-    _sessionStorage.updateEcosystemApp(id, { lastSeen: iso }).catch(() => {});
+    _sessionStorage.updateEcosystemApp(id, { lastSeen: iso }).catch(lastSeenFailed);
   } else {
-    _sessionStorage.updateAgent(id, { lastSeen: iso }).catch(() => {});
+    _sessionStorage.updateAgent(id, { lastSeen: iso }).catch(lastSeenFailed);
   }
 }
 
@@ -67,7 +72,8 @@ async function resolvePatToken(token: string): Promise<VerifiedToken | null> {
   if (!_sessionStorage) return null;
   const r = await resolvePat(_sessionStorage, token);
   if (!r) return null;
-  _sessionStorage.touchPat(r.patId, new Date().toISOString()).catch(() => {});
+  _sessionStorage.touchPat(r.patId, new Date().toISOString())
+    .catch(err => logger.warn('PAT lastUsed update failed; the token will look unused', { patId: r.patId, error: String(err) }));
   return {
     sub: r.sub,
     owner: r.owner,
