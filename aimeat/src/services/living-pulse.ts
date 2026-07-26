@@ -47,7 +47,7 @@ async function appendHistory(storage: Storage, ownerGaii: string, loc: Loc, slot
     const cur = await storage.getMemory(ownerGaii, histKey(loc, slot));
     const prev = ((cur?.value as { versions?: unknown[] })?.versions) || [];
     await upsert(storage, ownerGaii, histKey(loc, slot), { slot, versions: [entry, ...prev].slice(0, HIST_CAP) });
-  } catch { /* history best-effort */ }
+  } catch (err) { logger.warn('prev: history best-effort', { error: String(err) }); }
 }
 const srcKey = (l: Loc, id: string) => `${wsRoot(l)}.living-src.${l.docId}__${id}.latest`;
 const ledgerKey = (l: Loc) => `${wsRoot(l)}.living-ledger.${l.docId}__${Date.now()}-${Math.random().toString(36).slice(2, 6)}.latest`;
@@ -64,7 +64,7 @@ async function upsert(storage: Storage, ownerGaii: string, key: string, value: u
 }
 
 async function addLedger(storage: Storage, ownerGaii: string, loc: Loc, event: Record<string, unknown>): Promise<void> {
-  try { await upsert(storage, ownerGaii, ledgerKey(loc), { ...event, at: new Date().toISOString() }); } catch { /* best-effort */ }
+  try { await upsert(storage, ownerGaii, ledgerKey(loc), { ...event, at: new Date().toISOString() }); } catch (err) { logger.warn('addLedger: best-effort', { error: String(err) }); }
 }
 
 /** Web-push + email when a living document retires (best-effort; in addition to the UI retired badge). */
@@ -75,13 +75,13 @@ async function notifyStop(services: LivingNotify | undefined, storage: Storage, 
     if (services.push?.enabled) {
       await services.push.sendNotification(ownerGaii.split('@')[0], { title: 'Living document retired', body, url: '/v1/profile?tab=living', tag: 'living:retired' });
     }
-  } catch { /* push best-effort */ }
+  } catch (err) { logger.warn('notifyStop: push best-effort', { error: String(err) }); }
   try {
     if (services.email?.enabled) {
       const to = (await storage.getGHII(ownerGaii) as { notificationEmail?: string } | null)?.notificationEmail;
       if (to) await services.email.sendNotification(to, 'Living document retired', body);
     }
-  } catch { /* email best-effort */ }
+  } catch (err) { logger.warn('to: email best-effort', { error: String(err) }); }
 }
 
 function cadenceMs(charter: Record<string, unknown> | undefined): number {
@@ -240,7 +240,7 @@ export async function pulseInstanceServer(
           if (h.key === configKey(loc) || seen.has(h.key)) continue;
           await addSrc(storage, ownerGaii, loc, slot, { text: h.snippet || h.title || h.key, origin: h.key, producer: h.producer || null });
         }
-      } catch { /* gather best-effort */ }
+      } catch (err) { logger.warn('charter: gather best-effort', { error: String(err) }); }
     }
 
     // 2. Re-derive from active sources.
@@ -309,7 +309,7 @@ async function evaluateStop(
         appId: 'living',
       });
       if (/^\s*yes\b/i.test(r.content || '')) return `condition met: ${stopWhen}`;
-    } catch { /* judge best-effort; do not retire on error */ }
+    } catch (err) { logger.warn('evaluateStop: judge best-effort; do not retire on error', { error: String(err) }); }
   }
   return null;
 }

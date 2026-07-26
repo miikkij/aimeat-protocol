@@ -19,6 +19,7 @@ import {
   computeHash,
 } from '../../services/component-registrar.js';
 import { resolveGhii } from '../../utils/ghii-resolver.js';
+import { logger } from '../../utils/logger.js';
 
 // ── Types for migration diff ──────────────────────────────────────────
 
@@ -98,7 +99,7 @@ export function registerManageRoutes(
             await storage.updateInstance(id, {
               installedComponents: updatedComponents,
               updatedAt: new Date().toISOString(),
-            }).catch(() => { /* non-critical */ });
+            }).catch(err => { logger.warn('GET /v1/instances/:id/status: non-critical', { error: String(err) }); });
           }
         }
 

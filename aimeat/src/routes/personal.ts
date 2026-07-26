@@ -255,7 +255,7 @@ export function personalRouter(
       // Close WebSocket if connected
       const conn = tunnelManager?.getConnection(nodeId);
       if (conn) {
-        try { conn.ws.close(1000, 'deregistered'); } catch { /* ignore */ }
+        try { conn.ws.close(1000, 'deregistered'); } catch (err) { logger.warn('DELETE /v1/personal/anchor/:nodeId: ignore', { error: String(err) }); }
       }
       await storage.deletePersonalNode(nodeId);
 

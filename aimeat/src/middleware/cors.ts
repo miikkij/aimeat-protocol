@@ -17,6 +17,7 @@
 import type { RequestHandler, Request } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
 
 export function corsMiddleware(config: AimeatConfig, getStorage?: () => Storage | null): RequestHandler {
     return async (req, res, next) => {
@@ -114,8 +115,9 @@ async function resolveAllowedOrigins(
         if (ghii?.allowedOrigins?.length) {
             return ghii.allowedOrigins;
         }
-    } catch {
+    } catch (err) {
         // Storage error — fall through to node default
+      logger.warn('resolveAllowedOrigins: continuing after a suppressed failure', { error: String(err) });
     }
 
     // Node-level default

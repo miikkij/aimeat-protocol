@@ -74,7 +74,7 @@ export async function initializeServices(
   let maintenanceCache: MaintenanceState = { enabled: false, message: '', enabledAt: null, enabledBy: null };
   try {
     maintenanceCache = await storage.getMaintenanceMode();
-  } catch { /* default to disabled */ }
+  } catch (err) { logger.warn('initializeServices: default to disabled', { error: String(err) }); }
 
   // Initialize node keys asynchronously
   initializeNode(config, storage);

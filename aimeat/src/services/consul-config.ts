@@ -15,6 +15,7 @@
 import Consul from 'consul';
 import type { AimeatConfig } from '../config.js';
 import { isImmutable, MUTABLE_CONFIG_MAP, parseConfigValue } from './config-schema.js';
+import { logger } from '../utils/logger.js';
 
 export interface ConsulConfigService {
   /** Load all config values from Consul KV (mutable only, raw strings) */
@@ -78,7 +79,7 @@ export function createConsulConfigService(config: AimeatConfig): ConsulConfigSer
             lastHash = hash;
             onUpdate(values);
           }
-        } catch { /* ignore watch errors */ }
+        } catch (err) { logger.warn('startWatching: ignore watch errors', { error: String(err) }); }
       }, config.consulWatchIntervalSeconds * 1000);
     },
 
@@ -95,7 +96,10 @@ export function createConsulConfigService(config: AimeatConfig): ConsulConfigSer
       try {
         await consul.agent.self();
         return true;
-      } catch { return false; }
+      } catch (err) {
+        logger.warn('health: continuing after a suppressed failure', { error: String(err) });
+        return false;
+      }
     },
   };
 }
@@ -118,6 +122,7 @@ export function applyConsulValues(
       if (!field.validate(value)) { skipped.push(dotPath); continue; }
       (config as unknown as Record<string, unknown>)[field.key] = value;
       applied.push(dotPath);
+      // eslint-disable-next-line aimeat/no-silent-catch -- not silent: the key is reported to the caller in the returned `skipped` list
     } catch { skipped.push(dotPath); }
   }
   return { applied, skipped };

@@ -99,6 +99,7 @@ export async function performKeyExchange(
         });
 
         if (!resp.ok) {
+            // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
             const body = await resp.text().catch(() => '');
             return { success: false, error: `Peer returned ${resp.status}: ${body}` };
         }

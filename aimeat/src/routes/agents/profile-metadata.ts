@@ -19,6 +19,7 @@ import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { markAgentSeen } from '../../services/telemetry-buffer.js';
 import { listByAgent as listEngagementsByAgent } from '../../services/workspace-engagements.js';
 import { VALID_MODES } from './constants.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerProfileMetadataRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // GET /v1/agents/:gaii — public agent profile (no auth)
@@ -106,7 +107,7 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         storage.countTasksByOwner(ownerGhii),
         storage.countMessagesByAgents(gaiis),
         storage.listAgentTasksByOwner(ownerGhii, { status: 'active', perPage: 200 }),
-        Promise.all(agents.map(a => storage.getOnboarding(a.gaii).catch(() => null))),
+        Promise.all(agents.map(a => storage.getOnboarding(a.gaii).catch(err => { logger.warn('GET /v1/agents: continuing after a suppressed failure', { error: String(err) }); return null; }))),
       ]);
       taskCounts = tc;
       msgCounts = mc;

@@ -8,6 +8,7 @@
 import type { Storage } from '../../storage/interface.js';
 import type { PeerInfo } from '../../services/federation.js';
 import type { PromotionMetrics } from '../../services/network-policy.js';
+import { logger } from '../../utils/logger.js';
 
 /** Build the measurable metrics for a peer's promotion eligibility (Phase B). */
 export async function promotionMetrics(storage: Storage, peer: PeerInfo, allWork?: { status: string; providerGaii: string; requesterGaii: string }[]): Promise<PromotionMetrics> {
@@ -18,7 +19,7 @@ export async function promotionMetrics(storage: Storage, peer: PeerInfo, allWork
         const done = new Set(['completed', 'delivered']);
         const suffix = `@${peer.nodeId}`;
         successfulWork = work.filter(w => done.has(w.status) && (String(w.providerGaii).endsWith(suffix) || String(w.requesterGaii).endsWith(suffix))).length;
-    } catch { /* none */ }
+    } catch (err) { logger.warn('daysActive: none', { error: String(err) }); }
     return {
         availabilityPct: peer.availabilityPct ?? null,
         daysActive,

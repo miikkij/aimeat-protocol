@@ -281,8 +281,9 @@ export function registerInstallRoutes(
         if (listing) {
           await storage.incrementInstallCount(listing.id);
         }
-      } catch {
+      } catch (err) {
         // Non-critical — install succeeds even if counter update fails
+        logger.warn('label: continuing after a suppressed failure', { error: String(err) });
       }
 
       emitChange('instances');

@@ -20,6 +20,7 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { emitChange } from '../services/event-bus.js';
 import { FlagCreateSchema, validateBody } from '../models/schemas.js';
+import { logger } from '../utils/logger.js';
 
 const VALID_TARGET_TYPES = ['memory', 'board_post', 'action', 'agent'] as const;
 const VALID_REASONS = ['unreliable', 'inappropriate', 'illegal', 'spam', 'other'] as const;
@@ -105,8 +106,9 @@ export function flagsRouter(config: AimeatConfig, storage: Storage): Router {
                     const key = keyParts.join('::');
                     await storage.incrementMemoryFlagCount(ownerGaii, key);
                 }
-            } catch {
+            } catch (err) {
                 // Flag creation still succeeds even if memory increment fails
+              logger.warn('POST /v1/flags: continuing after a suppressed failure', { error: String(err) });
             }
         }
 

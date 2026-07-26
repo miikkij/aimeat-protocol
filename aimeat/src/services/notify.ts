@@ -32,6 +32,7 @@
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import type { PushService } from './push.js';
+import { logger } from '../utils/logger.js';
 
 export const NOTIF_PREFIX = 'notif.';
 const NOTIF_TTL_HOURS = 24 * 90;   // 90 days
@@ -84,7 +85,8 @@ export async function dismissConversationNotifications(storage: Storage, recipie
     let removed = 0;
     for (const ref of refs) { if (await storage.deleteMemory(ref.ownerGaii, ref.key)) removed++; }
     return removed;
-  } catch {
+  } catch (err) {
+    logger.warn('notify: suppressed failure, continuing', { error: String(err) });
     return 0;
   }
 }
@@ -156,9 +158,10 @@ export async function notify(storage: Storage, recipientGhii: string, input: Not
         tag: `notif:${input.type}`,
         actions: actions.slice(0, 2).map(a => ({ action: a.id, title: a.label })),
         data: { notifId: id, actions },
-      }).catch(() => { /* push is best-effort */ });
+      }).catch(err => { logger.warn('notify: push is best-effort', { error: String(err) }); });
     }
-  } catch {
+  } catch (err) {
     /* notifications are best-effort — swallow so the triggering action still succeeds */
+    logger.warn('notify: continuing after a suppressed failure', { error: String(err) });
   }
 }

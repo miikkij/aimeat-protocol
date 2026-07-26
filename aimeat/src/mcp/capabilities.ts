@@ -18,6 +18,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { logger } from '../utils/logger.js';
 
 export function registerCapabilitiesTools(
     mcp: McpServer,
@@ -97,12 +98,12 @@ export function registerCapabilitiesTools(
                 const { invokeCapability } = await import('../services/capability-invoke.js');
                 const result = await invokeCapability(config, storage, cap, args.input || {}, getAgentGaii(), getToken() ?? '', args.mode || 'normal');
 
-                storage.incrementCapabilityStats(cap.id, { success: 1, error: 0, totalMs: result.duration_ms }).catch(() => {});
+                storage.incrementCapabilityStats(cap.id, { success: 1, error: 0, totalMs: result.duration_ms }).catch(err => { logger.warn('getToken: continuing after a suppressed failure', { error: String(err) }); });
 
                 return { content: [{ type: 'text' as const, text: JSON.stringify(result, null, 2) }] };
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
-                storage.incrementCapabilityStats(cap.id, { success: 0, error: 1, totalMs: 0, lastError: message }).catch(() => {});
+                storage.incrementCapabilityStats(cap.id, { success: 0, error: 1, totalMs: 0, lastError: message }).catch(err => { logger.warn('getToken: continuing after a suppressed failure', { error: String(err) }); });
                 return { content: [{ type: 'text' as const, text: `Invoke failed: ${message}` }], isError: true };
             }
         },

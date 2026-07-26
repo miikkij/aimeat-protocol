@@ -141,7 +141,7 @@ export async function drainSyncQueue(
     } catch (err) {
       recordSyncAttempt(false);
       const entryIds = entries.map(e => e.id);
-      await storage.markReplicationFailed(entryIds).catch(() => {});
+      await storage.markReplicationFailed(entryIds).catch(err => { logger.warn('drainSyncQueue: continuing after a suppressed failure', { error: String(err) }); });
       logger.warn(`Sync queue drain failed for peer ${peer.nodeId}`, {
         error: err instanceof Error ? err.message : String(err),
       });
@@ -237,7 +237,8 @@ async function runScheduledSync(
             const result = await syncCatalogueToPeer(peer, config, storage);
             recordSyncAttempt(result.success);
             recordSyncDuration(Date.now() - start);
-          } catch {
+          } catch (err) {
+            logger.warn('sync-scheduler: suppressed failure, continuing', { error: String(err) });
             recordSyncAttempt(false);
           } finally {
             decrementActiveSyncs();

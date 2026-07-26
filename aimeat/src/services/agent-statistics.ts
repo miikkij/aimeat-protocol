@@ -17,6 +17,7 @@
  *   v1.0.0 -- 2026-05-31 -- Initial Quality-tab aggregation (per-context reviews + performance)
  */
 import type { Storage, AgentTaskRecord, RatingContext } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
 
 /** Below this sample size a bucket is flagged low-confidence; don't act on it. */
 export const LOW_CONFIDENCE_N = 10;
@@ -256,7 +257,7 @@ export async function recomputeAndCacheStatistics(
     try {
       await writeCache(storage, ownerGhii, agentGaii, `${base}.performance`, stats.performance);
       await writeCache(storage, ownerGhii, agentGaii, `${base}.reviews`, stats.reviews);
-    } catch { /* cache is best-effort; the rollup is still returned */ }
+    } catch (err) { logger.warn('recomputeAndCacheStatistics: cache is best-effort; the rollup is still returned', { error: String(err) }); }
   }
 
   return stats;

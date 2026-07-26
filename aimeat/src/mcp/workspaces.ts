@@ -106,6 +106,7 @@ import { normalizeDocValueImages } from '../services/doc-images.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole } from '../services/workspace-roles.js';
 import { listVersionRefs, maxVersionOf, pruneVersionsAfterPublish } from '../services/workspace-versions.js';
 import { registerWorkspaceMemberTools } from './workspace-members.js';
+import { logger } from '../utils/logger.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean; create_only?: boolean; maxVersions?: number };
 type Manifest = { objectTypes?: ObjType[] } & Record<string, unknown>;
@@ -137,12 +138,14 @@ export function registerWorkspaceTools(
      *  params) by parsing it, then stamp the instance id so the stored record/document carries it. */
     const coerceValue = (value: unknown, id: string): unknown => {
         let v = value;
+        // eslint-disable-next-line aimeat/no-silent-catch -- leave as string → schema rejects clearly
         if (typeof v === 'string') { try { const p = JSON.parse(v); if (p && typeof p === 'object') v = p; } catch { /* leave as string → schema rejects clearly */ } }
         return (v && typeof v === 'object' && !Array.isArray(v)) ? { ...(v as Record<string, unknown>), id } : v;
     };
 
     /** Parse a possibly-JSON-stringified object param (manifest / schemas) back to an object. */
     const parseObj = (v: unknown): unknown => {
+        // eslint-disable-next-line aimeat/no-silent-catch -- leave as-is
         if (typeof v === 'string') { try { const p = JSON.parse(v); if (p && typeof p === 'object') return p; } catch { /* leave as-is */ } }
         return v;
     };
@@ -175,7 +178,7 @@ export function registerWorkspaceTools(
         const { items } = await storage.listAllMemory({ prefix: key, limit: 20 });
         await Promise.all(items
             .filter(r => r.key === key && r.ownerGaii !== keepOwner)
-            .map(r => storage.deleteMemory(r.ownerGaii, r.key).catch(() => { /* best-effort collapse */ })));
+            .map(r => storage.deleteMemory(r.ownerGaii, r.key).catch(err => { logger.warn('collapseTo: best-effort collapse', { error: String(err) }); })));
     };
     /** Write workspace CONTENT under the member's GHII — ONE owner per key, so a record never forks into
      *  per-agent duplicates that the read path then has to disambiguate. Author/attribution is preserved
@@ -510,7 +513,7 @@ export function registerWorkspaceTools(
             // Memory Contracts (reactive): publishing a watched record (e.g. a bug → status:done)
             // fires Tracked Response evaluation. Gated O(1) on the track-registry in the subscriber.
             emitMemoryWritten(latestOwner, `${base}.latest`);
-            void updateOrganismStructure(storage, config, organism_id, { event: 'content published', actor: writerGaii }).catch(() => { /* timeline best-effort */ });
+            void updateOrganismStructure(storage, config, organism_id, { event: 'content published', actor: writerGaii }).catch(err => { logger.warn('publishOt: timeline best-effort', { error: String(err) }); });
             return ok({ published: base, version: n });
         });
 
@@ -563,7 +566,7 @@ export function registerWorkspaceTools(
                     apps: Array.isArray(appsParsed) ? appsParsed as Array<Record<string, unknown>> : undefined,
                 });
                 emitChange('organisms');
-                void updateOrganismStructure(storage, config, organism_id, { event: 'workspace updated', actor: writerGaii }).catch(() => { /* timeline best-effort */ });
+                void updateOrganismStructure(storage, config, organism_id, { event: 'workspace updated', actor: writerGaii }).catch(err => { logger.warn('async: timeline best-effort', { error: String(err) }); });
                 return ok(result);
             } catch (e) {
                 if (e instanceof WorkspaceMetaError) return fail(e.message);
@@ -671,7 +674,7 @@ export function registerWorkspaceTools(
             const workspaces = ((regRec?.value as { workspaces?: unknown[] } | undefined)?.workspaces) ?? [];
             await writeRecord(regKey, { workspaces: [...workspaces, { id: wsId, name: String(name || 'Workspace').trim() || 'Workspace', createdAt: now, createdBy: ownerName }] }, regRec, ownerGhii);
             emitChange('organisms');
-            void updateOrganismStructure(storage, config, organism_id, { event: 'workspace created', actor: writerGaii }).catch(() => { /* timeline best-effort */ });
+            void updateOrganismStructure(storage, config, organism_id, { event: 'workspace created', actor: writerGaii }).catch(err => { logger.warn('workspaces: timeline best-effort', { error: String(err) }); });
             return ok({ created: true, ws: wsId, types: man.objectTypes.map(o => o.name), schemas_locked: Object.keys(schemaMap) });
         });
 

@@ -62,7 +62,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
           logger.warn('Board subscription notification failed', { boardId, gaii: sub.gaii, error: String(err) });
         });
       }
-    }).catch(() => { /* ignore */ });
+    }).catch(err => { logger.warn('notifySubscribers: ignore', { error: String(err) }); });
   }
 
   // POST /v1/boards — create a board (agent auth; system boards require operator)

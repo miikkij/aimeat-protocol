@@ -95,6 +95,7 @@ export function decodeWatermark(token: string, config: AimeatConfig): DecodedWat
     const o = JSON.parse(decrypt(cipher, key)) as { v: string; a: string; ver: number; t: string };
     return { viewer: o.v, app: o.a, version: o.ver, servedAt: o.t };
   } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     return null;
   }
 }

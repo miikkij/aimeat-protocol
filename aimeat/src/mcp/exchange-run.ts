@@ -43,6 +43,7 @@ import { appToolsKey, AppToolsDocSchema } from '../models/app-tool-schemas.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
+import { logger } from '../utils/logger.js';
 
 /** A capture-only mock Express Response: settleMeteredCoordinate writes its 402/429/500 body here on
  *  failure (it only ever calls res.status(code).json(body)); success never touches res. */
@@ -82,7 +83,7 @@ export function registerExchangeRunTools(
             await sendDirectMessage({ config, storage, peers: new Map<string, PeerInfo>() }, {
                 senderGhii: gh(owner), recipientGhii: gh(recipientOwner), body, subject, respondable: false, skipContactGate: true,
             });
-        } catch { /* notification failure must never fail the action */ }
+        } catch (err) { logger.warn('notify: notification failure must never fail the action', { error: String(err) }); }
     }
 
     function workView(w: AgentWork) {

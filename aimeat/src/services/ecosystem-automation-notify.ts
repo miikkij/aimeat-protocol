@@ -44,7 +44,8 @@ function excerpt(value: unknown, max = 600): string {
   let s: string;
   try {
     s = typeof value === 'string' ? value : JSON.stringify(value);
-  } catch {
+  } catch (err) {
+    logger.warn('ecosystem-automation-notify: suppressed failure, continuing', { error: String(err) });
     s = String(value);
   }
   if (!s) return '(no content)';
@@ -90,7 +91,8 @@ async function readAdvisorySummaries(
   let outbox: MemoryRecord[];
   try {
     outbox = await storage.listMemory(ownerGhii, { prefix: outboxPrefix(app) });
-  } catch {
+  } catch (err) {
+    logger.warn('ecosystem-automation-notify: suppressed failure, continuing', { error: String(err) });
     return [];
   }
   const out: AdvisorySummary[] = [];
@@ -147,7 +149,7 @@ export async function notifyAutomationTaskComplete(
       try {
         const rec = await storage.getMemory(task.agentGaii, task.deliverableKey);
         if (rec) deliverableExcerpt = excerpt(rec.value);
-      } catch { /* best-effort — the link still works */ }
+      } catch (err) { logger.warn('notifyAutomationTaskComplete: best-effort — the link still works', { error: String(err) }); }
     }
 
     // What the agent actually produced: its `support-advisory@1` payloads in the owner's outbox.
@@ -242,7 +244,7 @@ export async function notifyAutomationTaskComplete(
       // Reflect that the email went out on the in-app record (best-effort).
       try {
         await storage.setMemory({ ...reportRecord, value: { ...(reportRecord.value as object), emailed: true }, version: 2, updatedAt: new Date().toISOString() });
-      } catch { /* best-effort */ }
+      } catch (err) { logger.warn('portalBase: best-effort', { error: String(err) }); }
     } else {
       logger.warn('automation report email send returned false', { owner: ownerName, recipe: auto.recipeId });
     }

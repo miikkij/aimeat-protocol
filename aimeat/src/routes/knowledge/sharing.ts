@@ -16,6 +16,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
 import type { KnowledgeHelpers } from './helpers.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerSharingRoutes(
   router: Router,
@@ -77,7 +78,7 @@ export function registerSharingRoutes(
         summary: `Knowledge package "${manifest.name}" published`,
         detail: manifest.synthesis?.description || '',
         link: `/v1/knowledge/${packageId}`,
-      }).catch(() => { /* feed is best-effort */ });
+      }).catch(err => { logger.warn('actor: feed is best-effort', { error: String(err) }); });
     }
   });
 

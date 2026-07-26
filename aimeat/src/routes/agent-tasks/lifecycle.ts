@@ -23,6 +23,7 @@ import { AgentTaskUpdateSchema, AgentTaskRequestChangesSchema } from '../../mode
 import { resolveTaskFileInputs } from '../../services/task-files.js';
 import { requireReadiness } from '../../middleware/readiness-gate.js';
 import type { TaskRouteHelpers } from './helpers.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerTaskLifecycleRoutes(
   router: Router, config: AimeatConfig, storage: Storage, helpers: TaskRouteHelpers,
@@ -143,7 +144,7 @@ export function registerTaskLifecycleRoutes(
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks', resolve(req));
-    try { emitResourceUpdated(resolveAgentGaii(req, req.params.name as string), `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(resolveAgentGaii(req, req.params.name as string), `aimeat://agents/${req.params.name as string}/tasks`); } catch (err) { logger.warn('pending_todo_count: MCP not connected', { error: String(err) }); }
   });
 
   /* ── DELETE /v1/agents/:name/tasks/:id -- Delete a task + clean its traces ──
@@ -195,14 +196,14 @@ export function registerTaskLifecycleRoutes(
       const livePrefix = `agents.${agentName}.tasks.${id}.`;
       const liveEntries = await storage.listMemory(task.agentGaii, { prefix: livePrefix });
       for (const m of liveEntries) await storage.deleteMemory(task.agentGaii, m.key);
-    } catch { /* best-effort trace cleanup */ }
+    } catch (err) { logger.warn('DELETE /v1/agents/:name/tasks/:id: best-effort trace cleanup', { error: String(err) }); }
     try {
       await storage.deleteMemory(task.ownerGaii, `agents.cancel.task.${id}`);
-    } catch { /* best-effort trace cleanup */ }
+    } catch (err) { logger.warn('DELETE /v1/agents/:name/tasks/:id: best-effort trace cleanup', { error: String(err) }); }
 
     res.json(success(config.nodeId, { deleted: true }));
     emitChange('agent-tasks', resolve(req));
-    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/tasks`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('DELETE /v1/agents/:name/tasks/:id: MCP not connected', { error: String(err) }); }
   });
 
   /* ── POST /v1/agents/:name/tasks/:id/start -- Start task (queued|paused|stalled -> active) ── */
@@ -277,7 +278,7 @@ export function registerTaskLifecycleRoutes(
         approved_at: now,
       });
     }
-    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch (err) { logger.warn('pending_todo_count: MCP not connected', { error: String(err) }); }
     // Connector forward tunnel: realtime reverse delivery of the now-active task. Owner approval
     // (queued -> active) is a runnable-state transition just like create-time auto-activation, so it
     // must push the same `task_assigned` wake — otherwise a daemon parked on the /local/tasks/next
@@ -450,7 +451,7 @@ export function registerTaskLifecycleRoutes(
         updated_at: now,
       });
     }
-    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch (err) { logger.warn('pending_todo_count: MCP not connected', { error: String(err) }); }
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks', resolve(req));
@@ -567,8 +568,8 @@ export function registerTaskLifecycleRoutes(
         created_at: now,
       });
     }
-    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/tasks`); } catch { /* MCP not connected */ }
-    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/messages`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/tasks`); } catch (err) { logger.warn('newTodos: MCP not connected', { error: String(err) }); }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${agentName}/messages`); } catch (err) { logger.warn('newTodos: MCP not connected', { error: String(err) }); }
 
     res.json(success(config.nodeId, { task: updated, message: messageRecord }));
     emitChange('agent-tasks', resolve(req));
@@ -627,7 +628,7 @@ export function registerTaskLifecycleRoutes(
         paused_at: now,
       });
     }
-    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch { /* MCP not connected */ }
+    try { emitResourceUpdated(task.agentGaii, `aimeat://agents/${req.params.name as string}/tasks`); } catch (err) { logger.warn('POST /v1/agents/:name/tasks/:id/pause: MCP not connected', { error: String(err) }); }
 
     res.json(success(config.nodeId, { task: updated }));
     emitChange('agent-tasks', resolve(req));

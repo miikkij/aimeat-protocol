@@ -67,6 +67,7 @@ export function portfolioStandaloneUrl(config: AimeatConfig, username: string): 
     const b = new URL(config.baseUrl);
     scheme = b.protocol.replace(':', '');
     portSuffix = b.port ? `:${b.port}` : '';
+  // eslint-disable-next-line aimeat/no-silent-catch -- keep https, no port
   } catch { /* keep https, no port */ }
   return `${scheme}://${label}.${config.portfolioHost}${portSuffix}/`;
 }

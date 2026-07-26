@@ -326,6 +326,7 @@ export async function mountRoutes(
         req.url = rewritten;
         req.originalUrl = rewritten;
       }
+    // eslint-disable-next-line aimeat/no-silent-catch -- auth verification happens later in requireAuth()
     } catch { /* auth verification happens later in requireAuth() */ }
     next();
   });

@@ -254,7 +254,7 @@ export class ConnectTunnelManager {
 
     const existing = this.connections.get(principal);
     if (existing) {
-      try { existing.ws.close(1000, 'replaced'); } catch { /* ignore */ }
+      try { existing.ws.close(1000, 'replaced'); } catch (err) { logger.warn('handleConnection: ignore', { error: String(err) }); }
       this.connections.delete(principal);
     }
     // Fresh session → fresh in-session dedup state (the replaced socket's close
@@ -348,7 +348,7 @@ export class ConnectTunnelManager {
         break;
       }
       case 'disconnect': {
-        try { conn.ws.close(1000, 'graceful'); } catch { /* ignore */ }
+        try { conn.ws.close(1000, 'graceful'); } catch (err) { logger.warn('handleConnection: ignore', { error: String(err) }); }
         break;
       }
       default: {
@@ -424,6 +424,7 @@ export class ConnectTunnelManager {
 
       const text = await res.text();
       let body: unknown;
+      // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
       try { body = text ? JSON.parse(text) : null; } catch { body = text; }
 
       this.send(conn.ws, { type: 'response', id, status: res.status, body });
@@ -639,7 +640,7 @@ export class ConnectTunnelManager {
       const [queued, active, pendingMessages] = await Promise.all([
         this.storage.listAgentTasks(principal, { status: 'queued' }),
         this.storage.listAgentTasks(principal, { status: 'active' }),
-        this.storage.listPendingMessages(principal).catch(() => []),
+        this.storage.listPendingMessages(principal).catch(err => { logger.warn('resolve: continuing after a suppressed failure', { error: String(err) }); return []; }),
       ]);
       // Dedup tasks by id (a task can't be both queued and active, but guard).
       const taskById = new Map<string, unknown>();
@@ -669,7 +670,7 @@ export class ConnectTunnelManager {
     for (const conn of this.connections.values()) {
       if (conn.rawToken !== rawToken) continue;
       this.send(conn.ws, { type: 'auth_revoked', message: 'Token revoked', timestamp: new Date().toISOString() });
-      try { conn.ws.close(1000, 'auth_revoked'); } catch { /* ignore */ }
+      try { conn.ws.close(1000, 'auth_revoked'); } catch (err) { logger.warn('onTokenRevoked: ignore', { error: String(err) }); }
       break;  // single-socket-per-principal — at most one match
     }
   }
@@ -723,7 +724,7 @@ export class ConnectTunnelManager {
       for (const [principal, conn] of this.connections) {
         if (now - conn.lastHeartbeat > offlineThreshold) {
           logger.warn('Connect tunnel heartbeat timeout', { event: 'connect_tunnel.timeout', principal, elapsed_ms: now - conn.lastHeartbeat });
-          try { conn.ws.close(1000, 'heartbeat_timeout'); } catch { /* ignore */ }
+          try { conn.ws.close(1000, 'heartbeat_timeout'); } catch (err) { logger.warn('startHeartbeatMonitor: ignore', { error: String(err) }); }
           this.connections.delete(principal);
           this.ackedDeliveries.delete(principal);
           this.clearSubscriptions(principal);
@@ -743,7 +744,7 @@ export class ConnectTunnelManager {
       this.heartbeatInterval = null;
     }
     for (const [principal, conn] of this.connections) {
-      try { conn.ws.close(1000, 'shutdown'); } catch { /* ignore */ }
+      try { conn.ws.close(1000, 'shutdown'); } catch (err) { logger.warn('shutdown: ignore', { error: String(err) }); }
       this.connections.delete(principal);
       this.clearSubscriptions(principal);
     }

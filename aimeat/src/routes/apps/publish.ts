@@ -31,6 +31,7 @@ import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-p
 import { lintAppHtmlForMobile } from '../../utils/app-mobile-lint.js';
 import { ensureAppSubdomain } from '../subdomains.js';
 import type { CanonicalOwner } from './helpers.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerPublishRoutes(
     router: Router,
@@ -286,7 +287,7 @@ export function registerPublishRoutes(
         // 404'd until someone hit the canonical URL (pitfall publish/new-app-subdomain-
         // provisioning-lag). Best-effort: a failed ensure never fails the publish.
         if (/\.html?$/i.test(filename)) {
-            try { await ensureAppSubdomain(storage, config, owner, filename); } catch { /* best-effort */ }
+            try { await ensureAppSubdomain(storage, config, owner, filename); } catch (err) { logger.warn('handler: best-effort', { error: String(err) }); }
         }
 
         // Handle optional screenshot upload (still uses file storage)
@@ -344,7 +345,7 @@ export function registerPublishRoutes(
                     reactions: {},
                     createdAt: now,
                 });
-            } catch { /* non-critical */ }
+            } catch (err) { logger.warn('handler: non-critical', { error: String(err) }); }
         }
 
         res.status(201).json(success(config.nodeId, {
@@ -375,6 +376,6 @@ export function registerPublishRoutes(
             summary: `App ${manifest.name || filename} ${isUpdate ? 'updated' : 'published'} (v${newVersion})`,
             detail: manifest.description || '',
             link: `${downloadUrl}?mode=inline`,
-        }).catch(() => { /* feed is best-effort */ });
+        }).catch(err => { logger.warn('handler: feed is best-effort', { error: String(err) }); });
     });
 }

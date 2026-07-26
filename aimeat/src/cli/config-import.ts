@@ -20,6 +20,7 @@ import { MUTABLE_CONFIG_MAP, isImmutable, parseConfigValue } from '../services/c
 import { createConsulConfigService } from '../services/consul-config.js';
 import { createStorage } from '../storage/storage-factory.js';
 import type { AimeatConfig } from '../config.js';
+import { logger } from '../utils/logger.js';
 
 interface ImportStats {
   mutable: string[];
@@ -43,7 +44,8 @@ function classifyValues(values: Record<string, string>): ImportStats {
         } else {
           unknown.push(dotPath); // Valid field but invalid value
         }
-      } catch {
+      } catch (err) {
+        logger.warn('config-import: suppressed failure, continuing', { error: String(err) });
         unknown.push(dotPath);
       }
     } else if (isImmutable(dotPath)) {

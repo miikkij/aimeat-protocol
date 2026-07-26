@@ -22,6 +22,7 @@ import { listPaymentHandlers, MORSEL_HANDLER_ID } from '../commerce/payment-hand
 import { TEST_MONEY_HANDLER_ID } from '../commerce/test-money-handler.js';
 import { percentFee } from '../commerce/money.js';
 import { recordMoneyPlatformFee } from '../commerce/session-service.js';
+import { logger } from '../utils/logger.js';
 
 /** The invoice/receivable rail that accrues real money without a live per-call PSP charge (prod EE). */
 const ACCRUAL_HANDLER_ID = 'io.aimeat.invoice';
@@ -92,5 +93,5 @@ export async function refundEntitlementMoney(
       buyerGhii: args.consumerGhii, amount: Math.max(0, Math.floor(args.priceMicros)), trackingCode: args.trackingCode,
       seller: { ghii: args.providerGhii, owner: ownerOf(args.providerGhii) },
     });
-  } catch { /* refund is best-effort; the handler contract says it must not throw, but guard anyway */ }
+  } catch (err) { logger.warn('refundEntitlementMoney: refund is best-effort; the handler contract says it must not throw, but guard anyway', { error: String(err) }); }
 }

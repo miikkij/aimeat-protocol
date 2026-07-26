@@ -18,6 +18,7 @@
  *   v1.0.0 -- 2026-06-09 -- Initial: hardened extractor with bomb + traversal + format guards.
  */
 import yauzl from 'yauzl';
+import { logger } from '../utils/logger.js';
 
 export type ZipSecurityCode =
   | 'NOT_A_ZIP' | 'TOO_MANY_FILES' | 'FILE_TOO_LARGE' | 'TOTAL_TOO_LARGE'
@@ -81,7 +82,7 @@ export function safeUnzip(buffer: Buffer, limits: SafeZipLimits): Promise<Map<st
       let fileCount = 0;
       let total = 0;
       let settled = false;
-      const fail = (e: ZipSecurityError) => { if (!settled) { settled = true; try { zipfile.close(); } catch { /* noop */ } reject(e); } };
+      const fail = (e: ZipSecurityError) => { if (!settled) { settled = true; try { zipfile.close(); } catch (err) { logger.warn('fail: noop', { error: String(err) }); } reject(e); } };
 
       zipfile.on('error', () => fail(new ZipSecurityError('READ_ERROR', 'Corrupt ZIP')));
       zipfile.on('entry', (entry: yauzl.Entry) => {

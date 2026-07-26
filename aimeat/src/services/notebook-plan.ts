@@ -22,6 +22,7 @@ import { stripCodeblock } from './llm-strip.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
 import { buildPlacementContext, type PlacementOrganism } from './notebook-classify.js';
 import { NOTEBOOK_PLAN_SYSTEM, NOTEBOOK_PLAN_TEMPLATE } from './notebook-plan-prompt.js';
+import { logger } from '../utils/logger.js';
 
 /** Step kinds the planner is allowed to emit (and the client can execute). `delegate` hands work to a
  *  fleet agent offer (async task); the others are self-run over OpenRouter + the librarian. */
@@ -66,7 +67,7 @@ async function loadPlanTemplate(storage: Storage): Promise<string> {
   try {
     const rec = await storage.getSystemPrompt('notebook-plan');
     if (rec && rec.active && typeof rec.content === 'string' && rec.content.trim()) return rec.content;
-  } catch { /* fall through to the code default */ }
+  } catch (err) { logger.warn('loadPlanTemplate: fall through to the code default', { error: String(err) }); }
   return NOTEBOOK_PLAN_TEMPLATE;
 }
 

@@ -376,7 +376,7 @@ export function registerRegisterLoginRoutes(
                 });
 
                 if (!verifyResp.ok) {
-                    const body = await verifyResp.json().catch(() => ({})) as Record<string, unknown>;
+                    const body = await verifyResp.json().catch(() => ({})) as Record<string, unknown>;   // eslint-disable-line aimeat/no-silent-catch -- body only enriches an error already reported
                     const errCode = (body as { error?: { code?: string } }).error?.code ?? 'FEDERATION_AUTH_FAILED';
                     const errMsg = (body as { error?: { message?: string } }).error?.message ?? 'Remote authentication failed';
                     res.status(verifyResp.status === 403 ? 403 : 401).json(

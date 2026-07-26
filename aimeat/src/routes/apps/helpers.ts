@@ -9,6 +9,7 @@
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { ensureAppSubdomain } from '../subdomains.js';
+import { logger } from '../../utils/logger.js';
 
 /**
  * The canonical-owner resolver closure built in appsRouter and passed to each route
@@ -31,6 +32,7 @@ export async function appOriginUrl(config: AimeatConfig, storage: Storage, owner
         const base = new URL(config.baseUrl);
         scheme = base.protocol.replace(':', '');
         portSuffix = base.port ? `:${base.port}` : '';
+    // eslint-disable-next-line aimeat/no-silent-catch -- keep https, no port
     } catch { /* keep https, no port */ }
     const bareOwner = owner.includes('@') ? owner.split('@')[0] : owner;
     try {
@@ -38,6 +40,6 @@ export async function appOriginUrl(config: AimeatConfig, storage: Storage, owner
         // (existing apps migrate transparently); fall back to the shared path form only if none is free.
         const sub = await ensureAppSubdomain(storage, config, bareOwner, filename);
         if (sub) return `${scheme}://${sub}.${config.appHost}${portSuffix}/`;
-    } catch { /* fall through to path form */ }
+    } catch (err) { logger.warn('appOriginUrl: fall through to path form', { error: String(err) }); }
     return `${scheme}://${config.appHost}${portSuffix}/${encodeURIComponent(bareOwner)}/${encodeURIComponent(filename)}`;
 }

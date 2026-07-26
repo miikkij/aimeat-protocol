@@ -598,7 +598,7 @@ export function registerExtensionsTools(
                 // Trigger capability aggregation so the extension appears immediately
                 import('../services/capability-aggregator.js')
                     .then(m => m.runCapabilityAggregation(config, storage))
-                    .catch(() => {});
+                    .catch(err => { logger.warn('scheduleNote: continuing after a suppressed failure', { error: String(err) }); });
 
                 logger.info(`Extension activated via MCP: ${name}`, { by: getAgentGaii() });
 

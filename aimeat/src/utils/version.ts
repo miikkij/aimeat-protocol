@@ -26,6 +26,7 @@ export function getSoftwareVersion(): string {
       const pkg = JSON.parse(readFileSync(path, 'utf-8')) as { name?: string; version?: string };
       if (pkg.version && (pkg.name === 'aimeat' || !pkg.name)) { cached = pkg.version; return cached; }
       if (pkg.version) { cached = pkg.version; return cached; }
+    // eslint-disable-next-line aimeat/no-silent-catch -- try next candidate
     } catch { /* try next candidate */ }
   }
   cached = 'unknown';

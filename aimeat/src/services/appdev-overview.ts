@@ -22,6 +22,7 @@ import { getLibraryPacks } from '../data/library-packs.js';
 import { getAppTemplateIndex } from '../data/app-templates.js';
 import { getAppdevPitfallIndex, getAppdevPitfallFacets } from '../data/appdev-pitfalls.js';
 import { listSkills, type SkillAccessor } from './skills.js';
+import { logger } from '../utils/logger.js';
 
 const CAP = 25;
 
@@ -149,8 +150,8 @@ export async function buildAppdevOverview(
     if (wanted.has('skills')) {
         const accessor: SkillAccessor = { ownerName: owner, gaii: callerGaii };
         const [nodeSkills, userSkills] = await Promise.all([
-            listSkills(storage, config, 'node', accessor).catch(() => []),
-            owner ? listSkills(storage, config, 'user', accessor, owner).catch(() => []) : Promise.resolve([]),
+            listSkills(storage, config, 'node', accessor).catch(err => { logger.warn('title: continuing after a suppressed failure', { error: String(err) }); return []; }),
+            owner ? listSkills(storage, config, 'user', accessor, owner).catch(err => { logger.warn('title: continuing after a suppressed failure', { error: String(err) }); return []; }) : Promise.resolve([]),
         ]);
         const builderFirst = [...nodeSkills].sort((a, b) =>
             (a.name === 'aimeat-app-builder' ? -1 : 0) - (b.name === 'aimeat-app-builder' ? -1 : 0));

@@ -27,6 +27,7 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth } from '../auth/middleware.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { cached } from '../services/cache.js';
+import { logger } from '../utils/logger.js';
 
 /** Page fetch caps — an unfurl only needs the <head>, so a small ceiling covers real pages. */
 const MAX_HTML_BYTES = 512 * 1024;      // 512 KB of HTML is plenty to reach the OG tags
@@ -47,7 +48,7 @@ async function readCapped(resp: Response, maxBytes: number): Promise<Buffer> {
     if (done) break;
     if (value) {
       total += value.length;
-      if (total > maxBytes) { try { await reader.cancel(); } catch { /* noop */ } break; }
+      if (total > maxBytes) { try { await reader.cancel(); } catch (err) { logger.warn('readCapped: noop', { error: String(err) }); } break; }
       chunks.push(value);
     }
   }
@@ -91,9 +92,11 @@ function parseMeta(html: string, originalUrl: string, resolvedUrl: string): Prev
   const rawImage = metaByKey(head, 'og:image') || metaByKey(head, 'og:image:url') || metaByKey(head, 'twitter:image');
   let image: string | null = null;
   if (rawImage) {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     try { image = new URL(rawImage, resolvedUrl).toString(); } catch { image = null; }
   }
   const siteName = metaByKey(head, 'og:site_name') || (() => {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     try { return new URL(resolvedUrl).hostname.replace(/^www\./, ''); } catch { return null; }
   })();
   return { url: originalUrl, resolvedUrl, title, description, image, siteName };
@@ -110,8 +113,9 @@ async function computePreview(rawUrl: string): Promise<Preview> {
   // A non-HTML target (a direct image/PDF/etc.) has no OG tags — return a bare, hostname-only preview so
   // the client can still show a minimal card (or skip it). Don't slurp the (possibly huge) body.
   if (!ctype.includes('text/html') && !ctype.includes('application/xhtml')) {
-    try { await resp.body?.cancel(); } catch { /* noop */ }
+    try { await resp.body?.cancel(); } catch (err) { logger.warn('ctype: noop', { error: String(err) }); }
     let siteName: string | null = null;
+    // eslint-disable-next-line aimeat/no-silent-catch -- noop
     try { siteName = new URL(resolvedUrl).hostname.replace(/^www\./, ''); } catch { /* noop */ }
     return { url: rawUrl, resolvedUrl, title: null, description: null, image: null, siteName };
   }
@@ -152,7 +156,7 @@ export function unfurlRouter(config: AimeatConfig): Router {
       });
       const ctype = (resp.headers.get('content-type') || '').toLowerCase();
       if (!ctype.startsWith('image/')) {
-        try { await resp.body?.cancel(); } catch { /* noop */ }
+        try { await resp.body?.cancel(); } catch (err) { logger.warn('ctype: noop', { error: String(err) }); }
         res.status(415).json(error(config.nodeId, 'NOT_AN_IMAGE', 'The URL did not resolve to an image.'));
         return;
       }

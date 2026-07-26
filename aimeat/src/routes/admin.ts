@@ -43,6 +43,7 @@ import { adminMemoryRouter } from './admin-memory.js';
 import { validatePasswordStrength } from '../utils/password-validation.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import { ADMIN_LOGIN_HTML, ADMIN_SETUP_HTML } from './admin/setup-html.js';
+import { logger } from '../utils/logger.js';
 
 export function adminRouter(
     config: AimeatConfig,
@@ -214,6 +215,7 @@ export function adminRouter(
                     amount: config.welcomeBonus,
                     timestamp: now,
                 });
+            // eslint-disable-next-line aimeat/no-silent-catch -- GHII record may already exist
             } catch { /* GHII record may already exist */ }
         } else {
             hasPassword = !!existingGhii.passwordHash;
@@ -418,7 +420,7 @@ export function adminRouter(
                 const v = r.value as { fee?: number; currency?: string } | undefined;
                 if (v?.currency && v.fee) operatorMoneyFees[v.currency] = (operatorMoneyFees[v.currency] ?? 0) + v.fee;
             }
-        } catch { /* commerce metrics must never break the dashboard */ }
+        } catch (err) { logger.warn('GET /v1/admin/dashboard: commerce metrics must never break the dashboard', { error: String(err) }); }
 
         // Inflation rate = net new morsels over 30d as % of current supply
         const netNew30d = minted30d - burned30d;
@@ -639,6 +641,7 @@ export function adminRouter(
                 try {
                     const oldListing = await storage.getListingByPackage(groupId);
                     if (oldListing) await storage.deleteTemplateListing(oldListing.id);
+                // eslint-disable-next-line aimeat/no-silent-catch -- no listing to delete
                 } catch { /* no listing to delete */ }
 
                 const { pkg, listing } = buildRecords(def, operator, operatorGhii);

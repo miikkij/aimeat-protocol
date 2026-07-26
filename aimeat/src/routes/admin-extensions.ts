@@ -66,7 +66,8 @@ function readBundledExtensions(): BundledExtensionInfo[] {
     entries = readdirSync(dir, { withFileTypes: true })
       .filter(d => d.isDirectory())
       .map(d => d.name);
-  } catch {
+  } catch (err) {
+    logger.warn('admin-extensions: suppressed failure, continuing', { error: String(err) });
     return [];
   }
 

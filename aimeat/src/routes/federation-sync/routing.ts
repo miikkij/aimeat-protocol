@@ -121,7 +121,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     signal: AbortSignal.timeout(30_000),
                 });
 
-                const data = await response.json().catch(() => null);
+                const data = await response.json().catch(err => { logger.warn('buildLocalHop: continuing after a suppressed failure', { error: String(err) }); return null; });
                 await chargeRoutingFee();
 
                 // F.2: Add hop signing for direct peer routing
@@ -182,7 +182,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 });
 
                 if (response.ok) {
-                    const data = await response.json().catch(() => null);
+                    const data = await response.json().catch(err => { logger.warn('buildLocalHop: continuing after a suppressed failure', { error: String(err) }); return null; });
                     await chargeRoutingFee();
 
                     // F.2: Add hop signing for multi-hop relay routing
@@ -200,8 +200,9 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     emitChange('federation');
                     return;
                 }
-            } catch {
+            } catch (err) {
                 // Try next relay
+              logger.warn('buildLocalHop: continuing after a suppressed failure', { error: String(err) });
             }
         }
 
@@ -262,8 +263,9 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                     }));
                     return;
                 }
-            } catch {
+            } catch (err) {
                 // Continue to next peer
+              logger.warn('GET /v1/federation/resolve/:gaii: continuing after a suppressed failure', { error: String(err) });
             }
         }
 
@@ -326,7 +328,7 @@ export function registerRoutingRoutes(router: Router, config: AimeatConfig, stor
                 signal: AbortSignal.timeout(30_000),
             });
 
-            const data = await response.json().catch(() => null);
+            const data = await response.json().catch(err => { logger.warn('POST /v1/federation/cross-node/work: continuing after a suppressed failure', { error: String(err) }); return null; });
 
             // Charge 1 morsel routing fee
             const requesterGaii = req.auth!.sub;

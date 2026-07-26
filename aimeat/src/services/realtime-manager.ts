@@ -161,7 +161,7 @@ export class RealtimeManager {
     this.storage.updateRealtimeRoom(roomId, {
       peerCount: room.peers.size,
       lastActivityAt: room.lastActivityAt.toISOString(),
-    }).catch(() => { });
+    }).catch(err => { logger.warn('joinRoom: continuing after a suppressed failure', { error: String(err) }); });
 
     // Notify the new peer
     const peerList = [...room.peers.values()]
@@ -229,6 +229,7 @@ export class RealtimeManager {
         this.metricsMessagesIn++;
         const msg: RealtimeMessage = JSON.parse(raw);
         this.handleMessage(peerId, roomId, msg);
+      // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
       } catch {
         this.sendToWs(ws, { type: 'error', code: 'INVALID_MESSAGE', message: 'Could not parse message' });
       }
@@ -276,7 +277,7 @@ export class RealtimeManager {
       this.storage.updateRealtimeRoom(roomId, {
         peerCount: room.peers.size,
         lastActivityAt: new Date().toISOString(),
-      }).catch(() => { });
+      }).catch(err => { logger.warn('joinRoom: continuing after a suppressed failure', { error: String(err) }); });
 
       // Auto-delete empty rooms
       if (room.peers.size === 0) {
@@ -287,7 +288,7 @@ export class RealtimeManager {
           if (id === roomId) { this.roomNameIndex.delete(name); break; }
         }
         this.rooms.delete(roomId);
-        this.storage.deleteRealtimeRoom(roomId).catch(() => { });
+        this.storage.deleteRealtimeRoom(roomId).catch(err => { logger.warn('joinRoom: continuing after a suppressed failure', { error: String(err) }); });
         logger.info('Realtime room auto-deleted (empty)', { roomId });
       }
     }
@@ -540,7 +541,7 @@ export class RealtimeManager {
     for (const [roomId, room] of this.rooms) {
       if (room.peers.size === 0 && now - room.lastActivityAt.getTime() > maxIdle) {
         this.rooms.delete(roomId);
-        this.storage.deleteRealtimeRoom(roomId).catch(() => { });
+        this.storage.deleteRealtimeRoom(roomId).catch(err => { logger.warn('cleanupInactiveRooms: continuing after a suppressed failure', { error: String(err) }); });
         cleaned++;
       }
     }
@@ -633,7 +634,8 @@ export class RealtimeManager {
       if (!Array.isArray(rooms)) return [];
       // Tag each room with origin node
       return rooms.map(r => ({ ...r, origin_node: peerUrl }));
-    } catch {
+    } catch (err) {
+      logger.warn('realtime-manager: suppressed failure, continuing', { error: String(err) });
       return [];
     }
   }
@@ -689,6 +691,7 @@ export class RealtimeManager {
             msg.from = `relay:${msg.from ?? 'unknown'}`;
             this.broadcastToRoom(localRoomId, '', msg);
           }
+        // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
         } catch {
           // Skip unparseable messages
         }

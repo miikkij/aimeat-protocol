@@ -240,7 +240,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
             // Existing session — update lastSeen for session tracking
             const ciId = sessionChatInstances.get(sessionId);
             if (ciId) {
-                storage.updateChatInstance(ciId, { lastSeen: new Date().toISOString() }).catch(() => { });
+                storage.updateChatInstance(ciId, { lastSeen: new Date().toISOString() }).catch(err => { logger.warn('handleMcpPost: continuing after a suppressed failure', { error: String(err) }); });
             }
             // Refresh the session's bearer token from THIS request before dispatching: the client
             // rotates its access token mid-session, and capability invocation re-presents it.

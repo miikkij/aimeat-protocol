@@ -12,6 +12,7 @@ import type { Storage, CapabilityRecord, CapabilityFilter } from '../storage/int
 import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
+import { logger } from '../utils/logger.js';
 
 function redactInput(input: Record<string, unknown>, redactedFields: string[]): Record<string, unknown> {
   if (!redactedFields.length) return input;
@@ -236,7 +237,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
         id: randomUUID(), capabilityId: cap.id, callerGhii,
         input: logInput, status: 'success', durationMs: result.duration_ms,
         error: null, timestamp: new Date().toISOString(),
-      }).catch(() => {});
+      }).catch(err => { logger.warn('mode: continuing after a suppressed failure', { error: String(err) }); });
 
       res.json(success(config.nodeId, result));
     } catch (err) {
@@ -247,14 +248,14 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
 
       storage.incrementCapabilityStats(cap.id, {
         success: 0, error: 1, totalMs: 0, lastError: message,
-      }).catch(() => {});
+      }).catch(err => { logger.warn('mode: continuing after a suppressed failure', { error: String(err) }); });
 
       // On error, log full input for debugging (regardless of redaction)
       storage.addCapabilityLog({
         id: randomUUID(), capabilityId: cap.id, callerGhii,
         input, status: 'error', durationMs: 0,
         error: message, timestamp: new Date().toISOString(),
-      }).catch(() => {});
+      }).catch(err => { logger.warn('mode: continuing after a suppressed failure', { error: String(err) }); });
 
       res.status(statusCode).json(error(config.nodeId, code, message));
     }

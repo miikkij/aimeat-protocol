@@ -77,6 +77,7 @@ export async function executeHooks(
                 });
 
                 if (!response.ok) {
+                    // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
                     const body = await response.text().catch(() => '');
                     logger.info(`Extension hook ${hookName}: action "${actionRef}" rejected`, { status: response.status, body });
                     return {
@@ -86,6 +87,7 @@ export async function executeHooks(
                     };
                 }
 
+                // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
                 const result = await response.json().catch(() => ({})) as Record<string, unknown>;
                 if (result.allowed === false) {
                     return {

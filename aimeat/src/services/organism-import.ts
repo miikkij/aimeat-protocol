@@ -18,6 +18,7 @@ import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { unzipBuffer, restoreWorkspace } from './workspace-import.js';
 import { ORG_EXPORT_VERSION } from './organism-export.js';
+import { logger } from '../utils/logger.js';
 
 interface OrgJson {
   aimeatOrganismExport: string;
@@ -93,13 +94,14 @@ export async function restoreOrganismFromFiles(
     const jb = files.get(`${folder}/workspace.json`);
     if (!jb) continue;
     let data;
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     try { data = JSON.parse(jb.toString('utf8')); } catch { continue; }
     const imgs = new Map<string, Buffer>();
     for (const [fname, buf] of files) if (fname.startsWith(`${folder}/images/`)) imgs.set(fname.slice(folder.length + 1), buf);
     try {
       const r = await restoreWorkspace(storage, config, { orgId: id, importerGaii, importerOwner, data, images: imgs });
       restored.push({ from: w.ws, ws: r.ws });
-    } catch { /* skip a workspace that fails to restore */ }
+    } catch (err) { logger.warn('name: skip a workspace that fails to restore', { error: String(err) }); }
   }
 
   return { organism_id: id, name, workspaces: restored };

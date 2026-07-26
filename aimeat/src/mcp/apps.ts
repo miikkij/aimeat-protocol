@@ -59,15 +59,18 @@ export function registerAppsTools(
             // the anonymous serve path serves — so an agent that published the face under its own GAII still
             // reports agent_face_present:true here.
             const [faceRec, boundSkills] = await Promise.all([
-                getOwnerScopePublicMemory(storage, config.nodeId, ownerName, agentFaceKey(filename)).catch(() => null),
-                listSkillsByBinding(storage, config, `app:${ownerName}/${filename}`, { ownerName }).catch(() => []),
+                getOwnerScopePublicMemory(storage, config.nodeId, ownerName, agentFaceKey(filename)).catch(err => { logger.warn('buildNextSteps: continuing after a suppressed failure', { error: String(err) }); return null; }),
+                listSkillsByBinding(storage, config, `app:${ownerName}/${filename}`, { ownerName }).catch(err => { logger.warn('buildNextSteps: continuing after a suppressed failure', { error: String(err) }); return []; }),
             ]);
             return {
                 agent_face_present: !!faceRec,
                 bound_skills_count: boundSkills.length,
                 template_proposal_hint: 'If anything here generalizes, record it: aimeat_app_template_propose (with your model id). Finish checklist: agent face published, a skill bound (metadata.binding app:owner/filename), learnings reported via aimeat_appdev_pitfall_report.',
             };
-        } catch { return undefined; }
+        } catch (err) {
+          logger.warn('buildNextSteps: continuing after a suppressed failure', { error: String(err) });
+          return undefined;
+        }
     }
 
     // ── Tool 1: aimeat_app_publish ──

@@ -140,6 +140,7 @@ async function verifyPendingToken(token: string): Promise<PendingSignup | null> 
       existingHint: typeof payload.existingHint === 'string' ? payload.existingHint : null,
     };
   } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     return null;
   }
 }

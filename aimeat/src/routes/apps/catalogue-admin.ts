@@ -23,6 +23,7 @@ import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { decodeWatermark } from '../../utils/app-protect.js';
 import { scanCatalogForCopies } from '../../services/app-similarity.js';
 import type { CanonicalOwner } from './helpers.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerCatalogueAdminRoutes(
     router: Router,
@@ -290,7 +291,7 @@ export function registerCatalogueAdminRoutes(
             const app = await storage.getAppByOwnerName(owner, filename);
             if (!app || app.ownerName !== owner) break;
             await storage.deleteApp(app.ownerGaii, filename);
-            await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`).catch(() => {});
+            await storage.deleteStorageFile(app.ownerGaii, `apps/screenshots/${filename}`).catch(err => { logger.warn('DELETE /v1/admin/apps/:owner/:filename: continuing after a suppressed failure', { error: String(err) }); });
             sweepCount++;
             if (sweepCount > 10) break; // safety cap, no real owner has >10 buckets
         }

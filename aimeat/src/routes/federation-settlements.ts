@@ -152,7 +152,7 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
 
                 // Credit relay nodes their shares
                 for (const share of relayDistribution.relay_shares) {
-                    const relayAgent = await storage.getAgent(share.node_id).catch(() => null);
+                    const relayAgent = await storage.getAgent(share.node_id).catch(err => { logger.warn('POST /v1/federation/settle: continuing after a suppressed failure', { error: String(err) }); return null; });
                     if (relayAgent) {
                         await storage.creditBalance(relayAgent.gaii, share.amount);
                         await storage.addTransaction({
@@ -269,7 +269,7 @@ export function federationSettlementsRouter(config: AimeatConfig, storage: Stora
                 signal: AbortSignal.timeout(30_000),
             });
 
-            const data = await response.json().catch(() => null);
+            const data = await response.json().catch(err => { logger.warn('POST /v1/federation/settle/outbound: continuing after a suppressed failure', { error: String(err) }); return null; });
 
             if (response.ok) {
                 logger.info(`Outbound settlement sent: ${amount} morsels for ${gaii} to node ${target_node} (tc: ${tracking_code})`);

@@ -159,6 +159,7 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
       }
 
       if (!resp.ok) {
+        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error message that is already being reported; an unreadable body is honestly reported as empty
         const body = await resp.text().catch(() => '');
         return { success: false, error: `HTTP ${resp.status}: ${body}` };
       }
@@ -201,8 +202,9 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
           trustScore: 100,
           morselBalance: 0,
         });
-      } catch {
+      } catch (err) {
         // Agent may already exist from another concurrent sync
+        logger.warn('storeGenesisEntries: continuing after a suppressed failure', { error: String(err) });
       }
     }
 
@@ -239,8 +241,9 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
           removed++;
         }
       }
-    } catch {
+    } catch (err) {
       // listMemory with prefix may not return results if no entries exist yet
+      logger.warn('entryId: continuing after a suppressed failure', { error: String(err) });
     }
 
     return { stored, removed };
@@ -317,12 +320,14 @@ export function createGenesisSyncService(config: AimeatConfig, storage: Storage)
               });
 
               totalSent++;
-            } catch {
+            } catch (err) {
               // Skip individual failures
+              logger.warn('syncSubscribedMemory: continuing after a suppressed failure', { error: String(err) });
             }
           }
-        } catch {
+        } catch (err) {
           // Skip agent on error
+          logger.warn('syncSubscribedMemory: continuing after a suppressed failure', { error: String(err) });
         }
       }
     }

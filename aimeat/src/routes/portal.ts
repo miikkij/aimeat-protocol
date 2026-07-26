@@ -71,6 +71,7 @@ import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } f
 function templateVars(config: AimeatConfig, locale: 'en' | 'fi'): Record<string, string> {
   // Derive nodeName from baseUrl host (e.g. "https://aimeat.io" -> "aimeat.io").
   let nodeName = config.nodeId;
+  // eslint-disable-next-line aimeat/no-silent-catch -- keep nodeId fallback
   try { nodeName = new URL(config.baseUrl).host; } catch { /* keep nodeId fallback */ }
 
   const mcpUrl = `${config.baseUrl}/v1/mcp`;

@@ -26,6 +26,7 @@ import { collectWorkspaceSummary } from './structure-overview.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
 import { NOTEBOOK_CLASSIFY_SYSTEM, NOTEBOOK_CLASSIFY_TEMPLATE } from './notebook-classify-prompt.js';
 import { NOTEBOOK_DISTRIBUTE_SYSTEM, NOTEBOOK_DISTRIBUTE_TEMPLATE } from './notebook-distribute-prompt.js';
+import { logger } from '../utils/logger.js';
 
 export interface PlacementSpace { namespace: string; name: string; examples?: string[] }
 export interface PlacementWorkspace { id: string; name: string; documentSpaces: PlacementSpace[] }
@@ -106,7 +107,7 @@ async function loadClassifyTemplate(storage: Storage): Promise<string> {
   try {
     const rec = await storage.getSystemPrompt('notebook-classify');
     if (rec && rec.active && typeof rec.content === 'string' && rec.content.trim()) return rec.content;
-  } catch { /* fall through to the code default */ }
+  } catch (err) { logger.warn('loadClassifyTemplate: fall through to the code default', { error: String(err) }); }
   return NOTEBOOK_CLASSIFY_TEMPLATE;
 }
 
@@ -202,7 +203,7 @@ async function loadDistributeTemplate(storage: Storage): Promise<string> {
   try {
     const rec = await storage.getSystemPrompt('notebook-distribute');
     if (rec && rec.active && typeof rec.content === 'string' && rec.content.trim()) return rec.content;
-  } catch { /* fall through to the code default */ }
+  } catch (err) { logger.warn('loadDistributeTemplate: fall through to the code default', { error: String(err) }); }
   return NOTEBOOK_DISTRIBUTE_TEMPLATE;
 }
 

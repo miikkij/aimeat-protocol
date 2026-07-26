@@ -16,6 +16,7 @@ import { sign, verify } from '../../auth/keypair.js';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { emitChange } from '../../services/event-bus.js';
 import { peerKeyCache } from '../../services/federation-helpers.js';
+import { logger } from '../../utils/logger.js';
 import {
     getActivePolicy, storeActivePolicy, coercePolicy, policySignString,
     type NetworkPolicyDoc,
@@ -83,7 +84,7 @@ export function registerPolicyBookRoutes(router: Router, config: AimeatConfig, s
             res.status(403).json(error(config.nodeId, 'UNKNOWN_ISSUER', `Policy issuer ${doc.issued_by} is not a known peer`));
             return;
         }
-        const sigOk = doc.signature ? await verify(issuerKey, policySignString(doc), doc.signature).catch(() => false) : false;
+        const sigOk = doc.signature ? await verify(issuerKey, policySignString(doc), doc.signature).catch(err => { logger.warn('source: continuing after a suppressed failure', { error: String(err) }); return false; }) : false;
         if (!sigOk) {
             res.status(401).json(error(config.nodeId, 'INVALID_SIGNATURE', 'Policy signature verification failed'));
             return;

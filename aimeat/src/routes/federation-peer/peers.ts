@@ -143,7 +143,8 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
                 let valid: boolean;
                 try {
                     valid = await verify(peer.publicKey, messageToVerify, signature);
-                } catch {
+                } catch (err) {
+                  logger.warn('peers: suppressed failure, continuing', { error: String(err) });
                     valid = false;
                 }
                 if (!valid) {
@@ -196,7 +197,8 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
             let valid: boolean;
             try {
                 valid = await verify(peer.publicKey, presenceSignString(from_node_id, timestamp, updates as PresenceUpdate[]), signature);
-            } catch {
+            } catch (err) {
+              logger.warn('peers: suppressed failure, continuing', { error: String(err) });
                 valid = false;
             }
             if (!valid) {
@@ -213,7 +215,7 @@ export function registerPeersRoutes(router: Router, config: AimeatConfig, storag
     router.get('/v1/federation/peers', requireAuth(), requireRole('operator'), async (_req, res) => {
         // Compute promotion eligibility for visiting peers (one work scan + policy fetch reused).
         const policy = await getActivePolicy(storage);
-        const allWork = await storage.listAllWork().catch(() => []) as unknown as { status: string; providerGaii: string; requesterGaii: string }[];
+        const allWork = await storage.listAllWork().catch(err => { logger.warn('GET /v1/federation/peers: continuing after a suppressed failure', { error: String(err) }); return []; }) as unknown as { status: string; providerGaii: string; requesterGaii: string }[];
         const peerList = await Promise.all([...peers.values()].map(async p => {
             let promotion_eligible: boolean | undefined;
             let promotion_failing: string[] | undefined;

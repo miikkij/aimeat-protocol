@@ -70,7 +70,8 @@ function isValidCron(cron: string, timezone?: string): boolean {
     const ok = !!c.nextRun();
     c.stop();
     return ok;
-  } catch {
+  } catch (err) {
+    logger.warn('schedules: suppressed failure, continuing', { error: String(err) });
     return false;
   }
 }
@@ -425,6 +426,7 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
           const c = new Cron(job.cron, opts);
           runs = c.nextRuns(PER_SCHEDULE, from);
           c.stop();
+        // eslint-disable-next-line aimeat/no-silent-catch -- cadence classification only: an expression that cannot be enumerated is skipped here and the schedule itself is untouched
         } catch { continue; }
         if (runs.length === 0) continue;
 

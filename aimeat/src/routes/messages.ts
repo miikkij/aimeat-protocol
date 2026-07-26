@@ -53,6 +53,7 @@ import { resolveAudience, sendBroadcast, broadcastToFederation } from '../servic
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 import { createMessagingDbService } from '../services/db/messaging-db-service.js';
 import { createMessagesInboxService } from '../services/db/messages-inbox-db-service.js';
+import { logger } from '../utils/logger.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
   const router = Router();
@@ -272,7 +273,7 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     const asAgent = String(req.query.agent || '').trim();
     let readAs = ghii;
     if (asAgent) {
-      const agents = await storage.getAgentsByOwner(req.auth!.owner).catch(() => []);
+      const agents = await storage.getAgentsByOwner(req.auth!.owner).catch(err => { logger.warn('GET /v1/messages/conversations/:conversationId: continuing after a suppressed failure', { error: String(err) }); return []; });
       if (!agents.some(a => a.gaii === asAgent)) {
         res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Not one of your agents'));
         return;

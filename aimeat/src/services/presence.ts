@@ -182,7 +182,7 @@ export class PresenceTracker {
       try {
         const rec = await this.storage.getMemory(ghii, PRESENCE_CONFIG_KEY);
         if (rec) cfg = normalizeConfig(rec.value);
-      } catch { /* defaults stand */ }
+      } catch (err) { logger.warn('getConfig: defaults stand', { error: String(err) }); }
     }
     this.configCache.set(ghii, { cfg, exp: Date.now() + CONFIG_CACHE_TTL_MS });
     return cfg;
@@ -194,7 +194,7 @@ export class PresenceTracker {
     const next = normalizeConfig({ ...current, ...partial });
     if (this.storage) {
       const now = new Date().toISOString();
-      const existing = await this.storage.getMemory(ghii, PRESENCE_CONFIG_KEY).catch(() => null);
+      const existing = await this.storage.getMemory(ghii, PRESENCE_CONFIG_KEY).catch(err => { logger.warn('setConfig: continuing after a suppressed failure', { error: String(err) }); return null; });
       await this.storage.setMemory({
         key: PRESENCE_CONFIG_KEY,
         ownerGaii: ghii,
@@ -296,7 +296,7 @@ export class PresenceTracker {
     if (cached && cached.exp > Date.now()) return cached.lastSeen;
     let lastSeen: string | null = null;
     if (this.storage) {
-      try { lastSeen = (await this.storage.getAgent(gaii))?.lastSeen ?? null; } catch { /* none */ }
+      try { lastSeen = (await this.storage.getAgent(gaii))?.lastSeen ?? null; } catch (err) { logger.warn('getVisibleMany: none', { error: String(err) }); }
     }
     this.agentSeenCache.set(gaii, { lastSeen, exp: Date.now() + AGENT_SEEN_CACHE_TTL_MS });
     return lastSeen;
@@ -307,7 +307,8 @@ export class PresenceTracker {
     try {
       const convs = await this.storage.listConversations(targetGhii);
       return convs.some(c => c.peerGhii === viewerGhii);
-    } catch {
+    } catch (err) {
+      logger.warn('presence: suppressed failure, continuing', { error: String(err) });
       return false;
     }
   }
@@ -405,7 +406,8 @@ export class PresenceTracker {
         signal: AbortSignal.timeout(this.config.federationTimeoutMs ?? 5_000),
       });
       return resp.ok;
-    } catch {
+    } catch (err) {
+      logger.warn('presence: suppressed failure, continuing', { error: String(err) });
       return false; // peer health is tracked by the federation heartbeat, not here
     }
   }

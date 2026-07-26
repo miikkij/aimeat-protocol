@@ -16,6 +16,7 @@
 import { readFileSync, writeFileSync, existsSync, unlinkSync, mkdirSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { getConfigDir } from './config.js';
+import { logger } from '../../utils/logger.js';
 
 function tokensDir(): string {
   const dir = join(getConfigDir(), 'tokens');
@@ -72,7 +73,8 @@ export async function listAllTokens(): Promise<StoredCredential[]> {
   let entries: string[];
   try {
     entries = readdirSync(dir);
-  } catch {
+  } catch (err) {
+    logger.warn('keychain: suppressed failure, continuing', { error: String(err) });
     return [];
   }
   const out: StoredCredential[] = [];
@@ -83,7 +85,7 @@ export async function listAllTokens(): Promise<StoredCredential[]> {
       const token = readFileSync(join(dir, name), 'utf-8').trim();
       if (!token) continue;
       out.push({ agent: parsed.agent, owner: parsed.owner, token });
-    } catch { /* unreadable file, skip */ }
+    } catch (err) { logger.warn('listAllTokens: unreadable file, skip', { error: String(err) }); }
   }
   return out;
 }

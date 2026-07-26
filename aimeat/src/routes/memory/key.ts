@@ -21,6 +21,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, memoryDb, stats, peers, resolve, workspaceAccess } = ctx;
@@ -287,8 +288,10 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     // C.3: Event-driven replication queue integration
     if (peers) {
-      enqueueMemoryReplication(effectiveGaii, key, config, storage, peers).catch(() => {
-        // Non-critical — will be picked up by scheduled sync
+      enqueueMemoryReplication(effectiveGaii, key, config, storage, peers).catch(err => {
+        // Non-critical for THIS request: the scheduled sync picks the record up later. Logged because an
+        // enqueue that keeps failing means replication runs only at sync cadence.
+        logger.warn('memory write: replication enqueue failed, leaving it to the scheduled sync', { error: String(err) });
       });
     }
 
@@ -394,8 +397,10 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     // C.3: Event-driven replication queue integration
     if (peers) {
-      enqueueMemoryReplication(record.ownerGaii, record.key, config, storage, peers).catch(() => {
-        // Non-critical — will be picked up by scheduled sync
+      enqueueMemoryReplication(record.ownerGaii, record.key, config, storage, peers).catch(err => {
+        // Non-critical for THIS request: the scheduled sync picks the record up later. Logged because an
+        // enqueue that keeps failing means replication runs only at sync cadence.
+        logger.warn('memory write: replication enqueue failed, leaving it to the scheduled sync', { error: String(err) });
       });
     }
 

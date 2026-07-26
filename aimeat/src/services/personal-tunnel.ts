@@ -58,7 +58,7 @@ export class TunnelManager {
     // Close existing connection for this nodeId if any
     const existing = this.connections.get(nodeId);
     if (existing) {
-      try { existing.ws.close(1000, 'replaced'); } catch { /* ignore */ }
+      try { existing.ws.close(1000, 'replaced'); } catch (err) { logger.warn('handleConnection: ignore', { error: String(err) }); }
     }
 
     const conn: PersonalNodeConnection = {
@@ -187,7 +187,7 @@ export class TunnelManager {
         conn.ws.send(JSON.stringify(ack));
         // Update lastSeen
         this.storage.updatePersonalNode(nodeId, { lastSeen: new Date().toISOString() })
-          .catch(() => { /* ignore */ });
+          .catch(err => { logger.warn('handleConnection: ignore', { error: String(err) }); });
         break;
       }
 
@@ -209,7 +209,7 @@ export class TunnelManager {
           try {
             const itemIds: string[] = JSON.parse(msg.payload);
             for (const id of itemIds) {
-              this.storage.deleteMailboxItem(id).catch(() => { /* ignore */ });
+              this.storage.deleteMailboxItem(id).catch(err => { logger.warn('handleConnection: ignore', { error: String(err) }); });
             }
             const stats3 = getStats();
             if (stats3) {
@@ -218,7 +218,7 @@ export class TunnelManager {
             const prom3 = getPromMetrics();
             if (prom3) prom3.mailboxDeliveredTotal.inc(itemIds.length);
             logger.info('Mailbox items acknowledged and deleted', { nodeId, count: itemIds.length });
-          } catch { /* ignore parse errors */ }
+          } catch (err) { logger.warn('handleConnection: ignore parse errors', { error: String(err) }); }
         }
         break;
       }
@@ -240,7 +240,7 @@ export class TunnelManager {
         this.storage.updatePersonalNode(nodeId, {
           status: 'offline',
           lastSeen: new Date().toISOString(),
-        }).catch(() => { /* ignore */ });
+        }).catch(err => { logger.warn('handleConnection: ignore', { error: String(err) }); });
         logger.info('Personal node gracefully disconnected', {
           event: 'tunnel.disconnect',
           personal_node_id: nodeId,
@@ -382,7 +382,7 @@ export class TunnelManager {
           this.storage.updatePersonalNode(nodeId, {
             status: 'offline',
             lastSeen: new Date(conn.lastHeartbeat).toISOString(),
-          }).catch(() => { /* ignore */ });
+          }).catch(err => { logger.warn('startHeartbeatMonitor: ignore', { error: String(err) }); });
         } else if (elapsed > offlineThreshold * 0.6) {
           // Degraded — heartbeat is late but not dead
           logger.warn('Personal node heartbeat late', {
@@ -390,7 +390,7 @@ export class TunnelManager {
             personal_node_id: nodeId,
             elapsed_ms: elapsed,
           });
-          this.storage.updatePersonalNode(nodeId, { status: 'degraded' }).catch(() => { /* ignore */ });
+          this.storage.updatePersonalNode(nodeId, { status: 'degraded' }).catch(err => { logger.warn('startHeartbeatMonitor: ignore', { error: String(err) }); });
         }
       }
     }, checkInterval);
@@ -415,7 +415,7 @@ export class TunnelManager {
     for (const [nodeId, conn] of this.connections) {
       try {
         conn.ws.close(1000, 'shutdown');
-      } catch { /* ignore */ }
+      } catch (err) { logger.warn('shutdown: ignore', { error: String(err) }); }
       this.connections.delete(nodeId);
     }
 

@@ -148,7 +148,7 @@ export function perfTraceMiddleware(enabled: boolean): RequestHandler {
       if (!headerSet) {
         headerSet = true;
         if (!res.headersSent) {
-          try { res.setHeader('X-Aimeat-Perf', summarize(store)); } catch { /* headers already locked */ }
+          try { res.setHeader('X-Aimeat-Perf', summarize(store)); } catch (err) { logger.warn('patchedWriteHead: headers already locked', { error: String(err) }); }
         }
       }
       return origWriteHead(...args);

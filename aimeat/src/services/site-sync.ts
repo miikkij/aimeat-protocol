@@ -126,6 +126,7 @@ export function startSiteSyncJob(config: AimeatConfig, storage: Storage, siteSer
     const intervalMs = config.siteLbSyncIntervalMin * 60 * 1000;
 
     const runSync = () => {
+        // eslint-disable-next-line aimeat/no-silent-catch -- triggerSiteSync already logs the failure; logging again would double-report one event
         triggerSiteSync(config, storage, siteService).catch(() => {
             // Error already logged in triggerSiteSync
         });

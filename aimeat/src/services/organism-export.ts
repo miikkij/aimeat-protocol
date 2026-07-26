@@ -22,6 +22,7 @@ import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
 import { collectWorkspace } from './workspace-export.js';
 import { listOrganismWorkspaceEntries } from './workspace-meta.js';
+import { logger } from '../utils/logger.js';
 
 export const ORG_EXPORT_VERSION = '1.0';
 
@@ -66,7 +67,7 @@ export async function exportOrganism(
       archive.append(JSON.stringify(json, null, 2), { name: `${folder}/workspace.json` });
       (orgJson.workspaces as Array<{ ws: string; name: string; folder: string }>).push({ ws: w.id, name: json.name, folder });
       count++;
-    } catch { /* skip a workspace the exporter can't read */ }
+    } catch (err) { logger.warn('exportOrganism: skip a workspace the exporter cant read', { error: String(err) }); }
   }
 
   archive.append(JSON.stringify(orgJson, null, 2), { name: 'organism.json' });

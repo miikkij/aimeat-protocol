@@ -562,6 +562,7 @@ export async function askAllAdvancedSettings(
       let appHostDefault = '';
       try {
         appHostDefault = `apps.${new URL(baseUrl).hostname}`;
+      // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
       } catch {
         appHostDefault = '';
       }
@@ -595,6 +596,7 @@ export async function askAllAdvancedSettings(
       let portfolioHostDefault = '';
       try {
         portfolioHostDefault = `portfolio.${new URL(baseUrl).hostname}`;
+      // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
       } catch {
         portfolioHostDefault = '';
       }

@@ -21,6 +21,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, SiteChangeLogEntry } from '../storage/interface.js';
 import { getSiteSyncState } from './site-sync.js';
 import { substituteVariables, resolvePromptContent } from './prompt-variables.js';
+import { logger } from '../utils/logger.js';
 
 const __dirname_site = dirname(fileURLToPath(import.meta.url));
 
@@ -322,7 +323,8 @@ export class SiteService {
             return records
                 .filter(r => r.key.startsWith('portal/'))
                 .map(r => r.key);
-        } catch {
+        } catch (err) {
+          logger.warn('site: suppressed failure, continuing', { error: String(err) });
             return [];
         }
     }
@@ -333,7 +335,8 @@ export class SiteService {
             return records
                 .filter(r => r.key.startsWith('portal/'))
                 .map(r => ({ key: r.key, value: r.value }));
-        } catch {
+        } catch (err) {
+          logger.warn('site: suppressed failure, continuing', { error: String(err) });
             return [];
         }
     }
@@ -358,8 +361,9 @@ export class SiteService {
                     if (Array.isArray(raw.hidden)) storedHidden = raw.hidden.filter((id: unknown) => typeof id === 'string');
                 }
             }
-        } catch {
+        } catch (err) {
             // Corrupt JSON or storage miss → fall back to defaults below.
+          logger.warn('getHeaderNav: continuing after a suppressed failure', { error: String(err) });
         }
         // Normalize: keep known stored ids in order, then append any known ids not yet listed.
         const order = storedOrder.filter(id => known.includes(id));

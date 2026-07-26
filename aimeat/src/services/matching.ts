@@ -190,7 +190,7 @@ export function createMatchingEngine(
         try {
           const rec = await storage.getGHII(entry.ghii);
           if (rec) ownerByGhii.set(entry.ghii, rec.ownerName);
-        } catch { /* skip profiles we can't resolve */ }
+        } catch (err) { logger.warn('allEntries: skip profiles we cant resolve', { error: String(err) }); }
       }
       const agentsByOwner = await storage.getAgentsByOwners([...new Set(ownerByGhii.values())]);
       const consentsByAgent = await storage.listConsentsForAgents(
@@ -322,8 +322,9 @@ export function createMatchingEngine(
                   });
                 }
               }
-            } catch {
+            } catch (err) {
               // Failed to send notification — match still created
+              logger.warn('allEntries: continuing after a suppressed failure', { error: String(err) });
             }
           }
         }

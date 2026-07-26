@@ -49,6 +49,7 @@ import {
 import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
 import { settleMeteredCoordinate } from './extensions/entitlement-gate.js';
+import { logger } from '../utils/logger.js';
 import {
   type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider,
 } from '../services/exchange-work.js';
@@ -209,7 +210,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
       await sendDirectMessage({ config, storage, peers: new Map<string, PeerInfo>() }, {
         senderGhii: gh(senderOwner), recipientGhii: gh(recipientOwner), body, subject, respondable: false, skipContactGate: true,
       });
-    } catch { /* a notification failure must not fail the proposal itself */ }
+    } catch (err) { logger.warn('notify: a notification failure must not fail the proposal itself', { error: String(err) }); }
   }
   function proposalView(p: ContractProposal) {
     return {

@@ -46,6 +46,7 @@ import {
 import type { EntitlementUnit } from './metered-entitlements.js';
 import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
 import { ODPS_VERSION, mergeOdpsExtras, mergeProvenance } from './exchange-odps.js';
+import { logger } from '../utils/logger.js';
 
 /** One outcome line of a reconcile — the dry-run report is exactly this list. */
 export interface ReconcileChange {
@@ -434,7 +435,7 @@ export async function reconcileAfterSourceWrite(storage: Storage, ownerGaii: str
   // view older than this write.
   lastReconcile.delete(ownerGhii);
   try { await reconcileOwnerOfferings(storage, ownerGhii, opts); }
-  catch { /* projection is best-effort: never fail the write that triggered it */ }
+  catch (err) { logger.warn('reconcileAfterSourceWrite: projection is best-effort: never fail the write that triggered it', { error: String(err) }); }
 }
 
 /** Same, for an extension whose actions may carry `commercial.exchange`. */
@@ -442,7 +443,7 @@ export async function reconcileAfterExtensionWrite(storage: Storage, ownerName: 
   const ownerGhii = `${ownerName}@${nodeId}`;
   lastReconcile.delete(ownerGhii);
   try { await reconcileOwnerOfferings(storage, ownerGhii, { extName }); }
-  catch { /* projection is best-effort */ }
+  catch (err) { logger.warn('reconcileAfterExtensionWrite: projection is best-effort', { error: String(err) }); }
 }
 
 // ── MIGRATION (TARGET-050 slice 3) ───────────────────────────────────────────

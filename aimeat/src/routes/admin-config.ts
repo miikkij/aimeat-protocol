@@ -22,6 +22,7 @@ import type { ConfigProvenance } from '../services/config-provenance.js';
 import type { ConsulConfigService } from '../services/consul-config.js';
 import { applyConsulValues } from '../services/consul-config.js';
 import { emitChange } from '../services/event-bus.js';
+import { logger } from '../utils/logger.js';
 
 export function adminConfigRouter(
     config: AimeatConfig,
@@ -233,7 +234,7 @@ export function adminConfigRouter(
                 const value = (config as unknown as Record<string, unknown>)[field.key];
                 await consulService.set(dotPath, serializeConfigValue(value));
                 exported++;
-            } catch { /* skip individual failures */ }
+            } catch (err) { logger.warn('value: skip individual failures', { error: String(err) }); }
         }
 
         res.json(success(config.nodeId, { exported, total: Object.keys(MUTABLE_CONFIG_MAP).length }));

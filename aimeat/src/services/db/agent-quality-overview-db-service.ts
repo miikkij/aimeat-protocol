@@ -15,6 +15,7 @@
  */
 import type { Storage } from '../../storage/interface.js';
 import { recomputeAndCacheStatistics } from '../agent-statistics.js';
+import { logger } from '../../utils/logger.js';
 
 export interface AgentQualityOverview {
   statistics: {
@@ -46,7 +47,7 @@ export class AgentQualityOverviewService {
       recomputeAndCacheStatistics(this.storage, agentGaii, nodeId),
       this.storage.listAgentTasks(agentGaii, { status: 'done', page: 1, perPage: doneLimit }),
       // Agent-authored custom metrics live under the AGENT's GAII namespace (optional).
-      this.storage.listMemory(agentGaii, { prefix: customPrefix }).catch(() => []),
+      this.storage.listMemory(agentGaii, { prefix: customPrefix }).catch(err => { logger.warn('constructor: continuing after a suppressed failure', { error: String(err) }); return []; }),
     ]);
 
     const custom = (customRecords ?? []).map(r => ({

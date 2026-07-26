@@ -15,6 +15,7 @@ import type { AimeatConfig } from '../config.js';
 import { stripCodeblock } from './llm-strip.js';
 import { NotebookAiError, resolveOwnerModel, completeOwner } from './notebook-ai.js';
 import { LIVING_AUTHOR_SYSTEM, LIVING_AUTHOR_TEMPLATE } from './living-author-prompt.js';
+import { logger } from '../utils/logger.js';
 
 export interface LivingSlot { section: string; desc: string; slot: string; kind: 'derived' | 'aggregate' | 'static'; rules: { max_words?: number }; agent: string | null }
 export interface LivingTemplate {
@@ -39,7 +40,7 @@ async function loadTemplate(storage: Storage): Promise<string> {
   try {
     const rec = await storage.getSystemPrompt('living-author');
     if (rec && rec.active && typeof rec.content === 'string' && rec.content.trim()) return rec.content;
-  } catch { /* fall through */ }
+  } catch (err) { logger.warn('loadTemplate: fall through', { error: String(err) }); }
   return LIVING_AUTHOR_TEMPLATE;
 }
 

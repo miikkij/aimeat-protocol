@@ -24,6 +24,7 @@ import type { Storage, ConsentAuditEntry } from '../storage/interface.js';
 import { globMatchSimple, consentMatchPattern } from '../storage/pattern-utils.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { bufferConsentAudit } from './consent-audit-buffer.js';
+import { logger } from '../utils/logger.js';
 
 /**
  * Check whether a consent record's recipient field matches a given accessor.
@@ -236,8 +237,9 @@ export function startConsentExpiryJob(storage: Storage): NodeJS.Timeout {
   return setInterval(async () => {
     try {
       await expireConsents(storage);
-    } catch {
+    } catch (err) {
       // Silent failure for background job
+      logger.warn('startConsentExpiryJob: continuing after a suppressed failure', { error: String(err) });
     }
   }, 10 * 60 * 1000); // 10 minutes
 }

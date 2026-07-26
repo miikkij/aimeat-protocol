@@ -29,6 +29,7 @@ import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentMessageCreateSchema, AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
 import { createAgentMessagesOverviewService } from '../services/db/agent-messages-overview-db-service.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
+import { logger } from '../utils/logger.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
 
@@ -146,7 +147,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
           created_at: record.createdAt,
         });
       }
-      try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/messages`); } catch { /* MCP not connected */ }
+      try { emitResourceUpdated(agentGaii, `aimeat://agents/${agentName}/messages`); } catch (err) { logger.warn('POST /v1/agents/:name/messages: MCP not connected', { error: String(err) }); }
     }
 
     res.status(201).json(success(config.nodeId, { message: created }, [
@@ -207,7 +208,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     const taskCache = new Map<string, string | null>();
     const resolveTaskTitle = async (threadId: string): Promise<string | null> => {
       if (taskCache.has(threadId)) return taskCache.get(threadId) ?? null;
-      const task = await storage.getAgentTask(threadId).catch(() => null);
+      const task = await storage.getAgentTask(threadId).catch(err => { logger.warn('resolveTaskTitle: continuing after a suppressed failure', { error: String(err) }); return null; });
       const title = task?.title ?? null;
       taskCache.set(threadId, title);
       return title;

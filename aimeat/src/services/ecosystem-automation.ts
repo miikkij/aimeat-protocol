@@ -36,7 +36,8 @@ export function matchesKeyGlob(glob: string, key: string): boolean {
   if (!glob) return false;
   try {
     return globToRegExp(glob).test(key);
-  } catch {
+  } catch (err) {
+    logger.warn('ecosystem-automation: suppressed failure, continuing', { error: String(err) });
     return false;
   }
 }
@@ -82,7 +83,7 @@ async function resolveAndGrantOrganism(
       org.members.some(m => ownerForms.has(m));
     if (!controlled) {
       for (const form of ownerForms) {
-        const membership = await storage.getMembership(org.id, form).catch(() => null);
+        const membership = await storage.getMembership(org.id, form).catch(err => { logger.warn('resolveAndGrantOrganism: continuing after a suppressed failure', { error: String(err) }); return null; });
         if (membership && membership.status === 'active') { controlled = true; break; }
       }
     }

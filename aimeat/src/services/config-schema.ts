@@ -411,6 +411,7 @@ export function parseConfigValue(field: ConfigFieldDef, raw: string): unknown {
     case 'float':  return parseFloat(raw);
     case 'boolean': return raw === 'true';
     case 'object': {
+      // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
       try { return JSON.parse(raw); } catch { return null; }
     }
     case 'string':

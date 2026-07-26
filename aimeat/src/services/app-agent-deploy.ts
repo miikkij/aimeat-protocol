@@ -20,6 +20,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AgentRecord, AgentTaskRecord, AgentTaskScope } from '../storage/interface.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
+import { logger } from '../utils/logger.js';
 
 export interface AppAgentTaskInput {
   kind: 'deploy-app-agent' | 'undeploy-app-agent';
@@ -107,7 +108,7 @@ export async function createAppAgentTask(
   // Realtime push down the connector tunnel (zero round-trip when the daemon is online;
   // replayed via backlog-on-connect when offline) + MCP resource nudge for polling daemons.
   emitDelivery({ target: runner.gaii, kind: 'task_assigned', id: task.id, payload: created });
-  try { emitResourceUpdated(runner.gaii, `aimeat://agents/${runner.name}/tasks`); } catch { /* MCP not connected */ }
+  try { emitResourceUpdated(runner.gaii, `aimeat://agents/${runner.name}/tasks`); } catch (err) { logger.warn('createAppAgentTask: MCP not connected', { error: String(err) }); }
   emitChange('agent-tasks', `${ownerName}@${config.nodeId}`);
 
   return { task: created, autoActivated };

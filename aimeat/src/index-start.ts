@@ -38,6 +38,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
       let pkgVersion = '0.0.0';
       try {
         pkgVersion = JSON.parse(readFileSync(join(pkgRoot, 'package.json'), 'utf-8')).version as string;
+      // eslint-disable-next-line aimeat/no-silent-catch -- leave 0.0.0 — still distinct from any real manifest version
       } catch { /* leave 0.0.0 — still distinct from any real manifest version */ }
       const healed = autoHealAssets(assetsRoot, process.cwd(), pkgVersion);
       if (healed && (healed.copied + healed.updated) > 0) {
@@ -134,7 +135,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
       logger.info('');
       for (const ext of active) {
         const instances = ext.instances?.supported
-          ? await storage.listExtensionInstances(ext.name).catch(() => [])
+          ? await storage.listExtensionInstances(ext.name).catch(err => { logger.warn('runStart: continuing after a suppressed failure', { error: String(err) }); return []; })
           : [];
         const activeInstances = instances.filter(i => i.status === 'active');
         const actionIds = ext.actions.map(a => a.id).join(', ');
@@ -152,7 +153,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
       }
       logger.info(`   ────────────────────────────────────────────────────`);
       logger.info('');
-    }).catch(() => { /* ignore */ });
+    }).catch(err => { logger.warn('vis: ignore', { error: String(err) }); });
 
     // Check and display maintenance mode warning
     storage.getMaintenanceMode().then(state => {
@@ -167,7 +168,7 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
         logger.info(`   └──────────────────────────────────────────────────────┘`);
         logger.info('');
       }
-    }).catch(() => { /* ignore */ });
+    }).catch(err => { logger.warn('vis: ignore', { error: String(err) }); });
   });
 
   // WebSocket upgrade handling for personal node tunnels + realtime P2P + connector forward tunnel
@@ -235,7 +236,8 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
           tunnelWss.handleUpgrade(request, socket, head, (ws) => {
             tunnelManager.handleConnection(ws, personalNode.nodeId, ownerName, personalNode.agentGaiis);
           });
-        } catch {
+        } catch (err) {
+          logger.warn('index-start: suppressed failure, continuing', { error: String(err) });
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
         }
@@ -278,7 +280,8 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
           connectWss.handleUpgrade(request, socket, head, (ws) => {
             connectTunnelManager.handleConnection(ws, payload, token);
           });
-        } catch {
+        } catch (err) {
+          logger.warn('index-start: suppressed failure, continuing', { error: String(err) });
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
         }
@@ -384,7 +387,8 @@ export async function runStart(config: AimeatConfig, sources: ConfigSources, pkg
           realtimeWss.handleUpgrade(request, socket, head, (ws) => {
             realtimeManager.handleUpgrade(ws, roomId, nick);
           });
-        } catch {
+        } catch (err) {
+          logger.warn('index-start: suppressed failure, continuing', { error: String(err) });
           socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
           socket.destroy();
         }

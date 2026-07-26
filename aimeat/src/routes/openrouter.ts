@@ -213,8 +213,8 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
       await Promise.all([
-        storage.deleteMemory(gaii, 'openrouter.apikey').catch(() => {}),
-        storage.deleteMemory(gaii, 'openrouter.settings').catch(() => {}),
+        storage.deleteMemory(gaii, 'openrouter.apikey').catch(err => { logger.warn('DELETE /v1/openrouter/settings: continuing after a suppressed failure', { error: String(err) }); }),
+        storage.deleteMemory(gaii, 'openrouter.settings').catch(err => { logger.warn('DELETE /v1/openrouter/settings: continuing after a suppressed failure', { error: String(err) }); }),
       ]);
       // Clear all cache entries for this user (keys are gaii:baseUrl)
       for (const key of modelCache.keys()) {

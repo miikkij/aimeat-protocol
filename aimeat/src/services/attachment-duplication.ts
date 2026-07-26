@@ -160,7 +160,7 @@ export async function sweepReferenceAttachments(ctx: AttachmentCtx): Promise<{ r
   const now = Date.now();
   let retried = 0, expired = 0;
 
-  const msgs = await ctx.storage.listInboundWithAttachments(200).catch(() => []);
+  const msgs = await ctx.storage.listInboundWithAttachments(200).catch(err => { logger.warn('sweepReferenceAttachments: continuing after a suppressed failure', { error: String(err) }); return []; });
   for (const m of msgs) {
     const atts = m.attachments || [];
     const held = atts.some(a => a.mode === 'reference' && !a.expired);
@@ -168,7 +168,7 @@ export async function sweepReferenceAttachments(ctx: AttachmentCtx): Promise<{ r
 
     if (now - new Date(m.createdAt).getTime() > ttlMs) {
       const updated = atts.map(a => (a.mode === 'reference' && !a.expired) ? { ...a, expired: true } : a);
-      await ctx.storage.updateMessageAttachments(m.id, m.ownerGhii, updated).catch(() => {});
+      await ctx.storage.updateMessageAttachments(m.id, m.ownerGhii, updated).catch(err => { logger.warn('sweepReferenceAttachments: continuing after a suppressed failure', { error: String(err) }); });
       expired++;
       await notify(ctx.storage, m.ownerGhii, {
         type: 'direct_message_attachment_expired',
@@ -180,7 +180,7 @@ export async function sweepReferenceAttachments(ctx: AttachmentCtx): Promise<{ r
     }
 
     const dup = await duplicateMessageAttachments(ctx, m.ownerGhii, m);
-    if (dup.changed) { await ctx.storage.updateMessageAttachments(m.id, m.ownerGhii, dup.attachments).catch(() => {}); retried++; }
+    if (dup.changed) { await ctx.storage.updateMessageAttachments(m.id, m.ownerGhii, dup.attachments).catch(err => { logger.warn('sweepReferenceAttachments: continuing after a suppressed failure', { error: String(err) }); }); retried++; }
   }
   return { retried, expired };
 }

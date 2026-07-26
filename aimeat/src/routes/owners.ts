@@ -27,6 +27,7 @@ import { fireHook } from '../utils/fire-hook.js';
 import { OwnerRegistrationSchema, validateBody } from '../models/schemas.js';
 import { emitChange } from '../services/event-bus.js';
 import { evictAgentTelemetry } from '../services/telemetry-buffer.js';
+import { logger } from '../utils/logger.js';
 
 export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -682,64 +683,64 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
 
     // 2. Delete GHII-level data (not covered by per-agent cascade)
     // Memory stored under GHII directly
-    try { await storage.deleteAllMemory(ghii); deletionLog.push('ghii_memory'); } catch { /* continue */ }
+    try { await storage.deleteAllMemory(ghii); deletionLog.push('ghii_memory'); } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
     // Consents granted by the GHII identity
     try {
       const ghiiConsents = await storage.listConsents(ghii, {});
       for (const c of ghiiConsents) await storage.deleteConsent(c.id);
       if (ghiiConsents.length) deletionLog.push(`consents:${ghiiConsents.length}`);
-    } catch { /* continue */ }
+    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
     // Organism memberships
     try {
       const memberships = await storage.listMembershipsByGhii(ghii);
       for (const m of memberships) await storage.deleteMembership(m.id);
       if (memberships.length) deletionLog.push(`memberships:${memberships.length}`);
-    } catch { /* continue */ }
+    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
     // Matches (stored by GHII, not agent GAII)
-    try { await storage.deleteMatchesByProfile(ghii); deletionLog.push('matches'); } catch { /* continue */ }
+    try { await storage.deleteMatchesByProfile(ghii); deletionLog.push('matches'); } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
     // Sessions
-    try { await storage.revokeAllSessions(name); deletionLog.push('sessions'); } catch { /* continue */ }
+    try { await storage.revokeAllSessions(name); deletionLog.push('sessions'); } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
     // Capabilities registered by this owner
     try {
       const caps = await storage.listCapabilitiesByOwner(ghii);
       for (const c of caps) await storage.deleteCapability(c.id);
       if (caps.length) deletionLog.push(`capabilities:${caps.length}`);
-    } catch { /* continue */ }
+    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
     // Scheduled jobs owned by this user
     try {
       const jobs = await storage.listScheduledJobs({});
       const ownerJobs = jobs.filter(j => j.createdBy === ghii || j.createdBy === name);
       for (const j of ownerJobs) await storage.deleteScheduledJob(j.id);
       if (ownerJobs.length) deletionLog.push(`scheduled_jobs:${ownerJobs.length}`);
-    } catch { /* continue */ }
+    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
     // Device auth records
     try {
       await storage.deleteDeviceAuthByOwner(name);
       deletionLog.push('device_auth');
-    } catch { /* continue */ }
+    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
     // Apps published by this owner
     try {
       const { apps } = await storage.listApps({ ownerGaii: ghii });
       for (const a of apps) await storage.deleteApp(ghii, a.filename);
       if (apps.length) deletionLog.push(`apps:${apps.length}`);
-    } catch { /* continue */ }
+    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
     // Extension instances created by this owner
     try {
       const count = await storage.deleteExtensionInstancesByOwner(ghii);
       // Also try bare owner name (some instances may use it as createdBy)
       const count2 = await storage.deleteExtensionInstancesByOwner(name);
       if (count + count2) deletionLog.push(`ext_instances:${count + count2}`);
-    } catch { /* continue */ }
+    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
     // Knowledge links contributed by this owner
     try {
       const count = await storage.deleteLinksByContributor(ghii);
       if (count) deletionLog.push(`knowledge_links:${count}`);
-    } catch { /* continue */ }
+    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
     // Knowledge reviews by this operator
     try {
       const count = await storage.deleteReviewsByOperator(ghii);
       if (count) deletionLog.push(`knowledge_reviews:${count}`);
-    } catch { /* continue */ }
+    } catch (err) { logger.warn('DELETE /v1/owners/:name: continue', { error: String(err) }); }
 
     // 3. Per-agent cascade + agent deletion (handled by storage.deleteOwner internally)
     // The storage provider's deleteOwner cascades: agent data, GHII records,

@@ -84,6 +84,7 @@ function normalizeNodeUrl(value: string | undefined): string | null {
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
     return url.toString().replace(/\/$/, '');
   } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
     return null;
   }
 }

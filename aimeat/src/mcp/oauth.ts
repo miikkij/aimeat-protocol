@@ -457,6 +457,7 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
                     res.status(200).json({ revoked: true });
                     return;
                 }
+            // eslint-disable-next-line aimeat/no-silent-catch -- not a valid JWT, try as refresh token
             } catch { /* not a valid JWT, try as refresh token */ }
         }
 

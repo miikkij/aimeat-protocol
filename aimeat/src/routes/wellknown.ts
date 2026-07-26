@@ -156,6 +156,7 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
     try {
       const sigHeaders = await signDirectoryResponse(state, req.headers.host ?? new URL(config.baseUrl).host);
       res.set(sigHeaders);
+    // eslint-disable-next-line aimeat/no-silent-catch -- directory stays useful unsigned
     } catch { /* directory stays useful unsigned */ }
     res.set('Cache-Control', 'max-age=86400');
     res.type(SIGNATURES_DIRECTORY_MEDIA_TYPE).send(JSON.stringify(signatureDirectoryBody(state)));

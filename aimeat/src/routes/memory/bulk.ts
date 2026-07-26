@@ -17,6 +17,7 @@ import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import type { BulkWriteItem } from '../../services/db/memory-db-service.js';
 import { type MemoryRouteCtx, isAnonymousGaii } from './shared.js';
+import { logger } from '../../utils/logger.js';
 
 export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
   // Data-access redesign (Phase 1): the batched write/import + owner-scope reads run through the
@@ -379,7 +380,8 @@ export function registerBulkRoutes(router: Router, ctx: MemoryRouteCtx): void {
           archive.append(content, { name: `memory/${sanitize(key)}.json` });
           manifest.items.push({ kind, key, owner_gaii: owner, included: true, visibility: record.visibility, url: `${config.baseUrl}/v1/memory/${encodeURIComponent(owner)}/${encodeURIComponent(key)}` });
         }
-      } catch {
+      } catch (err) {
+        logger.warn('bulk: suppressed failure, continuing', { error: String(err) });
         manifest.items.push({ kind, key, owner_gaii: owner, included: false, reason: 'error' });
       }
     }

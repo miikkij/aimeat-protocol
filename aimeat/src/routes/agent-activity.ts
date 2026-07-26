@@ -29,6 +29,7 @@ import { buildGAII } from '../utils/gaii.js';
 import { recomputeAndCacheStatistics } from '../services/agent-statistics.js';
 import { createAgentActivityOverviewService } from '../services/db/agent-activity-overview-db-service.js';
 import { createAgentQualityOverviewService } from '../services/db/agent-quality-overview-db-service.js';
+import { logger } from '../utils/logger.js';
 
 export function agentActivityRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -251,7 +252,7 @@ export function agentActivityRouter(config: AimeatConfig, storage: Storage): Rou
     try {
       const records = await storage.listMemory(agentGaii, { prefix: customPrefix });
       custom = records.map(r => ({ key: r.key.slice(customPrefix.length), value: r.value, updated_at: r.updatedAt }));
-    } catch { /* custom metrics are optional */ }
+    } catch (err) { logger.warn('GET /v1/agents/:name/statistics: custom metrics are optional', { error: String(err) }); }
 
     res.json(success(config.nodeId, {
       performance: stats.performance,
