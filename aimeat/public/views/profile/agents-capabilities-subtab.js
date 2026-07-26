@@ -19,6 +19,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { getCapabilities } from '/js/services/agent-capabilities.js';
+import { swallowed } from '/js/swallowed.js';
 
 function tFallback(key, fallback) {
   const val = t(key);
@@ -123,7 +124,8 @@ export default function AgentCapabilitiesSubtab({ agentName, agent }) {
         setTechCaps(resp?.data?.technical_capabilities ?? []);
         setDomainCaps(resp?.data?.domain_capabilities ?? []);
         setLanguages(resp?.data?.languages ?? []);
-      } catch {
+      } catch (err) {
+        swallowed('agents-capabilities-subtab: load', err);
         if (!cancelled) {
           setTechCaps([]);
           setDomainCaps([]);
@@ -144,7 +146,7 @@ export default function AgentCapabilitiesSubtab({ agentName, agent }) {
         setTechCaps(resp?.data?.technical_capabilities ?? []);
         setDomainCaps(resp?.data?.domain_capabilities ?? []);
         setLanguages(resp?.data?.languages ?? []);
-      } catch { /* ignore */ }
+      } catch (err) { swallowed('agents-capabilities-subtab: handler', err); }
     };
     return onLiveUpdate(['agents', 'cortex'], handler);
   }, [agentName]);

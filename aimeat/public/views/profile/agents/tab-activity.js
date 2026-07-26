@@ -26,6 +26,7 @@ import { getActivity, getActivityLog, getActivityOverview } from '/js/services/a
 import { getDirectives } from '/js/services/agent-directives.js';
 import { getWebhookConfig, getTelemetry } from '/js/services/agent-integration.js';
 import { getLedgerUsage } from '/js/services/ledger.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -72,7 +73,7 @@ export default function TabActivity({ agent, agentName }) {
       // not the bare name — filtering by the name matches nothing.
       const [overview, ledgerResp] = await Promise.all([
         getActivityOverview(agentName),
-        getLedgerUsage(agent?.gaii || agentName, { groupBy: 'day' }).catch(() => null),
+        getLedgerUsage(agent?.gaii || agentName, { groupBy: 'day' }).catch(err => { swallowed('tab-activity: loadData', err); return null; }),
       ]);
       let actResp, logResp, dirResp, whResp, telResp;
       if (overview) {
@@ -83,11 +84,11 @@ export default function TabActivity({ agent, agentName }) {
         telResp = { data: overview.telemetry };
       } else {
         [actResp, logResp, dirResp, whResp, telResp] = await Promise.all([
-          getActivity(agentName, 30).catch(() => null),
-          getActivityLog(agentName, 1, 50).catch(() => null),
-          getDirectives(agentName).catch(() => null),
-          getWebhookConfig(agentName).catch(() => null),
-          getTelemetry(agentName, { days: 1 }).catch(() => null),
+          getActivity(agentName, 30).catch(err => { swallowed('tab-activity: loadData', err); return null; }),
+          getActivityLog(agentName, 1, 50).catch(err => { swallowed('tab-activity: loadData', err); return null; }),
+          getDirectives(agentName).catch(err => { swallowed('tab-activity: loadData', err); return null; }),
+          getWebhookConfig(agentName).catch(err => { swallowed('tab-activity: loadData', err); return null; }),
+          getTelemetry(agentName, { days: 1 }).catch(err => { swallowed('tab-activity: loadData', err); return null; }),
         ]);
       }
       setStats(actResp?.data?.activity_stats || null);
@@ -129,7 +130,8 @@ export default function TabActivity({ agent, agentName }) {
         webhookTotalCount: (wh?.success_count ?? 0) + (wh?.fail_count ?? 0),
         mcpActive: agent?.mcpEnabled || agent?.mcp_enabled || false,
       });
-    } catch {
+    } catch (err) {
+      swallowed('tab-activity: webhookTotalCount', err);
       setStats(null);
       setEvents([]);
     }
@@ -155,7 +157,7 @@ export default function TabActivity({ agent, agentName }) {
       setEvents(prev => [...prev, ...newEvents]);
       setLogPage(nextPage);
       setHasMore(newEvents.length >= 50);
-    } catch { /* silent */ }
+    } catch (err) { swallowed('tab-activity: handleLoadMore', err); }
   }
 
   if (loading) {

@@ -26,6 +26,7 @@ export function isAppHtmlUrl(href) {
   try {
     path = new URL(href, window.location.href).pathname;
   } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     return false;
   }
   // /v1/apps/<owner>/<file> — two path segments after /v1/apps/. The bare collection

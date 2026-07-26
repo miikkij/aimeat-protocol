@@ -28,6 +28,7 @@ import { apiGet } from "/js/api.js";
 import { UsageChart, colorForIndex } from "/components/UsageChart.js";
 import { minidenticon } from "/lib/minidenticons.min.js";
 import { PresencePill } from "./landing-page.modals.js";
+import { swallowed } from '/js/swallowed.js';
 import {
   relTime, fmtClock, openProfileTab, gotoWorkspace, gotoOrganism, gotoOrganismsList,
   fmtBytes, fmtUsd, fmtCompact,
@@ -115,7 +116,7 @@ export function AgentsCard({ owner, initialAgents }) {
   const [agents, setAgents] = useState(initialAgents ? seedAgents(initialAgents) : null);
   const [nextJob, setNextJob] = useState(null);
   const loadAgents = useCallback(async () => {
-    try { setAgents(seedAgents(await listAgents(owner))); } catch { setAgents([]); }
+    try { setAgents(seedAgents(await listAgents(owner))); } catch (err) { swallowed('landing-page.cards', err); setAgents([]); }
   }, [owner]);
   const loadSchedules = useCallback(async () => {
     try {
@@ -124,7 +125,7 @@ export function AgentsCard({ owner, initialAgents }) {
         .filter(s => s.enabled !== false && s.nextRunAt && new Date(s.nextRunAt).getTime() > Date.now())
         .sort((a, b) => String(a.nextRunAt).localeCompare(String(b.nextRunAt)));
       setNextJob(all[0] || null);
-    } catch { /* scheduler row is optional */ }
+    } catch (err) { swallowed('landing-page.cards: seedAgents', err); }
   }, []);
   const load = useCallback(async () => { await Promise.all([loadAgents(), loadSchedules()]); }, [loadAgents, loadSchedules]);
   useEffect(() => { if (initialAgents) setAgents(seedAgents(initialAgents)); }, [initialAgents]);
@@ -144,7 +145,11 @@ export function AgentsCard({ owner, initialAgents }) {
       </button>
       ${agents.slice(0, 3).map(a => html`
         <button class="pf-home-row" key=${a.gaii || a.name}
-          onClick=${() => { try { sessionStorage.setItem('aimeat.agents.open', a.name); } catch { /* noop */ } openProfileTab('agents'); }}>
+          onClick=${() => {
+            // eslint-disable-next-line aimeat/no-silent-catch -- a browser refusing sessionStorage here IS the answer: the tab still opens, it just does not preselect this agent
+            try { sessionStorage.setItem('aimeat.agents.open', a.name); } catch { /* noop */ }
+            openProfileTab('agents');
+          }}>
           <span class="pf-home-row-ico">${'🤖'}</span>
           <span class="pf-home-row-label">${escHtml(a.display_name || a.name)}</span>
           <span class="pf-home-row-meta ${isToday(a.last_seen) ? 'pf-ok' : ''}">
@@ -172,7 +177,7 @@ export function UsageCard({ switchTab, initialUsage }) {
   // duplicate). We still refresh on live-update for freshness after a real change.
   const [u, setU] = useState(initialUsage ?? null);
   const load = useCallback(async () => {
-    try { const r = await apiGet('/v1/owner/usage'); setU(r?.data || null); } catch { setU(null); }
+    try { const r = await apiGet('/v1/owner/usage'); setU(r?.data || null); } catch (err) { swallowed('landing-page.cards', err); setU(null); }
   }, []);
   useEffect(() => { if (initialUsage) setU(initialUsage); }, [initialUsage]);
   const liveRef = useRef(load); liveRef.current = load;
@@ -255,7 +260,7 @@ export function CommerceCard() {
         sold: orders.length,
         earnedBy: sumBy(orders, (x) => x.receipt && x.receipt.earned),
       });
-    } catch { setStats(null); /* commerce disabled or unreachable — render nothing */ }
+    } catch (err) { swallowed('landing-page.cards', err); setStats(null); /* commerce disabled or unreachable — render nothing */ }
   }, []);
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(load); liveRef.current = load;
@@ -288,7 +293,7 @@ export function AiSpendCard() {
   const [data, setData] = useState(null);
   const load = useCallback(async () => {
     try { const r = await apiGet('/v1/ai/usage/history?days=30'); setData(r?.data || null); }
-    catch { setData(null); }
+    catch (err) { swallowed('landing-page.cards', err); setData(null); }
   }, []);
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(load); liveRef.current = load;
@@ -354,7 +359,7 @@ export function AgentLedgerCard() {
   const [data, setData] = useState(null);
   const load = useCallback(async () => {
     try { const r = await apiGet('/v1/ledger/usage?group_by=model'); setData(r?.data || null); }
-    catch { setData(null); }
+    catch (err) { swallowed('landing-page.cards', err); setData(null); }
   }, []);
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(load); liveRef.current = load;
@@ -472,7 +477,7 @@ export function NextSteps({ switchTab, hasApps }) {
     let cancelled = false;
     apiGet('/v1/portfolio/config')
       .then(r => { if (!cancelled) setHasPortfolio(!!(r?.data?.config?.enabled)); })
-      .catch(() => { if (!cancelled) setHasPortfolio(false); });
+      .catch((err) => { swallowed('landing-page.cards', err); if (!cancelled) setHasPortfolio(false); });
     return () => { cancelled = true; };
   }, []);
 
@@ -539,7 +544,7 @@ export function CortexSection({ switchTab, onDismiss }) {
 export function InboxNavButton({ active, onClick }) {
   const [unread, setUnread] = useState(0);
   const load = useCallback(async () => {
-    try { const d = await listInbox(); setUnread(d?.unread || 0); } catch { /* noop */ }
+    try { const d = await listInbox(); setUnread(d?.unread || 0); } catch (err) { swallowed('landing-page.cards: InboxNavButton', err); }
   }, []);
   useEffect(() => { load(); }, [load]);
   const ref = useRef(load); ref.current = load;

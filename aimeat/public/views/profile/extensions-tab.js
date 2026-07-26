@@ -47,6 +47,7 @@ import * as v8Ext from '/js/services/extensions.js';
 import { getNodeUrl, getSession } from '/js/services/auth.js';
 import { buildCortexPrompt, buildServerExtensionPrompt } from './extensions-tab.prompts.js';
 import { COMP_ICONS, COMP_TAG_CLASSES, BUNDLED } from './extensions-tab.constants.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function ExtensionsTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -86,7 +87,7 @@ export default function ExtensionsTab({ session, showToast }) {
     try {
       const resp = await cortexService.listExtensions();
       setExtensions(resp?.extensions || []);
-    } catch { setExtensions([]); }
+    } catch (err) { swallowed('extensions-tab', err); setExtensions([]); }
   }
 
   function onSrvManifestChange(text) {
@@ -104,7 +105,7 @@ export default function ExtensionsTab({ session, showToast }) {
           return entries.length > 0 ? entries : prev;
         });
       }
-    } catch { /* ignore parse errors */ }
+    } catch (err) { swallowed('extensions-tab: onSrvManifestChange', err); }
   }
 
   async function handleSrvInstall() {
@@ -134,7 +135,7 @@ export default function ExtensionsTab({ session, showToast }) {
   }
 
   async function loadServerExtensions() {
-    try { setSrvExts(await v8Ext.listV8Extensions()); } catch { setSrvExts([]); }
+    try { setSrvExts(await v8Ext.listV8Extensions()); } catch (err) { swallowed('extensions-tab', err); setSrvExts([]); }
   }
 
   async function loadSrvDetail(name) {
@@ -144,7 +145,7 @@ export default function ExtensionsTab({ session, showToast }) {
     try {
       const ext = await v8Ext.getV8Extension(name);
       setSrvDetail(ext);
-      try { setSrvInstances(await v8Ext.listInstances(name)); } catch { setSrvInstances([]); }
+      try { setSrvInstances(await v8Ext.listInstances(name)); } catch (err) { swallowed('extensions-tab', err); setSrvInstances([]); }
     } catch(e) { setSrvDetail({ error: e.message }); }
   }
 

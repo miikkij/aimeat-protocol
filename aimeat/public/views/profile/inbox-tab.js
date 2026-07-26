@@ -141,6 +141,7 @@ import { buildConversationReplyProps, buildMessageReplyProps, buildConversationN
 import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel } from './inbox-tab/panels.js';
 import { useThreadAutoScroll, useMobileComposerKeyboard, useLinkPreviewToggle } from './inbox-tab/use-thread-ux.js';
 import { ContactPicker } from '/components/ContactPicker.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function InboxTab({ showToast }) {
   const [requests, setRequests] = useState([]);
@@ -192,10 +193,10 @@ export default function InboxTab({ showToast }) {
 
   const loadLists = useCallback(async () => {
     const [reqs, convs, impIds, trs] = await Promise.all([
-      messages.listRequests().catch(() => []),
-      messages.listConversations().catch(() => []),
-      tracked.listImportantMessageIds().catch(() => []),
-      tracked.listTrackedResponses().catch(() => []),
+      messages.listRequests().catch(err => { swallowed('inbox-tab: isOperator', err); return []; }),
+      messages.listConversations().catch(err => { swallowed('inbox-tab: isOperator', err); return []; }),
+      tracked.listImportantMessageIds().catch(err => { swallowed('inbox-tab: isOperator', err); return []; }),
+      tracked.listTrackedResponses().catch(err => { swallowed('inbox-tab: isOperator', err); return []; }),
     ]);
     setRequests(reqs);
     setConversations(convs);
@@ -208,12 +209,12 @@ export default function InboxTab({ showToast }) {
   // the 6-request fan-out. Interactive refreshes (live-update, post-send) keep using loadLists (the 4
   // lists); a composite failure falls back to the individual loaders so the inbox still populates.
   const loadOverview = useCallback(async () => {
-    const r = await apiGet('/v1/messages/overview').catch(() => null);
+    const r = await apiGet('/v1/messages/overview').catch(err => { swallowed('inbox-tab: isOperator', err); return null; });
     const d = r?.data;
     if (!d) {
       loadLists();
-      agentsSvc.listAgents().then(a => setMyAgents(a || [])).catch(() => {});
-      apiGet('/v1/groups').then(gr => setMyGroups(gr?.data?.groups || [])).catch(() => {});
+      agentsSvc.listAgents().then(a => setMyAgents(a || [])).catch(err => { swallowed('inbox-tab: isOperator', err); });
+      apiGet('/v1/groups').then(gr => setMyGroups(gr?.data?.groups || [])).catch(err => { swallowed('inbox-tab: isOperator', err); });
       return;
     }
     setRequests(d.requests || []);
@@ -230,7 +231,7 @@ export default function InboxTab({ showToast }) {
   // requests = 5 requests) on each is the request storm. Direct-message changes ('messages') still
   // do the full refresh below.
   const loadTrackedOnly = useCallback(async () => {
-    const trs = await tracked.listTrackedResponses().catch(() => []);
+    const trs = await tracked.listTrackedResponses().catch(err => { swallowed('inbox-tab: isOperator', err); return []; });
     setTrackedList(trs.filter(tr => tr.state !== 'cancelled' && !dismissedRef.current.has(tr.id)));
   }, []);
 
@@ -288,11 +289,11 @@ export default function InboxTab({ showToast }) {
     const on = !next.has(msg.id);
     if (on) next.add(msg.id); else next.delete(msg.id);
     setImportant(next);
-    await tracked.setMessageImportant(msg.id, on).catch(() => {});
+    await tracked.setMessageImportant(msg.id, on).catch(err => { swallowed('inbox-tab: toggleImportant', err); });
   };
 
   const startSuggestedReply = async (tr) => {
-    const d = await tracked.getTrackedResponseDraft(tr.id).catch(() => null);
+    const d = await tracked.getTrackedResponseDraft(tr.id).catch(err => { swallowed('inbox-tab: startSuggestedReply', err); return null; });
     setDraftPrefill(d?.draft?.body || awaitingDrafts[tr.id] || '');
     setReplyingTrId(tr.id);
   };
@@ -307,6 +308,7 @@ export default function InboxTab({ showToast }) {
       sessionStorage.setItem('aimeat-profile-tab', 'organisms');
       sessionStorage.setItem('aimeat.ws.openId', r.organismId);
       sessionStorage.setItem('aimeat.ws.openWs', r.workspaceId);
+    // eslint-disable-next-line aimeat/no-silent-catch -- noop
     } catch { /* noop */ }
     window.location.assign('/v1/profile?tab=organisms');
   };
@@ -318,7 +320,7 @@ export default function InboxTab({ showToast }) {
     let cancelled = false;
     (async () => {
       const entries = await Promise.all(awaitingForConv.map(async tr => {
-        const d = await tracked.getTrackedResponseDraft(tr.id).catch(() => null);
+        const d = await tracked.getTrackedResponseDraft(tr.id).catch(err => { swallowed('inbox-tab', err); return null; });
         return [tr.id, d?.draft?.body || ''];
       }));
       if (!cancelled) setAwaitingDrafts(Object.fromEntries(entries));
@@ -341,7 +343,7 @@ export default function InboxTab({ showToast }) {
   const loadThread = useCallback(async (conv, markRead = false) => {
     if (!conv) return;
     // threadAllRef: false = newest 50 (fast default); true = the FULL history (header "All messages" toggle).
-    const msgs = (await messages.getConversation(conv.conversationId, conv.viaAgent, threadAllRef.current).catch(() => [])).slice().reverse();
+    const msgs = (await messages.getConversation(conv.conversationId, conv.viaAgent, threadAllRef.current).catch(err => { swallowed('inbox-tab: msgs', err); return []; })).slice().reverse();
     setThread(msgs);
     // Reuse already-resolved attachment URLs for the same conversation (a refresh must not re-download
     // every image); a different conversation starts a fresh cache.
@@ -349,7 +351,7 @@ export default function InboxTab({ showToast }) {
     urlCacheRef.current = cache;
     setUrlMap(cache.map);
     // Agent-owned ("via <agent>") threads are read-only for the owner — don't post a read receipt as them.
-    if (markRead && !conv.viaAgent) await messages.markConversationRead(conv.conversationId).catch(() => {});
+    if (markRead && !conv.viaAgent) await messages.markConversationRead(conv.conversationId).catch(err => { swallowed('inbox-tab: msgs', err); });
   }, []);
   const toggleThreadAll = () => setThreadAll(v => { const nv = !v; threadAllRef.current = nv; if (activeConv) loadThread(activeConv); return nv; });
 
@@ -369,21 +371,21 @@ export default function InboxTab({ showToast }) {
         const cmds = val && Array.isArray(val.commands) ? val.commands.filter(c => c && c.id) : [];
         if (!cancelled && cmds.length) setAgentCommands(cmds);
       })
-      .catch(() => { /* no commands published — fine */ });
+      .catch(err => { swallowed('inbox-tab: toggleThreadAll', err); });
     return () => { cancelled = true; };
   }, [activePeer]);
 
   // Recent broadcasts/polls the user sent — tracked in localStorage so results stay re-accessible.
   const BC_STORE = 'aimeat.inbox.broadcasts';
-  useEffect(() => { try { setRecentBroadcasts(JSON.parse(localStorage.getItem(BC_STORE) || '[]')); } catch { /* none */ } }, []);
+  useEffect(() => { try { setRecentBroadcasts(JSON.parse(localStorage.getItem(BC_STORE) || '[]')); } catch { /* none */ } }, []);   // eslint-disable-line aimeat/no-silent-catch -- none
   const trackBroadcast = (entry) => setRecentBroadcasts(prev => {
     const next = [entry, ...prev.filter(b => b.id !== entry.id)].slice(0, 30);
-    try { localStorage.setItem(BC_STORE, JSON.stringify(next)); } catch { /* quota */ }
+    try { localStorage.setItem(BC_STORE, JSON.stringify(next)); } catch { /* quota */ }   // eslint-disable-line aimeat/no-silent-catch -- quota
     return next;
   });
   const openResults = async (id) => {
     setMode('results'); setResultsId(id); setResults(null); setActiveConv(null);
-    setResults(await messages.getBroadcastResults(id).catch(() => null));
+    setResults(await messages.getBroadcastResults(id).catch(err => { swallowed('inbox-tab', err); return null; }));
   };
 
   // Inbox-link (mailto-style): /v1/profile?tab=messages&to=<id>[,<id>]&subject=<s> opens a prefilled
@@ -399,7 +401,7 @@ export default function InboxTab({ showToast }) {
     } else {
       setMode('compose'); setActiveConv(null); setTo(recips[0]); setComposeSubject(subject);
     }
-    try { window.history.replaceState({}, '', '/v1/profile?tab=messages'); } catch { /* noop */ }
+    try { window.history.replaceState({}, '', '/v1/profile?tab=messages'); } catch (err) { swallowed('inbox-tab: toParam', err); }
   }, []);
 
   // Recipient suggestions for a new message: your own agents (GAIIs) + everyone you've a thread with.
@@ -473,7 +475,7 @@ export default function InboxTab({ showToast }) {
     todo.forEach(id => { peerNamesRef.current[id] = ''; });   // reserve (fallback = handle) so we look it up once
     Promise.all(todo.map(async (id) => {
       const path = String(id).includes('#') ? `/v1/agents/${encodeURIComponent(id)}` : `/v1/ghii/${encodeURIComponent(id)}`;
-      const r = await apiGet(path).catch(() => null);
+      const r = await apiGet(path).catch(err => { swallowed('inbox-tab: openConversation', err); return null; });
       const dn = String(r?.data?.display_name || '').trim();
       if (dn) peerNamesRef.current[id] = dn;
     })).then(() => setPeerNames({ ...peerNamesRef.current }));
@@ -555,7 +557,7 @@ export default function InboxTab({ showToast }) {
         loadLists();
         if (id) openResults(id); else setMode('idle');
       }
-    } catch { showToast?.(t('inbox.failed'), true); }
+    } catch (err) { swallowed('inbox-tab', err); showToast?.(t('inbox.failed'), true); }
     setSending(false);
   };
 
@@ -571,12 +573,12 @@ export default function InboxTab({ showToast }) {
   // thread once accepted, else falls back to the list (sender still pending accept/block).
   const consumeDeepLink = useCallback(async () => {
     let target = null;
-    try { target = sessionStorage.getItem('aimeat.inbox.open'); } catch { /* noop */ }
+    try { target = sessionStorage.getItem('aimeat.inbox.open'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
     if (!target) return;
-    try { sessionStorage.removeItem('aimeat.inbox.open'); } catch { /* noop */ }
+    try { sessionStorage.removeItem('aimeat.inbox.open'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
     if (target === 'requests') { await loadLists(); return; }
     const fromRequest = target.startsWith('req:'); if (fromRequest) target = target.slice(4);
-    const convs = await messages.listConversations().catch(() => []);
+    const convs = await messages.listConversations().catch(err => { swallowed('inbox-tab', err); return []; });
     const conv = convs.find(c => c.conversationId === target);
     if (conv) openConversation(conv); else if (fromRequest) await loadLists();
     // openConversation uses only stable setters/refs (no stale-closure risk); keeping it out of deps
@@ -591,12 +593,12 @@ export default function InboxTab({ showToast }) {
   }, [consumeDeepLink]);
 
   const accept = async (contactId) => {
-    await messages.acceptRequest(contactId).catch(() => {});
+    await messages.acceptRequest(contactId).catch(err => { swallowed('inbox-tab', err); return {}; });
     showToast?.(t('inbox.acceptedToast'));
     await loadLists();
   };
   const block = async (contactId) => {
-    await messages.blockContact(contactId).catch(() => {});
+    await messages.blockContact(contactId).catch(err => { swallowed('inbox-tab', err); return {}; });
     showToast?.(t('inbox.blockedToast'));
     await loadLists();
     if (activeConv?.peerGhii === contactId) { setActiveConv(null); setThread([]); setMode('idle'); }
@@ -615,7 +617,7 @@ export default function InboxTab({ showToast }) {
       });
       if (resp?.ok === false) showToast?.(resp?.error?.message || t('inbox.failed'), true);
       else { await loadThread(activeConv); loadLists(); }
-    } catch { showToast?.(t('inbox.failed'), true); }
+    } catch (err) { swallowed('inbox-tab', err); showToast?.(t('inbox.failed'), true); }
     setSending(false);
   };
 
@@ -657,7 +659,7 @@ export default function InboxTab({ showToast }) {
         setReplyQuote(null);
         // If this send fulfils a Tracked Response awaiting approval, mark it replied.
         if (replyingTrId) {
-          await tracked.markTrackedResponseReplied(replyingTrId, resp?.data?.message?.id).catch(() => {});
+          await tracked.markTrackedResponseReplied(replyingTrId, resp?.data?.message?.id).catch(err => { swallowed('inbox-tab: replyTo', err); });
           setReplyingTrId(null); setDraftPrefill('');
         }
         const conv = activeConv || { conversationId: resp?.data?.message?.conversationId, peerGhii: recipient };
@@ -665,7 +667,7 @@ export default function InboxTab({ showToast }) {
         await loadThread(conv);
         loadLists();
       }
-    } catch {
+    } catch (err) { swallowed('inbox-tab: replyTo', err);
       showToast?.(t('inbox.failed'), true);
     }
     setSending(false);

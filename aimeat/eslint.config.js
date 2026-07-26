@@ -89,6 +89,18 @@ export default tseslint.config(
     },
   },
   {
+    // The browser SPA. There is no server logger here, and printing every suppressed failure would
+    // destroy a signal this project measures against: Rule 1b verification treats a clean console as
+    // evidence. So the frontend records them instead — public/js/swallowed.js keeps a bounded buffer,
+    // readable at any time with AIMEAT_SWALLOWED() and echoed to the console only under ?debug=1.
+    // Browser idioms where the throw IS the answer (storage blocked, no user gesture, a cache entry
+    // that is not JSON) carry a disable saying so.
+    files: ['public/**/*.js'],
+    rules: {
+      'aimeat/no-silent-catch': 'error',
+    },
+  },
+  {
     // The no-build frontend in public/ is type-checked by tsconfig.frontend.json (checkJs),
     // which detects undefined names with full type info. eslint's no-undef can't see the
     // browser/SDK globals (window, document, AIMEAT, …) and would only flood with false

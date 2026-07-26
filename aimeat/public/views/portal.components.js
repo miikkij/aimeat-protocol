@@ -12,6 +12,7 @@ import { CopyButton as BaseCopyButton } from "/components/CopyButton.js";
 import { StatusDot } from "/components/StatusDot.js";
 import { hasAuth, getCurrentSession, timeAgo } from "./portal.helpers.js";
 import { buildMainPrompt, buildFullBuilderPrompt, buildAgentPrompt, buildConnectPrompt } from "./portal.prompts.js";
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 const NODE_URL = window.location.origin;
@@ -48,11 +49,11 @@ export function OnelinersFeed() {
               setMessages(d.data.value.messages.slice(-20).reverse());
             }
           })
-          .catch(() => {});
+          .catch(err => { swallowed('portal.components: load', err); });
       }
       load();
       iv = setInterval(load, 15000);
-    }).catch(() => {});
+    }).catch(err => { swallowed('portal.components: load', err); });
     return () => { if (iv) clearInterval(iv); };
   }, []);
 
@@ -124,7 +125,7 @@ function UserWorldAccordion() {
 
       setIdentity({ owner: s.owner || '-', ghii: s.ghii || '-' });
 
-      const safe = (p) => p.then(v => v).catch(() => null);
+      const safe = (p) => p.then(v => v).catch(err => { swallowed('portal.components: safe', err); return null; });
       const responses = await Promise.all([
         safe(s.fetch('/v1/wallet')),
         safe(s.fetch('/v1/agents')),

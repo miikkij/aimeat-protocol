@@ -22,6 +22,7 @@ import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** Weighted score: critical=3, major=2, minor=1. Returns 0-100 or null. */
 export function computeWeightedScore(dims) {
@@ -58,7 +59,7 @@ export async function callModel(projectId, prompt, modelId, { retries = 1, tempe
       });
       if (!raw.ok) {
         let msg = `HTTP ${raw.status}`;
-        try { const e = await raw.json(); msg = e.error?.message || msg; } catch { /* ignore */ }
+        try { const e = await raw.json(); msg = e.error?.message || msg; } catch (err) { swallowed('calibrator-batch.helpers: callModel', err); }
         // Retry on 502/503/429
         if (attempt < retries && (raw.status === 502 || raw.status === 503 || raw.status === 429)) {
           console.warn(`callModel retry ${attempt + 1}/${retries}: ${msg}`);
@@ -97,7 +98,7 @@ export function extractJson(text) {
   const start = text.indexOf('{');
   const end = text.lastIndexOf('}');
   if (start === -1 || end === -1 || end <= start) return null;
-  try { return JSON.parse(text.slice(start, end + 1)); } catch { return null; }
+  try { return JSON.parse(text.slice(start, end + 1)); } catch { return null; }   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
 }
 
 export function scoreClass(score) {

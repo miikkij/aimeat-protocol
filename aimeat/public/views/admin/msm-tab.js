@@ -24,6 +24,7 @@ import { escHtml } from '/js/utils.js';
 import { dt, Empty, ExpandableHelp, ErrorBox, useToast, Toast } from './shared.js';
 import { getMsmDetail, createMsm, updateMsm, deleteMsm, getMsmTemplates, getMsmTemplate } from '/js/services/admin.js';
 import { Modal } from '/components/Modal.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function MsmTab({ data, reload }) {
   const integrations = data.msm?.integrations || [];
@@ -61,7 +62,7 @@ export default function MsmTab({ data, reload }) {
       try {
         const r = await getMsmTemplates();
         setTemplates(r.data?.templates || []);
-      } catch { setTemplates([]); }
+      } catch (err) { swallowed('msm-tab', err); setTemplates([]); }
     }
   }
 

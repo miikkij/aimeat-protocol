@@ -15,6 +15,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, apiPost, apiDelete, api } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * List agents owned by the given owner. Returns array.
@@ -71,7 +72,7 @@ export async function getAgentEngagements(agentName) {
   try {
     const data = await apiGet(`/v1/agents/${encodeURIComponent(agentName)}/engagements`);
     return Array.isArray(data?.data?.engagements) ? data.data.engagements : [];
-  } catch { return []; }
+  } catch (err) { swallowed('agents: getAgentEngagements', err); return []; }
 }
 
 /** List chat session agents (name starts with 'session-'). */
@@ -126,7 +127,7 @@ export async function getAgentGroups() {
     const resp = await apiGet('/v1/memory?prefix=agents.groups');
     const item = (resp?.data?.items || []).find(i => i.key === 'agents.groups');
     return Array.isArray(item?.value?.groups) ? item.value.groups : [];
-  } catch { return []; }
+  } catch (err) { swallowed('agents: item', err); return []; }
 }
 
 /** Persist the owner's custom agent groups. */

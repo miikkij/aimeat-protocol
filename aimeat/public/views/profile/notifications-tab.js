@@ -13,6 +13,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner, ToggleSwitch, GlassCard } from './shared.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function NotificationsTab({ session, showToast }) {
   const [loading, setLoading] = useState(true);
@@ -49,7 +50,7 @@ export default function NotificationsTab({ session, showToast }) {
           setSubscribed(!!sub);
         }
       }
-    } catch { /* push not configured */ }
+    } catch (err) { swallowed('notifications-tab: NotificationsTab', err); }
     // Check email verification status
     try {
       const ghii = session.ghii || `${session.owner}@${window.AIMEAT?.auth?.nodeId || ''}`;
@@ -62,7 +63,7 @@ export default function NotificationsTab({ session, showToast }) {
       if (prefsRes.data?.value) {
         setEmailPrefs(prefsRes.data.value);
       }
-    } catch { /* no prefs yet */ }
+    } catch (err) { swallowed('notifications-tab: NotificationsTab', err); }
     setLoading(false);
   }, [session]);
 
@@ -140,7 +141,8 @@ export default function NotificationsTab({ session, showToast }) {
       await apiDelete('/v1/push/subscribe');
       setSubscribed(false);
       showToast(t('profile.notifications.unsubscribeSuccess'));
-    } catch {
+    } catch (err) {
+      swallowed('notifications-tab: handleUnsubscribe', err);
       showToast(t('profile.notifications.unsubscribeFailed'), true);
     }
     setSubStatus(null);
@@ -154,7 +156,8 @@ export default function NotificationsTab({ session, showToast }) {
         return;
       }
       showToast(t('profile.notifications.testSent'));
-    } catch {
+    } catch (err) {
+      swallowed('notifications-tab: handleTestPush', err);
       showToast(t('profile.notifications.testFailed'), true);
     }
   }
@@ -172,7 +175,8 @@ export default function NotificationsTab({ session, showToast }) {
       });
       setEmailPrefs(newPrefs);
       showToast(t('profile.notifications.emailPrefsSaved'));
-    } catch {
+    } catch (err) {
+      swallowed('notifications-tab: handleSaveEmailPrefs', err);
       showToast(t('profile.notifications.emailPrefsFailed'), true);
     }
     setSavingEmail(false);

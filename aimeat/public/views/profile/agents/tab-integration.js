@@ -47,6 +47,7 @@ import { t, tOr } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { detectAgentState } from './state-detector.js';
+import { swallowed } from '/js/swallowed.js';
 import {
   getOnboarding, startOnboarding, getIntegrationOverview,
   getWebhookConfig, testWebhook, updateWebhook,
@@ -80,7 +81,7 @@ export default function TabIntegration({ agent, onboarding, showToast, agentName
       // back to the individual reads. Each composite sub-object mirrors the matching endpoint's `.data`.
       const [ov, sbResp] = await Promise.all([
         getIntegrationOverview(agentName),
-        getSkillBundleVersion(agentName).catch(() => null),
+        getSkillBundleVersion(agentName).catch(err => { swallowed('tab-integration: TabIntegration', err); return null; }),
       ]);
       setBundleVersion(sbResp?.data || null);
       if (ov) {
@@ -89,15 +90,15 @@ export default function TabIntegration({ agent, onboarding, showToast, agentName
         setPostChecklist(ov.onboarding?.post_onboarding_checklist || null);
       } else {
         const [whResp, dlResp, obResp] = await Promise.all([
-          getWebhookConfig(agentName).catch(() => null),
-          getDeliveryLog(agentName, 10).catch(() => null),
-          getOnboarding(agentName).catch(() => null),
+          getWebhookConfig(agentName).catch(err => { swallowed('tab-integration: TabIntegration', err); return null; }),
+          getDeliveryLog(agentName, 10).catch(err => { swallowed('tab-integration: TabIntegration', err); return null; }),
+          getOnboarding(agentName).catch(err => { swallowed('tab-integration: TabIntegration', err); return null; }),
         ]);
         setWebhook(whResp?.data || null);
         setDeliveries(dlResp?.data?.deliveries || []);
         setPostChecklist(obResp?.data?.post_onboarding_checklist || null);
       }
-    } catch { /* silent */ }
+    } catch (err) { swallowed('tab-integration: TabIntegration', err); }
     if (showSpinner) setLoading(false);
   }, [agentName]);
 
@@ -124,7 +125,8 @@ export default function TabIntegration({ agent, onboarding, showToast, agentName
         showToast(t('profile.agents.webhook.testFailed'), true);
       }
       loadData();
-    } catch {
+    } catch (err) {
+      swallowed('tab-integration: handleTestWebhook', err);
       showToast(t('profile.agents.webhook.testFailed'), true);
     }
     setTesting(false);
@@ -187,7 +189,8 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" &&
       showToast(t('profile.agents.detail.integration.webhookUpdated'));
       setEditingWebhook(false);
       loadData();
-    } catch {
+    } catch (err) {
+      swallowed('tab-integration: handleSaveWebhook', err);
       showToast(t('profile.agents.detail.integration.webhookUpdateError'), true);
     }
     setSavingWebhook(false);
@@ -205,7 +208,7 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" &&
       await updateSkillBundle(agentName);
       showToast(t('profile.agents.detail.integration.update'));
       loadData();
-    } catch { /* silent */ }
+    } catch (err) { swallowed('tab-integration: handleUpdateBundle', err); }
     setUpdatingBundle(false);
   }
 
@@ -230,7 +233,7 @@ curl -H "Authorization: Bearer <jwt>" -o skill-bundle.zip "${skillBundleUrl}" &&
     try {
       const resp = await getDeliveryLog(agentName, 200);
       setAllDeliveries(resp?.data?.deliveries || []);
-    } catch { /* silent */ }
+    } catch (err) { swallowed('tab-integration: handleShowAll', err); }
     setShowAllDeliveries(true);
   }
 

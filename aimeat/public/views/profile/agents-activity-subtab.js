@@ -21,6 +21,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { getActivity, getActivityLog } from '/js/services/agent-activity.js';
+import { swallowed } from '/js/swallowed.js';
 
 const RANGE_OPTIONS = [
   { days: 7, label: '7d' },
@@ -180,7 +181,8 @@ export default function AgentActivitySubtab({ agentName }) {
       setEvents(logResp?.data?.events || []);
       setHasMoreLog((logResp?.data?.events || []).length >= 20);
       setLogPage(1);
-    } catch {
+    } catch (err) {
+      swallowed('agents-activity-subtab: loadData', err);
       setStats(null);
       setHistory([]);
       setJobs([]);
@@ -216,8 +218,9 @@ export default function AgentActivitySubtab({ agentName }) {
       setEvents(prev => [...prev, ...newEvents]);
       setLogPage(nextPage);
       setHasMoreLog(newEvents.length >= 20);
-    } catch {
+    } catch (err) {
       // silent
+      swallowed('agents-activity-subtab: handleViewMore', err);
     }
   }
 

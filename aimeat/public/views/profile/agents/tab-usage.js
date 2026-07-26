@@ -20,6 +20,7 @@ import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { getLedgerUsage, getLedgerRuns, getLedgerUsageOverview } from '/js/services/ledger.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -55,14 +56,15 @@ export default function TabUsage({ agent, agentName }) {
         setRuns(ov.runs || []);
       } else {
         const [modelResp, runsResp] = await Promise.all([
-          getLedgerUsage(gaii, { groupBy: 'model' }).catch(() => null),
-          getLedgerRuns(gaii, { limit: 50 }).catch(() => null),
+          getLedgerUsage(gaii, { groupBy: 'model' }).catch(err => { swallowed('tab-usage: loadData', err); return null; }),
+          getLedgerRuns(gaii, { limit: 50 }).catch(err => { swallowed('tab-usage: loadData', err); return null; }),
         ]);
         setTotals(modelResp?.data?.totals || null);
         setByModel(modelResp?.data?.groups || []);
         setRuns(runsResp?.data?.runs || []);
       }
-    } catch {
+    } catch (err) {
+      swallowed('tab-usage: loadData', err);
       setTotals(null);
       setByModel([]);
       setRuns([]);

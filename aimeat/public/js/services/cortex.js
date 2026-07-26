@@ -13,6 +13,7 @@
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 import { getNodeUrl } from '/js/services/auth.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** List installed extensions. Returns { extensions: [...], total: number }. */
 export async function listExtensions() {
@@ -26,7 +27,7 @@ export async function listExtensions() {
 export async function getExtensionDetail(name) {
   const enc = encodeURIComponent(name);
   let data;
-  try { data = await apiGet(`/v1/cortex/${enc}`); } catch { return null; }
+  try { data = await apiGet(`/v1/cortex/${enc}`); } catch (err) { swallowed('cortex', err); return null; }
   const ext = data.data?.extension || data.data;
 
   // Fetch prompt content for each prompt component
@@ -35,14 +36,14 @@ export async function getExtensionDetail(name) {
     try {
       const pd = await apiGet(`/v1/cortex/${enc}/prompts/${encodeURIComponent(p.name)}`);
       if (pd.data?.content) p._content = pd.data.content;
-    } catch { /* skip */ }
+    } catch (err) { swallowed('cortex: prompts', err); }
   }));
 
   // Fetch ontology
   try {
     const ontData = await apiGet(`/v1/cortex/${enc}/ontology`);
     ext._ontologies = ontData.data?.ontologies || [];
-  } catch { ext._ontologies = []; }
+  } catch (err) { swallowed('cortex', err); ext._ontologies = []; }
 
   return ext;
 }
@@ -98,7 +99,7 @@ export async function installBundledExtension(bundledId, ownerNamespace) {
   try {
     const jsResp = await fetch(`${url}/cortex-bundled/${bundledId}.js`);
     if (jsResp.ok) libs[`${bundledId}.js`] = await jsResp.text();
-  } catch { /* no lib file, ok */ }
+  } catch (err) { swallowed('cortex: installBundledExtension', err); }
 
   return installExtension(manifest, libs);
 }

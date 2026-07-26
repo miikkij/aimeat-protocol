@@ -20,6 +20,7 @@ import { t } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { num, dt, Empty, StatsGrid } from './shared.js';
 import * as api from '/js/services/admin-agent-integration.js';
+import { swallowed } from '/js/swallowed.js';
 
 
 export default function AgentIntegrationTab({ data: _data, session }) {
@@ -44,7 +45,7 @@ export default function AgentIntegrationTab({ data: _data, session }) {
       setOnboarding(onbRes.data || null);
       setReadiness(readRes.data || null);
       setBundles(bundRes.data?.bundles || null);
-    } catch { /* API unavailable */ }
+    } catch (err) { swallowed('agent-integration-tab: AgentIntegrationTab', err); }
     setLoading(false);
   }, [session]);
 
@@ -59,7 +60,7 @@ export default function AgentIntegrationTab({ data: _data, session }) {
     try {
       await api.regenerateBundles(session);
       await loadData();
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('agent-integration-tab: handleRegenerate', err); }
     setRegenerating(false);
   };
 
@@ -141,7 +142,7 @@ function AddPlatformForm({ session, onDone, onCancel }) {
         detect_pattern: pattern.trim() || undefined,
       });
       onDone();
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('agent-integration-tab: handleSubmit', err); }
     setSubmitting(false);
   };
 
@@ -212,7 +213,7 @@ function StuckAgentRow({ agent, session, onAction }) {
     try {
       await api.sendReminder(session, agent.agent_gaii);
       onAction();
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('agent-integration-tab: handleRemind', err); }
     setActing(false);
   };
 
@@ -221,7 +222,7 @@ function StuckAgentRow({ agent, session, onAction }) {
     try {
       await api.skipOnboardingStep(session, agent.agent_gaii, agent.current_step);
       onAction();
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('agent-integration-tab: handleSkip', err); }
     setActing(false);
   };
 
@@ -301,7 +302,7 @@ function renderSkillBundles(bundles, onRegenerate, regenerating, session) {
     try {
       await api.notifyOutdatedAgents(session, platform);
       window.dispatchEvent(new CustomEvent('aimeat-toast', { detail: { message: t('admin.agentIntegration.notifySuccess') } }));
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('agent-integration-tab: handleNotify', err); }
   };
 
   return html`

@@ -32,6 +32,7 @@ import { collectImages, ImageStrip } from '/components/ImageDeliverable.js';
 import WorkflowForm from './workflows-form.js';
 
 import { EmptyState } from '/components/EmptyState.js';
+import { swallowed } from '/js/swallowed.js';
 const html = htm.bind(h);
 
 /** Pick a display string from a localized value (string | { locale: text }). */
@@ -195,9 +196,9 @@ function DetailView({ id, onBack, onOpenRun, onRun, onEdit }) {
 
   const load = useCallback(async () => {
     const [d, bp, rr] = await Promise.all([
-      getWorkflow(id).catch(() => null),
+      getWorkflow(id).catch(err => { swallowed('workflows-tab: DetailView', err); return null; }),
       getBlueprint(id).catch(e => ({ _err: e.message })),
-      listRuns(id).catch(() => null),
+      listRuns(id).catch(err => { swallowed('workflows-tab: DetailView', err); return null; }),
     ]);
     setDef(d?.data || null);
     if (bp?._err) setErr(bp._err); else setBlueprint(bp?.data || null);

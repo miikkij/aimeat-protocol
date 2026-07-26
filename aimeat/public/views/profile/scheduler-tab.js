@@ -31,6 +31,7 @@ import ScheduleItem, { formatUntil } from './schedule-item.js';
 import SchedulerCalendar from './scheduler-calendar.js';
 
 import { EmptyState } from '/components/EmptyState.js';
+import { swallowed } from '/js/swallowed.js';
 const html = htm.bind(h);
 
 /** Scroll to and briefly flash a schedule's card (or extension row) by id. */
@@ -74,7 +75,7 @@ export default function SchedulerTab({ showToast }) {
         setData(ov.schedules);
         setAgents(ov.agents);
       } else {
-        const [schedRes, agentsRes] = await Promise.all([listAllSchedules(), listAgents().catch(() => null)]);
+        const [schedRes, agentsRes] = await Promise.all([listAllSchedules(), listAgents().catch(err => { swallowed('scheduler-tab: SchedulerTab', err); return null; })]);
         setData(schedRes?.data || { managed: [], extensions: [], agentInternal: [] });
         setAgents(agentsRes?.data?.agents || []);
       }

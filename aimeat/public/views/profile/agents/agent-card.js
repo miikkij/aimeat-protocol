@@ -83,6 +83,7 @@ import TabUsage from './tab-usage.js';
 import TabSchedules from './tab-schedules.js';
 import TabQuality from './tab-quality.js';
 import TabServices from './tab-services.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -127,9 +128,7 @@ async function fetchReadme(agent) {
     const found = Array.isArray(items) ? items.find(it => it.key === key) : null;
     const value = found?.value;
     return typeof value === 'string' ? value : '';
-  } catch {
-    return '';
-  }
+  } catch (err) { swallowed('agent-card', err); return ''; }
 }
 
 // Maps a tab id to its change-count key in the `changes` prop. Badges live ONLY on
@@ -636,7 +635,8 @@ function ProblemZone2({ agent, setActiveTab, showToast }) {
       } else {
         showToast(t('profile.agents.detail.zone2.testWebhookFailed'), true);
       }
-    } catch {
+    } catch (err) {
+      swallowed('agent-card: handleTestWebhook', err);
       showToast(t('profile.agents.detail.zone2.testWebhookFailed'), true);
     }
     setTesting(false);
@@ -652,7 +652,8 @@ function ProblemZone2({ agent, setActiveTab, showToast }) {
       } else {
         showToast(t('profile.agents.detail.zone2.urlUpdateFailed'), true);
       }
-    } catch {
+    } catch (err) {
+      swallowed('agent-card: handleSaveUrl', err);
       showToast(t('profile.agents.detail.zone2.urlUpdateFailed'), true);
     }
   }

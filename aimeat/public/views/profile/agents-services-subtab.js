@@ -78,6 +78,7 @@ export default function AgentServicesSubtab({ agentName, session, showToast }) {
         showToast(t('profile.agents.services.unpublished'));
         loadServices();
       } else {
+        // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error already being reported
         const body = await resp.json().catch(() => ({}));
         showToast(body.error?.message || t('profile.agents.services.unpublishError'), true);
       }

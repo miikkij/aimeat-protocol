@@ -48,6 +48,7 @@ import { t, getLocale } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import NodeTotals from './landing-node-totals.js';
+import { swallowed } from '/js/swallowed.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -61,7 +62,7 @@ function StatsPanel({ navigate }) {
   useEffect(() => {
     fetch('/v1/public/node-stats-today').then(r => r.json())
       .then(j => { if (j?.ok !== false) setStats(j.data); })
-      .catch(() => { /* fallback line stays */ });
+      .catch(err => { swallowed('landing: StatsPanel', err); });
   }, []);
 
   const parts = [];
@@ -93,7 +94,7 @@ function fmtPublished(iso) {
   try {
     const d = new Date(iso);
     return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch { return ''; }
+  } catch (err) { swallowed('landing: fmtPublished', err); return ''; }
 }
 
 function Gallery() {
@@ -104,7 +105,7 @@ function Gallery() {
     // apps (no manage flag), so the wall never surfaces moderated/hidden apps.
     fetch('/v1/apps?sort=popular&limit=60').then(r => r.json())
       .then(j => setApps(j?.data?.apps || []))
-      .catch(() => { /* empty state renders */ });
+      .catch(err => { swallowed('landing: Gallery', err); });
   }, []);
 
   const ql = q.trim().toLowerCase();
@@ -334,22 +335,23 @@ function BuildAppPrompt() {
       const list = ((d.data && d.data.templates) || []).filter(t => t.kind !== 'component');
       list.sort((a, b) => (a.kind === 'use-case' ? 0 : 1) - (b.kind === 'use-case' ? 0 : 1));
       setTemplates(list);
-    }).catch(() => {});
+    }).catch(err => { swallowed('landing: list', err); });
   }, []);
   const onPick = async (e) => {
     const id = e.target.value; setTplId(id);
     if (!id) { setTplContent(''); return; }
     try { const d = await (await fetch('/v1/app-templates/' + encodeURIComponent(id))).json(); setTplContent((d.data && d.data.template && d.data.template.content) || ''); }
-    catch { setTplContent(''); }
+    catch (err) { swallowed('landing', err); setTplContent(''); }
   };
   const [canonical, setCanonical] = useState('');
-  useEffect(() => { fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(() => {}); }, []);
+  useEffect(() => { fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(err => { swallowed('landing: onPick', err); }); }, []);
   const prompt = appendTemplateBlock(canonical || buildLandingAppPrompt(window.location.origin), tplContent);
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(prompt);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    // eslint-disable-next-line aimeat/no-silent-catch -- prompt is visible to select manually
     } catch { /* prompt is visible to select manually */ }
   };
   return html`
@@ -447,6 +449,7 @@ function BuildAgentPrompt() {
       await navigator.clipboard.writeText(prompt);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    // eslint-disable-next-line aimeat/no-silent-catch -- prompt is visible to select manually
     } catch { /* prompt is visible to select manually */ }
   };
   return html`
@@ -470,6 +473,7 @@ function AskYourAI() {
       await navigator.clipboard.writeText(ASK_AI_PROMPT);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    // eslint-disable-next-line aimeat/no-silent-catch -- clipboard blocked — the prompt is visible to select manually
     } catch { /* clipboard blocked — the prompt is visible to select manually */ }
   };
   return html`
@@ -489,10 +493,11 @@ function AskYourAI() {
 function BuildHero() {
   const [copied, setCopied] = useState(false);
   const [canonical, setCanonical] = useState('');
-  useEffect(() => { fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(() => {}); }, []);
+  useEffect(() => { fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(err => { swallowed('landing', err); return {}; }); }, []);
   const prompt = canonical || buildLandingAppPrompt(window.location.origin);
   const copy = async () => {
     try { await navigator.clipboard.writeText(prompt); setCopied(true); setTimeout(() => setCopied(false), 2000); }
+    // eslint-disable-next-line aimeat/no-silent-catch -- the full prompt is also visible lower on the page
     catch { /* the full prompt is also visible lower on the page */ }
   };
   return html`
@@ -516,11 +521,12 @@ export default function Landing({ navigate }) {
   // shows the landing — otherwise a logged-in user could never see this page at all.
   // The in-app flag is set by spa.html's handleNav (sessionStorage, per browser tab).
   useEffect(() => {
-    try { if (sessionStorage.getItem('aimeat.in-app') === '1') return undefined; } catch { /* fall through */ }
+    try { if (sessionStorage.getItem('aimeat.in-app') === '1') return undefined; } catch { /* fall through */ }   // eslint-disable-line aimeat/no-silent-catch -- fall through
     const check = () => {
       try {
         const raw = localStorage.getItem('aimeat_session');
         if (raw && JSON.parse(raw)?.jwt) { navigate('/v1/profile'); return true; }
+      // eslint-disable-next-line aimeat/no-silent-catch -- stay on landing
       } catch { /* stay on landing */ }
       return false;
     };

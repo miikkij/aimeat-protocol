@@ -24,6 +24,7 @@ import { useConfirm } from '/components/Modal.js';
 import * as nodesService from '/js/services/nodes.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import NodeStatsTab from './node-stats-tab.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* Default export below wraps the node list and Node stats into one page with
  * sub-tabs — Node stats left the sidebar menu (2026-06-10 sidebar reorg). */
@@ -58,7 +59,7 @@ function NodesList({ session, showToast, onStats }) {
       const list = await nodesService.listNodes();
       setNodes(list);
       onStats?.({ nodes: list.length });
-    } catch { setNodes([]); onStats?.({ nodes: 0 }); }
+    } catch (err) { swallowed('nodes-tab', err); setNodes([]); onStats?.({ nodes: 0 }); }
   }
 
   async function handleRegister(nodeId, vis, gaiis) {

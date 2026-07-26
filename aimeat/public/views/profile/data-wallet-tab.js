@@ -29,6 +29,7 @@ import { Spinner, recipientBadge, isExpiringSoon } from './shared.js';
 import { DataTable } from '/components/DataTable.js';
 import * as consentService from '/js/services/consent.js';
 import { ContactPicker } from '/components/ContactPicker.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function DataWalletTab({ session, showToast }) {
   const [consents, setConsents] = useState(null);
@@ -61,21 +62,21 @@ export default function DataWalletTab({ session, showToast }) {
     try {
       const list = await consentService.listConsents();
       setConsents(Array.isArray(list) ? list : []);
-    } catch { setConsents([]); }
+    } catch (err) { swallowed('data-wallet-tab', err); setConsents([]); }
   }
 
   async function loadAudit(days) {
     try {
       const list = await consentService.listAuditEntries(days);
       setAuditEntries(Array.isArray(list) ? list : []);
-    } catch { setAuditEntries([]); }
+    } catch (err) { swallowed('data-wallet-tab', err); setAuditEntries([]); }
   }
 
   async function loadPermSummary() {
     try {
       const data = await consentService.getPermissionSummary();
       setPermSummary(data || null);
-    } catch { setPermSummary(null); }
+    } catch (err) { swallowed('data-wallet-tab', err); setPermSummary(null); }
   }
 
   // Live update listener
@@ -128,7 +129,7 @@ export default function DataWalletTab({ session, showToast }) {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch { showToast(t('profile.error'), true); }
+    } catch (err) { swallowed('data-wallet-tab', err); showToast(t('profile.error'), true); }
   }
 
   const filteredConsents = consents?.filter(c => {

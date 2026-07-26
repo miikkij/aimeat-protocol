@@ -11,6 +11,7 @@
  */
 
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 export async function getOnboarding(agentName) {
   return apiGet(`/v1/agents/${encodeURIComponent(agentName)}/onboarding`);
@@ -25,7 +26,7 @@ export async function getIntegrationOverview(agentName) {
   try {
     const resp = await apiGet(`/v1/agents/${encodeURIComponent(agentName)}/integration/overview`);
     return resp?.data ?? null;
-  } catch { return null; }
+  } catch (err) { swallowed('agent-integration: getIntegrationOverview', err); return null; }
 }
 
 export async function startOnboarding(agentName) {

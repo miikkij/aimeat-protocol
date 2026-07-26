@@ -30,6 +30,7 @@ import {
   PENDING_ANALYSIS, PENDING_REFLECTION, PENDING_SYNTHESIS, PasteBack, CollapsiblePre,
 } from './calibrator-batch.helpers.js';
 import { Step4View } from './calibrator-batch.step4.js';
+import { swallowed } from '/js/swallowed.js';
 
 
 // ── BatchCard Component ──
@@ -317,7 +318,7 @@ export default function BatchCard({ batchSummary, index, projectId, project, cur
         const { getVersion } = await import('/js/services/calibrator.js');
         const ver = await getVersion(projectId, batchVersion);
         if (ver?.prompt) batchPrompt = ver.prompt;
-      } catch { /* best effort — fall through to the no-prompt guard below */ }
+      } catch (err) { swallowed('calibrator-batch: handleApplySelected', err); }
     }
     if (!batchPrompt) { showToast?.('Could not load prompt for this batch\'s version', true); return; }
 
@@ -380,6 +381,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
           clearInterval(applyTimer); setApplyingFixes(false);
           return;
         }
+      // eslint-disable-next-line aimeat/no-silent-catch -- not pure JSON — good, it's a prompt
       } catch { /* not pure JSON — good, it's a prompt */ }
       await createVersion(projectId, {
         prompt: trimmed,

@@ -10,6 +10,7 @@
  *   v1.0.0 — 2026-07-18 — initial: surface tier + proof ledger on the Cortex Libraries cards.
  */
 import { useState, useEffect } from 'preact/hooks';
+import { swallowed } from '/js/swallowed.js';
 
 /** Fetch the node's library-pack tier/proof ledger once, keyed by pack id (public endpoint). */
 export function useMaturityLedger() {
@@ -19,7 +20,7 @@ export function useMaturityLedger() {
       const map = {};
       for (const p of (d.data?.packs || [])) if (p.modelTier) map[p.id] = p;
       setLedger(map);
-    }).catch(() => { /* older node without the endpoint — cards just omit the badge */ });
+    }).catch(err => { swallowed('extensions-tab.maturity: useMaturityLedger', err); });
   }, []);
   return ledger;
 }

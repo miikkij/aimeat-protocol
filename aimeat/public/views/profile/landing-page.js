@@ -104,6 +104,7 @@ import { getMemory, createMemory } from "/js/services/memory.js";
 import { minidenticon } from "/lib/minidenticons.min.js";
 import { syncTabHistory } from "./landing-page.helpers.js";
 import { EditProfileModal, ChangePasswordModal } from "./landing-page.modals.js";
+import { swallowed } from '/js/swallowed.js';
 import {
   ProfileCard, WaitingForYou, NextSteps, UsageCard, AiSpendCard, AgentLedgerCard,
   CommerceCard, ContinueCard, AgentsCard, CortexSection, InboxNavButton,
@@ -161,6 +162,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
       // Fall back to a ?tab= deep link (also how Back/Forward restores a tab).
       const tabId = new URLSearchParams(window.location.search).get('tab');
       if (tabId) return { tabId, slot: 'main' };
+    // eslint-disable-next-line aimeat/no-silent-catch -- ignore
     } catch { /* ignore */ }
     return null;
   });
@@ -172,7 +174,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Extensions promo: onboarding-only (apps < 3) and dismissable for good.
   const [showPromo, setShowPromo] = useState(() => { try { return localStorage.getItem('aimeat.cortexPromoDismissed') !== '1'; } catch { return true; } });
-  const dismissPromo = () => { setShowPromo(false); try { localStorage.setItem('aimeat.cortexPromoDismissed', '1'); } catch { /* noop */ } };
+  const dismissPromo = () => { setShowPromo(false); try { localStorage.setItem('aimeat.cortexPromoDismissed', '1'); } catch { /* noop */ } };   // eslint-disable-line aimeat/no-silent-catch -- noop
 
   const owner = session.owner;
 
@@ -181,7 +183,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
     try {
       const list = await listApps();
       setApps(Array.isArray(list) ? list.filter(a => a.owner === owner) : []);
-    } catch { setApps([]); }
+    } catch (err) { swallowed('landing-page', err); setApps([]); }
     finally { setAppsLoaded(true); }
   }, [owner]);
 
@@ -205,6 +207,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
     try {
       if (next) sessionStorage.setItem('aimeat-profile-tab', JSON.stringify(next));
       else sessionStorage.removeItem('aimeat-profile-tab');
+    // eslint-disable-next-line aimeat/no-silent-catch -- noop
     } catch { /* noop */ }
     // Push a history entry so Back returns here (skipped when reacting to popstate).
     if (!fromPopRef.current) syncTabHistory(next?.tabId || null, false);
@@ -217,6 +220,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   useEffect(() => {
     getMemory('sidebar.pins', { soft: true })
       .then(r => { const v = r?.data?.value; if (Array.isArray(v) && v.length) setPins(v.filter(id => SIDEBAR_ITEM_BY_ID[id])); })
+      // eslint-disable-next-line aimeat/no-silent-catch -- defaults stand
       .catch(() => { /* defaults stand */ });
   }, []);
   const togglePin = (id) => {
@@ -225,7 +229,7 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
       if (prev.includes(id)) next = prev.filter(x => x !== id);
       else if (prev.length >= 5) { showToast?.(t('profile.landing.pinLimit') || 'Max 5 pinned items'); return prev; }
       else next = [...prev, id];
-      createMemory('sidebar.pins', next, 'private').catch(() => {});
+      createMemory('sidebar.pins', next, 'private').catch(err => { swallowed('landing-page', err); return {}; });
       return next;
     });
   };
@@ -238,13 +242,13 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
     setCollapsedGroups(prev => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key); else next.add(key);
-      try { localStorage.setItem('aimeat.sidebar.collapsed', JSON.stringify([...next])); } catch { /* noop */ }
+      try { localStorage.setItem('aimeat.sidebar.collapsed', JSON.stringify([...next])); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
       return next;
     });
   };
 
   const close = useCallback(() => {
-    try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }
+    try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
     if (!fromPopRef.current) syncTabHistory(null, false);
     setOpenView(null);
   }, []);
@@ -259,10 +263,10 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
       try {
         if (tabId && !(INFRA_TAB_IDS.has(tabId) && !isOperator)) {
           const v = { tabId, slot: 'main' };
-          try { sessionStorage.setItem('aimeat-profile-tab', JSON.stringify(v)); } catch { /* noop */ }
+          try { sessionStorage.setItem('aimeat-profile-tab', JSON.stringify(v)); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
           setOpenView(v);
         } else {
-          try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }
+          try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
           setOpenView(null);
         }
       } finally {

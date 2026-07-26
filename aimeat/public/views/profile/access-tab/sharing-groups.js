@@ -16,6 +16,7 @@ import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import * as groupsApi from '/js/services/sharing-groups.js';
+import { swallowed } from '/js/swallowed.js';
 
 export function SharingGroupsSection({ showToast, initial }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -47,7 +48,8 @@ export function SharingGroupsSection({ showToast, initial }) {
     try {
       const resp = await groupsApi.listGroups();
       setGroups(resp?.data?.groups || []);
-    } catch {
+    } catch (err) {
+      swallowed('sharing-groups: SharingGroupsSection', err);
       setGroups([]);
     }
   }, []);
@@ -62,6 +64,7 @@ export function SharingGroupsSection({ showToast, initial }) {
         setShowCreate(true);
         setTimeout(() => document.getElementById('access-sharing-groups')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 400);
       }
+    // eslint-disable-next-line aimeat/no-silent-catch -- noop
     } catch { /* noop */ }
   }, []);
 

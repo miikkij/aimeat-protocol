@@ -42,7 +42,7 @@ export default function PortfolioTab({ session, navigate, showToast }) {
   // prop function of uncertain stability, and adding it could re-fire the forward before unmount.
   useEffect(() => {
     if (cfg !== undefined && !cfg?.enabled) {
-      try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }
+      try { sessionStorage.removeItem('aimeat-profile-tab'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
       navigate('/v1/portfolio');
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps

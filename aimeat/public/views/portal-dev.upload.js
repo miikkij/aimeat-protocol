@@ -6,6 +6,7 @@
  */
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import { html, NODE_URL, dt, formatBytes, CopyBtn } from './portal-dev.shared.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* ══════════════════════════════════════════════
    UPLOAD SECTION (Step 4)
@@ -117,7 +118,7 @@ function CommunityApps({ locale, isLoggedIn, session }) {
       .then(d => {
         if (d.ok && d.data?.apps) setApps(d.data.apps);
       })
-      .catch(() => {});
+      .catch(err => { swallowed('portal-dev.upload: CommunityApps', err); });
   }, []);
 
   const [codePending, setCodePending] = useState({});
@@ -136,7 +137,8 @@ function CommunityApps({ locale, isLoggedIn, session }) {
       fetch('/v1/apps').then(r => r.json()).then(d2 => {
         if (d2.ok && d2.data?.apps) setApps(d2.data.apps);
       });
-    } catch {
+    } catch (err) {
+      swallowed('portal-dev.upload: CommunityApps', err);
       setCodePending(p => ({ ...p, [filename]: 'error' }));
     }
   }, [session]);

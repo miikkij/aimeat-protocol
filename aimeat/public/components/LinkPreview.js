@@ -39,7 +39,7 @@ function loadDismissed() {
   try { return new Set(JSON.parse(localStorage.getItem(DISMISS_KEY) || '[]')); } catch { return new Set(); }
 }
 function saveDismissed(set) {
-  try { localStorage.setItem(DISMISS_KEY, JSON.stringify([...set].slice(-500))); } catch { /* quota */ }
+  try { localStorage.setItem(DISMISS_KEY, JSON.stringify([...set].slice(-500))); } catch { /* quota */ }   // eslint-disable-line aimeat/no-silent-catch -- quota
 }
 
 /** One preview card. Renders nothing while loading, or if the link has no usable metadata. */

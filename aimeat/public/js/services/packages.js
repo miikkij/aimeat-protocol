@@ -74,6 +74,7 @@ export async function importPackageZip(file) {
     body: formData,
   });
   if (!res.ok) {
+    // eslint-disable-next-line aimeat/no-silent-catch -- the body is read only to enrich an error already being reported
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error?.message || `Import failed: ${res.status}`);
   }

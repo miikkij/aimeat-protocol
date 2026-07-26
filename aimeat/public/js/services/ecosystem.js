@@ -17,6 +17,7 @@
  *     disappears — no 'revoked' ghost) and cleans up the app's automation config; deposited data is kept.
  */
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** The owner's connected GEAIs. Returns an array. */
 export async function listEcosystemApps() {
@@ -92,7 +93,7 @@ export async function getAutomationOverview(app) {
     const d = data?.data;
     if (!d) return null;
     return { schedules: d.schedules || [], recipe: d.recipe ?? null, organisms: d.organisms || [], advisories: d.advisories || [] };
-  } catch { return null; }
+  } catch (err) { swallowed('ecosystem: getAutomationOverview', err); return null; }
 }
 
 /** Upsert the automation recipe for an app. body: { agents, organism?, email?, requireApproval?, enabled, trigger? }. */

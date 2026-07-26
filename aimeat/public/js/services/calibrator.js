@@ -14,6 +14,7 @@
  */
 
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 const BASE = '/v1/calibrator';
 
@@ -43,7 +44,7 @@ export async function getProjectDetail(id) {
   try {
     const resp = await apiGet(`${BASE}/${id}/detail`);
     return resp?.data ?? null;
-  } catch { return null; }
+  } catch (err) { swallowed('calibrator: getProjectDetail', err); return null; }
 }
 
 export async function updateProject(id, updates) {

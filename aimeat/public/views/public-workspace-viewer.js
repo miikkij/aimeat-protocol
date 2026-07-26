@@ -31,6 +31,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
 import { useViewCSS } from '/components/useViewCSS.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -67,12 +68,12 @@ export default function PublicWorkspaceViewer() {
       const session = window.AIMEAT?.auth?.getSession?.();
       if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
       let st = null;
-      try { st = sessionStorage.getItem(shareTokenKey(org, ws)); } catch { /* storage unavailable */ }
+      try { st = sessionStorage.getItem(shareTokenKey(org, ws)); } catch { /* storage unavailable */ }   // eslint-disable-line aimeat/no-silent-catch -- storage unavailable
       if (st) headers['X-Share-Token'] = st;
       const res = await fetch(`/v1/organisms/${encodeURIComponent(org)}/workspace/public/documents?ws=${encodeURIComponent(ws)}`, { headers });
       if (res.status === 404) { setDocs([]); setGate(null); return; }
       if (res.status === 401) {
-        const body = await res.json().catch(() => null);
+        const body = await res.json().catch(err => { swallowed('public-workspace-viewer', err); return null; });
         const code = body?.error?.code;
         setGate(code === 'SHARE_ACCOUNT_REQUIRED' ? 'account' : 'password');
         setDocs([]);
@@ -105,11 +106,12 @@ export default function PublicWorkspaceViewer() {
         body: JSON.stringify({ ws, password: pw }),
       });
       if (res.status === 429) { setUnlockErr(t('pwv.passwordTooMany') || 'Too many attempts — try again in a few minutes.'); return; }
-      const body = await res.json().catch(() => null);
+      const body = await res.json().catch(err => { swallowed('public-workspace-viewer: PublicWorkspaceViewer', err); return null; });
       if (!res.ok || !body?.data?.share_token) { setUnlockErr(t('pwv.passwordWrong') || 'Wrong password.'); return; }
-      try { sessionStorage.setItem(shareTokenKey(org, ws), body.data.share_token); } catch { /* storage unavailable */ }
+      try { sessionStorage.setItem(shareTokenKey(org, ws), body.data.share_token); } catch { /* storage unavailable */ }   // eslint-disable-line aimeat/no-silent-catch -- storage unavailable
       setPw(''); setDocs(undefined); setGate(null);
       await load();
+    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     } catch {
       setUnlockErr(t('pwv.passwordWrong') || 'Wrong password.');
     } finally {
@@ -189,6 +191,7 @@ export default function PublicWorkspaceViewer() {
       await navigator.clipboard.writeText(aiLink);
       setCopied(true);
       setTimeout(() => setCopied(false), 1800);
+    // eslint-disable-next-line aimeat/no-silent-catch -- clipboard unavailable — ignore
     } catch { /* clipboard unavailable — ignore */ }
   }, [aiLink]);
 

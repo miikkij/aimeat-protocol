@@ -17,6 +17,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { onLiveUpdate } from '/lib/live-updates.js';
+import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const num = (n) => (Number(n) || 0).toLocaleString();
@@ -30,7 +31,7 @@ export default function NodeTotals() {
       fetch('/v1/public/node-totals')
         .then(r => r.json())
         .then(j => { if (alive && j && j.ok !== false && j.data) setTotals(j.data); })
-        .catch(() => { /* keep last value — panel renders a graceful placeholder */ });
+        .catch(err => { swallowed('landing-node-totals: load', err); });
     };
     load();
     const off = onLiveUpdate(['agents', 'apps', 'organisms'], () => load());

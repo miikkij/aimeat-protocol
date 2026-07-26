@@ -7,6 +7,7 @@
 import { useState, useCallback } from 'preact/hooks';
 import { sanitizeHtml, copyToClipboard } from '/js/utils.js';
 import { html, NODE_URL, dt, GOAL_LIST, CopyBtn } from './portal-dev.shared.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* ══════════════════════════════════════════════
    PANELS (MCP, API, Browse, Prompt Package)
@@ -238,7 +239,7 @@ function PromptPackagePanel({ locale, platform, variant, isLoggedIn }) {
         if (d.ok) setPromptText(d.data.prompt);
         else setPromptText('Error: ' + (d.error?.message || 'Unknown'));
       })
-      .catch(() => { setLoading(false); setPromptText('Failed to load prompt.'); });
+      .catch((err) => { swallowed('portal-dev.panels', err); setLoading(false); setPromptText('Failed to load prompt.'); });
   }, [platform, variant, isLoggedIn]);
 
   return html`

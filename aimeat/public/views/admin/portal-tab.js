@@ -29,6 +29,7 @@ import {
   importSiteBundle, triggerLbSync, getHeaderNav, saveHeaderNav,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
+import { swallowed } from '/js/swallowed.js';
 
 // Public header link ids → their nav i18n label key (mirror of PUBLIC_NAV_LINKS in spa.html
 // and PUBLIC_NAV_LINK_IDS in src/services/site.ts). Gated links are not configurable.
@@ -68,7 +69,7 @@ export default function PortalTab({ data, reload }) {
     try {
       const res = await getSiteMemoryKeys();
       setMemKeys(res.data?.keys || []);
-    } catch { setMemKeys([]); }
+    } catch (err) { swallowed('portal-tab', err); setMemKeys([]); }
   }
 
   async function loadNav() {
@@ -79,7 +80,7 @@ export default function PortalTab({ data, reload }) {
       setNavLinks(order
         .filter(id => HEADER_LINK_LABELS[id])
         .map(id => ({ id, visible: !hidden.has(id) })));
-    } catch { setNavLinks([]); }
+    } catch (err) { swallowed('portal-tab', err); setNavLinks([]); }
   }
 
   function toggleNav(id) {

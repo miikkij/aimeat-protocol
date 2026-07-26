@@ -14,6 +14,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* ── Package Import ── */
 
@@ -42,7 +43,7 @@ export async function getKnowledgeTab() {
     const d = data?.data;
     if (!d) return null;
     return { packages: d.packages || [], consents: d.consents || [] };
-  } catch { return null; }
+  } catch (err) { swallowed('knowledge: getKnowledgeTab', err); return null; }
 }
 
 export async function getPackage(packageId) {

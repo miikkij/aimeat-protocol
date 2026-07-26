@@ -21,6 +21,7 @@ import * as memoryService from '/js/services/memory.js';
 import { listSubscriptions } from '/js/services/boards.js';
 import { listInstances, listPackages } from '/js/services/packages.js';
 import { Spinner } from './shared.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* ───── Panel registry ───── */
 
@@ -88,7 +89,7 @@ function AgentsPanel({ session, switchTab }) {
     try {
       const list = await listAgents(session.owner);
       setAgents(Array.isArray(list) ? list.slice(0, 5) : []);
-    } catch { setAgents([]); }
+    } catch (err) { swallowed('inline-panels', err); setAgents([]); }
     setLoading(false);
   }, [session.owner]);
 
@@ -133,7 +134,7 @@ function MemoryPanel({ switchTab }) {
     try {
       const list = await memoryService.listMemories();
       setItems(Array.isArray(list) ? list.slice(0, 3) : []);
-    } catch { setItems([]); }
+    } catch (err) { swallowed('inline-panels', err); setItems([]); }
     setLoading(false);
   }, []);
 
@@ -178,7 +179,7 @@ function BoardsPanel({ switchTab }) {
     try {
       const list = await listSubscriptions();
       setBoards(Array.isArray(list) ? list.slice(0, 4) : []);
-    } catch { setBoards([]); }
+    } catch (err) { swallowed('inline-panels', err); setBoards([]); }
     setLoading(false);
   }, []);
 
@@ -231,7 +232,7 @@ function PackagesPanel({ switchTab }) {
         const list = pkgs.value?.data || pkgs.value || [];
         setAvailable(Array.isArray(list) ? list.slice(0, 3) : []);
       }
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('inline-panels: PackagesPanel', err); }
     setLoading(false);
   }, []);
 

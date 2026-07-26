@@ -232,7 +232,7 @@ function loadOpts(storageKey) {
 }
 function saveOpts(storageKey, opts) {
   if (!storageKey) return;
-  try { localStorage.setItem(`aimeat.mm.${storageKey}`, JSON.stringify(opts)); } catch { /* quota/private mode — non-fatal */ }
+  try { localStorage.setItem(`aimeat.mm.${storageKey}`, JSON.stringify(opts)); } catch { /* quota/private mode — non-fatal */ }   // eslint-disable-line aimeat/no-silent-catch -- quota/private mode — non-fatal
 }
 
 /**

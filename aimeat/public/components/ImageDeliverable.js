@@ -47,6 +47,7 @@ function asStructured(value, format) {
     const looksJson = s[0] === '{' || s[0] === '[';
     if (s && (looksJson || format === 'json')) {
       try { const p = JSON.parse(s); if (p !== null && typeof p === 'object') return p; }
+      // eslint-disable-next-line aimeat/no-silent-catch -- not JSON after all — fall through to text
       catch { /* not JSON after all — fall through to text */ }
     }
   }
@@ -128,7 +129,7 @@ export function collectImages(value, altFallback) {
 function needsAuth(url) {
   if (/^data:/i.test(url)) return false;
   let path = url;
-  try { path = new URL(url, window.location.origin).pathname; } catch { /* keep relative */ }
+  try { path = new URL(url, window.location.origin).pathname; } catch { /* keep relative */ }   // eslint-disable-line aimeat/no-silent-catch -- keep relative
   if (path.includes('/v1/pub/')) return false;            // public, anon-readable
   return /\/v1\/(memory|storage|deliverables)\b/.test(path);
 }

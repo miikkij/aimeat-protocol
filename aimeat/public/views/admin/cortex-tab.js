@@ -21,6 +21,7 @@ import { escHtml } from '/js/utils.js';
 import { Badge, StatsGrid, Empty, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as cortexService from '/js/services/cortex.js';
+import { swallowed } from '/js/swallowed.js';
 
 const COMP_ICONS = { schema: '\u{1F4D0}', prompt: '\u{1F4AC}', action: '\u26A1', 'board-template': '\u{1F4CC}', ontology: '\u{1F9EC}', 'seed-data': '\u{1F331}', lib: '\u{1F4E6}' };
 
@@ -37,7 +38,7 @@ export default function CortexTab() {
     try {
       const resp = await cortexService.listExtensions();
       setExtensions(resp?.extensions || []);
-    } catch { if (showSpinner) setExtensions([]); }
+    } catch (err) { swallowed('cortex-tab', err); if (showSpinner) setExtensions([]); }
     setLoading(false);
   }, []);
 

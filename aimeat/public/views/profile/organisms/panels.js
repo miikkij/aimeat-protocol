@@ -23,6 +23,7 @@ import * as orgService from '/js/services/organisms.js';
 import { listPosts, createPost } from '/js/services/boards.js';
 import { copyToClipboard } from '/js/utils.js';
 import { relTime } from '/views/profile/organisms/helpers.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * Content search inside an organism — case-insensitive substring over the records + documents of
@@ -42,7 +43,7 @@ export function OrgSearch({ orgId, onOpenWorkspace }) {
     setBusy(true);
     const tid = setTimeout(async () => {
       try { const r = await orgService.searchOrganism(orgId, query); if (!cancelled) setResults(r?.data?.results || []); }
-      catch { if (!cancelled) setResults([]); }
+      catch (err) { swallowed('panels', err); if (!cancelled) setResults([]); }
       finally { if (!cancelled) setBusy(false); }
     }, 220);
     return () => { cancelled = true; clearTimeout(tid); };
@@ -51,7 +52,7 @@ export function OrgSearch({ orgId, onOpenWorkspace }) {
   // Open a hit at the exact record/document: stash the deep-link the workspace reads on mount, then
   // navigate to that workspace (its openDoc effect resolves namespace → space tab + opens the item).
   const openHit = (r) => {
-    try { sessionStorage.setItem(`aimeat.ws.${orgId}.${r.ws}.openDoc`, JSON.stringify({ namespace: r.namespace, id: r.id })); } catch { /* noop */ }
+    try { sessionStorage.setItem(`aimeat.ws.${orgId}.${r.ws}.openDoc`, JSON.stringify({ namespace: r.namespace, id: r.id })); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
     onOpenWorkspace?.(r.ws);
   };
 
@@ -90,7 +91,7 @@ export function IncomingInvitations({ showToast, onChanged }) {
   const [invites, setInvites] = useState([]);
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
-    const r = await orgService.listMyInvitations().catch(() => null);
+    const r = await orgService.listMyInvitations().catch(err => { swallowed('panels: IncomingInvitations', err); return null; });
     setInvites(r?.data?.invitations || []);
   }, []);
   useEffect(() => { load(); }, [load]);

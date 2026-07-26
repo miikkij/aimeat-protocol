@@ -15,6 +15,7 @@ import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as boardsService from '/js/services/boards.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** Extract the owner name from a GAII or GHII string. */
 function extractOwner(gaii) {
@@ -44,7 +45,7 @@ export default function BoardsTab({ session, showToast }) {
 
   async function loadMyData() {
     try { setMyBoards(await boardsService.listSubscriptions()); }
-    catch { setMyBoards([]); }
+    catch (err) { swallowed('boards-tab', err); setMyBoards([]); }
   }
 
   // Live update listener
@@ -54,7 +55,7 @@ export default function BoardsTab({ session, showToast }) {
 
   async function loadAllData() {
     try { setAllBoards(await boardsService.listAllBoards()); }
-    catch { setAllBoards([]); }
+    catch (err) { swallowed('boards-tab', err); setAllBoards([]); }
   }
 
   async function handleCreate(name, desc, vis) {
@@ -62,7 +63,7 @@ export default function BoardsTab({ session, showToast }) {
     if (resp.ok !== false) {
       // Auto-subscribe owner to their own board so it appears in "my boards"
       const boardId = resp.data?.id || resp.data?.board_id;
-      if (boardId) await boardsService.subscribe(boardId).catch(() => {});
+      if (boardId) await boardsService.subscribe(boardId).catch(err => { swallowed('boards-tab: handleCreate', err); });
       showToast(t('profile.boards.created'));
       setShowBrdForm(false);
       loadMyData();
@@ -98,7 +99,7 @@ export default function BoardsTab({ session, showToast }) {
       const boardData = myBoards?.find(b => (b.board_id || b.id) === boardId)
         || allBoards?.find(b => (b.board_id || b.id) === boardId);
       setBoardView({ id: boardId, name: boardName, posts, boardData });
-    } catch { setBoardView({ id: boardId, name: boardName, posts: [], boardData: null }); }
+    } catch (err) { swallowed('boards-tab', err); setBoardView({ id: boardId, name: boardName, posts: [], boardData: null }); }
   }
 
   async function handlePost(boardId, content) {

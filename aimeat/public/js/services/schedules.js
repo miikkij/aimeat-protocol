@@ -18,6 +18,7 @@
  *     projected cron fire-times for the Profile › Scheduler calendar.
  */
 import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** Master aggregate: { managed, extensions, agentInternal }. */
 export async function listAllSchedules() {
@@ -35,7 +36,7 @@ export async function getSchedulerTab() {
     const d = res?.data;
     if (!d) return null;
     return { schedules: d.schedules || { managed: [], extensions: [], agentInternal: [] }, agents: d.agents || [] };
-  } catch { return null; }
+  } catch (err) { swallowed('schedules: getSchedulerTab', err); return null; }
 }
 
 /**

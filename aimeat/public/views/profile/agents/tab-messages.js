@@ -33,6 +33,7 @@ import { timeAgo } from '/js/utils.js';
 import { sendMessage, listMessages, listThreads, getMessagesOverview } from '/js/services/agent-messages.js';
 import { getAgentCommands } from '/js/services/agent-integration.js';
 import { Markdown } from '/components/Markdown.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -122,7 +123,7 @@ export default function TabMessages({ agent, agentName, showToast }) {
 
   function applyCommands(value) {
     if (Array.isArray(value)) setCommands(value);
-    else if (typeof value === 'string') { try { setCommands(JSON.parse(value)); } catch { setCommands([]); } }
+    else if (typeof value === 'string') { try { setCommands(JSON.parse(value)); } catch { setCommands([]); } }   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     else setCommands([]);
   }
 
@@ -132,10 +133,11 @@ export default function TabMessages({ agent, agentName, showToast }) {
       const data = resp?.data?.value;
       if (Array.isArray(data)) setCommands(data);
       else if (typeof data === 'string') {
-        try { setCommands(JSON.parse(data)); } catch { setCommands([]); }
+        try { setCommands(JSON.parse(data)); } catch { setCommands([]); }   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
       } else {
         setCommands([]);
       }
+    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     } catch { setCommands([]); }
   }
 
@@ -145,7 +147,7 @@ export default function TabMessages({ agent, agentName, showToast }) {
       if (activeThread) opts.threadId = activeThread;
       const res = await listMessages(agentName, opts);
       setMessages(res?.data?.messages || []);
-    } catch { setMessages([]); }
+    } catch (err) { swallowed('tab-messages', err); setMessages([]); }
     setLoading(false);
   }
 
@@ -153,7 +155,7 @@ export default function TabMessages({ agent, agentName, showToast }) {
     try {
       const res = await listThreads(agentName);
       setThreads(res?.data?.threads || []);
-    } catch { setThreads([]); }
+    } catch (err) { swallowed('tab-messages', err); setThreads([]); }
   }
 
   useEffect(() => {

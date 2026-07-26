@@ -19,6 +19,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner, KebabMenu } from './shared.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { swallowed } from '/js/swallowed.js';
 import {
   getFlowPromptText, getBuildPromptText, getCuratedPitfalls, getLearnedPitfalls,
   updateLearnedPitfall, deleteLearnedPitfall, getTemplateProposals, deleteTemplateProposal,
@@ -79,7 +80,7 @@ function LearnedPitfalls({ showToast }) {
   const [expanded, setExpanded] = useState(null);
 
   async function load(shared = includeShared) {
-    try { setData(await getLearnedPitfalls(shared)); } catch { setData({ pitfalls: [], total: 0 }); }
+    try { setData(await getLearnedPitfalls(shared)); } catch (err) { swallowed('appdev-tab', err); setData({ pitfalls: [], total: 0 }); }
   }
   const liveRef = useRef(load); liveRef.current = load;
   useEffect(() => { liveRef.current(includeShared); }, [includeShared]);
@@ -161,7 +162,7 @@ function TemplateProposals({ showToast }) {
   const [expanded, setExpanded] = useState(null);
 
   async function load() {
-    try { setData(await getTemplateProposals()); } catch { setData({ templates: [], total: 0 }); }
+    try { setData(await getTemplateProposals()); } catch (err) { swallowed('appdev-tab', err); setData({ templates: [], total: 0 }); }
   }
   useEffect(() => { load(); }, []);
   const liveRef = useRef(load); liveRef.current = load;

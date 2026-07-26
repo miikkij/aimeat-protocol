@@ -35,6 +35,7 @@ import { t } from '/js/i18n.js';
 import { apiGet, apiPut, apiPost, apiDelete } from '/js/api.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import { useConfirm } from '/components/Modal.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** Compact number (73306 → "73.3k") for token axis/labels. */
 function fmtCompact(n) {
@@ -87,7 +88,7 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
         if (resp.data.max_tokens != null) setMaxTokens(String(resp.data.max_tokens));
         if (resp.data.hasApiKey) loadModels();
       }
-    } catch { /* no settings yet */ }
+    } catch (err) { swallowed('openrouter-settings: loadSettings', err); }
     setLoaded(true);
   }
 
@@ -432,9 +433,9 @@ function AiAppsBudgetPanel() {
 
   async function reload() {
     const [u, s, hist] = await Promise.all([
-      apiGet('/v1/ai/usage').catch(() => null),
-      apiGet('/v1/ai/settings').catch(() => null),
-      apiGet('/v1/ai/usage/history?days=30').catch(() => null),
+      apiGet('/v1/ai/usage').catch(err => { swallowed('openrouter-settings: reload', err); return null; }),
+      apiGet('/v1/ai/settings').catch(err => { swallowed('openrouter-settings: reload', err); return null; }),
+      apiGet('/v1/ai/usage/history?days=30').catch(err => { swallowed('openrouter-settings: reload', err); return null; }),
     ]);
     if (hist && hist.ok !== false && hist.data) setHistory(hist.data);
     if (u && u.ok !== false && u.data) setUsage(u.data);

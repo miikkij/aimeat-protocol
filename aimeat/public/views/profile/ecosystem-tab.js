@@ -124,6 +124,7 @@ import { listEcosystemApps, listAppData, listPending, approve, revoke, listSubsc
 import { ECO_PRESETS } from './ecosystem-tab.helpers.js';
 import { EcoAutomationSection } from './ecosystem-tab.automation.js';
 import { EcoDataEntry, EcoSetupGuide, EcoAskInClaude, EcoTechDetails } from './ecosystem-tab.cards.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function EcosystemTab({ onStats, showToast }) {
   const [apps, setApps] = useState([]);
@@ -142,8 +143,9 @@ export default function EcosystemTab({ onStats, showToast }) {
     try {
       const items = await listAppData(app);
       setAppData(d => ({ ...d, [geai]: items }));
-    } catch {
+    } catch (err) {
       // Leave the cached value (if any); a transient failure shouldn't blank the section.
+      swallowed('ecosystem-tab: loadAppData', err);
     }
   };
 
@@ -157,7 +159,8 @@ export default function EcosystemTab({ onStats, showToast }) {
       const [a, p, s] = await Promise.all([listEcosystemApps(), listPending(), listSubscriptions()]);
       setApps(a); setPending(p); setSubs(s);
       onStats?.({ ecosystem: a.length });
-    } catch {
+    } catch (err) {
+      swallowed('ecosystem-tab: loadData', err);
       showToast?.(t('profile.ecosystem.loadError'), 'error');
     } finally {
       setLoading(false);
@@ -198,26 +201,26 @@ export default function EcosystemTab({ onStats, showToast }) {
       await approve(userCode, { action: 'approve', scopes: ECO_PRESETS[preset] });
       showToast?.(t('profile.ecosystem.approved'), 'success');
       await loadData();
-    } catch { showToast?.(t('profile.ecosystem.approveError'), 'error'); }
+    } catch (err) { swallowed('ecosystem-tab', err); showToast?.(t('profile.ecosystem.approveError'), 'error'); }
   }
   async function onDeny(userCode) {
     try { await approve(userCode, { action: 'deny' }); await loadData(); }
-    catch { showToast?.(t('profile.ecosystem.approveError'), 'error'); }
+    catch (err) { swallowed('ecosystem-tab', err); showToast?.(t('profile.ecosystem.approveError'), 'error'); }
   }
   async function onRevokeConfirm() {
     const app = revokeApp;
     setRevokeApp(null); setRevokeInput('');
     try { await revoke(app); showToast?.(t('profile.ecosystem.revoked'), 'success'); await loadData(); }
-    catch { showToast?.(t('profile.ecosystem.revokeError'), 'error'); }
+    catch (err) { swallowed('ecosystem-tab', err); showToast?.(t('profile.ecosystem.revokeError'), 'error'); }
   }
   async function onSubscribe(app) {
     const event = subForm[app]?.event || 'memory.write';
     try { await subscribe(app, event); setSubForm(f => ({ ...f, [app]: {} })); await loadData(); }
-    catch { showToast?.(t('profile.ecosystem.subError'), 'error'); }
+    catch (err) { swallowed('ecosystem-tab', err); showToast?.(t('profile.ecosystem.subError'), 'error'); }
   }
   async function onUnsubscribe(app, event) {
     try { await unsubscribe(app, event); await loadData(); }
-    catch { showToast?.(t('profile.ecosystem.subError'), 'error'); }
+    catch (err) { swallowed('ecosystem-tab', err); showToast?.(t('profile.ecosystem.subError'), 'error'); }
   }
 
   if (loading) return html`<div class="pf-eco"><${Spinner} /></div>`;

@@ -9,6 +9,7 @@
  *   v1.0.0 — 2026-07-16 — Initial: list/add/remove/resolveEmail/searchDirectory.
  */
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** The merged address book. opts: { q, state }. Returns [{ contact_id, kind, display_name, state, origin, has_messages }]. */
 export async function listContacts(opts = {}) {
@@ -43,5 +44,5 @@ export async function searchDirectory(q) {
     const resp = await apiGet(`/v1/ghii/list?q=${encodeURIComponent(q)}`);
     const list = resp?.data?.humans ?? [];
     return Array.isArray(list) ? list : [];
-  } catch { return []; }
+  } catch (err) { swallowed('contacts: searchDirectory', err); return []; }
 }

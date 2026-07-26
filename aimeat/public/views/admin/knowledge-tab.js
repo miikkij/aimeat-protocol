@@ -18,6 +18,7 @@ import { escHtml } from '/js/utils.js';
 import { Badge, Spinner, Empty } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as adminService from '/js/services/admin.js';
+import { swallowed } from '/js/swallowed.js';
 
 const CONTENT_TYPES = ['document', 'research', 'idea', 'plan', 'dataset', 'tutorial', 'collection', 'article', 'story', 'fiction'];
 const MATURITY_OPTS = ['draft', 'review', 'published'];
@@ -44,7 +45,7 @@ export default function KnowledgeAdminTab() {
     try {
       const resp = await adminService.getKnowledgePackages({ flagged: showFlaggedOnly || undefined });
       setPackages(resp?.data?.packages || []);
-    } catch { setPackages([]); }
+    } catch (err) { swallowed('knowledge-tab', err); setPackages([]); }
     finally { setLoading(false); }
   }, [showFlaggedOnly]);
 

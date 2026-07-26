@@ -34,7 +34,7 @@ export function useLinkPreviewToggle() {
     try { return localStorage.getItem(LINK_PREVIEWS_KEY) !== 'off'; } catch { return true; }
   });
   const toggleLinkPreviews = () => setShow((v) => {
-    try { localStorage.setItem(LINK_PREVIEWS_KEY, v ? 'off' : 'on'); } catch { /* quota */ }
+    try { localStorage.setItem(LINK_PREVIEWS_KEY, v ? 'off' : 'on'); } catch { /* quota */ }   // eslint-disable-line aimeat/no-silent-catch -- quota
     return !v;
   });
   return { showLinkPreviews, toggleLinkPreviews };

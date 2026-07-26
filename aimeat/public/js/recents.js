@@ -21,6 +21,7 @@ function readAll() {
     const raw = localStorage.getItem(KEY);
     const list = raw ? JSON.parse(raw) : [];
     return Array.isArray(list) ? list : [];
+  // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
   } catch { return []; }
 }
 
@@ -31,6 +32,7 @@ export function recordRecent(item) {
     const list = readAll().filter(x => !(x.type === item.type && x.id === item.id));
     list.unshift({ type: item.type, id: item.id, label: item.label, sub: item.sub || '', data: item.data || {}, at: new Date().toISOString() });
     localStorage.setItem(KEY, JSON.stringify(list.slice(0, CAP)));
+  // eslint-disable-next-line aimeat/no-silent-catch -- recents are a convenience — never break the caller
   } catch { /* recents are a convenience — never break the caller */ }
 }
 

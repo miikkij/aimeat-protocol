@@ -1,3 +1,4 @@
+import { swallowed } from '/js/swallowed.js';
 /**
  * @file public/sw.js
  * @description AIMEAT push-notification service worker. Displays incoming Web Push messages and
@@ -40,7 +41,8 @@ self.addEventListener('push', (event) => {
       options.actions = data.actions.slice(0, 2).map((a) => ({ action: a.action, title: a.title }));
     }
     event.waitUntil(self.registration.showNotification(title, options));
-  } catch {
+  } catch (err) {
+    swallowed('sw', err);
     const text = event.data.text();
     event.waitUntil(self.registration.showNotification('AIMEAT', { body: text }));
   }
@@ -61,7 +63,7 @@ self.addEventListener('notificationclick', (event) => {
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
       for (const client of windowClients) {
         let clientUrl;
-        try { clientUrl = new URL(client.url); } catch { continue; }
+        try { clientUrl = new URL(client.url); } catch { continue; }   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
         if (clientUrl.origin !== target.origin || clientUrl.pathname !== target.pathname) continue;
         // A focused SPA runs the action with the owner's session; a plain click just switches view.
         client.postMessage(actionMsg || { type: 'aimeat-notification-click', url: target.pathname + target.search + target.hash });

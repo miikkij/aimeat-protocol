@@ -12,6 +12,7 @@
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
+import { swallowed } from '/js/swallowed.js';
 const html = htm.bind(h);
 
 export default function AuthImage({ src, alt, ...props }) {
@@ -42,7 +43,8 @@ export default function AuthImage({ src, alt, ...props }) {
         urlRef.current = url;
         setBlobUrl(url);
       })
-      .catch(() => {
+      .catch((err) => {
+        swallowed('auth-image', err);
         if (!cancelled) setBlobUrl(null);
       });
 

@@ -25,6 +25,7 @@ import { listAppSchedules, createCapabilitySchedule, setScheduleEnabled, trigger
 import { listAgents } from '/js/services/agents.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { CADENCES, CRON_TO_CADENCE, defaultTriggerGlob, primarySchedulable, allowedCadencesFor, recommendationFor } from './ecosystem-tab.helpers.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * The per-schedule run-history log: lazy-fetches GET /v1/schedules/:id on first
@@ -41,7 +42,7 @@ function EcoScheduleLog({ jobId, refreshKey }) {
     setRuns(undefined);
     getScheduleDetail(jobId)
       .then(d => { if (alive) setRuns(Array.isArray(d.runs) ? d.runs : []); })
-      .catch(() => { if (alive) setRuns([]); });
+      .catch((err) => { swallowed('ecosystem-tab.automation', err); if (alive) setRuns([]); });
     return () => { alive = false; };
   }, [jobId, refreshKey]);
 
@@ -223,17 +224,17 @@ export function EcoAutomationSection({ app, showToast }) {
     // back to the individual reads.
     const [ov, agentList] = await Promise.all([
       getAutomationOverview(app.app),
-      listAgents().catch(() => []),
+      listAgents().catch(err => { swallowed('ecosystem-tab.automation: ownerName', err); return []; }),
     ]);
     let schedList, recipe, orgs, advList;
     if (ov) {
       schedList = ov.schedules; recipe = ov.recipe; orgs = ov.organisms; advList = ov.advisories;
     } else {
       const [s, r, orgResp, a] = await Promise.all([
-        listAppSchedules(app.app).catch(() => []),
-        getAutomationRecipe(app.app).catch(() => null),
-        (ownerName ? listOrganisms({ member: ownerName }) : Promise.resolve(null)).catch(() => null),
-        listPendingAdvisories(app.app).catch(() => null),
+        listAppSchedules(app.app).catch(err => { swallowed('ecosystem-tab.automation: ownerName', err); return []; }),
+        getAutomationRecipe(app.app).catch(err => { swallowed('ecosystem-tab.automation: ownerName', err); return null; }),
+        (ownerName ? listOrganisms({ member: ownerName }) : Promise.resolve(null)).catch(err => { swallowed('ecosystem-tab.automation: ownerName', err); return null; }),
+        listPendingAdvisories(app.app).catch(err => { swallowed('ecosystem-tab.automation: ownerName', err); return null; }),
       ]);
       schedList = s; recipe = r; orgs = orgResp?.data?.organisms || []; advList = a;
     }
@@ -314,7 +315,8 @@ export function EcoAutomationSection({ app, showToast }) {
 
       showToast?.(t('profile.ecosystem.autoSaved'), 'success');
       await load();
-    } catch {
+    } catch (err) {
+      swallowed('ecosystem-tab.automation: cron', err);
       showToast?.(t('profile.ecosystem.autoSaveError'), 'error');
     } finally {
       setSaving(false);
@@ -363,7 +365,8 @@ export function EcoAutomationSection({ app, showToast }) {
       } else {
         showToast?.(t('profile.ecosystem.advFailed'), 'warning');
       }
-    } catch {
+    } catch (err) {
+      swallowed('ecosystem-tab.automation: onApproveAdv', err);
       showToast?.(t('profile.ecosystem.advError'), 'error');
     } finally {
       setAdvBusy(b => ({ ...b, [id]: false }));
@@ -377,7 +380,8 @@ export function EcoAutomationSection({ app, showToast }) {
       await rejectAdvisory(app.app, id);
       showToast?.(t('profile.ecosystem.advRejected'), 'success');
       setAdvisories(list => (list || []).filter(p => p.id !== id));
-    } catch {
+    } catch (err) {
+      swallowed('ecosystem-tab.automation: onRejectAdv', err);
       showToast?.(t('profile.ecosystem.advError'), 'error');
     } finally {
       setAdvBusy(b => ({ ...b, [id]: false }));

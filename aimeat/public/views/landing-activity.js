@@ -18,6 +18,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { swallowed } from '/js/swallowed.js';
 // NOTE: text interpolated as a child below (${ev.summary} etc.) is auto-escaped by
 // Preact, so it is XSS-safe AND renders quotes correctly — do NOT call escHtml here
 // (that would double-escape, surfacing literal &quot; in titles).
@@ -92,7 +93,7 @@ export default function PublicActivityFeed() {
     let es;
     try {
       es = new EventSource('/v1/public/events');
-    } catch { return undefined; }
+    } catch (err) { swallowed('landing-activity: PublicActivityFeed', err); return undefined; }
     es.onmessage = (msg) => {
       let ev;
       try { ev = JSON.parse(msg.data); } catch { return; }
@@ -106,7 +107,7 @@ export default function PublicActivityFeed() {
         setUnseen(u => ({ ...u, [ev.category]: (u[ev.category] || 0) + 1 }));
       }
     };
-    return () => { try { es.close(); } catch { /* ignore */ } };
+    return () => { try { es.close(); } catch (err) { swallowed('landing-activity: PublicActivityFeed', err); } };
   }, []);
 
   const selectTab = (cat) => {

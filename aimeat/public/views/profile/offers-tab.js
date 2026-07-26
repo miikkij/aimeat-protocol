@@ -44,6 +44,7 @@ import { dt } from '/js/format.js';
 import { StatusDot } from '/components/StatusDot.js';
 import * as offersService from '/js/services/offers.js';
 import * as grouping from '/js/services/offers-grouping.js';
+import { swallowed } from '/js/swallowed.js';
 
 const askLabel = (entry, offer) => {
   if (offer?.availability?.scheduleBorn) return t('profile.offers.runNow') || '⏱ Run now';
@@ -98,7 +99,7 @@ function OfferCard({ entry, offer, showToast, confirm, busy, setBusy, onChanged,
     const next = !runsOpen; setRunsOpen(next);
     if (next && runs === undefined) {
       setRuns('loading');
-      const r = await offersService.listOfferRuns({ agent: entry.agent, offerId: offer.id, limit: 5 }).catch(() => []);
+      const r = await offersService.listOfferRuns({ agent: entry.agent, offerId: offer.id, limit: 5 }).catch(err => { swallowed('offers-tab: toggleRuns', err); return []; });
       setRuns(Array.isArray(r) ? r : []);
     }
   };
@@ -261,7 +262,7 @@ function DeliverableRow({ d, showToast, onChanged }) {
     // don't gate on deliverable_key (CrewAI agents often never set it).
     if (next && content === undefined && d.status !== 'failed' && d.agent_gaii) {
       setContent('loading');
-      const v = await offersService.getDeliverableContent({ agentGaii: d.agent_gaii, deliverableKey: d.deliverable_key, taskId: d.task_id }).catch(() => null);
+      const v = await offersService.getDeliverableContent({ agentGaii: d.agent_gaii, deliverableKey: d.deliverable_key, taskId: d.task_id }).catch(err => { swallowed('offers-tab: toggle', err); return null; });
       setContent(v ?? null);
     }
   };
@@ -313,7 +314,7 @@ function DeliverableRow({ d, showToast, onChanged }) {
 function InboxFeed({ showToast }) {
   const [items, setItems] = useState(null);
   const load = useCallback(async () => {
-    const r = await offersService.listDeliverables().catch(() => null);
+    const r = await offersService.listDeliverables().catch(err => { swallowed('offers-tab: InboxFeed', err); return null; });
     setItems(r?.data?.deliverables || []);
   }, []);
   useEffect(() => { load(); }, [load]);
@@ -377,7 +378,7 @@ export default function OffersTab({ session, showToast }) {
     try {
       const r = await offersService.listOffers();
       setFeed(r?.data?.agents || []);
-    } catch { setFeed([]); }
+    } catch (err) { swallowed('offers-tab', err); setFeed([]); }
   }, []);
   useEffect(() => { if (session) load(); }, [session, load]);
   useEffect(() => { if (session) offersService.aiAvailable().then(setAiOn).catch(() => setAiOn(false)); }, [session]);

@@ -31,6 +31,7 @@ import {
   getConfig, saveConfig,
 } from '/js/services/admin.js';
 import { useConfirm } from '/components/Modal.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function FederationTab({ data, reload }) {
   const peeringRequests = data.federation || [];
@@ -82,7 +83,7 @@ export default function FederationTab({ data, reload }) {
   const [bookPrimary, setBookPrimary] = useState(false);
   const loadBook = useCallback(async () => {
     try { const r = await getFederationBook(); setBook(r.data?.book || null); setBookPrimary(!!r.data?.is_primary); }
-    catch { setBook(null); }
+    catch (err) { swallowed('federation-tab', err); setBook(null); }
   }, []);
   useEffect(() => { loadBook(); }, [loadBook]);
   useEffect(() => onLiveUpdate(['federation'], () => loadBook()), [loadBook]);
@@ -114,7 +115,7 @@ export default function FederationTab({ data, reload }) {
     try {
       const r = await getNetworkDirectory(keyword || '');
       setDirEntries(r.data?.entries || []);
-    } catch { setDirEntries([]); }
+    } catch (err) { swallowed('federation-tab', err); setDirEntries([]); }
     finally { setDirLoading(false); }
   }, []);
 

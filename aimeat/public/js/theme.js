@@ -38,6 +38,7 @@ function storedChoice() {
     const v = localStorage.getItem(STORAGE_KEY);
     return VALID.has(v) ? v : null;
   } catch {
+    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     return null;
   }
 }
@@ -68,7 +69,7 @@ export function setTheme(theme, persist = true) {
   const next = VALID.has(theme) ? theme : 'light';
   document.documentElement.dataset.theme = next;
   if (persist) {
-    try { localStorage.setItem(STORAGE_KEY, next); } catch { /* ignore */ }
+    try { localStorage.setItem(STORAGE_KEY, next); } catch { /* ignore */ }   // eslint-disable-line aimeat/no-silent-catch -- ignore
   }
   syncMetaThemeColor(next);
   const detail = { theme: next };

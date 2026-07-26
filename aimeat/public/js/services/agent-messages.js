@@ -11,6 +11,7 @@
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  */
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * Composite mount for the Messages subtab: command palette + enriched threads + message history (page 1)
@@ -21,7 +22,7 @@ export async function getMessagesOverview(agentName) {
   try {
     const resp = await apiGet(`/v1/agents/${encodeURIComponent(agentName)}/messages/overview`);
     return resp?.data ?? null;
-  } catch { return null; }
+  } catch (err) { swallowed('agent-messages: getMessagesOverview', err); return null; }
 }
 
 export async function sendMessage(agentName, content, threadId, linkedTaskId, metadata) {

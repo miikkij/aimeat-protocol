@@ -18,6 +18,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { StatsGrid } from './shared.js';
 import * as api from '/js/services/admin.js';
+import { swallowed } from '/js/swallowed.js';
 
 const STATUSES = ['delivered', 'queued', 'failed', 'undeliverable'];
 const TONE = { delivered: 'good', queued: 'warn', failed: 'bad', undeliverable: 'bad' };
@@ -29,7 +30,7 @@ function relTime(iso) {
     if (s < 3600) return `${Math.floor(s / 60)}m`;
     if (s < 86400) return `${Math.floor(s / 3600)}h`;
     return new Date(iso).toLocaleDateString();
-  } catch { return ''; }
+  } catch (err) { swallowed('messages-tab: relTime', err); return ''; }
 }
 
 export default function MessagesTab() {

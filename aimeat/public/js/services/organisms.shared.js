@@ -8,6 +8,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from organisms.js (max-file-lines)
  */
 import { apiGet } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** Does this space's data live in workspace memory keys (records/documents the workspace view can
  *  show)? Missing backing counts as memory. Mirrors the server's isMemoryBackedSpace — THE one
@@ -29,5 +30,5 @@ export async function getObjectSchema(orgId, wsId, namespace) {
   try {
     const resp = await apiGet(`/v1/memory/${encodeURIComponent(key)}/schema`);
     return resp?.data?.has_schema ? resp.data.schema : null;
-  } catch { return null; }
+  } catch (err) { swallowed('organisms.shared: getObjectSchema', err); return null; }
 }

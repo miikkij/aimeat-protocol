@@ -92,6 +92,7 @@ export function buildWorkspaceModel(ctx) {
     || Object.values(share.spaces || {}).some(Boolean) || Object.values(share.docs || {}).some(Boolean));
   const copyShareLink = async (url) => {
     try { await navigator.clipboard.writeText(window.location.origin + url); showToast(t('organisms.linkCopied') || 'Link copied'); }
+    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     catch { showToast(t('organisms.copyFailed') || 'Copy failed'); }
   };
 

@@ -23,6 +23,7 @@ import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { fmtMoney } from '/js/utils.js';
 import { Spinner } from '/components/Spinner.js';
 import { EmptyState } from '/components/EmptyState.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -67,7 +68,7 @@ export function PaymentsPanel({ org }) {
   }, [org.slug]);
   useEffect(() => {
     let alive = true;
-    fetch('/.well-known/ucp').then(r => r.json()).then(p => { if (alive) setProfile(p); }).catch(() => { if (alive) setProfile(false); });
+    fetch('/.well-known/ucp').then(r => r.json()).then(p => { if (alive) setProfile(p); }).catch((err) => { swallowed('my-company.payments', err); if (alive) setProfile(false); });
     loadPsp(); loadConnect(); loadMoney();
     return () => { alive = false; };
   }, [loadPsp, loadConnect, loadMoney]);

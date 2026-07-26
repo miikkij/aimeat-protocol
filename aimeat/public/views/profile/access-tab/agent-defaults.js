@@ -12,6 +12,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { getOwnerDefaults, upsertOwnerDefaults } from '/js/services/agent-directives.js';
+import { swallowed } from '/js/swallowed.js';
 
 export function AgentDefaultsSection({ showToast, initial }) {
   const [defaults, setDefaults] = useState(initial?.defaults ?? null);   // seeded from /v1/access/overview; else self-loads
@@ -27,7 +28,8 @@ export function AgentDefaultsSection({ showToast, initial }) {
     try {
       const resp = await getOwnerDefaults();
       setDefaults(resp?.data?.defaults || null);
-    } catch {
+    } catch (err) {
+      swallowed('agent-defaults: AgentDefaultsSection', err);
       setDefaults(null);
     }
   }, []);

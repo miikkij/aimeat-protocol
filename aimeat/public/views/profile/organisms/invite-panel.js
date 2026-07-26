@@ -105,7 +105,7 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
   };
 
   const copyAcceptUrl = async (url) => {
-    try { await navigator.clipboard.writeText(url); showToast(t('organisms.linkCopied') || 'Link copied'); } catch { /* clipboard blocked */ }
+    try { await navigator.clipboard.writeText(url); showToast(t('organisms.linkCopied') || 'Link copied'); } catch { /* clipboard blocked */ }   // eslint-disable-line aimeat/no-silent-catch -- clipboard blocked
   };
 
   const submitLabel = isEmail

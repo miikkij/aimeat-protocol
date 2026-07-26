@@ -20,6 +20,7 @@ import { DeliverableBody } from '/components/ImageDeliverable.js';
 import { OfferCardView } from '/components/offer-card-view.js';
 import { Spinner } from '/components/Spinner.js';
 import { EmptyState } from '/components/EmptyState.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -98,7 +99,7 @@ export default function CompaniesView() {
 
   async function loadMyOrders() {
     try { const r = await apiGet('/v1/orders'); setMyOrders(r.data?.orders ?? []); }
-    catch { setMyOrders([]); }
+    catch (err) { swallowed('companies', err); setMyOrders([]); }
   }
   function toggleOrders() { const n = !showOrders; setShowOrders(n); if (n) loadMyOrders(); }
 
@@ -113,7 +114,7 @@ export default function CompaniesView() {
 
   async function openCompany(owner, slug) {
     setSelected({ owner, slug }); setProfile(null); setErr('');
-    try { history.replaceState(null, '', `/v1/companies?c=${encodeURIComponent(owner)}/${encodeURIComponent(slug)}`); } catch { /* ignore */ }
+    try { history.replaceState(null, '', `/v1/companies?c=${encodeURIComponent(owner)}/${encodeURIComponent(slug)}`); } catch (err) { swallowed('companies: openCompany', err); }
     try {
       const r = await apiGet(`/v1/orgs/${encodeURIComponent(owner)}/${encodeURIComponent(slug)}/offerings`);
       setProfile(r.data ?? null);

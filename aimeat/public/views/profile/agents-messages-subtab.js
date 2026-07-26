@@ -27,6 +27,7 @@ import { t } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { sendMessage, listMessages, listThreads } from '/js/services/agent-messages.js';
 import { createTask } from '/js/services/agent-tasks.js';
+import { swallowed } from '/js/swallowed.js';
 
 function ProposedTask({ task, agentName, showToast }) {
   const [creating, setCreating] = useState(false);
@@ -170,7 +171,8 @@ export default function AgentMessagesSubtab({ agentName, showToast }) {
       if (activeThread) opts.threadId = activeThread;
       const res = await listMessages(agentName, opts);
       setMessages(res?.data?.messages || []);
-    } catch {
+    } catch (err) {
+      swallowed('agents-messages-subtab: loadMessages', err);
       setMessages([]);
     }
     setLoading(false);
@@ -180,7 +182,8 @@ export default function AgentMessagesSubtab({ agentName, showToast }) {
     try {
       const res = await listThreads(agentName);
       setThreads(res?.data?.threads || []);
-    } catch {
+    } catch (err) {
+      swallowed('agents-messages-subtab: loadThreads', err);
       setThreads([]);
     }
   }

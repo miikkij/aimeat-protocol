@@ -107,6 +107,7 @@ function parseJwtPayload(jwt) {
     const parts = jwt.split('.');
     if (parts.length !== 3) return null;
     return JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
+  // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
   } catch { return null; }
 }
 

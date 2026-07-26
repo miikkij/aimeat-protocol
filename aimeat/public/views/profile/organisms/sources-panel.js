@@ -21,6 +21,7 @@ import * as knowledgeService from '/js/services/knowledge.js';
 import { EmptyState } from '/components/EmptyState.js';
 import { SearchBar } from '/components/SearchBar.js';
 import { fmtBytes } from '/js/format.js';
+import { swallowed } from '/js/swallowed.js';
 
 const SRC_ICON = { memory: '🧠', storage: '📎', knowledge: '📚' };
 
@@ -70,7 +71,7 @@ export function SourcesPanel({ orgId, wsId, showToast }) {
         const r = await knowledgeService.discoverPackages({ limit: 50, sort: 'recent' });
         setResults((r?.data?.packages || []).filter(p => !ql || String(p.name || '').toLowerCase().includes(ql)));
       }
-    } catch { setResults([]); }
+    } catch (err) { swallowed('sources-panel', err); setResults([]); }
     finally { setLoading(false); }
   };
   const searchRef = useRef(doSearch); searchRef.current = doSearch;

@@ -29,6 +29,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { api } from '/js/api.js';
 import { escHtml } from '/js/utils.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -70,7 +71,7 @@ export default function AppGrant() {
         try {
           const list = await api('/v1/app-grants');
           grant = (list.data?.grants || []).find((g) => g.app === res.data.app) || null;
-        } catch { /* ignore */ }
+        } catch (err) { swallowed('app-grant: doLogin', err); }
         if (!live) return;
         const reqScopes = (res.data.scopes || []).map((s) => s.scope);
         // The owner's OWN app (server-verified: the redirect origin is bound to exactly this app):

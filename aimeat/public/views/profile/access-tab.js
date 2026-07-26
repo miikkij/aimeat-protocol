@@ -40,6 +40,7 @@ import { SharingGroupsSection } from './access-tab/sharing-groups.js';
 import { AgentDefaultsSection } from './access-tab/agent-defaults.js';
 import { ConnectedAppsSection } from './access-tab/connected-apps.js';
 import { AccessTokensSection } from './access-tab/access-tokens.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* ═══════════════════════════════════════════════════════════════════
    Main Access Tab
@@ -52,6 +53,7 @@ function jwtExpiry(jwt) {
     if (!payload.exp) return null;
     const until = new Date(payload.exp * 1000);
     return { until, hoursLeft: Math.max(0, (until.getTime() - Date.now()) / 3600000) };
+  // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
   } catch { return null; }
 }
 
@@ -79,7 +81,7 @@ export default function AccessTab({ session, showToast }) {
       setOverview(d);
     }).catch(() => {
       setOverview(null);   // children self-load; parent falls back to its own two reads
-      apiGet('/v1/consent').then(data => setAuthConsents((data.data?.consents || []).filter(c => c.scope === 'auth' && c.status === 'active'))).catch(() => {});
+      apiGet('/v1/consent').then(data => setAuthConsents((data.data?.consents || []).filter(c => c.scope === 'auth' && c.status === 'active'))).catch(err => { swallowed('access-tab: AccessTab', err); });
       apiGet('/v1/ghii/me').then(r => setPubKey(r?.data?.public_key ?? null)).catch(() => setPubKey(null));
     });
   }, []);

@@ -9,6 +9,7 @@
  */
 import { api, apiGet, apiPost, apiPut } from '/js/api.js';
 import { wsRoot } from './organisms.shared.js';
+import { swallowed } from '/js/swallowed.js';
 
 // ── Workspace (manifest-driven; a "project" = an organism with a manifest) ──
 
@@ -63,7 +64,7 @@ export async function getManifestArchitectPrompt() {
   try {
     const resp = await apiGet('/v1/portal/prompts/manifest-architect');
     return resp?.data?.prompt || '';
-  } catch { return ''; }
+  } catch (err) { swallowed('organisms.workspace-gen: getManifestArchitectPrompt', err); return ''; }
 }
 
 /* Self-contained, positively-framed one-shot prompt for the workspace generator (and the
@@ -263,7 +264,7 @@ export async function applyGeneratedWorkspace(orgId, wsId, generated, opts = {})
       for (const item of items.slice(0, 5)) {
         n++;
         const id = String((item && item.id) || `example-${n}`).replace(/[^a-zA-Z0-9_-]/g, '-');
-        await apiPost('/v1/memory', { key: `${root}.${namespace}.${id}.draft`, value: { ...item, id }, visibility: 'private' }).catch(() => {});
+        await apiPost('/v1/memory', { key: `${root}.${namespace}.${id}.draft`, value: { ...item, id }, visibility: 'private' }).catch(err => { swallowed('organisms.workspace-gen: applyGeneratedWorkspace', err); });
       }
     }
   }
