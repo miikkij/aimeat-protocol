@@ -10,6 +10,9 @@
  *   - deserializeGHII: maps a DB row to a GHIIRecord (JSON fields, boolean coercion)
  *
  * @version-history
+ *   v1.1.0 — 2026-07-26 — createGHII/updateGHII write passwordFailedAttempts + passwordLockedUntil and
+ *     deserializeGHII reads them. The columns existed but nothing touched them, so the brute-force
+ *     lockout never engaged on this backend either.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type Database from 'better-sqlite3';
@@ -41,6 +44,11 @@ function deserializeGHII(row: Record<string, unknown>): GHIIRecord {
   if (row.totpLastUsedAt) record.totpLastUsedAt = row.totpLastUsedAt as string;
   if (row.totpLastUsedCode) record.totpLastUsedCode = row.totpLastUsedCode as string;
   if (row.totpFailedAttempts) record.totpFailedAttempts = row.totpFailedAttempts as number;
+  // Password lockout state. These two columns existed in the schema but NOTHING read or wrote them,
+  // on either backend, so config.passwordLockoutAttempts could never engage: every wrong password
+  // read back "0 attempts so far". Found 2026-07-26 while un-swallowing storage errors.
+  if (row.passwordFailedAttempts) record.passwordFailedAttempts = row.passwordFailedAttempts as number;
+  if (row.passwordLockedUntil) record.passwordLockedUntil = row.passwordLockedUntil as string;
   if (row.totpLockedUntil) record.totpLockedUntil = row.totpLockedUntil as string;
   if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
   if (row.emailHash) record.emailHash = row.emailHash as string;
@@ -66,11 +74,12 @@ export function createGHII(db: Database.Database, record: GHIIRecord): GHIIRecor
     db.prepare(
       `INSERT INTO ghiis (ghii, username, nodeId, displayName, bio, avatar, locale, passwordHash,
        verificationLevel, ownerName, createdAt, updatedAt, totpSecret, totpEnabled, totpBackupCodes,
-       totpLastUsedAt, totpLastUsedCode, totpFailedAttempts, totpLockedUntil, semantic, emailHash,
+       totpLastUsedAt, totpLastUsedCode, totpFailedAttempts, totpLockedUntil,
+       passwordFailedAttempts, passwordLockedUntil, semantic, emailHash,
        emailVerifiedAt, verificationMethod, magicLinkEnabled, notificationEmail, lastLoginAt,
        loginCount, verifiedAttributes, verificationIssuer, verificationCredentialHash, ftnVerified,
        googleSub, trustScore, morselBalance, allowedOrigins)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.ghii, record.username, record.nodeId, record.displayName,
       record.bio ?? null, record.avatar ?? null, record.locale ?? null,
@@ -80,6 +89,7 @@ export function createGHII(db: Database.Database, record: GHIIRecord): GHIIRecor
       record.totpBackupCodes ? JSON.stringify(record.totpBackupCodes) : null,
       record.totpLastUsedAt ?? null, record.totpLastUsedCode ?? null,
       record.totpFailedAttempts ?? 0, record.totpLockedUntil ?? null,
+      record.passwordFailedAttempts ?? 0, record.passwordLockedUntil ?? null,
       record.semantic ? JSON.stringify(record.semantic) : null,
       record.emailHash ?? null, record.emailVerifiedAt ?? null,
       record.verificationMethod ?? null, record.magicLinkEnabled ? 1 : 0,
@@ -127,7 +137,8 @@ export function updateGHII(db: Database.Database, ghii: string, updates: Partial
     `UPDATE ghiis SET username = ?, nodeId = ?, displayName = ?, bio = ?, avatar = ?, locale = ?,
      passwordHash = ?, verificationLevel = ?, ownerName = ?, createdAt = ?, updatedAt = ?,
      totpSecret = ?, totpEnabled = ?, totpBackupCodes = ?, totpLastUsedAt = ?,
-     totpLastUsedCode = ?, totpFailedAttempts = ?, totpLockedUntil = ?, semantic = ?,
+     totpLastUsedCode = ?, totpFailedAttempts = ?, totpLockedUntil = ?,
+     passwordFailedAttempts = ?, passwordLockedUntil = ?, semantic = ?,
      emailHash = ?, emailVerifiedAt = ?, verificationMethod = ?, magicLinkEnabled = ?,
      notificationEmail = ?, lastLoginAt = ?, loginCount = ?, verifiedAttributes = ?,
      verificationIssuer = ?, verificationCredentialHash = ?, ftnVerified = ?,
@@ -142,6 +153,7 @@ export function updateGHII(db: Database.Database, ghii: string, updates: Partial
     updated.totpBackupCodes ? JSON.stringify(updated.totpBackupCodes) : null,
     updated.totpLastUsedAt ?? null, updated.totpLastUsedCode ?? null,
     updated.totpFailedAttempts ?? 0, updated.totpLockedUntil ?? null,
+    updated.passwordFailedAttempts ?? 0, updated.passwordLockedUntil ?? null,
     updated.semantic ? JSON.stringify(updated.semantic) : null,
     updated.emailHash ?? null, updated.emailVerifiedAt ?? null,
     updated.verificationMethod ?? null, updated.magicLinkEnabled ? 1 : 0,

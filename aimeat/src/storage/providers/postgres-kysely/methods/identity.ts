@@ -6,6 +6,10 @@
  *   register→token→request path exercise. Mappers are module-local (row → *Record).
  * @version-history
  *   2026-07-19 — model/modelDetectedBy: indicative primary-LLM attribution on agents (AppDev KB Phase 3)
+ *   v1.2.0 — 2026-07-26 — Password lockout actually persists: updateGHII stops deleting
+ *     passwordFailedAttempts/passwordLockedUntil as "not columns" (migration 0013 adds them) and
+ *     toGHIIRecord projects them, so config.passwordLockoutAttempts can engage. An empty update is a
+ *     no-op returning the current row instead of invalid SQL.
  *   v1.1.0 — 2026-07-16 — Add getGHIIsByGhiis batch (Phase 3): many GHII records by ghii in one query.
  *   v1.0.0 — 2026-07-15 — Phase 5: owner/agent/ghii/auth-revoke on Postgres+Kysely.
  */
@@ -54,6 +58,9 @@ function toGHIIRecord(r: Selectable<Ghii>): GHIIRecord {
     totpSecret: r.totpSecret ?? undefined, totpEnabled: r.totpEnabled ?? false, totpBackupCodes: arr(r.totpBackupCodes),
     totpLastUsedAt: r.totpLastUsedAt ?? undefined, totpLastUsedCode: r.totpLastUsedCode ?? undefined,
     totpFailedAttempts: r.totpFailedAttempts ?? undefined, totpLockedUntil: r.totpLockedUntil ?? undefined,
+    // Password lockout state. Absent from this projection until 2026-07-26, so even a fixed write
+    // would have read back "no failed attempts" and the lockout still could not engage.
+    passwordFailedAttempts: r.passwordFailedAttempts ?? undefined, passwordLockedUntil: r.passwordLockedUntil ?? undefined,
     emailHash: r.emailHash ?? undefined, emailVerifiedAt: r.emailVerifiedAt ?? undefined, verificationMethod: (r.verificationMethod ?? undefined) as GHIIRecord['verificationMethod'],
     magicLinkEnabled: r.magicLinkEnabled ?? undefined, notificationEmail: r.notificationEmail ?? undefined,
     lastLoginAt: r.lastLoginAt ?? undefined, loginCount: r.loginCount ?? undefined, verifiedAttributes: arr(r.verifiedAttributes),
@@ -250,10 +257,18 @@ export const identityMethods = {
   async updateGHII(this: PostgresKyselyStorage, ghii: string, updates: Partial<GHIIRecord>): Promise<GHIIRecord | null> {
     try {
       const data = { ...updates } as Record<string, unknown>;
-      delete data.semantic; delete data.passwordFailedAttempts; delete data.passwordLockedUntil;   // not columns
+      // `passwordFailedAttempts` / `passwordLockedUntil` USED to be deleted here as "not columns".
+      // That is how the brute-force lockout came to be dead: on a wrong password the UPDATE had
+      // nothing left to set, the resulting error was swallowed into null, and the route answered a
+      // clean 401 while the counter stayed at zero forever. Migration 0013 adds both columns (their
+      // totp equivalents were always there). See also the empty-update guard below.
+      delete data.semantic;   // not a column
       if (data.createdAt) data.createdAt = new Date(data.createdAt as string);
       if (data.updatedAt) data.updatedAt = new Date(data.updatedAt as string);
       if ('externalIdentities' in data) data.externalIdentities = jsonb((data.externalIdentities ?? null) as Parameters<typeof jsonb>[0]);   // Json column
+      // An UPDATE with no columns is invalid SQL, and "update nothing" is not a failure. Answer it
+      // the way a successful no-op update would: with the current row.
+      if (Object.keys(data).length === 0) return this.getGHII(ghii);
       const rows = await this.db.updateTable('Ghii').set(data as never).where('ghii', '=', ghii).returningAll().execute();
       return rows[0] ? toGHIIRecord(rows[0]) : null;
     } catch (err) { throw dbError('updateGHII', err); }
