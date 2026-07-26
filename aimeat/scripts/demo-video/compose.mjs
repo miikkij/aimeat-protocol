@@ -54,9 +54,13 @@ function card(kind, spec) {
 if (m.intro) parts.push(card('intro', m.intro));
 
 // Main recording -> normalized mp4 (exact size, 30fps, h264).
+// A build that really takes ten minutes is still ten minutes of tape; speed compresses the
+// waiting without cutting anything out, so what is on screen stays the run that happened.
+const speed = (m.output && m.output.speed) || 1;
 const body = join(dir, '_body.mp4');
-ff(['-i', src, '-vf', `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=0x0B0D11,fps=30,format=yuv420p`,
-    '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', body]);
+const rate = speed !== 1 ? `setpts=${(1 / speed).toFixed(5)}*PTS,` : '';
+ff(['-i', src, '-vf', `${rate}scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2:color=0x0B0D11,fps=30,format=yuv420p`,
+    '-an', '-c:v', 'libx264', '-preset', 'medium', '-crf', '20', body]);
 parts.push(body);
 
 if (m.outro) parts.push(card('outro', m.outro));

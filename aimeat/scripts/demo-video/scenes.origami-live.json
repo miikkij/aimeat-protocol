@@ -1,0 +1,1052 @@
+{
+  "name": "origami-live",
+  "baseUrl": "https://origami.apps.aimeat.io",
+  "locale": "en-GB",
+  "strict": true,
+  "viewport": {
+    "width": 1440,
+    "height": 900,
+    "deviceScaleFactor": 1.5
+  },
+  "storageStateFile": "C:/Users/mail/AppData/Local/Temp/claude/e--dev-GitHub-aimeat-protocol/c1106fab-9203-49b1-be84-9d75f040ea56/scratchpad/origami-state.json",
+  "output": {
+    "width": 1440,
+    "height": 900,
+    "speed": 6
+  },
+  "_notes": [
+    "One continuous build on a real production board, project 'From scratch'.",
+    "Every selector below was tried by hand on the finished Showcase board first:",
+    "  - the toolbar's New request is hidden while the surface is empty (#empty-go owns the first move)",
+    "  - button[data-act='build'] TOGGLES build mode; a new frame-app already starts in it",
+    "  - the wiring rows are Does / who / from / into, translated, so they are read by index",
+    "  - an element is selected by clicking it, and only a real element (never the container div):",
+    "    a stale selection made the previous take write the verb into an empty div and wipe the card",
+    "  - the app picker rows read 'CADENCEhappydude500001', so \\b does not match after the name",
+    "  - the fixed toolbar eats clicks near the top of the window, hence centerOn before every click"
+  ],
+  "scenes": [
+    {
+      "label": "the empty surface",
+      "steps": [
+        {
+          "type": "goto",
+          "path": "/"
+        },
+        {
+          "type": "waitUntil",
+          "code": "() => !!window.__origami",
+          "ms": 60000
+        },
+        {
+          "_": "the take begins from an empty surface. Clearing the model is not enough: the save has to LAND before the page is asked to show the result, or the reload races it and the old frames come back.",
+          "type": "eval",
+          "code": "(async () => { const O = window.__origami, b = O.board(); const had = b.frames.length; b.frames.length = 0; await O.saveBoard(true); return 'cleared ' + had + ' frame(s)'; })()"
+        },
+        {
+          "type": "wait",
+          "ms": 1200
+        },
+        {
+          "_": "a fresh load of an empty board shows the welcome deterministically; dispatching a change on the project picker did not, and cost a take",
+          "type": "goto",
+          "path": "/"
+        },
+        {
+          "type": "waitUntil",
+          "label": "the surface is empty and the welcome is up",
+          "code": "() => { const O = window.__origami; if (!O) return false; const b = O.board(); const g = document.getElementById('empty-go'); return b.frames.length === 0 && !!g && g.offsetParent !== null; }",
+          "ms": 45000
+        },
+        {
+          "type": "caption",
+          "title": "An empty surface",
+          "subtitle": "a board, a login, nothing on it"
+        },
+        {
+          "type": "wait",
+          "ms": 2600
+        }
+      ]
+    },
+    {
+      "label": "one sentence, and work in parallel",
+      "steps": [
+        {
+          "type": "caption",
+          "title": "You ask for something",
+          "subtitle": "in one sentence, in your own words"
+        },
+        {
+          "type": "click",
+          "selector": "#empty-go"
+        },
+        {
+          "type": "waitUntil",
+          "code": "() => window.__origami.board().frames.some(f => f.spec.kind === 'request')",
+          "ms": 20000
+        },
+        {
+          "type": "waitUntil",
+          "code": "() => !!document.querySelector('.og-frame input[placeholder]')",
+          "ms": 20000
+        },
+        {
+          "_": "two things matter in this sentence. Naming the data, because left to guess the composer picked agents.activity-reporter and charted elapsed_s in two takes out of three. And naming the SHAPES, because 'show ... and draw a chart' came back as two near-identical charts: a viewer cannot tell why there are two.",
+          "type": "type",
+          "selector": ".og-frame input[placeholder]",
+          "text": "Show my ai-usage per day as a table, and draw a chart of the same numbers",
+          "delayMs": 45
+        },
+        {
+          "type": "press",
+          "key": "Enter"
+        },
+        {
+          "type": "caption",
+          "title": "It plans the work first",
+          "subtitle": "and says what it is about to do"
+        },
+        {
+          "_": "the dotted ring is the radar: the request panel is not a chat box, it is a subject that owns its work",
+          "type": "wait",
+          "ms": 2500
+        },
+        {
+          "type": "caption",
+          "title": "The dotted ring is a radar",
+          "subtitle": "one subject, its own log, and every window it makes stays attached to it"
+        },
+        {
+          "_": "the request is running now. Nothing about the surface says you have to sit and watch it: the next fold is made while the first one is still being worked on."
+        },
+        {
+          "type": "caption",
+          "title": "Other apps can live here too",
+          "subtitle": "this is CADENCE, our CRM, running on the surface"
+        },
+        {
+          "type": "click",
+          "selector": "#btn-add-app"
+        },
+        {
+          "type": "waitUntil",
+          "code": "() => document.getElementById('picker').open",
+          "ms": 15000
+        },
+        {
+          "_": "the picker opens with an empty list and fills as you search, so search first",
+          "type": "type",
+          "selector": "#picker-q",
+          "text": "CADENCE",
+          "delayMs": 60
+        },
+        {
+          "type": "waitUntil",
+          "label": "the picker has rows",
+          "code": "() => document.querySelectorAll('#picker .og-picker-row').length > 0",
+          "ms": 20000
+        },
+        {
+          "type": "report",
+          "label": "apps offered",
+          "code": "() => Array.from(document.querySelectorAll('#picker .og-picker-row')).map(r => r.textContent.replace(/\\s+/g, ' ').trim()).join(' | ')"
+        },
+        {
+          "_": "rows read 'CADENCEhappydude500001'; the help app must not win",
+          "type": "eval",
+          "code": "(() => { const rows = Array.from(document.querySelectorAll('#picker .og-picker-row')); const hit = rows.find(r => r.textContent.trim().startsWith('CADENCE') && !/opas|help|k\\u00e4ytt/i.test(r.textContent)) || rows[0]; if (!hit) throw new Error('CADENCE not in the picker'); hit.click(); return 'picked: ' + hit.textContent.replace(/\\s+/g, ' ').trim().slice(0, 60); })()"
+        },
+        {
+          "type": "waitUntil",
+          "code": "() => window.__origami.board().frames.some(f => (f.spec.app || {}).filename === 'cadence.html')",
+          "ms": 60000
+        },
+        {
+          "type": "wait",
+          "ms": 4000
+        },
+        {
+          "_": "give the borrowed app its own place at once: a window that lands on top of another one reads as a mistake even when nothing is wrong",
+          "type": "arrange",
+          "plan": [
+            {
+              "is": "request",
+              "x": 1040,
+              "y": 620,
+              "w": 500,
+              "h": 320
+            },
+            {
+              "is": "CADENCE",
+              "x": 1600,
+              "y": 460,
+              "w": 700,
+              "h": 700
+            }
+          ]
+        },
+        {
+          "type": "caption",
+          "title": "Two things at once",
+          "subtitle": "the surface was never waiting for you"
+        },
+        {
+          "type": "wait",
+          "ms": 2000
+        },
+        {
+          "_": "whether one sentence becomes one job or several is the model's call: gpt-oss split it in two and asked, GLM planned it as one and started. Wait for EITHER the question or the first window, then answer the question only if it is there.",
+          "type": "waitUntil",
+          "code": "() => Array.from(document.querySelectorAll('button')).some(b => /do them all/i.test(b.textContent)) || window.__origami.board().frames.some(f => ['table','chart','note','image'].includes(f.spec.kind))",
+          "ms": 300000
+        },
+        {
+          "type": "wait",
+          "ms": 2000
+        },
+        {
+          "_": "the board asking permission is the best moment in the scene, and the old version answered it with an invisible click at the edge of the screen. Look at the question, let it be read, answer it.",
+          "type": "when",
+          "label": "the board asked something",
+          "code": "() => Array.from(document.querySelectorAll('button')).some(b => /do them all/i.test(b.textContent))",
+          "then": [
+            {
+              "type": "eval",
+              "code": "(() => { document.querySelectorAll('[data-probe=\"asked\"]').forEach(n => n.removeAttribute('data-probe')); const b = Array.from(document.querySelectorAll('.og-frame button')).find(x => /do them all/i.test(x.textContent)); const fr = b && b.closest('.og-frame'); if (fr) fr.setAttribute('data-probe', 'asked'); return 'the board is waiting for an answer'; })()"
+            },
+            {
+              "type": "centerOn",
+              "selector": "[data-probe=\"asked\"]"
+            },
+            {
+              "type": "caption",
+              "title": "It stopped to ask",
+              "subtitle": "one sentence, two pieces of work: both, or one?"
+            },
+            {
+              "type": "wait",
+              "ms": 4000
+            },
+            {
+              "type": "click",
+              "text": "Do them all"
+            },
+            {
+              "type": "caption",
+              "title": "Both, please",
+              "subtitle": "and each piece gets its own window"
+            },
+            {
+              "type": "wait",
+              "ms": 2000
+            }
+          ]
+        },
+        {
+          "type": "caption",
+          "title": "And then it works",
+          "subtitle": "each piece of work gets its own window"
+        },
+        {
+          "type": "waitUntil",
+          "code": "() => window.__origami.board().frames.filter(f => ['table','chart','note','image'].includes(f.spec.kind)).length >= 1",
+          "ms": 420000
+        },
+        {
+          "_": "give a second window a chance to land before framing the shot, without demanding one",
+          "type": "wait",
+          "ms": 25000
+        },
+        {
+          "type": "report",
+          "label": "windows made",
+          "code": "() => window.__origami.board().frames.filter(f => ['table','chart','note','image'].includes(f.spec.kind)).map(f => f.spec.kind + ' \"' + (f.spec.title || '') + '\" from ' + (((f.spec.source || {}).prefix) || (f.spec.source || {}).type || '?')).join(' | ')"
+        },
+        {
+          "_": "fail here rather than film the wrong numbers: every result window must read the records that were asked for",
+          "type": "waitUntil",
+          "label": "the windows read ai-usage",
+          "code": "() => window.__origami.board().frames.filter(f => ['table','chart'].includes(f.spec.kind)).every(f => /ai-usage/.test(((f.spec.source || {}).prefix) || ''))",
+          "ms": 20000
+        },
+        {
+          "_": "a grace period, not a demand: if the second window is on its way it gets a minute, and if the board decided one window answers the sentence, the take goes on and the report says so.",
+          "type": "when",
+          "label": "only one window so far",
+          "code": "() => window.__origami.board().frames.filter(f => f.spec.kind === 'chart' || f.spec.kind === 'table').length < 2",
+          "then": [
+            {
+              "type": "waitUntil",
+              "label": "the second window",
+              "code": "() => window.__origami.board().frames.filter(f => f.spec.kind === 'chart' || f.spec.kind === 'table').length >= 2",
+              "ms": 60000,
+              "soft": true
+            },
+            {
+              "type": "wait",
+              "ms": 1500
+            }
+          ]
+        },
+        {
+          "type": "report",
+          "label": "what the one sentence made",
+          "code": "() => window.__origami.board().frames.filter(f => f.spec.kind === 'chart' || f.spec.kind === 'table').map(f => f.spec.kind).join(' + ') || 'nothing'"
+        },
+        {
+          "_": "the two made windows read as a row, not as a pile",
+          "type": "arrange",
+          "plan": [
+            {
+              "is": "chart",
+              "x": 700,
+              "y": 120,
+              "w": 560,
+              "h": 300
+            },
+            {
+              "is": "table",
+              "x": 1300,
+              "y": 120,
+              "w": 560,
+              "h": 300
+            }
+          ]
+        },
+        {
+          "type": "click",
+          "selector": "#btn-fit"
+        },
+        {
+          "_": "the board decides how many windows one sentence needs, so the words under it must be true for one or for two",
+          "type": "caption",
+          "title": "My own numbers, on the surface",
+          "subtitle": "read out of my own ai-usage keys"
+        },
+        {
+          "_": "lean back and let the radar be seen whole, then come back in",
+          "type": "zoom",
+          "to": 0.55,
+          "ms": 1600
+        },
+        {
+          "type": "wait",
+          "ms": 1500
+        },
+        {
+          "type": "zoom",
+          "to": 1,
+          "ms": 1400
+        },
+        {
+          "type": "wait",
+          "ms": 4000
+        },
+        {
+          "_": "the board decides how many windows one sentence needs, so the words under it must be true for one or for two",
+          "type": "caption",
+          "title": "My own numbers, on the surface",
+          "subtitle": "read out of my own ai-usage keys"
+        },
+        {
+          "type": "wait",
+          "ms": 2500
+        }
+      ]
+    },
+    {
+      "label": "an invitation",
+      "steps": [
+        {
+          "type": "caption",
+          "title": "Now something to send out",
+          "subtitle": "an invitation to our session on 14 August"
+        },
+        {
+          "type": "click",
+          "selector": "#btn-build"
+        },
+        {
+          "_": "a new frame-app opens in build mode already; clicking the pencil here would close it",
+          "type": "waitUntil",
+          "code": "() => getComputedStyle(document.getElementById('builder')).display === 'flex'",
+          "ms": 20000
+        },
+        {
+          "type": "eval",
+          "code": "(() => { document.querySelectorAll('[data-probe=\"card\"]').forEach(x => x.removeAttribute('data-probe')); const n = Array.from(document.querySelectorAll('.og-frame')).find(x => /Frame-app/.test((x.querySelector('.og-frame-title') || {}).textContent || '')); if (!n) throw new Error('frame not found'); n.setAttribute('data-probe', 'card'); })()"
+        },
+        {
+          "_": "centre it in the part of the window that is not under the builder",
+          "type": "centerOn",
+          "selector": "[data-probe=\"card\"]"
+        },
+        {
+          "type": "wait",
+          "ms": 1200
+        },
+        {
+          "type": "eval",
+          "code": "(() => { const n = Array.from(document.querySelectorAll('.og-frame')).find(x => /Frame-app/.test((x.querySelector('.og-frame-title') || {}).textContent || '')); const el = n.querySelector('[data-og-el]'); el.click(); })()"
+        },
+        {
+          "type": "waitUntil",
+          "label": "an element is selected",
+          "code": "() => !!document.querySelector('#build-wire .og-wire-self')",
+          "ms": 15000
+        },
+        {
+          "_": "the card carries the same numbers the board just drew, so the request is written from the records rather than from a guess. It asks for the card ONLY: with the form in the same sentence the model dropped the form three takes running.",
+          "type": "eval",
+          "code": "(async () => { const S = window.AIMEAT.auth.getSession(); const r = await S.fetch('/v1/memory?prefix=' + encodeURIComponent('ai-usage.') + '&per_page=200&owner_scope=true'); const j = (r && r.json) ? await r.json() : r; const items = (j && j.data && (j.data.items || j.data)) || []; let tok = 0, calls = 0, days = 0; items.forEach(it => { const v = (it && it.value) || it || {}; if (v.total_tokens == null && v.total_calls == null) return; days++; tok += Number(v.total_tokens || 0); calls += Number(v.total_calls || 0); }); const fmt = (n) => String(n).replace(/\\B(?=(\\d{3})+(?!\\d))/g, ' '); const line = 'An invitation card. At the top an image with src https://aimeat.io/v1/pub/happydude500001%40aimeat-finland-001-genesis/gen.img.invites-origami-launch and rounded corners. Then a heading ORIGAMI live, under it Friday 14 August 15:00 EEST, Espoo and online. Then a small box that says Tokens on the board ' + fmt(tok) + ' across ' + days + ' days, ' + fmt(calls) + ' calls.'; document.getElementById('build-ask').value = line; document.getElementById('build-ask').dispatchEvent(new Event('input', { bubbles: true })); return 'asking with ' + fmt(tok) + ' tokens / ' + days + ' days / ' + fmt(calls) + ' calls'; })()"
+        },
+        {
+          "type": "wait",
+          "ms": 1500
+        },
+        {
+          "type": "click",
+          "selector": "#build-ask-go"
+        },
+        {
+          "_": "the wait is the moment to make room: the card grows to hold what is about to arrive, so the answer lands in a window that already fits it instead of in a letterbox that has to be dragged open afterwards",
+          "type": "arrange",
+          "plan": [
+            {
+              "is": "^(?!.*picture).*(invitation|frame-app|html)",
+              "x": 1160,
+              "y": 560,
+              "w": 660,
+              "h": 680,
+              "probe": "card"
+            }
+          ],
+          "fit": false
+        },
+        {
+          "type": "centerOn",
+          "selector": "[data-probe=\"card\"]"
+        },
+        {
+          "_": "the ask is done when the button frees up; whatever the board said about it is then worth reporting",
+          "type": "waitUntil",
+          "label": "the ask came back",
+          "code": "() => !document.getElementById('build-ask-go').disabled",
+          "ms": 180000
+        },
+        {
+          "type": "eval",
+          "code": "(() => { const t = (document.getElementById('toast-host') || {}).innerText || ''; console.log('[origami] after the ask: ' + t.replace(/\\s+/g, ' ').slice(0, 120)); })()"
+        },
+        {
+          "_": "measured by hand: the ask takes about 90s and lands in the frame's data and on the screen together. Accept either, because a check that reads only one of them cannot tell a slow model from a lost answer.",
+          "type": "waitUntil",
+          "label": "the card has words in it",
+          "code": "() => { const f = window.__origami.board().frames.find(x => x.spec.kind === 'html'); const n = Array.from(document.querySelectorAll('.og-frame')).find(x => /Frame-app/.test((x.querySelector('.og-frame-title') || {}).textContent || '')); return /ORIGAMI live/i.test((f && f.spec.html) || '') || /ORIGAMI live/i.test((n && n.innerText) || ''); }",
+          "ms": 300000
+        },
+        {
+          "type": "report",
+          "label": "the card so far",
+          "code": "() => { const f = window.__origami.board().frames.find(x => x.spec.kind === 'html'); const n = Array.from(document.querySelectorAll('.og-frame')).find(x => /Frame-app/.test((x.querySelector('.og-frame-title') || {}).textContent || '')); return 'data=' + ((f && f.spec.html) || '').length + 'B screen=' + (n ? n.querySelectorAll('input').length : -1) + ' inputs · ' + (((document.getElementById('toast-host') || {}).innerText) || '').replace(/\\s+/g, ' ').slice(0, 90); }"
+        },
+        {
+          "type": "wait",
+          "ms": 2500
+        },
+        {
+          "type": "caption",
+          "title": "The form comes off the shelf",
+          "subtitle": "no need to ask a model for a field and a button"
+        },
+        {
+          "type": "click",
+          "selector": "#btn-lib"
+        },
+        {
+          "type": "waitUntil",
+          "label": "the shelves are up",
+          "code": "() => document.getElementById('pool').open && document.querySelectorAll('#pool-list .og-pool-card').length > 0",
+          "ms": 30000
+        },
+        {
+          "type": "type",
+          "selector": "#pool-q",
+          "text": "RSVP",
+          "delayMs": 70
+        },
+        {
+          "type": "wait",
+          "ms": 1200
+        },
+        {
+          "_": "a piece made once and kept on the shelf: four labelled fields and a button. The model produced a form on one take in four, and a shelf piece produces it every time.",
+          "type": "eval",
+          "code": "(() => { const cards = Array.from(document.querySelectorAll('#pool-list .og-pool-card')); const hit = cards.find(c => /rsvp-first/.test(c.innerHTML)) || cards.find(c => /<input/.test(c.innerHTML)); if (!hit) throw new Error('no RSVP piece on the shelves'); const use = hit.querySelector('.og-pool-acts button'); use.click(); return 'used: ' + ((hit.querySelector('.og-pool-body div') || {}).textContent || '') + ' via \"' + use.textContent.trim() + '\"'; })()"
+        },
+        {
+          "type": "waitUntil",
+          "label": "the piece landed in the card",
+          "code": "() => { const f = window.__origami.board().frames.find(x => x.spec.kind === 'html'); const h = (f && f.spec.html) || ''; const inSpec = (h.match(/<input/g) || []).length; const nodes = Array.from(document.querySelectorAll('.og-frame')).filter(x => !x.querySelector('iframe')); const inDom = Math.max(0, ...nodes.map(x => x.querySelectorAll('input').length)); return Math.max(inSpec, inDom) >= 4; }",
+          "ms": 30000,
+          "_": "one rule for 'is the form there', counting the data and the screen; the data lands a moment later"
+        },
+        {
+          "type": "wait",
+          "ms": 2000
+        },
+        {
+          "_": "only ask the model to build a form when there is no form. The data catches up a moment after the paint, and a check that reads the data alone starts a two-minute repair of something that is already on screen.",
+          "type": "when",
+          "label": "the form is missing (try 1)",
+          "code": "() => { const f = window.__origami.board().frames.find(x => x.spec.kind === 'html'); const h = (f && f.spec.html) || ''; const inSpec = (h.match(/<input/g) || []).length; const nodes = Array.from(document.querySelectorAll('.og-frame')).filter(x => !x.querySelector('iframe')); const inDom = Math.max(0, ...nodes.map(x => x.querySelectorAll('input').length)); return Math.max(inSpec, inDom) < 4; }",
+          "then": [
+            {
+              "type": "caption",
+              "title": "One more fold",
+              "subtitle": "now the part people fill in"
+            },
+            {
+              "type": "type",
+              "selector": "#build-ask",
+              "text": "Turn this one field into four: First name, Last name, Email and Phone, each with its label, and keep the button",
+              "delayMs": 16,
+              "_": "the shelf piece already put a field and a button in the card, so the model is asked to EXTEND what is there. Asking it to invent a form from nothing failed three takes running."
+            },
+            {
+              "type": "click",
+              "selector": "#build-ask-go"
+            },
+            {
+              "type": "waitUntil",
+              "label": "the ask came back",
+              "code": "() => !document.getElementById('build-ask-go').disabled",
+              "ms": 180000
+            },
+            {
+              "type": "wait",
+              "ms": 2500
+            }
+          ]
+        },
+        {
+          "type": "when",
+          "label": "the form is missing (try 2)",
+          "code": "() => { const f = window.__origami.board().frames.find(x => x.spec.kind === 'html'); const h = (f && f.spec.html) || ''; const inSpec = (h.match(/<input/g) || []).length; const nodes = Array.from(document.querySelectorAll('.og-frame')).filter(x => !x.querySelector('iframe')); const inDom = Math.max(0, ...nodes.map(x => x.querySelectorAll('input').length)); return Math.max(inSpec, inDom) < 4; }",
+          "then": [
+            {
+              "type": "type",
+              "selector": "#build-ask",
+              "text": "Add three more input fields next to the first one, labelled Last name, Email and Phone",
+              "delayMs": 16,
+              "_": "the shelf piece already put a field and a button in the card, so the model is asked to EXTEND what is there. Asking it to invent a form from nothing failed three takes running."
+            },
+            {
+              "type": "click",
+              "selector": "#build-ask-go"
+            },
+            {
+              "type": "waitUntil",
+              "label": "the ask came back",
+              "code": "() => !document.getElementById('build-ask-go').disabled",
+              "ms": 180000
+            },
+            {
+              "type": "wait",
+              "ms": 2500
+            }
+          ],
+          "_": "only ask the model to build a form when there is no form. The data catches up a moment after the paint, and a check that reads the data alone starts a two-minute repair of something that is already on screen."
+        },
+        {
+          "type": "when",
+          "label": "the form is missing (try 3)",
+          "code": "() => { const f = window.__origami.board().frames.find(x => x.spec.kind === 'html'); const h = (f && f.spec.html) || ''; const inSpec = (h.match(/<input/g) || []).length; const nodes = Array.from(document.querySelectorAll('.og-frame')).filter(x => !x.querySelector('iframe')); const inDom = Math.max(0, ...nodes.map(x => x.querySelectorAll('input').length)); return Math.max(inSpec, inDom) < 4; }",
+          "then": [
+            {
+              "type": "type",
+              "selector": "#build-ask",
+              "text": "The form needs four text fields in total: First name, Last name, Email, Phone",
+              "delayMs": 16,
+              "_": "the shelf piece already put a field and a button in the card, so the model is asked to EXTEND what is there. Asking it to invent a form from nothing failed three takes running."
+            },
+            {
+              "type": "click",
+              "selector": "#build-ask-go"
+            },
+            {
+              "type": "waitUntil",
+              "label": "the ask came back",
+              "code": "() => !document.getElementById('build-ask-go').disabled",
+              "ms": 180000
+            },
+            {
+              "type": "wait",
+              "ms": 2500
+            }
+          ],
+          "_": "only ask the model to build a form when there is no form. The data catches up a moment after the paint, and a check that reads the data alone starts a two-minute repair of something that is already on screen."
+        },
+        {
+          "_": "one rule for 'is the form there', counting the data and the screen; the data lands a moment later",
+          "type": "waitUntil",
+          "code": "() => { const f = window.__origami.board().frames.find(x => x.spec.kind === 'html'); const h = (f && f.spec.html) || ''; const inSpec = (h.match(/<input/g) || []).length; const nodes = Array.from(document.querySelectorAll('.og-frame')).filter(x => !x.querySelector('iframe')); const inDom = Math.max(0, ...nodes.map(x => x.querySelectorAll('input').length)); return Math.max(inSpec, inDom) >= 4; }",
+          "ms": 60000,
+          "label": "the form is in the card"
+        },
+        {
+          "type": "caption",
+          "title": "Make room for it",
+          "subtitle": "a frame is a window, and windows resize"
+        },
+        {
+          "_": "open it up: the card holds a heading, a picture, three lines of numbers and four fields, and a viewer should see all of it without scrolling",
+          "type": "arrange",
+          "plan": [
+            {
+              "is": "^(?!.*picture).*(invitation|frame-app|html)",
+              "x": 1160,
+              "y": 600,
+              "w": 620,
+              "h": 640,
+              "probe": "card"
+            }
+          ]
+        },
+        {
+          "type": "centerOn",
+          "selector": "[data-probe=\"card\"]"
+        },
+        {
+          "type": "wait",
+          "ms": 2500
+        },
+        {
+          "_": "the data arrives before the paint: scene 4 selects a DOM element, so wait for the DOM",
+          "type": "waitUntil",
+          "code": "() => { const n = Array.from(document.querySelectorAll('.og-frame')).find(x => !x.querySelector('iframe') && x.querySelector('button[data-og-el]')); return !!n; }",
+          "ms": 60000
+        },
+        {
+          "type": "caption",
+          "title": "The card is real HTML",
+          "subtitle": "every piece still editable, one element at a time"
+        },
+        {
+          "_": "keep it: the last take lost the generated card because nothing had saved it yet",
+          "type": "click",
+          "selector": "#btn-save"
+        },
+        {
+          "type": "wait",
+          "ms": 3500
+        }
+      ]
+    },
+    {
+      "label": "the button gets a sentence, not code",
+      "steps": [
+        {
+          "type": "caption",
+          "title": "The button gets told what to do",
+          "subtitle": "no code: a verb, and where it goes"
+        },
+        {
+          "type": "eval",
+          "code": "(() => { document.querySelectorAll('[data-probe]').forEach(n => n.removeAttribute('data-probe')); const node = Array.from(document.querySelectorAll('.og-frame')).find(n => !n.querySelector('iframe') && n.querySelector('button[data-og-el]')); if (!node) throw new Error('the card has not painted yet'); node.setAttribute('data-probe', 'card'); const btns = Array.from(node.querySelectorAll('button[data-og-el]')); const btn = btns.find(b => /there|tulen|seat|rsvp|send|submit|ilmoit/i.test(b.textContent)) || btns[btns.length - 1]; btn.setAttribute('data-probe', 'btn'); })()"
+        },
+        {
+          "type": "centerOn",
+          "selector": "[data-probe=\"card\"]"
+        },
+        {
+          "_": "a real click on a real element: this is what selects it in the builder",
+          "type": "click",
+          "selector": "[data-probe=\"btn\"]"
+        },
+        {
+          "type": "waitUntil",
+          "code": "() => document.querySelectorAll('#build-wire .og-wire-row').length >= 1",
+          "ms": 20000
+        },
+        {
+          "type": "eval",
+          "code": "(() => { const s = document.querySelector('#build-wire select'); s.value = 'submit'; s.dispatchEvent(new Event('change', { bubbles: true })); })()"
+        },
+        {
+          "_": "Does / who / from / into, in WIRE_FIELDS order",
+          "type": "waitUntil",
+          "code": "() => document.querySelectorAll('#build-wire .og-wire-row').length >= 4",
+          "ms": 15000
+        },
+        {
+          "type": "eval",
+          "code": "(() => { const rows = Array.from(document.querySelectorAll('#build-wire .og-wire-row')); const set = (el, v) => { const d = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value').set; d.call(el, v); el.dispatchEvent(new Event('input', { bubbles: true })); el.dispatchEvent(new Event('change', { bubbles: true })); }; const card = document.querySelector('[data-probe=\"card\"]'); const ids = Array.from(card.querySelectorAll('input[data-og-el]')).map(n => n.getAttribute('data-og-el')); const at = (i) => ids[i] ? '#' + ids[i] : ''; set(rows[1].querySelector('input'), '/v1/intake/b9c552d1-6a73-40f7-9d2c-91172c7f1332/ws-mrkj9sbei68/origami-live'); set(rows[2].querySelector('input'), ['etunimi=' + at(0), 'sukunimi=' + at(1), 'email=' + at(2), 'puhelin=' + at(3)].filter(p => !p.endsWith('=')).join(', ')); })()"
+        },
+        {
+          "_": "the wiring must be on the element AND the card must still be there: last time the write wiped it",
+          "type": "waitUntil",
+          "code": "() => { const f = window.__origami.board().frames.find(x => x.spec.kind === 'html'); const h = f.spec.html || ''; return /data-og-do=\"submit\"/.test(h) && /v1\\/intake/.test(h) && h.length > 600; }",
+          "ms": 15000
+        },
+        {
+          "type": "caption",
+          "title": "It posts straight into our CRM",
+          "subtitle": "CADENCE, the one we built ourselves"
+        },
+        {
+          "type": "wait",
+          "ms": 3500
+        }
+      ]
+    },
+    {
+      "label": "publish",
+      "steps": [
+        {
+          "type": "caption",
+          "title": "Publish",
+          "subtitle": "the invitation becomes an app of its own"
+        },
+        {
+          "type": "click",
+          "selector": "#build-publish"
+        },
+        {
+          "type": "waitUntil",
+          "code": "() => document.getElementById('promote').open",
+          "ms": 15000
+        },
+        {
+          "type": "type",
+          "selector": "#pr-name",
+          "text": "ORIGAMI live, an invitation",
+          "delayMs": 35
+        },
+        {
+          "type": "click",
+          "selector": "#pr-go"
+        },
+        {
+          "type": "waitUntil",
+          "code": "() => window.__origami.board().frames.some(f => f.spec.kind === 'app')",
+          "ms": 240000
+        },
+        {
+          "_": "the builder has done its job and it covers a third of the window; get it out of the way before anything is shown off",
+          "type": "click",
+          "selector": "#build-close"
+        },
+        {
+          "type": "wait",
+          "ms": 800
+        },
+        {
+          "type": "click",
+          "selector": "#btn-fit"
+        },
+        {
+          "type": "caption",
+          "title": "It has its own address now",
+          "subtitle": "and answering it needs no account"
+        },
+        {
+          "type": "zoom",
+          "to": 0.5,
+          "ms": 1600
+        },
+        {
+          "type": "wait",
+          "ms": 2000
+        },
+        {
+          "type": "wait",
+          "ms": 4000
+        },
+        {
+          "type": "caption",
+          "title": "And a window onto the answers",
+          "subtitle": "the CRM's own contacts, filtered to this event"
+        },
+        {
+          "_": "the list is added from the board's own data layer. There is no click path for a workspace source with a filter yet — the source is registered unhinted, so the composer never offers it — which is worth saying out loud rather than filming around.",
+          "type": "eval",
+          "code": "(async () => { const O = window.__origami; const before = O.board().frames.length; const id = await O.addSpec({\"h\": 321, \"kind\": \"table\", \"i18n\": {\"en\": {\"title\": \"Who is coming — in CADENCE\"}, \"fi\": {\"title\": \"Ketkä tulevat — CADENCEssa\"}}, \"title\": \"Who is coming — in CADENCE\", \"intent\": \"Who is coming\", \"view\": {\"columns\": [{\"key\": \"etunimi\", \"label\": \"First name\"}, {\"key\": \"sukunimi\", \"label\": \"Last name\"}, {\"key\": \"email\", \"label\": \"Email\"}, {\"key\": \"puhelin\", \"label\": \"Phone\"}, {\"key\": \"tila\", \"label\": \"Status\"}]}, \"source\": {\"type\": \"workspace\", \"org\": \"b9c552d1-6a73-40f7-9d2c-91172c7f1332\", \"ws\": \"ws-mrkj9sbei68\", \"space\": \"crm.contacts\", \"label\": \"CADENCE · contacts\", \"where\": {\"field\": \"tagit\", \"equals\": \"ORIGAMI live\"}}}); const n = document.querySelector('[data-og-id=\"' + id + '\"]'); if (n) n.setAttribute('data-probe', 'coming'); return 'the list is on the board (' + before + ' -> ' + O.board().frames.length + ' frames)'; })()"
+        },
+        {
+          "type": "waitUntil",
+          "label": "the list has read CADENCE",
+          "code": "() => { const n = document.querySelector('[data-probe=\"coming\"]'); return !!n && n.querySelectorAll('tbody tr').length > 0; }",
+          "ms": 30000
+        },
+        {
+          "type": "report",
+          "label": "who is coming, before the guest answers",
+          "code": "() => { const n = document.querySelector('[data-probe=\"coming\"]'); return n.querySelectorAll('tbody tr').length + ' row(s)'; }"
+        },
+        {
+          "type": "arrange",
+          "plan": [
+            {
+              "probe": "coming",
+              "is": "who is coming",
+              "x": 700,
+              "y": 1000,
+              "w": 880,
+              "h": 340
+            }
+          ]
+        },
+        {
+          "type": "centerOn",
+          "selector": "[data-probe=\"coming\"]"
+        },
+        {
+          "type": "wait",
+          "ms": 2500
+        }
+      ]
+    },
+    {
+      "label": "a guest answers",
+      "steps": [
+        {
+          "type": "caption",
+          "title": "Someone fills it in",
+          "subtitle": "no sign-in, no registration"
+        },
+        {
+          "_": "'the first app frame' is CADENCE now that CADENCE is on the board. The one this scene is about is the invitation that was just published, and it can be told apart by the app it points at.",
+          "type": "eval",
+          "code": "(() => { const O = window.__origami, b = O.board(); const fr = b.frames.find(f => f.spec.kind === 'app' && /invitation/i.test(JSON.stringify(f.spec))); if (!fr) throw new Error('the published invitation is not on the board'); if (!fr.spec.live) O.toggleLive(fr.id); return 'the invitation frame is live'; })()"
+        },
+        {
+          "type": "waitUntil",
+          "label": "the invitation frame is on the board",
+          "code": "() => !!document.querySelector('iframe[title*=\"invitation\" i]')",
+          "ms": 30000
+        },
+        {
+          "type": "eval",
+          "code": "(() => { const f = document.querySelector('iframe[title*=\"invitation\" i]'); const n = f && f.closest('.og-frame'); if (!n) throw new Error('no frame around the invitation'); document.querySelectorAll('[data-probe=\"app\"]').forEach(x => x.removeAttribute('data-probe')); n.setAttribute('data-probe', 'app'); return 'centred on the invitation'; })()"
+        },
+        {
+          "type": "centerOn",
+          "selector": "[data-probe=\"app\"]"
+        },
+        {
+          "_": "the app is served from its own origin, so the page cannot look inside it: the wait has to go through the driver, which can. A published app boots, takes its frame grant and renders, and six seconds was a guess.",
+          "type": "waitFor",
+          "selector": "iframe[title*=\"invitation\" i] >> internal:control=enter-frame >> input >> visible=true >> nth=3",
+          "ms": 45000
+        },
+        {
+          "type": "wait",
+          "ms": 1200
+        },
+        {
+          "_": "the published invitation is the frame named after it, not 'the one that is not CADENCE'",
+          "type": "type",
+          "selector": "iframe[title*=\"invitation\" i] >> internal:control=enter-frame >> input >> visible=true >> nth=0",
+          "text": "Kalle",
+          "delayMs": 60
+        },
+        {
+          "type": "type",
+          "selector": "iframe[title*=\"invitation\" i] >> internal:control=enter-frame >> input >> visible=true >> nth=1",
+          "text": "Mäkinen",
+          "delayMs": 60,
+          "_": "the published invitation is the frame named after it, not 'the one that is not CADENCE'"
+        },
+        {
+          "type": "type",
+          "selector": "iframe[title*=\"invitation\" i] >> internal:control=enter-frame >> input >> visible=true >> nth=2",
+          "text": "makinen.kalle@gmail.com",
+          "delayMs": 40,
+          "_": "the published invitation is the frame named after it, not 'the one that is not CADENCE'"
+        },
+        {
+          "type": "type",
+          "selector": "iframe[title*=\"invitation\" i] >> internal:control=enter-frame >> input >> visible=true >> nth=3",
+          "text": "0503742422",
+          "delayMs": 40,
+          "_": "the published invitation is the frame named after it, not 'the one that is not CADENCE'"
+        },
+        {
+          "_": "the published invitation is the frame named after it, not 'the one that is not CADENCE'",
+          "type": "click",
+          "selector": "iframe[title*=\"invitation\" i] >> internal:control=enter-frame >> button[data-og-do]"
+        },
+        {
+          "_": "whether the answer really reached the CRM is checked against CADENCE after the run, not with a predicate here that could only ever say yes",
+          "type": "wait",
+          "ms": 4000
+        },
+        {
+          "type": "wait",
+          "ms": 5000
+        }
+      ]
+    },
+    {
+      "label": "it lands in the CRM",
+      "steps": [
+        {
+          "type": "centerOn",
+          "selector": "[data-probe=\"coming\"]"
+        },
+        {
+          "type": "caption",
+          "title": "The answer is already in CADENCE",
+          "subtitle": "a stranger's form became a CRM contact"
+        },
+        {
+          "_": "count first, so the proof is a number that changed and not a table that looks busy",
+          "type": "eval",
+          "code": "(() => { window.__before = document.querySelector('[data-probe=\"coming\"]').querySelectorAll('tbody tr').length; return 'the list held ' + window.__before + ' row(s) before the answer'; })()"
+        },
+        {
+          "type": "wait",
+          "ms": 1200
+        },
+        {
+          "_": "zoomed out, a frame hides its own controls until the cursor is on it. Reach for the window first, the way a person does, and the controls appear.",
+          "type": "hover",
+          "selector": "[data-probe=\"coming\"] .og-frame-title"
+        },
+        {
+          "type": "wait",
+          "ms": 600
+        },
+        {
+          "type": "click",
+          "selector": "[data-probe=\"coming\"] [data-act=\"refresh\"]"
+        },
+        {
+          "type": "waitUntil",
+          "label": "the guest appears in the list",
+          "code": "() => document.querySelector('[data-probe=\"coming\"]').querySelectorAll('tbody tr').length > window.__before",
+          "ms": 30000
+        },
+        {
+          "type": "report",
+          "label": "who is coming, after the answer",
+          "code": "() => window.__before + ' -> ' + document.querySelector('[data-probe=\"coming\"]').querySelectorAll('tbody tr').length + ' row(s)'"
+        },
+        {
+          "type": "caption",
+          "title": "One row more than a minute ago",
+          "subtitle": "nobody typed it in, and nobody imported anything"
+        },
+        {
+          "type": "wait",
+          "ms": 3000
+        },
+        {
+          "type": "caption",
+          "title": "And CADENCE raised the follow-up call",
+          "subtitle": "the CRM's own rule, on the CRM's own data"
+        },
+        {
+          "type": "wait",
+          "ms": 2500
+        }
+      ]
+    },
+    {
+      "label": "all of it on one surface",
+      "steps": [
+        {
+          "_": "the closing arrangement: the request panel and its radar in the middle, everything it made or borrowed set around it in named places",
+          "type": "arrange",
+          "plan": [
+            {
+              "is": "request",
+              "x": 1040,
+              "y": 620,
+              "w": 500,
+              "h": 320
+            },
+            {
+              "is": "CADENCE",
+              "x": 1600,
+              "y": 460,
+              "w": 700,
+              "h": 700
+            },
+            {
+              "is": "ORIGAMI live|^app$",
+              "x": 180,
+              "y": 460,
+              "w": 480,
+              "h": 700
+            },
+            {
+              "is": "chart",
+              "x": 700,
+              "y": 120,
+              "w": 560,
+              "h": 300
+            },
+            {
+              "is": "table",
+              "x": 1300,
+              "y": 120,
+              "w": 560,
+              "h": 300
+            },
+            {
+              "is": "^(?!.*picture).*(invitation|frame-app|html)",
+              "x": 1600,
+              "y": 1020,
+              "w": 560,
+              "h": 340,
+              "probe": "card"
+            },
+            {
+              "probe": "coming",
+              "is": "who is coming",
+              "x": 640,
+              "y": 1020,
+              "w": 900,
+              "h": 340
+            }
+          ]
+        },
+        {
+          "type": "wait",
+          "ms": 1200
+        },
+        {
+          "type": "click",
+          "selector": "#btn-fit"
+        },
+        {
+          "type": "captionHide"
+        },
+        {
+          "type": "wait",
+          "ms": 3000
+        },
+        {
+          "_": "the proof already happened in front of the camera one scene ago, on the board's own list. Reaching inside CADENCE to press its Refresh button proved the same thing twice and depended on a button in someone else's app.",
+          "type": "caption",
+          "title": "One surface, one afternoon",
+          "subtitle": "my numbers, an invitation with its own address, and a stranger's answer in the CRM"
+        },
+        {
+          "type": "wait",
+          "ms": 4000
+        },
+        {
+          "type": "captionHide"
+        },
+        {
+          "type": "wait",
+          "ms": 1500
+        }
+      ]
+    }
+  ]
+}
