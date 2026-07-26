@@ -13,15 +13,19 @@
  *   v1.0.0 — 2026-05-02 — Initial implementation
  *   v1.1.0 — 2026-07-05 — Adopt the shared isUnsafeName guard from safe-zip (adds backslash /
  *     drive-letter / null-byte rejection on top of ../ and absolute paths).
+ *   v1.2.0 — 2026-07-26 — parseExtensionZip delegates validation + record building to the shared
+ *     buildExtensionRecordFromManifest (routes/extensions/manifest.ts) instead of keeping a thinner
+ *     third copy. The copy had drifted: per-action pricing (tollMorsels / commercial / ODPS), the
+ *     pricing validator, instances validation and the `type: secret` config marker were all missing,
+ *     so a priced EXCHANGE capability became free just by being installed as a ZIP.
  */
 
 import yauzl from 'yauzl';
-import YAML from 'yaml';
 import type { AimeatConfig } from '../config.js';
 import type { ExtensionRecord, CortexExtensionRecord } from '../storage/interface.js';
 import { parseCortexManifest } from './cortex-manifest.js';
 import { isUnsafeName } from './safe-zip.js';
-import { scanSandboxCapabilityWarnings } from '../routes/extensions/manifest.js';
+import { buildExtensionRecordFromManifest } from '../routes/extensions/manifest.js';
 
 const ZIP_MAGIC = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
 const MAX_FILES = 50;
@@ -33,6 +37,8 @@ const DECOMPRESSION_RATIO = 10;
 interface ExtensionZipResult {
     ok: boolean;
     error?: string;
+    /** Machine-readable reason from the shared manifest builder (INVALID_MANIFEST, MISSING_SCRIPT, …). */
+    code?: string;
     record?: ExtensionRecord;
     /** Non-blocking sandbox-capability notes (crypto.subtle, Date.now, Math.random, eval). */
     warnings?: string[];
@@ -60,23 +66,6 @@ export async function parseExtensionZip(buffer: Buffer, config: AimeatConfig): P
         return { ok: false, error: 'ZIP must contain manifest.yaml at root' };
     }
 
-    let manifest: Record<string, unknown>;
-    try {
-        manifest = YAML.parse(manifestBuf.toString('utf-8')) as Record<string, unknown>;
-    } catch {
-        return { ok: false, error: 'manifest.yaml is not valid YAML' };
-    }
-
-    const metadata = manifest.metadata as Record<string, unknown> | undefined;
-    if (!metadata?.name || !metadata?.version || !metadata?.description || !metadata?.author) {
-        return { ok: false, error: 'metadata.name, metadata.version, metadata.description, and metadata.author are required' };
-    }
-
-    const actions = manifest.actions as Array<Record<string, unknown>> | undefined;
-    if (!Array.isArray(actions) || actions.length === 0) {
-        return { ok: false, error: 'actions array is required and must not be empty' };
-    }
-
     // Extract scripts from scripts/ directory
     const scripts: Record<string, string> = {};
     for (const [path, buf] of files) {
@@ -86,89 +75,22 @@ export async function parseExtensionZip(buffer: Buffer, config: AimeatConfig): P
         }
     }
 
-    for (const action of actions) {
-        if (!action.id || !action.method || !action.path || !action.script) {
-            return { ok: false, error: 'Each action must have id, method, path, and script fields' };
-        }
-        if (!scripts[action.script as string]) {
-            return { ok: false, error: `Script "${action.script}" referenced in action "${action.id}" not found in scripts/ directory` };
-        }
+    // Validation + record building is the SHARED builder the REST and MCP paths use. This function
+    // used to carry its own thinner copy, and the copies drifted: the ZIP path silently dropped
+    // per-action pricing (tollMorsels / commercial / ODPS), skipped validateActionPricing and
+    // skipped the `type: secret` config marker, so an extension published as a priced EXCHANGE
+    // provider became a free one purely by being installed as a ZIP. Only ZIP-shaped concerns
+    // (magic bytes, entry extraction, the scripts/ layout) belong here.
+    const built = buildExtensionRecordFromManifest(
+        manifestBuf.toString('utf-8'), scripts, config, 'upload', new Date().toISOString(),
+    );
+    if (!built.ok) {
+        return { ok: false, error: built.message, code: built.code };
     }
 
-    for (const [filename, content] of Object.entries(scripts)) {
-        const sizeKb = Buffer.byteLength(content, 'utf-8') / 1024;
-        if (sizeKb > config.extensionMaxCodeSizeKb) {
-            return { ok: false, error: `Script "${filename}" (${Math.round(sizeKb)}KB) exceeds limit of ${config.extensionMaxCodeSizeKb}KB` };
-        }
-    }
-
-    const name = metadata.name as string;
-    const manifestConfig = manifest.config as Record<string, unknown> | undefined;
-    const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
-    const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
-    const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
-    const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
-
-    const record: ExtensionRecord = {
-        name,
-        version: metadata.version as string,
-        description: metadata.description as string,
-        author: metadata.author as string,
-        status: 'inactive',
-        requiredApis: (manifest.required_apis as string[]) ?? [],
-        actions: actions.map(a => ({
-            id: a.id as string,
-            method: (a.method as string).toUpperCase(),
-            path: a.path as string,
-            inputSchema: (a.input as Record<string, unknown>) ?? {},
-            outputSchema: (a.output as Record<string, unknown>) ?? {},
-            scriptContent: scripts[a.script as string],
-        })),
-        config: {
-            ...(manifestConfig
-                ? Object.fromEntries(
-                    Object.entries(manifestConfig).map(([k, v]) => {
-                        if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
-                            return [k, (v as Record<string, unknown>).default];
-                        }
-                        return [k, v];
-                    }),
-                )
-                : {}),
-            ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
-        },
-        limits: {
-            memoryMb: Math.min(
-                (manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb,
-                config.extensionMaxMemoryMb,
-            ),
-            timeoutMs: Math.min(
-                (manifestLimits?.timeout_ms as number) ?? config.extensionTimeoutMs,
-                config.extensionTimeoutMs,
-            ),
-            maxApiCalls: Math.min(
-                (manifestLimits?.max_api_calls as number) ?? config.extensionMaxApiCalls,
-                config.extensionMaxApiCalls,
-            ),
-        },
-        federation: {
-            advertise: (manifestFederation?.advertise as boolean) ?? false,
-            capabilities: (manifestFederation?.capabilities as string[]) ?? [],
-        },
-        ...(manifestInstances?.supported ? {
-            instances: {
-                supported: true,
-                configSchema: (manifestInstances.config_per_instance as Record<string, unknown>) ?? undefined,
-            },
-        } : {}),
-        installedBy: 'upload',
-        installedAt: new Date().toISOString(),
-    };
-
-    // Same sandbox-capability scan the inline install path runs, so a ZIP upload is not a way
-    // to skip the warning.
-    const warnings = scanSandboxCapabilityWarnings(scripts);
-    return warnings.length ? { ok: true, record, warnings } : { ok: true, record };
+    return built.warnings?.length
+        ? { ok: true, record: built.record, warnings: built.warnings }
+        : { ok: true, record: built.record };
 }
 
 // ── Cortex ZIP ──

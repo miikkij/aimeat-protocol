@@ -3,6 +3,10 @@
  * @description Shared extension-manifest validator/builder — validates a YAML manifest + scripts map
  *   and builds the ExtensionRecord it describes. Extracted from src/routes/extensions.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-07-26 — validateManifestShape: type-check every field the builder later reads as a
+ *     string. `(a.method as string).toUpperCase()` on a mis-typed field threw a TypeError out of the
+ *     builder, which the presigned-upload router turned into a bare 500 with no mention of the
+ *     manifest. Mis-typed fields are now a 400 naming the field and what the YAML produced.
  *   v1.1.0 — 2026-07-17 — Per-action pricing: validate + carry `tollMorsels` (anti-abuse burn) and
  *     `commercial` {payMorsels, payMoney} for priced raw calls (design notes doc-r6tyr3o, C1/M1)
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
@@ -69,6 +73,71 @@ export function scanSandboxCapabilityWarnings(scripts: Record<string, string>): 
 
 const isNonNegInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v >= 0 && Number.isFinite(v);
 const fail = (message: string): ExtBuildResult => ({ ok: false, status: 400, code: 'INVALID_MANIFEST', message });
+
+const isNonEmptyString = (v: unknown): v is string => typeof v === 'string' && v.trim().length > 0;
+
+/**
+ * Describe what a manifest field actually turned out to be, so the error names the mistake instead
+ * of the type. A YAML flow map (`input: { type: object, description: a, b }`) is the usual way a
+ * field silently becomes the wrong shape: the comma starts a new entry, and what the author read as
+ * prose ends up as a key.
+ */
+function describeYamlValue(v: unknown): string {
+  if (v === undefined) return 'missing';
+  if (v === null) return 'null';
+  if (Array.isArray(v)) return 'a list';
+  if (typeof v === 'object') return `a map (${Object.keys(v as object).slice(0, 4).join(', ')})`;
+  return `${typeof v} (${JSON.stringify(v)})`;
+}
+
+/**
+ * Every manifest field this builder later treats as a string MUST be checked here first.
+ *
+ * The bug this closes: `actions[].method` was read as `(a.method as string).toUpperCase()` with no
+ * check, so a manifest where the field parsed as anything else threw a TypeError out of the whole
+ * builder. On the REST/MCP paths that surfaced as a message; on the presigned ZIP path the router's
+ * catch-all turned it into a bare `500 PROCESSING_FAILED`, which tells the author nothing about
+ * their manifest. A mis-typed field is the author's mistake to fix, so it must be a 400 that names
+ * the field, the action and what the YAML actually produced.
+ */
+function validateManifestShape(
+  metadata: Record<string, unknown>,
+  actions: Array<Record<string, unknown>>,
+): ExtBuildResult | null {
+  for (const field of ['name', 'description', 'author'] as const) {
+    if (!isNonEmptyString(metadata[field])) {
+      return fail(`metadata.${field} must be a non-empty string, got ${describeYamlValue(metadata[field])}`);
+    }
+  }
+  // A YAML scalar like `version: 1.0` parses as a number, which is a legitimate thing to write.
+  // Accept it and coerce at build time; refuse the shapes that cannot be a version at all.
+  if (!isNonEmptyString(metadata.version) && typeof metadata.version !== 'number') {
+    return fail(`metadata.version must be a string (quote it, e.g. "1.0.0"), got ${describeYamlValue(metadata.version)}`);
+  }
+
+  for (const [i, action] of actions.entries()) {
+    if (typeof action !== 'object' || action === null || Array.isArray(action)) {
+      return fail(`actions[${i}] must be a map with id, method, path and script, got ${describeYamlValue(action)}`);
+    }
+    const label = isNonEmptyString(action.id) ? `"${action.id}"` : `at index ${i}`;
+    for (const field of ['id', 'method', 'path', 'script'] as const) {
+      if (!isNonEmptyString(action[field])) {
+        return fail(`Action ${label}: ${field} must be a non-empty string, got ${describeYamlValue(action[field])}`);
+      }
+    }
+    // input/output are JSON Schema documents. A comma inside an unquoted flow-map description is
+    // the common way these stop being maps, and storing the wreckage means the action advertises
+    // an input contract nobody wrote.
+    for (const field of ['input', 'output'] as const) {
+      const v = action[field];
+      if (v !== undefined && (typeof v !== 'object' || v === null || Array.isArray(v))) {
+        return fail(`Action ${label}: ${field} must be a JSON Schema map, got ${describeYamlValue(v)}`
+          + '. A comma inside an unquoted flow map splits it into another entry — quote the text.');
+      }
+    }
+  }
+  return null;
+}
 
 /**
  * Validate a raw action's pricing (design: notes doc-r6tyr3o). `tollMorsels` is an optional
@@ -172,10 +241,11 @@ export function buildExtensionRecordFromManifest(
   if (!Array.isArray(actions) || actions.length === 0) {
     return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'actions array is required and must not be empty' };
   }
+  // Type-check before ANY field is read as a string — see validateManifestShape.
+  const shapeErr = validateManifestShape(metadata, actions);
+  if (shapeErr) return shapeErr;
+
   for (const action of actions) {
-    if (!action.id || !action.method || !action.path || !action.script) {
-      return { ok: false, status: 400, code: 'INVALID_MANIFEST', message: 'Each action must have id, method, path, and script fields' };
-    }
     if (!scripts[action.script as string]) {
       return { ok: false, status: 400, code: 'MISSING_SCRIPT',
         message: `Script "${action.script as string}" referenced in action "${action.id as string}" not found in scripts object` };
@@ -211,7 +281,8 @@ export function buildExtensionRecordFromManifest(
 
   const record: ExtensionRecord = {
     name: metadata.name as string,
-    version: metadata.version as string,
+    // Coerced, not cast: `version: 1.0` is a number in YAML and validateManifestShape allows it.
+    version: String(metadata.version),
     description: metadata.description as string,
     author: metadata.author as string,
     status: 'inactive',

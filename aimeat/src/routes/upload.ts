@@ -34,6 +34,13 @@
  *     (previously an MCP update without a description BLANKED the catalog description, reset the
  *     category to 'tool', dropped the icon/tags and cleared forkable+protection). Also invalidates
  *     the protection cache on re-publish, mirroring POST /v1/apps.
+ *   v1.9.0 - 2026-07-26 - handleExtensionUpload stops reporting failures as success. `?? existing`
+ *     turned a storage write that did not apply into `200 {success:true, updated:true}` carrying the
+ *     OLD record, so an upsert could leave the extension running the previous code while telling the
+ *     caller it had shipped. Also: the bare owner is derived the way handleAppUpload does (a GHII
+ *     subject recorded installedBy 'upload' and made the ownership check short-circuit away), secret
+ *     config is encrypted as on the REST path, EXCHANGE re-projection + capability aggregation run,
+ *     and the router's catch-all names the failure instead of answering a blank 500.
  *   v1.8.0 - 2026-07-26 - handleExtensionUpload honours the token meta's `update` and `activate`.
  *     It previously took no meta at all and answered a flat 409 on an existing name, so a caller
  *     that had explicitly requested an upsert was forced into delete + reinstall - which also
@@ -56,6 +63,9 @@ import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { ensureAppSubdomain } from './subdomains.js';
+import { getEncryptionKey } from '../services/encryption.js';
+import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
+import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
 
 export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -130,7 +140,16 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
             }
         } catch (err) {
             logger.error('Upload processing failed', { error: (err as Error).message, stack: (err as Error).stack, type: verified.utype });
-            res.status(500).json({ success: false, error: 'PROCESSING_FAILED', message: 'Upload processing failed' });
+            // The caller holds a presigned token they minted for this exact upload, so naming the
+            // failure tells them nothing about anyone else's data — and a bare "Upload processing
+            // failed" is unactionable. A ZIP whose manifest had one mis-typed field surfaced as
+            // exactly that 500, and the author had no way to learn which field.
+            res.status(500).json({
+                success: false,
+                error: 'PROCESSING_FAILED',
+                message: 'Upload processing failed',
+                reason: (err as Error).message.slice(0, 300),
+            });
         }
     });
 
@@ -286,12 +305,20 @@ async function handleExtensionUpload(
 ): Promise<void> {
     const result = await parseExtensionZip(data, config);
     if (!result.ok) {
-        res.status(400).json({ success: false, error: 'VALIDATION_FAILED', message: result.error });
+        res.status(400).json({ success: false, error: result.code ?? 'VALIDATION_FAILED', message: result.error });
         return;
     }
 
+    // The token subject is a full GAII (agent#owner@node) for agent uploads and the owner's GHII
+    // (owner@node) for owner / app-grant uploads. parseGAII returns null for the GHII form, so
+    // `parseGAII(sub)?.owner` alone recorded the extension as installedBy 'upload' AND made the
+    // ownership check below vanish by short-circuiting — any owner could then overwrite anyone's
+    // extension through a presigned ZIP. Derive the bare owner the way handleAppUpload does.
+    const parsedSub = parseGAII(sub);
+    const ownerName = parsedSub ? parsedSub.owner : (sub.includes('@') ? sub.split('@')[0] : sub);
+
     const record = result.record!;
-    record.installedBy = parseGAII(sub)?.owner ?? 'upload';
+    record.installedBy = ownerName;
     record.installedAt = new Date().toISOString();
 
     // `update`/`activate` ride in the token meta (PRESIGNED_META_KEYS). This handler used to ignore
@@ -309,7 +336,9 @@ async function handleExtensionUpload(
         });
         return;
     }
-    if (existing && parseGAII(sub)?.owner && existing.installedBy && existing.installedBy !== parseGAII(sub)!.owner) {
+    // Ownership is checked unconditionally: an upload whose subject we cannot attribute is refused
+    // rather than quietly allowed.
+    if (existing && existing.installedBy && existing.installedBy !== ownerName) {
         res.status(403).json({
             success: false, error: 'FORBIDDEN',
             message: `Extension "${record.name}" belongs to another owner`,
@@ -317,13 +346,26 @@ async function handleExtensionUpload(
         return;
     }
 
+    // Encrypt `type: secret` config values before they are stored, exactly as POST/PUT
+    // /v1/extensions do. Without this a ZIP install was a way to write an API key to the database
+    // in plaintext.
+    const encConfig = encryptSecretFields(record.config, getExtSecretKeys(record), getEncryptionKey(config));
+    if (encConfig === null) {
+        res.status(503).json({
+            success: false, error: 'ENCRYPTION_NOT_CONFIGURED',
+            message: 'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY to install extensions with secret config.',
+        });
+        return;
+    }
+    record.config = encConfig;
+
     let saved: ExtensionRecord;
     if (existing) {
         // Same field set the REST upsert (PUT /v1/extensions/:name) swaps: code + metadata only.
         // Lifecycle (status, installedBy, installedAt, activatedAt), the ext:{name} memory and any
         // instances are preserved — that preservation is the whole reason to upsert instead of
         // delete + reinstall.
-        saved = await storage.updateExtension(record.name, {
+        const updated = await storage.updateExtension(record.name, {
             version: record.version,
             description: record.description,
             author: record.author,
@@ -336,7 +378,21 @@ async function handleExtensionUpload(
             ...(wantActivate && existing.status !== 'active'
                 ? { status: 'active' as const, activatedAt: new Date().toISOString() }
                 : {}),
-        }) ?? existing;
+        });
+        // A write that did not happen must never be answered with success. This line used to read
+        // `?? existing`, so a storage failure was reported as `200 {success:true, updated:true}`
+        // carrying the OLD record: the caller was told the upsert worked while the extension kept
+        // running the previous code. That is the worst possible answer — worse than an error,
+        // because it ends the investigation.
+        if (!updated) {
+            logger.error(`Extension upsert wrote nothing via upload: ${record.name}`, { by: sub });
+            res.status(500).json({
+                success: false, error: 'UPDATE_FAILED',
+                message: `Extension "${record.name}" was NOT updated — the storage write did not apply. The installed version is unchanged.`,
+            });
+            return;
+        }
+        saved = updated;
     } else {
         if (wantActivate) {
             record.status = 'active';
@@ -345,8 +401,24 @@ async function handleExtensionUpload(
         saved = await storage.createExtension(record);
     }
 
+    // Parity with the REST and MCP install paths: re-project any EXCHANGE listings the actions
+    // declare, and refresh aggregated capabilities when the extension is live.
+    await reconcileAfterExtensionWrite(storage, ownerName, config.nodeId, saved.name);
+    if (saved.status === 'active') {
+        import('../services/capability-aggregator.js')
+            .then(m => m.runCapabilityAggregation(config, storage))
+            .catch(err => logger.error('Capability aggregation after extension upload failed', { error: String(err) }));
+    }
+
     logger.info(`Extension ${existing ? 'updated' : 'installed'} via upload: ${saved.name}`, { version: saved.version, by: sub, activated: wantActivate });
     emitResourceListChanged(sub);
+
+    // An ACTIVE extension whose manifest declares schedules needs a re-registration this endpoint
+    // has no scheduler for — say so instead of letting the author assume the new cron is live.
+    const hasSchedules = Array.isArray(saved.config.__schedules) && (saved.config.__schedules as unknown[]).length > 0;
+    const scheduleNote = existing && saved.status === 'active' && hasSchedules
+        ? 'schedules in the manifest are NOT re-registered by this endpoint — use PUT /v1/extensions/{name} (REST upsert) or deactivate + activate to refresh them'
+        : undefined;
 
     res.json({
         success: true,
@@ -355,6 +427,7 @@ async function handleExtensionUpload(
         version: saved.version,
         status: saved.status,
         updated: !!existing,
+        ...(scheduleNote ? { note: scheduleNote } : {}),
         actions: saved.actions.map(a => ({ id: a.id, method: a.method, path: a.path })),
         // Non-blocking sandbox-capability notes (no crypto.subtle in QuickJS, non-deterministic
         // Date.now/Math.random). Surfaced here so a ZIP upload is not a way to miss them.

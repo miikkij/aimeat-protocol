@@ -19,13 +19,20 @@
  *   v1.5.0 — 2026-07-19 — aimeat_extension_install gains update:true (in-place upsert preserving
  *     lifecycle + ext: memory, owner-gated) and activate:true (skip separate activate call);
  *     closes pitfall ext/extension-install-no-upsert
+ *   v1.6.0 — 2026-07-26 — aimeat_extension_install: a failed upsert is reported as a failure (it used
+ *     to answer with the record it MEANT to write, i.e. the new version number over unchanged code);
+ *     `scripts` without `manifest` is an error instead of a silent fall-through to upload mode; the
+ *     hand-rolled manifest→record copy is replaced by the shared buildExtensionRecordFromManifest,
+ *     which adds ODPS/plans/secret-config/instances handling this path was missing.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { parse as parseYaml } from 'yaml';
-import { validateActionPricing } from '../routes/extensions/manifest.js';
+import { buildExtensionRecordFromManifest } from '../routes/extensions/manifest.js';
+import { getEncryptionKey } from '../services/encryption.js';
+import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
+import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
@@ -395,6 +402,20 @@ export function registerExtensionsTools(
         },
         annotationsFor('aimeat_extension_install'),
         async ({ manifest: manifestYaml, scripts, update, activate }) => {
+            // A caller who sent scripts plainly meant to install inline. Falling through to upload
+            // mode here handed them an upload_url instead, dropped the scripts on the floor and said
+            // nothing — so the "workaround" for a broken ZIP path silently became the ZIP path.
+            if (!manifestYaml && scripts) {
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: 'Inline mode needs BOTH manifest and scripts — scripts were provided without a manifest, '
+                            + 'so nothing was installed. Send the manifest YAML too, or omit scripts to get an upload URL for a ZIP.',
+                    }],
+                    isError: true,
+                };
+            }
+
             // --- UPLOAD MODE: no manifest provided, return presigned upload URL ---
             if (!manifestYaml) {
                 const maxBytes = config.extensionMaxCodeSizeKb * 1024 * 50;
@@ -434,130 +455,41 @@ export function registerExtensionsTools(
                 return { content: [{ type: 'text' as const, text: 'scripts is required when using inline mode (manifest provided)' }], isError: true };
             }
 
-            // Parse manifest YAML
-            let manifest: Record<string, unknown>;
-            try {
-                manifest = parseYaml(manifestYaml) as Record<string, unknown>;
-            } catch {
-                return { content: [{ type: 'text' as const, text: 'Failed to parse manifest YAML' }], isError: true };
+            // Validation + record building is the SHARED builder that REST (POST/PUT /v1/extensions)
+            // and the ZIP upload path use. This tool used to carry its own thinner copy, which is how
+            // ODPS descriptors, `commercial.plans`/`pricesMoney`, the `type: secret` config marker and
+            // instances validation ended up applying on some install paths and not others.
+            const callerOwner = parseGAII(getAgentGaii())?.owner
+                ?? (getAgentGaii().includes('@') ? getAgentGaii().split('@')[0] : 'mcp-agent');
+            const built = buildExtensionRecordFromManifest(
+                manifestYaml, scripts, config, callerOwner, new Date().toISOString(),
+            );
+            if (!built.ok) {
+                return { content: [{ type: 'text' as const, text: `${built.code}: ${built.message}` }], isError: true };
             }
+            const record = built.record;
+            const name = record.name;
 
-            // Validate required metadata fields
-            const metadata = manifest.metadata as Record<string, unknown> | undefined;
-            if (!metadata?.name || !metadata?.version || !metadata?.description || !metadata?.author) {
-                return {
-                    content: [{ type: 'text' as const, text: 'metadata.name, metadata.version, metadata.description, and metadata.author are required' }],
-                    isError: true,
-                };
-            }
-
-            // Validate actions array
-            const actions = manifest.actions as Array<Record<string, unknown>> | undefined;
-            if (!Array.isArray(actions) || actions.length === 0) {
-                return { content: [{ type: 'text' as const, text: 'actions array is required and must not be empty' }], isError: true };
-            }
-
-            for (const action of actions) {
-                if (!action.id || !action.method || !action.path || !action.script) {
-                    return {
-                        content: [{ type: 'text' as const, text: 'Each action must have id, method, path, and script fields' }],
-                        isError: true,
-                    };
-                }
-                if (!scripts[action.script as string]) {
-                    return {
-                        content: [{ type: 'text' as const, text: `Script "${action.script as string}" referenced in action "${action.id as string}" not found in scripts object` }],
-                        isError: true,
-                    };
-                }
-                // Per-action pricing (tollMorsels / commercial) — validate here so the MCP install path
-                // matches REST (C1/M1); without this the fields were silently dropped and calls ran free.
-                const pricingErr = validateActionPricing(action, action.id as string);
-                if (pricingErr && !pricingErr.ok) {
-                    return { content: [{ type: 'text' as const, text: pricingErr.message }], isError: true };
-                }
-            }
-
-            // Check if extension already exists
-            const name = metadata.name as string;
             const existingExt = await storage.getExtension(name);
             if (existingExt && !update) {
                 return { content: [{ type: 'text' as const, text: `Extension "${name}" is already installed — pass update: true to upsert it in place (activation status and its ext: memory are preserved), or delete + reinstall.` }], isError: true };
             }
             if (existingExt && update) {
                 // Only the installing owner may update their extension in place.
-                const callerOwner = parseGAII(getAgentGaii())?.owner ?? '';
                 if (existingExt.installedBy && existingExt.installedBy !== callerOwner) {
                     return { content: [{ type: 'text' as const, text: `Extension "${name}" was installed by "${existingExt.installedBy}" — only the installing owner may update it` }], isError: true };
                 }
             }
 
-            // Build ExtensionRecord
-            const manifestConfig = manifest.config as Record<string, unknown> | undefined;
-            const manifestLimits = manifest.limits as Record<string, unknown> | undefined;
-            const manifestFederation = manifest.federation as Record<string, unknown> | undefined;
-            const manifestSchedules = manifest.schedules as Array<Record<string, unknown>> | undefined;
-            const manifestInstances = manifest.instances as Record<string, unknown> | undefined;
-
-            const record: ExtensionRecord = {
-                name,
-                version: metadata.version as string,
-                description: metadata.description as string,
-                author: metadata.author as string,
-                status: 'inactive',
-                requiredApis: (manifest.required_apis as string[]) ?? [],
-                actions: actions.map(a => ({
-                    id: a.id as string,
-                    method: (a.method as string).toUpperCase(),
-                    path: a.path as string,
-                    inputSchema: (a.input as Record<string, unknown>) ?? {},
-                    outputSchema: (a.output as Record<string, unknown>) ?? {},
-                    scriptContent: scripts[a.script as string],
-                    // Carry per-action pricing through (validated above) — priced EXCHANGE providers must
-                    // survive an MCP/Claude-chat install, not just the REST path.
-                    ...(a.tollMorsels !== undefined ? { tollMorsels: a.tollMorsels as number } : {}),
-                    ...(a.commercial !== undefined ? { commercial: a.commercial as ExtensionRecord['actions'][number]['commercial'] } : {}),
-                })),
-                config: {
-                    ...(manifestConfig
-                        ? Object.fromEntries(
-                            Object.entries(manifestConfig).map(([k, v]) => {
-                                if (v && typeof v === 'object' && 'default' in (v as Record<string, unknown>)) {
-                                    return [k, (v as Record<string, unknown>).default];
-                                }
-                                return [k, v];
-                            }),
-                        )
-                        : {}),
-                    ...(manifestSchedules ? { __schedules: manifestSchedules } : {}),
-                },
-                limits: {
-                    memoryMb: Math.min(
-                        (manifestLimits?.memory_mb as number) ?? config.extensionMaxMemoryMb,
-                        config.extensionMaxMemoryMb,
-                    ),
-                    timeoutMs: Math.min(
-                        (manifestLimits?.timeout_ms as number) ?? config.extensionTimeoutMs,
-                        config.extensionTimeoutMs,
-                    ),
-                    maxApiCalls: Math.min(
-                        (manifestLimits?.max_api_calls as number) ?? config.extensionMaxApiCalls,
-                        config.extensionMaxApiCalls,
-                    ),
-                },
-                federation: {
-                    advertise: (manifestFederation?.advertise as boolean) ?? false,
-                    capabilities: (manifestFederation?.capabilities as string[]) ?? [],
-                },
-                ...(manifestInstances?.supported ? {
-                    instances: {
-                        supported: true,
-                        configSchema: (manifestInstances.config_per_instance as Record<string, unknown>) ?? undefined,
-                    },
-                } : {}),
-                installedBy: parseGAII(getAgentGaii())?.owner ?? 'mcp-agent',
-                installedAt: new Date().toISOString(),
-            };
+            // Encrypt `type: secret` config values before storing, as POST/PUT /v1/extensions do.
+            const encConfig = encryptSecretFields(record.config, getExtSecretKeys(record), getEncryptionKey(config));
+            if (encConfig === null) {
+                return {
+                    content: [{ type: 'text' as const, text: 'ENCRYPTION_NOT_CONFIGURED: set AIMEAT_ENCRYPTION_KEY to install extensions with secret config.' }],
+                    isError: true,
+                };
+            }
+            record.config = encConfig;
 
             try {
                 let result: ExtensionRecord;
@@ -576,7 +508,18 @@ export function registerExtensionsTools(
                         federation: record.federation,
                         instances: record.instances,
                     });
-                    result = updated ?? { ...record, status: existingExt.status };
+                    // Never answer a write that did not apply with the record we WANTED to store.
+                    // This line used to be `updated ?? { ...record, status }`, which reported the NEW
+                    // version number while the database still held the old code — the most misleading
+                    // answer available, because it looks like proof the deploy worked.
+                    if (!updated) {
+                        logger.error(`Extension upsert wrote nothing via MCP: ${name}`, { by: record.installedBy });
+                        return {
+                            content: [{ type: 'text' as const, text: `Extension "${name}" was NOT updated — the storage write did not apply, and the installed version is unchanged. Nothing was deployed.` }],
+                            isError: true,
+                        };
+                    }
+                    result = updated;
                     action = 'updated';
                     logger.info(`Extension updated via MCP: ${name}`, { version: record.version, by: record.installedBy });
                 } else {
@@ -588,19 +531,27 @@ export function registerExtensionsTools(
                 // Optional immediate activation (skips the separate activate call).
                 let status = result.status;
                 if (activate && status !== 'active') {
-                    await storage.updateExtension(name, { status: 'active', activatedAt: new Date().toISOString() });
+                    const activated = await storage.updateExtension(name, { status: 'active', activatedAt: new Date().toISOString() });
+                    if (!activated) {
+                        return {
+                            content: [{ type: 'text' as const, text: `Extension "${name}" was ${action} but could NOT be activated — it is still ${status}. Retry with aimeat_extension_activate.` }],
+                            isError: true,
+                        };
+                    }
                     status = 'active';
                 }
-                // Actions may have changed (or just went live) — refresh aggregated capabilities.
+                // Actions may have changed (or just went live) — refresh aggregated capabilities, and
+                // re-project any EXCHANGE listings the actions declare (parity with REST).
+                await reconcileAfterExtensionWrite(storage, record.installedBy, config.nodeId, name);
                 if (status === 'active') {
                     import('../services/capability-aggregator.js')
                         .then(m => m.runCapabilityAggregation(config, storage))
-                        .catch(() => {});
+                        .catch(err => logger.error('Capability aggregation after MCP extension install failed', { error: String(err) }));
                 }
 
                 // An ACTIVE extension whose manifest declares schedules needs a schedule
                 // re-registration this tool cannot perform — point at the REST upsert.
-                const manifestSchedules = manifest.schedules as unknown[] | undefined;
+                const manifestSchedules = record.config.__schedules as unknown[] | undefined;
                 const scheduleNote = (action === 'updated' && status === 'active' && Array.isArray(manifestSchedules) && manifestSchedules.length > 0)
                     ? 'schedules in the manifest are NOT re-registered by this tool — use PUT /v1/extensions/{name} (REST upsert) or deactivate + activate to refresh them'
                     : undefined;
