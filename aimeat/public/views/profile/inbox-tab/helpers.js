@@ -5,6 +5,8 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-07-27 — sendFailure(): pick the toast text for a failed send, preferring the thrown
+ *     reason (attachment too large, out of quota) over the generic "could not send".
  *   v1.2.0 — 2026-07-21 — resolveThreadAttachmentUrls(): resolve non-inline attachment URLs for a loaded
  *     thread (reusing the previous conversation's cache), extracted from inbox-tab loadThread.
  *   v1.1.0 — 2026-07-17 — quoteSnippet(): one-line plain-text excerpt of a message body for reply-quotes.
@@ -12,6 +14,17 @@
  */
 import { t, getLocale } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
+
+/**
+ * Toast text for a failed send. An attachment upload throws for reasons the sender can act on: the file
+ * is over this node's per-file limit, or the account is out of storage quota. The generic "could not
+ * send" hid every one of them, so an oversized video read as a dead button, with nothing in the console
+ * either. Prefer the thrown message; keep the generic line for errors that carry none of their own.
+ */
+export function sendFailure(err) {
+  const msg = String(err?.message || '').trim();
+  return msg && msg !== 'Failed to fetch' ? msg : t('inbox.failed');
+}
 
 /**
  * Resolve presigned URLs for a thread's non-inline attachments, reusing already-resolved URLs from the

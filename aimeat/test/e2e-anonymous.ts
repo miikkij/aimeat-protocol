@@ -129,6 +129,47 @@ await test('Deleted memory returns 404', async () => {
     assert(status === 404, `Expected 404, got ${status}`);
 });
 
+// ─── Phase 2b: Storage namespace fence ───
+// The shared anonymous identity may only write under anonymous/*. The fence must hold for BOTH
+// upload representations: inline base64 AND the presigned mint. It used to be applied only after the
+// presigned branch returned early, so asking for an upload URL walked straight past it — a gate on
+// the write must not be skippable by choosing a different way to perform the same write.
+console.log('\nPhase 2b — Storage namespace fence (anonymous/*)');
+
+await test('Anonymous inline upload OUTSIDE anonymous/* → 403', async () => {
+    const { status, body } = await json('/v1/storage', anonAuth({
+        method: 'POST',
+        body: JSON.stringify({ key: 'escaped/inline.txt', data: Buffer.from('nope').toString('base64'), mime_type: 'text/plain' }),
+    }));
+    assert(status === 403, `Expected 403, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('Anonymous PRESIGNED mint OUTSIDE anonymous/* → 403, no token issued', async () => {
+    const { status, body } = await json('/v1/storage', anonAuth({
+        method: 'POST',
+        body: JSON.stringify({ key: 'escaped/presigned.txt', mime_type: 'text/plain', mode: 'presigned' }),
+    }));
+    assert(status === 403, `Expected 403, got ${status}: ${JSON.stringify(body)}`);
+    assert(!body.data?.upload_url, 'A refused mint must not hand back an upload_url');
+});
+
+await test('Anonymous PRESIGNED mint INSIDE anonymous/* still works end to end', async () => {
+    const key = `anonymous/presigned-${Date.now()}.txt`;
+    const mint = await json('/v1/storage', anonAuth({
+        method: 'POST',
+        body: JSON.stringify({ key, mime_type: 'text/plain', mode: 'presigned' }),
+    }));
+    assert(mint.status === 200, `Expected 200, got ${mint.status}: ${JSON.stringify(mint.body)}`);
+    assert(mint.body.data?.upload_url, 'Expected an upload_url');
+    const put = await fetch(mint.body.data.upload_url, {
+        method: 'PUT', headers: { 'Content-Type': 'text/plain' }, body: 'allowed',
+    });
+    assert(put.status === 200, `Expected PUT 200, got ${put.status}`);
+    const result = await put.json() as { success?: boolean; key?: string; size?: number };
+    assert(result.success === true && result.key === key, `Expected the file stored under ${key}, got ${JSON.stringify(result)}`);
+    assert(result.size === 7, `Expected 7 raw bytes (no base64 inflation), got ${result.size}`);
+});
+
 // ─── Phase 3: Micro-memory without OTK ───
 console.log('\nPhase 3 — Micro-Memory (no OTK)');
 

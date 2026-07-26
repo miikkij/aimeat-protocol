@@ -9855,7 +9855,11 @@ paths:
         '410':
           description: Token expired (60 min TTL)
         '413':
-          description: File exceeds size limit encoded in token
+          description: |
+            `FILE_TOO_LARGE` — the body exceeds the per-file size limit encoded in the token, or
+            `QUOTA_EXCEEDED` — a storage upload would put the account over its total storage quota
+            (the same gate the inline `POST /v1/storage` applies; the token's limit caps one file,
+            the quota caps the account).
         '500':
           description: |
             Processing failed. The body carries a `reason` naming the failure. An extension upsert
@@ -9907,12 +9911,52 @@ paths:
     post:
       operationId: uploadFile
       summary: Upload file
+      description: |
+        Three request shapes. Prefer **presigned** for anything over ~1 KB: JSON with
+        `mode: "presigned"` stores no bytes and answers with an `upload_url` to `PUT` the raw file to
+        (see `PUT /v1/upload/{token}`). The inline JSON form base64-encodes the file into the request
+        body, which inflates it by 4/3 and must therefore fit inside the node's JSON body limit — a
+        ceiling separate from, and usually lower than, the storage quota.
       tags: [Storage]
       security:
         - BearerAuth: []
       requestBody:
         required: true
         content:
+          application/json:
+            schema:
+              type: object
+              required: [key]
+              properties:
+                key:
+                  type: string
+                data:
+                  type: string
+                  description: Base64-encoded file bytes. Required unless `mode` is `presigned`.
+                mime_type:
+                  type: string
+                mode:
+                  type: string
+                  enum: [presigned]
+                  description: >
+                    Mint a one-shot upload URL instead of storing bytes now. The response carries
+                    `upload_url`, `upload_method`, `content_type`, `max_size_bytes` and
+                    `expires_in_seconds`.
+                visibility:
+                  type: string
+                  enum: [private, owner, group, workspace, members, public]
+                group_id:
+                  type: string
+                  description: Sharing group ID (required when visibility is 'group')
+                workspace_refs:
+                  type: array
+                  items:
+                    type: string
+                  description: >
+                    One or more "{organismId}/{workspaceId}" (required when visibility is
+                    'workspace').
+                federate:
+                  type: boolean
           multipart/form-data:
             schema:
               type: object
@@ -9929,10 +9973,18 @@ paths:
                   type: string
                   description: Sharing group ID (required when visibility is 'group')
       responses:
+        '200':
+          description: >
+            Presigned mode — an upload URL was minted. No bytes were stored; `PUT` the file to
+            `upload_url`.
         '201':
           $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          description: >
+            An anonymous principal targeted a key outside `anonymous/*`. Applies to both the inline
+            and the presigned form: the namespace fence is on the write, not on the representation.
         '413':
-          description: Storage quota exceeded
+          description: Storage quota exceeded, or the file exceeds the per-file size limit
 
     get:
       operationId: listStorage
