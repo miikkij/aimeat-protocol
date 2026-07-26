@@ -20,10 +20,13 @@
  * @version-history
  *   v1.0.0 — 2026-07-26 — Initial: ctx.files.read/write so a capability can take a file REFERENCE
  *     instead of its bytes (image pipelines, MCP-safe handoff).
+ *   v1.1.0 — 2026-07-26 — parseRef delegates to services/file-refs.ts: the same reference form now
+ *     serves MCP tools, DM attachments and task attachments, and there is one implementation of it.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { authorizeRead } from './access-guard.js';
+import { parseFileRef } from './file-refs.js';
 import { checkStorageQuota } from './quota.js';
 
 /** What may cross the sandbox bridge in one call, in decoded bytes. */
@@ -37,17 +40,9 @@ export interface ExtensionFileRef {
 /**
  * Split "<gaii>/<key>" into its parts. A GAII always carries an @node, so the first path segment
  * is an owner only when it looks like one; anything else is a plain key belonging to the caller.
+ * Kept as a named export here (the sandbox's vocabulary) over the shared implementation.
  */
-export function parseRef(ref: string, callerGaii: string): { gaii: string; key: string } {
-    const slash = ref.indexOf('/');
-    if (slash > 0) {
-        const head = ref.slice(0, slash);
-        if (head.includes('@') || head.startsWith('ext:')) {
-            return { gaii: head, key: ref.slice(slash + 1) };
-        }
-    }
-    return { gaii: callerGaii, key: ref };
-}
+export const parseRef = parseFileRef;
 
 export function makeExtensionFiles(deps: {
     config: AimeatConfig;

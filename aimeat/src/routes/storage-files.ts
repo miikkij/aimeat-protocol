@@ -25,6 +25,12 @@
  *     not read by script: the global CORS middleware resolves origins from the caller's identity and
  *     a public read carries none, so it fell back to the node default. The gated branches below are
  *     unchanged and keep the credentialed policy.
+ *   v1.7.0 -- 2026-07-26 -- GET /v1/pub accepts ?mode=handle (presigned URL + metadata instead of the
+ *     bytes) so an agent/liaison that may read a file it does NOT own can hand the URL to a fetch or
+ *     a document parser without pulling binary through a tool result. Same guard, other representation.
+ *     Also removed the unreachable cross-owner branches from GET/HEAD /v1/storage: those look the key
+ *     up in the CALLER's namespace, so `file.ownerGaii !== caller` could never be true and the
+ *     authorizeRead() there never ran. Cross-namespace reads have exactly one door: /v1/pub.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -43,6 +49,7 @@ import { normalizeWorkspaceRefs } from '../utils/workspace-ref.js';
 import { generateUploadToken } from '../services/upload-token.js';
 import { generateDownloadToken, verifyDownloadToken, DownloadTokenError } from '../services/download-token.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
+import { FOREIGN_HANDLE_TTL_SECONDS, OWN_HANDLE_TTL_SECONDS } from '../services/file-refs.js';
 
 /** F11: max bytes returned inline (base64) from handle/inline download mode — keeps big binaries out of the model context. */
 const INLINE_MAX_BYTES = 32 * 1024;
@@ -522,6 +529,25 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
+        // ?mode=handle — answer an ALLOWED read with a presigned URL + metadata instead of the bytes.
+        // Same access decision as the byte path (this runs only after it passes); the caller just gets
+        // a URL it can hand to a fetch, a document parser or a human. A file the caller does not own
+        // gets the shorter TTL: the handle survives a revoked grant until it expires.
+        const handleMode = (Array.isArray(req.query.mode) ? req.query.mode[0] : req.query.mode) === 'handle';
+        const sendHandle = async (accessorGaii: string): Promise<void> => {
+            const ttl = accessorGaii === gaii ? OWN_HANDLE_TTL_SECONDS : FOREIGN_HANDLE_TTL_SECONDS;
+            const token = await generateDownloadToken(
+                { sub: gaii, key, mimeType: file.mimeType, size: file.size }, ttl,
+            );
+            res.json(success(config.nodeId, {
+                ref: `${gaii}/${key}`, owner_gaii: gaii, key, mode: 'handle',
+                mime_type: file.mimeType, size: file.size, visibility: file.visibility,
+                download_url: `${config.baseUrl}/v1/download/${token}`,
+                download_method: 'GET', expires_in_seconds: ttl,
+                note: 'Binary content is NOT inlined. GET download_url to fetch the bytes out-of-band.',
+            }, [{ description: 'Fetch the file bytes', method: 'GET', url: `/v1/download/${token}` }]));
+        };
+
         // Public files are always accessible (audited when the consent layer is on,
         // mirroring memory's public read).
         if (file.visibility === 'public') {
@@ -532,6 +558,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 visibility: 'public',
                 action: 'read',
             });
+            if (handleMode) { await sendHandle(req.auth?.sub ? resolveIdentity(req.auth, config.nodeId) : gaii); return; }
             res.setHeader('Cache-Control', 'public, max-age=300');
             // A public file is world-readable by definition, and until now only by <img>: a script
             // that fetched the same bytes got no Access-Control-Allow-Origin and was blocked. The
@@ -595,6 +622,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
+        if (handleMode) { await sendHandle(accessorGaii); return; }
         res.setHeader('Content-Type', file.mimeType);
         res.setHeader('Content-Length', file.size);
         res.end(file.data);
@@ -612,34 +640,17 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     router.head('/v1/storage/{*key}', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
         const gaii = resolve(req);
         const key = extractKey(req.params);
+        // This route is namespaced to the caller: the lookup above already scopes to `gaii`, so a
+        // file belonging to anyone else is simply absent here. Cross-namespace reads (an agent
+        // reading its owner's file, a group/workspace share) go through GET /v1/pub/:gaii/{key},
+        // which runs the authorizeRead() guard.
         const file = await storage.getStorageFile(gaii, key);
         if (!file) {
+            // ASCII only: a header value with a non-ASCII character (an em dash, say) makes Node throw
+            // ERR_INVALID_CHAR and turns this 404 into a 500.
+            res.setHeader('X-AIMEAT-Hint', 'Own namespace only - for a file owned by someone else use GET /v1/pub/{owner}/{key}');
             res.status(404).end();
             return;
-        }
-
-        // Cross-agent access: if the file is not owned by the requester, enforce consent
-        // through the shared guard (threads file.groupId for visibility:'group').
-        if (file.ownerGaii !== resolve(req)) {
-            if (file.visibility === 'public') {
-                // Public files are always accessible
-            } else if (config.consentEnabled) {
-                const result = await authorizeRead(storage, config, {
-                    ownerGaii: file.ownerGaii,
-                    accessorGaii: resolve(req),
-                    resourceKey: `storage:${key}`,
-                    visibility: file.visibility,
-                    groupId: file.groupId,
-                    action: 'read',
-                });
-                if (!result.allowed) {
-                    res.status(403).end();
-                    return;
-                }
-            } else {
-                res.status(403).end();
-                return;
-            }
         }
 
         res.setHeader('Content-Type', file.mimeType);
@@ -653,34 +664,14 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
     router.get('/v1/storage/{*key}', requireAuth(), requireExternalPrincipal(), requireScope('storage:read'), async (req, res) => {
         const gaii = resolve(req);
         const key = extractKey(req.params);
+        // Namespaced to the caller (see the HEAD handler above): a file owned by anyone else is not
+        // reachable here at all. The named alternative in the 404 is the whole point — an agent asked
+        // for its OWNER's file by bare key and got a blank "not found" that read as data loss.
         const file = await storage.getStorageFile(gaii, key);
         if (!file) {
-            res.status(404).json(error(config.nodeId, 'NOT_FOUND', `File not found: ${key}`));
+            res.status(404).json(error(config.nodeId, 'NOT_FOUND',
+                `File not found in your namespace: ${key}. This route reads only your own files - for a file owned by someone else (e.g. your owner's upload or a DM attachment) use GET /v1/pub/{owner}/{key}.`));
             return;
-        }
-
-        // Cross-agent access: if the file is not owned by the requester, enforce consent
-        // through the shared guard (one decision + audit, threads file.groupId).
-        if (file.ownerGaii !== resolve(req)) {
-            if (file.visibility === 'public') {
-                // Public files are always accessible
-            } else if (config.consentEnabled) {
-                const result = await authorizeRead(storage, config, {
-                    ownerGaii: file.ownerGaii,
-                    accessorGaii: resolve(req),
-                    resourceKey: `storage:${key}`,
-                    visibility: file.visibility,
-                    groupId: file.groupId,
-                    action: 'read',
-                });
-                if (!result.allowed) {
-                    res.status(403).json(error(config.nodeId, 'CONSENT_REQUIRED', 'You do not have consent to access this file'));
-                    return;
-                }
-            } else {
-                res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'You can only access your own files'));
-                return;
-            }
         }
 
         // F11: ?mode=handle | inline — return a JSON handle instead of raw bytes, so callers

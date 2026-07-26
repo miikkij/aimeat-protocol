@@ -42,6 +42,13 @@
  *     owner_scope read path and the app-grant route for writes; memory_list discloses
  *     values_omitted + how to read one; memory_write returns SHADOWED_BY_OWNER_COPY when the
  *     owner already holds the key. Covered by test/e2e-memory-namespaces.ts.
+ *   v1.11.0 -- 2026-07-26 -- Storage tools moved to ./core-storage.ts, where aimeat_storage_download
+ *     now reads by REFERENCE (new `owner` param, or an
+ *     "owner@node/key" key) through services/file-refs.ts, so an agent can open a file its OWNER
+ *     uploaded or one that arrived as a DM/task attachment. It previously looked only in the caller's
+ *     own namespace and answered a bare "File not found" — the file was reachable by policy the whole
+ *     time (visibility:'owner' / a consent grant), only the lookup was namespaced. Denials now name
+ *     the fix. Covered by test/e2e-agent-file-handoff.ts.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -51,9 +58,6 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
-import { generateUploadToken } from '../services/upload-token.js';
-import { generateDownloadToken } from '../services/download-token.js';
-import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
@@ -65,20 +69,13 @@ import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, shadowedByOwnerCopy, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
 import { registerCoreAdminTools } from './core-admin.js';
+import { registerCoreStorageTools } from './core-storage.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
 // aggregation earlier and give the agent an actionable "narrow your query" signal.
 const MEMORY_LIST_DEFAULT_LIMIT = 200;
 const MEMORY_LIST_MAX_LIMIT = 1000;
-
-// F11: storage holds binaries (images, video, large blobs). aimeat_storage_download returns a
-// handle (resource_link + presigned download_url) instead of base64 so bytes never enter the
-// model context. Only small text files may be returned inline.
-const STORAGE_INLINE_MAX_BYTES = 32 * 1024;
-function isInlineableMime(mime: string): boolean {
-    return mime.startsWith('text/') || /(json|xml|csv|javascript|yaml|markdown)/i.test(mime);
-}
 
 export function registerCoreTools(
     mcp: McpServer,
@@ -667,128 +664,8 @@ export function registerCoreTools(
         },
     );
 
-    // ── Tool 13: aimeat_storage_upload ──
-    mcp.tool(
-        'aimeat_storage_upload',
-        descriptionFor('aimeat_storage_upload'),
-        {
-            key: z.string().describe('Storage key (path-like identifier)'),
-            data_base64: z.string().optional().describe('Base64-encoded file data. Omit to get an upload URL instead (recommended for files > 1KB).'),
-            mime_type: z.string().optional().describe('MIME type (default: application/octet-stream)'),
-            visibility: z.enum(['private', 'owner', 'group', 'public']).optional().describe('Access control (default: private)'),
-            group_id: z.string().optional().describe('ID of sharing group for group visibility'),
-        },
-        annotationsFor('aimeat_storage_upload'),
-        async ({ key, data_base64, mime_type, visibility, group_id }) => {
-            // --- UPLOAD MODE ---
-            if (!data_base64) {
-                const maxBytes = 10 * 1024 * 1024;
-                const contentType = mime_type ?? 'application/octet-stream';
-                const token = await generateUploadToken({
-                    sub: agentGaii,
-                    utype: 'storage',
-                    meta: { key, mime_type: contentType, visibility: visibility ?? 'private' },
-                    maxBytes,
-                    contentType,
-                });
-
-                const uploadUrl = `${config.baseUrl}/v1/upload/${token}`;
-
-                return {
-                    content: [{
-                        type: 'text' as const,
-                        text: JSON.stringify({
-                            mode: 'upload',
-                            upload_url: uploadUrl,
-                            upload_method: 'PUT',
-                            content_type: contentType,
-                            max_size_bytes: maxBytes,
-                            expires_in_seconds: 3600,
-                            note: 'PUT the raw file to upload_url. The response contains the result as JSON.',
-                        }, null, 2),
-                    }],
-                };
-            }
-
-            // --- INLINE MODE ---
-            const fileData = Buffer.from(data_base64, 'base64');
-            if (fileData.length > 10 * 1024 * 1024) {
-                return { content: [{ type: 'text' as const, text: 'File exceeds 10MB limit' }], isError: true };
-            }
-            const file = await storage.createStorageFile({
-                key,
-                ownerGaii: agentGaii,
-                visibility: visibility ?? 'private',
-                groupId: visibility === 'group' ? group_id : undefined,
-                mimeType: mime_type ?? 'application/octet-stream',
-                size: fileData.length,
-                data: fileData,
-                createdAt: new Date().toISOString(),
-            });
-            emitResourceUpdated(agentGaii, `aimeat://storage/${encodeURIComponent(key)}`);
-            emitResourceListChanged(agentGaii);
-            return {
-                content: [{ type: 'text' as const, text: JSON.stringify({
-                    mode: 'inline', key: file.key, owner_gaii: file.ownerGaii, size: file.size, uploaded: true,
-                    // To embed this image in a workspace document, use embed_markdown / embed_url — NOT the raw
-                    // /v1/storage/<key> path. Saving it into a document scopes the file to that workspace's
-                    // members (visibility:'workspace'); it is never exposed to the public internet.
-                    embed_url: pubEmbedUrl(file.ownerGaii, file.key),
-                    embed_markdown: pubEmbedMarkdown(file.ownerGaii, file.key),
-                }, null, 2) }],
-            };
-        },
-    );
-
-    // ── Tool 14: aimeat_storage_download ──
-    mcp.tool(
-        'aimeat_storage_download',
-        descriptionFor('aimeat_storage_download'),
-        {
-            key: z.string(),
-            inline: z.boolean().optional().describe('Only for small text files (<= 32 KB): return content inline. Binaries always return a download handle, never base64 in context.'),
-        },
-        annotationsFor('aimeat_storage_download'),
-        async ({ key, inline }) => {
-            const file = await storage.getStorageFile(agentGaii, key);
-            if (!file) return { content: [{ type: 'text' as const, text: 'File not found' }], isError: true };
-            const resourceUri = `aimeat://storage/${encodeURIComponent(key)}`;
-
-            // Inline only for small text files — keeps binaries (images/video/large blobs) out of context.
-            if (inline && file.size <= STORAGE_INLINE_MAX_BYTES && isInlineableMime(file.mimeType)) {
-                return jsonContent({
-                    key: file.key, mime_type: file.mimeType, size: file.size,
-                    mode: 'inline', content_text: file.data.toString('utf8'), resource_uri: resourceUri,
-                });
-            }
-
-            // Default: return a handle. resource_link lets MCP clients read bytes out-of-band via
-            // resources/read; download_url is a presigned, TTL-limited HTTP fetch for everything else.
-            const token = await generateDownloadToken({ sub: file.ownerGaii, key, mimeType: file.mimeType, size: file.size });
-            return {
-                content: [
-                    {
-                        type: 'resource_link' as const,
-                        uri: resourceUri,
-                        name: file.key,
-                        mimeType: file.mimeType,
-                        description: `${file.size} bytes — fetch via download_url; do not read the bytes into context`,
-                    },
-                    {
-                        type: 'text' as const,
-                        text: JSON.stringify({
-                            key: file.key, mime_type: file.mimeType, size: file.size, mode: 'handle',
-                            download_url: `${config.baseUrl}/v1/download/${token}`,
-                            download_method: 'GET', expires_in_seconds: 3600, resource_uri: resourceUri,
-                            note: inline
-                                ? 'inline refused (file too large or not text) — returning a handle instead'
-                                : 'Binary content is not inlined. GET download_url to fetch the bytes out-of-band.',
-                        }, null, 2),
-                    },
-                ],
-            };
-        },
-    );
+    // ── Storage Tools (upload/download) — extracted to ./core-storage.ts ──
+    registerCoreStorageTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
 
     // ── Admin Tools (operator-only) — extracted to ./core-admin.ts ──
     registerCoreAdminTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);

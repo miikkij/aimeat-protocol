@@ -15,6 +15,10 @@
  *   v1.4.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
  *   v1.5.0 -- 2026-07-14 -- propose_todos auto-activates a queued task when the agent's mode is
  *     task-runner (started event + task_assigned push) -- parity with the REST propose-todos route.
+ *   v1.6.0 -- 2026-07-26 -- aimeat_task_create takes `files` (attachments by reference) and
+ *     aimeat_task_get returns each attachment as a presigned handle authorized for the reading agent.
+ *     Previously an attachments field was silently dropped: the call answered 201 while the file
+ *     vanished, so delegating file-shaped work looked like it worked and did not.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -25,6 +29,7 @@ import type { Storage, AgentTaskRecord, AgentTaskTodo } from '../storage/interfa
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { parseGAII, buildGAII } from '../utils/gaii.js';
+import { resolveTaskFileInputs, taskWithFileHandles } from '../services/task-files.js';
 import { emitDelivery } from '../services/event-bus.js';
 import { recordTaskStarted } from '../services/activity-recorder.js';
 
@@ -55,9 +60,11 @@ export function registerAgentTaskTools(
             title: z.string().describe('Short human-readable title for the task.'),
             description: z.string().describe('The actual prompt / instruction for the target agent.'),
             status: z.enum(['draft', 'queued']).optional().describe('Default "queued" (visible to target immediately).'),
+            files: z.array(z.string()).max(20).optional()
+                .describe('Files the target agent needs, by REFERENCE: "<owner@node>/<storage key>" (or a bare key for one of your own files). Upload first via aimeat_storage_upload, or pass the `ref` from a DM attachment. You must be able to read each file yourself; the target agent gets a presigned download_url from aimeat_task_get.'),
         },
         annotationsFor('aimeat_task_create'),
-        async ({ target_agent, title, description, status }) => {
+        async ({ target_agent, title, description, status, files }) => {
             const callerParsed = parseGAII(agentGaii);
             if (!callerParsed) {
                 return { content: [{ type: 'text' as const, text: 'Could not resolve caller identity' }], isError: true };
@@ -70,6 +77,14 @@ export function registerAgentTaskTools(
                     isError: true,
                 };
             }
+            const fileResult = await resolveTaskFileInputs(
+                storage, config, files?.map(ref => ({ ref })),
+                { gaii: agentGaii, sub: agentGaii, owner: callerParsed.owner },
+            );
+            if ('error' in fileResult) {
+                return { content: [{ type: 'text' as const, text: JSON.stringify({ error: fileResult.error.message, code: fileResult.error.code }, null, 2) }], isError: true };
+            }
+
             const now = new Date().toISOString();
             const id = randomUUID();
             const record: AgentTaskRecord = {
@@ -81,6 +96,7 @@ export function registerAgentTaskTools(
                 scope: [],
                 rules: [],
                 verification: { userExpects: '', technicalChecks: [] },
+                ...(fileResult.files.length ? { resources: { files: fileResult.files } } : {}),
                 todos: [],
                 status: (status ?? 'queued') as AgentTaskRecord['status'],
                 createdAt: now,
@@ -95,6 +111,7 @@ export function registerAgentTaskTools(
                         task_id: created.id,
                         target_agent,
                         status: created.status,
+                        files: fileResult.files.length,
                         created_at: created.createdAt,
                     }, null, 2),
                 }],
@@ -162,6 +179,12 @@ export function registerAgentTaskTools(
                 return { content: [{ type: 'text' as const, text: 'Access denied -- task belongs to another agent' }], isError: true };
             }
 
+            // Attachments become presigned handles here, authorized for THIS agent on THIS read — the
+            // task assignment carries the reference, the read carries the permission.
+            const withFiles = await taskWithFileHandles(storage, config, task, {
+                gaii: agentGaii, sub: agentGaii, owner: parseGAII(agentGaii)?.owner,
+            });
+
             return {
                 content: [{
                     type: 'text' as const,
@@ -173,7 +196,7 @@ export function registerAgentTaskTools(
                         scope: task.scope,
                         rules: task.rules,
                         verification: task.verification,
-                        resources: task.resources,
+                        resources: withFiles.resources,
                         todos: task.todos.map(t => ({
                             id: t.id,
                             order: t.order,

@@ -3,6 +3,10 @@
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from agent-tasks.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-26 — resources.files: a task can be created WITH file attachments (checked against
+ *     the creator's own read access, mime/size taken from the stored file), and the detail read returns
+ *     each one as a presigned handle authorized for the reader. Before this, handing an agent a PDF
+ *     meant sending a DM — the task, which is what file-shaped work actually is, could not carry it.
  */
 
 import type { Router } from 'express';
@@ -16,6 +20,7 @@ import { getActiveWorkflowEngine } from '../../services/workflow/engine.js';
 import { logger } from '../../utils/logger.js';
 import { emitResourceUpdated } from '../../mcp/index.js';
 import { AgentTaskCreateSchema } from '../../models/agent-task-schemas.js';
+import { resolveTaskFileInputs, taskWithFileHandles } from '../../services/task-files.js';
 import type { TaskRouteHelpers } from './helpers.js';
 
 export function registerTaskCreateReadRoutes(
@@ -98,6 +103,17 @@ export function registerTaskCreateReadRoutes(
     }
 
     const body = parsed.data;
+
+    // Attachments are validated against the CREATOR's own read access — a task must not be a way to
+    // slip a reference to data the creator cannot see into somebody's work queue.
+    const fileResult = await resolveTaskFileInputs(storage, config, body.resources?.files, {
+      gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined,
+    });
+    if ('error' in fileResult) {
+      res.status(fileResult.error.status).json(error(config.nodeId, fileResult.error.code, fileResult.error.message));
+      return;
+    }
+
     const now = new Date().toISOString();
     const id = randomUUID();
 
@@ -140,6 +156,7 @@ export function registerTaskCreateReadRoutes(
         knowledgePackages: body.resources.knowledge_packages,
         memoryKeys: body.resources.memory_keys,
         memoryPrefixes: body.resources.memory_prefixes,
+        ...(fileResult.files.length ? { files: fileResult.files } : {}),
       } : undefined,
       todos,
       status: effectiveStatus,
@@ -318,6 +335,10 @@ export function registerTaskCreateReadRoutes(
       return;
     }
 
-    res.json(success(config.nodeId, { task }));
+    // Attachments come back as presigned handles, authorized for THIS reader on THIS read.
+    const withFiles = await taskWithFileHandles(storage, config, task, {
+      gaii: resolve(req), sub: req.auth!.sub, owner: req.auth!.owner as string | undefined,
+    });
+    res.json(success(config.nodeId, { task: withFiles }));
   });
 }

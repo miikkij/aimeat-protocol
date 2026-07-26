@@ -5,8 +5,23 @@
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-29 -- Add 'revision_requested' task status, 'outdated' todo status, and 'revision_requested' event type for the owner-requests-changes-to-proposed-todos flow.
  *   v1.2.0 -- 2026-05-30 -- Raise task description max length 4096 -> 10000 chars (create + update). The agent crew reads task.description as its primary prompt, so this is the field that needs room.
+ *   v1.3.0 -- 2026-07-26 -- resources.files: a task can carry FILE references (an invoice PDF, a form)
+ *     alongside knowledge packages and memory keys. File-shaped work is naturally a task, and the only
+ *     way to hand an agent a document used to be a DM. Input is a reference plus an optional name; mime
+ *     and size are resolved server-side from the stored file.
  */
 import { z } from 'zod';
+
+/**
+ * A file handed to the agent WITH the task. `ref` is "<ownerGaii>/<key>" (a bare key means the
+ * caller's own storage) — the same reference form ctx.files.read and DM attachments use. The bytes are
+ * never carried here: at create time the server checks the file exists and that the CREATOR may read
+ * it, and every later read is authorized as the agent doing the reading.
+ */
+export const TaskFileRefSchema = z.object({
+  ref: z.string().min(1).max(700),
+  name: z.string().max(256).optional(),
+});
 
 const TodoStatusSchema = z.enum(['pending', 'active', 'done', 'failed', 'skipped', 'outdated']);
 
@@ -28,6 +43,7 @@ export const AgentTaskCreateSchema = z.object({
     knowledge_packages: z.array(z.string()).optional(),
     memory_keys: z.array(z.string()).optional(),
     memory_prefixes: z.array(z.string()).optional(),
+    files: z.array(TaskFileRefSchema).max(20).optional(),
   }).optional(),
   todos: z.array(z.object({
     id: z.string(),
@@ -62,6 +78,7 @@ export const AgentTaskUpdateSchema = z.object({
     knowledge_packages: z.array(z.string()).optional(),
     memory_keys: z.array(z.string()).optional(),
     memory_prefixes: z.array(z.string()).optional(),
+    files: z.array(TaskFileRefSchema).max(20).optional(),
   }).optional(),
   todos: z.array(z.object({
     id: z.string(),

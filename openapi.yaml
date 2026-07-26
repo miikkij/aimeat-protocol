@@ -2562,6 +2562,61 @@ components:
         - done, failed: terminal states.
       enum: [draft, queued, revision_requested, active, paused, done, failed, stalled]
 
+    AgentTaskFileRef:
+      type: object
+      description: >
+        One file handed to the agent WITH the task. Only a REFERENCE is stored, never the bytes.
+        On create, `ref` (and optionally `name`) is supplied; the server verifies the file exists and
+        that the CREATOR can read it, then fills `mime` and `size` from the stored file. On read, the
+        entry is authorized again as the READING principal and carries `access` plus a presigned
+        `download_url` when granted — so a revoked grant stops handing out URLs on the next read.
+      required: [ref]
+      properties:
+        ref:
+          type: string
+          description: '"<ownerGaii>/<storage key>" (a bare key means the caller''s own storage).'
+          example: alice@aimeat-fi-001-genesis/invoices/2026-07.pdf
+        name:
+          type: string
+        mime:
+          type: string
+          readOnly: true
+        size:
+          type: integer
+          readOnly: true
+        access:
+          type: string
+          enum: [granted, denied, missing]
+          readOnly: true
+        reason:
+          type: string
+          readOnly: true
+          description: Why a non-granted read was refused (e.g. consent_denied, not_found).
+        download_url:
+          type: string
+          readOnly: true
+          description: Presigned, TTL-limited GET. Present only when access is granted.
+        expires_in_seconds:
+          type: integer
+          readOnly: true
+    AgentTaskResources:
+      type: object
+      description: What the agent needs in order to do the task — knowledge, memory, and files.
+      properties:
+        knowledge_packages:
+          type: array
+          items: { type: string }
+        memory_keys:
+          type: array
+          items: { type: string }
+        memory_prefixes:
+          type: array
+          items: { type: string }
+        files:
+          type: array
+          maxItems: 20
+          items:
+            $ref: '#/components/schemas/AgentTaskFileRef'
     AgentTask:
       type: object
       required: [id, agentName, ownerGaii, title, status, createdAt, updatedAt]
@@ -2598,6 +2653,8 @@ components:
         updatedAt:
           type: string
           format: date-time
+        resources:
+          $ref: '#/components/schemas/AgentTaskResources'
         deliverableKey:
           type: string
           description: Memory key (agent namespace) where the task's deliverable was published, if any.
@@ -9926,6 +9983,13 @@ paths:
         download_url + metadata) instead of bytes — used by MCP clients so binary content
         never enters the model context. With `mode=inline`, returns small (<= 32 KB) text
         files inline as JSON; larger or non-text files are rejected with 413.
+
+
+        Scope: this route reads the CALLER's own namespace only — files are keyed by
+        (owner, key), so a file owned by anyone else is absent here and answers 404. To read a
+        file someone else owns (an owner's upload for one of their agents, a DM or task
+        attachment, a group/workspace share) use `GET /v1/pub/{gaii}/{key}`, which runs the
+        consent/visibility guard.
       tags: [Storage]
       security:
         - BearerAuth: []
@@ -24970,14 +25034,23 @@ paths:
       operationId: getPublicFile
       summary: Download public file
       description: |
-        Download a file by owner GAII and key. Public files need no auth.
-        Non-public files apply the same consent/visibility rules as memory:
-        the caller must hold a matching consent grant or (for `visibility:'group'`)
-        be a member of the file's sharing group; `organism.{id}` grants resolve for
-        active organism members. Every read is written to the consent audit log.
-        An authenticated caller without access gets 403; anonymous/unauthenticated
-        callers get 404 (file existence is hidden on public URLs).
+        Download a file by owner GAII and key. This is the ONE door for reading a file the caller
+        does not own — `GET /v1/storage/{key}` is namespaced to the caller and cannot reach it.
+        Public files need no auth. Non-public files apply the same consent/visibility rules as
+        memory: `visibility:'owner'` admits every agent and app of the SAME owner (this is how a
+        document an owner uploads reaches that owner's own agent — upload with `visibility: owner`,
+        then the agent reads it with its own token), `members` any authenticated node user,
+        `group`/`workspace` their members, and a private file only with a matching consent grant;
+        `organism.{id}` grants resolve for active organism members. Denied reads are written to the
+        consent audit log. An authenticated caller without access gets 403; anonymous/
+        unauthenticated callers get 404 (file existence is hidden on public URLs).
         Supports wildcard keys with path separators.
+
+        With `mode=handle` the response is a presigned, TTL-limited `download_url` plus metadata
+        instead of the bytes, so an agent or liaison can hand the URL to a fetch or a document
+        parser without pulling binary through a tool result. The access decision is identical. A
+        handle for someone else's file expires sooner (15 min) than one for your own (1 h), so it
+        cannot long outlive a revoked grant.
       tags: [Storage]
       parameters:
         - name: gaii
@@ -24985,16 +25058,47 @@ paths:
           required: true
           schema:
             type: string
-          description: URL-encoded agent GAII
+          description: URL-encoded owner GHII / agent GAII that owns the file
         - name: key
           in: path
           required: true
           schema:
             type: string
           description: File key (may contain path separators)
+        - name: mode
+          in: query
+          required: false
+          description: Omit for raw bytes; `handle` returns a presigned download_url + metadata.
+          schema:
+            type: string
+            enum: [handle]
       responses:
         '200':
-          description: File content with appropriate Content-Type
+          description: File bytes, or a JSON handle when `mode=handle`
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          ref: { type: string }
+                          owner_gaii: { type: string }
+                          key: { type: string }
+                          mode: { type: string, enum: [handle] }
+                          mime_type: { type: string }
+                          size: { type: integer }
+                          visibility: { type: string }
+                          download_url: { type: string }
+                          download_method: { type: string, enum: [GET] }
+                          expires_in_seconds: { type: integer }
         '403':
           $ref: '#/components/responses/Forbidden'
         '404':
@@ -27757,6 +27861,8 @@ paths:
                     properties:
                       text: { type: string }
                       done: { type: boolean, default: false }
+                resources:
+                  $ref: '#/components/schemas/AgentTaskResources'
       responses:
         '201':
           description: Task created
