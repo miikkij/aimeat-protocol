@@ -44,6 +44,13 @@ interface IntakeFormConfig {
 }
 
 const FORM_ID_RE = /^[a-z0-9][a-z0-9-]{1,63}$/; // human slug rules (a token uses the frm_ prefix, also matches)
+
+/** Take the C0 control characters out of a submitted value, keeping tab, newline and return.
+ *  A NUL in particular cannot be stored by Postgres at all, so without this it becomes a 500. */
+function stripControls(s: string): string {
+    // eslint-disable-next-line no-control-regex
+    return s.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '');
+}
 const MAX_BODY_FIELDS = 60;
 const MAX_VALUE_LEN = 8000;
 
@@ -210,7 +217,13 @@ export function registerOrganismIntakeRoutes(router: Router, config: AimeatConfi
         if (Object.prototype.hasOwnProperty.call(body, f) && body[f] != null) {
           const val = body[f];
           if (typeof val === 'string' && val.length > MAX_VALUE_LEN) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `Field '${f}' is too long`)); return; }
-          record[f] = val;
+          // A NUL byte cannot be stored in a Postgres text/jsonb value, so it reached the write and
+          // came back as a 500 to an anonymous caller — measured against the live form. Nothing was
+          // ever written, but a public endpoint answering "unexpected error" to crafted input is a
+          // gap in its own right: the caller cannot tell a bug from a rejection, and the log fills
+          // with noise anyone can generate. The other C0 controls go with it: none of them belong
+          // in a form field, and stripping is friendlier than refusing a paste that carried one.
+          record[f] = typeof val === 'string' ? stripControls(val) : val;
         }
       }
       for (const rf of cfg.requiredFields) {
