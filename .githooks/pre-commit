@@ -56,4 +56,7 @@ pnpm -s check:mcp-tools
 echo "[pre-commit] Cortex pack integrity: embed + VERSION constants (check:viewport)…"
 pnpm -s check:viewport
 
+echo "[pre-commit] No silent exception handlers in the cleaned areas (check:silent-catch)…"
+pnpm -s check:silent-catch -- --strict
+
 echo "[pre-commit] ✓ all checks passed"

@@ -86,6 +86,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:sdk
 
+      - name: No silent exception handlers in the cleaned areas (check:silent-catch)
+        working-directory: .
+        run: pnpm check:silent-catch -- --strict
+
       - name: MCP tool surface/handler parity (check:mcp-tools)
         working-directory: aimeat
         run: pnpm check:mcp-tools
