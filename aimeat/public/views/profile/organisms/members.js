@@ -27,6 +27,7 @@ import { PresenceDot } from '/components/PresenceDot.js';
 import * as orgService from '/js/services/organisms.js';
 import { fmtDate, orgInitials, relTime } from '/views/profile/organisms/helpers.js';
 import { InvitePanel, PendingInvites } from '/views/profile/organisms/invite-panel.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** Inline per-member workspace-role editor: every manageable workspace with a
  *  none/viewer/contributor select. Changes apply immediately (grant replaces, none revokes). */
@@ -92,13 +93,13 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
   const [accessEditFor, setAccessEditFor] = useState(null); // bare owner name whose access panel is open
 
   const load = useCallback(async () => {
-    const tasks = [orgService.listMembers(orgId).catch(() => null)];
+    const tasks = [orgService.listMembers(orgId).catch(err => { swallowed('members: toGhii', err); return null; })];
     if (canManage) {
       tasks.push(
-        orgService.listJoinRequests(orgId).catch(() => null),
-        orgService.listMembers(orgId, 'banned').catch(() => null),
-        orgService.listInvitations(orgId).catch(() => null),
-        orgService.listEmailInvitations(orgId).catch(() => null),
+        orgService.listJoinRequests(orgId).catch(err => { swallowed('members: toGhii', err); return null; }),
+        orgService.listMembers(orgId, 'banned').catch(err => { swallowed('members: toGhii', err); return null; }),
+        orgService.listInvitations(orgId).catch(err => { swallowed('members: toGhii', err); return null; }),
+        orgService.listEmailInvitations(orgId).catch(err => { swallowed('members: toGhii', err); return null; }),
       );
     }
     const [mb, rq, bn, inv, eminv] = await Promise.all(tasks);
@@ -142,7 +143,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
           setWsAccess(map);
           setWsOptions((wss || []).map(w => ({ id: w.id, name: w.name || w.id })));
         }
-      } catch { /* the access line is optional */ }
+      } catch (err) { swallowed('members: add', err); }
     })();
     return () => { cancelled = true; };
   }, [orgId, show, accessTick]);

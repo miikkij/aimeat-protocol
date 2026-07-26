@@ -50,6 +50,7 @@ import { escHtml } from '/js/utils.js';
 import { listApps } from '/js/services/apps.js';
 import { NODE_URL, tr, stampCspNonce, getSession } from './portfolio/shared.js';
 import { PortfolioBuilder } from './portfolio/builder.js';
+import { swallowed } from '/js/swallowed.js';
 
 
 /* ── Viewer Component ── */
@@ -101,7 +102,7 @@ function PortfolioViewer({ username, navigate }) {
       try {
         const resp = await fetch(`/v1/memory/${encodeURIComponent(d.gaii)}/${encodeURIComponent(d.key)}`,
           s ? { headers: { Authorization: 'Bearer ' + s.jwt } } : undefined);
-        const j = await resp.json().catch(() => null);
+        const j = await resp.json().catch(err => { swallowed('portfolio: reply', err); return null; });
         const ok = !!(resp.ok && j && j.ok !== false);
         reply(ok, ok ? (j.data?.value ?? null) : null);
       } catch {
@@ -156,14 +157,14 @@ function PortfolioViewer({ username, navigate }) {
     (async () => {
       try {
         const resp = await fetch(`${NODE_URL}/v1/memory/${encodeURIComponent(ownerGhii)}/${encodeURIComponent('app-catalog.promoted')}?soft=1`);
-        const j = await resp.json().catch(() => null);
+        const j = await resp.json().catch(err => { swallowed('portfolio: reply', err); return null; });
         const items = (j && j.data && j.data.value && Array.isArray(j.data.value.items)) ? j.data.value.items : [];
         if (!items.length) { if (!cancelled) setPromotedApps([]); return; }
         let byRef = {};
         try {
           const apps = await listApps();
           (apps || []).forEach(a => { byRef[`${a.owner}/${a.filename || a.name}`] = a; });
-        } catch { /* names fall back to the filename */ }
+        } catch (err) { swallowed('portfolio: items', err); }
         const cards = items.filter(it => it && typeof it.ref === 'string').map(it => {
           const slash = it.ref.indexOf('/');
           const owner = it.ref.slice(0, slash);
@@ -176,7 +177,7 @@ function PortfolioViewer({ username, navigate }) {
           };
         });
         if (!cancelled) setPromotedApps(cards);
-      } catch { if (!cancelled) setPromotedApps([]); }
+      } catch (err) { swallowed('portfolio', err); if (!cancelled) setPromotedApps([]); }
     })();
     return () => { cancelled = true; };
   }, [data]);

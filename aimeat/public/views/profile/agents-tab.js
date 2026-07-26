@@ -80,6 +80,7 @@ import { buildAgentPrompt, buildTaskRunnerPrompt, buildMcpOnboardingPrompt, PLAT
 import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, saveCollapsedGroups, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, popOutAgent } from './agents/tab-helpers.js';
 import { renderFilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
 import ScopesModal from './agents/scopes-modal.js';
+import { swallowed } from '/js/swallowed.js';
 
 // The familiar GitHub "Octocat" mark. fill=currentColor so it inherits the link's themed color.
 const GhMark = html`<svg class="gh-mark" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>`;
@@ -185,7 +186,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
       setDraggingAgentName(name);
       if (e?.dataTransfer) {
         e.dataTransfer.effectAllowed = 'move';
-        try { e.dataTransfer.setData('text/plain', name); } catch { /* ignore */ }
+        try { e.dataTransfer.setData('text/plain', name); } catch (err) { swallowed('agents-tab: onDragStart', err); }
       }
     },
     onDragOver: (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; },
@@ -213,7 +214,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
       setDraggingName(name);
       if (e?.dataTransfer) {
         e.dataTransfer.effectAllowed = 'move';
-        try { e.dataTransfer.setData('text/plain', name); } catch { /* ignore */ }
+        try { e.dataTransfer.setData('text/plain', name); } catch (err) { swallowed('agents-tab: onDragStart', err); }
       }
     },
     onDragOver: (e) => { e.preventDefault(); if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'; },
@@ -251,7 +252,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
     try {
       const resp = await apiGet('/v1/agents/device-authorize/pending');
       if (resp?.data?.requests) setPendingRequests(resp.data.requests);
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('agents-tab: loadPending', err); }
   }
 
   async function loadData() {
@@ -319,7 +320,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
         saveSeen(session.owner, fresh);
       }
       setChangesMap(chMap);
-    } catch { setAgents([]); }
+    } catch (err) { swallowed('agents-tab', err); setAgents([]); }
   }
 
   // Live updates (push-only, no steady-state polling): refetch the fleet only when a relevant
@@ -356,6 +357,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
       setTimeout(() => {
         document.querySelector(`[data-agent-name="${name}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 500);
+    // eslint-disable-next-line aimeat/no-silent-catch -- noop
     } catch { /* noop */ }
   }, []);
 
@@ -382,7 +384,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
       } else {
         showToast(resp?.error?.message || t('profile.agents.scopeUi.saveError'), true);
       }
-    } catch {
+    } catch (err) {
+      swallowed('agents-tab: handleSaveScopes', err);
       showToast(t('profile.agents.scopeUi.saveError'), true);
     }
   }
@@ -405,7 +408,8 @@ export default function AgentsTab({ session, showToast, onStats }) {
       } else {
         showToast(resp?.error?.message || t('profile.agents.pendingRequests.approveError'), true);
       }
-    } catch {
+    } catch (err) {
+      swallowed('agents-tab: handleApprove', err);
       showToast(t('profile.agents.pendingRequests.approveError'), true);
     }
   }
@@ -416,7 +420,7 @@ export default function AgentsTab({ session, showToast, onStats }) {
         await deleteAgent(name);
         showToast(t('profile.agents.deleted'));
         loadData();
-      } catch { showToast(t('profile.unknownError'), true); }
+      } catch (err) { swallowed('agents-tab', err); showToast(t('profile.unknownError'), true); }
     });
   }
 

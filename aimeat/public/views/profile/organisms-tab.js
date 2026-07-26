@@ -51,6 +51,7 @@ import { fmtDate, orgInitials, exportOrganismZip } from '/views/profile/organism
 import { IncomingInvitations } from '/views/profile/organisms/panels.js';
 import { OrganismHome } from '/views/profile/organisms/home.js';
 import { Workspace } from '/views/profile/organisms/workspace.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function OrganismsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -60,7 +61,9 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [archivedOpen, setArchivedOpen] = useState(false);   // collapsible "Archived" section (closed by default)
   // organism whose workspaces are open, then the specific workspace within it — both restored from
   // sessionStorage so an F5 returns to where you were. openId set + openWs null = the workspace LIST.
+  // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
   const [openId, setOpenId] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openId') || null; } catch { return null; } });
+  // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
   const [openWs, setOpenWs] = useState(() => { try { return sessionStorage.getItem('aimeat.ws.openWs') || null; } catch { return null; } });
   // Transient deep-link target from the organism mindmap: open this space's tab on first render of the
   // workspace. In-memory only (not persisted) — an F5 lands on the workspace overview, not a stale tab.
@@ -123,8 +126,9 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       setPublicOrganisms((pubResp?.data?.organisms || []).filter(o => !mineIds.has(o.id)));
       onStats?.({ organisms: mine.length });
       setWsCounts(Object.fromEntries(mine.map(o => [o.id, o.workspace_count ?? 0])));
-      try { const r = await memoryService.getMemory('organisms.ui', { soft: true }); applyPrefs(r?.data?.value); } catch { /* no saved prefs */ }
-    } catch {
+      try { const r = await memoryService.getMemory('organisms.ui', { soft: true }); applyPrefs(r?.data?.value); } catch (err) { swallowed('organisms-tab: applyPrefs', err); }
+    } catch (err) {
+      swallowed('organisms-tab: applyPrefs', err);
       setMyOrganisms([]);
       setPublicOrganisms([]);
     }
@@ -138,7 +142,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   // Read as part of loadData's mount composite (above); this key backs savePrefs.
   const UI_PREFS_KEY = 'organisms.ui';
   const savePrefs = useCallback((order, sort) => {
-    memoryService.createMemory(UI_PREFS_KEY, { order, sort }, 'private').catch(() => {});
+    memoryService.createMemory(UI_PREFS_KEY, { order, sort }, 'private').catch(err => { swallowed('organisms-tab: applyPrefs', err); });
   }, []);
 
   // Stable sort keeps server order for ids missing from the saved manual order (appended at the end).
@@ -189,10 +193,10 @@ export default function OrganismsTab({ session, showToast, onStats }) {
 
   // Persist the open organism + workspace (F5 restore), and drop a restored id the user can no longer open.
   useEffect(() => {
-    try { if (openId) sessionStorage.setItem('aimeat.ws.openId', openId); else sessionStorage.removeItem('aimeat.ws.openId'); } catch { /* noop */ }
+    try { if (openId) sessionStorage.setItem('aimeat.ws.openId', openId); else sessionStorage.removeItem('aimeat.ws.openId'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
   }, [openId]);
   useEffect(() => {
-    try { if (openWs) sessionStorage.setItem('aimeat.ws.openWs', openWs); else sessionStorage.removeItem('aimeat.ws.openWs'); } catch { /* noop */ }
+    try { if (openWs) sessionStorage.setItem('aimeat.ws.openWs', openWs); else sessionStorage.removeItem('aimeat.ws.openWs'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
   }, [openWs]);
   useEffect(() => {
     if (openId && myOrganisms && !myOrganisms.some(o => o.id === openId)) { setOpenId(null); setOpenWs(null); }
@@ -217,7 +221,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       const params = new URLSearchParams(window.location.search);
       const org = params.get('org');
       if (org) { setOpenId(org); setOpenWs(params.get('ws') || null); setOpenSpace(null); setOpenSettings(false); }
-    } catch { /* noop */ }
+    } catch (err) { swallowed('organisms-tab: onOpen', err); }
   }, []);
 
   // Cross-organism content search (debounced) — librarian FTS across all my own content.
@@ -227,7 +231,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     let cancelled = false;
     setGBusy(true);
     const tid = setTimeout(async () => {
-      const hits = await memoryService.librarianSearch(query, 60, 'own').catch(() => []);
+      const hits = await memoryService.librarianSearch(query, 60, 'own').catch(err => { swallowed('organisms-tab: onOpen', err); return []; });
       if (!cancelled) { setGHits(hits || []); setGBusy(false); }
     }, 220);
     return () => { cancelled = true; clearTimeout(tid); };
@@ -262,7 +266,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       } else {
         showToast(result?.error?.message || (t('organisms.createError') || 'Failed to create'));
       }
-    } catch {
+    } catch (err) {
+      swallowed('organisms-tab: onOpen', err);
       showToast(t('organisms.createError') || 'Failed to create');
     } finally { setCreating(false); }
   }, [formName, formDesc, formType, formPolicy, formVisibility, formInterests, showToast, loadData]);
@@ -278,7 +283,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         showToast(result?.error?.message || 'Could not join');
       }
       loadData();
-    } catch {
+    } catch (err) {
+      swallowed('organisms-tab: onOpen', err);
       showToast(t('organisms.joinError') || 'Failed to join');
     }
   }, [showToast, loadData]);
@@ -290,7 +296,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         showToast(t('organisms.left') || 'Left organism');
         setOpenId(null); setOpenWs(null);
         loadData();
-      } catch {
+      } catch (err) {
+        swallowed('organisms-tab: onOpen', err);
         showToast(t('organisms.leaveError') || 'Failed to leave');
       }
     }, { danger: true });
@@ -304,7 +311,8 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         setExpanded(null);
         setOpenId(null); setOpenWs(null);
         loadData();
-      } catch {
+      } catch (err) {
+        swallowed('organisms-tab: onOpen', err);
         showToast(t('organisms.deleteError') || 'Failed to delete');
       }
     }, { danger: true });
@@ -455,7 +463,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   // Open a cross-organism search hit: jump to its organism + workspace, pre-filling the in-workspace
   // search with the query so you land on the filtered result list (reuses Kerros 1).
   const openGHit = (hit) => {
-    try { if (hit.workspaceId) sessionStorage.setItem(`aimeat.ws.${hit.organismId}.${hit.workspaceId}.search`, gQuery.trim()); } catch { /* noop */ }
+    try { if (hit.workspaceId) sessionStorage.setItem(`aimeat.ws.${hit.organismId}.${hit.workspaceId}.search`, gQuery.trim()); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
     setOpenId(hit.organismId);
     setOpenWs(hit.workspaceId || null);
     setOpenSpace(null);

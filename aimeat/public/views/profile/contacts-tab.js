@@ -23,6 +23,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import * as contactsService from '/js/services/contacts.js';
+import { swallowed } from '/js/swallowed.js';
 
 const KIND_ICON = { ghii: '👤', gaii: '🤖', geai: '🧩' };
 const bare = (id) => String(id || '').split('@')[0];
@@ -44,7 +45,7 @@ export default function ContactsTab({ showToast }) {
       ]);
       setContacts(list);
       setBlockedCount(blocked.length);
-    } catch { setContacts([]); }
+    } catch (err) { swallowed('contacts-tab', err); setContacts([]); }
   }, []);
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(load); liveRef.current = load;

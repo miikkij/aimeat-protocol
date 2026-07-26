@@ -11,6 +11,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from inbox-tab.js (max-file-lines)
  */
 import { t, getLocale } from '/js/i18n.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * Resolve presigned URLs for a thread's non-inline attachments, reusing already-resolved URLs from the
@@ -30,7 +31,7 @@ export async function resolveThreadAttachmentUrls(msgs, conversationId, prevCach
       const key = (a.mode === 'duplicate' && a.localKey) ? a.localKey
         : (m.direction === 'outbound' && a.storageKey) ? a.storageKey : null;
       if (!key) return;
-      const u = await resolveUrl(key).catch(() => null);
+      const u = await resolveUrl(key).catch(err => { swallowed('helpers: key', err); return null; });
       if (u) map[uk] = u;
     })));
   return { convId: conversationId, map };

@@ -28,6 +28,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { num, fmtUp, fmtBytes, StatCard, EconRow } from './shared.js';
 import * as api from '/js/services/admin.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* ── Helpers ── */
 
@@ -145,7 +146,7 @@ export default function StatsTab({ data }) {
         : getDateRange(p);
       const resp = await api.getStats(range?.from, range?.to);
       if (resp.data) setSd(resp.data);
-    } catch { /* keep existing data */ }
+    } catch (err) { swallowed('stats-tab: StatsTab', err); }
     setLoading(false);
   }, []);
 

@@ -1,3 +1,4 @@
+import { swallowed } from '/js/swallowed.js';
 /**
  * @file public/js/utils.js
  * @description Shared browser helpers used across all portal/SPA views — HTML/attribute escaping and
@@ -209,7 +210,8 @@ export function handleImgError(e) {
       icon = `<path d="M21 5v6.59l-3-3L13.41 13 9 8.59 3 14.59V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2zm0 14c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2v-2.58l6-6L13.41 15 18 10.41l3 3V19z" fill="currentColor" opacity=".5"/><line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="1.5" opacity=".5"/>`;
     }
     applyFallbackSvg(img, w, h, label, icon);
-  }).catch(() => {
+  }).catch((err) => {
+    swallowed('utils', err);
     applyFallbackSvg(img, w, h, 'N/A',
       `<path d="M21 5v6.59l-3-3L13.41 13 9 8.59 3 14.59V5c0-1.1.9-2 2-2h14c1.1 0 2 .9 2 2zm0 14c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2v-2.58l6-6L13.41 15 18 10.41l3 3V19z" fill="currentColor" opacity=".5"/><line x1="4" y1="4" x2="20" y2="20" stroke="currentColor" stroke-width="1.5" opacity=".5"/>`);
   });

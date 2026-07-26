@@ -14,11 +14,13 @@ const ORDER_KEY_PREFIX = 'aimeat-agent-order:';
 export function loadAgentOrder(owner) {
   if (!owner) return [];
   try { return JSON.parse(localStorage.getItem(ORDER_KEY_PREFIX + owner) || '[]') || []; }
+  // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
   catch { return []; }
 }
 export function saveAgentOrder(owner, names) {
   if (!owner) return;
   try { localStorage.setItem(ORDER_KEY_PREFIX + owner, JSON.stringify(names)); }
+  // eslint-disable-next-line aimeat/no-silent-catch -- ignore quota/availability errors
   catch { /* ignore quota/availability errors */ }
 }
 
@@ -39,6 +41,7 @@ export function loadCollapsedGroups(owner) {
 export function saveCollapsedGroups(owner, set) {
   if (!owner) return;
   try { localStorage.setItem(COLLAPSE_KEY_PREFIX + owner, JSON.stringify([...set])); }
+  // eslint-disable-next-line aimeat/no-silent-catch -- ignore quota/availability errors
   catch { /* ignore quota/availability errors */ }
 }
 
@@ -53,11 +56,13 @@ const SEEN_KEY_PREFIX = 'aimeat-agent-seen:';
 export function loadSeen(owner) {
   if (!owner) return {};
   try { return JSON.parse(localStorage.getItem(SEEN_KEY_PREFIX + owner) || '{}') || {}; }
+  // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
   catch { return {}; }
 }
 export function saveSeen(owner, data) {
   if (!owner) return;
   try { localStorage.setItem(SEEN_KEY_PREFIX + owner, JSON.stringify(data)); }
+  // eslint-disable-next-line aimeat/no-silent-catch -- ignore quota/availability errors
   catch { /* ignore quota/availability errors */ }
 }
 // Stamp the given agent+tab as seen-now and persist. Read-modify-write against

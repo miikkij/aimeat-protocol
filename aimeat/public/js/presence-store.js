@@ -16,6 +16,7 @@
  */
 import { useState, useEffect } from 'preact/hooks';
 import { getPresenceBatch } from '/js/services/presence.js';
+import { swallowed } from '/js/swallowed.js';
 
 const cache = new Map();        // ghii → { status, since }
 const subs = new Map();         // ghii → Set<fn>
@@ -45,8 +46,9 @@ async function flush() {
       lastFetched.set(ghii, now);
       notify(ghii);
     }
-  } catch {
+  } catch (err) {
     /* leave the cache as-is; a later live-update or remount retries */
+    swallowed('presence-store: flush', err);
   }
 }
 

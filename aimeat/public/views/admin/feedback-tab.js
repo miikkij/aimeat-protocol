@@ -18,6 +18,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { useToast, Toast } from './shared.js';
 import * as api from '/js/services/admin.js';
+import { swallowed } from '/js/swallowed.js';
 
 const STATUSES = ['new', 'ack', 'in_progress', 'resolved', 'wont_fix'];
 const CATEGORIES = ['bug', 'blocker', 'idea', 'ux', 'question', 'other'];
@@ -34,7 +35,7 @@ function relTime(iso) {
     if (s < 3600) return `${Math.floor(s / 60)}m`;
     if (s < 86400) return `${Math.floor(s / 3600)}h`;
     return new Date(iso).toLocaleDateString();
-  } catch { return ''; }
+  } catch (err) { swallowed('feedback-tab: relTime', err); return ''; }
 }
 
 function ThreadView({ thread, onBack, onChanged, showErr, showOk }) {

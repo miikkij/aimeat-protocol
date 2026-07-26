@@ -44,6 +44,7 @@ import { minidenticon } from '/lib/minidenticons.min.js';
 import * as schedules from '/js/services/schedules.js';
 import { MODES } from '/js/services/messages-ai-prompts.js';
 import { loadToastUI, prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, ATTACH_ICO, attachKind, IFORM_OTHER } from './helpers.js';
+import { swallowed } from '/js/swallowed.js';
 
 export function Avatar({ seed, size = 36 }) {
   const svg = minidenticon(typeof seed === 'string' && seed ? seed : 'user');
@@ -327,7 +328,7 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
  * the draft doesn't leak between threads. */
 export function Composer({ recipient, sendLabel, sending, onSend, initialText = '', draftKey = '', focusNonce = 0 }) {
   // Restore an in-progress draft for this conversation/compose (localStorage), or the passed initialText.
-  const readDraft = () => { try { return draftKey ? (localStorage.getItem(draftKey) || '') : ''; } catch { return ''; } };
+  const readDraft = () => { try { return draftKey ? (localStorage.getItem(draftKey) || '') : ''; } catch { return ''; } };   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
   const seeded = initialText || readDraft();   // an explicit suggested reply wins; else restore a draft
   // 'rich' = Toast UI (desktop); 'simple' = a plain auto-growing textarea (mobile chat input, no toolbar/
   // preview — a phone keyboard + heavy WYSIWYG toolbar is miserable); 'markdown' = the textarea+preview
@@ -348,10 +349,10 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
     if (!draftKey) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
-      try { if (text && text.trim()) localStorage.setItem(draftKey, text); else localStorage.removeItem(draftKey); } catch { /* quota */ }
+      try { if (text && text.trim()) localStorage.setItem(draftKey, text); else localStorage.removeItem(draftKey); } catch { /* quota */ }   // eslint-disable-line aimeat/no-silent-catch -- quota
     }, 400);
   };
-  const clearDraft = () => { try { if (draftKey) localStorage.removeItem(draftKey); } catch { /* noop */ } };
+  const clearDraft = () => { try { if (draftKey) localStorage.removeItem(draftKey); } catch { /* noop */ } };   // eslint-disable-line aimeat/no-silent-catch -- noop
 
   // A pasted / dropped image is added to the SAME file-attachment queue as the 📎 button (uploaded to
   // storage + rendered as an image on the bubble) — never base64-inlined into the body, which would
@@ -385,7 +386,7 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
     if (mode !== 'rich') return undefined;
     let inst = null, cancelled = false;
     (async () => {
-      const Editor = await loadToastUI().catch(() => null);
+      const Editor = await loadToastUI().catch(err => { swallowed('components: handleImagePaste', err); return null; });
       if (cancelled) return;
       if (!Editor) { setMode('markdown'); return; }
       if (!containerRef.current) return;
@@ -413,7 +414,7 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
     })();
     return () => {
       cancelled = true;
-      if (inst) { try { inst.destroy(); } catch { /* noop */ } }
+      if (inst) { try { inst.destroy(); } catch (err) { swallowed('components: handleImagePaste', err); } }
       editorRef.current = null;
     };
     // Create the editor once when mode becomes 'rich': `seeded` is intentionally read only at
@@ -426,7 +427,7 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   // Seed the rich editor with an initial draft (e.g. a Tracked Response suggested reply) once it mounts.
   useEffect(() => {
     if (mode === 'rich' && initialText && editorRef.current) {
-      try { editorRef.current.setMarkdown(initialText); } catch { /* noop */ }
+      try { editorRef.current.setMarkdown(initialText); } catch (err) { swallowed('components: handleImagePaste', err); }
     }
   }, [mode, initialText]);
 
@@ -439,7 +440,7 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
       try {
         if (mode === 'rich' && editorRef.current?.focus) editorRef.current.focus();
         else if (taRef.current) taRef.current.focus();
-      } catch { /* noop */ }
+      } catch (err) { swallowed('components: handleImagePaste', err); }
     }, 60);
     return () => clearTimeout(id);
     // Only focusNonce is the trigger; mode/refs are read at fire time.
@@ -452,7 +453,7 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   useEffect(() => {
     if (mode !== 'rich' || !editorRef.current?.setHeight) return;
     const tall = typeof window !== 'undefined' ? Math.round(window.innerHeight * 0.6) : 400;
-    try { editorRef.current.setHeight(expanded ? tall + 'px' : '160px'); } catch { /* noop */ }
+    try { editorRef.current.setHeight(expanded ? tall + 'px' : '160px'); } catch (err) { swallowed('components: handleImagePaste', err); }
   }, [expanded, mode]);
 
   // Auto-grow the simple (mobile) textarea to fit its content, capped so it never eats the thread. When
@@ -469,7 +470,7 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
 
   const getText = () => (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
   const reset = () => {
-    try { editorRef.current?.setMarkdown(''); } catch { /* noop */ }
+    try { editorRef.current?.setMarkdown(''); } catch (err) { swallowed('components: reset', err); }
     setMd(''); setFiles([]); if (fileRef.current) fileRef.current.value = '';
     if (mode === 'simple' && taRef.current) taRef.current.style.height = 'auto';
     clearDraft();   // a sent message is no longer a draft
@@ -563,7 +564,7 @@ export function SchedulePanel({ agentName, onClose, showToast }) {
   const [busy, setBusy] = useState(false);
   const load = useCallback(async () => {
     try { const r = await schedules.listAgentSchedules(agentName); setJobs(r?.data?.managed || []); }
-    catch { setJobs([]); }
+    catch (err) { swallowed('components', err); setJobs([]); }
   }, [agentName]);
   useEffect(() => { setJobs(null); load(); }, [load]);
   const create = async () => {
@@ -612,6 +613,7 @@ export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
       else { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
       setCopied(true); setTimeout(() => setCopied(false), 1800);
       showToast?.(t('inbox.ai.copied'));
+    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     } catch { showToast?.(t('inbox.failed'), true); }
   };
   return html`
@@ -658,6 +660,7 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
       else { const ta = document.createElement('textarea'); ta.value = promptText; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
       setCopied(true); setTimeout(() => setCopied(false), 1800);
       showToast?.(t('inbox.ai.copied'));
+    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     } catch { showToast?.(t('inbox.failed'), true); }
   };
 

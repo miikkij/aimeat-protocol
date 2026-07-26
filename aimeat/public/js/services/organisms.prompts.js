@@ -8,6 +8,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from organisms.js (max-file-lines)
  */
 import { isMemorySpace, isDocSpace, getObjectSchema } from './organisms.shared.js';
+import { swallowed } from '/js/swallowed.js';
 
 // ── Access prompt: a copy-paste prompt teaching an AI/agent how to use THIS workspace ──
 // Bridges the MCP gap (no workspace-aware tools yet) by injecting the real structure + the exact
@@ -40,7 +41,7 @@ export async function buildAccessPrompt(orgId, orgName, wsId, ws, variant = 'hum
   const described = [];
   for (const ot of types) {
     // records is the default mode (mode may be undefined) — fetch the schema unless it's a document.
-    const schema = !isDocSpace(ot) ? await getObjectSchema(orgId, wsId, ot.namespace).catch(() => null) : null;
+    const schema = !isDocSpace(ot) ? await getObjectSchema(orgId, wsId, ot.namespace).catch(err => { swallowed('organisms.prompts: types', err); return null; }) : null;
     described.push(describeType(ot, schema));
   }
   const structure = described.join('\n') || '(no spaces declared yet)';
@@ -140,7 +141,7 @@ export async function buildContractAgentPrompt(orgId, orgName, wsId, ws) {
   const types = (m.objectTypes || []).filter(isMemorySpace);
   const described = [];
   for (const ot of types) {
-    const schema = !isDocSpace(ot) ? await getObjectSchema(orgId, wsId, ot.namespace).catch(() => null) : null;
+    const schema = !isDocSpace(ot) ? await getObjectSchema(orgId, wsId, ot.namespace).catch(err => { swallowed('organisms.prompts: types', err); return null; }) : null;
     described.push(describeType(ot, schema));
   }
   const structure = described.join('\n') || '(no spaces declared yet)';

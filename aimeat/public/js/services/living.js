@@ -23,6 +23,7 @@ import { createMemory, getMemory, listMemories, deleteMemory, librarianSearch } 
 import { wsRoot, saveManifest } from '/js/services/organisms.js';
 import * as offersService from '/js/services/offers.js';
 import { getTask } from '/js/services/agent-tasks.js';
+import { swallowed } from '/js/swallowed.js';
 
 const TEMPLATE_PREFIX = 'living.template.';
 const SCHEMA = 'schema:living-document@1';
@@ -69,7 +70,7 @@ export async function getLivingOverview() {
     const d = r?.data;
     if (!d) return null;
     return { templates: d.templates || [], instances: d.instances || [], organisms: d.organisms || [] };
-  } catch { return null; }
+  } catch (err) { swallowed('living: getLivingOverview', err); return null; }
 }
 
 export async function getTemplate(id) {
@@ -155,7 +156,7 @@ export async function ensureLivingTypes(orgId, wsId) { return ensureLivingManife
 
 async function ensureLivingManifest(orgId, wsId) {
   let manifest = null;
-  try { manifest = (await getMemory(`${wsRoot(orgId, wsId)}.meta.manifest`))?.data?.value || null; } catch { /* none */ }
+  try { manifest = (await getMemory(`${wsRoot(orgId, wsId)}.meta.manifest`))?.data?.value || null; } catch (err) { swallowed('living: ensureLivingManifest', err); }
   const base = manifest || { manifestVersion: '1.0', id: orgId, name: 'Workspace', kind: 'project', status: 'active', objectTypes: [] };
   const have = new Set((base.objectTypes || []).map(o => o.namespace));
   const merged = [...(base.objectTypes || []), ...livingObjectTypes().filter(o => !have.has(o.namespace))];
@@ -247,12 +248,12 @@ export async function addSource(loc, slotId, src) {
 /** Approve a pending (gated) delta: promote it to the live derivation and clear the pending entry. */
 export async function approvePending(loc, slotId, pendingValue) {
   await setSlotContent(loc, slotId, pendingValue?.markdown || '', pendingValue?.derivedFrom || []);
-  await deleteMemory(pendingKey(loc, slotId)).catch(() => {});
+  await deleteMemory(pendingKey(loc, slotId)).catch(err => { swallowed('living: approvePending', err); });
 }
 
 /** Reject a pending (gated) delta: discard it. */
 export async function rejectPending(loc, slotId) {
-  await deleteMemory(pendingKey(loc, slotId)).catch(() => {});
+  await deleteMemory(pendingKey(loc, slotId)).catch(err => { swallowed('living: rejectPending', err); });
 }
 
 /**
@@ -284,7 +285,7 @@ async function appendHistory(loc, slotId, entry) {
     const cur = (await getMemory(histKey(loc, slotId)))?.data?.value;
     const versions = [entry, ...((cur?.versions) || [])].slice(0, HIST_CAP);
     await createMemory(histKey(loc, slotId), { slot: slotId, versions }, 'private');
-  } catch { /* history is best-effort */ }
+  } catch (err) { swallowed('living: cur', err); }
 }
 
 /** Write a slot derivation directly (manual content or an applied delta) + record a history version. */
@@ -313,7 +314,7 @@ const ledgerKey = (loc, ts) => `${wsRoot(loc.orgId, loc.wsId)}.living-ledger.${l
 
 async function addLedger(loc, event) {
   const ts = Date.now() + '-' + Math.random().toString(36).slice(2, 6);
-  try { await createMemory(ledgerKey(loc, ts), { ...event, at: new Date().toISOString() }, 'private'); } catch { /* best-effort */ }
+  try { await createMemory(ledgerKey(loc, ts), { ...event, at: new Date().toISOString() }, 'private'); } catch (err) { swallowed('living: addLedger', err); }
 }
 
 /** Recent ledger events for an instance, newest first. */
@@ -341,7 +342,7 @@ function awaitTask(agentName, taskId, onStatus) {
     async function check() {
       if (settled) return;
       let task = null;
-      try { const r = await getTask(agentName, taskId); task = r?.data?.task || r?.data || null; } catch { /* transient */ }
+      try { const r = await getTask(agentName, taskId); task = r?.data?.task || r?.data || null; } catch (err) { swallowed('living: check', err); }
       const st = task?.status;
       if (st) onStatus?.(st);
       if (st === 'done') { settled = true; cleanup(); resolve(task); return; }
@@ -393,7 +394,7 @@ export async function pulseInstance(orgId, wsId, docId, opts = {}) {
   const inst = await readInstance(orgId, wsId, docId);
   if (!inst) throw new Error('Instance not found');
   const gated = inst.config.charter?.trust?.derive === 'gated';
-  const offersFeed = await offersService.listOffers().catch(() => null);
+  const offersFeed = await offersService.listOffers().catch(err => { swallowed('living: pulseInstance', err); return null; });
 
   let costUsd = 0;
   const results = [];
@@ -415,7 +416,7 @@ export async function pulseInstance(orgId, wsId, docId, opts = {}) {
         }
       } else {
         onStatus?.(slotId, 'searching');
-        const hits = await librarianSearch(`${sec.section} ${inst.config.charter?.scope || ''}`.trim(), 5, 'own').catch(() => []);
+        const hits = await librarianSearch(`${sec.section} ${inst.config.charter?.scope || ''}`.trim(), 5, 'own').catch(err => { swallowed('living: pulseInstance', err); return []; });
         const existingOrigins = new Set(inst.sources.filter(s => s.slot === slotId).map(s => s.origin));
         for (const h of hits) {
           if (existingOrigins.has(h.key)) continue;

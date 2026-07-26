@@ -26,6 +26,7 @@ import { t } from '/js/i18n.js';
 import { num, StatsGrid, DataTable, Spinner, Empty } from './shared.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import * as api from '/js/services/admin.js';
+import { swallowed } from '/js/swallowed.js';
 
 const usd = (n) => { const v = Number(n) || 0; return '$' + (v < 1 ? v.toFixed(4) : v.toFixed(2)); };
 function fmtCompact(n) {
@@ -63,12 +64,12 @@ export default function UsageTab() {
     try {
       const range = getDateRange(p);
       const [lr, ar] = await Promise.all([
-        api.getLedger(range.from, range.to).catch(() => null),
-        api.getAiUsage(range.from, range.to).catch(() => null),
+        api.getLedger(range.from, range.to).catch(err => { swallowed('usage-tab: UsageTab', err); return null; }),
+        api.getAiUsage(range.from, range.to).catch(err => { swallowed('usage-tab: UsageTab', err); return null; }),
       ]);
       if (lr && lr.data) setLedger(lr.data);
       if (ar && ar.data) setAiUsage(ar.data);
-    } catch { /* keep previous data */ }
+    } catch (err) { swallowed('usage-tab: UsageTab', err); }
     setLoading(false);
   }, []);
 

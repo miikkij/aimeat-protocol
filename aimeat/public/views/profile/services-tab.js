@@ -14,6 +14,7 @@ import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { listMyServices, browse, publish, unpublish } from '/js/services/catalogue.js';
 import { apiGet } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 const SERVICE_CATEGORIES = ['language','translation','analysis','generation','coding','data','image','audio','video','search','utility','other'];
 
@@ -33,7 +34,7 @@ function fmtDate(s) {
 function SchemaPreview({ schema, label }) {
   if (!schema || typeof schema !== 'object' || Object.keys(schema).length === 0) return null;
   let preview;
-  try { preview = JSON.stringify(schema, null, 2); } catch { preview = String(schema); }
+  try { preview = JSON.stringify(schema, null, 2); } catch (err) { swallowed('services-tab', err); preview = String(schema); }
   return html`
     <div class="svc-detail-row">
       <span class="svc-detail-label">${label}</span>
@@ -166,14 +167,14 @@ export default function ServicesTab({ session, showToast, onStats }) {
       const list = await listMyServices(session.owner);
       setMyServices(list);
       onStats?.({ services: list.length });
-    } catch { setMyServices([]); }
+    } catch (err) { swallowed('services-tab', err); setMyServices([]); }
   }
 
   async function loadCatalogueData(cat) {
     try {
       const list = await browse(cat || undefined);
       setCatalogue(list);
-    } catch { setCatalogue([]); }
+    } catch (err) { swallowed('services-tab', err); setCatalogue([]); }
   }
 
   async function publishService(name, desc, category, price, unit, webhook) {

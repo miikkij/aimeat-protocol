@@ -34,6 +34,7 @@ import * as orgService from '/js/services/organisms.js';
 import * as memoryService from '/js/services/memory.js';
 import { fmtDate, relTime } from '/views/profile/organisms/helpers.js';
 import { OrgSearch } from '/views/profile/organisms/panels.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* Workspace list — an organism contains many workspaces (each an independent manifest + data set,
  * namespaced under organism.{id}.w.{wsId}.*). Lists the registry (organism.{id}.meta.workspaces),
@@ -77,12 +78,12 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
           if (Array.isArray(v.order)) setCustomOrder(v.order.filter(x => typeof x === 'string'));
           if (['custom', 'name', 'newest'].includes(v.sort)) setSortMode(v.sort);
         }
-      } catch { /* no saved prefs yet */ }
+      } catch (err) { swallowed('workspace-list: WorkspaceList', err); }
     })();
     return () => { alive = false; };
   }, [UI_PREFS_KEY]);
   const savePrefs = useCallback((order, sort) => {
-    memoryService.createMemory(UI_PREFS_KEY, { order, sort }, 'private').catch(() => {});
+    memoryService.createMemory(UI_PREFS_KEY, { order, sort }, 'private').catch(err => { swallowed('workspace-list: WorkspaceList', err); });
   }, [UI_PREFS_KEY]);
 
   // Active workspaces sorted for display; archived ones stay in server order in their own section.
@@ -171,7 +172,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
   useEffect(() => {
     if (!showOverview) return;
     let cancelled = false;
-    orgService.buildOrganismOverviewMermaid(orgId).then(c => { if (!cancelled) setOverview(c); }).catch(() => {});
+    orgService.buildOrganismOverviewMermaid(orgId).then(c => { if (!cancelled) setOverview(c); }).catch(err => { swallowed('workspace-list: decide', err); });
     return () => { cancelled = true; };
   }, [orgId, list, showOverview]);
   // Re-load on organism changes, but DEBOUNCE: on a busy node dozens of agents emit 'organisms'
@@ -223,7 +224,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
   };
 
   // ── Export (download ZIP backup) + Import (upload a ZIP as a new workspace) ──
-  const jwt = () => { try { return window.AIMEAT?.auth?.getSession?.()?.jwt || ''; } catch { return ''; } };
+  const jwt = () => { try { return window.AIMEAT?.auth?.getSession?.()?.jwt || ''; } catch (err) { swallowed('workspace-list', err); return ''; } };
   const fileRef = useRef(null);
   const doExport = async (w) => {
     try {

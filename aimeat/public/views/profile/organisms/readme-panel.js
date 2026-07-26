@@ -52,6 +52,7 @@ export function ReadmePanel({ markdown, canEdit, onSave, aiPromptSeed, kind, nam
   const copyPrompt = async () => {
     const prompt = buildAiPrompt(kind, name, aiPromptSeed);
     try { await navigator.clipboard.writeText(prompt); setCopied(true); setTimeout(() => setCopied(false), 2500); }
+    // eslint-disable-next-line aimeat/no-silent-catch -- clipboard may be blocked; the user can still type the README
     catch { /* clipboard may be blocked; the user can still type the README */ }
   };
 

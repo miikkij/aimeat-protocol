@@ -19,6 +19,7 @@
 import { h } from 'preact';
 import { useRef, useEffect } from 'preact/hooks';
 import htm from 'htm';
+import { swallowed } from '/js/swallowed.js';
 const html = htm.bind(h);
 
 let chartJsPromise = null;
@@ -94,7 +95,7 @@ export function UsageChart({ type = 'bar', labels = [], datasets = [], stacked =
           },
         },
       });
-    }).catch(() => { /* chart unavailable — the canvas just stays blank */ });
+    }).catch(err => { swallowed('UsageChart: UsageChart', err); });
     return () => {
       cancelled = true;
       if (chartRef.current) { chartRef.current.destroy(); chartRef.current = null; }

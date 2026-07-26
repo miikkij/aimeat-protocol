@@ -24,6 +24,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { StatsGrid, Empty, Spinner, Badge, ExpandableHelp, ErrorBox, dt } from './shared.js';
 import * as pkgService from '/js/services/packages.js';
+import { swallowed } from '/js/swallowed.js';
 import {
   seedExamples,
   listPendingTemplates,
@@ -49,7 +50,7 @@ function ReviewPanel({ item, onDone }) {
       try {
         const res = await reviewTemplate(item.id);
         if (!cancelled && res.ok !== false) setDetail(res.data);
-      } catch { /* ignore */ }
+      } catch (err) { swallowed('packages-tab: ReviewPanel', err); }
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -323,7 +324,7 @@ export default function PackagesAdminTab() {
         setPending(pendRes.data?.pending ?? pendRes.data?.templates ?? []);
         setHistory(pendRes.data?.history ?? []);
       }
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('packages-tab: PackagesAdminTab', err); }
     setLoading(false);
   }, []);
 

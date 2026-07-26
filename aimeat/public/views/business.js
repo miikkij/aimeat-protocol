@@ -19,6 +19,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { ContactCard } from '/components/ContactCard.js';
 import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
+import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 const CONTACT = 'mailto:jouni.miikki@aimeat.io';
@@ -32,7 +33,7 @@ export default function Business({ navigate }) {
     fetch('/v1/apps?limit=100').then(r => r.json()).then(j => {
       const apps = j?.data?.apps || [];
       setPaper(apps.find(a => /sanomat/i.test(a.filename || '') || /sanomat/i.test(a.name || '')) || null);
-    }).catch(() => {});
+    }).catch(err => { swallowed('business: Business', err); });
   }, []);
   // The FreePartyLights public status page (org + workspace ids on aimeat.io; public
   // document sharing verified ON — 5 docs readable without auth). NEVER Wellprepd.

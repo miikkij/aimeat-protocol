@@ -13,6 +13,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** Load GHII CORS settings. */
 export async function getGhiiCors() {
@@ -70,7 +71,7 @@ export async function loadAll(agents) {
       try {
         const cors = await getAgentCors(ag.name);
         agentsCors.push(cors);
-      } catch { /* skip */ }
+      } catch (err) { swallowed('security: loadAll', err); }
     }
   }
   return { ghii, agents: agentsCors };
@@ -87,5 +88,5 @@ export async function getSecurityOverview() {
     const d = data?.data;
     if (!d) return null;
     return { ghii: d.ghii ?? null, agents: d.agents || [], sessions: d.sessions || [] };
-  } catch { return null; }
+  } catch (err) { swallowed('security: getSecurityOverview', err); return null; }
 }

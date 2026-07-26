@@ -21,6 +21,7 @@ import { Markdown } from '/components/Markdown.js';
 import { getAutomationRecipe } from '/js/services/ecosystem.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { keyFp, OUTBOUND_EVENTS, resolveOrganismName } from './ecosystem-tab.helpers.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * One "Data this app wrote" entry: collapsed row (key + visibility chip + timeAgo) that expands to
@@ -90,8 +91,8 @@ export function EcoAskInClaude({ app }) {
   const load = async () => {
     const ownerName = (currentGhii().split('@')[0]) || '';
     const [recipeResp, orgResp] = await Promise.all([
-      getAutomationRecipe(app.app).catch(() => null),
-      (ownerName ? listOrganisms({ member: ownerName }) : Promise.resolve(null)).catch(() => null),
+      getAutomationRecipe(app.app).catch(err => { swallowed('ecosystem-tab.cards: ownerName', err); return null; }),
+      (ownerName ? listOrganisms({ member: ownerName }) : Promise.resolve(null)).catch(err => { swallowed('ecosystem-tab.cards: ownerName', err); return null; }),
     ]);
     setRecipe(recipeResp);
     setOrgs(orgResp?.data?.organisms || []);

@@ -21,6 +21,7 @@ import { connect, disconnect, onUpdate, offUpdate } from '/lib/live-updates.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import * as orgService from '/js/services/organisms.js';
 import { DocumentView, DocumentEditor } from './profile/organisms/document.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -55,7 +56,7 @@ export default function DocSolo() {
       for (const d of (w.objects?.[type] || [])) byId.set(d.id, { ...d, _draft: false, _published: true });
       for (const d of (w.drafts?.[type] || [])) { const pub = byId.get(d.id); byId.set(d.id, { ...d, _draft: true, _published: !!pub, _pub: pub || null }); }
       setDoc(byId.get(id) || null);
-    } catch { setDoc(null); }
+    } catch (err) { swallowed('doc-solo', err); setDoc(null); }
   }, [session, org, ws, type, id]);
 
   useEffect(() => { load(); }, [load]);

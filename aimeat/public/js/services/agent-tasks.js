@@ -12,6 +12,7 @@
  *     Quality subtab's statistics + done-tasks mount reads into one call.
  */
 import { apiGet, apiPost, apiDelete, api } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 export async function listTasks(agentName, opts = {}) {
   const params = new URLSearchParams();
@@ -85,5 +86,5 @@ export async function getQualityOverview(agentName) {
   try {
     const resp = await apiGet(`/v1/agents/${encodeURIComponent(agentName)}/quality/overview`);
     return resp?.data ?? null;
-  } catch { return null; }
+  } catch (err) { swallowed('agent-tasks: getQualityOverview', err); return null; }
 }

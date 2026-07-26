@@ -88,6 +88,7 @@ export async function downloadSkillZip(name, { scope, owner, organism, ws } = {}
   try {
     jwt = (window.AIMEAT?.auth?.getSession()?.jwt)
       || JSON.parse(localStorage.getItem('aimeat_session') || '{}').jwt || '';
+  // eslint-disable-next-line aimeat/no-silent-catch -- anonymous
   } catch { /* anonymous */ }
   const res = await fetch(`/v1/skills/${encodeURIComponent(name)}/zip${qs ? `?${qs}` : ''}`, {
     headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},

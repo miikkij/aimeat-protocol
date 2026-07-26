@@ -20,6 +20,7 @@ import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.
 import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
 import { ColorPicker } from './color-picker.js';
 import { groupDocs } from './helpers.js';
+import { swallowed } from '/js/swallowed.js';
 
 // A document-space: left index (section tree + documents, with an Unsorted group) + a main
 // area showing the active document (view/edit). Sections nest via parentId; documents are
@@ -43,7 +44,7 @@ export function renderDocSpace(ctx, ot) {
   const docItem = (d) => html`
     <div class="pj-doc-item ${isActive(d) ? 'active' : ''} ${itemColor(ot.name, d.id) ? 'pj-colored pj-tag-' + itemColor(ot.name, d.id) : ''}" key=${'di' + d.id}
       draggable=${true}
-      onDragStart=${(e) => { draggedDoc.current = { type: ot.name, id: d.id }; if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', d.id); } catch { /* noop */ } } }}
+      onDragStart=${(e) => { draggedDoc.current = { type: ot.name, id: d.id }; if (e.dataTransfer) { e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', d.id); } catch (err) { swallowed('doc-space: docItem', err); } } }}
       onDragEnd=${() => { draggedDoc.current = null; }}>
       <span class="pj-grip" title=${t('organisms.dragHint') || 'Drag into a section'}>⠿</span>
       <${ColorPicker} value=${itemColor(ot.name, d.id)} onPick=${(c) => setItemColor(ot.name, d.id, c)} />

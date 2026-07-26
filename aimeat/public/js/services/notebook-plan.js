@@ -20,6 +20,7 @@ import { api } from '/js/api.js';
 import { librarianSearch } from '/js/services/memory.js';
 import * as offers from '/js/services/offers.js';
 import { getTask } from '/js/services/agent-tasks.js';
+import { swallowed } from '/js/swallowed.js';
 
 const ASSESS_HITS = 6;          // how many librarian hits to feed the assessor
 const AI_TIMEOUT_MS = 1_800_000; // 30 min — same as the classify call; the model may think a while
@@ -67,7 +68,7 @@ function awaitTask(agentName, taskId, opts = {}) {
     async function check() {
       if (settled) return;
       let task = null;
-      try { const r = await getTask(agentName, taskId); task = r?.data?.task || r?.data || null; } catch { /* transient */ }
+      try { const r = await getTask(agentName, taskId); task = r?.data?.task || r?.data || null; } catch (err) { swallowed('notebook-plan: check', err); }
       const status = task?.status;
       if (status) onStatus?.(status);
       if (status === 'done') { settled = true; cleanup(); resolve(task); return; }

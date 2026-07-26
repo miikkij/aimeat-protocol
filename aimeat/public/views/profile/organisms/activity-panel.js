@@ -17,6 +17,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { dt } from '/js/format.js';
 import * as orgService from '/js/services/organisms.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* Build a GitHub-style contribution calendar from activity events. Each day holds FOUR counters —
  * documents draft/published and records (schema'd) draft/published — so a cell can be drawn as a 2×2
@@ -68,7 +69,7 @@ export function ActivityPanel({ orgId, wsId }) {
   const [show, setShow] = useState(true);
   useEffect(() => {
     let cancelled = false;
-    const fetchIt = () => orgService.getWorkspaceActivity(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
+    const fetchIt = () => orgService.getWorkspaceActivity(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(err => { swallowed('activity-panel: fetchIt', err); });
     fetchIt();
     const off = onLiveUpdate(['organisms'], fetchIt);
     return () => { cancelled = true; off(); };

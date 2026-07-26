@@ -15,6 +15,7 @@ import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 // Mirrors the agent scope domains (agents-tab.js) — the same list agents are granted from.
 const PAT_SCOPE_DOMAINS = [
@@ -65,7 +66,7 @@ export function AccessTokensSection({ session, showToast, initial }) {
 
   const load = useCallback(async () => {
     try { const r = await apiGet('/v1/access/tokens'); setTokens(r.data?.tokens || []); }
-    catch { setTokens([]); }
+    catch (err) { swallowed('access-tokens', err); setTokens([]); }
   }, []);
   useEffect(() => { if (!initial) load(); }, [load]);   // eslint-disable-line react-hooks/exhaustive-deps -- seed once from `initial`; fetch only when unseeded
 

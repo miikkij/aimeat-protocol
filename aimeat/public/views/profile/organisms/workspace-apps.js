@@ -19,6 +19,7 @@ import { t } from '/js/i18n.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import { listApps } from '/js/services/apps.js';
 import { saveWorkspaceApps } from '/js/services/organisms.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** The launch URL for a pinned app, carrying the workspace context in the fragment. */
 function launchHref(orgId, wsId, b) {
@@ -38,7 +39,7 @@ export function WorkspaceApps({ orgId, wsId, apps, canEdit, showToast, onChanged
   useEffect(() => {
     if (bound.length === 0 && !showPicker) return undefined;
     let cancelled = false;
-    listApps().then(a => { if (!cancelled) setCatalog(a); }).catch(() => { if (!cancelled) setCatalog([]); });
+    listApps().then(a => { if (!cancelled) setCatalog(a); }).catch((err) => { swallowed('workspace-apps', err); if (!cancelled) setCatalog([]); });
     return () => { cancelled = true; };
   }, [bound.length, showPicker]);
 
@@ -58,7 +59,8 @@ export function WorkspaceApps({ orgId, wsId, apps, canEdit, showToast, onChanged
       await saveWorkspaceApps(orgId, wsId, next.map(b => ({ owner: b.owner, filename: b.filename, ...(b.label ? { label: b.label } : {}) })));
       showToast?.(t('organisms.apps.saved') || 'Workspace apps updated', 'success');
       onChanged?.();
-    } catch {
+    } catch (err) {
+      swallowed('workspace-apps: save', err);
       showToast?.(t('organisms.apps.saveError') || 'Could not update apps', 'error');
     } finally { setBusy(false); }
   };

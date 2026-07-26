@@ -12,6 +12,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { apiGet, apiPut } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 // ── LLM Config Editor (provider + key + model) ──
 
@@ -39,7 +40,7 @@ export default function LlmConfigEditor({ config, onChange, onRemove, label }) {
         const hasSharedKey = !!resp.data?.hasApiKey;
         setSharedKeyExists(hasSharedKey);
         if (hasSharedKey) loadModels();
-      } catch { /* no shared settings */ }
+      } catch (err) { swallowed('calibrator-llm-editor: LlmConfigEditor', err); }
     })();
   }, []);
 
@@ -50,7 +51,7 @@ export default function LlmConfigEditor({ config, onChange, onRemove, label }) {
     try {
       const resp = await apiGet('/v1/openrouter/models');
       if (resp.data?.models) setModels(resp.data.models);
-    } catch { setModels([]); }
+    } catch (err) { swallowed('calibrator-llm-editor', err); setModels([]); }
     setModelsLoading(false);
   }
 

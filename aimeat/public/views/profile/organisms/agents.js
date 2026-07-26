@@ -21,6 +21,7 @@ import { EmptyState } from '/components/EmptyState.js';
 import * as orgService from '/js/services/organisms.js';
 import { listAgents, offersWorkspaceContract, contractNamesOf } from '/js/services/agents.js';
 import { relTime } from '/views/profile/organisms/helpers.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * Agents tab — attached agents listed first; "+ Attach agent" opens a picker of the user's OWN
@@ -53,7 +54,7 @@ export function OrgAgentsPanel({ org, ghii, canManage, showToast, onChanged }) {
         const map = {};
         for (const [name, v] of Object.entries(agents)) map[name] = { count: v.count, lastAt: v.lastAt, ws: new Set(v.workspaces || []) };
         if (!cancelled) setActed(map);
-      } catch { /* context is optional */ }
+      } catch (err) { swallowed('agents: OrgAgentsPanel', err); }
     })();
     return () => { cancelled = true; };
   }, [orgId, attached.length]);

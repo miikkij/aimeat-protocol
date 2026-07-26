@@ -22,6 +22,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { useConfirm } from '/components/Modal.js';
 import { listAgents, deleteAgent } from '/js/services/agents.js';
 import { apiGet } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function ChatSessionsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -36,7 +37,7 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
       const sessions = agents.filter(a => a.owner === session.owner && a.name?.startsWith('session-'));
       setChatSessions(sessions);
       onStats?.({ chatSessions: sessions.length });
-    } catch { setChatSessions([]); }
+    } catch (err) { swallowed('chat-sessions-tab', err); setChatSessions([]); }
   }, [session?.owner, onStats]);
 
   useEffect(() => {
@@ -56,7 +57,8 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
         showToast(t('profile.chatSessions.deleted'));
         setExpanded(null);
         loadData();
-      } catch {
+      } catch (err) {
+        swallowed('chat-sessions-tab: ChatSessionsTab', err);
         showToast(t('profile.chatSessions.deleteError'));
       } finally { setDeleting(null); }
     }, { danger: true });
@@ -80,7 +82,8 @@ export default function ChatSessionsTab({ session, showToast, onStats }) {
       } else {
         showToast(t('profile.chatSessions.promptError'));
       }
-    } catch {
+    } catch (err) {
+      swallowed('chat-sessions-tab: ChatSessionsTab', err);
       showToast(t('profile.chatSessions.promptError'));
     } finally { setCopying(null); }
   }, [showToast]);

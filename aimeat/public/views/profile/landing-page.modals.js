@@ -15,6 +15,7 @@ import { onLiveUpdate } from "/lib/live-updates.js";
 import { Spinner } from "./shared.js";
 import { PresenceDot } from "/components/PresenceDot.js";
 import { useToast } from "/components/Toast.js";
+import { swallowed } from '/js/swallowed.js';
 
 /* ───── Edit Profile Modal ───── */
 
@@ -42,7 +43,7 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
           });
           setCurrentEmail(d.notification_email || '');
         }
-      } catch { /* use defaults */ }
+      } catch (err) { swallowed('landing-page.modals: EditProfileModal', err); }
       if (!cancelled) setLoading(false);
     })();
     return () => { cancelled = true; };
@@ -67,7 +68,8 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
       } else {
         showToast(t('profile.landing.editError'), true);
       }
-    } catch {
+    } catch (err) {
+      swallowed('landing-page.modals: save', err);
       showToast(t('profile.landing.editError'), true);
     }
     setSaving(false);
@@ -182,7 +184,8 @@ export function ChangePasswordModal({ onClose, onChanged }) {
       try {
         const resp = await getProfile();
         if (!cancelled) setHasPassword(resp?.data?.has_password !== false);
-      } catch {
+      } catch (err) {
+        swallowed('landing-page.modals: ChangePasswordModal', err);
         if (!cancelled) setHasPassword(true); // fail safe: require current password
       }
     })();
@@ -350,7 +353,7 @@ export function PresencePill() {
     try {
       const r = await getMyPresence();
       if (r?.data) { setCfg(r.data.config); setStatus(r.data.status || 'unknown'); }
-    } catch { /* pill stays hidden until it loads */ }
+    } catch (err) { swallowed('landing-page.modals: PresencePill', err); }
   }, []);
   useEffect(() => { load(); }, [load]);
   const liveRef = useRef(load); liveRef.current = load;
@@ -364,7 +367,7 @@ export function PresencePill() {
     try {
       const r = await setMyPresence(partial);
       if (r?.data) { setCfg(r.data.config); setStatus(r.data.status || 'unknown'); }
-    } catch { setCfg(cfg); /* revert */ }
+    } catch (err) { swallowed('landing-page.modals', err); setCfg(cfg); /* revert */ }
     setSaving(false);
   };
 

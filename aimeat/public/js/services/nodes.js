@@ -13,6 +13,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** Cached personal_nodes_enabled flag from bootstrap. */
 let _personalEnabled = null;
@@ -22,7 +23,7 @@ async function isPersonalEnabled() {
   try {
     const data = await apiGet('/');
     _personalEnabled = !!data?.data?.this_node?.personal_nodes_enabled;
-  } catch { _personalEnabled = false; }
+  } catch (err) { swallowed('nodes', err); _personalEnabled = false; }
   return _personalEnabled;
 }
 
@@ -32,7 +33,7 @@ export async function listNodes() {
     if (!(await isPersonalEnabled())) return [];
     const data = await apiGet('/v1/personal/status?soft=1');
     return data?.data?.node_id ? [data.data] : [];
-  } catch { return []; }
+  } catch (err) { swallowed('nodes: listNodes', err); return []; }
 }
 
 /** Register (anchor) a personal node. */

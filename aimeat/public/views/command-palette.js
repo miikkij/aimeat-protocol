@@ -26,6 +26,7 @@ import { librarianSearch } from '/js/services/memory.js';
 import { listOrganisms } from '/js/services/organisms.js';
 import { getOwner } from '/js/services/auth.js';
 import { listRecents } from '/js/recents.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** Hand off to the organisms tab using the app's existing nav contract: prime the sessionStorage the
  *  OrganismsTab reads on mount (open id + workspace + an optional ws-search pre-fill), then switch to
@@ -37,11 +38,12 @@ function openTarget(navigate, { orgId, wsId, query }) {
     if (orgId) sessionStorage.setItem('aimeat.ws.openId', orgId);
     if (wsId) sessionStorage.setItem('aimeat.ws.openWs', wsId); else sessionStorage.removeItem('aimeat.ws.openWs');
     if (orgId && wsId && query) sessionStorage.setItem(`aimeat.ws.${orgId}.${wsId}.search`, query);
+  // eslint-disable-next-line aimeat/no-silent-catch -- private mode — the route fallback still works
   } catch { /* private mode — the route fallback still works */ }
   try {
     window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'organisms' } }));
     window.dispatchEvent(new CustomEvent('aimeat-open-organism', { detail: { orgId, wsId: wsId || null } }));
-  } catch { /* noop */ }
+  } catch (err) { swallowed('command-palette: openTarget', err); }
   if (!location.pathname.startsWith('/v1/profile')) navigate('/v1/profile?tab=organisms');
 }
 
@@ -70,7 +72,7 @@ export function CommandPalette({ navigate }) {
   useEffect(() => {
     if (!open) { setQ(''); setHits(null); setSel(0); return; }
     const me = getOwner();
-    if (me) listOrganisms({ member: me }).then(r => setOrgs((r?.data?.organisms) || [])).catch(() => {});
+    if (me) listOrganisms({ member: me }).then(r => setOrgs((r?.data?.organisms) || [])).catch(err => { swallowed('command-palette: onKey', err); });
     setTimeout(() => inputRef.current?.querySelector('input')?.focus(), 30);
   }, [open]);
 
@@ -82,7 +84,7 @@ export function CommandPalette({ navigate }) {
     let cancelled = false;
     setBusy(true);
     const tid = setTimeout(async () => {
-      const r = await librarianSearch(query, 30, 'own').catch(() => []);
+      const r = await librarianSearch(query, 30, 'own').catch(err => { swallowed('command-palette: onKey', err); return []; });
       if (!cancelled) { setHits(r || []); setBusy(false); setSel(0); }
     }, 200);
     return () => { cancelled = true; clearTimeout(tid); };

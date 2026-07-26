@@ -17,6 +17,7 @@ import * as memoryService from '/js/services/memory.js';
 import { listPeers } from '/js/services/federation.js';
 import { formatRelativeTime } from './helpers.js';
 import { DiscoverPreview } from './components.js';
+import { swallowed } from '/js/swallowed.js';
 
 function browseErrorMessage(e) {
   const code = e.code || '';
@@ -67,7 +68,7 @@ export async function initBrowseRemote(ctx) {
   try {
     const peers = await listPeers();
     ctx.setRemotePeers(Array.isArray(peers) ? peers.filter(p => p.status === 'active' || p.status === 'healthy') : []);
-  } catch { ctx.setRemotePeers([]); }
+  } catch (err) { swallowed('browse-view', err); ctx.setRemotePeers([]); }
 }
 
 export async function handlePullRemoteEntry(ctx, key, peerNodeId) {
@@ -102,7 +103,7 @@ export async function handlePullAll(ctx) {
           await memoryService.pullFromRemote(ctx.selectedPeer, entry.key);
         }
         pulled++;
-      } catch { /* skip failed entries */ }
+      } catch (err) { swallowed('browse-view: handlePullAll', err); }
     }
     ctx.showToast(t('profile.memory.pullAllSuccess').replace('{count}', pulled));
     ctx.loadMemories();

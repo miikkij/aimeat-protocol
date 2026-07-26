@@ -37,6 +37,7 @@ import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
 import { OrgMemberManager } from '/views/profile/organisms/members.js';
 import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
 import { BoardPreview } from '/views/profile/organisms/panels.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* ───────────────── Organism home page ─────────────────
  * One home per organism: breadcrumb header (avatar, name, badges, description,
@@ -50,7 +51,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const [showSettings, setShowSettings] = useState(!!initialSettings);
   const [wsCount, setWsCount] = useState(null);
   const [pendingJoin, setPendingJoin] = useState(0);   // Members tab pill — visible without opening the tab
-  useEffect(() => { try { sessionStorage.setItem('aimeat.org.tab', tab); } catch { /* noop */ } }, [tab]);
+  useEffect(() => { try { sessionStorage.setItem('aimeat.org.tab', tab); } catch { /* noop */ } }, [tab]);   // eslint-disable-line aimeat/no-silent-catch -- noop
 
   const isCreator = org.creatorGhii === ghii;
   const isAdmin = org.admins?.includes(ghii);
@@ -103,7 +104,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
     let cancelled = false;
     const fetchIt = () => orgService.listJoinRequests(org.id)
       .then(r => { if (!cancelled) setPendingJoin(((r?.data?.join_requests) || []).filter(x => x.status === 'pending').length); })
-      .catch(() => {});
+      .catch(err => { swallowed('home: fetchIt', err); });
     fetchIt();
     const off = onLiveUpdate(['organisms'], fetchIt);
     return () => { cancelled = true; off(); };
@@ -159,7 +160,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
       });
       if (result?.ok !== false) { showToast(t('organisms.updated') || 'Organism updated'); onChanged?.(); }
       else showToast(result?.error?.message || (t('organisms.updateError') || 'Failed to update'));
-    } catch { showToast(t('organisms.updateError') || 'Failed to update'); }
+    } catch (err) { swallowed('home', err); showToast(t('organisms.updateError') || 'Failed to update'); }
     finally { setSaving(false); }
   };
   // Leaving a dirty form (closing settings / breadcrumb back) asks before dropping the changes.
@@ -187,14 +188,14 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
         const wss = (await orgService.discoverWorkspaces(org.id)).filter(w => w.access !== 'none');
         let recs = 0, docs = 0;
         await Promise.all(wss.map(async (w) => {
-          const wsData = await orgService.getWorkspace(org.id, w.id).catch(() => null);
+          const wsData = await orgService.getWorkspace(org.id, w.id).catch(err => { swallowed('home: wss', err); return null; });
           for (const ot of (wsData?.manifest?.objectTypes || []).filter(orgService.isMemorySpace)) {
             const n = new Set([...(wsData.drafts?.[ot.name] || []), ...(wsData.objects?.[ot.name] || [])].map(d => d.id)).size;
             if (orgService.isDocSpace(ot)) docs += n; else recs += n;
           }
         }));
         if (!cancelled) setDelStats({ ws: wss.length, recs, docs });
-      } catch { /* the counts are a courtesy — the generic warning still shows */ }
+      } catch (err) { swallowed('home: wss', err); }
     })();
     return () => { cancelled = true; };
   }, [org.id, showSettings, isCreator]);
@@ -208,7 +209,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
         await orgService.deleteOrganism(org.id);
         showToast(t('organisms.deleted') || 'Organism deleted');
         onBack(); onChanged?.();
-      } catch { showToast(t('organisms.deleteError') || 'Failed to delete'); }
+      } catch (err) { swallowed('home', err); showToast(t('organisms.deleteError') || 'Failed to delete'); }
     }, { danger: true, title: t('organisms.deleteOrganismTitle') || 'Delete this organism' });
   };
   // Archive / unarchive the whole organism (creator/admin) — read-only + hidden from AI materials,

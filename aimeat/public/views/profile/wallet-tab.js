@@ -33,6 +33,7 @@ import { Spinner } from './shared.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { getWallet, getTransactions, requestMorsels } from '/js/services/wallet.js';
 import { apiGet, apiPut, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * Map backend transaction type to a display label.
@@ -159,14 +160,14 @@ function MoneyActivity({ initial }) {
   const load = useCallback(async () => {
     try {
       const [s, o] = await Promise.all([
-        apiGet('/v1/commerce/checkout-sessions?limit=100').catch(() => null),
-        apiGet('/v1/commerce/orders?limit=100').catch(() => null),
+        apiGet('/v1/commerce/checkout-sessions?limit=100').catch(err => { swallowed('wallet-tab: m', err); return null; }),
+        apiGet('/v1/commerce/orders?limit=100').catch(err => { swallowed('wallet-tab: m', err); return null; }),
       ]);
       const money = (x) => x.currency && x.currency !== 'morsel';
       const purchases = (s?.data?.sessions ?? []).filter(money);
       const sales = (o?.data?.orders ?? []).filter(money);
       setData({ purchases, sales });
-    } catch { setData({ purchases: [], sales: [] }); }
+    } catch (err) { swallowed('wallet-tab', err); setData({ purchases: [], sales: [] }); }
   }, []);
   useEffect(() => { if (!initial) load(); }, [load]);   // eslint-disable-line react-hooks/exhaustive-deps -- seed once from `initial`; fetch only when unseeded
   if (!data || (!data.purchases.length && !data.sales.length)) return null;
@@ -218,7 +219,7 @@ export default function WalletTab({ session, showToast, onStats }) {
       // Mount: ONE composite call (GET /v1/wallet/overview) seeds wallet + recent transactions AND the
       // MoneyActivity section (checkout-sessions + orders). The Enterprise PSP section stays on its own
       // /v1/me/psp call. Falls back to the individual wallet endpoints if the composite is unavailable.
-      const ov = await apiGet('/v1/wallet/overview').then(r => r?.data).catch(() => null);
+      const ov = await apiGet('/v1/wallet/overview').then(r => r?.data).catch(err => { swallowed('wallet-tab: loadData', err); return null; });
       if (ov?.wallet) {
         setWalletData(ov.wallet);
         onStats?.({ balance: ov.wallet.balance ?? '-' });
@@ -234,8 +235,8 @@ export default function WalletTab({ session, showToast, onStats }) {
       try {
         const tx = await getTransactions(20);
         setWalletTx(tx);
-      } catch { setWalletTx([]); }
-    } catch { setWalletData(null); }
+      } catch (err) { swallowed('wallet-tab', err); setWalletTx([]); }
+    } catch (err) { swallowed('wallet-tab', err); setWalletData(null); }
   }
 
   const toggleTx = useCallback((id) => {

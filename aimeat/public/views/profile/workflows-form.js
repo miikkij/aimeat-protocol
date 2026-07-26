@@ -16,6 +16,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { listAgents } from '/js/services/agents.js';
 import { putWorkflow, getAgentOffers } from '/js/services/workflows.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -54,7 +55,7 @@ export default function WorkflowForm({ existing, onSaved, onCancel, showToast })
   const [saving, setSaving] = useState(false);
 
   // listAgents() returns the agent array directly (not an envelope); stay tolerant of both shapes.
-  useEffect(() => { listAgents().then(r => setAgents(Array.isArray(r) ? r : (r?.data?.agents ?? r?.data ?? []))).catch(() => {}); }, []);
+  useEffect(() => { listAgents().then(r => setAgents(Array.isArray(r) ? r : (r?.data?.agents ?? r?.data ?? []))).catch(err => { swallowed('workflows-form: WorkflowForm', err); }); }, []);
 
   const loadOffers = useCallback(async (agentName) => {
     if (!agentName) return;

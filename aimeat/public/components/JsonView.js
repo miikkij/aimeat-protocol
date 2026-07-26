@@ -25,6 +25,7 @@ export function parseValue(value) {
     const trimmed = value.trim();
     if (trimmed && (trimmed[0] === '{' || trimmed[0] === '[')) {
       try { return { json: JSON.parse(trimmed) }; }
+      // eslint-disable-next-line aimeat/no-silent-catch -- not JSON after all — show raw
       catch { /* not JSON after all — show raw */ }
     }
     return { raw: value };

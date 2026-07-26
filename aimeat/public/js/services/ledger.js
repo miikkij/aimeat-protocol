@@ -14,6 +14,7 @@
  *   v1.1.0 -- 2026-07-16 -- Add getLedgerUsageOverview folding the Usage tab's two mount reads into one.
  */
 import { apiGet } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * Daily usage aggregates for one agent (or all of the owner's agents when agentName is falsy),
@@ -57,5 +58,5 @@ export async function getLedgerUsageOverview(agentName, { runsLimit = 50 } = {})
   try {
     const resp = await apiGet(`/v1/ledger/usage/overview?${p.toString()}`);
     return resp?.data ?? null;
-  } catch { return null; }
+  } catch (err) { swallowed('ledger: getLedgerUsageOverview', err); return null; }
 }

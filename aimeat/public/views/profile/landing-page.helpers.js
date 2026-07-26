@@ -5,6 +5,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)
  */
 import { t, getLocale } from "/js/i18n.js";
+import { swallowed } from '/js/swallowed.js';
 
 /* ───── Small time helpers (reuse the organisms rel-time keys) ───── */
 
@@ -41,6 +42,7 @@ export function gotoWorkspace(orgId, wsId, wsTab) {
     sessionStorage.setItem('aimeat.ws.openId', orgId);
     sessionStorage.setItem('aimeat.ws.openWs', wsId);
     if (wsTab) sessionStorage.setItem(`aimeat.ws.${orgId}.${wsId}.tab`, wsTab);
+  // eslint-disable-next-line aimeat/no-silent-catch -- noop
   } catch { /* noop */ }
   openProfileTab('organisms');
 }
@@ -49,11 +51,12 @@ export function gotoOrganism(orgId, homeTab) {
     sessionStorage.setItem('aimeat.ws.openId', orgId);
     sessionStorage.removeItem('aimeat.ws.openWs');
     if (homeTab) sessionStorage.setItem('aimeat.org.tab', homeTab);
+  // eslint-disable-next-line aimeat/no-silent-catch -- noop
   } catch { /* noop */ }
   openProfileTab('organisms');
 }
 export function gotoOrganismsList() {
-  try { sessionStorage.removeItem('aimeat.ws.openId'); sessionStorage.removeItem('aimeat.ws.openWs'); } catch { /* noop */ }
+  try { sessionStorage.removeItem('aimeat.ws.openId'); sessionStorage.removeItem('aimeat.ws.openWs'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
   openProfileTab('organisms');
 }
 
@@ -68,7 +71,7 @@ export function syncTabHistory(tabId, replace) {
     const state = { aimeatTab: tabId || null };
     if (replace) history.replaceState(state, '', path);
     else history.pushState(state, '', path);
-  } catch { /* history unavailable */ }
+  } catch (err) { swallowed('landing-page.helpers: syncTabHistory', err); }
 }
 
 export function fmtBytes(n) {

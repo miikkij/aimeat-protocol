@@ -28,6 +28,7 @@ import { KeyValueRow } from '/components/KeyValueRow.js';
 import { Markdown } from '/components/Markdown.js';
 import { dt } from '/js/format.js';
 import * as orgService from '/js/services/organisms.js';
+import { swallowed } from '/js/swallowed.js';
 
 // Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) only when a document is edited —
 // it's ~520KB, so it stays out of the main bundle. Resolves window.toastui.Editor.
@@ -77,11 +78,11 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
       let out = raw;
       for (const su of urls) {
         try { const bu = await orgService.fetchStorageObjectUrl(su); created.push(bu); out = out.split(su).join(bu); }
-        catch { /* leave the storage URL — renders broken but never throws */ }
+        catch (err) { swallowed('document: shown', err); }
       }
       if (!cancelled) setRendered(out);
     })();
-    return () => { cancelled = true; created.forEach(u => { try { URL.revokeObjectURL(u); } catch { /* noop */ } }); };
+    return () => { cancelled = true; created.forEach(u => { try { URL.revokeObjectURL(u); } catch (err) { swallowed('document: shown', err); } }); };
   }, [shown.markdown]);
 
   // A [file](/v1/…) LINK (pdf etc.) can't carry the session token on a plain navigation, so intercept
@@ -97,8 +98,8 @@ export function DocumentView({ page, busy, onEdit, onPublish, onWikiLink, onPopO
     const tab = window.open('', '_blank', 'noopener');
     orgService.fetchStorageObjectUrl(href).then(bu => {
       if (tab) tab.location.href = bu; else window.open(bu, '_blank', 'noopener');
-      setTimeout(() => { try { URL.revokeObjectURL(bu); } catch { /* noop */ } }, 60_000);
-    }).catch(() => { try { tab?.close(); } catch { /* noop */ } });
+      setTimeout(() => { try { URL.revokeObjectURL(bu); } catch (err) { swallowed('document: onDocClick', err); } }, 60_000);
+    }).catch(() => { try { tab?.close(); } catch (err) { swallowed('document: onDocClick', err); } });
   };
 
   // created/saved/published timestamps come from the workspace read (record metadata on the value).
@@ -152,7 +153,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
     if (!embedded.length) { setImages([]); return undefined; }
     orgService.listStorageVisibilities().then((vis) => {
       if (!cancelled) setImages(embedded.map(e => ({ ...e, visibility: vis[e.key] || 'private' })));
-    }).catch(() => { if (!cancelled) setImages(embedded.map(e => ({ ...e, visibility: 'private' }))); });
+    }).catch((err) => { swallowed('document', err); if (!cancelled) setImages(embedded.map(e => ({ ...e, visibility: 'private' }))); });
     return () => { cancelled = true; };
     // Runs once on mount from the initial `page` snapshot; the editor is remounted per document
     // via `key`, so re-running on `page` identity changes is unnecessary and would reset image state.
@@ -165,14 +166,14 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
       const r = await orgService.setImageVisibility(key, visibility);
       if (r?.ok === false) throw new Error(r?.error?.message || 'Failed');
       setImages(imgs => imgs.map(i => i.key === key ? { ...i, visibility } : i));
-    } catch { /* leave as-is; a failed toggle just doesn't change the pill */ }
+    } catch (err) { swallowed('document: changeImageVisibility', err); }
     finally { setImgBusy(false); }
   };
   const makeAllImagesPublic = async () => {
     setImgBusy(true);
     try {
       const targets = images.filter(i => i.visibility !== 'public');
-      await Promise.all(targets.map(i => orgService.setImageVisibility(i.key, 'public').catch(() => {})));
+      await Promise.all(targets.map(i => orgService.setImageVisibility(i.key, 'public').catch(err => { swallowed('document: makeAllImagesPublic', err); })));
       setImages(imgs => imgs.map(i => ({ ...i, visibility: 'public' })));
     } finally { setImgBusy(false); }
   };
@@ -184,7 +185,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
     pending.current.push(
       orgService.uploadImage(orgId, blob, blob.type || 'image/png')
         .then((url) => { imageMap.current[dataUrl] = url; })
-        .catch(() => { /* keep the inline data URL */ }),
+        .catch(err => { swallowed('document: uploadAndMap', err); }),
     );
   };
   const insertFromFile = async (file) => {
@@ -199,7 +200,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
     if (mode !== 'rich') return undefined;
     let inst = null, cancelled = false; const blobUrls = [];
     (async () => {
-      const Editor = await loadToastUI().catch(() => null);
+      const Editor = await loadToastUI().catch(err => { swallowed('document: insertFromFile', err); return null; });
       if (cancelled) return;
       if (!Editor) { setMode('markdown'); return; }
       // Already-stored images embed a private /v1/storage URL, which a plain <img> in the editor
@@ -212,7 +213,7 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
           const bu = await orgService.fetchStorageObjectUrl(su);
           displayMap.current[bu] = su; blobUrls.push(bu);
           initial = initial.split(su).join(bu);
-        } catch { /* leave the storage URL — it renders broken but saves intact */ }
+        } catch (err) { swallowed('document: initial', err); }
       }
       if (cancelled || !containerRef.current) return;
       inst = new Editor({
@@ -244,9 +245,9 @@ export function DocumentEditor({ orgId, page, busy, onSave, onCancel }) {
     })();
     return () => {
       cancelled = true;
-      if (inst) { try { inst.destroy(); } catch { /* noop */ } }
+      if (inst) { try { inst.destroy(); } catch (err) { swallowed('document: addImageBlobHook', err); } }
       editorRef.current = null;
-      blobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch { /* noop */ } });
+      blobUrls.forEach(u => { try { URL.revokeObjectURL(u); } catch (err) { swallowed('document: addImageBlobHook', err); } });
     };
     // Re-init the editor only on mode switch. `uploadAndMap` is recreated every render (adding it
     // would rebuild the editor on every render) and `page` is the initial content snapshot — both

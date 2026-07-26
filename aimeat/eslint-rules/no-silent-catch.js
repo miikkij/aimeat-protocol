@@ -40,6 +40,9 @@ const ABSENCE_LITERALS = new Set(['null', 'false', 'undefined', '0', "''", '""',
 const DEFAULT_LOG_NAMES = [
   'logger', 'console', 'log', 'warn', 'error', 'info', 'debug', 'trace',
   'captureException', 'reportError', 'notify', 'audit', 'track', 'emitError',
+  // The frontend's reporting channel (public/js/swallowed.js): a bounded, inspectable buffer rather
+  // than console noise, because Rule 1b verification treats a clean console as evidence.
+  'swallowed',
 ];
 
 /** Callee name fragments that count as "this error reached someone who can act on it". */
@@ -47,6 +50,14 @@ const SURFACE_NAMES = new Set([
   'res', 'reply', 'response', 'reject', 'next', 'send', 'json', 'status',
   'setError', 'showError', 'toast', 'alert', 'fail', 'abort', 'exit',
 ]);
+
+/**
+ * Frontend state setters that put the FAILURE itself on screen — `setFailed(true)`,
+ * `setErr('renderer')`. The user sees that something went wrong, which is the browser's equivalent
+ * of a log line. Deliberately narrow: `setContacts([])` is NOT this, because turning a failure into
+ * an empty list is exactly the "absence that looks like an answer" this rule exists to catch.
+ */
+const RE_SURFACE_SETTER = /^set(Err|Error|Failed|Failure|Broken|Unavailable)/;
 
 const isBlock = (n) => n && n.type === 'BlockStatement';
 
@@ -140,7 +151,7 @@ export const noSilentCatch = {
             const segments = sourceCode.getText(node.callee).split(/[.?[\]()]+/).filter(Boolean);
             for (const seg of segments) {
               if (logNames.has(seg)) hasLog = true;
-              else if (SURFACE_NAMES.has(seg)) hasSurface = true;
+              else if (SURFACE_NAMES.has(seg) || RE_SURFACE_SETTER.test(seg)) hasSurface = true;
             }
             break;
           }

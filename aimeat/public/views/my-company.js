@@ -47,6 +47,7 @@ import { EmptyState } from '/components/EmptyState.js';
 import { THEMES, buildPortfolioData } from '/views/portfolio-themes.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { PaymentsPanel } from '/views/my-company.payments.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -116,7 +117,7 @@ function MembersPanel({ slug, creatorOwner, viewerRole }) {
   const [role, setRole] = useState('member');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const load = useCallback(async () => { try { const r = await apiGet(`/v1/orgs/${encodeURIComponent(slug)}/members`); setMembers(r.data?.members ?? []); } catch { setMembers([]); } }, [slug]);
+  const load = useCallback(async () => { try { const r = await apiGet(`/v1/orgs/${encodeURIComponent(slug)}/members`); setMembers(r.data?.members ?? []); } catch (err) { swallowed('my-company', err); setMembers([]); } }, [slug]);
   useEffect(() => { load(); }, [load]);
   async function add(e) {
     e.preventDefault();
@@ -297,7 +298,7 @@ function PortfolioPanel({ org, offerings }) {
     setBusy(true); setErr(''); setMsg('');
     try {
       const r = await apiPut(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio/publish`, { html: renderTheme() });
-      apiPut(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio/config`, { ...choices(), themeId }).catch(() => {});
+      apiPut(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio/config`, { ...choices(), themeId }).catch(err => { swallowed('my-company: publishTheme', err); });
       setCfg(r.data?.portfolio); setMsg(t('myCompany.pfPublished'));
     } catch (e) { setErr(e.message || 'Publish failed'); }
     finally { setBusy(false); }
@@ -305,8 +306,9 @@ function PortfolioPanel({ org, offerings }) {
 
   function generate() {
     setPrompt(buildPortfolioPrompt(org, offerings, { includeOfferings, includeInfo, useLogo, lookDescription: look }));
-    apiPut(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio/config`, { includeOfferings, includeInfo, useLogo, lookDescription: look }).catch(() => {});
+    apiPut(`/v1/orgs/${encodeURIComponent(org.slug)}/portfolio/config`, { includeOfferings, includeInfo, useLogo, lookDescription: look }).catch(err => { swallowed('my-company: generate', err); });
   }
+  // eslint-disable-next-line aimeat/no-silent-catch -- clipboard blocked
   async function copyPrompt() { try { await navigator.clipboard.writeText(prompt); setMsg(t('myCompany.pfCopied')); } catch { /* clipboard blocked */ } }
   async function publish() {
     if (!htmlIn.trim()) { setErr(t('myCompany.pfNeedHtml')); return; }
@@ -414,7 +416,7 @@ function OfferingCard({ o, orgOwner, slug, onOrdered, onChanged, callerOwner, ro
       const amt = microsFromInput(moneyAmt);
       const priceMoney = amt ? { amount: amt, currency: moneyCur } : null;
       // record who last edited the company's listing (surfaced as "last saved by")
-      await apiPatch(`/v1/orgs/${encodeURIComponent(slug)}/offerings`, { agentName: o.agentName, offerId: o.offerId, priceMoney }).catch(() => {});
+      await apiPatch(`/v1/orgs/${encodeURIComponent(slug)}/offerings`, { agentName: o.agentName, offerId: o.offerId, priceMoney }).catch(err => { swallowed('my-company: saveBilling', err); });
       setEditMode(false);
       if (onChanged) await onChanged();
     } catch (e) { setErr(e.message || 'Save failed'); }
@@ -495,7 +497,7 @@ function OfferPicker({ slug, alreadyListed, onListed }) {
   const [agents, setAgents] = useState(null); // [{ name, offers: [] }]
   const [busy, setBusy] = useState('');
   useEffect(() => {
-    Promise.all([apiGet('/v1/offers').catch(() => ({})), apiGet('/v1/agents').catch(() => ({}))]).then(([offR, agR]) => {
+    Promise.all([apiGet('/v1/offers').catch(err => { swallowed('my-company', err); return ({}); }), apiGet('/v1/agents').catch(err => { swallowed('my-company', err); return ({}); })]).then(([offR, agR]) => {
       const offersByAgent = {};
       for (const a of (offR.data?.agents ?? [])) offersByAgent[a.agent] = a.offers ?? [];
       const names = (agR.data?.agents ?? agR.data ?? []).map(a => a.name || String(a.gaii || '').split('#')[0]).filter(Boolean);
@@ -569,7 +571,7 @@ export default function MyCompanyView() {
 
   async function loadOrders(org) {
     try { const r = await apiGet(`/v1/orgs/${encodeURIComponent(org.slug)}/orders`); setOrdersReceived(r.data?.orders ?? []); }
-    catch { setOrdersReceived([]); }
+    catch (err) { swallowed('my-company', err); setOrdersReceived([]); }
   }
   async function openOrg(org) {
     setSelected(org); setOfferings([]); setOrdersReceived([]); setShowPicker(false); setSubTab('catalog');
@@ -585,7 +587,7 @@ export default function MyCompanyView() {
   }
   async function loadMyOrders() {
     try { const r = await apiGet('/v1/orders'); setMyOrders(r.data?.orders ?? []); }
-    catch { setMyOrders([]); }
+    catch (err) { swallowed('my-company', err); setMyOrders([]); }
   }
   function toggleMyOrders() {
     const next = !showMyOrders; setShowMyOrders(next);

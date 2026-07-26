@@ -34,6 +34,7 @@ import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as pkgService from '/js/services/packages.js';
 import { apiGet } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 // ─── InstanceCard ───────────────────────────────────────────────────────────
 // Expanded card for one installed package instance: shows every component's
@@ -169,7 +170,7 @@ export default function PackagesTab({ session, showToast, navigate }) {
       // Mount: ONE composite (GET /v1/packages/tab) seeds the three LOCAL sections (installed instances +
       // owner's packages + newest templates). Falls back to the three individual reads on failure. The
       // cross-node federation-templates call below stays separate (best-effort outbound).
-      const ov = await apiGet('/v1/packages/tab').then(r => r?.data).catch(() => null);
+      const ov = await apiGet('/v1/packages/tab').then(r => r?.data).catch(err => { swallowed('packages-tab: PackagesTab', err); return null; });
       if (ov) {
         setInstances(ov.instances?.instances ?? []);
         setPackages(ov.packages?.packages ?? []);
@@ -188,8 +189,8 @@ export default function PackagesTab({ session, showToast, navigate }) {
       try {
         const fedRes = await pkgService.listFederationTemplates({ limit: 50 });
         if (fedRes.ok) setRemoteTemplates(fedRes.data?.templates ?? []);
-      } catch { /* federation may not be available */ }
-    } catch { /* ignore */ }
+      } catch (err) { swallowed('packages-tab: PackagesTab', err); }
+    } catch (err) { swallowed('packages-tab: PackagesTab', err); }
     setLoading(false);
   }, [session?.owner]);
 
@@ -350,7 +351,8 @@ export default function PackagesTab({ session, showToast, navigate }) {
       } else {
         showToast('Failed to load prompt', true);
       }
-    } catch {
+    } catch (err) {
+      swallowed('packages-tab: copyPackagePrompt', err);
       showToast('Failed to load prompt', true);
     }
   };

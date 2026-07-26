@@ -13,6 +13,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** List all active consents. Returns array. */
 export async function listConsents() {
@@ -66,7 +67,7 @@ export async function getDataWalletOverview(days) {
       audit: d.audit?.entries || [],
       permSummary: d.permSummary || null,
     };
-  } catch { return null; }
+  } catch (err) { swallowed('consent: getDataWalletOverview', err); return null; }
 }
 
 /** Load effective permission rules for a specific memory key. */

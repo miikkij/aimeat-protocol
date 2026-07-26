@@ -20,6 +20,7 @@ import { DataTable } from '/components/DataTable.js';
 import { useConfirm } from '/components/Modal.js';
 import * as securityService from '/js/services/security.js';
 import { listAgents } from '/js/services/agents.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function SecurityTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -49,7 +50,7 @@ export default function SecurityTab({ session, showToast }) {
         setSecurityData(result);
         setSessions(sessionsList);
       }
-    } catch { setSecurityData({ ghii: {}, agents: [] }); }
+    } catch (err) { swallowed('security-tab', err); setSecurityData({ ghii: { }, agents: [] }); }
     setLoading(false);
   }, [session]);
 

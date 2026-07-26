@@ -21,12 +21,13 @@ import { listAgents } from '/js/services/agents.js';
 import { getOnboarding } from '/js/services/agent-integration.js';
 import { listTasks } from '/js/services/agent-tasks.js';
 import AgentCard from './profile/agents/agent-card.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
 function getSoloName() {
   try { return new URLSearchParams(window.location.search).get('solo') || ''; }
-  catch { return ''; }
+  catch (err) { swallowed('agent-solo', err); return ''; }
 }
 
 export default function AgentSolo() {
@@ -63,10 +64,10 @@ export default function AgentSolo() {
           done: (doneResp?.data?.tasks || []).filter(tk => tk.completedAt?.startsWith(today)).length,
           active: (activeResp?.data?.tasks || []).length,
         };
-      } catch { /* stats are best-effort */ }
+      } catch (err) { swallowed('agent-solo: active', err); }
       setAgent({ ...a, taskStats });
       try { const ob = await getOnboarding(name); setOnboarding(ob?.data?.onboarding || null); }
-      catch { setOnboarding(null); }
+      catch (err) { swallowed('agent-solo', err); setOnboarding(null); }
       setError(null);
     } catch (e) {
       setError(e.message || 'Error');

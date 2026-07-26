@@ -31,6 +31,7 @@ import * as orgService from '/js/services/organisms.js';
 import { listAgents, offersWorkspaceContract, contractNamesOf, adoptContractTask } from '/js/services/agents.js';
 import { Mermaid } from '/components/Mermaid.js';
 import { ContactPicker } from '/components/ContactPicker.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* Participants panel — who takes part in this workspace, as a node → owner → agents chart plus a
  * listing. Built from the records' identity traces (humans + their agents) + organism membership.
@@ -53,7 +54,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
   const [engagements, setEngagements] = useState([]);
   const [retireBusy, setRetireBusy] = useState('');
   useEffect(() => {
-    listAgents().then(a => setContractAgents((a || []).filter(offersWorkspaceContract))).catch(() => {});
+    listAgents().then(a => setContractAgents((a || []).filter(offersWorkspaceContract))).catch(err => { swallowed('participants-panel: ParticipantsPanel', err); });
   }, []);
   // The engagement for (agent, contract) in THIS workspace, or undefined. contract '' = bare marker.
   const engFor = (a, contract) => engagements.find(e => e.agent === a.gaii && (e.contract || '') === (contract || ''));
@@ -64,7 +65,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
     const key = `${a.gaii}:${contract || ''}`;
     setAdoptBusy(key);
     try {
-      await orgService.activateEngagement(orgId, wsId, a.gaii, contract).catch(() => {});
+      await orgService.activateEngagement(orgId, wsId, a.gaii, contract).catch(err => { swallowed('participants-panel: adopt', err); });
       const r = await adoptContractTask(a.name, { organismId: orgId, ws: wsId, contract });
       if (r?.ok === false) showToast?.(r?.error?.message || (t('organisms.adoptFailed') || 'Could not queue the adoption task'));
       else showToast?.((t('organisms.adoptQueued') || 'Adoption task queued for {agent} — it provisions the contract and reports back').replace('{agent}', a.display_name || a.name));
@@ -93,7 +94,7 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
     const actions = names.length ? names : [''];
     setRetireBusy(`${a.gaii}:*`);
     try {
-      for (const c of actions) await orgService.retireEngagement(orgId, wsId, a.gaii, c).catch(() => {});
+      for (const c of actions) await orgService.retireEngagement(orgId, wsId, a.gaii, c).catch(err => { swallowed('participants-panel: retireAll', err); });
       showToast?.((t('organisms.retired') || '{agent} retired from this workspace').replace('{agent}', a.display_name || a.name));
       await refreshEngagements();
     } finally { setRetireBusy(''); }
@@ -105,30 +106,30 @@ export function ParticipantsPanel({ orgId, wsId, showToast }) {
     const actions = names.length ? names : [''];
     setAdoptBusy(`${a.gaii}:*`);
     try {
-      for (const c of actions) await orgService.activateEngagement(orgId, wsId, a.gaii, c).catch(() => {});
-      await adoptContractTask(a.name, { organismId: orgId, ws: wsId, contract: actions[0] }).catch(() => {});
+      for (const c of actions) await orgService.activateEngagement(orgId, wsId, a.gaii, c).catch(err => { swallowed('participants-panel: readoptAll', err); });
+      await adoptContractTask(a.name, { organismId: orgId, ws: wsId, contract: actions[0] }).catch(err => { swallowed('participants-panel: readoptAll', err); });
       showToast?.((t('organisms.broughtBack') || '{agent} is working here again').replace('{agent}', a.display_name || a.name));
       await refreshEngagements();
     } finally { setAdoptBusy(''); }
   };
-  const refreshEngagements = () => orgService.getWorkspaceEngagements(orgId, wsId).then(setEngagements).catch(() => {});
+  const refreshEngagements = () => orgService.getWorkspaceEngagements(orgId, wsId).then(setEngagements).catch(err => { swallowed('participants-panel: refreshEngagements', err); });
   useEffect(() => {
     let cancelled = false;
     const fetchIt = () => {
-      orgService.getWorkspaceParticipants(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(() => {});
-      orgService.getWorkspaceEngagements(orgId, wsId).then(e => { if (!cancelled) setEngagements(e); }).catch(() => {});
+      orgService.getWorkspaceParticipants(orgId, wsId).then(d => { if (!cancelled) setData(d); }).catch(err => { swallowed('participants-panel: fetchIt', err); });
+      orgService.getWorkspaceEngagements(orgId, wsId).then(e => { if (!cancelled) setEngagements(e); }).catch(err => { swallowed('participants-panel: fetchIt', err); });
     };
     fetchIt();
     const off = onLiveUpdate(['organisms'], fetchIt);
     return () => { cancelled = true; off(); };
   }, [orgId, wsId]);
   const isManager = !!(data && (data.nodes || []).some(n => (n.owners || []).some(o => o.isSelf && o.isCreator)));
-  const loadAccess = useCallback(() => orgService.getWorkspaceAccess(orgId, wsId).then(setAccess).catch(() => {}), [orgId, wsId]);
+  const loadAccess = useCallback(() => orgService.getWorkspaceAccess(orgId, wsId).then(setAccess).catch(err => { swallowed('participants-panel: fetchIt', err); }), [orgId, wsId]);
   useEffect(() => { if (isManager) loadAccess(); }, [isManager, orgId, wsId, data, loadAccess]);  if (!data || !(data.nodes || []).length) return null;
   const owners = [];
   for (const n of data.nodes) for (const o of (n.owners || [])) owners.push({ ...o, node: n.id, isLocalNode: n.isLocal });
 
-  const after = async (p) => { setBusy(true); try { await p; await loadAccess(); } catch { /* the row stays so the user can retry */ } finally { setBusy(false); } };
+  const after = async (p) => { setBusy(true); try { await p; await loadAccess(); } catch (err) { swallowed('participants-panel: after', err); } finally { setBusy(false); } };
   const doGrant = (g, r) => { const name = (g || '').trim(); if (name) { after(orgService.grantWorkspaceRole(orgId, wsId, name, r)); setGrantee(''); } };
   const doRevoke = (g) => after(orgService.revokeWorkspaceRole(orgId, wsId, g));
   const doDecide = (requester, decision) => after(orgService.decideWorkspaceAccess(orgId, wsId, requester, decision));

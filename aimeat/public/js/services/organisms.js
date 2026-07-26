@@ -37,6 +37,7 @@ import { api, apiGet, apiPost, apiPut, apiPatch, apiDelete } from '/js/api.js';
 import { decodeEntities } from '/js/utils.js';
 import { wsRoot, isMemorySpace, isDocSpace } from './organisms.shared.js';
 import { mlbl } from './organisms.charts.js';
+import { swallowed } from '/js/swallowed.js';
 
 // ── Re-exports of pieces extracted to sibling modules (pure extraction, max-file-lines) ──
 export { wsRoot, isMemorySpace, isDocSpace, getObjectSchema } from './organisms.shared.js';
@@ -75,7 +76,7 @@ export async function getOrganismsTab() {
     const d = data?.data;
     if (!d) return null;
     return { mine: d.mine || [], public: d.public || [], uiPrefs: d.uiPrefs ?? null };
-  } catch { return null; }
+  } catch (err) { swallowed('organisms: getOrganismsTab', err); return null; }
 }
 
 /** Get organism detail. */
@@ -134,7 +135,7 @@ export async function getWaiting() {
   try {
     const resp = await apiGet('/v1/organisms/waiting');
     return Array.isArray(resp?.data?.items) ? resp.data.items : [];
-  } catch { return []; }
+  } catch (err) { swallowed('organisms: getWaiting', err); return []; }
 }
 
 /** Agent activity aggregated across every readable workspace in ONE request (organism Agents tab).
@@ -143,7 +144,7 @@ export async function getAgentsActivity(orgId) {
   try {
     const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/agents/activity`);
     return resp?.data?.agents || {};
-  } catch { return {}; }
+  } catch (err) { swallowed('organisms: getAgentsActivity', err); return {}; }
 }
 
 /** List the comment thread on a workspace object (record or document). */
@@ -161,7 +162,7 @@ export async function listCommentsBatch(orgId, instances) {
   try {
     const resp = await apiPost(`/v1/organisms/${encodeURIComponent(orgId)}/comments/batch`, { instances });
     return (resp?.data?.comments) || {};
-  } catch { return {}; }
+  } catch (err) { swallowed('organisms: listCommentsBatch', err); return {}; }
 }
 
 /** Add a comment to a workspace object. anchor: { section?|quote? }; parentId for a threaded reply. */
@@ -304,7 +305,7 @@ export async function deleteWorkspace(orgId, wsId) {
   const r = await apiDelete(`/v1/organisms/${encodeURIComponent(orgId)}/workspace?ws=${encodeURIComponent(wsId)}`);
   // Drop the registry entry so the deleted workspace no longer lists.
   const list = await listWorkspaces(orgId);
-  await saveWorkspaceRegistry(orgId, list.filter(w => w.id !== wsId)).catch(() => {});
+  await saveWorkspaceRegistry(orgId, list.filter(w => w.id !== wsId)).catch(err => { swallowed('organisms: deleteWorkspace', err); });
   return r;
 }
 
@@ -340,7 +341,7 @@ export async function getOrganismOverview(orgId) {
   try {
     const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/overview`);
     return r?.data?.markdown || '';
-  } catch { return ''; }
+  } catch (err) { swallowed('organisms: getOrganismOverview', err); return ''; }
 }
 
 /** OKF-style STRUCTURE OVERVIEW (Markdown) of ONE workspace — per space the most-recent entries
@@ -349,7 +350,7 @@ export async function getWorkspaceOverview(orgId, wsId) {
   try {
     const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/overview?ws=${encodeURIComponent(wsId)}`);
     return r?.data?.markdown || '';
-  } catch { return ''; }
+  } catch (err) { swallowed('organisms: getWorkspaceOverview', err); return ''; }
 }
 
 /** Full workspace overview payload in ONE call: the OKF markdown PLUS the measurability `objectives`
@@ -369,7 +370,7 @@ export async function getOrganismGraph(orgId) {
   try {
     const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/graph`);
     return r?.data?.graph || null;
-  } catch { return null; }
+  } catch (err) { swallowed('organisms: getOrganismGraph', err); return null; }
 }
 
 /** Deterministic GRAPH of ONE workspace (root = workspace, with its spaces). Returns null on failure. */
@@ -377,7 +378,7 @@ export async function getWorkspaceGraph(orgId, wsId) {
   try {
     const r = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/graph?ws=${encodeURIComponent(wsId)}`);
     return r?.data?.graph || null;
-  } catch { return null; }
+  } catch (err) { swallowed('organisms: getWorkspaceGraph', err); return null; }
 }
 
 /** Organism STRUCTURE TIMELINE: { current, history } — the trackable structure fingerprint's current
@@ -418,7 +419,7 @@ export async function listWorkspaces(orgId) {
     const list = Array.isArray(item?.value?.workspaces) ? item.value.workspaces : [];
     // Names are plain text; legacy import paths stored them HTML-escaped. Decode for display.
     return list.map(w => (w && w.name ? { ...w, name: decodeEntities(w.name) } : w));
-  } catch { return []; }
+  } catch (err) { swallowed('organisms: item', err); return []; }
 }
 
 /** Persist the workspace registry. */
@@ -440,7 +441,7 @@ export async function discoverWorkspaces(orgId, opts = {}) {
     const list = Array.isArray(resp?.data?.workspaces) ? resp.data.workspaces : [];
     // Names are plain text; legacy import paths stored them HTML-escaped. Decode for display.
     return list.map(w => (w && w.name ? { ...w, name: decodeEntities(w.name) } : w));
-  } catch { return []; }
+  } catch (err) { swallowed('organisms: discoverWorkspaces', err); return []; }
 }
 
 /** Request access to a workspace you can see but not read. */
@@ -453,7 +454,7 @@ export async function listWorkspaceRequests(orgId, ws) {
   try {
     const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access?ws=${encodeURIComponent(ws)}`);
     return Array.isArray(resp?.data?.requests) ? resp.data.requests : [];
-  } catch { return []; }
+  } catch (err) { swallowed('organisms: listWorkspaceRequests', err); return []; }
 }
 
 /** Approve or deny a member's access request to your workspace. decision: 'approve'|'deny'|'viewer'|'contributor'. */
@@ -475,7 +476,7 @@ export async function getWorkspaceAccessAll(orgId) {
   try {
     const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace-access?all=1`);
     return Array.isArray(resp?.data?.workspaces) ? resp.data.workspaces : [];
-  } catch { return []; }
+  } catch (err) { swallowed('organisms: getWorkspaceAccessAll', err); return []; }
 }
 
 /** Directly add (or re-role) a member: role 'viewer' (read) | 'contributor' (read+write). grantee = an
@@ -498,7 +499,7 @@ export async function getWorkspaceEngagements(orgId, ws) {
   try {
     const resp = await apiGet(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/engagements?ws=${encodeURIComponent(ws)}`);
     return Array.isArray(resp?.data?.engagements) ? resp.data.engagements : [];
-  } catch { return []; }
+  } catch (err) { swallowed('organisms: getWorkspaceEngagements', err); return []; }
 }
 
 /** Activate (adopt) a contract engagement for one of your agents. `agent` = full GAII. */
@@ -566,17 +567,17 @@ function slug(name) {
 export async function buildOrganismOverviewMermaid(orgId) {
   const nodeId = (currentGhii().split('@')[1]) || '';
   const [orgResp, memResp, wsList] = await Promise.all([
-    getOrganism(orgId).catch(() => null),
-    listMembers(orgId).catch(() => null),
-    listWorkspaces(orgId).catch(() => []),
+    getOrganism(orgId).catch(err => { swallowed('organisms: nodeId', err); return null; }),
+    listMembers(orgId).catch(err => { swallowed('organisms: nodeId', err); return null; }),
+    listWorkspaces(orgId).catch(err => { swallowed('organisms: nodeId', err); return []; }),
   ]);
   const org = orgResp?.data?.organism || {};
   const members = memResp?.data?.members || [];
   const agents = org.agentGaiis || [];
   const wsData = [];
   for (const w of wsList) {
-    const ws = await getWorkspace(orgId, w.id).catch(() => null);
-    const sources = await getWorkspaceSources(orgId, w.id).catch(() => []);
+    const ws = await getWorkspace(orgId, w.id).catch(err => { swallowed('organisms: nodeId', err); return null; });
+    const sources = await getWorkspaceSources(orgId, w.id).catch(err => { swallowed('organisms: nodeId', err); return []; });
     const types = (ws?.manifest?.objectTypes || []).filter(isMemorySpace)
       .map(o => `${o.name} (${isDocSpace(o) ? 'doc' : 'rec'})`);
     const knowledge = sources.filter(s => s.type === 'knowledge').map(s => s.label || s.packageId);
@@ -686,7 +687,7 @@ export async function deleteWorkspaceObject(orgId, wsId, namespace, id) {
     if (it.key !== base && !it.key.startsWith(base + '.')) continue;  // exclude sibling ids
     const role = it.key === base ? '' : it.key.slice(base.length + 1);
     if (role === '' || role === 'draft' || role === 'latest' || /^version\.\d+$/.test(role)) {
-      try { await apiDelete(`/v1/memory/${encodeURIComponent(it.key)}`); deleted++; } catch { /* skip */ }
+      try { await apiDelete(`/v1/memory/${encodeURIComponent(it.key)}`); deleted++; } catch (err) { swallowed('organisms: items', err); }
     }
   }
   return deleted;
@@ -709,7 +710,7 @@ export async function getConfig(orgId) {
   try {
     const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}`);
     return (resp?.data?.items || []).find(i => i.key === key)?.value || {};
-  } catch { return {}; }
+  } catch (err) { swallowed('organisms: getConfig', err); return {}; }
 }
 
 /** The current owner's GHII (`owner@node`). ALWAYS returns a string so callers can safely `.split('@')`.
@@ -723,7 +724,7 @@ export function currentGhii() {
   try {
     const s = typeof auth.getSession === 'function' ? auth.getSession() : null;
     if (s && typeof s === 'object' && typeof s.ghii === 'string') return s.ghii;
-  } catch { /* ignore */ }
+  } catch (err) { swallowed('organisms: auth', err); }
   return '';
 }
 
@@ -737,7 +738,7 @@ export async function getAllSections(orgId, wsId) {
       const m = String(it.key || '').match(/\.meta\.sections\.(.+)$/);
       if (m) out[m[1]] = Array.isArray(it.value?.sections) ? it.value.sections : [];
     }
-  } catch { /* none yet */ }
+  } catch (err) { swallowed('organisms: getAllSections', err); }
   return out;
 }
 
@@ -756,7 +757,7 @@ export async function getAllColors(orgId, wsId) {
       const m = String(it.key || '').match(/\.meta\.colors\.(.+)$/);
       if (m) out[m[1]] = (it.value && typeof it.value.colors === 'object' && it.value.colors) || {};
     }
-  } catch { /* none yet */ }
+  } catch (err) { swallowed('organisms: getAllColors', err); }
   return out;
 }
 
@@ -776,7 +777,7 @@ export async function getWorkspaceSources(orgId, wsId) {
     const resp = await apiGet(`/v1/memory?prefix=${encodeURIComponent(key)}`);
     const item = (resp?.data?.items || []).find(i => i.key === key);
     return Array.isArray(item?.value?.sources) ? item.value.sources : [];
-  } catch { return []; }
+  } catch (err) { swallowed('organisms: item', err); return []; }
 }
 
 /** Persist the workspace's source references. */

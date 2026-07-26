@@ -9,6 +9,7 @@
  *                          searchMemory prefix arg, exportMemory/importMemory/bulkDeleteMemory.
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** List all memory entries. Returns array. Optional agentGaii to view another agent's memory. */
 export async function listMemories(agentGaii, opts) {
@@ -109,7 +110,7 @@ export async function bundleCollection(items) {
   const resp = await fetch(`${base}/v1/memory/bundle`, { method: 'POST', headers, body: JSON.stringify({ items }) });
   if (!resp.ok) {
     let msg = String(resp.status);
-    try { const j = await resp.json(); msg = j?.error?.message || msg; } catch { /* non-JSON */ }
+    try { const j = await resp.json(); msg = j?.error?.message || msg; } catch (err) { swallowed('memory: bundleCollection', err); }
     throw new Error(msg);
   }
   return resp.blob();

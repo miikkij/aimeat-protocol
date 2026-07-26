@@ -20,6 +20,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { getSession } from '/js/services/auth.js';
+import { swallowed } from '/js/swallowed.js';
 
 const SOURCE_ICONS = { extension: '\u{1F50C}', cortex: '\u{1F9E0}', action: '\u{1F6E0}️', manual: '✍️', app: '\u{1F4F1}' };
 const POLICY_LABELS = {
@@ -47,7 +48,7 @@ export default function CapabilitiesTab() {
       const res = await session.fetch('/v1/capabilities?per_page=100');
       setCaps(res.data?.capabilities || []);
       if (res.data?.policy) setPolicy(res.data.policy);
-    } catch { setCaps([]); }
+    } catch (err) { swallowed('capabilities-tab', err); setCaps([]); }
     setLoading(false);
   }, []);
 

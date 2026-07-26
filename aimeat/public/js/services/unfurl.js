@@ -10,6 +10,7 @@
  *   v1.0.0 — 2026-07-21 — Initial link-preview service (inbox message link cards).
  */
 import { apiGet } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 const enc = encodeURIComponent;
 
@@ -19,7 +20,8 @@ export async function fetchPreview(url) {
   try {
     const r = await apiGet(`/v1/unfurl?url=${enc(url)}`);
     return r?.data || null;
-  } catch {
+  } catch (err) {
+    swallowed('unfurl', err);
     return null;   // a preview is best-effort — a link that won't unfurl just shows no card
   }
 }
@@ -37,7 +39,5 @@ export async function fetchPreviewImageUrl(imageUrl) {
     const blob = await resp.blob();
     if (!blob.type.startsWith('image/')) return null;
     return URL.createObjectURL(blob);
-  } catch {
-    return null;
-  }
+  } catch (err) { swallowed('unfurl', err); return null; }
 }

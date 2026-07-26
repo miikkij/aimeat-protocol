@@ -13,6 +13,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { detectLocale, persistLocale } from './utils.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** Flatten a nested object into dot-notation keys. */
 function flatten(obj, prefix = '') {
@@ -51,8 +52,9 @@ export async function loadTranslations(locale) {
       const locRes = await fetch(`/locales/${currentLocale}.json?v=${_v}`);
       const locData = await locRes.json();
       translations = { ...fallback, ...flatten(locData) };
-    } catch {
+    } catch (err) {
       // Fall back to English
+      swallowed('i18n: loadTranslations', err);
       translations = fallback;
     }
   }

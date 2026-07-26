@@ -19,6 +19,7 @@ import TagEditor from '/js/components/tag-editor.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { formatBytes, formatRelativeTime, shortTok, groupOfKey, displayRemainder, VIS_OPTIONS } from './helpers.js';
 import { MemoryForm } from './components.js';
+import { swallowed } from '/js/swallowed.js';
 
 export function sortEntries(entries, sortBy) {
   const sorted = [...entries];
@@ -70,7 +71,7 @@ export function renderEntries(ctx) {
     if (m.tags && m.tags.some(tag => tag.toLowerCase().includes(ft))) return true;
     const v = valueOf(m);   // undefined in meta mode (value not loaded) → key/tag filter only
     if (v === undefined) return false;
-    try { return JSON.stringify(v).toLowerCase().includes(ft); } catch { return false; }
+    try { return JSON.stringify(v).toLowerCase().includes(ft); } catch (err) { swallowed('entries-view', err); return false; }
   }), sortBy);
 
   const toggleMemTag = (tag) => {
@@ -123,7 +124,7 @@ export function renderEntries(ctx) {
                   onClick=${() => applyVis(m, 'group', grp.id)}>${t('knowledge.visibility.group')}: ${escHtml(grp.name)}</button>
               `)
             : html`<button class="mem-vis-opt mem-vis-opt--dim" onClick=${() => {
-                try { sessionStorage.setItem('aimeat.access.focus', 'groups'); } catch { /* noop */ }
+                try { sessionStorage.setItem('aimeat.access.focus', 'groups'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
                 window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
               }}>${t('profile.memory.createGroupBtn')}</button>`}
         </div>

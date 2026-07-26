@@ -22,6 +22,7 @@
 import { api, apiGet, apiPost, apiPut } from '/js/api.js';
 import { copyToClipboard } from '/js/utils.js';
 import { createTask, rateTask } from '/js/services/agent-tasks.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** The goal-first feed: every agent's offers + mode/availability. */
 export async function listOffers() {
@@ -62,7 +63,7 @@ export async function listDeliverables() {
 /** This offer's OWN recent runs: filter the deliverables aggregate by the offer + agent it ran for
  *  (the Ask flow stamps scope.offer_id, surfaced as `offer_id`). Newest first, capped at `limit`. */
 export async function listOfferRuns({ agent, offerId, limit = 5 }) {
-  const r = await listDeliverables().catch(() => null);
+  const r = await listDeliverables().catch(err => { swallowed('offers: listOfferRuns', err); return null; });
   const all = r?.data?.deliverables || [];
   return all.filter(d => d.offer_id === offerId && d.agent === agent).slice(0, limit);
 }
@@ -77,7 +78,7 @@ export async function aiAvailable() {
   try {
     const r = await apiGet('/v1/openrouter/settings');
     return !!(r?.ok && r.data && (r.data.hasApiKey || r.data.has_api_key));
-  } catch { return false; }
+  } catch (err) { swallowed('offers: aiAvailable', err); return false; }
 }
 
 /**
@@ -107,7 +108,7 @@ export async function rankOffersByNeed(needText, items) {
   const content = r.data?.content || '';
   const m = /\{[\s\S]*\}/.exec(content);
   let parsed = null;
-  try { parsed = JSON.parse(m ? m[0] : content); } catch { /* unparseable */ }
+  try { parsed = JSON.parse(m ? m[0] : content); } catch { /* unparseable */ }   // eslint-disable-line aimeat/no-silent-catch -- unparseable
   if (!parsed) { const e = new Error('AI returned unparseable JSON'); e.code = 'JSON_PARSE_FAILED'; throw e; }
   const ranked = (Array.isArray(parsed.ranked) ? parsed.ranked : [])
     .map(x => ({ item: items[x.n], why: typeof x.why === 'string' ? x.why : '' }))
@@ -126,8 +127,8 @@ export async function getDeliverableContent({ agentGaii, deliverableKey, taskId 
   if (!agentGaii) return null;
   const enc = encodeURIComponent;
   const reqs = [];
-  if (deliverableKey) reqs.push(apiGet(`/v1/memory?agent=${enc(agentGaii)}&prefix=${enc(deliverableKey)}&per_page=5`).catch(() => null));
-  if (taskId) reqs.push(apiGet(`/v1/memory?agent=${enc(agentGaii)}&tags=${enc('task:' + taskId)}&per_page=50`).catch(() => null));
+  if (deliverableKey) reqs.push(apiGet(`/v1/memory?agent=${enc(agentGaii)}&prefix=${enc(deliverableKey)}&per_page=5`).catch(err => { swallowed('offers', err); return null; }));
+  if (taskId) reqs.push(apiGet(`/v1/memory?agent=${enc(agentGaii)}&tags=${enc('task:' + taskId)}&per_page=50`).catch(err => { swallowed('offers', err); return null; }));
   const results = await Promise.all(reqs);
   const items = [];
   const seen = new Set();

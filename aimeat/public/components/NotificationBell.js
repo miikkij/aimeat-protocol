@@ -24,16 +24,17 @@ import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
+import { swallowed } from '/js/swallowed.js';
 const html = htm.bind(h);
 
-const jwt = () => { try { return window.AIMEAT?.auth?.getSession?.()?.jwt || ''; } catch { return ''; } };
+const jwt = () => { try { return window.AIMEAT?.auth?.getSession?.()?.jwt || ''; } catch (err) { swallowed('NotificationBell', err); return ''; } };
 async function api(path, opts = {}) {
   const token = jwt();
   if (!token) return null;
   try {
     const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });
     return await res.json();
-  } catch { return null; }
+  } catch (err) { swallowed('NotificationBell: api', err); return null; }
 }
 
 function relTime(iso) {
@@ -43,7 +44,7 @@ function relTime(iso) {
     if (s < 3600) return Math.floor(s / 60) + 'm ago';
     if (s < 86400) return Math.floor(s / 3600) + 'h ago';
     return d.toLocaleDateString();
-  } catch { return ''; }
+  } catch (err) { swallowed('NotificationBell: relTime', err); return ''; }
 }
 
 // Action id → i18n key (falls back to the server-provided English label) and → button class.
@@ -75,6 +76,7 @@ export function openNotificationLink(link, onNavigate) {
       try {
         sessionStorage.setItem('aimeat-profile-tab', JSON.stringify({ tabId, slot: 'main' }));
         if (tabId === 'messages' && rest) sessionStorage.setItem('aimeat.inbox.open', rest);
+      // eslint-disable-next-line aimeat/no-silent-catch -- noop
       } catch { /* noop */ }
       if (onNavigate) onNavigate('/v1/profile');
       setTimeout(() => window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId } })), 60);
@@ -179,7 +181,7 @@ export function NotificationBell({ t, onNavigate }) {
     setReplyText('');
     setResults(s => ({ ...s, [n.id]: undefined }));
     // Stash so an "AI draft" jump lands in the right thread.
-    if (a.conversationId) { try { sessionStorage.setItem('aimeat.inbox.open', a.conversationId); } catch { /* noop */ } }
+    if (a.conversationId) { try { sessionStorage.setItem('aimeat.inbox.open', a.conversationId); } catch { /* noop */ } }   // eslint-disable-line aimeat/no-silent-catch -- noop
   };
 
   const renderAction = (n, a) => {

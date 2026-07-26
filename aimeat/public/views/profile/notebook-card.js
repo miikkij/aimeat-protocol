@@ -35,6 +35,7 @@ import * as offersService from '/js/services/offers.js';
 import { Markdown } from '/components/Markdown.js';
 import { OpenRouterSettings } from './openrouter-settings.js';
 import { NEW, NB_STEPS, relTime, firstLine, noteText } from './notebook-helpers.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function NoteCard({ note, showToast, orgNames, settings, autoEnrich, onChanged, onOrgsChanged, onDelete }) {
   const [view, setView] = useState('peek');               // 'line' | 'peek' | 'full'
@@ -179,7 +180,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
   // ── Enrich: plan → run steps → fold into the note ──
 
   async function persistNote(value) {
-    try { await createMemory(note.key, value, 'private'); } catch { /* best-effort */ }
+    try { await createMemory(note.key, value, 'private'); } catch (err) { swallowed('notebook-card: persistNote', err); }
   }
 
   async function handleEnrich() {
@@ -188,7 +189,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
     setPlanning(true);
     try {
       let offersFeed = null, catalogue = [];
-      try { offersFeed = await offersService.listOffers(); catalogue = buildCatalogue(offersFeed); } catch { /* no fleet → reason/assess only */ }
+      try { offersFeed = await offersService.listOffers(); catalogue = buildCatalogue(offersFeed); } catch (err) { swallowed('notebook-card: handleEnrich', err); }
       const data = await generatePlan(baseText(), catalogue);
       const existing = Array.isArray(note.value?.enrichments) ? note.value.enrichments : [];
       const plan = data?.plan || { steps: [], summary: '', confidence: 0 };
@@ -521,7 +522,7 @@ export default function NoteCard({ note, showToast, orgNames, settings, autoEnri
       ${trackOpen && trackMsg && html`<${TrackResponseModal} open=${true} msg=${trackMsg}
         defaultMode=${trackedIntent?.mode || 'approve'} allowPark=${false}
         onClose=${() => setTrackOpen(false)} showToast=${showToast}
-        onDone=${() => { setTrackOpen(false); deleteMemory(note.key).catch(() => {}).finally(() => onChanged?.()); }} />`}
+        onDone=${() => { setTrackOpen(false); deleteMemory(note.key).catch(err => { swallowed('notebook-card: renderSuggestPanel', err); }).finally(() => onChanged?.()); }} />`}
     </div>
   `;
 }

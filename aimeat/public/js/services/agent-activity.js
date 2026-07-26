@@ -13,6 +13,7 @@
  *     subtab's 5 agent-domain mount reads into one call (ledger stays separate).
  */
 import { apiGet } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 export async function getActivity(agentName, days = 30, granularity = 'daily') {
   return apiGet(`/v1/agents/${encodeURIComponent(agentName)}/activity?days=${days}&granularity=${granularity}`);
@@ -31,5 +32,5 @@ export async function getActivityOverview(agentName) {
   try {
     const resp = await apiGet(`/v1/agents/${encodeURIComponent(agentName)}/activity/overview`);
     return resp?.data ?? null;
-  } catch { return null; }
+  } catch (err) { swallowed('agent-activity: getActivityOverview', err); return null; }
 }

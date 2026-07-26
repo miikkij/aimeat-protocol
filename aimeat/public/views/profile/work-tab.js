@@ -20,6 +20,7 @@ import { Modal } from '/components/Modal.js';
 import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { listInbox, listSent, getWorkOverview, submitRating, acceptWork, rejectWork, deliverWork } from '/js/services/work.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function WorkTab({ session, showToast, onStats }) {
   const [workInbox, setWorkInbox] = useState(null);
@@ -42,11 +43,11 @@ export default function WorkTab({ session, showToast, onStats }) {
       const inbox = await listInbox();
       setWorkInbox(inbox);
       onStats?.({ work: inbox.length });
-    } catch { setWorkInbox([]); }
+    } catch (err) { swallowed('work-tab', err); setWorkInbox([]); }
     try {
       const sent = await listSent();
       setWorkSent(sent);
-    } catch { setWorkSent([]); }
+    } catch (err) { swallowed('work-tab', err); setWorkSent([]); }
   }, [onStats]);
 
   useEffect(() => {

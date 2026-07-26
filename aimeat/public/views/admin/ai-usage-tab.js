@@ -19,6 +19,7 @@ import { t } from '/js/i18n.js';
 import { num, StatsGrid, DataTable, Spinner, Empty } from './shared.js';
 import { UsageChart, colorForIndex } from '/components/UsageChart.js';
 import * as api from '/js/services/admin.js';
+import { swallowed } from '/js/swallowed.js';
 
 const usd = (n) => { const v = Number(n) || 0; return '$' + (v < 1 ? v.toFixed(4) : v.toFixed(2)); };
 function fmtCompact(n) {
@@ -55,7 +56,7 @@ export default function AiUsageTab() {
       const range = getDateRange(p);
       const resp = await api.getAiUsage(range.from, range.to);
       if (resp && resp.data) setData(resp.data);
-    } catch { /* keep previous data */ }
+    } catch (err) { swallowed('ai-usage-tab: AiUsageTab', err); }
     setLoading(false);
   }, []);
 

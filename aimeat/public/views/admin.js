@@ -69,6 +69,7 @@ import AgentIntegrationAdminTab from './admin/agent-integration-tab.js';
 import SubdomainsAdminTab from './admin/subdomains-tab.js';
 import AppsAdminTab        from './admin/apps-tab.js';
 import SkillsAdminTab      from './admin/skills-tab.js';
+import { swallowed } from '/js/swallowed.js';
 
 // ── Sidebar nav structure ──
 const NAV_GROUPS = [
@@ -211,8 +212,9 @@ export default function Admin({ navigate, locale }) {
                 setLoading(false);
                 return;
               }
-            } catch {
+            } catch (err) {
               // Refresh failed
+              swallowed('admin: Admin', err);
             }
           }
           setAccessDenied(true);
@@ -290,15 +292,15 @@ export default function Admin({ navigate, locale }) {
           api.getSiteChangelog().catch(() => ({ data: null })),
         ]);
         d.portal = { meta: portalMeta.data, template: portalTemplate.data, changelog: portalChangelog.data };
-      } catch { d.portal = null; }
+      } catch (err) { swallowed('admin', err); d.portal = null; }
 
-      try { const sr = await api.getStats(); if (sr.data) d.stats = sr.data; } catch { d.stats = null; }
+      try { const sr = await api.getStats(); if (sr.data) d.stats = sr.data; } catch (err) { swallowed('admin', err); d.stats = null; }
 
       // Load owners from dedicated admin endpoint (includes roles)
       try {
         const ownersResp = await api.getAdminOwners();
         d.owners = ownersResp.data?.owners || [];
-      } catch { d.owners = []; }
+      } catch (err) { swallowed('admin', err); d.owners = []; }
 
       // Final counts
       newCounts.owners = d.owners.length;

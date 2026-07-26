@@ -20,6 +20,7 @@ import { useConfirm, Modal } from '/components/Modal.js';
 import { Markdown } from '/components/Markdown.js';
 import { detectImage, ImageView, DeliverableBody } from '/components/ImageDeliverable.js';
 import RateModal from './rate-modal.js';
+import { swallowed } from '/js/swallowed.js';
 
 // Per-browser "blur the title" preference. Used when screen-recording the tab
 // so sensitive task titles can be hidden without affecting other viewers or
@@ -41,6 +42,7 @@ function isTaskBlurred(taskId) {
 function setTaskBlurred(taskId, blurred) {
   const set = readBlurredSet();
   if (blurred) set.add(taskId); else set.delete(taskId);
+  // eslint-disable-next-line aimeat/no-silent-catch -- storage full/blocked -- preference just won't persist
   try { localStorage.setItem(BLUR_STORAGE_KEY, JSON.stringify([...set])); } catch { /* storage full/blocked -- preference just won't persist */ }
 }
 
@@ -123,6 +125,7 @@ function parseMemoryValue(value) {
     const trimmed = value.trim();
     if (trimmed && (trimmed[0] === '{' || trimmed[0] === '[')) {
       try { return { json: JSON.parse(trimmed) }; }
+      // eslint-disable-next-line aimeat/no-silent-catch -- not JSON after all -- show raw
       catch { /* not JSON after all -- show raw */ }
     }
     return { raw: value };
@@ -233,7 +236,8 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
       // Keep the RAW value (string OR object) so the shared image detector can recognise an
       // image deliverable (e.g. { url, mime:"image/*" }); DeliverableBody handles the display.
       setDeliverable({ value: found.value });
-    } catch {
+    } catch (err) {
+      swallowed('task-item: fetchDeliverable', err);
       setDeliverable({ notFound: true });
     }
   }
@@ -254,11 +258,11 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
       const tag = `task:${task.id}`;
       const livePrefix = `agents.${agentName}.tasks.${task.id}.`;
       const fetches = [
-        apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&tags=${encodeURIComponent(tag)}&per_page=50`).catch(() => null),
-        apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&prefix=${encodeURIComponent(livePrefix)}&per_page=20`).catch(() => null),
+        apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&tags=${encodeURIComponent(tag)}&per_page=50`).catch(err => { swallowed('task-item: fetchTaskMemory', err); return null; }),
+        apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&prefix=${encodeURIComponent(livePrefix)}&per_page=20`).catch(err => { swallowed('task-item: fetchTaskMemory', err); return null; }),
       ];
       if (task.deliverableKey) {
-        fetches.push(apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&prefix=${encodeURIComponent(task.deliverableKey)}&per_page=5`).catch(() => null));
+        fetches.push(apiGet(`/v1/memory?agent=${encodeURIComponent(gaii)}&prefix=${encodeURIComponent(task.deliverableKey)}&per_page=5`).catch(err => { swallowed('task-item: fetchTaskMemory', err); return null; }));
       }
       const results = await Promise.all(fetches);
       const items = [];
@@ -270,7 +274,8 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
         }
       }
       setTaskMemory({ items });
-    } catch {
+    } catch (err) {
+      swallowed('task-item: fetchTaskMemory', err);
       setTaskMemory({ items: [] });
     }
   }
@@ -280,7 +285,7 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
     try {
       const resp = await listEvents(agentName, task.id);
       setEvents(resp?.data?.events || []);
-    } catch { setEvents([]); }
+    } catch (err) { swallowed('task-item', err); setEvents([]); }
     if (!silent) setLoadingEvents(false);
   }, [agentName, task.id]);
 
@@ -362,7 +367,7 @@ export function TaskItem({ task, agentName, showToast, onRefresh, autoOpen = 0 }
           await apiPost('/v1/memory', { key: 'agents.cancel.task.' + task.id, value: [task.id], visibility: 'owner' });
           // Immediate native stop (owner-only): pause active tasks.
           if (task.status === 'active') {
-            try { await apiPost(`/v1/agents/${encodeURIComponent(agentName)}/tasks/${encodeURIComponent(task.id)}/pause`, {}); } catch { /* marker still applies */ }
+            try { await apiPost(`/v1/agents/${encodeURIComponent(agentName)}/tasks/${encodeURIComponent(task.id)}/pause`, {}); } catch (err) { swallowed('task-item: handleCancel', err); }
           }
           showToast(t('profile.agents.tasks.cancelled'));
           onRefresh();

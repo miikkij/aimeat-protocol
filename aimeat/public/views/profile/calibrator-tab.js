@@ -25,6 +25,7 @@ import { useConfirm } from '/components/Modal.js';
 import LlmConfigEditor from '/views/profile/calibrator-llm-editor.js';
 import CalibrationChart from '/views/profile/calibrator-chart.js';
 import BatchCard from '/views/profile/calibrator-batch.js';
+import { swallowed } from '/js/swallowed.js';
 import {
   listProjects, createProject, getProject, getProjectDetail, updateProject, deleteProject,
   listVersions, getVersion, createVersion,
@@ -47,7 +48,7 @@ function ProjectListView({ onSelect, showToast }) {
   async function loadData() {
     setLoading(true);
     try { setProjects(await listProjects()); }
-    catch { setProjects([]); }
+    catch (err) { swallowed('calibrator-tab', err); setProjects([]); }
     setLoading(false);
   }
 
@@ -174,9 +175,9 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
       const resp = await apiGet(`/v1/memory?prefix=calibrator.${projectId}.run.&tags=calibrator,run`);
       const oldRuns = resp?.data?.entries || [];
       for (const r of oldRuns) {
-        try { await apiDelete(`/v1/memory/${encodeURIComponent(r.key)}`); } catch { /* ignore */ }
+        try { await apiDelete(`/v1/memory/${encodeURIComponent(r.key)}`); } catch (err) { swallowed('calibrator-tab: cleanupLegacyRuns', err); }
       }
-    } catch { /* ignore migration errors */ }
+    } catch (err) { swallowed('calibrator-tab: cleanupLegacyRuns', err); }
   }
 
   // Fallback path: the individual four-request waterfall, used when the composite is unavailable.
@@ -237,7 +238,7 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
         setTargetOutput(v.targetOutput || '');
         setSelectedVersion(p.currentVersion);
       }
-    } catch { /* ignore reload errors */ }
+    } catch (err) { swallowed('calibrator-tab: reloadBatches', err); }
   }
 
   async function handleUpdateProject(updates) {

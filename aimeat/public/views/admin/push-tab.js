@@ -18,6 +18,7 @@ import { escHtml } from '/js/utils.js';
 import * as api from '/js/services/admin.js';
 import { dt, StatCard, Empty, ExpandableHelp, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function PushTab({ data, reload }) {
   const push = data.push;
@@ -47,7 +48,8 @@ export default function PushTab({ data, reload }) {
       await api.savePushTemplate(tpl.id, tpl.locale, tpl.fields);
       setSaving(null);
       reload();
-    } catch {
+    } catch (err) {
+      swallowed('push-tab: handleSave', err);
       setSaving(null);
       showErr(t('dashboard.saveFailed'));
     }
@@ -59,7 +61,8 @@ export default function PushTab({ data, reload }) {
       await api.testPush();
       setTestStatus('sent');
       setTimeout(() => setTestStatus(null), 3000);
-    } catch {
+    } catch (err) {
+      swallowed('push-tab: handleTest', err);
       setTestStatus('error');
       setTimeout(() => setTestStatus(null), 3000);
     }
@@ -72,7 +75,8 @@ export default function PushTab({ data, reload }) {
         await api.resetPushTemplates();
         setResetStatus(null);
         reload();
-      } catch {
+      } catch (err) {
+        swallowed('push-tab: handleReset', err);
         setResetStatus('error');
         setTimeout(() => setResetStatus(null), 3000);
       }
@@ -121,7 +125,8 @@ export default function PushTab({ data, reload }) {
       await api.unsubscribePush();
       setSubStatus(null);
       reload();
-    } catch {
+    } catch (err) {
+      swallowed('push-tab: handleUnsubscribe', err);
       setSubStatus('error');
       setTimeout(() => setSubStatus(null), 3000);
     }

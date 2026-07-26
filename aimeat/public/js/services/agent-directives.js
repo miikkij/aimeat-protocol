@@ -8,6 +8,7 @@
  *     the Data Access subtab's 3 mount reads (directives + agent-memory-metadata + skill-links) into one.
  */
 import { apiGet, apiPut, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 export async function getDirectives(agentName) {
   return apiGet(`/v1/agents/${encodeURIComponent(agentName)}/directives`);
@@ -22,7 +23,7 @@ export async function getDataAccessOverview(agentName) {
   try {
     const resp = await apiGet(`/v1/agents/${encodeURIComponent(agentName)}/data-access/overview`);
     return resp?.data ?? null;
-  } catch { return null; }
+  } catch (err) { swallowed('agent-directives: getDataAccessOverview', err); return null; }
 }
 
 export async function upsertDirectives(agentName, data) {

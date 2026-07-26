@@ -35,6 +35,7 @@ import { listOrganisms } from '/js/services/organisms.js';
 import * as skillsService from '/js/services/skills.js';
 import { getNodeUrl } from '/js/services/auth.js';
 import { recordRecent } from '/js/recents.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * Per-app bound skills (2d): the skills that teach agents how to use THIS app.
@@ -50,7 +51,7 @@ function AppSkills({ owner, filename, showToast }) {
   const binding = `app:${owner}/${filename}`;
 
   const load = useCallback(async () => {
-    try { setSkills(await skillsService.listAppSkills(owner, filename)); } catch { setSkills([]); }
+    try { setSkills(await skillsService.listAppSkills(owner, filename)); } catch (err) { swallowed('apps-tab', err); setSkills([]); }
   }, [owner, filename]);
   useEffect(() => { load(); }, [load]);
 
@@ -64,7 +65,7 @@ function AppSkills({ owner, filename, showToast }) {
         const options = mine.filter(s => !bound.has(s.ref));
         setMySkills(options);
         setSelected(options[0]?.name ?? '');
-      } catch { setMySkills([]); }
+      } catch (err) { swallowed('apps-tab', err); setMySkills([]); }
     }
   }
 
@@ -143,7 +144,7 @@ function AppAgents({ owner, filename, agents, showToast, session }) {
       try {
         const resp = await appAgentStatus(owner, filename, def.agent_name);
         if (resp?.ok !== false && resp?.data) next[def.agent_name] = resp.data;
-      } catch { /* leave unknown */ }
+      } catch (err) { swallowed('apps-tab: AppAgents', err); }
     }));
     setStatuses(next);
   }, [owner, filename, agents]);
@@ -165,11 +166,11 @@ function AppAgents({ owner, filename, agents, showToast, session }) {
         list.sort((a, b) => rank(a.mode) - rank(b.mode));
         setMyAgents(list);
         setRunner(list.some(a => a.name === 'crew-forge') ? 'crew-forge' : (list[0]?.name ?? ''));
-      } catch { setMyAgents([]); }
+      } catch (err) { swallowed('apps-tab', err); setMyAgents([]); }
       try {
         const resp = await listOrganisms({ member: session.owner });
         setMyOrgs(resp?.data?.organisms ?? []);
-      } catch { setMyOrgs([]); }
+      } catch (err) { swallowed('apps-tab', err); setMyOrgs([]); }
     }
   }
 
@@ -308,7 +309,7 @@ export default function AppsTab({ session, showToast, onStats }) {
       setMyApps(own);
       setAllApps(list);
       onStats?.({ apps: own.length });
-    } catch { setMyApps([]); setAllApps([]); }
+    } catch (err) { swallowed('apps-tab', err); setMyApps([]); setAllApps([]); }
     // Promoted apps: read the owner's own app-catalog.promoted doc (soft = no 404 when unset).
     try {
       const res = await getMemory('app-catalog.promoted', { soft: true });
@@ -316,7 +317,7 @@ export default function AppsTab({ session, showToast, onStats }) {
       const map = {};
       if (Array.isArray(items)) items.forEach(it => { if (it && it.ref) map[it.ref] = it.text || {}; });
       setPromoted(map);
-    } catch { setPromoted({}); }
+    } catch (err) { swallowed('apps-tab', err); setPromoted({ }); }
   }
 
   async function handleUpload(file, description, screenshot, accessCode) {
@@ -372,10 +373,11 @@ export default function AppsTab({ session, showToast, onStats }) {
 
   async function handleCopyAgentPrompt(app) {
     let current;
-    try { current = JSON.parse(agentsJson); } catch { current = app.manifest?.cortex?.agents ?? []; }
+    try { current = JSON.parse(agentsJson); } catch { current = app.manifest?.cortex?.agents ?? []; }   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     try {
       await navigator.clipboard.writeText(buildAgentAuthoringPrompt(app, current));
       showToast(t('profile.apps.agentPromptCopied') || 'Prompt copied — paste it to your AI chat, then paste the JSON result back here');
+    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     } catch {
       showToast(t('profile.apps.agentPromptCopyFailed') || 'Copy failed — clipboard unavailable', true);
     }

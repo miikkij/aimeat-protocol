@@ -31,6 +31,7 @@ import { api, apiPost } from '/js/api.js';
 import { createMemory, getMemory, deleteMemory } from '/js/services/memory.js';
 import { createOrganism, saveManifest, listWorkspaces, saveWorkspaceRegistry, wsRoot, writeDraft, publishDraft } from '/js/services/organisms.js';
 import { handleOf } from '/js/services/messages-ai-prompts.js';
+import { swallowed } from '/js/swallowed.js';
 
 const DOC_SPACE = 'pages';
 
@@ -161,7 +162,7 @@ export async function parkConversationToNotebook({ conv, thread, peerName, summa
 /** The per-owner notebook trust toggles ({ autoDetectIntent, autoRunPlan, autoDistribute }). */
 export async function getNotebookSettings() {
   try { const r = await getMemory('notebook.settings'); return (r?.data?.value) || {}; }
-  catch { return {}; }
+  catch (err) { swallowed('notebook', err); return { }; }
 }
 export async function saveNotebookSettings(settings) {
   return createMemory('notebook.settings', settings, 'private');
@@ -181,7 +182,7 @@ async function readManifest(orgId, wsId) {
   try {
     const r = await getMemory(`${wsRoot(orgId, wsId)}.meta.manifest`);
     return r?.data?.value || null;
-  } catch { return null; }
+  } catch (err) { swallowed('notebook: readManifest', err); return null; }
 }
 
 /**
@@ -234,7 +235,7 @@ export async function materializeDocument(plan) {
     } else if (manifest) {
       // Best-effort: add a default document space to the manifest so the doc renders.
       const updated = { ...manifest, objectTypes: [...(manifest.objectTypes || []), docSpaceObjectType()] };
-      await saveManifest(organismId, workspaceId, updated).catch(() => {});
+      await saveManifest(organismId, workspaceId, updated).catch(err => { swallowed('notebook: existingDoc', err); });
       space = DOC_SPACE;
     } else {
       space = DOC_SPACE;
@@ -255,7 +256,7 @@ export async function materializeDocument(plan) {
   if (pubResp?.ok === false) throw new Error(pubResp.error?.message || 'Could not publish document');
 
   // 5. Drop the source inbox note (it has been filed).
-  if (plan.sourceKey) await deleteMemory(plan.sourceKey).catch(() => {});
+  if (plan.sourceKey) await deleteMemory(plan.sourceKey).catch(err => { swallowed('notebook: existingDoc', err); });
 
   return { organismId, workspaceId, space, docId };
 }
@@ -302,6 +303,6 @@ export async function distributeChunks(chunks, sourceKey, onProgress) {
       throw e;   // surface the failure; source note is NOT deleted so nothing is lost
     }
   }
-  if (sourceKey) await deleteMemory(sourceKey).catch(() => {});
+  if (sourceKey) await deleteMemory(sourceKey).catch(err => { swallowed('notebook: distributeChunks', err); });
   return results;
 }

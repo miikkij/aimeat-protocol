@@ -93,6 +93,7 @@ import { CartTray, EditMemoryModal, FilePreviewModal } from './memory-tab/compon
 import { renderEntries } from './memory-tab/entries-view.js';
 import { renderFilesList } from './memory-tab/files-view.js';
 import { renderBrowsePanel, loadBrowseHome, initBrowseRemote, initDiscover, closeBrowse } from './memory-tab/browse-view.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function MemoryTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -124,6 +125,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   // send to a workspace's Sources). Persisted in localStorage per owner so it survives reloads.
   const cartStoreKey = `aimeat.mem.cart.${session?.owner || 'anon'}`;
   const [cart, setCart] = useState(() => {
+    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     try { const raw = localStorage.getItem(`aimeat.mem.cart.${session?.owner || 'anon'}`); const a = raw ? JSON.parse(raw) : []; return Array.isArray(a) ? a : []; } catch { return []; }
   });
   const [cartOrgs, setCartOrgs] = useState([]);         // organisms the user can send a collection into
@@ -175,13 +177,13 @@ export default function MemoryTab({ session, showToast, onStats }) {
       for (const o of orgs) map[o.id] = o.name;
       setOrgNames(map);
       setCartOrgs(orgs.map(o => ({ id: o.id, name: o.name })));
-    } catch { /* names are a nicety — ids still render */ }
+    } catch (err) { swallowed('memory-tab: loadOrgNames', err); }
   }
 
   // ── Collection cart ───────────────────────────────────────────────────────
   // Persist on every change so the cart survives reloads (and cross-tab within the same owner).
   useEffect(() => {
-    try { localStorage.setItem(cartStoreKey, JSON.stringify(cart)); } catch { /* quota/private mode — cart is best-effort */ }
+    try { localStorage.setItem(cartStoreKey, JSON.stringify(cart)); } catch { /* quota/private mode — cart is best-effort */ }   // eslint-disable-line aimeat/no-silent-catch -- quota/private mode — cart is best-effort
   }, [cart, cartStoreKey]);
 
   const cartIdOf = (it) => `${it.kind}:${it.ownerGaii || ''}:${it.key}`;
@@ -206,7 +208,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     setCollapsedGroups(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id); else next.add(id);
-      try { sessionStorage.setItem('aimeat.mem.groups.collapsed', JSON.stringify([...next])); } catch { /* noop */ }
+      try { sessionStorage.setItem('aimeat.mem.groups.collapsed', JSON.stringify([...next])); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
       return next;
     });
   }
@@ -235,7 +237,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
       }
       setFedConsents(map);
       setAllConsents(consents.filter(c => !c.status || c.status === 'active'));
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('memory-tab: loadFedConsents', err); }
   }
 
   // Does any active consent pattern cover this key? Drives the per-row shield:
@@ -288,7 +290,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     try {
       const list = await listAgents();
       setAgents(Array.isArray(list) ? list : []);
-    } catch { setAgents([]); }
+    } catch (err) { swallowed('memory-tab', err); setAgents([]); }
   }
 
   async function loadGroups() {
@@ -296,14 +298,14 @@ export default function MemoryTab({ session, showToast, onStats }) {
       const resp = await listGroups();
       if (resp?.data?.groups) setGroups(resp.data.groups);
       else if (Array.isArray(resp?.data)) setGroups(resp.data);
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('memory-tab: loadGroups', err); }
   }
 
   // Mount composite: ONE GET /v1/memory/tab seeds all six sections — agents + owner-scope memory
   // (metadata-only) + files + consent + sharing-groups + organism names. loadMemories owns later
   // (dynamic) memory re-fetches on agent/archived change; on failure we fall back to the six loaders.
   async function loadTab() {
-    const ov = await apiGet('/v1/memory/tab').then(r => r?.data).catch(() => null);
+    const ov = await apiGet('/v1/memory/tab').then(r => r?.data).catch(err => { swallowed('memory-tab: loadTab', err); return null; });
     if (!ov) { loadAgents(); loadMemories(); loadFiles(); loadFedConsents(); loadGroups(); loadOrgNames(); return; }
     setAgents(Array.isArray(ov.agents) ? ov.agents : []);
     // memory (metadata-only default view — mirrors loadMemories meta path)
@@ -352,7 +354,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
         setValueCache({});
         if (!memArchived) onStats?.({ memory: items.length });
       }
-    } catch { setMemories([]); }
+    } catch (err) { swallowed('memory-tab', err); setMemories([]); }
   }
 
   // "Load all contents" — pull every entry's value so the instant client filter can search values too.
@@ -361,7 +363,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     try {
       const list = await memoryService.listMemories(selectedAgent || undefined);
       setMemories(Array.isArray(list) ? list : []);
-    } catch { /* keep the meta list we already have */ }
+    } catch (err) { swallowed('memory-tab: loadFullContents', err); }
   }
 
   // Lazy value fetch (meta mode): on row expand, fetch the value once and cache it.
@@ -371,7 +373,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     try {
       const resp = await memoryService.getMemory(key, { soft: true, agent: selectedAgent || undefined });
       setValueCache(prev => ({ ...prev, [key]: resp?.data?.value ?? null }));
-    } catch {
+    } catch (err) { swallowed('memory-tab: ensureValue', err);
       setValueCache(prev => ({ ...prev, [key]: null }));
     } finally {
       setLoadingValueKeys(prev => { const n = new Set(prev); n.delete(key); return n; });
@@ -494,7 +496,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
       const list = await memoryService.listFiles();
       setFiles(Array.isArray(list) ? list : []);
       onStats?.({ files: Array.isArray(list) ? list.length : 0 });
-    } catch { setFiles([]); }
+    } catch (err) { swallowed('memory-tab', err); setFiles([]); }
   }
 
   async function handleCreateMemory(key, value, visibility, tags, groupId) {
@@ -523,7 +525,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     // object (not a string of JSON) so readers get back what the writer stored.
     let v = value;
     const s = String(value || '').trim();
-    if (/^[[{]/.test(s)) { try { v = JSON.parse(s); } catch { /* modal validates; keep raw as fallback */ } }
+    if (/^[[{]/.test(s)) { try { v = JSON.parse(s); } catch { /* modal validates; keep raw as fallback */ } }   // eslint-disable-line aimeat/no-silent-catch -- modal validates; keep raw as fallback
     const body = { value: v, visibility, version };
     if (visibility === 'group' && groupId) body.group_id = groupId;
     const resp = await memoryService.updateMemoryFull(key, body);
@@ -541,7 +543,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
         const base64 = await readFileAsBase64(item.file);
         await memoryService.uploadFile(item.key, base64, item.file.type || 'application/octet-stream', visibility, tags);
         ok++;
-      } catch { fail++; }
+      } catch (err) { swallowed('memory-tab', err); fail++; }
     }
     if (ok > 0) showToast(ok === 1 ? t('profile.files.uploaded') : `${ok} ${t('profile.files.filesUploaded')}`);
     if (fail > 0) showToast(`${fail} ${t('profile.files.uploadFailed')}`, true);
@@ -590,7 +592,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     try {
       const result = await getKeyPermissions(key);
       setKeyRulesPopover({ key, rules: result.rules, visibility: result.visibility });
-    } catch { setKeyRulesPopover(null); }
+    } catch (err) { swallowed('memory-tab', err); setKeyRulesPopover(null); }
   }
 
   // Quick visibility change from the expanded detail. 'group' needs a group pick,
@@ -635,7 +637,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
       try {
         const resp = await memoryService.updateMemoryVisibility(m.key, vis, m.version, groupId);
         if (resp.ok === false) fail++; else ok++;
-      } catch { fail++; }
+      } catch (err) { swallowed('memory-tab', err); fail++; }
     }
     showToast((t('profile.memory.bulkDone') || '{n} updated').replace('{n}', String(ok)) + (fail ? ` · ${fail} ${t('profile.error') || 'failed'}` : ''), fail > 0);
     setSelectedKeys(new Set());
@@ -647,7 +649,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     confirm((t('profile.memory.bulkDeleteConfirm') || 'Delete {n} memory entries? This cannot be undone.').replace('{n}', String(n)), async () => {
       let ok = 0;
       for (const key of selectedKeys) {
-        try { const r = await memoryService.deleteMemory(key); if (r.ok !== false) ok++; } catch { /* count below */ }
+        try { const r = await memoryService.deleteMemory(key); if (r.ok !== false) ok++; } catch (err) { swallowed('memory-tab: bulkDelete', err); }
       }
       showToast((t('profile.memory.bulkDeleted') || '{n} deleted').replace('{n}', String(ok)));
       setSelectedKeys(new Set());

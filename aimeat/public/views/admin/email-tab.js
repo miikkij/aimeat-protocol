@@ -17,6 +17,7 @@ import { EconRow, Empty, ExpandableHelp } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { sendTestEmail, getEmailTemplates, sendGroupEmail, saveEmailTemplate, resetEmailTemplate, seedEmailTemplates, resetAllEmailTemplates, saveConfig } from '/js/services/admin.js';
+import { swallowed } from '/js/swallowed.js';
 
 const TEMPLATE_IDS = ['notification', 'verification', 'magic_link', 'match_suggestion'];
 const TEMPLATE_LABELS = {
@@ -229,7 +230,8 @@ export default function EmailTab({ data, reload, locale }) {
       const r = await getEmailTemplates(loc);
       setTemplates(r.data.templates || []);
       setSeeded(!!r.data.seeded);
-    } catch {
+    } catch (err) {
+      swallowed('email-tab: loadTemplates', err);
       setTemplates(null);
     }
     setTplLoading(false);
@@ -240,7 +242,7 @@ export default function EmailTab({ data, reload, locale }) {
     try {
       await saveConfig([{ path: dotPath, value: newValue }]);
       reload();
-    } catch { /* reload will show current state */ }
+    } catch (err) { swallowed('email-tab: toggleSmtpConfig', err); }
     setCfgSaving(false);
   }
 

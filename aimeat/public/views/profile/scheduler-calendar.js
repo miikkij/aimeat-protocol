@@ -23,6 +23,7 @@ import htm from 'htm';
 import { useState, useMemo, useEffect, useCallback } from 'preact/hooks';
 import { t } from '/js/i18n.js';
 import { listScheduleOccurrences } from '/js/services/schedules.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -112,7 +113,7 @@ export default function SchedulerCalendar({ schedules = [], reloadKey = 0, onJum
         setFreq(res?.data?.frequent || []);
         setTruncated(!!res?.data?.truncated);
       })
-      .catch(() => { if (alive) { setOcc([]); setFreq([]); setTruncated(false); } })
+      .catch((err) => { swallowed('scheduler-calendar', err); if (alive) { setOcc([]); setFreq([]); setTruncated(false); } })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [startMs, endMs, reloadKey]);

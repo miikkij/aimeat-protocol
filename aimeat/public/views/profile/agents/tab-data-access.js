@@ -33,6 +33,7 @@ import { getDirectives, getDataAccessOverview, upsertDirectives } from '/js/serv
 import { updateMemoryFull, deleteMemory, createMemory } from '/js/services/memory.js';
 import * as skillsService from '/js/services/skills.js';
 import { useConfirm } from '/components/Modal.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -133,9 +134,9 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
         keys = (ov.memory_keys || []).map(k => ({ key: k.key, visibility: k.visibility, version: k.version, createdAt: k.created_at, updatedAt: k.updated_at }));
       } else {
         const [dirResp, memResp, links] = await Promise.all([
-          getDirectives(agentName).catch(() => null),
-          apiGet(`/v1/memory?prefix=&per_page=100&agent=${encodeURIComponent(agent.gaii || agentName)}`).catch(() => null),
-          skillsService.getAgentSkillLinks(agentName).catch(() => []),
+          getDirectives(agentName).catch(err => { swallowed('tab-data-access: loadData', err); return null; }),
+          apiGet(`/v1/memory?prefix=&per_page=100&agent=${encodeURIComponent(agent.gaii || agentName)}`).catch(err => { swallowed('tab-data-access: loadData', err); return null; }),
+          skillsService.getAgentSkillLinks(agentName).catch(err => { swallowed('tab-data-access: loadData', err); return []; }),
         ]);
         const data = dirResp?.data || {};
         setMemoryAreas(data.memory_areas || []);
@@ -166,7 +167,8 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
           setEditingKey(null);
         }
       }
-    } catch {
+    } catch (err) {
+      swallowed('tab-data-access: loadData', err);
       setMemoryAreas([]);
       setResources([]);
       setMemoryKeys([]);
@@ -199,7 +201,8 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
         setSkillLibrary(lib);
         const first = [...lib.user, ...lib.node].find(s => !skillLinks.some(l => l.ref === s.ref));
         setSelectedSkillRef(first?.ref ?? '');
-      } catch {
+      } catch (err) {
+        swallowed('tab-data-access: openSkillPicker', err);
         setSkillLibrary({ node: [], user: [] });
       }
     }
@@ -357,7 +360,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       // store the parsed value (object/array/number/etc.); otherwise store the
       // raw string.
       let parsed;
-      try { parsed = JSON.parse(editValue); } catch { parsed = editValue; }
+      try { parsed = JSON.parse(editValue); } catch { parsed = editValue; }   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
       await updateMemoryFull(mk.key, { value: parsed, version: mk.version });
       showToast(t('profile.agents.detail.data_access.valueSaved'));
       setEditingKey(null);
@@ -391,7 +394,7 @@ export default function TabDataAccess({ agent, agentName, showToast, allAgents }
       // Preserve value type: store parsed JSON when the text parses, else the
       // raw string.
       let parsed;
-      try { parsed = JSON.parse(newKeyValue); } catch { parsed = newKeyValue; }
+      try { parsed = JSON.parse(newKeyValue); } catch { parsed = newKeyValue; }   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
       // Store under the AGENT's GAII (not the owner GHII) so the entry belongs
       // to the agent being viewed.
       const gaii = agent?.gaii || agentName;

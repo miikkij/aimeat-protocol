@@ -11,6 +11,7 @@
  */
 import { api, apiGet } from '/js/api.js';
 import { createMemory, getMemory, deleteMemory } from '/js/services/memory.js';
+import { swallowed } from '/js/swallowed.js';
 
 const enc = encodeURIComponent;
 const FLAG_PREFIX = 'message-flag.';
@@ -80,12 +81,12 @@ export async function cancelTrackedResponse(id) {
 // ── Lightweight "Important / needs reply" flag (Tier 1) — owner memory, no schema migration ──
 export async function setMessageImportant(messageId, important) {
   if (important) return createMemory(flagKey(messageId), { important: true, at: new Date().toISOString() }, 'private');
-  return deleteMemory(flagKey(messageId)).catch(() => {});
+  return deleteMemory(flagKey(messageId)).catch(err => { swallowed('tracked-responses: setMessageImportant', err); });
 }
 
 export async function isMessageImportant(messageId) {
   try { const r = await getMemory(flagKey(messageId)); return !!(r?.data?.value?.important); }
-  catch { return false; }
+  catch (err) { swallowed('tracked-responses', err); return false; }
 }
 
 /** Return the set of message ids the owner flagged important (for the "Needs reply" filter). Uses a
@@ -99,5 +100,5 @@ export async function listImportantMessageIds() {
       .map(m => String(m.key || ''))
       .filter(k => k.startsWith(FLAG_PREFIX))
       .map(k => k.slice(FLAG_PREFIX.length).replace(/\.latest$/, ''));
-  } catch { return []; }
+  } catch (err) { swallowed('tracked-responses: listImportantMessageIds', err); return []; }
 }

@@ -33,6 +33,7 @@ import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { api } from '/js/api.js';
 import { escHtml } from '/js/utils.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -54,7 +55,7 @@ export default function InviteAccept() {
     let live = true;
     api('/v1/auth/providers')
       .then((res) => { if (live) setProviders(res?.data?.providers || []); })
-      .catch(() => { /* no providers — password form stands alone */ });
+      .catch(err => { swallowed('invite-accept: InviteAccept', err); });
     return () => { live = false; };
   }, []);
 
@@ -121,7 +122,7 @@ export default function InviteAccept() {
   // Sign out and stay on the accept page, so the visitor can register the invited email or sign in as
   // the account it belongs to. The 'logout' event handler above re-fetches the viewer verdict.
   function signOutAndRetry() {
-    try { window.AIMEAT?.auth?.logout?.(); } catch { /* ignore */ }
+    try { window.AIMEAT?.auth?.logout?.(); } catch (err) { swallowed('invite-accept: signOutAndRetry', err); }
     setAuthed(false); setMismatch(false);
   }
 

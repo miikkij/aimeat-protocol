@@ -19,6 +19,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { dt } from '/js/format.js';
 import * as orgService from '/js/services/organisms.js';
+import { swallowed } from '/js/swallowed.js';
 
 /**
  * Comment thread on one workspace object (record or document). Targeted by orgId+ws+space+instanceId.
@@ -36,13 +37,13 @@ export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, bat
   const [anchorQuote, setAnchorQuote] = useState('');
   const [replyTo, setReplyTo] = useState(null);   // { id, body } of the comment being replied to
   const [busy, setBusy] = useState(false);
-  const me = (() => { try { return window.AIMEAT?.auth?.getSession?.() || {}; } catch { return {}; } })();
+  const me = (() => { try { return window.AIMEAT?.auth?.getSession?.() || {}; } catch (err) { swallowed('workspace-comments', err); return { }; } })();
   const mine = (author) => author && (author === me.gaii || author === me.ghii);
 
   const load = useCallback(async () => {
     if (batched) { await onReload?.(); return; }   // parent re-runs the batch → flows back via initialComments
     if (!ws || !space || !instanceId) return;
-    const r = await orgService.listComments(orgId, ws, space, instanceId).catch(() => null);
+    const r = await orgService.listComments(orgId, ws, space, instanceId).catch(err => { swallowed('workspace-comments: mine', err); return null; });
     setComments(r?.data?.comments || []);
   }, [orgId, ws, space, instanceId, batched, onReload]);
   // Batched: keep local view in sync with the prop (undefined = still loading → null). Standalone: self-fetch.

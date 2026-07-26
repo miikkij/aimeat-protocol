@@ -38,6 +38,7 @@ import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import * as knowledgeService from '/js/services/knowledge.js';
 import { extractFedConsents } from './knowledge-tab.helpers.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function KnowledgeTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -77,7 +78,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       const list = await knowledgeService.listMyPackages();
       setPackages(list);
       onStats?.({ knowledge: list.length });
-    } catch { if (showSpinner) setPackages([]); } // keep old list on a transient live-update refetch
+    } catch (err) { swallowed('knowledge-tab', err); if (showSpinner) setPackages([]); } // keep old list on a transient live-update refetch
     finally { setLoading(false); }
   }, [onStats]);
 
@@ -99,7 +100,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
   const loadFedConsents = useCallback(async () => {
     try {
       setFedConsents(extractFedConsents(await listConsents()));
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('knowledge-tab: KnowledgeTab', err); }
   }, []);
 
 
@@ -140,7 +141,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
     try {
       const resp = await knowledgeService.discoverPackages({ sort: 'recent', limit: 10 });
       setDiscovered(resp?.data?.packages || []);
-    } catch { setDiscovered([]); }
+    } catch (err) { swallowed('knowledge-tab', err); setDiscovered([]); }
     finally { setDiscoverLoading(false); }
   }, []);
 
@@ -157,10 +158,10 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
           const resp = await knowledgeService.listOrganismPackages(org.id || org.organismId);
           const pkgs = resp?.data?.packages || [];
           all.push(...pkgs.map(p => ({ ...p, organismName: org.name || org.id })));
-        } catch { /* skip */ }
+        } catch (err) { swallowed('knowledge-tab: KnowledgeTab', err); }
       }
       setOrganismPackages(all);
-    } catch { setOrganismPackages([]); }
+    } catch (err) { swallowed('knowledge-tab', err); setOrganismPackages([]); }
     finally { setOrganismLoading(false); }
   }, [session?.organisms]);
 
@@ -179,7 +180,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       } else {
         showToast('Prompt template not available yet');
       }
-    } catch {
+    } catch (err) { swallowed('knowledge-tab: KnowledgeTab', err);
       showToast(t('profile.knowledge.copyFailed'));
     }
   }, [showToast]);
@@ -217,6 +218,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         catalogListed: pkg.sharing?.catalog_listed ?? true,
         organismShare: '',
       });
+    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     } catch {
       setImportError(t('profile.knowledge.parseError'));
     }
@@ -242,7 +244,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       } else {
         showToast(t('knowledge.import.error'));
       }
-    } catch {
+    } catch (err) { swallowed('knowledge-tab', err);
       showToast(t('knowledge.import.error'));
     } finally { setImporting(false); }
   }, [importPreview, showToast, loadPackages]);
@@ -259,7 +261,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         showToast(t('knowledge.myKnowledge.deleted') || 'Package deleted');
         setExpandedPkg(null);
         loadPackages();
-      } catch {
+      } catch (err) { swallowed('knowledge-tab', err);
         showToast(t('knowledge.myKnowledge.deleteError') || 'Failed to delete package');
       } finally { setDeleting(null); }
     }, { danger: true });
@@ -279,7 +281,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       try {
         await copyToClipboard(JSON.stringify(manifest, null, 2));
         showToast(t('knowledge.myKnowledge.exportCopied') || 'Package JSON copied to clipboard');
-      } catch {
+      } catch (err) { swallowed('knowledge-tab', err);
         showToast('Failed to export package');
       }
     }
@@ -295,7 +297,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       } else {
         showToast(t('profile.knowledge.cloneFailed'));
       }
-    } catch { showToast(t('profile.knowledge.cloneFailed')); }
+    } catch (err) { swallowed('knowledge-tab', err); showToast(t('profile.knowledge.cloneFailed')); }
   }, [showToast, loadPackages]);
 
   /* ── Update sharing settings ── */
@@ -316,7 +318,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
       } else {
         showToast(t('knowledge.myKnowledge.saveError') || 'Failed to save settings');
       }
-    } catch {
+    } catch (err) { swallowed('knowledge-tab', err);
       showToast(t('knowledge.myKnowledge.saveError') || 'Failed to save settings');
     } finally { setSavingSharing(null); }
   }, [showToast, loadPackages]);
@@ -340,7 +342,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         showToast(result?.error?.message || (t('knowledge.myKnowledge.saveError') || 'Failed'));
         loadPackages(); // Revert on error
       }
-    } catch {
+    } catch (err) { swallowed('knowledge-tab: updatedEntries', err);
       showToast(t('knowledge.myKnowledge.saveError') || 'Failed');
       loadPackages(); // Revert on error
     }
@@ -373,7 +375,7 @@ export default function KnowledgeTab({ session, showToast, onStats }) {
         }
         return next;
       });
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('knowledge-tab: updatedEntries', err); }
     finally { setLoadingEntries(null); }
   }, [expandedPkg, packages, entryData]);
 

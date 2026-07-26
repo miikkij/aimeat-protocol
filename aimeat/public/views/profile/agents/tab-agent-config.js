@@ -23,6 +23,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { copyToClipboard } from '/js/utils.js';
 import { apiGet, apiPut, apiPatch } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -128,7 +129,8 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
         setSelectedFile(configFiles[0].key);
         setPreview(configFiles[0].content);
       }
-    } catch {
+    } catch (err) {
+      swallowed('tab-agent-config: loadFiles', err);
       if (showSpinner) setFiles([]); // keep old files on a transient live-update refetch
     }
     setLoading(false);

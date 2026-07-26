@@ -13,6 +13,7 @@
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { apiGet, api } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 /** Load work inbox items. Returns array. */
 export async function listInbox() {
@@ -36,7 +37,7 @@ export async function getWorkOverview() {
     const d = data?.data;
     if (!d) return null;
     return { inbox: d.inbox || [], sent: d.sent || [] };
-  } catch { return null; }
+  } catch (err) { swallowed('work: getWorkOverview', err); return null; }
 }
 
 /** Submit a rating for a completed work item. */

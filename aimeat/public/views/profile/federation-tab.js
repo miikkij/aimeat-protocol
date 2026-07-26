@@ -19,6 +19,7 @@ import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { StatusDot } from '/components/StatusDot.js';
 import { listPeers } from '/js/services/federation.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function FederationTab() {
   const [federation, setFederation] = useState(null);
@@ -31,7 +32,7 @@ export default function FederationTab() {
     try {
       const peers = await listPeers();
       setFederation(peers);
-    } catch { setFederation([]); }
+    } catch (err) { swallowed('federation-tab', err); setFederation([]); }
   }
 
   // Live update listener

@@ -30,6 +30,7 @@ import { apiGet } from '/js/api.js';
 import { useConfirm } from '/components/Modal.js';
 import NoteCard from './notebook-card.js';
 import { INBOX_PREFIX, noteText } from './notebook-helpers.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function NotebookTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -52,7 +53,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
   // re-fetches (post-capture/delete, live-update) keep using the individual loaders; a composite failure
   // falls back to them too.
   async function loadTab() {
-    const ov = await apiGet('/v1/notebook').then(r => r?.data).catch(() => null);
+    const ov = await apiGet('/v1/notebook').then(r => r?.data).catch(err => { swallowed('notebook-tab: loadTab', err); return null; });
     if (!ov) { loadInbox(); loadOrgNames(); loadSettings(); return; }
     setInbox(ov.inbox || []);
     onStats?.({ notebook: (ov.inbox || []).length });
@@ -70,12 +71,12 @@ export default function NotebookTab({ session, showToast, onStats }) {
     try {
       const s = await getNotebookSettings();
       setSettings({ autoDetectIntent: !!s.autoDetectIntent, autoRunPlan: !!s.autoRunPlan, autoDistribute: !!s.autoDistribute });
-    } catch { /* defaults stand */ }
+    } catch (err) { swallowed('notebook-tab: loadSettings', err); }
   }
   async function toggleSetting(key) {
     const next = { ...settings, [key]: !settings[key] };
     setSettings(next);
-    try { await saveNotebookSettings(next); } catch { showToast(t('profile.error'), true); }
+    try { await saveNotebookSettings(next); } catch (err) { swallowed('notebook-tab', err); showToast(t('profile.error'), true); }
   }
 
   // Re-fetch the inbox on live updates (a capture elsewhere, a sync) — Rule from the frontend guide.
@@ -95,7 +96,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
         .sort((a, b) => +new Date(b.updated_at || b.created_at || 0) - +new Date(a.updated_at || a.created_at || 0));
       setInbox(notes);
       onStats?.({ notebook: notes.length });
-    } catch { setInbox([]); }
+    } catch (err) { swallowed('notebook-tab', err); setInbox([]); }
   }
 
   async function loadOrgNames() {
@@ -104,7 +105,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
       const map = {};
       for (const o of (resp?.data?.organisms || [])) map[o.id] = o.name;
       setOrgNames(map);
-    } catch { /* names are a nicety — ids still render */ }
+    } catch (err) { swallowed('notebook-tab: loadOrgNames', err); }
   }
 
   async function handleCapture() {
@@ -180,6 +181,7 @@ export default function NotebookTab({ session, showToast, onStats }) {
         sessionStorage.setItem('aimeat.ws.openId', hit.organismId);
         sessionStorage.setItem('aimeat.ws.openWs', hit.workspaceId);
         if (docId) sessionStorage.setItem(`aimeat.ws.${hit.organismId}.${hit.workspaceId}.openDoc`, JSON.stringify({ namespace: hit.space, id: docId }));
+      // eslint-disable-next-line aimeat/no-silent-catch -- noop
       } catch { /* noop */ }
       window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'organisms' } }));
       return;

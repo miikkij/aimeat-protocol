@@ -26,6 +26,7 @@ import * as living from '/js/services/living.js';
 import { listOrganisms, listWorkspaces } from '/js/services/organisms.js';
 import * as offersService from '/js/services/offers.js';
 import { buildCatalogue } from '/js/services/notebook-plan.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function LivingTab({ session, showToast }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -66,7 +67,7 @@ export default function LivingTab({ session, showToast }) {
       setTemplates(tpls);
       setInstances(insts);
       setOrgs(orgResp?.data?.organisms || []);
-    } catch { setTemplates([]); setInstances([]); }
+    } catch (err) { swallowed('living-tab', err); setTemplates([]); setInstances([]); }
   }
 
   // ── Templates ──
@@ -89,7 +90,7 @@ export default function LivingTab({ session, showToast }) {
     setAuthoring(true);
     try {
       let catalogue = [];
-      try { catalogue = buildCatalogue(await offersService.listOffers()); } catch { /* no fleet */ }
+      try { catalogue = buildCatalogue(await offersService.listOffers()); } catch (err) { swallowed('living-tab: handleAuthor', err); }
       const data = await living.authorTemplate(need.trim(), catalogue);
       const tpl = data?.template;
       if (!tpl) throw new Error(t('profile.error'));

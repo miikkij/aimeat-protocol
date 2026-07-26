@@ -18,6 +18,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { getAgentEngagements, contractNamesOf, offersWorkspaceContract, adoptContractTask } from '/js/services/agents.js';
 import { retireEngagement, activateEngagement } from '/js/services/organisms.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -53,7 +54,7 @@ export default function TabContracts({ agent, agentName, showToast }) {
   const readopt = async (e) => {
     setBusy(engKey(e));
     try {
-      await activateEngagement(e.organism_id, e.ws, e.agent, e.contract).catch(() => {});
+      await activateEngagement(e.organism_id, e.ws, e.agent, e.contract).catch(err => { swallowed('tab-contracts: readopt', err); });
       await adoptContractTask(agentName, { organismId: e.organism_id, ws: e.ws, contract: e.contract });
       showToast?.(t('profile.agents.detail.contracts.readoptedToast') || 'Re-adopted — the agent will pick this workspace back up');
       await load();

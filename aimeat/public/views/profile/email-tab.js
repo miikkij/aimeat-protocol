@@ -15,6 +15,7 @@ import { t } from '/js/i18n.js';
 import { Spinner, GlassCard } from './shared.js';
 import { apiPost } from '/js/api.js';
 import { getProfile } from '/js/services/auth.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function EmailTab({ session, showToast }) {
   const [loading, setLoading] = useState(true);
@@ -41,7 +42,7 @@ export default function EmailTab({ session, showToast }) {
           setStep('verified');
         }
       }
-    } catch { /* ignore */ }
+    } catch (err) { swallowed('email-tab: loadData', err); }
     setLoading(false);
   }
 

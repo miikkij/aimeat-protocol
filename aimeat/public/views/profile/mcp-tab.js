@@ -15,6 +15,7 @@ import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { listChatInstances, deleteChatInstance } from '/js/services/agents.js';
+import { swallowed } from '/js/swallowed.js';
 
 export default function McpTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -28,7 +29,7 @@ export default function McpTab({ session, showToast, onStats }) {
       const mcp = instances.filter(ci => ci.app_name?.startsWith('mcp-') || ci.id?.startsWith('mcp-'));
       setConnections(mcp);
       onStats?.({ mcpConnections: mcp.length });
-    } catch { setConnections([]); }
+    } catch (err) { swallowed('mcp-tab', err); setConnections([]); }
   }, [onStats]);
 
   useEffect(() => {
@@ -52,7 +53,8 @@ export default function McpTab({ session, showToast, onStats }) {
         showToast(t('profile.mcp.deleted'));
         setExpanded(null);
         loadData();
-      } catch {
+      } catch (err) {
+        swallowed('mcp-tab: handler', err);
         showToast(t('profile.mcp.deleteError'), true);
       } finally { setDeleting(null); }
     }, { danger: true });

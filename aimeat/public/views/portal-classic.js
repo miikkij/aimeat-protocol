@@ -19,6 +19,7 @@ import htm from 'htm';
 import { CopyButton } from '/components/CopyButton.js';
 import { t as globalT } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 const NODE_URL = window.location.origin;
@@ -251,7 +252,7 @@ function WelcomeBoard() {
           setMessages(d.data.value.messages);
         }
       })
-      .catch(() => {});
+      .catch(err => { swallowed('portal-classic: WelcomeBoard', err); });
   }, []);
 
   useEffect(() => {

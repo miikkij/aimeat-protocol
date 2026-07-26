@@ -18,6 +18,7 @@ import { listWorkspaces, getWorkspaceSources, saveWorkspaceSources } from '/js/s
 import { Modal } from '/components/Modal.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { fileIcon, fileCategory, fileBytesUrl, fetchFileBytes, encKeyPath } from './file-helpers.js';
+import { swallowed } from '/js/swallowed.js';
 
 export function DiscoverPreview({ ownerGaii, memKey }) {
   const [value, setValue] = useState(null);
@@ -79,7 +80,7 @@ export function CartTray({ cart, nodeUrl, orgs, onRemove, onClear, showToast }) 
   const pickOrg = async (orgId) => {
     setSendOrg(orgId); setSendWs(''); setWorkspaces([]);
     if (!orgId) return;
-    try { setWorkspaces(await listWorkspaces(orgId)); } catch { setWorkspaces([]); }
+    try { setWorkspaces(await listWorkspaces(orgId)); } catch (err) { swallowed('components', err); setWorkspaces([]); }
   };
   // Cart item → workspace Source pointer (files are type 'storage'; see sources-panel.js).
   const sourceOf = (it) => it.kind === 'file'
@@ -245,7 +246,7 @@ export function FilePreviewModal({ file, nodeUrl, onClose, onDownload, showToast
       const u = URL.createObjectURL(blob);
       window.open(u, '_blank', 'noopener');
       setTimeout(() => URL.revokeObjectURL(u), 60_000);
-    } catch { showToast(t('profile.files.previewError') || 'Couldn’t load this file', true); }
+    } catch (err) { swallowed('components', err); showToast(t('profile.files.previewError') || 'Couldn’t load this file', true); }
   };
 
   return html`
@@ -416,7 +417,7 @@ export function EditMemoryModal({ memKey, initialValue, initialVisibility, initi
                 <div class="text-meta-sm mb-xs">${t('profile.memory.noGroups')}</div>
                 <button class="btn-outline btn-sm" onClick=${() => {
                   onCancel();
-                  try { sessionStorage.setItem('aimeat.access.focus', 'groups'); } catch { /* noop */ }
+                  try { sessionStorage.setItem('aimeat.access.focus', 'groups'); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
                   window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'access' } }));
                 }}>${t('profile.memory.createGroupBtn')}</button>`
               : html`

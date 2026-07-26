@@ -21,6 +21,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import * as contactsService from '/js/services/contacts.js';
+import { swallowed } from '/js/swallowed.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const KIND_ICON = { ghii: '👤', gaii: '🤖', geai: '🧩' };
@@ -49,7 +50,7 @@ export function ContactPicker({ value = '', onChange, onSubmit, onEmailUnresolve
 
   const loadContacts = useCallback(async () => {
     if (contacts !== null) return;
-    try { setContacts(await contactsService.listContacts()); } catch { setContacts([]); }
+    try { setContacts(await contactsService.listContacts()); } catch (err) { swallowed('ContactPicker', err); setContacts([]); }
   }, [contacts]);
 
   // Directory search (debounced) — only for name-ish input, never for emails/full ids.
@@ -101,7 +102,7 @@ export function ContactPicker({ value = '', onChange, onSubmit, onEmailUnresolve
       setResolveState(r);
       if (r.found) { onChange?.(r.owner); setOpen(false); }
       else onEmailUnresolved?.(email);
-    } catch { setResolveState(null); }
+    } catch (err) { swallowed('ContactPicker', err); setResolveState(null); }
   };
 
   const onKeyDown = (e) => {

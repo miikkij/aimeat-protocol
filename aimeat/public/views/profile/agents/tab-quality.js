@@ -33,6 +33,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { t } from '/js/i18n.js';
 import { getAgentStatistics, getQualityOverview, listTasks, rateTask } from '/js/services/agent-tasks.js';
 import RateModal from './rate-modal.js';
+import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
 
@@ -98,12 +99,12 @@ export default function TabQuality({ agentName, showToast }) {
       } else {
         const [statsResp, tasksResp] = await Promise.all([
           getAgentStatistics(agentName),
-          listTasks(agentName, { status: 'done', per_page: 100 }).catch(() => null),
+          listTasks(agentName, { status: 'done', per_page: 100 }).catch(err => { swallowed('tab-quality: TabQuality', err); return null; }),
         ]);
         if (statsResp?.data) setData(statsResp.data);
         setDoneTasks(tasksResp?.data?.tasks || []);
       }
-    } catch { /* keep showing the last good data on a transient error */ }
+    } catch (err) { swallowed('tab-quality: TabQuality', err); }
     setLoading(false);
   }, [agentName]);
 

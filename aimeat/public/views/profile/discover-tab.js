@@ -22,6 +22,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { getSession } from '/js/services/auth.js';
+import { swallowed } from '/js/swallowed.js';
 
 const SCOPES = ['own', 'public', 'shared'];
 const TYPE_ICONS = {
@@ -47,7 +48,8 @@ export default function DiscoverTab() {
     try {
       const res = await session.fetch(`/v1/discover?${params.toString()}`);
       setData(res.data || { entries: [], total: 0, facets: { types: [], tags: [] } });
-    } catch {
+    } catch (err) {
+      swallowed('discover-tab: DiscoverTab', err);
       setData({ entries: [], total: 0, facets: { types: [], tags: [] } });
     }
     setLoading(false);
@@ -80,6 +82,7 @@ export default function DiscoverTab() {
         sessionStorage.setItem('aimeat.ws.openId', org);
         sessionStorage.setItem('aimeat.ws.openWs', wsId);
         sessionStorage.setItem(`aimeat.ws.${org}.${wsId}.openDoc`, JSON.stringify({ namespace: space, id: docId }));
+      // eslint-disable-next-line aimeat/no-silent-catch -- noop
       } catch { /* noop */ }
       window.dispatchEvent(new CustomEvent('aimeat-open-tab', { detail: { tabId: 'organisms' } }));
       return;

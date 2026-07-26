@@ -17,6 +17,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
+import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -114,7 +115,7 @@ export default function HowItWorks({ navigate }) {
     fetch('/v1/apps?limit=100').then(r => r.json()).then(j => {
       const apps = j?.data?.apps || [];
       setPaper(apps.find(a => /sanomat/i.test(a.filename || '') || /sanomat/i.test(a.name || '')) || null);
-    }).catch(() => { /* box renders without link */ });
+    }).catch(err => { swallowed('how-it-works: HowItWorks', err); });
   }, []);
 
   const card = (titleKey, titleFb, textKey, textFb) => html`

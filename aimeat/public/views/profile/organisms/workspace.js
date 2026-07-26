@@ -70,6 +70,7 @@ import { renderRecordSpace } from './workspace/record-space.js';
 import { renderOverview, renderObjectives, renderWsSearchResults, renderOvSection } from './workspace/overview.js';
 import { renderTabsNav, renderSpacesAdd, renderSettingsPanel, renderShareTab, renderReviewTab, renderActivityTab } from './workspace/panels.js';
 import { buildBreadcrumb, buildWorkspaceModel } from './workspace/model.js';
+import { swallowed } from '/js/swallowed.js';
 
 /* ───────────────── Organism workspace (manifest-driven) ─────────────────
  * Any organism can have a governed workspace. If it has no manifest yet, offer
@@ -89,7 +90,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       setWsName(name);
       // Feed the home page's "Continue" list with a real display name.
       recordRecent({ type: 'workspace', id: `${orgId}/${wsId}`, label: name || wsId, sub: org.name || '', data: { orgId, wsId } });
-    }).catch(() => {});
+    }).catch(err => { swallowed('workspace: name', err); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- org.name only feeds recordRecent's display sub; the workspace-name fetch is intentionally keyed to orgId/wsId.
   }, [orgId, wsId]);  // Pop a document out into its own window (served by doc-solo.js) so several can sit side by side,
@@ -121,6 +122,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     try {
       const raw = sessionStorage.getItem(docKey);
       if (raw) { const v = JSON.parse(raw); if (v && v.type && v.id) return { type: v.type, mode: v.mode === 'edit' ? 'edit' : 'view', page: { id: v.id } }; }
+    // eslint-disable-next-line aimeat/no-silent-catch -- noop
     } catch { /* noop */ }
     return null;
   });
@@ -157,11 +159,11 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   // history never shows as unseen. Neutral gray badges only — red is reserved for errors.
   const seenKey = 'aimeat.ws.' + orgId + '.' + wsId + '.seen';
   const [seen, setSeen] = useState(() => {
-    try { const raw = localStorage.getItem(seenKey); return raw ? JSON.parse(raw) : null; } catch { return null; }
+    try { const raw = localStorage.getItem(seenKey); return raw ? JSON.parse(raw) : null; } catch { return null; }   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
   });
   const markSeen = useCallback((tabId) => setSeen(prev => {
     const next = { ...(prev || {}), [tabId]: new Date().toISOString() };
-    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* noop */ }
+    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
     return next;
   }), [seenKey]);
   // Items (not raw events) changed since the tab's seen mark. The user's own non-agent edits
@@ -182,14 +184,14 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
 
   const load = useCallback(async () => {
     // In the archived view, request ONLY archived content (read-only); otherwise the normal active set.
-    const w = await orgService.getWorkspace(orgId, wsId, showArchived ? { archived: 'only' } : undefined).catch(() => null);
+    const w = await orgService.getWorkspace(orgId, wsId, showArchived ? { archived: 'only' } : undefined).catch(err => { swallowed('workspace', err); return null; });
     if (w && w.manifest) {
       const [ap, cfg, secs, act, cols] = await Promise.all([
-        orgService.listApprovals(orgId, 'pending').catch(() => []),
-        orgService.getConfig(orgId).catch(() => ({})),
-        orgService.getAllSections(orgId, wsId).catch(() => ({})),
+        orgService.listApprovals(orgId, 'pending').catch(err => { swallowed('workspace', err); return []; }),
+        orgService.getConfig(orgId).catch(err => { swallowed('workspace', err); return ({}); }),
+        orgService.getAllSections(orgId, wsId).catch(err => { swallowed('workspace', err); return ({}); }),
         orgService.getWorkspaceActivity(orgId, wsId).catch(() => ({ events: [] })),
-        orgService.getAllColors(orgId, wsId).catch(() => ({})),
+        orgService.getAllColors(orgId, wsId).catch(err => { swallowed('workspace', err); return ({}); }),
       ]);
       setApprovals(ap); setGateOn(!!(cfg?.gates?.publish?.enabled)); setSectionsByType(secs);
       setWsEvents(act?.events || []); setColorsByType(cols);
@@ -208,7 +210,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     let cancelled = false;
     const loadGraph = async () => {
       const [g, ov] = await Promise.all([
-        orgService.getWorkspaceGraph(orgId, wsId).catch(() => null),
+        orgService.getWorkspaceGraph(orgId, wsId).catch(err => { swallowed('workspace: loadGraph', err); return null; }),
         orgService.getWorkspaceOverviewFull(orgId, wsId).catch(() => ({ markdown: '', objectives: [] })),
       ]);
       if (cancelled) return;
@@ -241,7 +243,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     let cancelled = false;
     setWsSearching(true);
     const tid = setTimeout(async () => {
-      const r = await orgService.searchOrganism(orgId, q, wsId).catch(() => null);
+      const r = await orgService.searchOrganism(orgId, q, wsId).catch(err => { swallowed('workspace: onWsMapNav', err); return null; });
       if (!cancelled) { setWsHits((r?.data?.results) || []); setWsSearching(false); }
     }, 220);   // debounce — instant feel without a request per keystroke
     return () => { cancelled = true; clearTimeout(tid); };
@@ -251,7 +253,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   // filtered result list for the query you jumped from.
   useEffect(() => {
     const k = `aimeat.ws.${orgId}.${wsId}.search`;
-    try { const v = sessionStorage.getItem(k); if (v) { setWsQuery(v); sessionStorage.removeItem(k); } } catch { /* noop */ }
+    try { const v = sessionStorage.getItem(k); if (v) { setWsQuery(v); sessionStorage.removeItem(k); } } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
   }, [orgId, wsId]);
 
   // Deep-link from the librarian "Open" button: aimeat.ws.{org}.{ws}.openDoc = { namespace, id }.
@@ -261,11 +263,11 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   useEffect(() => {
     if (!ws?.manifest) return;
     let req = null;
-    try { req = JSON.parse(sessionStorage.getItem(openDocKey) || 'null'); } catch { req = null; }
+    try { req = JSON.parse(sessionStorage.getItem(openDocKey) || 'null'); } catch { req = null; }   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
     if (!req || !req.namespace || !req.id) return;
     const ot = (ws.manifest.objectTypes || []).find(o => o.namespace === req.namespace);
     if (ot) { setTab('space:' + ot.name); setActiveDoc({ type: ot.name, mode: 'view', page: { id: req.id } }); }
-    try { sessionStorage.removeItem(openDocKey); } catch { /* noop */ }
+    try { sessionStorage.removeItem(openDocKey); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
   }, [ws, openDocKey]);
 
   // Persist the open document (id only) so an F5 returns to it. Skip unsaved new docs (no id yet).
@@ -273,6 +275,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     try {
       if (activeDoc?.type && activeDoc.page?.id) sessionStorage.setItem(docKey, JSON.stringify({ type: activeDoc.type, id: activeDoc.page.id, mode: activeDoc.mode }));
       else sessionStorage.removeItem(docKey);
+    // eslint-disable-next-line aimeat/no-silent-catch -- noop
     } catch { /* noop */ }
   }, [activeDoc, docKey]);
 
@@ -334,7 +337,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   useEffect(() => {
     if (seen !== null || ws === undefined) return;
     const next = { __base: new Date().toISOString() };
-    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* noop */ }
+    try { localStorage.setItem(seenKey, JSON.stringify(next)); } catch { /* noop */ }   // eslint-disable-line aimeat/no-silent-catch -- noop
     setSeen(next);
   }, [seen, ws, seenKey]);
   // Changes landing on the tab the user is LOOKING at are seen immediately — otherwise a draft
@@ -405,7 +408,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
         if (sectionId) {
           const secs = (sectionsByType[ot.name] || []).map(s => s.id === sectionId
             ? { ...s, documents: [...(s.documents || []).filter(d => d !== id), id] } : s);
-          await orgService.saveSections(orgId, wsId, ot.name, secs).catch(() => {});
+          await orgService.saveSections(orgId, wsId, ot.name, secs).catch(err => { swallowed('workspace: secs', err); });
         }
         // Reload, then open the just-saved document (view mode). renderDocSpace re-resolves the id
         // to the fresh merged entry, so the new draft shows with its badge instead of the empty state.
@@ -441,7 +444,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   const sectionsRef = useRef(sectionsByType); sectionsRef.current = sectionsByType;
   const setSecName = (typeName, secId, name) =>
     setSectionsByType(s => ({ ...s, [typeName]: (s[typeName] || []).map(x => x.id === secId ? { ...x, name } : x) }));
-  const commitSecName = (typeName) => { setEditingSec(null); orgService.saveSections(orgId, wsId, typeName, sectionsRef.current[typeName] || []).catch(() => {}); };
+  const commitSecName = (typeName) => { setEditingSec(null); orgService.saveSections(orgId, wsId, typeName, sectionsRef.current[typeName] || []).catch(err => { swallowed('workspace: commitSecName', err); }); };
 
   // ── Optional color tags. Section colors live on the section object (persisted via updateSections);
   // per-document/record colors live in a parallel meta.colors map (persisted via saveColors). ──

@@ -21,6 +21,7 @@ import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
 import { apiGet, apiDelete } from '/js/api.js';
+import { swallowed } from '/js/swallowed.js';
 
 // A grant untouched for this long is offered for bulk revoke. Long enough that a seasonal app
 // (something used a few times a year) is not swept away without the owner meaning to.
@@ -45,7 +46,7 @@ export function ConnectedAppsSection({ showToast, initial }) {
 
   const load = useCallback(async () => {
     try { const r = await apiGet('/v1/app-grants'); setGrants(r.data?.grants || []); }
-    catch { setGrants([]); }
+    catch (err) { swallowed('connected-apps', err); setGrants([]); }
   }, []);
   useEffect(() => { if (!initial) load(); }, [load]);   // eslint-disable-line react-hooks/exhaustive-deps -- seed once from `initial`; fetch only when unseeded
 
@@ -98,7 +99,7 @@ export function ConnectedAppsSection({ showToast, initial }) {
         let done = 0, failed = 0;
         for (const g of stale) {
           try { await apiDelete('/v1/app-grants/' + g.grant_id); done++; }
-          catch { failed++; }
+          catch (err) { swallowed('connected-apps', err); failed++; }
         }
         setBusy(false);
         showToast(failed
