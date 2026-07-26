@@ -33,7 +33,7 @@ import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import { notify } from '../services/notify.js';
-import { generateUploadToken } from '../services/upload-token.js';
+import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { enforceExtensionMemoryLimits } from '../services/quota.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { annotationsFor } from './annotations.js';
@@ -398,10 +398,14 @@ export function registerExtensionsTools(
             // --- UPLOAD MODE: no manifest provided, return presigned upload URL ---
             if (!manifestYaml) {
                 const maxBytes = config.extensionMaxCodeSizeKb * 1024 * 50;
+                // The caller's update/activate intent must survive into the token, or the upload
+                // silently ignores it: this meta used to be `{}`, so `update: true` was accepted
+                // here and the PUT still failed ALREADY_EXISTS. buildUploadMeta picks exactly the
+                // keys PRESIGNED_META_KEYS declares for this utype.
                 const token = await generateUploadToken({
                     sub: getAgentGaii(),
                     utype: 'extension',
-                    meta: {},
+                    meta: buildUploadMeta('extension', { update, activate }),
                     maxBytes,
                     contentType: 'application/zip',
                 });

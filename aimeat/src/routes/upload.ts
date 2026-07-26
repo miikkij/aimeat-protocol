@@ -34,11 +34,16 @@
  *     (previously an MCP update without a description BLANKED the catalog description, reset the
  *     category to 'tool', dropped the icon/tags and cleared forkable+protection). Also invalidates
  *     the protection cache on re-publish, mirroring POST /v1/apps.
+ *   v1.8.0 - 2026-07-26 - handleExtensionUpload honours the token meta's `update` and `activate`.
+ *     It previously took no meta at all and answered a flat 409 on an existing name, so a caller
+ *     that had explicitly requested an upsert was forced into delete + reinstall - which also
+ *     throws away the extension's ext:{name} memory. Upsert swaps the same code+metadata field
+ *     set as PUT /v1/extensions/:name and preserves lifecycle fields; owner mismatch is 403.
  */
 
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppManifest } from '../storage/interface.js';
+import type { Storage, AppManifest, ExtensionRecord } from '../storage/interface.js';
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
@@ -112,7 +117,7 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
                     await handleStorageUpload(res, storage, verified.sub, verified.meta, data);
                     return;
                 case 'extension':
-                    await handleExtensionUpload(res, config, storage, verified.sub, data);
+                    await handleExtensionUpload(res, config, storage, verified.sub, verified.meta, data);
                     return;
                 case 'cortex':
                     await handleCortexUpload(res, config, storage, verified.sub, data);
@@ -277,7 +282,7 @@ async function handleStorageUpload(
 
 async function handleExtensionUpload(
     res: Response, config: AimeatConfig, storage: Storage,
-    sub: string, data: Buffer,
+    sub: string, meta: Record<string, unknown>, data: Buffer,
 ): Promise<void> {
     const result = await parseExtensionZip(data, config);
     if (!result.ok) {
@@ -289,23 +294,71 @@ async function handleExtensionUpload(
     record.installedBy = parseGAII(sub)?.owner ?? 'upload';
     record.installedAt = new Date().toISOString();
 
+    // `update`/`activate` ride in the token meta (PRESIGNED_META_KEYS). This handler used to ignore
+    // them entirely and answer a flat 409 on an existing name, so a caller that had explicitly asked
+    // for an upsert was told the extension already exists and had to delete + reinstall — which also
+    // discards the extension's ext: memory.
+    const wantUpdate = meta.update === true;
+    const wantActivate = meta.activate === true;
+
     const existing = await storage.getExtension(record.name);
-    if (existing) {
-        res.status(409).json({ success: false, error: 'ALREADY_EXISTS', message: `Extension "${record.name}" is already installed` });
+    if (existing && !wantUpdate) {
+        res.status(409).json({
+            success: false, error: 'ALREADY_EXISTS',
+            message: `Extension "${record.name}" is already installed. Re-request the upload URL with update:true to upsert it in place.`,
+        });
+        return;
+    }
+    if (existing && parseGAII(sub)?.owner && existing.installedBy && existing.installedBy !== parseGAII(sub)!.owner) {
+        res.status(403).json({
+            success: false, error: 'FORBIDDEN',
+            message: `Extension "${record.name}" belongs to another owner`,
+        });
         return;
     }
 
-    const created = await storage.createExtension(record);
-    logger.info(`Extension installed via upload: ${created.name}`, { version: created.version, by: sub });
+    let saved: ExtensionRecord;
+    if (existing) {
+        // Same field set the REST upsert (PUT /v1/extensions/:name) swaps: code + metadata only.
+        // Lifecycle (status, installedBy, installedAt, activatedAt), the ext:{name} memory and any
+        // instances are preserved — that preservation is the whole reason to upsert instead of
+        // delete + reinstall.
+        saved = await storage.updateExtension(record.name, {
+            version: record.version,
+            description: record.description,
+            author: record.author,
+            requiredApis: record.requiredApis,
+            actions: record.actions,
+            config: record.config,
+            limits: record.limits,
+            federation: record.federation,
+            instances: record.instances,
+            ...(wantActivate && existing.status !== 'active'
+                ? { status: 'active' as const, activatedAt: new Date().toISOString() }
+                : {}),
+        }) ?? existing;
+    } else {
+        if (wantActivate) {
+            record.status = 'active';
+            record.activatedAt = new Date().toISOString();
+        }
+        saved = await storage.createExtension(record);
+    }
+
+    logger.info(`Extension ${existing ? 'updated' : 'installed'} via upload: ${saved.name}`, { version: saved.version, by: sub, activated: wantActivate });
     emitResourceListChanged(sub);
 
     res.json({
         success: true,
         type: 'extension',
-        name: created.name,
-        version: created.version,
-        status: created.status,
-        actions: created.actions.map(a => ({ id: a.id, method: a.method, path: a.path })),
+        name: saved.name,
+        version: saved.version,
+        status: saved.status,
+        updated: !!existing,
+        actions: saved.actions.map(a => ({ id: a.id, method: a.method, path: a.path })),
+        // Non-blocking sandbox-capability notes (no crypto.subtle in QuickJS, non-deterministic
+        // Date.now/Math.random). Surfaced here so a ZIP upload is not a way to miss them.
+        ...(result.warnings?.length ? { warnings: result.warnings } : {}),
     });
 }
 

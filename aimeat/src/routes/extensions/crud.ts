@@ -23,6 +23,8 @@ import {
 } from '../../services/extension-secrets.js';
 import { buildExtensionRecordFromManifest } from './manifest.js';
 import { hasExtWritePermission, canManageInstalledExt } from './permissions.js';
+import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
+import { resolveIdentity } from '../../utils/gaii.js';
 
 export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig, storage: Storage, scheduler?: Scheduler): void {
   // ── GET /v1/extensions — List installed extensions ────────────
@@ -64,6 +66,32 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       if (!hasExtWritePermission(req, config)) {
         res.status(403).json(error(config.nodeId, 'INSUFFICIENT_ROLE',
           `Extension install requires ${config.extInstallRole} role or ext:write scope`));
+        return;
+      }
+
+      // ── PRESIGNED MODE ── mirrors POST /v1/apps: mint an upload URL, install on PUT.
+      // Without this the ONLY way to get an extension upload token was the MCP tool, which forces
+      // a ~1000-char JWT through whoever is driving; over REST the mint and the PUT can live in one
+      // command and the credential is never transcribed. `update`/`activate` ride in the token meta
+      // (PRESIGNED_META_KEYS) — writing that meta by hand is what dropped them before.
+      if ((req.body as { mode?: string }).mode === 'presigned') {
+        const maxBytes = config.extensionMaxCodeSizeKb * 1024 * 50;
+        const token = await generateUploadToken({
+          sub: resolveIdentity(req.auth!, config.nodeId),
+          utype: 'extension',
+          meta: buildUploadMeta('extension', req.body as Record<string, unknown>),
+          maxBytes,
+          contentType: 'application/zip',
+        });
+        res.json(success(config.nodeId, {
+          mode: 'upload',
+          upload_url: `${config.baseUrl}/v1/upload/${token}`,
+          upload_method: 'PUT',
+          content_type: 'application/zip',
+          max_size_bytes: maxBytes,
+          expires_in_seconds: 3600,
+          zip_structure: 'manifest.yaml at root, scripts in scripts/ directory',
+        }));
         return;
       }
 
@@ -133,7 +161,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       // TARGET-050: an action flagged `commercial.exchange` is projected onto the market from here.
       await reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, created.name);
 
-      res.status(201).json(success(config.nodeId, { extension: created }, [
+      res.status(201).json(success(config.nodeId, { extension: created, ...(built.warnings?.length ? { warnings: built.warnings } : {}) }, [
         { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
         { description: 'View extension details', method: 'GET', url: `/v1/extensions/${created.name}` },
       ]));
@@ -215,7 +243,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
         const created = await storage.createExtension(record);
         logger.info(`Extension installed via upsert: ${created.name}`, { version: created.version, by: req.auth!.owner });
         await reconcileAfterExtensionWrite(storage, req.auth!.owner as string, config.nodeId, created.name);
-        res.status(201).json(success(config.nodeId, { extension: created, action: 'created' }, [
+        res.status(201).json(success(config.nodeId, { extension: created, action: 'created', ...(built.warnings?.length ? { warnings: built.warnings } : {}) }, [
           { description: 'Activate extension', method: 'POST', url: `/v1/extensions/${created.name}/activate` },
           { description: 'View extension details', method: 'GET', url: `/v1/extensions/${created.name}` },
         ]));
@@ -305,7 +333,7 @@ export function registerExtensionCrudRoutes(router: Router, config: AimeatConfig
       }
 
       logger.info(`Extension upserted: ${name}`, { version: record.version, by: req.auth!.sub, reinitialized });
-      res.json(success(config.nodeId, { extension: updated, action: 'updated', reinitialized }, [
+      res.json(success(config.nodeId, { extension: updated, action: 'updated', reinitialized, ...(built.warnings?.length ? { warnings: built.warnings } : {}) }, [
         { description: 'Execute an action', method: 'POST', url: `/v1/ext/${name}/<actionId>` },
         { description: 'View extension details', method: 'GET', url: `/v1/extensions/${name}` },
       ]));
