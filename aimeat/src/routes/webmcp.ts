@@ -31,6 +31,7 @@ import { paymentChallenge } from '../commerce/x402.js';
 import { readEntitlementForCall } from '../services/metered-entitlements.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { settleMeteredCoordinate } from './extensions/entitlement-gate.js';
+import { mintInternalPass } from './extensions/internal-pass.js';
 import { recordCallDuration } from '../services/call-timing.js';
 
 /** The WebMCP draft this bridge mirrors (W3C Web Machine Learning CG). */
@@ -154,6 +155,12 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
           return;
         }
         // Authorize + settle + rake (validated target above, so a failure here never leaves a phantom charge).
+        // THIS route settles, because this route knows which product was bought. An extension-backed
+        // capability then runs over the node's own HTTP surface and meets the raw-invoke paywall,
+        // which now also charges for actions a priced app-tool sells — so the invoke carries a
+        // one-shot pass saying this call is already paid for. The raw route could not make that
+        // decision itself: one action can be sold under several tools, and a caller holding two of
+        // those contracts gives it nothing to choose between.
         const outcome = await settleMeteredCoordinate({
           config, storage, coordExt, coordAction: toolName,
           label: `${filename}/${toolName}${pinnedVersion ? ` v${pinnedVersion}` : ''}`, callerGaii, res,
@@ -164,7 +171,8 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
           try {
             const { invokeCapability } = await import('../services/capability-invoke.js');
             const startedAt = Date.now();
-            const invoked = await invokeCapability(config, storage, cap, req.body?.input ?? req.body ?? {}, callerGaii, jwt, 'normal');
+            const invoked = await invokeCapability(config, storage, cap, req.body?.input ?? req.body ?? {}, callerGaii, jwt, 'normal',
+              mintInternalPass(coordExt, toolName));
             // Measured so the provider can propose a service commitment from evidence (call-timing.ts).
             recordCallDuration(storage, ent.providerGhii, coordExt, toolName, Date.now() - startedAt);
             res.json(success(config.nodeId, { app: appRef, tool: toolName, iface_version: pinnedVersion ?? null, metered: true, result: invoked.result }));

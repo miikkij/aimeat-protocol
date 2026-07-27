@@ -11,6 +11,8 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v1.3.0 — 2026-07-27 — An action that BACKS a priced app-tool is no longer free through the raw
+ *     route: it settles on that app-tool's coordinate, so the product has one price and no bypass.
  *   v1.2.0 — 2026-07-20 — EXCHANGE G2: consult a durable metered entitlement (budget + rake) before the token/morsel channels (TARGET-045)
  *   v1.1.0 — 2026-07-17 — Money channel: consume the one-time ext-pay token (D1/D3) instead of 402-stub
  *   v1.0.0 — 2026-07-17 — Initial (Phase 2: owner-free + toll + morsel payment; money → 402)
@@ -23,7 +25,9 @@ import type { ExtensionRecord } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { consumeExtPayToken } from '../../services/ext-pay-token.js';
-import { settleViaEntitlement } from './entitlement-gate.js';
+import { settleViaEntitlement, settleMeteredCoordinate } from './entitlement-gate.js';
+import { pricedAppToolsFor } from './priced-binding.js';
+import { consumeInternalPass } from './internal-pass.js';
 import { burnPacingToll, resolvePacingToll } from './pacing.js';
 import { logger } from '../../utils/logger.js';
 
@@ -54,12 +58,26 @@ export async function enforcePaywall(args: {
   res: Response;
   /** `x-aimeat-pay-token` header — a one-time token minted by a settled ext-call checkout (D1). */
   payToken?: string;
+  /** `x-aimeat-internal-pass` header — this call was already settled by the app-tool route. */
+  internalPass?: string;
 }): Promise<PaywallOutcome> {
-  const { config, storage, ext, action, callerGaii, res, payToken } = args;
+  const { config, storage, ext, action, callerGaii, res, payToken, internalPass } = args;
   const ownerName = ext.installedBy;
   // Owner from any principal form: GHII (owner@node), GAII (agent#owner@node), or bare name.
   // (parseGAII only recognises the GAII form, so extract directly to catch owner GHII sessions.)
   const callerOwner = callerGaii.split('@')[0].split('#').pop() ?? callerGaii;
+
+  // 0. Already settled upstream. The app-tool route charges the contract and then invokes the
+  //    capability over this node's own HTTP surface, which lands right back here — and since an
+  //    action behind a priced tool is no longer free (step 3.5), charging again would take payment
+  //    twice for one call. The pass is minted in-process, single use, and unknown to any caller, so
+  //    an absent or bogus one simply means "charge normally". It also stands down the pacing burn,
+  //    which the upstream settlement already took.
+  const settled = consumeInternalPass(internalPass);
+  if (settled) {
+    logger.debug('paywall stood down: settled upstream', { ext: ext.name, action: action.id, ...settled });
+    return { ok: true };
+  }
 
   // 1. Owner (and their own principals) always free — no toll, no payment.
   if (callerOwner === ownerName) return { ok: true };
@@ -93,8 +111,43 @@ export async function enforcePaywall(args: {
   });
   if (!paced.ok) return { ok: false };
 
-  // 3.5 Not commercial → free public call (the script's own public_access decides who may read).
-  if (!action.commercial) return { ok: true };
+  // 3.5 Not commercial in its OWN right — but it may be what a priced app-tool sells. An app-tool
+  //     binds an extension action and puts a price on it; the raw route is the same capability
+  //     through a different door, and it was free. Every priced app on the node had a bypass beside
+  //     its own front door, and only the buyer who contracted actually paid.
+  //
+  //     Charged on the APP-TOOL's coordinate, not this action's, because that is the coordinate the
+  //     product is sold under: a contract holder settles once at the price they agreed, whichever
+  //     door they came through, and anyone else is told which listing to contract.
+  if (!action.commercial) {
+    const sold = await pricedAppToolsFor(storage, `${ownerName}@${config.nodeId}`, ext.name, action.id);
+    if (!sold.length) return { ok: true };                  // genuinely free: nothing sells it
+
+    // One action can be sold under several tools. Settle the one the caller actually CONTRACTED —
+    // charging them against a product they never bought would be its own kind of theft — and try
+    // them in a stable order so an uncontracted caller always gets the same answer.
+    for (const s of sold) {
+      const coordExt = `apptool:${ownerName}/${s.appId}`;
+      const viaTool = await settleMeteredCoordinate({
+        config, storage, coordExt, coordAction: s.tool,
+        label: `${s.appId}/${s.tool}`, callerGaii, res,
+      });
+      if (viaTool) return viaTool;                          // contracted → settled once, right here
+    }
+
+    const first = sold[0]!;
+    res.status(402).json({
+      ...error(config.nodeId, 'PAYMENT_REQUIRED',
+        `This capability is sold as ${sold.length === 1 ? 'the app-tool' : 'the app-tools'} `
+        + sold.map(s => `"${ownerName}/${s.appId} · ${s.tool}"`).join(', ') + '. '
+        + 'Take a contract on EXCHANGE (POST /v1/exchange/entitlements with the offering id) and '
+        + 'call it again — this route and the app-tool endpoint settle the same contract.'),
+      ...paymentChallenge(config),
+      app_tool: { owner: ownerName, app_id: first.appId, tool: first.tool, coordinate: `apptool:${ownerName}/${first.appId}` },
+      app_tools: sold.map(s => ({ owner: ownerName, app_id: s.appId, tool: s.tool })),
+    });
+    return { ok: false };
+  }
 
   // 4. Money channel (D1/D3): require a one-time token minted by a settled ext-call checkout.
   //    Checked BEFORE the morsel debit so a combo-2 caller without money is never charged morsels.

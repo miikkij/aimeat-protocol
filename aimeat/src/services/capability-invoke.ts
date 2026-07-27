@@ -11,6 +11,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage, CapabilityRecord } from '../storage/interface.js';
 import { safeFetch } from '../utils/url-validator.js';
+import { INTERNAL_PASS_HEADER } from '../routes/extensions/internal-pass.js';
 import { getActiveConnectTunnelManager } from './connect-tunnel.js';
 import { parseGaiiLoose, buildGEAI } from '../utils/gaii.js';
 
@@ -30,6 +31,11 @@ export async function invokeCapability(
   callerGhii: string,
   jwt: string,
   mode: 'normal' | 'raw' = 'normal',
+  /**
+   * One-shot proof that a route which knows the purchased product already settled this call.
+   * Minted in-process, single use, seconds long — see `routes/extensions/internal-pass.ts`.
+   */
+  internalPass?: string,
 ): Promise<InvokeResult> {
   const start = Date.now();
 
@@ -69,9 +75,15 @@ export async function invokeCapability(
         );
       }
 
+      // `internalPass` (when present) tells the paywall on the other end that this call was already
+      // settled by the route that knows which product was bought. Absent on every other path, so a
+      // capability reached any other way is charged normally.
       const response = await fetch(`http://127.0.0.1:${config.port}/v1/ext/${extName}/${actionId}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}` },
+        headers: {
+          'Content-Type': 'application/json', 'Authorization': `Bearer ${jwt}`,
+          ...(internalPass ? { [INTERNAL_PASS_HEADER]: internalPass } : {}),
+        },
         body: JSON.stringify(input),
       });
       const body = await response.json() as Record<string, unknown>;

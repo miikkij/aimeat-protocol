@@ -292,6 +292,78 @@ await test('Usage stats and lineage are per RAIL, not per coordinate', async () 
   assert(onUsd.length === 0, `the USD listing has no contract of its own, got ${JSON.stringify(onUsd)}`);
 });
 
+// ── No bypass: the raw door onto a priced product is the same product ────────
+await test('BYPASS: calling the backing extension action directly is NOT free once a tool sells it', async () => {
+  // The hole this closes, measured on production 2026-07-27: nuotta.html/search sold
+  // ext:kaiku-signals:search for 0.01 EUR while any signed-in principal could POST
+  // /v1/ext/kaiku-signals/search and get the identical answer for nothing. Every priced app on the
+  // node had that bypass beside its own front door — it is not a property of one extension.
+  const stranger = await setupOwner('by');
+  const direct = await json(`/v1/ext/${EXT}/free`, {
+    method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ businessId: '0101263-6' }),
+  });
+  assert(direct.status === 402, `a stranger must be charged, got ${direct.status}: ${JSON.stringify(direct.body).slice(0, 200)}`);
+  assert(direct.body?.error?.code === 'PAYMENT_REQUIRED', `402 says why: ${JSON.stringify(direct.body?.error)}`);
+  // The refusal must NAME the product, or the caller has no way to become a customer.
+  // Both `brief` and `paid` bind this one capability, which is exactly the ambiguity a first-match
+  // lookup would resolve by accident — the refusal names every product it is sold as.
+  const named = (direct.body?.app_tools ?? []).map((a: any) => a.tool).sort();
+  assert(JSON.stringify(named) === JSON.stringify(['brief', 'paid']),
+    `the 402 names every listing that sells it: ${JSON.stringify(direct.body?.app_tools)}`);
+});
+
+await test('BYPASS: the provider still calls their own extension free', async () => {
+  const own = await json(`/v1/ext/${EXT}/free`, {
+    method: 'POST', headers: auth(provider.token), body: JSON.stringify({ businessId: '0101263-6' }),
+  });
+  assert(own.status === 200, `owner-free survives, got ${own.status}: ${JSON.stringify(own.body?.error)}`);
+});
+
+await test('BYPASS: a contract holder calling the raw route settles ONCE, on a contract they hold', async () => {
+  // Same product, different door: the contract the consumer signed is what pays, so the two doors
+  // cannot be played off against each other.
+  //
+  // This consumer holds BOTH `brief` and `paid`, which bind the same capability — the raw route has
+  // nothing in the request to tell it which product was meant, so it settles the first in a stable
+  // order and the other is untouched. That resolution is defined rather than incidental; a caller
+  // who needs a particular one calls the app-tool endpoint, which names it.
+  const entFor = async (action: string) => {
+    const r = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+    return (r.body.data.entitlements as any[]).find(e => e.ext === `apptool:${provider.name}/${APP_ID}` && e.action === action);
+  };
+  const beforeBrief = await entFor('brief'), beforePaid = await entFor('paid');
+  const raw = await json(`/v1/ext/${EXT}/free`, {
+    method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ businessId: '0101263-6' }),
+  });
+  assert(raw.status === 200, `the contract holder gets through, got ${raw.status}: ${JSON.stringify(raw.body?.error)}`);
+  const afterBrief = await entFor('brief'), afterPaid = await entFor('paid');
+  assert(afterBrief.budget.calls === beforeBrief.budget.calls + 1,
+    `exactly one call on the settled contract, ${beforeBrief.budget.calls} → ${afterBrief.budget.calls}`);
+  assert(afterBrief.budget.spent_units === beforeBrief.budget.spent_units + afterBrief.price_per_call,
+    `charged its own agreed price once: ${beforeBrief.budget.spent_units} → ${afterBrief.budget.spent_units} at ${afterBrief.price_per_call}`);
+  assert(afterPaid.budget.calls === beforePaid.budget.calls,
+    `the OTHER contract is untouched — one call is one charge: ${JSON.stringify(afterPaid.budget)}`);
+});
+
+await test('NO DOUBLE CHARGE: the app-tool endpoint charges once, not once per door it passes through', async () => {
+  // The metered app-tool path invokes an extension over this node's own HTTP surface, so the call
+  // meets the raw paywall on the way. Settling in both places would charge one call twice.
+  const readEnt = async () => {
+    const r = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+    return (r.body.data.entitlements as any[]).find(e => e.ext === `apptool:${provider.name}/${APP_ID}` && e.action === 'paid');
+  };
+  const before = await readEnt();
+  const call = await json(`/v1/apps/${encodeURIComponent(provider.name)}/${encodeURIComponent(APP_ID)}/webmcp/tools/paid`, {
+    method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ businessId: '0101263-6' }),
+  });
+  assert(call.status === 200, `metered call ${call.status}: ${JSON.stringify(call.body?.error)}`);
+  const after = await readEnt();
+  assert(after.budget.calls === before.budget.calls + 1,
+    `ONE call, not two: ${before.budget.calls} → ${after.budget.calls}`);
+  assert(after.budget.spent_units === before.budget.spent_units + 20_000,
+    `ONE charge of 0.02 EUR, not two: ${before.budget.spent_units} → ${after.budget.spent_units}`);
+});
+
 await test('INVARIANT: repricing the source does NOT change an existing contract', async () => {
   const w = await writeManifest(provider.token, [tool({ price: { morsels: 99 } })]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);

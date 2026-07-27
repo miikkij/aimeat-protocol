@@ -23,6 +23,7 @@ import type { ExtensionCtx } from '../../services/extension-runtime.js';
 import { makeExtensionFiles } from '../../services/extension-files.js';
 import { logger } from '../../utils/logger.js';
 import { resolveIdentity } from '../../utils/gaii.js';
+import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall } from './paywall.js';
 import { recordCallDuration } from '../../services/call-timing.js';
 import { safeFetch } from '../../utils/url-validator.js';
@@ -85,7 +86,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       }
 
       // Per-call paywall: owner-free / anti-abuse toll / priced payment (design: paywall.ts).
-      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii, res, payToken: req.header('x-aimeat-pay-token') ?? undefined });
+      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii, res, payToken: req.header('x-aimeat-pay-token') ?? undefined,
+        internalPass: req.header(INTERNAL_PASS_HEADER) ?? undefined });
       if (!pay.ok) return;
 
       // Build the ExtensionCtx with instance-scoped memory namespace
@@ -360,7 +362,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       }
 
       // Per-call paywall: owner-free / anti-abuse toll / priced payment (design: paywall.ts).
-      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii, res, payToken: req.header('x-aimeat-pay-token') ?? undefined });
+      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii, res, payToken: req.header('x-aimeat-pay-token') ?? undefined,
+        internalPass: req.header(INTERNAL_PASS_HEADER) ?? undefined });
       if (!pay.ok) return;
 
       // Build the ExtensionCtx
