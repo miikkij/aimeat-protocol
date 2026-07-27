@@ -40,9 +40,29 @@ It never invents secrets or pushes anything outward without asking.
 </p>
 <p align="center"><em>The portal and profile are fully responsive: on mobile the grouped navigation collapses into an off-canvas drawer and the logged-in pill stays reachable.</em></p>
 
-### See it in action (5:50)
+### See it in action
 
-An AI agent connects to an AIMEAT node and reaches full operational readiness autonomously:
+Four recordings of a real browser against the live node, with the account's real data. Waiting is cut and long stretches are compressed; every number on screen is the one the node actually returned.
+
+**An agent builds a working surface over MCP — nothing is clicked (1:05)**
+
+<video src="https://github.com/miikkij/aimeat-protocol/raw/main/assets/video/mcp-direct.mp4" controls muted playsinline width="100%"></video>
+
+One sentence typed into a chat. Claude writes the plan onto an [ORIGAMI](#origami--a-surface-that-builds-itself) board and ticks it off as it goes: 23 days of the owner's own AI usage read out of the account, the same numbers drawn as a chart, a whole CRM running live inside a frame, and an invitation published at its own address that anyone can answer without an account — then the replies, read back out of the CRM and filtered to that event. Nobody clicked anything in that window. 3 min 49 s from nothing to all of it, shown here in 65 seconds. ([direct link](assets/video/mcp-direct.mp4))
+
+**The same surface, driven by a human (1:34)**
+
+<video src="https://github.com/miikkij/aimeat-protocol/raw/main/assets/video/origami-live.mp4" controls muted playsinline width="100%"></video>
+
+An empty board → one sentence that starts several pieces of work at once → an invitation, where you describe what its button should do in plain language → publish → a guest answers with no account → the answer lands in the CRM → all of it side by side on one surface. ([direct link](assets/video/origami-live.mp4))
+
+**A capability earns real money (2:46)**
+
+<video src="https://github.com/miikkij/aimeat-protocol/raw/main/assets/video/helvetinkone.mp4" controls muted playsinline width="100%"></video>
+
+A real product ([NUOTTA](#nuotta--public-tender-intelligence), not a demo) answers a question a supplier would actually ask; the same capability is listed for sale on [EXCHANGE](#exchange--a-marketplace-where-apps-buy-what-they-need) with what a buyer is told before paying; somebody buys it; the seller's wallet changes; and a till built on the surface reads the seller's own public figures every five seconds. ([direct link](assets/video/helvetinkone.mp4))
+
+**An agent connects and reaches full operational readiness on its own (5:50)**
 
 [![AIMEAT Agent Hello Integration](https://img.youtube.com/vi/ncBX9BaoAWM/maxresdefault.jpg)](https://youtu.be/ncBX9BaoAWM)
 
@@ -71,6 +91,7 @@ AIMEAT covers that layer. Agents store their output in shared memory, other agen
 
 - **MCP** (now Linux Foundation, MIT) is the native tool-calling standard in AIMEAT
 - **A2A** (now Linux Foundation, Apache 2.0) handles session-based delegation; AIMEAT adds persistent identity, memory exchange, and economic settlement
+- **ODPS** — the [Open Data Product Specification](https://opendataproducts.org/) v4.1 (Linux Foundation, Apache 2.0) is how a priced capability describes itself. Every EXCHANGE listing is *projected* into an ODPS document on read — `GET /v1/exchange/offerings/{id}/odps(.yaml)` — so a catalogue or a buying agent that has never heard of AIMEAT can still read what a thing is, how it is delivered, what it costs, what you may do with the output, and who stands behind it
 - **MemPalace** (MIT) is excellent single-agent memory; AIMEAT adds the network layer (sharing, federation, discovery)
 - **Nostr**, **ANP**, **Mem0/Letta** etc. cover different angles; AIMEAT offers a simpler HTTP-based approach focused on shared memory and economy
 
@@ -125,7 +146,9 @@ A node MUST implement Identity, Data, and Authorization. Economy, Collaboration,
 
 ### Applications and packages
 
-On top of the protocol sits the application layer. Apps are self-contained HTML files built by AI and stored on your node. Server extensions run in a sandboxed environment, processing data and calling external APIs. Cortex manifests provide shared UI components (charts, forms, layouts) that any app can use. Packages bundle all of these together into installable units that others can browse and install from the template gallery.
+On top of the protocol sits the application layer. Apps are self-contained HTML files built by AI and stored on your node, each served from its own origin. Server extensions run in a QuickJS-WASM sandbox, processing data and calling external APIs. Cortex manifests provide shared UI components (charts, forms, layouts) that any app can use. Packages bundle all of these together into installable units that others can browse and install from the template gallery.
+
+An app is also an **agent surface**: any function it exposes can be published as a priced **app-tool** that appears on [EXCHANGE](#exchange--a-marketplace-where-apps-buy-what-they-need), in the node's MCP server card and in the product feed. The browser and the agent then run the *same* engine — [GRAPH 3D](#and-the-rest-of-the-shelf) previews a surface in WebGL and sells the identical vector render server-side; [Pixel Mirage](#and-the-rest-of-the-shelf) dithers in the browser and sells the same render for a morsel. One implementation, two audiences.
 
 ### Node types
 
@@ -187,109 +210,100 @@ Tell any AI what you want and get a working app. Your node serves a canonical bu
 
 For simple one-off apps, just copy the prompt from the portal landing page, paste it into any AI chat, and you get a working HTML app that uses AIMEAT memory. No registration needed.
 
-### Example: Jewelz game (6 minutes)
+If your AI can make HTTP calls (Claude Code, Cursor, Copilot), point it at your node's `llms.txt` and describe what you want — it reads the API docs, checks `/v1/capabilities`, and builds. If your AI chat cannot make HTTP calls (ChatGPT, Gemini, free-tier Claude), copy the app-generation prompt from your node's "Try it" page at `/v1/classic`; the AI asks you what you want and produces an HTML file you paste into the App Catalogue. Add the node as an MCP server and the AI can install extensions and publish apps directly, with no UI at all: `aimeat_app_publish`, `aimeat_extension_install`, `aimeat_cortex_install`, `aimeat_memory_*`, `aimeat_storage_*` cover the whole publish/install/inspect cycle.
 
-If your AI can make HTTP calls (Claude Code, Cursor, Copilot), point it at your node's `llms.txt` and describe what you want:
+### What has been built on it
 
-```
-http://localhost:40050/llms.txt - Build me a match-3 jewels game.
-This node has capabilities at /v1/capabilities - check what's available
-(like the aimeat-charts cortex for score visualization).
-Use the standard AIMEAT app template with login bar and save high scores to memory.
-```
+Every app below is a **single HTML file** living on the node, built by talking to an AI, published over MCP in seconds. There is no per-app backend code beyond sandboxed extensions. All of them are live on [aimeat.io](https://aimeat.io/); each runs on its own origin (`https://<app>.apps.aimeat.io/`) under H-2 origin isolation.
 
-The AI reads the API docs, checks available capabilities, and builds the app:
+#### ORIGAMI — a surface that builds itself
 
-<img src="assets/screenshots/gen_jewels_game_app1.png" alt="Claude Code building Jewelz game from a single prompt" width="600" />
-
-The result is a match-3 game with AIMEAT login, persistent high scores saved to memory, and a Chart.js score history panel. Runs directly on your node:
-
-<img src="assets/screenshots/gen_jewels_game_app2.png" alt="Jewelz game running on AIMEAT" width="600" />
-
-> **If your AI chat can't make HTTP calls** (ChatGPT, Gemini, free-tier Claude), go to your node's "Try it" page at `/v1/classic` and copy the app generation prompt from there. The AI will ask you questions (what kind of app, name, style), you answer, and it produces an HTML file. Paste it into the App Catalogue, iterate to improve it, and publish. You can also connect agents to the same app if they use the same memory keys.
-
-### Example: Rick and Morty app with server-side extension (under 10 minutes)
-
-Here's what the full flow looks like, from zero to a published app with a server-side API extension:
-
-**1. Copy the "Generate Extension" prompt from your profile's Extensions tab. Paste it into any AI chat along with what you want (e.g. "create extension from https://rickandmortyapi.com/"). The AI designs the extension, actions, and scheduled jobs:**
-
-<img src="assets/screenshots/gen-extensions-rickmorty1.png" alt="AI designs the extension architecture" width="600" />
-
-**2. The AI produces all the files: manifest, 8 action scripts, install command. It validates the YAML, checks sandbox compatibility, and gives you a one-line install:**
-
-<img src="assets/screenshots/gen-extensions-rickmorty2.png" alt="AI generates extension files with install command" width="600" />
-
-**3. After installing, the extension appears in your profile with all its actions, config, and API endpoint ready to use:**
-
-<img src="assets/screenshots/gen-extensions-rickmorty3.png" alt="Extension code review in profile" width="400" />
-<img src="assets/screenshots/gen-extensions-rickmorty4.png" alt="Installed extension with actions and API endpoint" width="600" />
-
-**4. Now build the app. Point the AI to `http://localhost:40050/llms.txt` and ask it to make a Rick and Morty app using the existing capabilities at `/v1/capabilities`. Paste the result into the App Catalogue (Add App > Paste):**
-
-<img src="assets/screenshots/gen-extensions-rickmorty5.png" alt="Pasting the app HTML into App Catalogue" width="400" />
-
-**5. The app is saved locally. Right-click to publish it to the server so others can use it too:**
-
-<img src="assets/screenshots/gen-extensions-rickmorty6.png" alt="App context menu with Publish option" width="300" />
-<img src="assets/screenshots/gen-extensions-rickmorty7.png" alt="Publish dialog" width="400" />
-
-That's it. A server-side extension with 8 API actions, a scheduled data refresh job, and a browser app that uses it, all created by copy-pasting prompts into an AI chat.
-
-> **Note:** If you add your AIMEAT node as an MCP server in Claude Code, VS Code, or Cursor, the AI can install extensions and publish apps directly through MCP tools without using the UI at all.
-
-### Example: Band Jam, a real-time multiplayer music app
-
-Not everything has to be simple. This is a real-time peer-to-peer music collaboration app built through conversation with Claude. Multiple people join a room, pick instruments, and play together over WebSockets. It has a ProTracker-style pattern editor, live jam mode, note recording, and a note river visualization showing what everyone is playing.
-
-The first prompt produced a working 971-line single HTML file. Then iterating over multiple rounds added features: virtual keyboard for mobile, multi-track recording, reconnect handling, per-track volume control, and 9-track tabbed editing.
-
-<details>
-<summary>Click to see the AI conversation that built it (4 screenshots)</summary>
-
-<p>
-  <img src="assets/screenshots/gen_realtime_websocket_p2p_BandJam1.jpeg" alt="Initial prompt and architecture" width="48%" />
-  <img src="assets/screenshots/gen_realtime_websocket_p2p_BandJam2.jpeg" alt="Feature iteration with honest limitations" width="48%" />
-</p>
-<p>
-  <img src="assets/screenshots/gen_realtime_websocket_p2p_BandJam4.jpeg" alt="Multi-track refactor with 9 tracks" width="48%" />
-  <img src="assets/screenshots/gen_realtime_websocket_p2p_BandJam5.jpeg" alt="Final version with per-track controls" width="48%" />
-</p>
-
-</details>
-
-Two users jamming together on desktop (top: piano, bottom: drums). Notes sync in real-time across all connected browsers:
-
-<img src="assets/screenshots/gen_realtime_websocket_p2p_BandJam6.jpeg" alt="Two browsers jamming together" width="600" />
-
-Works on mobile too. Virtual drum pads with multi-touch support:
-
-<img src="assets/screenshots/gen_realtime_websocket_p2p_BandJam8_mobile.jpeg" alt="Mobile drum pad interface" width="300" />
-
-All of this runs on AIMEAT's built-in WebSocket realtime layer. The app is a single HTML file, no build step, no external dependencies beyond what the node provides.
-
-### Example: 3D world with live AI agents
-
-This one combines everything. A Three.js 3D world where you place and edit objects, with AI agents connected to the same world through AIMEAT's shared memory and chat. The agent (Hermes/OpenClaw, connected via Telegram) sees what's in the world, responds to requests in the world chat, and builds content alongside you in real-time.
-
-<img src="assets/screenshots/gen_3dword_app_with_agent_creating_content_also_by_chatting_with_agent.jpg" alt="3D world with AI agent creating content through chat" width="700" />
-
-On the left: Telegram chat with the agent. The user asks it to build things ("build a house", "add windows"), and it does, updating the 3D world through shared memory. On the right: the world chat panel showing both the user and the agent (`maailmat-builder#happyadmin@aimeat-finland-001-genesis`) communicating. The agent updates its presence automatically, reads the current world state so it knows what's already there, and creates new objects based on conversation.
-
-The app prompts the agent with the current world state so it can make informed decisions about what to build and where. You edit the world manually (drag objects, place shapes from the toolbar) while the agent builds alongside you. Everything syncs through AIMEAT memory.
-
-### Example: Comicland, an AI comic community (full app, built from VS Code)
-
-Comicland is a community for AI-generated comics built end-to-end from VS Code with Claude Code talking directly to a live AIMEAT node. No CI, no separate deploy step -- each iteration is `aimeat_app_publish` over MCP and the new version is live on the node within seconds. The whole 5-layer AIMEAT stack (extension, cortex, app) was scaffolded by AI, then evolved through dozens of feature passes in the same workflow.
+You write a sentence; a window appears on the board and fills itself in. The window can be data, a chart, a form, a published app running as the real program, or work handed to one of your agents. Alternatives fold out beside a frame so you can compare them, and the winner gets promoted. The first two [recordings above](#see-it-in-action) — one driven by an agent over MCP, one by a human — are both ORIGAMI.
 
 <p align="center">
-  <img src="assets/screenshots/comic-land-series-view.png" alt="Comicland series detail with episodes, follow, tip, and owner-only publish/unpublish controls" width="48%" />
-  <img src="assets/screenshots/comic-land-creation-pipeline.png" alt="Comicland creation pipeline: AI interview -> script JSON -> per-page image prompts -> overlay editor -> publish" width="48%" />
+  <img src="assets/screenshots/origami-till-nuotta.png" alt="An ORIGAMI board: on the left a till showing EUR settled, morsels, paid calls and buyers under contract; on the right the NUOTTA app running live inside a frame" width="820" />
+</p>
+<p align="center"><em>Left: a till the owner described in one sentence, re-reading the seller's own public figures every five seconds. Right: NUOTTA, the actual app, running inside a frame on the same board.</em></p>
+
+#### EXCHANGE — a marketplace where apps buy what they need
+
+Providers list capabilities (data feeds, APIs, agent work, callable app-tools); apps and agents browse or post a need, accept a budget-capped contract, and every call is metered. Prices show on both rails at once — real money settled to the provider, and morsels that pace usage.
+
+<p align="center">
+  <img src="assets/screenshots/app-exchange.png" alt="EXCHANGE marketplace: 40 offerings, 5 needs, 9 contracts, settlement rails USDC/EURC over x402 and Stripe EUR/USD, and a listing priced at 0.02 EUR per call plus 1 morsel" width="820" />
 </p>
 
-What's in there: a prompt-driven creation pipeline (AI interview produces a script, the app generates per-page Nano-Banana-style image prompts with character/environment references, the user pastes the resulting images back); a 3-step episode wizard with page or panel images; a drag-and-drop speech-bubble overlay editor with language-keyed translations; multi-tenant reading where any logged-in user can read another author's published series from their own GHII namespace; characters and environments with multiple reference images and a chosen showcase; follow/tip/comment social actions; per-series public/private toggle and per-episode draft/published toggle so authors can prepare quietly and roll out when ready; full FI/EN i18n. All of it stored in AIMEAT memory + storage with proper public/private visibility, no Comicland-specific backend code beyond one sandboxed extension with eleven router-actions.
+#### ODPS — the descriptor a listing already speaks
 
-The same loop works for any sufficiently rich app: open a folder, point Claude Code at the node, and iterate. The MCP tools (`aimeat_app_publish`, `aimeat_extension_install`, `aimeat_cortex_install`, `aimeat_memory_*`, `aimeat_storage_*`) cover the entire publish/install/inspect cycle.
+Every listing is projected on read into an [Open Data Product Specification](https://opendataproducts.org/) v4.1 document (Linux Foundation, Apache 2.0) at `GET /v1/exchange/offerings/{id}/odps.yaml` — [try one live](https://aimeat.io/v1/exchange/offerings/off-8cb6cc96-a92/odps.yaml). Nothing is stored in ODPS form, and nothing is invented: a field the node cannot know is omitted, never filled with a plausible value, so an unstated SLA is an absent SLA block instead of a promise of 99.9 %. The AIMEAT-specific truth (metered coordinate, pinned interface + I/O schema, call recipe, provenance, observed reputation) sits under `product.x-aimeat`, where the schema permits extensions, so the document still validates against the official one.
+
+<p align="center">
+  <img src="assets/screenshots/app-odps.png" alt="The ODPS app validating a live AIMEAT listing: valid ODPS v4.1 document, 100% buyer-facing completeness, 13 fields a buyer looks for, 0 problems, 0 notices" width="820" />
+</p>
+<p align="center"><em>The ODPS app checks a document against the official v4.1 schema in the browser, explains what each part is for, and shows what is missing from your own. The same validator is a metered capability agents can call.</em></p>
+
+#### NUOTTA — public tender intelligence
+
+Finnish public procurement, searchable by what you sell rather than by who you know — CPV codes match by prefix, so `72` covers every IT service beneath it and returns 1,456 notices in the shot below. Then Go/No-Go analysis, scoring, budget leads, a buyer money picture, stored tender documents and bid drafting. Five of its functions are listed on EXCHANGE as priced app-tools.
+
+<p align="center">
+  <img src="assets/screenshots/app-nuotta.png" alt="NUOTTA searching Finnish public tenders by CPV prefix 72, showing 1,456 matching tenders with buyer, deadline and CPV codes per result" width="820" />
+</p>
+
+#### TURBO — make the API you already have AI-native
+
+TURBO bolts an AI-native layer onto an existing system without touching it. Paste your `openapi.yaml` into an AI chat with TURBO's prompt (or let it draft the spec from your docs first) and you get an acceleration report: what becomes possible, proposed prices, proposed agent crews. You approve the operations and the EUR/USD prices, an MCP-connected AI executes one handoff brief, and TURBO polls the node and turns each step green only when the artifact really exists.
+
+<p align="center">
+  <img src="assets/screenshots/app-turbo.png" alt="TURBO: turbocharge the API you already have — the four-step Survey / Approve / Execute / Verify flow and what you end up with" width="820" />
+</p>
+
+What you end up with: your API proxied as a sandboxed extension with the key encrypted and host-pinned, a dev library (`AIMEAT.{yourapi}.*` from one script tag), a published app built on it, and an agent skill with priced tools agents buy through checkout. Everything installs into your own account.
+
+#### CADENCE — a CRM that fits in one hand
+
+Mobile-first: tap to dial, dictate the note by voice, set the next follow-up. Company cards enrich from the Finnish trade register and show buying signals from public procurement. One named public form per event carries its name into every contact's source and tag. Per-member notification routing, HubSpot CSV import, SSE live-refetch, bilingual handbook — and four of its capabilities are for sale on EXCHANGE.
+
+#### HARMONY MAP — chords as a living map
+
+Chords are nodes and the arrows show how harmony moves; follow them and you get progressions that sound good. Six diagram shapes (function map, circle of fifths, cadence staircase, molecule, Tonnetz, tension pyramid), triads through jazz 9ths, seven modes that recolour the same theory, then scenes and tracks you arrange into a whole song — with a live 3D note-cube, an AI composer, guided lessons, ear training, MIDI export and a share link that carries the entire song.
+
+<p align="center">
+  <img src="assets/screenshots/app-harmony-map.png" alt="HARMONY MAP showing a jazz ii-V-I in F with 9th chords, arrows coloured by resolution / reversible / relative / parallel key, and a keyboard highlighting the key's notes and the selected chord's tones" width="820" />
+</p>
+
+#### Band Jam — jam together in real time
+
+Multiple people join a room, pick instruments, and play together over the node's WebSocket layer: a ProTracker-style pattern editor, live jam mode, multi-layer song arrangement, a note river showing what everyone plays. Now with **116 ST-XX sample disks** (CC0) in an extended `.asb` format free of Amiga-era size limits — every sample becomes an instrument you can pick per track — plus an **AI bandmate** that follows your key and groove and fills in drums, bass and chords.
+
+<p align="center">
+  <img src="assets/screenshots/app-band-jam.png" alt="Band Jam in a room: transport and edit mode, the AI Band panel, and the sample banks panel with ST-01 loaded showing 126 samples" width="820" />
+</p>
+
+#### Games
+
+<p align="center">
+  <img src="assets/screenshots/app-tower-tetris.png" alt="TOWER TETRIS: the shared 43-floor tower rendered in 3D beside the play panel" width="49%" />
+  <img src="assets/screenshots/app-teletype.png" alt="TELETYPE: green-on-black arcade attract screen with INSERT COIN and the @-ship on its rail" width="49%" />
+</p>
+
+**TOWER TETRIS** — one persistent shared 3D tower for the whole node. Every line you clear adds a floor in your colour; doubles, triples and TETRIS wreck 3/6/10 floors of your top colour, and demolition pays points. The tower survives forever in a server-side extension, so you always arrive at whatever everyone else has built (43 floors, record 47, at the time of the shot).
+
+**TELETYPE** — a writing-based R-Type. Your `@`-ship rides a rail, enemies are words you type down letter by letter, and magenta GUNNERs fire the same short bullet-word back at you. One keyboard, two threats: the next letter you press decides which one lives, so attack and defence share a single input channel. Five word pools from GEEKNERD to SUPERTYPIST, flawless-streak combos, three-letter high scores.
+
+#### Soliton Soundscape — hear a nonlinear collision
+
+Launch two solitons and watch what a collision actually does to them: the taller one advances, the smaller is delayed, and the thin translucent curves show where each would have been without the interaction. The phase shift is annotated on the graph and the combined wave is played as a tone.
+
+<p align="center">
+  <img src="assets/screenshots/app-soliton.png" alt="Soliton Soundscape: two colliding pulses with the phase shift annotated as advanced +0.66 and delayed -0.56, simulation controls, and the generated sound waveform" width="820" />
+</p>
+
+#### And the rest of the shelf
+
+**LATTICE** — a spreadsheet where cells are live AIMEAT memory and formulas are AI transforms, every computation priced and logged; an agent can read the sheet, plan a recalculation, price it from the sheet's own history, and write it back. **GRAPH 3D** — plot a formula in three dimensions, then sell the same render to agents as a priced app-tool with vector SVG output. **Pixel Mirage** — 32 palettes and 18 dither algorithms in the browser, and the identical render sold to agents from one shared engine. **PRH Yritystutka** — Finnish company intelligence over PRH and Statistics Finland open data, with a watchlist and change alerts. **MISSIONS** — governed agent mission control, where policies compile into enforced approval gates. **AIMEAT Experience Center** — the academy and showroom, free to explore without an account.
+
+**Try them yourself, no account needed:** [HARMONY MAP](https://harmony-map.apps.aimeat.io/) · [Soliton Soundscape](https://soliton-soundscape.apps.aimeat.io/) · [TOWER TETRIS](https://tetris3d.apps.aimeat.io/) · [TELETYPE](https://teletype.apps.aimeat.io/) · [ODPS validator](https://odps.apps.aimeat.io/) · [Experience Center](https://experience-center.apps.aimeat.io/). The rest ask you to sign in, because they work on your data.
 
 ### Sell services and get paid
 
@@ -301,17 +315,13 @@ Settlement is **non-custodial** and pluggable — the same session settles in:
 - **USDC over x402** (Base) — an external x402-compatible agent signs an EIP-3009 authorization, a facilitator verifies and settles it on-chain, and funds move straight to the seller's wallet; the node holds nothing (proven end-to-end on Base Sepolia);
 - **euros over Stripe Connect** (Enterprise) — sellers are Stripe Express connected accounts, charges land on the seller with the operator's platform fee routed as an application fee, and DAC7 + VAT are booked.
 
-The commerce core never holds funds or keys, and adding a rail is one more `PaymentHandler` — the core stays untouched. Agent-faced apps can monetize their tools the same way (priced `app-tool` calls listed in the product feed and the MCP server card).
-
-### Calibrate prompts
-
-<img src="assets/screenshots/profile-generator.png" alt="Generator and calibrator" width="600" />
-
-The calibrator batch-tests generator prompts against multiple AI models via OpenRouter. It analyzes output quality on structural dimensions, runs dual reflection (judge + candidate), and synthesizes improvements at conservative/moderate/aggressive tiers. Version tracking with changelogs keeps a history of what changed and why.
+The commerce core never holds funds or keys, and adding a rail is one more `PaymentHandler` — the core stays untouched. Agent-faced apps can monetize their tools the same way (priced `app-tool` calls listed in the product feed and the MCP server card), and every listing publishes itself as an [ODPS v4.1 descriptor](#odps--the-descriptor-a-listing-already-speaks) so a buyer that has never heard of AIMEAT can still read the terms.
 
 ### Built-in components
 
-Seven bundled cortexes ship out of the box: charts (Chart.js wrapper), forms (inputs, selects, validation), layouts (8 responsive patterns including dashboard grid and fibonacci), navigation (tabs, sidebar, breadcrumbs), dialogs (modals, toasts, alerts), viewers (carousel, grid, DataTable, timeline), and canvas (drawing with export). All are MIT-licensed, zero external dependencies, and available to any app under the `AIMEAT.*` namespace.
+Thirteen bundled cortexes ship out of the box: charts (Chart.js wrapper), forms (inputs, selects, validation), layouts (8 responsive patterns including dashboard grid and fibonacci), navigation (tabs, sidebar, breadcrumbs), dialogs (modals, toasts, alerts), viewers (carousel, grid, DataTable, timeline), canvas (drawing with export), motion, flow, DAG, surface, viewport and i18n. All are MIT-licensed, zero external dependencies, and available to any app under the `AIMEAT.*` namespace.
+
+Alongside them a **library-pack registry** serves self-hosted third-party libraries from the node itself (three.js, PixiJS, Phaser, p5.js, mermaid, Chart.js, Tailwind + daisyUI, pdf.js and more) at `/lib/`, so an app never reaches for a CDN and the node's CSP stays closed.
 
 ### Packages and templates
 
@@ -451,17 +461,19 @@ aimeat-protocol/
 ├── openapi.yaml              canonical API contract (OpenAPI 3.1)
 ├── startup.prompt.md         paste-to-AI: fresh clone → running node
 ├── aimeat/                   ★ the reference implementation (Node 24 / TypeScript / Express 5)
-│   ├── src/routes/           ~132 route handlers (one per domain)
-│   ├── src/services/         ~184 business-logic services
+│   ├── src/routes/           ~199 route modules (one per domain)
+│   ├── src/services/         ~275 business-logic services
 │   ├── src/storage/          Storage interface + PostgreSQL(Kysely) / SQLite providers
 │   ├── src/auth/  mcp/  middleware/  models/  server-bootstrap/  cli/  enterprise/
+│   ├── src/static/sdk-libs/  browser SDK libs, ESM source → esbuild IIFE at /v1/libs/
 │   ├── public/               Preact + HTM SPA, no build (views, components, js, css, lib)
 │   ├── locales/  test/  tools/   i18n · E2E suites · dev tools (synthtraces)
 │   └── docs/                  implementation-local docs (integrations, …)
 ├── python/aimeat-crewai/     ★ pip-installable CrewAI liaison/connector (own PyPI line)
 ├── aimeat-desktop/           ★ Tauri desktop app — AIMEAT Personal Node installer
+├── tools/aimeat-openhands/   preconfigured OpenHands app-builder (fetches /v1/prompts/build-app)
 ├── packages/                 hosted app source (agent-kanban, digital-signage, …) + build scripts
-├── assets/                   brand/design assets, logos, screenshots
+├── assets/                   brand/design assets, logos, screenshots, README videos
 └── docs/                     spec + guides — v4.0 Core/Platform, coding-guidelines/, known_gaps, …
 ```
 
@@ -472,9 +484,8 @@ The agent **runtime** (fleet daemon + 40+ crew templates) lives in the sibling r
 ```bash
 pnpm test:e2e:sqlite            # fast iteration default
 pnpm test:e2e:postgres-kysely   # primary / prod backend; run before a PR (needs a running Postgres)
-pnpm test:playwright:sqlite # browser tests, scoped
-pnpm test                   # unit tests
-pnpm typecheck && pnpm lint
+pnpm test                       # unit tests (vitest)
+pnpm typecheck && pnpm typecheck:frontend && pnpm lint
 
 # Run a single E2E suite (preferred during iteration -- much faster than the full sweep)
 cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=<suite>
@@ -508,6 +519,8 @@ cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2
 | v2.0 | 2026-03-08 | Node types, moderation, idempotency |
 | v1.x | 2025-2026 | Core protocol and early features |
 
+Those are *specification* versions. The reference implementation has its own line — see [CHANGELOG.md](CHANGELOG.md) and the [releases page](https://github.com/miikkij/aimeat-protocol/releases).
+
 ---
 
 ## Contributing
@@ -517,11 +530,13 @@ This is MIT. Modify as you see fit, play, create and learn, enjoy with love. Bec
 See [CONTRIBUTING.md](CONTRIBUTING.md). Before opening a PR:
 
 ```bash
-pnpm typecheck
+pnpm typecheck && pnpm typecheck:frontend
 pnpm lint
 pnpm test:e2e:sqlite
 pnpm test:e2e:postgres-kysely
 ```
+
+A committed pre-commit hook (`.githooks/pre-commit`, activated by the root `prepare` script) runs lint, both typechecks and the importmap/catalog/MCP-tool consistency checks before every commit; CI runs the same set plus the unit suite.
 
 ## License
 
