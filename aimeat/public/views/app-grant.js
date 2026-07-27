@@ -22,6 +22,18 @@
  *     shows "Your app" instead of "not yours"; manage mode pre-checks the UNION of granted +
  *     requested scopes and badges newly requested ones "new" (they used to come unchecked, so
  *     users silently kept the old grant after an app added a scope).
+ *   v1.3.0 — 2026-07-27 — Weight + framing pass (outside feedback: the screen "was heavy and would
+ *     easily scare people away"). Generic for every app, nothing app-specific here:
+ *       • identity first — icon (manifest) or a monogram, name, origin, and the app's own
+ *         description, so a stranger sees WHAT this is before what it asks for;
+ *       • the scope wall collapses to ONE line of areas ("Works with: your saved data, your
+ *         files") behind "Show the exact permissions (N)". The exact list is unchanged and one
+ *         click away — the wording is not softened, because app-grant memory scopes really do
+ *         reach the owner's whole namespace;
+ *       • one disclosure instead of two: expanding shows the list WITH the per-scope checkboxes
+ *         (the old "Advanced" toggle hid subset selection from everyone who never found it);
+ *       • the guarantees read as promises, not as the warning "This app is not yours";
+ *       • "Don't trust" → "Not now": cancelling no longer means declaring the app untrustworthy.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -32,12 +44,38 @@ import { escHtml } from '/js/utils.js';
 import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
-const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
+/** t() with a literal fallback; {vars} are interpolated into the fallback too (missing-key safety). */
+const tr = (key, fallback, vars) => {
+  const v = t(key, vars);
+  if (v && v !== key) return v;
+  let s = fallback;
+  if (vars) for (const [k, val] of Object.entries(vars)) s = s.replaceAll(`{${k}}`, String(val));
+  return s;
+};
+
+/**
+ * Plain-language area per scope family, for the one-line summary. The summary names WHAT the app
+ * touches; the exact verbs (read / create / delete) stay in the expandable list, unchanged.
+ */
+const AREA_FALLBACKS = {
+  memory: 'your saved data',
+  storage: 'your files',
+  catalogue: 'the public catalogue',
+  social: 'boards',
+  messages: 'your messages',
+  wallet: 'your morsel balance',
+  knowledge: 'your knowledge packages',
+  task: "your agents' tasks",
+  workflow: 'your automations',
+  ai: 'your AI budget',
+  notifications: 'notifications to you',
+  organism: 'your workspaces',
+};
 
 export default function AppGrant() {
   const [state, setState] = useState({ status: 'loading', request: null, error: '' });
   const [submitting, setSubmitting] = useState(false);
-  const [advanced, setAdvanced] = useState(false);
+  const [details, setDetails] = useState(false); // exact per-scope list + checkboxes, collapsed by default
   const [selected, setSelected] = useState(() => new Set());
   const [existingGrant, setExistingGrant] = useState(null); // the grant this app already holds (manage mode)
   const [ownApp, setOwnApp] = useState(false); // server-verified: origin-bound request for the signed-in owner's own app
@@ -91,7 +129,7 @@ export default function AppGrant() {
         // covers what it's asking for, just approve silently — no second prompt for an app you trust.
         const covers = grant && reqScopes.every((s) => grant.scopes.includes(s));
         if (grant && !res.data.manage && covers) { setState({ status: 'autoapprove', request: res.data }); return; }
-        if (grant) setAdvanced(true); // manage / add-scopes → show the per-scope checkboxes up front
+        if (grant) setDetails(true); // manage / add-scopes → open the exact list + checkboxes up front
         setState({ status: 'ready', request: res.data });
       })
       .catch((e) => { if (live) setState({ status: 'error', error: e.message || tr('appGrant.expired', 'This request has expired.') }); });
@@ -184,48 +222,82 @@ export default function AppGrant() {
   }
 
   const req = state.request;
+  // Areas, in the order the app asked for them — one plain line instead of a wall of boxes.
+  const areas = [];
+  for (const s of req.scopes) {
+    const family = String(s.scope).split(':')[0];
+    if (!areas.includes(family)) areas.push(family);
+  }
+  const areaLine = areas.map((a) => tr(`appGrant.area.${a}`, AREA_FALLBACKS[a] || a)).join(', ');
+  const keepsData = areas.includes('memory') || areas.includes('storage');
+  const icon = String(req.app_icon || '').trim();
+  const iconIsUrl = /^(https?:\/\/|\/)/.test(icon);
+  const monogram = (Array.from(String(req.app_name || '?').trim())[0] || '?').toUpperCase();
+
   return html`
     <div class="agr-wrap">
       <div class="agr-card">
-        <span class="agr-badge ${ownApp ? 'agr-badge-own' : ''}">${ownApp ? tr('appGrant.ownBadge', 'Your app') : tr('appGrant.externalBadge', 'External app')}</span>
-        <h1 class="agr-title">${existingGrant ? tr('appGrant.manageTitle', 'Manage this app’s access') : tr('appGrant.trustTitle', 'Trust this app?')}</h1>
-        <div class="agr-app">
-          <div class="agr-app-name">${escHtml(req.app_name)}</div>
-          <div class="agr-app-origin">${escHtml(req.app_origin)}</div>
+        <div class="agr-head">
+          <div class="agr-icon" aria-hidden="true">
+            ${icon
+              ? (iconIsUrl
+                ? html`<img class="agr-icon-img" src=${icon} alt="" />`
+                : html`<span class="agr-icon-glyph">${escHtml(icon)}</span>`)
+              : html`<span class="agr-icon-mono">${escHtml(monogram)}</span>`}
+          </div>
+          <div class="agr-head-text">
+            <div class="agr-app-name">${escHtml(req.app_name)}</div>
+            <div class="agr-app-origin">${escHtml(req.app_origin)}</div>
+          </div>
+          <span class="agr-badge ${ownApp ? 'agr-badge-own' : ''}">${ownApp ? tr('appGrant.ownBadge', 'Your app') : tr('appGrant.externalBadge', 'External app')}</span>
         </div>
-        <p class="agr-muted">${ownApp
-          ? tr('appGrant.ownIntro', 'This is your own app. It still uses a scoped, revocable key — never your login session.')
-          : tr('appGrant.trustIntro', 'This app is not yours. It gets its OWN scoped, revocable key — never your login session. You can revoke it anytime in Profile › Access.')}</p>
 
-        <div class="agr-scopes-label">${tr('appGrant.needsLabel', 'This app needs:')}</div>
-        <ul class="agr-scopes">
-          ${req.scopes.map((s) => html`
-            <li class="agr-scope" key=${s.scope}>
-              ${advanced && html`
-                <input type="checkbox" class="agr-scope-check" checked=${selected.has(s.scope)}
-                  onChange=${() => toggle(s.scope)} aria-label=${s.scope} />`}
-              <span class="agr-scope-text">
-                <span class="agr-scope-desc">${escHtml(s.description || s.scope)}
-                  ${existingGrant && !existingGrant.scopes.includes(s.scope) && html`<span class="agr-scope-newbadge">${tr('appGrant.newScope', 'new')}</span>`}
-                </span>
-                <span class="agr-scope-name">${escHtml(s.scope)}</span>
-              </span>
-            </li>`)}
-        </ul>
+        <h1 class="agr-title">${existingGrant
+          ? tr('appGrant.manageTitle', 'Manage this app’s access')
+          : tr('appGrant.connectTitle', 'Connect {app} to your account', { app: req.app_name })}</h1>
+        ${req.app_description && html`<p class="agr-lede">${escHtml(req.app_description)}</p>`}
 
-        <button class="agr-advanced-toggle" onClick=${() => setAdvanced((v) => !v)}>
-          ${advanced ? tr('appGrant.advancedHide', '▲ Hide advanced') : tr('appGrant.advancedShow', '⚙ Advanced — choose permissions')}
+        <div class="agr-summary">
+          <span class="agr-summary-label">${tr('appGrant.worksWith', 'Works with:')}</span>
+          <span class="agr-summary-areas">${escHtml(areaLine)}</span>
+        </div>
+        <button class="agr-details-toggle" aria-expanded=${details} onClick=${() => setDetails((v) => !v)}>
+          ${details
+            ? tr('appGrant.hideDetails', 'Hide the exact permissions')
+            : tr('appGrant.showDetails', 'Show the exact permissions ({n})', { n: req.scopes.length })}
         </button>
+
+        ${details && html`
+          <ul class="agr-scopes">
+            ${req.scopes.map((s) => html`
+              <li class="agr-scope" key=${s.scope}>
+                <input type="checkbox" class="agr-scope-check" checked=${selected.has(s.scope)}
+                  onChange=${() => toggle(s.scope)} aria-label=${s.scope} />
+                <span class="agr-scope-text">
+                  <span class="agr-scope-desc">${escHtml(s.description || s.scope)}
+                    ${existingGrant && !existingGrant.scopes.includes(s.scope) && html`<span class="agr-scope-newbadge">${tr('appGrant.newScope', 'new')}</span>`}
+                  </span>
+                  <span class="agr-scope-name">${escHtml(s.scope)}</span>
+                </span>
+              </li>`)}
+          </ul>
+          <p class="agr-details-hint">${tr('appGrant.subsetHint', 'Uncheck anything you would rather not give. The app gets exactly what stays checked.')}</p>`}
+
+        <ul class="agr-assure">
+          <li>${tr('appGrant.assureKey', 'It gets its own key, never your password.')}</li>
+          ${keepsData && html`<li>${tr('appGrant.assureHome', 'What it saves lives in your own AIMEAT account.')}</li>`}
+          <li>${tr('appGrant.assureRevoke', 'You can revoke it in one click: Profile › Access.')}</li>
+          ${!existingGrant && html`<li>${tr('appGrant.assureNext', 'Next time it signs you in without this screen.')}</li>`}
+        </ul>
 
         <div class="agr-actions">
           ${existingGrant
             ? html`<button class="btn-danger agr-btn" onClick=${revoke} disabled=${submitting}>${tr('appGrant.revoke', 'Revoke access')}</button>`
-            : html`<button class="btn-outline agr-btn" onClick=${deny} disabled=${submitting}>${tr('appGrant.deny', 'Don’t trust')}</button>`}
+            : html`<button class="btn-outline agr-btn" onClick=${deny} disabled=${submitting}>${tr('appGrant.notNow', 'Not now')}</button>`}
           <button class="btn-primary agr-btn" onClick=${approve} disabled=${submitting || selected.size === 0}>
-            ${submitting ? tr('appGrant.approving', 'Allowing…') : (existingGrant ? tr('appGrant.saveCta', 'Save changes') : tr('appGrant.trustCta', '❤ Trust — allow access'))}
+            ${submitting ? tr('appGrant.approving', 'Allowing…') : (existingGrant ? tr('appGrant.saveCta', 'Save changes') : tr('appGrant.connectCta', 'Connect'))}
           </button>
         </div>
-        ${!existingGrant && html`<p class="agr-next">${tr('appGrant.nextNote', 'Next time this app logs you in automatically — no prompt.')}</p>`}
       </div>
     </div>`;
 }

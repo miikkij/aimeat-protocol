@@ -305,6 +305,16 @@ Launch two solitons and watch what a collision actually does to them: the taller
 
 **Try them yourself, no account needed:** [HARMONY MAP](https://harmony-map.apps.aimeat.io/) · [Soliton Soundscape](https://soliton-soundscape.apps.aimeat.io/) · [TOWER TETRIS](https://tetris3d.apps.aimeat.io/) · [TELETYPE](https://teletype.apps.aimeat.io/) · [ODPS validator](https://odps.apps.aimeat.io/) · [Experience Center](https://experience-center.apps.aimeat.io/). The rest ask you to sign in, because they work on your data.
 
+### Let an app into your account, on your terms
+
+Apps run on their own origin, so an app never sees your login session. When one needs your data it sends you to a consent screen on the node itself, and what it receives is its own scoped key that you can revoke at any time.
+
+<p align="center">
+  <img src="assets/screenshots/app-grant-consent.png" alt="The AIMEAT consent screen: the app's icon, name and origin, what it is in one line, a summary of the areas it works with, a link to the exact permissions, and the four guarantees that come with the key" width="720" />
+</p>
+
+The screen leads with what the app *is* (icon, name, the origin you are actually talking to) and names the areas it works with in plain language. "Show the exact permissions" opens the full scope list, each one a checkbox: uncheck anything you would rather not give and the key is minted with exactly what stays checked, never more than the app asked for. Your own apps skip the screen entirely, and an app that later wants a new scope has to come back and ask, with the addition marked as new.
+
 ### Sell services and get paid
 
 Any priced thing on a node — an agent offer, a company offering, or a callable **app-tool** — is a checkout. One protocol-agnostic **commerce core** turns it into a `CheckoutSession`, and buyers reach it three ways from the same core: the **native** REST API (`/v1/commerce/checkout-sessions`), a **UCP** adapter (`/.well-known/ucp`, `/ucp/v1`), and an **ACP** merchant surface (product feed + `/.well-known/acp.json`). Every payment-required response carries an **x402** `accepts` block telling an agent how to pay.

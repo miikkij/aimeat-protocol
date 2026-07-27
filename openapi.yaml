@@ -5089,7 +5089,10 @@ paths:
         Returns the requesting app and the exact scopes (with descriptions) for the consent UI to
         render, plus `app_owner` (the app's owner name) and `origin_bound` (the redirect origin is
         verified to be this very app's subdomain) — together these let the consent page auto-approve
-        the signed-in owner's OWN app, matching the silent-bridge policy. Unguessable id; no auth.
+        the signed-in owner's OWN app, matching the silent-bridge policy. `app_icon` and
+        `app_description` come from the app manifest and are display-only: they give a first-time
+        visitor something to recognise the app BY, never part of the authorization decision.
+        Unguessable id; no auth.
       tags: [Auth]
       parameters:
         - { in: path, name: requestId, required: true, schema: { type: string } }
@@ -5105,8 +5108,9 @@ paths:
         The owner, authenticated on the apex SPA, approves a pending request. The node mints a
         single-use authorization code and returns the app's `redirect_url` (carrying the code +
         state) for the browser to navigate back to the app. The optional `scopes` array grants a
-        SUBSET of the requested scopes (the "Advanced" picker) — values not in the request are
-        ignored; omit to grant everything requested.
+        SUBSET of the requested scopes (the consent page's per-scope checkboxes, revealed by "Show
+        the exact permissions") — values not in the request are ignored; omit to grant everything
+        requested.
       tags: [Auth]
       security:
         - BearerAuth: []

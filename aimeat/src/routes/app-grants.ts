@@ -44,6 +44,10 @@
  *     newest row kept a live refresh hash, the stale ones showed in the Access tab as active access
  *     that nothing could use. Both consent paths now resolve the live grant via a direct
  *     getAppGrantByOwnerAndApp lookup, and a partial unique index enforces the invariant in the DB.
+ *   v1.7.0 — 2026-07-27 — GET /request/:id also returns app_icon + app_description (from the app
+ *     manifest, already loaded in authorize — no extra query). The consent screen showed a stranger
+ *     nothing but a name, a raw origin and a wall of scope boxes; the icon/monogram and the app's
+ *     own one-liner give them something to decide ON. Display-only, never part of the gate.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -274,6 +278,10 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       request_id: pending.requestId,
       app: pending.app,
       app_name: pending.appName,
+      // Identity + context for the consent screen: a stranger deciding on an app they have never
+      // seen needs to know WHAT it is, not only which scopes it asks for. Both are display-only.
+      app_icon: pending.appIcon,
+      app_description: pending.appDescription,
       app_origin: pending.appOrigin,
       response_mode: pending.responseMode,
       manage: pending.manage, // true → always show the management screen; false → may auto-approve an existing grant
