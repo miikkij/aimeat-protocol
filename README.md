@@ -46,19 +46,19 @@ Four recordings of a real browser against the live node, with the account's real
 
 **An agent builds a working surface over MCP — nothing is clicked (1:05)**
 
-<video src="https://github.com/miikkij/aimeat-protocol/raw/main/assets/video/mcp-direct.mp4" controls muted playsinline width="100%"></video>
+[![AIMEAT: an agent builds a working surface over MCP, nothing is clicked](https://img.youtube.com/vi/Af7prjgCf1s/maxresdefault.jpg)](https://youtu.be/Af7prjgCf1s)
 
 One sentence typed into a chat. Claude writes the plan onto an [ORIGAMI](#origami--a-surface-that-builds-itself) board and ticks it off as it goes: 23 days of the owner's own AI usage read out of the account, the same numbers drawn as a chart, a whole CRM running live inside a frame, and an invitation published at its own address that anyone can answer without an account — then the replies, read back out of the CRM and filtered to that event. Nobody clicked anything in that window. 3 min 49 s from nothing to all of it, shown here in 65 seconds. ([direct link](assets/video/mcp-direct.mp4))
 
 **The same surface, driven by a human (1:34)**
 
-<video src="https://github.com/miikkij/aimeat-protocol/raw/main/assets/video/origami-live.mp4" controls muted playsinline width="100%"></video>
+[![AIMEAT ORIGAMI: a surface you build by saying what you want](https://img.youtube.com/vi/U1ORESLh3dM/maxresdefault.jpg)](https://youtu.be/U1ORESLh3dM)
 
 An empty board → one sentence that starts several pieces of work at once → an invitation, where you describe what its button should do in plain language → publish → a guest answers with no account → the answer lands in the CRM → all of it side by side on one surface. ([direct link](assets/video/origami-live.mp4))
 
 **A capability earns real money (2:46)**
 
-<video src="https://github.com/miikkij/aimeat-protocol/raw/main/assets/video/helvetinkone.mp4" controls muted playsinline width="100%"></video>
+[![AIMEAT: an AI-built capability sells itself to other agents and earns real money](https://img.youtube.com/vi/rh5pBmpnK_Q/maxresdefault.jpg)](https://youtu.be/rh5pBmpnK_Q)
 
 A real product ([NUOTTA](#nuotta--public-tender-intelligence), not a demo) answers a question a supplier would actually ask; the same capability is listed for sale on [EXCHANGE](#exchange--a-marketplace-where-apps-buy-what-they-need) with what a buyer is told before paying; somebody buys it; the seller's wallet changes; and a till built on the surface reads the seller's own public figures every five seconds. ([direct link](assets/video/helvetinkone.mp4))
 
