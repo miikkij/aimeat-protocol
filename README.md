@@ -29,10 +29,10 @@ owner handle), runs the setup commands for you, and surfaces each agent's approv
 It never invents secrets or pushes anything outward without asking.
 
 <p align="center">
-  <img src="assets/screenshots/portal-landing.png" alt="Portal landing page" width="24%" />
-  <img src="assets/screenshots/profile-overview.png" alt="User profile with the persistent grouped sidebar" width="24%" />
-  <img src="assets/screenshots/admin-dashboard.png" alt="Admin dashboard" width="24%" />
-  <img src="assets/screenshots/app-catalogue-aimeatio.png" alt="App catalogue" width="24%" />
+  <img src="assets/screenshots/portal-landing.png" alt="The aimeat.io landing page and the wall of apps people have built with their AI" width="24%" />
+  <img src="assets/screenshots/profile-overview.png" alt="Owner profile: 115 apps, 14,805 memories, 662 morsels, 70 agents, with usage quotas and AI spend" width="24%" />
+  <img src="assets/screenshots/admin-dashboard.png" alt="Operator admin dashboard, Statistics tab: 30,409 memory operations, 3,815 schema validations, 45 owners, 114 agents, daily activity chart" width="24%" />
+  <img src="assets/screenshots/app-catalogue-aimeatio.png" alt="App catalogue library view with 115 apps, each card showing its Listed / Unlisted state and a Staging pill for unpublished drafts" width="24%" />
 </p>
 
 <p align="center">
