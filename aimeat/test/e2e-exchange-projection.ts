@@ -280,6 +280,13 @@ await test('Usage stats and lineage are per RAIL, not per coordinate', async () 
   const onEur = await consumersOf(eur.offeringId);
   const onUsd = await consumersOf(usd.offeringId);
   assert(onEur.every(c => c.unit === 'money'), `EUR listing shows only money contracts: ${JSON.stringify(onEur)}`);
+  // A combined price charges money AND burns morsels, and the burn lands on the wallet rather than
+  // on the entitlement meter — so a provider reading `settledUnits` alone sees half their own price.
+  // The row carries the frozen toll and the burn it produced, per contract, so nothing is inferred
+  // from a listing's toll TODAY (a contract older than the toll has calls and no burn at all).
+  assert(onEur.every(c => c.tollMorsels === 11), `the contract's frozen toll rides on the row: ${JSON.stringify(onEur.map(c => c.tollMorsels))}`);
+  assert(onEur.every(c => c.burnedMorsels === c.calls * c.tollMorsels),
+    `burned morsels are calls x toll: ${JSON.stringify(onEur.map(c => [c.calls, c.tollMorsels, c.burnedMorsels]))}`);
   // The consumer holds exactly one live contract (the EUR one, re-taken above), so the USD
   // listing must claim nobody rather than borrowing it.
   assert(onUsd.length === 0, `the USD listing has no contract of its own, got ${JSON.stringify(onUsd)}`);

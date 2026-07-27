@@ -485,18 +485,36 @@ export interface ConsumerRow {
   unit: EntitlementUnit;
   calls: number;
   settledUnits: number;
+  /** The pacing burn this contract carries, per call — the morsel half of a combined price. */
+  tollMorsels: number;
+  /** Morsels burned across this contract's calls: `calls * tollMorsels`. */
+  burnedMorsels: number;
   state: string;
   lastUsedAt: string;
 }
 
-/** List the consumers holding contracts against an offering (provider lineage/consumption log). */
+/**
+ * List the consumers holding contracts against an offering (provider lineage/consumption log).
+ *
+ * `settledUnits` is REVENUE in the contract's own unit; the pacing morsels a combined price also
+ * burns are a wallet transaction and appear nowhere on the entitlement's meter. A provider reading
+ * only `settledUnits` therefore sees half of what their price charges, and cannot derive the other
+ * half either: a contract signed before its listing carried a toll has calls but no burn, so
+ * `calls * (the listing's toll today)` would invent morsels that were never taken. The toll is read
+ * from the CONTRACT, which froze it at accept, so the figure is what that consumer actually paid.
+ */
 export async function offeringConsumers(storage: Storage, o: Offering): Promise<ConsumerRow[]> {
   const ents = (await listEntitlementsByProvider(storage, o.providerGhii))
     .filter(e => e.ext === o.ext && e.action === o.action && sameRail(e, o));
   return ents
-    .map(e => ({
-      consumerGaii: e.consumerGaii, appId: e.appId, contractRef: e.contractRef, unit: e.unit,
-      calls: e.budget.calls, settledUnits: e.budget.spentUnits, state: e.state, lastUsedAt: e.updatedAt,
-    }))
+    .map(e => {
+      const toll = typeof e.tollMorsels === 'number' && e.tollMorsels > 0 ? e.tollMorsels : 0;
+      return {
+        consumerGaii: e.consumerGaii, appId: e.appId, contractRef: e.contractRef, unit: e.unit,
+        calls: e.budget.calls, settledUnits: e.budget.spentUnits,
+        tollMorsels: toll, burnedMorsels: toll * e.budget.calls,
+        state: e.state, lastUsedAt: e.updatedAt,
+      };
+    })
     .sort((a, b) => b.calls - a.calls);
 }
