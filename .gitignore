@@ -83,6 +83,11 @@ generatorinterview.txt
 jounis_ideas.md
 github_optics.md
 
+# One-off browser probes written to answer a single question during a session. The demo-video
+# harness itself IS source (record/watch/cut/wait/selfcheck); these underscore-prefixed scripts
+# are the throwaway half: they hardcode board ids, prod URLs and a local storageState path.
+aimeat/scripts/demo-video/_*.mjs
+
 # Test output files
 *-results.txt
 test-output.txt

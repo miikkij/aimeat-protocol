@@ -49,6 +49,7 @@ async function setupOwner(label: string) {
   return { name, token: tok.body.data.token as string };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
+const hasKeys = (v: unknown): boolean => !!v && typeof v === 'object' && Object.keys(v as Record<string, unknown>).length > 0;
 
 console.log('\n=== AIMEAT EXCHANGE PROJECTION E2E (TARGET-050 — the source owns the listing) ===\n');
 
@@ -385,6 +386,94 @@ await test('Adopting a hand-authored listing never erases an attestation its sou
   assert(after.provenance?.legalBasis === 'Legitimate interest',
     `the hand-stated attestation survived adoption: ${JSON.stringify(after.provenance)}`);
 });
+
+// -- The task shape: an UNBOUND tool lists as agent-work ---------------------
+// The checkout has fulfilled unbound tools as tasks since phase B, while the projection skipped
+// them, so the market could not list what the shop could already sell. These prove the listing is
+// RUNNABLE and not merely visible: a consumer contracts, starts work, and it names the assignee.
+
+const TASK_APP = `taskproj-${Date.now()}.html`;
+const AGENT = `deliverer${Date.now()}`.slice(0, 28);
+
+const writeTaskManifest = (token: string, tools: unknown[]) =>
+  json('/v1/memory', {
+    method: 'POST', headers: auth(token),
+    body: JSON.stringify({ key: `apps.${TASK_APP}.tools`, visibility: 'public', value: { version: 1, tools } }),
+  });
+const taskListings = async (token: string, taskType: string) =>
+  (await myOfferings(token)).filter(o => o.ext === `agentwork:${provider.name}/${AGENT}` && o.action === taskType);
+const unbound = (over: Record<string, unknown> = {}) => ({
+  name: 'digest', description: 'A written digest, delivered by an agent',
+  inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, usageTerms: TERMS,
+  price: { morsels: 5 }, exchange: true, agent: AGENT, ...over,
+});
+
+await test('Setup: the provider has an agent that can receive fulfillment tasks', async () => {
+  const reg = await json('/v1/agents', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ name: AGENT, owner: provider.name, capabilities: ['memory'], scopes: ['*'] }),
+  });
+  assert(reg.status === 201, `register agent ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+});
+
+await test('An unbound tool with a named agent lists as AGENT-WORK carrying its taskSpec', async () => {
+  const w = await writeTaskManifest(provider.token, [unbound()]);
+  assert(w.status === 200 || w.status === 201, `write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+  const mine = await taskListings(provider.token, 'digest');
+  assert(mine.length === 1, `exactly one agent-work listing, got ${mine.length}`);
+  const o = mine[0];
+  assert(o.kind === 'agent-work' && o.auto === true, `kind/auto: ${JSON.stringify({ kind: o.kind, auto: o.auto })}`);
+  assert(o.unit === 'morsels' && o.basePrice === 5, `price from the manifest: ${o.unit}/${o.basePrice}`);
+  assert(o.surface?.agentName === AGENT && o.surface?.taskType === 'digest',
+    `the surface names the assignee the work path builds its GAII from: ${JSON.stringify(o.surface)}`);
+  assert(hasKeys(o.taskSpec?.inputSchema) && hasKeys(o.taskSpec?.outputSchema),
+    `the taskSpec carries both schemas: ${JSON.stringify(o.taskSpec)}`);
+});
+
+await test('The listing is RUNNABLE: a consumer contracts and starts work on the named assignee', async () => {
+  const o = (await taskListings(provider.token, 'digest'))[0];
+  const acc = await json('/v1/exchange/entitlements', {
+    method: 'POST', headers: auth(consumer.token),
+    body: JSON.stringify({ offering_id: o.offeringId, cap_units: 50 }),
+  });
+  assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
+  const started = await json('/v1/exchange/work', {
+    method: 'POST', headers: auth(consumer.token),
+    body: JSON.stringify({ offering_id: o.offeringId, input: { businessId: '3323553-5' } }),
+  });
+  assert(started.status === 200 || started.status === 201, `start work ${started.status}: ${JSON.stringify(started.body?.error)}`);
+  const w = JSON.stringify(started.body.data);
+  assert(w.includes(AGENT), `the work went to the manifest agent: ${w.slice(0, 240)}`);
+});
+
+await test('An unbound tool with NO agent is skipped, not listed, because nobody could deliver it', async () => {
+  const w = await writeTaskManifest(provider.token, [unbound({ name: 'orphan', agent: undefined })]);
+  assert(w.status === 200 || w.status === 201, `write ${w.status}`);
+  const mine = (await myOfferings(provider.token)).filter(o => o.action === 'orphan' && o.state === 'listed');
+  assert(mine.length === 0, `no listing for an unassigned task tool, got ${mine.length}`);
+  const dry = await json('/v1/exchange/reconcile', {
+    method: 'POST', headers: auth(provider.token), body: JSON.stringify({ dry_run: true, app_id: TASK_APP }),
+  });
+  assert(dry.status === 200, `dry-run ${dry.status}`);
+  const changes = dry.body.data.report?.changes ?? dry.body.data.changes ?? [];
+  const why = changes.find((c: any) => c.reason === 'NO_ASSIGNEE');
+  assert(!!why, `the report says why rather than going quiet: ${JSON.stringify(changes).slice(0, 300)}`);
+});
+
+await test('An unbound tool naming an agent that does not exist is skipped, a listing must not lie', async () => {
+  const w = await writeTaskManifest(provider.token, [unbound({ name: 'ghost', agent: 'nobody-here-at-all' })]);
+  assert(w.status === 200 || w.status === 201, `write ${w.status}`);
+  const mine = (await myOfferings(provider.token)).filter(o => o.action === 'ghost' && o.state === 'listed');
+  assert(mine.length === 0, `no listing for a phantom assignee, got ${mine.length}`);
+});
+
+await test('Delisting still works from the source: dropping the flag removes the agent-work card', async () => {
+  const w = await writeTaskManifest(provider.token, [unbound({ exchange: false })]);
+  assert(w.status === 200 || w.status === 201, `write ${w.status}`);
+  const live = (await taskListings(provider.token, 'digest')).filter(o => o.state === 'listed');
+  assert(live.length === 0, `the card came off the market, still listed: ${live.length}`);
+});
+
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

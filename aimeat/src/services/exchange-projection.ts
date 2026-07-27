@@ -135,12 +135,30 @@ function contentHash(parts: unknown): string {
 
 // ── SOURCE → DESIRED LISTINGS ────────────────────────────────────────────────
 
-/** App-tool manifests (`apps.{appId}.tools`) the owner has flagged for EXCHANGE. */
+/**
+ * App-tool manifests (`apps.{appId}.tools`) the owner has flagged for EXCHANGE.
+ *
+ * A manifest tool sells in one of two shapes, and the EXCHANGE now lists both:
+ *   - BOUND (`action_id`)  → an `app-tool` listing, metered per synchronous capability call.
+ *   - UNBOUND (`agent`)    → an `agent-work` listing, settled on delivery of a fulfillment task.
+ * The checkout path has fulfilled unbound tools as tasks since phase B; the projection used to skip
+ * them, so the market could not list what the shop could already sell. An unbound tool needs a named
+ * agent of this owner: `aimeat_exchange_work` builds the assignee GAII from the surface, so a listing
+ * with no real assignee would take an order nobody can deliver.
+ */
 async function desiredFromAppTools(
   storage: Storage, ownerGhii: string, ownerName: string, only: string | undefined,
   skips: ReconcileChange[], dryRun: boolean,
 ): Promise<DesiredListing[]> {
   const out: DesiredListing[] = [];
+  /** The owner's agent names, read once and only when an unbound tool actually needs them. */
+  let assignees: Set<string> | null = null;
+  const canAssign = async (name: string): Promise<boolean> => {
+    if (!assignees) {
+      assignees = new Set((await storage.listAgents()).filter(a => a.owner === ownerName).map(a => a.name));
+    }
+    return assignees.has(name);
+  };
   const records = only
     ? [await storage.getMemory(ownerGhii, appToolsKey(only))].filter(Boolean)
     : (await storage.listMemory(ownerGhii, { prefix: 'apps.' })).filter(r => /^apps\..+\.tools$/.test(r.key));
@@ -156,11 +174,36 @@ async function desiredFromAppTools(
       if (tool.exchange !== true) continue;
       const label = `${appId}/${tool.name}`;
       const skip = (reason: string) => skips.push({ action: 'skipped', offeringId: null, kind: 'app-tool', label, unit: null, currency: null, reason });
-      if (!tool.action_id) { skip('TOOL_UNBOUND'); continue; }
       if (!hasSchema(tool.inputSchema) || !hasSchema(tool.outputSchema)) { skip('SCHEMA_REQUIRED'); continue; }
       const money = moneyPricesOf(tool.priceMoney, tool.pricesMoney);
       const morsels = tool.price && tool.price.morsels > 0 ? tool.price.morsels : 0;
       if (!money.length && !morsels) { skip('NOT_PRICED'); continue; }
+
+      // ── UNBOUND: the task shape. Listed as agent-work, settled when the assignee delivers. ──
+      if (!tool.action_id) {
+        if (!tool.agent) { skip('NO_ASSIGNEE'); continue; }
+        if (!(await canAssign(tool.agent))) { skip('ASSIGNEE_NOT_FOUND'); continue; }
+        const taskCoord = agentWorkCoordinate(ownerName, tool.agent, tool.name);
+        const taskBase = {
+          kind: 'agent-work' as const, ext: taskCoord.ext, action: taskCoord.action,
+          surface: { kind: 'agent-work' as const, ownerName, agentName: tool.agent, taskType: tool.name },
+          title: `${appId} · ${tool.name}`, description: tool.description ?? '',
+          plans: (tool.plans ?? []) as OfferingPlan[], usageTerms: usageTermsOf(tool.usageTerms), tags: [] as string[],
+          provenance: provenanceOf(mergeProvenance(parsed.data.provenance, tool.provenance) ?? undefined),
+          odps: mergeOdpsExtras(parsed.data.odps, tool.odps),
+          tollMorsels: tool.tollMorsels ?? null,
+          taskSpec: { inputSchema: tool.inputSchema ?? {}, outputSchema: tool.outputSchema ?? {} },
+        };
+        for (const p of prices(morsels, money)) {
+          out.push({
+            ...taskBase, ...p,
+            key: listingKey('agent-work', taskCoord.ext, taskCoord.action, p.unit, p.currency),
+            sourceHash: contentHash([taskBase.title, taskBase.description, taskBase.taskSpec, taskBase.plans,
+              taskBase.usageTerms, taskBase.provenance, taskBase.odps, taskBase.tollMorsels, p]),
+          });
+        }
+        continue;
+      }
       // Pin (or read, when dry) the interface version — the integration contract, unchanged by this work.
       const def = { inputSchema: tool.inputSchema ?? {}, outputSchema: tool.outputSchema ?? {}, binding: tool.action_id };
       const iface = dryRun
@@ -298,11 +341,28 @@ export async function reconcileOwnerOfferings(
   const scoped = !!(opts?.appId || opts?.extName || opts?.agentName);
   const changes: ReconcileChange[] = [];
 
-  const desired: DesiredListing[] = [
+  const sourced: DesiredListing[] = [
     ...(!scoped || opts?.appId ? await desiredFromAppTools(storage, ownerGhii, ownerName, opts?.appId, changes, dryRun) : []),
     ...(!scoped || opts?.extName ? await desiredFromExtActions(storage, ownerName, opts?.extName, changes) : []),
     ...(!scoped || opts?.agentName ? await desiredFromAgentOffers(storage, ownerName, opts?.agentName, changes) : []),
   ];
+
+  /* Two sources can now want the SAME listing: an unbound app-tool projects onto (agent, toolName),
+     and that agent may publish an offer under the same id. The create branch below reads only the
+     pre-existing offerings, so a duplicate key would mint two rival cards — the exact defect this
+     projection exists to prevent. First source wins, and the loser is REPORTED rather than dropped
+     quietly: a capability that silently failed to list is worse than one that says why. */
+  const desired: DesiredListing[] = [];
+  const claimed = new Map<string, DesiredListing>();
+  for (const d of sourced) {
+    const held = claimed.get(d.key);
+    if (held) {
+      skipped(changes, d, `DUPLICATE_OF ${labelOf(held)}`);
+      continue;
+    }
+    claimed.set(d.key, d);
+    desired.push(d);
+  }
 
   const mine = (await listAllOfferings(storage)).filter(o => o.providerOwner === ownerName);
   const byKey = new Map<string, Offering>();
@@ -376,6 +436,11 @@ export async function reconcileOwnerOfferings(
 
   return summarise(ownerName, dryRun, changes);
 }
+
+/** Record a desired listing that will NOT be created, with the reason on its own coordinate. */
+const skipped = (changes: ReconcileChange[], d: DesiredListing, reason: string): void => {
+  changes.push({ action: 'skipped', offeringId: null, kind: d.kind, label: labelOf(d), unit: d.unit, currency: d.currency, reason });
+};
 
 const labelOf = (d: DesiredListing): string =>
   d.surface?.kind === 'app-tool' ? `${d.surface.appId}/${d.surface.tool}`
