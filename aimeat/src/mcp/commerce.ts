@@ -25,7 +25,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor, responseFormatSchema, shapeResponse } from './catalog/shape.js';
-import { AppToolsDocSchema, appToolsKey } from '../models/app-tool-schemas.js';
+import { AppToolsDocSchema, appToolsKey, appIdFromToolsKey } from '../models/app-tool-schemas.js';
 import { OffersDocSchema, type Offer } from '../models/offer-schemas.js';
 import { reconcileAfterSourceWrite } from '../services/exchange-projection.js';
 import { integerMicros, isSupportedMoneyCurrency } from '../commerce/money.js';
@@ -33,6 +33,7 @@ import { createSession, getSession, completeSession, listSessions, CommerceError
 import { PaymentError } from '../commerce/payment-handlers.js';
 import { issueJWT } from '../auth/jwt.js';
 import { emitChange } from '../services/event-bus.js';
+import { logger } from '../utils/logger.js';
 
 const PSP_KEY = 'commerce.psp';
 
@@ -54,6 +55,28 @@ function maskSecret(secret: unknown): string {
     const s = typeof secret === 'string' ? s4(secret) : '';
     return s ? `…${s}` : '(set)';
     function s4(v: string): string { return v.length >= 4 ? v.slice(-4) : ''; }
+}
+
+/**
+ * The app ids this owner publishes a tool manifest for — the signpost on an APP_TOOLS_NOT_FOUND.
+ * A cross-owner caller sees only the public ones, matching the read gate itself, so the hint can
+ * never reveal that a private manifest exists.
+ */
+async function listAppToolManifests(storage: Storage, ownerGhii: string, includePrivate: boolean): Promise<string[]> {
+    try {
+        const recs = await storage.listMemory(ownerGhii, { prefix: 'apps.' });
+        return recs
+            .filter(r => includePrivate || r.visibility === 'public')
+            .map(r => appIdFromToolsKey(r.key))
+            .filter((id): id is string => !!id)
+            .sort()
+            .slice(0, 12);
+    } catch (err) {
+        // The hint is a courtesy on a path that has already failed; never turn it into a second
+        // failure — but say so, or a broken listing looks like an owner with no manifests.
+        logger.warn('app-tool manifest hint could not be built', { ownerGhii, error: String(err) });
+        return [];
+    }
 }
 
 export function registerCommerceTools(
@@ -175,7 +198,16 @@ export function registerCommerceTools(
             // Cross-owner reads require the record to be PUBLIC — a private manifest is
             // indistinguishable from a missing one (mirrors the WebMCP listing gate).
             if (!rec || (targetOwner !== owner && rec.visibility !== 'public')) {
-                return fail(`APP_TOOLS_NOT_FOUND: app "${targetOwner}/${app_id}" declares no ${targetOwner === owner ? '' : 'public '}tool manifest`);
+                // Name the manifests this owner DOES publish. An app id is a filename and carries its
+                // extension, while the app's own subdomain does not: an agent that read
+                // `nuotta.apps.aimeat.io` asked for "nuotta", was told the app declares no manifest,
+                // believed it, and went off to download the app's HTML to work out what it does. The
+                // bare "not found" was true of the key and false of the app.
+                const near = await listAppToolManifests(storage, `${targetOwner}@${config.nodeId}`, targetOwner === owner);
+                const hint = near.length
+                    ? ` This owner publishes tool manifests for: ${near.join(', ')}. An app id is a filename and includes its extension.`
+                    : '';
+                return fail(`APP_TOOLS_NOT_FOUND: app "${targetOwner}/${app_id}" declares no ${targetOwner === owner ? '' : 'public '}tool manifest.${hint}`);
             }
             return ok({ app: `${targetOwner}/${app_id}`, visibility: rec.visibility, manifest: rec.value });
         },

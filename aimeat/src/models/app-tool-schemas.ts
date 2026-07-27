@@ -132,3 +132,9 @@ export type AppToolsDoc = z.infer<typeof AppToolsDocSchema>;
 
 /** The memory key an app's tool manifest lives under (PUBLIC record, app owner's GHII). */
 export const appToolsKey = (appId: string): string => `apps.${appId}.tools`;
+
+/** The app id back out of that key, or null when the key is not a tool manifest. */
+export const appIdFromToolsKey = (key: string): string | null => {
+  const m = /^apps\.(.+)\.tools$/.exec(key);
+  return m ? m[1]! : null;
+};

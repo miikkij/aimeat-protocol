@@ -239,6 +239,18 @@ await test('7. app_tools_get reads own manifest; invalid manifest is rejected lo
     assert(bad.isError && bad.text.includes('INVALID_TOOL_MANIFEST'), `invalid manifest: ${bad.text}`);
 });
 
+await test('7b. A missed app id NAMES the manifests this owner does publish', async () => {
+    // An app id is a filename and carries its extension; the app's own subdomain does not. An agent
+    // that read `mcpshop.apps.…` asked for "mcpshop", was told the app declares no manifest, believed
+    // it, and went off to download the app's HTML. The bare "not found" was true of the key and false
+    // of the app, so the error has to name what is actually there.
+    const r = await mcp.call('aimeat_app_tools_get', { app_id: 'mcpshop' });
+    assert(r.isError, `a wrong id must still fail: ${r.text}`);
+    assert(r.text.includes('APP_TOOLS_NOT_FOUND'), `keeps its code: ${r.text}`);
+    assert(r.text.includes('mcpshop.html'), `names the real app id, got: ${r.text}`);
+    assert(r.text.includes('includes its extension'), `says WHY the id missed, got: ${r.text}`);
+});
+
 await test('8. offer_price_set prices an own offer in morsels + EUR micro-units', async () => {
     // Base offer doc via REST (owner token passes requireRole("agent") for own agents).
     const pub = await json('/v1/agents/trader/offers', {
