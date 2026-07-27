@@ -186,7 +186,9 @@ async function desiredFromAppTools(
         const taskCoord = agentWorkCoordinate(ownerName, tool.agent, tool.name);
         const taskBase = {
           kind: 'agent-work' as const, ext: taskCoord.ext, action: taskCoord.action,
-          surface: { kind: 'agent-work' as const, ownerName, agentName: tool.agent, taskType: tool.name },
+          // appId is what makes this listing findable by a reconcile scoped to its own app — the
+          // agentwork coordinate carries no trace of where the tool was declared.
+          surface: { kind: 'agent-work' as const, ownerName, agentName: tool.agent, taskType: tool.name, appId },
           title: `${appId} · ${tool.name}`, description: tool.description ?? '',
           plans: (tool.plans ?? []) as OfferingPlan[], usageTerms: usageTermsOf(tool.usageTerms), tags: [] as string[],
           provenance: provenanceOf(mergeProvenance(parsed.data.provenance, tool.provenance) ?? undefined),
@@ -449,7 +451,13 @@ const labelOf = (d: DesiredListing): string =>
 
 /** Does a projected offering belong to the source this scoped reconcile is about? */
 function inScope(o: Offering, opts?: { appId?: string; extName?: string; agentName?: string }): boolean {
-  if (opts?.appId) return o.kind === 'app-tool' && o.surface?.kind === 'app-tool' && o.surface.appId === opts.appId;
+  // An app manifest sources BOTH kinds: a bound tool lists as app-tool, an unbound one as agent-work.
+  // Matching only the first left a task-shape listing that its own manifest could never retire.
+  if (opts?.appId) {
+    if (o.surface?.kind === 'app-tool') return o.surface.appId === opts.appId;
+    if (o.surface?.kind === 'agent-work') return o.surface.appId === opts.appId;
+    return false;
+  }
   if (opts?.extName) return o.kind === 'ext-action' && o.ext === opts.extName;
   if (opts?.agentName) return o.kind === 'agent-work' && o.surface?.kind === 'agent-work' && o.surface.agentName === opts.agentName;
   return true;

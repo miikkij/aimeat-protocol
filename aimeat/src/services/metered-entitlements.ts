@@ -99,6 +99,13 @@ export interface AgentWorkSurface {
   ownerName: string;
   agentName: string;
   taskType: string;
+  /**
+   * Set only when the listing was projected from an APP-TOOL manifest's unbound (task-shape) tool
+   * rather than from the agent's own offers doc. It is what lets a reconcile scoped to that app find
+   * this listing again: the metered coordinate is `agentwork:{owner}/{agent}`, which carries no trace
+   * of the app, so without this the source could create a listing it could never retire.
+   */
+  appId?: string;
 }
 
 /** The sellable surface a contract binds to when it is not a raw ext-action. */

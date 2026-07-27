@@ -467,6 +467,26 @@ await test('An unbound tool naming an agent that does not exist is skipped, a li
   assert(mine.length === 0, `no listing for a phantom assignee, got ${mine.length}`);
 });
 
+await test('The task-shape listing is retirable BY ITS OWN APP: a scoped reconcile can see it', async () => {
+  await writeTaskManifest(provider.token, [unbound()]);
+  const live = (await taskListings(provider.token, 'digest')).filter(o => o.state === 'listed');
+  assert(live.length === 1, `listed again before the scoped retire, got ${live.length}`);
+  const id = live[0].offeringId;
+  assert(live[0].surface?.appId === TASK_APP,
+    `the surface remembers which app declared it, else a scoped reconcile is blind: ${JSON.stringify(live[0].surface)}`);
+
+  // Empty the manifest. The write triggers a reconcile scoped to THIS app, and that scoped pass is
+  // the whole subject of this test. Read the offering BY ID afterwards: the market list endpoint
+  // runs an unscoped reconcile of its own before answering, which would sweep the orphan up and
+  // hide the defect (it did exactly that in the first version of this test).
+  await writeTaskManifest(provider.token, []);
+  const one = await json(`/v1/exchange/offerings/${id}`);
+  assert(one.status === 200, `read the offering by id ${one.status}`);
+  const state = (one.body.data.offering ?? one.body.data).state;
+  assert(state === 'delisted',
+    `the app retired its own task listing through the scoped pass, state is "${state}"`);
+});
+
 await test('Delisting still works from the source: dropping the flag removes the agent-work card', async () => {
   const w = await writeTaskManifest(provider.token, [unbound({ exchange: false })]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
