@@ -28,7 +28,10 @@ import { safeFetch } from '../utils/url-validator.js';
 export interface ExtensionCtx {
     memory: {
         get(key: string): Promise<unknown | null>;
-        set(key: string, value: unknown): Promise<void>;
+        /** `visibility` defaults to 'public' — the historical behaviour every extension was written
+         *  against. Pass 'private' for a key that holds anyone's personal data: an ext namespace is
+         *  world-readable, so a membership list written the default way is served to strangers. */
+        set(key: string, value: unknown, opts?: { visibility?: 'public' | 'private' }): Promise<void>;
         search(prefix: string, opts?: Record<string, unknown>): Promise<Array<{ key: string; value: unknown }>>;
         delete(key: string): Promise<boolean>;
         getPublic(namespace: string, key: string): Promise<unknown | null>;
@@ -224,7 +227,7 @@ ${userFnDecl}
         hash: (s) => __hash(s),
         memory: {
             get:       async (key)            => __call(__memory_get, [key]),
-            set:       async (key, value)     => __call(__memory_set, [key, JSON.stringify(value)]),
+            set:       async (key, value, opts) => __call(__memory_set, [key, JSON.stringify(value), JSON.stringify(opts || {})]),
             search:    async (prefix, opts)   => __call(__memory_search, [prefix, opts ? JSON.stringify(opts) : '{}']),
             delete:    async (key)            => __call(__memory_delete, [key]),
             getPublic: async (namespace, key) => __call(__memory_getPublic, [namespace, key]),
@@ -283,9 +286,9 @@ export function trackMemoryAccess(ctx: ExtensionCtx): { ctx: ExtensionCtx; acces
             accessLog.reads.push(key);
             return origMemory.get(key);
         },
-        set: async (key, value) => {
+        set: async (key, value, opts) => {
             accessLog.writes.push(key);
-            return origMemory.set(key, value);
+            return origMemory.set(key, value, opts);
         },
         search: async (prefix, opts) => {
             accessLog.reads.push(`${prefix}*`);
@@ -375,7 +378,11 @@ export async function executeExtensionAction(
             counter, limits.maxApiCalls, inflight);
 
         registerAsyncHostFn(vm, '__memory_set',
-            async (key, valueJson) => { const value = JSON.parse(valueJson); await ctx.memory.set(key, value); },
+            async (key, valueJson, optsJson) => {
+                const value = JSON.parse(valueJson);
+                const opts = JSON.parse(optsJson || '{}') as { visibility?: 'public' | 'private' };
+                await ctx.memory.set(key, value, opts);
+            },
             counter, limits.maxApiCalls, inflight);
 
         registerAsyncHostFn(vm, '__memory_search',

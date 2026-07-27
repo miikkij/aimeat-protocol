@@ -71,14 +71,14 @@ export async function runExtensionJob(
         const record = await storage.getMemory(extMemoryOwner, key);
         return record ? record.value : null;
       },
-      set: async (key, value) => {
+      set: async (key, value, opts) => {
         const existing = await storage.getMemory(extMemoryOwner, key);
         const now = new Date().toISOString();
         await storage.setMemory({
           key,
           ownerGaii: extMemoryOwner,
           value,
-          visibility: 'public',
+          visibility: opts?.visibility === 'private' ? 'private' : 'public',
           tags: [],
           ttlHours: null,
           version: existing ? existing.version + 1 : 1,
