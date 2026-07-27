@@ -211,8 +211,11 @@ async function desiredFromAppTools(
           out.push({
             ...taskBase, ...p,
             key: listingKey('agent-work', taskCoord.ext, taskCoord.action, p.unit, p.currency),
+            // appId rides in the hash because it rides in the SURFACE and not in the key: without it
+            // an existing listing whose surface predates this field reads as `unchanged`, the update
+            // is skipped, and it keeps a surface no scoped reconcile can match.
             sourceHash: contentHash([taskBase.title, taskBase.description, taskBase.taskSpec, taskBase.plans,
-              taskBase.usageTerms, taskBase.provenance, taskBase.odps, taskBase.tollMorsels, p]),
+              taskBase.usageTerms, taskBase.provenance, taskBase.odps, taskBase.tollMorsels, appId, p]),
           });
         }
         continue;
