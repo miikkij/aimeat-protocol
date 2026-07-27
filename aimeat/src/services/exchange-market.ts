@@ -17,6 +17,10 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.8.0 — 2026-07-27 — Usage stats and consumer lineage match on the RAIL as well as the coordinate.
+ *     A dual-priced capability projects two offerings over one (provider, ext, action), so each listing
+ *     was showing the other's contracts and `totalSettledUnits` summed morsels and EUR micro-units into
+ *     one figure documented as "in the offering's unit".
  *   v1.7.0 — 2026-07-25 — Pacing is per capability: Offering carries `tollMorsels` and the pricing
  *     resolver hands it to the contract, so a provider — not only the node — sets the brake.
  *   v1.6.0 — 2026-07-25 — ODPS v4.1 adoption (TARGET-045 §4 / addendum Q2+Q3): Provenance (now with
@@ -409,9 +413,22 @@ export interface OfferingStats {
   timing: { count: number; p50Ms: number; p95Ms: number; maxMs: number } | null;
 }
 
-/** Compute an offering's usage stats from the entitlements minted against its (provider, ext, action). */
+/**
+ * True when an entitlement was minted on THIS offering's rail. A capability priced in both morsels and
+ * money projects two offerings over one (provider, ext, action) coordinate, so matching on the coordinate
+ * alone showed each listing the other's contracts — and summed two units into one `totalSettledUnits`
+ * that claims to be "in the offering's unit". A morsel listing then reported a EUR balance beside a
+ * "1 morsel per call" price.
+ */
+function sameRail(e: { unit: EntitlementUnit; currency?: string | null }, o: Offering): boolean {
+  if (e.unit !== o.unit) return false;
+  return o.unit !== 'money' || (e.currency ?? 'EUR') === (o.currency ?? 'EUR');
+}
+
+/** Compute an offering's usage stats from the entitlements minted against its (provider, ext, action, rail). */
 export async function offeringStats(storage: Storage, o: Offering): Promise<OfferingStats> {
-  const ents = (await listEntitlementsByProvider(storage, o.providerGhii)).filter(e => e.ext === o.ext && e.action === o.action);
+  const ents = (await listEntitlementsByProvider(storage, o.providerGhii))
+    .filter(e => e.ext === o.ext && e.action === o.action && sameRail(e, o));
   const consumers = new Set(ents.map(e => e.consumerGaii));
   let totalCalls = 0, totalSettledUnits = 0, activeContracts = 0, lastUsedAt: string | null = null;
   for (const e of ents) {
@@ -449,7 +466,8 @@ export interface ConsumerRow {
 
 /** List the consumers holding contracts against an offering (provider lineage/consumption log). */
 export async function offeringConsumers(storage: Storage, o: Offering): Promise<ConsumerRow[]> {
-  const ents = (await listEntitlementsByProvider(storage, o.providerGhii)).filter(e => e.ext === o.ext && e.action === o.action);
+  const ents = (await listEntitlementsByProvider(storage, o.providerGhii))
+    .filter(e => e.ext === o.ext && e.action === o.action && sameRail(e, o));
   return ents
     .map(e => ({
       consumerGaii: e.consumerGaii, appId: e.appId, contractRef: e.contractRef, unit: e.unit,

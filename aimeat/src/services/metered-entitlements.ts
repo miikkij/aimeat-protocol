@@ -16,6 +16,11 @@
  *   const gate = await authorizeAndCharge(storage, consumerGaii, ext, action, priceMicros);
  *   if (!gate.ok) return res.status(402)...;
  * @version-history
+ *   v1.5.0 — 2026-07-27 — A re-mint on a DIFFERENT rail starts a fresh meter. `spentUnits` is denominated
+ *     in the entitlement's own unit, and a capability priced on both rails projects two offerings against
+ *     one (consumer, ext, action) triple, so accepting the second re-minted the first and carried a EUR
+ *     micro-unit balance onto a morsel contract — 0.22 EUR read back as 220 000 morsels on a live listing.
+ *     Spend, calls and a bundle's callsRemaining now carry only when unit + currency are unchanged.
  *   v1.4.0 — 2026-07-25 — Contracts capture `tollMorsels` at signature: raising the pacing burn later
  *     governs new contracts, never ones already agreed.
  *   v1.3.0 — 2026-07-21 — Contract history: archiveEntitlement + listEntitlementHistoryByConsumer/ByProvider
@@ -29,6 +34,7 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
+import { logger } from '../utils/logger.js';
 
 /** System namespace — server-side only, never surfaced to a client (mirrors `ext-pay-token`). */
 const NS = 'metered-entitlement';
@@ -192,7 +198,7 @@ export async function listEntitlementsByApp(storage: Storage, appId: string): Pr
 
 /** Mint (or overwrite) an entitlement — called by the contract-acceptance flow after both sides agree.
  *  One `(consumer, ext, action)` triple has one entitlement; re-minting replaces it (e.g. renegotiated price),
- *  carrying spend forward only when explicitly asked. */
+ *  carrying spend forward only when explicitly asked — and only when the rail is unchanged (see below). */
 export async function createEntitlement(
   storage: Storage,
   input: {
@@ -204,6 +210,25 @@ export async function createEntitlement(
   },
 ): Promise<MeteredEntitlement> {
   const now = new Date().toISOString();
+  // `spentUnits` is denominated in the entitlement's OWN unit, so it only means anything while the
+  // rail stays the same. A capability priced on both rails projects two offerings against one
+  // `(consumer, ext, action)` triple, so accepting the second one re-mints the first — and carrying
+  // a money balance onto a morsel contract multiplies it by a million. Measured on a live listing:
+  // 22 calls that settled 220 000 EUR micro-units (0.22 EUR) came back as 220 000 morsels next to a
+  // "1 morsel per call" price. A rail change is a new meter, the same reading exchange-proposals
+  // already applies to a renegotiation.
+  const prev = input.carrySpend ?? null;
+  const sameRail = !!prev && prev.unit === input.unit
+    && (input.unit !== 'money' || (prev.currency ?? 'EUR') === (input.currency ?? 'EUR'));
+  if (prev && !sameRail) {
+    logger.info('Entitlement re-minted on a different rail: spend meter reset', {
+      ext: input.ext, action: input.action, consumer: input.consumerGaii,
+      from: `${prev.unit}${prev.currency ? ':' + prev.currency : ''}`,
+      to: `${input.unit}${input.currency ? ':' + input.currency : ''}`,
+      droppedSpentUnits: prev.budget.spentUnits, droppedCalls: prev.budget.calls,
+    });
+  }
+  const carried = sameRail ? prev.budget : { spentUnits: 0, calls: 0 };
   const value: MeteredEntitlement = {
     entitlementId: input.carrySpend?.entitlementId || randomUUID(),
     consumerGaii: input.consumerGaii,
@@ -215,12 +240,13 @@ export async function createEntitlement(
     unit: input.unit,
     pricePerCall: input.pricePerCall,
     currency: input.unit === 'money' ? (input.currency ?? 'EUR') : null,
-    pricing: input.pricing ?? input.carrySpend?.pricing ?? { model: 'per_call' },
+    // A bundle's callsRemaining was bought in the old unit, so it does not survive a rail change either.
+    pricing: input.pricing ?? (sameRail ? prev.pricing : null) ?? { model: 'per_call' },
     surface: input.surface ?? input.carrySpend?.surface ?? null,
     budget: {
       capUnits: input.capUnits ?? null,
-      spentUnits: input.carrySpend?.budget.spentUnits ?? 0,
-      calls: input.carrySpend?.budget.calls ?? 0,
+      spentUnits: carried.spentUnits,
+      calls: carried.calls,
     },
     rakePercent: input.rakePercent ?? null,
     // Captured at signature, like the price: a provider raising their pacing later governs NEW contracts.

@@ -170,6 +170,69 @@ await test('Consumer contracts the morsel listing at the CURRENT price', async (
   assert(acc.body.data.entitlement.surface?.ifaceVersion === 1, 'contract pinned to interface v1');
 });
 
+await test('INVARIANT: switching rails starts a FRESH meter (a EUR balance is not morsels)', async () => {
+  // One (consumer, ext, action) triple holds one contract, so accepting a second rail for the same
+  // tool re-mints the first. `spentUnits` is denominated in the contract's own unit, and carrying it
+  // across turned 0.22 EUR into 220 000 morsels on a live listing beside a "1 morsel" price.
+  const mine = forTool(await myOfferings(provider.token), 'brief');
+  const morsel = mine.find(o => o.unit === 'morsels');
+  const eur = mine.find(o => o.unit === 'money' && o.currency === 'EUR');
+  assert(!!morsel && !!eur, `both rails are listed: ${JSON.stringify(mine.map(o => `${o.unit}/${o.currency}`))}`);
+
+  // Spend on the morsel contract the previous test signed, so there is a balance to carry.
+  const call = await json(`/v1/apps/${encodeURIComponent(provider.name)}/${encodeURIComponent(APP_ID)}/webmcp/tools/brief`, {
+    method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ businessId: '0101263-6' }),
+  });
+  assert(call.status === 200, `metered call ${call.status}: ${JSON.stringify(call.body?.error)}`);
+  const readEnt = async () => {
+    const r = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+    return (r.body.data.entitlements as any[]).find(e => e.ext === `apptool:${provider.name}/${APP_ID}` && e.action === 'brief');
+  };
+  const spent = await readEnt();
+  assert(spent.unit === 'morsels' && spent.budget.spent_units === 11 && spent.budget.calls === 1,
+    `one call at 11 morsels: ${JSON.stringify(spent.budget)} ${spent.unit}`);
+
+  // Now take the EUR listing for the same tool.
+  const acc = await json('/v1/exchange/entitlements', {
+    method: 'POST', headers: auth(consumer.token),
+    body: JSON.stringify({ offering_id: eur!.offeringId, cap_units: 1_000_000 }),
+  });
+  assert(acc.status === 201, `EUR accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
+  const after = await readEnt();
+  assert(after.unit === 'money' && after.currency === 'EUR', `rail switched: ${after.unit}/${after.currency}`);
+  assert(after.budget.spent_units === 0 && after.budget.calls === 0,
+    `the morsel balance must NOT ride onto the EUR meter, got ${JSON.stringify(after.budget)}`);
+
+  // And back again: the EUR spend must not become morsels either.
+  const back = await json('/v1/exchange/entitlements', {
+    method: 'POST', headers: auth(consumer.token),
+    body: JSON.stringify({ offering_id: morsel!.offeringId, cap_units: 100 }),
+  });
+  assert(back.status === 201, `morsel re-accept ${back.status}: ${JSON.stringify(back.body?.error)}`);
+  const home = await readEnt();
+  assert(home.unit === 'morsels' && home.budget.spent_units === 0, `fresh meter on return: ${JSON.stringify(home.budget)}`);
+});
+
+await test('Usage stats and lineage are per RAIL, not per coordinate', async () => {
+  // The two listings share (provider, ext, action). Matching on the coordinate alone showed each
+  // listing the other's contracts and summed morsels and EUR micro-units into one "settled" figure.
+  const mine = forTool(await myOfferings(provider.token), 'brief');
+  const morsel = mine.find(o => o.unit === 'morsels')!;
+  const eur = mine.find(o => o.unit === 'money' && o.currency === 'EUR')!;
+  const consumersOf = async (id: string) => {
+    const r = await json(`/v1/exchange/offerings/${id}/consumers`, { headers: auth(provider.token) });
+    assert(r.status === 200, `consumers ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    return r.body.data.consumers as any[];
+  };
+  const onMorsel = await consumersOf(morsel.offeringId);
+  const onEur = await consumersOf(eur.offeringId);
+  assert(onMorsel.every(c => c.unit === 'morsels'), `morsel listing shows only morsel contracts: ${JSON.stringify(onMorsel)}`);
+  assert(onEur.every(c => c.unit === 'money'), `EUR listing shows only money contracts: ${JSON.stringify(onEur)}`);
+  // The consumer holds exactly one live contract (the morsel one, re-taken above), so the EUR
+  // listing must claim nobody rather than borrowing it.
+  assert(onEur.length === 0, `the EUR listing has no contract of its own, got ${JSON.stringify(onEur)}`);
+});
+
 await test('INVARIANT: repricing the source does NOT change an existing contract', async () => {
   const w = await writeManifest(provider.token, [tool({ price: { morsels: 99 } })]);
   assert(w.status === 200 || w.status === 201, `write ${w.status}`);
