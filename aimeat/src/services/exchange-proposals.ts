@@ -14,12 +14,14 @@
  *   const p = await putProposal(storage, {...});
  *   const ent = await supersedeWithProposal(storage, proposal, existingEntitlement);
  * @version-history
+ *   v1.1.0 — 2026-07-27 — Supersede reads the CONTRACT, not whatever currently authorises the call: a
+ *     provider's grant is not terms to renegotiate.
  *   v1.0.0 — 2026-07-21 — Initial renegotiation: propose / accept (supersede + archive) / decline / withdraw.
  */
 import { randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
 import {
-  archiveEntitlement, createEntitlement, readEntitlementForCall,
+  archiveEntitlement, createEntitlement, readContractForCall,
   type EntitlementUnit, type MeteredEntitlement,
 } from './metered-entitlements.js';
 
@@ -89,7 +91,7 @@ export async function listProposalsForOwner(storage: Storage, owner: string): Pr
 export async function supersedeWithProposal(
   storage: Storage, proposal: ContractProposal,
 ): Promise<MeteredEntitlement | null> {
-  const existing = await readEntitlementForCall(storage, proposal.consumerGaii, proposal.ext, proposal.action);
+  const existing = await readContractForCall(storage, proposal.consumerGaii, proposal.ext, proposal.action);
   if (!existing) return null;
   await archiveEntitlement(storage, existing, 'superseded', proposal.proposalId);
   const newPrice = proposal.newPricePerCall ?? existing.pricePerCall;

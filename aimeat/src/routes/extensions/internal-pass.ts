@@ -19,12 +19,15 @@
  *   the loopback request the node makes to itself. A pass that arrives from anywhere else does not
  *   exist in the map, so it does nothing — the header cannot be forged into a free call, only into
  *   a normal paid one.
- * @structure mintInternalPass(coordExt, coordAction) · consumeInternalPass(token) · INTERNAL_PASS_HEADER
+ * @structure mintInternalPass(coordExt, coordAction, kind) · consumeInternalPass(token) · INTERNAL_PASS_HEADER
  * @usage
- *   const pass = mintInternalPass(coordExt, toolName);            // app-tool route, after settling
- *   headers[INTERNAL_PASS_HEADER] = pass;                          // on the loopback invoke
- *   const settled = consumeInternalPass(req.header(INTERNAL_PASS_HEADER));  // paywall
+ *   const pass = mintInternalPass(coordExt, toolName);              // after settling the contract
+ *   const pass = mintInternalPass(coordExt, toolName, 'unpriced');  // the manifest prices this tool at nothing
+ *   headers[INTERNAL_PASS_HEADER] = pass;                            // on the loopback invoke
+ *   const upstream = consumeInternalPass(req.header(INTERNAL_PASS_HEADER));  // paywall
  * @version-history
+ *   v1.1.0 — 2026-07-27 — A pass says WHICH decision was made. `unpriced` retires only the app-tool
+ *     question; an action's own `commercial` terms survive a free tool in front of it.
  *   v1.0.0 — 2026-07-27 — Initial: one settlement per call once the raw door became chargeable.
  */
 import { randomBytes } from 'node:crypto';
@@ -32,8 +35,17 @@ import { randomBytes } from 'node:crypto';
 /** Header the loopback invoke carries. Meaningless to an outside caller — see the file note. */
 export const INTERNAL_PASS_HEADER = 'x-aimeat-internal-pass';
 
-/** What was settled upstream, so the paywall can log what it is standing down for. */
+/**
+ * What the upstream door decided, so the paywall knows how much to stand down.
+ *
+ * The two answers are NOT the same. `settled` means the contract for this product was charged and
+ * there is nothing left to take. `unpriced` means the door looked the product up and the manifest
+ * puts no price on it — which retires the app-tool question only. An extension action that names its
+ * own `commercial` terms is still owed those, because a free app-tool is the provider declining to
+ * charge for THEIR tool, not for someone else's action.
+ */
 export interface InternalPass {
+  kind: 'settled' | 'unpriced';
   coordExt: string;
   coordAction: string;
 }
@@ -54,11 +66,11 @@ function sweep(now: number): void {
   }
 }
 
-export function mintInternalPass(coordExt: string, coordAction: string): string {
+export function mintInternalPass(coordExt: string, coordAction: string, kind: InternalPass['kind'] = 'settled'): string {
   const now = Date.now();
   sweep(now);
   const token = randomBytes(24).toString('base64url');
-  passes.set(token, { pass: { coordExt, coordAction }, expiresAt: now + TTL_MS });
+  passes.set(token, { pass: { kind, coordExt, coordAction }, expiresAt: now + TTL_MS });
   return token;
 }
 

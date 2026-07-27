@@ -14,6 +14,9 @@
  *     - `money`   — real EUR/USD accrual via {@link settleEntitlementMoney} (off the morsel ledger).
  * @structure settleMeteredCoordinate · settleViaEntitlement (ext wrapper) · settleMorsels · settleMoney
  * @version-history
+ *   v1.4.0 — 2026-07-27 — Grants settle through this same gate at price 0: the pacing burn moves to the
+ *     provider's wallet and the ceiling checked is what the PROVIDER carries (a zero price can never
+ *     trip a consumer spend cap, so `cap_carried_units` needed a check of its own).
  *   v1.3.0 — 2026-07-21 — Generalised to a metered COORDINATE (ext, action strings) so it settles app-tool
  *     calls too (EXCHANGE cross-app selling, Gap 1); settleViaEntitlement is now the ext wrapper.
  *   v1.2.0 — 2026-07-20 — Pricing models (Phase B): computeCharge drives per-call amount (bundle/subscription + rate limit).
@@ -73,6 +76,8 @@ export async function settleMeteredCoordinate(args: {
   const paced = await burnPacingToll({
     config, storage, callerGaii, providerOwner: ent.providerGhii.split('@')[0] ?? null,
     label, toll, res,
+    // On a grant the provider carries BOTH halves of their own price — see burnPacingToll.
+    ...(ent.grant ? { payerGaii: ent.providerGhii } : {}),
   });
   if (!paced.ok) return { ok: false };
 
@@ -90,6 +95,19 @@ export async function settleMeteredCoordinate(args: {
       `Your EXCHANGE subscription for ${label} is over its rate limit — retry shortly (contract ${ent.contractRef}).`));
     return { ok: false };
   }
+  // A GRANT's ceiling is on what the PROVIDER carries, not on what the consumer spends: the consumer
+  // spends nothing, so the ordinary budget check below can never fire on one. Without this, "carry
+  // this member up to 500 morsels' worth" would be a number with nothing behind it.
+  if (ent.grant && ent.grant.capCarriedUnits !== null
+      && ent.grant.carriedUnits + ent.grant.listPricePerCall > ent.grant.capCarriedUnits) {
+    res.status(402).json({ ...error(config.nodeId, 'GRANT_EXHAUSTED',
+      `Your access to ${label} is carried by the provider, and that grant has reached the `
+      + `${ent.grant.capCarriedUnits} ${ent.unit === 'money' ? (ent.currency ?? '') : 'morsel'} `.replace('  ', ' ')
+      + 'ceiling they set. Ask them to extend it, or take a contract of your own.'),
+      ...paymentChallenge(config) });
+    return { ok: false };
+  }
+
   // Budget cap is checked against THIS call's charge (a refill/renewal may cost a block/period fee).
   if (!budgetAllows(ent, decision.chargeUnits)) {
     const cap = ent.unit === 'money' ? `${formatMoneyMajor(ent.budget.capUnits ?? 0)} ${ent.currency ?? ''}`.trim() : `${ent.budget.capUnits} morsel`;

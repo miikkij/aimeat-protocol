@@ -11,6 +11,9 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v1.4.0 — 2026-07-27 — The raw route stops GUESSING which product a shared action is. It settles
+ *     only an unambiguous binding (one priced tool); several means several products, and it says so
+ *     instead of billing whichever contract the caller happens to hold.
  *   v1.3.0 — 2026-07-27 — An action that BACKS a priced app-tool is no longer free through the raw
  *     route: it settles on that app-tool's coordinate, so the product has one price and no bypass.
  *   v1.2.0 — 2026-07-20 — EXCHANGE G2: consult a durable metered entitlement (budget + rake) before the token/morsel channels (TARGET-045)
@@ -26,7 +29,8 @@ import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { consumeExtPayToken } from '../../services/ext-pay-token.js';
 import { settleViaEntitlement, settleMeteredCoordinate } from './entitlement-gate.js';
-import { pricedAppToolsFor } from './priced-binding.js';
+import { pricedAppToolsFor, type PricedBinding } from './priced-binding.js';
+import { readEntitlementForCall, computeCharge, type MeteredEntitlement } from '../../services/metered-entitlements.js';
 import { consumeInternalPass } from './internal-pass.js';
 import { burnPacingToll, resolvePacingToll } from './pacing.js';
 import { logger } from '../../utils/logger.js';
@@ -46,6 +50,53 @@ export interface PaywallOutcome {
 const isPosInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v > 0 && Number.isFinite(v);
 
 /**
+ * How a caller names WHICH product a shared capability is being called as. A header rather than a body
+ * field: the body of a raw invoke is the extension's own input, governed by the action's input schema,
+ * and a routing hint has no business inside data the provider validates.
+ */
+export const APP_TOOL_HEADER = 'x-aimeat-app-tool';
+
+/** Split `{app_id}/{tool}`. Anything else is a malformed request, not a silent fallback to guessing. */
+function parseNamedTool(raw: string | undefined | null): PricedBinding | null {
+  const v = (raw ?? '').trim();
+  if (!v) return null;
+  const slash = v.lastIndexOf('/');
+  if (slash < 1 || slash === v.length - 1) return null;
+  return { appId: v.slice(0, slash), tool: v.slice(slash + 1) };
+}
+
+/**
+ * Of the products that sell this action, the CHEAPEST one the caller already holds a live right to —
+ * or null when they hold none.
+ *
+ * "Cheapest" is compared inside a rail and never across one: morsels and money micro-units are
+ * different things, and `1` of one is not less than `10000` of the other. A right that costs nothing
+ * this call wins outright (a provider's grant, or a bundle with quota left) — being charged while
+ * holding free access to the same capability is the surprise this whole ordering exists to prevent.
+ * Below that, a morsel right beats a money one: morsels are the node's own throttle unit and settle no
+ * real currency, so charging EUR while a morsel contract sits unused is the more expensive mistake.
+ */
+async function cheapestHeld(
+  storage: Storage, sold: PricedBinding[], ownerName: string, callerGaii: string,
+): Promise<PricedBinding | null> {
+  const rank = (e: MeteredEntitlement): [number, number] => {
+    const charge = computeCharge(e, Date.now()).chargeUnits;
+    if (charge <= 0) return [0, 0];
+    return [e.unit === 'morsels' ? 1 : 2, charge];
+  };
+  let best: { binding: PricedBinding; key: [number, number] } | null = null;
+  for (const s of sold) {
+    const ent = await readEntitlementForCall(storage, callerGaii, `apptool:${ownerName}/${s.appId}`, s.tool);
+    if (!ent || ent.state !== 'active') continue;
+    const key = rank(ent);
+    if (!best || key[0] < best.key[0] || (key[0] === best.key[0] && key[1] < best.key[1])) {
+      best = { binding: s, key };
+    }
+  }
+  return best?.binding ?? null;
+}
+
+/**
  * Gate a raw extension invoke. Order: owner-free → anti-abuse toll (burn) → free (no commercial) →
  * money token (Phase 3; currently 402) → morsel payment (atomic debit-caller + credit-owner).
  */
@@ -60,24 +111,33 @@ export async function enforcePaywall(args: {
   payToken?: string;
   /** `x-aimeat-internal-pass` header — this call was already settled by the app-tool route. */
   internalPass?: string;
+  /** `x-aimeat-app-tool` header — which product a caller holding several means. Validated, never trusted. */
+  namedAppTool?: string;
 }): Promise<PaywallOutcome> {
-  const { config, storage, ext, action, callerGaii, res, payToken, internalPass } = args;
+  const { config, storage, ext, action, callerGaii, res, payToken, internalPass, namedAppTool } = args;
   const ownerName = ext.installedBy;
   // Owner from any principal form: GHII (owner@node), GAII (agent#owner@node), or bare name.
   // (parseGAII only recognises the GAII form, so extract directly to catch owner GHII sessions.)
   const callerOwner = callerGaii.split('@')[0].split('#').pop() ?? callerGaii;
 
-  // 0. Already settled upstream. The app-tool route charges the contract and then invokes the
-  //    capability over this node's own HTTP surface, which lands right back here — and since an
-  //    action behind a priced tool is no longer free (step 3.5), charging again would take payment
-  //    twice for one call. The pass is minted in-process, single use, and unknown to any caller, so
-  //    an absent or bogus one simply means "charge normally". It also stands down the pacing burn,
-  //    which the upstream settlement already took.
-  const settled = consumeInternalPass(internalPass);
-  if (settled) {
-    logger.debug('paywall stood down: settled upstream', { ext: ext.name, action: action.id, ...settled });
+  // 0. A door that KNOWS which product was asked for has already ruled on this call. The app-tool
+  //    routes, the commerce checkout and the MCP twin all invoke the capability over this node's own
+  //    HTTP surface, which lands right back here — so without a pass one call would be ruled on
+  //    twice, and the second ruling would be made by the one place that cannot know the product.
+  //    The pass is minted in-process, single use, and unknown to any caller, so an absent or bogus
+  //    one simply means "apply the normal rules".
+  //
+  //    `settled` — the contract was charged upstream; there is nothing left to take, pacing included.
+  //    `unpriced` — the manifest puts no price on the tool the caller came through. That answers the
+  //    app-tool question (step 3.5) and nothing else: an action with its own `commercial` terms is
+  //    still owed them, because a provider publishing a free tool is declining to charge for THEIR
+  //    tool, not waiving someone else's price.
+  const upstream = consumeInternalPass(internalPass);
+  if (upstream?.kind === 'settled') {
+    logger.debug('paywall stood down: settled upstream', { ext: ext.name, action: action.id, ...upstream });
     return { ok: true };
   }
+  const soldFreeUpstream = upstream?.kind === 'unpriced';
 
   // 1. Owner (and their own principals) always free — no toll, no payment.
   if (callerOwner === ownerName) return { ok: true };
@@ -120,17 +180,42 @@ export async function enforcePaywall(args: {
   //     product is sold under: a contract holder settles once at the price they agreed, whichever
   //     door they came through, and anyone else is told which listing to contract.
   if (!action.commercial) {
+    if (soldFreeUpstream) return { ok: true };              // the door the caller used prices it at nothing
     const sold = await pricedAppToolsFor(storage, `${ownerName}@${config.nodeId}`, ext.name, action.id);
     if (!sold.length) return { ok: true };                  // genuinely free: nothing sells it
 
-    // One action can be sold under several tools. Settle the one the caller actually CONTRACTED —
-    // charging them against a product they never bought would be its own kind of theft — and try
-    // them in a stable order so an uncontracted caller always gets the same answer.
-    for (const s of sold) {
-      const coordExt = `apptool:${ownerName}/${s.appId}`;
+    // WHICH product is this? The route sees an action; a price belongs to a product, and one action
+    // can be sold as several. Resolved in the order a buyer would expect to be treated:
+    //
+    //   1. What the caller NAMED (`x-aimeat-app-tool: {app_id}/{tool}`), validated twice over — it
+    //      must be one of the tools that actually sell this action, and the caller must hold a live
+    //      right to it. A name is a request, never an instruction: nobody talks their way onto a
+    //      product they did not contract, and nobody is billed for one either.
+    //   2. Otherwise the CHEAPEST right they hold. Silence used to be resolved alphabetically, which
+    //      settled a 0.05 EUR product for a caller who also held the 0.01 EUR one — a 5× difference
+    //      decided by spelling. Ambiguity should cost the least it could have meant.
+    //
+    // Only rights the caller already holds are ever considered, so this can charge them for a
+    // product they never bought in neither branch. Holding none is the honest 402 below.
+    const named = parseNamedTool(namedAppTool);
+    if (namedAppTool && !named) {
+      res.status(400).json(error(config.nodeId, 'INVALID_APP_TOOL',
+        `Name the product as "{app_id}/{tool}" in the ${APP_TOOL_HEADER} header, e.g. "notes.html/search".`));
+      return { ok: false };
+    }
+    if (named && !sold.some(s => s.appId === named.appId && s.tool === named.tool)) {
+      res.status(400).json(error(config.nodeId, 'APP_TOOL_MISMATCH',
+        `"${named.appId}/${named.tool}" does not sell ${ext.name}/${action.id}. This capability is sold as `
+        + sold.map(s => `"${s.appId} · ${s.tool}"`).join(', ') + '.'));
+      return { ok: false };
+    }
+
+    const candidates = named ? sold.filter(s => s.appId === named.appId && s.tool === named.tool) : sold;
+    const chosen = await cheapestHeld(storage, candidates, `${ownerName}`, callerGaii);
+    if (chosen) {
       const viaTool = await settleMeteredCoordinate({
-        config, storage, coordExt, coordAction: s.tool,
-        label: `${s.appId}/${s.tool}`, callerGaii, res,
+        config, storage, coordExt: `apptool:${ownerName}/${chosen.appId}`, coordAction: chosen.tool,
+        label: `${chosen.appId}/${chosen.tool}`, callerGaii, res,
       });
       if (viaTool) return viaTool;                          // contracted → settled once, right here
     }
@@ -141,10 +226,17 @@ export async function enforcePaywall(args: {
         `This capability is sold as ${sold.length === 1 ? 'the app-tool' : 'the app-tools'} `
         + sold.map(s => `"${ownerName}/${s.appId} · ${s.tool}"`).join(', ') + '. '
         + 'Take a contract on EXCHANGE (POST /v1/exchange/entitlements with the offering id) and '
-        + 'call it again — this route and the app-tool endpoint settle the same contract.'),
+        + 'call it again — this route and the app-tool endpoint settle the same contract.'
+        + (sold.length > 1
+          ? ` They are separate products at separate prices; hold more than one and this route settles the `
+            + `cheapest unless you name it with "${APP_TOOL_HEADER}: {app_id}/{tool}".`
+          : '')),
       ...paymentChallenge(config),
       app_tool: { owner: ownerName, app_id: first.appId, tool: first.tool, coordinate: `apptool:${ownerName}/${first.appId}` },
-      app_tools: sold.map(s => ({ owner: ownerName, app_id: s.appId, tool: s.tool })),
+      app_tools: sold.map(s => ({
+        owner: ownerName, app_id: s.appId, tool: s.tool,
+        invoke: `/v1/apps/${ownerName}/${s.appId}/webmcp/tools/${s.tool}`,
+      })),
     });
     return { ok: false };
   }

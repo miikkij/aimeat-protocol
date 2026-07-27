@@ -19,6 +19,9 @@
  *   const paced = await burnPacingToll({ config, storage, callerGaii, providerOwner, label, toll, res });
  *   if (!paced.ok) return { ok: false };   // 402 already sent
  * @version-history
+ *   v1.1.0 — 2026-07-27 — `payerGaii`: on an EXCHANGE grant the PROVIDER burns the toll, because a
+ *     member carried by a provider is not paying half a price they were told was covered — and dropping
+ *     the burn instead would hand them the one thing a money budget cannot bound.
  *   v1.0.0 — 2026-07-25 — Extracted from the extension paywall and moved to the shared chokepoint, so a
  *     money-only contract is paced too (it previously had no morsel brake of any kind).
  */
@@ -55,6 +58,13 @@ export function resolvePacingToll(config: AimeatConfig, declared: number | undef
 export async function burnPacingToll(args: {
   config: AimeatConfig; storage: Storage; callerGaii: string; providerOwner: string | null;
   label: string; toll: number; res: Response;
+  /**
+   * Whose wallet the burn comes out of, when that is not the caller's. Set for a GRANT: the provider
+   * said they would carry this consumer, and the morsel half of a price is still half of it — a
+   * "granted" member paying the toll would be paying for access they were told was theirs. The brake
+   * stays on, and the provider feels it, which is the honest place for a cost they volunteered for.
+   */
+  payerGaii?: string;
 }): Promise<{ ok: boolean }> {
   const { config, storage, callerGaii, providerOwner, label, toll, res } = args;
   if (toll <= 0) return { ok: true };
@@ -62,19 +72,23 @@ export async function burnPacingToll(args: {
   const callerOwner = callerGaii.split('@')[0]?.split('#').pop() ?? callerGaii;
   if (providerOwner && callerOwner === providerOwner) return { ok: true };   // own capability, no pacing
 
-  const burned = await storage.debitBalance(callerGaii, toll);
+  const payer = args.payerGaii ?? callerGaii;
+  const carried = payer !== callerGaii;
+  const burned = await storage.debitBalance(payer, toll);
   if (!burned) {
     res.status(402).json({
-      ...error(config.nodeId, 'INSUFFICIENT_MORSELS',
-        `This call burns a ${toll}-morsel pacing toll and your balance does not cover it. Morsels replenish `
-        + 'daily; the toll bounds how fast a capability can be called, whatever it is paid in.'),
+      ...error(config.nodeId, 'INSUFFICIENT_MORSELS', carried
+        ? `This call burns a ${toll}-morsel pacing toll, which the provider carries for you under their `
+          + 'grant, and their balance does not cover it right now. Morsels replenish daily.'
+        : `This call burns a ${toll}-morsel pacing toll and your balance does not cover it. Morsels replenish `
+          + 'daily; the toll bounds how fast a capability can be called, whatever it is paid in.'),
       ...paymentChallenge(config),
     });
     return { ok: false };
   }
   await storage.addTransaction({
-    id: `pacing-${randomUUID()}`, gaii: callerGaii, type: 'extension_toll', amount: -toll,
-    trackingCode: `pacing:${label}`, timestamp: new Date().toISOString(),
+    id: `pacing-${randomUUID()}`, gaii: payer, type: 'extension_toll', amount: -toll,
+    trackingCode: carried ? `pacing:granted:${label}` : `pacing:${label}`, timestamp: new Date().toISOString(),
   });
   return { ok: true };
 }

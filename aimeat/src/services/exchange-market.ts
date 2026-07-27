@@ -17,6 +17,9 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.9.0 — 2026-07-27 — Consumer lineage marks GRANTS (`granted`, `carriedUnits`): a guest belongs on
+ *     the same list as a customer, or a provider reads a consumption log with the consumption they are
+ *     paying for missing from it.
  *   v1.8.0 — 2026-07-27 — Usage stats and consumer lineage match on the RAIL as well as the coordinate.
  *     A dual-priced capability projects two offerings over one (provider, ext, action), so each listing
  *     was showing the other's contracts and `totalSettledUnits` summed morsels and EUR micro-units into
@@ -489,6 +492,14 @@ export interface ConsumerRow {
   tollMorsels: number;
   /** Morsels burned across this contract's calls: `calls * tollMorsels`. */
   burnedMorsels: number;
+  /** True when the PROVIDER carries this consumer rather than billing them (an EXCHANGE grant). */
+  granted: boolean;
+  /**
+   * What a granted consumer's calls have cost the provider, in the listing's unit — the list price
+   * they chose not to charge, accumulated. Zero on a paying contract, where `settledUnits` is the
+   * figure that means something.
+   */
+  carriedUnits: number;
   state: string;
   lastUsedAt: string;
 }
@@ -513,6 +524,9 @@ export async function offeringConsumers(storage: Storage, o: Offering): Promise<
         consumerGaii: e.consumerGaii, appId: e.appId, contractRef: e.contractRef, unit: e.unit,
         calls: e.budget.calls, settledUnits: e.budget.spentUnits,
         tollMorsels: toll, burnedMorsels: toll * e.budget.calls,
+        // A guest belongs on the same list as a customer, marked as one. Leaving grants out would
+        // show a provider a consumption log with the consumption they are paying for missing.
+        granted: !!e.grant, carriedUnits: e.grant?.carriedUnits ?? 0,
         state: e.state, lastUsedAt: e.updatedAt,
       };
     })

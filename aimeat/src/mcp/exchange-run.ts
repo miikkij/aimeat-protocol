@@ -19,6 +19,8 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken);
  * @version-history
+ *   v1.1.0 — 2026-07-27 — The app-tool invoke carries the internal pass. Without it the loopback met the
+ *     raw paywall and settled the same contract a second time — one call, two charges.
  *   v1.0.0 — 2026-07-21 — Initial: generic app-tool invoke + agent-work + renegotiation over MCP (parity with
  *     the REST routes so every MCP client, not only crewaimeat, can act on EXCHANGE).
  */
@@ -164,7 +166,13 @@ export function registerExchangeRunTools(
             // Settled → invoke; refund on throw (never leave a phantom charge).
             try {
                 const { invokeCapability } = await import('../services/capability-invoke.js');
-                const invoked = await invokeCapability(config, storage, cap, (input ?? {}) as Record<string, unknown>, callerGaii, getToken() ?? '', 'normal');
+                const { mintInternalPass } = await import('../routes/extensions/internal-pass.js');
+                // Settled above on this app-tool's coordinate. The capability then runs over the node's
+                // own HTTP surface and meets the raw paywall, which cannot know which product was bought —
+                // so it billed the same contract a second time. One call, one settlement, whichever twin
+                // of this route the caller reached (the REST WebMCP path carries the same pass).
+                const invoked = await invokeCapability(config, storage, cap, (input ?? {}) as Record<string, unknown>, callerGaii, getToken() ?? '', 'normal',
+                    mintInternalPass(coordExt, tool));
                 return ok({ app: `${ownerName}/${app}`, tool, iface_version: pinnedVersion ?? null, metered: true, result: invoked.result });
             } catch (err) {
                 if (outcome.refund) await outcome.refund();

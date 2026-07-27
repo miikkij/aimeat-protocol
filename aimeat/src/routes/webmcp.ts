@@ -14,6 +14,8 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
  * @version-history
+ *   v1.2.0 — 2026-07-27 — `pricesMoney` counts as a price (a USD-only tool was invoking free), and the
+ *     unpriced path tells the raw paywall so downstream that a free tool is not billed at a sibling's price.
  *   v1.1.0 — 2026-07-21 — EXCHANGE metered path (Gap 1): an authenticated caller holding a durable app-tool
  *     CONTRACT gets the call metered (+ rake) and routed to the PINNED interface binding; no contract → the
  *     existing checkout (priced) / free (unpriced) paths run unchanged.
@@ -37,7 +39,13 @@ import { recordCallDuration } from '../services/call-timing.js';
 /** The WebMCP draft this bridge mirrors (W3C Web Machine Learning CG). */
 const WEBMCP_SPEC = 'https://github.com/webmachinelearning/webmcp';
 
-const isPriced = (t: AppTool): boolean => !!((t.price && t.price.morsels > 0) || t.priceMoney);
+/** Priced when the manifest names money or morsels ANYWHERE — `pricesMoney` is a price too, and a tool
+ *  carrying only that (one sold in USD but not EUR) was reaching the free invoke path. */
+const isPriced = (t: AppTool): boolean => !!(
+  (t.price && t.price.morsels > 0)
+  || (t.priceMoney && t.priceMoney.amount > 0)
+  || (t.pricesMoney ?? []).some(m => m.amount > 0)
+);
 
 /** Load the PUBLIC tool manifest of owner/filename, or null (missing, private, malformed). */
 async function loadPublicManifest(
@@ -216,7 +224,12 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
       const jwt = (req.headers.authorization || '').replace('Bearer ', '');
       try {
         const { invokeCapability } = await import('../services/capability-invoke.js');
-        const invoked = await invokeCapability(config, storage, cap, req.body?.input ?? req.body ?? {}, callerGhii, jwt, 'normal');
+        // This route just read the manifest and found no price on THIS tool. The backing action may
+        // still be sold under a sibling tool, and the raw paywall — which sees only the action —
+        // would then bill this free call at that neighbour's price. Say what was decided instead of
+        // letting it be re-decided by the one place with less information.
+        const invoked = await invokeCapability(config, storage, cap, req.body?.input ?? req.body ?? {}, callerGhii, jwt, 'normal',
+          mintInternalPass(`apptool:${ownerName}/${filename}`, toolName, 'unpriced'));
         res.json(success(config.nodeId, { app: appRef, tool: toolName, result: invoked.result }));
       } catch (err) {
         const e = err as { statusCode?: number; code?: string; message?: string };

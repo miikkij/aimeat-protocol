@@ -15,6 +15,9 @@
  *   registerSellableResolver(appToolSellableResolver());
  *   const sellable = await getSellableResolver(ref.kind).resolve(storage, config, ref, buyerOwner);
  * @version-history
+ *   v1.3.0 — 2026-07-27 — app-tool: fulfillment carries the internal pass (the checkout IS the payment,
+ *     so the raw paywall must not charge it again — or refuse it outright), and a buyer the provider has
+ *     GRANTED resolves at price 0 like a self-purchase.
  *   v1.2.0 — 2026-07-14 — Task path (phase B): tools without an action_id binding fulfill as an
  *     agent TASK (manifest `agent`, else the owner GHII) instead of being rejected
  *   v1.1.0 — 2026-07-14 — app-tool resolver: priced tool calls on agent-faced apps, manifest at
@@ -166,7 +169,17 @@ export function appToolSellableResolver(): SellableResolver {
       const tool: AppTool | undefined = parsed.data.tools.find((t) => t.name === toolName);
       if (!tool) throw new CommerceError('TOOL_NOT_FOUND', 404, `Tool not found on app "${appRef}": ${toolName}`);
 
-      const isSelf = sellerOwner === buyerOwner;
+      // A provider who GRANTED this buyer carries their calls; the checkout is one of the doors that
+      // has to honour that, or "approved" would mean free everywhere except the one place a buyer is
+      // most likely to click. Checked against the buyer's owner GHII — the identity a checkout is
+      // opened under — and never against the seller's other customers.
+      const { readGrantForCall } = await import('../services/metered-entitlements.js');
+      const granted = await readGrantForCall(
+        storage, `${buyerOwner}@${config.nodeId}`, `apptool:${sellerOwner}/${appId}`, toolName,
+      );
+      const carriedByProvider = granted?.state === 'active';
+
+      const isSelf = sellerOwner === buyerOwner || carriedByProvider;
       const currency = ref.currency ?? 'morsel';
       let unitPrice = 0;
       let psp: unknown;
@@ -177,7 +190,7 @@ export function appToolSellableResolver(): SellableResolver {
           }
           unitPrice = Number(tool.price.morsels);
         }
-      } else {
+      } else if (!carriedByProvider) {
         if (!tool.priceMoney || tool.priceMoney.currency !== currency) {
           throw new CommerceError('CURRENCY_NOT_SUPPORTED', 422, `This tool has no ${currency} price`);
         }
@@ -212,8 +225,15 @@ export function appToolSellableResolver(): SellableResolver {
             throw new CommerceError('CAPABILITY_NOT_FOUND', 404, `Backing capability not found: ${actionId}`);
           }
           const { invokeCapability } = await import('../services/capability-invoke.js');
+          const { mintInternalPass } = await import('../routes/extensions/internal-pass.js');
+          // The checkout is the payment: this session collected the tool's declared price before
+          // fulfillment ran. The capability then runs over the node's own HTTP surface and meets the
+          // raw paywall, which sees only the backing action — so without this it charges the buyer a
+          // second time on whatever contract they hold, and refuses to serve them at all when they
+          // hold none. Payment IS the invocation; the pass says the payment already happened.
           const invoked = await invokeCapability(
             ctx.config, ctx.storage, cap, item.input ?? {}, session.buyerIdentity, callerJwt ?? '', 'normal',
+            mintInternalPass(`apptool:${sellerOwner}/${appId}`, toolName),
           );
           return { result: invoked.result };
         },

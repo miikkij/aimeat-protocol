@@ -25,6 +25,9 @@
  *   import { schedulesRouter } from './routes/schedules.js';
  *   app.use(schedulesRouter(config, storage, scheduler));
  * @version-history
+ *   v1.3.0 — 2026-07-27 — Only the extension's owner may put its actions on a clock: the scheduler runs
+ *     as a system caller, so a cron on someone else's extension is a standing unpriced call on their
+ *     capability with no door where a price could be asked.
  *   v1.2.0 — 2026-07-16 — Add GET /v1/scheduler/tab composite (schedule aggregate + agent names) folding
  *     the Scheduler mount; extracted aggregateSchedules shared with GET /v1/schedules (behavior unchanged).
  *   v1.1.0 — 2026-07-16 — buildRecordFromBody reuses the loaded agent record (was getAgent twice)
@@ -215,6 +218,14 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
       }
       const ext = await storage.getExtension(extensionName);
       if (!ext) return { status: 404, code: 'EXTENSION_NOT_FOUND', message: `Extension "${extensionName}" not found` };
+      // Only the extension's own owner may put its actions on a clock. The scheduler runs an action as
+      // a system caller — no paywall, no contract, no meter — so a cron on someone else's extension is
+      // an unlimited standing call on their capability, their API keys and their quota, with no door
+      // where a price could be asked. 404 rather than 403: which extensions exist is not a stranger's
+      // business either.
+      if (ext.installedBy !== req.auth!.owner) {
+        return { status: 404, code: 'EXTENSION_NOT_FOUND', message: `Extension "${extensionName}" not found` };
+      }
       base.extensionName = extensionName;
       base.actionId = actionId;
       if (typeof body.instance_id === 'string') base.instanceId = body.instance_id;

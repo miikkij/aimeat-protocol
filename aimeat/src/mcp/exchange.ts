@@ -16,6 +16,8 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.3.0 — 2026-07-27 — Contract-lifecycle reads target the CONTRACT explicitly (readContractForCall),
+ *     so minting and the off-switch never act on a provider's grant.
  *   v1.2.0 — 2026-07-21 — need_post carries usage_intent; needs listings enriched with the requesting app's
  *     name/description (enrichNeeds) so a provider can judge who they'd serve.
  *   v1.1.0 — 2026-07-21 — accept by `offering_id` (ext-action AND app-tool kinds, via resolveOfferingPricing);
@@ -33,7 +35,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import {
-    createEntitlement, readEntitlementForCall, listEntitlementsByConsumer,
+    createEntitlement, readContractForCall, listEntitlementsByConsumer,
     pauseEntitlement, revokeEntitlement, type MeteredEntitlement,
 } from '../services/metered-entitlements.js';
 import {
@@ -213,7 +215,7 @@ export function registerExchangeTools(
                 if (capUnits !== null && capUnits < minCharge) {
                     return fail(`BUDGET_TOO_LOW: budget cap (${capUnits}) is below the ${minCharge}-${priced.unit === 'money' ? priced.currency : 'morsel'} minimum charge`);
                 }
-                const existing = await readEntitlementForCall(storage, consumerGaii, priced.ext, priced.action);
+                const existing = await readContractForCall(storage, consumerGaii, priced.ext, priced.action);
                 const ent = await createEntitlement(storage, {
                     consumerGaii, appId: app_id ?? null, providerGhii: priced.providerGhii, ext: priced.ext, action: priced.action,
                     capabilityLabel: priced.capabilityLabel, unit: priced.unit, pricePerCall: priced.pricePerCall,
@@ -243,7 +245,7 @@ export function registerExchangeTools(
             const providerGhii = `${extRec.installedBy}@${config.nodeId}`;
 
             // Carry spend forward on re-acceptance (renegotiation) so a new contract does not reset the meter.
-            const existing = await readEntitlementForCall(storage, consumerGaii, ext, action);
+            const existing = await readContractForCall(storage, consumerGaii, ext, action);
             const ent = await createEntitlement(storage, {
                 consumerGaii, appId: app_id ?? null, providerGhii, ext, action, capabilityLabel: `${ext}/${action}`,
                 unit, pricePerCall, currency, pricing, capUnits, contractRef, tollMorsels: act.tollMorsels ?? null,
@@ -276,7 +278,7 @@ export function registerExchangeTools(
         },
         annotationsFor('aimeat_exchange_contract_off'),
         async ({ ext, action, mode }) => {
-            const ent = await readEntitlementForCall(storage, consumerGaii, ext, action);
+            const ent = await readContractForCall(storage, consumerGaii, ext, action);
             if (!ent || ownerOf(ent.consumerGaii) !== owner) {
                 return fail('NOT_FOUND: no entitlement of yours for that capability');
             }
@@ -395,7 +397,7 @@ export function registerExchangeTools(
             if (!priced.ok) return fail(`${priced.code}: ${priced.message}`);
 
             const capCap = cap_units !== undefined ? Math.floor(cap_units) : n.budgetCap;
-            const existing = await readEntitlementForCall(storage, consumerGaii, bid.ext, bid.action);
+            const existing = await readContractForCall(storage, consumerGaii, bid.ext, bid.action);
             const ent = await createEntitlement(storage, {
                 consumerGaii, appId: n.appId, providerGhii: `${extRec.installedBy}@${config.nodeId}`,
                 ext: bid.ext, action: bid.action, capabilityLabel: `${bid.ext}/${bid.action}`,

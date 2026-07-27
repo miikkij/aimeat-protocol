@@ -16,6 +16,10 @@
  *   const gate = await authorizeAndCharge(storage, consumerGaii, ext, action, priceMicros);
  *   if (!gate.ok) return res.status(402)...;
  * @version-history
+ *   v1.6.0 — 2026-07-27 — GRANTS: a provider may carry a consumer's access themselves (`grant` block,
+ *     price 0, its own key space). A grant never overwrites a paid contract and wins over one while it is
+ *     active, so "I approved you" is access rather than a bill — and what the provider is carrying is
+ *     counted (`carriedUnits`) instead of vanishing into a zero meter.
  *   v1.5.0 — 2026-07-27 — A re-mint on a DIFFERENT rail starts a fresh meter. `spentUnits` is denominated
  *     in the entitlement's own unit, and a capability priced on both rails projects two offerings against
  *     one (consumer, ext, action) triple, so accepting the second re-minted the first and carried a EUR
@@ -41,6 +45,16 @@ const NS = 'metered-entitlement';
 /** History namespace — superseded (renegotiated) contracts are archived here so the record survives the
  *  live-key overwrite; the consumer/provider "past contracts" views read it. Append-only. */
 const NS_HISTORY = 'metered-entitlement-history';
+/**
+ * GRANT namespace — access a PROVIDER carries for someone instead of billing them.
+ *
+ * Deliberately its own key space rather than a zero-priced contract in the ordinary slot. One
+ * `(consumer, ext, action)` triple has exactly one entitlement, so writing a grant there would
+ * overwrite whatever contract the consumer had bought — a provider could destroy a paying customer's
+ * terms by being generous, and revoking the gift would leave them with nothing rather than with what
+ * they paid for. Two slots, and the grant wins while it is active.
+ */
+const NS_GRANT = 'metered-grant';
 
 /** The unit an entitlement is priced + budgeted in. Kept single-unit-per-entitlement so money micros and
  *  morsels are NEVER conflated (commerce `money.ts` micros ≠ morsel counts). `money` prices are integer
@@ -117,6 +131,33 @@ export interface AgentWorkSurface {
 /** The sellable surface a contract binds to when it is not a raw ext-action. */
 export type SellableSurface = AppToolSurface | AgentWorkSurface;
 
+/**
+ * What makes an entitlement a GRANT rather than a purchase: the provider decided this consumer may
+ * call, and the provider carries it. Present only on grants — its absence is what "this is a bought
+ * contract" means, on every read path.
+ *
+ * `pricePerCall` on a grant is 0, so nothing settles and the consumer is billed in neither half of the
+ * price. That would also make the provider's cost invisible (a zero meter reads the same at one call
+ * and at a million), so the LIST price is kept here and accumulated per call: `carriedUnits` is what
+ * the provider gave away, in the listing's own unit.
+ */
+export interface EntitlementGrant {
+  /** The provider owner who issued it — the only principal who may revoke it. */
+  grantedBy: string;
+  /** What one call WOULD have cost at the listing price, in the entitlement's `unit`. */
+  listPricePerCall: number;
+  /** Accumulated `listPricePerCall` across the calls this grant has served. The carried cost. */
+  carriedUnits: number;
+  /** Ceiling on `carriedUnits` — how much the provider is willing to carry. `null` = no ceiling. */
+  capCarriedUnits: number | null;
+  /** Free-text reason the provider recorded (e.g. the app role this represents). */
+  note: string;
+  /** The app + role this grant stands for, when an app issued it on an approval. Lets a demotion in
+   *  that app find and withdraw exactly the grants the approval created. */
+  reason: { appId: string; role: string } | null;
+  issuedAt: string;
+}
+
 /** The stored shape of one entitlement (the `value` of the memory record). */
 export interface MeteredEntitlement {
   entitlementId: string;
@@ -152,6 +193,8 @@ export interface MeteredEntitlement {
   /** The sellable surface when this contract is for an app-tool (Gap 1) or agent-work (Gap 2); absent for a
    *  raw ext-action. App-tool calls route to the pinned interface binding; agent-work settles on delivery. */
   surface?: SellableSurface | null;
+  /** Set when the provider carries this access instead of billing it — see {@link EntitlementGrant}. */
+  grant?: EntitlementGrant | null;
   /** The contract this entitlement was minted under (an EXCHANGE contract or a `wsengage.*` id). */
   contractRef: string;
   /** Who carries the trust-ramp / escrow risk, per the contract. */
@@ -170,30 +213,87 @@ export function entitlementKey(consumerGaii: string, ext: string, action: string
   return `entitlement.${h}`;
 }
 
-/** Look up the live entitlement authorising this exact call, or null. */
-export async function readEntitlementForCall(
+/** The same coordinate in the GRANT key space — a separate slot, so a gift never overwrites a purchase. */
+export function grantKey(consumerGaii: string, ext: string, action: string): string {
+  const h = createHash('sha256').update(`${consumerGaii}|${ext}|${action}`).digest('hex').slice(0, 32);
+  return `entgrant.${h}`;
+}
+
+/** Read the grant covering this exact call, whatever state it is in (revoked ones still read back). */
+export async function readGrantForCall(
+  storage: Storage, consumerGaii: string, ext: string, action: string,
+): Promise<MeteredEntitlement | null> {
+  const rec = await storage.getMemory(NS_GRANT, grantKey(consumerGaii, ext, action));
+  return rec ? (rec.value as MeteredEntitlement) : null;
+}
+
+/** Read the bought contract for this call, ignoring any grant. */
+export async function readContractForCall(
   storage: Storage, consumerGaii: string, ext: string, action: string,
 ): Promise<MeteredEntitlement | null> {
   const rec = await storage.getMemory(NS, entitlementKey(consumerGaii, ext, action));
   return rec ? (rec.value as MeteredEntitlement) : null;
 }
 
-/** Every entitlement a consumer holds (for the app cost/contract surface, G3). Filtered prefix scan. */
-export async function listEntitlementsByConsumer(storage: Storage, consumerGaii: string): Promise<MeteredEntitlement[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'entitlement.', limit: 5000 });
-  return items.map(r => r.value as MeteredEntitlement).filter(v => v && v.consumerGaii === consumerGaii);
+/**
+ * Look up whatever authorises this exact call, or null.
+ *
+ * An ACTIVE grant wins over a bought contract: the provider said they would carry this consumer, and
+ * billing them anyway while a grant is live is the one outcome an approval must never produce. A
+ * revoked or exhausted grant steps aside and the consumer's own contract (if any) answers again — so
+ * withdrawing a gift returns someone to what they bought rather than cutting them off.
+ *
+ * Every metered surface reaches this one function, which is why the grant needs no per-route wiring:
+ * app-tool REST, the MCP twin, the raw extension door and agent-work delivery all read it.
+ *
+ * COST: two keyed `getMemory` lookups per metered call instead of one, on the busiest path EXCHANGE
+ * has. Both are O(1) by key, and the alternative — teaching every surface to ask twice — is how the
+ * free-door bugs above got in. Use {@link readContractForCall} on paths that only ever mean the
+ * bought contract (minting, renegotiation, the consumer's off-switch); they pay for one read and,
+ * more importantly, cannot mistake a gift for terms.
+ */
+export async function readEntitlementForCall(
+  storage: Storage, consumerGaii: string, ext: string, action: string,
+): Promise<MeteredEntitlement | null> {
+  const granted = await readGrantForCall(storage, consumerGaii, ext, action);
+  if (granted && granted.state === 'active') return granted;
+  return readContractForCall(storage, consumerGaii, ext, action);
 }
 
-/** Every entitlement a provider sells (for the provider/earnings view). Filtered prefix scan. */
+/**
+ * Every live entitlement on the node — bought contracts AND grants.
+ *
+ * Both are read, because every surface built on these lists is answering a question a grant is part
+ * of: what does this app cost me, who is using my capability, what am I carrying. A list that quietly
+ * skipped grants would show a provider a customer roster with their guests missing from it.
+ */
+async function listAllEntitlements(storage: Storage): Promise<MeteredEntitlement[]> {
+  const [bought, granted] = await Promise.all([
+    storage.listAllMemory({ prefix: 'entitlement.', limit: 5000 }),
+    storage.listAllMemory({ prefix: 'entgrant.', limit: 5000 }),
+  ]);
+  return [...bought.items, ...granted.items].map(r => r.value as MeteredEntitlement).filter(Boolean);
+}
+
+/** Every entitlement a consumer holds (for the app cost/contract surface, G3). Filtered prefix scan. */
+export async function listEntitlementsByConsumer(storage: Storage, consumerGaii: string): Promise<MeteredEntitlement[]> {
+  return (await listAllEntitlements(storage)).filter(v => v.consumerGaii === consumerGaii);
+}
+
+/** Every entitlement a provider sells or carries (for the provider/earnings view). Filtered prefix scan. */
 export async function listEntitlementsByProvider(storage: Storage, providerGhii: string): Promise<MeteredEntitlement[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'entitlement.', limit: 5000 });
-  return items.map(r => r.value as MeteredEntitlement).filter(v => v && v.providerGhii === providerGhii);
+  return (await listAllEntitlements(storage)).filter(v => v.providerGhii === providerGhii);
 }
 
 /** Every entitlement a consuming app holds (the per-app cost/contract surface, G3). Filtered prefix scan. */
 export async function listEntitlementsByApp(storage: Storage, appId: string): Promise<MeteredEntitlement[]> {
-  const { items } = await storage.listAllMemory({ prefix: 'entitlement.', limit: 5000 });
-  return items.map(r => r.value as MeteredEntitlement).filter(v => v && v.appId === appId);
+  return (await listAllEntitlements(storage)).filter(v => v.appId === appId);
+}
+
+/** Every grant a provider has issued — "who am I carrying, and what has it cost me?". */
+export async function listGrantsByProvider(storage: Storage, providerGhii: string): Promise<MeteredEntitlement[]> {
+  const { items } = await storage.listAllMemory({ prefix: 'entgrant.', limit: 5000 });
+  return items.map(r => r.value as MeteredEntitlement).filter(v => v && !!v.grant && v.providerGhii === providerGhii);
 }
 
 /** Mint (or overwrite) an entitlement — called by the contract-acceptance flow after both sides agree.
@@ -347,6 +447,9 @@ export function budgetAllows(ent: MeteredEntitlement, chargeUnits: number): bool
 export async function commitSpend(storage: Storage, ent: MeteredEntitlement, chargeUnits: number, pricing?: PricingSpec): Promise<MeteredEntitlement> {
   ent.budget.spentUnits += Math.max(0, chargeUnits);
   ent.budget.calls += 1;
+  // A grant settles nothing, so its spend meter never moves; the provider's cost is the list price
+  // they chose not to charge, accumulated here. Without it "what is this costing me?" has no answer.
+  if (ent.grant) ent.grant.carriedUnits += Math.max(0, ent.grant.listPricePerCall);
   if (pricing) ent.pricing = pricing;
   if (ent.budget.capUnits !== null && ent.budget.spentUnits >= ent.budget.capUnits) ent.state = 'exhausted';
   ent.updatedAt = new Date().toISOString();
@@ -362,6 +465,8 @@ export async function refundSpend(storage: Storage, consumerGaii: string, ext: s
   if (!e) return;
   e.budget.spentUnits = Math.max(0, e.budget.spentUnits - Math.max(0, chargeUnits));
   e.budget.calls = Math.max(0, e.budget.calls - 1);
+  // Undelivered work costs the provider nothing to carry either.
+  if (e.grant) e.grant.carriedUnits = Math.max(0, e.grant.carriedUnits - Math.max(0, e.grant.listPricePerCall));
   if (e.state === 'exhausted' && (e.budget.capUnits === null || e.budget.spentUnits < e.budget.capUnits)) {
     e.state = 'active';
   }
@@ -379,10 +484,81 @@ export async function revokeEntitlement(storage: Storage, consumerGaii: string, 
   return flip(storage, consumerGaii, ext, action, 'revoked');
 }
 
+/**
+ * Issue (or re-issue) a grant: the provider carries this consumer's calls instead of billing them.
+ *
+ * Writes only the grant slot, so a consumer who was already paying keeps their contract untouched
+ * underneath — and gets it back the moment the grant is withdrawn. Re-issuing carries the accumulated
+ * `carriedUnits` forward, because what a provider has already given away does not un-happen when they
+ * raise the ceiling.
+ */
+export async function issueGrant(
+  storage: Storage,
+  input: {
+    consumerGaii: string; appId?: string | null; providerGhii: string; ext: string; action: string;
+    capabilityLabel?: string; unit: EntitlementUnit; currency?: string | null; surface?: SellableSurface | null;
+    tollMorsels?: number | null; listPricePerCall: number; capCarriedUnits?: number | null;
+    note?: string; reason?: { appId: string; role: string } | null; grantedBy: string;
+  },
+): Promise<MeteredEntitlement> {
+  const now = new Date().toISOString();
+  const prev = await readGrantForCall(storage, input.consumerGaii, input.ext, input.action);
+  const carriedForward = prev?.grant && prev.unit === input.unit ? prev.grant.carriedUnits : 0;
+  const value: MeteredEntitlement = {
+    entitlementId: prev?.entitlementId || randomUUID(),
+    consumerGaii: input.consumerGaii,
+    appId: input.appId ?? prev?.appId ?? null,
+    providerGhii: input.providerGhii,
+    ext: input.ext,
+    action: input.action,
+    capabilityLabel: input.capabilityLabel || `${input.ext}/${input.action}`,
+    unit: input.unit,
+    // Zero by construction: this is the whole point. A grant that charged anything would be a discount.
+    pricePerCall: 0,
+    currency: input.unit === 'money' ? (input.currency ?? 'EUR') : null,
+    pricing: { model: 'per_call' },
+    surface: input.surface ?? prev?.surface ?? null,
+    budget: { capUnits: null, spentUnits: 0, calls: prev?.budget.calls ?? 0 },
+    rakePercent: null,
+    tollMorsels: input.tollMorsels ?? null,
+    grant: {
+      grantedBy: input.grantedBy,
+      listPricePerCall: Math.max(0, Math.floor(input.listPricePerCall)),
+      carriedUnits: carriedForward,
+      capCarriedUnits: input.capCarriedUnits ?? null,
+      note: (input.note ?? '').slice(0, 500),
+      reason: input.reason ?? null,
+      issuedAt: prev?.grant?.issuedAt || now,
+    },
+    contractRef: `grant:${input.grantedBy}`,
+    escrowParty: null,
+    state: 'active',
+    createdAt: prev?.createdAt || now,
+    createdBy: input.grantedBy,
+    updatedAt: now,
+  };
+  await persist(storage, value);
+  return value;
+}
+
+/**
+ * Withdraw a grant. Terminal and immediate: the next call reads `state !== 'active'` and falls back to
+ * whatever the consumer bought for themselves, which for most of them is nothing.
+ */
+export async function revokeGrant(storage: Storage, consumerGaii: string, ext: string, action: string): Promise<boolean> {
+  const g = await readGrantForCall(storage, consumerGaii, ext, action);
+  if (!g || !g.grant) return false;
+  g.state = 'revoked';
+  g.updatedAt = new Date().toISOString();
+  await persist(storage, g);
+  return true;
+}
+
+/** The consumer's own off-switch acts on what the consumer BOUGHT — a grant is the provider's to withdraw. */
 async function flip(
   storage: Storage, consumerGaii: string, ext: string, action: string, state: MeteredEntitlement['state'],
 ): Promise<boolean> {
-  const ent = await readEntitlementForCall(storage, consumerGaii, ext, action);
+  const ent = await readContractForCall(storage, consumerGaii, ext, action);
   if (!ent) return false;
   ent.state = state;
   ent.updatedAt = new Date().toISOString();
@@ -391,9 +567,13 @@ async function flip(
 }
 
 async function persist(storage: Storage, value: MeteredEntitlement): Promise<void> {
+  // A grant lives in its own slot; writing it to the contract key is what would destroy a purchase.
+  const isGrant = !!value.grant;
   await storage.setMemory({
-    key: entitlementKey(value.consumerGaii, value.ext, value.action),
-    ownerGaii: NS,
+    key: isGrant
+      ? grantKey(value.consumerGaii, value.ext, value.action)
+      : entitlementKey(value.consumerGaii, value.ext, value.action),
+    ownerGaii: isGrant ? NS_GRANT : NS,
     value,
     visibility: 'private',
     tags: ['metered-entitlement'],

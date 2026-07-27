@@ -319,30 +319,52 @@ await test('BYPASS: the provider still calls their own extension free', async ()
   assert(own.status === 200, `owner-free survives, got ${own.status}: ${JSON.stringify(own.body?.error)}`);
 });
 
-await test('BYPASS: a contract holder calling the raw route settles ONCE, on a contract they hold', async () => {
-  // Same product, different door: the contract the consumer signed is what pays, so the two doors
-  // cannot be played off against each other.
-  //
-  // This consumer holds BOTH `brief` and `paid`, which bind the same capability — the raw route has
-  // nothing in the request to tell it which product was meant, so it settles the first in a stable
-  // order and the other is untouched. That resolution is defined rather than incidental; a caller
-  // who needs a particular one calls the app-tool endpoint, which names it.
-  const entFor = async (action: string) => {
-    const r = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
-    return (r.body.data.entitlements as any[]).find(e => e.ext === `apptool:${provider.name}/${APP_ID}` && e.action === action);
-  };
-  const beforeBrief = await entFor('brief'), beforePaid = await entFor('paid');
+const entOf = async (action: string) => {
+  const r = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+  return (r.body.data.entitlements as any[]).find(e => e.ext === `apptool:${provider.name}/${APP_ID}` && e.action === action);
+};
+
+await test('BYPASS: holding two products on one capability, the raw route settles the CHEAPER of them', async () => {
+  // Same capability, different door — but `brief` (11 morsels) and `paid` (0.02 EUR) are different
+  // PRODUCTS, and a raw request carries nothing saying which was meant. It used to resolve that by
+  // spelling, which billed whichever tool sorted first. Ambiguity now costs the least it could have
+  // meant: a morsel right settles before a money one, and the other contract is not touched.
+  const beforeBrief = await entOf('brief'), beforePaid = await entOf('paid');
   const raw = await json(`/v1/ext/${EXT}/free`, {
     method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ businessId: '0101263-6' }),
   });
   assert(raw.status === 200, `the contract holder gets through, got ${raw.status}: ${JSON.stringify(raw.body?.error)}`);
-  const afterBrief = await entFor('brief'), afterPaid = await entFor('paid');
+  const afterBrief = await entOf('brief'), afterPaid = await entOf('paid');
   assert(afterBrief.budget.calls === beforeBrief.budget.calls + 1,
-    `exactly one call on the settled contract, ${beforeBrief.budget.calls} → ${afterBrief.budget.calls}`);
+    `exactly one call on the cheaper contract, ${beforeBrief.budget.calls} → ${afterBrief.budget.calls}`);
   assert(afterBrief.budget.spent_units === beforeBrief.budget.spent_units + afterBrief.price_per_call,
     `charged its own agreed price once: ${beforeBrief.budget.spent_units} → ${afterBrief.budget.spent_units} at ${afterBrief.price_per_call}`);
   assert(afterPaid.budget.calls === beforePaid.budget.calls,
-    `the OTHER contract is untouched — one call is one charge: ${JSON.stringify(afterPaid.budget)}`);
+    `the money contract is untouched — one call is one charge: ${JSON.stringify(afterPaid.budget)}`);
+});
+
+await test('BYPASS: naming the product overrides the default, and only among products they hold', async () => {
+  // A caller who means the money product says so. The name is a request, not an instruction: it must
+  // be a tool that really sells this action, and one they really contracted.
+  const beforeBrief = await entOf('brief'), beforePaid = await entOf('paid');
+  const named = await json(`/v1/ext/${EXT}/free`, {
+    method: 'POST', headers: { ...auth(consumer.token), 'x-aimeat-app-tool': `${APP_ID}/paid` },
+    body: JSON.stringify({ businessId: '0101263-6' }),
+  });
+  assert(named.status === 200, `the named product serves its holder, got ${named.status}: ${JSON.stringify(named.body?.error)}`);
+  const afterBrief = await entOf('brief'), afterPaid = await entOf('paid');
+  assert(afterPaid.budget.calls === beforePaid.budget.calls + 1,
+    `the NAMED contract is the one that moved: ${beforePaid.budget.calls} → ${afterPaid.budget.calls}`);
+  assert(afterBrief.budget.calls === beforeBrief.budget.calls,
+    `and the cheaper default stayed put: ${JSON.stringify(afterBrief.budget)}`);
+  // A tool that does not sell this action is a bad request, never a fallback to guessing.
+  const bogus = await json(`/v1/ext/${EXT}/free`, {
+    method: 'POST', headers: { ...auth(consumer.token), 'x-aimeat-app-tool': `${APP_ID}/not-a-tool` },
+    body: JSON.stringify({ businessId: '0101263-6' }),
+  });
+  assert(bogus.status === 400, `naming a product that does not sell it is refused, got ${bogus.status}`);
+  const settled = await entOf('brief');
+  assert(settled.budget.calls === afterBrief.budget.calls, 'and a refused name charges nothing');
 });
 
 await test('NO DOUBLE CHARGE: the app-tool endpoint charges once, not once per door it passes through', async () => {

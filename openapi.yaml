@@ -8258,6 +8258,113 @@ paths:
         '404':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/exchange/grants:
+    post:
+      operationId: exchangeIssueGrant
+      summary: Carry a consumer's access instead of billing them — issue an EXCHANGE grant
+      description: >
+        The provider decides who may use their capability without paying for it: "only the members I
+        approve may use this app; everyone else pays". A grant is an entitlement priced at zero over the
+        provider's OWN listing, held in its own key space, so it never overwrites a contract the consumer
+        bought and stepping aside returns them to it. It is read at the one settlement chokepoint every
+        metered surface shares, so it holds on the app-tool endpoint, the raw extension route, the MCP
+        twin and the commerce checkout alike. The consumer settles NOTHING in either half of the price —
+        the pacing morsels burn from the PROVIDER's wallet, since a carried member paying the throttle is
+        still a member paying. What the provider is giving away is counted (`carried_units` accumulates
+        the list price per call) and can be bounded (`cap_carried_units`). Requires scope
+        `exchange:grant`, so an app issuing these on an owner's approval must say so. Body:
+        `{ consumer, offering_id, cap_carried_units?, note?, app_id?, reason? }`. Returns `{ grant }`.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [consumer, offering_id]
+              properties:
+                consumer: { type: string, description: "The principal to carry — an owner name, their GHII, or one of their agents' GAII. Must resolve on this node; a name that no call would ever match is rejected rather than stored." }
+                offering_id: { type: string, description: The provider's own listed offering. Someone else's is a 404. }
+                cap_carried_units: { type: integer, description: "Ceiling on what the provider will carry, in the listing's unit. Omit for no ceiling." }
+                note: { type: string, description: Free text the provider records with the approval. }
+                app_id: { type: string, description: 'Consuming app id ("owner/filename") for the per-app cost surface.' }
+                reason:
+                  type: object
+                  description: The app + role this grant stands for, so a demotion can withdraw exactly what the approval created.
+                  properties:
+                    app_id: { type: string }
+                    role: { type: string }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+    get:
+      operationId: exchangeListGrants
+      summary: Everyone you are carrying, and what it has cost you
+      description: >
+        Every grant the caller's owner has ISSUED, with the accumulated cost of each. `?app_id=` narrows to
+        the grants one app's approvals created. Response `data`: `{ grants: [{ consumer_gaii, ext, action,
+        capability, list_price_per_call, carried_units, cap_carried_units, reason, state, budget }],
+        count, carried }`, where `carried` totals the cost per rail (morsels / EUR / USD).
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: query
+          name: app_id
+          schema: { type: string }
+          description: Only grants issued under this app's approvals.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/exchange/grants/revoke:
+    post:
+      operationId: exchangeRevokeGrant
+      summary: Withdraw a grant — one, or every grant an app approval issued
+      description: >
+        Immediate: the next call reads a non-active grant and falls back to whatever the consumer bought
+        for themselves, which for most of them is nothing. Two forms — `{ consumer, offering_id }` for one,
+        or `{ app_id, role?, consumer? }` for every grant issued under an approval being taken back, so an
+        app demoting a member does not have to remember each listing. Provider-only; requires scope
+        `exchange:grant`. Returns `{ revoked, grants }`.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                consumer: { type: string }
+                offering_id: { type: string, description: Withdraw one grant; requires consumer. }
+                app_id: { type: string, description: Withdraw every grant this app's approvals issued. }
+                role: { type: string, description: With app_id, narrow to one role. }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/exchange/proposals:
     post:
       operationId: exchangeProposeChange

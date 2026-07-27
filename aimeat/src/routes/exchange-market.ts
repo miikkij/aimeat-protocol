@@ -34,7 +34,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { resolvePacingToll } from './extensions/pacing.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
-import { createEntitlement, readEntitlementForCall } from '../services/metered-entitlements.js';
+import { createEntitlement, readContractForCall } from '../services/metered-entitlements.js';
 import {
   type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type NeedSpec, type OfferingPlan,
   resolveActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate, agentWorkCoordinate,
@@ -569,7 +569,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     if (!priced.ok) return res.status(400).json(error(config.nodeId, priced.code, priced.message));
 
     const capCap = posOrNull((req.body ?? {})?.cap_units) ?? n.budgetCap;
-    const existing = await readEntitlementForCall(storage, consumerGaii, bid.ext, bid.action);
+    const existing = await readContractForCall(storage, consumerGaii, bid.ext, bid.action);
     const ent = await createEntitlement(storage, {
       consumerGaii, appId: n.appId, providerGhii: `${extRec.installedBy}@${config.nodeId}`,
       ext: bid.ext, action: bid.action, capabilityLabel: `${bid.ext}/${bid.action}`,

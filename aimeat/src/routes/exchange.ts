@@ -18,6 +18,10 @@
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-07-27 — GRANTS: POST/GET /v1/exchange/grants + /grants/revoke — a provider carries a
+ *     consumer instead of billing them, which is what "only the members I approve" means once a
+ *     capability has a price. Contract-lifecycle reads (mint carry-forward, renegotiation, the
+ *     consumer's off-switch) now read the CONTRACT explicitly, so a grant is never mistaken for one.
  *   v1.3.0 — 2026-07-21 — Agent work (Gap 2): POST /work (start) + /work/:id/deliver (settle on delivery) +
  *     GET /work — the async third sellable surface, metered per delivered task via the shared settlement.
  *   v1.2.0 — 2026-07-21 — Renegotiation + history: POST/GET /proposals (+ accept/decline/withdraw) with a
@@ -30,14 +34,15 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, requireScope } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import {
-  createEntitlement, readEntitlementForCall, listEntitlementsByConsumer,
+  createEntitlement, readEntitlementForCall, readContractForCall, listEntitlementsByConsumer,
   pauseEntitlement, revokeEntitlement,
+  issueGrant, revokeGrant, readGrantForCall, listGrantsByProvider,
   listEntitlementHistoryByConsumer, listEntitlementHistoryByProvider,
   type MeteredEntitlement, type EntitlementHistoryEntry,
 } from '../services/metered-entitlements.js';
@@ -56,6 +61,30 @@ import {
 
 function ownerOf(gaii: string): string {
   return gaii.split('@')[0].split('#').pop() ?? gaii;
+}
+
+/**
+ * The exact principal string a grant must be keyed by — the one the gate will see on the call.
+ *
+ * Entitlements hash `(consumer, ext, action)`, so `alice`, `alice@node` and `bot#alice@node` are three
+ * different slots. A provider typing a bare name and getting a 201 back would have a record that no
+ * call ever reads: the grant would look issued and do nothing, which is worse than a refusal. So a
+ * bare owner name is completed to their GHII, a full GHII/GAII on this node is taken as given, and
+ * anything else is rejected rather than stored.
+ */
+function normaliseConsumer(raw: string, nodeId: string): string | null {
+  const v = raw.trim();
+  if (!v || /\s/.test(v)) return null;
+  // A bare name is the owner; a bare `bot#alice` names an agent on this node. Both complete the same way.
+  if (!v.includes('@')) {
+    return /^[A-Za-z0-9_.-]+(#[A-Za-z0-9_.-]+)?$/.test(v) ? `${v}@${nodeId}` : null;
+  }
+  const [local, node, ...rest] = v.split('@');
+  if (rest.length || !local || !node) return null;
+  // Cross-node grants are refused rather than silently stored: this node's gate only ever sees
+  // principals it authenticated, so a foreign GHII would be another grant that never applies.
+  if (node !== nodeId) return null;
+  return /^[A-Za-z0-9_.-]+(#[A-Za-z0-9_.-]+)?$/.test(local) ? v : null;
 }
 
 function view(config: AimeatConfig, e: MeteredEntitlement) {
@@ -121,7 +150,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
         return res.status(400).json(error(config.nodeId, 'BUDGET_TOO_LOW',
           `Budget cap (${capUnits}) is below the ${minCharge}-${priced.unit === 'money' ? priced.currency : 'morsel'} minimum charge`));
       }
-      const existing = await readEntitlementForCall(storage, consumerGaii, priced.ext, priced.action);
+      const existing = await readContractForCall(storage, consumerGaii, priced.ext, priced.action);
       const ent = await createEntitlement(storage, {
         consumerGaii, appId, providerGhii: priced.providerGhii, ext: priced.ext, action: priced.action,
         capabilityLabel: priced.capabilityLabel, unit: priced.unit, pricePerCall: priced.pricePerCall,
@@ -161,7 +190,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const providerGhii = `${extRec.installedBy}@${config.nodeId}`;
 
     // Carry spend forward on re-acceptance (renegotiation) so a new contract does not reset the meter.
-    const existing = await readEntitlementForCall(storage, consumerGaii, ext, action);
+    const existing = await readContractForCall(storage, consumerGaii, ext, action);
     const ent = await createEntitlement(storage, {
       consumerGaii, appId, providerGhii, ext, action, capabilityLabel: `${ext}/${action}`,
       unit, pricePerCall, currency, pricing, capUnits, contractRef, escrowParty, createdBy: owner,
@@ -170,6 +199,173 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     return res.status(201).json(success(config.nodeId, { entitlement: view(config, ent) }, [
       { description: 'This app’s cost & contracts', method: 'GET', url: appId ? `/v1/apps/cost?app_id=${encodeURIComponent(appId)}` : '/v1/exchange/entitlements' },
     ]));
+  });
+
+  // ── GRANTS (the provider carries someone's access instead of billing it) ─────
+  /**
+   * A grant is what "only the members I approve may use this" means once a capability has a price.
+   *
+   * Before this existed a provider had exactly two things to say: charge everyone, or charge nobody.
+   * Neither is an approval. Approving someone and then billing them is not one either, and the moment
+   * the free raw door onto a priced product was closed, an approved member with no contract simply
+   * stopped being served — the approval had never done anything on its own, the hole had been doing
+   * it. So the node needs the provider to be able to say the third thing: this one, on me.
+   *
+   * Mechanically it is an entitlement priced at zero, in its own key space (services/
+   * metered-entitlements.ts). Everything a bought contract gets, it gets: the same coordinate, the
+   * same meter, the same pacing brake, the same ceiling, the same immediate off-switch — and it is
+   * read at the one chokepoint every metered surface shares, so it works through the app-tool
+   * endpoint, the raw extension route, the MCP twin and the checkout without any of them knowing it
+   * exists. What it does NOT do is move money, in either half of the price: the consumer settles
+   * nothing, and the pacing morsels burn from the PROVIDER's wallet, because a member paying the
+   * throttle for access they were told was free is still a member paying.
+   *
+   * The cost the provider carries is counted rather than lost to a zero meter: `carried_units`
+   * accumulates the list price of every call served, and `cap_carried_units` bounds it.
+   */
+  function grantView(config2: AimeatConfig, e: MeteredEntitlement) {
+    const g = e.grant!;
+    return {
+      ...view(config2, e),
+      granted: true,
+      granted_by: g.grantedBy,
+      list_price_per_call: g.listPricePerCall,
+      carried_units: g.carriedUnits,
+      cap_carried_units: g.capCarriedUnits,
+      note: g.note,
+      reason: g.reason,
+      issued_at: g.issuedAt,
+    };
+  }
+
+  /**
+   * POST /v1/exchange/grants — issue one. Body:
+   * `{ consumer, offering_id, cap_carried_units?, note?, app_id?, reason? }`.
+   *
+   * Provider-only over the provider's OWN listing, so nobody hands out a capability that is not
+   * theirs. `exchange:grant` is its own scope because an app issuing these on the owner's behalf —
+   * which is the point, an approval inside an app should be able to produce one — is giving away the
+   * owner's revenue, and that is not something a memory scope should silently cover.
+   */
+  router.post('/v1/exchange/grants', requireAuth(), requireScope('exchange:grant'), async (req: Request, res: Response) => {
+    const owner = req.auth!.owner;
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const rawConsumer = typeof b.consumer === 'string' ? b.consumer.trim() : '';
+    const offeringId = typeof b.offering_id === 'string' ? b.offering_id.trim() : '';
+    if (!rawConsumer || !offeringId) {
+      return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'consumer and offering_id are required'));
+    }
+    // A grant is keyed by the EXACT principal string the gate will see on the call. `alice` and
+    // `alice@node` hash to different slots, so an un-normalised name produces a grant that is never
+    // read — a silent nothing, which is the precise failure this feature exists to end.
+    const consumer = normaliseConsumer(rawConsumer, config.nodeId);
+    if (!consumer) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_CONSUMER',
+        `"${rawConsumer}" is not a principal shape this node can grant to. Name an owner ("alice" or "alice@${config.nodeId}") or one of their agents ("bot#alice@${config.nodeId}").`));
+    }
+    if (ownerOf(consumer) === owner) {
+      return res.status(400).json(error(config.nodeId, 'GRANT_TO_SELF',
+        'You already call your own capability free — a grant to yourself would only add a record that never applies.'));
+    }
+    const o = await getOffering(storage, offeringId);
+    if (!o || o.state !== 'listed') return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such listed offering'));
+    // 404, not 403: whether someone else's offering exists is not this caller's business.
+    if (o.providerOwner !== owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering of yours'));
+
+    // Read the listing exactly as an acceptance does — unit, coordinate, pinned surface and toll all
+    // come from the source, so a granted call meters and reports like a bought one. Only the price is
+    // replaced, by nothing.
+    const priced = await resolveOfferingPricing(storage, o, null);
+    if (!priced.ok) return res.status(priced.status).json(error(config.nodeId, priced.code, priced.message));
+
+    const capCarried = typeof b.cap_carried_units === 'number' && Number.isFinite(b.cap_carried_units) && b.cap_carried_units >= 0
+      ? Math.floor(b.cap_carried_units) : null;
+    const rawReason = (b.reason ?? {}) as Record<string, unknown>;
+    const reason = typeof rawReason.app_id === 'string' && typeof rawReason.role === 'string'
+      ? { appId: rawReason.app_id, role: rawReason.role } : null;
+
+    const ent = await issueGrant(storage, {
+      consumerGaii: consumer, appId: typeof b.app_id === 'string' && b.app_id ? b.app_id : null,
+      providerGhii: priced.providerGhii, ext: priced.ext, action: priced.action,
+      capabilityLabel: priced.capabilityLabel, unit: priced.unit, currency: priced.currency,
+      surface: priced.surface, tollMorsels: priced.tollMorsels,
+      listPricePerCall: priced.pricePerCall, capCarriedUnits: capCarried,
+      note: typeof b.note === 'string' ? b.note : '', reason, grantedBy: owner,
+    });
+    logger.info('EXCHANGE grant issued: the provider carries this consumer', {
+      provider: owner, consumer, ext: priced.ext, action: priced.action, listPrice: priced.pricePerCall,
+    });
+    return res.status(201).json(success(config.nodeId, { grant: grantView(config, ent) }, [
+      { description: 'Everyone you are carrying', method: 'GET', url: '/v1/exchange/grants' },
+      { description: 'Who reaches this listing, bought or carried', method: 'GET', url: `/v1/exchange/offerings/${offeringId}/consumers` },
+    ]));
+  });
+
+  /** GET /v1/exchange/grants — every grant the caller's owner has ISSUED, and what each has cost them. */
+  router.get('/v1/exchange/grants', requireAuth(), async (req: Request, res: Response) => {
+    const providerGhii = `${req.auth!.owner}@${config.nodeId}`;
+    const mine = await listGrantsByProvider(storage, providerGhii);
+    const appId = typeof req.query.app_id === 'string' ? req.query.app_id : '';
+    const filtered = appId ? mine.filter(g => g.grant?.reason?.appId === appId) : mine;
+    return res.json(success(config.nodeId, {
+      grants: filtered.map(g => grantView(config, g)),
+      count: filtered.length,
+      // What the whole guest list has cost, per rail — the number a provider actually wants, and the
+      // one a zero spend meter can never give them.
+      carried: filtered.reduce((acc, g) => {
+        const k = g.unit === 'money' ? (g.currency ?? 'EUR') : 'morsels';
+        acc[k] = (acc[k] ?? 0) + (g.grant?.carriedUnits ?? 0);
+        return acc;
+      }, {} as Record<string, number>),
+    }));
+  });
+
+  /**
+   * POST /v1/exchange/grants/revoke — withdraw. Body: `{ consumer, offering_id }` for one, or
+   * `{ app_id, role?, consumer? }` for every grant an app issued under an approval it is taking back.
+   * Immediate: the next call reads a non-active grant and falls back to whatever the consumer bought
+   * for themselves, which for most of them is nothing.
+   *
+   * The bulk form is what keeps an approval and its grants from drifting apart — an app demoting a
+   * member withdraws exactly what its approval created, without having to remember each listing.
+   */
+  router.post('/v1/exchange/grants/revoke', requireAuth(), requireScope('exchange:grant'), async (req: Request, res: Response) => {
+    const owner = req.auth!.owner;
+    const providerGhii = `${owner}@${config.nodeId}`;
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const consumer = typeof b.consumer === 'string' && b.consumer.trim()
+      ? normaliseConsumer(b.consumer.trim(), config.nodeId) : null;
+    const offeringId = typeof b.offering_id === 'string' ? b.offering_id.trim() : '';
+    const appId = typeof b.app_id === 'string' ? b.app_id.trim() : '';
+    const role = typeof b.role === 'string' ? b.role.trim() : '';
+
+    let targets: MeteredEntitlement[] = [];
+    if (offeringId) {
+      if (!consumer) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'consumer is required alongside offering_id'));
+      const o = await getOffering(storage, offeringId);
+      if (!o || o.providerOwner !== owner) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such offering of yours'));
+      const g = await readGrantForCall(storage, consumer, o.ext, o.action);
+      if (g?.grant) targets = [g];
+    } else if (appId) {
+      targets = (await listGrantsByProvider(storage, providerGhii)).filter(g =>
+        g.grant?.reason?.appId === appId
+        && (!role || g.grant?.reason?.role === role)
+        && (!consumer || g.consumerGaii === consumer));
+    } else {
+      return res.status(400).json(error(config.nodeId, 'BAD_REQUEST',
+        'Name what to withdraw: { consumer, offering_id } for one, or { app_id, role?, consumer? } for everything an approval issued'));
+    }
+
+    let revoked = 0;
+    for (const g of targets) {
+      if (g.state !== 'active') continue;
+      if (await revokeGrant(storage, g.consumerGaii, g.ext, g.action)) revoked += 1;
+    }
+    logger.info('EXCHANGE grants withdrawn', { provider: owner, revoked, appId: appId || null, role: role || null });
+    return res.json(success(config.nodeId, {
+      revoked,
+      grants: targets.map(g => ({ consumer: g.consumerGaii, ext: g.ext, action: g.action, capability: g.capabilityLabel })),
+    }));
   });
 
   /** GET /v1/exchange/entitlements — every entitlement the caller's owner holds (as consumer). */
@@ -192,7 +388,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const mode = b.mode === 'revoke' ? 'revoke' : 'pause';
     if (!ext || !action) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext and action are required'));
 
-    const ent = await readEntitlementForCall(storage, consumerGaii, ext, action);
+    const ent = await readContractForCall(storage, consumerGaii, ext, action);
     if (!ent || ownerOf(ent.consumerGaii) !== owner) {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No entitlement of yours for that capability'));
     }
@@ -238,7 +434,7 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const action = typeof b.action === 'string' ? b.action : '';
     if (!ext || !action) return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'ext and action are required'));
     const targetConsumer = typeof b.consumer_gaii === 'string' && b.consumer_gaii ? b.consumer_gaii : resolveIdentity(req.auth!, config.nodeId);
-    const ent = await readEntitlementForCall(storage, targetConsumer, ext, action);
+    const ent = await readContractForCall(storage, targetConsumer, ext, action);
     if (!ent) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such contract'));
     const isConsumer = ownerOfGaii(ent.consumerGaii) === owner;
     const isProvider = ownerOfGaii(ent.providerGhii) === owner;

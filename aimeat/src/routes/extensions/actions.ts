@@ -5,6 +5,8 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-07-27 — Forward `x-aimeat-app-tool` to the paywall, so a caller holding contracts for
+ *     several products sold on one action can name which one they mean.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — ctx.memory.getPublic owner-agent fallback batches into one listMemoryForOwners
  *   v1.2.0 — 2026-07-17 — Per-call paywall (enforcePaywall) before execute in both handlers +
@@ -24,7 +26,7 @@ import { makeExtensionFiles } from '../../services/extension-files.js';
 import { logger } from '../../utils/logger.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { INTERNAL_PASS_HEADER } from './internal-pass.js';
-import { enforcePaywall } from './paywall.js';
+import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
 import { recordCallDuration } from '../../services/call-timing.js';
 import { safeFetch } from '../../utils/url-validator.js';
 import { enforceExtensionMemoryLimits } from '../../services/quota.js';
@@ -87,7 +89,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
 
       // Per-call paywall: owner-free / anti-abuse toll / priced payment (design: paywall.ts).
       const pay = await enforcePaywall({ config, storage, ext, action, callerGaii, res, payToken: req.header('x-aimeat-pay-token') ?? undefined,
-        internalPass: req.header(INTERNAL_PASS_HEADER) ?? undefined });
+        internalPass: req.header(INTERNAL_PASS_HEADER) ?? undefined,
+        namedAppTool: req.header(APP_TOOL_HEADER) ?? undefined });
       if (!pay.ok) return;
 
       // Build the ExtensionCtx with instance-scoped memory namespace
@@ -363,7 +366,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
 
       // Per-call paywall: owner-free / anti-abuse toll / priced payment (design: paywall.ts).
       const pay = await enforcePaywall({ config, storage, ext, action, callerGaii, res, payToken: req.header('x-aimeat-pay-token') ?? undefined,
-        internalPass: req.header(INTERNAL_PASS_HEADER) ?? undefined });
+        internalPass: req.header(INTERNAL_PASS_HEADER) ?? undefined,
+        namedAppTool: req.header(APP_TOOL_HEADER) ?? undefined });
       if (!pay.ok) return;
 
       // Build the ExtensionCtx
