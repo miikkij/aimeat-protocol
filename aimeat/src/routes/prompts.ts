@@ -29,6 +29,7 @@ import { isV2Role, V2_ROLES } from '../mcp/catalog/surfaces.js';
 import { DRAFT_OFFER_PROMPT } from '../services/draft-offer-prompt.js';
 import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
 import { buildAppPrompt } from '../services/build-app-prompt.js';
+import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 import { logger } from '../utils/logger.js';
 
@@ -258,6 +259,35 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Starter templates (use-case scaffolds + app shells)', method: 'GET', url: '/v1/app-templates' },
       { description: 'Publish the finished app', method: 'POST', url: '/v1/apps' },
+    ]));
+  });
+
+  // GET /v1/prompts/build-extension — the canonical "build a server extension" prompt. Same shape
+  // and same reasoning as build-app: one text in the node, so the Extensions tab, an agentic coder,
+  // the aimeat-extension-builder skill and llms.txt cannot drift apart. Public: build guidance, not
+  // a secret. ?lang, ?owner, ?idea, ?format=txt. MUST be registered before /v1/prompts/:tier.
+  router.get('/v1/prompts/build-extension', (req, res) => {
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
+    const owner = typeof req.query.owner === 'string' && req.query.owner
+      ? req.query.owner : (req.auth?.owner ?? '');
+    const idea = typeof req.query.idea === 'string' ? req.query.idea : '';
+    const { full, body } = buildExtensionPrompt(config, { lang, owner, idea });
+    if (req.query.format === 'txt') {
+      res.type('text/plain; charset=utf-8').send(full);
+      return;
+    }
+    res.json(success(config.nodeId, {
+      id: 'build-extension',
+      name: 'Build an AIMEAT server extension',
+      description: 'Canonical guided prompt for a sandboxed server extension: the ctx surface, the manifest, secret config, file I/O, the commercial block that lists it on the market, and how to install it.',
+      lang,
+      prompt: full,
+      system_prompt: full,
+      body,
+    }, [
+      { description: 'Install the finished extension', method: 'POST', url: '/v1/extensions' },
+      { description: 'The scopes an app grant may hold (ext:write is NOT one)', method: 'GET', url: '/v1/app-grants/scopes' },
+      { description: 'See it on the market once priced', method: 'GET', url: '/v1/exchange/offerings' },
     ]));
   });
 

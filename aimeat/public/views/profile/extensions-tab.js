@@ -45,7 +45,7 @@ import { useMaturityLedger, maturityBadge } from './extensions-tab.maturity.js';
 import * as cortexService from '/js/services/cortex.js';
 import * as v8Ext from '/js/services/extensions.js';
 import { getNodeUrl, getSession } from '/js/services/auth.js';
-import { buildCortexPrompt, buildServerExtensionPrompt } from './extensions-tab.prompts.js';
+import { buildCortexPrompt, fetchServerExtensionPrompt } from './extensions-tab.prompts.js';
 import { COMP_ICONS, COMP_TAG_CLASSES, BUNDLED } from './extensions-tab.constants.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -611,7 +611,7 @@ export default function ExtensionsTab({ session, showToast }) {
       <div class="section-title">${t('profile.v8ext.title')}</div>
       <div class="section-desc">${t('profile.v8ext.desc')}</div>
       <div class="ext-hero-actions">
-        <button class="btn-primary" onClick=${() => { const p = buildServerExtensionPrompt(getSession() || {}); copyToClipboard(p); showToast(t('profile.extensions.promptCopied')); }}>${'\u{1F916}'} Create with AI</button>
+        <button class="btn-primary" onClick=${async () => { const p = await fetchServerExtensionPrompt(getSession() || {}); copyToClipboard(p); showToast(t('profile.extensions.promptCopied')); }}>${'\u{1F916}'} Create with AI</button>
         <button class="btn-outline" onClick=${() => setShowSrvInstall(true)}>+ Add</button>
       </div>
       ${hasSrv ? html`

@@ -6977,6 +6977,42 @@ paths:
         '200':
           description: The build prompt (JSON envelope with prompt + body, or text/plain with format=txt)
 
+  /v1/prompts/build-extension:
+    get:
+      operationId: getBuildExtensionPrompt
+      summary: Canonical "build an AIMEAT server extension" prompt
+      description: >-
+        The node-served, single-source-of-truth extension-building prompt — the SAME text the
+        profile Extensions tab copies, so the tab, an agentic coder, the
+        node:aimeat-extension-builder skill and llms.txt cannot drift apart. Covers the sandbox
+        ctx surface (memory, fetch, files, caller, config, log, hash, now), the manifest and its
+        input/output schemas, secret config fields, binary file I/O, the `commercial` block that
+        prices an action and the `exchange` flag that lists it on the market, and how to install
+        and activate the result. data.prompt is the complete copy-paste prompt; data.body is the
+        platform core the tab wraps its own header around. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi], default: en }
+          description: Language for the built extension's own user-facing text; the instructions stay English
+        - name: owner
+          in: query
+          schema: { type: string, maxLength: 100 }
+          description: The account the extension will be installed for, so namespaces read concretely (defaults to the caller when authenticated)
+        - name: idea
+          in: query
+          schema: { type: string, maxLength: 500 }
+          description: What the extension should do, embedded in the prompt header
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the full prompt as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The extension build prompt (JSON envelope with prompt + body, or text/plain with format=txt)
+
   /v1/prompts/appdev-flow:
     get:
       operationId: getAppdevFlowPrompt

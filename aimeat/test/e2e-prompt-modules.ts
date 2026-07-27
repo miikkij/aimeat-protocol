@@ -301,6 +301,65 @@ await test('Cascade-delete owner', async () => {
     assert(status === 200 || status === 204, `delete owner: ${status}`);
 });
 
+// ── GET /v1/prompts/build-extension ────────────────────────────────────────
+// The tab's own copy taught a WORKING extension and never a SELLABLE one: audited against the
+// live text it had zero mentions of the commercial block, the exchange flag, the install route,
+// secret config or file I/O. Someone following it built something with no way onto the market and
+// nowhere to be installed. These assert the four gaps stay closed, by name.
+
+await test('build-extension: the route serves a prompt with a body for the tab to wrap', async () => {
+    const r = await json('/v1/prompts/build-extension');
+    assert(r.status === 200, `status ${r.status}`);
+    const d = r.body?.data ?? {};
+    assert(d.id === 'build-extension', `id: ${d.id}`);
+    assert(typeof d.prompt === 'string' && d.prompt.length > 2000, `prompt length ${d.prompt?.length}`);
+    assert(typeof d.body === 'string' && d.body.length > 2000, `body length ${d.body?.length}`);
+});
+
+await test('build-extension: it teaches the COMMERCIAL block, in the units the node enforces', async () => {
+    const { body } = await json('/v1/prompts/build-extension');
+    const p: string = body.data.prompt;
+    assert(p.includes('commercial'), 'names the commercial block');
+    assert(p.includes('payMorsels') && p.includes('payMoney'), 'names both payment channels');
+    assert(p.includes('exchange: true'), 'says which flag lists it on the market');
+    assert(/micro-?units/i.test(p), 'warns that money is in micro-units');
+    assert(p.includes('1000000') || p.includes('1 EUR = 1000000'), 'gives the micro-unit conversion');
+});
+
+await test('build-extension: it says how to INSTALL, and who may', async () => {
+    const { body } = await json('/v1/prompts/build-extension');
+    const p: string = body.data.prompt;
+    assert(p.includes('POST') && p.includes('/v1/extensions'), 'gives the install route');
+    assert(/activate/i.test(p), 'mentions activation, without which nothing runs');
+    assert(p.includes('ext:write'), 'states the permission an installer needs');
+});
+
+await test('build-extension: it covers secret config and binary file I/O', async () => {
+    const { body } = await json('/v1/prompts/build-extension');
+    const p: string = body.data.prompt;
+    assert(/type:\s*secret/.test(p), 'shows how a secret field is declared');
+    assert(p.includes('ctx.config'), 'shows where a decrypted secret arrives');
+    assert(p.includes('ctx.files.read') && p.includes('ctx.files.write'), 'covers file I/O');
+});
+
+await test('build-extension: the ctx surface matches the runtime, not a memory of it', async () => {
+    const { body } = await json('/v1/prompts/build-extension');
+    const p: string = body.data.prompt;
+    for (const call of ['ctx.memory.getPublic', 'ctx.fetch', 'ctx.caller', 'ctx.log', 'ctx.hash', 'ctx.now']) {
+        assert(p.includes(call), `documents ${call}`);
+    }
+    assert(p.includes('export default async function'), 'shows the script entry shape');
+});
+
+await test('build-extension: format=txt returns the raw prompt', async () => {
+    const res = await fetch(`${BASE}/v1/prompts/build-extension?format=txt&owner=zoe`);
+    assert(res.status === 200, `status ${res.status}`);
+    assert((res.headers.get('content-type') || '').includes('text/plain'), 'served as text/plain');
+    const text = await res.text();
+    assert(text.includes('zoe'), 'the owner reaches the text');
+    assert(!text.trimStart().startsWith('{'), 'not the JSON envelope');
+});
+
 // ── Summary ──
 console.log(`\n${'='.repeat(40)}`);
 console.log(`  Prompt Modules: ${passed} passed, ${failed} failed (${passed + failed} total)`);

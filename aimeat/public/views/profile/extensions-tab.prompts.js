@@ -143,6 +143,30 @@ To install: go to Profile > Extensions > + Add > paste the YAML manifest > add J
 }
 
 /* ── Server Extension scaffolding prompt builder ── */
+/**
+ * The canonical extension prompt, from the node. GET /v1/prompts/build-extension is the single
+ * source of truth (services/build-extension-prompt.ts) so this tab, an agentic coder, the
+ * aimeat-extension-builder skill and llms.txt all read the same text.
+ *
+ * buildServerExtensionPrompt below is the OFFLINE FALLBACK only. It is deliberately shorter and
+ * older; improve the guidance in the node service, never here.
+ */
+export async function fetchServerExtensionPrompt(sess) {
+  const owner = sess?.owner || '';
+  try {
+    const res = await fetch(`${getNodeUrl()}/v1/prompts/build-extension?format=txt`
+      + (owner ? `&owner=${encodeURIComponent(owner)}` : ''));
+    if (res.ok) {
+      const text = await res.text();
+      if (text && text.length > 400) return text;
+    }
+    // The fallback IS the handling: offline, or a node too old to serve this route, must still
+    // yield a usable prompt rather than an error toast.
+    // eslint-disable-next-line aimeat/no-silent-catch -- see the two lines above
+  } catch { /* fall through to the bundled copy */ }
+  return buildServerExtensionPrompt(sess || {});
+}
+
 export function buildServerExtensionPrompt(sess) {
   const url = getNodeUrl();
   const owner = sess?.owner || 'user';
