@@ -49,6 +49,13 @@ async function setupOwner(label: string) {
   return { name, token: tok.body.data.token as string };
 }
 const auth = (t: string) => ({ Authorization: `Bearer ${t}` });
+/** An agent session token, signed with the private key its registration returned. */
+async function agentToken(gaii: string, priv: string): Promise<string> {
+  const ts = new Date().toISOString();
+  const { body } = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ gaii, timestamp: ts, signature: await sign(priv, gaii + ts) }) });
+  assert(body.ok === true, `agent token: ${JSON.stringify(body.error)}`);
+  return body.data.token as string;
+}
 const hasKeys = (v: unknown): boolean => !!v && typeof v === 'object' && Object.keys(v as Record<string, unknown>).length > 0;
 
 console.log('\n=== AIMEAT EXCHANGE PROJECTION E2E (TARGET-050 — the source owns the listing) ===\n');
@@ -494,6 +501,28 @@ await test('Delisting still works from the source: dropping the flag removes the
   assert(live.length === 0, `the card came off the market, still listed: ${live.length}`);
 });
 
+
+await test("A provider's own AGENT browsing the market does not wipe the provider's listings", async () => {
+  await writeManifest(provider.token, [tool()]);                 // one bound tool, listed
+  const before = forTool(await myOfferings(provider.token), 'brief').filter(o => o.state === 'listed');
+  assert(before.length >= 1, `something to lose before the browse, got ${before.length}`);
+
+  // Browse as an AGENT of the same owner. The browse reconciles the caller first, and an agent's
+  // identity is a GAII — if that reaches reconcile unnormalised, the manifests are looked for in
+  // the agent's own namespace, come back empty, and every projected listing is delisted as unwanted.
+  const reg = await json('/v1/agents', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ name: `browser${Date.now()}`.slice(0, 28), owner: provider.name, capabilities: ['memory'], scopes: ['*'] }),
+  });
+  assert(reg.status === 201, `register browsing agent ${reg.status}: ${JSON.stringify(reg.body?.error)}`);
+  const agentTok = await agentToken(reg.body.data.agent.gaii, reg.body.data.private_key);
+  const browsed = await json('/v1/exchange/offerings', { headers: auth(agentTok) });
+  assert(browsed.status === 200, `agent browse ${browsed.status}`);
+
+  const after = forTool(await myOfferings(provider.token), 'brief').filter(o => o.state === 'listed');
+  assert(after.length === before.length,
+    `the market survived being read by an agent: ${before.length} listed before, ${after.length} after`);
+});
 
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

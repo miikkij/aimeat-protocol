@@ -133,6 +133,17 @@ function contentHash(parts: unknown): string {
   return createHash('sha256').update(JSON.stringify(parts)).digest('hex').slice(0, 24);
 }
 
+/**
+ * The OWNER GHII behind any principal: `agent#owner@node` and `owner@node` both resolve to
+ * `owner@node`. Listings and their sources belong to the owner, never to the agent that happened
+ * to trigger the reconcile.
+ */
+export function ownerGhiiOf(principal: string): string {
+  const [namePart, host] = principal.split('@');
+  const owner = namePart.includes('#') ? namePart.split('#').pop()! : namePart;
+  return host ? `${owner}@${host}` : owner;
+}
+
 // ── SOURCE → DESIRED LISTINGS ────────────────────────────────────────────────
 
 /**
@@ -335,10 +346,15 @@ function prices(morsels: number, money: Array<{ amount: number; currency: string
  * interface snapshot). Scope it with appId/extName/agentName to reconcile a single source after a write.
  */
 export async function reconcileOwnerOfferings(
-  storage: Storage, ownerGhii: string,
+  storage: Storage, principal: string,
   opts?: { dryRun?: boolean; appId?: string; extName?: string; agentName?: string },
 ): Promise<ReconcileReport> {
   const dryRun = opts?.dryRun === true;
+  /* Normalise HERE, not at the call sites. Sources live in the OWNER's namespace, so a GAII reaching
+     this far reads an agent's empty `apps.*` and every projected listing of that owner looks
+     unwanted — one agent browsing the market would delist the lot. The write path already
+     normalised; the browse path did not, and one asymmetry was enough. */
+  const ownerGhii = ownerGhiiOf(principal);
   const ownerName = ownerGhii.split('@')[0].split('#').pop() ?? ownerGhii;
   const scoped = !!(opts?.appId || opts?.extName || opts?.agentName);
   const changes: ReconcileChange[] = [];
@@ -479,7 +495,9 @@ function summarise(owner: string, dryRun: boolean, changes: ReconcileChange[]): 
  */
 const RECONCILE_WINDOW_MS = 30_000;
 const lastReconcile = new Map<string, number>();
-export async function reconcileOwnerOfferingsThrottled(storage: Storage, ownerGhii: string): Promise<void> {
+export async function reconcileOwnerOfferingsThrottled(storage: Storage, principal: string): Promise<void> {
+  // Key the throttle on the OWNER too, so five of one owner's agents browsing do not buy five passes.
+  const ownerGhii = ownerGhiiOf(principal);
   const now = Date.now();
   const prev = lastReconcile.get(ownerGhii) ?? 0;
   if (now - prev < RECONCILE_WINDOW_MS) return;
@@ -500,9 +518,7 @@ export async function reconcileAfterSourceWrite(storage: Storage, ownerGaii: str
   const offers = /^agents\.(.+)\.offers$/.exec(key);
   if (!app && !offers) return;
   // An offers doc lives under the AGENT's GAII (`agent#owner@node`); listings belong to the owner GHII.
-  const [namePart, host] = ownerGaii.split('@');
-  const ownerName = namePart.includes('#') ? namePart.split('#')[1] : namePart;
-  const ownerGhii = host ? `${ownerName}@${host}` : ownerName;
+  const ownerGhii = ownerGhiiOf(ownerGaii);
   const opts = app ? { appId: app[1] } : { agentName: offers![1] };
   // A source write is the authoritative signal — clear the browse throttle so a later read cannot serve a
   // view older than this write.
