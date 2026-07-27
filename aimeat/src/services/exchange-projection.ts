@@ -12,8 +12,15 @@
  *   Reconcile projects those sources onto offerings: creates what is flagged, updates what changed,
  *   delists what is no longer flagged (or no longer priced). Identity of a listing is the DEDUPE KEY
  *   (kind, ext, action, unit, currency) — a price change therefore UPDATES the existing listing instead
- *   of minting a rival one, and a tool priced in both morsels and EUR yields one listing per unit that
- *   the marketplace app groups into a single card.
+ *   of minting a rival one.
+ *
+ *   COMBINED PRICE: a source that names both a money price and a morsel figure is stating ONE price —
+ *   "1 morsel · 0.01 EUR", which is how the authoring UI and the marketplace card both show it. It
+ *   projects to ONE money listing carrying the morsels as its pacing toll, so a call pays the provider
+ *   the money and burns the morsels. It used to project a morsel listing BESIDE the money one, which
+ *   made two purchasable alternatives out of one declared product: a buyer could take the morsel side
+ *   and never pay the provider anything, for a second product nobody authored. Morsels WITHOUT money
+ *   remain a listing of their own — that one is a deliberate no-money offer.
  *
  *   HARD INVARIANT: a projection never touches a CONTRACT. Entitlements keep the interface version and
  *   the price they were signed at (`app-tool-interfaces.ts` deliberately does not freeze price — it is
@@ -26,6 +33,8 @@
  *   const report = await reconcileOwnerOfferings(storage, ownerGhii, { dryRun: true });
  *   await reconcileOwnerOfferings(storage, ownerGhii, { appId: 'prh.html' });
  * @version-history
+ *   v1.4.0 — 2026-07-27 — Combined price: money + morsels declared together project ONE money listing
+ *     whose pacing toll is the morsel figure, instead of two rival listings a buyer could choose between.
  *   v1.3.0 — 2026-07-25 — Pacing projects too: the source's `tollMorsels` reaches the listing (and is
  *     overwritten when cleared, unlike an attestation — a stale brake keeps charging consumers).
  *   v1.2.0 — 2026-07-25 — App-level ODPS defaults: the tool manifest's root `odps`/`provenance` are
@@ -204,7 +213,7 @@ async function desiredFromAppTools(
           plans: (tool.plans ?? []) as OfferingPlan[], usageTerms: usageTermsOf(tool.usageTerms), tags: [] as string[],
           provenance: provenanceOf(mergeProvenance(parsed.data.provenance, tool.provenance) ?? undefined),
           odps: mergeOdpsExtras(parsed.data.odps, tool.odps),
-          tollMorsels: tool.tollMorsels ?? null,
+          tollMorsels: pacingTollOf(tool.tollMorsels, morsels, money.length > 0),
           taskSpec: { inputSchema: tool.inputSchema ?? {}, outputSchema: tool.outputSchema ?? {} },
         };
         for (const p of prices(morsels, money)) {
@@ -235,7 +244,7 @@ async function desiredFromAppTools(
         // App-level defaults (manifest root) are inherited by every tool; the tool overrides field by field.
         provenance: provenanceOf(mergeProvenance(parsed.data.provenance, tool.provenance) ?? undefined),
         odps: mergeOdpsExtras(parsed.data.odps, tool.odps),
-        tollMorsels: tool.tollMorsels ?? null,
+        tollMorsels: pacingTollOf(tool.tollMorsels, morsels, money.length > 0),
       };
       for (const p of prices(morsels, money)) {
         out.push({
@@ -272,7 +281,7 @@ async function desiredFromExtActions(
         title: `${ext.name} · ${act.id}`, description: ext.description ?? '',
         plans: (comm.plans ?? []) as OfferingPlan[], usageTerms: usageTermsOf(comm.usageTerms), tags: [] as string[],
         provenance: provenanceOf(comm.provenance), odps: comm.odps ?? null,
-        tollMorsels: act.tollMorsels ?? null,
+        tollMorsels: pacingTollOf(act.tollMorsels, morsels, money.length > 0),
       };
       for (const p of prices(morsels, money)) {
         out.push({
@@ -317,7 +326,7 @@ async function desiredFromAgentOffers(
         title: offer.title || `${agent.name}: ${offer.id}`, description: offer.ask ?? '',
         plans: [] as OfferingPlan[], usageTerms: usageTermsOf(offer.usageTerms), tags: (offer.tags ?? []) as string[],
         provenance: provenanceOf(offer.provenance), odps: offer.odps ?? null,
-        tollMorsels: offer.tollMorsels ?? null,
+        tollMorsels: pacingTollOf(offer.tollMorsels, morsels, money.length > 0),
         taskSpec: { inputSchema: offer.inputSchema ?? {}, outputSchema: offer.outputSchema ?? {} },
       };
       for (const p of prices(morsels, money)) {
@@ -336,9 +345,28 @@ async function desiredFromAgentOffers(
 function prices(morsels: number, money: Array<{ amount: number; currency: string }>):
   Array<{ unit: EntitlementUnit; basePrice: number; currency: string | null }> {
   const rows: Array<{ unit: EntitlementUnit; basePrice: number; currency: string | null }> = [];
-  if (morsels > 0) rows.push({ unit: 'morsels', basePrice: morsels, currency: null });
+  // A source that declares BOTH a money price and a morsel figure is stating ONE combined price:
+  // "1 morsel · 0.01 EUR". The money is what the provider is paid; the morsels pace the call
+  // (see pacingTollOf below, which carries them onto the listing as the toll). This used to emit
+  // a separate morsel listing beside the money one, which turned one product into two purchasable
+  // alternatives — and a buyer who took the morsel one got the whole thing for pacing tokens,
+  // which the platform itself says are not a currency. Nobody ever declared that second product.
+  // Morsels WITHOUT money stay a listing of their own: that is a deliberate no-money offer.
+  if (morsels > 0 && money.length === 0) rows.push({ unit: 'morsels', basePrice: morsels, currency: null });
   for (const m of money) rows.push({ unit: 'money', basePrice: m.amount, currency: m.currency });
   return rows;
+}
+
+/**
+ * The pacing toll a listing carries. An explicit `tollMorsels` always wins — it is the declared
+ * one. Otherwise, when a source prices in money AND names a morsel figure, that figure IS the
+ * pacing half of the combined price and rides along as the toll, so a call costs the money to the
+ * provider and burns the morsels. Money-only stays untolled; morsels-only is priced in morsels
+ * already and must not be charged twice for the same number.
+ */
+function pacingTollOf(declared: number | null | undefined, morsels: number, hasMoney: boolean): number | null {
+  if (declared != null) return declared;
+  return hasMoney && morsels > 0 ? morsels : null;
 }
 
 // ── RECONCILE ────────────────────────────────────────────────────────────────
