@@ -86,7 +86,9 @@ github_optics.md
 # One-off browser probes written to answer a single question during a session. The demo-video
 # harness itself IS source (record/watch/cut/wait/selfcheck); these underscore-prefixed scripts
 # are the throwaway half: they hardcode board ids, prod URLs and a local storageState path.
-aimeat/scripts/demo-video/_*.mjs
+# The demo-video harness is LOCAL tooling. Its scene manifests carry an absolute path to a
+# signed-in browser state on THIS machine, and this repo is public. Kept on disk, out of git.
+aimeat/scripts/demo-video/
 
 # Test output files
 *-results.txt
