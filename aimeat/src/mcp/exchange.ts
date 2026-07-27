@@ -39,7 +39,7 @@ import {
 import {
     type Offering, type Need, type Bid, type ActionCommercial, type NeedSpec,
     resolveActionPricing, resolveOfferingPricing, newNeedId, newBidId,
-    getOffering, listOfferings, matchOfferings,
+    getOffering, listOfferings, matchOfferings, filterOfferings,
     putNeed, getNeed, listNeeds, putBid, getBid,
     offeringStats, offeringConsumers, enrichNeeds,
 } from '../services/exchange-market.js';
@@ -122,7 +122,7 @@ export function registerExchangeTools(
         annotationsFor('aimeat_exchange_offerings'),
         async ({ q, ext, action, stats }) => {
             const offerings = (ext && action) || q
-                ? await matchOfferings(storage, { ext: ext || null, action: action || null, text: q || null })
+                ? await filterOfferings(storage, { ext: ext || null, action: action || null, text: q || null })
                 : await listOfferings(storage);
             if (stats) {
                 const withStats = await Promise.all(offerings.map(async o => ({ ...o, stats: await offeringStats(storage, o) })));

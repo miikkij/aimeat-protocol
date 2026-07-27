@@ -350,12 +350,37 @@ export async function matchOfferings(
 ): Promise<Offering[]> {
   const all = await listOfferings(storage);
   const text = (q.text || '').trim().toLowerCase();
+  // A NEED's ext/action are a WISH, not a filter: an exact coordinate hit wins, and otherwise the
+  // description still surfaces near-matches, which is the whole point of posting a need. Browsing
+  // wants the opposite (narrow to what was asked) and gets it from filterOfferings below.
   const hits = all.filter(o => {
     if (q.ext && q.action) return o.ext === q.ext && o.action === q.action;
     if (!text) return true;
     return [o.title, o.description, o.ext, o.action, ...(o.tags || [])].join(' ').toLowerCase().includes(text);
   });
   return hits.sort((a, b) => a.basePrice - b.basePrice);
+}
+
+/**
+ * BROWSE filter — every supplied term NARROWS, independently. Distinct from {@link matchOfferings},
+ * whose ext/action are a need's WISH (an exact coordinate hit, else a text near-match). Browsing
+ * asked the wish matcher for one app's listings and got the whole market back, because `ext` only
+ * counted alongside `action`: the app showed a moon-phase service and a Rick & Morty lookup beside
+ * its own tools. A filter the server accepts and drops is worse than one it rejects.
+ */
+export async function filterOfferings(
+  storage: Storage, q: { ext?: string | null; action?: string | null; text?: string | null },
+): Promise<Offering[]> {
+  const all = await listOfferings(storage);
+  const text = (q.text || '').trim().toLowerCase();
+  return all
+    .filter(o => {
+      if (q.ext && o.ext !== q.ext) return false;
+      if (q.action && o.action !== q.action) return false;
+      if (!text) return true;
+      return [o.title, o.description, o.ext, o.action, ...(o.tags || [])].join(' ').toLowerCase().includes(text);
+    })
+    .sort((a, b) => a.basePrice - b.basePrice);
 }
 
 // ── NEED ────────────────────────────────────────────────────────────────────

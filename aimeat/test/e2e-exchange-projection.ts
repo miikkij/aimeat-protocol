@@ -170,6 +170,28 @@ await test('Consumer contracts the morsel listing at the CURRENT price', async (
   assert(acc.body.data.entitlement.surface?.ifaceVersion === 1, 'contract pinned to interface v1');
 });
 
+await test('?ext= alone NARROWS the market — a filter the server drops is worse than one it rejects', async () => {
+  // Requiring ext AND action together meant `?ext=` fell through to "list everything": an app
+  // showing its own tools listed a moon-phase service and a Rick & Morty lookup beside them.
+  const mineExt = `apptool:${provider.name}/${APP_ID}`;
+  const all = await json('/v1/exchange/offerings', { headers: auth(consumer.token) });
+  assert(all.status === 200, `list ${all.status}`);
+  const filtered = await json(`/v1/exchange/offerings?ext=${encodeURIComponent(mineExt)}`, { headers: auth(consumer.token) });
+  assert(filtered.status === 200, `filtered ${filtered.status}`);
+  const rows = filtered.body.data.offerings as any[];
+  assert(rows.length > 0, "the filter finds this app's own listings");
+  assert(rows.every(o => o.ext === mineExt), `every row belongs to the asked-for ext: ${JSON.stringify(rows.map(o => o.ext))}`);
+  // Not "fewer rows than the market" — in this fixture the provider IS the market, so that
+  // would pass or fail on who else happens to be listed. A filter that narrows returns nothing
+  // for a coordinate nobody offers; one that is silently dropped returns everything.
+  const bogus = await json('/v1/exchange/offerings?ext=apptool:nobody/none.html', { headers: auth(consumer.token) });
+  assert((bogus.body.data.offerings as any[]).length === 0,
+    `an ext nobody offers returns nothing, got ${(bogus.body.data.offerings as any[]).length} of ${(all.body.data.offerings as any[]).length}`);
+  // action alone narrows too, without an ext beside it.
+  const byAction = await json('/v1/exchange/offerings?action=brief', { headers: auth(consumer.token) });
+  assert((byAction.body.data.offerings as any[]).every(o => o.action === 'brief'), 'action alone narrows as well');
+});
+
 await test('INVARIANT: switching rails starts a FRESH meter (a EUR balance is not morsels)', async () => {
   // One (consumer, ext, action) triple holds one contract, so accepting a second rail for the same
   // tool re-mints the first. `spentUnits` is denominated in the contract's own unit, and carrying it

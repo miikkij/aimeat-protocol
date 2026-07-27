@@ -38,7 +38,7 @@ import { createEntitlement, readEntitlementForCall } from '../services/metered-e
 import {
   type Offering, type Need, type Bid, type ActionCommercial, type UsageTerms, type NeedSpec, type OfferingPlan,
   resolveActionPricing, newOfferingId, newNeedId, newBidId, appToolCoordinate, agentWorkCoordinate,
-  putOffering, getOffering, listOfferings, deleteOffering, matchOfferings,
+  putOffering, getOffering, listOfferings, deleteOffering, matchOfferings, filterOfferings,
   putNeed, getNeed, listNeeds, putBid, listBids, getBid,
   offeringStats, offeringConsumers, enrichNeeds,
 } from '../services/exchange-market.js';
@@ -420,8 +420,11 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
         .catch(err => { logger.warn('GET /v1/exchange/offerings: a stale projection must never break browsing', { error: String(err) }); });
     }
     const ext = str(req.query.ext), action = str(req.query.action), q = str(req.query.q);
-    const offerings = (ext && action) || q
-      ? await matchOfferings(storage, { ext: ext || null, action: action || null, text: q || null })
+    // ANY supplied filter routes to the matcher. Requiring ext AND action together meant
+    // `?ext=` alone fell through to "list everything", which reads as "this provider sells the
+    // whole market". A filter the server accepts and drops is worse than one it rejects.
+    const offerings = ext || action || q
+      ? await filterOfferings(storage, { ext: ext || null, action: action || null, text: q || null })
       : await listOfferings(storage);
     if (str(req.query.stats) === '1') {
       const withStats = await Promise.all(offerings.map(async o => ({ ...o, stats: await offeringStats(storage, o) })));
