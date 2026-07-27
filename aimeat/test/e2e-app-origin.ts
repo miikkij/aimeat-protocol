@@ -160,6 +160,36 @@ async function main() {
             assert(body.includes('app origin demo'), 'subdomain-served body contains the app content');
         });
 
+        // ── The agent arriving with nothing but the URL ─────────────────────────────────────
+        // A published app is a single-file SPA: its body is empty until JavaScript runs, so a
+        // fetching agent that does not execute scripts sees the meta tags and stops. Measured on a
+        // live app, one concluded there was nothing agent-facing and downloaded 184 kB of source to
+        // work out what the app does — while the MCP card, the WebMCP listing and a priced tool
+        // manifest all existed. These two assertions are that agent's whole journey.
+
+        await test('the served app names its own owner and app id, without running any script', async () => {
+            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            const body = await res.text();
+            assert(body.includes('<noscript id="aimeat-agent-discovery">'), 'a script-free discovery block is present');
+            assert(body.includes(`app_id: ${filename}`), `the app id is stated with its extension: ${filename}`);
+            assert(body.includes(`owner:  ${owner}`), 'the owner is stated');
+            assert(body.includes('/webmcp'), 'it points at the callable-tool listing');
+            assert(body.includes('rel="mcp-server"'), 'and links the MCP server card for a raw-HTML reader');
+        });
+
+        await test('llms.txt on an app origin is THAT app, not the node builder guide', async () => {
+            const res = await fetch(`${BASE}/llms.txt`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            const body = await res.text();
+            // The node-wide guide is app-BUILDING instructions; serving it here sent an agent that
+            // habitually tries /llms.txt to the wrong manual, which is worse than a 404.
+            assert(!body.includes('{{LIBRARY_PACKS_TABLE}}') && !/Client SDK Libraries/i.test(body),
+                'it is not the node-wide builder guide');
+            assert(body.includes(filename) || body.includes(owner),
+                `it names the app or its owner: ${body.slice(0, 160)}`);
+        });
+
         // ── Phase 4: the header must not grow with what the owner accumulates ───────────────
         // This is the test that was missing when frame-ancestors listed the owner's app origins:
         // it passed with two apps and took production down at 76, because the CSP header outgrew

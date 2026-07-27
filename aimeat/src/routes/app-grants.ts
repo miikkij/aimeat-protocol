@@ -97,6 +97,8 @@ interface PendingRequest {
   requestId: string;
   app: string;          // owner/filename
   appName: string;
+  appIcon: string;      // manifest icon (emoji or URL); '' → consent page draws a monogram
+  appDescription: string; // manifest description — the "what is this" line for a first-time visitor
   appOrigin: string;    // origin of redirect_uri (shown to user, bound into the grant)
   scopes: string[];
   redirectUri: string;
@@ -251,6 +253,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
     const requestId = `agreq-${randomBytes(18).toString('hex')}`;
     pendingRequests.set(requestId, {
       requestId, app, appName: appRecord.manifest?.name || app.slice(slash + 1),
+      appIcon: appRecord.manifest?.icon || '', appDescription: appRecord.manifest?.description || '',
       appOrigin: rd.origin, scopes: requested, redirectUri, state, codeChallenge,
       codeChallengeMethod: method === 'plain' ? 'plain' : 'S256', responseMode, manage, originBound,
       expiresAt: Date.now() + REQUEST_TTL_MS,

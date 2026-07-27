@@ -12,6 +12,11 @@
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  *        app.use(subdomainAdminRouter(config, storage));
  * @version-history
+ *   v1.6.0 — 2026-07-27 — Agent discovery on the app origin: every inline-served app carries a
+ *     script-free <noscript> block naming its owner, its app id WITH the extension, its sellable
+ *     tools and where the schemas live, plus <link rel="mcp-server">; and `/llms.txt` on an app
+ *     origin serves THAT app's agent face instead of the node's 139 kB app-building guide, in which
+ *     the app's own name appears zero times.
  *   v1.0.0 — 2026-06-12 — Initial: subdomain routing (operator-only management)
  *   v1.1.0 — 2026-06-20 — H-2: serve apps on the app origin — `<sub>.apps.<apex>` (existing
  *     GET / path) + path form `apps.<apex>/<owner>/<file>` (req.appOrigin-guarded); shared
@@ -50,6 +55,8 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { injectAimeatBadge } from '../utils/app-badge.js';
+import { injectAgentDiscovery } from '../utils/app-agent-discovery.js';
+import { appToolNames } from '../services/app-tool-names.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { prefersMarkdown } from '../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../services/agent-face.js';
@@ -210,7 +217,9 @@ export function relaxAppCspMeta(data: Buffer | Uint8Array | string, apexOrigin: 
  * author's own CSP meta is relaxed (frame-src/connect-src → allow the apex) so the H-2 silent-SSO
  * bridge + token exchange work even when the app sets `default-src 'self'`.
  */
-function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, apexOrigin?: string, protect?: { config: AimeatConfig; viewer: string }): void {
+function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, apexOrigin?: string,
+                  protect?: { config: AimeatConfig; viewer: string },
+                  discover?: { baseUrl: string; toolNames: string[] }): void {
   res.setHeader('Content-Type', app.mimeType);
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
@@ -225,6 +234,16 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
       ? relaxAppCspMeta(app.data as Buffer | Uint8Array | string, apexOrigin)
       : (app.data as Buffer | Uint8Array | string);
     let buf = injectAimeatBadge(relaxed);
+    // The body of a single-file app is empty until its JavaScript runs, so a fetching agent sees
+    // the meta tags and nothing else. This adds a static block naming the app id, the tools and
+    // where the schemas live — the facts an agent otherwise has to guess from the subdomain.
+    if (discover) {
+      buf = injectAgentDiscovery(buf, {
+        owner: app.ownerName, filename: app.filename,
+        appName: app.manifest?.name ?? null, description: app.manifest?.description ?? null,
+        baseUrl: discover.baseUrl, toolNames: discover.toolNames,
+      });
+    }
     // Opt-in copy-protection (obfuscate / domainLock / watermark) on the runnable body.
     if (protect && hasAnyProtection(app.manifest.protection)) {
       buf = applyAppProtection(buf, {
@@ -425,7 +444,24 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (await serveAppAgentFace(res, config, storage, app)) return;
     }
 
-    serveApp(res, storage, app, appCspForRequest, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' });  // the SDK (aimeat-auth.js) does the silent SSO itself
+    const discover = { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };
+    serveApp(res, storage, app, appCspForRequest, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discover);  // the SDK (aimeat-auth.js) does the silent SSO itself
+  });
+
+  // `llms.txt` on an APP origin is the app's own agent-facing document, not the node's.
+  // The node-wide guide is 139 kB of app-BUILDING instructions in which the app's own name
+  // appears zero times, and it was being served here: an agent that habitually tries
+  // /llms.txt read the wrong manual and stopped looking. Serving the same markdown the
+  // Agent Face serves keeps one source and answers the habit.
+  router.get('/llms.txt', async (req: Request, res: Response, next) => {
+    const sub = req.subdomain;
+    if (!req.appOrigin || !sub || !config.appOriginEnabled) return next();
+    const site = await storage.getSubdomainSite(sub);
+    if (!site || !site.enabled || site.kind !== 'app') return next();
+    const app = await resolveAppTarget(storage, site.target);
+    if (!app || appIsRestricted(config, app)) return next();
+    if (await serveAppAgentFace(res, config, storage, app)) return;
+    return next();
   });
 
   // App-origin path form: `apps.<apex>/<owner>/<filename>` on the bare app host. Apps need their
@@ -455,7 +491,8 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       res.redirect(302, `${scheme}://${sub}.${config.appHost}${portSuffix}/`);
       return;
     }
-    serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }); // no subdomain available → serve on the shared host (no SSO)
+    const discoverShared = { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };
+    serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discoverShared); // no subdomain available → serve on the shared host (no SSO)
   });
 
   return router;
