@@ -14,23 +14,28 @@
  *   MCP run tools all reach settlement through `settleMeteredCoordinate` directly and were never paced at
  *   all. The rule this file encodes: money, metering and abuse limits belong at the chokepoint EVERY path
  *   shares, never on one surface. Adding a new metered surface must not mean re-deriving this.
- * @structure resolvePacingToll · burnPacingToll
+ * @structure resolvePacingToll · burnPacingToll (express wrapper over the shared burn)
  * @usage
  *   const paced = await burnPacingToll({ config, storage, callerGaii, providerOwner, label, toll, res });
  *   if (!paced.ok) return { ok: false };   // 402 already sent
  * @version-history
+ *   v1.3.0 — 2026-07-28 — The burn moved to services/metered-settlement.ts so the chokepoint can
+ *     reach it without an Express response; this is a wrapper over it, not a second implementation.
+ *   v1.2.0 — 2026-07-27 — The burn is filed under the OWNER whose balance moved, with the caller named
+ *     as initiator — an agent's toll used to land in a ledger its payer never reads.
  *   v1.1.0 — 2026-07-27 — `payerGaii`: on an EXCHANGE grant the PROVIDER burns the toll, because a
  *     member carried by a provider is not paying half a price they were told was covered — and dropping
  *     the burn instead would hand them the one thing a money budget cannot bound.
  *   v1.0.0 — 2026-07-25 — Extracted from the extension paywall and moved to the shared chokepoint, so a
  *     money-only contract is paced too (it previously had no morsel brake of any kind).
  */
-import { randomUUID } from 'node:crypto';
 import type { Response } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
+import { burnPacingTollFor } from '../../services/metered-settlement.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
 
 /**
  * How many morsels this call burns. A per-capability value wins when the source declares one; otherwise
@@ -58,37 +63,20 @@ export function resolvePacingToll(config: AimeatConfig, declared: number | undef
 export async function burnPacingToll(args: {
   config: AimeatConfig; storage: Storage; callerGaii: string; providerOwner: string | null;
   label: string; toll: number; res: Response;
-  /**
-   * Whose wallet the burn comes out of, when that is not the caller's. Set for a GRANT: the provider
-   * said they would carry this consumer, and the morsel half of a price is still half of it — a
-   * "granted" member paying the toll would be paying for access they were told was theirs. The brake
-   * stays on, and the provider feels it, which is the honest place for a cost they volunteered for.
-   */
-  payerGaii?: string;
 }): Promise<{ ok: boolean }> {
   const { config, storage, callerGaii, providerOwner, label, toll, res } = args;
   if (toll <= 0) return { ok: true };
+  if (providerOwner && ownerGhiiOf(callerGaii).split('@')[0] === providerOwner) return { ok: true };
 
-  const callerOwner = callerGaii.split('@')[0]?.split('#').pop() ?? callerGaii;
-  if (providerOwner && callerOwner === providerOwner) return { ok: true };   // own capability, no pacing
-
-  const payer = args.payerGaii ?? callerGaii;
-  const carried = payer !== callerGaii;
-  const burned = await storage.debitBalance(payer, toll);
+  const burned = await burnPacingTollFor({ config, storage, caller: callerGaii, label, toll, payer: null });
   if (!burned) {
     res.status(402).json({
-      ...error(config.nodeId, 'INSUFFICIENT_MORSELS', carried
-        ? `This call burns a ${toll}-morsel pacing toll, which the provider carries for you under their `
-          + 'grant, and their balance does not cover it right now. Morsels replenish daily.'
-        : `This call burns a ${toll}-morsel pacing toll and your balance does not cover it. Morsels replenish `
-          + 'daily; the toll bounds how fast a capability can be called, whatever it is paid in.'),
+      ...error(config.nodeId, 'INSUFFICIENT_MORSELS',
+        `This call burns a ${toll}-morsel pacing toll and your balance does not cover it. Morsels replenish `
+        + 'daily; the toll bounds how fast a capability can be called, whatever it is paid in.'),
       ...paymentChallenge(config),
     });
     return { ok: false };
   }
-  await storage.addTransaction({
-    id: `pacing-${randomUUID()}`, gaii: payer, type: 'extension_toll', amount: -toll,
-    trackingCode: carried ? `pacing:granted:${label}` : `pacing:${label}`, timestamp: new Date().toISOString(),
-  });
   return { ok: true };
 }

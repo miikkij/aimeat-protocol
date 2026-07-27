@@ -2,6 +2,9 @@
  * @file src/storage/types/commerce.ts
  * @description Memory, action/work/wallet, boards, disputes, files, marketplace, flags, and escrow record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-27 — WalletTransaction.initiatorGaii: `gaii` is the payer and can only be a human,
+ *     so without a second column the ledger could not say whether a charge came from the person, an
+ *     agent, or an app they once connected.
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  */
 import type { SemanticAnnotation } from './common.js';
@@ -95,11 +98,21 @@ export interface WorkRecord {
 
 export interface WalletTransaction {
   id: string;
+  /** Whose BALANCE moved. Always a human's GHII — agents and apps hold no balance of their own. */
   gaii: string;
   type: string;
   amount: number;
   counterpartyGaii?: string;
   trackingCode?: string;
+  /**
+   * Who actually made the call, when that is not the human themselves: an agent's GAII, an
+   * ecosystem app's GEAI, or the owner GHII an app grant presents.
+   *
+   * `gaii` answers who PAYS and can only ever be the owner, so without this the ledger cannot say
+   * whether a charge came from the person, one of their agents, or an app they once connected —
+   * and after the fact nobody can tell them. Absent when the owner called directly.
+   */
+  initiatorGaii?: string;
   timestamp: string;
 }
 

@@ -237,11 +237,11 @@ export const workMethods = {
 
   async addTransaction(this: SqliteStorage, tx: WalletTransaction): Promise<WalletTransaction> {
     this.db.prepare(
-      `INSERT INTO wallet_transactions (id, gaii, type, amount, counterpartyGaii, trackingCode, timestamp)
-       VALUES (?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO wallet_transactions (id, gaii, type, amount, counterpartyGaii, trackingCode, initiatorGaii, timestamp)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       tx.id, tx.gaii, tx.type, tx.amount,
-      tx.counterpartyGaii ?? null, tx.trackingCode ?? null, tx.timestamp,
+      tx.counterpartyGaii ?? null, tx.trackingCode ?? null, tx.initiatorGaii ?? null, tx.timestamp,
     );
     return tx;
   },
@@ -273,6 +273,7 @@ export const workMethods = {
     };
     if (row.counterpartyGaii) record.counterpartyGaii = row.counterpartyGaii as string;
     if (row.trackingCode) record.trackingCode = row.trackingCode as string;
+  if (row.initiatorGaii) record.initiatorGaii = row.initiatorGaii as string;
     return record;
   },
 

@@ -34,15 +34,16 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireScope, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import {
   createEntitlement, readEntitlementForCall, readContractForCall, listEntitlementsByConsumer,
   pauseEntitlement, revokeEntitlement,
   issueGrant, revokeGrant, readGrantForCall, listGrantsByProvider,
+  mergeOwnerEntitlements, listAllEntitlementsForMerge,
   listEntitlementHistoryByConsumer, listEntitlementHistoryByProvider,
   type MeteredEntitlement, type EntitlementHistoryEntry,
 } from '../services/metered-entitlements.js';
@@ -116,6 +117,11 @@ function view(config: AimeatConfig, e: MeteredEntitlement) {
       remaining_units: e.budget.capUnits === null ? null : Math.max(0, e.budget.capUnits - e.budget.spentUnits),
       calls: e.budget.calls,
     },
+    // One right, held by the human who pays for it — and underneath, which of their principals used
+    // it. An owner looking at a bill should be able to see that an agent ran up most of it.
+    callers: Object.entries(e.callers ?? {})
+      .map(([gaii, u]) => ({ gaii, calls: u.calls, spent_units: u.spentUnits, carried_units: u.carriedUnits ?? 0, last_used_at: u.lastUsedAt }))
+      .sort((a, b) => b.calls - a.calls),
   };
 }
 
@@ -396,6 +402,77 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
       ? await revokeEntitlement(storage, consumerGaii, ext, action)
       : await pauseEntitlement(storage, consumerGaii, ext, action);
     return res.json(success(config.nodeId, { ext, action, mode, applied: ok }));
+  });
+
+
+  /**
+   * POST /v1/exchange/entitlements/merge — fold the rights one OWNER holds over one coordinate into
+   * the single record they now key to. Operator-only, `?dry_run=1` by default in practice.
+   *
+   * Rights used to be keyed by the exact caller, so an owner and their agent each got their own
+   * contract for the same product while both drew on the one balance. Measured on production: an
+   * agent's contract carried 118 calls and 17.70 EUR next to its owner's untouched one. Once the key
+   * moved to the owner, the caller-keyed records stop resolving — their history would simply stop
+   * being found. This is what carries it across.
+   *
+   * Nothing is discarded: calls and spend are summed, each source becomes a row in the surviving
+   * record's caller breakdown, and every absorbed record is archived to contract history first. The
+   * surviving TERMS are the most recently created ones, because that is the last thing the human
+   * agreed to — and where an older record priced differently, that is a real change to what a call
+   * costs, so it is reported per group rather than left to be discovered.
+   */
+  router.post('/v1/exchange/entitlements/merge', requireAuth(), requireRole('operator'), async (req: Request, res: Response) => {
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const dryRun = b.dry_run !== false && String(req.query.dry_run ?? '') !== '0';
+
+    // Group every live right by what it will key to from now on: owner + coordinate + rail.
+    const all = await listAllEntitlementsForMerge(storage);
+    const groups = new Map<string, MeteredEntitlement[]>();
+    for (const e of all) {
+      const rail = e.unit === 'money' ? `money:${e.currency ?? 'EUR'}` : 'morsels';
+      const kind = e.grant ? 'grant' : 'contract';
+      groups.set(`${kind}|${ownerGhiiOf(e.consumerGaii)}|${e.ext}|${e.action}|${rail}`,
+        [...(groups.get(`${kind}|${ownerGhiiOf(e.consumerGaii)}|${e.ext}|${e.action}|${rail}`) ?? []), e]);
+    }
+
+    const merged: Array<Record<string, unknown>> = [];
+    for (const [key, records] of groups) {
+      if (records.length < 2) continue;
+      const outcome = await mergeOwnerEntitlements(storage, records, { dryRun });
+      if (!outcome) continue;
+      const { survivor, absorbed } = outcome;
+      // A price or toll that differs between the records being folded is the one thing an operator
+      // must see before saying yes: it changes what the absorbed callers pay from here on.
+      const termsChanged = absorbed.some(a =>
+        a.pricePerCall !== survivor.pricePerCall || (a.tollMorsels ?? null) !== (survivor.tollMorsels ?? null));
+      merged.push({
+        group: key,
+        owner: survivor.consumerGaii,
+        capability: survivor.capabilityLabel,
+        kind: survivor.grant ? 'grant' : 'contract',
+        absorbed: absorbed.map(a => ({
+          consumer_gaii: a.consumerGaii, calls: a.budget.calls, spent_units: a.budget.spentUnits,
+          price_per_call: a.pricePerCall, toll_morsels: a.tollMorsels ?? null,
+        })),
+        result: {
+          calls: survivor.budget.calls, spent_units: survivor.budget.spentUnits,
+          price_per_call: survivor.pricePerCall, toll_morsels: survivor.tollMorsels ?? null,
+          callers: survivor.callers ?? {},
+        },
+        terms_changed: termsChanged,
+      });
+    }
+
+    logger.info('EXCHANGE entitlement merge', { dryRun, groups: merged.length });
+    return res.json(success(config.nodeId, {
+      dry_run: dryRun,
+      scanned: all.length,
+      merged_groups: merged.length,
+      terms_changed_groups: merged.filter(m => m.terms_changed).length,
+      groups: merged,
+    }, [
+      { description: dryRun ? 'Apply it' : 'Your contracts', method: 'POST', url: '/v1/exchange/entitlements/merge' },
+    ]));
   });
 
   // ── RENEGOTIATION (proposals) + HISTORY ─────────────────────────────────────

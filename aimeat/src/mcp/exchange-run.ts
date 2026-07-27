@@ -10,21 +10,22 @@
  *       contract; the provider delivers → settle-on-delivery; list your items either side). Mirrors /v1/exchange/work*.
  *     - aimeat_exchange_proposals / _proposal_decide — RENEGOTIATION (list the proposals you're party to; accept
  *       → supersede, decline, or withdraw). Mirrors GET /v1/exchange/proposals + /:id/{accept,decline,withdraw}.
- *   Every tool acts as the CALLER's own resolved GAII (never from input) and calls the SAME services + the SAME
- *   settlement (settleMeteredCoordinate) as the REST routes — no new business logic, no undercut, node stays the
- *   trust boundary. Settlement is res-coupled in the gateway, so the two settling tools drive it through a
- *   capture-only mock Response and translate the outcome to an MCP result.
+ *   Every tool acts as the CALLER's own resolved GAII (never from input) and reaches the SAME metered
+ *   chokepoint (authoriseMeteredCall) as the REST routes — no new business logic, no undercut, node stays
+ *   the trust boundary. The chokepoint returns a decision rather than writing HTTP, so these tools render
+ *   it as MCP text instead of fabricating an Express response to get at it.
  * @structure registerExchangeRunTools() — registers 6 tools (app-tool invoke · work start/deliver/list · proposals/decide)
  * @usage
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken);
  * @version-history
+ *   v1.2.0 — 2026-07-28 — Calls the metered chokepoint directly. The capture-only mock Express
+ *     Response existed only because the gate insisted on writing HTTP; a decision is a value.
  *   v1.1.0 — 2026-07-27 — The app-tool invoke carries the internal pass. Without it the loopback met the
  *     raw paywall and settled the same contract a second time — one call, two charges.
  *   v1.0.0 — 2026-07-21 — Initial: generic app-tool invoke + agent-work + renegotiation over MCP (parity with
  *     the REST routes so every MCP client, not only crewaimeat, can act on EXCHANGE).
  */
-import type { Response } from 'express';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
@@ -40,30 +41,14 @@ import {
 import {
     getProposal, listProposalsForOwner, supersedeWithProposal, putProposal,
 } from '../services/exchange-proposals.js';
-import { settleMeteredCoordinate } from '../routes/extensions/entitlement-gate.js';
+import { authoriseMeteredCall } from '../services/metered-access.js';
+import { meteredRefusalText } from '../routes/extensions/metered-response.js';
 import { appToolsKey, appIdFromToolsKey, AppToolsDocSchema } from '../models/app-tool-schemas.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
 import { logger } from '../utils/logger.js';
 
-/** A capture-only mock Express Response: settleMeteredCoordinate writes its 402/429/500 body here on
- *  failure (it only ever calls res.status(code).json(body)); success never touches res. */
-function captureRes(): { res: Response; taken: () => { status: number; body: unknown } | null } {
-    let cap: { status: number; body: unknown } | null = null;
-    const res = {
-        status(status: number) {
-            return { json(body: unknown) { cap = { status, body }; return res; } };
-        },
-    } as unknown as Response;
-    return { res, taken: () => cap };
-}
-
-/** Pull a human message out of a captured error envelope. */
-function capMessage(cap: { status: number; body: unknown } | null, fallback: string): string {
-    const b = cap?.body as { error?: { code?: string; message?: string } } | undefined;
-    return b?.error?.message ? `${b.error.code ?? 'ERROR'}: ${b.error.message}` : fallback;
-}
 
 /** The app ids an owner publishes a public tool manifest for — the signpost on a missed lookup. */
 async function listAppToolManifests(storage: Storage, ownerGhii: string): Promise<string[]> {
@@ -154,14 +139,17 @@ export function registerExchangeRunTools(
             const cap = await storage.getCapability(binding);
             if (!cap) return fail(`CAPABILITY_NOT_FOUND: backing capability not found (${binding})`);
 
-            // Settle the metered call (budget + rake) through the SAME gateway as the REST WebMCP path.
-            const { res, taken } = captureRes();
-            const outcome = await settleMeteredCoordinate({
-                config, storage, coordExt, coordAction: tool,
-                label: `${app}/${tool}${pinnedVersion ? ` v${pinnedVersion}` : ''}`, callerGaii, res,
+            // The SAME decision the REST twin makes, from the same function — not a re-derivation of
+            // it, and no fabricated Response to reach it through.
+            const label = `${app}/${tool}${pinnedVersion ? ` v${pinnedVersion}` : ''}`;
+            const outcome = await authoriseMeteredCall({
+                config, storage, caller: callerGaii, product: { ext: coordExt, action: tool, label },
             });
-            if (!outcome) return fail('NO_CONTRACT: no active contract to settle against');
-            if (!outcome.ok) return fail(capMessage(taken(), 'PAYMENT_REQUIRED: the metered call could not settle'));
+            if (outcome.kind === 'no_right') return fail('NO_CONTRACT: no active contract to settle against');
+            if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') {
+                const r = meteredRefusalText(outcome, label);
+                return fail(`${r.code}: ${r.message}`);
+            }
 
             // Settled → invoke; refund on throw (never leave a phantom charge).
             try {
@@ -175,7 +163,7 @@ export function registerExchangeRunTools(
                     mintInternalPass(coordExt, tool));
                 return ok({ app: `${ownerName}/${app}`, tool, iface_version: pinnedVersion ?? null, metered: true, result: invoked.result });
             } catch (err) {
-                if (outcome.refund) await outcome.refund();
+                if (outcome.kind === 'settled') await outcome.refund();
                 const e = err as { code?: string; message?: string };
                 return fail(`${e.code ?? 'TOOL_INVOKE_FAILED'}: ${e.message ?? 'tool invocation failed (you were refunded)'}`);
             }
@@ -234,13 +222,16 @@ export function registerExchangeRunTools(
             if (w.state !== 'open') return fail(`WORK_NOT_OPEN: work is ${w.state}`);
             const before = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
             if (!before || before.state !== 'active') return fail('CONTRACT_INACTIVE: the consumer contract is no longer active — cannot settle this delivery');
-            const { res, taken } = captureRes();
-            const outcome = await settleMeteredCoordinate({
-                config, storage, coordExt: w.ext, coordAction: w.action, label: `${w.agentGaii}:${w.taskType}`,
-                callerGaii: w.consumerGaii, res,
+            const workLabel = `${w.agentGaii}:${w.taskType}`;
+            const outcome = await authoriseMeteredCall({
+                config, storage, caller: w.consumerGaii,
+                product: { ext: w.ext, action: w.action, label: workLabel },
             });
-            if (!outcome) return fail('NO_CONTRACT: no active contract to settle against');
-            if (!outcome.ok) return fail(capMessage(taken(), 'PAYMENT_REQUIRED: delivery could not settle (budget/rate)'));
+            if (outcome.kind === 'no_right') return fail('NO_CONTRACT: no active contract to settle against');
+            if (outcome.kind !== 'settled' && outcome.kind !== 'free_owner') {
+                const r = meteredRefusalText(outcome, workLabel);
+                return fail(`${r.code}: ${r.message}`);
+            }
             const after = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
             const charged = after && before ? Math.max(0, after.budget.spentUnits - before.budget.spentUnits) : 0;
             w.state = 'delivered'; w.output = output ?? null; w.chargedUnits = charged; w.deliveredAt = new Date().toISOString();

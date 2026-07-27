@@ -11,6 +11,9 @@
  *   one-time token, and retries with `x-aimeat-pay-token`; the paywall verifies + consumes it (D1/D3).
  * @structure enforcePaywall · PaywallOutcome
  * @version-history
+ *   v1.5.0 — 2026-07-28 — The sequence moved to services/metered-access.ts; this door's job is to name
+ *     the product. A right that exists but is exhausted is still resolved, so the caller is told their
+ *     budget is spent rather than told to take a contract they already hold.
  *   v1.4.0 — 2026-07-27 — The raw route stops GUESSING which product a shared action is. It settles
  *     only an unambiguous binding (one priced tool); several means several products, and it says so
  *     instead of billing whichever contract the caller happens to hold.
@@ -33,6 +36,7 @@ import { pricedAppToolsFor, type PricedBinding } from './priced-binding.js';
 import { readEntitlementForCall, computeCharge, type MeteredEntitlement } from '../../services/metered-entitlements.js';
 import { consumeInternalPass } from './internal-pass.js';
 import { burnPacingToll, resolvePacingToll } from './pacing.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 
 type ExtAction = ExtensionRecord['actions'][number];
@@ -75,6 +79,11 @@ function parseNamedTool(raw: string | undefined | null): PricedBinding | null {
  * holding free access to the same capability is the surprise this whole ordering exists to prevent.
  * Below that, a morsel right beats a money one: morsels are the node's own throttle unit and settle no
  * real currency, so charging EUR while a morsel contract sits unused is the more expensive mistake.
+ *
+ * A right that exists but is not usable — exhausted, paused, revoked — is still returned when nothing
+ * active is held, so the chokepoint can say WHICH of those it is. Skipping it entirely made this door
+ * tell a caller whose budget was spent to "take a contract on EXCHANGE", while the app-tool and MCP
+ * doors told the same caller their budget was spent. One decision has to produce one answer.
  */
 async function cheapestHeld(
   storage: Storage, sold: PricedBinding[], ownerName: string, callerGaii: string,
@@ -85,15 +94,17 @@ async function cheapestHeld(
     return [e.unit === 'morsels' ? 1 : 2, charge];
   };
   let best: { binding: PricedBinding; key: [number, number] } | null = null;
+  let unusable: PricedBinding | null = null;
   for (const s of sold) {
     const ent = await readEntitlementForCall(storage, callerGaii, `apptool:${ownerName}/${s.appId}`, s.tool);
-    if (!ent || ent.state !== 'active') continue;
+    if (!ent) continue;
+    if (ent.state !== 'active') { unusable ??= s; continue; }
     const key = rank(ent);
     if (!best || key[0] < best.key[0] || (key[0] === best.key[0] && key[1] < best.key[1])) {
       best = { binding: s, key };
     }
   }
-  return best?.binding ?? null;
+  return best?.binding ?? unusable;
 }
 
 /**
@@ -277,8 +288,8 @@ export async function enforcePaywall(args: {
     }
     const track = `ext:${ext.name}:${action.id}:pay`;
     const ts = new Date().toISOString();
-    await storage.addTransaction({ id: `ext-pay-${randomUUID()}`, gaii: callerGaii, type: 'extension_pay', amount: -payMorsels, trackingCode: track, timestamp: ts });
-    await storage.addTransaction({ id: `ext-earn-${randomUUID()}`, gaii: ownerGhii, type: 'extension_earn', amount: payMorsels, trackingCode: track, timestamp: ts });
+    await storage.addTransaction({ id: `ext-pay-${randomUUID()}`, gaii: ownerGhiiOf(callerGaii), type: 'extension_pay', amount: -payMorsels, trackingCode: track, initiatorGaii: callerGaii, timestamp: ts });
+    await storage.addTransaction({ id: `ext-earn-${randomUUID()}`, gaii: ownerGhii, type: 'extension_earn', amount: payMorsels, trackingCode: track, initiatorGaii: callerGaii, timestamp: ts });
     return {
       ok: true,
       refund: async () => {

@@ -17,6 +17,8 @@
  *   offeringStats (reputation) · offeringConsumers (provider data-lineage)
  * @usage import { putOffering, listOfferings, matchOfferings, putNeed, listOpenNeeds, putBid } from './exchange-market.js';
  * @version-history
+ *   v1.10.0 — 2026-07-27 — A consumer row carries its `callers` breakdown: the row is the human who
+ *     pays, and underneath it their agents, apps and their own direct calls.
  *   v1.9.0 — 2026-07-27 — Consumer lineage marks GRANTS (`granted`, `carriedUnits`): a guest belongs on
  *     the same list as a customer, or a provider reads a consumption log with the consumption they are
  *     paying for missing from it.
@@ -495,6 +497,12 @@ export interface ConsumerRow {
   /** True when the PROVIDER carries this consumer rather than billing them (an EXCHANGE grant). */
   granted: boolean;
   /**
+   * WHO under that consumer actually called, and how much each of them used. The row above is the
+   * human who pays; this is their agents, apps and ecosystem apps, plus the human's own direct calls.
+   * Empty on contracts that predate the breakdown — the totals are still right, only unattributed.
+   */
+  callers: Array<{ gaii: string; calls: number; settledUnits: number; carriedUnits: number; lastUsedAt: string }>;
+  /**
    * What a granted consumer's calls have cost the provider, in the listing's unit — the list price
    * they chose not to charge, accumulated. Zero on a paying contract, where `settledUnits` is the
    * figure that means something.
@@ -527,6 +535,9 @@ export async function offeringConsumers(storage: Storage, o: Offering): Promise<
         // A guest belongs on the same list as a customer, marked as one. Leaving grants out would
         // show a provider a consumption log with the consumption they are paying for missing.
         granted: !!e.grant, carriedUnits: e.grant?.carriedUnits ?? 0,
+        callers: Object.entries(e.callers ?? {})
+          .map(([gaii, u]) => ({ gaii, calls: u.calls, settledUnits: u.spentUnits, carriedUnits: u.carriedUnits ?? 0, lastUsedAt: u.lastUsedAt }))
+          .sort((x, y) => y.calls - x.calls),
         state: e.state, lastUsedAt: e.updatedAt,
       };
     })

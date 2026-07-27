@@ -816,6 +816,165 @@ await test('PACING · on a GRANT the burn comes out of the PROVIDER, because the
     assert(burns.length > 0 && burns.every(t => t.amount < 0), 'and it is recorded as a burn on the provider, not as revenue to anyone');
 });
 
+// ── ONE RIGHT PER HUMAN, ATTRIBUTED PER CALLER ───────────────────────────────────────────────────
+//
+// Only the human has a balance: debitBalance resolves every agent to its owner before touching a row.
+// A right keyed to the exact caller was therefore out of step with the wallet paying for it, and on
+// production one person ended up holding two contracts for one product. The right is the owner's; who
+// called is recorded beside it, which is what agents having identities is for.
+
+/** The caller breakdown on a contract, as the consumer's own view reports it. */
+async function callersOf(token: string, ext: string, action: string) {
+    const c = await contract(token, ext, action);
+    return (c?.callers ?? []) as any[];
+}
+
+await test('OWNER-KEY · an owner contracts, and their AGENT calls it without a contract of its own', async () => {
+    const buyer = await setupOwner('ok1');
+    const bot = await setupAgent(buyer, 'okbot');
+    const cExt = `apptool:${provider.name}/${APP}`;
+    const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: offeringSolo, cap_units: 400 }) });
+    assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
+
+    // The agent never accepted anything. Before the key moved to the owner this was a 402.
+    const bb = await balance(buyer.token);
+    const r = await rawInvoke(bot.token, 'solo');
+    assert(r.status === 200, `the owner's agent inherits the owner's contract: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(bb - await balance(buyer.token) === 8, `and the HUMAN is billed, moved ${bb - await balance(buyer.token)}`);
+
+    // One record, not two: the agent's call lands on the owner's meter.
+    const c = await contract(buyer.token, cExt, 'solo');
+    assert(c.budget.calls === 1, `one right, one meter — got ${c.budget.calls} call(s)`);
+});
+
+await test('OWNER-KEY · the breakdown says WHICH principal used it', async () => {
+    const buyer = await setupOwner('ok2');
+    const bot = await setupAgent(buyer, 'okbot2');
+    const cExt = `apptool:${provider.name}/${APP}`;
+    await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: offeringSolo, cap_units: 400 }) });
+
+    await rawInvoke(bot.token, 'solo');
+    await rawInvoke(bot.token, 'solo');
+    await rawInvoke(buyer.token, 'solo');
+
+    const rows = await callersOf(buyer.token, cExt, 'solo');
+    const agentRow = rows.find(x => x.gaii === bot.gaii);
+    const humanRow = rows.find(x => x.gaii === buyer.gaii);
+    assert(!!agentRow && agentRow.calls === 2, `the agent's two calls are attributed to it: ${JSON.stringify(rows)}`);
+    assert(!!humanRow && humanRow.calls === 1, `and the human's own call to them: ${JSON.stringify(rows)}`);
+    const c = await contract(buyer.token, cExt, 'solo');
+    assert(rows.reduce((n, x) => n + x.calls, 0) === c.budget.calls,
+        `the rows sum to the total (${rows.reduce((n: number, x: any) => n + x.calls, 0)} vs ${c.budget.calls})`);
+    assert(agentRow.spent_units === 16 && humanRow.spent_units === 8,
+        `and so does the spend: agent ${agentRow.spent_units}, human ${humanRow.spent_units}`);
+});
+
+await test('OWNER-KEY · the provider sees the same breakdown under the human who pays', async () => {
+    const cons = await json(`/v1/exchange/offerings/${offeringSolo}/consumers`, { headers: auth(provider.token) });
+    const rows = cons.body.data.consumers as any[];
+    const withFleet = rows.find(r => (r.callers ?? []).some((c: any) => c.gaii.includes('#')));
+    assert(!!withFleet, `a provider can see an agent behind a paying customer: ${JSON.stringify(rows.map(r => [r.consumerGaii, (r.callers ?? []).length]))}`);
+    assert(withFleet.callers.reduce((n: number, c: any) => n + c.calls, 0) === withFleet.calls,
+        'the breakdown sums to the row it sits under');
+});
+
+await test('LEDGER · a transaction names who made the call, not only who paid for it', async () => {
+    const buyer = await setupOwner('ok3');
+    const bot = await setupAgent(buyer, 'okbot3');
+    await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: offeringSolo, cap_units: 400 }) });
+    await rawInvoke(bot.token, 'solo');
+
+    const rows = await txns(buyer.token);
+    const pay = rows.find(t => t.type === 'extension_pay');
+    assert(!!pay, `the charge is on the ledger: ${JSON.stringify(rows.map(t => t.type))}`);
+    // The balance is the human's — that is the whole point of one wallet — but the ledger now says
+    // which principal caused the movement, which is what nobody could answer before.
+    assert(pay.initiator_gaii === bot.gaii,
+        `the agent is named as the initiator, got ${JSON.stringify(pay.initiator_gaii)} (expected ${bot.gaii})`);
+});
+
+await test('OWNER-KEY · a GRANT to the human covers their agents too', async () => {
+    const guest = await setupOwner('ok4');
+    const gbot = await setupAgent(guest, 'okbot4');
+    const g = await json('/v1/exchange/grants', {
+        method: 'POST', headers: auth(provider.token),
+        body: JSON.stringify({ consumer: guest.name, offering_id: offeringSolo }),
+    });
+    assert(g.status === 201, `grant ${g.status}: ${JSON.stringify(g.body?.error)}`);
+    const gb = await balance(guest.token);
+    const r = await rawInvoke(gbot.token, 'solo');
+    assert(r.status === 200, `an approved member's agent is served too: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(await balance(guest.token) === gb, `and still billed nothing, moved ${gb - await balance(guest.token)}`);
+});
+
+await test('MERGE · operator-only, and a dry run changes nothing', async () => {
+    const denied = await json('/v1/exchange/entitlements/merge', { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ dry_run: true }) });
+    assert(denied.status === 403, `a non-operator cannot run the migration, got ${denied.status}`);
+
+    const before = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+    const dry = await json('/v1/exchange/entitlements/merge', { method: 'POST', headers: auth(operator.token), body: JSON.stringify({ dry_run: true }) });
+    assert(dry.status === 200, `dry run ${dry.status}: ${JSON.stringify(dry.body?.error)}`);
+    assert(dry.body.data.dry_run === true, 'it reports itself as a dry run');
+    assert(typeof dry.body.data.scanned === 'number' && dry.body.data.scanned > 0, `it scanned something: ${dry.body.data.scanned}`);
+    const after = await json('/v1/exchange/entitlements', { headers: auth(consumer.token) });
+    assert(JSON.stringify(before.body.data) === JSON.stringify(after.body.data), 'and wrote nothing');
+});
+
+// ── ONE CHOKEPOINT ───────────────────────────────────────────────────────────────────────────────
+//
+// Owner-free used to be implemented in three doors and missing from a fourth, so the answer to "is
+// this call free?" depended on which door you knocked on. It is one function now, and these are the
+// two ends of it: the door that had the rule, and the door that did not.
+
+await test('CHOKEPOINT · an owner is never charged for their OWN app-tool, contract or no contract', async () => {
+    // The provider buys their own product. Nothing stops them, and on production three listings had
+    // exactly this. The app-tool door then charged them, because it settled whenever a contract
+    // existed and never asked whose capability it was — so the owner paid the platform rake to
+    // themselves. The raw door had the rule; this one did not.
+    const acc = await json('/v1/exchange/entitlements', {
+        method: 'POST', headers: auth(provider.token),
+        body: JSON.stringify({ offering_id: offeringSolo, cap_units: 400 }),
+    });
+    assert(acc.status === 201, `the provider can hold a contract against themselves: ${acc.status}`);
+
+    const pb = await balance(provider.token);
+    const viaTool = await toolInvoke(provider.token, 'solo');
+    assert(viaTool.status === 200, `app-tool door: ${viaTool.status} ${JSON.stringify(viaTool.body?.error)}`);
+    const viaRaw = await rawInvoke(provider.token, 'solo');
+    assert(viaRaw.status === 200, `raw door: ${viaRaw.status} ${JSON.stringify(viaRaw.body?.error)}`);
+    const viaMcp = parse(await captureTools(provider.gaii, provider.token)['aimeat_app_tool_invoke']({ owner: provider.name, app: APP, tool: 'solo', input: { q: 'hi' } }));
+    assert(!viaMcp.error, `MCP door: ${viaMcp.error}`);
+
+    assert(await balance(provider.token) === pb,
+        `no door bills an owner for their own capability — ${pb - await balance(provider.token)} morsels moved across three`);
+    // And the meter does not advance either: a free call is not a metered one.
+    const c = await contract(provider.token, `apptool:${provider.name}/${APP}`, 'solo');
+    assert(c.budget.calls === 0, `their own calls are not metered against their own contract, got ${c.budget.calls}`);
+});
+
+await test('CHOKEPOINT · every door refuses the same way when a ceiling is hit', async () => {
+    // One decision function means one answer. Previously each door rendered its own, and the MCP twin
+    // had to fabricate an Express response to read what the HTTP one would have said.
+    const capped = await setupOwner('cp1');
+    const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(capped.token), body: JSON.stringify({ offering_id: offeringSolo, cap_units: 8 }) });
+    assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
+    assert((await rawInvoke(capped.token, 'solo')).status === 200, 'the one call the cap allows');
+
+    const raw = await rawInvoke(capped.token, 'solo');
+    const tool = await toolInvoke(capped.token, 'solo');
+    const mcp = parse(await captureTools(capped.gaii, capped.token)['aimeat_app_tool_invoke']({ owner: provider.name, app: APP, tool: 'solo', input: { q: 'hi' } }));
+    assert(raw.status === 402, `raw refuses: ${raw.status}`);
+    assert(tool.status === 402, `app-tool refuses: ${tool.status}`);
+    assert(!!mcp.error, `MCP refuses: ${JSON.stringify(mcp.data ?? null).slice(0, 160)}`);
+    // The point is not WHICH code it is, it is that one decision produced all three. Assert the
+    // agreement rather than the wording, or the test pins today's phrasing instead of the invariant.
+    const code = raw.body?.error?.code as string;
+    assert(tool.body?.error?.code === code,
+        `the app-tool door gives the same code: ${tool.body?.error?.code} vs ${code}`);
+    assert(mcp.error.startsWith(code),
+        `and so does MCP, from the same function: ${JSON.stringify(mcp.error).slice(0, 160)} vs ${code}`);
+});
+
 console.log(`\n═══ MONEY AUDIT: ${passed} passed, ${failed} failed (${passed + failed} total) ═══\n`);
 server.close();
 await storage.disconnect?.();

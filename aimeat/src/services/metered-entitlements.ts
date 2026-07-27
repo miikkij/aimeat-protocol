@@ -16,6 +16,12 @@
  *   const gate = await authorizeAndCharge(storage, consumerGaii, ext, action, priceMicros);
  *   if (!gate.ok) return res.status(402)...;
  * @version-history
+ *   v1.7.0 — 2026-07-27 — A right is keyed to the OWNER, not to the exact caller, because the wallet
+ *     already is: `debitBalance` collapses every GAII to its owner, so keying the right per-principal
+ *     made one person hold two contracts for one product (measured on production: an agent's contract
+ *     carried 118 calls and 17.70 EUR while its owner's sat unused). Who CALLED is kept instead as a
+ *     per-caller breakdown, which is what agents having identities is for. `mergeOwnerEntitlements`
+ *     folds the pre-existing duplicates together.
  *   v1.6.0 — 2026-07-27 — GRANTS: a provider may carry a consumer's access themselves (`grant` block,
  *     price 0, its own key space). A grant never overwrites a paid contract and wins over one while it is
  *     active, so "I approved you" is access rather than a bill — and what the provider is carrying is
@@ -38,6 +44,7 @@
  */
 import { createHash, randomUUID } from 'node:crypto';
 import type { Storage } from '../storage/interface.js';
+import { ownerGhiiOf } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 /** System namespace — server-side only, never surfaced to a client (mirrors `ext-pay-token`). */
@@ -158,6 +165,31 @@ export interface EntitlementGrant {
   issuedAt: string;
 }
 
+/**
+ * What ONE principal did under a right that belongs to their owner.
+ *
+ * The bill goes to the human either way — they hold the balance — but "who used this" is a different
+ * question from "who pays for it", and collapsing the two throws away the answer to the first. An
+ * owner looking at 118 calls should be able to see that their composer agent made all of them.
+ */
+export interface CallerUsage {
+  calls: number;
+  /** Settled in the entitlement's unit. Always 0 under a grant, where nothing settles. */
+  spentUnits: number;
+  /** List price this caller consumed under a grant — the provider's carried cost, attributed. */
+  carriedUnits: number;
+  lastUsedAt: string;
+}
+
+/**
+ * How many distinct callers are tracked before the rest are folded into one bucket. A fleet owner can
+ * run more agents than anyone wants inside a single memory record; the total is never wrong, only the
+ * attribution of the long tail.
+ */
+export const CALLER_ROWS_MAX = 100;
+/** Where callers past {@link CALLER_ROWS_MAX} are counted, so the rows still sum to the total. */
+export const CALLER_OVERFLOW = 'other';
+
 /** The stored shape of one entitlement (the `value` of the memory record). */
 export interface MeteredEntitlement {
   entitlementId: string;
@@ -195,6 +227,8 @@ export interface MeteredEntitlement {
   surface?: SellableSurface | null;
   /** Set when the provider carries this access instead of billing it — see {@link EntitlementGrant}. */
   grant?: EntitlementGrant | null;
+  /** Per-principal breakdown of {@link EntitlementBudget}. Keyed by the exact caller GAII/GHII. */
+  callers?: Record<string, CallerUsage>;
   /** The contract this entitlement was minted under (an EXCHANGE contract or a `wsengage.*` id). */
   contractRef: string;
   /** Who carries the trust-ramp / escrow risk, per the contract. */
@@ -209,14 +243,24 @@ export interface MeteredEntitlement {
  *  gateway does an O(1) `getMemory` lookup (no scan). GAII contains `@`/`#` — hashing sidesteps key-segment
  *  rules while staying reproducible. The full identifiers live in the value for verification. */
 export function entitlementKey(consumerGaii: string, ext: string, action: string): string {
-  const h = createHash('sha256').update(`${consumerGaii}|${ext}|${action}`).digest('hex').slice(0, 32);
-  return `entitlement.${h}`;
+  return `entitlement.${coordinateHash(consumerGaii, ext, action)}`;
 }
 
 /** The same coordinate in the GRANT key space — a separate slot, so a gift never overwrites a purchase. */
 export function grantKey(consumerGaii: string, ext: string, action: string): string {
-  const h = createHash('sha256').update(`${consumerGaii}|${ext}|${action}`).digest('hex').slice(0, 32);
-  return `entgrant.${h}`;
+  return `entgrant.${coordinateHash(consumerGaii, ext, action)}`;
+}
+
+/**
+ * The slot a right lives in: the OWNER behind the caller, plus the coordinate.
+ *
+ * Keyed on the owner rather than the exact principal because that is who pays. An owner's agent, app
+ * grant and ecosystem app all draw on the one balance, so giving each of them a separate right meant
+ * the same human buying the same product more than once and holding meters that never met.
+ */
+function coordinateHash(consumerGaii: string, ext: string, action: string): string {
+  const owner = ownerGhiiOf(consumerGaii);
+  return createHash('sha256').update(`${owner}|${ext}|${action}`).digest('hex').slice(0, 32);
 }
 
 /** Read the grant covering this exact call, whatever state it is in (revoked ones still read back). */
@@ -288,6 +332,14 @@ export async function listEntitlementsByProvider(storage: Storage, providerGhii:
 /** Every entitlement a consuming app holds (the per-app cost/contract surface, G3). Filtered prefix scan. */
 export async function listEntitlementsByApp(storage: Storage, appId: string): Promise<MeteredEntitlement[]> {
   return (await listAllEntitlements(storage)).filter(v => v.appId === appId);
+}
+
+/**
+ * Every live right on the node, contracts and grants alike — the input to the owner-key migration,
+ * which has to see records whose key no longer resolves in order to fold them in.
+ */
+export async function listAllEntitlementsForMerge(storage: Storage): Promise<MeteredEntitlement[]> {
+  return listAllEntitlements(storage);
 }
 
 /** Every grant a provider has issued — "who am I carrying, and what has it cost me?". */
@@ -444,12 +496,19 @@ export function budgetAllows(ent: MeteredEntitlement, chargeUnits: number): bool
 
 /** Commit one call AFTER settlement succeeded: add `chargeUnits` to spend, bump calls, advance the pricing
  *  state, flip to `exhausted` at the cap. (Read-modify-write — see the concurrency note on {@link authorizeAndCharge}.) */
-export async function commitSpend(storage: Storage, ent: MeteredEntitlement, chargeUnits: number, pricing?: PricingSpec): Promise<MeteredEntitlement> {
-  ent.budget.spentUnits += Math.max(0, chargeUnits);
+export async function commitSpend(
+  storage: Storage, ent: MeteredEntitlement, chargeUnits: number, pricing?: PricingSpec,
+  /** The exact principal that made this call. The bill is the owner's; the call is theirs. */
+  callerGaii?: string,
+): Promise<MeteredEntitlement> {
+  const charged = Math.max(0, chargeUnits);
+  const carried = ent.grant ? Math.max(0, ent.grant.listPricePerCall) : 0;
+  ent.budget.spentUnits += charged;
   ent.budget.calls += 1;
   // A grant settles nothing, so its spend meter never moves; the provider's cost is the list price
   // they chose not to charge, accumulated here. Without it "what is this costing me?" has no answer.
-  if (ent.grant) ent.grant.carriedUnits += Math.max(0, ent.grant.listPricePerCall);
+  if (ent.grant) ent.grant.carriedUnits += carried;
+  if (callerGaii) recordCaller(ent, callerGaii, 1, charged, carried);
   if (pricing) ent.pricing = pricing;
   if (ent.budget.capUnits !== null && ent.budget.spentUnits >= ent.budget.capUnits) ent.state = 'exhausted';
   ent.updatedAt = new Date().toISOString();
@@ -460,13 +519,20 @@ export async function commitSpend(storage: Storage, ent: MeteredEntitlement, cha
 /** Roll back one call's spend by `chargeUnits` (the gate calls this when the sandbox script throws AFTER
  *  settlement, in lockstep with the money refund). Floors at 0 and un-exhausts if this frees headroom. Does
  *  NOT rewind the pricing quota/window (a thrown call still consumed its slot — conservative). No-op if gone. */
-export async function refundSpend(storage: Storage, consumerGaii: string, ext: string, action: string, chargeUnits: number): Promise<void> {
+export async function refundSpend(
+  storage: Storage, consumerGaii: string, ext: string, action: string, chargeUnits: number,
+  callerGaii?: string,
+): Promise<void> {
   const e = await readEntitlementForCall(storage, consumerGaii, ext, action);
   if (!e) return;
-  e.budget.spentUnits = Math.max(0, e.budget.spentUnits - Math.max(0, chargeUnits));
+  const charged = Math.max(0, chargeUnits);
+  const carried = e.grant ? Math.max(0, e.grant.listPricePerCall) : 0;
+  e.budget.spentUnits = Math.max(0, e.budget.spentUnits - charged);
   e.budget.calls = Math.max(0, e.budget.calls - 1);
   // Undelivered work costs the provider nothing to carry either.
-  if (e.grant) e.grant.carriedUnits = Math.max(0, e.grant.carriedUnits - Math.max(0, e.grant.listPricePerCall));
+  if (e.grant) e.grant.carriedUnits = Math.max(0, e.grant.carriedUnits - carried);
+  // The caller's own row rolls back in lockstep, or the breakdown stops summing to the total.
+  if (callerGaii) recordCaller(e, callerGaii, -1, -charged, -carried);
   if (e.state === 'exhausted' && (e.budget.capUnits === null || e.budget.spentUnits < e.budget.capUnits)) {
     e.state = 'active';
   }
@@ -564,6 +630,93 @@ async function flip(
   ent.updatedAt = new Date().toISOString();
   await persist(storage, ent);
   return true;
+}
+
+/**
+ * Attribute one call (or roll one back, with negative deltas) to the principal that made it.
+ *
+ * A right belongs to the owner and the bill goes to their balance; this is the other half of the
+ * question. Rows are capped so one owner's fleet cannot grow a memory record without bound — past
+ * {@link CALLER_ROWS_MAX} distinct callers the rest accumulate under {@link CALLER_OVERFLOW}, so the
+ * rows still sum to `budget`, only the long tail loses its name.
+ */
+function recordCaller(ent: MeteredEntitlement, callerGaii: string, calls: number, spent: number, carried: number): void {
+  const rows = (ent.callers ??= {});
+  const key = rows[callerGaii] || Object.keys(rows).length < CALLER_ROWS_MAX ? callerGaii : CALLER_OVERFLOW;
+  const row = rows[key] ?? { calls: 0, spentUnits: 0, carriedUnits: 0, lastUsedAt: '' };
+  row.calls = Math.max(0, row.calls + calls);
+  row.spentUnits = Math.max(0, row.spentUnits + spent);
+  row.carriedUnits = Math.max(0, row.carriedUnits + carried);
+  row.lastUsedAt = new Date().toISOString();
+  rows[key] = row;
+}
+
+/**
+ * Fold every right one OWNER holds over one coordinate into a single record — the migration for rights
+ * that were minted per-principal before they were keyed per-owner.
+ *
+ * Nothing is thrown away. Calls and spend are summed, each source record's usage becomes its own row in
+ * the breakdown, and the originals are archived. The surviving TERMS are the most recently created
+ * ones, because that is the last set the human agreed to; where they differ from an older record's,
+ * that is a real change to what a call costs and the caller of this function is expected to report it
+ * rather than let it happen quietly.
+ *
+ * Rails are never merged: morsels and money micro-units are different numbers, so a coordinate priced
+ * on both keeps one record per rail.
+ */
+export async function mergeOwnerEntitlements(
+  storage: Storage, records: MeteredEntitlement[], opts: { dryRun: boolean },
+): Promise<{ survivor: MeteredEntitlement; absorbed: MeteredEntitlement[] } | null> {
+  if (records.length < 2) return null;
+  const ordered = [...records].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
+  const newest = ordered[ordered.length - 1] as MeteredEntitlement;
+  const oldest = ordered[0] as MeteredEntitlement;
+
+  // The survivor carries the newest TERMS and everyone's HISTORY.
+  const survivor: MeteredEntitlement = {
+    ...newest,
+    consumerGaii: ownerGhiiOf(newest.consumerGaii),
+    createdAt: oldest.createdAt,
+    budget: {
+      capUnits: newest.budget.capUnits,
+      spentUnits: ordered.reduce((n, e) => n + e.budget.spentUnits, 0),
+      calls: ordered.reduce((n, e) => n + e.budget.calls, 0),
+    },
+    callers: {},
+    updatedAt: new Date().toISOString(),
+  };
+  if (survivor.grant && newest.grant) {
+    survivor.grant = { ...newest.grant, carriedUnits: ordered.reduce((n, e) => n + (e.grant?.carriedUnits ?? 0), 0) };
+  }
+  // Each source contributes its own usage under its own principal, plus whatever breakdown it already had.
+  for (const e of ordered) {
+    const rows = e.callers ?? { [e.consumerGaii]: { calls: e.budget.calls, spentUnits: e.budget.spentUnits, carriedUnits: e.grant?.carriedUnits ?? 0, lastUsedAt: e.updatedAt } };
+    for (const [who, row] of Object.entries(rows)) {
+      const prev = survivor.callers![who] ?? { calls: 0, spentUnits: 0, carriedUnits: 0, lastUsedAt: '' };
+      survivor.callers![who] = {
+        calls: prev.calls + row.calls,
+        spentUnits: prev.spentUnits + row.spentUnits,
+        carriedUnits: prev.carriedUnits + (row.carriedUnits ?? 0),
+        lastUsedAt: prev.lastUsedAt > row.lastUsedAt ? prev.lastUsedAt : row.lastUsedAt,
+      };
+    }
+  }
+  const absorbed = ordered.filter(e => e !== newest);
+  if (opts.dryRun) return { survivor, absorbed };
+
+  // Archive first: if the write below fails, the record of what was there survives.
+  for (const e of absorbed) await archiveEntitlement(storage, e, 'superseded', null);
+  await persist(storage, survivor);
+  // Drop the source slots that no longer resolve — only the ones whose key differs from the survivor's,
+  // or the write above would be deleted straight after it was made.
+  const keyOf = survivor.grant ? grantKey : entitlementKey;
+  const survivorKey = keyOf(survivor.consumerGaii, survivor.ext, survivor.action);
+  const ns = survivor.grant ? NS_GRANT : NS;
+  for (const e of [...absorbed, newest]) {
+    const k = keyOf(e.consumerGaii, e.ext, e.action);
+    if (k !== survivorKey) await storage.deleteMemory(ns, k);
+  }
+  return { survivor, absorbed };
 }
 
 async function persist(storage: Storage, value: MeteredEntitlement): Promise<void> {

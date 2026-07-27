@@ -54,6 +54,8 @@ export function initializeSchema(db: Database.Database): void {
 
   // Organism member-roster visibility (privacy fix 2026-07-03: rosters were world-readable).
   safeAddColumn('organisms', 'memberVisibility', 'TEXT');
+  // Who made the call, beside whose balance moved — see WalletTransaction.initiatorGaii.
+  safeAddColumn('wallet_transactions', 'initiatorGaii', 'TEXT');
 
   // Owner session refresh tokens — add columns to existing sessions tables, then
   // index the lookup columns (must run AFTER the ALTERs so the columns exist).

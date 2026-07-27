@@ -31,7 +31,7 @@
  *   v1.0.0 — 2026-07-27 — Initial: close the free raw door onto every priced app-tool on the node.
  */
 import type { Storage } from '../../storage/interface.js';
-import { AppToolsDocSchema } from '../../models/app-tool-schemas.js';
+import { AppToolsDocSchema, isToolPriced } from '../../models/app-tool-schemas.js';
 import { cached, TTL } from '../../services/cache.js';
 import { logger } from '../../utils/logger.js';
 
@@ -46,13 +46,6 @@ export interface PricedBinding {
 const APP_TOOLS_PREFIX = 'apps.';
 const APP_TOOLS_SUFFIX = '.tools';
 
-/** A tool is priced when it names money or morsels; either one makes the raw call non-free. */
-function isPriced(t: { price?: { morsels?: number } | null; priceMoney?: { amount?: number } | null;
-                      pricesMoney?: Array<{ amount?: number }> | null }): boolean {
-  if (t.price && typeof t.price.morsels === 'number' && t.price.morsels > 0) return true;
-  if (t.priceMoney && typeof t.priceMoney.amount === 'number' && t.priceMoney.amount > 0) return true;
-  return (t.pricesMoney ?? []).some(m => typeof m?.amount === 'number' && m.amount > 0);
-}
 
 /**
  * Every priced app-tool that sells this extension action. Empty is the common answer and means
@@ -78,7 +71,7 @@ export async function pricedAppToolsFor(
         if (!parsed.success) continue;
         const appId = rec.key.slice(APP_TOOLS_PREFIX.length, -APP_TOOLS_SUFFIX.length);
         for (const t of parsed.data.tools) {
-          if (t.action_id === binding && isPriced(t)) out.push({ appId, tool: t.name });
+          if (t.action_id === binding && isToolPriced(t)) out.push({ appId, tool: t.name });
         }
       }
       // Stable order, so an ambiguous binding resolves the same way on every node and every call

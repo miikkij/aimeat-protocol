@@ -135,6 +135,7 @@ export function applySchemaTables1(db: Database.Database): void {
       amount           REAL NOT NULL,
       counterpartyGaii TEXT,
       trackingCode     TEXT,
+      initiatorGaii    TEXT,
       timestamp        TEXT NOT NULL
     );
 

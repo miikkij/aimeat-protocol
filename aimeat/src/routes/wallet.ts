@@ -9,6 +9,9 @@
  *   - GET  /v1/wallet/history      — deprecated alias for /transactions
  *   - POST /v1/wallet/request      — request daily allowance morsels
  * @version-history
+ *   v1.1.0 — 2026-07-27 — Transactions carry `initiator_gaii`: who made the call, beside whose balance
+ *     moved. An agent's spending is filed under its owner, so before this it left the owner's history
+ *     unable to explain a debit.
  *   v1.0.0 — 2026-03-17 — Simplify to single GHII-based balance (remove dual agent/owner paths)
  *   v1.1.0 — 2026-06-22 — Cache the per-owner escrow sum (services/cache.ts, 60s): it scans every
  *     agent's work items, so the wallet poll re-scanned on each load. Invalidated on work/wallet changes.
@@ -133,6 +136,8 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
         amount: tx.amount,
         counterparty_gaii: tx.counterpartyGaii,
         tracking_code: tx.trackingCode,
+        // Who made the call, when that was not you: one of your agents, or an app you connected.
+        initiator_gaii: tx.initiatorGaii ?? null,
         timestamp: tx.timestamp,
       })),
       total: transactions.length,

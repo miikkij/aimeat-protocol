@@ -13,6 +13,9 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.2.0 — 2026-07-27 — `ownerGhiiOf`: the identity anything about MONEY keys on, since the wallet
+ *     already collapses every agent to its owner. Rights that keyed on the exact caller instead went
+ *     out of step with the balance paying for them.
  *   v1.1.0 — 2026-06-14 — Add GEAI (ecosystem app) identity helpers; harden GAII parsers to reject
  *     `eco:`; make parseGaiiLoose/resolveIdentity GEAI-aware (ecosystem-apps foundation, chunk 1).
  */
@@ -162,6 +165,26 @@ export function parseGaiiLoose(gaii: string): { agent: string; owner: string; no
  */
 export function isSameOwner(gaiiA: string, gaiiB: string): boolean {
   return parseGaiiLoose(gaiiA).owner === parseGaiiLoose(gaiiB).owner;
+}
+
+/**
+ * The OWNER GHII behind any principal: `agent#alice@node`, `eco:drum#alice@node` and `alice@node` all
+ * resolve to `alice@node`.
+ *
+ * This is the identity anything about MONEY keys on, because the human is the only principal with a
+ * balance — `debitBalance` already collapses every GAII to its owner before touching a row. Anything
+ * that keys a spending RIGHT on the exact caller instead ends up out of step with the wallet paying
+ * for it: on production one person held two separate contracts for the same product, one under their
+ * agent and one under themselves, both drawing on the one balance.
+ *
+ * Use it for rights and billing. Do NOT use it for attribution — who actually called is the exact
+ * principal, and that distinction is the whole point of agents having identities.
+ */
+export function ownerGhiiOf(principal: string): string {
+  const [namePart, host] = principal.split('@');
+  if (!namePart) return principal;
+  const owner = namePart.includes('#') ? (namePart.split('#').pop() as string) : namePart;
+  return host ? `${owner}@${host}` : owner;
 }
 
 // Chat Instance ID format: platform-appname#owner@node

@@ -18,6 +18,7 @@ function mapTx(r: Selectable<Transaction>): WalletTransaction {
   return {
     id: r.txId, gaii: r.gaii, type: r.type, amount: r.amount,
     counterpartyGaii: r.counterpartyGaii ?? undefined, trackingCode: r.trackingCode ?? undefined,
+    initiatorGaii: r.initiatorGaii ?? undefined,
     timestamp: (r.timestamp instanceof Date ? r.timestamp : new Date(r.timestamp)).toISOString(),
   };
 }
@@ -45,7 +46,8 @@ export const walletMethods = {
   async addTransaction(this: PostgresKyselyStorage, tx: WalletTransaction): Promise<WalletTransaction> {
     const [row] = await this.db.insertInto('Transaction').values({
       txId: tx.id, gaii: tx.gaii, type: tx.type, amount: tx.amount,
-      counterpartyGaii: tx.counterpartyGaii ?? null, trackingCode: tx.trackingCode ?? null, timestamp: new Date(tx.timestamp),
+      counterpartyGaii: tx.counterpartyGaii ?? null, trackingCode: tx.trackingCode ?? null,
+      initiatorGaii: tx.initiatorGaii ?? null, timestamp: new Date(tx.timestamp),
     }).returningAll().execute();
     return mapTx(row);
   },

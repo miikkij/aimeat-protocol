@@ -11,6 +11,8 @@
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
  * @version-history
+ *   v1.5.0 — 2026-07-28 — `isToolPriced`: one definition of whether a tool carries a price. There were
+ *     two and they disagreed about `pricesMoney`, which let a USD-only tool invoke free.
  *   v1.4.0 — 2026-07-25 — `tollMorsels`: a tool declares its own pacing burn, so a node default of 0
  *     means "paced only where a provider asked for it" instead of "never paced".
  *   v1.4.0 — 2026-07-25 — ODPS: per-tool `provenance` + `odps` (the authoring block projected into the
@@ -138,3 +140,21 @@ export const appIdFromToolsKey = (key: string): string | null => {
   const m = /^apps\.(.+)\.tools$/.exec(key);
   return m ? m[1]! : null;
 };
+
+/**
+ * Does this tool carry a price, in ANY of the three places a manifest may state one?
+ *
+ * One definition, because there were two and they disagreed: the app-tool route ignored `pricesMoney`,
+ * so a tool sold only in USD reached the free invoke path and was then billed in morsels against an
+ * unrelated contract. "Is this priced" is a property of the manifest, so it belongs beside the schema
+ * rather than in each route that happens to ask.
+ */
+export function isToolPriced(t: {
+  price?: { morsels?: number } | null;
+  priceMoney?: { amount?: number } | null;
+  pricesMoney?: Array<{ amount?: number }> | null;
+}): boolean {
+  if (t.price && typeof t.price.morsels === 'number' && t.price.morsels > 0) return true;
+  if (t.priceMoney && typeof t.priceMoney.amount === 'number' && t.priceMoney.amount > 0) return true;
+  return (t.pricesMoney ?? []).some(m => typeof m?.amount === 'number' && m.amount > 0);
+}

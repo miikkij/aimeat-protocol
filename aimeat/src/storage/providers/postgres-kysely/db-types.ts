@@ -1484,6 +1484,7 @@ export interface Transaction {
   counterpartyGaii: string | null;
   gaii: string;
   id: Generated<string>;
+  initiatorGaii: string | null;
   timestamp: Generated<Timestamp>;
   trackingCode: string | null;
   txId: string;

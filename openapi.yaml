@@ -8217,9 +8217,12 @@ paths:
       operationId: exchangeListEntitlements
       summary: List the caller-owner's EXCHANGE entitlements (EXCHANGE / TARGET-045)
       description: >
-        Every metered entitlement the caller's owner holds as consumer, with live spend + budget.
-        Response `data`: `{ entitlements: [{ entitlement_id, provider, ext, action, unit, price_per_call,
-        rake_percent, contract_ref, state, budget: { cap_units, spent_units, remaining_units, calls } }] }`.
+        Every metered entitlement the caller's owner holds as consumer, with live spend + budget. A right
+        belongs to the HUMAN who pays for it, so one record covers the owner, their agents, their apps and
+        their ecosystem apps alike; `callers` breaks the totals down by the principal that actually made
+        each call. Response `data`: `{ entitlements: [{ entitlement_id, provider, ext, action, unit,
+        price_per_call, rake_percent, contract_ref, state, budget: { cap_units, spent_units,
+        remaining_units, calls }, callers: [{ gaii, calls, spent_units, carried_units, last_used_at }] }] }`.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -8256,6 +8259,41 @@ paths:
         '400':
           $ref: '#/components/responses/AimeatError'
         '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/exchange/entitlements/merge:
+    post:
+      operationId: exchangeMergeEntitlements
+      summary: Fold per-caller rights into the one right their owner holds (operator)
+      description: >
+        Migration for rights minted before they were keyed to the owner. Only the human has a balance —
+        `debitBalance` resolves every agent to its owner before touching a row — so a right keyed to the
+        exact caller left one person holding several contracts for one product, all drawing on the one
+        wallet. Once the key moved to the owner, those caller-keyed records stop resolving and their
+        history would simply stop being found; this carries it across. Calls and spend are summed, each
+        source becomes a row in the surviving record's caller breakdown, and every absorbed record is
+        archived to contract history first. Surviving TERMS are the most recently created ones, because
+        that is the last set the human agreed to; groups where an absorbed record priced differently are
+        flagged `terms_changed`, because that changes what a call costs those callers. Rails are never
+        merged (morsels and money micro-units are different numbers). Defaults to a DRY RUN — pass
+        `{ "dry_run": false }` to apply. Operator-only.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dry_run: { type: boolean, default: true, description: Report what would be merged without writing. }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
           $ref: '#/components/responses/AimeatError'
 
   /v1/exchange/grants:
