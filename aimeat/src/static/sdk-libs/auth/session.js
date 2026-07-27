@@ -271,9 +271,13 @@ export function restoreSessionFromAppOrigin(interactive) {
     var grant = (r && r.ok && r.access_token) ? r : null;
     var appId = (r && r.app) || null;
     var own = !!(r && r.own);
-    // consent_required → not yet granted; login_required → not logged into the apex at all. BOTH are
-    // resolved by the visible popup — ONLY on a user gesture (interactive).
-    if (!grant && interactive && r && (r.error === 'consent_required' || r.error === 'login_required') && r.app) {
+    // consent_required → not granted yet; login_required → not logged into the apex; invalid_scope
+    // → the app declares a scope the STORED grant lacks, which is what publishing a new
+    // <meta name="aimeat-scopes"> does. All three take the same visible popup, on a user gesture.
+    // invalid_scope was missing, and its absence locked an owner out of their OWN app: Sign In did
+    // nothing at all and the only escape was republishing without the scope. An upgrade must ASK.
+    if (!grant && interactive && r && r.app
+      && (r.error === 'consent_required' || r.error === 'login_required' || r.error === 'invalid_scope')) {
       appId = r.app;
       grant = await requestConsentPopup(r.app, r.scope);
       // login_required hits OWN apps too — the token exchange reports own/app itself, so trust it.

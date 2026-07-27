@@ -1500,7 +1500,7 @@
       var grant = r && r.ok && r.access_token ? r : null;
       var appId = r && r.app || null;
       var own = !!(r && r.own);
-      if (!grant && interactive && r && (r.error === "consent_required" || r.error === "login_required") && r.app) {
+      if (!grant && interactive && r && r.app && (r.error === "consent_required" || r.error === "login_required" || r.error === "invalid_scope")) {
         appId = r.app;
         grant = await requestConsentPopup(r.app, r.scope);
         own = !!(grant && grant.own);
