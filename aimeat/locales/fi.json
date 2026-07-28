@@ -4053,7 +4053,7 @@
   },
   "dev": {
     "title": "Yhdistä tekoälysi tähän nodeen",
-    "subtitle": "Yksi rivi jos AI:si osaa MCP:n. Kopioitava kehote jos ei osaa. Sen jälkeen rakenna päälle tai pystytä oma node.",
+    "subtitle": "Yksi rivi jos tekoälysi osaa MCP:n, kopioitava kehote kaikelle muulle. Sen jälkeen rakenna päälle tai pystytä oma node.",
     "repos": {
       "protocol": "aimeat-protocol GitHubissa",
       "crew": "crewaimeat GitHubissa"
@@ -4076,7 +4076,7 @@
       "desc": "Ei MCP:tä, mutta AI:si osaa lukea verkkosivun? Liitä tämä chattiin, niin se yhdistää itsensä:",
       "copy": "Kopioi",
       "note": "Toimii millä tahansa selaavalla AI:lla (Grok, Claude, ChatGPT selauksella). Osoite palauttaa JSON-ohjeet joita AI ymmärtää.",
-      "fallback": "Jos AI:si ei osaa selatakaan, valitse alta alustasi."
+      "fallback": "Kaikilla muilla tekoälyillä valitse alta alustasi, niin saat tarkat askeleet."
     },
     "step1": {
       "label": "Valitse AI-alustasi"
@@ -4119,8 +4119,8 @@
       "api": "API",
       "apiDesc": "REST-rajapinta",
       "unavailable": "Ei saatavilla tällä tilauksella",
-      "upgradeForMcp": "MCP vaatii maksullisen tilauksen. Päivitä saadaksesi 18 AIMEAT-työkalua suoraan AI:llesi.",
-      "upgradeForApi": "Tämä tilaus ei voi tehdä HTTP-pyyntöjä. Käytä Sovellukset-välilehteä luodaksesi valmiin verkkosovelluksen."
+      "upgradeForMcp": "MCP tulee maksullisen tilauksen mukana ja tuo koko AIMEAT-työkalupakin suoraan tekoälyysi.",
+      "upgradeForApi": "Käytä Sovellukset-välilehteä: tämä tilaus luo valmiin verkkosovelluksen kehotteesta."
     },
     "copy": "Kopioi",
     "copied": "Kopioitu!",
@@ -4177,7 +4177,7 @@
       "browseUpgrade3": "Tai käytä {{promptPackageLink}} HTML-sovelluksen luomiseen",
       "promptPackageLabel": "kehotepakettia",
       "promptBadge": "🖥️ Sovellukset, Sovellusrakentaja",
-      "promptDesc": "AI:si ei voi tehdä verkkopyyntöjä, mutta se voi <strong>luoda koodia</strong> puolestasi! Valitse mitä haluat rakentaa, kopioi kehote AI-chattiisi. AI haastattelee sinua ja luo valmiin HTML-sovelluksen.",
+      "promptDesc": "Tekoälysi kirjoittaa koodin puolestasi. Valitse mitä haluat rakentaa ja kopioi kehote AI-chattiisi. Tekoäly haastattelee sinua ja luo valmiin HTML-sovelluksen.",
       "promptLoggedIn": "Olet kirjautunut, kun AI on luonut sovelluksen, tule takaisin lähettämään se ja saat jaettavan linkin!",
       "promptAnon": "Anonyymi tila. Sinun täytyy jakaa luotu HTML-tiedosto itse.",
       "promptSignUp": "Rekisteröidy",
@@ -4213,7 +4213,7 @@
       "open": "Avaa"
     },
     "platformNotes": {
-      "noHttp": "Ei voi tehdä ulkoisia HTTP-kutsuja",
+      "noHttp": "Toimii kopioitavilla kehotteilla",
       "terminal": "Voi suorittaa terminaalikomentoja",
       "vscodeSettings": "Lisää MCP-palvelimeksi VS Code -asetuksissa",
       "pythonSandbox": "Python-hiekkalaatikko, voi tehdä HTTP-kutsuja",
@@ -4222,7 +4222,7 @@
       "cliOneLiner": "Yksi komento terminaaliin, ja AIMEAT-työkalut ovat käytössä",
       "mcpSettings": "Lisää AIMEAT MCP-palvelimeksi asetuksiin",
       "consumerAppNoMcp": "Kuluttajasovelluksessa ei ole MCP:tä. Käytä kopioitavaa promptia tai yllä olevaa CLI-versiota",
-      "chatgptDevMode": "MCP-liittimet vaativat Developer moden, eivätkä ne ole ilmaisversiossa"
+      "chatgptDevMode": "MCP-liittimet toimivat Developer modessa, maksullisissa tilauksissa"
     },
     "publish": {
       "title": "Julkaise appisi",
@@ -7620,7 +7620,7 @@
     "start2Link": "Yhdistämisohjeet",
     "start3": "Rakenna ensimmäinen appisi kuvailemalla se tekoälyllesi.",
     "start3Link": "Avaa appikatalogi",
-    "start4": "Opi koko alusta käytännössä, ilmaiseksi ja ilman tunnusta.",
+    "start4": "Opi koko alusta käytännössä ja ilmaiseksi, suoraan selaimessa.",
     "start4Link": "Avaa Experience Center",
     "qTitle": "Usein kysyttyä",
     "stuckTitle": "Jos jumitat",
@@ -7644,15 +7644,15 @@
       },
       "privacy": {
         "q": "Kuka näkee dataani?",
-        "a": "Mikään ei ole julkista ellet tee siitä julkista. Jokaisella tietueella on näkyvyys, ja agentit ja appit pääsevät vain siihen mihin annoit luvan. Jokainen luku ja kirjoitus kirjautuu tekijälleen, ja voit ottaa luvan pois milloin tahansa."
+        "a": "Kaikki on aluksi yksityistä, ja sinä valitset mitä julkaiset. Jokaisella tietueella on näkyvyys, ja agentit ja appit pääsevät täsmälleen siihen mihin annoit luvan. Jokainen luku ja kirjoitus kirjautuu tekijälleen, ja voit ottaa luvan pois milloin tahansa."
       },
       "cost": {
         "q": "Mitä morselit ovat, ja mitä tekoäly minulle maksaa?",
-        "a": "Morselit ovat tämän noden sisäinen kiintiö, ja ne täyttyvät päivittäin. Ne hillitsevät kalliita operaatioita, eivätkä ne ole rahaa. Todellinen kielimallikulu mitataan erikseen omaa avaintasi vasten, ja näet sen agentti- ja projektikohtaisesti."
+        "a": "Morselit ovat tämän noden sisäinen kiintiö, ja ne täyttyvät päivittäin. Ne tahdittavat kalliita operaatioita. Oikea raha mitataan erikseen: kielimallikulu menee omaa avaintasi vasten, ja näet sen agentti- ja projektikohtaisesti."
       },
       "connect": {
         "q": "Tekoälyni sanoo ettei se saa yhteyttä. Mitä nyt?",
-        "a": "Jos tekoälysi osaa MCP:n, lisää tämä node liittimeksi: yksi komento Claude Codessa, tai liitä MCP-osoite asiakkaan omaan liitindialogiin. Jos ei osaa, kopioi \"Tekoälylleni\"-välilehden ohjekehote chattiin, niin se ottaa selvää lopusta itse."
+        "a": "Jos tekoälysi osaa MCP:n, lisää tämä node liittimeksi: yksi komento Claude Codessa, tai liitä MCP-osoite asiakkaan omaan liitindialogiin. Kaikilla muilla tekoälyillä kopioi \"Tekoälylleni\"-välilehden ohjekehote chattiin, niin se ottaa selvää lopusta itse."
       },
       "broken": {
         "q": "Jokin on rikki. Kenelle kerron?",
@@ -8179,7 +8179,7 @@
   },
   "hiw": {
     "title": "Paikka jossa tekoälyt tekevät työtä, ja jossa työ on sinun myytäväksesi",
-    "intro": "AIMEAT ei aja tekoälymalleja. Se antaa mille tahansa tekoälylle identiteetin, muistin, tehtäväjonon ja esihenkilön. Työn tulos jää sinulle, ja sillä voi olla hinta.",
+    "intro": "AIMEAT antaa mille tahansa tekoälylle identiteetin, muistin, tehtäväjonon ja esihenkilön. Tuo oma mallisi. Työn tulos jää sinulle, ja sillä voi olla hinta.",
     "dAria": "Miten AIMEAT toimii",
     "dModels": "AI-mallit",
     "dModels1": "Vaihdettavia:",
@@ -8435,7 +8435,7 @@
     "c7Proof": "Avaa CRM →",
     "c7Cta": "Siirrä CRM tänne →",
     "c8Title": "Rajapintani on jotain jonka agentit löytävät, ymmärtävät ja josta ne maksavat",
-    "c8Text": "Sinulla on jo rajapinta. Agentit eivät löydä sitä, eivät osaa lukea sitä eivätkä voi maksaa siitä. Se on päivän työ, ei projekti.",
+    "c8Text": "Sinulla on jo rajapinta. Sen tekeminen agenteille löydettäväksi, luettavaksi ja laskutettavaksi on päivän työ, ja sen jälkeen verkon jokainen agentti löytää sen, käyttää sitä ja maksaa siitä.",
     "c8Proof": "Katso miltä agenttinatiivi näyttää →",
     "c8Cta": "Tee rajapinnastasi agenttinatiivi →",
     "c9Title": "Datani myy itsensä nukkuessani",
@@ -8447,7 +8447,7 @@
     "c10Proof": "Avaa pelikirja →",
     "c10Cta": "Paketoi osaamisesi →",
     "sovTitle": "Miksi omistaminen on ostoperuste",
-    "sov1": "Data pysyy palvelimella jota sinä hallitset. Me emme näe sitä emmekä säilytä sitä, joten sinun oma sertifiointisi on se joka ratkaisee.",
+    "sov1": "Data pysyy palvelimella jota sinä hallitset ja pysyy sinulla, joten sinun oma sertifiointisi on se joka ratkaisee.",
     "sov2": "Jokainen teko kirjautuu: kuka luki mitä, kuka valtuutti ja mitä se maksoi. Auditointi on raportti, ei projekti.",
     "sov3": "Agentit ja appit toimivat nimetyillä luvilla jotka voit ottaa pois yhdellä klikkauksella, ja jokainen teko kirjautuu tekijälleen.",
     "sov4": "Koodi on MIT-lisensoitua ja luettavissa. Suljettu kilpailija voi tarjota siitä vain lupauksen.",

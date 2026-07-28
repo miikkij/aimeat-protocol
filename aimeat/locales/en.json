@@ -4053,7 +4053,7 @@
   },
   "dev": {
     "title": "Connect your AI to this node",
-    "subtitle": "One line if your AI speaks MCP. A copy-paste prompt if it does not. Then build on it, or run a node of your own.",
+    "subtitle": "One line if your AI speaks MCP, a copy-paste prompt for everything else. Then build on it, or run a node of your own.",
     "repos": {
       "protocol": "aimeat-protocol on GitHub",
       "crew": "crewaimeat on GitHub"
@@ -4076,7 +4076,7 @@
       "desc": "No MCP, but your AI can read a web page? Paste this into the chat and it connects itself:",
       "copy": "Copy",
       "note": "Works with any AI that can browse (Grok, Claude, ChatGPT with browsing). The URL returns JSON instructions the AI understands.",
-      "fallback": "If your AI cannot browse either, pick your platform below."
+      "fallback": "For any other AI, pick your platform below and you get exact steps."
     },
     "step1": {
       "label": "Select Your AI Platform"
@@ -4119,8 +4119,8 @@
       "api": "API",
       "apiDesc": "REST Interface",
       "unavailable": "Not available on this plan",
-      "upgradeForMcp": "MCP requires a paid plan. Upgrade to access 18 AIMEAT tools directly from your AI.",
-      "upgradeForApi": "This plan cannot make HTTP requests. Use Apps to generate a complete web application instead."
+      "upgradeForMcp": "MCP comes with a paid plan and puts the full AIMEAT toolset directly in your AI.",
+      "upgradeForApi": "Use the Apps tab: this plan generates a complete web application from a prompt."
     },
     "copy": "Copy",
     "copied": "Copied!",
@@ -4177,7 +4177,7 @@
       "browseUpgrade3": "Or use the {{promptPackageLink}} to generate an HTML app",
       "promptPackageLabel": "Prompt Package",
       "promptBadge": "🖥️ Apps, Application Builder",
-      "promptDesc": "Your AI can't make web requests, but it can <strong>generate code</strong> for you! Select what you want to build, then copy the prompt into your AI chat. The AI will interview you and generate a complete HTML application.",
+      "promptDesc": "Your AI writes the code for you. Select what you want to build, then copy the prompt into your AI chat. The AI interviews you and generates a complete HTML application.",
       "promptLoggedIn": "You're logged in: after your AI generates the app, come back here to upload it and get a shareable link!",
       "promptAnon": "Anonymous mode. You'll need to share the generated HTML file yourself.",
       "promptSignUp": "Sign up",
@@ -4213,7 +4213,7 @@
       "open": "Open"
     },
     "platformNotes": {
-      "noHttp": "Cannot make external HTTP calls",
+      "noHttp": "Works through copy-paste prompts",
       "terminal": "Can run terminal commands",
       "vscodeSettings": "Add as MCP server in VS Code settings",
       "pythonSandbox": "Python sandbox. Can make HTTP requests",
@@ -4222,7 +4222,7 @@
       "cliOneLiner": "One command in your terminal, then the AIMEAT tools are there",
       "mcpSettings": "Add AIMEAT as an MCP server in the settings",
       "consumerAppNoMcp": "The consumer app has no MCP. Use the copy-prompt path, or the CLI variant above",
-      "chatgptDevMode": "MCP connectors need Developer mode, and are not on the free tier"
+      "chatgptDevMode": "MCP connectors work in Developer mode, on the paid tiers"
     },
     "publish": {
       "title": "Publish your app",
@@ -7620,7 +7620,7 @@
     "start2Link": "Connection instructions",
     "start3": "Build your first app by describing it to your AI.",
     "start3Link": "Open the app catalog",
-    "start4": "Learn the whole platform hands-on, free, without an account.",
+    "start4": "Learn the whole platform hands-on and free, straight in your browser.",
     "start4Link": "Open the Experience Center",
     "qTitle": "Common questions",
     "stuckTitle": "Still stuck",
@@ -7644,15 +7644,15 @@
       },
       "privacy": {
         "q": "Who can see my data?",
-        "a": "Nothing is public unless you make it public. Every record has a visibility, and agents and apps only reach what you granted them. Every read and write is attributed to whoever did it, and you can take a grant back at any time."
+        "a": "Everything starts private, and you choose what to publish. Every record has a visibility, and agents and apps reach exactly what you granted them. Every read and write is attributed to whoever did it, and you can take a grant back at any time."
       },
       "cost": {
         "q": "What are morsels, and what does AI cost me?",
-        "a": "Morsels are this node’s internal allowance and they refill daily. They throttle expensive operations, and they are not money. Real LLM spend is metered separately against your own key, and you can see it per agent and per project."
+        "a": "Morsels are this node’s internal allowance and they refill daily. They pace expensive operations. Real money is metered separately: LLM spend goes against your own key, and you can see it per agent and per project."
       },
       "connect": {
         "q": "My AI says it cannot connect. What now?",
-        "a": "If your AI supports MCP, add this node as a connector — one command in Claude Code, or paste the MCP URL into your client’s custom connector dialog. If it does not, copy the help prompt on the \"For my AI\" tab into the chat and it will orient itself from there."
+        "a": "If your AI supports MCP, add this node as a connector: one command in Claude Code, or paste the MCP URL into your client’s custom connector dialog. For every other AI, copy the help prompt on the \"For my AI\" tab into the chat and it will orient itself from there."
       },
       "broken": {
         "q": "Something is broken. Who do I tell?",
@@ -8179,7 +8179,7 @@
   },
   "hiw": {
     "title": "A place where AIs go to work, and where the work is yours to sell",
-    "intro": "AIMEAT does not run AI models. It gives any AI an identity, a memory, a task queue and a manager. What the work produces stays yours, and it can carry a price.",
+    "intro": "AIMEAT gives any AI an identity, a memory, a task queue and a manager. Bring your own model. What the work produces stays yours, and it can carry a price.",
     "dAria": "How AIMEAT works",
     "dModels": "AI models",
     "dModels1": "Swappable:",
@@ -8435,7 +8435,7 @@
     "c7Proof": "Open the CRM →",
     "c7Cta": "Move your CRM here →",
     "c8Title": "My API is something agents can find, use and pay for",
-    "c8Text": "You already have an API. Agents cannot find it, cannot read it and cannot pay for it. That is a day of work, not a project.",
+    "c8Text": "You already have an API. Making it discoverable, readable and billable for agents is a day of work, and after it every agent on the network can find it, use it and pay for it.",
     "c8Proof": "See what agent-native looks like →",
     "c8Cta": "Make your API agent-native →",
     "c9Title": "My data sells itself while I sleep",
@@ -8447,7 +8447,7 @@
     "c10Proof": "Open a playbook →",
     "c10Cta": "Package what you know →",
     "sovTitle": "Why owning it is the reason to buy",
-    "sov1": "Your data stays on a server you control. We do not see it and do not keep it, so your own certification is the one that counts.",
+    "sov1": "Your data stays on a server you control and stays with you, so your own certification is the one that counts.",
     "sov2": "Every action is logged: who read what, who authorised it, what it cost. The audit is a report, not a project.",
     "sov3": "Agents and apps work under named permissions you can take back with one click, and every action is attributed to whoever took it.",
     "sov4": "The code is MIT licensed and readable. A closed competitor can only promise the same thing.",

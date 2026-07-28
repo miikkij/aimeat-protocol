@@ -22,10 +22,10 @@ It returns an up-to-date JSON map of this node: identity, capabilities, the gett
 - Endpoint: `{{node_url}}/v1/mcp` · Auth: OAuth 2.1 (no API keys, no stdio proxy).
 - Add the node as an MCP connector; the AIMEAT tools become available immediately.
 - Claude Code, one line: `claude mcp add aimeat --transport http {{node_url}}/v1/mcp`
-- Not available in the Gemini consumer app or Microsoft Copilot; in ChatGPT it needs Developer mode.
+- Available in ChatGPT via Developer mode. For the Gemini consumer app and Microsoft Copilot, use the copy-prompt path below.
 
 ### B) Agent via Device Authorization (RFC 8628) — for a real agent/fleet
-An agent cannot self-register; the human owner approves it:
+The human owner approves every agent, so the flow below waits on them:
 1. `POST /v1/agents/device-authorize` `{ agent_name, owner, node, mode }` → `{ user_code, verification_uri, device_code, interval }`.
 2. Show the owner the `user_code`; they approve in the profile **Agents** tab and pick the agent's scopes.
 3. Poll `POST /v1/agents/device-token` `{ device_code }` → returns a JWT once approved.
@@ -59,11 +59,11 @@ Humans authenticate as owners at `{{node_url}}/v1/portal` (password / OAuth / TO
 
 **Building an app** — apps are single-file HTML. Start from `GET /v1/prompts/build-app` (the canonical spec) and `GET /v1/app-templates` (T1 pure client · T2 +cortex · T3 +extension). If you have MCP tools, load the `node:aimeat-app-builder` skill and call `aimeat_appdev_overview` **first** — the owner's existing apps and the recorded pitfalls are usually the fastest correct starting point.
 
-**Tasks & workflows** — the owner queues work for their own agents as **tasks** (`/v1/tasks`, `draft → queued → active → done`); an agent reports progress and proposes todos. **Workflows** (`/v1/workflows`) chain steps into a pipeline with human-approval gates. **Schedules** (`/v1/schedules`) run either on a clock.
+**Tasks & workflows** — the owner queues work for their own agents as **tasks** (`/v1/tasks`, `draft → queued → active → done`); an agent reports progress and proposes todos. **Workflows** (`/v1/workflows`) chain steps into a pipeline with human-approval gates. **Schedules** (`/v1/schedules`) run work on a clock.
 
-**EXCHANGE** (`/v1/exchange`) — the two-sided market. An offering carries a price and an ODPS v4.1 descriptor; a consumer posts a need or accepts an offering, and a contract meters every call. This is how a capability earns rather than just runs.
+**EXCHANGE** (`/v1/exchange`) — the two-sided market. An offering carries a price and an ODPS v4.1 descriptor; a consumer posts a need or accepts an offering, and a contract meters every call. This is how a capability earns as it runs.
 
-**Commerce** (`/v1/commerce`, `/v1/checkout`) — checkout and settlement behind a pluggable payment interface (Stripe Connect and x402/stablecoin rails exist). Nothing is mandated; a node runs fine without any of it.
+**Commerce** (`/v1/commerce`, `/v1/checkout`) — checkout and settlement behind a pluggable payment interface (Stripe Connect and x402/stablecoin rails exist). All of it is optional; a node runs fine on its own.
 
 **Skills & Capabilities** — install SKILL.md packs into an agent (`/v1/skills`); publish/invoke/vouch agent capabilities (`/v1/capabilities`).
 
@@ -80,7 +80,7 @@ Humans authenticate as owners at `{{node_url}}/v1/portal` (password / OAuth / TO
 - **SCOPE_DENIED / FORBIDDEN:** the agent lacks a required scope → the owner adjusts it in the Agents tab.
 - **Data not visible:** visibility/ownership/consent mismatch — you only see what your identity is authorized to read.
 - **Morsels depleted:** `GET /v1/wallet`; wait for the next daily allowance.
-- **Something on the node is broken or missing:** report it to the operator via `POST /v1/feedback` from inside the session instead of guessing or working around it.
+- **Something on the node needs fixing or is missing:** report it to the operator via `POST /v1/feedback` from inside the session, and let them answer before you build around it.
 
 ## Step 5 — Reference links
 
@@ -100,8 +100,8 @@ Humans authenticate as owners at `{{node_url}}/v1/portal` (password / OAuth / TO
 
 1. **Start from the root endpoint** — it is self-documenting and always current.
 2. **Follow `hints.next_actions`** in every response — they guide your next step.
-3. **Never hardcode domains** — use the node's `base_url` from the root response.
-4. **You only see what your identity is authorized to read** — don't assume; check.
+3. **Always take domains from the node's `base_url`** in the root response, so the same code works on any node.
+4. **You see what your identity is authorized to read** — check what that is before you conclude something is missing.
 5. **Morsels are finite** — check balance before costly operations.
 6. **The OpenAPI spec is the contract** — when in doubt, `/v1/spec` or `/v1/docs`.
 7. **Operator (Tier 2) features need the node operator** — if you need extensions or backend logic, ask your user to contact them.
