@@ -10,6 +10,8 @@
  *     .dv-num/.dv-label; dev-portal stats use canonical .stat-card family.
  *   v1.3.0 — 2026-06-02 — Component unification (#11): remove .dv-dot (had a
  *     hardcoded #22c55e); node-badge dot uses canonical <StatusDot>.
+ *   v1.4.0 — 2026-07-28 — Community list leads with Open (apps run on the node) and keeps
+ *     Download as the quieter second action: .dv-app-actions / -open / -download.
  */
 /* ── Dev Portal root vars ── */
 :root {
@@ -90,6 +92,13 @@
 
 /* Panel */
 .dv-panel { background: var(--bg-card); border-radius: 12px; padding: 1.5rem; margin-bottom: 1.5rem; border: 1px solid var(--border); }
+.dv-panel--accent { border-color: var(--love1, #E8564A); }
+.dv-panel-title { margin: 0 0 .5rem; }
+.dv-panel-lead { margin: 0 0 .5rem; }
+.dv-notice-sub { color: var(--text-dim); font-size: .85rem; }
+.dv-mt { margin-top: 1.25rem; }
+.dv-prompt-output--flush { margin-bottom: 0; }
+.dv-prompt-text--single { max-height: none; font-size: .85rem; }
 
 /* Prompt output */
 .dv-prompt-output { position: relative; }
@@ -136,6 +145,10 @@
 .dv-share-url { display: flex; align-items: center; gap: .5rem; background: var(--bg-surface); border: 1px solid var(--success); border-radius: 8px; padding: .6rem 1rem; margin-top: .75rem; font-family: monospace; font-size: .85rem; }
 .dv-share-url input { flex: 1; background: none; border: none; color: var(--text, #1A1A2E); font-family: monospace; font-size: .85rem; outline: none; }
 .dv-share-url .dv-copy-btn { position: static; background: #22c55e; color: #fff; padding: .3rem .6rem; font-size: .8rem; }
+/* .dv-copy-btn is absolutely positioned for the prompt boxes (which are position:relative).
+   In a plain flex row it has no positioned ancestor and escapes to the page corner, so the
+   row pins it back into the flow. */
+.dv-code-row .dv-copy-btn { position: static; }
 
 /* App list */
 .dv-app-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: .75rem; margin-top: 1rem; }
@@ -143,6 +156,12 @@
 .dv-app-name { font-weight: 600; margin-bottom: .25rem; }
 .dv-app-meta { font-size: .75rem; color: var(--text-dim); }
 .dv-app-item a { color: var(--love1, #E8564A); }
+/* Open first: these apps run on the node, they are not files you take home.
+   Download stays available as the quieter second action. */
+.dv-app-actions { display: flex; align-items: center; gap: .6rem; margin-top: .6rem; flex-wrap: wrap; }
+.dv-app-open { font-size: .8rem; padding: .3rem .8rem; }
+.dv-app-download { font-size: .78rem; color: var(--text-dim); }
+.dv-app-item .dv-app-download { color: var(--text-dim); }
 
 @media (max-width: 600px) {
   .dv-platforms { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }

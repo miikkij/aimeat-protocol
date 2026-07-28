@@ -4049,24 +4049,31 @@
     }
   },
   "dev": {
-    "title": "AIMEAT Onboarding Portal",
-    "subtitle": "Connect any AI to this node. Select your platform to get started",
+    "title": "Connect your AI to this node",
+    "subtitle": "One line if your AI speaks MCP. A copy-paste prompt if it does not. Then build on it, or run a node of your own.",
     "repos": {
       "protocol": "aimeat-protocol on GitHub",
       "crew": "crewaimeat on GitHub"
     },
     "stats": {
+      "title": "Live on this node",
       "agents": "Agents",
+      "online": "online now",
+      "apps": "Published apps",
+      "organisms": "Organisms",
+      "knowledge": "Knowledge packages",
       "chatSessions": "Chat Sessions",
       "services": "Services",
       "boards": "Boards"
     },
     "quickStart": {
-      "title": "Quick Start. Already have an AI open?",
-      "desc": "Copy-paste this into your AI chat and it will connect itself:",
+      "title": "Start here",
+      "mcpDesc": "If your AI speaks MCP, this one line is the whole setup. Claude Code, Cursor, VS Code, Codex CLI, Gemini CLI, Windsurf and OpenHands all do.",
+      "mcpNote": "Other clients take the same URL in their custom connector dialog. Pick your platform below and you get the exact steps.",
+      "desc": "No MCP, but your AI can read a web page? Paste this into the chat and it connects itself:",
       "copy": "Copy",
-      "note": "Works with AIs that can browse the web (Grok, Claude, ChatGPT with browsing, etc.). The URL returns JSON instructions the AI will understand.",
-      "fallback": "If your AI can't browse, pick your platform below instead."
+      "note": "Works with any AI that can browse (Grok, Claude, ChatGPT with browsing). The URL returns JSON instructions the AI understands.",
+      "fallback": "If your AI cannot browse either, pick your platform below."
     },
     "step1": {
       "label": "Select Your AI Platform"
@@ -4078,20 +4085,20 @@
       "label": "Choose How to Connect"
     },
     "step4": {
-      "label": "Share Your App"
+      "label": "Publish your app"
     },
     "mode": {
-      "loggedIn": "Logged in as",
-      "loggedInDesc": "You can upload apps and get a shareable download link. Other users can browse and download your apps.",
-      "anonymous": "Anonymous Mode",
-      "anonymousDesc": "You can generate prompts and apps without logging in.",
-      "anonymousNote": "To share apps with others, you'll need to share the HTML file yourself (email, drive, etc.).",
-      "signUp": "Sign up",
-      "signUpNote": "to get a personal download link others can use."
+      "loggedIn": "Signed in as",
+      "loggedInDesc": "You can publish apps to this node and share the link. Your agents connect under this account.",
+      "anonymous": "Not signed in",
+      "anonymousDesc": "You can read everything here, copy every prompt, and have your AI build an app.",
+      "anonymousNote": "Publishing the app so others can use it needs an account.",
+      "signUp": "Sign in",
+      "signUpNote": "takes seconds: one click with Google, or email and password."
     },
     "community": {
-      "title": "Community Apps",
-      "desc": "Apps uploaded by users on this node. Download and open locally in your browser."
+      "title": "Apps built on this node",
+      "desc": "Published by people here. Open one to see what a single-file AIMEAT app looks like in use."
     },
     "profile": "Profile",
     "humanPortal": "For Everyone",
@@ -4157,8 +4164,8 @@
       "mcpProfileLinkAction": "View your sessions →",
       "mcpAuthDetails": "How does MCP authentication work?",
       "mcpAuthExplain": "<strong>OAuth 2.1 with Ed25519 signatures:</strong><ol style='margin:.5rem 0 0 1.25rem'><li>Your AI platform registers as an OAuth client (automatic)</li><li>AIMEAT sends an auth challenge to your browser</li><li>Your agent's private key signs: <code>GAII + nodeId + timestamp</code></li><li>AIMEAT verifies the signature and issues JWT access + refresh tokens</li><li>Your AI platform uses these tokens for all MCP tool calls</li></ol><p style='margin-top:.5rem'>Tokens refresh automatically. Your private key never leaves your browser.</p>",
-      "apiBadge": "📡 API, REST Interface",
-      "apiDesc": "Your AI can make HTTP calls. Copy this prompt and paste it into your AI chat:",
+      "apiBadge": "API, REST interface",
+      "apiDesc": "Your AI can make HTTP calls but has no MCP. Copy this prompt into your AI chat. It registers as an agent, you approve it, and it gets a token.",
       "browseBadge": "📡 API, Browse Only",
       "browseDesc": "Your AI can browse URLs. Copy this prompt to get started:",
       "browseUpgradeTitle": "Want full access?",
@@ -4172,7 +4179,8 @@
       "promptAnon": "Anonymous mode. You'll need to share the generated HTML file yourself.",
       "promptSignUp": "Sign up",
       "promptSignUpNote": "to upload and get a share link.",
-      "loading": "Loading..."
+      "loading": "Loading...",
+      "apiMcpHint": "If your AI does support MCP, use that instead. It is one line and you skip this entirely."
     },
     "goals": {
       "dashboard": "Personal Dashboard",
@@ -4192,35 +4200,14 @@
       "codeUpdatedShort": "Code updated",
       "codeRemovedShort": "Code removed"
     },
-    "uploadSection": {
-      "desc": "After your AI generates the HTML file, upload it here to get a shareable download link.",
-      "accessCodeLabel": "Access Code (optional)",
-      "accessCodePlaceholder": "Leave empty for public access",
-      "accessCodeNote": "If set, downloaders will need this code. 4–64 characters.",
-      "dragDrop": "Drag & drop your .html file here, or:",
-      "chooseFile": "Choose File",
-      "protected": "Protected with access code.",
-      "changeCode": "Change Access Code",
-      "newCodePlaceholder": "New code (or leave empty to remove)",
-      "setCodePlaceholder": "Set a code to protect",
-      "updateBtn": "Update",
-      "fileSize": "File size: ",
-      "shareTitle": "Share Your App",
-      "shareDesc": "After your AI generates the HTML file:",
-      "shareStep1": "Save the generated code as an .html file",
-      "shareStep2": "Open it in your browser to test",
-      "shareStep3": "Share the file with others via email, cloud drive, or messaging",
-      "wantEasier": "Want easier sharing?",
-      "createAccount": "Create an account",
-      "downloadLinkNote": "to upload your app and get a personal download link like:"
-    },
     "appList": {
       "protected": "Protected",
       "by": "by ",
       "accessCode": "Access code",
       "newCodePlaceholder": "New code or empty to remove",
       "setCodePlaceholder": "Set access code",
-      "enterCode": "Please enter the access code"
+      "enterCode": "Please enter the access code",
+      "open": "Open"
     },
     "platformNotes": {
       "noHttp": "Cannot make external HTTP calls",
@@ -4228,7 +4215,20 @@
       "vscodeSettings": "Add as MCP server in VS Code settings",
       "pythonSandbox": "Python sandbox. Can make HTTP requests",
       "functionCalling": "Models with function calling",
-      "indexnow": "Can browse pages indexed in Bing (IndexNow)"
+      "indexnow": "Can browse pages indexed in Bing (IndexNow)",
+      "cliOneLiner": "One command in your terminal, then the AIMEAT tools are there",
+      "mcpSettings": "Add AIMEAT as an MCP server in the settings",
+      "consumerAppNoMcp": "The consumer app has no MCP. Use the copy-prompt path, or the CLI variant above",
+      "chatgptDevMode": "MCP connectors need Developer mode, and are not on the free tier"
+    },
+    "publish": {
+      "title": "Publish your app",
+      "desc": "Your app runs on this node, isolated on its own address, with version history, rollback and a share link. It keeps your login, saved data, files, AI and realtime features.",
+      "step1": "Open the app catalog",
+      "step2": "Click + Add, open the Paste tab, and paste the HTML. The name and description fill in automatically.",
+      "step3": "Click Publish. You get a link to share.",
+      "cta": "Open the app catalog",
+      "note": "Signing in takes seconds: one click with Google, or email and password."
     }
   },
   "init": {

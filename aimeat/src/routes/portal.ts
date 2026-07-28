@@ -33,6 +33,11 @@
  *   v1.8.0 — 2026-06-20 — Add /v1/app-grant SPA route (H-2 consent page) and inject
  *     window.__APP_ORIGIN_ENABLED into the SPA shell so launchers open apps top-level when
  *     the app origin is provisioned.
+ *   v1.10.0 — 2026-07-28 — Platform registry refresh: Claude Code moves from the `api` path to
+ *     `mcp` (it is a native MCP client; the old routing greyed out its MCP tab and served an
+ *     obsolete owner-key prompt), Gemini CLI added as an MCP variant, and Cursor, Codex CLI,
+ *     Windsurf and OpenHands added as MCP platforms. New note keys: cliOneLiner, mcpSettings,
+ *     consumerAppNoMcp, chatgptDevMode.
  *   v1.9.0 — 2026-07-14 — Markdown for Agents: /v1/portal and the static info pages
  *     (privacy/terms/connect) negotiate Accept: text/markdown — the portal serves the
  *     authored landing markdown, static pages an HTML→markdown conversion; Vary: Accept.
@@ -248,8 +253,8 @@ const PLATFORMS: AIPlatform[] = [
   {
     id: 'chatgpt', name: 'ChatGPT', vendor: 'OpenAI',
     variants: [
-      { id: 'free', name: 'Free', tier: 'C', path: 'browse' },
-      { id: 'plus', name: 'Plus', tier: 'A', path: 'mcp' },
+      { id: 'free', name: 'Free', tier: 'C', path: 'browse', notes: 'chatgptDevMode' },
+      { id: 'plus', name: 'Plus', tier: 'A', path: 'mcp', notes: 'chatgptDevMode' },
       { id: 'pro', name: 'Pro', tier: 'A', path: 'mcp' },
       { id: 'team', name: 'Team', tier: 'A', path: 'mcp' },
       { id: 'enterprise', name: 'Enterprise', tier: 'A', path: 'mcp' },
@@ -261,7 +266,16 @@ const PLATFORMS: AIPlatform[] = [
       { id: 'free', name: 'Free (claude.ai)', tier: 'C', path: 'browse' },
       { id: 'pro', name: 'Pro (claude.ai)', tier: 'A', path: 'mcp' },
       { id: 'max', name: 'Max (claude.ai)', tier: 'A', path: 'mcp' },
-      { id: 'code', name: 'Claude Code (CLI)', tier: 'B', path: 'api' },
+      // Claude Code speaks MCP natively (`claude mcp add`). It sat on the `api` path until
+      // 2026-07-28, which greyed out the MCP tab for the single best MCP client there is and
+      // handed it an obsolete owner-key/Ed25519 prompt instead.
+      { id: 'code', name: 'Claude Code (CLI)', tier: 'A', path: 'mcp', notes: 'cliOneLiner' },
+    ],
+  },
+  {
+    id: 'cursor', name: 'Cursor', vendor: 'Anysphere',
+    variants: [
+      { id: 'mcp', name: 'Cursor (MCP)', tier: 'A', path: 'mcp', notes: 'mcpSettings' },
     ],
   },
   {
@@ -269,6 +283,24 @@ const PLATFORMS: AIPlatform[] = [
     variants: [
       { id: 'vscode-mcp', name: 'VS Code (MCP)', tier: 'A', path: 'mcp', notes: 'vscodeSettings' },
       { id: 'vscode-chat', name: 'VS Code (Terminal)', tier: 'B', path: 'api', notes: 'terminal' },
+    ],
+  },
+  {
+    id: 'codexcli', name: 'Codex CLI', vendor: 'OpenAI',
+    variants: [
+      { id: 'mcp', name: 'Codex CLI (MCP)', tier: 'A', path: 'mcp', notes: 'cliOneLiner' },
+    ],
+  },
+  {
+    id: 'windsurf', name: 'Windsurf', vendor: 'Codeium',
+    variants: [
+      { id: 'mcp', name: 'Windsurf (MCP)', tier: 'A', path: 'mcp', notes: 'mcpSettings' },
+    ],
+  },
+  {
+    id: 'openhands', name: 'OpenHands', vendor: 'All Hands AI',
+    variants: [
+      { id: 'mcp', name: 'OpenHands (MCP)', tier: 'A', path: 'mcp', notes: 'mcpSettings' },
     ],
   },
   {
@@ -296,7 +328,8 @@ const PLATFORMS: AIPlatform[] = [
   {
     id: 'gemini', name: 'Gemini', vendor: 'Google',
     variants: [
-      { id: 'chat', name: 'Gemini Chat', tier: 'D', path: 'prompt-package' },
+      { id: 'cli', name: 'Gemini CLI (MCP)', tier: 'A', path: 'mcp', notes: 'mcpSettings' },
+      { id: 'chat', name: 'Gemini Chat (app)', tier: 'D', path: 'prompt-package', notes: 'consumerAppNoMcp' },
       { id: 'browse', name: 'Gemini (with browse)', tier: 'C', path: 'browse' },
       { id: 'api', name: 'Gemini API (external)', tier: 'B', path: 'api' },
     ],

@@ -4049,24 +4049,31 @@
     }
   },
   "dev": {
-    "title": "AIMEAT-liitäntäportaali",
-    "subtitle": "Yhdistä mikä tahansa AI tähän solmuun, valitse alustasi aloittaaksesi",
+    "title": "Yhdistä tekoälysi tähän nodeen",
+    "subtitle": "Yksi rivi jos AI:si osaa MCP:n. Kopioitava kehote jos ei osaa. Sen jälkeen rakenna päälle tai pystytä oma node.",
     "repos": {
       "protocol": "aimeat-protocol GitHubissa",
       "crew": "crewaimeat GitHubissa"
     },
     "stats": {
-      "agents": "Agentit",
-      "chatSessions": "Keskustelusessiot",
-      "services": "Palvelut",
-      "boards": "Taulut"
+      "title": "Tällä nodella juuri nyt",
+      "agents": "Agenttia",
+      "online": "paikalla nyt",
+      "apps": "Julkaistua appia",
+      "organisms": "Organismia",
+      "knowledge": "Tietopakettia",
+      "chatSessions": "Keskustelusessiota",
+      "services": "Palvelua",
+      "boards": "Taulua"
     },
     "quickStart": {
-      "title": "Pikastart. Onko AI jo auki?",
-      "desc": "Kopioi-liitä tämä AI-chattiin niin se yhdistää itse:",
+      "title": "Aloita tästä",
+      "mcpDesc": "Jos AI:si osaa MCP:n, tämä yksi rivi on koko asennus. Claude Code, Cursor, VS Code, Codex CLI, Gemini CLI, Windsurf ja OpenHands osaavat.",
+      "mcpNote": "Muut asiakkaat ottavat saman osoitteen omaan liitindialogiinsa. Valitse alta alustasi, niin saat tarkat askeleet.",
+      "desc": "Ei MCP:tä, mutta AI:si osaa lukea verkkosivun? Liitä tämä chattiin, niin se yhdistää itsensä:",
       "copy": "Kopioi",
-      "note": "Toimii AI:lla jotka voivat selata verkkoa (Grok, Claude, ChatGPT selauksella, jne.). URL palauttaa JSON-ohjeet jotka AI ymmärtää.",
-      "fallback": "Jos AI:si ei voi selata, valitse alustasi alta."
+      "note": "Toimii millä tahansa selaavalla AI:lla (Grok, Claude, ChatGPT selauksella). Osoite palauttaa JSON-ohjeet joita AI ymmärtää.",
+      "fallback": "Jos AI:si ei osaa selatakaan, valitse alta alustasi."
     },
     "step1": {
       "label": "Valitse AI-alustasi"
@@ -4078,20 +4085,20 @@
       "label": "Valitse yhdistämistapa"
     },
     "step4": {
-      "label": "Jaa sovelluksesi"
+      "label": "Julkaise appisi"
     },
     "mode": {
       "loggedIn": "Kirjautuneena",
-      "loggedInDesc": "Voit lähettää sovelluksia ja saada jaettavan latauslinkin. Muut voivat selata ja ladata sovelluksiasi.",
-      "anonymous": "Anonyymi tila",
-      "anonymousDesc": "Voit luoda kehotteita ja sovelluksia kirjautumatta.",
-      "anonymousNote": "Jakaaksesi sovelluksia muille, sinun täytyy jakaa HTML-tiedosto itse (sähköposti, pilvipalvelu, jne.).",
-      "signUp": "Rekisteröidy",
-      "signUpNote": "saadaksesi henkilökohtaisen latauslinkin."
+      "loggedInDesc": "Voit julkaista appeja tälle nodelle ja jakaa linkin. Agenttisi yhdistyvät tälle tunnukselle.",
+      "anonymous": "Et ole kirjautunut",
+      "anonymousDesc": "Voit lukea kaiken täältä, kopioida jokaisen kehotteen ja antaa AI:si rakentaa appin.",
+      "anonymousNote": "Appin julkaisu muiden käyttöön vaatii tunnuksen.",
+      "signUp": "Kirjautuminen",
+      "signUpNote": "vie sekunteja: yksi klikkaus Googlella tai sähköposti ja salasana."
     },
     "community": {
-      "title": "Yhteisön sovellukset",
-      "desc": "Käyttäjien lähettämät sovellukset tällä solmulla. Lataa ja avaa paikallisesti selaimessasi."
+      "title": "Tällä nodella rakennetut appit",
+      "desc": "Täällä julkaistuja. Avaa jokin ja näet millainen yhden tiedoston AIMEAT-appi on käytössä."
     },
     "profile": "Profiili",
     "humanPortal": "Kaikille",
@@ -4157,8 +4164,8 @@
       "mcpProfileLinkAction": "Näytä sessiosi →",
       "mcpAuthDetails": "Miten MCP-tunnistautuminen toimii?",
       "mcpAuthExplain": "<strong>OAuth 2.1 Ed25519-allekirjoituksilla:</strong><ol style='margin:.5rem 0 0 1.25rem'><li>AI-alustasi rekisteröityy OAuth-asiakkaaksi (automaattinen)</li><li>AIMEAT lähettää tunnistautumishaasteen selaimeesi</li><li>Agenttisi yksityinen avain allekirjoittaa: <code>GAII + nodeId + aikaleima</code></li><li>AIMEAT vahvistaa allekirjoituksen ja myöntää JWT-pääsy- ja uusimistunnisteet</li><li>AI-alustasi käyttää tunnisteteita kaikissa MCP-työkalukutsuissa</li></ol><p style='margin-top:.5rem'>Tunnisteet uusiutuvat automaattisesti. Yksityinen avaimesi ei koskaan poistu selaimestasi.</p>",
-      "apiBadge": "📡 API, REST-rajapinta",
-      "apiDesc": "AI:si voi tehdä HTTP-kutsuja. Kopioi tämä kehote ja liitä se AI-chattiisi:",
+      "apiBadge": "API, REST-rajapinta",
+      "apiDesc": "AI:si osaa tehdä HTTP-kutsuja mutta siinä ei ole MCP:tä. Kopioi tämä kehote AI-chattiisi. Se pyytää agentiksi, sinä hyväksyt sen, ja se saa tokenin.",
       "browseBadge": "📡 API, Vain selaus",
       "browseDesc": "AI:si voi selata URL-osoitteita. Kopioi tämä kehote aloittaaksesi:",
       "browseUpgradeTitle": "Haluatko täyden pääsyn?",
@@ -4172,7 +4179,8 @@
       "promptAnon": "Anonyymi tila. Sinun täytyy jakaa luotu HTML-tiedosto itse.",
       "promptSignUp": "Rekisteröidy",
       "promptSignUpNote": "lähettääksesi sovelluksen ja saadaksesi jakolinkin.",
-      "loading": "Ladataan..."
+      "loading": "Ladataan...",
+      "apiMcpHint": "Jos AI:si osaa MCP:n, käytä sitä. Se on yksi rivi ja ohittaa tämän kokonaan."
     },
     "goals": {
       "dashboard": "Henkilökohtainen hallintapaneeli",
@@ -4192,35 +4200,14 @@
       "codeUpdatedShort": "Koodi päivitetty",
       "codeRemovedShort": "Koodi poistettu"
     },
-    "uploadSection": {
-      "desc": "Kun AI on luonut HTML-tiedoston, lähetä se tänne saadaksesi jaettavan latauslinkin.",
-      "accessCodeLabel": "Pääsykoodi (valinnainen)",
-      "accessCodePlaceholder": "Jätä tyhjäksi julkiselle",
-      "accessCodeNote": "Jos asetettu, lataajat tarvitsevat tämän koodin. 4–64 merkkiä.",
-      "dragDrop": "Vedä ja pudota .html-tiedosto tähän, tai:",
-      "chooseFile": "Valitse tiedosto",
-      "protected": "Suojattu pääsykoodilla.",
-      "changeCode": "Vaihda pääsykoodi",
-      "newCodePlaceholder": "Uusi koodi (tai tyhjä poistaaksesi)",
-      "setCodePlaceholder": "Aseta suojakoodi",
-      "updateBtn": "Päivitä",
-      "fileSize": "Tiedostokoko: ",
-      "shareTitle": "Jaa sovelluksesi",
-      "shareDesc": "Kun AI on luonut HTML-tiedoston:",
-      "shareStep1": "Tallenna luotu koodi .html-tiedostona",
-      "shareStep2": "Avaa se selaimessa testataksesi",
-      "shareStep3": "Jaa tiedosto muille sähköpostilla, pilvipalvelulla tai viestillä",
-      "wantEasier": "Haluatko helpomman jakamisen?",
-      "createAccount": "Luo tili",
-      "downloadLinkNote": "lähettääksesi sovelluksen ja saadaksesi henkilökohtaisen latauslinkin kuten:"
-    },
     "appList": {
       "protected": "Suojattu",
       "by": "tekijä ",
       "accessCode": "Pääsykoodi",
       "newCodePlaceholder": "Uusi koodi tai tyhjä poistaaksesi",
       "setCodePlaceholder": "Aseta pääsykoodi",
-      "enterCode": "Syötä pääsykoodi"
+      "enterCode": "Syötä pääsykoodi",
+      "open": "Avaa"
     },
     "platformNotes": {
       "noHttp": "Ei voi tehdä ulkoisia HTTP-kutsuja",
@@ -4228,7 +4215,20 @@
       "vscodeSettings": "Lisää MCP-palvelimeksi VS Code -asetuksissa",
       "pythonSandbox": "Python-hiekkalaatikko, voi tehdä HTTP-kutsuja",
       "functionCalling": "Mallit joilla on funktokutsut",
-      "indexnow": "Voi selata Bingiin indeksoituja sivuja (IndexNow)"
+      "indexnow": "Voi selata Bingiin indeksoituja sivuja (IndexNow)",
+      "cliOneLiner": "Yksi komento terminaaliin, ja AIMEAT-työkalut ovat käytössä",
+      "mcpSettings": "Lisää AIMEAT MCP-palvelimeksi asetuksiin",
+      "consumerAppNoMcp": "Kuluttajasovelluksessa ei ole MCP:tä. Käytä kopioitavaa promptia tai yllä olevaa CLI-versiota",
+      "chatgptDevMode": "MCP-liittimet vaativat Developer moden, eivätkä ne ole ilmaisversiossa"
+    },
+    "publish": {
+      "title": "Julkaise appisi",
+      "desc": "Appi ajetaan tällä nodella omassa osoitteessaan eristettynä, versiohistorialla, palautuksella ja jaettavalla linkillä. Kirjautuminen, tallennettu data, tiedostot, AI ja reaaliaikaisuus pysyvät mukana.",
+      "step1": "Avaa appikatalogi",
+      "step2": "Paina + Lisää, avaa Liitä-välilehti ja liitä HTML. Nimi ja kuvaus täyttyvät itsestään.",
+      "step3": "Paina Julkaise. Saat linkin jaettavaksi.",
+      "cta": "Avaa appikatalogi",
+      "note": "Kirjautuminen vie sekunteja: yksi klikkaus Googlella tai sähköposti ja salasana."
     }
   },
   "init": {

@@ -1,107 +1,35 @@
 /**
  * @file public/views/portal-dev.upload.js
- * @description App upload/share section + community apps listing (with access-code manager) for the portal-dev view. Extracted from portal-dev.js to satisfy max-file-lines.
+ * @description Publish pointer + community apps listing (with access-code manager) for the portal-dev view. Extracted from portal-dev.js to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from portal-dev.js (max-file-lines)
+ *   v1.1.0 — 2026-07-28 — UploadSection becomes a pointer to the app catalog. It taught the
+ *     obsolete "save the HTML and email it" model, and for signed-in owners it POSTed an inline
+ *     base64 body to /v1/apps — a second publish path with no versioning, origin isolation or
+ *     share link. Community list leads with Open (the app runs on the node); Download is secondary.
  */
-import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
-import { html, NODE_URL, dt, formatBytes, CopyBtn } from './portal-dev.shared.js';
+import { useState, useEffect, useCallback } from 'preact/hooks';
+import { html, NODE_URL, dt, formatBytes } from './portal-dev.shared.js';
 import { swallowed } from '/js/swallowed.js';
 
 /* ══════════════════════════════════════════════
-   UPLOAD SECTION (Step 4)
+   PUBLISH (Step 4)
    ══════════════════════════════════════════════ */
-function UploadSection({ locale, isLoggedIn, session }) {
-  const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState(null);
-  const [accessCode, setAccessCode] = useState('');
-  const [dragover, setDragover] = useState(false);
-  const inputRef = useRef(null);
-
-  const handleUpload = useCallback(async (file) => {
-    if (!session) return;
-    setUploading(true);
-    setUploadResult(null);
-    try {
-      const arrayBuf = await file.arrayBuffer();
-      const bytes = new Uint8Array(arrayBuf);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      const b64 = btoa(binary);
-
-      const body = { filename: file.name, content: b64, mime_type: 'text/html' };
-      if (accessCode.trim()) body.access_code = accessCode.trim();
-
-      const resp = await session.fetch('/v1/apps', {
-        method: 'POST',
-        body: JSON.stringify(body),
-      });
-      const data = resp.data || resp;
-      const downloadUrl = NODE_URL + (data.download_url || '/v1/apps/' + encodeURIComponent(session.owner) + '/' + encodeURIComponent(file.name));
-      setUploadResult({ ok: true, downloadUrl, protected: data.protected, filename: file.name, size: file.size });
-    } catch (e) {
-      setUploadResult({ ok: false, error: e.message });
-    }
-    setUploading(false);
-  }, [session, accessCode]);
-
-  if (!isLoggedIn) {
-    return html`
-      <div class="dv-panel">
-        <h3>\ud83d\udccc ${dt('uploadSection.shareTitle', locale)}</h3>
-        <p>${dt('uploadSection.shareDesc', locale)}</p>
-        <ol style="margin-left:1.5rem;margin-bottom:1rem">
-          <li>${dt('uploadSection.shareStep1', locale)}</li>
-          <li>${dt('uploadSection.shareStep2', locale)}</li>
-          <li>${dt('uploadSection.shareStep3', locale)}</li>
-        </ol>
-        <div class="dv-mode-notice dv-mode-notice-anon" style="margin:0">
-          <div class="dv-notice-icon">\ud83d\udca1</div>
-          <div><strong>${dt('uploadSection.wantEasier', locale)}</strong> ${dt('uploadSection.downloadLinkNote', locale)}<br/>
-            <code style="font-size:.8rem;color:var(--accent)">${NODE_URL}/v1/apps/yourname/my-app.html</code>
-          </div>
-        </div>
-      </div>
-    `;
-  }
-
+/* One publish path: the app catalog. This panel used to teach "save the HTML and email it
+   around", and for signed-in owners it POSTed an inline base64 body to /v1/apps — a second,
+   divergent publish path that skipped the catalog's versioning, origin isolation and share
+   link. Replaced 2026-07-28 with a pointer to the one real path. */
+function UploadSection({ locale }) {
+  const steps = ['publish.step1', 'publish.step2', 'publish.step3'];
   return html`
     <div class="dv-panel">
-      <h3>\ud83d\udce4 ${dt('upload', locale)}</h3>
-      <p>${dt('uploadSection.desc', locale)}</p>
-      <div style="margin-bottom:1rem">
-        <label style="font-size:.85rem;font-weight:600;display:block;margin-bottom:.4rem">${dt('uploadSection.accessCodeLabel', locale)}</label>
-        <input type="text" placeholder=${dt('uploadSection.accessCodePlaceholder', locale)}
-               style="background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:.4rem .6rem;color:var(--text);font-size:.85rem;width:100%;max-width:300px"
-               maxlength="64" value=${accessCode} onInput=${e => setAccessCode(e.target.value)} />
-        <p style="font-size:.75rem;color:var(--muted);margin-top:.25rem">${dt('uploadSection.accessCodeNote', locale)}</p>
-      </div>
-      <div class=${`dv-upload-area ${dragover ? 'dragover' : ''}`}
-           onDragOver=${e => { e.preventDefault(); setDragover(true); }}
-           onDragLeave=${() => setDragover(false)}
-           onDrop=${e => { e.preventDefault(); setDragover(false); if (e.dataTransfer.files.length > 0) handleUpload(e.dataTransfer.files[0]); }}>
-        <p style="margin-bottom:.5rem">${dt('uploadSection.dragDrop', locale)}</p>
-        <input type="file" ref=${inputRef} accept=".html,.htm" style="display:none"
-               onChange=${e => { if (e.target.files.length > 0) handleUpload(e.target.files[0]); }} />
-        <button class="dv-upload-btn" type="button" disabled=${uploading}
-                onClick=${() => inputRef.current?.click()}>
-          ${uploading ? dt('uploading', locale) : dt('uploadSection.chooseFile', locale)}
-        </button>
-      </div>
-      ${uploadResult && (uploadResult.ok
-        ? html`
-          <div style="margin-top:1rem">
-            <div style="color:var(--success);font-weight:600;margin-bottom:.5rem">\u2705 ${dt('uploaded', locale)}${uploadResult.protected ? ' \ud83d\udd12' : ''}</div>
-            <p>${dt('shareLink', locale)}:</p>
-            <div class="dv-share-url">
-              <input type="text" value=${uploadResult.downloadUrl} readonly />
-              <${CopyBtn} text=${uploadResult.downloadUrl} locale=${locale} />
-            </div>
-            <p style="font-size:.8rem;color:var(--muted);margin-top:.5rem">${dt('uploadSection.fileSize', locale)}${formatBytes(uploadResult.size)}</p>
-          </div>
-        `
-        : html`<p style="color:var(--danger);margin-top:.75rem">${dt('uploadFailed', locale)}: ${uploadResult.error}</p>`
-      )}
+      <h3>${dt('publish.title', locale)}</h3>
+      <p>${dt('publish.desc', locale)}</p>
+      <ol class="dv-steps">
+        ${steps.map(k => html`<li key=${k}>${dt(k, locale)}</li>`)}
+      </ol>
+      <a class="btn-primary" href="/app-catalog.html">${dt('publish.cta', locale)}</a>
+      <p class="dv-hint">${dt('publish.note', locale)}</p>
     </div>
   `;
 }
@@ -172,7 +100,15 @@ function CommunityApps({ locale, isLoggedIn, session }) {
                     }} style="font-size:.85rem">\u2b07 ${dt('download', locale)}</a>
                   </div>
                 `
-                : html`<a href=${NODE_URL + app.download_url} download style="display:inline-block;margin-top:.5rem;font-size:.85rem">\u2b07 ${dt('download', locale)}</a>`
+                : html`
+                  <div class="dv-app-actions">
+                    <a class="btn-primary dv-app-open"
+                       href=${`/v1/apps/${encodeURIComponent(app.owner)}/${encodeURIComponent(app.filename)}?mode=inline`}>
+                      ${dt('appList.open', locale)}
+                    </a>
+                    <a class="dv-app-download" href=${NODE_URL + app.download_url} download>${dt('download', locale)}</a>
+                  </div>
+                `
               }
               ${isLoggedIn && session?.owner === app.owner && html`
                 <div style="margin-top:.5rem;padding-top:.5rem;border-top:1px solid var(--border)">

@@ -15,6 +15,9 @@
        row and .page-content as the sole overflow-y:auto scroll region. Removes the ~nav-height phantom
        overscroll and stops view content sliding under the (formerly sticky, now in-frame) header. Coupled
        offset fixes: .pf-sidebar/.adm-sidebar stick to top:0 of the region and cap at 100dvh−nav-height.
+     v1.24.0 — 2026-07-28 — Live counters: add .stat-card-value.is-loading (quiet placeholder while
+       the fetch is in flight — a hard 0 on a live counter reads as a dead node) and .stat-card-sub
+       (second line under a counter, e.g. "2 online now"). Additive only.
      v1.23.1 — 2026-07-20 — Mobile: pin .notif-dropdown to fixed viewport insets under 560px (the
        320px, right:0-anchored panel ran off the LEFT edge — the bell sits mid-right of the bar — and
        got clipped by body{overflow-x:hidden}); long notif titles/bodies wrap (overflow-wrap:anywhere).
@@ -888,6 +891,11 @@ a { color: inherit; text-decoration: none; }
 .stat-card-value.purple  { color: var(--purple); }
 .stat-card-value.blue    { color: var(--blue); }
 .stat-card-value.mono    { font-family: var(--font-mono, monospace); }
+/* Placeholder while the counter's fetch is still in flight. A hard 0 on a live counter
+   reads as "nothing runs here", so the card stays quiet until it knows the number. */
+.stat-card-value.is-loading { color: var(--text-muted); opacity: 0.45; }
+/* Optional second line under a counter (e.g. "2 online now"). */
+.stat-card-sub { font-size: 0.68rem; color: var(--text-muted); margin-top: 0.2rem; }
 /* Shared responsive stat grid wrapper. */
 .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 12px; margin-bottom: 32px; }
 
