@@ -1058,6 +1058,14 @@ await test('APP CAP · a ceiling on what an app may spend of your money holds, a
     const cap = await json(`/v1/app-grants/${grantId}/spend-cap`, { method: 'PATCH', headers: auth(consumer.token), body: JSON.stringify({ cap_morsels: 8 }) });
     assert(cap.status === 200 && cap.body.data.cap_morsels === 8, `cap set: ${cap.status} ${JSON.stringify(cap.body?.data ?? cap.body?.error)}`);
 
+    // The owner has to be able to SEE it, or the limit is a setting with no dial. Profile > Access
+    // renders the control from exactly these three fields.
+    const listed = await json('/v1/app-grants', { headers: auth(consumer.token) });
+    const row = (listed.body.data.grants as any[]).find(g => g.grant_id === grantId);
+    assert(row?.can_spend === true, `the list says this app may spend: ${JSON.stringify(row?.can_spend)}`);
+    assert(row?.spend_cap_morsels === 8, `and what its ceiling is: ${JSON.stringify(row?.spend_cap_morsels)}`);
+    assert(typeof row?.spent_morsels === 'number', `and how much of it is gone: ${JSON.stringify(row?.spent_morsels)}`);
+
     const call = () => json(`/v1/ext/${EXT}/solo`, { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
     assert((await call()).status === 200, 'the call the ceiling allows');
     const cb = await balance(consumer.token);

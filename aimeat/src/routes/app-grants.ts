@@ -560,6 +560,10 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       grants: grants.map(g => ({
         grant_id: g.grantId, app: g.app, app_name: g.appName, app_origin: g.appOrigin,
         scopes: g.scopes, granted_at: g.createdAt, last_used_at: g.lastUsedAt,
+        // Only meaningful for an app that may spend at all; the UI hides the control otherwise.
+        can_spend: (g.scopes ?? []).includes('contract:spend'),
+        spend_cap_morsels: g.spendCapMorsels ?? null,
+        spent_morsels: g.spentMorsels ?? 0,
       })),
       total: grants.length,
     }));

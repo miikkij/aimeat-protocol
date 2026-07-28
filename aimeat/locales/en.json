@@ -3209,7 +3209,16 @@
       "validUntil": "Valid until {time} ({h} h)",
       "noKeypair": "No keypair is stored for this account. Keys are generated at registration; older accounts may not have one.",
       "fedAllowAllCaption": "Any federation node can verify your identity. Uncheck to restrict to the list below.",
-      "adRuleExample": "Example: \"Always answer in Finnish\" or \"Never spend morsels without asking\"."
+      "adRuleExample": "Example: \"Always answer in Finnish\" or \"Never spend morsels without asking\".",
+      "agSpendTitle": "Spending limit",
+      "agSpendNoLimit": "No limit — it may spend whatever you hold.",
+      "agSpendUsed": "{spent} of {cap} morsels used",
+      "agSpendPlaceholder": "morsels, or empty for no limit",
+      "agCapSave": "Set limit",
+      "agCapSaved": "Spending limit saved",
+      "agCapResetBtn": "Clear counter",
+      "agCapReset": "Counter cleared",
+      "agCapFailed": "Could not change the limit"
     },
     "nodes": {
       "title": "Personal Nodes",

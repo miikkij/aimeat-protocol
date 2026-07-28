@@ -3209,7 +3209,16 @@
       "validUntil": "Voimassa {time} asti ({h} h)",
       "noKeypair": "Tilille ei ole tallennettu avainparia. Avaimet luodaan rekisteröityessä; vanhoilta tileiltä se voi puuttua.",
       "fedAllowAllCaption": "Mikä tahansa federaatiosolmu voi verifioida identiteettisi. Rajaa alla olevaan listaan poistamalla valinta.",
-      "adRuleExample": "Esim. \"Vastaa aina suomeksi\" tai \"Älä koskaan käytä murusia kysymättä\"."
+      "adRuleExample": "Esim. \"Vastaa aina suomeksi\" tai \"Älä koskaan käytä murusia kysymättä\".",
+      "agSpendTitle": "Kulutusraja",
+      "agSpendNoLimit": "Ei rajaa — se voi kuluttaa kaiken mitä sinulla on.",
+      "agSpendUsed": "{spent}/{cap} morselia käytetty",
+      "agSpendPlaceholder": "morseleina, tyhjä tarkoittaa rajatonta",
+      "agCapSave": "Aseta raja",
+      "agCapSaved": "Kulutusraja tallennettu",
+      "agCapResetBtn": "Nollaa laskuri",
+      "agCapReset": "Laskuri nollattu",
+      "agCapFailed": "Rajan muuttaminen ei onnistunut"
     },
     "nodes": {
       "title": "Henkilökohtaiset solmut",

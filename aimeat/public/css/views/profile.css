@@ -4,6 +4,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.18.0 — 2026-07-28 — .ag-spend*: the spending limit on a connected app's card.
  *   v2.17.0 — 2026-07-25 — .ag-scope-toggle: the Connected Apps scope count is now the disclosure
  *     button for its badge list (button reset so it still renders as a plain .badge).
  *   v2.16.2 — 2026-07-21 — App-shell scroll model (theme.css v1.24.0): .pf-sidebar sticks to top:0 of
@@ -1622,6 +1623,13 @@
 .pf .access-mono     { font-family: monospace; font-size: .75rem; word-break: break-all; color: var(--muted); }
 /* Scope count doubles as the disclosure control for the badge list it summarises: button reset so a
    <button> carrying .badge looks exactly like the static badges elsewhere in the card. */
+/* Spending limit on a connected app's card. Only an app that asked to spend shows one, so this
+   never appears on the majority of cards and must not push the rest of the layout around. */
+.pf .ag-spend { margin-top: .75rem; padding-top: .75rem; border-top: 1px solid var(--border); }
+.pf .ag-spend-head { display: flex; align-items: baseline; justify-content: space-between; gap: .75rem; flex-wrap: wrap; margin-bottom: .4rem; }
+.pf .ag-spend-row { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; }
+.pf .ag-spend-input { max-width: 16rem; flex: 1 1 8rem; }
+
 .pf .ag-scope-toggle { border: 0; font-family: inherit; font-size: .66rem; font-weight: 600; cursor: pointer; }
 .pf .ag-scope-toggle:hover { filter: brightness(1.1); }
 .pf .access-key-blur { filter: blur(4px); transition: filter .2s; }

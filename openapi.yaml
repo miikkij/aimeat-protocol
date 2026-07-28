@@ -8270,7 +8270,9 @@ paths:
         A yes with no number is a blank cheque, and until an app could be named apart from its owner the
         question could not even be asked — an app grant presents the owner's own GHII, so at the money
         layer a call from an app was indistinguishable from the person's own. Body:
-        `{ cap_morsels: number | null, reset?: boolean }`. `null` removes the ceiling (the scope alone);
+        `{ cap_morsels: number | null, reset?: boolean }`. GET /v1/app-grants carries the same three
+        fields back (`can_spend`, `spend_cap_morsels`, `spent_morsels`) so Profile > Access can render
+        the dial. `null` removes the ceiling (the scope alone);
         `0` stops the app spending without withdrawing anything else it was trusted with; `reset: true`
         puts the counter back to zero. Only morsel charges count against it — money is denominated in
         micro-units and summing the two into one ceiling would conflate different numbers. Owner-only.

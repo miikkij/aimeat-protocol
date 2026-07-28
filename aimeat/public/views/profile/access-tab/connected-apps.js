@@ -8,6 +8,9 @@
  *   + a bulk revoke of grants unused for STALE_DAYS.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from access-tab.js (max-file-lines)
+ *   v1.2.0 — 2026-07-28 — A spending limit on the card of an app that asked to spend. The permission
+ *     answers whether; an owner usually means an amount, and the question had nowhere to live until
+ *     an app could be told apart from its owner at the money layer.
  *   v1.1.0 — 2026-07-25 — Readability pass: sort most-recently-used first, collapse the
  *     scope-badge wall behind its count, and add a bulk revoke for long-unused grants.
  *     (The duplicate rows that made this list unreadable are fixed server-side; this
@@ -20,7 +23,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { useConfirm } from '/components/Modal.js';
-import { apiGet, apiDelete } from '/js/api.js';
+import { apiGet, apiDelete, apiPatch } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 
 // A grant untouched for this long is offered for bulk revoke. Long enough that a seasonal app
@@ -32,6 +35,70 @@ function idleMs(g, now) {
   const ts = g.last_used_at || g.granted_at;
   const parsed = ts ? Date.parse(ts) : NaN;
   return Number.isNaN(parsed) ? Infinity : now - parsed;
+}
+
+/**
+ * The spending limit for one app, on its own card.
+ *
+ * Shown only for an app that asked to spend at all. A permission is a yes or no; what an owner
+ * usually means is an amount, and until an app could be told apart from its owner at the money layer
+ * the question had nowhere to live. Empty means no limit — the permission alone.
+ */
+function SpendLimit({ grant, showToast, onSaved }) {
+  const [value, setValue] = useState(grant.spend_cap_morsels == null ? '' : String(grant.spend_cap_morsels));
+  const [saving, setSaving] = useState(false);
+  const spent = grant.spent_morsels || 0;
+  const cap = grant.spend_cap_morsels;
+
+  const save = useCallback(async (body, done) => {
+    setSaving(true);
+    try {
+      await apiPatch('/v1/app-grants/' + grant.grant_id + '/spend-cap', body);
+      showToast(done);
+      onSaved();
+    } catch (err) {
+      swallowed('connected-apps-cap', err);
+      showToast(t('profile.access.agCapFailed') || 'Could not change the limit');
+    }
+    setSaving(false);
+  }, [grant.grant_id, showToast, onSaved]);
+
+  return html`
+    <div class="ag-spend">
+      <div class="ag-spend-head">
+        <span class="detail-label">${t('profile.access.agSpendTitle') || 'Spending limit'}</span>
+        <span class="text-meta-sm">
+          ${cap == null
+            ? (t('profile.access.agSpendNoLimit') || 'No limit — it may spend whatever you hold.')
+            : (t('profile.access.agSpendUsed') || '{spent} of {cap} morsels used')
+                .replace('{spent}', String(spent)).replace('{cap}', String(cap))}
+        </span>
+      </div>
+      <div class="ag-spend-row">
+        <input
+          class="input input-sm ag-spend-input"
+          type="number" min="0" step="1" inputmode="numeric"
+          placeholder=${t('profile.access.agSpendPlaceholder') || 'morsels, or empty for no limit'}
+          value=${value}
+          disabled=${saving}
+          onInput=${(e) => setValue(e.target.value)}
+        />
+        <button
+          class="btn-outline btn-sm"
+          disabled=${saving}
+          onClick=${() => save({ cap_morsels: value.trim() === '' ? null : Math.max(0, Math.floor(Number(value))) },
+            t('profile.access.agCapSaved') || 'Spending limit saved')}
+        >${t('profile.access.agCapSave') || 'Set limit'}</button>
+        ${spent > 0 && html`
+          <button
+            class="btn-ghost btn-sm"
+            disabled=${saving}
+            onClick=${() => save({ reset: true }, t('profile.access.agCapReset') || 'Counter cleared')}
+          >${t('profile.access.agCapResetBtn') || 'Clear counter'}</button>
+        `}
+      </div>
+    </div>
+  `;
 }
 
 // Apps the owner has explicitly granted scoped access to (the H-2 app-grant flow). Each
@@ -152,6 +219,7 @@ export function ConnectedAppsSection({ showToast, initial }) {
                   ${g.scopes.map(s => html`<span class="badge badge-muted" key=${s}>${escHtml(s)}</span>`)}
                 </div>
               `}
+              ${g.can_spend && html`<${SpendLimit} grant=${g} showToast=${showToast} onSaved=${load} />`}
               <div class="card-actions">
                 <button class="btn-danger-solid btn-sm" onClick=${() => handleRevoke(g.grant_id, g.app_name || g.app)}>${t('profile.access.agRevoke') || 'Revoke'}</button>
               </div>
