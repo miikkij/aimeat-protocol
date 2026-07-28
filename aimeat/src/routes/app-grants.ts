@@ -97,6 +97,10 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // apart. Paired with a per-app ceiling (`spend_cap_units`) so the answer can be an amount rather
   // than a yes.
   'contract:spend': 'Buy on your behalf using contracts you hold (spends your morsels or money)',
+  // The other side of the same coin: an app that manages who may use ITS owner's capability.
+  // A membership gate that approves someone and cannot open the door for them is decoration, and
+  // the owner is the one paying for what it gives away — so it is asked for, never assumed.
+  'exchange:grant': 'Give and withdraw free access to capabilities you sell (you carry the cost)',
   'notifications:send': 'Send you notifications (bell + browser push) that open this app',
   'organism:read': 'Read the published content of workspaces you are a member of (e.g. gated curriculum an app renders for you)',
   'organism:invite': 'Invite people into organisms you belong to (send email invitations / access keys on your behalf)',

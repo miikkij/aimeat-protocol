@@ -1278,6 +1278,23 @@ await test('APP GRANT · a grant given BEFORE the permission existed keeps worki
     assert((await ask(newId)).kind === 'scope_required', 'but a grant given after it still has to ask');
 });
 
+await test('APP GRANT · an app can be given the right to hand out its owner\'s capability', async () => {
+    // A membership gate that approves someone and cannot open the door for them is decoration. The
+    // app IS the owner's admin surface, so it must be able to issue the grant its approval promises —
+    // but it runs on an app grant, which gets no owner bypass, so the permission has to be askable.
+    // It was not: `exchange:grant` was enforced on the route and absent from the vocabulary an app
+    // may request, so every such wiring would have met a 403 with no way to fix it.
+    const cat = await json('/v1/app-grants/scopes');
+    const offered = (cat.body.data.scopes as any[]).map(s2 => s2.scope);
+    assert(offered.includes('exchange:grant'), `an app can ask for it: ${JSON.stringify(offered.filter((x: string) => x.startsWith('exchange') || x.startsWith('contract')))}`);
+    assert(offered.includes('contract:spend'), 'and for the permission to spend');
+    // Neither is a default. Giving away revenue and spending money are not things an app gets by
+    // saying nothing.
+    const defaults = (cat.body.data.scopes as any[]).filter(s2 => s2.default).map(s2 => s2.scope);
+    assert(!defaults.includes('exchange:grant') && !defaults.includes('contract:spend'),
+        `neither is granted by default: ${JSON.stringify(defaults)}`);
+});
+
 console.log(`\n═══ MONEY AUDIT: ${passed} passed, ${failed} failed (${passed + failed} total) ═══\n`);
 server.close();
 await storage.disconnect?.();
