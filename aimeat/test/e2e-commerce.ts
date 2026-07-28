@@ -115,8 +115,10 @@ await test('1. GET /.well-known/ucp — profile advertises checkout + the morsel
     assert(res.status === 200, `status ${res.status}`);
     const profile = await res.json() as any;
     assert(typeof profile.ucp?.version === 'string', 'missing ucp.version');
-    assert(profile.ucp.services?.rest?.endpoint?.endsWith('/ucp/v1'), `rest endpoint: ${profile.ucp.services?.rest?.endpoint}`);
-    assert(profile.ucp.services?.mcp?.endpoint?.endsWith('/v1/mcp'), 'missing mcp transport');
+    // Service names map to ARRAYS of entries, as the spec requires.
+    assert(Array.isArray(profile.ucp.services?.rest), 'ucp.services.rest must be an array of entries');
+    assert(profile.ucp.services.rest[0]?.endpoint?.endsWith('/ucp/v1'), `rest endpoint: ${profile.ucp.services.rest[0]?.endpoint}`);
+    assert(profile.ucp.services?.mcp?.[0]?.endpoint?.endsWith('/v1/mcp'), 'missing mcp transport');
     // UCP declares capabilities as an OBJECT keyed by capability name, each key holding an array
     // of declarations. A validator reads the old array-of-{name} shape as "capabilities missing".
     assert(!Array.isArray(profile.ucp.capabilities) && typeof profile.ucp.capabilities === 'object',

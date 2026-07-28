@@ -63,8 +63,9 @@ import { injectAgentDiscovery } from '../utils/app-agent-discovery.js';
 import { injectAppHeadMeta } from '../utils/app-head-meta.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
-import { prefersMarkdown } from '../services/markdown-negotiation.js';
-import { serveAppAgentFace } from '../services/agent-face.js';
+import { prefersMarkdown, sendMarkdown } from '../services/markdown-negotiation.js';
+import { serveAppAgentFace, buildAppAgentFace } from '../services/agent-face.js';
+import { appLlmsTxt, appAgentsMd, appSitemapMd } from '../services/app-agent-surfaces.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { logger } from '../utils/logger.js';
 
@@ -515,15 +516,15 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
   // appears zero times, and it was being served here: an agent that habitually tries
   // /llms.txt read the wrong manual and stopped looking. Serving the same markdown the
   // Agent Face serves keeps one source and answers the habit.
-  router.get('/llms.txt', async (req: Request, res: Response, next) => {
-    const sub = req.subdomain;
-    if (!req.appOrigin || !sub || !config.appOriginEnabled) return next();
-    const site = await storage.getSubdomainSite(sub);
-    if (!site || !site.enabled || site.kind !== 'app') return next();
-    const app = await resolveAppTarget(storage, site.target);
-    if (!app || appIsRestricted(config, app)) return next();
-    if (await serveAppAgentFace(res, config, storage, app)) return;
-    return next();
+  router.get(['/llms.txt', '/llms-full.txt'], async (req: Request, res: Response, next) => {
+    const app = await appForOrigin(req, config, storage);
+    if (!app) return next();
+    const face = await buildAppAgentFace(config, storage, app);
+    const tools = await appToolNames(storage, app.ownerGaii, app.filename);
+    // text/plain, not text/markdown: llmstxt.org names that content type, and this path was
+    // answering markdown — a conformance failure on a document whose whole job is conformance.
+    res.type('text/plain; charset=utf-8')
+      .send(appLlmsTxt(config, app, appOriginFor(req, config), tools, face?.markdown));
   });
 
   // ── Per-origin discovery documents ──────────────────────────────────────────────────────────
@@ -566,7 +567,8 @@ Sitemap: ${origin}/sitemap.xml
     ].join('\n'));
   });
 
-  router.get('/.well-known/mcp.json', async (req: Request, res: Response, next) => {
+  router.get(['/.well-known/mcp.json', '/.well-known/mcp/server-card.json'],
+    async (req: Request, res: Response, next) => {
     const app = await appForOrigin(req, config, storage);
     if (!app) return next();
     const origin = appOriginFor(req, config);
@@ -575,6 +577,17 @@ Sitemap: ${origin}/sitemap.xml
     res.set('Access-Control-Allow-Origin', '*');
     res.json({
       $schema: 'https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json',
+      // BOTH shapes. server.json (SEP-2127) wants name/description/version at the root; other
+      // readers look for serverInfo.name and report the card as having no name without it. The
+      // first version of this card carried only the root fields and cost the app origin six points
+      // on a scanner that had been passing it — a card is read by whoever reads it, not by the
+      // spec. Node card (wellknown.ts) carries both for the same reason.
+      protocolVersion: '2025-06-18',
+      serverInfo: {
+        name: `${app.ownerName}/${app.filename}`,
+        title: app.manifest?.name ?? app.filename.replace(/\.[^.]+$/, ''),
+        version: String(app.versionNumber ?? 1),
+      },
       name: `io.aimeat.app/${app.ownerName}/${app.filename}`,
       description: app.manifest?.description
         ?? `${name} — an application published on AIMEAT by ${app.ownerName}.`,
@@ -594,15 +607,23 @@ Sitemap: ${origin}/sitemap.xml
     });
   });
 
-  router.get(['/AGENTS.md', '/agents.md', '/sitemap.md', '/llms-full.txt'],
-    async (req: Request, res: Response, next) => {
-      const app = await appForOrigin(req, config, storage);
-      if (!app) return next();
-      // One source: the same Agent Face document /llms.txt serves. An app's agent-facing story is
-      // one document, and splitting it into four that can drift is how three of them go stale.
-      if (await serveAppAgentFace(res, config, storage, app)) return;
-      return next();
-    });
+  // One SOURCE, three shapes. Pointing all of these at the Agent Face was one document too few:
+  // llms.txt is asked for a blockquote summary and link lists, sitemap.md for links, AGENTS.md for
+  // installation/configuration/usage sections, and the face is prose with none of those shapes.
+  // The face is still the substance inside each — src/services/app-agent-surfaces.ts wraps it.
+  router.get(['/AGENTS.md', '/agents.md'], async (req: Request, res: Response, next) => {
+    const app = await appForOrigin(req, config, storage);
+    if (!app) return next();
+    const face = await buildAppAgentFace(config, storage, app);
+    const tools = await appToolNames(storage, app.ownerGaii, app.filename);
+    sendMarkdown(res, appAgentsMd(config, app, appOriginFor(req, config), tools, face?.markdown));
+  });
+
+  router.get('/sitemap.md', async (req: Request, res: Response, next) => {
+    const app = await appForOrigin(req, config, storage);
+    if (!app) return next();
+    sendMarkdown(res, appSitemapMd(config, app, appOriginFor(req, config)));
+  });
 
   // App-origin path form: `apps.<apex>/<owner>/<filename>` on the bare app host. Apps need their
   // OWN per-app origin for seamless SSO (the silent bridge binds a token to one subdomain), so this

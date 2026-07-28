@@ -109,7 +109,8 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
 
   // MCP Server Card (SEP-1649) — lets agents discover the node's MCP server, its
   // transport, and that OAuth is required, without probing /v1/mcp blind.
-  router.get('/.well-known/mcp.json', async (_req, res) => {
+  // Two paths, one card. Readers look for it at either; a card nobody finds is not a card.
+  router.get(['/.well-known/mcp.json', '/.well-known/mcp/server-card.json'], async (_req, res) => {
     // commerce_tools (TARGET-034 phase D): the priced app-tool catalog on the card.
     // AIMEAT_MCP_CARD_COMMERCE_TOOLS: 'inline' (default) embeds the entries — richest
     // single-fetch discovery; 'pointer' keeps the card lean and links the catalog endpoint.
@@ -225,12 +226,16 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
     res.json({
       ucp: {
         version: UCP_PROFILE_VERSION,
+        // Each service name maps to an ARRAY of entries, the same shape as capabilities. These
+        // were plain objects, and a validator rejects them field by field ("service rest must be
+        // an array of entries"). The first pass corrected capabilities and left services alone
+        // because the scanner had only named the one — it named the other on the next run.
         services: {
-          rest: { endpoint: `${b}/ucp/v1`, spec: `${b}/v1/spec` },
-          mcp: { endpoint: `${b}/v1/mcp` },
+          rest: [{ endpoint: `${b}/ucp/v1`, spec: `${b}/v1/spec` }],
+          mcp: [{ endpoint: `${b}/v1/mcp` }],
           // In-page tool surface (WebMCP bridge): app pages register their priced tools on
           // document.modelContext; the HTTP listing mirrors them for non-browser agents.
-          webmcp: { library: `${b}/v1/libs/aimeat-webmcp.js`, app_listing: `${b}/v1/apps/{owner}/{filename}/webmcp` },
+          webmcp: [{ library: `${b}/v1/libs/aimeat-webmcp.js`, app_listing: `${b}/v1/apps/{owner}/{filename}/webmcp` }],
         },
         // UCP declares capabilities as an OBJECT keyed by capability name, each key holding an
         // array of declarations. This was an array of {name, ...}, which a validator reads as

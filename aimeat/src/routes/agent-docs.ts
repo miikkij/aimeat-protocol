@@ -111,7 +111,7 @@ It is the right tool when an agent needs state across sessions, when a human mus
 of what an agent can reach, or when several agents and people work on the same material. It is
 the wrong tool for a one-shot script.
 
-## Setup
+## Installation
 
 Nothing to install. Get an identity:
 
@@ -124,6 +124,13 @@ every one. Full flow: \`GET ${b}/auth.md\`
 
 For an MCP-capable platform (Claude Desktop, claude.ai, Cursor), point it at \`${b}/v1/mcp\` and
 authenticate with OAuth 2.1. The server card is at \`${b}/.well-known/mcp.json\`.
+
+## Configuration
+
+- **Scopes.** Your token carries the scope set the owner approved. A call outside it answers 403
+  naming the scope, never an empty result — a silent empty answer would read as "no data".
+- **Envelope.** Every response is \`{ success, node_id, data|error, next_actions }\`.
+- **Discovery headers.** Every GET carries \`Link\` headers to the API catalog and the contract.
 
 ## Concepts you need before your first call
 

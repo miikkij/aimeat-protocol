@@ -141,7 +141,9 @@ function locs(xml: string): string[] {
     });
 
     await test('AGENTS.md carries the sections a coding agent needs', async () => {
-        for (const section of ['## Setup', '## Usage', '## Conventions']) {
+        // Installation / Configuration / Usage are the section names a convention-following
+        // reader looks for, and 'Setup' is not one of them.
+        for (const section of ['## Installation', '## Configuration', '## Usage']) {
             assert(agents.body.includes(section), `AGENTS.md missing ${section}`);
         }
         assert(/^# /m.test(agents.body), 'no H1');

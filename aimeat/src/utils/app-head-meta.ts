@@ -14,9 +14,9 @@
  *
  *   1. **Never overwrite what the app declares.** A tag the author wrote wins. This fills gaps; it
  *      does not take the author's page away from them.
- *   2. **Add an h1 only when there are none.** The accessibility check wants exactly one. An app
- *      that renders its own heading in static markup would end up with two, turning a passing
- *      check into a failing one.
+ *   2. **No heading is injected.** A hidden h1 would satisfy a checker that counts elements and
+ *      help nobody — hidden content is not in the accessibility tree — and a visible one would
+ *      change how somebody else's app looks. The app's own heading, or none, is the honest answer.
  *
  *   The JSON-LD is a SoftwareApplication, and its `offers` come from the app's priced tools — the
  *   one piece here that is not about a checker: a machine-readable price on a machine-readable
@@ -28,6 +28,9 @@
  * @usage
  *   buf = injectAppHeadMeta(buf, { owner, filename, appName, description, origin, baseUrl, tools });
  * @version-history
+ *   v1.1.0 — 2026-07-28 — Works on a document with no <head> (or no <html>) — the common shape for
+ *     a single-file app, and the one the first version silently skipped, so it did nothing at all
+ *     for exactly the apps that needed it. Heading injection dropped, see rule 2 (phase 12b)
  *   v1.0.0 — 2026-07-28 — Initial (agent-readability phase 12)
  */
 
@@ -66,13 +69,21 @@ function esc(t: string): string {
 
 const has = (html: string, re: RegExp) => re.test(html);
 
-/** Add the tags the document does not already carry. Returns the input unchanged if it has no head. */
+/** Add the tags the document does not already carry. Returns the input unchanged if it is not a document. */
 export function injectAppHeadMeta(
   data: Buffer | Uint8Array | string,
   spec: AppHeadSpec,
 ): Buffer {
   const text = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
-  if (!/<\/head\s*>/i.test(text)) return Buffer.from(text, 'utf-8');
+  // A single-file app is frequently a bare fragment. The one measured here opens with
+  // `<meta charset>` and has no doctype, no <html> and no <head> at all, leaving the parser to
+  // build them — and the first version of this function bailed out on the missing </head>, so it
+  // did nothing whatsoever for exactly the documents that needed it most.
+  const hasHtmlEl = /<html[\s>]/i.test(text);
+  const hasHeadEl = /<\/head\s*>/i.test(text);
+  if (!hasHtmlEl && !hasHeadEl && !/<\/body\s*>/i.test(text) && !/<\/html\s*>/i.test(text)) {
+    return Buffer.from(text, 'utf-8');  // not an HTML document
+  }
 
   const name = spec.appName?.trim() || spec.filename.replace(/\.[^.]+$/, '');
   const desc = spec.description?.trim()
@@ -130,18 +141,19 @@ export function injectAppHeadMeta(
     add.push(`<script type="application/ld+json"${spec.nonceAttr ?? ''}>${JSON.stringify(ld)}</script>`);
   }
 
-  let out = add.length ? text.replace(/<\/head\s*>/i, `${add.join('\n')}\n</head>`) : text;
-
-  // `lang` only when the author left it off — an app in Finnish must not be relabelled English.
-  if (!/<html[^>]*\slang=/i.test(out)) {
-    out = out.replace(/<html(\s|>)/i, (m, tail: string) => `<html lang="en"${tail === '>' ? '>' : ' '}`);
+  let out: string;
+  if (hasHeadEl) {
+    out = add.length ? text.replace(/<\/head\s*>/i, `${add.join('\n')}\n</head>`) : text;
+  } else {
+    // No head element: open the document properly and let the parser close the head where it
+    // always did — at the first flow content. The app's own <meta> and <title> stay in the head
+    // exactly as before; the document simply now has a doctype, a lang and our tags.
+    out = `<!DOCTYPE html>\n<html lang="en">\n<head>\n${add.join('\n')}\n${text}`;
   }
 
-  // Exactly one h1, and only if there are none. An app whose static markup already has a heading
-  // would otherwise end up with two, which fails the same check this is here to satisfy.
-  if (!/<h1[\s>]/i.test(out) && /<\/body\s*>/i.test(out)) {
-    out = out.replace(/<\/body\s*>/i,
-      `<h1 class="aimeat-app-title" hidden>${esc(name)}</h1></body>`);
+  // `lang` only when the author left it off — an app in Finnish must not be relabelled English.
+  if (hasHtmlEl && !/<html[^>]*\slang=/i.test(out)) {
+    out = out.replace(/<html(\s|>)/i, (m, tail: string) => `<html lang="en"${tail === '>' ? '>' : ' '}`);
   }
 
   return Buffer.from(out, 'utf-8');

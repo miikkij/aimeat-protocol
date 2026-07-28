@@ -24,6 +24,9 @@
  *   }
  * @version-history
  *   v1.0.0 — 2026-07-14 — Initial: Agent Face convention serving (phase 1)
+ *   v1.2.0 — 2026-07-28 — buildAppAgentFace() split out of serveAppAgentFace() so the per-origin
+ *     llms.txt / AGENTS.md / sitemap.md builders can compose the same body instead of each pointing
+ *     at this one document (agent-readability phase 12b)
  *   v1.1.0 — 2026-07-21 — Resolve the face across owner-scope (GHII + the owner's agents/eco apps) so an
  *     owner's AGENT can publish a face for the owner's app — memory is keyed by the writer, so an
  *     MCP-agent write lands under its GAII; the serve path now finds the first PUBLIC copy in the union.
@@ -103,14 +106,13 @@ function appHtml(app: AppRecord): string {
  * `domain:memory` tag (REST memory writes) and `domain:apps` (republish); the short public TTL
  * is the backstop for write paths that don't emit (e.g. MCP memory_write).
  */
-export async function serveAppAgentFace(
-  res: Response,
+export async function buildAppAgentFace(
   config: AimeatConfig,
   storage: Storage,
   app: AppRecord,
-): Promise<boolean> {
+): Promise<{ markdown: string; fromFace: boolean } | null> {
   const isHtml = /html/i.test(app.mimeType);
-  const built = await cached(
+  return cached(
     `agentface:${app.ownerName}/${app.filename}:v${app.versionNumber}`,
     TTL.public,
     async (): Promise<{ markdown: string; fromFace: boolean } | null> => {
@@ -122,7 +124,19 @@ export async function serveAppAgentFace(
     },
     ['domain:memory', 'domain:apps'],
   );
+}
+
+export async function serveAppAgentFace(
+  res: Response,
+  config: AimeatConfig,
+  storage: Storage,
+  app: AppRecord,
+): Promise<boolean> {
+  const built = await buildAppAgentFace(config, storage, app);
   if (built === null) return false;
   sendMarkdown(res, built.markdown, built.fromFace ? undefined : appHtml(app));
   return true;
 }
+
+/** The app body as a string — exported so the per-origin document builders can reuse it. */
+export function appHtmlText(app: AppRecord): string { return appHtml(app); }
