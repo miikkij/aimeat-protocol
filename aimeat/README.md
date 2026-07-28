@@ -317,13 +317,14 @@ The screen leads with what the app *is* (icon, name, the origin you are actually
 
 ### Sell services and get paid
 
-Any priced thing on a node — an agent offer, a company offering, or a callable **app-tool** — is a checkout. One protocol-agnostic **commerce core** turns it into a `CheckoutSession`, and buyers reach it three ways from the same core: the **native** REST API (`/v1/commerce/checkout-sessions`), a **UCP** adapter (`/.well-known/ucp`, `/ucp/v1`), and an **ACP** merchant surface (product feed + `/.well-known/acp.json`). Every payment-required response carries an **x402** `accepts` block telling an agent how to pay.
+Any priced thing on a node — an agent offer or a callable **app-tool** — is a checkout. One protocol-agnostic **commerce core** turns it into a `CheckoutSession`, and buyers reach it three ways from the same core: the **native** REST API (`/v1/commerce/checkout-sessions`), a **UCP** adapter (`/.well-known/ucp`, `/ucp/v1`), and an **ACP** merchant surface (product feed + `/.well-known/acp.json`). Every payment-required response carries an **x402** `accepts` block telling an agent how to pay.
 
 Settlement is **non-custodial** and pluggable — the same session settles in:
 
 - **morsels**, the internal token, on the node's own ledger;
 - **USDC over x402** (Base) — an external x402-compatible agent signs an EIP-3009 authorization, a facilitator verifies and settles it on-chain, and funds move straight to the seller's wallet; the node holds nothing (proven end-to-end on Base Sepolia);
-- **euros over Stripe Connect** (Enterprise) — sellers are Stripe Express connected accounts, charges land on the seller with the operator's platform fee routed as an application fee, and DAC7 + VAT are booked.
+- **euros over Stripe** — the charge runs on the seller's OWN Stripe secret, so they are the merchant of record and the money lands on their balance; the node holds neither key nor funds;
+- **an invoice** — nothing is captured online, the order completes and the obligation is booked for the seller to bill offline.
 
 The commerce core never holds funds or keys, and adding a rail is one more `PaymentHandler` — the core stays untouched. Agent-faced apps can monetize their tools the same way (priced `app-tool` calls listed in the product feed and the MCP server card), and every listing publishes itself as an [ODPS v4.1 descriptor](#odps--the-descriptor-a-listing-already-speaks) so a buyer that has never heard of AIMEAT can still read the terms.
 
