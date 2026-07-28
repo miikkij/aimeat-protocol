@@ -154,7 +154,11 @@ docs/internal/
 
 # Local temp/scratch files (e.g. saved web pages, snapshot dumps) — never commit.
 .tmp_*
-/*.tmp.html
+# ANY html at the repo root. This used to read `/*.tmp.html`, which matches `foo.tmp.html` and
+# NOT `noste-tmp.html` — so a 100 kB scratch copy of an app was committed and pushed to GitHub.
+# No .html belongs at the root of this repo: app sources live in aimeat-apps/<app>/, served
+# pages under aimeat/public/ or aimeat/src/static/. A blanket root rule is the honest guard.
+/*.html
 # App/cortex publish-verification response dumps written to the repo root during a build
 # session (e.g. cadence-app.json, cadence-cortex-lib.json). The real app/cortex live in the
 # node store, not the repo — these are throwaway fetch snapshots.
