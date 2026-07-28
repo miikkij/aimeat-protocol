@@ -7636,15 +7636,15 @@
     "q": {
       "agent": {
         "q": "What is an agent, and how is it different from an AI?",
-        "a": "An AI is a model. An agent is a job for an AI on your node: it has a name, a memory that survives the conversation, a queue of tasks you write in plain language, and a spending cap. Swap the model behind it and the agent keeps its memory and its work."
+        "a": "An AI is a model. An agent is a job you give an AI: it has a name, a memory that survives the conversation, a queue of tasks you write in plain language, and a spending cap. Change the AI behind it and the agent keeps its memory and its work."
       },
       "organism": {
         "q": "What is an organism, and when do I need one?",
-        "a": "An organism is a shared space where people and agents work on the same thing: workspaces, versioned records, and a publish gate a human passes. You need one when more than one person, or more than one agent, touches the same material. For your own notes you do not."
+        "a": "An organism is a shared space where people and agents work on the same thing. It keeps a history of every change, and anything that goes out passes a person first. You want one when more than one person, or more than one agent, touches the same material. For your own notes you do not need one."
       },
       "privacy": {
         "q": "Who can see my data?",
-        "a": "Everything starts private, and you choose what to publish. Every record has a visibility, and agents and apps reach exactly what you granted them. Every read and write is attributed to whoever did it, and you can take a grant back at any time."
+        "a": "Everything starts private, and you choose what to publish. Agents and apps reach exactly what you handed them and nothing beside it, every read and write carries the name of whoever did it, and you can take a permission back at any time."
       },
       "cost": {
         "q": "What are morsels, and what does AI cost me?",
@@ -7656,7 +7656,7 @@
       },
       "broken": {
         "q": "Something is broken. Who do I tell?",
-        "a": "Tell the operator of this node. Your AI can send it from inside the session, or use the contact details below. Include what you were doing and what you expected instead."
+        "a": "Tell whoever runs this site. Your AI can send the message from inside the session, or use the contact details below. Say what you were doing and what you expected to happen."
       }
     }
   },
@@ -8204,9 +8204,9 @@
     "cardAgentsTitle": "Agents",
     "cardAgentsText": "An agent is not an AI. It is a job for an AI. It has an identity, a memory that persists, a task queue you feed in plain language, working hours and a spending cap. Quality can be reviewed afterwards. Run it on any model: CrewAI, Claude, GPT, your own runtime.",
     "cardOrgTitle": "Organisms",
-    "cardOrgText": "An organism turns agent output into assets. Workspaces, versioning and publish gates: agents get to do a lot, fast, but meaningful decisions pass through a human. Humans and agents work side by side, and every change is attributed to its author.",
+    "cardOrgText": "An organism is where the work turns into something you keep: one shared picture of a project that people and agents both write to. Agents get to do a lot and do it fast, and the decisions that matter wait for a person. Every change carries the name of whoever made it.",
     "cardAssetsTitle": "Your assets",
-    "cardAssetsText": "Models come and go. Identity, memory, work history and results stay on your node. Swap Grok for Claude mid-flight. The agent picks up where it left off.",
+    "cardAssetsText": "Models come and go. Your identity, your memory, your work history and your results stay on the machine you control. Swap one AI for another mid-flight and the agent picks up where it left off.",
     "exampleTitle": "Examples from this node",
     "exampleText": "AIMEAT Sanomat writes itself every evening. news-fetcher pulls raw material at 17:00, six writer agents produce the articles, and the paper ships with zero human hours.",
     "exampleCta": "Read tonight's paper →",
@@ -8218,10 +8218,10 @@
     "dExchange2": "contracts, settlement",
     "dExchange3": "other companies",
     "cardAppsTitle": "Apps",
-    "cardAppsText": "Describe what you want and your AI builds it. The app runs on your node, isolated on its own address, versioned, with a link you can share. It reaches your data only through permissions you granted and can take back.",
+    "cardAppsText": "Describe what you want and your AI builds it. The app gets its own web address, keeps every earlier version in case you want one back, and comes with a link you can send to anyone. It reaches your information through permissions you granted and can take back.",
     "cardConsentTitle": "Consent",
     "cardConsentText": "Every agent and every app works under named permissions, and every action is attributed to whoever took it. Take a permission back and the door closes. The audit is a report, not a project.",
-    "exampleApps": "An app you own: CADENCE is a CRM built by describing it. Contacts, deals and follow-ups as versioned records, kept fed by agents.",
+    "exampleApps": "An app you own: CADENCE is a CRM built by describing it. Contacts, deals and follow-ups, kept up to date by agents while you sell.",
     "exampleAppsCta": "Open it →",
     "exampleExchange": "Work with a price: a capability listed on EXCHANGE, bought by another company’s agent under a contract, every call logged and settled.",
     "exampleExchangeCta": "See the market →",
@@ -8394,7 +8394,7 @@
   "biz": {
     "heroTitle": "A digital employee that never sleeps",
     "heroSub": "Scheduled agents fetch, write, report and ship while you do something else. Every step traceable, and what they produce is yours.",
-    "proofUnavailable": "Live proof runs on the operator’s node.",
+    "proofUnavailable": "The live example runs on the machine of whoever operates this site.",
     "c1Title": "I wake up already knowing what happened in my field",
     "c1Text": "A publication that writes itself every evening. Agents pull the raw material, write the pieces and ship the edition. Zero human hours.",
     "c1Proof": "Read tonight's edition →",
@@ -8417,9 +8417,9 @@
     "c5Text": "A user left an idea in the morning. An agent triaged it into a task, implemented it, ran the tests, updated the status page and marked the feedback resolved. A human confirmed it works. The whole chain is traceable: feedback → task → release.",
     "c5Proof": "Follow one from idea to release →",
     "c5Cta": "Open a feedback loop for your customers →",
-    "c6Title": "A whole company running on its own node",
-    "c6Text": "The homepage lives in agent memory on its own AIMEAT node, federated into the network. One crew audits the node every morning at 04:00; another runs research overnight.",
-    "c6Proof": "Open a living node →",
+    "c6Title": "A whole company running on a server of its own",
+    "c6Text": "The homepage lives in agent memory on this company’s own machine, a node of its own connected to the network. One crew of agents checks the machine every morning at 04:00; another runs research overnight.",
+    "c6Proof": "Open a company that runs this way →",
     "c6Cta": "See hosting packages →",
     "allLive": "Everything above runs in production right now. No proof is a mockup.",
     "ctaDemo": "Book a demo →",
@@ -8431,7 +8431,7 @@
     "c2ProofNote": "Example, sent today at 07:00: \"3 new bookings · 1 review (4★, answered) · a competitor dropped prices · suggested action: weekend campaign.\"",
     "c3ProofNote": "Example action list: \"1) Answer the review on platform Y today. 2) Trend Z is rising, draft a post. 3) A competitor launched a campaign, counter-offer attached.\"",
     "c7Title": "My CRM costs less than lunch, and my agents keep it fed",
-    "c7Text": "Contacts, companies, deals and follow-ups as versioned records you own. Tap to dial, dictate the note by voice, set the next follow-up. Company cards enrich themselves from the trade register.",
+    "c7Text": "Contacts, companies, deals and follow-ups, with a history of every change and no way to lose one. Tap to dial, dictate the note by voice, set the next follow-up. Company details fill themselves in from the trade register.",
     "c7Proof": "Open the CRM →",
     "c7Cta": "Move your CRM here →",
     "c8Title": "My API is something agents can find, use and pay for",

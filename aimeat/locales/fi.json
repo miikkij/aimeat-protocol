@@ -7636,15 +7636,15 @@
     "q": {
       "agent": {
         "q": "Mikä agentti on, ja miten se eroaa tekoälystä?",
-        "a": "Tekoäly on malli. Agentti on tekoälylle annettu työ sinun nodellasi: sillä on nimi, keskustelun yli säilyvä muisti, jono tehtäviä jotka kirjoitat tavallisella kielellä, ja kulukatto. Vaihda malli sen takaa, ja agentti pitää muistinsa ja työnsä."
+        "a": "Tekoäly on malli. Agentti on työ jonka annat tekoälylle: sillä on nimi, keskustelun yli säilyvä muisti, jono tehtäviä jotka kirjoitat tavallisella kielellä, ja kulukatto. Vaihda tekoäly sen takaa, ja agentti pitää muistinsa ja työnsä."
       },
       "organism": {
         "q": "Mikä organismi on, ja milloin tarvitsen sellaisen?",
-        "a": "Organismi on jaettu tila jossa ihmiset ja agentit työstävät samaa asiaa: työtilat, versioidut tietueet ja julkaisuportti jonka ihminen läpäisee. Tarvitset sen kun samaan aineistoon koskee useampi ihminen tai useampi agentti. Omiin muistiinpanoihin et."
+        "a": "Organismi on jaettu tila jossa ihmiset ja agentit työstävät samaa asiaa. Se säilyttää historian jokaisesta muutoksesta, ja kaikki ulos lähtevä käy ihmisen kautta. Sellaisen haluat kun samaan aineistoon koskee useampi ihminen tai useampi agentti. Omiin muistiinpanoihin et tarvitse."
       },
       "privacy": {
         "q": "Kuka näkee dataani?",
-        "a": "Kaikki on aluksi yksityistä, ja sinä valitset mitä julkaiset. Jokaisella tietueella on näkyvyys, ja agentit ja appit pääsevät täsmälleen siihen mihin annoit luvan. Jokainen luku ja kirjoitus kirjautuu tekijälleen, ja voit ottaa luvan pois milloin tahansa."
+        "a": "Kaikki on aluksi yksityistä, ja sinä valitset mitä julkaiset. Agentit ja appit pääsevät täsmälleen siihen minkä annoit niille etkä mihinkään sen vierestä, jokaisessa luvussa ja kirjoituksessa on tekijänsä nimi, ja voit ottaa luvan pois milloin tahansa."
       },
       "cost": {
         "q": "Mitä morselit ovat, ja mitä tekoäly minulle maksaa?",
@@ -7656,7 +7656,7 @@
       },
       "broken": {
         "q": "Jokin on rikki. Kenelle kerron?",
-        "a": "Kerro tämän noden operaattorille. Tekoälysi voi lähettää viestin suoraan istunnosta, tai käytä alla olevia yhteystietoja. Kerro mitä olit tekemässä ja mitä odotit tapahtuvan."
+        "a": "Kerro sille joka ylläpitää tätä sivustoa. Tekoälysi voi lähettää viestin suoraan istunnosta, tai käytä alla olevia yhteystietoja. Kerro mitä olit tekemässä ja mitä odotit tapahtuvan."
       }
     }
   },
@@ -8204,9 +8204,9 @@
     "cardAgentsTitle": "Agentit",
     "cardAgentsText": "Agentti ei ole tekoäly vaan työsuhde tekoälylle. Sillä on identiteetti, muisti joka säilyy, työjono jolle annat tehtäviä selkokielellä, työvuorot ja kulukatto. Työn laatua voi arvioida jälkikäteen. Aja sitä millä mallilla haluat: CrewAI, Claude, GPT, oma runtime.",
     "cardOrgTitle": "Organismit",
-    "cardOrgText": "Organismi tekee agenttien tuotoksesta omaisuutta. Workspacet, versiointi ja julkaisuportit: agentit saavat tehdä paljon ja nopeasti, mutta merkitykselliset päätökset kulkevat ihmisen läpi. Ihmiset ja agentit toimivat rinnakkain, ja jokainen muutos attribuoituu tekijälleen.",
+    "cardOrgText": "Organismi on paikka jossa työstä tulee jotain mikä jää: yksi jaettu kuva projektista, johon sekä ihmiset että agentit kirjoittavat. Agentit saavat tehdä paljon ja nopeasti, ja merkittävät päätökset odottavat ihmistä. Jokaisessa muutoksessa on tekijänsä nimi.",
     "cardAssetsTitle": "Sinun omaisuutesi",
-    "cardAssetsText": "Mallit tulevat ja menevät. Identiteetti, muisti, työhistoria ja tulokset pysyvät solmullasi. Vaihda Grok Claudeen kesken kaiken. Agentin työ jatkuu siitä mihin se jäi.",
+    "cardAssetsText": "Mallit tulevat ja menevät. Identiteettisi, muistisi, työhistoriasi ja tuloksesi pysyvät koneella jota sinä hallitset. Vaihda tekoäly toiseen kesken kaiken, ja agentti jatkaa siitä mihin jäi.",
     "exampleTitle": "Esimerkkejä tältä nodelta",
     "exampleText": "AIMEAT Sanomat kirjoittaa itsensä joka ilta. news-fetcher hakee raakamateriaalin klo 17, kuusi kirjoittaja-agenttia tuottaa artikkelit, ja lehti julkaistaan ilman ihmistyötunteja.",
     "exampleCta": "Lue tämän illan lehti →",
@@ -8218,10 +8218,10 @@
     "dExchange2": "sopimukset, tilitys",
     "dExchange3": "toiset yritykset",
     "cardAppsTitle": "Appit",
-    "cardAppsText": "Kuvaile mitä haluat, ja tekoälysi rakentaa sen. Appi ajetaan omalla nodellasi eristettynä omaan osoitteeseensa, versioituna, ja saat linkin jaettavaksi. Se pääsee dataasi vain niillä luvilla jotka annoit ja jotka voit ottaa pois.",
+    "cardAppsText": "Kuvaile mitä haluat, ja tekoälysi rakentaa sen. Appi saa oman verkko-osoitteen, säilyttää jokaisen aiemman version siltä varalta että haluat sen takaisin, ja siitä saa linkin jonka voit lähettää kenelle tahansa. Se pääsee tietoihisi niillä luvilla jotka annoit ja jotka voit ottaa pois.",
     "cardConsentTitle": "Suostumus",
     "cardConsentText": "Jokainen agentti ja appi toimii nimetyillä luvilla, ja jokainen teko kirjautuu tekijälleen. Ota lupa pois, ja ovi sulkeutuu. Auditointi on raportti, ei projekti.",
-    "exampleApps": "Appi jonka omistat: CADENCE on CRM joka rakennettiin kuvailemalla. Kontaktit, kaupat ja seurannat versioituina tietueina, agenttien ylläpitäminä.",
+    "exampleApps": "Appi jonka omistat: CADENCE on CRM joka rakennettiin kuvailemalla. Kontaktit, kaupat ja seurannat, joita agentit pitävät ajan tasalla sillä aikaa kun myyt.",
     "exampleAppsCta": "Avaa se →",
     "exampleExchange": "Työ jolla on hinta: EXCHANGEen listattu kyvykkyys, jonka toisen yrityksen agentti ostaa sopimuksella, ja jokainen kutsu kirjautuu ja tilitetään.",
     "exampleExchangeCta": "Katso markkina →",
@@ -8394,7 +8394,7 @@
   "biz": {
     "heroTitle": "Digityöntekijä joka ei nuku",
     "heroSub": "Ajastetut agentit hakevat, kirjoittavat, raportoivat ja julkaisevat sillä aikaa kun teet muuta. Jokainen askel jää jäljitettäväksi, ja tulos on sinun.",
-    "proofUnavailable": "Elävä näyttö pyörii operaattorin nodella.",
+    "proofUnavailable": "Elävä esimerkki pyörii sen koneella joka ylläpitää tätä sivustoa.",
     "c1Title": "Herään ja tiedän mitä alallani tapahtui",
     "c1Text": "Julkaisu joka kirjoittaa itsensä joka ilta. Agentit hakevat raaka-aineen, kirjoittavat jutut ja julkaisevat numeron. Nolla ihmistuntia.",
     "c1Proof": "Lue tämän illan numero →",
@@ -8417,9 +8417,9 @@
     "c5Text": "Käyttäjä jätti idean aamulla. Agentti triagesi sen tehtäväksi, toteutti sen, ajoi testit, päivitti tilannesivun ja merkitsi palautteen ratkaistuksi. Ihminen varmisti että se toimii. Koko ketju on jäljitettävissä: palaute → tehtävä → julkaisu.",
     "c5Proof": "Seuraa yhtä ideasta julkaisuun →",
     "c5Cta": "Avaa palautesilmukka asiakkaillesi →",
-    "c6Title": "Kokonainen yritys omalla nodellaan",
-    "c6Text": "Kotisivu elää agenttien muistissa omalla AIMEAT-nodella, federoituna verkkoon. Yksi miehistö auditoi noden joka aamu klo 04:00, toinen ajaa tutkimusta öisin.",
-    "c6Proof": "Avaa elävä node →",
+    "c6Title": "Kokonainen yritys omalla palvelimellaan",
+    "c6Text": "Kotisivu elää agenttien muistissa yrityksen omalla koneella, omalla nodella joka on kytketty verkkoon. Yksi agenttimiehistö tarkistaa koneen joka aamu klo 04:00, toinen ajaa tutkimusta öisin.",
+    "c6Proof": "Avaa yritys joka toimii näin →",
     "c6Cta": "Katso hosting-paketit →",
     "allLive": "Kaikki yllä oleva pyörii tuotannossa nyt. Mikään todiste ei ole mockup.",
     "ctaDemo": "Varaa demo →",
@@ -8431,7 +8431,7 @@
     "c2ProofNote": "Esimerkki, lähetetty tänään klo 07:00: \"3 uutta varausta · 1 arvostelu (4★, vastattu) · kilpailija laski hintoja · ehdotettu toimenpide: viikonloppukampanja.\"",
     "c3ProofNote": "Esimerkki toimenpidelistasta: \"1) Vastaa arvosteluun alustalla Y tänään. 2) Trendi Z nousee, luonnostele postaus. 3) Kilpailija käynnisti kampanjan, vastatarjous liitteenä.\"",
     "c7Title": "CRM maksaa vähemmän kuin lounas, ja agentit pitävät sen ajan tasalla",
-    "c7Text": "Kontaktit, yritykset, kaupat ja seurannat versioituina tietueina jotka omistat. Soita napista, sanele muistiinpano, aseta seuraava kontaktointi. Yrityskortit rikastuvat kaupparekisteristä.",
+    "c7Text": "Kontaktit, yritykset, kaupat ja seurannat, ja jokaisesta muutoksesta jää historia jota ei voi hukata. Soita napista, sanele muistiinpano, aseta seuraava kontaktointi. Yritystiedot täyttyvät itsestään kaupparekisteristä.",
     "c7Proof": "Avaa CRM →",
     "c7Cta": "Siirrä CRM tänne →",
     "c8Title": "Rajapintani on jotain jonka agentit löytävät, ymmärtävät ja josta ne maksavat",
