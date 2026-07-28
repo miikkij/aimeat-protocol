@@ -90,6 +90,12 @@ function templateVars(config: AimeatConfig, locale: 'en' | 'fi'): Record<string,
     cursorDeeplinkConfig,
     operatorName: config.operator.name,
     operatorTypeLabel: operatorTypeLabel(config.operator.type, locale),
+    operatorBusinessId: config.operator.businessId,
+    // Ready-made clause so a node with no business id renders nothing at all rather than a stray
+    // separator: a natural person has no such number and must not appear to be missing one.
+    operatorBusinessIdClause: config.operator.businessId
+      ? (locale === 'fi' ? `, Y-tunnus ${config.operator.businessId}` : `, business ID ${config.operator.businessId}`)
+      : '',
     operatorAddress: config.operator.address,
     operatorCountry: config.operator.country,
     operatorEmail: config.operator.email,
@@ -551,8 +557,6 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
 
   const spaRoutes = [
     '/v1/profile',
-    '/v1/my-company',
-    '/v1/companies',
     '/v1/aimeat-os',
     '/v1/app-store',
     '/v1/classic',

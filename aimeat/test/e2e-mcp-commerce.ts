@@ -129,7 +129,7 @@ let sellerOwner: Awaited<ReturnType<typeof setupOwner>>;
 const mcp = new McpSession();       // commerce-scoped agent
 const narrow = new McpSession();    // memory-only agent (scope filter check)
 let sellerAppRef = '';
-let traderGaii = '', traderKey = ''; // reused for the /v2/mcp/enterprise session
+let traderGaii = '', traderKey = ''; // reused for the /v2/mcp/commerce session
 
 await test('Setup: owners + commerce-scoped and narrow MCP agents + seller manifest', async () => {
     op = await setupOwner('o'); // fresh-DB operator self-heal catcher (fee neutrality)
@@ -311,26 +311,23 @@ await test('11. checkout_list shows the purchase; unknown session errors cleanly
     assert(ghost.isError && ghost.text.includes('SESSION_NOT_FOUND'), `ghost: ${ghost.text}`);
 });
 
-// ─── Phase 5: the /v2/mcp/enterprise surface (Community/stub edition in this suite) ───
-console.log('\nPhase 5 — Enterprise surface');
+// ─── Phase 5: the /v2/mcp/commerce surface ───
+console.log('\nPhase 5 — Commerce surface');
 
-await test('12. /v2/mcp/enterprise serves the core commerce baseline; EE org tools absent on Community', async () => {
-    const ent = new McpSession('/v2/mcp/enterprise');
+await test('12. /v2/mcp/commerce serves the selling baseline and nothing else', async () => {
+    const ent = new McpSession('/v2/mcp/commerce');
     await ent.init(traderGaii, traderKey);
     const { body } = await ent.rpc('tools/list', {});
     const names = new Set(body.result.tools.map((t: any) => t.name));
-    // Core baseline present (scope-permitting): commerce + wallet-free reads.
+    // Baseline present (scope-permitting): commerce + the memory a listing lives in.
     for (const n of ['aimeat_commerce_psp_status', 'aimeat_app_tools_publish', 'aimeat_checkout_open', 'aimeat_app_tools_get', 'aimeat_memory_read']) {
-        assert(names.has(n), `enterprise baseline missing ${n}`);
+        assert(names.has(n), `commerce baseline missing ${n}`);
     }
-    // EE-contributed org tools appear ONLY when the ee/ module is loaded (AIMEAT_EE_DISABLED
-    // forces the stub in this suite, so they must be absent).
-    assert(!names.has('aimeat_org_psp_set') && !names.has('aimeat_org_list'), 'EE org tools must be absent on Community');
     // Surface discipline: unrelated core tools stay off this surface.
-    assert(!names.has('aimeat_board_post') && !names.has('aimeat_admin_mint'), 'non-commerce tools stay off the enterprise surface');
+    assert(!names.has('aimeat_board_post') && !names.has('aimeat_admin_mint'), 'non-commerce tools stay off the commerce surface');
     // The surface is fully usable, not just listable.
     const st = await ent.call('aimeat_commerce_psp_status', {});
-    assert(!st.isError && st.data.configured === false, `psp status over enterprise surface: ${st.text}`);
+    assert(!st.isError && st.data.configured === false, `psp status over commerce surface: ${st.text}`);
 });
 
 await test('13. Unknown v2 role still rejects cleanly', async () => {
@@ -340,7 +337,7 @@ await test('13. Unknown v2 role still rejects cleanly', async () => {
         body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'initialize', params: {} }),
     });
     const body = await res.json() as any;
-    assert(res.status === 400 && String(body.error?.message).includes('enterprise'), `unknown role: ${res.status} ${JSON.stringify(body.error)}`);
+    assert(res.status === 400 && String(body.error?.message).includes('commerce'), `unknown role: ${res.status} ${JSON.stringify(body.error)}`);
 });
 
 console.log(`\n${'═'.repeat(50)}`);

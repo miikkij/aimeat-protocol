@@ -58,7 +58,6 @@ const ALL_SUITES = [
     'test/e2e-calibrator.ts',
     'test/e2e-concurrency.ts',
     'test/e2e-disputes.ts',
-    'test/e2e-enterprise-stub.ts',
     // DISABLED: e2e-email.ts always fails locally/CI because there are no SMTP
     // credentials configured to actually send email. Re-enable once a test mail
     // sender (or credentials) is available. -- disabled 2026-06-14
@@ -339,11 +338,6 @@ async function startServer(): Promise<ChildProcess> {
         // its own flag-ON server.
         AIMEAT_PORTFOLIO_ORIGIN_ENABLED: 'false',
         AIMEAT_PORTFOLIO_HOST: '',
-        // Open-core test suite runs in Community edition (no proprietary ee/ module): force the
-        // enterprise stub even when an ee/ directory exists in the local working tree, so the
-        // ENTERPRISE_REQUIRED behavior is deterministic in both CI and local. The ee/ module has
-        // its own tests in its own (private) repo.
-        AIMEAT_EE_DISABLED: process.env.AIMEAT_EE_DISABLED ?? 'true',
         // x402 settlement: pin the rail ON and settle against the OFF-CHAIN double. e2e-x402 needs
         // the handler registered, and its X-PAYMENT proofs carry a FIXED placeholder signature
         // (`0x` + 'ab' × 65) from an address nobody holds a key for — a real facilitator rejects

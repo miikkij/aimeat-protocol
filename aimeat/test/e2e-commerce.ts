@@ -8,6 +8,11 @@
  *   cross-owner 403/404 isolation Rule 10 requires.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=commerce
  * @version-history
+ *   v1.6.0 — 2026-07-28 — Seller payment rails now that money settlement is core: payout status
+ *     reports card/stablecoin/invoice, the Stripe secret is written and cleared through
+ *     /v1/commerce/payout/stripe without ever being echoed, one rail's write never clears the
+ *     other's setting, a card sale with no seller credentials fails with PSP_NOT_CONFIGURED, and
+ *     the invoice rail completes the same sale by booking a payable
  *   v1.5.0 — 2026-07-14 — Web Bot Auth: outbound UCP profile fetch carries a verifiable RFC 9421
  *     Ed25519 signature (verified against /.well-known/http-message-signatures-directory)
  *   v1.4.0 — 2026-07-14 — MCP card commerce_tools (TARGET-034 phase D): /v1/commerce/tools
@@ -70,6 +75,26 @@ let buyer: Awaited<ReturnType<typeof setupOwner>>;
 let vendorGaii = '';
 const PRICE = 10;
 
+/** The seller's published offers. Hoisted because PUT /v1/agents/:name/offers REPLACES the whole
+ *  list: a later test that adds one must re-publish these too, or it silently deletes them. */
+const BASE_OFFERS = [
+    {
+        id: 'translate-doc', title: 'Translate a document', ask: 'Send a document; I translate it to Finnish.',
+        deliverable: { format: 'document', sample: 'untested' },
+        price: { morsels: PRICE, unit: 'per-call' }, visibility: 'public',
+    },
+    {
+        id: 'secret-work', title: 'Private work', ask: 'Owner-only offer.',
+        deliverable: { format: 'document', sample: 'untested' },
+        price: { morsels: 1 }, visibility: 'private',
+    },
+    {
+        id: 'free-listing', title: 'Listed but unpriced', ask: 'Public offer with no price.',
+        deliverable: { format: 'document', sample: 'untested' },
+        visibility: 'public',
+    },
+];
+
 await test('Setup: operator-neutral + seller + buyer owners; seller publishes priced offers', async () => {
     // Register a NEUTRAL owner first: on a fresh DB the first registered owner is self-healed
     // into the operator role — without this, the SELLER would be the operator and the fee leg
@@ -80,25 +105,7 @@ await test('Setup: operator-neutral + seller + buyer owners; seller publishes pr
     const ag = await json('/v1/agents', { method: 'POST', headers: auth(seller.token), body: JSON.stringify({ name: 'vendor', owner: seller.name, capabilities: ['social'] }) });
     assert(ag.status === 201, `agent ${ag.status}: ${JSON.stringify(ag.body.error || ag.body)}`);
     vendorGaii = `vendor#${seller.name}@${NODE_ID}`;
-    const offers = {
-        offers: [
-            {
-                id: 'translate-doc', title: 'Translate a document', ask: 'Send a document; I translate it to Finnish.',
-                deliverable: { format: 'document', sample: 'untested' },
-                price: { morsels: PRICE, unit: 'per-call' }, visibility: 'public',
-            },
-            {
-                id: 'secret-work', title: 'Private work', ask: 'Owner-only offer.',
-                deliverable: { format: 'document', sample: 'untested' },
-                price: { morsels: 1 }, visibility: 'private',
-            },
-            {
-                id: 'free-listing', title: 'Listed but unpriced', ask: 'Public offer with no price.',
-                deliverable: { format: 'document', sample: 'untested' },
-                visibility: 'public',
-            },
-        ],
-    };
+    const offers = { offers: BASE_OFFERS };
     const pub = await json('/v1/agents/vendor/offers', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify(offers) });
     assert(pub.status === 200, `publish offers ${pub.status}: ${JSON.stringify(pub.body.error)}`);
 });
@@ -200,7 +207,7 @@ await test('8. Unknown offer → 404; private offer cross-owner → 403; unprice
 await test('9. Unknown payment handler → 422', async () => {
     const create = await json('/v1/commerce/checkout-sessions', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'translate-doc' }] }) });
     const id = create.body.data.session.id;
-    const r = await json(`/v1/commerce/checkout-sessions/${id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment: { handler: 'com.stripe.spt' } }) });
+    const r = await json(`/v1/commerce/checkout-sessions/${id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment: { handler: 'com.example.no-such-rail' } }) });
     assert(r.status === 422 && r.body.error?.code === 'UNKNOWN_PAYMENT_HANDLER', `expected 422, got ${r.status} ${r.body.error?.code}`);
 });
 
@@ -280,10 +287,11 @@ await test('16. ACP checkout: create by sku + complete (morsel settlement)', asy
     assert(create.body.status === 'ready_for_payment', `acp status: ${create.body.status}`);
     const done = await json(`/acp/v1/checkout_sessions/${create.body.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
     assert(done.status === 200 && done.body.status === 'completed', `acp complete: ${done.status} ${done.body.status}`);
-    // The stripe provider maps to the (absent on Community) EE handler → 422.
+    // The stripe provider maps to a REGISTERED handler (card settlement is core), so the refusal
+    // here is about the money: this session is priced in morsels and a card cannot settle it.
     const create2 = await json('/acp/v1/checkout_sessions', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ items: [{ id: `offer:${vendorGaii}:translate-doc` }] }) });
     const stripe = await json(`/acp/v1/checkout_sessions/${create2.body.id}/complete`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment_data: { provider: 'stripe' } }) });
-    assert(stripe.status === 422 && stripe.body.error?.code === 'UNKNOWN_PAYMENT_HANDLER', `stripe on Community: ${stripe.status} ${stripe.body.error?.code}`);
+    assert(stripe.status === 422 && stripe.body.error?.code === 'CURRENCY_MISMATCH', `stripe against a morsel session: ${stripe.status} ${stripe.body.error?.code}`);
 });
 
 await test('17. 402 responses carry the x402-style accepts block', async () => {
@@ -296,12 +304,12 @@ await test('17. 402 responses carry the x402-style accepts block', async () => {
     assert(Array.isArray(r.body.accepts) && r.body.accepts.some((a: any) => a.scheme === 'aimeat-checkout' && a.handler === 'io.aimeat.morsels'), `accepts: ${JSON.stringify(r.body.accepts)}`);
 });
 
-await test('18. Community node rejects org-offering items (no EE resolver) and money currencies', async () => {
+await test('18. Unknown item kinds and unpriced currencies are refused', async () => {
     const r = await json('/v1/commerce/checkout-sessions', {
         method: 'POST', headers: auth(buyer.token),
-        body: JSON.stringify({ items: [{ kind: 'org-offering', org: 'x/y', agent: 'a', offer_id: 'o' }] }),
+        body: JSON.stringify({ items: [{ kind: 'no-such-kind', agent: 'a', offer_id: 'o' }] }),
     });
-    assert(r.status === 422 && r.body.error?.code === 'UNKNOWN_ITEM_KIND', `org-offering on Community: ${r.status} ${r.body.error?.code}`);
+    assert(r.status === 400 && r.body.error?.code === 'INVALID_CHECKOUT', `unknown kind: ${r.status} ${r.body.error?.code}`);
     const eur = await json('/v1/commerce/checkout-sessions', {
         method: 'POST', headers: auth(buyer.token),
         body: JSON.stringify({ currency: 'EUR', items: [{ agent: vendorGaii, offer_id: 'translate-doc' }] }),
@@ -595,6 +603,114 @@ await test('32. MCP Server Card embeds the catalog inline (default mode) + keeps
     const feedSkus = (feed.products || []).filter((p: any) => p.id.startsWith('app-tool:')).map((p: any) => p.id).sort();
     const cardSkus = (ct.tools || []).map((t: any) => t.sku).sort();
     assert(JSON.stringify(feedSkus) === JSON.stringify(cardSkus), `feed/card sku drift: ${JSON.stringify({ feedSkus, cardSkus })}`);
+});
+
+// ─── Seller payment rails: the credentials a seller brings themselves ───
+// Every money rail settles to the SELLER — the node has no platform account and holds no key —
+// so "can I take money" is answered entirely by what the seller has set on themselves.
+
+await test('34. Payout status reports all three money rails; the Stripe secret is never returned', async () => {
+    const before = await json('/v1/commerce/payout', { headers: auth(seller.token) });
+    assert(before.status === 200, `payout status ${before.status}: ${JSON.stringify(before.body?.error)}`);
+    assert(before.body.data.stripe?.configured === false, `no credentials yet: ${JSON.stringify(before.body.data.stripe)}`);
+    // Invoice needs no credential at all, so it is reported as available from the start.
+    assert(before.body.data.invoice?.available === true, `invoice rail advertised: ${JSON.stringify(before.body.data.invoice)}`);
+
+    const set = await json('/v1/commerce/payout/stripe', {
+        method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ secret_key: 'sk_test_e2e_seller_key_1234' }),
+    });
+    assert(set.status === 200 && set.body.data.configured === true, `set ${set.status}: ${JSON.stringify(set.body?.error)}`);
+    assert(set.body.data.keyHint === '…1234', `only the last four are echoed: ${JSON.stringify(set.body.data)}`);
+
+    const after = await json('/v1/commerce/payout', { headers: auth(seller.token) });
+    assert(after.body.data.stripe?.configured === true, `configured after set: ${JSON.stringify(after.body.data.stripe)}`);
+    assert(!JSON.stringify(after.body).includes('sk_test_e2e_seller_key_1234'), 'the secret must never appear in a response body');
+
+    const gone = await json('/v1/commerce/payout/stripe', { method: 'DELETE', headers: auth(seller.token) });
+    assert(gone.status === 200 && gone.body.data.configured === false, `delete ${gone.status}`);
+    const cleared = await json('/v1/commerce/payout', { headers: auth(seller.token) });
+    assert(cleared.body.data.stripe?.configured === false, 'credentials are gone after delete');
+});
+
+await test('35. A too-short Stripe secret is refused, and one rail never clears the other', async () => {
+    const bad = await json('/v1/commerce/payout/stripe', {
+        method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ secret_key: 'sk_1' }),
+    });
+    assert(bad.status === 400 && bad.body?.error?.code === 'INVALID_PSP', `expected INVALID_PSP, got ${bad.status}/${JSON.stringify(bad.body?.error)}`);
+
+    // The two rails share ONE opaque record, so the real risk is a write wiping the neighbour.
+    const addr = '0x' + 'c3d4e5f6'.repeat(5);
+    const x = await json('/v1/commerce/payout/x402', { method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ address: addr }) });
+    assert(x.status === 200, `seed x402 address ${x.status}: ${JSON.stringify(x.body?.error)}`);
+    const set = await json('/v1/commerce/payout/stripe', {
+        method: 'PUT', headers: auth(seller.token), body: JSON.stringify({ secret_key: 'sk_test_kept_alongside' }),
+    });
+    assert(set.status === 200, `set stripe ${set.status}`);
+    const rec = await json('/v1/memory/commerce.psp', { headers: auth(seller.token) });
+    const v = (rec.body.data?.value ?? rec.body.data?.record?.value) as any;
+    assert(String(v.payTo ?? '').toLowerCase() === addr.toLowerCase(), `the x402 address survived: ${JSON.stringify(v)}`);
+    assert(v.secretKey === 'sk_test_kept_alongside', `the stripe key landed: ${JSON.stringify(v)}`);
+
+    // ...and clearing Stripe leaves the address alone.
+    await json('/v1/commerce/payout/stripe', { method: 'DELETE', headers: auth(seller.token) });
+    const after = await json('/v1/memory/commerce.psp', { headers: auth(seller.token) });
+    const v2 = (after.body.data?.value ?? after.body.data?.record?.value) as any;
+    assert(!v2.secretKey && String(v2.payTo ?? '').toLowerCase() === addr.toLowerCase(),
+        `stripe cleared, address kept: ${JSON.stringify(v2)}`);
+});
+
+await test('36. A card sale by a seller with no credentials fails with PSP_NOT_CONFIGURED, not a charge', async () => {
+    // The seller cleared their key in the test above. The Stripe handler is registered on EVERY
+    // node now, so the refusal has to come from the seller's own missing credential — and it has to
+    // name the fix. A money-priced offer is published here so the session really reaches settlement.
+    const priced = await json('/v1/agents/vendor/offers', {
+        method: 'PUT', headers: auth(seller.token),
+        // Re-publish the existing offers alongside the new one: this endpoint replaces the list.
+        body: JSON.stringify({ offers: BASE_OFFERS.concat([{
+            id: 'eur-service', title: 'Service priced in euros', ask: 'A euro-priced service.',
+            deliverable: { format: 'document', sample: 'untested' },
+            priceMoney: { amount: 2_000_000, currency: 'EUR' }, visibility: 'public',
+        }] as never) }),
+    });
+    assert(priced.status === 200, `publish EUR offer ${priced.status}: ${JSON.stringify(priced.body?.error)}`);
+
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'eur-service', quantity: 1 }], currency: 'EUR' }),
+    });
+    assert(create.status === 201, `EUR session ${create.status}: ${JSON.stringify(create.body?.error)}`);
+
+    const done = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ payment: { handler: 'com.stripe.spt', instrument: 'pm_card_visa' } }),
+    });
+    assert(done.status === 403 && done.body?.error?.code === 'PSP_NOT_CONFIGURED',
+        `expected PSP_NOT_CONFIGURED, got ${done.status}/${JSON.stringify(done.body?.error)}`);
+    assert(/Wallet tab|aimeat_commerce_psp_set/.test(String(done.body.error.message)),
+        `the message names where to fix it: ${done.body.error.message}`);
+});
+
+await test('37. The same EUR sale settles offline through the invoice rail, booking a payable', async () => {
+    // The rail that needs no credential at all: nothing is captured, the order completes, and what
+    // the buyer owes is booked for the seller to bill. This is what a seller without Stripe uses.
+    const create = await json('/v1/commerce/checkout-sessions', {
+        method: 'POST', headers: auth(buyer.token),
+        body: JSON.stringify({ items: [{ agent: vendorGaii, offer_id: 'eur-service', quantity: 1 }], currency: 'EUR' }),
+    });
+    assert(create.status === 201, `EUR session ${create.status}: ${JSON.stringify(create.body?.error)}`);
+    const done = await json(`/v1/commerce/checkout-sessions/${create.body.data.session.id}/complete`, {
+        method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ payment: { handler: 'io.aimeat.invoice' } }),
+    });
+    assert(done.status === 200, `invoice complete ${done.status}: ${JSON.stringify(done.body?.error)}`);
+    const tracking = String(done.body.data.session?.receipt?.trackingCode ?? '');
+    assert(tracking.startsWith('inv_'), `invoice tracking code: ${tracking}`);
+
+    const book = await json(`/v1/memory/commerce.payable.${encodeURIComponent(tracking)}`, { headers: auth(seller.token) });
+    const v = (book.body.data?.value ?? book.body.data?.record?.value) as any;
+    const entry = (v?.items ?? [])[0];
+    assert(entry && entry.method === 'invoice' && entry.status === 'pending',
+        `a pending payable is booked for the seller: ${JSON.stringify(v)}`);
+    assert(entry.currency === 'EUR' && entry.amount > 0, `the payable carries the money amount: ${JSON.stringify(entry)}`);
 });
 
 // ─── Web Bot Auth: outbound safeFetch traffic is signed (RFC 9421) and verifiable ───

@@ -8,16 +8,9 @@
  *   - GET    /v1/owner/agent-defaults         -- Get owner-level defaults
  *   - PUT    /v1/owner/agent-defaults         -- Upsert owner defaults
  * @version-history
- *   v1.5.0 -- 2026-06-24 -- Secretary G1: dedup the merge against the enterprise layer — drop owner/agent
- *     rules that duplicate a locked enterprise rule (dropEnterpriseDuplicates) so a company Secretary
- *     provisioned before the brain became seam-sourced can never render its stale persisted brain twice.
- *     No-op when there is no enterprise layer (Community / non-company agents unaffected).
- *   v1.4.0 -- 2026-06-24 -- Add a 4th `enterprise` source to the merge (Secretary P4-B): for a company
- *     Secretary (tag system:company-secretary) the GET merge overlays the edition's locked brain from
- *     the Enterprise seam (provider.secretaryDirectives(orgId)), ranked above owner/agent and read-only
- *     (PUT only ever writes the agent layer). Sourced live (never persisted) so brains are swappable and
- *     each company resolves its own org. Community/stub omits the seam method → no change for any other
- *     agent. Response gains `enterprise_locked`.
+ *   v1.6.0 -- 2026-07-28 -- Drop the dead `enterprise` directive layer with the edition seam: the
+ *     merge has been system + owner + agent for a while and `enterprise_locked` was always false,
+ *     so the field is gone rather than lingering as a promise the response cannot keep.
  *   v1.1.0 -- 2026-05-23 -- Add webhook dispatch for directive.updated events
  *   v1.2.0 -- 2026-05-28 -- Include owner-managed shared memory tags in directive reads
  *   v1.3.0 -- 2026-05-31 -- PUT now MERGES instead of full-replace: fields omitted
@@ -122,7 +115,6 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
 
     const responseData: Record<string, unknown> = {
       purpose: agentDirectives?.purpose ?? '',
-      enterprise_locked: false,
       rules: mergedRules,
       memory_areas: (agentDirectives?.memoryAreas ?? []).map(ma => ({
         key_prefix: ma.keyPrefix,

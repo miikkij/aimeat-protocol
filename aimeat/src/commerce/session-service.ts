@@ -82,7 +82,7 @@ async function resolveItems(
     }
     items.push({
       kind: sellable.kind, agent: sellable.agentGaii, offerId: sellable.offerId,
-      org: raw.org, app: raw.app, input: raw.input,
+      app: raw.app, input: raw.input,
       quantity, title: sellable.title, unitPrice: sellable.priceMorsels,
     });
     total += sellable.priceMorsels * quantity;
@@ -247,7 +247,7 @@ export async function completeSession(
   const sellables: Sellable[] = [];
   for (const item of session.items) {
     sellables.push(await resolveOne(storage, config, {
-      kind: item.kind, agent: item.agent, offer_id: item.offerId, org: item.org, app: item.app,
+      kind: item.kind, agent: item.agent, offer_id: item.offerId, app: item.app,
       currency: session.currency,
     }, session.buyerOwner));
   }

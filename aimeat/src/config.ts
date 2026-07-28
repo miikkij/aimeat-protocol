@@ -602,6 +602,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     operator: {
       name: process.env.AIMEAT_OPERATOR_NAME ?? '',
       type: (process.env.AIMEAT_OPERATOR_TYPE as OperatorType) ?? 'natural_person',
+      businessId: process.env.AIMEAT_OPERATOR_BUSINESS_ID ?? '',
       address: process.env.AIMEAT_OPERATOR_ADDRESS ?? '',
       country: process.env.AIMEAT_OPERATOR_COUNTRY ?? '',
       email: process.env.AIMEAT_OPERATOR_EMAIL ?? '',

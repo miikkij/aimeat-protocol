@@ -7,7 +7,7 @@
  *     - agent    : the owner's personal agent (memory/task/message/knowledge/discovery)
  *     - service  : marketplace/provider (board/work/action/wallet/capabilities/organism)
  *     - admin    : operator + owner governance (admin/flag/group/consent/agent-mgmt)
- *     - enterprise: company commerce (core commerce baseline + the ee/ module's org tools)
+ *     - commerce : selling and getting paid (credentials, priced manifests, checkout, receipts)
  *   v1/mcp stays full and frozen; these are opt-in. Surfaces are ALLOWLISTS over the same catalog —
  *   no forked handlers. instance_* is intentionally absent from v2 (auto-created session meta).
  * @structure
@@ -19,6 +19,9 @@
  *   import { toolsForSurface } from '../catalog/surfaces.js';
  *   const allowed = toolsForSurface('agent'); // register only these on /v2/mcp/agent
  * @version-history
+ *   2026-07-28 — The `enterprise` surface becomes `commerce` (/v2/mcp/commerce): the edition seam is
+ *     gone, so the surface is named after what it does — sell and get paid — and its allowlist is
+ *     fixed rather than extendable at boot.
  *   2026-07-19 — Connector reachability: place the last uncovered catalog tools — app_fork (appdev),
  *     contact_* (agent), organism_*_email invites (appdev+agent+service), workflow_answer/pending_inputs
  *     (agent) — so validateSurfaces().uncovered is empty and the connector can register them.
@@ -30,8 +33,8 @@
  */
 import { CLI_FALLBACK_TOOL_DEFINITIONS } from './definitions.js';
 
-export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin' | 'enterprise';
-export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin', 'enterprise'];
+export type SurfaceRole = 'appdev' | 'agent' | 'service' | 'admin' | 'commerce';
+export const V2_ROLES: readonly SurfaceRole[] = ['appdev', 'agent', 'service', 'admin', 'commerce'];
 
 /**
  * Catalog tools intentionally NOT exposed on any v2 server surface:
@@ -144,11 +147,10 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_agent_mode_set', 'aimeat_agent_tags_set',
         'aimeat_operator_agent_configure', 'aimeat_operator_ai_config',
     ],
-    // The company-commerce surface (/v2/mcp/enterprise): the CORE baseline below plus whatever
-    // the active edition contributes at boot (EnterpriseProvider.getMcpTools →
-    // setEnterpriseSurfaceExtras). On Community the surface exists with just this baseline —
-    // enterprise org tools appear only when the ee/ module is loaded.
-    enterprise: [
+    // The selling surface (/v2/mcp/commerce): everything an agent needs to price something, take
+    // payment for it and read what came in — credentials for the seller's own rails, priced tool
+    // manifests, checkout, wallet, and the memory/storage the listing itself lives in.
+    commerce: [
         'aimeat_commerce_psp_set', 'aimeat_commerce_psp_status', 'aimeat_commerce_psp_delete',
         'aimeat_app_tools_publish', 'aimeat_app_tools_get', 'aimeat_offer_price_set',
         'aimeat_checkout_open', 'aimeat_checkout_complete', 'aimeat_checkout_list',
@@ -165,17 +167,8 @@ const _surfaceSets: Record<SurfaceRole, Set<string>> = {
     agent: new Set(MCP_SURFACES.agent),
     service: new Set(MCP_SURFACES.service),
     admin: new Set(MCP_SURFACES.admin),
-    enterprise: new Set(MCP_SURFACES.enterprise),
+    commerce: new Set(MCP_SURFACES.commerce),
 };
-
-/**
- * Extend the enterprise surface with the edition's dynamically contributed tool names (boot time,
- * from mcp/enterprise-tools.ts). Dynamic extras live OUTSIDE MCP_SURFACES so validateSurfaces()
- * keeps checking only static core names against the catalog.
- */
-export function setEnterpriseSurfaceExtras(names: string[]): void {
-    _surfaceSets.enterprise = new Set([...MCP_SURFACES.enterprise, ...names]);
-}
 
 /** The set of tool names exposed on a given v2 surface. */
 export function toolsForSurface(role: SurfaceRole): Set<string> {

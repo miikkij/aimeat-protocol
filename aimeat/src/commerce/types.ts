@@ -4,7 +4,7 @@
  *   Sellable (an agent offer priced in morsels), the CheckoutSession lifecycle record persisted as
  *   a memory record (no schema changes), and the PaymentHandler provider contract that payment
  *   methods implement (core ships morsels; EE registers real-money handlers via the
- *   EnterpriseProvider seam). Protocol adapters (native REST, UCP, ACP, x402) are thin shells over
+ *   registries). Protocol adapters (native REST, UCP, ACP, x402) are thin shells over
  *   these — see doc-t033-commerce-spec in the dev organism's design space.
  * @structure Sellable · FulfillArgs · FulfillOutcome · CheckoutLineItem · CheckoutReceipt ·
  *   CheckoutSessionRecord · PaymentContext · PaymentResult · PaymentHandler
@@ -28,9 +28,9 @@ export interface DistributeArgs {
   trackingCode: string;
 }
 
-/** A normalized "thing for sale" — an agent offer, or (EE) a company-catalog offering. */
+/** A normalized "thing for sale" — an agent offer, a priced app-tool, a priced extension call. */
 export interface Sellable {
-  /** Resolver kind: 'offer' (core) | 'org-offering' (EE) | future kinds. */
+  /** Resolver kind: 'offer' | 'app-tool' | 'ext-call' | future kinds. */
   kind: string;
   agentGaii: string;
   agentName: string;
@@ -83,8 +83,6 @@ export interface CheckoutLineItem {
   /** Provider agent — full GAII. */
   agent: string;
   offerId: string;
-  /** org-offering: "creatorOwner/slug" so the resolver can find the catalog again. */
-  org?: string;
   /** app-tool: "ownerName/appId" so the resolver can find the tool manifest again. */
   app?: string;
   /** app-tool: the buyer's tool input, persisted with the quote and passed to the invoke. */
@@ -120,7 +118,7 @@ export interface CheckoutSessionRecord {
   sellerOwner: string;
   sellerGhii: string;
   items: CheckoutLineItem[];
-  /** 'morsel' (Community default) or an ISO money code (EE handlers; amounts in minor units). */
+  /** 'morsel' (default) or an ISO money code (amounts in 6-decimal micro-units). */
   currency: string;
   total: number;
   note?: string;
@@ -134,7 +132,7 @@ export interface CheckoutSessionRecord {
   expiresAt: string;
 }
 
-/** Injected into payment handlers — handlers never import core internals by path (EE parity). */
+/** Injected into payment handlers, so a handler never reaches for storage or config on its own. */
 export interface PaymentContext {
   config: AimeatConfig;
   storage: Storage;
@@ -148,11 +146,11 @@ export interface PaymentResult {
 }
 
 /**
- * A payment method provider. Core registers `io.aimeat.morsels`; the EE module contributes
- * real-money handlers (stripe-spt, wallet tokens, stablecoin) via
- * `EnterpriseProvider.getPaymentHandlers()` — same registry, same contract.
+ * A payment method provider. Core registers all of them: `io.aimeat.morsels` (this node's ledger),
+ * `com.stripe.spt` (cards on the SELLER's own Stripe account), `io.aimeat.invoice` (settled
+ * offline) and `com.coinbase.x402` (stablecoin, when enabled) — one registry, one contract.
  *
- * The money flow is split so custom distributions (EE commission splits) reuse the same handler:
+ * The money flow is split so custom distributions reuse the same handler:
  * `collect` takes the gross from the buyer, `payout` pays one recipient, `refund` reverses a
  * collect. The session service orchestrates: collect → fulfill → payouts/distribute → fee leg.
  */
@@ -172,7 +170,7 @@ export interface PaymentHandler {
     amount: number;
     currency: string;
     reference: string;
-    /** The operator's platform fee on this sale (minor units) — a Connect handler routes it as an application fee. */
+    /** The operator's platform fee on this sale (minor units) — booked separately, not deducted at the rail. */
     fee: number;
     /** Opaque payment instrument from the adapter (e.g. a Stripe SPT); unused by morsels. */
     instrument?: unknown;

@@ -5,9 +5,8 @@
  *   basics — `ucp.version` + `ucp.capabilities` echoed in every response, capability intersection
  *   against the calling platform's profile from the `UCP-Agent` header (fetched via safeFetch,
  *   best-effort) — and the three checkout endpoints. Settlement uses the node's registered
- *   payment handlers (Community: io.aimeat.morsels, so callers authenticate as AIMEAT principals;
- *   EE money handlers appear automatically). Item ids: "offer:<agentGaii>:<offerId>" or
- *   "org-offering:<owner>/<slug>:<agentGaii>:<offerId>".
+ *   payment handlers (morsels, cards on the seller's own Stripe account, invoice, stablecoin).
+ *   Item ids: "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>".
  * @structure
  *   - POST  /ucp/v1/checkout-sessions            create ({ line_items: [{ item:{id}|ref, quantity }] })
  *   - GET   /ucp/v1/checkout-sessions/:id        read (buyer only)
@@ -43,11 +42,10 @@ const LineItemSchema = z.object({
   item: z.union([
     z.object({ id: z.string().min(1).max(500) }),
     z.object({
-      kind: z.enum(['offer', 'org-offering', 'app-tool']).optional(),
+      kind: z.enum(['offer', 'app-tool']).optional(),
       agent: z.string().max(300).optional(),
       offer_id: z.string().min(1).max(100).optional(),
       tool: z.string().min(1).max(100).optional(),
-      org: z.string().max(200).optional(),
       app: z.string().min(3).max(300).optional(),
       input: z.record(z.string(), z.unknown()).optional(),
     }).refine((i) => !!(i.offer_id || i.tool), { message: 'Each item needs offer_id (offers) or tool (app-tools)' }),
@@ -67,14 +65,11 @@ const CompleteSchema = z.object({
   payment: z.object({ handler: z.string().max(100).optional(), instrument: z.unknown().optional() }).optional(),
 });
 
-/** "offer:<agentGaii>:<offerId>" | "org-offering:<owner>/<slug>:<agentGaii>:<offerId>" → SellableRef */
+/** "offer:<agentGaii>:<offerId>" | "app-tool:<owner>/<appId>:<tool>" → SellableRef */
 function parseItemId(id: string): SellableRef {
   const parts = id.split(':');
   if (parts[0] === 'offer' && parts.length >= 3) {
     return { kind: 'offer', agent: parts[1] as string, offer_id: parts.slice(2).join(':') };
-  }
-  if (parts[0] === 'org-offering' && parts.length >= 4) {
-    return { kind: 'org-offering', org: parts[1] as string, agent: parts[2] as string, offer_id: parts.slice(3).join(':') };
   }
   if (parts[0] === 'app-tool' && parts.length >= 3) {
     return { kind: 'app-tool', app: parts[1] as string, tool: parts.slice(2).join(':') };
@@ -91,9 +86,8 @@ function toRefs(lineItems: z.infer<typeof CreateSchema>['line_items']): Sellable
 }
 
 const itemId = (i: CheckoutSessionRecord['items'][number]) =>
-  i.kind === 'org-offering' ? `org-offering:${i.org}:${i.agent}:${i.offerId}`
-    : i.kind === 'app-tool' ? `app-tool:${i.app ?? i.agent}:${i.offerId}`
-      : `offer:${i.agent}:${i.offerId}`;
+  i.kind === 'app-tool' ? `app-tool:${i.app ?? i.agent}:${i.offerId}`
+    : `offer:${i.agent}:${i.offerId}`;
 
 /** Map our session record onto a UCP-shaped checkout_session. */
 function toUcpSession(s: CheckoutSessionRecord) {

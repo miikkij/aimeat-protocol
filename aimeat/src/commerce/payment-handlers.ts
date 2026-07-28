@@ -1,9 +1,10 @@
 /**
  * @file src/commerce/payment-handlers.ts
  * @description Payment-handler registry for the commerce core (TARGET-033) + the built-in morsel
- *   handler. Core registers `io.aimeat.morsels` at mount; the EE module's handlers (real money)
- *   arrive through `EnterpriseProvider.getPaymentHandlers()` and land in the same registry, so the
- *   checkout flow and the /.well-known/ucp profile treat every payment method uniformly. Handlers
+ *   handler. Core registers every handler at mount: `io.aimeat.morsels` (this node's ledger),
+ *   `com.stripe.spt` (cards on the SELLER's own account), `io.aimeat.invoice` (settled offline) and,
+ *   when enabled, `com.coinbase.x402` (stablecoin). One registry, so the checkout flow and the
+ *   /.well-known/ucp profile treat every payment method uniformly. Handlers
  *   implement collect / payout / refund — the session service orchestrates the legs (including
  *   commission splits and the operator-or-burn fee leg).
  * @structure registerPaymentHandler · getPaymentHandler · listPaymentHandlers ·

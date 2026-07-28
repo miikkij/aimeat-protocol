@@ -2727,11 +2727,6 @@ components:
       properties:
         purpose:
           type: string
-        enterprise_locked:
-          type: boolean
-          description: >-
-            True when an edition-locked enterprise directive layer is present (a company Secretary on the
-            AIMEAT Enterprise edition). Such rules carry source 'enterprise' + locked:true and are read-only.
         rules:
           type: array
           items:
@@ -2741,10 +2736,7 @@ components:
                 type: string
               source:
                 type: string
-                enum: [system, enterprise, owner, agent]
-              locked:
-                type: boolean
-                description: True for read-only enterprise-layer rules (cannot be edited via PUT).
+                enum: [system, owner, agent]
         memoryAreas:
           type: array
           items:
@@ -12035,10 +12027,12 @@ paths:
       summary: Which payout rails can pay you, and what each needs (owner) (TARGET-042)
       description: >
         The seller's settlement rails reported apart, because they are different things: **Stripe** moves
-        real currency (EUR/USD) to a connected account through a provider that holds the funds, while
-        **x402** settles a stablecoin on-chain straight to an address you control, non-custodially, with
-        the node holding no key. Returns `{ x402: { enabled, network, testnet, configured, address,
-        currencies, assets, note }, stripe: { configured, provider, currencies, note } }`. `currencies`
+        real currency (EUR/USD) onto YOUR OWN Stripe account using the secret key you brought (you are
+        the merchant of record; the node holds neither key nor funds), **x402** settles a stablecoin
+        on-chain straight to an address you control, and **invoice** captures nothing at all and books
+        the obligation for you to bill offline. Returns `{ x402: { enabled, network, testnet, configured,
+        address, currencies, assets, note }, stripe: { configured, provider, keyHint, currencies, note },
+        invoice: { available, currencies, note } }`. `currencies`
         and `assets` are READ FROM THE NODE'S NETWORK REGISTRY, so they list only what this node can
         really settle: `assets` carries `{ currency, symbol, address, decimals }` per settleable
         currency (USD → USDC, EUR → EURC on the Base networks). ONE payout address receives every asset.
@@ -12078,6 +12072,40 @@ paths:
       description: >
         Clears only the payout address. Card and invoice settlement through your Stripe credentials is
         unaffected; stablecoin sales (USDC and EURC alike) fail until an address is set again.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/commerce/payout/stripe:
+    put:
+      operationId: commercePayoutStripeSet
+      summary: Set your own Stripe secret key for card settlement (owner)
+      description: >
+        Stores the Stripe secret key that card sales of YOUR items settle on. There is no node-level or
+        platform key: the charge runs on your account, you are the merchant of record, Stripe did your
+        KYC, and this node holds neither the funds nor a claim on them. MERGED into your payment-settings
+        record, so your x402 payout address is untouched. The secret is stored server-side and is NEVER
+        returned by any endpoint; reads report only `keyHint` (last four characters). 400 INVALID_PSP
+        unless `secret_key` is 8-200 characters. Responds `{ configured, provider, keyHint, note }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [secret_key], properties: {
+          secret_key: { type: string, minLength: 8, maxLength: 200, description: "Your Stripe secret key (sk_live_… or sk_test_…)." },
+          provider: { type: string, maxLength: 60, description: "Provider label, default 'stripe'." } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+    delete:
+      operationId: commercePayoutStripeClear
+      summary: Remove your Stripe credentials (owner)
+      description: >
+        Clears only the Stripe credentials. Your x402 payout address is untouched and invoice settlement
+        still works; card sales fail with PSP_NOT_CONFIGURED until credentials are set again.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       responses:
@@ -12128,11 +12156,10 @@ paths:
                     type: object
                     description: Needs offer_id (offers), tool (app-tools), or app+tool (ext-call).
                     properties:
-                      kind: { type: string, enum: [offer, org-offering, app-tool, ext-call], default: offer }
+                      kind: { type: string, enum: [offer, app-tool, ext-call], default: offer }
                       agent: { type: string, description: Provider agent GAII (or bare name for own agent) }
                       offer_id: { type: string }
                       tool: { type: string, description: 'app-tool: the tool name from apps.{appId}.tools; ext-call: the action id' }
-                      org: { type: string, description: 'org-offering: "creatorOwner/slug"' }
                       app: { type: string, description: 'app-tool: "ownerName/appId"; ext-call: the extension name' }
                       input: { type: object, description: 'app-tool: buyer input forwarded to the capability invoke at completion' }
                       quantity: { type: integer, minimum: 1, maximum: 1000, default: 1, description: app-tool items are limited to 1 }
@@ -12340,7 +12367,7 @@ paths:
         Universal Commerce Protocol (2026-04-08) shaped checkout over the commerce core. Every
         response carries ucp.version + ucp.capabilities; the UCP-Agent header (platform profile
         URL) is fetched best-effort for capability negotiation. Item ids:
-        "offer:<agentGaii>:<offerId>" or "org-offering:<owner>/<slug>:<agentGaii>:<offerId>".
+        "offer:<agentGaii>:<offerId>" or "app-tool:<owner>/<appId>:<tool>".
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -29143,11 +29170,8 @@ paths:
       summary: Get merged agent directives
       description: |
         Returns the merged view of agent directives combining system defaults,
-        an optional edition-locked enterprise layer (company Secretary on the
-        Enterprise edition), owner defaults, and agent-specific overrides. Rules
-        are ordered by source priority: system, enterprise, owner, agent. The
-        enterprise layer is read-only (`locked:true`); `enterprise_locked` flags
-        its presence.
+        owner defaults, and agent-specific overrides, ordered by source priority:
+        system, owner, agent.
       tags: [Agent Directives]
       security:
         - BearerAuth: []

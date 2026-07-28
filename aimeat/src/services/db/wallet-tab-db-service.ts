@@ -2,11 +2,11 @@
  * @file src/services/db/wallet-tab-db-service.ts
  * @description Purpose-built Application DB Service for the profile Wallet tab — the ONE call behind
  *   GET /v1/wallet/overview. The tab mounts a 5-request fan-out: the tab itself (wallet + transactions),
- *   plus two child sections (PspSection → /v1/me/psp; MoneyActivity → commerce checkout-sessions +
+ *   plus two child sections (SellingSection → /v1/commerce/payout; MoneyActivity → checkout-sessions +
  *   orders). This folds the FOUR core reads (wallet + transactions + checkout-sessions + orders) into one
  *   read scope; the transaction ledger is read ONCE and serves both the lifetime stats and the recent
- *   list. The PSP section is ENTERPRISE (its endpoint lives in ee/, not core) and conditionally rendered,
- *   so it stays self-fetching — core must not reach into ee/. Single-master: serves the Wallet tab mount
+ *   list. The Selling & payments section reads the seller's payout rails from a different endpoint and
+ *   is conditionally rendered, so it stays self-fetching. Single-master: serves the Wallet tab mount
  *   only; the individual endpoints stay for interactive re-fetches.
  *
  * @structure WalletTabService.overview(ownerName, ownerGhii) → { wallet, transactions, checkoutSessions, orders }

@@ -535,9 +535,6 @@ export function adminRouter(
                     // Real-money commerce (minor units per ISO currency), separate from morsels.
                     money_volume: moneyVolume,
                     operator_money_fees: operatorMoneyFees,
-                    // The operator's Stripe Connect platform account (their OWN business account for
-                    // taking the platform cut via application-fee — routing, not custody).
-                    platform_connected: !!process.env.AIMEAT_PLATFORM_STRIPE_KEY,
                 },
             },
             config: {

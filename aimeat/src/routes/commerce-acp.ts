@@ -122,7 +122,7 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
       checkout: { base_url: `${b}/acp/v1/checkout_sessions` },
       // App-tool products also surface IN-PAGE via the WebMCP bridge (TARGET-034 phase C).
       webmcp: { library: `${b}/v1/libs/aimeat-webmcp.js`, app_listing: `${b}/v1/apps/{owner}/{filename}/webmcp` },
-      note: 'ACP merchant surface over the AIMEAT commerce core. Delegated real-money payment (Stripe SPT) requires the Enterprise edition payment handler; Community nodes settle in morsels with AIMEAT authentication.',
+      note: 'ACP merchant surface over the AIMEAT commerce core. Real-money payment settles on the SELLER\'s own Stripe account, or offline by invoice; morsel sales settle on this node\'s ledger with AIMEAT authentication.',
     });
   });
 

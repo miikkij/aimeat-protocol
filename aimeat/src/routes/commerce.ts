@@ -10,10 +10,16 @@
  *   - GET    /v1/commerce/checkout-sessions/:id        read (buyer only; lazy expiry)
  *   - PATCH  /v1/commerce/checkout-sessions/:id        replace items OR { cancel: true }
  *   - POST   /v1/commerce/checkout-sessions/:id/complete  charge + fulfill (payment.handler optional)
+ *   - GET    /v1/commerce/payout                       which rails can pay this seller
+ *   - PUT/DELETE /v1/commerce/payout/x402              the seller's stablecoin address
+ *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  * @version-history
+ *   v1.4.0 — 2026-07-28 — Stripe credentials are set here (PUT/DELETE /v1/commerce/payout/stripe)
+ *     beside the x402 address, replacing the removed edition's own endpoint; the two rail writes
+ *     share writePsp, which keeps the record's version instead of resetting it on every edit
  *   v1.3.0 — 2026-07-14 — app-tool line items ({kind:'app-tool', app:'owner/appId', tool, input})
  *     + caller JWT threaded into completeSession for callable fulfillment (TARGET-034 phase A)
- *   v1.2.0 — 2026-07-13 — Item kinds via the sellable-resolver registry (org-offering) + x402-style 402 accepts (phases 4–5)
+ *   v1.2.0 — 2026-07-13 — Item kinds via the sellable-resolver registry + x402-style 402 accepts (phases 4–5)
  *   v1.1.0 — 2026-07-13 — List endpoints, commerceEnabled gate, config TTL (phase 2)
  *   v1.0.0 — 2026-07-13 — Initial native checkout adapter (TARGET-033 phase 1)
  */
@@ -37,12 +43,11 @@ import { decodeXPayment, getX402Network, getX402Asset, x402SettlementCurrencies 
 import { X402_HANDLER_ID } from '../commerce/x402-handler.js';
 
 const ItemsSchema = z.array(z.object({
-  kind: z.enum(['offer', 'org-offering', 'app-tool', 'ext-call']).optional(),
+  kind: z.enum(['offer', 'app-tool', 'ext-call']).optional(),
   agent: z.string().min(1).max(300).optional(),
   offer_id: z.string().min(1).max(100).optional(),
   /** app-tool: the tool name (alias for offer_id) — from the app's apps.{appId}.tools manifest. */
   tool: z.string().min(1).max(100).optional(),
-  org: z.string().max(200).optional(),
   /** app-tool: "ownerName/appId" — locates the tool manifest. */
   app: z.string().min(3).max(300).optional(),
   /** app-tool: the buyer's tool input, forwarded to the capability invoke at completion. */
@@ -95,6 +100,26 @@ type PspRecord = { provider?: string; secretKey?: unknown; payTo?: string; addre
 async function readPsp(storage: Storage, ownerGhii: string): Promise<PspRecord> {
   const rec = await storage.getMemory(ownerGhii, PSP_KEY);
   return (rec?.value as PspRecord | undefined) ?? {};
+}
+
+/**
+ * Write the seller's payment settings record. Callers pass the WHOLE next record (they merged what
+ * they keep), and the version/createdAt of the existing one carry forward — a rail setting must not
+ * reset the record's history just because the other rail was edited.
+ */
+async function writePsp(storage: Storage, ownerGhii: string, next: PspRecord): Promise<void> {
+  const existing = await storage.getMemory(ownerGhii, PSP_KEY);
+  const now = new Date().toISOString();
+  await storage.setMemory({
+    key: PSP_KEY, ownerGaii: ownerGhii, value: next, visibility: 'private', tags: ['commerce'], ttlHours: null,
+    version: (existing?.version ?? 0) + 1, createdAt: existing?.createdAt ?? now, updatedAt: now,
+  });
+}
+
+/** Last four characters of a stored secret, never the secret itself. */
+function maskSecret(secret: unknown): string | null {
+  if (typeof secret !== 'string' || !secret) return null;
+  return secret.length >= 4 ? `…${secret.slice(-4)}` : '(set)';
 }
 
 /** The x402 payout address in any of the shapes the facilitator accepts (extractPayTo mirrors this). */
@@ -158,9 +183,46 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
       stripe: {
         configured: !!psp.secretKey,
         provider: psp.provider ?? null,
+        keyHint: maskSecret(psp.secretKey),
         currencies: ['EUR', 'USD'],
-        note: 'Card and invoice settlement in real currency, paid out to your connected account.',
+        note: 'Card settlement in real currency on YOUR OWN Stripe account: you are the merchant of record and the money lands on your balance. This node never holds the key or the funds.',
       },
+      invoice: {
+        // Always available: it captures nothing, so it needs no credential. Worth reporting beside
+        // the other two, because it is the answer for a seller who bills separately.
+        available: true,
+        currencies: ['EUR', 'USD'],
+        note: 'Take a money order without any payment provider — the obligation is booked and you invoice it out of band.',
+      },
+    }));
+  });
+
+  /** Store the seller's OWN Stripe secret. Merges: the x402 address in the same record survives. */
+  router.put('/v1/commerce/payout/stripe', requireAuth(), requireRole('owner'), async (req, res) => {
+    const raw = (req.body ?? {}) as { secret_key?: unknown; provider?: unknown };
+    const secretKey = typeof raw.secret_key === 'string' ? raw.secret_key.trim() : '';
+    if (secretKey.length < 8 || secretKey.length > 200) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_PSP',
+        'secret_key must be your Stripe secret (8-200 characters). It is stored server-side and never returned by any endpoint.'));
+    }
+    const provider = typeof raw.provider === 'string' && raw.provider.trim() ? raw.provider.trim().slice(0, 60) : 'stripe';
+    const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
+    await writePsp(storage, ownerGhii, { ...(await readPsp(storage, ownerGhii)), provider, secretKey });
+    return res.json(success(config.nodeId, {
+      configured: true, provider, keyHint: maskSecret(secretKey),
+      note: 'Money sales now settle on this Stripe account. The secret is never returned by any endpoint.',
+    }));
+  });
+
+  /** Remove the Stripe credentials only — the x402 address in the same record is untouched. */
+  router.delete('/v1/commerce/payout/stripe', requireAuth(), requireRole('owner'), async (req, res) => {
+    const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
+    const next: PspRecord = { ...(await readPsp(storage, ownerGhii)) };
+    delete next.secretKey; delete next.provider;
+    await writePsp(storage, ownerGhii, next);
+    return res.json(success(config.nodeId, {
+      configured: false,
+      note: 'Card sales now fail until credentials are set again. Stablecoin and invoice settlement are unaffected.',
     }));
   });
 
@@ -199,12 +261,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     // Store the canonical EIP-55 form: mixed case is what a wallet shows, so the seller can compare.
     const canonical = toChecksumAddress(address);
     const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
-    const psp = await readPsp(storage, ownerGhii);
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key: PSP_KEY, ownerGaii: ownerGhii, value: { ...psp, payTo: canonical },
-      visibility: 'private', tags: ['commerce'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
-    });
+    await writePsp(storage, ownerGhii, { ...(await readPsp(storage, ownerGhii)), payTo: canonical });
     return res.json(success(config.nodeId, {
       configured: true, address: canonical, network: config.x402Network,
       // One address receives every settlement asset this network carries — report them all, so the
@@ -222,11 +279,7 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     const next: PspRecord = { ...psp };
     delete next.payTo; delete next.address;
     if (next.x402) { const x = { ...next.x402 }; delete x.address; delete x.payTo; next.x402 = x; }
-    const now = new Date().toISOString();
-    await storage.setMemory({
-      key: PSP_KEY, ownerGaii: ownerGhii, value: next,
-      visibility: 'private', tags: ['commerce'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
-    });
+    await writePsp(storage, ownerGhii, next);
     return res.json(success(config.nodeId, { configured: false, note: 'Stablecoin sales now fail until an address is set again. Card/invoice settlement is unaffected.' }));
   });
 

@@ -65,6 +65,20 @@ export async function askOperatorSettings(
   );
   settings.AIMEAT_OPERATOR_TYPE = type as string;
 
+  // Only anything but a natural person has one, and for those it is what turns this into a company
+  // node: invoices, contracts and ODPS listings all name the legal entity behind the node.
+  if (type !== 'natural_person') {
+    const businessId = checkCancel(
+      await p.text({
+        message: t('init.operatorBusinessId'),
+        placeholder: env.AIMEAT_OPERATOR_BUSINESS_ID || '1234567-8',
+        defaultValue: env.AIMEAT_OPERATOR_BUSINESS_ID ?? '',
+      }),
+      t,
+    );
+    settings.AIMEAT_OPERATOR_BUSINESS_ID = businessId.trim();
+  }
+
   const address = checkCancel(
     await p.text({
       message: t('init.operatorAddress'),

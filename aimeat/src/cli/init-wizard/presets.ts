@@ -129,6 +129,7 @@ export const CONFIG_DEFAULTS: Record<string, string> = {
   // Operator info (rendered into /v1/privacy)
   AIMEAT_OPERATOR_NAME: '',
   AIMEAT_OPERATOR_TYPE: 'natural_person',
+  AIMEAT_OPERATOR_BUSINESS_ID: '',
   AIMEAT_OPERATOR_ADDRESS: '',
   AIMEAT_OPERATOR_COUNTRY: '',
   AIMEAT_OPERATOR_EMAIL: '',

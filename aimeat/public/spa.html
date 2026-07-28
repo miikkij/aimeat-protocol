@@ -96,8 +96,6 @@
   <link rel="stylesheet" href="/css/components/tags.css">
   <link rel="stylesheet" href="/css/components/image-deliverable.css">
   <link rel="stylesheet" href="/css/views/help.css">
-  <link rel="stylesheet" href="/css/views/my-company.css">
-  <link rel="stylesheet" href="/css/views/companies.css">
   <link rel="stylesheet" href="/css/views/capabilities.css">
   <link rel="stylesheet" href="/css/views/agents-detail.css">
   <link rel="stylesheet" href="/css/views/scheduler.css">
@@ -209,8 +207,6 @@
       "/js/services/admin-agent-integration.js": "/js/services/admin-agent-integration.js",
       "/js/services/schedules.js": "/js/services/schedules.js",
       "/js/services/workflows.js": "/js/services/workflows.js",
-      "/views/portfolio-themes.js": "/views/portfolio-themes.js",
-      "/views/my-company.payments.js": "/views/my-company.payments.js",
       "/views/profile/shared.js": "/views/profile/shared.js",
       "/views/profile/openrouter-settings.js": "/views/profile/openrouter-settings.js",
       "/views/profile/organisms/helpers.js": "/views/profile/organisms/helpers.js",
@@ -351,8 +347,6 @@
       '/v1/how-it-works': () => import('/views/how-it-works.js' + B),
       '/v1/business':    () => import('/views/business.js' + B),
       '/v1/profile':     () => import('/views/profile.js' + B),
-      '/v1/my-company':  () => import('/views/my-company.js' + B),
-      '/v1/companies':   () => import('/views/companies.js' + B),
       '/v1/app-grant':   () => import('/views/app-grant.js' + B),
       '/v1/invite':      () => import('/views/invite-accept.js' + B),
       '/v1/aimeat-os':   () => import('/views/aimeat-os.js' + B),
@@ -543,10 +537,11 @@
     // Built-in public links. Operators can show/hide and reorder these via the admin
     // Portal tab (persisted at /v1/site/header-nav). Auth/role-gated links (Apps, Profile,
     // Admin) are NOT in this list — they stay forced by the session/role checks below.
-    // Companies / My Company are deliberately absent (2026-07-28). Doing business on AIMEAT does
-    // not need a separate "company" object: you stand up a node and run the company on it, which
-    // is one concept instead of two and works the same for every shape of organisation. Both
-    // routes still resolve for anyone holding a link; they are only off the menu.
+    // There is no Companies or My Company link because there is no company object any more
+    // (removed 2026-07-28). Doing business on AIMEAT means standing up a node and running the
+    // company on it: one concept instead of two, and it works the same for every shape of
+    // organisation. A profile, an organism and the node's own operator identity carry what the
+    // separate object used to.
     //
     // `siteKey` entries are apps that belong to THIS node's operator, not protocol surfaces.
     // They render only when the node configured a URL for them (AIMEAT_SITE_* → window.__SITE),

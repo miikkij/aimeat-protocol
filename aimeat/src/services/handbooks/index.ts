@@ -5,6 +5,7 @@
  *   Served via GET /v1/agents/me/handbook/surface/:role and the MCP aimeat_handbook_get(surface=...).
  * @structure SURFACE_HANDBOOKS (role -> markdown) + handbookForRole()
  * @version-history
+ *   v1.2.0 -- 2026-07-28 -- The enterprise handbook becomes the commerce handbook (edition seam removed)
  *   v1.1.0 -- 2026-07-14 -- Add the enterprise surface handbook (company commerce)
  *   v1.0.0 -- 2026-05-30 -- Aggregate the 4 v2 surface handbooks
  */
@@ -13,14 +14,14 @@ import { AGENT_HANDBOOK } from './agent.js';
 import { APPDEV_HANDBOOK } from './appdev.js';
 import { SERVICE_HANDBOOK } from './service.js';
 import { ADMIN_HANDBOOK } from './admin.js';
-import { ENTERPRISE_HANDBOOK } from './enterprise.js';
+import { COMMERCE_HANDBOOK } from './commerce.js';
 
 export const SURFACE_HANDBOOKS: Record<SurfaceRole, string> = {
     agent: AGENT_HANDBOOK,
     appdev: APPDEV_HANDBOOK,
     service: SERVICE_HANDBOOK,
     admin: ADMIN_HANDBOOK,
-    enterprise: ENTERPRISE_HANDBOOK,
+    commerce: COMMERCE_HANDBOOK,
 };
 
 /** The operating handbook markdown for a v2 surface role. */

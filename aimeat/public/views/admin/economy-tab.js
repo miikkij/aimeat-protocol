@@ -86,7 +86,6 @@ export default function EconomyTab({ data, reload }) {
           <div class="adm-subhead">${t('dashboard.commerceMoney')}</div>
           <${EconRow} label=${t('dashboard.commerceMoneyVolume')} value=${fmtMoneyMap(e.commerce.money_volume) || '—'} />
           <${EconRow} label=${t('dashboard.commerceMoneyFees')} value=${fmtMoneyMap(e.commerce.operator_money_fees) || '—'} />
-          <${EconRow} label=${t('dashboard.commercePlatformAccount')} value=${e.commerce.platform_connected ? (t('dashboard.on') || 'connected') : (t('dashboard.commercePlatformNone') || 'not connected — fees are invoice receivables')} />
         ` : null}
       </div>`}
 

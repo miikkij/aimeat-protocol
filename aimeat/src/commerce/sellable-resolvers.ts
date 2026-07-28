@@ -2,10 +2,9 @@
  * @file src/commerce/sellable-resolvers.ts
  * @description Sellable-resolver registry (TARGET-033 phase 4): pluggable sources of "things for
  *   sale" the checkout core can price and fulfill. Core registers the `offer` resolver (agent
- *   offers, the phase-1 behavior); the EE module registers `org-offering` (company catalogs with
- *   commission splits) via `EnterpriseProvider.getSellableResolvers()`. A resolver returns a
- *   Sellable — optionally with a custom `distribute` callback that replaces the default
- *   seller payout (e.g. member cut + org-wallet cut).
+ *   offers), `app-tool` (priced tools on a published app) and `ext-call` (priced raw extension
+ *   calls). A resolver returns a Sellable — optionally with a custom `distribute` callback that
+ *   replaces the default single-seller payout when a sale has to be split several ways.
  * @structure SellableResolver · registerSellableResolver · getSellableResolver ·
  *   resetSellableResolvers · offerSellableResolver (core 'offer' kind) ·
  *   appToolSellableResolver (core 'app-tool' kind, TARGET-034 phase A) ·
@@ -42,8 +41,6 @@ export interface SellableRef {
   offer_id?: string;
   /** app-tool alias for offer_id: the tool name from the app's manifest. */
   tool?: string;
-  /** org-offering: "creatorOwner/slug" — resolved by the EE resolver. */
-  org?: string;
   /** app-tool: "ownerName/appId" — locates the apps.{appId}.tools manifest. */
   app?: string;
   /** app-tool: the buyer's tool input, forwarded to the capability invoke at fulfillment. */

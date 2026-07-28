@@ -74,6 +74,13 @@ export interface OperatorConfig {
   name: string;
   /** Controller type. Drives display strings ("a natural person" / "a company" ...). */
   type: OperatorType;
+  /**
+   * Business/registration identifier of the controller (Finnish Y-tunnus "NNNNNNN-N", VAT id,
+   * company number — whatever the jurisdiction issues). Empty for a natural person. This is what
+   * makes a node a COMPANY node: an ODPS listing's dataHolder, an invoice and a contract all need
+   * the legal identity, and it belongs to whoever runs the node rather than to a separate object.
+   */
+  businessId: string;
   /** Postal address. GDPR requires a contact address for the controller. */
   address: string;
   /** Country of operation (e.g. "Finland"). Used in international-transfers section. */

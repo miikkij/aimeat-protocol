@@ -39,7 +39,7 @@ export function walletRouter(config: AimeatConfig, storage: Storage): Router {
    * + recent transactions + commerce checkout-sessions + orders, composed in one read scope by
    * WalletTabService (the ledger is read once for both stats and the list). Owner-scope: requires 'owner'
    * role — the Wallet tab is an owner view, and this is stricter than the folded endpoints, so no section
-   * is exposed more widely. The Enterprise PSP section stays on its own /v1/me/psp call (ee/, conditional).
+   * is exposed more widely. The Selling & payments section stays on its own /v1/commerce/payout call.
    * The individual endpoints stay for interactive re-fetches. ── */
   router.get('/v1/wallet/overview', requireAuth(), requireRole('owner'), async (req, res) => {
     const owner = req.auth!.owner as string;

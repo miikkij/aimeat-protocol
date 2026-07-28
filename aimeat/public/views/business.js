@@ -185,6 +185,7 @@ export default function Business({ navigate }) {
       <section class="ld-sovereignty">
         <h2 class="ld-casegroup-title">${tr('biz.sovTitle', 'Why owning it is the reason to buy')}</h2>
         <ul class="ld-sov-list">
+          <li>${tr('biz.sov0', 'A company here is a node, not an account type. You take your own AIMEAT node, put your business identity and your own payment keys on it, invite your people and build the apps your work needs. Nothing about it is a separate product tier.')}</li>
           <li>${tr('biz.sov1', 'Your data stays on a server you control. We do not see it and do not keep it, so your own certification is the one that counts.')}</li>
           <li>${tr('biz.sov2', 'Every action is logged: who read what, who authorised it, what it cost. The audit is a report, not a project.')}</li>
           <li>${tr('biz.sov3', 'Agents and apps work under named permissions you can take back with one click, and every action is attributed to whoever took it.')}</li>

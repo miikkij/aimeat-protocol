@@ -2,13 +2,15 @@
  * @file src/server-bootstrap/routes-loader.ts
  * @description Central route mounting for the AIMEAT server: imports every domain router and wires
  *   them (with shared middleware and injected services — federation, directory, tunnels, realtime,
- *   scheduler, workflow engine, enterprise provider) onto the Express app during bootstrap.
+ *   scheduler, workflow engine) onto the Express app during bootstrap.
  *
  * @structure
- *   - router imports: pulls in all src/routes/* and mcp/enterprise routers
+ *   - router imports: pulls in all src/routes/* routers
  *   - mountRoutes(): async entrypoint that registers routers + middleware in the correct order
  *
  * @version-history
+ *   v1.7.0 — 2026-07-28 — Drop the enterprise-edition seam (single edition): the Stripe and invoice
+ *     money handlers register here as core rails instead of arriving from a loaded ee/ module
  *   v1.6.0 — 2026-07-21 — Mount unfurlRouter (GET /v1/unfurl(/image) — link-preview cards)
  *   v1.5.0 — 2026-07-19 — Mount appdevPitfallsRouter (/v1/appdev/pitfalls, AppDev KB Phase 1)
  *   v1.4.0 — 2026-07-14 — Mount agentSkillsDiscoveryRouter (/.well-known/agent-skills, RFC v0.2.0)
@@ -34,12 +36,12 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { workspaceAccessMiddleware } from '../middleware/workspace-access.js';
 import { logger } from '../utils/logger.js';
-import { loadEnterpriseProvider, buildEnterpriseContext } from '../enterprise/loader.js';
 import { registerPaymentHandler, resetPaymentHandlers, morselPaymentHandler } from '../commerce/payment-handlers.js';
+import { stripePaymentHandler } from '../commerce/stripe-handler.js';
+import { invoicePaymentHandler } from '../commerce/invoice-handler.js';
 import { getWebBotAuthState, signOutboundRequest, resetWebBotAuth } from '../services/web-bot-auth.js';
 import { setOutboundRequestSigner } from '../utils/url-validator.js';
 import { registerSellableResolver, resetSellableResolvers, offerSellableResolver, appToolSellableResolver, extCallSellableResolver } from '../commerce/sellable-resolvers.js';
-import { setEnterpriseMcpTools } from '../mcp/enterprise-tools.js';
 import { commerceRouter } from '../routes/commerce.js';
 import { commerceUcpRouter } from '../routes/commerce-ucp.js';
 import { commerceAcpRouter } from '../routes/commerce-acp.js';
@@ -331,13 +333,9 @@ export async function mountRoutes(
     next();
   });
 
-  // Enterprise edition (open-core seam): load the active provider ONCE up front, then mount its routes
-  // near the end of this function. Community degrades to the stub (ENTERPRISE_REQUIRED for gated namespaces).
-  const enterprise = await loadEnterpriseProvider(buildEnterpriseContext(config, storage));
-
-  // Commerce core (TARGET-033): register the Community morsel handler + the core offer resolver,
-  // then whatever payment handlers / sellable resolvers the active edition contributes (EE: real
-  // money + org offerings) — one registry each, advertised at /.well-known/ucp. The resets keep
+  // Commerce core (TARGET-033): one registry of payment handlers and one of sellable resolvers,
+  // advertised at /.well-known/ucp. Every rail is core — morsels on this node's ledger, cards on
+  // the SELLER's own Stripe account, invoices settled offline, stablecoin via x402. The resets keep
   // embedded test servers from double-registering.
   // Web Bot Auth (RFC 9421): reset the per-boot key state (embedded test servers), then arm the
   // outbound signer on safeFetch when the operator opted in. The key DIRECTORY at
@@ -352,13 +350,15 @@ export async function mountRoutes(
 
   resetPaymentHandlers();
   registerPaymentHandler(morselPaymentHandler());
+  // Money rails. Neither carries a node-level credential: the Stripe handler charges on the
+  // seller's own key (commerce.psp) and the invoice handler books an obligation instead of
+  // capturing anything, so both are safe to register on every node.
+  registerPaymentHandler(stripePaymentHandler());
+  registerPaymentHandler(invoicePaymentHandler());
   resetSellableResolvers();
   registerSellableResolver(offerSellableResolver());
   registerSellableResolver(appToolSellableResolver());
   registerSellableResolver(extCallSellableResolver());   // priced raw-call money channel (rm-commercial-raw-calls)
-  for (const handler of (await enterprise.getPaymentHandlers?.()) ?? []) {
-    registerPaymentHandler(handler);
-  }
   // TEST ONLY: a fake EUR/USD rail so the money chain is E2E-provable without a real PSP. Off in prod.
   if (config.testMoneyHandler) {
     const { testMoneyPaymentHandler } = await import('../commerce/test-money-handler.js');
@@ -374,13 +374,6 @@ export async function mountRoutes(
       config, config.x402TestFacilitator ? testFacilitator() : httpFacilitator(config.x402FacilitatorUrl),
     ));
   }
-  for (const resolver of (await enterprise.getSellableResolvers?.()) ?? []) {
-    registerSellableResolver(resolver);
-  }
-  // Edition-contributed MCP tools (EnterpriseProvider.getMcpTools): installed once at boot —
-  // per-session registration + the /v2/mcp/enterprise surface extras + dynamic scope entries
-  // all read this registry. Community/stub: empty (the enterprise surface keeps its core baseline).
-  setEnterpriseMcpTools((await enterprise.getMcpTools?.()) ?? []);
   app.use(commerceRouter(config, storage));
   app.use(commerceUcpRouter(config, storage));
   app.use(commerceAcpRouter(config, storage));
@@ -503,11 +496,6 @@ export async function mountRoutes(
   if (config.portfolioEnabled) {
     app.use(portfolioRouter(config, storage));
   }
-
-  // Enterprise edition (open-core seam): mount the proprietary `ee/` module if dropped in, else the
-  // Community stub (returns ENTERPRISE_REQUIRED for gated namespaces). The provider was loaded once
-  // near the top of this function; mount its routes here.
-  await enterprise.mountRoutes(app);
 
   app.use(portalRouter(config, storage));
   app.use(portalApiRouter(config, storage));

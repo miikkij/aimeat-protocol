@@ -3,6 +3,11 @@
  * @description Profile tab for morsel wallet: balance overview, lifetime stats,
  *   morsel request form, and transaction history with expandable details.
  * @version-history
+ *   v1.6.0 — 2026-07-28 — One "Selling & payments" section replaces the separate PSP and x402 blocks:
+ *     card, stablecoin and invoice rails render from a single GET /v1/commerce/payout, and the Stripe
+ *     key is written through /v1/commerce/payout/stripe. The old block called the removed edition's
+ *     own endpoint and hid itself when that 404'd, so on a node without the module a seller was never
+ *     shown the credential field at all.
  *   v1.5.1 — 2026-07-25 — The x402 chip reports every currency → token pair the node can settle
  *     (USD → USDC, EUR → EURC) instead of a single hardcoded token (TARGET-042).
  *   v1.5.0 — 2026-07-25 — Payout rails: an x402 USDC payout-address section beside the Stripe one, so a
@@ -15,7 +20,7 @@
  *     <CopyButton>; delete local copyToClipboard helper + dead copied-state/handlers.
  *   v1.4.0 — 2026-07-16 — Mount folds the tab's wallet+transactions AND MoneyActivity's checkout+orders
  *     into ONE GET /v1/wallet/overview (WalletTabService); MoneyActivity seeds from `initial` + skips its
- *     own mount fetch. The Enterprise PSP section keeps its own /v1/me/psp call. Falls back to the
+ *     own mount fetch. The Selling & payments section keeps its own payout call. Falls back to the
  *     individual endpoints if the composite is unavailable. (Phase 4 slice 3 — frontend half.)
  *   v1.5.0 — 2026-07-18 — Vaihe 3 card-cohesion: the two remaining unframed sections now sit in a `.card`
  *     like the balance/lifetime/history sections do — PSP `.wallet-psp` block and MoneyActivity's
@@ -48,56 +53,22 @@ function txTypeLabel(tx) {
   return tx.amount > 0 ? t('profile.wallet.earned') : t('profile.wallet.shared');
 }
 
-/* "Selling & payments" — the individual seller's own PSP credentials (/v1/me/psp, EE).
- * Money sales settle on the SELLER's own Stripe account; the node never holds keys or funds.
- * Hidden when the node has no EE module (404/501 from the endpoint). */
-function PspSection() {
-  const [psp, setPsp] = useState(null);
-  const [keyIn, setKeyIn] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [msg, setMsg] = useState('');
-  const load = useCallback(() => {
-    apiGet('/v1/me/psp').then(r => setPsp(r.data?.psp ?? { configured: false })).catch(() => setPsp(false));
-  }, []);
-  useEffect(() => { load(); }, [load]);
-  if (psp === null || psp === false) return null; // Community node or still loading — nothing to show
-  async function save() {
-    setBusy(true); setMsg('');
-    try { await apiPut('/v1/me/psp', { secret_key: keyIn.trim() }); setKeyIn(''); setMsg(t('profile.wallet.pspSaved')); load(); }
-    catch (e) { setMsg(e.message || 'Save failed'); }
-    finally { setBusy(false); }
-  }
-  async function remove() {
-    setBusy(true); setMsg('');
-    try { await apiDelete('/v1/me/psp'); setMsg(t('profile.wallet.pspRemoved')); load(); }
-    catch (e) { setMsg(e.message || 'Remove failed'); }
-    finally { setBusy(false); }
-  }
-  return html`
-    <div class="section-title mt-2">${t('profile.wallet.pspTitle')}</div>
-    <div class="section-desc">${t('profile.wallet.pspDesc')}</div>
-    <div class="card wallet-psp">
-      ${psp.configured
-        ? html`<span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.pspConfigured')} ${psp.keyHint || ''}</span>`
-        : html`<span class="pf-psp-chip pf-psp-chip--warn">${t('profile.wallet.pspMissing')}</span>`}
-      <div class="wallet-psp-row">
-        <input class="input-field input-sm wallet-psp-input" type="password" placeholder="sk_live_…" value=${keyIn} onInput=${(e) => setKeyIn(e.target.value)} />
-        <button class="btn-primary btn-sm" disabled=${busy || keyIn.trim().length < 8} onClick=${save}>${t('profile.wallet.pspSave')}</button>
-        ${psp.configured && html`<button class="btn-ghost btn-sm" disabled=${busy} onClick=${remove}>${t('profile.wallet.pspRemove')}</button>`}
-      </div>
-      ${msg && html`<span class="text-meta">${msg}</span>`}
-    </div>`;
-}
-
-/* "Stablecoin payouts (x402)" — the seller's on-chain payout address.
- * A different rail from Stripe, and the difference matters at sale time: Stripe settles EUR/USD to a
- * connected account through a provider that holds the funds; x402 settles a stablecoin on-chain
- * straight to this address, non-custodially, with the node holding no key. The token follows the
- * price (USD → USDC, EUR → EURC) and ONE address receives them all, so the chip reports the pairs
- * the node can actually settle rather than naming a single token. A money sale over x402 without an
- * address fails with SELLER_NO_X402_ADDRESS, which is exactly what this section prevents. */
-function X402Section() {
+/* "Selling & payments" — every rail that can pay this seller, from ONE read of /v1/commerce/payout.
+ *
+ * The three rails are shown together because the question a seller actually has is "can I take
+ * money yet, and how does it reach me", and the answers differ in kind:
+ *   - Card (Stripe): runs on the seller's OWN secret key. They are the merchant of record, the money
+ *     lands on their Stripe balance, and this node holds neither key nor funds.
+ *   - Stablecoin (x402): settles on-chain straight to an address the seller controls. The token
+ *     follows the price (USD → USDC, EUR → EURC) and ONE address receives them all, so the chip
+ *     reports the pairs this node can really settle instead of naming a single token. A money sale
+ *     over x402 with no address fails with SELLER_NO_X402_ADDRESS, which this section prevents.
+ *   - Invoice: always available because it captures nothing — the order completes and the amount is
+ *     booked as a payable the seller bills offline.
+ * Nothing here is edition-gated: the node has no platform account of its own to gate it on. */
+function SellingSection() {
   const [state, setState] = useState(null);
+  const [keyIn, setKeyIn] = useState('');
   const [addr, setAddr] = useState('');
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState('');
@@ -110,41 +81,76 @@ function X402Section() {
     window.addEventListener('aimeat-live-update', handler);
     return () => window.removeEventListener('aimeat-live-update', handler);
   }, [load]);
+  // false = commerce is off on this node (503) — there is nothing to sell through.
   if (state === null || state === false) return null;
+
+  const stripe = state.stripe || {};
   const x = state.x402 || {};
-  if (!x.enabled) return null;              // the operator has not enabled the rail on this node
-  const valid = /^0x[a-fA-F0-9]{40}$/.test(addr.trim());
-  async function save() {
+  const addrValid = /^0x[a-fA-F0-9]{40}$/.test(addr.trim());
+
+  async function run(fn, okMsg) {
     setBusy(true); setMsg('');
-    try { await apiPut('/v1/commerce/payout/x402', { address: addr.trim() }); setAddr(''); setMsg(t('profile.wallet.x402Saved')); load(); }
-    catch (e) { setMsg(e.message || 'Save failed'); }
+    try { await fn(); setMsg(okMsg); load(); }
+    catch (e) { setMsg(e.message || 'Failed'); }
     finally { setBusy(false); }
   }
-  async function remove() {
-    setBusy(true); setMsg('');
-    try { await apiDelete('/v1/commerce/payout/x402'); setMsg(t('profile.wallet.x402Removed')); load(); }
-    catch (e) { setMsg(e.message || 'Remove failed'); }
-    finally { setBusy(false); }
-  }
+
   return html`
-    <div class="section-title mt-2">${t('profile.wallet.x402Title')}</div>
-    <div class="section-desc">${t('profile.wallet.x402Desc')}</div>
+    <div class="section-title mt-2">${t('profile.wallet.sellingTitle')}</div>
+    <div class="section-desc">${t('profile.wallet.sellingDesc')}</div>
+
     <div class="card wallet-psp">
       <div class="wallet-rail-row">
-        ${x.configured
-          ? html`<span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.x402Configured')} <code>${x.address}</code></span>`
-          : html`<span class="pf-psp-chip pf-psp-chip--warn">${t('profile.wallet.x402Missing')}</span>`}
-        <span class="pf-psp-chip">${(x.assets || []).map(a => `${a.currency} → ${a.symbol}`).join(' · ')} · ${x.network}${x.testnet ? ` · ${t('profile.wallet.x402Testnet')}` : ''}</span>
+        <strong>${t('profile.wallet.railCard')}</strong>
+        ${stripe.configured
+          ? html`<span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.pspConfigured')} ${stripe.keyHint || ''}</span>`
+          : html`<span class="pf-psp-chip pf-psp-chip--warn">${t('profile.wallet.pspMissing')}</span>`}
+        <span class="pf-psp-chip">${(stripe.currencies || []).join(' · ')}</span>
       </div>
       <div class="wallet-psp-row">
-        <input class="input-field input-sm wallet-psp-input" type="text" spellcheck="false" placeholder="0x…"
-               value=${addr} onInput=${(e) => setAddr(e.target.value)} />
-        <button class="btn-primary btn-sm" disabled=${busy || !valid} onClick=${save}>${t('profile.wallet.x402Save')}</button>
-        ${x.configured && html`<button class="btn-ghost btn-sm" disabled=${busy} onClick=${remove}>${t('profile.wallet.x402Remove')}</button>`}
+        <input class="input-field input-sm wallet-psp-input" type="password" placeholder="sk_live_…"
+               value=${keyIn} onInput=${(e) => setKeyIn(e.target.value)} />
+        <button class="btn-primary btn-sm" disabled=${busy || keyIn.trim().length < 8}
+                onClick=${() => run(async () => { await apiPut('/v1/commerce/payout/stripe', { secret_key: keyIn.trim() }); setKeyIn(''); }, t('profile.wallet.pspSaved'))}>
+          ${t('profile.wallet.pspSave')}</button>
+        ${stripe.configured && html`<button class="btn-ghost btn-sm" disabled=${busy}
+                onClick=${() => run(() => apiDelete('/v1/commerce/payout/stripe'), t('profile.wallet.pspRemoved'))}>
+          ${t('profile.wallet.pspRemove')}</button>`}
       </div>
-      ${addr.trim() && !valid && html`<span class="text-meta">${t('profile.wallet.x402Invalid')}</span>`}
-      ${msg && html`<span class="text-meta">${msg}</span>`}
-    </div>`;
+      <span class="text-meta">${t('profile.wallet.railCardNote')}</span>
+    </div>
+
+    ${x.enabled && html`
+      <div class="card wallet-psp">
+        <div class="wallet-rail-row">
+          <strong>${t('profile.wallet.railStablecoin')}</strong>
+          ${x.configured
+            ? html`<span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.x402Configured')} <code>${x.address}</code></span>`
+            : html`<span class="pf-psp-chip pf-psp-chip--warn">${t('profile.wallet.x402Missing')}</span>`}
+          <span class="pf-psp-chip">${(x.assets || []).map(a => `${a.currency} → ${a.symbol}`).join(' · ')} · ${x.network}${x.testnet ? ` · ${t('profile.wallet.x402Testnet')}` : ''}</span>
+        </div>
+        <div class="wallet-psp-row">
+          <input class="input-field input-sm wallet-psp-input" type="text" spellcheck="false" placeholder="0x…"
+                 value=${addr} onInput=${(e) => setAddr(e.target.value)} />
+          <button class="btn-primary btn-sm" disabled=${busy || !addrValid}
+                  onClick=${() => run(async () => { await apiPut('/v1/commerce/payout/x402', { address: addr.trim() }); setAddr(''); }, t('profile.wallet.x402Saved'))}>
+            ${t('profile.wallet.x402Save')}</button>
+          ${x.configured && html`<button class="btn-ghost btn-sm" disabled=${busy}
+                  onClick=${() => run(() => apiDelete('/v1/commerce/payout/x402'), t('profile.wallet.x402Removed'))}>
+            ${t('profile.wallet.x402Remove')}</button>`}
+        </div>
+        ${addr.trim() && !addrValid && html`<span class="text-meta">${t('profile.wallet.x402Invalid')}</span>`}
+      </div>`}
+
+    <div class="card wallet-psp">
+      <div class="wallet-rail-row">
+        <strong>${t('profile.wallet.railInvoice')}</strong>
+        <span class="pf-psp-chip pf-psp-chip--ok">${t('profile.wallet.railInvoiceReady')}</span>
+      </div>
+      <span class="text-meta">${t('profile.wallet.railInvoiceNote')}</span>
+    </div>
+
+    ${msg && html`<span class="text-meta">${msg}</span>`}`;
 }
 
 /* "Money purchases & sales" — real-money (EUR/USD) checkout activity, separate from morsels.
@@ -217,7 +223,7 @@ export default function WalletTab({ session, showToast, onStats }) {
   async function loadData() {
     try {
       // Mount: ONE composite call (GET /v1/wallet/overview) seeds wallet + recent transactions AND the
-      // MoneyActivity section (checkout-sessions + orders). The Enterprise PSP section stays on its own
+      // MoneyActivity section (checkout-sessions + orders). The Selling & payments section stays on its own
       // /v1/me/psp call. Falls back to the individual wallet endpoints if the composite is unavailable.
       const ov = await apiGet('/v1/wallet/overview').then(r => r?.data).catch(err => { swallowed('wallet-tab: loadData', err); return null; });
       if (ov?.wallet) {
@@ -309,9 +315,8 @@ export default function WalletTab({ session, showToast, onStats }) {
       </div>
     </div>
 
-    <!-- Selling & payment provider (individual seller's own Stripe key; EE nodes only) -->
-    <${PspSection} />
-    <${X402Section} />
+    <!-- Selling & payments: every rail that can pay this seller, from one read -->
+    <${SellingSection} />
 
     <!-- Real-money (EUR/USD) purchases & sales, separate from the morsel ledger -->
     <${MoneyActivity} initial=${moneyInitial} />

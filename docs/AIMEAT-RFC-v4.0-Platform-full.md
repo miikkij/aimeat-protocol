@@ -48,7 +48,7 @@ Individual end-user applications built on this Platform (the MACHINE ROOM apps, 
 - 5 The Ecosystem (GEAI apps & event plane)
 - 6 Build Tools (node-served build-app prompt + OpenHands; Generator & Foundry removed)
 - 7 Live Surface: Realtime, Notifications, Push, SSE
-- 8 Business, Payments & Enterprise Direction
+- 8 Business & Payments
 - 9 Deprecations & Cleanup
 - Appendix A: Platform Scope Catalog
 - Appendix B: Platform Capability Status Matrix
@@ -254,16 +254,16 @@ The single operator control plane (`admin-*.ts`, ~17 routes; `public/views/admin
 
 ---
 
-## 8. Business, Payments & Enterprise Direction  `[realizes Core Part VI payment interface]`
+## 8. Business & Payments  `[realizes Core Part VI payment interface]`
 
 The Core provides a **payment interface, not a payment system** (Core Part VI). The Platform is where commercial models are wired onto it — and this is an explicit growth direction, not an afterthought.
 
 - **Enabling, not mandating.** A node may run entirely on morsels with no money at all. A commercial operator wires real settlement behind the same interface. The intended direction is an **HTTP 402 "Payment Required" index** (or an equivalent pluggable settlement hook) so that any metered resource can, at the operator's option, require payment.
 - **The operator owns KYC.** Whoever runs a platform is responsible for know-your-customer, billing, tax, and compliance. The protocol does not impose or perform these; it exposes the hooks.
-- **Enterprise edition** — an open-core direction (a private `ee/` split; Organizations as elevated organisms / GOII; company/KYB features) grows business and heavier-usage capabilities on top of the Core without changing it.
+- **One edition, shaped by configuration.** There is no enterprise fork and no company object. A business runs on its own node: the operator identity carries the legal entity, members are accounts on it, internal structure lives in organisms and workspaces, and every seller brings their own payment credentials. The same substrate is a personal node or a company node depending on how it is configured, which is the whole point of the thin Core.
 - **Metering feeds billing.** The Core usage ledger (Core §25) already exports CSV billing; a commercial operator settles that through the payment interface under their own policy.
 
-The principle mirrors security posture and the thin Core: one substrate supports the hobbyist localhost node and the commercial enterprise deployment, and forces neither.
+The principle mirrors security posture and the thin Core: one substrate supports the hobbyist localhost node and the commercial deployment, and forces neither.
 
 ---
 

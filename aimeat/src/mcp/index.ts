@@ -62,7 +62,6 @@ import { registerConsentTools } from './consent.js';
 import { registerCommerceTools } from './commerce.js';
 import { registerExchangeTools } from './exchange.js';
 import { registerExchangeRunTools } from './exchange-run.js';
-import { registerEnterpriseMcpTools } from './enterprise-tools.js';
 import { registerChatInstancesTools } from './chat-instances.js';
 import { registerFlagsTools } from './flags.js';
 import { registerFeedbackTools } from './feedback.js';
@@ -178,9 +177,6 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerCommerceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerExchangeTools(mcp, storage, config, () => agentGaii);
         registerExchangeRunTools(mcp, storage, config, () => agentGaii, getToken);
-        // Edition-contributed tools (EnterpriseProvider.getMcpTools, installed at boot) — same
-        // scope gate via the dynamic map; no-op on Community.
-        registerEnterpriseMcpTools(mcp, storage, config, () => agentGaii);
         registerChatInstancesTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerFlagsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerFeedbackTools(mcp, storage, config, () => agentGaii);
