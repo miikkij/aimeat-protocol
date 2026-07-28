@@ -49,6 +49,13 @@
  *     own namespace and answered a bare "File not found" — the file was reachable by policy the whole
  *     time (visibility:'owner' / a consent grant), only the lookup was namespaced. Denials now name
  *     the fix. Covered by test/e2e-agent-file-handoff.ts.
+ *   v1.12.0 -- 2026-07-29 -- aimeat_memory_write emits the SSE `memory` domain. It was the one write
+ *     surface that did not: the 24 REST paths in routes/memory/ emit, and so does every other MCP
+ *     surface here (agents, scheduler, organisms, commerce, operator-config), but a write made over
+ *     MCP reached storage and no live consumer heard about it. Measured on production against one
+ *     open, healthy SSE stream: five writes through POST /v1/memory produced five
+ *     {"domains":["memory"]} frames; three through this tool produced none. That is the difference
+ *     between an app that fills in while an agent works and one that needs the human to reload.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -58,6 +65,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { generateTrackingCode } from '../utils/tracking-code.js';
 import { calculateWorkCost, holdEscrow, settlePayment } from '../services/morsel.js';
+import { emitChange } from '../services/event-bus.js';
 import type { ResourceChangeEvent } from './index.js';
 import { resourceEvents } from './index.js';
 import { annotationsFor } from './annotations.js';
@@ -412,6 +420,18 @@ export function registerCoreTools(
             });
             emitResourceUpdated(agentGaii, `aimeat://memory/${encodeURIComponent(key)}`);
             if (!existing) emitResourceListChanged(agentGaii);
+            // The SSE `memory` domain, which every REST write path already emits (24 call sites in
+            // src/routes/memory/). This one did not, so a write made over MCP reached storage and
+            // no live consumer ever heard about it: an app watching its owner's memory saw the
+            // agent's work only if the human reloaded. Every other MCP surface here emits — agents,
+            // scheduler, organisms, commerce, operator-config — and memory was the gap.
+            //
+            // No ownerGaii argument, matching the REST paths: an omitted owner is a global
+            // broadcast, and the SSE layer's own scope check (DOMAIN_SCOPE requires memory:read)
+            // decides who is entitled to hear it. Passing the AGENT's GAII here would scope the
+            // event to the agent's own streams and hide it from the owner's, which is the reverse
+            // of what an owner-visible write means.
+            emitChange('memory');
             return {
                 content: [{
                     type: 'text' as const,

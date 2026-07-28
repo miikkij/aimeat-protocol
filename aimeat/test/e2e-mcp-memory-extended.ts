@@ -405,6 +405,64 @@ await test('9. aimeat_memory_read_public returns error for non-existent key', as
     assert(text.includes('not found') || text.includes('not found'), `error message: ${text}`);
 });
 
+// ─── The live channel hears an agent's write ────────────────────────────────────────────────
+//
+// An agent writes a record over MCP and the human's page fills in without a refresh. That only
+// works if the write EMITS on the SSE `memory` domain, and for a long time this one surface did
+// not: the REST paths emitted, every other MCP surface emitted, and `aimeat_memory_write` wrote
+// straight to storage in silence. Nothing looked broken — the data was there on the next reload —
+// which is why it survived. Measured on production before the fix: five writes through
+// POST /v1/memory produced five frames on one open stream, three through this tool produced none.
+//
+// The assertion is deliberately about the OWNER's stream rather than the agent's. What the fix
+// buys is a human watching their agent work, so that is what is checked.
+await test('10. aimeat_memory_write reaches the owner\'s live stream on the "memory" domain', async () => {
+    const ticket = await json('/v1/events/ticket', {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(ticket.status === 200 && !!ticket.body.data?.ticket, `ticket: ${ticket.status}`);
+
+    const ctrl = new AbortController();
+    const res = await fetch(`${BASE}/v1/events?ticket=${ticket.body.data.ticket}`, { signal: ctrl.signal });
+    assert(res.status === 200, `stream status ${res.status}`);
+
+    let buf = '';
+    const reader = res.body!.getReader();
+    const dec = new TextDecoder();
+    void (async () => {
+        try {
+            for (;;) {
+                const { value, done } = await reader.read();
+                if (done) break;
+                if (value) buf += dec.decode(value, { stream: true });
+            }
+        } catch { /* aborted below */ }
+    })();
+
+    const domains = () => buf.split('\n')
+        .filter(l => l.startsWith('data: '))
+        .flatMap(l => { try { const p = JSON.parse(l.slice(6)); return Array.isArray(p.domains) ? p.domains : []; } catch { return []; } });
+
+    // Let the stream open before the write, or the frame races the connection.
+    const openDeadline = Date.now() + 3_000;
+    while (Date.now() < openDeadline && !buf.includes(':open')) await new Promise(r => setTimeout(r, 50));
+    assert(buf.includes(':open'), 'stream must open before the write');
+
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_memory_write',
+        arguments: { key: 'sse.mcp.probe', value: { at: Date.now() }, visibility: 'owner' },
+    }, 203);
+    assert(body.result?.content?.[0]?.text !== undefined, 'write returned content');
+    assert(JSON.parse(body.result.content[0].text).written === true, 'write reported success');
+
+    const deadline = Date.now() + 6_000;
+    while (Date.now() < deadline && !domains().includes('memory')) await new Promise(r => setTimeout(r, 100));
+    const seen = domains();
+    ctrl.abort();
+    assert(seen.includes('memory'),
+        `an MCP memory write must emit the "memory" domain; the owner stream saw ${JSON.stringify(seen)}`);
+});
+
 // ─── Summary ───
 console.log(`\n${passed + failed} tests: ${passed} passed, ${failed} failed\n`);
 if (failed > 0) process.exit(1);
