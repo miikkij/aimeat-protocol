@@ -9,33 +9,42 @@
  * @version-history
  *   v1.0.0 — 2026-06-10 — Initial (owner spec: human card).
  *   v2.0.0 — 2026-07-28 — Contact details from siteLinks instead of hardcoded. A clone of
- *     this repo used to publish Jouni's phone number on its own business page.
+ *     this repo used to publish the founder's phone number on its own business page.
+ *   v2.1.0 — 2026-07-28 — Renders a LIST of people with roles: a company has a person who
+ *     answers commercial questions and a person who answers technical ones, and a single
+ *     hardcoded card sent both to the same inbox.
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { siteLink } from '/js/site.js';
+import { siteContacts } from '/js/site.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
 export function ContactCard() {
-  const name = siteLink('contactName');
-  const email = siteLink('contactEmail');
-  const phone = siteLink('contactPhone');
+  const contacts = siteContacts();
 
-  // No email, no card. A "talk to a human" box with nobody behind it is worse than nothing.
-  if (!email) return null;
+  // Nobody configured, no card. A "talk to a human" box with no human behind it is worse
+  // than nothing at all.
+  if (contacts.length === 0) return null;
 
   return html`
     <div class="ld-contact">
       <div class="ld-contact-title">${tr('contact.title', 'Talk to a human.')}</div>
-      ${name ? html`<div class="ld-contact-name">${name}</div>` : ''}
-      <div class="ld-contact-links">
-        ${phone ? html`<a href=${`tel:${phone.replace(/\s+/g, '')}`}>${phone}</a>` : ''}
-        <a href=${`mailto:${email}`}>${email}</a>
+      <div class="ld-contact-people">
+        ${contacts.map(c => html`
+          <div class="ld-contact-person" key=${c.email}>
+            <div class="ld-contact-name">${c.name || c.email}</div>
+            ${c.role ? html`<div class="ld-contact-role">${c.role}</div>` : ''}
+            <div class="ld-contact-links">
+              ${c.phone ? html`<a href=${`tel:${c.phone.replace(/[\s-]/g, '')}`}>${c.phone}</a>` : ''}
+              <a href=${`mailto:${c.email}`}>${c.email}</a>
+            </div>
+          </div>
+        `)}
       </div>
-      <div class="ld-contact-sub">${tr('contact.sub', 'I answer myself. A demo fits in the same call.')}</div>
+      <div class="ld-contact-sub">${tr('contact.sub', 'You reach us directly. A demo fits in the same call.')}</div>
     </div>
   `;
 }

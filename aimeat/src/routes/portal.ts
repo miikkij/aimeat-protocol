@@ -139,11 +139,14 @@ function renderPrivacyNotConfiguredPage(missing: string[], locale: 'en' | 'fi'):
  * no internal id, and no operator field beyond the contact details the operator chose to
  * publish may be added to this object — it ships to every anonymous visitor.
  */
-function publicSiteLinks(config: AimeatConfig): Record<string, string> {
-  const out: Record<string, string> = {};
+function publicSiteLinks(config: AimeatConfig): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(config.siteLinks)) {
     if (typeof value === 'string' && value.trim() !== '') out[key] = value.trim();
   }
+  // The contact list travels as-is when it has anyone in it. Every field of it is already
+  // printed on the public pages, so nothing here is newly disclosed by the injection.
+  if (config.siteLinks.contacts.length > 0) out.contacts = config.siteLinks.contacts;
   return out;
 }
 

@@ -132,7 +132,13 @@
 /* ── Contact card (business + pricing only) ── */
 .ld-contact { max-width: 460px; margin: 2.25rem auto 0; padding: 1.25rem 1.5rem; border: 2px solid var(--accent); border-radius: 14px; background: var(--card); text-align: center; }
 .ld-contact-title { font-size: 1.15rem; font-weight: 800; margin-bottom: .4rem; }
+/* Two people side by side on a wide screen, stacked on a phone. */
+.ld-contact-people { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: .5rem; }
+.ld-contact-person { display: flex; flex-direction: column; gap: .2rem; }
+.ld-contact-role { font-size: .8rem; color: var(--text-dim); margin-bottom: .2rem; }
 .ld-contact-name { font-weight: 600; margin-bottom: .35rem; }
+.ld-contact-person .ld-contact-name { margin-bottom: 0; }
+.ld-contact-person .ld-contact-links { flex-direction: column; gap: .15rem; margin-bottom: 0; }
 .ld-contact-links { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; margin-bottom: .45rem; }
 .ld-contact-links a { color: var(--accent); text-decoration: none; font-weight: 600; }
 .ld-contact-links a:hover { text-decoration: underline; }

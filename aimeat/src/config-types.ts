@@ -110,6 +110,22 @@ export interface OperatorConfig {
  * Same posture rule as the rest of the config (Rule 10): safe public default in the repo,
  * documented per-node override.
  */
+/**
+ * One person printed on the public pages. The FIRST entry with an email is the one every
+ * "book a demo" / "talk to us" call to action mails, so order it by who should field the
+ * first contact rather than by seniority.
+ */
+export interface SiteContact {
+  /** Display name. */
+  name: string;
+  /** Role line under the name (e.g. "CEO and co-founder"). Optional. */
+  role: string;
+  /** Contact email. An entry with no email is dropped — it would render as a dead card. */
+  email: string;
+  /** Phone, rendered as a tel: link. Optional. */
+  phone: string;
+}
+
 export interface SiteLinksConfig {
   /** Hands-on academy / showroom app. Renders the "Learn" nav item when set. */
   learn: string;
@@ -133,12 +149,11 @@ export interface SiteLinksConfig {
   playbooks: string;
   /** An external node running on AIMEAT, shown as third-party proof. */
   showcase: string;
-  /** Contact person shown on the public pages. */
-  contactName: string;
-  /** Contact email for demo / sales enquiries. */
-  contactEmail: string;
-  /** Contact phone, rendered only when set. */
-  contactPhone: string;
+  /**
+   * People shown on the public pages, in the order they should be approached. Empty means the
+   * node prints no contact card and no "talk to us" control at all, which is a valid state.
+   */
+  contacts: SiteContact[];
 }
 
 export interface AimeatConfig {
