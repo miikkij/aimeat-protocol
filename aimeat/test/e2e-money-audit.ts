@@ -1210,10 +1210,14 @@ await test('CHAIN · a reseller buys from a supplier on ITS OWN account, and its
         `and the buying capability is named: ${JSON.stringify(row.callers)}`);
 });
 
-await test('MERGE · applied for real, two rights of one human become one and nothing is lost', async () => {
-    // The state this migrates away from: rights were keyed on the exact caller, so a person could hold
-    // one contract as themselves and another through an agent, both drawing on the one balance. Five
-    // such pairs exist on production. This proves the fold keeps every call and every morsel.
+await test('MERGE · a right stored under the OLD key is folded in, deleted, and never counted twice', async () => {
+    // The real shape, not a no-op. Before rights keyed on the owner, an agent's contract lived at a
+    // hash of its own GAII. That key cannot be recomputed from the record any more — which is exactly
+    // how the first version of this migration failed on production: it recomputed the key, got the
+    // survivor's own, deleted nothing, and left the source behind so its 118 calls were counted twice
+    // in the provider's totals. A second run would have folded them in again and read back 236.
+    const { entitlementKey } = await import('../src/services/metered-entitlements.js');
+    const { createHash } = await import('node:crypto');
     const person = await setupOwner('mrg');
     const bot = await setupAgent(person, 'mrgbot');
     const cExt = `apptool:${provider.name}/${APP}`;
@@ -1221,30 +1225,78 @@ await test('MERGE · applied for real, two rights of one human become one and no
     const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(person.token), body: JSON.stringify({ offering_id: offeringSolo, cap_units: 400 }) });
     assert(acc.status === 201, `contract ${acc.status}`);
     await rawInvoke(person.token, 'solo');
-    await rawInvoke(bot.token, 'solo');
+    const owned = await contract(person.token, cExt, 'solo');
+    assert(owned.budget.calls === 1, `the owner-keyed right has one call: ${owned.budget.calls}`);
 
-    const before = await contract(person.token, cExt, 'solo');
-    assert(before.budget.calls === 2, `both calls landed on the one right: ${before.budget.calls}`);
+    // Write a second right the way the OLD scheme did: keyed on the agent's exact GAII.
+    const legacyKey = 'entitlement.' + createHash('sha256').update(`${bot.gaii}|${cExt}|solo`).digest('hex').slice(0, 32);
+    assert(legacyKey !== entitlementKey(bot.gaii, cExt, 'solo'),
+        'the old key is one the current scheme cannot produce — that is the whole problem');
+    const now = new Date().toISOString();
+    await storage.setMemory({
+        key: legacyKey, ownerGaii: 'metered-entitlement',
+        value: { ...JSON.parse(JSON.stringify(owned)), entitlementId: 'legacy-' + Date.now(), consumerGaii: bot.gaii,
+            ext: cExt, action: 'solo', capabilityLabel: `${APP}/solo`, unit: 'morsels', pricePerCall: 8,
+            currency: null, pricing: { model: 'per_call' }, providerGhii: provider.gaii, contractRef: 'legacy',
+            budget: { capUnits: 400, spentUnits: 24, calls: 3 }, rakePercent: null, state: 'active',
+            createdAt: '2026-07-01T00:00:00.000Z', createdBy: person.name, updatedAt: now, callers: undefined },
+        visibility: 'private', tags: ['metered-entitlement'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+    } as never);
 
-    // Nothing to fold — the key is already the owner's, which is the point of the change. The
-    // migration must therefore be a NO-OP here, not a second merge that double-counts.
     const run = await json('/v1/exchange/entitlements/merge', { method: 'POST', headers: auth(operator.token), body: JSON.stringify({ dry_run: false }) });
     assert(run.status === 200, `merge ${run.status}: ${JSON.stringify(run.body?.error)}`);
-    assert(run.body.data.dry_run === false, 'it reports itself as applied');
 
     const after = await contract(person.token, cExt, 'solo');
-    assert(after.budget.calls === before.budget.calls && after.budget.spent_units === before.budget.spent_units,
-        `an already-merged node is untouched: ${before.budget.calls}/${before.budget.spent_units} → ${after.budget.calls}/${after.budget.spent_units}`);
+    assert(after.budget.calls === 4, `the legacy 3 calls joined the owner's 1: ${after.budget.calls}`);
+    assert(after.budget.spent_units === owned.budget.spent_units + 24, `and its spend: ${after.budget.spent_units}`);
 
-    // Idempotent: running it twice must not move anything either.
+    // The stale row is GONE — not merely ignored. While it survived, the provider's totals counted it.
+    const stale = await storage.getMemory('metered-entitlement', legacyKey);
+    assert(!stale, 'the source row was deleted, at the key it was actually stored under');
+
+    // And a second run changes nothing. This is the assertion the first version passed by testing a
+    // node that had nothing to merge.
     const again = await json('/v1/exchange/entitlements/merge', { method: 'POST', headers: auth(operator.token), body: JSON.stringify({ dry_run: false }) });
     assert(again.status === 200, `second run ${again.status}`);
     const third = await contract(person.token, cExt, 'solo');
-    assert(third.budget.calls === before.budget.calls, `and again on a second run: ${third.budget.calls}`);
+    assert(third.budget.calls === 4, `re-running does not count the same calls again: ${third.budget.calls}`);
+    assert(third.budget.spent_units === after.budget.spent_units, `nor the same spend: ${third.budget.spent_units}`);
+});
 
-    // The breakdown still names both principals after the migration touched the store.
-    const rows = await callersOf(person.token, cExt, 'solo');
-    assert(rows.length >= 2, `the human and their agent are both still named: ${JSON.stringify(rows.map((r: any) => r.gaii))}`);
+await test('MERGE · a survivor that still has its source beside it is repaired, not doubled', async () => {
+    // Exactly the state production was left in: the survivor already carries the absorbed history in
+    // its caller breakdown, and the stale row is still there. Folding it in again would inflate a real
+    // customer's meter, so the fold is skipped and only the removal happens.
+    const { createHash } = await import('node:crypto');
+    const person = await setupOwner('mrp');
+    const bot = await setupAgent(person, 'mrpbot');
+    const cExt = `apptool:${provider.name}/${APP}`;
+    await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(person.token), body: JSON.stringify({ offering_id: offeringSolo, cap_units: 400 }) });
+    await rawInvoke(bot.token, 'solo');
+
+    const survivor = await contract(person.token, cExt, 'solo');
+    const botRow = (survivor.callers as any[]).find(c => c.gaii === bot.gaii);
+    assert(botRow && botRow.calls === 1, `the survivor credits the agent: ${JSON.stringify(survivor.callers)}`);
+
+    // The stale source, carrying the SAME history the survivor already counted.
+    const legacyKey = 'entitlement.' + createHash('sha256').update(`${bot.gaii}|${cExt}|solo|legacy`).digest('hex').slice(0, 32);
+    const now = new Date().toISOString();
+    await storage.setMemory({
+        key: legacyKey, ownerGaii: 'metered-entitlement',
+        value: { ...JSON.parse(JSON.stringify(survivor)), entitlementId: 'dup-' + Date.now(), consumerGaii: bot.gaii,
+            ext: cExt, action: 'solo', unit: 'morsels', pricePerCall: 8, currency: null, pricing: { model: 'per_call' },
+            providerGhii: provider.gaii, contractRef: 'dup', capabilityLabel: `${APP}/solo`,
+            budget: { capUnits: 400, spentUnits: 8, calls: 1 }, rakePercent: null, state: 'active',
+            createdAt: '2026-07-02T00:00:00.000Z', createdBy: person.name, updatedAt: now, callers: undefined },
+        visibility: 'private', tags: ['metered-entitlement'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
+    } as never);
+
+    await json('/v1/exchange/entitlements/merge', { method: 'POST', headers: auth(operator.token), body: JSON.stringify({ dry_run: false }) });
+
+    const after = await contract(person.token, cExt, 'solo');
+    assert(after.budget.calls === survivor.budget.calls,
+        `history already in the survivor is not added a second time: ${survivor.budget.calls} → ${after.budget.calls}`);
+    assert(!(await storage.getMemory('metered-entitlement', legacyKey)), 'and the duplicate row is removed');
 });
 
 await test('APP GRANT · a grant given BEFORE the permission existed keeps working', async () => {

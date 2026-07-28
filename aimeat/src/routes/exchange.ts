@@ -43,10 +43,10 @@ import {
   createEntitlement, readEntitlementForCall, readContractForCall, listEntitlementsByConsumer,
   pauseEntitlement, revokeEntitlement,
   issueGrant, revokeGrant, readGrantForCall, listGrantsByProvider,
-  mergeOwnerEntitlements, listAllEntitlementsForMerge,
   listEntitlementHistoryByConsumer, listEntitlementHistoryByProvider,
   type MeteredEntitlement, type EntitlementHistoryEntry,
 } from '../services/metered-entitlements.js';
+import { mergeOwnerEntitlements, listAllEntitlementsForMerge } from '../services/entitlement-merge.js';
 import { resolveActionPricing, resolveOfferingPricing, getOffering, type ActionCommercial } from '../services/exchange-market.js';
 import {
   type ContractProposal, newProposalId, putProposal, getProposal, listProposalsForOwner,
@@ -427,12 +427,13 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
 
     // Group every live right by what it will key to from now on: owner + coordinate + rail.
     const all = await listAllEntitlementsForMerge(storage);
-    const groups = new Map<string, MeteredEntitlement[]>();
-    for (const e of all) {
+    const groups = new Map<string, Array<{ key: string; value: MeteredEntitlement }>>();
+    for (const rec of all) {
+      const e = rec.value;
       const rail = e.unit === 'money' ? `money:${e.currency ?? 'EUR'}` : 'morsels';
       const kind = e.grant ? 'grant' : 'contract';
-      groups.set(`${kind}|${ownerGhiiOf(e.consumerGaii)}|${e.ext}|${e.action}|${rail}`,
-        [...(groups.get(`${kind}|${ownerGhiiOf(e.consumerGaii)}|${e.ext}|${e.action}|${rail}`) ?? []), e]);
+      const k = `${kind}|${ownerGhiiOf(e.consumerGaii)}|${e.ext}|${e.action}|${rail}`;
+      groups.set(k, [...(groups.get(k) ?? []), rec]);
     }
 
     const merged: Array<Record<string, unknown>> = [];

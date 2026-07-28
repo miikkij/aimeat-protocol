@@ -48,7 +48,8 @@ import { ownerGhiiOf } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 
 /** System namespace — server-side only, never surfaced to a client (mirrors `ext-pay-token`). */
-const NS = 'metered-entitlement';
+export const NS_ENTITLEMENT = 'metered-entitlement';
+const NS = NS_ENTITLEMENT;
 /** History namespace — superseded (renegotiated) contracts are archived here so the record survives the
  *  live-key overwrite; the consumer/provider "past contracts" views read it. Append-only. */
 const NS_HISTORY = 'metered-entitlement-history';
@@ -61,7 +62,8 @@ const NS_HISTORY = 'metered-entitlement-history';
  * terms by being generous, and revoking the gift would leave them with nothing rather than with what
  * they paid for. Two slots, and the grant wins while it is active.
  */
-const NS_GRANT = 'metered-grant';
+export const NS_GRANT_PUBLIC = 'metered-grant';
+const NS_GRANT = NS_GRANT_PUBLIC;
 
 /** The unit an entitlement is priced + budgeted in. Kept single-unit-per-entitlement so money micros and
  *  morsels are NEVER conflated (commerce `money.ts` micros ≠ morsel counts). `money` prices are integer
@@ -334,14 +336,6 @@ export async function listEntitlementsByApp(storage: Storage, appId: string): Pr
   return (await listAllEntitlements(storage)).filter(v => v.appId === appId);
 }
 
-/**
- * Every live right on the node, contracts and grants alike — the input to the owner-key migration,
- * which has to see records whose key no longer resolves in order to fold them in.
- */
-export async function listAllEntitlementsForMerge(storage: Storage): Promise<MeteredEntitlement[]> {
-  return listAllEntitlements(storage);
-}
-
 /** Every grant a provider has issued — "who am I carrying, and what has it cost me?". */
 export async function listGrantsByProvider(storage: Storage, providerGhii: string): Promise<MeteredEntitlement[]> {
   const { items } = await storage.listAllMemory({ prefix: 'entgrant.', limit: 5000 });
@@ -410,7 +404,7 @@ export async function createEntitlement(
     createdBy: input.carrySpend?.createdBy || input.createdBy,
     updatedAt: now,
   };
-  await persist(storage, value);
+  await persistEntitlement(storage, value);
   return value;
 }
 
@@ -440,7 +434,7 @@ export async function authorizeAndCharge(
     if (ent.state === 'active') {
       ent.state = 'exhausted';
       ent.updatedAt = new Date().toISOString();
-      await persist(storage, ent);
+      await persistEntitlement(storage, ent);
     }
     return { ok: false, reason: 'budget_exhausted' };
   }
@@ -448,7 +442,7 @@ export async function authorizeAndCharge(
   ent.budget.calls += 1;
   if (ent.budget.capUnits !== null && nextSpent >= ent.budget.capUnits) ent.state = 'exhausted';
   ent.updatedAt = new Date().toISOString();
-  await persist(storage, ent);
+  await persistEntitlement(storage, ent);
   return { ok: true, entitlement: ent };
 }
 
@@ -512,7 +506,7 @@ export async function commitSpend(
   if (pricing) ent.pricing = pricing;
   if (ent.budget.capUnits !== null && ent.budget.spentUnits >= ent.budget.capUnits) ent.state = 'exhausted';
   ent.updatedAt = new Date().toISOString();
-  await persist(storage, ent);
+  await persistEntitlement(storage, ent);
   return ent;
 }
 
@@ -537,7 +531,7 @@ export async function refundSpend(
     e.state = 'active';
   }
   e.updatedAt = new Date().toISOString();
-  await persist(storage, e);
+  await persistEntitlement(storage, e);
 }
 
 /** Pause (owner off-switch) — stops authorising without losing the record/spend history. */
@@ -603,7 +597,7 @@ export async function issueGrant(
     createdBy: input.grantedBy,
     updatedAt: now,
   };
-  await persist(storage, value);
+  await persistEntitlement(storage, value);
   return value;
 }
 
@@ -616,7 +610,7 @@ export async function revokeGrant(storage: Storage, consumerGaii: string, ext: s
   if (!g || !g.grant) return false;
   g.state = 'revoked';
   g.updatedAt = new Date().toISOString();
-  await persist(storage, g);
+  await persistEntitlement(storage, g);
   return true;
 }
 
@@ -628,7 +622,7 @@ async function flip(
   if (!ent) return false;
   ent.state = state;
   ent.updatedAt = new Date().toISOString();
-  await persist(storage, ent);
+  await persistEntitlement(storage, ent);
   return true;
 }
 
@@ -651,75 +645,7 @@ function recordCaller(ent: MeteredEntitlement, callerGaii: string, calls: number
   rows[key] = row;
 }
 
-/**
- * Fold every right one OWNER holds over one coordinate into a single record — the migration for rights
- * that were minted per-principal before they were keyed per-owner.
- *
- * Nothing is thrown away. Calls and spend are summed, each source record's usage becomes its own row in
- * the breakdown, and the originals are archived. The surviving TERMS are the most recently created
- * ones, because that is the last set the human agreed to; where they differ from an older record's,
- * that is a real change to what a call costs and the caller of this function is expected to report it
- * rather than let it happen quietly.
- *
- * Rails are never merged: morsels and money micro-units are different numbers, so a coordinate priced
- * on both keeps one record per rail.
- */
-export async function mergeOwnerEntitlements(
-  storage: Storage, records: MeteredEntitlement[], opts: { dryRun: boolean },
-): Promise<{ survivor: MeteredEntitlement; absorbed: MeteredEntitlement[] } | null> {
-  if (records.length < 2) return null;
-  const ordered = [...records].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
-  const newest = ordered[ordered.length - 1] as MeteredEntitlement;
-  const oldest = ordered[0] as MeteredEntitlement;
-
-  // The survivor carries the newest TERMS and everyone's HISTORY.
-  const survivor: MeteredEntitlement = {
-    ...newest,
-    consumerGaii: ownerGhiiOf(newest.consumerGaii),
-    createdAt: oldest.createdAt,
-    budget: {
-      capUnits: newest.budget.capUnits,
-      spentUnits: ordered.reduce((n, e) => n + e.budget.spentUnits, 0),
-      calls: ordered.reduce((n, e) => n + e.budget.calls, 0),
-    },
-    callers: {},
-    updatedAt: new Date().toISOString(),
-  };
-  if (survivor.grant && newest.grant) {
-    survivor.grant = { ...newest.grant, carriedUnits: ordered.reduce((n, e) => n + (e.grant?.carriedUnits ?? 0), 0) };
-  }
-  // Each source contributes its own usage under its own principal, plus whatever breakdown it already had.
-  for (const e of ordered) {
-    const rows = e.callers ?? { [e.consumerGaii]: { calls: e.budget.calls, spentUnits: e.budget.spentUnits, carriedUnits: e.grant?.carriedUnits ?? 0, lastUsedAt: e.updatedAt } };
-    for (const [who, row] of Object.entries(rows)) {
-      const prev = survivor.callers![who] ?? { calls: 0, spentUnits: 0, carriedUnits: 0, lastUsedAt: '' };
-      survivor.callers![who] = {
-        calls: prev.calls + row.calls,
-        spentUnits: prev.spentUnits + row.spentUnits,
-        carriedUnits: prev.carriedUnits + (row.carriedUnits ?? 0),
-        lastUsedAt: prev.lastUsedAt > row.lastUsedAt ? prev.lastUsedAt : row.lastUsedAt,
-      };
-    }
-  }
-  const absorbed = ordered.filter(e => e !== newest);
-  if (opts.dryRun) return { survivor, absorbed };
-
-  // Archive first: if the write below fails, the record of what was there survives.
-  for (const e of absorbed) await archiveEntitlement(storage, e, 'superseded', null);
-  await persist(storage, survivor);
-  // Drop the source slots that no longer resolve — only the ones whose key differs from the survivor's,
-  // or the write above would be deleted straight after it was made.
-  const keyOf = survivor.grant ? grantKey : entitlementKey;
-  const survivorKey = keyOf(survivor.consumerGaii, survivor.ext, survivor.action);
-  const ns = survivor.grant ? NS_GRANT : NS;
-  for (const e of [...absorbed, newest]) {
-    const k = keyOf(e.consumerGaii, e.ext, e.action);
-    if (k !== survivorKey) await storage.deleteMemory(ns, k);
-  }
-  return { survivor, absorbed };
-}
-
-async function persist(storage: Storage, value: MeteredEntitlement): Promise<void> {
+export async function persistEntitlement(storage: Storage, value: MeteredEntitlement): Promise<void> {
   // A grant lives in its own slot; writing it to the contract key is what would destroy a purchase.
   const isGrant = !!value.grant;
   await storage.setMemory({
