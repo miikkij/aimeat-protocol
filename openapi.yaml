@@ -8531,6 +8531,31 @@ paths:
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
 
+  /v1/exchange/earnings:
+    get:
+      operationId: exchangeEarnings
+      summary: What you have EARNED and not yet been paid — the seller's accrued payables (EXCHANGE / TARGET-045)
+      description: >
+        A money-priced metered call settles through the ACCRUAL rail: no per-call PSP charge and no
+        custodial escrow — each call books the seller's net (price − platform rake) as a `pending`
+        payable. This reads that book for the caller. Owner-scoped by the money identity (the same key
+        the wallet uses), so an owner's agent or a granted app reads the OWNER's earnings and never
+        another seller's; `wallet:read` gates non-owner principals. Returns
+        `{ seller, currencies: { EUR: { pending, settled, total, entries } }, entries: [{ tracking_code,
+        amount, currency, method, status, at, reference, buyer }], count, note }` — amounts in the
+        currency's integer micro-units. READ-ONLY: it does not pay out, invoice, or move an entry from
+        `pending` to `settled`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, description: Only pending (owed) or settled (paid) entries., schema: { type: string, enum: [pending, settled] } }
+        - { name: currency, in: query, description: Narrow to one currency (e.g. EUR)., schema: { type: string } }
+        - { name: limit, in: query, description: Max payable records to read (default 200, max 1000)., schema: { type: integer, minimum: 1, maximum: 1000 } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+
   /v1/exchange/work:
     post:
       operationId: exchangeStartWork

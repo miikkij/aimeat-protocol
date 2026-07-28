@@ -5,6 +5,8 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.2.0 — 2026-07-28 — aimeat-exchange.js coverage (served source, every wrapped group, the
+ *     no-duplication-of-commerce guard, and the registry entry with both dependencies)
  *   v1.1.0 — 2026-07-14 — aimeat-commerce.js coverage (served source + catalogue entry)
  *   v1.0.0 — 2026-07-14 — Header added; file pre-dates header standard
  */
@@ -686,16 +688,41 @@ await test('GET /v1/libs/aimeat-commerce.js — serves checkout + money-formatti
     assert(res.headers.get('Content-Type')?.includes('javascript'), 'should be javascript');
 });
 
-await test('GET /v1/libs — catalogue lists markdown, organism, editor and commerce', async () => {
+await test('GET /v1/libs/aimeat-exchange.js — serves the market client (listings, contracts, earnings)', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-exchange.js`);
+    assert(res.ok, `exchange lib failed: ${res.status}`);
+    const text = await res.text();
+    assert(res.headers.get('Content-Type')?.includes('javascript'), 'should be javascript');
+    // Browsing + selling + contracts + earnings + demand — one endpoint per group, so a group that
+    // silently stops being wired fails here rather than in an app.
+    assert(text.includes('/v1/exchange/offerings'), 'should read the offerings surface');
+    assert(text.includes('/v1/exchange/offerings/'), 'should reach one offering (detail/odps/consumers)');
+    assert(text.includes('/odps.yaml'), 'should expose the ODPS YAML projection');
+    assert(text.includes('/v1/exchange/reconcile'), 'should expose reconcile');
+    assert(text.includes('/v1/exchange/entitlements'), 'should read the caller’s contracts');
+    assert(text.includes('/v1/exchange/earnings'), 'should read the seller’s accrued earnings');
+    assert(text.includes('/v1/exchange/needs'), 'should cover the demand side (needs + bids)');
+    assert(text.includes('odpsCompleteness'), 'should ship the ODPS completeness meter');
+    assert(text.includes('fmtUnit'), 'should ship the unit formatter');
+    // Money formatting is aimeat-commerce's job — this library must DELEGATE, never restate it.
+    assert(!/function fmtMoney|fmtMoney\s*\(micros/.test(text), 'must not re-implement fmtMoney (delegate to AIMEAT.commerce)');
+    assert(!text.includes('1000000'), 'must not restate the money micro-unit constant (use AIMEAT.commerce.MONEY_UNIT)');
+});
+
+await test('GET /v1/libs — catalogue lists markdown, organism, editor, commerce and exchange', async () => {
     const res = await fetch(`${BASE}/v1/libs`);
     assert(res.ok, `libs catalogue failed: ${res.status}`);
     const data = await res.json() as any;
     const names = (data.libraries ?? []).map((l: any) => l.name);
-    for (const expected of ['aimeat-markdown', 'aimeat-organism', 'aimeat-editor', 'aimeat-commerce']) {
+    for (const expected of ['aimeat-markdown', 'aimeat-organism', 'aimeat-editor', 'aimeat-commerce', 'aimeat-exchange']) {
         assert(names.includes(expected), `catalogue should list ${expected} (got: ${names.join(', ')})`);
     }
     const commerce = (data.libraries ?? []).find((l: any) => l.name === 'aimeat-commerce');
     assert(commerce?.requires === 'aimeat-auth', 'aimeat-commerce must declare requires: aimeat-auth');
+    const exchange = (data.libraries ?? []).find((l: any) => l.name === 'aimeat-exchange');
+    // Registered wrong = invisible to every AI-facing surface, which is the failure this catches.
+    assert(exchange?.requires?.includes('aimeat-auth') && exchange?.requires?.includes('aimeat-commerce'),
+        `aimeat-exchange must declare both dependencies, got "${exchange?.requires}"`);
 });
 
 // ─── Results ───

@@ -8,6 +8,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.1.0 — 2026-07-28 — Add aimeat-exchange (the EXCHANGE marketplace browser client). It
+ *     requires aimeat-commerce as well as aimeat-auth: money formatting is commerce's, not its own.
  *   v1.0.0 — 2026-07-16 — initial: 20 SDK packs migrated from libs.ts catalogue +
  *     build-app-prompt lines + llms-template table (Library Acceleration Program, Phase 1).
  */
@@ -260,6 +262,27 @@ export const SDK_PACKS: LibraryPack[] = [
     modelTier: 'needs-doc',
     promptGroup: 'economy',
     promptLine: '- aimeat-commerce.js — buy/sell agent offers via checkout sessions: `AIMEAT.commerce.buyOffer(agent, offerId)` (open + complete in one call), `openCheckout`/`completeCheckout`, the public priced-offer `feed()`, price reading (`getOffer`, `priceOf`) and money formatting — money is integer 6-decimal MICRO-units, `AIMEAT.commerce.fmtMoney(1500000, "EUR")` → "1.50 EUR"; morsels stay plain integers (`fmtAmount` is currency-aware). A 402 error carries `err.paymentRequired` + the x402-style `err.accepts` list. Never ask the user for payment secrets — seller PSP config lives server-side. Requires aimeat-auth.',
+  },
+  {
+    id: 'aimeat-exchange',
+    kind: 'sdk',
+    category: 'economy',
+    title: 'EXCHANGE (marketplace)',
+    description: 'EXCHANGE marketplace from the browser: browse/search offerings and their ODPS v4.1 descriptors, publish and delist your own supply, read usage stats and the provider consumer list (with the per-caller breakdown — which app or agent actually called), accept and switch off contracts, see outbound spend and accrued earnings, and work the demand side (needs + bids). Complements aimeat-commerce (checkout + money formatting) — it does not repeat it.',
+    url: '/v1/libs/aimeat-exchange.js',
+    include: ['<script src="{{BASE_URL}}/v1/libs/aimeat-exchange.js"></script>'],
+    requires: ['aimeat-auth', 'aimeat-commerce'],
+    license: 'MIT',
+    apiSurface: 'AIMEAT.exchange',
+    aiDoc: 'Sell and buy CAPABILITIES (not one-off orders — that is aimeat-commerce). BROWSE (public, works signed out): list({ ext, action, q, stats: true }), search(q), get(id) → { offering, capability, call_recipe, stats, pacing }, odps(id) / odpsYaml(id) for the ODPS v4.1 descriptor, info() for the platform rake. SELL: publish(spec) — the node enforces a legibility gate, so a listing needs a non-empty inputSchema AND outputSchema (400 SCHEMA_REQUIRED) and usageTerms { derivatives, resale, attribution } (400 USAGE_TERMS_REQUIRED), and the PRICE is read authoritatively from the source (the extension action, the tool manifest, the agent offer) — never sent from the browser. Three kinds share the call: default ext-action { ext, action }, { kind: "app-tool", appId, tool }, { kind: "agent-work", agentName, taskType, priceMorsels|priceMoney, inputSchema, outputSchema }. stats(id) is usage/reputation; consumers(id) is PROVIDER-ONLY lineage where each row carries `callers` — the human who pays plus their agents/apps underneath, which is how you answer "is my data read from an app or by an agent directly?". delist(id); reconcile() re-projects your listings from their sources. update(id, patch) is DERIVED (the node has no PATCH for a listing): it republishes and delists, so the offering id changes, and a source-projected listing is refused with SOURCE_MANAGED — edit the source and reconcile() instead. BUY: accept(offeringId, { capUnits, appId, planId }) mints the contract (you choose only the budget; capUnits below one charge → BUDGET_TOO_LOW), contracts() lists what you hold with spend + calls, off(contract, { mode: "pause"|"revoke" }) is the off-switch, history() the superseded terms. spend() is DERIVED from your own contracts (the node aggregates the seller side; the buyer side exists only per app at /v1/apps/cost). EARN: earnings() reads what money calls accrued to you — { currencies: { EUR: { pending, settled, total } }, entries } net of rake, in integer micro-units. Read-only: it does not pay out or settle. DEMAND: needs()/postNeed({ appId, description, spec })/bids(needId)/bid(needId, spec)/acceptBid(needId, bidId). HELPERS: fmtUnit(amount, unit, currency) delegates money to AIMEAT.commerce.fmtMoney and formats morsels as plain integers — the two units never mix in one figure; odpsCompleteness(offering) → { percent, missing[] } counts only the fields a PROVIDER authors, so every gap is actionable.',
+    changelog: [],
+    tierHint: 'T2',
+    interviewTriggers: ['marketplace', 'listing', 'offering', 'contract', 'earnings', 'sell data', 'kauppapaikka', 'listaus', 'sopimus', 'tarjooma'],
+    sizeEstimate: '~12KB',
+    status: 'stable',
+    modelTier: 'needs-doc',
+    promptGroup: 'economy',
+    promptLine: '- aimeat-exchange.js — the EXCHANGE marketplace from the browser: browse/search listings + their ODPS descriptors (`AIMEAT.exchange.list`, `get`, `odps`), publish your own supply (`publish` — needs input+output schema and `usageTerms`; price comes from the source, never the browser), see who is using it (`stats`, `consumers` — each row breaks down whether an app or an agent actually called), accept + switch off contracts (`accept`, `contracts`, `off`), read outbound `spend()` and accrued `earnings()`, and work the demand side (`needs`, `postNeed`, `bid`, `acceptBid`). Money stays integer micro-units — format with `fmtUnit`. Requires aimeat-auth + aimeat-commerce.',
   },
   {
     id: 'aimeat-audio',

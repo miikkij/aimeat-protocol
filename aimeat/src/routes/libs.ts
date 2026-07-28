@@ -6,6 +6,10 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.1.0 - 2026-07-28 - New library aimeat-exchange.js: the EXCHANGE marketplace from a browser —
+ *   browse/search listings, publish + manage your own supply, provider lineage (who called, and
+ *   whether from an app or an agent), contracts, outbound spend, accrued earnings, and the demand
+ *   side (needs + bids). Registered as a route and in the library-pack registry.
  * v2.0.0 - 2026-07-19 - SDK-libs migration Phase 5: every browser lib is now authored as
  *   componentized JSDoc-typed ESM under src/static/sdk-libs/ and esbuild-bundled to an IIFE served at
  *   the same URL. Removed all 23 JS-in-a-template-string generators (lib-*.ts, libs/auth-lib-part*.ts,
@@ -156,8 +160,8 @@ import { buildLibsCatalogue } from '../data/library-packs.js';
 // URL) are wired explicitly below; everything else is this list. Sources: src/static/sdk-libs/<name>/.
 const SDK_LIB_NAMES = [
   'speech', 'data', 'wallet', 'ai', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
-  'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'webmcp',
-  'markdown', 'audio', 'tunnel',
+  'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'exchange',
+  'webmcp', 'markdown', 'audio', 'tunnel',
 ] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {

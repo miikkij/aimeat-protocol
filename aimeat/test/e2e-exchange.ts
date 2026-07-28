@@ -9,6 +9,9 @@
  *   spend; the consumer's pause/revoke off-switch blocks calls; and re-accepting resumes (spend carried).
  * @usage cd aimeat && AIMEAT_EXTENSIONS_ENABLED=true pnpm exec tsx test/e2e-exchange.ts
  * @version-history
+ *   v1.3.0 — 2026-07-28 — EARNINGS: GET /v1/exchange/earnings — the seller's own accrued payables
+ *     (per currency + the per-entry breakdown), the ?status filter, cross-owner isolation and the
+ *     unauthenticated refusal. The accrual rail booked these and no route read them.
  *   v1.2.0 — 2026-07-25 — ODPS v4.1 conformance (TARGET-045 §4): provenance + odps authoring block
  *     validated on write, and the projected document checked against the OFFICIAL published schema.
  *   v1.1.0 — 2026-07-20 — Legibility layer: offering detail (I/O schema + recipe + stats), usage terms, need
@@ -387,7 +390,46 @@ if (!moneyEnabled) {
     assert(r.status === 200, `cost ${r.status}`);
     assert(r.body.data.totals.money.spent_units === 200000 && r.body.data.totals.money.calls === 2, `money totals: ${JSON.stringify(r.body.data.totals.money)}`);
   });
+
+  // ── EARNINGS: the other half of the money rail — what the accrual actually owes the SELLER ──
+  // The consumer's side of a money call was already readable (budget spent). The provider's side was
+  // booked as a payable and read by nothing, so a seller could see that they had been used and not
+  // that they had been paid.
+  await test('EARNINGS: the seller reads what the money calls accrued — 2 pending EUR entries, net of rake', async () => {
+    const rake = ((await json('/v1/exchange/info')).body.data.rake_percent) || 5;
+    const net = 100000 - Math.ceil(100000 * rake / 100);
+    const r = await json('/v1/exchange/earnings', { headers: auth(provider.token) });
+    assert(r.status === 200, `earnings ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    const d = r.body.data;
+    assert(d.seller === `${provider.name}@${NODE_ID}`, `earnings are owner-scoped, got seller=${d.seller}`);
+    const eur = d.currencies?.EUR;
+    assert(!!eur, `expected an EUR accrual, got ${JSON.stringify(d.currencies)}`);
+    assert(eur.entries === 2, `2 money calls → 2 payable entries, got ${eur.entries}`);
+    assert(eur.pending === 2 * net, `pending must be the net of rake (2×${net}), got ${eur.pending}`);
+    assert(eur.settled === 0, `nothing is settled yet (this surface only makes the accrual readable), got ${eur.settled}`);
+    assert(Array.isArray(d.entries) && d.entries.length === 2, `per-contract breakdown behind the figure: ${JSON.stringify(d.entries)}`);
+    assert(d.entries.every((e: any) => e.status === 'pending' && e.amount === net && e.tracking_code), `entry shape: ${JSON.stringify(d.entries[0])}`);
+    assert(d.entries.some((e: any) => e.buyer === `${consumer.name}@${NODE_ID}`), `the buyer is named on the entry: ${JSON.stringify(d.entries.map((e: any) => e.buyer))}`);
+  });
+
+  await test('EARNINGS: ?status=settled filters — none of this accrual is settled', async () => {
+    const r = await json('/v1/exchange/earnings?status=settled', { headers: auth(provider.token) });
+    assert(r.status === 200, `earnings filtered ${r.status}`);
+    assert(r.body.data.count === 0, `no settled entries yet, got ${r.body.data.count}`);
+  });
+
+  await test('EARNINGS: the BUYER who paid reads none of the seller’s accrual (owner-scoped, not client-supplied)', async () => {
+    const r = await json('/v1/exchange/earnings', { headers: auth(consumer.token) });
+    assert(r.status === 200, `earnings ${r.status}`);
+    assert(r.body.data.count === 0, `the buyer must read none of the provider's payables, got ${r.body.data.count}`);
+    assert(!r.body.data.currencies?.EUR, `and no EUR total: ${JSON.stringify(r.body.data.currencies)}`);
+  });
 }
+
+await test('EARNINGS requires auth → 401 without a token', async () => {
+  const r = await json('/v1/exchange/earnings');
+  assert(r.status === 401, `expected 401, got ${r.status}`);
+});
 
 // ── GAP 1: APP-TOOL OFFERINGS (cross-app selling) — pinned interface + metered call + freeze ──
 // A provider APP sells one of its tools (e.g. getCompanyBrief) as a durable metered offering. The tool binds

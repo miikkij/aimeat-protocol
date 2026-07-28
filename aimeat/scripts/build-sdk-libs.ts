@@ -13,6 +13,7 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.1.0 — 2026-07-28 — Register aimeat-exchange (the EXCHANGE marketplace browser client).
  *   v1.0.0 — 2026-07-19 — Initial: esbuild IIFE bundler + drift check for the SDK-libs migration (Phase 0, pilot: speech).
  */
 import * as esbuild from 'esbuild';
@@ -55,6 +56,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'social', entry: 'social/index.js' },
   { name: 'work', entry: 'work/index.js' },
   { name: 'commerce', entry: 'commerce/index.js' },
+  { name: 'exchange', entry: 'exchange/index.js' },
   { name: 'webmcp', entry: 'webmcp/index.js' },
   { name: 'markdown', entry: 'markdown/index.js' },
   { name: 'audio', entry: 'audio/index.js' },

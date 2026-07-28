@@ -13,11 +13,16 @@
  *   the Stripe/EE drawdown is wired. Dynamic agent-negotiated pricing (a signed price quote that differs
  *   from the list price) is a later addition — slice-1 accepts the provider's listed price + a budget.
  * @structure exchangeRouter — POST /v1/exchange/entitlements · GET /v1/exchange/entitlements ·
- *   POST /v1/exchange/entitlements/off
+ *   POST /v1/exchange/entitlements/off · GET /v1/exchange/earnings
  * @usage
  *   import { exchangeRouter } from './routes/exchange.js';
  *   app.use(exchangeRouter(config, storage));
  * @version-history
+ *   v1.5.0 — 2026-07-28 — EARNINGS: GET /v1/exchange/earnings reads the seller's own accrued
+ *     payables (per currency + the per-entry breakdown). The accrual rail booked these on every
+ *     money-priced call and nothing exposed them — the exposure lived in the removed ee/ module,
+ *     so a seller could see they had been used but not that they had been paid. Read-only: it does
+ *     not pay out, invoice, or move an entry from `pending` to `settled`.
  *   v1.4.0 — 2026-07-27 — GRANTS: POST/GET /v1/exchange/grants + /grants/revoke — a provider carries a
  *     consumer instead of billing them, which is what "only the members I approve" means once a
  *     capability has a price. Contract-lifecycle reads (mint carry-forward, renegotiation, the
@@ -47,6 +52,7 @@ import {
   type MeteredEntitlement, type EntitlementHistoryEntry,
 } from '../services/metered-entitlements.js';
 import { mergeOwnerEntitlements, listAllEntitlementsForMerge } from '../services/entitlement-merge.js';
+import { listPayables } from '../commerce/payable-book.js';
 import { resolveActionPricing, resolveOfferingPricing, getOffering, type ActionCommercial } from '../services/exchange-market.js';
 import {
   type ContractProposal, newProposalId, putProposal, getProposal, listProposalsForOwner,
@@ -593,6 +599,68 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const providerGhii = resolveIdentity(req.auth!, config.nodeId);
     const past = await listEntitlementHistoryByProvider(storage, providerGhii);
     return res.json(success(config.nodeId, { history: past.map(e => historyView(config, e)), count: past.length }));
+  });
+
+  // ── EARNINGS (what the accrual rail owes the seller) ─────────────────────────
+  /**
+   * GET /v1/exchange/earnings — the money the caller has EARNED and not yet been paid.
+   *
+   * A money-priced call settles through the accrual rail (services/entitlement-money.ts): no per-call
+   * PSP charge, no custodial escrow — each metered call books the seller's net (price − rake) as a
+   * `pending` payable (commerce/payable-book.ts). Both halves of that were already true and only one
+   * of them was readable: a seller could see they had been USED (offering stats, consumer lineage)
+   * and not that they had been PAID. `listPayables` existed; the route that exposed it lived in the
+   * removed `ee/` module, so the figure was booked and read by nothing.
+   *
+   * This makes the accrued figure readable. It deliberately does NOT pay anything out, invoice
+   * anything, or move an entry from `pending` to `settled` — that is a later phase, and a route that
+   * implied otherwise would be the wrong kind of promise about money.
+   *
+   * Owner-scoped by the money identity: `ownerGhiiOf(resolveIdentity(...))`, the same key the wallet
+   * and the payable book use, so an owner's agent or a granted app reads the OWNER's earnings and
+   * never another seller's. `wallet:read` gates it for those non-owner principals (an owner session
+   * bypasses scopes) — being handed someone's balance and being handed their receivables are the
+   * same favour. `?status=pending|settled`, `?currency=EUR`, `?limit=` narrow it.
+   */
+  router.get('/v1/exchange/earnings', requireAuth(), requireScope('wallet:read'), async (req: Request, res: Response) => {
+    const sellerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
+    const status = req.query.status === 'settled' ? 'settled' : req.query.status === 'pending' ? 'pending' : null;
+    const currency = typeof req.query.currency === 'string' && req.query.currency ? req.query.currency.toUpperCase() : null;
+    const rawLimit = Number(req.query.limit);
+    const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(Math.floor(rawLimit), 1000) : 200;
+
+    const all = await listPayables(storage, sellerGhii, limit);
+    const entries = all.filter(e => (!status || e.status === status) && (!currency || e.currency === currency));
+
+    // The headline figure a seller wants, per currency — split by whether the money has actually
+    // reached them, because "owed" and "paid" are not the same number and one total would hide it.
+    const currencies: Record<string, { pending: number; settled: number; total: number; entries: number }> = {};
+    for (const e of entries) {
+      const c = currencies[e.currency] ?? (currencies[e.currency] = { pending: 0, settled: 0, total: 0, entries: 0 });
+      c[e.status] += e.amount;
+      c.total += e.amount;
+      c.entries += 1;
+    }
+
+    return res.json(success(config.nodeId, {
+      seller: sellerGhii,
+      currencies,
+      entries: entries.map(e => ({
+        tracking_code: e.trackingCode,
+        amount: e.amount,
+        currency: e.currency,
+        method: e.method,
+        status: e.status,
+        at: e.at,
+        reference: e.reference ?? null,
+        buyer: e.buyerGhii ?? null,
+      })),
+      count: entries.length,
+      note: 'Amounts are net of the platform rake, in the currency’s integer micro-units. `pending` means '
+        + 'booked as owed, not yet paid out — this surface reads the accrual, it does not settle it.',
+    }, [
+      { description: 'Who is using what you sell', method: 'GET', url: '/v1/exchange/offerings' },
+    ]));
   });
 
   // ── AGENT WORK (async surface — settled per delivered task, Gap 2) ───────────
