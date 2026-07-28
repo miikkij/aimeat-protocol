@@ -32,6 +32,10 @@
  * @usage  AIMEAT.game.injectStyle() adds it, or link it yourself BEFORE your own styles:
  *   <link rel="stylesheet" href="/lib/aimeat-game.css">
  * @version-history
+ *   v1.3.0 — 2026-07-28 — A menu entry contains its own text (rows size to their entry via
+ *     grid-auto-rows: min-content; the entry element itself moved off <button>, whose box will
+ *     not grow with a nested multi-line child), the rail node paints above its connectors, and
+ *     the measure tokens --ag-menu-max / --ag-screen-max / --ag-actions-align arrived.
  *   v1.2.0 — 2026-07-28 — --ag-font-ui: buttons, chips and tabs no longer inherit the DISPLAY
  *     face. A characterful display face (Bangers, a heavy serif) is for the logo and the big
  *     headings; at 14px on a control it reads as a dark clump. Owner review, arcade skin.

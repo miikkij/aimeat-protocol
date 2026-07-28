@@ -1506,8 +1506,13 @@
 
   // src/static/sdk-libs/game/index.js
   var game = {
-    /** The library version, so an app can require a floor before using a newer component. */
-    version: "1.0.0",
+    /**
+     * The library version, so an app can require a floor before using a newer component — and so
+     * an app that prints it (EXCHANGE LAB does) is not showing a number from three releases ago.
+     * It MUST match the newest entry in the /lib/aimeat-game.css version history; e2e-libs.ts
+     * fails when the two drift, because a version string that never moves is worse than none.
+     */
+    version: "1.3.0",
     // ── Shell and navigation ──
     menu,
     screen,

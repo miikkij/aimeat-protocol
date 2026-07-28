@@ -743,6 +743,22 @@ await test('GET /v1/libs/aimeat-game.js — serves the gamification kit with eve
     assert(!text.includes('🥩'), 'morsels are plain integers — never the meat emoji');
 });
 
+await test('GET /v1/libs/aimeat-game.js — the version an app prints moves with the library', async () => {
+    const [js, css] = await Promise.all([
+        fetch(`${BASE}/v1/libs/aimeat-game.js`).then((r) => r.text()),
+        fetch(`${BASE}/lib/aimeat-game.css`).then((r) => r.text()),
+    ]);
+    // EXCHANGE LAB puts AIMEAT.game.version on screen. It sat at 1.0.0 through three shipped
+    // changes, which is worse than showing nothing — so the constant is pinned to the artefact
+    // that actually carries a changelog, and this fails the moment the two drift.
+    const shipped = js.match(/version:\s*["']([\d.]+)["']/)?.[1];
+    const newest = css.match(/@version-history\s*\n\s*\*\s*v([\d.]+)/)?.[1];
+    assert(shipped, 'the library must expose a version');
+    assert(newest, 'the stylesheet must carry a version history');
+    assert(shipped === newest,
+        `AIMEAT.game.version (${shipped}) must match the newest stylesheet version (${newest})`);
+});
+
 await test('GET /v1/libs/aimeat-game.js — makes no network calls and hardcodes no colour', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-game.js`);
     const code = withoutComments(await res.text());

@@ -27,6 +27,9 @@
  *   AIMEAT.game.injectStyle();
  *   AIMEAT.game.menu({ title: 'Chapters', entries, onPick(e) { … } });
  * @version-history
+ *   v1.3.0 — 2026-07-28 — Menu entries are role="menuitem" elements (a <button> box will not grow
+ *     with a nested multi-line child, so two-line labels spilled over their own border); Enter and
+ *     Space moved to the list handler; menu({ full, head }) options.
  *   v1.0.0 — 2026-07-28 — Initial: the general-purpose gamification UI kit (NOSTE prompt 01 / requirements R-K3).
  */
 import { attach } from '../_core/namespace.js';
@@ -42,8 +45,13 @@ import { badge, comingSoon } from './markers.js';
 import { leaderboard, statGrid, dataTable, card } from './board.js';
 
 const game = {
-  /** The library version, so an app can require a floor before using a newer component. */
-  version: '1.0.0',
+  /**
+   * The library version, so an app can require a floor before using a newer component — and so
+   * an app that prints it (EXCHANGE LAB does) is not showing a number from three releases ago.
+   * It MUST match the newest entry in the /lib/aimeat-game.css version history; e2e-libs.ts
+   * fails when the two drift, because a version string that never moves is worse than none.
+   */
+  version: '1.3.0',
 
   // ── Shell and navigation ──
   menu, screen, modal, toast, confirm,
