@@ -27,8 +27,8 @@
   "inbox.messageThis": "Send a message",
   "nav.members": "Members",
   "members.title": "Members",
-  "members.desc": "People on this node who have published a portfolio.",
-  "members.empty": "No published portfolios yet.",
+  "members.desc": "People here who have published a page of their own.",
+  "members.empty": "Nobody has published a page yet. Yours can be the first.",
   "inbox.broadcast": "Broadcast",
   "inbox.broadcastTitle": "Send to many",
   "inbox.bcModeBroadcast": "Message (repliable)",
@@ -8568,5 +8568,7 @@
   "invite.signedInAs": "You're signed in as {owner}.",
   "invite.mismatchBody": "This invitation was sent to {email}. It can only be accepted by the account whose verified email is that address. Sign out and open the link again, or ask the inviter to add your account directly.",
   "invite.signOutRetry": "Sign out",
-  "invite.switchAccount": "Use a different account"
+  "invite.switchAccount": "Use a different account",
+  "members.yours": "Every account can have one. Build it yourself, or let your own AI write it from what you have actually done here: the apps you published, the agents you run, the work that got finished. It becomes your page at a web address you can hand to anyone.",
+  "members.yoursCta": "Make your page →"
 }

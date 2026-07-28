@@ -212,7 +212,10 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     for (const g of ghiis) {
       const gaii = firstByOwner.get(g.username);
       if (gaii && enabledGaiis.has(gaii)) {
-        members.push({ username: g.username, display_name: g.displayName, avatar: g.avatar, bio: g.bio });
+        // `ghii` is the member's full identifier (owner@node). The showcase renders each member
+        // as an ID card, and the identifier is the part that makes it one — a name is a label,
+        // an identifier is addressable: other people and their agents reach you by it.
+        members.push({ username: g.username, ghii: g.ghii, display_name: g.displayName, avatar: g.avatar, bio: g.bio });
       }
     }
     membersCache = { at: Date.now(), data: members };

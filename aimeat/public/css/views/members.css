@@ -1,31 +1,61 @@
 /**
  * @file members.css
- * @description Node members showcase grid (published-portfolio owners). Card grid with avatar + name +
- *   bio, linking to each member's portfolio.
+ * @description Node members showcase (published-portfolio owners). Each member renders as an ID
+ *   card: identicon + name + full GHII + bio, linking to their portfolio. Plus the "you can have
+ *   one too" panel above the grid.
  * @version-history
  *   v1.0.0 — 2026-06-23 — Initial.
+ *   v2.0.0 — 2026-07-28 — ID-card layout (avatar beside the identity lines instead of a centred
+ *     column) so the identifier is readable, and the .mbr-yours panel that tells a visitor the
+ *     page is available to them.
  */
 .mbr { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
 .mbr-title { font-size: 1.6rem; margin: 0 0 6px; }
-.mbr-desc { color: var(--text-dim); margin: 0 0 24px; }
+.mbr-desc { color: var(--text-dim); margin: 0 0 20px; }
+
+/* "You can be on this page too." The list is only interesting to a visitor once they know
+   they can join it. */
+.mbr-yours {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+  padding: 16px 18px; margin: 0 0 28px;
+  border: 1px solid var(--accent-border, var(--border)); border-radius: var(--radius-md, 12px);
+  background: var(--accent-subtle, var(--bg-surface, var(--bg-dim)));
+}
+.mbr-yours-text { margin: 0; font-size: 0.92rem; line-height: 1.55; max-width: 62ch; }
+.mbr-yours-cta { white-space: nowrap; }
+
+/* Wider minimum than a plain avatar grid: an identifier is long, and truncating the thing that
+   makes the card an ID card would defeat it. */
 .mbr-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
   gap: 16px;
 }
 .mbr-card {
-  display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
-  padding: 20px 14px; border: 1px solid var(--card-border, var(--border)); border-radius: var(--radius-md, 12px);
+  display: flex; flex-direction: column; gap: 10px;
+  padding: 16px; border: 1px solid var(--card-border, var(--border)); border-radius: var(--radius-md, 12px);
   background: var(--card-bg); text-decoration: none; color: inherit;
   transition: border-color 0.12s, transform 0.12s;
 }
 .mbr-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+/* Avatar beside the identity lines, the way a card carries a photo next to a number. */
+.mbr-card-head { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .mbr-avatar {
-  width: 64px; height: 64px; border-radius: var(--radius-full, 50%);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 32px; background: var(--accent-subtle); border: 1px solid var(--accent-border);
+  width: 52px; height: 52px; flex: 0 0 auto; border-radius: var(--radius-full, 50%);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+  background: var(--accent-subtle); border: 1px solid var(--accent-border);
 }
-.mbr-name { font-weight: 600; }
+.mbr-avatar svg { width: 100%; height: 100%; }
+.mbr-avatar--emoji { font-size: 26px; }
+.mbr-idlines { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.mbr-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The identifier is the card's number: monospace, quiet, and allowed to wrap rather than be cut,
+   because a half-shown identifier is worse than a two-line one. */
+.mbr-ghii {
+  font-family: var(--font-mono, monospace); font-size: 0.72rem; color: var(--text-dim);
+  overflow-wrap: anywhere; line-height: 1.35;
+}
 .mbr-bio {
   font-size: 13px; color: var(--text-dim);
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;

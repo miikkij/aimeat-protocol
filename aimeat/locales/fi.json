@@ -27,8 +27,8 @@
   "inbox.messageThis": "Lähetä viesti",
   "nav.members": "Jäsenet",
   "members.title": "Jäsenet",
-  "members.desc": "Tämän solmun käyttäjät, jotka ovat julkaisseet portfolion.",
-  "members.empty": "Ei julkaistuja portfolioita vielä.",
+  "members.desc": "Täällä olevat ihmiset, jotka ovat julkaisseet oman sivunsa.",
+  "members.empty": "Kukaan ei ole vielä julkaissut sivua. Sinun voi olla ensimmäinen.",
   "inbox.broadcast": "Joukkoviesti",
   "inbox.broadcastTitle": "Lähetä monelle",
   "inbox.bcModeBroadcast": "Viesti (vastattava)",
@@ -8568,5 +8568,7 @@
   "invite.signedInAs": "Olet kirjautuneena tilillä {owner}.",
   "invite.mismatchBody": "Tämä kutsu lähetettiin osoitteeseen {email}. Sen voi hyväksyä vain tili, jonka vahvistettu sähköposti on kyseinen osoite. Kirjaudu ulos ja avaa linkki uudelleen, tai pyydä kutsujaa lisäämään tilisi suoraan.",
   "invite.signOutRetry": "Kirjaudu ulos",
-  "invite.switchAccount": "Käytä toista tiliä"
+  "invite.switchAccount": "Käytä toista tiliä",
+  "members.yours": "Jokainen tunnus voi saada sellaisen. Tee se itse, tai anna oman tekoälysi kirjoittaa se siitä mitä olet täällä oikeasti tehnyt: julkaisemasi appit, ajamasi agentit, valmiiksi saatu työ. Siitä tulee sinun sivusi verkko-osoitteessa jonka voit antaa kenelle tahansa.",
+  "members.yoursCta": "Tee oma sivusi →"
 }
