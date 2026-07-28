@@ -456,9 +456,13 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
     };
 
     // ── v1/mcp — full surface (frozen, role 'all') ──
-    router.post('/v1/mcp', handleMcpPost('all'));
-    router.get('/v1/mcp', handleMcpGet);
-    router.delete('/v1/mcp', handleMcpDelete);
+    // `/mcp` alongside `/v1/mcp`. The versioned path stays canonical and is what the Server Card
+    // declares, but `/mcp` at the origin root is the de facto convention: a client that does not
+    // read the card tries it first, and every one that did got a 404 from a node whose MCP server
+    // was one path away. An alias, not a second server — same handlers, same sessions.
+    router.post(['/v1/mcp', '/mcp'], handleMcpPost('all'));
+    router.get(['/v1/mcp', '/mcp'], handleMcpGet);
+    router.delete(['/v1/mcp', '/mcp'], handleMcpDelete);
 
     // ── v2/mcp/:role — purpose-scoped surfaces (appdev | agent | service | admin) ──
     router.post('/v2/mcp/:role', async (req: Request, res: Response) => {

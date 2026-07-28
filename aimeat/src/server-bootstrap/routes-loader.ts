@@ -51,6 +51,7 @@ import { bootstrapRouter } from '../routes/bootstrap.js';
 import { agentDocsRouter } from '../routes/agent-docs.js';
 import { glossaryRouter } from '../routes/glossary.js';
 import { markdownMirrorsRouter } from '../routes/markdown-mirrors.js';
+import { agentConventionsRouter } from '../routes/agent-conventions.js';
 import { wellknownRouter, discoveryLinkHeaders } from '../routes/wellknown.js';
 import { agentSkillsDiscoveryRouter } from '../routes/agent-skills-discovery.js';
 import { authRouter } from '../routes/auth.js';
@@ -283,6 +284,7 @@ export async function mountRoutes(
   app.use(agentDocsRouter(config));  // /sitemap.md + /AGENTS.md (apex only)
   app.use(glossaryRouter(config));   // /v1/glossary.{json,md} + JSON-LD
   app.use(markdownMirrorsRouter(config));  // <page>.md mirrors (apex only)
+  app.use(agentConventionsRouter(config));  // /openapi.json, /skill.md, /agents.txt, webmcp + x402 discovery
   app.use(statsRouter(config, storage, stats, metricsRegistry));
   app.use(wellknownRouter(config, storage));
   app.use(agentSkillsDiscoveryRouter(config, storage));  // /.well-known/agent-skills (RFC v0.2.0)

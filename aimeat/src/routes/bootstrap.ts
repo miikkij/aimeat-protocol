@@ -144,6 +144,15 @@ export function bootstrapRouter(
 
     const accept = _req.headers.accept ?? '';
     const wantsJson = _req.query.format === 'json' || /application\/json/i.test(accept);
+    // A client that asks for plain text gets plain text. It used to get the HTML page, which is
+    // the one thing `Accept: text/plain` says it does not want — and the markdown landing is
+    // already the right body for it, just under a different content type.
+    const wantsPlain = !wantsJson && _req.query.format !== 'md'
+      && /text\/plain/i.test(accept) && !/text\/html/i.test(accept);
+    if (wantsPlain) {
+      res.type('text/plain; charset=utf-8').send(buildLandingMarkdown(config));
+      return;
+    }
 
     // Markdown for Agents: Accept: text/markdown (or ?format=md) serves the markdown
     // landing — the operator's custom template converted when one is set, the authored

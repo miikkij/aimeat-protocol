@@ -388,6 +388,77 @@ function locs(xml: string): string[] {
         assert(body.data?.for_ai_agents || body.data?.for_ai_assistants, 'bootstrap lost its guidance sections');
     });
 
+    // ── Conventional agent paths (phase 14) ─────────────────────────────────────────────────
+    // Measured by pointing a scanner at itself and reading its probe list out of the result: it
+    // tries /openapi.json, /skill.md, /agents.txt and /mcp at the origin root and reads no
+    // discovery document at all. Being correct at our own address and absent from the conventional
+    // one is a distinction only the spec cares about.
+    await test('the conventional agent paths answer', async () => {
+        const expected: Array<[string, string]> = [
+            ['/openapi.json', 'application/json'],
+            ['/skill.md', 'text/markdown'],
+            ['/agents.txt', 'text/plain'],
+            ['/.well-known/webmcp.json', 'application/json'],
+            ['/.well-known/x402.json', 'application/json'],
+        ];
+        for (const [p, ct] of expected) {
+            const r = await text(p);
+            assert(r.status === 200, `${p} → ${r.status}`);
+            assert(r.ct.includes(ct), `${p} content-type ${r.ct}, expected ${ct}`);
+        }
+    });
+
+    await test('/openapi.json is the whole contract, not a stub', async () => {
+        const spec = await (await fetch(`${BASE}/openapi.json`)).json() as any;
+        assert(typeof spec.openapi === 'string', 'no openapi version field');
+        const n = Object.keys(spec.paths ?? {}).length;
+        assert(n > 100, `expected the full contract, got ${n} paths`);
+    });
+
+    await test('skill.md has frontmatter with a name and a description', async () => {
+        const body = (await text('/skill.md')).body;
+        assert(body.startsWith('---\n'), 'no frontmatter');
+        const fm = body.slice(4, body.indexOf('\n---', 4));
+        assert(/^name:\s*\S+/m.test(fm), 'frontmatter has no name');
+        assert(/^description:\s*\S+/m.test(fm), 'frontmatter has no description');
+    });
+
+    // The rail is real and settles on a test network. That is stated in the document rather than
+    // left to be discovered after a transfer, and it is derived from the network registry, so a
+    // config flip to mainnet changes this answer with no edit here.
+    await test('x402 discovery names the network it actually settles on', async () => {
+        const x = await (await fetch(`${BASE}/.well-known/x402.json`)).json() as any;
+        assert(typeof x.network === 'string' && x.network.length > 0, 'no network');
+        assert(typeof x.testnet === 'boolean', 'testnet flag missing — a buyer must not have to infer it');
+        if (x.testnet) assert(typeof x.notice === 'string', 'a testnet rail must say so in plain words');
+        assert(x.settlement?.custodial === false, 'settlement must declare that this node holds no funds');
+        for (const a of x.assets ?? []) {
+            assert(/^0x[0-9a-fA-F]{40}$/.test(a.address), `bad asset address: ${a.address}`);
+        }
+    });
+
+    await test('the MCP server answers on /mcp as well as /v1/mcp', async () => {
+        // Unauthenticated: any status but 404 proves the route exists. 404 would mean the alias is gone.
+        for (const p of ['/mcp', '/v1/mcp']) {
+            const r = await fetch(`${BASE}${p}`, {
+                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
+            });
+            assert(r.status !== 404, `${p} → 404, the MCP server is not reachable there`);
+        }
+    });
+
+    await test('the root serves plain text to a plain-text client', async () => {
+        const r = await text('/', { Accept: 'text/plain' });
+        assert(r.ct.includes('text/plain'), `Accept: text/plain → ${r.ct}`);
+        assert(r.body.length > 100, 'plain-text body is empty');
+    });
+
+    await test('the HTML head points at llms.txt and identifies the organization', async () => {
+        const h = await text('/', { Accept: 'text/html' });
+        assert(h.body.includes('href="/llms.txt"'), 'no link to llms.txt in the head');
+        assert(h.body.includes('"@type": "Organization"'), 'no Organization JSON-LD');
+    });
+
     console.log(`\n  ${passed} passed, ${failed} failed`);
     process.exit(failed > 0 ? 1 : 0);
 })();

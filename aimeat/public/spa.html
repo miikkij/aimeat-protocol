@@ -45,7 +45,28 @@
     ]
   }
   </script>
+  <!-- SoftwareApplication above says what the software is; Organization says who stands behind the
+       node. An agent resolving "who is aimeat.io" needs the second, and had only the first. -->
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    "name": "AIMEAT",
+    "url": "https://aimeat.io",
+    "logo": "https://aimeat.io/favicon.svg",
+    "description": "Open protocol infrastructure for AI agents: persistent memory, identity, consent, shared workspaces and a usage meter, over REST and MCP.",
+    "sameAs": [
+      "https://github.com/miikkij/aimeat-protocol",
+      "https://www.overscalesolutions.com"
+    ]
+  }
+  </script>
 
+  <!-- The agent-facing documents, declared where a reader looks before fetching anything: an
+       agent tool that reads the head finds the manual without guessing a path, and a scanner that
+       checks whether a site points at its own llms.txt finds the pointer. -->
+  <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-friendly description">
+  <link rel="alternate" type="text/plain" href="/llms-full.txt" title="Full content for LLMs">
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="manifest" href="/manifest.json">
   <!-- WebMCP bridge (TARGET-034 phase C): registers node-level tools (commerce feed, node info)
