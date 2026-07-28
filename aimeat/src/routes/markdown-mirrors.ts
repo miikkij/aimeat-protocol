@@ -65,7 +65,11 @@ export function markdownMirrorsRouter(config: AimeatConfig): Router {
   const router = Router();
 
   for (const page of mirroredPages()) {
-    router.get(mirrorPath(page), apexOnly, (_req, res) => {
+    // The root answers on two paths. A reader forms a mirror URL by appending `.md` to the page
+    // URL, which for the root is `/.md` — and `/index.md` alone left the root as the one page
+    // whose mirror could not be found by the convention every other page follows.
+    const paths = page.path === '/' ? ['/index.md', '/.md'] : [mirrorPath(page)];
+    router.get(paths, apexOnly, (_req, res) => {
       // rel="canonical" back to the HTML page: the mirror is a rendering of that page, not a
       // second page with the same content competing with it in an index.
       res.set('Link', `<${config.baseUrl.replace(/\/$/, '')}${page.path}>; rel="canonical"`);

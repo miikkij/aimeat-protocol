@@ -625,6 +625,17 @@ Sitemap: ${origin}/sitemap.xml
     sendMarkdown(res, appSitemapMd(config, app, appOriginFor(req, config)));
   });
 
+  // The app root's markdown mirror, on both paths a reader might form: `/.md` (page URL + `.md`,
+  // which is what a scanner constructs) and `/index.md`. Same document the root serves under
+  // `?format=md`, so there is one surface and two ways in.
+  router.get(['/.md', '/index.md'], async (req: Request, res: Response, next) => {
+    const app = await appForOrigin(req, config, storage);
+    if (!app) return next();
+    res.set('Link', `<${appOriginFor(req, config)}/>; rel="canonical"`);
+    if (await serveAppAgentFace(res, config, storage, app)) return;
+    return next();
+  });
+
   // App-origin path form: `apps.<apex>/<owner>/<filename>` on the bare app host. Apps need their
   // OWN per-app origin for seamless SSO (the silent bridge binds a token to one subdomain), so this
   // REDIRECTS to the app's auto-assigned `<sub>.apps.<apex>` rather than serving on the shared host.

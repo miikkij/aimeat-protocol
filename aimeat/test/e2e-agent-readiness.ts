@@ -305,6 +305,18 @@ function locs(xml: string): string[] {
         }
     });
 
+    // A scanner forms the mirror URL by appending `.md` to the page URL, so the root's is `/.md`.
+    // This was claimed done in a commit message before the code existed; the assertion is here so
+    // the claim cannot outrun the route again.
+    await test('the root mirror answers on both /.md and /index.md', async () => {
+        for (const p of ['/index.md', '/.md']) {
+            const r = await text(p);
+            assert(r.status === 200, `${p} → ${r.status}`);
+            assert(r.ct.includes('text/markdown'), `${p} content-type ${r.ct}`);
+            assert(r.body.startsWith('---\n'), `${p} has no frontmatter`);
+        }
+    });
+
     await test('page URLs negotiate markdown', async () => {
         for (const p of mirroredPages()) {
             const r = await text(p.path, { Accept: 'text/markdown' });
