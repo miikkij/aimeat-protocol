@@ -73,6 +73,7 @@ function parseSiteContacts(): SiteContact[] {
     role: String(c.role ?? '').trim(),
     email: String(c.email ?? '').trim(),
     phone: String(c.phone ?? '').trim(),
+    linkedin: String(c.linkedin ?? '').trim(),
   });
   if (raw) {
     try {
@@ -88,6 +89,7 @@ function parseSiteContacts(): SiteContact[] {
     role: process.env.AIMEAT_SITE_CONTACT_ROLE,
     email: process.env.AIMEAT_SITE_CONTACT_EMAIL ?? process.env.AIMEAT_OPERATOR_EMAIL,
     phone: process.env.AIMEAT_SITE_CONTACT_PHONE,
+    linkedin: process.env.AIMEAT_SITE_CONTACT_LINKEDIN,
   });
   return single.email ? [single] : [];
 }

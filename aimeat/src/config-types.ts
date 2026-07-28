@@ -124,6 +124,8 @@ export interface SiteContact {
   email: string;
   /** Phone, rendered as a tel: link. Optional. */
   phone: string;
+  /** Profile URL (LinkedIn or equivalent), rendered as a link. Optional. */
+  linkedin: string;
 }
 
 export interface SiteLinksConfig {

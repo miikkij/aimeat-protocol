@@ -46,7 +46,7 @@ export function hasSite(key) {
 }
 
 /**
- * @typedef {{ name: string, role: string, email: string, phone: string }} SiteContact
+ * @typedef {{ name: string, role: string, email: string, phone: string, linkedin: string }} SiteContact
  */
 
 /**

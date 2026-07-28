@@ -13,6 +13,8 @@
  *   v2.1.0 — 2026-07-28 — Renders a LIST of people with roles: a company has a person who
  *     answers commercial questions and a person who answers technical ones, and a single
  *     hardcoded card sent both to the same inbox.
+ *   v2.2.0 — 2026-07-28 — Optional profile link (LinkedIn) per contact. A stranger deciding
+ *     whether to email you generally wants to see who you are first.
  */
 import { h } from 'preact';
 import htm from 'htm';
@@ -40,6 +42,7 @@ export function ContactCard() {
             <div class="ld-contact-links">
               ${c.phone ? html`<a href=${`tel:${c.phone.replace(/[\s-]/g, '')}`}>${c.phone}</a>` : ''}
               <a href=${`mailto:${c.email}`}>${c.email}</a>
+              ${c.linkedin ? html`<a href=${c.linkedin} target="_blank" rel="noopener">${tr('contact.linkedin', 'LinkedIn')}</a>` : ''}
             </div>
           </div>
         `)}
