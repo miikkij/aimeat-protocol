@@ -92,6 +92,10 @@
   /* A game menu sits in the middle of the screen, not stretched across it. `safe center`
      centres a short list and still scrolls a long one instead of clipping its top. */
   align-content: safe center;
+  /* Each row sizes to ITS OWN entry. With auto rows the entries stretch to a row shorter than
+     their content and a two- or three-line label spills over its own border — which happens at
+     every display face a skin might choose, so it has to be fixed here and not by the author. */
+  grid-auto-rows: min-content;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--ag-menu-col)), 1fr));
   width: 100%;
   max-width: var(--ag-menu-max);
@@ -101,10 +105,8 @@
 .ag-menu__item {
   font: inherit;
   text-align: left;
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  align-items: center;
-  gap: var(--ag-gap);
+  display: block;
+  user-select: none;
   min-height: calc(var(--ag-touch) * 1.5);
   padding: calc(var(--ag-pad) * 0.9) var(--ag-pad);
   background-color: var(--ag-surface);
@@ -116,6 +118,15 @@
   transform: rotate(var(--ag-tilt));
   cursor: pointer;
   transition: transform var(--ag-motion) var(--ag-ease), border-color var(--ag-motion) var(--ag-ease);
+  min-width: 0;
+}
+
+.ag-menu__inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ag-gap);
+  min-height: calc(var(--ag-touch) * 1.5 - var(--ag-pad) * 1.8);
   min-width: 0;
 }
 
@@ -181,7 +192,7 @@
 }
 
 .ag-menu__arrow {
-  font-family: var(--ag-font-display);
+  font-family: var(--ag-font-ui);
   font-size: var(--ag-text-title);
   color: var(--ag-accent-text);
 }

@@ -27,6 +27,7 @@
 
 .ag-lb__metric {
   font: inherit;
+  font-family: var(--ag-font-ui);
   font-size: var(--ag-text-fine);
   font-weight: 600;
   min-height: calc(var(--ag-touch) * 0.75);

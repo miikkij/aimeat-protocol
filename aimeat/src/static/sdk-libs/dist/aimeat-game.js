@@ -426,12 +426,12 @@
       }
       clear(list);
       if (!head && depth) {
-        list.appendChild(el("button", {
-          type: "button",
+        list.appendChild(el("div", {
           class: "ag-menu__item ag-menu__item--back",
           role: "menuitem",
+          tabindex: "0",
           on: { click: back }
-        }, el("span", {}, el("span", { class: "ag-menu__label", text: "↩ " + t("back") }))));
+        }, el("div", { class: "ag-menu__inner" }, el("span", {}, el("span", { class: "ag-menu__label", text: "↩ " + t("back") })))));
       }
       const entries = level();
       if (!entries.length) {
@@ -461,16 +461,16 @@
         entry.sublabel ? el("span", { class: "ag-menu__sublabel", text: entry.sublabel }) : null,
         locked && entry.lockReason ? el("span", { class: "ag-menu__reason", text: entry.lockReason }) : null
       ]);
-      return el("button", {
-        type: "button",
+      return el("div", {
         class: "ag-menu__item" + (locked ? " ag-menu__item--locked" : "") + (st === "done" ? " ag-menu__item--done" : ""),
         role: "menuitem",
+        tabindex: "0",
         "data-ag-id": entry.id,
         "aria-disabled": locked ? "true" : null,
         on: { click: function() {
           pick(entry);
         } }
-      }, [body, marks]);
+      }, el("div", { class: "ag-menu__inner" }, [body, marks]));
     }
     function pick(entry) {
       const path = pathIds();
@@ -490,6 +490,17 @@
       if (ev.key === "Escape") {
         ev.preventDefault();
         back();
+        return;
+      }
+      if (ev.key === "Enter" || ev.key === " " || ev.key === "Spacebar") {
+        const active = (
+          /** @type {HTMLElement|null} */
+          document.activeElement
+        );
+        if (active && active.classList.contains("ag-menu__item")) {
+          ev.preventDefault();
+          active.click();
+        }
         return;
       }
       const items = (
