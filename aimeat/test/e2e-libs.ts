@@ -719,6 +719,90 @@ function withoutComments(src: string): string {
     return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
 }
 
+/**
+ * Load a served IIFE library and return the `AIMEAT` surface it attached, so a test can CALL the
+ * thing rather than grep its source. A text assertion cannot tell "formats money" from "mentions
+ * money", and the bug this exists for produced a perfectly plausible-looking string.
+ */
+async function loadServedLib(name: string, extraGlobals: Record<string, unknown> = {}): Promise<any> {
+    const res = await fetch(`${BASE}/v1/libs/${name}`);
+    assert(res.ok, `${name} failed to serve: ${res.status}`);
+    const src = await res.text();
+    // Just enough DOM for a library to finish loading. Anything that actually needs a browser is
+    // out of scope here; this exists to reach the PURE functions, which is where the unit bugs are.
+    const stubEl = () => ({
+        style: {}, dataset: {}, classList: { add() {}, remove() {}, toggle() {}, contains: () => false },
+        setAttribute() {}, getAttribute: () => null, removeAttribute() {}, appendChild() {},
+        addEventListener() {}, removeEventListener() {}, querySelector: () => null, querySelectorAll: () => [],
+    });
+    const doc: any = {
+        documentElement: stubEl(), head: stubEl(), body: stubEl(),
+        createElement: stubEl, createTextNode: stubEl,
+        querySelector: () => null, querySelectorAll: () => [],
+        addEventListener() {}, removeEventListener() {},
+    };
+    const win: any = {
+        AIMEAT: {}, location: { origin: BASE, href: BASE + '/' }, document: doc,
+        navigator: { language: 'en' }, localStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+        matchMedia: () => ({ matches: false, addEventListener() {}, removeEventListener() {} }),
+        addEventListener() {}, removeEventListener() {}, fetch: () => Promise.reject(new Error('no network in this harness')),
+        setTimeout, clearTimeout, console,
+        ...extraGlobals,
+    };
+    win.window = win;
+    win.globalThis = win;
+    win.self = win;
+    const vm = await import('node:vm');
+    const ctx = vm.createContext(win);
+    vm.runInContext(src, ctx);
+    return win.AIMEAT;
+}
+
+await test('aimeat-exchange fmtUnit — money is money, morsels are morsels, and a bad unit THROWS', async () => {
+    // aimeat-commerce owns money formatting; this library must delegate to it. The stub is that
+    // contract, so a change that stopped delegating would fail here too.
+    let delegated: any = null;
+    const AIMEAT = await loadServedLib('aimeat-exchange.js');
+    AIMEAT.commerce = {
+        MONEY_UNIT: 1000000,
+        fmtMoney: (micros: number, currency?: string) => {
+            delegated = { micros, currency };
+            return `${(micros / 1000000).toFixed(2)} ${currency ?? ''}`.trim();
+        },
+    };
+    const { fmtUnit, fmtMorsels } = AIMEAT.exchange;
+
+    // The two units, each in its own shape.
+    assert(fmtUnit(1500000, 'money', 'EUR') === '1.50 EUR', `money: got "${fmtUnit(1500000, 'money', 'EUR')}"`);
+    assert(delegated?.micros === 1500000 && delegated?.currency === 'EUR', 'money must delegate to AIMEAT.commerce.fmtMoney');
+    assert(fmtUnit(10, 'morsels') === '10 morsels', `morsels: got "${fmtUnit(10, 'morsels')}"`);
+    assert(fmtUnit(1, 'morsels') === '1 morsel', `singular morsel: got "${fmtUnit(1, 'morsels')}"`);
+    assert(fmtMorsels(3) === '3 morsels', 'fmtMorsels stays plain integers');
+
+    // The documented shorthand: omit the unit and pass a currency.
+    assert(fmtUnit(1500000, undefined, 'EUR') === '1.50 EUR', 'omitted unit + currency must format as money');
+    // Nothing at all still means morsels, which is the meter and the sensible default.
+    assert(fmtUnit(7) === '7 morsels', 'no unit and no currency is morsels');
+
+    // ── The regression this test exists for ──────────────────────────────────────────────────
+    // `fmtUnit(17793800, 'EUR')` put the CURRENCY in the UNIT slot. The old implementation
+    // evaluated isMoney as false and rendered 17.79 EUR as "17793800 morsels": right explanation,
+    // wrong unit, wrong number by a factor of a million. Silently degrading to the other unit is
+    // not a fallback, it is a wrong figure with a confident face on it (R-S8).
+    let threw = false;
+    let message = '';
+    try { fmtUnit(17793800, 'EUR'); } catch (e: any) { threw = true; message = e.message; }
+    assert(threw, 'fmtUnit(amount, "EUR") must THROW: a currency in the unit slot silently became morsels');
+    assert(/EUR/.test(message) && /unit/i.test(message),
+        `the error must name the offending unit and say what a unit is, got "${message}"`);
+    assert(/money/.test(message), `the error must say how to spell it correctly, got "${message}"`);
+
+    // Any other unknown unit, same treatment.
+    let threw2 = false;
+    try { fmtUnit(5, 'bananas'); } catch { threw2 = true; }
+    assert(threw2, 'an unrecognised unit must throw rather than fall through to morsels');
+});
+
 await test('GET /v1/libs/aimeat-game.js — serves the gamification kit with every component', async () => {
     const res = await fetch(`${BASE}/v1/libs/aimeat-game.js`);
     assert(res.ok, `game lib failed: ${res.status}`);

@@ -508,9 +508,20 @@
     const n = Math.round(Number(amount) || 0);
     return n + (Math.abs(n) === 1 ? " morsel" : " morsels");
   }
+  var MORSEL_UNITS = ["morsels", "morsel", "MORSEL", "MORSELS"];
+  var MONEY_UNITS = ["money"];
   function fmtUnit(amount, unit, currency) {
-    const isMoney = unit === "money" || !!currency && currency !== "morsel" && currency !== "MORSEL";
-    if (!isMoney) return fmtMorsels(amount);
+    if (unit === void 0 || unit === null || unit === "") {
+      const impliedMoney = !!currency && currency !== "morsel" && currency !== "MORSEL";
+      return impliedMoney ? money(amount, currency) : fmtMorsels(amount);
+    }
+    if (MORSEL_UNITS.indexOf(unit) !== -1) return fmtMorsels(amount);
+    if (MONEY_UNITS.indexOf(unit) !== -1) return money(amount, currency);
+    throw new Error(
+      `fmtUnit: unknown unit "${unit}". The signature is fmtUnit(amount, unit, currency), where unit is "money" or "morsels". If "${unit}" is a currency, you want fmtUnit(amount, "money", "${unit}") — passing it as the unit used to render money as morsels, silently and wrongly.`
+    );
+  }
+  function money(amount, currency) {
     const c = commerce();
     if (!c) {
       throw new Error("AIMEAT.commerce is required to format money. Include aimeat-commerce.js before aimeat-exchange.js");

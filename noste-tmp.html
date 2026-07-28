@@ -1,0 +1,1834 @@
+<!--
+  @file noste.html
+  @description NOSTE, a game in which every player starts a real small business on AIMEAT: finds
+    something an AI agent could use, describes it so a machine understands it, prices it, lists it
+    on EXCHANGE and gets real money when somebody calls it.
+
+    THE ONE TENSION THIS APP MANAGES. It looks like a game and every number in it is true. Most
+    gamified products fall over by picking one side, a dull dashboard, or a toy whose figures
+    nobody believes. So: the game layer is on the OUTSIDE and the truth is on the INSIDE. There is
+    no decorative counter anywhere in this file, and celebration is reserved for the three moments
+    in §5 of the design. A compliment that arrives too easily is condescending, and here real money
+    moves.
+
+    WHAT IT DOES NOT DO. It does not build a fourth building prompt, extensions and cortex come
+    from Profile > Extensions, applications from the app catalogue, API acceleration from TURBO,
+    and this fetches them from their own source so improvements upstream arrive for free. It does
+    not write a second definition of ODPS completeness, the platform's validator has one and this
+    links to it. It does not re-implement anything aimeat-game provides.
+  @structure head (theme restore, scopes, locales) · layout CSS (the SKIN is in the cortex) ·
+    i18n en/fi · state · public reads · views (door, menu, home, interview, venture, build,
+    catalogue, product, boards, money, quests, stats, console, privacy) · boot
+  @usage  https://noste.apps.aimeat.io/
+  @version-history
+    v1.0.0 (2026-07-28): Initial (NOSTE brief 03, Part C).
+-->
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, interactive-widget=resizes-content">
+<title>NOSTE</title>
+<meta name="aimeat-app" content="noste.html">
+<meta name="aimeat-locales" content="en fi">
+<!--
+  THE SCOPE LIST, AND WHY IT IS THIS LIST. This meta tag REPLACES the default grant rather than
+  adding to it, so leaving out memory:read would silently drop it. Adding one later does NOT upgrade
+  an existing grant, the player has to re-approve and the new scope arrives UNCHECKED, so getting
+  this right before the first publish is the difference between a working app and one that locks its
+  own owner out. Each one is used:
+    memory:read/write/delete, the player's private ventures and drafts live in their own memory
+    storage:read/write, product logos
+    wallet:read, the morsel balance, and the accrued earnings the money ladder reads
+                               (a granted app is a non-owner principal, which the earnings route
+                               requires this scope for)
+  Nothing else is requested. ai:use is deliberately absent: the interview happens in the player's
+  own AI chat or through their own MCP agent, never on their AI budget here.
+-->
+<meta name="aimeat-scopes" content="memory:read memory:write memory:delete storage:read storage:write wallet:read">
+
+<script>
+  // Restore BOTH theme axes before first paint, so there is no flash of the wrong look.
+  (function () {
+    function mode(t) { document.documentElement.setAttribute('data-theme', t === 'dark' ? 'dark' : 'light'); }
+    function pal(p) {
+      if (p && p !== 'aimeat') document.documentElement.setAttribute('data-palette', p);
+      else document.documentElement.removeAttribute('data-palette');
+    }
+    mode(localStorage.getItem('aimeat-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+    pal(localStorage.getItem('aimeat-palette'));
+    addEventListener('storage', function (e) {
+      if (e.key === 'aimeat-theme' && e.newValue) mode(e.newValue);
+      if (e.key === 'aimeat-palette' && e.newValue) pal(e.newValue);
+    });
+  })();
+</script>
+
+<link rel="stylesheet" href="https://aimeat.io/lib/aimeat-game.css">
+
+<style>
+  /*
+   * LAYOUT ONLY. Every colour, radius, font, density and motion value belongs to the --ag-*
+   * contract and is set by AIMEAT.noste.applySkin(). If something here reaches for a colour, the
+   * variable is missing from the library and that is where it should be added.
+   */
+  html, body { margin: 0; padding: 0; height: 100%; }
+  body {
+    background: var(--ag-bg);
+    color: var(--ag-ink);
+    font-family: var(--ag-font);
+    overflow-x: clip;               /* clip, never hidden, hidden breaks sticky positioning */
+  }
+  #app { min-height: 100dvh; display: flex; flex-direction: column; }
+
+  .nst-top {
+    display: flex; align-items: center; gap: var(--ag-gap);
+    padding: 10px clamp(12px, 3vw, 24px);
+    border-bottom: var(--ag-line-w) solid var(--ag-line);
+    background: var(--ag-surface);
+    position: sticky; top: 0; z-index: 20;
+    flex-wrap: wrap;                /* the item count varies with the role, so it must wrap */
+  }
+  .nst-top__brand {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--ag-font-display); font-weight: var(--ag-weight-display);
+    letter-spacing: var(--ag-tracking-display);
+    font-size: 1.15rem; min-width: 0;
+  }
+  .nst-top__mark { width: 22px; height: 22px; flex: none; }
+  .nst-top__nav { display: flex; gap: 6px; flex-wrap: wrap; flex: 1 1 auto; min-width: 0; }
+  /* The login pill carries the theme, palette and language cluster. Nothing goes beside it that
+     cannot shrink, and this app adds no second control of any of the three. */
+  .nst-top__auth { flex: 0 1 auto; min-width: 0; margin-left: auto; }
+
+  .nst-main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+  .nst-wrap { width: 100%; max-width: 1080px; margin: 0 auto; padding: clamp(14px, 3vw, 28px); }
+
+  .nst-grid { display: grid; gap: var(--ag-gap); grid-template-columns: repeat(auto-fill, minmax(min(260px, 100%), 1fr)); }
+  .nst-split { display: grid; gap: var(--ag-gap); grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) { .nst-split { grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); } }
+  .nst-split--even { grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 900px) { .nst-split--even { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+  .nst-stack { display: flex; flex-direction: column; gap: var(--ag-gap); min-width: 0; }
+  .nst-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+
+  .nst-panel {
+    background: var(--ag-surface);
+    border: var(--ag-line-w) solid var(--ag-line);
+    border-radius: var(--ag-radius);
+    padding: var(--ag-pad);
+    min-width: 0;
+  }
+  .nst-label {
+    font-size: var(--ag-text-fine); text-transform: var(--ag-label-caps);
+    letter-spacing: var(--ag-label-tracking); color: var(--ag-ink-dim);
+  }
+  .nst-lede { font-size: 1.05rem; line-height: 1.55; max-width: 62ch; }
+  .nst-fine { font-size: var(--ag-text-fine); color: var(--ag-ink-dim); line-height: 1.5; max-width: 70ch; }
+
+  /* ── The door. One line, one button, one true number. ── */
+  .nst-door {
+    flex: 1 1 auto; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; gap: var(--ag-gap); padding: clamp(20px, 6vh, 60px) 20px;
+  }
+  .nst-door__mark { width: clamp(76px, 18vw, 132px); height: auto; }
+  .nst-door__title {
+    font-family: var(--ag-font-display); font-weight: var(--ag-weight-display);
+    letter-spacing: var(--ag-tracking-display);
+    font-size: var(--ag-text-hero); margin: 0; line-height: 1;
+  }
+  .nst-door__line { font-size: 1.1rem; max-width: 34ch; margin: 0; color: var(--ag-ink-dim); }
+  .nst-door__proof { display: flex; gap: clamp(16px, 5vw, 44px); flex-wrap: wrap; justify-content: center; }
+  .nst-door__proof b { display: block; font-size: 1.7rem; font-family: var(--ag-font-display); font-variant-numeric: tabular-nums; }
+
+  /* ── The value-add ladder (AIMEAT.noste.ladder) ── */
+  .nst-ladder { display: flex; flex-direction: column; gap: 6px; }
+  .nst-ladder__rung {
+    display: flex; gap: 12px; align-items: flex-start;
+    padding: 10px 12px; border-radius: var(--ag-radius-sm);
+    border: var(--ag-line-w) solid color-mix(in oklab, var(--ag-line) 40%, var(--ag-surface));
+    background: var(--ag-surface);
+  }
+  .nst-ladder__rung--reached { border-color: var(--ag-line); }
+  .nst-ladder__rung--here {
+    border-color: var(--ag-accent);
+    border-left-width: var(--ag-select-w);
+    background: color-mix(in oklab, var(--ag-accent) 8%, var(--ag-surface));
+  }
+  .nst-ladder__rung--next { border-style: dashed; }
+  .nst-ladder__num {
+    font-family: var(--ag-font-display); font-size: 1.05rem; line-height: 1.4;
+    min-width: 1.4em; text-align: center; color: var(--ag-ink-dim); font-variant-numeric: tabular-nums;
+  }
+  .nst-ladder__rung--here .nst-ladder__num { color: var(--ag-accent-text); }
+  .nst-ladder__body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .nst-ladder__title { font-weight: 600; }
+  .nst-ladder__what { font-size: var(--ag-text-fine); color: var(--ag-ink-dim); line-height: 1.45; }
+  .nst-ladder__note { font-size: var(--ag-text-fine); color: var(--ag-ink-dim); margin: 6px 0 0; }
+
+  /* ── The prompt pair (AIMEAT.noste.promptBox) ── */
+  .nst-prompt__cols { display: grid; gap: var(--ag-gap); grid-template-columns: minmax(0, 1fr); }
+  @media (min-width: 860px) { .nst-prompt__cols { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
+  .nst-prompt__col { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+  .nst-prompt__text {
+    margin: 0; max-height: 320px; white-space: pre-wrap; word-break: break-word;
+    font-family: var(--ag-font-mono); font-size: var(--ag-text-fine); line-height: 1.5;
+    background: var(--ag-surface-2); border: var(--ag-line-w) solid var(--ag-line);
+    border-radius: var(--ag-radius-sm); padding: 12px;
+  }
+  .nst-prompt__in {
+    width: 100%; box-sizing: border-box; resize: vertical; min-height: 180px;
+    font-family: var(--ag-font-mono); font-size: var(--ag-text-fine); line-height: 1.5;
+    color: var(--ag-ink); background: var(--ag-surface-2);
+    border: var(--ag-line-w) solid var(--ag-line); border-radius: var(--ag-radius-sm); padding: 12px;
+  }
+  .nst-prompt__status { margin: 0; font-size: var(--ag-text-fine); min-height: 1.4em; line-height: 1.45; }
+  .nst-prompt__status--err { color: var(--ag-err); }
+  .nst-prompt__status--ok { color: var(--ag-ok); }
+  .nst-prompt__status--warn { color: var(--ag-warn); }
+  .nst-prompt__hint, .nst-prompt__mcp { font-size: var(--ag-text-fine); color: var(--ag-ink-dim); margin: 0; line-height: 1.5; }
+  .nst-prompt__mcp { margin-top: var(--ag-gap); padding-top: 10px; border-top: 1px solid var(--ag-line); }
+
+  /* ── The money view is deliberately the plainest screen in the game. ── */
+  .nst-money .nst-panel { background: var(--ag-surface); }
+  .nst-money .nst-figure {
+    font-family: var(--ag-font-mono); font-variant-numeric: tabular-nums;
+    font-size: 1.6rem; letter-spacing: -0.01em;
+  }
+
+  .nst-form { display: flex; flex-direction: column; gap: 10px; }
+  .nst-form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--ag-text-fine); min-width: 0; }
+  .nst-form input, .nst-form textarea, .nst-form select {
+    font: inherit; font-size: 0.95rem; color: var(--ag-ink); background: var(--ag-surface-2);
+    border: var(--ag-line-w) solid var(--ag-line); border-radius: var(--ag-radius-sm);
+    padding: 9px 10px; width: 100%; box-sizing: border-box; min-width: 0;
+  }
+  .nst-form textarea { resize: vertical; min-height: 74px; }
+
+  /* The four entry points: a label and a sentence, sized to their own text. */
+  .nst-entry { display: block; width: 100%; text-align: left; padding: 14px 16px; height: auto; }
+  .nst-entry__label { display: block; font-weight: 600; margin-bottom: 3px; }
+  .nst-entry__hint { display: block; font-size: var(--ag-text-fine); color: var(--ag-ink-dim); line-height: 1.45; white-space: normal; }
+
+  .nst-scroll-x { overflow-x: auto; max-width: 100%; }
+  .nst-empty { color: var(--ag-ink-dim); font-size: var(--ag-text-fine); line-height: 1.55; max-width: 60ch; }
+  .nst-hide { display: none !important; }
+</style>
+
+<div id="app">
+  <header class="nst-top" id="top" hidden>
+    <span class="nst-top__brand">
+      <svg class="nst-top__mark" viewBox="0 0 32 32" aria-hidden="true">
+        <rect x="8" y="3" width="16" height="10" rx="2" fill="none" stroke="var(--ag-accent)" stroke-width="2.5"/>
+        <path d="M9 19h14M11 23h10" stroke="var(--ag-ink-dim)" stroke-width="2" stroke-linecap="round"/>
+        <path d="M8 30l8-4 8 4" fill="none" stroke="var(--ag-accent-2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span>NOSTE</span>
+    </span>
+    <nav class="nst-top__nav" id="nav"></nav>
+    <span class="nst-top__auth" id="login"></span>
+  </header>
+  <main class="nst-main" id="main"></main>
+</div>
+
+<script src="https://aimeat.io/v1/libs/aimeat-auth.js"></script>
+<script src="https://aimeat.io/v1/libs/aimeat-commerce.js"></script>
+<script src="https://aimeat.io/v1/libs/aimeat-exchange.js"></script>
+<script src="https://aimeat.io/v1/libs/aimeat-game.js"></script>
+<script src="https://aimeat.io/v1/cortex/noste-cortex/libs/noste.js"></script>
+
+<script>
+(function () {
+  'use strict';
+
+  var G = AIMEAT.game;
+  var N = AIMEAT.noste;
+  var X = AIMEAT.exchange;
+
+  // ── Words ──────────────────────────────────────────────────────────────────────────────────
+  // Finnish is written as Finnish, not as translated English. The kit's own handful of strings
+  // come from aimeat-game; everything below is NOSTE's.
+  var DICT = {
+    en: {
+      tagline: 'Start a real business your AI can sell for you.',
+      door: 'Find the one thing you already have that an AI agent would pay to use. Describe it, price it, list it. The money is real.',
+      begin: 'Begin', continue: 'Continue', builtHere: 'services built here', calledToday: 'calls today',
+      playersHere: 'players', navHome: 'Home', navVenture: 'Ventures', navCatalogue: 'Catalogue',
+      navBoards: 'Boards', navMoney: 'Money', navQuests: 'Quests', navStats: 'Stats',
+      navConsole: 'Console', navPrivacy: 'What we can see',
+      menuTitle: 'NOSTE', menuSub: 'Everything here is real. The points are not money and the money is not a game.',
+      mAct0: 'What have you got?', mAct0s: 'An interview that finds what you could sell',
+      mAct1: 'Your ventures', mAct1s: 'Score, value-add level, what to fix next',
+      mAct2: 'Build it', mAct2s: 'Where the tools are, and what already exists',
+      mCatalogue: 'The catalogue', mCatalogues: 'What is ready, and what is coming',
+      mBoards: 'Boards', mBoardss: 'Several ways to be winning',
+      mMoney: 'Money', mMoneys: 'What you have earned, and how to get it out',
+      mQuests: 'Quests', mQuestss: 'The main one, and the Wall of Fame',
+      mStats: 'Stats', mStatss: 'The whole game, in public',
+      mConsole: 'Operator console', mConsoles: 'Every player, inside a stated boundary',
+      lockedConsole: 'This needs the moderator or operator role.',
+      accrued: 'Accrued', yourServices: 'Your services', nextStep: 'One next step',
+      noServices: 'No ventures yet. The interview is the fastest way to find your first one, it takes about six minutes and most of it happens in your own AI chat.',
+      startInterview: 'Start the interview', openIt: 'Open',
+      activity: 'What others are doing', nothingYet: 'Nothing has happened here yet. Be the first.',
+      interviewTitle: 'What could you sell?',
+      interviewLede: 'Most people do not know what they have. This finds out by talking to you, about six minutes, in whatever AI chat you already use. It can produce more than one idea, which is normal and welcome: pick one and the rest wait in IN PROGRESS.',
+      importedOne: 'Brought in one idea.', importedMany: 'Brought in {n} ideas.',
+      ventureTitle: 'Venture', readiness: 'Readiness', valueAdd: 'Value-add level',
+      proofNeeded: 'Capped until a real call succeeds',
+      scoreTitle: 'What the score is made of', openOdps: 'Check the descriptor in the ODPS tool',
+      buildTitle: 'Build it', buildLede: 'This is a dashboard, not a build tool. NOSTE watches the node and turns a row green when the artefact actually appears, it does not wait to be told.',
+      openTurbo: 'Open TURBO', buildMyself: 'I will build it myself',
+      mcpNote: 'If your AI is connected to this node, you do not have to see or do any of this, it does it for you. These instructions are for when it is not.',
+      whereInstall: 'Where each part is installed',
+      instApp: 'An application is installed from the app catalogue.',
+      instExt: 'An extension and a cortex library are installed from Profile → Extensions.',
+      catReady: 'READY', catProgress: 'IN PROGRESS',
+      catReadyLede: 'These can be contracted and called now.',
+      catProgressLede: 'These are being built. It is public on purpose: it is a demand signal, and it is what gives a builder an audience before their first euro.',
+      tellMe: 'Tell me when this is ready', watching: 'We will tell you', interested: '{n} waiting',
+      moneyTitle: 'Money', moneyLede: 'This is the plainest screen in the game on purpose. When it is about money, dull is a sign of trust.',
+      mSandbox: 'SANDBOX', mAccruing: 'ACCRUING', mPayout: 'PAYOUT READY', mDirect: 'DIRECT',
+      mSandboxW: 'Selling for morsels. No money moving. Nothing required of you.',
+      mAccruingW: 'Real sales. The buyer pays Overscale and your share accrues as a receivable.',
+      mPayoutW: 'There is something to take out. This is an invitation, not a requirement.',
+      mDirectW: 'Your own Stripe key. Sales go straight to you and Overscale is not in the middle.',
+      pending: 'Pending', settled: 'Settled', noEarnings: 'Nothing has accrued yet. It will appear here the moment somebody calls something of yours and pays.',
+      earningsNote: 'Read from what the accrual rail actually booked, net of the platform rake. This screen reads it; it does not pay it out.',
+      boardsTitle: 'Boards', challengesTitle: 'Challenges',
+      challengeLede: 'A challenge is public, it is decided by the recorded numbers rather than by a vote, and it touches no money. Being ignored costs nothing: an unanswered challenge expires and leaves no trace.',
+      noChallenges: 'No live challenges.', questsTitle: 'Quests',
+      mainQuest: 'Take an API and make it agent-native',
+      mainQuestBody: 'Your own API, an open-data API, or any open API you want to modernise. Done properly this reaches value-add level 0 or 1, and that is a full performance, it puts you on the Wall of Fame.',
+      wallTitle: 'Wall of Fame', wallEmpty: 'Nobody yet. The first name here gets the most attention it will ever get.',
+      incubator: 'Agent incubator', incubatorBody: 'Take an instance and install agents that work alongside the application you just built. Your service stops being an interface and starts doing work.',
+      statsTitle: 'The whole game', statsLede: 'Public, no login. A marketing page that happens to be true.',
+      consoleTitle: 'Operator console', privacyTitle: 'What an operator can see',
+      privacyLede: 'A game that quietly watches everything is a different product from one that says what it watches, and that difference is the only reason anyone would put a real business idea in here. So here it is, in plain words.',
+      privPublic: 'Public play state', privPublicW: 'Your showcase entries, the boards, badges and the activity feed. These are already public to anyone at all, signed in or not. The operator sees all of it.',
+      privPrivate: 'Your ventures', privPrivateW: 'They live in your own memory space, one record each, private unless you open them. Nobody else can read a private one, the operator included: the shared game store is readable by everybody, so nothing about an unshared venture is put there in the first place. Opening one is your decision and this app carries it out; you can close it again the same way.',
+      privMoney: 'Money', privMoneyW: 'Your earnings are yours. No balance of any kind is stored in the shared game state, so there is nothing there for an operator to see: the console shows platform totals about entries and players, and never a figure about anybody\'s money. Your own accrual is read live from the EXCHANGE rail, by you.',
+      save: 'Save', cancel: 'Cancel', remove: 'Remove', publish: 'Publish', publishing: 'Publishing…',
+      newVenture: 'New venture', title: 'Title', promise: 'The promise, in one line',
+      description: 'Description', beneficiary: 'Who benefits, and how', useCase: 'A concrete use case',
+      priceRationale: 'Why it costs what it costs', stage: 'Act', level: 'Value-add level you claim',
+      signInToPlay: 'Sign in to play. Reading the catalogue, the boards and the stats needs no account.',
+      loading: 'Loading…', failed: 'That did not work: {m}',
+      you: 'You', joinNow: 'Join the game', joined: 'You are in.',
+      promoteIt: 'Put it forward', promoteFree: 'Promotion is free while NOSTE is in its first season. It will be paid in morsels, never in money, because a board where visibility is bought with money measures wealth instead of achievement.',
+      challengeSomeone: 'Challenge somebody', metric: 'Metric', opponent: 'Player',
+      sharedOn: 'Open to anyone', sharedOff: 'Only you',
+      sharedOnWhat: 'This venture is open: anyone can read the whole record, including the operator.',
+      sharedOffWhat: 'This venture is yours alone. Nobody else can read it, the operator included.',
+      sharedNowOn: 'Opened. Anyone can read this record now.',
+      sharedNowOff: 'Closed. Only you can read this record now.',
+      whatHaveYou: 'What have you got?',
+      whatHaveYouH: 'Pick whichever is nearest. It only sets where the conversation starts, and you can say anything you like once it does.',
+      entryUnknown: 'I do not know yet',
+      entryUnknownH: 'The most common answer, and the most honest one. The interview starts wide and finds it with you.',
+      entryData: 'Some data of my own',
+      entryDataH: 'Something you collect, measure or maintain. It does not have to be tidy.',
+      entryApi: 'An interface I own or can reach',
+      entryApiH: 'Paste the openapi.yaml, the docs, a URL or a screenshot straight into the chat and it will read it.',
+      entryWish: 'A service I wish existed',
+      entryWishH: 'A wish is a full starting point, not an empty answer. Usually it is your own method, and that is the top of the ladder.',
+      continueTitle: 'Take the interview further',
+      continueLede: 'This prompt carries the draft with it, so the conversation picks up rather than starts again. Do the market review you skipped, go deeper, or take it up a level. Bringing the result back updates the same draft instead of making a second one.',
+      continueIt: 'Continue the interview',
+      marketMissing: 'The live market extract could not be read just now, so the prompt says so rather than letting the AI assume the market is empty.',
+      cardIsWhatAppears: 'This is the card that would appear in the IN PROGRESS catalogue. Nothing goes public that you have not looked at.',
+      cardPublicWhy: 'Public is the usual choice: being seen, and people asking to be told when it is ready, is the best reason to keep going.',
+      cardPrivateWhy: 'Private is one click and reversible. A half-formed idea can be competitively sensitive, and it is yours either way.',
+      interviewFound: 'What the interview found', whyBother: 'Why this is worth doing',
+      exampleCall: 'Example call', rights: 'Rights', hasPersonalData: 'contains personal data',
+      employerData: 'employer data', marketFound: 'Market', needsFound: 'From what people asked for',
+      enrichmentIdeas: 'Could also become', estimateOnly: 'estimate, no source',
+      decideTitle: 'Idea {n} of {of}',
+      makePublic: 'Put it in the catalogue', keepPrivate: 'Keep it to myself',
+      nowPublic: 'It is in the IN PROGRESS catalogue.',
+      shareTitle: 'Open this venture to anyone?',
+      shareBody: 'The whole record becomes readable by anybody, signed in or not, including the operator. You can close it again at any time, but anything already read stays read.'
+    },
+    fi: {
+      tagline: 'Perusta oikea bisnes, jota tekoälysi voi myydä puolestasi.',
+      door: 'Etsi se yksi asia joka sinulla jo on ja josta AI-agentti maksaisi. Kuvaa se, hinnoittele se, listaa se. Raha on oikeaa.',
+      begin: 'Aloita', continue: 'Jatka', builtHere: 'palvelua rakennettu', calledToday: 'kutsua tänään',
+      playersHere: 'pelaajaa', navHome: 'Koti', navVenture: 'Yritykset', navCatalogue: 'Katalogi',
+      navBoards: 'Taulut', navMoney: 'Raha', navQuests: 'Tehtävät', navStats: 'Tilastot',
+      navConsole: 'Konsoli', navPrivacy: 'Mitä näemme',
+      menuTitle: 'NOSTE', menuSub: 'Kaikki täällä on totta. Pisteet eivät ole rahaa eikä raha ole peliä.',
+      mAct0: 'Mitä sinulla on?', mAct0s: 'Haastattelu joka etsii sen mitä voisit myydä',
+      mAct1: 'Yrityksesi', mAct1s: 'Pisteet, jalostusaste, mikä korjataan seuraavaksi',
+      mAct2: 'Rakenna se', mAct2s: 'Mistä työkalut löytyvät ja mikä on jo olemassa',
+      mCatalogue: 'Katalogi', mCatalogues: 'Mikä on valmista ja mikä on tulossa',
+      mBoards: 'Taulut', mBoardss: 'Monta tapaa olla voitolla',
+      mMoney: 'Raha', mMoneys: 'Paljonko olet ansainnut ja miten saat sen ulos',
+      mQuests: 'Tehtävät', mQuestss: 'Päätehtävä ja kunniataulu',
+      mStats: 'Tilastot', mStatss: 'Koko peli, julkisesti',
+      mConsole: 'Ylläpitäjän konsoli', mConsoles: 'Kaikki pelaajat, kerrotun rajan sisällä',
+      lockedConsole: 'Tähän tarvitaan moderaattorin tai ylläpitäjän rooli.',
+      accrued: 'Kertymä', yourServices: 'Palvelusi', nextStep: 'Yksi seuraava askel',
+      noServices: 'Ei vielä yhtään yritystä. Haastattelu on nopein tapa löytää ensimmäinen, se vie noin kuusi minuuttia ja tapahtuu enimmäkseen omassa AI-chatissasi.',
+      startInterview: 'Aloita haastattelu', openIt: 'Avaa',
+      activity: 'Mitä muut tekevät', nothingYet: 'Täällä ei ole vielä tapahtunut mitään. Ole ensimmäinen.',
+      interviewTitle: 'Mitä sinä voisit myydä?',
+      interviewLede: 'Useimmat eivät tiedä mitä heillä on. Tämä selvittää sen juttelemalla kanssasi, noin kuusi minuuttia, siinä AI-chatissa jota jo käytät. Ideoita voi syntyä useampi, mikä on tavallista ja toivottavaa: valitse yksi, loput jäävät odottamaan TEKEILLÄ-katalogiin.',
+      importedOne: 'Yksi idea tuotu sisään.', importedMany: '{n} ideaa tuotu sisään.',
+      ventureTitle: 'Yritys', readiness: 'Valmiustaso', valueAdd: 'Jalostusaste',
+      proofNeeded: 'Katossa kunnes oikea kutsu onnistuu',
+      scoreTitle: 'Mistä pisteet koostuvat', openOdps: 'Tarkista kuvaus ODPS-työkalussa',
+      buildTitle: 'Rakenna se', buildLede: 'Tämä on kojelauta eikä rakennustyökalu. NOSTE tarkkailee nodea ja värittää rivin vihreäksi vasta kun artefakti oikeasti ilmestyy, se ei jää odottamaan ilmoitusta.',
+      openTurbo: 'Avaa TURBO', buildMyself: 'Rakennan itse',
+      mcpNote: 'Jos tekoälysi on yhteydessä tähän nodeen, sinun ei tarvitse nähdä eikä tehdä mitään tästä, se hoitaa nämä puolestasi. Nämä ohjeet ovat sitä varten kun yhteyttä ei ole.',
+      whereInstall: 'Mihin kukin osa asennetaan',
+      instApp: 'Applikaatio asennetaan app-katalogista.',
+      instExt: 'Extension ja cortex-kirjasto asennetaan profiilin Extensions-välilehdeltä.',
+      catReady: 'VALMIS', catProgress: 'TEKEILLÄ',
+      catReadyLede: 'Näistä voi tehdä sopimuksen ja näitä voi kutsua nyt.',
+      catProgressLede: 'Nämä ovat kesken. Ne näkyvät julkisesti tarkoituksella: se on kysyntäsignaali, ja se antaa tekijälle yleisön jo ennen ensimmäistä euroa.',
+      tellMe: 'Ilmoita kun tämä on valmis', watching: 'Ilmoitamme sinulle', interested: '{n} odottaa',
+      moneyTitle: 'Raha', moneyLede: 'Tämä on tarkoituksella pelin tylsin näkymä. Kun kyse on rahasta, tylsä on luottamuksen merkki.',
+      mSandbox: 'HIEKKALAATIKKO', mAccruing: 'KERTYY', mPayout: 'NOSTETTAVISSA', mDirect: 'SUORAAN',
+      mSandboxW: 'Myyntiä morseleilla. Rahaa ei liiku. Sinulta ei vaadita mitään.',
+      mAccruingW: 'Oikeaa myyntiä. Ostaja maksaa Overscalelle ja sinun osuutesi kertyy saatavaksi.',
+      mPayoutW: 'Nostettavaa on. Tämä on kutsu, ei vaatimus.',
+      mDirectW: 'Oma Stripe-avaimesi. Myynti tulee suoraan sinulle eikä Overscale ole välissä.',
+      pending: 'Kertynyt', settled: 'Tilitetty', noEarnings: 'Mitään ei ole vielä kertynyt. Se ilmestyy tähän sillä hetkellä kun joku kutsuu jotain sinun ja maksaa siitä.',
+      earningsNote: 'Luettu siitä mitä kertymärail on oikeasti kirjannut, alustan osuuden jälkeen. Tämä näkymä lukee sen, se ei tilitä sitä.',
+      boardsTitle: 'Taulut', challengesTitle: 'Haasteet',
+      challengeLede: 'Haaste on julkinen, se ratkeaa kirjatuista luvuista eikä äänestyksellä, eikä se koske rahaan. Huomiotta jättäminen ei maksa mitään: vastaamaton haaste raukeaa eikä jätä jälkeä.',
+      noChallenges: 'Ei käynnissä olevia haasteita.', questsTitle: 'Tehtävät',
+      mainQuest: 'Ota API ja tee siitä agentti-natiivi',
+      mainQuestBody: 'Oma API, avoimen datan API tai mikä tahansa avoin API jonka haluat nykyaikaistaa. Kunnolla tehtynä tämä yltää jalostusasteelle 0 tai 1, ja se on täysi suoritus, se vie kunniataululle.',
+      wallTitle: 'Kunniataulu', wallEmpty: 'Ei vielä ketään. Ensimmäinen nimi tässä saa eniten huomiota mitä tässä koskaan saa.',
+      incubator: 'Agenttihautomo', incubatorBody: 'Otat itsellesi instanssin ja asennat agentteja, jotka toimivat yhdessä juuri rakentamasi applikaation kanssa. Palvelusi lakkaa olemasta rajapinta ja alkaa tehdä työtä.',
+      statsTitle: 'Koko peli', statsLede: 'Julkinen, ei kirjautumista. Markkinointisivu joka sattuu olemaan totta.',
+      consoleTitle: 'Ylläpitäjän konsoli', privacyTitle: 'Mitä ylläpitäjä näkee',
+      privacyLede: 'Peli joka katsoo hiljaa kaikkea on eri tuote kuin peli joka kertoo mitä katsoo, ja ero on ainoa syy miksi kukaan panisi oikean liikeidean tänne. Tässä se siis on, selkokielellä.',
+      privPublic: 'Julkinen pelitila', privPublicW: 'Näyteikkunasi, taulut, merkit ja tapahtumavirta. Nämä ovat jo julkisia kenelle tahansa, kirjautuneelle tai ei. Ylläpitäjä näkee ne kokonaan.',
+      privPrivate: 'Yrityksesi', privPrivateW: 'Ne ovat sinun omassa muistitilassasi, kukin omana tietueenaan, yksityisinä kunnes avaat ne. Yksityistä ei lue kukaan muu, ei myöskään ylläpitäjä: jaettu pelitila on kaikkien luettavissa, joten avaamattomasta yrityksestä ei viedä sinne mitään. Avaaminen on sinun päätöksesi ja tämä sovellus toteuttaa sen. Voit myös sulkea sen samalla tavalla.',
+      privMoney: 'Raha', privMoneyW: 'Kertymäsi on sinun. Jaettuun pelitilaan ei ole tallennettu yhtään saldoa, joten siellä ei ole ylläpitäjälle mitään nähtävää: konsoli näyttää alustatason lukuja merkinnöistä ja pelaajista, ei koskaan kenenkään rahaa koskevaa lukua. Oman kertymäsi luet elävänä EXCHANGEn kiskolta itse.',
+      save: 'Tallenna', cancel: 'Peruuta', remove: 'Poista', publish: 'Julkaise', publishing: 'Julkaistaan…',
+      newVenture: 'Uusi yritys', title: 'Otsikko', promise: 'Lupaus yhdellä rivillä',
+      description: 'Kuvaus', beneficiary: 'Kuka hyötyy ja miten', useCase: 'Konkreettinen käyttötapaus',
+      priceRationale: 'Miksi se maksaa sen mitä maksaa', stage: 'Näytös', level: 'Jalostusaste jonka ilmoitat',
+      signInToPlay: 'Kirjaudu pelataksesi. Katalogin, taulujen ja tilastojen lukeminen ei vaadi tiliä.',
+      loading: 'Ladataan…', failed: 'Se ei onnistunut: {m}',
+      you: 'Sinä', joinNow: 'Liity peliin', joined: 'Olet mukana.',
+      promoteIt: 'Nosta esiin', promoteFree: 'Esiin nostaminen on maksutonta NOSTEn ensimmäisen kauden ajan. Siitä tulee morselimaksullinen, ei koskaan rahalla, koska taulu jossa näkyvyys ostetaan rahalla mittaa varakkuutta eikä saavutusta.',
+      challengeSomeone: 'Haasta joku', metric: 'Mittari', opponent: 'Pelaaja',
+      sharedOn: 'Avoin kaikille', sharedOff: 'Vain sinä',
+      sharedOnWhat: 'Tämä yritys on avoin: kuka tahansa voi lukea koko tietueen, myös ylläpitäjä.',
+      sharedOffWhat: 'Tämä yritys on vain sinun. Kukaan muu ei lue sitä, ei myöskään ylläpitäjä.',
+      sharedNowOn: 'Avattu. Kuka tahansa voi nyt lukea tämän tietueen.',
+      sharedNowOff: 'Suljettu. Vain sinä luet tämän tietueen.',
+      whatHaveYou: 'Mitä sinulla on?',
+      whatHaveYouH: 'Valitse lähin. Se vain päättää mistä keskustelu alkaa, ja sen jälkeen saat puhua mistä haluat.',
+      entryUnknown: 'En tiedä vielä',
+      entryUnknownH: 'Yleisin vastaus ja rehellisin. Haastattelu aloittaa laajasti ja etsii sen kanssasi.',
+      entryData: 'Omaa dataa',
+      entryDataH: 'Jotain mitä keräät, mittaat tai ylläpidät. Sen ei tarvitse olla siistiä.',
+      entryApi: 'Rajapinta jonka omistan tai johon pääsen',
+      entryApiH: 'Läväytä openapi.yaml, dokumentaatio, URL tai kuvakaappaus suoraan chattiin, se lukee sen.',
+      entryWish: 'Palvelu jota ei vielä ole',
+      entryWishH: 'Toive on täysi lähtökohta eikä tyhjä vastaus. Yleensä se on sinun oma menetelmäsi, ja se on tikapuiden huippu.',
+      continueTitle: 'Jatka haastattelua',
+      continueLede: 'Tämä kehote kantaa aihion mukanaan, joten keskustelu jatkuu eikä ala alusta. Tee väliin jäänyt markkinakatsaus, syvenny tai nosta aihio seuraavalle tasolle. Tuloksen tuominen päivittää saman aihion eikä tee toista.',
+      continueIt: 'Jatka haastattelua',
+      marketMissing: 'Elävää markkinaotetta ei juuri nyt saatu luettua, joten kehote sanoo sen sen sijaan että antaisi AI:n olettaa markkinan tyhjäksi.',
+      cardIsWhatAppears: 'Tämä on se kortti joka ilmestyisi TEKEILLÄ-katalogiin. Mikään ei mene julki ilman että olet katsonut sen.',
+      cardPublicWhy: 'Julkinen on tavallinen valinta: näkyvyys ja se että joku pyytää ilmoitusta valmistumisesta on paras syy jatkaa.',
+      cardPrivateWhy: 'Yksityinen on yhden klikkauksen valinta ja peruttavissa. Puolivalmis idea voi olla kilpailullisesti arka, ja se on sinun joka tapauksessa.',
+      interviewFound: 'Mitä haastattelu löysi', whyBother: 'Miksi tämä kannattaa tehdä',
+      exampleCall: 'Esimerkkikutsu', rights: 'Oikeudet', hasPersonalData: 'sisältää henkilötietoja',
+      employerData: 'työnantajan dataa', marketFound: 'Markkina', needsFound: 'Mitä ihmiset toivoivat',
+      enrichmentIdeas: 'Voisi myös olla', estimateOnly: 'arvio, ei lähdettä',
+      decideTitle: 'Idea {n} / {of}',
+      makePublic: 'Vie katalogiin', keepPrivate: 'Pidä omana tietona',
+      nowPublic: 'Se on TEKEILLÄ-katalogissa.',
+      shareTitle: 'Avataanko tämä yritys kaikille?',
+      shareBody: 'Koko tietue tulee kenen tahansa luettavaksi, kirjautuneen tai ei, myös ylläpitäjän. Voit sulkea sen milloin tahansa, mutta jo luettu on luettu.'
+    }
+  };
+
+  var lang = (AIMEAT.auth.getLang && AIMEAT.auth.getLang()) || 'en';
+  function t(k, vars) {
+    var d = DICT[lang] || DICT.en;
+    var s = (d[k] !== undefined ? d[k] : (DICT.en[k] !== undefined ? DICT.en[k] : k));
+    if (vars) { for (var v in vars) { s = s.split('{' + v + '}').join(String(vars[v])); } }
+    return s;
+  }
+
+  // The five rungs of the value-add ladder, with what the NEXT one would take. All of them are
+  // honourable, and 0 is the right answer for a great many services.
+  function rungs() {
+    return lang === 'fi' ? [
+      { title: '0. Silta', what: 'Toit olemassa olevan rajapinnan agenttien ulottuville sellaisenaan.', next: 'Tuo jokin rajapinta agenttien ulottuville.' },
+      { title: '1. Ergonomia', what: 'Teit siitä agentille käyttökelpoisen: koodistot selkokielelle, kevyemmät vastaukset, sivutus, skills-tiedosto.', next: 'Tee vastauksista agentille luettavia ja kirjoita skills-tiedosto.' },
+      { title: '2. Rikastus', what: 'Lisäsit jotain mitä lähteessä ei ole: laskettuja kenttiä, historiaa, laatuarvion.', next: 'Lisää jotain mitä lähde ei tuota, ja kirjaa muunnos alkuperälohkoon.' },
+      { title: '3. Ketjutus', what: 'Yhdistät useaa lähdettä joksikin mitä yksikään niistä ei tuota.', next: 'Ota sopimus toisen tarjoomasta ja yhdistä se omaasi.' },
+      { title: '4. Oma tuotanto', what: 'Data tai menetelmä on sinun: tuotat sen, mallinnat sen tai se syntyy toiminnastasi.', next: 'Tuo mukaan aineisto tai menetelmä joka on sinun.' }
+    ] : [
+      { title: '0. Bridge', what: 'You brought an existing API within reach of agents, as it is.', next: 'Put an API within reach of agents.' },
+      { title: '1. Ergonomics', what: 'You made it usable for an agent: codes in plain language, lighter responses, paging, a skills file.', next: 'Make the responses legible to an agent and write a skills file.' },
+      { title: '2. Enrichment', what: 'You added something the source does not have: computed fields, history, a quality read.', next: 'Add something the source does not produce, and record the transformation in provenance.' },
+      { title: '3. Chaining', what: 'You combine several sources into something none of them produces.', next: 'Contract somebody else\'s offering and combine it with yours.' },
+      { title: '4. Origination', what: 'The data or the method is yours: you produce it, you model it, or it arises from what you do.', next: 'Bring in data or a method that is your own.' }
+    ];
+  }
+
+  // ── State ──────────────────────────────────────────────────────────────────────────────────
+  var S = {
+    session: null, player: null, role: null, caps: [],
+    ventures: [], stats: null, view: null, booted: false, joining: false
+  };
+  var main = document.getElementById('main');
+  var top = document.getElementById('top');
+  var nav = document.getElementById('nav');
+
+  function el(tag, attrs, kids) { return G.el(tag, attrs, kids); }
+  function panel(kids, cls) { return el('div', { class: 'nst-panel' + (cls ? ' ' + cls : '') }, kids); }
+  function label(text) { return el('div', { class: 'nst-label', text: text }); }
+  function btn(text, kind, onClick) {
+    return el('button', { type: 'button', class: 'ag-btn' + (kind ? ' ag-btn--' + kind : ''), on: { click: onClick } }, text);
+  }
+
+  function show(node) {
+    G.clear(main);
+    main.appendChild(node);
+    main.scrollTop = 0;
+    window.scrollTo(0, 0);
+  }
+
+  function fail(e) {
+    G.toast(t('failed', { m: (e && e.message) || String(e) }), 'err');
+  }
+
+  // ONE KEY PER VENTURE, in the PLAYER'S OWN memory space, and the visibility of each is the
+  // player's to set. That shape is the whole privacy model:
+  //
+  //   - The shared extension namespace `ext:noste` is world-readable by design. It is what makes
+  //     the catalogues, the boards and the stats work with no account at all. Nothing that a player
+  //     has not chosen to share belongs there, so nothing about an unshared venture goes there.
+  //   - A venture is written here, under the player's own identity, PRIVATE by default. Nobody
+  //     else can read it, operator included.
+  //   - Opening one up is a decision the player makes and the app carries out: the same key is
+  //     rewritten with `visibility: 'public'`, and from that moment anyone can read it. Closing it
+  //     again is the same move in reverse.
+  //   - Publishing an entry to the catalogue is that decision made explicitly, for the parts a
+  //     catalogue shows.
+  //
+  // A single array under one key could not express any of this: visibility is per KEY, so ten
+  // ventures in one record are ten things with one shared answer to a question that belongs to each
+  // of them separately.
+  var VPREFIX = 'noste.venture.';
+  var VINDEX = 'noste.index';
+
+  async function loadVentures() {
+    if (!S.session) { S.ventures = []; return; }
+    try {
+      var index = await AIMEAT.data.get(VINDEX);
+      var ids = Array.isArray(index) ? index : (index && Array.isArray(index.ids) ? index.ids : []);
+      var loaded = [];
+      for (var i = 0; i < ids.length; i++) {
+        try {
+          var v = await AIMEAT.data.get(VPREFIX + ids[i]);
+          if (v && v.id) loaded.push(v);
+        } catch (e) { /* one unreadable venture must not hide the rest */ }
+      }
+      S.ventures = loaded;
+    } catch (e) { S.ventures = []; }
+  }
+
+  /** Save one venture at the visibility the player has chosen for it. */
+  async function saveVenture(v) {
+    await AIMEAT.data.set(VPREFIX + v.id, v, {
+      visibility: v.shared ? 'public' : 'private',
+      tags: ['noste', 'venture']
+    });
+    var ids = S.ventures.map(function (x) { return x.id; });
+    await AIMEAT.data.set(VINDEX, ids, { visibility: 'private', tags: ['noste'] });
+  }
+
+  /** Save every venture. Used after an import, where several arrive at once. */
+  async function saveVentures() {
+    for (var i = 0; i < S.ventures.length; i++) await saveVenture(S.ventures[i]);
+  }
+
+  /**
+   * Open a venture to the world, or close it again. This is a real change of who can read the
+   * record, so it is confirmed and it is stated plainly rather than being a quiet toggle.
+   */
+  async function setShared(v, shared) {
+    if (shared) {
+      var yes = await G.confirm({
+        title: t('shareTitle'),
+        body: t('shareBody')
+      });
+      if (!yes) return false;
+    }
+    v.shared = !!shared;
+    await saveVenture(v);
+    return true;
+  }
+
+  /** Delete a venture: the record goes, not just the reference to it. */
+  async function deleteVenture(v) {
+    S.ventures = S.ventures.filter(function (x) { return x.id !== v.id; });
+    try { await AIMEAT.data.remove ? AIMEAT.data.remove(VPREFIX + v.id) : AIMEAT.data.delete(VPREFIX + v.id); }
+    catch (e) { /* the key may already be gone; the index below is what the app reads */ }
+    await AIMEAT.data.set(VINDEX, S.ventures.map(function (x) { return x.id; }), { visibility: 'private', tags: ['noste'] });
+  }
+
+  function newVenture() {
+    return {
+      id: 'v' + Math.random().toString(36).slice(2, 10),
+      title: '', promise: '', description: '', beneficiary: '', useCase: '',
+      level: 0, sourceKind: '', priceRationale: '', stage: 'act1',
+      inputSchema: {}, outputSchema: {}, usageTerms: {}, provenance: {}, artifacts: {},
+      externalApis: [], demand: {}, proof: {}, odps: {}, listed: false,
+      // What the interview found, carried whole (R-Q4b). Empty is empty: an untouched optional
+      // field is never filled with something that merely sounds right.
+      rationale: '', exampleCall: {}, rights: {}, weight: '', entry: '',
+      market: [], enrichment: [], needsResearch: [], saidBy: {},
+      // Private until the player says otherwise. The default is the safe one on purpose.
+      shared: false,
+      createdAt: new Date().toISOString()
+    };
+  }
+
+  // ── Navigation ─────────────────────────────────────────────────────────────────────────────
+  var VIEWS = [
+    { id: 'home', label: 'navHome', render: viewHome, needsSession: true },
+    { id: 'ventures', label: 'navVenture', render: viewVentures, needsSession: true },
+    { id: 'catalogue', label: 'navCatalogue', render: viewCatalogue },
+    { id: 'boards', label: 'navBoards', render: viewBoards },
+    { id: 'money', label: 'navMoney', render: viewMoney, needsSession: true },
+    { id: 'quests', label: 'navQuests', render: viewQuests },
+    { id: 'stats', label: 'navStats', render: viewStats },
+    { id: 'console', label: 'navConsole', render: viewConsole, needsRole: true },
+    { id: 'privacy', label: 'navPrivacy', render: viewPrivacy }
+  ];
+
+  function canSee(v) {
+    if (v.needsSession && !S.session) return false;
+    if (v.needsRole) return S.caps.indexOf('*') >= 0 || S.caps.indexOf('oversee') >= 0;
+    return true;
+  }
+
+  function renderNav() {
+    G.clear(nav);
+    VIEWS.filter(canSee).forEach(function (v) {
+      nav.appendChild(el('button', {
+        type: 'button',
+        class: 'ag-chip' + (S.view === v.id ? ' ag-chip--on' : ''),
+        'aria-current': S.view === v.id ? 'page' : null,
+        on: { click: function () { go(v.id); } }
+      }, t(v.label)));
+    });
+  }
+
+  function go(id) {
+    var v = VIEWS.filter(function (x) { return x.id === id; })[0];
+    if (!v || !canSee(v)) v = VIEWS.filter(canSee)[0];
+    if (!v) { renderDoor(); return; }
+    S.view = v.id;
+    if (location.hash.slice(1) !== v.id) history.replaceState(null, '', '#' + v.id);
+    top.hidden = false;
+    renderNav();
+    show(el('div', { class: 'nst-wrap' }, el('p', { class: 'nst-empty', text: t('loading') })));
+    Promise.resolve(v.render()).catch(fail);
+  }
+
+  // A link pasted into an OPEN tab changes the hash without reloading, so a boot-time read alone
+  // would leave the reader on the wrong screen.
+  window.addEventListener('hashchange', function () {
+    var id = location.hash.slice(1);
+    if (id && id !== S.view) go(id);
+  });
+
+  // ── The door ───────────────────────────────────────────────────────────────────────────────
+  async function renderDoor() {
+    top.hidden = true;
+    var stats = S.stats || await N.stats();
+    S.stats = stats;
+
+    var proof = el('div', { class: 'nst-door__proof' });
+    // Two true numbers and nothing else. There is no counter here that moves for atmosphere: the
+    // moment one number on this page is decoration, none of the others are believed either.
+    [[stats.live || 0, t('builtHere')], [stats.players || 0, t('playersHere')]].forEach(function (pair) {
+      proof.appendChild(el('div', {}, [
+        el('b', { text: String(pair[0]) }),
+        el('span', { class: 'nst-label', text: pair[1] })
+      ]));
+    });
+
+    var mark = el('div', { class: 'nst-door__mark' });
+    mark.innerHTML = '<svg viewBox="0 0 32 32" width="100%" aria-hidden="true">'
+      + '<rect x="8" y="3" width="16" height="10" rx="2" fill="none" stroke="var(--ag-accent)" stroke-width="2.5"/>'
+      + '<path d="M9 19h14M11 23h10" stroke="var(--ag-ink-dim)" stroke-width="2" stroke-linecap="round"/>'
+      + '<path d="M8 30l8-4 8 4" fill="none" stroke="var(--ag-accent-2)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+    var enter = btn(S.session ? t('continue') : t('begin'), 'primary', function () {
+      if (S.session) { go('home'); return; }
+      // The login bar is the ONLY interactive sign-in path, on an app origin login() is
+      // silent-only, so a hand-rolled button must delegate to the bar's own control.
+      top.hidden = false;
+      var real = document.querySelector('#login button:not([aria-label])') || document.querySelector('#login button');
+      if (real) real.click();
+      else G.toast(t('signInToPlay'), 'info');
+    });
+
+    var doorEl = el('div', { class: 'nst-door' }, [
+      mark,
+      el('h1', { class: 'nst-door__title', text: 'NOSTE' }),
+      el('p', { class: 'nst-door__line', text: t('tagline') }),
+      el('p', { class: 'nst-lede', text: t('door') }),
+      enter,
+      proof,
+      el('div', { class: 'nst-row' }, [
+        btn(t('navCatalogue'), 'ghost', function () { go('catalogue'); }),
+        btn(t('navStats'), 'ghost', function () { go('stats'); })
+      ])
+    ]);
+    show(doorEl);
+  }
+
+  // ── Home ───────────────────────────────────────────────────────────────────────────────────
+  async function viewHome() {
+    var results = S.ventures.map(function (v) { return { v: v, r: N.engine.scoreVenture(v) }; });
+    var best = null;
+    results.forEach(function (row) {
+      var n = N.engine.nextStep(row.r);
+      if (n && (!best || n.gain > best.n.gain)) best = { n: n, v: row.v };
+    });
+
+    var earnings = null;
+    try { earnings = await X.earnings(); } catch (e) { /* signed in but no wallet scope, or nothing yet */ }
+    var eur = earnings && earnings.currencies && earnings.currencies.EUR;
+
+    var accrued = panel([
+      label(t('accrued')),
+      el('div', { class: 'nst-figure', text: eur ? X.fmtUnit(eur.pending, 'EUR') : G.money(0, 'EUR') }),
+      el('p', { class: 'nst-fine', text: eur && eur.pending ? t('earningsNote') : t('noEarnings') })
+    ]);
+
+    var mine = el('div', { class: 'nst-grid' });
+    if (!results.length) {
+      mine.appendChild(el('div', {}, [
+        el('p', { class: 'nst-empty', text: t('noServices') }),
+        btn(t('startInterview'), 'primary', function () { openInterview().catch(fail); })
+      ]));
+    } else {
+      results.forEach(function (row) {
+        var c = G.card({
+          title: row.v.title || t('newVenture'),
+          author: row.v.promise || '',
+          metric: { label: t('readiness'), value: row.r.percent + '%' },
+          image: row.v.logo || undefined,
+          tags: ['L' + row.r.level, row.v.stage || 'act1'],
+          onPick: function () { openVenture(row.v.id); }
+        });
+        mine.appendChild(c.el);
+      });
+    }
+
+    var next = panel([
+      label(t('nextStep')),
+      best
+        ? el('div', { class: 'nst-stack' }, [
+          el('p', { class: 'nst-lede', text: best.n.label + ', +' + best.n.gain }),
+          el('p', { class: 'nst-fine', text: best.n.reason }),
+          btn(t('openIt'), 'primary', function () { openVenture(best.v.id); })
+        ])
+        : el('p', { class: 'nst-empty', text: t('noServices') })
+    ]);
+
+    var feed = await N.feed(12);
+    var feedBox = panel([label(t('activity'))].concat(
+      feed.events.length
+        ? feed.events.map(function (e) {
+          return el('p', { class: 'nst-fine', text: e.text });
+        })
+        : [el('p', { class: 'nst-empty', text: t('nothingYet') })]
+    ));
+
+    show(el('div', { class: 'nst-wrap nst-stack' }, [
+      el('div', { class: 'nst-split' }, [
+        el('div', { class: 'nst-stack' }, [accrued, el('div', { class: 'nst-stack' }, [label(t('yourServices')), mine]), next]),
+        feedBox
+      ])
+    ]));
+  }
+
+  // ── The interview ──────────────────────────────────────────────────────────────────────────
+  // ── The interview (requirements section Q) ─────────────────────────────────────────────────
+  //
+  // The mouth of the funnel, and the place the game is either entered or abandoned. Most people
+  // cannot answer "what could you sell?", so nothing here asks them to. It hands the question to an
+  // AI they already use, with enough context that a generic workplace chatbot can run it properly.
+
+  /**
+   * The four ways somebody arrives (R-Q16). The choice is baked into the prompt as the starting
+   * position, so the interview CONTINUES from it instead of asking the same question again.
+   */
+  var ENTRIES = [
+    { id: 'unknown',  labelKey: 'entryUnknown',  hintKey: 'entryUnknownH' },
+    { id: 'data',     labelKey: 'entryData',     hintKey: 'entryDataH' },
+    { id: 'api',      labelKey: 'entryApi',      hintKey: 'entryApiH' },
+    { id: 'wish',     labelKey: 'entryWish',     hintKey: 'entryWishH' }
+  ];
+
+  /**
+   * An extract of the REAL market, read fresh (R-Q8). Without it the interview checks "is anybody
+   * already selling this?" by guessing, and a workplace chatbot that knows nothing about AIMEAT has
+   * no idea what selling to an agent even means. Failure here is not fatal: the prompt says the
+   * extract is missing rather than pretending the market is empty.
+   */
+  async function marketExtract() {
+    var out = { offerings: [], needs: [], ok: false };
+    try {
+      var listed = await X.list({ });
+      out.offerings = (listed.offerings || []).slice(0, 25).map(function (o) {
+        return { title: o.title || '', tags: (o.tags || []).slice(0, 4) };
+      });
+      out.ok = true;
+    } catch (e) { /* stated as missing below */ }
+    try {
+      var open = await X.needs({ open: true });
+      out.needs = (open.needs || []).slice(0, 15).map(function (n) {
+        return (n.description || '').slice(0, 160);
+      });
+    } catch (e) { /* the same */ }
+    return out;
+  }
+
+  /**
+   * Build the interview prompt. Composed at the click, never a stored string, because half of what
+   * makes it work is the market extract inside it.
+   *
+   * @param {string} entryId  which of the four entry points the player chose (R-Q16)
+   * @param {object} market   the live extract (R-Q8)
+   * @param {object} [draft]  an existing draft, for the continuation prompt (R-Q14)
+   */
+  function interviewPrompt(entryId, market, draft) {
+    var L = [];
+    L.push('You are interviewing somebody to find out what they could sell to AI agents on AIMEAT.');
+    L.push('Talk to them in whatever language they write to you in. This is a conversation, not a form.');
+    L.push('');
+
+    // ── 1. What selling to an agent even means, for an AI that has never heard of AIMEAT (R-Q8) ──
+    L.push('## The platform, briefly, because you may not know it');
+    L.push('AIMEAT is a marketplace where an AI agent CONTRACTS a capability and then CALLS it, and');
+    L.push('the seller is paid per call. A capability is one operation with a stated input and a');
+    L.push('stated output: the agent sends JSON, gets JSON back, and is metered. A seller publishes');
+    L.push('an "app-tool" (an operation their app offers) or an extension action.');
+    L.push('Money is integer micro-units, 1 EUR = 1000000. Morsels are a separate internal meter and');
+    L.push('are plain integers. The two are never added together.');
+    L.push('');
+    L.push('Value-add levels, which decide what a price can honestly be:');
+    L.push('  0 bridge      an existing API brought within reach of agents, as it is');
+    L.push('  1 ergonomics  made usable for an agent: plain codes, lighter responses, paging, a skills file');
+    L.push('  2 enrichment  something the source does not have: computed fields, history, a quality read');
+    L.push('  3 chaining    several sources combined into something none of them produces');
+    L.push('  4 origination the data or the method is theirs');
+    L.push('EVERY LEVEL IS HONOURABLE and 0 is the right answer for a great many services. Free is a');
+    L.push('full answer at levels 0 and 1. Do not push somebody up the ladder; show it and let them choose.');
+    L.push('');
+
+    // ── 2. The actual market, so "does this exist already" is checked and not guessed (R-Q8) ──
+    L.push('## What is on this market right now');
+    if (market && market.ok && market.offerings.length) {
+      L.push('Already selling (' + market.offerings.length + ' of the current listings):');
+      market.offerings.forEach(function (o) {
+        L.push('  - ' + o.title + (o.tags.length ? '  [' + o.tags.join(', ') + ']' : ''));
+      });
+    } else {
+      L.push('(The live listing extract could not be read when this prompt was built. Say so if the');
+      L.push('question of what already exists comes up, rather than assuming the market is empty.)');
+    }
+    if (market && market.needs.length) {
+      L.push('');
+      L.push('Open needs, things agents are asking for and not finding:');
+      market.needs.forEach(function (n) { L.push('  - ' + n); });
+    }
+    L.push('');
+
+    // ── 3. Where this person is starting from (R-Q16) ──
+    var starts = {
+      unknown: 'They do not know yet what they have. This is the most common and most honest starting point. Start wide: what do they do all day, what do they have access to that others do not, what do people keep asking them.',
+      data: 'They have DATA of some kind. Find out what it is, where it comes from, how often it changes, and whether they are allowed to sell it.',
+      api: 'They OWN or can reach an INTERFACE. Ask them to paste the openapi.yaml, the documentation, a URL or a screenshot straight into this chat, and interview onward from what it actually says. Do not start over. If a URL will not open for you, ask them to paste the relevant part rather than guessing what is in it.',
+      wish: 'They described a service they WISH existed. This is a full starting point, not an empty result. Work out what building it would take, who else would find the same thing valuable, and what part of it is sellable. It is usually value-add level 4, because the method would be theirs.'
+    };
+    L.push('## Where they are starting');
+    L.push(starts[entryId] || starts.unknown);
+    L.push('');
+
+    if (draft) {
+      // ── The continuation prompt (R-Q14) ──
+      L.push('## This is a CONTINUATION');
+      L.push('They already have this draft. Deepen it, do the parts that were skipped, or take it up a');
+      L.push('level. Return the SAME draftId so the game updates it instead of making a second one.');
+      L.push('');
+      L.push(JSON.stringify(draftForPrompt(draft), null, 2));
+      L.push('');
+    }
+
+    // ── 4. How to run it (R-Q9) ──
+    L.push('## How to run this');
+    L.push('1. ASK FIRST. A handful of good questions, not a twenty-item form. Go deeper wherever they');
+    L.push('   light up. When their answers start getting shorter, wrap up.');
+    L.push('2. Cover: what they have; who would benefit and for what; how an agent would call it;');
+    L.push('   what it would be worth and why; what building it would take; which level it reaches');
+    L.push('   and what the next one would need.');
+    L.push('3. Get at least one CONCRETE EXAMPLE CALL per idea: one sentence for what the agent asks,');
+    L.push('   one for what it gets back. That is the question that separates an idea from a wish.');
+    L.push('   Never invent it for them. If there is not one, leave it out and say so.');
+    L.push('4. RIGHTS, asked now because this is the cheapest place to find out:');
+    L.push('   - is this theirs, open, or somebody else\'s? For an open source, name the licence.');
+    L.push('   - does it contain personal data? If so, say plainly that selling it needs a lawful basis.');
+    L.push('   - is it an employer\'s data or system? Whose is it really?');
+    L.push('   The worst thing this game can produce is three weeks of work on something unsellable.');
+    L.push('5. OFFER, do not impose, a market review: would they like you to search the web for who');
+    L.push('   already sells something like this, at what price, and whether the same data or');
+    L.push('   capability is available elsewhere for free? That last part matters most: if it is free');
+    L.push('   elsewhere, the value is in ergonomics and enrichment, not in the gate.');
+    L.push('   The method is WEB SEARCH, if you can do it. If you cannot, say so plainly and mark');
+    L.push('   every market statement as an estimate. Never present something you remember as a');
+    L.push('   search result.');
+    L.push('6. OFFER a needs study: search what real users say they want and complain about in this');
+    L.push('   area (forums, reviews, discussions), and derive 4 to 5 concrete improvement proposals.');
+    L.push('   Each one carries the need it answers and where that need showed up. Same rule: if you');
+    L.push('   cannot search, do not do this from memory.');
+    L.push('7. Suggest enrichment ideas of your own too, reasoned from the source, and keep them');
+    L.push('   separate from the needs study: those come from what people actually said.');
+    L.push('8. Ask them where on the scale they want to be. The same subject covers a light version');
+    L.push('   (deterministic, level 0 to 1, free or cheap) and a heavy one (AI in the loop, level 2');
+    L.push('   to 3, priced). BOTH ARE HONOURABLE. If you always steer to the heavy end you are');
+    L.push('   selling them work they did not ask for.');
+    L.push('9. Every idea needs an answer to "why is this worth doing". "I want to learn" and "I want');
+    L.push('   to make an open API usable by agents for free" are COMPLETE answers.');
+    L.push('10. If nothing sellable is there, say "not yet". That is an honourable result and it');
+    L.push('    keeps their trust. Point them at the open needs above or at accelerating an open API');
+    L.push('    instead. A wish, though, is NOT an empty result: it is the seed of a product.');
+    L.push('11. BEFORE you output anything, tell them in plain language what you found ("you have');
+    L.push('    three possible products: ...") and let them confirm or correct it. Only then emit JSON.');
+    L.push('');
+
+    // ── 5. The output contract (R-Q4b, R-Q10, R-Q3g) ──
+    L.push('## When they have confirmed, output ONE JSON object and nothing else');
+    L.push('```json');
+    L.push(JSON.stringify({
+      ideas: [{
+        draftId: '(omit for a new idea; return it unchanged when continuing one)',
+        title: 'short name',
+        promise: 'one line a buyer would understand',
+        description: 'a paragraph for a human',
+        beneficiary: 'whose problem this solves, and how',
+        useCase: 'one concrete situation where an agent calls this',
+        rationale: 'why this is worth doing at all. "to learn" is a complete answer',
+        exampleCall: { ask: 'what the agent sends', gets: 'what comes back' },
+        entry: entryId,
+        weight: 'light | heavy',
+        level: 0,
+        sourceKind: 'open-data | own-api | own-production | derived',
+        priceRationale: 'why it costs what it costs, in terms of the level',
+        rights: { owner: 'theirs | open | someone else', licence: 'named, if open', personalData: false, employer: false },
+        market: [{ claim: 'what you found', source: 'url, or leave empty', estimate: false }],
+        enrichment: ['your own ideas for what else this could become'],
+        needsResearch: [{ claim: 'an improvement proposal', need: 'the need it answers', source: 'where that need showed' }],
+        saidBy: { title: 'player', level: 'ai' },
+        externalApis: [],
+        inputSchema: {}, outputSchema: {},
+        usageTerms: { derivatives: true, resale: false, attribution: true },
+        provenance: { source: 'where the data comes from', transformations: '', attribution: '' }
+      }]
+    }, null, 2));
+    L.push('```');
+    L.push('');
+    L.push('Rules for that object, and they matter more than filling it in:');
+    L.push('- STATE ONLY WHAT THEY TOLD YOU. A field you do not know is a field you LEAVE OUT. Never');
+    L.push('  a plausible-sounding guess, and above all never an invented service level or quality claim.');
+    L.push('- `saidBy` marks which parts came from THEM and which you proposed. Anything you thought');
+    L.push('  of must not appear as their intention.');
+    L.push('- Every entry in `market` and `needsResearch` carries a source, or `estimate: true`. A');
+    L.push('  market claim with neither is how somebody ends up pricing a real product on fiction.');
+    L.push('- Several ideas is normal and welcome. People usually have more to sell than they guessed.');
+    return L.join('\n');
+  }
+
+  /** The subset of a draft that goes back into a continuation prompt. */
+  function draftForPrompt(v) {
+    return {
+      draftId: v.id, title: v.title, promise: v.promise, description: v.description,
+      beneficiary: v.beneficiary, useCase: v.useCase, rationale: v.rationale,
+      exampleCall: v.exampleCall, level: v.level, weight: v.weight, sourceKind: v.sourceKind,
+      priceRationale: v.priceRationale, rights: v.rights, market: v.market,
+      enrichment: v.enrichment, needsResearch: v.needsResearch,
+      inputSchema: v.inputSchema, outputSchema: v.outputSchema,
+      usageTerms: v.usageTerms, provenance: v.provenance
+    };
+  }
+
+  /**
+   * The interview screen. `continueFrom` turns it into the continuation prompt (R-Q14).
+   */
+  async function openInterview(continueFrom) {
+    if (!S.session) { G.toast(t('signInToPlay'), 'warn'); return; }
+
+    var entry = continueFrom ? (continueFrom.entry || 'unknown') : null;
+    var market = null;
+    var modal = null;
+
+    // Step 1: which of the four entry points (R-Q16). Skipped when continuing.
+    if (!entry) {
+      entry = await new Promise(function (resolve) {
+        var list = el('div', { class: 'nst-stack' }, ENTRIES.map(function (e) {
+          return el('button', {
+            type: 'button', class: 'ag-btn ag-btn--plain nst-entry',
+            on: { click: function () { modal.close(); resolve(e.id); } }
+          }, [
+            el('span', { class: 'nst-entry__label', text: t(e.labelKey) }),
+            el('span', { class: 'nst-entry__hint', text: t(e.hintKey) })
+          ]);
+        }));
+        modal = G.modal({
+          title: t('whatHaveYou'),
+          body: el('div', { class: 'nst-stack' }, [
+            el('p', { class: 'nst-fine', text: t('whatHaveYouH') }), list
+          ]),
+          onClose: function () { resolve(null); }
+        });
+      });
+      if (!entry) return;
+    }
+
+    // Step 2: read the real market, then compose. Never a stored string.
+    var busy = G.modal({ title: t('interviewTitle'), body: el('p', { class: 'nst-fine', text: t('loading') }), dismissible: false });
+    market = await marketExtract();
+    busy.close();
+
+    var box = N.promptBox({
+      title: continueFrom ? t('continueTitle') : t('interviewTitle'),
+      hint: continueFrom ? t('continueLede') : t('interviewLede'),
+      prompt: interviewPrompt(entry, market, continueFrom),
+      mcpNote: t('mcpNote'),
+      // ONE validator, shared with the extension's `idea` action through the engine.
+      validate: function (parsed) {
+        var v = N.engine.validateIdeas(parsed);
+        if (v.ok !== true) return { ok: false, field: v.field, message: v.message };
+        return { ok: true, value: v.ideas };
+      },
+      onAccept: async function (ideas) {
+        sheet.close();
+        await reviewImport(ideas, entry, continueFrom);
+      }
+    });
+
+    if (!market.ok) {
+      box.el.insertBefore(
+        el('p', { class: 'nst-prompt__hint', text: t('marketMissing') }),
+        box.el.firstChild
+      );
+    }
+
+    var sheet = G.modal({ title: continueFrom ? t('continueTitle') : t('interviewTitle'), body: box.el, dismissible: true });
+  }
+
+  /**
+   * What happens to an imported result BEFORE anything becomes public (R-Q6).
+   *
+   * The draft is saved to the player's own memory space first, private, because it is theirs. Then
+   * the card that WOULD appear in the public catalogue is drawn, and the player decides per idea.
+   * Public is the recommended default, because visibility and "tell me when it is ready" interest
+   * are the best reason to keep going. But a half-formed business idea can be competitively
+   * sensitive, and private is one click. Nothing reaches the catalogue that the player did not look
+   * at and approve.
+   */
+  async function reviewImport(ideas, entryId, continueFrom) {
+    var made = [];
+    for (var i = 0; i < ideas.length; i++) {
+      var idea = ideas[i];
+      var v;
+      // A continuation updates the draft it came from rather than adding a second one (R-Q14).
+      var existing = S.ventures.filter(function (x) { return x.id === (idea.draftId || ''); })[0]
+        || (continueFrom && idea.draftId === continueFrom.id ? continueFrom : null);
+      if (existing) {
+        v = existing;
+      } else {
+        v = newVenture();
+        S.ventures.push(v);
+      }
+      ['title','promise','description','beneficiary','useCase','rationale','priceRationale','sourceKind','weight'].forEach(function (k) {
+        if (typeof idea[k] === 'string' && idea[k]) v[k] = idea[k];
+      });
+      if (typeof idea.level === 'number') v.level = idea.level;
+      ['exampleCall','rights','usageTerms','provenance','inputSchema','outputSchema','odps','saidBy'].forEach(function (k) {
+        if (idea[k] && typeof idea[k] === 'object') v[k] = idea[k];
+      });
+      ['externalApis','market','enrichment','needsResearch'].forEach(function (k) {
+        if (Array.isArray(idea[k]) && idea[k].length) v[k] = idea[k];
+      });
+      v.entry = idea.entry || entryId || '';
+      v.shared = v.shared === true;         // private until the player says otherwise
+      await saveVenture(v);
+      made.push(v);
+    }
+
+    G.toast(made.length === 1 ? t('importedOne') : t('importedMany', { n: made.length }), 'ok');
+    await decideVisibility(made, 0);
+  }
+
+  /** One card at a time: this is what would be public. Publish it, or keep it. */
+  async function decideVisibility(list, i) {
+    if (i >= list.length) { go('ventures'); return; }
+    var v = list[i];
+    var r = N.engine.scoreVenture(v);
+
+    var card = G.card({
+      title: v.title || t('newVenture'),
+      author: S.player ? S.player.name : '',
+      metric: { label: t('readiness'), value: r.percent + '%' },
+      tags: ['L' + r.level, 'act1']
+    });
+
+    var body = el('div', { class: 'nst-stack' }, [
+      el('p', { class: 'nst-lede', text: t('cardIsWhatAppears') }),
+      card.el,
+      el('p', { class: 'nst-fine', text: t('cardPublicWhy') }),
+      el('p', { class: 'nst-fine', text: t('cardPrivateWhy') })
+    ]);
+
+    await new Promise(function (resolve) {
+      var m = G.modal({
+        title: t('decideTitle', { n: i + 1, of: list.length }),
+        body: body,
+        dismissible: false,
+        actions: [
+          { id: 'public', label: t('makePublic'), kind: 'primary', onClick: function () {
+            G.whileBusy(null, (async function () {
+              try {
+                await N.publishEntry({
+                  id: v.id, title: v.title || 'Untitled', promise: v.promise || '',
+                  stage: 'act1', readiness: r.percent, level: r.level,
+                  missing: r.rows.filter(function (x) { return x.points < x.max; }).map(function (x) { return x.label; })
+                });
+                v.listed = true;
+                await saveVenture(v);
+                G.toast(t('nowPublic'), 'ok');
+              } catch (e) { fail(e); }
+              m.close(); resolve();
+            })());
+          } },
+          { id: 'private', label: t('keepPrivate'), kind: 'ghost', onClick: function () {
+            v.listed = false;
+            saveVenture(v).then(function () { m.close(); resolve(); });
+          } }
+        ]
+      });
+    });
+
+    await decideVisibility(list, i + 1);
+  }
+
+  // ── Ventures ───────────────────────────────────────────────────────────────────────────────
+  async function viewVentures() {
+    var wrap = el('div', { class: 'nst-wrap nst-stack' });
+    wrap.appendChild(el('div', { class: 'nst-row' }, [
+      btn(t('startInterview'), 'primary', function () { openInterview().catch(fail); }),
+      btn('+ ' + t('newVenture'), 'ghost', async function () {
+        var fresh = newVenture();
+        S.ventures.push(fresh);
+        await saveVenture(fresh);
+        openVenture(fresh.id);
+      })
+    ]));
+
+    if (!S.ventures.length) {
+      wrap.appendChild(el('p', { class: 'nst-empty', text: t('noServices') }));
+      show(wrap); return;
+    }
+
+    var grid = el('div', { class: 'nst-grid' });
+    S.ventures.forEach(function (v) {
+      var r = N.engine.scoreVenture(v);
+      var c = G.card({
+        title: v.title || t('newVenture'),
+        author: v.promise || '',
+        metric: { label: t('readiness'), value: r.percent + '%' },
+        tags: ['L' + r.level, v.stage || 'act1'],
+        onPick: function () { openVenture(v.id); }
+      });
+      grid.appendChild(c.el);
+    });
+    wrap.appendChild(grid);
+    show(wrap);
+  }
+
+  function openVenture(id) {
+    var v = S.ventures.filter(function (x) { return x.id === id; })[0];
+    if (!v) { go('ventures'); return; }
+    var r = N.engine.scoreVenture(v);
+
+    // The act rail: where this venture is. aimeat-game draws it; NOSTE only says which step.
+    var acts = ['act1', 'act2', 'act3'].map(function (a, i) {
+      var current = (v.stage === 'live') ? 3 : (['act1', 'act2', 'act3'].indexOf(v.stage || 'act1'));
+      return {
+        id: a,
+        label: lang === 'fi' ? ['Speksi', 'Rakennus', 'Levitys'][i] : ['Spec', 'Build', 'Spread'][i],
+        state: i < current ? 'done' : (i === current ? 'current' : 'future')
+      };
+    });
+    var railEl = G.rail({ steps: acts });
+
+    // The score, as its parts. Every row is a button, so the number is a to-do list rather than a
+    // verdict, that is the whole reason aimeat-game has this component.
+    var breakdown = G.scoreBreakdown({
+      title: t('scoreTitle'),
+      rows: r.rows,
+      total: { points: r.total, max: r.max },
+      totalLabel: t('readiness'),
+      threshold: 70,
+      onPick: function (row) { openFix(v, row); }
+    });
+
+    var ladderEl = N.ladder({
+      level: r.level, claimed: r.levelClaimed, rungs: rungs(),
+      note: r.capped ? t('proofNeeded') : ''
+    });
+
+    var form = ventureForm(v);
+
+    var body = el('div', { class: 'nst-stack' }, [
+      railEl.el,
+      el('div', { class: 'nst-split' }, [
+        el('div', { class: 'nst-stack' }, [breakdown.el, form]),
+        el('div', { class: 'nst-stack' }, [
+          panel([label(t('valueAdd')), ladderEl.el]),
+          panel([
+            label('ODPS'),
+            el('p', { class: 'nst-fine', text: lang === 'fi'
+              ? 'NOSTE ei kirjoita toista määritelmää täyttöasteesta. Alustan validaattorilla on omansa.'
+              : 'NOSTE does not write a second definition of completeness. The platform validator has one.' }),
+            el('a', { class: 'ag-btn ag-btn--ghost', href: 'https://odps.apps.aimeat.io/', target: '_blank', rel: 'noopener' }, t('openOdps'))
+          ]),
+          panel([
+            label(t('buildTitle')),
+            el('p', { class: 'nst-fine', text: t('buildLede') }),
+            btn(t('openIt'), 'ghost', function () { go('build'); openBuild(v); })
+          ]),
+          interviewFindings(v)
+        ])
+      ])
+    ]);
+
+    var sc = G.screen({
+      title: v.title || t('newVenture'),
+      subtitle: v.promise || '',
+      body: body,
+      onBack: function () { go('ventures'); },
+      actions: [
+        { id: 'publish', label: t('publish'), kind: 'primary', onClick: function () { publishToCatalogue(v); } },
+        { id: 'remove', label: t('remove'), kind: 'danger', onClick: async function () {
+          var yes = await G.confirm({ title: t('remove') + '?', danger: true });
+          if (!yes) return;
+          await deleteVenture(v);
+          go('ventures');
+        } }
+      ]
+    });
+    top.hidden = false;
+    show(el('div', { class: 'nst-wrap' }, sc.el));
+  }
+
+  /**
+   * What the interview found, shown as it was recorded. Three rules are visible rather than
+   * described: a market claim without a source is labelled an estimate (R-Q3g), what the AI
+   * proposed is not shown as the player's intention (R-Q10), and the whole panel is absent rather
+   * than empty when nothing was found.
+   */
+  function interviewFindings(v) {
+    var parts = [];
+    if (v.rationale) parts.push(el('div', {}, [label(t('whyBother')), el('p', { class: 'nst-fine', text: v.rationale })]));
+    if (v.exampleCall && (v.exampleCall.ask || v.exampleCall.gets)) {
+      parts.push(el('div', {}, [
+        label(t('exampleCall')),
+        el('p', { class: 'nst-fine', text: (v.exampleCall.ask || '') + (v.exampleCall.gets ? '  ->  ' + v.exampleCall.gets : '') })
+      ]));
+    }
+    if (v.rights && (v.rights.owner || v.rights.licence || v.rights.personalData)) {
+      var bits = [];
+      if (v.rights.owner) bits.push(v.rights.owner);
+      if (v.rights.licence) bits.push(v.rights.licence);
+      if (v.rights.personalData) bits.push(t('hasPersonalData'));
+      if (v.rights.employer) bits.push(t('employerData'));
+      parts.push(el('div', {}, [label(t('rights')), el('p', { class: 'nst-fine', text: bits.join(' · ') })]));
+    }
+    function claims(list, headKey) {
+      if (!Array.isArray(list) || !list.length) return null;
+      return el('div', {}, [label(t(headKey))].concat(list.map(function (c) {
+        var tail = c.source ? (' [' + c.source + ']') : (' [' + t('estimateOnly') + ']');
+        return el('p', { class: 'nst-fine', text: (c.need ? c.need + ': ' : '') + c.claim + tail });
+      })));
+    }
+    var mk = claims(v.market, 'marketFound'); if (mk) parts.push(mk);
+    var nr = claims(v.needsResearch, 'needsFound'); if (nr) parts.push(nr);
+    if (Array.isArray(v.enrichment) && v.enrichment.length) {
+      parts.push(el('div', {}, [label(t('enrichmentIdeas'))].concat(
+        v.enrichment.map(function (e) { return el('p', { class: 'nst-fine', text: e }); })
+      )));
+    }
+
+    parts.push(btn(t('continueIt'), 'ghost', function () { openInterview(v).catch(fail); }));
+    return panel([label(t('interviewFound'))].concat(parts));
+  }
+
+  function ventureForm(v) {
+    function field(key, labelKey, multiline) {
+      var input = el(multiline ? 'textarea' : 'input', { value: v[key] || '' });
+      input.value = v[key] || '';
+      input.addEventListener('change', async function () {
+        v[key] = input.value;
+        await saveVenture(v);
+        openVenture(v.id);   // the score is recomputed from the saved truth, never from the form
+      });
+      return el('label', {}, [el('span', { text: t(labelKey) }), input]);
+    }
+    var levelSel = el('select', {});
+    [0, 1, 2, 3, 4].forEach(function (n) {
+      var o = el('option', { value: String(n), text: String(n) + ', ' + rungs()[n].title.split(', ')[1] });
+      if (Number(v.level) === n) o.selected = true;
+      levelSel.appendChild(o);
+    });
+    levelSel.addEventListener('change', async function () {
+      v.level = Number(levelSel.value); await saveVenture(v); openVenture(v.id);
+    });
+
+    var stageSel = el('select', {});
+    [['act1', 'Act 1'], ['act2', 'Act 2'], ['act3', 'Act 3'], ['live', 'Live']].forEach(function (p) {
+      var o = el('option', { value: p[0], text: p[1] });
+      if ((v.stage || 'act1') === p[0]) o.selected = true;
+      stageSel.appendChild(o);
+    });
+    stageSel.addEventListener('change', async function () {
+      v.stage = stageSel.value; await saveVenture(v); openVenture(v.id);
+    });
+
+    var sharedBtn = btn(
+      v.shared ? t('sharedOn') : t('sharedOff'),
+      v.shared ? 'ghost' : 'plain',
+      async function () {
+        var changed = await setShared(v, !v.shared);
+        if (changed) { G.toast(v.shared ? t('sharedNowOn') : t('sharedNowOff'), 'ok'); openVenture(v.id); }
+      }
+    );
+
+    return panel([
+      label(t('ventureTitle')),
+      el('div', { class: 'nst-stack' }, [
+        el('p', { class: 'nst-fine', text: v.shared ? t('sharedOnWhat') : t('sharedOffWhat') }),
+        sharedBtn
+      ]),
+      el('div', { class: 'nst-form' }, [
+        field('title', 'title'),
+        field('promise', 'promise'),
+        field('description', 'description', true),
+        field('beneficiary', 'beneficiary', true),
+        field('useCase', 'useCase', true),
+        field('priceRationale', 'priceRationale', true),
+        el('label', {}, [el('span', { text: t('level') }), levelSel]),
+        el('label', {}, [el('span', { text: t('stage') }), stageSel])
+      ])
+    ]);
+  }
+
+  // Every missing row is clickable and lands where it is fixed. A breakdown whose rows do nothing
+  // is a scoreboard; one whose rows go somewhere is a game.
+  function openFix(v, row) {
+    var m = G.modal({
+      title: row.label,
+      body: el('div', { class: 'nst-stack' }, [
+        el('p', { class: 'nst-lede', text: row.reason }),
+        el('p', { class: 'nst-fine', text: G.i18n.t('points', { a: row.points, b: row.max }) })
+      ]),
+      actions: [{ id: 'ok', label: G.i18n.t('close'), kind: 'primary', onClick: function () { m.close(); } }]
+    });
+  }
+
+  async function publishToCatalogue(v) {
+    var r = N.engine.scoreVenture(v);
+    try {
+      await N.publishEntry({
+        id: v.id, title: v.title || 'Untitled', promise: v.promise || '',
+        stage: v.stage || 'act1', readiness: r.percent, level: r.level,
+        logo: v.logo || '', link: v.link || '',
+        missing: r.rows.filter(function (x) { return x.points < x.max; }).map(function (x) { return x.label; })
+      });
+      // The score a board ranks on is the NODE's, computed from the same engine, the browser's
+      // figure is a preview, never the record.
+      await N.score({ venture: v, metric: 'readiness' });
+      v.listed = true;
+      await saveVenture(v);
+      // One of the three moments worth celebrating: IN PROGRESS becomes READY.
+      if (v.stage === 'live') {
+        G.modal({
+          title: lang === 'fi' ? 'Se on julki.' : 'It is out there.',
+          body: el('p', { class: 'nst-lede', text: lang === 'fi'
+            ? 'Palvelusi siirtyi TEKEILLÄ-katalogista VALMIS-katalogiin. Kaikille jotka pyysivät ilmoitusta kerrotaan.'
+            : 'Your service moved from IN PROGRESS to READY. Everyone who asked to be told is being told.' })
+        });
+      } else {
+        G.toast(t('joined'), 'ok');
+      }
+    } catch (e) { fail(e); }
+  }
+
+  // ── Build dashboard ────────────────────────────────────────────────────────────────────────
+  function openBuild(v) {
+    // Routed, not rewritten. Each prompt is fetched from its own source, so an improvement made
+    // upstream arrives here for free and there is never a fourth copy to keep in step.
+    var rows = [
+      { id: 'app', label: lang === 'fi' ? 'Applikaatio' : 'Application',
+        where: lang === 'fi' ? 'App-katalogi, "luo uusi appi"' : 'App catalogue, "create new app"',
+        href: 'https://aimeat.io/app-catalog.html' },
+      { id: 'extension', label: 'Extension',
+        where: lang === 'fi' ? 'Profiili → Extensions' : 'Profile → Extensions',
+        href: 'https://aimeat.io/profile#extensions' },
+      { id: 'cortex', label: 'Cortex',
+        where: lang === 'fi' ? 'Profiili → Extensions' : 'Profile → Extensions',
+        href: 'https://aimeat.io/profile#extensions' },
+      { id: 'skill', label: 'Skills',
+        where: lang === 'fi' ? 'TURBO tai skills-rekisteri' : 'TURBO or the skills registry',
+        href: 'https://turbo.apps.aimeat.io/' },
+      { id: 'tools', label: 'App-tools',
+        where: lang === 'fi' ? 'TURBO' : 'TURBO', href: 'https://turbo.apps.aimeat.io/' },
+      { id: 'listing', label: 'EXCHANGE',
+        where: lang === 'fi' ? 'Listaus syntyy lähteestä' : 'The listing is projected from the source',
+        href: 'https://exchange.apps.aimeat.io/' }
+    ];
+
+    var table = G.dataTable({
+      columns: [
+        { id: 'label', label: lang === 'fi' ? 'Osa' : 'Part' },
+        { id: 'state', label: lang === 'fi' ? 'Tila' : 'State' },
+        { id: 'where', label: lang === 'fi' ? 'Mistä' : 'Where' }
+      ],
+      rows: rows.map(function (row) {
+        return {
+          label: row.label,
+          state: (v.artifacts && v.artifacts[row.id]) ? '✓' : ', ',
+          where: row.where,
+          href: row.href
+        };
+      }),
+      onPick: function (row) { if (row.href) window.open(row.href, '_blank', 'noopener'); }
+    });
+
+    var m = G.modal({
+      title: t('buildTitle'),
+      body: el('div', { class: 'nst-stack' }, [
+        el('p', { class: 'nst-lede', text: t('buildLede') }),
+        el('div', { class: 'nst-row' }, [
+          el('a', { class: 'ag-btn ag-btn--primary', href: 'https://turbo.apps.aimeat.io/', target: '_blank', rel: 'noopener' }, t('openTurbo'))
+        ]),
+        el('div', { class: 'nst-scroll-x' }, table.el),
+        panel([
+          label(t('whereInstall')),
+          el('p', { class: 'nst-fine', text: t('instApp') }),
+          el('p', { class: 'nst-fine', text: t('instExt') })
+        ]),
+        el('p', { class: 'nst-prompt__mcp', text: t('mcpNote') })
+      ])
+    });
+  }
+
+  // ── Catalogue ──────────────────────────────────────────────────────────────────────────────
+  var catTab = 'ready';
+  async function viewCatalogue() {
+    var data = await N.catalogue(catTab);
+    var wrap = el('div', { class: 'nst-wrap nst-stack' });
+
+    var tabs = el('div', { class: 'nst-row' }, [
+      el('button', { type: 'button', class: 'ag-chip' + (catTab === 'ready' ? ' ag-chip--on' : ''),
+        on: { click: function () { catTab = 'ready'; viewCatalogue().catch(fail); } } }, t('catReady')),
+      el('button', { type: 'button', class: 'ag-chip' + (catTab === 'progress' ? ' ag-chip--on' : ''),
+        on: { click: function () { catTab = 'progress'; viewCatalogue().catch(fail); } } }, t('catProgress'))
+    ]);
+    wrap.appendChild(tabs);
+    wrap.appendChild(el('p', { class: 'nst-fine', text: catTab === 'ready' ? t('catReadyLede') : t('catProgressLede') }));
+
+    if (!data.entries.length) {
+      wrap.appendChild(el('p', { class: 'nst-empty', text: t('nothingYet') }));
+      show(wrap); return;
+    }
+
+    var grid = el('div', { class: 'nst-grid' });
+    data.entries.forEach(function (e) {
+      var tags = ['L' + (e.level || 0)];
+      if (!e.live) tags.push((e.readiness || 0) + '%');
+      if (e.boostedUntil) tags.push('↑');
+      var c = G.card({
+        title: e.title, author: e.author,
+        metric: e.live
+          ? { label: t('interested', { n: e.interest || 0 }), value: (e.metric || '') }
+          : { label: t('readiness'), value: (e.readiness || 0) + '%' },
+        image: e.logo || undefined, tags: tags,
+        onPick: function () { openProduct(e); }
+      });
+      grid.appendChild(c.el);
+    });
+    wrap.appendChild(grid);
+    show(wrap);
+  }
+
+  function openProduct(e) {
+    var body = el('div', { class: 'nst-stack' }, [
+      el('p', { class: 'nst-lede', text: e.promise || '' }),
+      panel([
+        label(t('valueAdd')),
+        N.ladder({ level: e.level || 0, rungs: rungs() }).el
+      ]),
+      e.live ? null : panel([
+        label(t('readiness')),
+        G.meter({ label: t('readiness'), value: e.readiness || 0, threshold: 70 }).el,
+        (e.missing && e.missing.length)
+          ? el('p', { class: 'nst-fine', text: e.missing.join(' · ') })
+          : null
+      ]),
+      e.link ? el('a', { class: 'ag-btn ag-btn--ghost', href: e.link, target: '_blank', rel: 'noopener' }, t('openIt')) : null
+    ]);
+
+    var actions = [];
+    if (!e.live) {
+      actions.push({ id: 'watch', label: t('tellMe'), kind: 'primary', onClick: async function () {
+        if (!S.session) { G.toast(t('signInToPlay'), 'warn'); return; }
+        try { var r = await N.watch(e.ref); G.toast(t('watching') + ' (' + r.count + ')', 'ok'); }
+        catch (err) { fail(err); }
+      } });
+    }
+    if (S.session && e.owner === (S.player && S.player.owner)) {
+      actions.push({ id: 'promote', label: t('promoteIt'), kind: 'ghost', onClick: async function () {
+        try {
+          await N.promote(e.id, 24);
+          G.toast(t('promoteFree'), 'info');
+          viewCatalogue().catch(fail);
+        } catch (err) { fail(err); }
+      } });
+    }
+    actions.push({ id: 'close', label: G.i18n.t('close'), kind: 'plain', onClick: function () { m.close(); } });
+
+    var m = G.modal({ title: e.title, body: body, actions: actions });
+  }
+
+  // ── Boards ─────────────────────────────────────────────────────────────────────────────────
+  async function viewBoards() {
+    var b = await N.board(undefined, 25);
+    var ch = await N.challenges();
+
+    var metrics = (b.metrics && b.metrics.length ? b.metrics : ['readiness']).map(function (id) {
+      return { id: id, label: id };
+    });
+    var rows = (b.rows || []).map(function (r) {
+      return {
+        id: r.owner, name: r.name, sublabel: 'L' + (r.level || 0),
+        you: !!(b.you && b.you.owner === r.owner),
+        rank: r.rank, values: (function () { var o = {}; o[b.metric] = r.value; return o; })()
+      };
+    });
+    // The viewer's own row travels with the board whatever their rank, being 40th is an answer,
+    // and an empty space is not.
+    if (b.you && !rows.some(function (r) { return r.id === b.you.owner; })) {
+      var o = {}; o[b.metric] = b.you.value;
+      rows.push({ id: b.you.owner, name: b.you.name + ' (' + t('you') + ')', you: true, rank: b.you.rank, values: o });
+    }
+
+    var lb = G.leaderboard({
+      title: t('boardsTitle'), metrics: metrics, metric: b.metric, rows: rows,
+      onSort: function (mid) { N.board(mid, 25).then(function () { viewBoards().catch(fail); }); }
+    });
+
+    var chRows = (ch.challenges || []).map(function (c) {
+      return {
+        who: c.from + ' → ' + c.to, metric: c.metric, state: c.state,
+        result: c.result ? (c.result.draw ? '=' : (c.result.from + ' : ' + c.result.to)) : ', '
+      };
+    });
+    var chTable = G.dataTable({
+      columns: [
+        { id: 'who', label: lang === 'fi' ? 'Kuka' : 'Who' },
+        { id: 'metric', label: t('metric') },
+        { id: 'state', label: lang === 'fi' ? 'Tila' : 'State' },
+        { id: 'result', label: lang === 'fi' ? 'Tulos' : 'Result' }
+      ],
+      rows: chRows,
+      emptyText: t('noChallenges')
+    });
+
+    show(el('div', { class: 'nst-wrap nst-stack' }, [
+      lb.el,
+      panel([
+        label(t('challengesTitle')),
+        el('p', { class: 'nst-fine', text: t('challengeLede') }),
+        el('div', { class: 'nst-scroll-x' }, chTable.el)
+      ])
+    ]));
+  }
+
+  // ── Money ──────────────────────────────────────────────────────────────────────────────────
+  async function viewMoney() {
+    var earnings = null;
+    try { earnings = await X.earnings(); } catch (e) { /* nothing accrued, or the scope is absent */ }
+    var eur = earnings && earnings.currencies && earnings.currencies.EUR;
+    var pending = eur ? eur.pending : 0;
+    var settled = eur ? eur.settled : 0;
+
+    // Where the player is on the ladder is READ, never chosen: sandbox until money has accrued,
+    // payout-ready once it has. Nothing here moves money, this screen reads the rail.
+    var step = pending > 0 ? 2 : (settled > 0 ? 2 : 0);
+    var steps = [
+      { id: 'sandbox', label: t('mSandbox'), state: step > 0 ? 'done' : 'current' },
+      { id: 'accruing', label: t('mAccruing'), state: step > 1 ? 'done' : (step === 1 ? 'current' : 'future') },
+      { id: 'payout', label: t('mPayout'), state: step === 2 ? 'current' : 'future' },
+      { id: 'direct', label: t('mDirect'), state: 'future' }
+    ];
+    var railEl = G.rail({ steps: steps });
+
+    var words = [
+      [t('mSandbox'), t('mSandboxW')], [t('mAccruing'), t('mAccruingW')],
+      [t('mPayout'), t('mPayoutW')], [t('mDirect'), t('mDirectW')]
+    ].map(function (p) {
+      return el('div', {}, [label(p[0]), el('p', { class: 'nst-fine', text: p[1] })]);
+    });
+
+    var figures = el('div', { class: 'nst-split--even nst-split' }, [
+      panel([label(t('pending')), el('div', { class: 'nst-figure', text: X.fmtUnit(pending, 'EUR') })]),
+      panel([label(t('settled')), el('div', { class: 'nst-figure', text: X.fmtUnit(settled, 'EUR') })])
+    ]);
+
+    var entries = (eur && eur.entries) || (earnings && earnings.entries) || [];
+    var table = G.dataTable({
+      columns: [
+        { id: 'at', label: lang === 'fi' ? 'Milloin' : 'When' },
+        { id: 'reference', label: lang === 'fi' ? 'Mistä' : 'From' },
+        { id: 'amount', label: lang === 'fi' ? 'Määrä' : 'Amount', num: true,
+          format: function (val) { return X.fmtUnit(val, 'EUR'); } },
+        { id: 'status', label: lang === 'fi' ? 'Tila' : 'Status' }
+      ],
+      rows: entries.slice(0, 100),
+      emptyText: t('noEarnings')
+    });
+
+    // The step that does not exist yet is drawn as planned rather than as a dead button. Clicking
+    // a control that cannot work is worse than being told it is not built.
+    var soon = G.comingSoon({
+      title: lang === 'fi' ? 'Nosto ja suora tilitys' : 'Payout and direct settlement',
+      description: lang === 'fi'
+        ? 'Kertymän laskuttaminen ja oman Stripe-avaimen liittäminen. Rakennetaan kun ensimmäinen kertymä on oikeasti syntynyt, kukaan ei täytä maksujärjestelyjä ennen kuin on jotain tilitettävää.'
+        : 'Invoicing the accrual and attaching your own Stripe key. Built once a first accrual actually exists, nobody fills in payment arrangements before there is something to settle.'
+    });
+
+    show(el('div', { class: 'nst-wrap nst-stack nst-money' }, [
+      el('h2', { class: 'ag-title', text: t('moneyTitle') }),
+      el('p', { class: 'nst-fine', text: t('moneyLede') }),
+      railEl.el,
+      figures,
+      panel([el('p', { class: 'nst-fine', text: t('earningsNote') }), el('div', { class: 'nst-scroll-x' }, table.el)]),
+      el('div', { class: 'nst-grid' }, words),
+      soon.el
+    ]));
+  }
+
+  // ── Quests ─────────────────────────────────────────────────────────────────────────────────
+  async function viewQuests() {
+    var cat = await N.catalogue('ready');
+    var wall = cat.entries.slice(0, 20);
+
+    var main = panel([
+      label(t('questsTitle')),
+      el('h2', { class: 'ag-title', text: t('mainQuest') }),
+      el('p', { class: 'nst-lede', text: t('mainQuestBody') }),
+      el('a', { class: 'ag-btn ag-btn--primary', href: 'https://turbo.apps.aimeat.io/', target: '_blank', rel: 'noopener' }, t('openTurbo'))
+    ]);
+
+    var soon = G.comingSoon({
+      title: t('incubator'),
+      description: t('incubatorBody'),
+      notify: {
+        onNotify: async function () {
+          if (!S.session) { G.toast(t('signInToPlay'), 'warn'); return; }
+          await AIMEAT.data.set('noste.interest.incubator', { at: new Date().toISOString() }, { visibility: 'private' });
+        }
+      }
+    });
+
+    var wallBox = panel([
+      label(t('wallTitle')),
+      wall.length
+        ? el('div', { class: 'nst-grid' }, wall.map(function (e) {
+          return G.card({ title: e.title, author: e.author, metric: { label: 'L', value: String(e.level || 0) },
+            image: e.logo || undefined, onPick: function () { openProduct(e); } }).el;
+        }))
+        : el('p', { class: 'nst-empty', text: t('wallEmpty') })
+    ]);
+
+    show(el('div', { class: 'nst-wrap nst-stack' }, [main, wallBox, soon.el]));
+  }
+
+  // ── Stats ──────────────────────────────────────────────────────────────────────────────────
+  async function viewStats() {
+    var s = await N.stats();
+    S.stats = s;
+    var tiles = G.statGrid([
+      { id: 'players', label: t('playersHere'), value: s.players || 0 },
+      { id: 'live', label: t('catReady'), value: s.live || 0 },
+      { id: 'challenges', label: t('challengesTitle'), value: s.challenges || 0 },
+      // No earnings tile. A count of who has earned would have to come from somewhere, and the only
+      // shared place to put it is public, which would publish a fact about each player's money.
+      { id: 'inprogress', label: t('catProgress'), value: s.inProgress || 0 }
+    ]);
+    var feed = await N.feed(20);
+    show(el('div', { class: 'nst-wrap nst-stack' }, [
+      el('h2', { class: 'ag-title', text: t('statsTitle') }),
+      el('p', { class: 'nst-fine', text: t('statsLede') }),
+      tiles.el,
+      panel([label(t('activity'))].concat(
+        feed.events.length
+          ? feed.events.map(function (e) { return el('p', { class: 'nst-fine', text: e.text }); })
+          : [el('p', { class: 'nst-empty', text: t('nothingYet') })]
+      ))
+    ]));
+  }
+
+  // ── Operator console ───────────────────────────────────────────────────────────────────────
+  async function viewConsole() {
+    var data;
+    try { data = await N.console(); }
+    catch (e) {
+      show(el('div', { class: 'nst-wrap' }, panel([el('p', { class: 'nst-empty', text: t('lockedConsole') })])));
+      return;
+    }
+
+    var tiles = G.statGrid([
+      { id: 'players', label: t('playersHere'), value: data.totals.players },
+      { id: 'public', label: lang === 'fi' ? 'julkiset' : 'public entries', value: data.totals.publicEntries },
+      { id: 'stuck', label: lang === 'fi' ? 'jumissa' : 'stuck', value: data.totals.stuck },
+      { id: 'listed', label: lang === 'fi' ? 'listattu' : 'listed', value: data.totals.listedEntries }
+    ]);
+
+    var table = G.dataTable({
+      columns: [
+        { id: 'name', label: lang === 'fi' ? 'Pelaaja' : 'Player' },
+        { id: 'joinedAt', label: lang === 'fi' ? 'Liittyi' : 'Joined', format: function (v) { return (v || '').slice(0, 10); } },
+        { id: 'lastAt', label: lang === 'fi' ? 'Viimeksi' : 'Last seen', format: function (v) { return (v || '').slice(0, 10); } },
+        { id: 'pub', label: lang === 'fi' ? 'Julkiset' : 'Public', num: true },
+        { id: 'best', label: lang === 'fi' ? 'Paras %' : 'Best %', num: true },
+      ],
+      rows: data.players.map(function (p) {
+        // Everything on this row is derived from what the player made PUBLIC. There is nothing
+        // else to derive it from, which is the point.
+        var best = 0;
+        (p.entries || []).forEach(function (e) { if ((e.readiness || 0) > best) best = e.readiness; });
+        return {
+          name: p.name, joinedAt: p.joinedAt, lastAt: p.lastAt,
+          pub: (p.entries || []).length, best: best, _p: p
+        };
+      }),
+      onPick: function (row) { openPlayer(row._p); }
+    });
+
+    show(el('div', { class: 'nst-wrap nst-stack' }, [
+      el('h2', { class: 'ag-title', text: t('consoleTitle') }),
+      // The boundary is stated at the top of the console, to the person it constrains.
+      panel([
+        label(t('privacyTitle')),
+        el('p', { class: 'nst-fine', text: data.boundary.publicPlayState + ' · ' + data.boundary.privateVentures + ' · ' + data.boundary.money })
+      ]),
+      tiles.el,
+      el('div', { class: 'nst-scroll-x' }, table.el)
+    ]));
+  }
+
+  function openPlayer(p) {
+    var body = el('div', { class: 'nst-stack' }, [
+      el('p', { class: 'nst-fine', text: (lang === 'fi' ? 'Liittyi ' : 'Joined ') + (p.joinedAt || '').slice(0, 10) }),
+      panel([
+        label(lang === 'fi' ? 'Julkiset merkinnät' : 'Public entries'),
+        (p.entries || []).length
+          ? el('div', {}, p.entries.map(function (e) {
+            return el('p', { class: 'nst-fine', text: e.title + ' · ' + e.stage + ' · ' + (e.readiness || 0) + '%' });
+          }))
+          : el('p', { class: 'nst-empty', text: lang === 'fi' ? 'Ei julkisia merkintöjä.' : 'No public entries.' })
+      ]),
+      panel([
+        label(lang === 'fi' ? 'Mitä tässä ei ole' : 'What is not here'),
+        // Said to the operator, not only to the player. There is no list of this person's unshared
+        // work because none was ever collected: the only shared store available is readable by
+        // everybody, so putting it there would have published it.
+        el('p', { class: 'nst-fine', text: lang === 'fi'
+          ? 'Tämän pelaajan avaamattomat yritykset. Niitä ei ole kerätty mihinkään: jaettu pelitila on kaikkien luettavissa, joten sinne vieminen olisi julkaisemista. Ne ovat pelaajan omassa muistitilassa, ja hän päättää itse avaako ne.'
+          : 'This player\'s unshared ventures. None were collected anywhere: the shared game store is readable by everybody, so putting them there would have published them. They live in the player\'s own memory space, and opening one is their decision.' }),
+        el('p', { class: 'nst-fine', text: lang === 'fi'
+          ? 'Eikä rahaa: kertymä on pelaajan, eikä yhtään saldoa ole tallennettu jaettuun pelitilaan.'
+          : 'Money is not here either: an accrual belongs to the player, and no balance is stored in the shared game state at all.' })
+      ])
+    ]);
+    var m = G.modal({ title: p.name, body: body,
+      actions: [{ id: 'close', label: G.i18n.t('close'), kind: 'primary', onClick: function () { m.close(); } }] });
+  }
+
+  // ── What an operator can see, said to the players ─────────────────────────────────────────
+  async function viewPrivacy() {
+    show(el('div', { class: 'nst-wrap nst-stack' }, [
+      el('h2', { class: 'ag-title', text: t('privacyTitle') }),
+      el('p', { class: 'nst-lede', text: t('privacyLede') }),
+      panel([label(t('privPublic')), el('p', { class: 'nst-fine', text: t('privPublicW') })]),
+      panel([label(t('privPrivate')), el('p', { class: 'nst-fine', text: t('privPrivateW') })]),
+      panel([label(t('privMoney')), el('p', { class: 'nst-fine', text: t('privMoneyW') })])
+    ]));
+  }
+
+  // ── Boot ───────────────────────────────────────────────────────────────────────────────────
+  async function onSession(session) {
+    if (!session || S.booted) return;
+    S.booted = true;
+    S.session = session;
+    try {
+      var j = await N.join({});
+      S.player = j.player;
+    } catch (e) { /* joining is not a gate on reading anything */ }
+    try {
+      var me = await N.whoami();
+      S.role = me.role; S.caps = me.caps || [];
+    } catch (e) { S.caps = []; }
+    await loadVentures();
+    var want = location.hash.slice(1);
+    go(want && want !== 'door' ? want : 'home');
+  }
+
+  function onLogout() {
+    S.session = null; S.player = null; S.role = null; S.caps = []; S.ventures = []; S.booted = false;
+    renderDoor().catch(fail);
+  }
+
+  N.applySkin();
+
+  AIMEAT.auth.mountLoginButton('#login', { onLogin: onSession, onLogout: onLogout });
+  // All three paths, because each covers a case the others do not: a fresh click, a page that
+  // loaded already signed in, and the async app-origin grant that fires neither.
+  AIMEAT.auth.login().then(function (s) { if (s) onSession(s); }).catch(function () {});
+  AIMEAT.auth.on('login', onSession);
+  AIMEAT.auth.on('logout', onLogout);
+
+  window.addEventListener('aimeat-lang-change', function (e) {
+    lang = e.detail.lang;
+    if (S.view) go(S.view); else renderDoor().catch(fail);
+  });
+
+  // A signed-out visitor is a first-class reader here, so the door renders immediately rather than
+  // waiting to find out whether anyone is signed in.
+  var startHash = location.hash.slice(1);
+  if (startHash && ['catalogue', 'boards', 'stats', 'quests', 'privacy'].indexOf(startHash) >= 0) {
+    go(startHash);
+  } else {
+    renderDoor().catch(fail);
+  }
+})();
+</script>
