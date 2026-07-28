@@ -19,6 +19,7 @@
 import * as ed from '@noble/ed25519';
 import { createHash } from 'node:crypto';
 import { spawn, type ChildProcess } from 'node:child_process';
+import { request as httpRequest } from 'node:http';
 import { existsSync, unlinkSync } from 'node:fs';
 import { resolve } from 'node:path';
 
@@ -48,6 +49,28 @@ async function signMsg(privB64: string, message: string): Promise<string> {
     return Buffer.from(sig).toString('base64');
 }
 const b64 = (s: string) => Buffer.from(s, 'utf8').toString('base64');
+
+/**
+ * GET with an explicit Host header, on the app origin. `fetch` refuses to set Host, and Host is the
+ * whole point here: production's proxy marks the host family without always naming the label, so the
+ * label has to come from Host — a case no fetch-based assertion can even express.
+ */
+function rawJson(path: string, hostHeader: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+        const req = httpRequest({
+            host: 'localhost', port: Number(PORT), path, method: 'GET',
+            headers: { host: hostHeader, 'x-app-origin': '1', accept: 'application/json' },
+        }, (res) => {
+            let data = '';
+            res.on('data', (c) => { data += c; });
+            res.on('end', () => {
+                try { resolve(JSON.parse(data)); } catch (err) { reject(new Error(`${res.statusCode}: ${data.slice(0, 200)} (${String(err)})`)); }
+            });
+        });
+        req.on('error', reject);
+        req.end();
+    });
+}
 
 function cleanupDb() {
     for (const f of [DB_PATH, DB_PATH + '-wal', DB_PATH + '-shm']) {
@@ -341,6 +364,22 @@ async function main() {
                 `the node issues the tokens: ${JSON.stringify(body.authorization_servers)}`);
             assert(body.aimeat?.app === `${owner}/${filename}`, `names the app: ${JSON.stringify(body.aimeat)}`);
             assert(body.aimeat?.app_id === filename, 'the app id keeps its extension');
+        });
+
+        // The shape production actually sends on this path: the proxy marks the host family and
+        // leaves the label to the Host header. Read as "no subdomain", every app origin answered
+        // as the bare app host — one resource identifier for all 76 of them, which is exactly the
+        // wrong answer the metadata was rewritten to stop giving.
+        await test('the label comes from Host when the proxy sends only the family marker', async () => {
+            const body = await rawJson('/.well-known/oauth-protected-resource', `${SUB}.${APP_HOST}:${PORT}`);
+            assert(body.resource === APP_ORIGIN, `expected this app's origin, got: ${body.resource}`);
+            assert(body.aimeat?.app === `${owner}/${filename}`, `and the app it serves: ${JSON.stringify(body.aimeat)}`);
+        });
+
+        await test('the BARE app host stays the bare app host (no label invented)', async () => {
+            const body = await rawJson('/.well-known/oauth-protected-resource', `${APP_HOST}:${PORT}`);
+            assert(body.resource === `http://${APP_HOST}:${PORT}`, `bare host resource: ${body.resource}`);
+            assert(body.aimeat === undefined, 'no app is named for the bare host');
         });
 
         await test('its scopes_supported are the ones the app itself declares', async () => {
