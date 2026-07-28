@@ -574,6 +574,26 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
       policyVersion: process.env.AIMEAT_OPERATOR_POLICY_VERSION ?? '1.0',
     },
 
+    // Public-page links. Empty by design: the marketing pages point at apps that belong to
+    // whoever runs the node, and a fresh clone must not advertise aimeat.io's apps or Jouni's
+    // phone number. Each empty value hides its link, nav item or section.
+    siteLinks: {
+      learn: process.env.AIMEAT_SITE_LEARN_URL ?? '',
+      exchange: process.env.AIMEAT_SITE_EXCHANGE_URL ?? '',
+      assessment: process.env.AIMEAT_SITE_ASSESSMENT_URL ?? '',
+      roadmap: process.env.AIMEAT_SITE_ROADMAP_URL ?? '',
+      paper: process.env.AIMEAT_SITE_PAPER_URL ?? '',
+      crm: process.env.AIMEAT_SITE_CRM_URL ?? '',
+      radar: process.env.AIMEAT_SITE_RADAR_URL ?? '',
+      briefing: process.env.AIMEAT_SITE_BRIEFING_URL ?? '',
+      apiAccelerator: process.env.AIMEAT_SITE_API_ACCELERATOR_URL ?? '',
+      playbooks: process.env.AIMEAT_SITE_PLAYBOOKS_URL ?? '',
+      showcase: process.env.AIMEAT_SITE_SHOWCASE_URL ?? '',
+      contactName: process.env.AIMEAT_SITE_CONTACT_NAME ?? '',
+      contactEmail: process.env.AIMEAT_SITE_CONTACT_EMAIL ?? process.env.AIMEAT_OPERATOR_EMAIL ?? '',
+      contactPhone: process.env.AIMEAT_SITE_CONTACT_PHONE ?? '',
+    },
+
     // Consul
     consulEnabled: process.env.AIMEAT_CONSUL_ENABLED === 'true',
     consulUrl: process.env.AIMEAT_CONSUL_URL ?? 'http://localhost:8500',

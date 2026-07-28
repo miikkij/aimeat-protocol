@@ -129,6 +129,24 @@ function renderPrivacyNotConfiguredPage(missing: string[], locale: 'en' | 'fi'):
     </body></html>`;
 }
 
+/**
+ * The site-link block handed to the browser, with empty entries dropped so the injected
+ * object only names what this node actually has. Consumers check for presence, so an
+ * absent key and an empty string mean the same thing — dropping them keeps the payload
+ * small and makes "not configured" unambiguous in devtools.
+ *
+ * Everything here is already public (they are links printed on public pages). No secret,
+ * no internal id, and no operator field beyond the contact details the operator chose to
+ * publish may be added to this object — it ships to every anonymous visitor.
+ */
+function publicSiteLinks(config: AimeatConfig): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const [key, value] of Object.entries(config.siteLinks)) {
+    if (typeof value === 'string' && value.trim() !== '') out[key] = value.trim();
+  }
+  return out;
+}
+
 const __dirname_portal = dirname(fileURLToPath(import.meta.url));
 
 /**
@@ -148,7 +166,8 @@ const BUILD_ID = Date.now().toString(36);
  *    (static + dynamic imports from any view) get fresh URLs after restart
  *  - CSP nonce injected into all script and style tags
  */
-export function serveSpa(res: import('express').Response, spaPath: string, appOriginEnabled = false): void {
+export function serveSpa(res: import('express').Response, spaPath: string, config: AimeatConfig): void {
+  const appOriginEnabled = config.appOriginEnabled && !!config.appHost;
   const v = `?v=${BUILD_ID}`;
   let html = readFileSync(spaPath, 'utf-8');
 
@@ -171,6 +190,10 @@ export function serveSpa(res: import('express').Response, spaPath: string, appOr
     // (the apex inline URL 301s to apps.<domain>) — a clean full page on an isolated origin,
     // no opaque-sandbox overlay. Off → the Phase-0 sandboxed iframe is used instead.
     `window.__APP_ORIGIN_ENABLED=${appOriginEnabled ? 'true' : 'false'};` +
+    // This node's own public-page links (its academy, marketplace, proof apps, contact).
+    // Injected rather than fetched so the first paint already knows which nav items and
+    // sections exist. Empty on a fresh clone, and every consumer treats empty as "absent".
+    `window.__SITE=${JSON.stringify(publicSiteLinks(config))};` +
     `(function(){var c="${BUILD_ID}";` +
     `function chk(){fetch("/v1/build",{cache:"no-store"}).then(function(r){return r.ok?r.json():null;})` +
     `.then(function(d){if(d&&d.build&&d.build!==c){location.reload();}}).catch(function(){});}` +
@@ -396,7 +419,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     }
     const spaPath = resolvePublicFile('spa.html');
     if (spaPath) {
-      serveSpa(res, spaPath, config.appOriginEnabled && !!config.appHost);
+      serveSpa(res, spaPath, config);
     } else {
       res.redirect(302, '/spa.html');
     }
@@ -514,7 +537,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   router.get('/v1/portfolio/:username', (_req, res) => {
     const spaPath = resolvePublicFile('spa.html');
     if (spaPath) {
-      serveSpa(res, spaPath, config.appOriginEnabled && !!config.appHost);
+      serveSpa(res, spaPath, config);
     } else {
       res.redirect(302, '/spa.html');
     }
@@ -554,7 +577,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     router.get(path, (_req, res) => {
       const spaPath = resolvePublicFile('spa.html');
       if (spaPath) {
-        serveSpa(res, spaPath, config.appOriginEnabled && !!config.appHost);
+        serveSpa(res, spaPath, config);
       } else {
         res.redirect(302, '/spa.html');
       }

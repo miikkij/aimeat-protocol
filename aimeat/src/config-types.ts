@@ -98,6 +98,49 @@ export interface OperatorConfig {
   policyVersion: string;
 }
 
+/**
+ * Links the public marketing pages (landing, how-it-works, business, help) point at.
+ *
+ * These are THIS node's own apps and contacts, not protocol features. aimeat.io fills them
+ * in from its deployment environment; a fresh clone leaves them empty and every page renders
+ * without the link, the nav item or the whole section. Nothing here may be required for a
+ * page to work — an operator who sets none of it still gets a coherent site that never
+ * advertises somebody else's apps or phone number.
+ *
+ * Same posture rule as the rest of the config (Rule 10): safe public default in the repo,
+ * documented per-node override.
+ */
+export interface SiteLinksConfig {
+  /** Hands-on academy / showroom app. Renders the "Learn" nav item when set. */
+  learn: string;
+  /** Capability marketplace app. Renders the "EXCHANGE" nav item when set. */
+  exchange: string;
+  /** Free AI current-state assessment used as the business-page entry point. */
+  assessment: string;
+  /** Public roadmap + portfolio surface. */
+  roadmap: string;
+  /** Agent-written publication, used as the "work happens without you" proof. */
+  paper: string;
+  /** CRM app. */
+  crm: string;
+  /** Company-intelligence / mention radar app. */
+  radar: string;
+  /** Morning briefing board app. */
+  briefing: string;
+  /** API-acceleration app (make an existing API agent-native). */
+  apiAccelerator: string;
+  /** Playbook app (the repeatable change package). */
+  playbooks: string;
+  /** An external node running on AIMEAT, shown as third-party proof. */
+  showcase: string;
+  /** Contact person shown on the public pages. */
+  contactName: string;
+  /** Contact email for demo / sales enquiries. */
+  contactEmail: string;
+  /** Contact phone, rendered only when set. */
+  contactPhone: string;
+}
+
 export interface AimeatConfig {
   port: number;
   baseUrl: string;
@@ -548,6 +591,10 @@ export interface AimeatConfig {
   // configured" so the operator is forced to fill it in before going
   // public. See `requireOperatorConfig()` for the validation rule.
   operator: OperatorConfig;
+
+  // Links the public marketing pages point at. Every field is optional; an empty value
+  // hides the link, the nav item or the whole section rather than breaking the page.
+  siteLinks: SiteLinksConfig;
 
   // CORS
   corsAllowedOrigins: string[];

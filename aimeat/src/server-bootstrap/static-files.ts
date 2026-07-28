@@ -156,7 +156,7 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
     const spaFile = join(publicDir, 'spa.html');
     if (existsSync(spaFile)) {
       app.get('/spa.html', (_req, res) => {
-        serveSpa(res, spaFile, config.appOriginEnabled && !!config.appHost);
+        serveSpa(res, spaFile, config);
       });
     }
 
