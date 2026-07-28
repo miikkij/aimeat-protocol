@@ -10,6 +10,10 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   v1.1.0 — 2026-07-28 — Phase 6: the app origin answers as itself — RFC 9728 protected-resource
+ *     metadata naming this origin + the app's declared scopes, the 401 discovery hint, the injected
+ *     self-activating WebMCP bridge (and its opt-out), and a WebMCP listing that describes an app
+ *     with no tool manifest instead of 404ing.
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phases 1–2).
  */
 import * as ed from '@noble/ed25519';
@@ -86,7 +90,8 @@ async function main() {
     try {
         const owner = `apporigin${Date.now() % 100000}`;
         const filename = 'origin-demo.html';
-        const HTML = '<!DOCTYPE html><html><body><h1>app origin demo</h1></body></html>';
+        const HTML = '<!DOCTYPE html><html><head><meta name="aimeat-scopes" content="memory:read ai:use"></head>'
+            + '<body><h1>app origin demo</h1></body></html>';
         let token = '';
 
         console.log('\n=== H-2 App Origin Isolation E2E (Phases 1–2) ===\n');
@@ -308,6 +313,91 @@ async function main() {
                 method: 'POST', headers: { Authorization: `Bearer ${tk.body.data.token}`, Origin: FRAMER }, body: '{}',
             });
             assert(r.status === 404, `outsider must not mint (expected 404, got ${r.status})`);
+        });
+
+        // ── Phase 6: the app origin answers as ITSELF ──────────────────────────────────────
+        // Each app origin is its own protected resource (own grant, own scopes, session-less host).
+        // While every one of them answered `/.well-known/oauth-protected-resource` with the APEX's
+        // MCP endpoint, a client following RFC 9728 §3.3 — which has it reject metadata whose
+        // `resource` is not the resource being talked to — learned nothing about how to authenticate
+        // here. The readiness scanner rejected it for exactly that reason.
+        console.log('\nPhase 6: protected-resource metadata + the in-page WebMCP bridge');
+
+        const APP_ORIGIN = `http://${SUB}.${APP_HOST}:${PORT}`;
+
+        await test('apex protected-resource metadata is unchanged (the MCP endpoint)', async () => {
+            const r = await json('/.well-known/oauth-protected-resource');
+            assert(r.status === 200, `status ${r.status}`);
+            assert(r.body.resource === `${BASE}/v1/mcp`, `apex resource changed: ${r.body.resource}`);
+            assert(JSON.stringify(r.body.authorization_servers) === JSON.stringify([BASE]), `apex AS: ${JSON.stringify(r.body.authorization_servers)}`);
+        });
+
+        await test('the app origin names ITSELF as the resource, and the node as its authorization server', async () => {
+            const res = await fetch(`${BASE}/.well-known/oauth-protected-resource`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            assert(res.status === 200, `status ${res.status}`);
+            const body = await res.json() as any;
+            assert(body.resource === APP_ORIGIN, `resource is this origin, got: ${body.resource}`);
+            assert(JSON.stringify(body.authorization_servers) === JSON.stringify([BASE]),
+                `the node issues the tokens: ${JSON.stringify(body.authorization_servers)}`);
+            assert(body.aimeat?.app === `${owner}/${filename}`, `names the app: ${JSON.stringify(body.aimeat)}`);
+            assert(body.aimeat?.app_id === filename, 'the app id keeps its extension');
+        });
+
+        await test('its scopes_supported are the ones the app itself declares', async () => {
+            const res = await fetch(`${BASE}/.well-known/oauth-protected-resource`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            const body = await res.json() as any;
+            const scopes: string[] = body.scopes_supported ?? [];
+            assert(scopes.includes('memory:read') && scopes.includes('ai:use'),
+                `expected the app's <meta name="aimeat-scopes">, got: ${JSON.stringify(scopes)}`);
+        });
+
+        await test('a 401 on the app origin points at THAT origin\'s metadata (RFC 9728 hint)', async () => {
+            const res = await fetch(`${BASE}/v1/memory`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            assert(res.status === 401, `expected 401, got ${res.status}`);
+            const wa = res.headers.get('www-authenticate') ?? '';
+            assert(wa.includes(`resource_metadata="${APP_ORIGIN}/.well-known/oauth-protected-resource"`),
+                `WWW-Authenticate should name this origin, got: ${wa}`);
+        });
+
+        await test('the served app loads the WebMCP bridge, self-activating, from its OWN origin', async () => {
+            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': SUB } });
+            const body = await res.text();
+            assert(body.includes('src="/v1/libs/aimeat-webmcp.js?expose=app"'),
+                'the bridge is loaded relatively, so an app CSP of script-src \'self\' still allows it');
+            assert(body.includes(`data-app="${filename}"`) && body.includes(`data-owner="${owner}"`),
+                'and it is told which app it is, id with extension');
+        });
+
+        await test('an app that opts out is left alone', async () => {
+            const quiet = 'origin-quiet.html';
+            const quietHtml = '<!DOCTYPE html><html><head><meta name="aimeat-webmcp" content="off"></head><body>q</body></html>';
+            const pub = await json('/v1/apps', {
+                method: 'POST', headers: { Authorization: `Bearer ${token}` },
+                body: JSON.stringify({ filename: quiet, content: b64(quietHtml), name: 'Quiet', description: 'd', category: 'utility', tags: [] }),
+            });
+            assert(pub.status === 201, `publish: ${pub.status}`);
+            await fetch(`${BASE}/v1/apps/${owner}/${quiet}?mode=inline`, { redirect: 'manual' }); // assigns the subdomain
+            const res = await fetch(`${BASE}/`, { headers: { 'x-app-origin': '1', 'x-subdomain': 'origin-quiet' } });
+            assert(res.status === 200, `expected 200, got ${res.status}`);
+            const body = await res.text();
+            assert(!body.includes('aimeat-webmcp.js'), 'no bridge was injected');
+            assert(body.includes('<noscript id="aimeat-agent-discovery">'), 'the script-free discovery block still is');
+        });
+
+        await test('the WebMCP listing describes an app that sells nothing yet, instead of 404ing', async () => {
+            const r = await json(`/v1/apps/${owner}/${filename}/webmcp`);
+            assert(r.status === 200, `expected 200 for a published app with no tool manifest, got ${r.status}`);
+            assert(Array.isArray(r.body.tools) && r.body.tools.length === 0, 'no tools, stated as an empty list');
+            const s = r.body.app_surface;
+            assert(s?.app === `${owner}/${filename}`, `app_surface names the app: ${JSON.stringify(s)}`);
+            assert(s.scopes.includes('ai:use'), `and carries its declared scopes: ${JSON.stringify(s?.scopes)}`);
+            assert(Array.isArray(s.skills) && Array.isArray(s.bundled_agents) && Array.isArray(s.exchange?.offerings),
+                'skills, bundled agents and EXCHANGE listings are always present as lists');
+        });
+
+        await test('an app that does not exist is still a 404', async () => {
+            const r = await json(`/v1/apps/${owner}/no-such-app.html/webmcp`);
+            assert(r.status === 404, `expected 404, got ${r.status}`);
         });
 
         console.log('\n─────────────────────────────────────');

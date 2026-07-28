@@ -12276,21 +12276,26 @@ paths:
         (name, description, inputSchema — the fields document.modelContext.registerTool takes)
         plus the AIMEAT payment contract per tool: fulfillment 'call' | 'task', and for priced
         tools the morsel/micro-unit money price with a ready-made checkout line item. The page
-        itself registers the same tools in-browser via /v1/libs/aimeat-webmcp.js. 404 when the
-        app declares no public manifest (TARGET-034 phase C).
+        itself registers the same tools in-browser via /v1/libs/aimeat-webmcp.js (TARGET-034 phase C).
+        Also carries `app_surface`: the app's public agent-facing description — declared scopes,
+        SKILL.md packs bound to the app, bundled crew-defs, and live EXCHANGE listings for its tools.
+        A published app with no public tool manifest answers 200 with an empty `tools` array (and a
+        manifest for an app this node does not host still lists its tools, without `app_surface`).
+        404 means neither exists, or the app is access-code gated, priced, or operator-hidden. A
+        PRIVATE manifest reads exactly like an absent one.
       tags: [Commerce]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
         - { name: filename, in: path, required: true, schema: { type: string } }
       responses:
         '200':
-          description: WebMCP tool listing
+          description: WebMCP tool listing + the app's public agent-facing surface
           content:
             application/json:
               schema:
                 type: object
         '404':
-          description: No public tool manifest
+          description: No such public app (missing, access-code gated, priced, or operator-hidden)
 
   /v1/apps/{owner}/{filename}/webmcp/tools/{tool}:
     post:

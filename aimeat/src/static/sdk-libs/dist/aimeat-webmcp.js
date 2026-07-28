@@ -94,6 +94,27 @@
       return asContent(res.ok ? res.data : res);
     };
   }
+  function aboutTool(ref, surface, toolCount) {
+    const s = surface || {};
+    const label = s.name || ref.appId;
+    const parts = [];
+    if (toolCount) parts.push(toolCount + " callable tool" + (toolCount === 1 ? "" : "s"));
+    if ((s.skills || []).length) parts.push(s.skills.length + " bound skill" + (s.skills.length === 1 ? "" : "s"));
+    if ((s.bundled_agents || []).length) parts.push(s.bundled_agents.length + " bundled agent" + (s.bundled_agents.length === 1 ? "" : "s"));
+    const offers = ((s.exchange || {}).offerings || []).length;
+    if (offers) parts.push(offers + " EXCHANGE listing" + (offers === 1 ? "" : "s"));
+    const carries = parts.length ? " Carries " + parts.join(", ") + "." : "";
+    return {
+      name: "about-this-app",
+      description: 'What "' + label + '" (' + ref.owner + "/" + ref.appId + ") offers an agent: its app id, declared scopes, the SKILL.md packs bound to it, the agent crews it ships, and what it sells on the AIMEAT EXCHANGE, with prices." + carries,
+      inputSchema: { type: "object", properties: {} },
+      async execute() {
+        if (surface) return asContent(surface);
+        const listing = await fetchListing(ref.owner, ref.appId);
+        return asContent(listing.app_surface || { app: ref.owner + "/" + ref.appId });
+      }
+    };
+  }
   var webmcp = {
     /** Every tool descriptor this page has registered (introspection + provideContext resends). */
     tools: [],
@@ -116,9 +137,15 @@
     /**
      * Expose an app's declared tools (apps.{appId}.tools manifest) to the in-browser agent.
      * Descriptions of priced tools carry the price tag so the agent can tell the user the cost.
+     *
+     * Every app also gets `about-this-app`, built from the listing's `app_surface`: the SKILL.md
+     * packs bound to the app, the crew-defs it ships, its declared scopes and its live EXCHANGE
+     * listings. An app that sells nothing still exposes that one, so an agent that lands on any
+     * app page can ask what it is looking at instead of reading 200 kB of minified source.
      */
     async exposeAppTools(ref) {
       const listing = await fetchListing(ref.owner, ref.appId);
+      const surface = listing.app_surface || null;
       const tools = (listing.tools || []).map(function(entry) {
         let desc = entry.description || entry.name;
         if (entry.payment && entry.payment.required) {
@@ -135,6 +162,7 @@
           execute: buildExecute(ref.owner, ref.appId, entry)
         };
       });
+      tools.unshift(aboutTool(ref, surface, tools.length));
       await webmcp.register(tools);
       return { surface: webmcp.surface, tools: tools.map(function(t) {
         return t.name;
@@ -169,6 +197,18 @@
     }
   };
   attach("webmcp", webmcp);
+  function appRefFromPage(el) {
+    const ds = el && el.dataset || {};
+    if (ds.owner && ds.app) return { owner: ds.owner, appId: ds.app };
+    try {
+      const node = document.getElementById("aimeat-app-ref");
+      if (!node) return null;
+      const ref = JSON.parse(node.textContent || "{}");
+      if (ref.owner && ref.app_id) return { owner: ref.owner, appId: ref.app_id };
+    } catch {
+    }
+    return null;
+  }
   try {
     const el = (
       /** @type {any} */
@@ -179,6 +219,12 @@
     if (expose === "node") {
       setTimeout(function() {
         webmcp.exposeNodeTools().catch(function() {
+        });
+      }, 0);
+    } else if (expose === "app") {
+      const ref = appRefFromPage(el);
+      if (ref) setTimeout(function() {
+        webmcp.exposeAppTools(ref).catch(function() {
         });
       }, 0);
     }

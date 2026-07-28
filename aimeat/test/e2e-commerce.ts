@@ -557,8 +557,10 @@ await test('30. WebMCP invoke gates: free-callable needs auth then invokes; unkn
     assert(authed.status === 200 && authed.body.data?.result?.echoed === 'Echo: free call', `free invoke: ${authed.status} ${JSON.stringify(authed.body.data)}`);
     const ghost = await json(`/v1/apps/${encodeURIComponent(seller.name)}/${encodeURIComponent(appId)}/webmcp/tools/no-such-tool`, { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({}) });
     assert(ghost.status === 404 && ghost.body.error?.code === 'TOOL_NOT_FOUND', `ghost tool: ${ghost.status} ${ghost.body.error?.code}`);
-    const noManifest = await fetch(`${BASE}/v1/apps/${encodeURIComponent(buyer.name)}/nothing.html/webmcp`);
-    assert(noManifest.status === 404, `no manifest ${noManifest.status}`);
+    // 404 means "no such public app". A published app that sells nothing answers 200 with an empty
+    // tool list — the two are different facts and only one of them is a missing resource.
+    const noApp = await fetch(`${BASE}/v1/apps/${encodeURIComponent(buyer.name)}/nothing.html/webmcp`);
+    assert(noApp.status === 404, `unknown app ${noApp.status}`);
 });
 
 // ─── MCP Server Card commerce_tools + the dedicated catalog (TARGET-034 phase D) ───

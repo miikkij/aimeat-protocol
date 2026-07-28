@@ -10,6 +10,9 @@
  *   import { registerOAuthRoutes } from './oauth.js';
  *   registerOAuthRoutes(router, config, storage);
  * @version-history
+ *   v1.4.0 — 2026-07-28 — /.well-known/oauth-protected-resource answers per ORIGIN
+ *     (services/protected-resource.ts): an app origin names itself, its app and its declared
+ *     scopes instead of the apex MCP endpoint. Apex response unchanged.
  *   v1.3.0 — 2026-07-14 — agent_auth object construction moved to services/auth-md.ts
  *     (buildAgentAuthMetadata) — /auth.md embeds the same block inline, one source of truth
  *   v1.2.0 — 2026-07-14 — agent_auth carries its own `skill` field (isitagentready expects it
@@ -28,6 +31,7 @@ import { issueJWT } from '../auth/jwt.js';
 import { verify } from '../auth/keypair.js';
 import { parseGAII } from '../utils/gaii.js';
 import { buildAgentAuthMetadata } from '../services/auth-md.js';
+import { buildProtectedResourceMetadata } from '../services/protected-resource.js';
 
 // OAuth 2.1 — authorization codes stay in-memory (short-lived, single-use).
 // Clients, refresh tokens, and approvals are persisted to storage.
@@ -475,14 +479,14 @@ export function registerOAuthRoutes(router: Router, config: AimeatConfig, storag
     // GET /.well-known/oauth-protected-resource — Resource metadata (RFC 9728)
     // MCP clients discover this URL from the WWW-Authenticate header on 401 responses.
     // It tells them WHERE the authorization server is and WHAT scopes are needed.
-    router.get('/.well-known/oauth-protected-resource', (_req: Request, res: Response) => {
-        const baseUrl = config.baseUrl;
-        res.json({
-            resource: `${baseUrl}/v1/mcp`,
-            authorization_servers: [baseUrl],
-            scopes_supported: ['aimeat:full'],
-            bearer_methods_supported: ['header'],
-        });
+    //
+    // Answered PER ORIGIN (services/protected-resource.ts). The apex keeps the document it has
+    // always served; an app origin (`<sub>.apps.<apex>`) and a portfolio origin describe
+    // themselves, because each is a distinct protected resource with its own grant and scopes.
+    // Serving the apex's identifier there was a wrong answer: RFC 9728 §3.3 has the client reject
+    // metadata whose `resource` is not the resource it is talking to.
+    router.get('/.well-known/oauth-protected-resource', async (req: Request, res: Response) => {
+        res.json(await buildProtectedResourceMetadata(req, config, storage));
     });
 
     // GET /.well-known/oauth-authorization-server — OAuth metadata (RFC 8414), extended with

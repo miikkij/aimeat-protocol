@@ -18,6 +18,10 @@
  * @structure injectAgentDiscovery(html, spec) — pure string transform, returns a Buffer.
  * @usage const body = injectAgentDiscovery(injectAimeatBadge(app.data), { owner, filename, ... });
  * @version-history
+ *   v1.1.0 — 2026-07-28 — Optional WebMCP bridge tag (`spec.webmcp`): the same block can now make the
+ *     app's tools CALLABLE in the browser, not merely findable. Pointing at a document is what the
+ *     v1.0.0 block did, and an in-browser agent that can read "there are five tools" still had no way
+ *     to invoke one.
  *   v1.0.0 — 2026-07-27 — Initial: <link rel="mcp-server"> + a <noscript> pointer block naming the
  *     owner, the app id with its extension, the tool manifest, the WebMCP endpoint and the
  *     agent-face markdown rendering.
@@ -38,6 +42,12 @@ export interface AppDiscoverySpec {
   baseUrl: string;
   /** Names of the app's sellable tools, when a manifest is published. Empty = no priced surface. */
   toolNames?: string[];
+  /**
+   * Also load the WebMCP bridge, so a browser-resident agent gets this app's tools as CALLABLE
+   * functions (plus `about-this-app`) instead of only a document telling it they exist. Off for
+   * apps that carry their own bridge call, and for those that opt out.
+   */
+  webmcp?: boolean;
 }
 
 const MARK = 'id="aimeat-agent-discovery"';
@@ -99,7 +109,14 @@ export function injectAgentDiscovery(data: Buffer | Uint8Array | string, spec: A
     // A machine-readable twin of the same facts, for a reader that prefers structure to prose.
     + `<script type="application/json" id="aimeat-app-ref">`
     + esc(JSON.stringify({ owner: spec.owner, app_id: spec.filename, app: appRef, tools }))
-    + `</script>`;
+    + `</script>`
+    // The WebMCP bridge, from THIS origin (not the apex): an app author's own
+    // `script-src 'self'` then still allows it. `defer` runs it after the ref block above exists,
+    // and `?expose=app` makes it self-activating — the app needs no code of its own.
+    + (spec.webmcp
+      ? `<script src="/v1/libs/aimeat-webmcp.js?expose=app" data-owner="${esc(spec.owner)}"`
+        + ` data-app="${esc(spec.filename)}" defer></script>`
+      : '');
 
   return Buffer.from(injectBeforeClosingTag(text, block), 'utf-8');
 }

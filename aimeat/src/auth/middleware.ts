@@ -11,6 +11,8 @@
  *   - resolvePatToken / maybeSetPatBrowserSession: Personal Access Token handling
  *
  * @version-history
+ *   v1.1.0 — 2026-07-28 — Every AUTH_REQUIRED 401 goes through deny401(), which stamps the RFC 9728
+ *     `WWW-Authenticate: Bearer resource_metadata="…"` hint for the origin the client reached.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import type { Request, Response, NextFunction } from 'express';
@@ -22,6 +24,7 @@ import { getStats } from '../services/stats.js';
 import { getPromMetrics } from '../services/prometheus.js';
 import type { Storage } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
+import { resourceMetadataUrl } from '../services/protected-resource.js';
 
 // P3-7: Reference to storage for session revocation checks
 let _sessionStorage: Storage | null = null;
@@ -186,7 +189,7 @@ export function requireAuth() {
         if (stats) stats.increment('auth_failures_total');
         const prom = getPromMetrics();
         if (prom) prom.authFailuresTotal.inc();
-        res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'This endpoint requires authentication'));
+        deny401(req, res, 'This endpoint requires authentication');
         return;
       }
       next();
@@ -199,7 +202,7 @@ export function requireAuth() {
       if (stats) stats.increment('auth_failures_total');
       const prom = getPromMetrics();
       if (prom) prom.authFailuresTotal.inc();
-      res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
+      deny401(req, res, 'Authentication required');
       return;
     }
 
@@ -212,7 +215,7 @@ export function requireAuth() {
         if (stats) stats.increment('auth_failures_total');
         const prom = getPromMetrics();
         if (prom) prom.authFailuresTotal.inc();
-        res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Invalid or revoked access token'));
+        deny401(req, res, 'Invalid or revoked access token');
         return;
       }
       req.auth = patAuth;
@@ -227,7 +230,7 @@ export function requireAuth() {
       if (stats) stats.increment('auth_failures_total');
       const prom = getPromMetrics();
       if (prom) prom.authFailuresTotal.inc();
-      res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Token has been revoked'));
+      deny401(req, res, 'Token has been revoked');
       return;
     }
 
@@ -237,7 +240,7 @@ export function requireAuth() {
       if (stats) stats.increment('auth_failures_total');
       const prom = getPromMetrics();
       if (prom) prom.authFailuresTotal.inc();
-      res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Invalid or expired token'));
+      deny401(req, res, 'Invalid or expired token');
       return;
     }
 
@@ -249,7 +252,7 @@ export function requireAuth() {
         if (stats) stats.increment('auth_failures_total');
         const prom = getPromMetrics();
         if (prom) prom.authFailuresTotal.inc();
-        res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Session has been revoked'));
+        deny401(req, res, 'Session has been revoked');
         return;
       }
     }
@@ -268,7 +271,7 @@ export function requireAuth() {
 export function requireAuthOrAnonymous() {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.auth) {
-      res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
+      deny401(req, res, 'Authentication required');
       return;
     }
     // Allow both authenticated and anonymous
@@ -287,7 +290,7 @@ export function requireRole(role: string) {
       if (stats) stats.increment('auth_failures_total');
       const prom = getPromMetrics();
       if (prom) prom.authFailuresTotal.inc();
-      res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
+      deny401(req, res, 'Authentication required');
       return;
     }
 
@@ -331,7 +334,7 @@ export function requireExternalPrincipal() {
       if (stats) stats.increment('auth_failures_total');
       const prom = getPromMetrics();
       if (prom) prom.authFailuresTotal.inc();
-      res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
+      deny401(req, res, 'Authentication required');
       return;
     }
     const roles = req.auth.roles;
@@ -428,7 +431,7 @@ export function requireLocalSession() {
  */
 export function requireRoleOrScope(role: string, ...scopes: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (!req.auth) { res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required')); return; }
+    if (!req.auth) { deny401(req, res, 'Authentication required'); return; }
     const roles = req.auth.roles;
     // Role path — mirrors requireRole(role) exactly (owner/operator satisfy 'agent'; operator satisfies 'owner').
     if (roles.includes(role) ||
@@ -444,7 +447,7 @@ export function requireRoleOrScope(role: string, ...scopes: string[]) {
 export function requireScope(...requiredScopes: string[]) {
   return (req: Request, res: Response, next: NextFunction) => {
     if (!req.auth) {
-      res.status(401).json(errorEnvelope('AUTH_REQUIRED', 'Authentication required'));
+      deny401(req, res, 'Authentication required');
       return;
     }
 
@@ -489,6 +492,20 @@ function extractToken(req: Request): string | null {
   // SECURITY: JWT tokens must NOT be accepted via URL query parameters.
   // Tokens in URLs are logged in access logs, browser history, and referrer headers.
   return null;
+}
+
+/**
+ * Refuse an unauthenticated request with 401 AND the RFC 9728 discovery hint. The
+ * `resource_metadata` parameter names the protected-resource metadata of the ORIGIN the client
+ * actually reached (apex, app origin, portfolio origin), which is how an MCP client learns where
+ * to get a token without having been told out of band. Header omitted when the config was never
+ * wired (unit tests constructing middleware standalone) — the 401 body is unchanged either way.
+ */
+function deny401(req: Request, res: Response, message: string): void {
+  if (_config && !res.headersSent) {
+    res.setHeader('WWW-Authenticate', `Bearer resource_metadata="${resourceMetadataUrl(req, _config)}"`);
+  }
+  res.status(401).json(errorEnvelope('AUTH_REQUIRED', message));
 }
 
 function errorEnvelope(code: string, message: string) {

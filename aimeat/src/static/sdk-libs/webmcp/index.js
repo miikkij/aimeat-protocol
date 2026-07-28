@@ -13,6 +13,10 @@
  * @usage <script src="/v1/libs/aimeat-webmcp.js"></script>
  *   await AIMEAT.webmcp.exposeAppTools({ owner: 'alice', appId: 'shop.html' });
  * @version-history
+ *   v1.1.0 — 2026-07-28 — `?expose=app` auto-activation (owner/app from the script tag's data-*, else
+ *     the injected #aimeat-app-ref block) and an `about-this-app` tool built from the listing's
+ *     app_surface — bound SKILL.md packs, bundled crews, declared scopes, EXCHANGE listings — so an
+ *     app with no priced tools still exposes something an agent can act on.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-webmcp.ts (SDK-libs migration Phase 2).
  */
 import { APEX_URL } from '../_core/config.js';
@@ -101,6 +105,35 @@ function buildExecute(owner, appId, entry) {
   };
 }
 
+/**
+ * The one tool every app exposes: what this app IS to an agent. The description carries the
+ * headline counts so an agent that only reads descriptors already knows whether there is a skill
+ * to load, a crew to deploy or a contract to take; execute() returns the whole surface.
+ */
+function aboutTool(ref, surface, toolCount) {
+  const s = surface || {};
+  const label = s.name || ref.appId;
+  const parts = [];
+  if (toolCount) parts.push(toolCount + ' callable tool' + (toolCount === 1 ? '' : 's'));
+  if ((s.skills || []).length) parts.push(s.skills.length + ' bound skill' + (s.skills.length === 1 ? '' : 's'));
+  if ((s.bundled_agents || []).length) parts.push(s.bundled_agents.length + ' bundled agent' + (s.bundled_agents.length === 1 ? '' : 's'));
+  const offers = ((s.exchange || {}).offerings || []).length;
+  if (offers) parts.push(offers + ' EXCHANGE listing' + (offers === 1 ? '' : 's'));
+  const carries = parts.length ? ' Carries ' + parts.join(', ') + '.' : '';
+  return {
+    name: 'about-this-app',
+    description: 'What "' + label + '" (' + ref.owner + '/' + ref.appId + ') offers an agent: its app id, '
+      + 'declared scopes, the SKILL.md packs bound to it, the agent crews it ships, and what it sells on the '
+      + 'AIMEAT EXCHANGE, with prices.' + carries,
+    inputSchema: { type: 'object', properties: {} },
+    async execute() {
+      if (surface) return asContent(surface);
+      const listing = await fetchListing(ref.owner, ref.appId);
+      return asContent(listing.app_surface || { app: ref.owner + '/' + ref.appId });
+    },
+  };
+}
+
 const webmcp = {
   /** Every tool descriptor this page has registered (introspection + provideContext resends). */
   tools: [],
@@ -121,9 +154,15 @@ const webmcp = {
   /**
    * Expose an app's declared tools (apps.{appId}.tools manifest) to the in-browser agent.
    * Descriptions of priced tools carry the price tag so the agent can tell the user the cost.
+   *
+   * Every app also gets `about-this-app`, built from the listing's `app_surface`: the SKILL.md
+   * packs bound to the app, the crew-defs it ships, its declared scopes and its live EXCHANGE
+   * listings. An app that sells nothing still exposes that one, so an agent that lands on any
+   * app page can ask what it is looking at instead of reading 200 kB of minified source.
    */
   async exposeAppTools(ref) {
     const listing = await fetchListing(ref.owner, ref.appId);
+    const surface = listing.app_surface || null;
     const tools = (listing.tools || []).map(function (entry) {
       let desc = entry.description || entry.name;
       if (entry.payment && entry.payment.required) {
@@ -140,6 +179,7 @@ const webmcp = {
         execute: buildExecute(ref.owner, ref.appId, entry),
       };
     });
+    tools.unshift(aboutTool(ref, surface, tools.length));
     await webmcp.register(tools);
     return { surface: webmcp.surface, tools: tools.map(function (t) { return t.name; }) };
   },
@@ -174,6 +214,24 @@ const webmcp = {
 // ── Expose globally + optional auto-activation from the script tag ──
 attach('webmcp', webmcp);
 
+/**
+ * Which app this page IS, for `?expose=app`. The serving route stamps data-owner/data-app on the
+ * script tag; the `#aimeat-app-ref` JSON block (injected into every app served on an app origin) is
+ * the fallback. Both state the app id WITH its extension — the subdomain label drops it, and a
+ * lookup made from the label alone misses every time.
+ */
+function appRefFromPage(el) {
+  const ds = (el && el.dataset) || {};
+  if (ds.owner && ds.app) return { owner: ds.owner, appId: ds.app };
+  try {
+    const node = document.getElementById('aimeat-app-ref');
+    if (!node) return null;
+    const ref = JSON.parse(node.textContent || '{}');
+    if (ref.owner && ref.app_id) return { owner: ref.owner, appId: ref.app_id };
+  } catch { /* no usable ref block */ }
+  return null;
+}
+
 try {
   const el = /** @type {any} */ (typeof document !== 'undefined' && document.currentScript);
   const src = el && el.src ? new URL(el.src, location.href) : null;
@@ -181,5 +239,10 @@ try {
   if (expose === 'node') {
     // Defer past parse so a scanner's early modelContext shim is in place.
     setTimeout(function () { webmcp.exposeNodeTools().catch(function () {}); }, 0);
+  } else if (expose === 'app') {
+    const ref = appRefFromPage(el);
+    // Same deferral as above, and the same silence on failure: an app whose tools cannot be listed
+    // must still render. The page keeps working with no tools registered.
+    if (ref) setTimeout(function () { webmcp.exposeAppTools(ref).catch(function () {}); }, 0);
   }
 } catch { /* auto-activation is best-effort; explicit calls always work */ }

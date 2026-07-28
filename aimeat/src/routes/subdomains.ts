@@ -12,6 +12,10 @@
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  *        app.use(subdomainAdminRouter(config, storage));
  * @version-history
+ *   v1.9.0 — 2026-07-28 — Every app served on an app origin also loads the WebMCP bridge
+ *     (`?expose=app`), so its tools are CALLABLE by a browser-resident agent and not merely listed
+ *     in a document. Apps that carry their own bridge call, or set
+ *     `<meta name="aimeat-webmcp" content="off">`, are left alone.
  *   v1.6.0 — 2026-07-27 — Agent discovery on the app origin: every inline-served app carries a
  *     script-free <noscript> block naming its owner, its app id WITH the extension, its sellable
  *     tools and where the schemas live, plus <link rel="mcp-server">; and `/llms.txt` on an app
@@ -213,6 +217,19 @@ export function relaxAppCspMeta(data: Buffer | Uint8Array | string, apexOrigin: 
 }
 
 /**
+ * Should the node load the WebMCP bridge into this app? Yes by default — an app origin is where a
+ * browser-resident agent meets the app, and every app already has a listing to expose. No when the
+ * app carries its own `aimeat-webmcp.js` (its call wins; two registrations of the same names would
+ * just replace each other) or opts out with `<meta name="aimeat-webmcp" content="off">`.
+ */
+function wantsWebmcpBridge(data: Buffer | Uint8Array | string): boolean {
+  const raw = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
+  const head = raw.slice(0, 64 * 1024);
+  if (/aimeat-webmcp\.js/i.test(raw)) return false;
+  return !/<meta\b[^>]*name\s*=\s*["']aimeat-webmcp["'][^>]*content\s*=\s*["']off["']/i.test(head);
+}
+
+/**
  * Write a published app's HTML body with the app CSP + cache/security headers. For HTML apps the
  * author's own CSP meta is relaxed (frame-src/connect-src → allow the apex) so the H-2 silent-SSO
  * bridge + token exchange work even when the app sets `default-src 'self'`.
@@ -242,6 +259,7 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
         owner: app.ownerName, filename: app.filename,
         appName: app.manifest?.name ?? null, description: app.manifest?.description ?? null,
         baseUrl: discover.baseUrl, toolNames: discover.toolNames,
+        webmcp: wantsWebmcpBridge(relaxed),
       });
     }
     // Opt-in copy-protection (obfuscate / domainLock / watermark) on the runnable body.

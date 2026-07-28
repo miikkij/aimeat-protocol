@@ -14,6 +14,9 @@
  *   - GET  /v1/apps/:owner/:filename/webmcp             public WebMCP-shaped tool listing
  *   - POST /v1/apps/:owner/:filename/webmcp/tools/:tool invoke (402 for priced; auth for free)
  * @version-history
+ *   v1.4.0 — 2026-07-28 — The listing carries `app_surface` (declared scopes, bound SKILL.md packs,
+ *     bundled crew-defs, live EXCHANGE listings) and answers 200 with an empty `tools` array for a
+ *     published app that sells nothing yet; 404 is now reserved for "no such public app".
  *   v1.3.0 — 2026-07-28 — Asks the metered chokepoint first instead of pre-checking whether a right
  *     exists. That pre-check is how the owner-free rule went missing on this door: an owner holding
  *     a contract against their own tool was charged the platform rake to call it.
@@ -27,7 +30,7 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage } from '../storage/interface.js';
+import type { Storage, AppRecord } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, callerPrincipal } from '../utils/gaii.js';
@@ -38,9 +41,18 @@ import { authoriseMeteredCall } from '../services/metered-access.js';
 import { respondMeteredRefusal } from './extensions/metered-response.js';
 import { mintInternalPass } from './extensions/internal-pass.js';
 import { recordCallDuration } from '../services/call-timing.js';
+import { buildAppAgentSurface } from '../services/app-agent-surface.js';
 
 /** The WebMCP draft this bridge mirrors (W3C Web Machine Learning CG). */
 const WEBMCP_SPEC = 'https://github.com/webmachinelearning/webmcp';
+
+/** True when an app must not be described on a public surface (gated, priced, or moderated away). */
+function isRestricted(config: AimeatConfig, app: AppRecord): boolean {
+  if (app.accessCode) return true;
+  if (app.operatorHidden) return true;
+  if (config.marketplaceEnabled && app.manifest.priceMorsels && app.manifest.priceMorsels > 0) return true;
+  return false;
+}
 
 /** Load the PUBLIC tool manifest of owner/filename, or null (missing, private, malformed). */
 async function loadPublicManifest(
@@ -90,14 +102,26 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
 
   // ── GET /v1/apps/:owner/:filename/webmcp — public, cache-friendly tool listing ──
   // Serves the WebMCP-shaped view of the app's PUBLIC apps.{appId}.tools manifest: descriptor
-  // fields agents feed to registerTool, plus the payment contract for priced tools. 404 when the
-  // app declares no public manifest (private manifests are indistinguishable from missing).
+  // fields agents feed to registerTool, plus the payment contract for priced tools — and the app's
+  // public agent-facing surface (`app_surface`): declared scopes, bound SKILL.md packs, bundled
+  // crew-defs, live EXCHANGE listings. An app with no tool manifest still answers 200 with an empty
+  // `tools` array, because "this app sells nothing yet" and "there is no such app" are different
+  // answers and only the second is a 404. A PRIVATE manifest reads exactly like an absent one.
   router.get('/v1/apps/:owner/:filename/webmcp', async (req, res) => {
     const ownerName = decodeURIComponent(req.params.owner as string).split('@')[0] as string;
     const filename = decodeURIComponent(req.params.filename as string);
     const tools = await loadPublicManifest(storage, config, ownerName, filename);
-    if (!tools) {
-      res.status(404).json(error(config.nodeId, 'APP_TOOLS_NOT_FOUND', `App "${ownerName}/${filename}" declares no public tool manifest`));
+    // The tool manifest is a memory-record convention keyed by filename, so a seller can declare
+    // tools for an app this node does not host — that listing must keep working. The app record is
+    // what the `app_surface` block needs, and only a RESTRICTED one (gated, priced, moderated away)
+    // is a reason to refuse the whole listing.
+    const app = await storage.getAppByOwnerName(ownerName, filename);
+    if (app && isRestricted(config, app)) {
+      res.status(404).json(error(config.nodeId, 'APP_NOT_FOUND', `No public app "${ownerName}/${filename}"`));
+      return;
+    }
+    if (!tools && !app) {
+      res.status(404).json(error(config.nodeId, 'APP_NOT_FOUND', `No public app or tool manifest for "${ownerName}/${filename}"`));
       return;
     }
     const b = config.baseUrl;
@@ -109,7 +133,8 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
       // served bridge library, so in-browser agents (Chrome/Edge) get them natively.
       page: `${b}/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}`,
       library: `${b}/v1/libs/aimeat-webmcp.js`,
-      tools: tools.map((t) => toolEntry(config, ownerName, filename, t)),
+      tools: (tools ?? []).map((t) => toolEntry(config, ownerName, filename, t)),
+      ...(app ? { app_surface: await buildAppAgentSurface(storage, config, app) } : {}),
       payment_challenge: paymentChallenge(config),
     });
   });
