@@ -5,6 +5,10 @@
  *   plus the /v1/libs catalogue and the generated JS sources themselves.
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=libs
  * @version-history
+ *   v1.3.0 — 2026-07-28 — aimeat-game.js coverage: every component exported, the NO-NETWORK and
+ *     NO-HARDCODED-COLOUR boundary guards (the two promises the library makes and the two an
+ *     edit could quietly break), the EN+FI strings, the --ag-* theming contract and its imported
+ *     stylesheet parts, and the registry entry declaring no dependencies.
  *   v1.2.0 — 2026-07-28 — aimeat-exchange.js coverage (served source, every wrapped group, the
  *     no-duplication-of-commerce guard, and the registry entry with both dependencies)
  *   v1.1.0 — 2026-07-14 — aimeat-commerce.js coverage (served source + catalogue entry)
@@ -706,19 +710,109 @@ await test('GET /v1/libs/aimeat-exchange.js — serves the market client (listin
     assert(text.includes('fmtUnit'), 'should ship the unit formatter');
     // Money formatting is aimeat-commerce's job — this library must DELEGATE, never restate it.
     assert(!/function fmtMoney|fmtMoney\s*\(micros/.test(text), 'must not re-implement fmtMoney (delegate to AIMEAT.commerce)');
-    assert(!text.includes('1000000'), 'must not restate the money micro-unit constant (use AIMEAT.commerce.MONEY_UNIT)');
+    // esbuild emits 1000000 as 1e6, so the literal-only form of this guard could never fail.
+    assert(!/\b(1000000|1e6)\b/.test(text), 'must not restate the money micro-unit constant (use AIMEAT.commerce.MONEY_UNIT)');
 });
 
-await test('GET /v1/libs — catalogue lists markdown, organism, editor, commerce and exchange', async () => {
+/** Strip comments so a claim about the CODE is not satisfied (or broken) by prose describing it. */
+function withoutComments(src: string): string {
+    return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
+}
+
+await test('GET /v1/libs/aimeat-game.js — serves the gamification kit with every component', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-game.js`);
+    assert(res.ok, `game lib failed: ${res.status}`);
+    const text = await res.text();
+    assert(res.headers.get('Content-Type')?.includes('javascript'), 'should be javascript');
+    // One assertion per component: a component that silently stops being exported fails here
+    // rather than as a missing screen in somebody's app.
+    for (const part of [
+        'menu', 'screen', 'modal', 'toast', 'confirm',
+        'rail', 'meter', 'scoreBreakdown', 'badge', 'comingSoon', 'counter', 'streak',
+        'leaderboard', 'statGrid', 'dataTable', 'card',
+        'money', 'morsels', 'injectStyle', 'guardButtons', 'whileBusy',
+    ]) {
+        assert(text.includes(part), `should export ${part}`);
+    }
+    // The state machine an app depends on: a locked entry is readable and still reports its pick.
+    assert(text.includes('lockReason'), 'a locked entry must be able to say why it is locked');
+    assert(text.includes('ag-menu__item--locked'), 'a locked entry must be styled as locked, not disabled');
+    // Money is integer micro-units, morsels are integers, and the meat emoji is never a unit.
+    // esbuild normalises 1000000 to 1e6, so accept either spelling of the same constant.
+    assert(/MONEY_UNIT\s*=\s*(1000000|1e6)\b/.test(text), 'money must use the 6-decimal micro-unit constant');
+    assert(!text.includes('🥩'), 'morsels are plain integers — never the meat emoji');
+});
+
+await test('GET /v1/libs/aimeat-game.js — makes no network calls and hardcodes no colour', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-game.js`);
+    const code = withoutComments(await res.text());
+    // THE BOUNDARY. This library renders; the host supplies the data. A component that fetches has
+    // the wrong boundary, and the whole "requires: []" registration is a lie the moment it does.
+    assert(!/\bfetch\s*\(/.test(code), 'must not call fetch — the host supplies the data');
+    assert(!/XMLHttpRequest|EventSource|WebSocket/.test(code), 'must not open any other transport either');
+    assert(!code.includes('/v1/'), 'must not reference a node API path');
+    // THE THEMING CONTRACT. Every colour is a CSS variable; a hex in the JS cannot be re-skinned.
+    assert(!/#[0-9a-fA-F]{6}\b/.test(code), 'must not hardcode a colour in JavaScript');
+    assert(!/rgba?\s*\(\s*\d/.test(code), 'must not hardcode a colour in JavaScript');
+});
+
+await test('GET /v1/libs/aimeat-game.js — ships English and Finnish for its own words', async () => {
+    const res = await fetch(`${BASE}/v1/libs/aimeat-game.js`);
+    const text = await res.text();
+    // The kit's own strings, in both languages. Finnish written as Finnish, ä/ö intact.
+    for (const word of ['Coming soon', 'Tulossa', 'Locked', 'Lukossa', 'morsels', 'morselia', 'Myöhemmin']) {
+        assert(text.includes(word), `should ship the string "${word}"`);
+    }
+    // It follows the platform language control instead of inventing a second one.
+    assert(text.includes('aimeat-lang'), 'should read the platform language key');
+    assert(text.includes('aimeat-lang-change'), 'should react to the platform language event');
+});
+
+await test('GET /lib/aimeat-game.css — serves the theming contract, light and dark', async () => {
+    const res = await fetch(`${BASE}/lib/aimeat-game.css`);
+    assert(res.ok, `game stylesheet failed: ${res.status}`);
+    const text = await res.text();
+    const css = withoutComments(text);
+    // The contract itself. A skin sets these and nothing else, so a token that disappears silently
+    // breaks every skin an author has already written.
+    for (const token of [
+        '--ag-bg', '--ag-scene', '--ag-surface', '--ag-surface-image', '--ag-ink', '--ag-ink-dim',
+        '--ag-line', '--ag-accent', '--ag-accent-2', '--ag-accent-ink', '--ag-accent-text',
+        '--ag-ok', '--ag-warn', '--ag-err', '--ag-info', '--ag-locked', '--ag-focus',
+        '--ag-radius', '--ag-radius-pill', '--ag-radius-round', '--ag-shadow', '--ag-glow', '--ag-tilt',
+        '--ag-font', '--ag-font-display', '--ag-font-ui', '--ag-font-mono',
+        '--ag-display-shadow', '--ag-label-caps', '--ag-touch', '--ag-menu-col', '--ag-menu-max',
+        '--ag-screen-max', '--ag-actions-align', '--ag-select-w', '--ag-motion', '--ag-juice',
+    ]) {
+        assert(css.includes(token), `the theming contract must declare ${token}`);
+    }
+    // Light is the default and dark is a re-declaration of the same names.
+    assert(css.includes(':root[data-theme=\'dark\']'), 'dark mode must re-declare the same tokens');
+    // A dark-theme-only wash breaks every light skin.
+    assert(!/rgba\(\s*255\s*,\s*255\s*,\s*255/.test(css), 'must not use rgba(255,255,255,…)');
+    // The parts the entry imports must actually be reachable, or the kit renders unstyled.
+    for (const part of ['shell.css', 'progress.css', 'board.css']) {
+        assert(css.includes(part), `should import ${part}`);
+        const partRes = await fetch(`${BASE}/lib/aimeat-game/${part}`);
+        assert(partRes.ok, `/lib/aimeat-game/${part} failed: ${partRes.status}`);
+    }
+});
+
+await test('GET /v1/libs — catalogue lists markdown, organism, editor, commerce, exchange and game', async () => {
     const res = await fetch(`${BASE}/v1/libs`);
     assert(res.ok, `libs catalogue failed: ${res.status}`);
     const data = await res.json() as any;
     const names = (data.libraries ?? []).map((l: any) => l.name);
-    for (const expected of ['aimeat-markdown', 'aimeat-organism', 'aimeat-editor', 'aimeat-commerce', 'aimeat-exchange']) {
+    for (const expected of ['aimeat-markdown', 'aimeat-organism', 'aimeat-editor', 'aimeat-commerce', 'aimeat-exchange', 'aimeat-game']) {
         assert(names.includes(expected), `catalogue should list ${expected} (got: ${names.join(', ')})`);
     }
     const commerce = (data.libraries ?? []).find((l: any) => l.name === 'aimeat-commerce');
     assert(commerce?.requires === 'aimeat-auth', 'aimeat-commerce must declare requires: aimeat-auth');
+    const game = (data.libraries ?? []).find((l: any) => l.name === 'aimeat-game');
+    // It depends on nothing, and saying otherwise would make an app load libraries it never uses.
+    assert(!game?.requires, `aimeat-game must declare no dependencies, got "${game?.requires}"`);
+    assert(game?.include?.includes('/lib/aimeat-game.css'),
+        'aimeat-game must include its stylesheet — the JS alone renders unstyled');
     const exchange = (data.libraries ?? []).find((l: any) => l.name === 'aimeat-exchange');
     // Registered wrong = invisible to every AI-facing surface, which is the failure this catches.
     assert(exchange?.requires?.includes('aimeat-auth') && exchange?.requires?.includes('aimeat-commerce'),
