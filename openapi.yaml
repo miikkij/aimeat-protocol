@@ -11885,6 +11885,25 @@ paths:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
 
+  /sitemap.xml:
+    get:
+      operationId: sitemapXml
+      summary: XML sitemap of the node's indexable pages
+      description: >-
+        sitemaps.org urlset listing the node's public HTML pages, generated from the shared
+        public-page registry (src/data/public-pages.ts). Indexable pages only: the OpenAPI
+        contract (/v1/spec), the catalogue and the health endpoint answer YAML or JSON and are
+        discovered through /.well-known/api-catalog, the Link headers on every GET response,
+        and llms.txt instead.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: Sitemap
+          content:
+            application/xml:
+              schema:
+                type: string
+
   /.well-known/aimeat:
     get:
       operationId: nodeDiscovery

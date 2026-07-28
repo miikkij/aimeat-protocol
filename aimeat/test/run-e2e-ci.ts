@@ -133,6 +133,7 @@ const ALL_SUITES = [
     'test/e2e-organism-dangling-refs.ts',
     'test/e2e-librarian.ts',
     'test/e2e-discover.ts',
+    'test/e2e-agent-readiness.ts',
     'test/e2e-notebook-plan.ts',
     'test/e2e-organism-overview.ts',
     'test/e2e-organism-structure.ts',

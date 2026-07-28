@@ -20,6 +20,9 @@
  *     {{LIBRARY_PACKS_TABLE}} token from the same registry
  *   v1.6.0 -- 2026-07-19 -- app_building: builder_skill (node:aimeat-app-builder) +
  *     pitfalls_endpoint (/v1/appdev/pitfalls) pointers (AppDev KB Phase 2)
+ *   v1.7.0 -- 2026-07-28 -- sitemap.xml is generated from the shared public-page registry
+ *     (src/data/public-pages.ts) and lists indexable HTML pages only; /v1/spec, /v1/catalogue and
+ *     /v1/health dropped from it (agent-readability phase 02)
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -35,6 +38,7 @@ import { getSiteSyncState } from '../services/site-sync.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
+import { sitemapPages } from '../data/public-pages.js';
 import { logger } from '../utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -61,22 +65,19 @@ export function bootstrapRouter(
 ): Router {
   const router = Router();
 
+  // Indexable HTML pages only, from the shared registry (src/data/public-pages.ts). The API
+  // endpoints this list used to carry — /v1/spec (YAML), /v1/catalogue and /v1/health (JSON) —
+  // are discoverable through the RFC 9727 API catalog, the Link headers on every GET, llms.txt
+  // and the bootstrap response. A sitemap advertises pages a crawler should index, and a JSON
+  // endpoint listed there only invites HTML checks it can never satisfy.
   router.get('/sitemap.xml', (_req, res) => {
     const b = config.baseUrl;
     const now = new Date().toISOString().split('T')[0];
-    const urls = [
-      { loc: `${b}/`, changefreq: 'weekly', priority: '1.0' },
-      { loc: `${b}/v1/portal`, changefreq: 'monthly', priority: '0.9' },
-      { loc: `${b}/v1/docs`, changefreq: 'weekly', priority: '0.8' },
-      { loc: `${b}/v1/spec`, changefreq: 'weekly', priority: '0.7' },
-      { loc: `${b}/v1/catalogue`, changefreq: 'daily', priority: '0.7' },
-      { loc: `${b}/v1/health`, changefreq: 'always', priority: '0.3' },
-    ];
     const xml = [
       '<?xml version="1.0" encoding="UTF-8"?>',
       '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-      ...urls.map(u =>
-        `  <url><loc>${u.loc}</loc><lastmod>${now}</lastmod><changefreq>${u.changefreq}</changefreq><priority>${u.priority}</priority></url>`
+      ...sitemapPages().map(p =>
+        `  <url><loc>${b}${p.path === '/' ? '/' : p.path}</loc><lastmod>${now}</lastmod><changefreq>${p.changefreq}</changefreq><priority>${p.priority}</priority></url>`
       ),
       '</urlset>',
     ].join('\n');
