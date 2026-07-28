@@ -60,7 +60,10 @@
 }
 
 .ag-rail__dot {
+  /* Above the connectors. ::after paints AFTER the element's children, so without this the
+     right-hand connector is drawn straight across the step number. */
   position: relative;
+  z-index: 1;
   width: var(--ag-rail-dot);
   height: var(--ag-rail-dot);
   border-radius: var(--ag-radius-round);

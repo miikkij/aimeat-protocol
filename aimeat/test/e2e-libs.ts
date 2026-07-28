@@ -788,14 +788,24 @@ await test('GET /lib/aimeat-game.css — serves the theming contract, light and 
     }
     // Light is the default and dark is a re-declaration of the same names.
     assert(css.includes(':root[data-theme=\'dark\']'), 'dark mode must re-declare the same tokens');
-    // A dark-theme-only wash breaks every light skin.
-    assert(!/rgba\(\s*255\s*,\s*255\s*,\s*255/.test(css), 'must not use rgba(255,255,255,…)');
-    // The parts the entry imports must actually be reachable, or the kit renders unstyled.
+    // The parts the entry imports must actually be reachable, or the kit renders unstyled — and
+    // the rules that matter live in THEM, not in the entry, so assert against what they serve.
+    let parts = '';
     for (const part of ['shell.css', 'progress.css', 'board.css']) {
         assert(css.includes(part), `should import ${part}`);
         const partRes = await fetch(`${BASE}/lib/aimeat-game/${part}`);
         assert(partRes.ok, `/lib/aimeat-game/${part} failed: ${partRes.status}`);
+        parts += withoutComments(await partRes.text());
     }
+    // The rail's connectors are ::before/::after on the STEP, and ::after paints after the step's
+    // children — so without an explicit lift the line is drawn straight across the step number.
+    assert(/\.ag-rail__dot\s*\{[^}]*z-index:\s*1/.test(parts),
+        'the rail node must paint above its connectors (z-index on .ag-rail__dot)');
+    // A menu entry must contain its own text: each row sizes to its entry instead of stretching it.
+    assert(parts.includes('grid-auto-rows: min-content'),
+        'menu rows must size to their own entry, or a two-line label spills over its border');
+    // A dark-theme-only wash breaks every light skin, in the entry and in the parts alike.
+    assert(!/rgba\(\s*255\s*,\s*255\s*,\s*255/.test(css + parts), 'must not use rgba(255,255,255,…)');
 });
 
 await test('GET /v1/libs — catalogue lists markdown, organism, editor, commerce, exchange and game', async () => {
