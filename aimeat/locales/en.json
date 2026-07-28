@@ -7606,11 +7606,59 @@
     "generatorLink": "Try the Generator"
   },
   "help": {
+    "pageTitle": "Help",
     "title": "Help your AI work with AIMEAT",
+    "tabHuman": "For me",
+    "tabAgent": "For my AI",
     "description": "If your AI assistant is having trouble connecting to or using this node, copy the prompt below and paste it into your AI chat. It will guide your AI through connecting, authenticating, and using all available features.",
-    "copyBtn": "Copy to clipboard",
-    "copied": "Copied!",
-    "loadError": "Failed to load help prompt."
+    "copyBtn": "Copy prompt",
+    "copied": "Copied",
+    "loadError": "Could not load the help prompt. Try reloading the page.",
+    "startTitle": "Getting started",
+    "start1": "Sign in or create an account. One click with Google, or email and password.",
+    "start2": "Connect your AI assistant so it can work here.",
+    "start2Link": "Connection instructions",
+    "start3": "Build your first app by describing it to your AI.",
+    "start3Link": "Open the app catalog",
+    "start4": "Learn the whole platform hands-on, free, without an account.",
+    "start4Link": "Open the Experience Center",
+    "qTitle": "Common questions",
+    "stuckTitle": "Still stuck",
+    "stuckAi": "Ask your own AI: get the help prompt →",
+    "stuckHuman": "Ask a human →",
+    "contactSubject": "A question about AIMEAT",
+    "agentEntryTitle": "For an agent reading this page directly",
+    "epRoot": "machine-readable getting started",
+    "epLlms": "the full agent manual",
+    "epSpec": "the OpenAPI contract",
+    "epMcp": "the MCP endpoint",
+    "epPrompt": "this prompt as plain markdown",
+    "q": {
+      "agent": {
+        "q": "What is an agent, and how is it different from an AI?",
+        "a": "An AI is a model. An agent is a job for an AI on your node: it has a name, a memory that survives the conversation, a queue of tasks you write in plain language, and a spending cap. Swap the model behind it and the agent keeps its memory and its work."
+      },
+      "organism": {
+        "q": "What is an organism, and when do I need one?",
+        "a": "An organism is a shared space where people and agents work on the same thing: workspaces, versioned records, and a publish gate a human passes. You need one when more than one person, or more than one agent, touches the same material. For your own notes you do not."
+      },
+      "privacy": {
+        "q": "Who can see my data?",
+        "a": "Nothing is public unless you make it public. Every record has a visibility, and agents and apps only reach what you granted them. Every read and write is attributed to whoever did it, and you can take a grant back at any time."
+      },
+      "cost": {
+        "q": "What are morsels, and what does AI cost me?",
+        "a": "Morsels are this node’s internal allowance and they refill daily. They throttle expensive operations, and they are not money. Real LLM spend is metered separately against your own key, and you can see it per agent and per project."
+      },
+      "connect": {
+        "q": "My AI says it cannot connect. What now?",
+        "a": "If your AI supports MCP, add this node as a connector — one command in Claude Code, or paste the MCP URL into your client’s custom connector dialog. If it does not, copy the help prompt on the \"For my AI\" tab into the chat and it will orient itself from there."
+      },
+      "broken": {
+        "q": "Something is broken. Who do I tell?",
+        "a": "Tell the operator of this node. Your AI can send it from inside the session, or use the contact details below. Include what you were doing and what you expected instead."
+      }
+    }
   },
   "capabilities": {
     "title": "Capabilities",

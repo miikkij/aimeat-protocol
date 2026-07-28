@@ -5,6 +5,9 @@
  * @version-history
  *   v1.0.0 — 2026-03-23 — Initial implementation
  *   v1.1.0 — 2026-06-02 — Copied-state selector .hlp-copied → .copied (CopyButton component migration)
+ *   v2.0.0 — 2026-07-28 — Two-tab shell (.hlp-tabs/.hlp-tab), human help (.hlp-steps/-questions/
+ *     -answer/-stuck) and the rendered-markdown prompt box (.hlp-prompt-rendered). The page used
+ *     to print the prompt's markdown source at a human who clicked "Help".
  */
 
 /* ── Container ── */
@@ -135,3 +138,28 @@
     max-height: 360px;
   }
 }
+
+/* ── Two audiences, two tabs (v2.0.0, 2026-07-28) ────────────────────────────
+   The page used to be the agent prompt alone, printed as markdown SOURCE. The
+   human tab is the default; the prompt now renders through <Markdown>. */
+.hlp-tabs { display: flex; gap: .5rem; margin: 0 0 1.5rem; border-bottom: 1px solid var(--border); }
+.hlp-tab {
+  background: none; border: none; border-bottom: 2px solid transparent;
+  padding: .6rem .9rem; margin-bottom: -1px; cursor: pointer;
+  color: var(--text-dim); font-size: .95rem; font-weight: 600; font-family: inherit;
+}
+.hlp-tab:hover { color: var(--text); }
+.hlp-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+.hlp-steps { margin: 0 0 1.75rem; padding-left: 1.3rem; line-height: 1.8; }
+.hlp-steps a { color: var(--accent); }
+.hlp-questions { display: grid; gap: .5rem; margin-bottom: 1.75rem; }
+.hlp-answer { margin: 0; color: var(--text-dim); font-size: .9rem; line-height: 1.6; }
+.hlp-stuck { display: flex; gap: .75rem; flex-wrap: wrap; }
+
+/* The rendered prompt is long; keep it scrollable inside its own box rather than
+   letting it push the endpoint list off the bottom of a phone screen. */
+.hlp-prompt-rendered { max-height: 60vh; overflow-y: auto; margin-top: 1rem; padding: 1rem 1.1rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--bg-surface, var(--bg-dim)); }
+.hlp-prompt-rendered table { display: block; overflow-x: auto; max-width: 100%; }
+.hlp-endpoints { margin: .9rem 0 0; padding-left: 1.2rem; display: grid; gap: .4rem; color: var(--text-dim); font-size: .88rem; }
+.hlp-endpoints code { background: var(--code-bg); padding: .1rem .4rem; border-radius: .25rem; }

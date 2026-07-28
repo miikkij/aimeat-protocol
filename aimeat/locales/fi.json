@@ -7606,11 +7606,59 @@
     "generatorLink": "Kokeile Generaattoria"
   },
   "help": {
-    "title": "Auta tekoälyäsi työskentelemään AIMEAT:n kanssa",
-    "description": "Jos tekoälyavustajallasi on vaikeuksia yhdistää tai käyttää tätä nodea, kopioi alla oleva kehote ja liitä se tekoälykeskusteluusi. Se opastaa tekoälyäsi yhdistämään, tunnistautumaan ja käyttämään kaikkia ominaisuuksia.",
-    "copyBtn": "Kopioi leikepöydälle",
-    "copied": "Kopioitu!",
-    "loadError": "Apukehotteen lataaminen epäonnistui."
+    "pageTitle": "Ohjeet",
+    "title": "Auta tekoälyäsi työskentelemään AIMEATissa",
+    "tabHuman": "Minulle",
+    "tabAgent": "Tekoälylleni",
+    "description": "Jos tekoälyavustajallasi on vaikeuksia yhdistää tähän nodeen tai käyttää sitä, kopioi alla oleva kehote ja liitä se AI-chattiisi. Se opastaa tekoälysi yhdistämisen, tunnistautumisen ja kaikkien ominaisuuksien läpi.",
+    "copyBtn": "Kopioi kehote",
+    "copied": "Kopioitu",
+    "loadError": "Ohjekehotetta ei saatu ladattua. Kokeile päivittää sivu.",
+    "startTitle": "Näin pääset alkuun",
+    "start1": "Kirjaudu sisään tai luo tunnus. Yksi klikkaus Googlella tai sähköposti ja salasana.",
+    "start2": "Yhdistä tekoälyavustajasi, jotta se voi tehdä työtä täällä.",
+    "start2Link": "Yhdistämisohjeet",
+    "start3": "Rakenna ensimmäinen appisi kuvailemalla se tekoälyllesi.",
+    "start3Link": "Avaa appikatalogi",
+    "start4": "Opi koko alusta käytännössä, ilmaiseksi ja ilman tunnusta.",
+    "start4Link": "Avaa Experience Center",
+    "qTitle": "Usein kysyttyä",
+    "stuckTitle": "Jos jumitat",
+    "stuckAi": "Kysy omalta tekoälyltäsi: hae ohjekehote →",
+    "stuckHuman": "Kysy ihmiseltä →",
+    "contactSubject": "Kysymys AIMEATista",
+    "agentEntryTitle": "Agentille joka lukee tätä sivua suoraan",
+    "epRoot": "koneluettava aloitusopas",
+    "epLlms": "agentin täysi käsikirja",
+    "epSpec": "OpenAPI-sopimus",
+    "epMcp": "MCP-päätepiste",
+    "epPrompt": "tämä kehote pelkkänä markdownina",
+    "q": {
+      "agent": {
+        "q": "Mikä agentti on, ja miten se eroaa tekoälystä?",
+        "a": "Tekoäly on malli. Agentti on tekoälylle annettu työ sinun nodellasi: sillä on nimi, keskustelun yli säilyvä muisti, jono tehtäviä jotka kirjoitat tavallisella kielellä, ja kulukatto. Vaihda malli sen takaa, ja agentti pitää muistinsa ja työnsä."
+      },
+      "organism": {
+        "q": "Mikä organismi on, ja milloin tarvitsen sellaisen?",
+        "a": "Organismi on jaettu tila jossa ihmiset ja agentit työstävät samaa asiaa: työtilat, versioidut tietueet ja julkaisuportti jonka ihminen läpäisee. Tarvitset sen kun samaan aineistoon koskee useampi ihminen tai useampi agentti. Omiin muistiinpanoihin et."
+      },
+      "privacy": {
+        "q": "Kuka näkee dataani?",
+        "a": "Mikään ei ole julkista ellet tee siitä julkista. Jokaisella tietueella on näkyvyys, ja agentit ja appit pääsevät vain siihen mihin annoit luvan. Jokainen luku ja kirjoitus kirjautuu tekijälleen, ja voit ottaa luvan pois milloin tahansa."
+      },
+      "cost": {
+        "q": "Mitä morselit ovat, ja mitä tekoäly minulle maksaa?",
+        "a": "Morselit ovat tämän noden sisäinen kiintiö, ja ne täyttyvät päivittäin. Ne hillitsevät kalliita operaatioita, eivätkä ne ole rahaa. Todellinen kielimallikulu mitataan erikseen omaa avaintasi vasten, ja näet sen agentti- ja projektikohtaisesti."
+      },
+      "connect": {
+        "q": "Tekoälyni sanoo ettei se saa yhteyttä. Mitä nyt?",
+        "a": "Jos tekoälysi osaa MCP:n, lisää tämä node liittimeksi: yksi komento Claude Codessa, tai liitä MCP-osoite asiakkaan omaan liitindialogiin. Jos ei osaa, kopioi \"Tekoälylleni\"-välilehden ohjekehote chattiin, niin se ottaa selvää lopusta itse."
+      },
+      "broken": {
+        "q": "Jokin on rikki. Kenelle kerron?",
+        "a": "Kerro tämän noden operaattorille. Tekoälysi voi lähettää viestin suoraan istunnosta, tai käytä alla olevia yhteystietoja. Kerro mitä olit tekemässä ja mitä odotit tapahtuvan."
+      }
+    }
   },
   "capabilities": {
     "title": "Kyvykkyydet",

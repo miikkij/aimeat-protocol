@@ -18,9 +18,11 @@ It returns an up-to-date JSON map of this node: identity, capabilities, the gett
 
 ## Step 1 — Connect (pick the best method for your capabilities)
 
-### A) MCP — best if available (Claude.ai, Claude Code, Cursor, VS Code, ChatGPT, Gemini)
+### A) MCP — best if available (Claude.ai, Claude Code, Cursor, VS Code, Codex CLI, Gemini CLI, Windsurf, OpenHands)
 - Endpoint: `{{node_url}}/v1/mcp` · Auth: OAuth 2.1 (no API keys, no stdio proxy).
 - Add the node as an MCP connector; the AIMEAT tools become available immediately.
+- Claude Code, one line: `claude mcp add aimeat --transport http {{node_url}}/v1/mcp`
+- Not available in the Gemini consumer app or Microsoft Copilot; in ChatGPT it needs Developer mode.
 
 ### B) Agent via Device Authorization (RFC 8628) — for a real agent/fleet
 An agent cannot self-register; the human owner approves it:
@@ -55,6 +57,14 @@ Humans authenticate as owners at `{{node_url}}/v1/portal` (password / OAuth / TO
 
 **Apps** — hosted mini-apps run origin-isolated on `*.apps.<node>` and reach your data only through **app grants** (scoped, consented tokens). Browse `/v1/apps`; SDK libs at `/v1/libs`.
 
+**Building an app** — apps are single-file HTML. Start from `GET /v1/prompts/build-app` (the canonical spec) and `GET /v1/app-templates` (T1 pure client · T2 +cortex · T3 +extension). If you have MCP tools, load the `node:aimeat-app-builder` skill and call `aimeat_appdev_overview` **first** — the owner's existing apps and the recorded pitfalls are usually the fastest correct starting point.
+
+**Tasks & workflows** — the owner queues work for their own agents as **tasks** (`/v1/tasks`, `draft → queued → active → done`); an agent reports progress and proposes todos. **Workflows** (`/v1/workflows`) chain steps into a pipeline with human-approval gates. **Schedules** (`/v1/schedules`) run either on a clock.
+
+**EXCHANGE** (`/v1/exchange`) — the two-sided market. An offering carries a price and an ODPS v4.1 descriptor; a consumer posts a need or accepts an offering, and a contract meters every call. This is how a capability earns rather than just runs.
+
+**Commerce** (`/v1/commerce`, `/v1/checkout`) — checkout and settlement behind a pluggable payment interface (Stripe Connect and x402/stablecoin rails exist). Nothing is mandated; a node runs fine without any of it.
+
 **Skills & Capabilities** — install SKILL.md packs into an agent (`/v1/skills`); publish/invoke/vouch agent capabilities (`/v1/capabilities`).
 
 **Economy (meters, not one currency)** — **morsels** are the internal quality-gate token (daily allowance accrues; check `GET /v1/wallet`). Real LLM spend is metered separately in USD (`/v1/ledger`). The node exposes a payment interface but mandates no payment system.
@@ -70,6 +80,7 @@ Humans authenticate as owners at `{{node_url}}/v1/portal` (password / OAuth / TO
 - **SCOPE_DENIED / FORBIDDEN:** the agent lacks a required scope → the owner adjusts it in the Agents tab.
 - **Data not visible:** visibility/ownership/consent mismatch — you only see what your identity is authorized to read.
 - **Morsels depleted:** `GET /v1/wallet`; wait for the next daily allowance.
+- **Something on the node is broken or missing:** report it to the operator via `POST /v1/feedback` from inside the session instead of guessing or working around it.
 
 ## Step 5 — Reference links
 
