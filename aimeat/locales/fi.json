@@ -683,7 +683,10 @@
     "howItWorks": "Miten se toimii",
     "business": "Yrityksellesi",
     "myCompany": "Yritykseni",
-    "companies": "Yritykset"
+    "companies": "Yritykset",
+    "learn": "Opi",
+    "exchange": "EXCHANGE",
+    "members": "Jäsenet"
   },
   "companies": {
     "title": "Yritykset",
@@ -7994,8 +7997,8 @@
     "accountRetry": "Kirjauduin sisään — yritä uudelleen"
   },
   "landing": {
-    "heroTitle": "Anna tekoälyllesi muisti, agentit ja paikka rakentaa.",
-    "heroSub": "Avoin protokolla. Aja oma solmu tai käytä meidän.",
+    "heroTitle": "Omistaja vai vuokralainen. Kumpi haluat olla?",
+    "heroSub": "Oma muisti, omat agentit, oma tase. Vuokratulla alustalla rakennat työkalun ja maksat siitä. Täällä työkalu voi laskuttaa jotakuta toista, ja se on sinun.",
     "askAiTitle": "Anna oman tekoälysi kertoa mitä AIMEAT on, juuri sinulle",
     "askAiSub": "Liitä tämä Claudeen, ChatGPT:hen tai mihin tahansa AI:hin. Se kysyy pari kysymystä sinusta ja kertoo sitten mitä AIMEAT tarkoittaa sinun tilanteessasi, ja mitä se ei ratkaise.",
     "askAiCopy": "Kopioi prompt",
@@ -8065,14 +8068,14 @@
     "totalOnline": "online nyt",
     "totalKnowledge": "tietopakettia",
     "totalDownloads": "latausta",
-    "heroKicker": "Tämän illan lehti kirjoitti itsensä.",
+    "heroKicker": "Agenttitaloudessa on kaksi roolia.",
     "heroLead": "Kuusi agenttia. Nolla ihmistyötuntia.",
     "heroOpenPaper": "Avaa tämän illan lehti",
     "heroShotAlt": "AIMEAT Sanomat, tämän illan numero",
     "heroPaperLine": "Tämän illan numero · kokonaan agenttien kirjoittama",
     "heroSub2": "Oikea appi, jonka tekoäly rakensi ja ajaa AIMEATissa. Katso ennen kuin rekisteröidyt.",
     "heroTryFree": "Kokeile ilmaiseksi →",
-    "heroGetOwn": "Hanki oma →",
+    "heroGetOwn": "Pystytä oma node →",
     "buildHeroKicker": "Turvallinen paikka rakentaa AI:lla.",
     "buildHeroTitle": "Rakenna oikea appsi AI:llasi minuuteissa, ja se on sinun.",
     "buildHeroSub": "Kopioi yksi prompti Claudeen, ChatGPT:hen tai mihin tahansa AI:hin. Se rakentaa sinulle toimivan appsin AIMEATiin, julkaistuna heti ja sinun pidettäväksi. Anna sitten agenttiesi pyörittää sitä puolestasi, kuten AIMEAT Sanomat kirjoittaa itsensä joka ilta.",
@@ -8088,7 +8091,13 @@
     "wallSearch": "Hae appseja…",
     "wallNoMatch": "Mikään appsi ei vastaa hakuasi.",
     "agentBuildTitle": "Rakenna agentti 10 minuutissa, kopioi tämä prompti",
-    "agentBuildSub": "Liitä Claudeen, ChatGPT:hen tai mihin tahansa tekoälyyn. Se rakentaa paikallisen AI-agentin: pyörii omalla koneellasi, ei API-avaimia: yhdistettynä nodeesi, ja näyttää miten jaat sen. Koodareille ja näpertelijöille; aloittelijat voivat käyttää desktop-sovellusta."
+    "agentBuildSub": "Liitä Claudeen, ChatGPT:hen tai mihin tahansa tekoälyyn. Se rakentaa paikallisen AI-agentin: pyörii omalla koneellasi, ei API-avaimia: yhdistettynä nodeesi, ja näyttää miten jaat sen. Koodareille ja näpertelijöille; aloittelijat voivat käyttää desktop-sovellusta.",
+    "heroCtaBuild": "Rakenna jotain, ilmaiseksi →",
+    "heroCtaBusiness": "Katso mitä se tekee yritykselle →",
+    "heroCtaLoading": "Ladataan rakennusohjetta…",
+    "buildLoading": "Ladataan rakennusohjetta tältä nodelta…",
+    "buildShowFull": "Näytä koko ohje",
+    "buildChars": "merkkiä"
   },
   "pricing": {
     "title": "Hinnoittelu",

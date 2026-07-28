@@ -11,6 +11,13 @@
  * @structure default export Landing({ navigate }) + BuildHero/Gallery(live wall)/StatsPanel/BuildAppPrompt/BuildAgentPrompt/AskYourAI
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v4.0.0 — 2026-07-28 — Hero states the fork (owner or tenant) with three entrances: build,
+ *     business, own node. The Experience Center line and every other app reference now come
+ *     from siteLinks, so a node that is not aimeat.io renders without them. The build button
+ *     waits for the node's canonical prompt instead of copying the in-file fallback, which
+ *     predates research-first and the T1/T2/T3 tiers. ASK_AI_PROMPT facts corrected: the old
+ *     block claimed "hosting is the only subscription" (untrue against the price list and the
+ *     EXCHANGE fee) and framed federation as cross-company work sharing.
  *   v2.2.0 — 2026-07-16 — Build-app prompt fetched from the canonical GET /v1/prompts/build-app
  *     (registry-generated libraries + capability packs; kills the landing's 5th drifting copy);
  *     the hand-built text remains only as the offline fallback. Template block via shared helper.
@@ -47,6 +54,7 @@ const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
+import { siteLink, hasSite } from '/js/site.js';
 import NodeTotals from './landing-node-totals.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -170,14 +178,18 @@ const ASK_AI_PROMPT = `I just found aimeat.io and want to know if it's useful fo
    - what it would NOT solve for me (be honest)
    - the easiest way for me to try it (hosted test, self-host, or paid setup)
 
-Facts (fallback): AIMEAT is an open-source (MIT) platform where AI agents
-and people work together in shared "organisms": agents get persistent
-memory, identity, tasks, schedules and human approval gates. Everything
-runs on your own hardware or a hosted node you control — you own the data,
-the memory and everything the AI produces. Works with any AI (Claude,
-ChatGPT, local models) via MCP or connectors. Federation lets separate
-companies share work by consent. Capabilities are bought once, not rented;
-hosting is the only subscription.`;
+Facts (fallback): AIMEAT is an open-source (MIT) platform where people and
+their AI agents work together in shared "organisms": agents get persistent
+memory, an identity, tasks, schedules and human approval gates, and every
+action is attributed to whoever took it and can be revoked. Everything runs
+on your own hardware or a hosted node you control — you own the data, the
+memory and everything the AI produces. You build apps by describing them;
+they run on your node, versioned, and reach your data only through
+permissions you granted. Capabilities can carry a price: AIMEAT EXCHANGE
+lets one company's app or agent buy exactly what it needs from another's
+under a contract, with every call logged and settled. Works with any AI
+(Claude, ChatGPT, local models) via MCP or connectors. Nodes can peer, so
+people work across company boundaries with their own credentials.`;
 
 // Mirrors buildPromptFromBuilder() in app-catalog.html for the "new app / no description" case,
 // with the current node URL injected. If no idea is given the prompt explicitly tells the AI to ask.
@@ -201,128 +213,10 @@ function appendTemplateBlock(p, templateContent) {
   return p + '\n## Starting template (copy from this)\nUse this skeleton as your base — keep its boot, login pill, and self-hosted theme wiring; fill the {{...}} slots; build your views inside <main>. Return the COMPLETE single HTML file based on it.\n```html\n' + templateContent + '\n```\n';
 }
 
-// FALLBACK ONLY - used until the canonical fetch resolves (first paint) or when it fails.
-function buildLandingAppPrompt(nodeUrl, templateContent) {
-  const base = (nodeUrl || '').replace(/\/+$/, '') || window.location.origin;
-  const LANGS = { en: 'English', fi: 'Finnish (Suomi)' };
-  const langName = LANGS[getLocale()] || 'English';
-  let p = '';
-  // Converse + build the UI in the visitor's site language (instructions stay English).
-  p += 'Language: talk to me and write ALL user-facing text (UI labels, buttons, messages) in ' + langName + '. These build instructions are in English, but converse with me and build the app interface in ' + langName + '.\n\n';
-  p += 'Help me build a single-file HTML app that runs on AIMEAT.\n';
-  p += 'My initial idea: (not given yet — ask me what to build)\n\n';
-  p += '## Step 1 — Interview me first\n';
-  p += 'If I have not described my idea above, your FIRST reply must ask me what I want to build. Then ask me these in ONE message and wait for my answers:\n';
-  p += '1. What kind of app? (message board · multiplayer game · notes/journal · habit or expense tracker · family tools like shared lists/calendar · drawing/creative · music jam · real-time collaboration · offer or need help/services · something else)\n';
-  p += '2. What should it be called?\n';
-  p += '3. How should it look and feel? (e.g. dark neon · cozy · sleek minimal · fun colorful) — it must support BOTH light and dark.\n';
-  p += '4. Data: SHARED (a community space others can see and add to) or PRIVATE (only mine)?\n';
-  p += '5. Should it use AI features (summaries, suggestions, generation)? If yes I can enable them via aimeat-ai.\n';
-  p += 'Skip any question I already answered in my idea above. Use my answers to customise everything in Step 2.\n\n';
-  p += '## Step 2 — Build it (once I have answered)\n\n';
-  p += 'This app runs in the AIMEAT ecosystem. Here is what you need to know:\n\n';
-  p += '### Available Client Libraries\n';
-  p += 'Load with <script src> from the node base ' + base + '/v1/libs/. Include ONLY the ones you use. Load aimeat-auth first — the others build on its session.\n\n';
-  p += 'Core:\n';
-  p += '- aimeat-auth.js — login button, JWT, session (`AIMEAT.auth`, `session.fetch()`)\n';
-  p += '- aimeat-data.js — private/public key-value memory + search (`AIMEAT.data`)\n';
-  p += '- aimeat-storage.js — file upload/download (`AIMEAT.storage`)\n\n';
-  p += 'AI (prompt-driven — see the AI section below):\n';
-  p += '- aimeat-ai.js — LLM completions on the USER\'s own OpenRouter key (`AIMEAT.ai.complete`). Requires aimeat-auth.\n\n';
-  p += 'Social & economy:\n';
-  p += '- aimeat-social.js — boards, posts, reactions (`AIMEAT.social`)\n';
-  p += '- aimeat-wallet.js — morsel balance + transactions (`AIMEAT.wallet`)\n';
-  p += '- aimeat-work.js — actions / work requests (`AIMEAT.work`)\n';
-  p += '- aimeat-agents.js — commission & watch the owner\'s AI agents (`AIMEAT.agents`)\n';
-  p += '- aimeat-capabilities.js — discover & invoke shared capabilities (`AIMEAT.capabilities`)\n\n';
-  p += 'Media & misc:\n';
-  p += '- aimeat-audio.js — audio engine: instruments, synth, soundboard\n';
-  p += '- aimeat-speech.js — text-to-speech / speech helpers\n';
-  p += '- aimeat-header.js — drop-in canonical site header (nav + theme)\n';
-  p += '- aimeat-tunnel.js — personal-node tunnel client (advanced)\n\n';
-  p += '### Auth Pattern\n';
-  p += 'Handle BOTH login paths: a fresh sign-in click (the onLogin callback) AND a page that loads already signed in (restore the session yourself). `onLogin` fires ONLY on a fresh sign-in — it does NOT fire on reload when a session already exists, so a page that relies on onLogin alone shows nothing to an already-logged-in returning user.\n';
-  p += '```html\n';
-  p += '<script src="' + base + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
-  p += '<script>\n';
-  p += 'function showApp(session) { /* session.owner, session.jwt, session.fetch() */ }\n';
-  p += 'function hideApp() { /* hide content, show a "Sign in" message */ }\n';
-  p += '\n';
-  p += '// Path 1 — fresh sign-in / sign-out via the login button:\n';
-  p += 'AIMEAT.auth.mountLoginButton("#login", {\n';
-  p += '  onLogin: showApp,   // fires ONLY on a fresh sign-in click, NOT on reload\n';
-  p += '  onLogout: hideApp\n';
-  p += '});\n';
-  p += '\n';
-  p += '// Path 2 — already signed in when the page loads. Restore the stored session\n';
-  p += '// explicitly; login() returns the session (or null if not signed in).\n';
-  p += 'AIMEAT.auth.login().then(function (session) { if (session) showApp(session); });\n';
-  p += '</' + 'script>\n';
-  p += '```\n\n';
-  p += '### Data Storage\n';
-  p += 'Match the PRIVATE vs SHARED choice from Step 1:\n';
-  p += '```javascript\n';
-  p += '// PRIVATE — scoped to the logged-in owner, only they can read it:\n';
-  p += 'await AIMEAT.data.set("myapp.notes", data, { visibility: "private", tags: ["myapp"] });\n';
-  p += 'const mine = await AIMEAT.data.get("myapp.notes");\n';
-  p += '// SHARED/community — public so everyone can read; each user writes their own key:\n';
-  p += 'await AIMEAT.data.set("myapp.shared.<unique-id>", entry, { visibility: "public" });\n';
-  p += 'const theirs = await AIMEAT.data.getPublic(ownerGaii, "myapp.shared.<id>");  // read others\n';
-  p += 'const results = await AIMEAT.data.search("query");\n';
-  p += '```\n';
-  p += 'Works only when logged in. After a write, read it back to confirm it persisted.\n\n';
-  p += '### AI (prompt-driven)\n';
-  p += 'aimeat-ai runs an LLM on the LOGGED-IN USER\'s own OpenRouter key — free for the app, and the user controls spend. Load aimeat-auth first, then gate every "Use AI" control on isAvailable().\n';
-  p += '```html\n';
-  p += '<script src="' + base + '/v1/libs/aimeat-auth.js"></' + 'script>\n';
-  p += '<script src="' + base + '/v1/libs/aimeat-ai.js"></' + 'script>\n';
-  p += '```\n';
-  p += '```javascript\n';
-  p += 'if (await AIMEAT.ai.isAvailable()) {            // false until login + key configured\n';
-  p += '  const r = await AIMEAT.ai.complete({ app_id: "my-app", prompt: "Summarise:\\n" + text });\n';
-  p += '  render(r.content);                            // also: r.model, r.usage, r.budget\n';
-  p += '} else { showHint("Log in and add an AI key to enable this."); }\n';
-  p += '// Structured output: const { parsed } = await AIMEAT.ai.completeJson({ app_id, prompt, schema });\n';
-  p += '```\n';
-  p += 'Always handle isAvailable()===false and catch errors; never hardcode an API key in the app.\n\n';
-  p += '### Real-time / multiplayer (optional)\n';
-  p += 'For shared live state (presence boards, 1v1 games) use realtime rooms via your authenticated session.fetch:\n';
-  p += '```javascript\n';
-  p += '// 1) create or join a room\n';
-  p += 'const room = (await session.fetch("/v1/realtime/rooms", { method: "POST",\n';
-  p += '  body: JSON.stringify({ name: "my-room" }) })).data;   // → { id, ws_url }\n';
-  p += '// 2) open a WebSocket for live presence + messages\n';
-  p += 'const ws = new WebSocket(location.origin.replace(/^http/, "ws") + room.ws_url);\n';
-  p += 'ws.onmessage = (e) => handle(JSON.parse(e.data));\n';
-  p += '// 3) for low-latency P2P, GET /v1/realtime/ice-servers and use WebRTC\n';
-  p += '```\n';
-  p += 'Simpler apps can skip rooms and just observe shared AIMEAT.data keys on a timer.\n\n';
-  p += '### Design Guidelines\n';
-  p += 'Use CSS variables so the app themes cleanly. Support light AND dark:\n';
-  p += '```css\n';
-  p += ':root { --bg:#fafaf8; --card:#fff; --text:#1a1a2e; --accent:#e8564a; --border:#e5e7eb; --radius:12px; }\n';
-  p += '@media (prefers-color-scheme: dark) {\n';
-  p += '  :root { --bg:#14141c; --card:#1e1e2a; --text:#ececf4; --border:#2e2e40; } }\n';
-  p += '```\n';
-  p += 'Always include <meta name="viewport" content="width=device-width, initial-scale=1.0">. Mobile-first, single self-contained HTML file with embedded CSS + JS.\n\n';
-  p += '### Important Rules\n';
-  p += '- Return the COMPLETE HTML file, not fragments\n';
-  p += '- Also write a one-sentence description of what the app does - it is REQUIRED when publishing and shows in the catalogue and on the landing wall\n';
-  p += '- Never use literal closing script tags in JS comments or strings\n';
-  p += '- Keep it as a single self-contained HTML file\n';
-  p += '- Load only the libraries you actually use; load aimeat-auth before libs that need a session\n';
-  p += '- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n';
-  p += '- Theme with CSS variables and support both light and dark\n';
-  p += '- Include error handling and loading states for API calls\n\n';
-  p += '## When the app is ready — tell me how to publish it\n';
-  p += 'After you hand me the finished single HTML file, END your reply by telling me (in my language) to do exactly this:\n';
-  p += '1. Open ' + base + '/app-catalog.html\n';
-  p += '2. Click "+ Add" → open the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
-  p += '3. Click Publish.\n';
-  p += 'I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n';
-  p += 'What I get: once published, the app is LIVE on my own AIMEAT node and PUBLIC — anyone can find it in the community catalogue and use it, and I get a link to share. From my catalogue I can launch it, publish updates (older versions are always kept), park it (hide it), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n';
-  return appendTemplateBlock(p, templateContent);
-}
+// The hand-written fallback build prompt lived here until 2026-07-28. It was the fifth copy of
+// a spec the node already serves at GET /v1/prompts/build-app, and it had drifted: no Step 0
+// research-first, no T1/T2/T3 tier choice, no capability packs. Both call sites now wait for
+// the canonical text rather than offering a stale one. Git history has it if ever needed.
 
 function BuildAppPrompt() {
   const [copied, setCopied] = useState(false);
@@ -344,9 +238,17 @@ function BuildAppPrompt() {
     catch (err) { swallowed('landing', err); setTplContent(''); }
   };
   const [canonical, setCanonical] = useState('');
+  const [expanded, setExpanded] = useState(false);
   useEffect(() => { fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(err => { swallowed('landing: onPick', err); }); }, []);
-  const prompt = appendTemplateBlock(canonical || buildLandingAppPrompt(window.location.origin), tplContent);
+  // Only the node's canonical prompt is offered. The in-file fallback predates research-first,
+  // the T1/T2/T3 tiers and the capability packs, so copying it by accident during the first
+  // second of page life would send someone off building the wrong shape.
+  const prompt = canonical ? appendTemplateBlock(canonical, tplContent) : '';
+  // 46k characters of prompt is correct to copy and wrong to dump on a landing page. Show the
+  // opening, keep the rest one click away, and copy the whole thing either way.
+  const preview = prompt.split('\n').slice(0, 14).join('\n');
   const copy = async () => {
+    if (!prompt) return;
     try {
       await navigator.clipboard.writeText(prompt);
       setCopied(true);
@@ -358,10 +260,14 @@ function BuildAppPrompt() {
     <section class="ld-askai">
       <h2 class="ld-askai-title">${tr('landing.buildTitle', 'Build your app in 10 minutes — copy this prompt')}</h2>
       <p class="ld-askai-sub">${tr('landing.buildSub', 'Paste into Claude, ChatGPT or any AI. It asks about your idea, builds the app and publishes it to your node. Share the link when done.')}</p>
-      ${templates.length ? html`<div class="ld-askai-tpl mb-half">${'✨'} ${tr('landing.startTemplate', 'Start from a template')}: <select class="input-field" onChange=${onPick} value=${tplId}><option value="">${tr('landing.fromScratch', '(none — build from scratch)')}</option>${templates.map(t => html`<option value=${t.id}>${t.kind === 'use-case' ? '★ ' : ''}${t.title}</option>`)}</select></div>` : ''}
+      ${templates.length ? html`<div class="ld-askai-tpl mb-half">${tr('landing.startTemplate', 'Start from a template')}: <select class="input-field" onChange=${onPick} value=${tplId}><option value="">${tr('landing.fromScratch', '(none — build from scratch)')}</option>${templates.map(t => html`<option value=${t.id}>${t.kind === 'use-case' ? '★ ' : ''}${t.title}</option>`)}</select></div>` : ''}
       <div class="ld-askai-box">
-        <pre class="ld-askai-prompt">${prompt}</pre>
-        <button class="btn-primary ld-askai-copy" onClick=${copy}>${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}</button>
+        <pre class="ld-askai-prompt">${prompt ? (expanded ? prompt : preview) : tr('landing.buildLoading', 'Loading the build prompt from this node…')}</pre>
+        ${prompt && !expanded ? html`
+          <button class="btn-ghost ld-askai-more" type="button" onClick=${() => setExpanded(true)}>
+            ${tr('landing.buildShowFull', 'Show the full prompt')} (${prompt.length.toLocaleString()} ${tr('landing.buildChars', 'characters')})
+          </button>` : ''}
+        <button class="btn-primary ld-askai-copy" onClick=${copy} disabled=${!prompt}>${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}</button>
       </div>
     </section>`;
 }
@@ -490,26 +396,37 @@ function AskYourAI() {
 /* ── Hero — value first: AIMEAT is a safe place to build real apps with your AI in minutes, and
    you own + publish them. One copyable prompt is the whole on-ramp; the live wall below is the
    proof that your creation lands on the same shelf as everyone else's. ── */
-function BuildHero() {
+function BuildHero({ onNavigate }) {
   const [copied, setCopied] = useState(false);
   const [canonical, setCanonical] = useState('');
   useEffect(() => { fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(err => { swallowed('landing', err); return {}; }); }, []);
-  const prompt = canonical || buildLandingAppPrompt(window.location.origin);
+  // Until the node's canonical prompt arrives, the button copies the in-file fallback — which
+  // predates research-first (Step 0), the T1/T2/T3 tiers and the capability packs. Copying that
+  // by accident sends someone off to build the wrong shape, so the button waits.
+  const prompt = canonical;
   const copy = async () => {
+    if (!prompt) return;
     try { await navigator.clipboard.writeText(prompt); setCopied(true); setTimeout(() => setCopied(false), 2000); }
     // eslint-disable-next-line aimeat/no-silent-catch -- the full prompt is also visible lower on the page
     catch { /* the full prompt is also visible lower on the page */ }
   };
+  // Three entrances, in the order the three audiences arrive: build something (the
+  // fastest reward), see what it does for a business, run a node of your own.
   return html`
     <section class="ld-hero2">
-      <p class="ld-hero2-kicker">${tr('landing.buildHeroKicker', 'A safe place to build with AI.')}</p>
-      <h1 class="ld-hero2-title">${tr('landing.buildHeroTitle', 'Build a real app with your AI in minutes, and it’s yours.')}</h1>
-      <p class="ld-hero2-sub">${tr('landing.buildHeroSub', 'Copy one prompt into Claude, ChatGPT or any AI. It builds you a working app on AIMEAT, published live and yours to keep. Then let your agents run it for you, the way AIMEAT Sanomat writes itself every evening.')}</p>
+      <p class="ld-hero2-kicker">${tr('landing.heroKicker', 'Two roles in the agent economy.')}</p>
+      <h1 class="ld-hero2-title">${tr('landing.heroTitle', 'Owner, or tenant. Which one do you want to be?')}</h1>
+      <p class="ld-hero2-sub">${tr('landing.heroSub', 'Your memory, your agents, your balance sheet. On a rented platform you build a tool and pay for it. Here the tool can bill someone else, and it is yours.')}</p>
       <div class="ld-hero2-cta">
-        <button class="btn-primary" type="button" onClick=${copy}>${copied ? tr('landing.buildHeroCopied', 'Copied ✓ — paste into your AI') : tr('landing.buildHeroCopy', 'Copy the build prompt →')}</button>
-        <a class="btn-outline" href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Get your own →')}</a>
+        <button class="btn-primary" type="button" onClick=${copy} disabled=${!prompt}>
+          ${copied ? tr('landing.buildHeroCopied', 'Copied ✓ — paste into your AI')
+            : prompt ? tr('landing.heroCtaBuild', 'Build something, free →')
+            : tr('landing.heroCtaLoading', 'Loading the build prompt…')}
+        </button>
+        <a class="btn-outline" href="/v1/business" onClick=${(e) => { e.preventDefault(); onNavigate('/v1/business'); }}>${tr('landing.heroCtaBusiness', 'See what it does for a business →')}</a>
+        <a class="btn-outline" href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Run your own node →')}</a>
       </div>
-      <p class="ld-hero2-after"><a href="https://experience-center.apps.aimeat.io" target="_blank" rel="noopener">🧭 ${tr('landing.ecLink', 'New here? Learn the whole ecosystem hands-on — open the Experience Center →')}</a></p>
+      ${hasSite('learn') ? html`<p class="ld-hero2-after"><a href=${siteLink('learn')} target="_blank" rel="noopener">${tr('landing.ecLink', 'New here? Learn the whole ecosystem hands-on — open the Experience Center →')}</a></p>` : ''}
       ${copied ? html`<p class="ld-hero2-after">${tr('landing.buildHeroAfter', 'Paste it into your AI and answer its questions. When your app is ready,')} <a href="/app-catalog.html">${tr('landing.openAppsToPublish', 'open your apps to add & publish it →')}</a> ${tr('landing.buildHeroAfter2', '(signing in takes seconds — Google or email).')}</p>` : ''}
     </section>
   `;
@@ -541,8 +458,8 @@ export default function Landing({ navigate }) {
 
   return html`
     <div class="ld">
-      <!-- 1. Hero — value first: build a real app with your AI; the live wall below is the proof. -->
-      <${BuildHero} />
+      <!-- 1. Hero — the fork: owner or tenant, and three entrances under it. -->
+      <${BuildHero} onNavigate=${navigate} />
 
       <!-- 2. Live wall — the real apps people built with their AI and published here (yours goes here). -->
       <${Gallery} />

@@ -683,7 +683,10 @@
     "howItWorks": "How it works",
     "business": "For your business",
     "myCompany": "My Company",
-    "companies": "Companies"
+    "companies": "Companies",
+    "learn": "Learn",
+    "exchange": "EXCHANGE",
+    "members": "Members"
   },
   "companies": {
     "title": "Companies",
@@ -7994,8 +7997,8 @@
     "accountRetry": "I signed in — try again"
   },
   "landing": {
-    "heroTitle": "Your AI gets memory, agents and a place to build.",
-    "heroSub": "Open protocol. Run your own node or use ours.",
+    "heroTitle": "Owner, or tenant. Which one do you want to be?",
+    "heroSub": "Your memory, your agents, your balance sheet. On a rented platform you build a tool and pay for it. Here the tool can bill someone else, and it is yours.",
     "askAiTitle": "Let your own AI tell you what AIMEAT is, for you",
     "askAiSub": "Paste this into Claude, ChatGPT or any AI. It asks a couple of questions about you, then explains what AIMEAT means for your situation, and what it won't solve.",
     "askAiCopy": "Copy prompt",
@@ -8065,14 +8068,14 @@
     "totalOnline": "online now",
     "totalKnowledge": "knowledge packages",
     "totalDownloads": "app downloads",
-    "heroKicker": "Tonight's paper wrote itself.",
+    "heroKicker": "Two roles in the agent economy.",
     "heroLead": "Six agents. Zero human hours.",
     "heroOpenPaper": "Open tonight's paper",
     "heroShotAlt": "AIMEAT Sanomat, tonight's edition",
     "heroPaperLine": "Tonight's edition · written entirely by agents",
     "heroSub2": "A real app, built and run by AI on AIMEAT. Look before you sign up.",
     "heroTryFree": "Try it free →",
-    "heroGetOwn": "Get your own →",
+    "heroGetOwn": "Run your own node →",
     "buildHeroKicker": "A safe place to build with AI.",
     "buildHeroTitle": "Build a real app with your AI in minutes, and it's yours.",
     "buildHeroSub": "Copy one prompt into Claude, ChatGPT or any AI. It builds you a working app on AIMEAT, published live and yours to keep. Then let your agents run it for you, the way AIMEAT Sanomat writes itself every evening.",
@@ -8088,7 +8091,13 @@
     "wallSearch": "Search apps…",
     "wallNoMatch": "No apps match your search.",
     "agentBuildTitle": "Build an agent in 10 minutes, copy this prompt",
-    "agentBuildSub": "Paste into Claude, ChatGPT or any AI. It builds a local AI agent: running on your own machine, no API keys: connected to your node, and shows you how to share it. For coders and tinkerers; beginners can use the desktop app instead."
+    "agentBuildSub": "Paste into Claude, ChatGPT or any AI. It builds a local AI agent: running on your own machine, no API keys: connected to your node, and shows you how to share it. For coders and tinkerers; beginners can use the desktop app instead.",
+    "heroCtaBuild": "Build something, free →",
+    "heroCtaBusiness": "See what it does for a business →",
+    "heroCtaLoading": "Loading the build prompt…",
+    "buildLoading": "Loading the build prompt from this node…",
+    "buildShowFull": "Show the full prompt",
+    "buildChars": "characters"
   },
   "pricing": {
     "title": "Pricing",

@@ -279,6 +279,7 @@
     import htm from 'htm';
     import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
     import { initThemeSystem } from '/js/theme.js';
+    import { siteLink } from '/js/site.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
     import { CommandPalette } from '/views/command-palette.js';
     import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
@@ -542,15 +543,44 @@
     // Built-in public links. Operators can show/hide and reorder these via the admin
     // Portal tab (persisted at /v1/site/header-nav). Auth/role-gated links (Apps, Profile,
     // Admin) are NOT in this list — they stay forced by the session/role checks below.
+    // `siteKey` entries are apps that belong to THIS node's operator, not protocol surfaces.
+    // They render only when the node configured a URL for them (AIMEAT_SITE_* → window.__SITE),
+    // so a fresh clone gets a nav without them instead of links into somebody else's apps.
     const PUBLIC_NAV_LINKS = [
       { id: 'try',        path: '/v1/portal',          key: 'nav.try' },
       { id: 'howItWorks', path: '/v1/how-it-works',    key: 'nav.howItWorks', fallback: 'How it works' },
+      { id: 'learn',      siteKey: 'learn',            key: 'nav.learn',      fallback: 'Learn', external: true },
+      { id: 'exchange',   siteKey: 'exchange',         key: 'nav.exchange',   fallback: 'EXCHANGE', external: true },
       { id: 'business',   path: '/v1/business',        key: 'nav.business',   fallback: 'For your business' },
       { id: 'companies',  path: '/v1/companies',       key: 'nav.companies',  fallback: 'Companies' },
       { id: 'members',    path: '/v1/members',         key: 'nav.members',    fallback: 'Members' },
       { id: 'devView',    path: '/v1/portal?view=dev', key: 'nav.devView',    matchActive: false },
       { id: 'help',       path: '/v1/help',            key: 'nav.help' },
     ];
+
+    /**
+     * Reconcile the operator's saved nav order with the links this build declares.
+     *
+     * A saved order predates every link added since the operator last touched the Portal tab,
+     * so shipping a nav item would otherwise be invisible on every node that has ever saved
+     * one. Keep the operator's arrangement for the ids they know about, and slot each newcomer
+     * next to the neighbour it is declared beside — appending them all to the end would bury
+     * "Learn" and "EXCHANGE" behind "Help".
+     */
+    function mergeNavOrder(stored) {
+      const known = new Set(stored);
+      const order = stored.slice();
+      let anchor = -1; // index in `order` of the last declared link we have placed
+      for (const link of PUBLIC_NAV_LINKS) {
+        const at = order.indexOf(link.id);
+        if (at !== -1) { anchor = at; continue; }
+        if (known.has(link.id)) continue;
+        anchor = anchor === -1 ? 0 : anchor + 1;
+        order.splice(anchor, 0, link.id);
+        known.add(link.id);
+      }
+      return order;
+    }
 
     function Header({ navigate, locale }) {
       const [session, setSession] = useState(null);
@@ -586,9 +616,9 @@
           .then(r => r.json())
           .then(d => {
             if (cancelled || !d?.ok || !d.data) return;
-            const order = Array.isArray(d.data.order) ? d.data.order : PUBLIC_NAV_LINKS.map(l => l.id);
+            const stored = Array.isArray(d.data.order) ? d.data.order : PUBLIC_NAV_LINKS.map(l => l.id);
             const hidden = Array.isArray(d.data.hidden) ? d.data.hidden : [];
-            setNavConfig({ order, hidden });
+            setNavConfig({ order: mergeNavOrder(stored), hidden });
             setFeatures(d.data.features || {});
           })
           .catch(e => console.warn('Header nav fetch failed:', e.message));
@@ -624,9 +654,13 @@
       // Resolve the public links to render: config order, minus hidden, by declared id.
       const linkById = Object.fromEntries(PUBLIC_NAV_LINKS.map(l => [l.id, l]));
       const hiddenSet = new Set(navConfig.hidden);
+      // Operator-owned apps (siteKey) resolve their href from window.__SITE and drop out of
+      // the nav entirely when this node has not configured one.
       const visibleLinks = navConfig.order
         .map(id => linkById[id])
-        .filter(l => l && !hiddenSet.has(l.id));
+        .filter(l => l && !hiddenSet.has(l.id))
+        .map(l => (l.siteKey ? { ...l, path: siteLink(l.siteKey) } : l))
+        .filter(l => l.path);
 
       return html`
         <nav class="topnav">
@@ -644,11 +678,16 @@
               <!-- Public links are operator-configurable (visibility + order) via the admin
                    Portal tab. "Try it" leads to the landing's path cards + app gallery.
                    Classic stays reachable deeper (landing card B "Start building"). -->
-              ${visibleLinks.map(link => html`
-                <a href="${link.path}" key=${link.id}
-                  onClick=${(e) => { handleNav(e, link.path); setMenuOpen(false); }}
-                  class="${link.matchActive !== false && currentPath === link.path ? 'active' : ''}">${t(link.key) || link.fallback || link.key}</a>
-              `)}
+              ${visibleLinks.map(link => (link.external
+                ? html`
+                  <a href="${link.path}" key=${link.id} target="_blank" rel="noopener"
+                    onClick=${() => setMenuOpen(false)}>${t(link.key) || link.fallback || link.key}</a>
+                `
+                : html`
+                  <a href="${link.path}" key=${link.id}
+                    onClick=${(e) => { handleNav(e, link.path); setMenuOpen(false); }}
+                    class="${link.matchActive !== false && currentPath === link.path ? 'active' : ''}">${t(link.key) || link.fallback || link.key}</a>
+                `))}
               ${session && html`
                 <a href="/app-catalog.html" target="_blank" onClick=${() => setMenuOpen(false)} class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
                 <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/profile'); setMenuOpen(false); }}>

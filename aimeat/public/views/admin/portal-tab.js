@@ -36,6 +36,10 @@ import { swallowed } from '/js/swallowed.js';
 const HEADER_LINK_LABELS = {
   try: 'nav.try',
   howItWorks: 'nav.howItWorks',
+  // learn/exchange render only when this node configured AIMEAT_SITE_LEARN_URL /
+  // AIMEAT_SITE_EXCHANGE_URL; hiding them here is a second, independent switch.
+  learn: 'nav.learn',
+  exchange: 'nav.exchange',
   business: 'nav.business',
   devView: 'nav.devView',
   help: 'nav.help',

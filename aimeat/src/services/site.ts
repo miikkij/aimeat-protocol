@@ -9,6 +9,10 @@
  *   - CONFIG_WHITELIST + TAG_REGEX: safe config keys and the {{...}} tag grammar for substitution
  *
  * @version-history
+ *   v1.2.0 — 2026-07-28 — PUBLIC_NAV_LINK_IDS gains `learn` and `exchange` (operator-owned apps;
+ *     the SPA renders them only when AIMEAT_SITE_*_URL is configured). getHeaderNav now slots a
+ *     newly-declared link next to its declared neighbour instead of appending it, so shipping a
+ *     nav item is visible on nodes that already saved an order rather than buried after "Help".
  *   v1.1.0 — 2026-07-14 — Inject the WebMCP bridge script into every portal HTML (custom or
  *     default) at this chokepoint — both GET / routes call getPortalHtml (TARGET-034 phase C)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
@@ -48,7 +52,10 @@ const HEADER_NAV_KEY = 'portal/header-nav';
 // Canonical ids of the public header links an operator may show/hide/reorder.
 // Auth/role-gated links (Apps, Profile, Admin) are NOT configurable — they stay
 // forced by their existing session/role rules in the SPA header.
-export const PUBLIC_NAV_LINK_IDS = ['try', 'howItWorks', 'business', 'devView', 'help'] as const;
+// `learn` and `exchange` point at apps this node's operator owns; the SPA renders them only
+// when AIMEAT_SITE_LEARN_URL / AIMEAT_SITE_EXCHANGE_URL are set. They are listed here so an
+// operator who HAS them can still reorder or hide them from the Portal tab.
+export const PUBLIC_NAV_LINK_IDS = ['try', 'howItWorks', 'learn', 'exchange', 'business', 'devView', 'help'] as const;
 
 export interface HeaderNavConfig {
     /** Display order of public link ids (always normalized to cover all known ids). */
@@ -365,9 +372,18 @@ export class SiteService {
             // Corrupt JSON or storage miss → fall back to defaults below.
           logger.warn('getHeaderNav: continuing after a suppressed failure', { error: String(err) });
         }
-        // Normalize: keep known stored ids in order, then append any known ids not yet listed.
+        // Normalize: keep the operator's arrangement for ids they saved, and slot any link
+        // added since then next to the neighbour it is DECLARED beside. Appending newcomers
+        // to the end instead would bury every future nav item behind "Help" on any node that
+        // has ever opened the Portal tab.
         const order = storedOrder.filter(id => known.includes(id));
-        for (const id of known) if (!order.includes(id)) order.push(id);
+        let anchor = -1;
+        for (const id of known) {
+            const at = order.indexOf(id);
+            if (at !== -1) { anchor = at; continue; }
+            anchor = anchor === -1 ? 0 : anchor + 1;
+            order.splice(anchor, 0, id);
+        }
         const hidden = storedHidden.filter(id => known.includes(id));
         return { order, hidden };
     }
