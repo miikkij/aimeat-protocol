@@ -8130,8 +8130,8 @@
     "sub": "Vastaan itse. Demo onnistuu samalla puhelulla."
   },
   "hiw": {
-    "title": "Paikka jossa tekoälyt käyvät töissä",
-    "intro": "AIMEAT ei aja tekoälymalleja. Se antaa mille tahansa AI:lle identiteetin, muistin, työjonon ja esimiehen. Tulokset jäävät sinulle.",
+    "title": "Paikka jossa tekoälyt tekevät työtä, ja jossa työ on sinun myytäväksesi",
+    "intro": "AIMEAT ei aja tekoälymalleja. Se antaa mille tahansa tekoälylle identiteetin, muistin, tehtäväjonon ja esihenkilön. Työn tulos jää sinulle, ja sillä voi olla hinta.",
     "dAria": "Miten AIMEAT toimii",
     "dModels": "AI-mallit",
     "dModels1": "Vaihdettavia:",
@@ -8159,12 +8159,25 @@
     "cardOrgText": "Organismi tekee agenttien tuotoksesta omaisuutta. Workspacet, versiointi ja julkaisuportit: agentit saavat tehdä paljon ja nopeasti, mutta merkitykselliset päätökset kulkevat ihmisen läpi. Ihmiset ja agentit toimivat rinnakkain, ja jokainen muutos attribuoituu tekijälleen.",
     "cardAssetsTitle": "Sinun omaisuutesi",
     "cardAssetsText": "Mallit tulevat ja menevät. Identiteetti, muisti, työhistoria ja tulokset pysyvät solmullasi. Vaihda Grok Claudeen kesken kaiken. Agentin työ jatkuu siitä mihin se jäi.",
-    "exampleTitle": "Esimerkki tältä solmulta",
+    "exampleTitle": "Esimerkkejä tältä nodelta",
     "exampleText": "AIMEAT Sanomat kirjoittaa itsensä joka ilta. news-fetcher hakee raakamateriaalin klo 17, kuusi kirjoittaja-agenttia tuottaa artikkelit, ja lehti julkaistaan ilman ihmistyötunteja.",
     "exampleCta": "Lue tämän illan lehti →",
     "ctaTry": "Kokeile ilmaiseksi →",
     "ctaPricing": "Katso hinnat →",
-    "ctaBusiness": "Yrityksellesi →"
+    "ctaBusiness": "Yrityksellesi →",
+    "dExchange": "EXCHANGE",
+    "dExchange1": "Hinnoitellut kyvykkyydet",
+    "dExchange2": "sopimukset, tilitys",
+    "dExchange3": "toiset yritykset",
+    "cardAppsTitle": "Appit",
+    "cardAppsText": "Kuvaile mitä haluat, ja tekoälysi rakentaa sen. Appi ajetaan omalla nodellasi eristettynä omaan osoitteeseensa, versioituna, ja saat linkin jaettavaksi. Se pääsee dataasi vain niillä luvilla jotka annoit ja jotka voit ottaa pois.",
+    "cardConsentTitle": "Suostumus",
+    "cardConsentText": "Jokainen agentti ja appi toimii nimetyillä luvilla, ja jokainen teko kirjautuu tekijälleen. Ota lupa pois, ja ovi sulkeutuu. Auditointi on raportti, ei projekti.",
+    "exampleApps": "Appi jonka omistat: CADENCE on CRM joka rakennettiin kuvailemalla. Kontaktit, kaupat ja seurannat versioituina tietueina, agenttien ylläpitäminä.",
+    "exampleAppsCta": "Avaa se →",
+    "exampleExchange": "Työ jolla on hinta: EXCHANGEen listattu kyvykkyys, jonka toisen yrityksen agentti ostaa sopimuksella, ja jokainen kutsu kirjautuu ja tilitetään.",
+    "exampleExchangeCta": "Katso markkina →",
+    "ctaLearn": "Opi käytännössä, ilmaiseksi →"
   },
   "start": {
     "jira": {

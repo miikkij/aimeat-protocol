@@ -10,6 +10,12 @@
  *   v1.0.0 — 2026-06-10 — Initial (owner spec).
  *   v1.1.0 — 2026-06-20 — H-2: the live-example app link opens in a sandboxed opaque-origin
  *     iframe (openAppSandboxed) instead of a top-level apex ?mode=inline tab.
+ *   v2.0.0 — 2026-07-28 — The chain ends at EXCHANGE, not at "your assets": one more box is
+ *     what separates this from any other agent platform, because the result can carry a price.
+ *     Two cards added (Apps — the thing the front page tells you to build, absent here until
+ *     now; Consent — the ownership guarantee that sells to a regulated buyer). Examples go from
+ *     one to three, one per layer, each rendered only if this node has that app (siteLinks).
+ *     Both SVG variants grew a box: wide viewBox 330 → 430, tall 690 → 810.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -17,6 +23,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
+import { siteLink, hasSite } from '/js/site.js';
 import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -70,12 +77,15 @@ function Diagram() {
   const org = { title: tr('hiw.dOrg', 'Organism'), lines: [tr('hiw.dOrg1', 'Shared truth:'), tr('hiw.dOrg2', 'workspaces, versions'), tr('hiw.dOrg3', 'humans + agents'), tr('hiw.dOrg4', 'publish gate')] };
   const assets = { title: tr('hiw.dAssets', 'Your assets'), lines: [tr('hiw.dAssets1', 'Versioned knowledge'), tr('hiw.dAssets2', 'apps and reports')] };
   const human = { title: tr('hiw.dHuman', 'Human at the gate'), lines: [tr('hiw.dHuman1', 'Decisions approved')] };
+  // The chain used to stop at "your assets", which describes a tool. One more box is what
+  // separates this from every other agent platform: the result can carry a price.
+  const exch = { title: tr('hiw.dExchange', 'EXCHANGE'), lines: [tr('hiw.dExchange1', 'Priced capabilities'), tr('hiw.dExchange2', 'contracts, settlement'), tr('hiw.dExchange3', 'other companies')] };
   const note = tr('hiw.dNote', 'The model can change — work and memory stay');
 
   return html`
     <div class="hiw-diagram">
-      <!-- Desktop: left → right, assets below organism, human wired to the gate. -->
-      <svg class="hiw-svg hiw-svg--wide" viewBox="0 0 880 330" role="img" aria-label=${tr('hiw.dAria', 'How AIMEAT works')}>
+      <!-- Desktop: left → right, assets below organism, human wired to the gate, EXCHANGE last. -->
+      <svg class="hiw-svg hiw-svg--wide" viewBox="0 0 880 430" role="img" aria-label=${tr('hiw.dAria', 'How AIMEAT works')}>
         <${Block} x="10" y="40" w="190" h="110" title=${models.title} lines=${models.lines} />
         <${Caption} x="105" y="172" note=${note} />
         <${Arrow} x1="200" y1="95" x2="240" y2="95" />
@@ -87,9 +97,12 @@ function Diagram() {
         <${Block} x="480" y="205" w="200" h="85" title=${assets.title} lines=${assets.lines} hot />
         <${Block} x="710" y="50" w="160" h="70" title=${human.title} lines=${human.lines} />
         <line x1="710" y1="85" x2="680" y2="85" stroke="var(--accent, #E8564A)" stroke-width="1.5" stroke-dasharray="4 3" />
+        <line x1="580" y1="290" x2="580" y2="325" stroke="var(--text-dim)" stroke-width="1.5" />
+        <polygon points="580,330 576,323 584,323" fill="var(--text-dim)" />
+        <${Block} x="480" y="330" w="200" h="90" title=${exch.title} lines=${exch.lines} hot />
       </svg>
       <!-- Mobile: same content stacked vertically. -->
-      <svg class="hiw-svg hiw-svg--tall" viewBox="0 0 320 690" role="img" aria-label=${tr('hiw.dAria', 'How AIMEAT works')}>
+      <svg class="hiw-svg hiw-svg--tall" viewBox="0 0 320 810" role="img" aria-label=${tr('hiw.dAria', 'How AIMEAT works')}>
         <${Block} x="40" y="10" w="240" h="105" title=${models.title} lines=${models.lines} />
         <${Caption} x="160" y="128" note=${note} />
         <line x1="160" y1="140" x2="160" y2="165" stroke="var(--text-dim)" stroke-width="1.5" />
@@ -103,6 +116,9 @@ function Diagram() {
         <line x1="160" y1="540" x2="160" y2="565" stroke="var(--text-dim)" stroke-width="1.5" />
         <polygon points="160,570 156,563 164,563" fill="var(--text-dim)" />
         <${Block} x="40" y="575" w="240" h="90" title=${assets.title} lines=${assets.lines} hot />
+        <line x1="160" y1="665" x2="160" y2="690" stroke="var(--text-dim)" stroke-width="1.5" />
+        <polygon points="160,695 156,688 164,688" fill="var(--text-dim)" />
+        <${Block} x="40" y="700" w="240" h="95" title=${exch.title} lines=${exch.lines} hot />
       </svg>
     </div>
   `;
@@ -128,8 +144,8 @@ export default function HowItWorks({ navigate }) {
   return html`
     <div class="ld">
       <section class="ld-hero">
-        <h1 class="ld-h1">${tr('hiw.title', 'A place where AIs go to work')}</h1>
-        <p class="ld-hero-sub">${tr('hiw.intro', "AIMEAT doesn't run AI models. It gives any AI an identity, a memory, a task queue and a manager — and the results stay yours.")}</p>
+        <h1 class="ld-h1">${tr('hiw.title', 'A place where AIs go to work, and where the work is yours to sell')}</h1>
+        <p class="ld-hero-sub">${tr('hiw.intro', 'AIMEAT does not run AI models. It gives any AI an identity, a memory, a task queue and a manager. What the work produces stays yours, and it can carry a price.')}</p>
       </section>
 
       <${Diagram} />
@@ -137,13 +153,17 @@ export default function HowItWorks({ navigate }) {
       <div class="ld-paths">
         ${card('hiw.cardAgentsTitle', 'Agents', 'hiw.cardAgentsText', 'An agent is not an AI — it is a job for an AI. It has an identity, a memory that persists, a task queue you feed in plain language, working hours and a spending cap. Quality can be reviewed afterwards. Run it on any model — CrewAI, Claude, GPT, your own runtime.')}
         ${card('hiw.cardOrgTitle', 'Organisms', 'hiw.cardOrgText', "An organism turns agent output into assets. Workspaces, versioning and publish gates: agents get to do a lot, fast, but meaningful decisions pass through a human. Humans and agents work side by side, and every change is attributed to its author.")}
+        ${card('hiw.cardAppsTitle', 'Apps', 'hiw.cardAppsText', 'Describe what you want and your AI builds it. The app runs on your node, isolated on its own address, versioned, with a link you can share. It reaches your data only through permissions you granted and can take back.')}
+        ${card('hiw.cardConsentTitle', 'Consent', 'hiw.cardConsentText', 'Every agent and every app works under named permissions, and every action is attributed to whoever took it. Take a permission back and the door closes. The audit is a report, not a project.')}
         ${card('hiw.cardAssetsTitle', 'Your assets', 'hiw.cardAssetsText', 'Models come and go. Identity, memory, work history and results stay on your node. Swap Grok for Claude mid-flight — the agent picks up where it left off.')}
       </div>
 
+      <!-- Three examples from three layers, so the page shows more than one thing the
+           platform does. Each renders only if this node actually has it. -->
       <div class="ld-stats ld-stats--withimg">
         <img class="ld-example-img" src="/img/toimitus.png" alt="" loading="lazy"
           onError=${(e) => { e.target.style.display = 'none'; }} />
-        <div class="ld-stats-line">${tr('hiw.exampleTitle', 'An example from this node')}</div>
+        <div class="ld-stats-line">${tr('hiw.exampleTitle', 'Examples from this node')}</div>
         <div class="ld-stats-own">
           ${tr('hiw.exampleText', 'AIMEAT Sanomat writes itself every evening. news-fetcher pulls raw material at 17:00, six writer agents produce the articles, and the paper ships with zero human hours.')}
           ${paper && html`
@@ -151,10 +171,22 @@ export default function HowItWorks({ navigate }) {
                 openAppSandboxed(`/v1/apps/${encodeURIComponent(paper.owner)}/${encodeURIComponent(paper.filename)}?mode=inline`, paper.filename); }}>
               ${tr('hiw.exampleCta', "Read tonight's paper →")}</a>`}
         </div>
+        ${hasSite('crm') ? html`
+          <div class="ld-stats-own">
+            ${tr('hiw.exampleApps', 'An app you own: CADENCE is a CRM built by describing it. Contacts, deals and follow-ups as versioned records, kept fed by agents.')}
+            <a class="ld-stats-cta" href=${siteLink('crm')} target="_blank" rel="noopener">${tr('hiw.exampleAppsCta', 'Open it →')}</a>
+          </div>` : ''}
+        ${hasSite('exchange') ? html`
+          <div class="ld-stats-own">
+            ${tr('hiw.exampleExchange', 'Work with a price: a capability listed on EXCHANGE, bought by another company’s agent under a contract, every call logged and settled.')}
+            <a class="ld-stats-cta" href=${siteLink('exchange')} target="_blank" rel="noopener">${tr('hiw.exampleExchangeCta', 'See the market →')}</a>
+          </div>` : ''}
       </div>
 
       <div class="ld-ctarow">
-        <a class="btn-primary" href="/v1/portal" onClick=${(e) => { e.preventDefault(); navigate('/v1/portal'); }}>${tr('hiw.ctaTry', 'Try it free →')}</a>
+        ${hasSite('learn')
+          ? html`<a class="btn-primary" href=${siteLink('learn')} target="_blank" rel="noopener">${tr('hiw.ctaLearn', 'Learn it hands-on, free →')}</a>`
+          : html`<a class="btn-primary" href="/v1/portal" onClick=${(e) => { e.preventDefault(); navigate('/v1/portal'); }}>${tr('hiw.ctaTry', 'Try it free →')}</a>`}
         <a class="btn-outline" href="/v1/pricing" onClick=${(e) => { e.preventDefault(); navigate('/v1/pricing'); }}>${tr('hiw.ctaPricing', 'See pricing →')}</a>
         <a class="btn-outline" href="/v1/business" onClick=${(e) => { e.preventDefault(); navigate('/v1/business'); }}>${tr('hiw.ctaBusiness', 'For your business →')}</a>
       </div>
