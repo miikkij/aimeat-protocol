@@ -115,14 +115,18 @@ await test('1. GET /.well-known/ucp — profile advertises checkout + the morsel
     assert(res.status === 200, `status ${res.status}`);
     const profile = await res.json() as any;
     assert(typeof profile.ucp?.version === 'string', 'missing ucp.version');
-    // Service names map to ARRAYS of entries, as the spec requires.
-    assert(Array.isArray(profile.ucp.services?.rest), 'ucp.services.rest must be an array of entries');
-    assert(profile.ucp.services.rest[0]?.endpoint?.endsWith('/ucp/v1'), `rest endpoint: ${profile.ucp.services.rest[0]?.endpoint}`);
-    assert(profile.ucp.services?.mcp?.[0]?.endpoint?.endsWith('/v1/mcp'), 'missing mcp transport');
-    // UCP declares capabilities as an OBJECT keyed by capability name, each key holding an array
-    // of declarations. A validator reads the old array-of-{name} shape as "capabilities missing".
-    assert(!Array.isArray(profile.ucp.capabilities) && typeof profile.ucp.capabilities === 'object',
-        `ucp.capabilities must be an object, got ${Array.isArray(profile.ucp.capabilities) ? 'array' : typeof profile.ucp.capabilities}`);
+    // Services are keyed by VERTICAL and each entry names its own transport. The MCP server is
+    // NOT declared here: it is real, but it is not a UCP binding, and /.well-known/mcp.json is
+    // where it belongs.
+    const shopping = profile.ucp.services?.shopping;
+    assert(Array.isArray(shopping), 'ucp.services.shopping must be an array of entries');
+    const svc = shopping[0];
+    for (const f of ['version', 'spec', 'transport', 'endpoint', 'schema']) {
+        assert(typeof svc?.[f] === 'string' && svc[f].length > 0, `service entry missing ${f}`);
+    }
+    assert(['rest', 'mcp', 'a2a', 'embedded'].includes(svc.transport), `bad transport: ${svc.transport}`);
+    assert(svc.endpoint.endsWith('/ucp/v1'), `rest endpoint: ${svc.endpoint}`);
+    assert(!profile.ucp.services.webmcp, 'webmcp is not a UCP transport and must not be a service');
     const checkout = profile.ucp.capabilities['dev.ucp.shopping.checkout']?.[0];
     assert(!!checkout?.endpoints?.create, 'missing checkout capability endpoints');
     assert(/^\d{4}-\d{2}-\d{2}$/.test(checkout.version), `capability version must be YYYY-MM-DD, got ${checkout.version}`);

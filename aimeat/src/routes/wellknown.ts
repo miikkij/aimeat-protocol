@@ -226,16 +226,25 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
     res.json({
       ucp: {
         version: UCP_PROFILE_VERSION,
-        // Each service name maps to an ARRAY of entries, the same shape as capabilities. These
-        // were plain objects, and a validator rejects them field by field ("service rest must be
-        // an array of entries"). The first pass corrected capabilities and left services alone
-        // because the scanner had only named the one — it named the other on the next run.
+        // Keyed by VERTICAL, not by transport. This block spent two rounds being corrected on the
+        // wrong axis: first the values became arrays, then each entry was told it was missing
+        // version/spec/transport — and the reason every message named "rest", "mcp" and "webmcp"
+        // is that those were our KEYS. A UCP service declares a vertical's API surface, and the
+        // transport is a field inside the entry with an enum value (rest | mcp | a2a | embedded).
+        //
+        // One entry, because REST at /ucp/v1 is the only place this node actually implements UCP.
+        // The MCP server and the in-page WebMCP bridge are real, but they are not UCP bindings;
+        // they are declared where they belong, in /.well-known/mcp.json and /.well-known/acp.json.
+        // Listing them here would be the same false advertising the ACP document is careful to
+        // avoid — a buyer following the declaration to a surface that does not speak the protocol.
         services: {
-          rest: [{ endpoint: `${b}/ucp/v1`, spec: `${b}/v1/spec` }],
-          mcp: [{ endpoint: `${b}/v1/mcp` }],
-          // In-page tool surface (WebMCP bridge): app pages register their priced tools on
-          // document.modelContext; the HTTP listing mirrors them for non-browser agents.
-          webmcp: [{ library: `${b}/v1/libs/aimeat-webmcp.js`, app_listing: `${b}/v1/apps/{owner}/{filename}/webmcp` }],
+          shopping: [{
+            version: UCP_PROFILE_VERSION,
+            spec: `https://ucp.dev/${UCP_PROFILE_VERSION}/specification/overview`,
+            transport: 'rest',
+            endpoint: `${b}/ucp/v1`,
+            schema: `https://ucp.dev/${UCP_PROFILE_VERSION}/services/shopping/rest.openapi.json`,
+          }],
         },
         // UCP declares capabilities as an OBJECT keyed by capability name, each key holding an
         // array of declarations. This was an array of {name, ...}, which a validator reads as
