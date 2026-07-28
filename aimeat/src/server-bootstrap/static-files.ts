@@ -57,6 +57,13 @@ function resolveServerDir(): string {
 /**
  * Set up static file serving, CSP headers, locale files, and PWA assets.
  */
+/**
+ * The node's robots.txt, prepared at boot from public/robots.txt plus the configured content
+ * signal. routes-loader registers the route for it, after the subdomain router — see the note where
+ * this is assigned. `null` when the node ships no robots.txt file.
+ */
+export let nodeRobotsTxt: string | null = null;
+
 export function setupStaticFiles(app: express.Express, config: AimeatConfig): void {
   const __dirname = resolveServerDir();
 
@@ -160,13 +167,17 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       });
     }
 
-    // Serve /robots.txt with the operator's Content Signals Policy directive
-    // (contentsignals.org) BEFORE express.static. The static file carries the safe public
-    // default ("search=yes, ai-input=yes, ai-train=no" — matches the per-bot rules: search
-    // bots allowed, training crawlers disallowed); AIMEAT_CONTENT_SIGNAL overrides the
-    // directive line for operators on a different policy, and 'off' removes it. The file is
-    // read once per boot (it only changes with a deploy).
-    const robotsFile = join(publicDir, 'robots.txt');
+    // The node's robots.txt source, read once per boot (it only changes with a deploy). It carries
+    // the safe public default ("search=yes, ai-input=yes, ai-train=no" — matching the per-bot
+    // rules: search bots allowed, training crawlers disallowed); AIMEAT_CONTENT_SIGNAL overrides
+    // the directive line for operators on a different policy, and 'off' removes it.
+    //
+    // The file is named robots.node.txt, NOT robots.txt, so that express.static cannot serve it.
+    // While it was called robots.txt it was served from disk on every host including app origins,
+    // ahead of any route that could have told them apart — so an app's crawl policy was the node's,
+    // ending in a Sitemap: line naming a different host. Every /robots.txt answer now comes from a
+    // route: app origins from subdomains.ts, the apex from routes-loader.
+    const robotsFile = join(publicDir, 'robots.node.txt');
     if (existsSync(robotsFile)) {
       let robotsTxt = readFileSync(robotsFile, 'utf-8');
       const signal = config.contentSignal;
@@ -175,10 +186,9 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       } else if (signal && signal !== 'search=yes, ai-input=yes, ai-train=no') {
         robotsTxt = robotsTxt.replace(/^Content-Signal:.*$/m, `Content-Signal: ${signal}`);
       }
-      app.get('/robots.txt', (_req, res) => {
-        res.set('Cache-Control', 'no-cache');
-        res.type('text/plain; charset=utf-8').send(robotsTxt);
-      });
+      // The text is prepared here; the route is registered by routes-loader, after the subdomain
+      // router, so a mapped app origin has already answered with its own.
+      nodeRobotsTxt = robotsTxt;
     }
 
     // JS, CSS, and HTML: Cache-Control: no-cache with ETag.

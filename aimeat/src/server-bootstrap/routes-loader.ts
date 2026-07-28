@@ -52,6 +52,7 @@ import { agentDocsRouter } from '../routes/agent-docs.js';
 import { glossaryRouter } from '../routes/glossary.js';
 import { markdownMirrorsRouter } from '../routes/markdown-mirrors.js';
 import { agentConventionsRouter } from '../routes/agent-conventions.js';
+import { nodeRobotsTxt } from './static-files.js';
 import { wellknownRouter, discoveryLinkHeaders } from '../routes/wellknown.js';
 import { agentSkillsDiscoveryRouter } from '../routes/agent-skills-discovery.js';
 import { authRouter } from '../routes/auth.js';
@@ -280,6 +281,21 @@ export async function mountRoutes(
   // Subdomain root serving MUST come before bootstrapRouter — its GET / handles
   // mapped `<sub>.<apex>` requests; apex requests fall through untouched.
   app.use(subdomainServeRouter(config, storage));
+  // The node's robots.txt, registered AFTER the subdomain router so an app origin has already
+  // answered with its own. Registered inside setupStaticFiles it ran before the subdomain
+  // middleware, could not tell which host it was on, and served the node's file everywhere.
+  if (nodeRobotsTxt !== null) {
+    const robots = nodeRobotsTxt;
+    app.get('/robots.txt', (req, res, next) => {
+      // Apex only, and this is the point where that can be decided: subdomainMiddleware has run.
+      // A mapped app origin answered above with its own; an UNMAPPED one gets a 404 rather than
+      // the node's file, because a robots.txt whose Sitemap: line names another host is a document
+      // about somebody else no matter which subdomain asked for it.
+      if (req.appOrigin || req.portfolioOrigin) { next(); return; }
+      res.set('Cache-Control', 'no-cache');
+      res.type('text/plain; charset=utf-8').send(robots);
+    });
+  }
   app.use(bootstrapRouter(config, storage, tunnelManager ?? undefined, siteService));
   app.use(agentDocsRouter(config));  // /sitemap.md + /AGENTS.md (apex only)
   app.use(glossaryRouter(config));   // /v1/glossary.{json,md} + JSON-LD

@@ -447,6 +447,18 @@ function locs(xml: string): string[] {
         }
     });
 
+    // robots.txt is registered by the static-file layer, ahead of the subdomain router, so without
+    // a guard it answered on every app origin with the NODE's file — ending in a Sitemap: line
+    // pointing at the apex. A robots.txt that sends a crawler to another host's sitemap is a
+    // document about somebody else served under the app's name.
+    await test('robots.txt does not leak the node file onto an app origin', async () => {
+        const apex = await text('/robots.txt');
+        assert(apex.status === 200 && apex.body.includes('Content-Signal'), 'apex robots.txt missing');
+        const onApp = await text('/robots.txt', { 'x-app-origin': '1', 'x-subdomain': 'someapp' });
+        assert(!onApp.body.includes('Content-Signal'),
+            'the node robots.txt answered on an app origin');
+    });
+
     await test('the root serves plain text to a plain-text client', async () => {
         const r = await text('/', { Accept: 'text/plain' });
         assert(r.ct.includes('text/plain'), `Accept: text/plain → ${r.ct}`);

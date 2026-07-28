@@ -24,7 +24,7 @@ if [ "$APP_MODE" = "--app" ]; then
   echo "== App origin: $B =="
   # A sitemap may only list URLs from the host that serves it. The node's sitemap answering here
   # is the failure this checks for, not a stylistic preference.
-  foreign=$(body "$B/sitemap.xml" | grep -o 'https\?://[^<]*' | grep -cv "^${B}" || true)
+  foreign=$(body "$B/sitemap.xml" | grep -o '<loc>[^<]*' | sed 's/<loc>//' | grep -cv "^${B}" || true)
   [ "${foreign:-1}" -eq 0 ] && ok "sitemap.xml lists only this origin" || bad "sitemap.xml has $foreign foreign URLs"
   body "$B/robots.txt" | grep -q "Sitemap: ${B}/sitemap.xml" && ok "robots.txt points at this origin" || bad "robots.txt points elsewhere"
   card=$(body "$B/.well-known/mcp.json")
@@ -34,8 +34,11 @@ if [ "$APP_MODE" = "--app" ]; then
   for t in '<html lang' 'rel="canonical"' 'name="description"' 'og:title' 'application/ld+json'; do
     echo "$html" | grep -q -- "$t" && ok "head: $t" || bad "head: $t missing"
   done
+  # No heading is injected into a published app: a hidden one helps nobody (hidden content is not
+  # in the accessibility tree) and a visible one changes how somebody else's app looks. Reported,
+  # not failed — the app's own heading, or none, is the honest answer.
   n=$(echo "$html" | grep -c '<h1[ >]')
-  [ "$n" -eq 1 ] && ok "exactly one h1" || bad "$n h1 elements, expected 1"
+  [ "$n" -le 1 ] && ok "h1 count $n (app's own; none is injected)" || bad "$n h1 elements, expected at most 1"
   echo "$html" | grep -o 'rel="canonical" href="[^"]*"' | grep -q "$B" && ok "canonical points here" || bad "canonical points elsewhere"
   for p in /llms.txt /AGENTS.md /sitemap.md /llms-full.txt; do
     [ "$(code "$B$p")" = "200" ] && ok "$p" || bad "$p → $(code "$B$p")"
@@ -70,7 +73,23 @@ for f in '"protocol"' '"api_base_url"' '"transports"' '"services"'; do
   echo "$A" | grep -q "$f" && ok "C21 acp $f" || bad "C21 acp $f missing"
 done
 
+echo "-- Conventional agent paths --"
+# What agent tooling probes at the origin root. It reads no discovery document, so being correct
+# at our own address and absent from the conventional one counts as absent.
+for p in /openapi.json /skill.md /agents.txt /.well-known/webmcp.json /.well-known/x402.json; do
+  c=$(code "$B$p"); [ "$c" = "200" ] && ok "$p" || bad "$p → $c"
+done
+[ "$(curl -s -o /dev/null -m 20 -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{}' "$B/mcp")" != "404" ] \
+  && ok "/mcp reaches the MCP server" || bad "/mcp → 404"
+body "$B/skill.md" | head -1 | grep -q '^---$' && ok "skill.md has frontmatter" || bad "skill.md has no frontmatter"
+X=$(body "$B/.well-known/x402.json")
+echo "$X" | grep -q '"testnet"' && ok "x402 declares testnet or mainnet" || bad "x402 does not say which network kind it is"
+echo "$X" | grep -q '"custodial": *false' && ok "x402 declares non-custodial settlement" || bad "x402 settlement undeclared"
+
 echo "-- Root content negotiation --"
+case "$(ctype "$B/" 'Accept: text/plain')" in text/plain*) ok "plain-text Accept → text/plain";; *) bad "plain-text Accept → $(ctype "$B/" 'Accept: text/plain')";; esac
+body "$B/" 'Accept: text/html' | grep -q 'href="/llms.txt"' && ok "head links llms.txt" || bad "head does not link llms.txt"
+body "$B/" 'Accept: text/html' | grep -q '"@type": "Organization"' && ok "Organization JSON-LD" || bad "no Organization JSON-LD"
 case "$(ctype "$B/" 'Accept: */*')"            in text/html*)      ok "wildcard Accept → HTML";;      *) bad "wildcard Accept → $(ctype "$B/" 'Accept: */*')";; esac
 case "$(ctype "$B/" 'Accept: application/json')" in application/json*) ok "JSON Accept → JSON";;       *) bad "JSON Accept → wrong type";; esac
 case "$(ctype "$B/?format=json")"              in application/json*) ok "?format=json → JSON";;        *) bad "?format=json → wrong type";; esac
@@ -89,7 +108,7 @@ for u in $(body "$B/sitemap.xml" | grep -o '<loc>[^<]*' | sed 's/<loc>//'); do
   c=$(code "$md"); [ "$c" = "200" ] && ok "    .md mirror" || bad "    .md mirror → $c"
   case "$(ctype "$u" 'Accept: text/markdown')" in text/markdown*) ok "    negotiates markdown";; *) bad "    negotiates markdown";; esac
   curl -sI -m 20 "$md" | grep -qi 'link:.*canonical' && ok "    .md canonical Link header" || bad "    .md canonical Link header"
-  body "$md" | grep -q '^## Site map' && ok "    .md site-map section" || bad "    .md site-map section"
+  body "$md" | grep -q '^## Sitemap' && ok "    .md sitemap section" || bad "    .md sitemap section"
 done
 
 echo; echo "PASS: $pass  FAIL: $fail"

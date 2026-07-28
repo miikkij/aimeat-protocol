@@ -107,6 +107,14 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
   });
   app.use(express.text({ limit: '1mb', type: ['text/yaml', 'application/x-yaml'] }));
 
+  // Subdomain resolution — sets req.subdomain / req.appOrigin / req.portfolioOrigin from nginx's
+  // X-Subdomain header (hostname fallback for dev). It runs BEFORE static serving because "which
+  // host is this?" has to be answerable before anything decides what to send: express.static was
+  // serving public/robots.txt on every app origin, so an app's crawl policy was the node's, ending
+  // in a Sitemap: line naming a different host. The middleware only sets request properties, so
+  // running it earlier changes nothing else. Serving still happens in subdomainServeRouter.
+  app.use(subdomainMiddleware(config));
+
   // Static file serving (public, locales, PWA)
   setupStaticFiles(app, config);
 
@@ -119,10 +127,6 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
 
   // Request ID — assigns a unique ID to every request (uses X-Request-Id if present)
   app.use(requestIdMiddleware());
-
-  // Subdomain resolution — sets req.subdomain from nginx's X-Subdomain header
-  // (hostname fallback for dev). Serving happens in subdomainServeRouter.
-  app.use(subdomainMiddleware(config));
 
   // optionalAuth() runs before CORS so req.auth is available for per-entity origin resolution
   app.use(optionalAuth());
