@@ -1287,7 +1287,12 @@ await test('MERGE · a survivor that still has its source beside it is repaired,
             ext: cExt, action: 'solo', unit: 'morsels', pricePerCall: 8, currency: null, pricing: { model: 'per_call' },
             providerGhii: provider.gaii, contractRef: 'dup', capabilityLabel: `${APP}/solo`,
             budget: { capUnits: 400, spentUnits: 8, calls: 1 }, rakePercent: null, state: 'active',
-            createdAt: '2026-07-02T00:00:00.000Z', createdBy: person.name, updatedAt: now, callers: undefined },
+            // LATER than the survivor on purpose. A survivor from an earlier run inherits the OLDEST
+            // creation date of everything it absorbed, so on production the stale source was the
+            // "newest" record — and a repair that trusts the date reads the empty one as canonical and
+            // folds the already-counted history in again. Dating this backwards would test a shape
+            // that cannot occur.
+            createdAt: '2026-12-31T00:00:00.000Z', createdBy: person.name, updatedAt: now, callers: undefined },
         visibility: 'private', tags: ['metered-entitlement'], ttlHours: null, version: 1, createdAt: now, updatedAt: now,
     } as never);
 

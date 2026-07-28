@@ -82,8 +82,16 @@ export async function mergeOwnerEntitlements(
   if (records.length < 2) return null;
   const byValue = new Map(records.map(r => [r.value, r.key]));
   const ordered = [...records.map(r => r.value)].sort((a, b) => (a.createdAt < b.createdAt ? -1 : 1));
-  const newest = ordered[ordered.length - 1] as MeteredEntitlement;
   const oldest = ordered[0] as MeteredEntitlement;
+
+  // WHICH record is the one in force? The one a call would actually find — the row at the live
+  // owner-keyed slot. Sorting by `createdAt` cannot answer it, because a survivor from an earlier run
+  // deliberately inherits the OLDEST creation date, so the "newest" record is the stale source beside
+  // it. That mistake is what let a repair run fold an already-counted 118 calls in a second time.
+  const liveKey = (records[0]!.value.grant ? grantKey : entitlementKey)(
+    ownerGhiiOf(oldest.consumerGaii), oldest.ext, oldest.action);
+  const live = records.find(r => r.key === liveKey)?.value ?? null;
+  const newest = live ?? (ordered[ordered.length - 1] as MeteredEntitlement);
 
   // The survivor carries the newest TERMS and everyone's HISTORY.
   const survivor: MeteredEntitlement = {
