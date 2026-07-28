@@ -49,6 +49,8 @@ import { commerceAcpRouter } from '../routes/commerce-acp.js';
 // Routes
 import { bootstrapRouter } from '../routes/bootstrap.js';
 import { agentDocsRouter } from '../routes/agent-docs.js';
+import { glossaryRouter } from '../routes/glossary.js';
+import { markdownMirrorsRouter } from '../routes/markdown-mirrors.js';
 import { wellknownRouter, discoveryLinkHeaders } from '../routes/wellknown.js';
 import { agentSkillsDiscoveryRouter } from '../routes/agent-skills-discovery.js';
 import { authRouter } from '../routes/auth.js';
@@ -279,6 +281,8 @@ export async function mountRoutes(
   app.use(subdomainServeRouter(config, storage));
   app.use(bootstrapRouter(config, storage, tunnelManager ?? undefined, siteService));
   app.use(agentDocsRouter(config));  // /sitemap.md + /AGENTS.md (apex only)
+  app.use(glossaryRouter(config));   // /v1/glossary.{json,md} + JSON-LD
+  app.use(markdownMirrorsRouter(config));  // <page>.md mirrors (apex only)
   app.use(statsRouter(config, storage, stats, metricsRegistry));
   app.use(wellknownRouter(config, storage));
   app.use(agentSkillsDiscoveryRouter(config, storage));  // /.well-known/agent-skills (RFC v0.2.0)
@@ -664,7 +668,7 @@ export async function mountRoutes(
   });
   startTrackedResponseReconciler(config, storage, peers);
 
-  app.use(specRouter());
+  app.use(specRouter(config));
 
   // Connector forward tunnel — operator-only stats route (WS upgrade is in index.ts)
   if (config.connectTunnelEnabled) {

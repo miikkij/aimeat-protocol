@@ -11904,6 +11904,59 @@ paths:
               schema:
                 type: string
 
+  /v1/glossary.json:
+    get:
+      operationId: glossaryJson
+      summary: The AIMEAT vocabulary (JSON)
+      description: >-
+        Every defined term with its form, an example, the definition and cross-references, grouped
+        into areas (identity, data, economy, extensibility, action, federation). `?term=<name>`
+        returns one entry (404 for an unknown term); the name matches the term or any of its
+        aliases, case-insensitively. Public and CORS-open — a reader who needs the vocabulary has
+        not authenticated yet. Same registry as /v1/glossary.md and the page's JSON-LD.
+      tags: [Catalogue]
+      parameters:
+        - name: term
+          in: query
+          required: false
+          schema: { type: string }
+          description: Return a single entry by term or alias.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/glossary.md:
+    get:
+      operationId: glossaryMd
+      summary: The AIMEAT vocabulary (markdown)
+      description: >-
+        The same registry as /v1/glossary.json rendered as markdown with frontmatter, one H2 per
+        area and one H3 per term. This is the form an agent reads.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: Glossary
+          content:
+            text/markdown:
+              schema: { type: string }
+
+  /v1/glossary/jsonld.json:
+    get:
+      operationId: glossaryJsonLd
+      summary: The AIMEAT vocabulary as schema.org DefinedTermSet
+      description: >-
+        JSON-LD rendering of the same registry, embedded in the glossary page's head so an indexer
+        reads structured terms instead of parsing the prose.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: DefinedTermSet
+          content:
+            application/json:
+              schema: { type: object }
+
   /.well-known/aimeat:
     get:
       operationId: nodeDiscovery

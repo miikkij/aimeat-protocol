@@ -93,6 +93,7 @@
   <link rel="stylesheet" href="/css/views/portfolio.css">
   <link rel="stylesheet" href="/css/views/members.css">
   <link rel="stylesheet" href="/css/views/inbox.css">
+  <link rel="stylesheet" href="/css/views/glossary.css">
   <link rel="stylesheet" href="/css/components/tags.css">
   <link rel="stylesheet" href="/css/components/image-deliverable.css">
   <link rel="stylesheet" href="/css/views/help.css">
@@ -241,11 +242,26 @@
   <!-- Background -->
   <div class="bg-canvas" id="bgCanvas"></div>
 
-  <!-- Static H1 for crawlers — visually hidden, SPA renders the real UI -->
-  <h1 class="visually-hidden">AIMEAT — AI Memory Exchange and Action Transfer. Open protocol for AI agents: persistent memory, identity, app generation, and federated node networks.</h1>
+  <!-- Static H1 for readers that never run the SPA — a crawler, an unfurler, an agent fetching the
+       raw document. Once a view mounts a heading of its own, this one is demoted to level two
+       (see the script below): two top-level headings is an uneven outline, and the accessibility
+       tree is what an agent parses to work out what a page is about. -->
+  <h1 id="crawler-h1" class="visually-hidden">AIMEAT — AI Memory Exchange and Action Transfer. Open protocol for AI agents: persistent memory, identity, app generation, and federated node networks.</h1>
 
   <!-- App root (Preact mounts here) -->
   <div id="app"></div>
+
+  <!-- Agent-facing links, in the STATIC markup on purpose. The SPA nav is rendered by Preact, so
+       anything that reads the document without running JavaScript — a crawler, an agent-readability
+       scanner, a web_fetch tool — sees none of it. These four are the documents such a reader is
+       looking for, and the glossary link is what lets it resolve a term it does not recognise. -->
+  <footer class="agent-footer">
+    <a href="/v1/glossary">Glossary</a>
+    <a href="/sitemap.md">Site map</a>
+    <a href="/llms.txt">llms.txt</a>
+    <a href="/AGENTS.md">AGENTS.md</a>
+    <a href="/v1/spec">API contract</a>
+  </footer>
 
   <!-- SSO handoff: the desktop app already holds an authenticated owner JWT (from its inline
        sign-in). It opens the portal with #handoff=<base64({owner,jwt})> so the browser is logged
@@ -345,6 +361,7 @@
       '/v1/pricing':     () => import('/views/pricing.js' + B),
       '/v1/start':       () => import('/views/start.js' + B),
       '/v1/how-it-works': () => import('/views/how-it-works.js' + B),
+      '/v1/glossary':    () => import('/views/glossary.js' + B),
       '/v1/business':    () => import('/views/business.js' + B),
       '/v1/profile':     () => import('/views/profile.js' + B),
       '/v1/app-grant':   () => import('/views/app-grant.js' + B),
@@ -811,6 +828,27 @@
 
       // Mount Preact app
       render(html`<${App} />`, document.getElementById('app'));
+
+      // Exactly one h1. The static crawler heading above exists for readers that never execute
+      // this script; the moment a view renders its own real heading, keeping both leaves the page
+      // with two h1 elements and a heading outline that says the page has two subjects. Demote the
+      // static one instead of removing it, so the text stays in the accessibility tree.
+      function oneH1() {
+        const stat = document.getElementById('crawler-h1');
+        if (!stat || stat.tagName !== 'H1') return;  // already demoted
+        const others = [...document.querySelectorAll('h1')].filter((el) => el !== stat);
+        if (others.length === 0) return;
+        const h2 = document.createElement('h2');
+        h2.id = 'crawler-h1';
+        h2.className = stat.className;
+        h2.textContent = stat.textContent;
+        stat.replaceWith(h2);
+      }
+      // Views are lazy-imported, so their heading appears well after first paint — a timeout is a
+      // guess about how long that takes, and it was wrong. Watch the app subtree instead and act
+      // the moment a heading shows up, on the first render and on every route change after it.
+      oneH1();
+      new MutationObserver(oneH1).observe(document.getElementById('app'), { childList: true, subtree: true });
 
       // Build i18n object for auth widget from modal.* translations
       function authI18n() {

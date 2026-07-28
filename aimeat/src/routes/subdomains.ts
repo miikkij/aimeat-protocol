@@ -60,6 +60,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { injectAimeatBadge } from '../utils/app-badge.js';
 import { injectAgentDiscovery } from '../utils/app-agent-discovery.js';
+import { injectAppHeadMeta } from '../utils/app-head-meta.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { prefersMarkdown } from '../services/markdown-negotiation.js';
@@ -234,9 +235,36 @@ function wantsWebmcpBridge(data: Buffer | Uint8Array | string): boolean {
  * author's own CSP meta is relaxed (frame-src/connect-src → allow the apex) so the H-2 silent-SSO
  * bridge + token exchange work even when the app sets `default-src 'self'`.
  */
+/**
+ * The app's own origin, e.g. `https://nuotta.apps.aimeat.io`. Built from the request host so a
+ * node on a different domain, or a dev box on http, describes itself correctly. Falls back to the
+ * apex when there is no host to read.
+ */
+function appOriginFor(req: Request, config: AimeatConfig): string {
+  const host = req.get('host');
+  if (!host) return config.baseUrl.replace(/\/$/, '');
+  const proto = config.baseUrl.startsWith('https') ? 'https' : (req.protocol || 'http');
+  return `${proto}://${host}`;
+}
+
+/**
+ * The app behind the current app-origin request, or null when this is not an app origin, the
+ * subdomain is unmapped, or the app is restricted. Every per-origin discovery document goes
+ * through this so they cannot disagree about which app they are describing.
+ */
+async function appForOrigin(req: Request, config: AimeatConfig, storage: Storage): Promise<AppRecord | null> {
+  const sub = req.subdomain;
+  if (!req.appOrigin || !sub || !config.appOriginEnabled) return null;
+  const site = await storage.getSubdomainSite(sub);
+  if (!site || !site.enabled || site.kind !== 'app') return null;
+  const app = await resolveAppTarget(storage, site.target);
+  if (!app || appIsRestricted(config, app)) return null;
+  return app;
+}
+
 function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, apexOrigin?: string,
                   protect?: { config: AimeatConfig; viewer: string },
-                  discover?: { baseUrl: string; toolNames: string[] }): void {
+                  discover?: { baseUrl: string; toolNames: string[]; origin?: string }): void {
   res.setHeader('Content-Type', app.mimeType);
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
@@ -261,6 +289,18 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
         baseUrl: discover.baseUrl, toolNames: discover.toolNames,
         webmcp: wantsWebmcpBridge(relaxed),
       });
+      // ...and the head metadata the app almost certainly has none of. Measured on a live app
+      // origin: lang, canonical, description, og:*, JSON-LD and h1 all absent. Authors write apps,
+      // not meta tags, and every published app gets an origin automatically — so this is derived
+      // here for all of them rather than asked for one at a time. Author-declared tags win.
+      if (discover.origin) {
+        buf = injectAppHeadMeta(buf, {
+          owner: app.ownerName, filename: app.filename,
+          appName: app.manifest?.name ?? null, description: app.manifest?.description ?? null,
+          origin: discover.origin, baseUrl: discover.baseUrl,
+          updatedAt: app.createdAt ?? null,
+        });
+      }
     }
     // Opt-in copy-protection (obfuscate / domainLock / watermark) on the runnable body.
     if (protect && hasAnyProtection(app.manifest.protection)) {
@@ -462,7 +502,11 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       if (await serveAppAgentFace(res, config, storage, app)) return;
     }
 
-    const discover = { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };
+    const discover = {
+      baseUrl: config.baseUrl,
+      toolNames: await appToolNames(storage, app.ownerGaii, app.filename),
+      origin: appOriginFor(req, config),
+    };
     serveApp(res, storage, app, appCspForRequest, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discover);  // the SDK (aimeat-auth.js) does the silent SSO itself
   });
 
@@ -481,6 +525,84 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     if (await serveAppAgentFace(res, config, storage, app)) return;
     return next();
   });
+
+  // ── Per-origin discovery documents ──────────────────────────────────────────────────────────
+  //
+  // An app origin is its own site. Left to fall through, these paths answered with the NODE's
+  // documents on the app's host: a sitemap.xml listing apex URLs (which sitemaps.org forbids
+  // outright — a sitemap may only list URLs from the host that serves it), a robots.txt pointing
+  // at the apex sitemap, and an MCP Server Card describing the node with no mention of the app's
+  // own tools. Each of those is a document about somebody else, served under the app's name.
+  //
+  // Everything below is derived from the app record and its tool manifest. There is no per-app
+  // configuration and there must never be one: apps get their origin automatically on first open,
+  // so anything requiring a manual step would be absent on every app already published.
+
+  router.get('/robots.txt', async (req: Request, res: Response, next) => {
+    const app = await appForOrigin(req, config, storage);
+    if (!app) return next();
+    const origin = appOriginFor(req, config);
+    res.type('text/plain; charset=utf-8').send(
+      `# ${app.ownerName}/${app.filename} — an application published on AIMEAT
+` +
+      `User-agent: *
+Allow: /
+
+Sitemap: ${origin}/sitemap.xml
+`);
+  });
+
+  router.get('/sitemap.xml', async (req: Request, res: Response, next) => {
+    const app = await appForOrigin(req, config, storage);
+    if (!app) return next();
+    const origin = appOriginFor(req, config);
+    const now = new Date().toISOString().split('T')[0];
+    const urls = [`${origin}/`, `${origin}/llms.txt`, `${origin}/AGENTS.md`, `${origin}/sitemap.md`];
+    res.type('application/xml').send([
+      '<?xml version="1.0" encoding="UTF-8"?>',
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
+      ...urls.map((u) => `  <url><loc>${u}</loc><lastmod>${now}</lastmod></url>`),
+      '</urlset>',
+    ].join('\n'));
+  });
+
+  router.get('/.well-known/mcp.json', async (req: Request, res: Response, next) => {
+    const app = await appForOrigin(req, config, storage);
+    if (!app) return next();
+    const origin = appOriginFor(req, config);
+    const tools = await appToolNames(storage, app.ownerGaii, app.filename);
+    const name = app.manifest?.name ?? app.filename.replace(/\.[^.]+$/, '');
+    res.set('Access-Control-Allow-Origin', '*');
+    res.json({
+      $schema: 'https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json',
+      name: `io.aimeat.app/${app.ownerName}/${app.filename}`,
+      description: app.manifest?.description
+        ?? `${name} — an application published on AIMEAT by ${app.ownerName}.`,
+      version: String(app.versionNumber ?? 1),
+      // The node's MCP server is where these tools are called; the card names the app so a client
+      // that landed on the app's host learns the two identifiers it needs — owner, and an app id
+      // WITH its extension. Reading the id off the subdomain drops the extension and every lookup
+      // for it misses.
+      transport: { type: 'streamable-http', endpoint: `${config.baseUrl}/v1/mcp` },
+      authentication: { required: true },
+      app: { owner: app.ownerName, app_id: app.filename, origin, tools },
+      webmcp: {
+        library: `${config.baseUrl}/v1/libs/aimeat-webmcp.js`,
+        listing: `${config.baseUrl}/v1/apps/${app.ownerName}/${app.filename}/webmcp`,
+        pages: [`${origin}/`],
+      },
+    });
+  });
+
+  router.get(['/AGENTS.md', '/agents.md', '/sitemap.md', '/llms-full.txt'],
+    async (req: Request, res: Response, next) => {
+      const app = await appForOrigin(req, config, storage);
+      if (!app) return next();
+      // One source: the same Agent Face document /llms.txt serves. An app's agent-facing story is
+      // one document, and splitting it into four that can drift is how three of them go stale.
+      if (await serveAppAgentFace(res, config, storage, app)) return;
+      return next();
+    });
 
   // App-origin path form: `apps.<apex>/<owner>/<filename>` on the bare app host. Apps need their
   // OWN per-app origin for seamless SSO (the silent bridge binds a token to one subdomain), so this

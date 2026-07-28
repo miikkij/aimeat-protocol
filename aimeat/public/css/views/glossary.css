@@ -1,0 +1,129 @@
+/**
+ * @file glossary.css
+ * @description Styles for the glossary page (/v1/glossary). Definition-list layout grouped by
+ *   area, with a filter box. Colours, spacing and type come from theme.css variables so the page
+ *   follows the active palette in both light and dark.
+ * @structure .gl-page wrapper · .gl-title/.gl-lede header · .gl-filter · .gl-area section ·
+ *   .gl-list definition list · .gl-entry/.gl-term/.gl-form/.gl-def/.gl-example/.gl-see
+ * @version-history
+ *   v1.0.0 — 2026-07-28 — Initial (agent-readability phase 06)
+ */
+
+.gl-page {
+  max-width: 56rem;
+  margin: 0 auto;
+  padding: var(--space-6, 1.5rem) var(--space-4, 1rem) var(--space-10, 4rem);
+}
+
+.gl-title {
+  font-size: var(--font-size-3xl, 2rem);
+  font-weight: 700;
+  color: var(--text);
+  margin: 0 0 var(--space-2, 0.5rem);
+}
+
+.gl-lede {
+  color: var(--text-dim);
+  margin: 0 0 var(--space-6, 1.5rem);
+  max-width: 46rem;
+}
+
+.gl-filter {
+  width: 100%;
+  padding: 0.6rem 0.85rem;
+  margin-bottom: var(--space-8, 2rem);
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--font-size-base, 1rem);
+}
+
+.gl-filter:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+.gl-empty {
+  color: var(--text-dim);
+  padding: var(--space-4, 1rem) 0;
+}
+
+.gl-area {
+  margin-bottom: var(--space-8, 2rem);
+}
+
+.gl-area-title {
+  font-size: var(--font-size-lg, 1.125rem);
+  font-weight: 700;
+  color: var(--accent);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin: 0 0 var(--space-3, 0.75rem);
+  padding-bottom: var(--space-2, 0.5rem);
+  border-bottom: 1px solid var(--border);
+}
+
+.gl-list {
+  margin: 0;
+}
+
+.gl-entry {
+  padding: var(--space-4, 1rem) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.gl-entry:last-child {
+  border-bottom: none;
+}
+
+.gl-term {
+  font-weight: 700;
+  color: var(--text);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2, 0.5rem);
+  margin-bottom: var(--space-2, 0.5rem);
+}
+
+.gl-form,
+.gl-example code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--font-size-sm, 0.875rem);
+  font-weight: 400;
+  color: var(--text-dim);
+  background: var(--bg-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  padding: 0.1rem 0.4rem;
+  /* Long identity forms must not widen the page on a narrow viewport. */
+  overflow-wrap: anywhere;
+}
+
+.gl-def {
+  margin: 0;
+  color: var(--text);
+}
+
+.gl-def p {
+  margin: 0 0 var(--space-2, 0.5rem);
+}
+
+.gl-def p:last-child {
+  margin-bottom: 0;
+}
+
+.gl-example,
+.gl-see {
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--text-dim);
+}
+
+.gl-machine {
+  margin-top: var(--space-8, 2rem);
+  padding-top: var(--space-4, 1rem);
+  border-top: 1px solid var(--border);
+  font-size: var(--font-size-sm, 0.875rem);
+  color: var(--text-dim);
+}

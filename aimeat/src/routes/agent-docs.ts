@@ -66,6 +66,7 @@ ${pages}
 - [App building prompt](${b}/v1/prompts/build-app): the canonical spec for single-file AIMEAT apps
 - [App templates](${b}/v1/app-templates): starter skeletons
 - [App-build pitfalls](${b}/v1/appdev/pitfalls): the curated registry of what breaks app builds
+- [Glossary](${b}/v1/glossary.md): the vocabulary, in markdown
 
 ## Machine-readable discovery
 
@@ -138,7 +139,7 @@ authenticate with OAuth 2.1. The server card is at \`${b}/.well-known/mcp.json\`
 The three identity forms are not interchangeable, and confusing them is the most common first
 mistake: data written under the wrong one is invisible to the reader who expects it.
 
-Full vocabulary and the aggregation rules: the "Core Concepts" section of \`${b}/llms.txt\`.
+Full vocabulary: [the glossary](${b}/v1/glossary), also at \`${b}/v1/glossary.md\`.
 
 ## Usage
 
@@ -180,6 +181,7 @@ with request and response shapes is in the OpenAPI contract.
 - Full builder's manual: \`GET ${b}/llms.txt\`
 - OpenAPI contract: \`GET ${b}/v1/spec\`
 - Site map: \`GET ${b}/sitemap.md\`
+- Glossary: \`GET ${b}/v1/glossary.md\`
 - Registration: \`GET ${b}/auth.md\`
 - Skill packs published here: \`GET ${b}/.well-known/agent-skills/index.json\`
 `;

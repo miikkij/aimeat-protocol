@@ -8326,5 +8326,15 @@
   "invite.signOutRetry": "Kirjaudu ulos",
   "invite.switchAccount": "Käytä toista tiliä",
   "members.yours": "Jokainen tunnus voi saada sellaisen. Tee se itse, tai anna oman tekoälysi kirjoittaa se siitä mitä olet täällä oikeasti tehnyt: julkaisemasi appit, ajamasi agentit, valmiiksi saatu työ. Siitä tulee sinun sivusi verkko-osoitteessa jonka voit antaa kenelle tahansa.",
-  "members.yoursCta": "Tee oma sivusi →"
+  "members.yoursCta": "Tee oma sivusi →",
+  "glossary.title": "Sanasto",
+  "glossary.lede": "AIMEATin käyttämät termit täsmällisesti määriteltyinä. Moni niistä muistuttaa toistaan, ja väärin arvaaminen ei näy virheenä vaan hiljaisuutena.",
+  "glossary.filter": "Rajaa termejä",
+  "glossary.example": "Esimerkiksi",
+  "glossary.seeAlso": "Katso myös",
+  "glossary.machineReadable": "Koneluettavana",
+  "glossary.loading": "Ladataan…",
+  "glossary.noMatch": "Yksikään termi ei vastaa hakua.",
+  "glossary.failed": "Sanastoa ei saatu ladattua.",
+  "nav.glossary": "Sanasto"
 }

@@ -8326,5 +8326,15 @@
   "invite.signOutRetry": "Sign out",
   "invite.switchAccount": "Use a different account",
   "members.yours": "Every account can have one. Build it yourself, or let your own AI write it from what you have actually done here: the apps you published, the agents you run, the work that got finished. It becomes your page at a web address you can hand to anyone.",
-  "members.yoursCta": "Make your page →"
+  "members.yoursCta": "Make your page →",
+  "glossary.title": "Glossary",
+  "glossary.lede": "The terms AIMEAT uses, defined precisely. Several are near-neighbours of each other, and guessing wrong is quiet rather than loud.",
+  "glossary.filter": "Filter terms",
+  "glossary.example": "For example",
+  "glossary.seeAlso": "See also",
+  "glossary.machineReadable": "Machine-readable",
+  "glossary.loading": "Loading…",
+  "glossary.noMatch": "No term matches that.",
+  "glossary.failed": "The glossary could not be loaded.",
+  "nav.glossary": "Glossary"
 }

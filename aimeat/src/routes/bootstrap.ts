@@ -26,6 +26,11 @@
  *   v1.8.0 -- 2026-07-28 -- /llms-full.txt serves the same manual as /llms.txt (llmstxt.org
  *     convention), apex-only; the manual gained a blockquote summary and link-list sections
  *     (agent-readability phase 05)
+ *   v1.9.0 -- 2026-07-28 -- GET / answers HTML by default and JSON only when asked
+ *     (?format=json or Accept: application/json). A wildcard Accept -- what every crawler, unfurler
+ *     and readability scanner sends -- used to get the JSON envelope, so the front door was invisible
+ *     to all of them. The SPA is now served AT the root instead of 302ing to /v1/portal
+ *     (agent-readability phase 10)
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -43,6 +48,7 @@ import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } f
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
 import { sitemapPages } from '../data/public-pages.js';
 import { apexOnly } from './agent-docs.js';
+import { serveSpa, resolvePublicFile } from './portal.js';
 import { logger } from '../utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -120,15 +126,29 @@ export function bootstrapRouter(
   router.get('/llms-full.txt', apexOnly, serveLlms);
 
   router.get('/', async (_req, res) => {
-    // The root negotiates three ways: text/markdown (agents, Markdown for Agents
-    // convention), text/html (browsers), everything else JSON. Declare it cache-wise.
+    // The root negotiates three ways: text/markdown (agents, Markdown for Agents convention),
+    // application/json (the machine-readable bootstrap) and HTML for everyone else.
+    //
+    // The default used to be the other way round: JSON unless the Accept header literally
+    // contained "text/html". A crawler, a link unfurler and every agent-readability scanner send
+    // `Accept: */*`, so the node's front door answered them with a JSON envelope — no title, no
+    // description, no headings, nothing an indexer could carry. The JSON bootstrap is not lost:
+    // `?format=json` is the address llms.txt, robots.txt, auth.md, ai-plugin.json and the landing
+    // markdown have all pointed at from the start, `Accept: application/json` still reaches it,
+    // and the HTML answer carries Link headers to the API catalog and the contract.
+    //
+    // Deliberately NOT done by sniffing the User-Agent: serving a scanner different bytes than a
+    // person is cloaking, and the content-parity check that currently passes would be the first
+    // thing to break.
     res.vary('Accept');
+
+    const accept = _req.headers.accept ?? '';
+    const wantsJson = _req.query.format === 'json' || /application\/json/i.test(accept);
 
     // Markdown for Agents: Accept: text/markdown (or ?format=md) serves the markdown
     // landing — the operator's custom template converted when one is set, the authored
-    // landing document otherwise (the default HTML path is an SPA redirect with nothing
-    // to convert). ?format=json still forces the JSON bootstrap.
-    if (_req.query.format === 'md' || (_req.query.format === undefined && prefersMarkdown(_req))) {
+    // landing document otherwise. ?format=json still forces the JSON bootstrap.
+    if (_req.query.format === 'md' || (_req.query.format === undefined && !wantsJson && prefersMarkdown(_req))) {
       if (siteService && config.siteEnabled && await siteService.hasCustomTemplate()) {
         const customHtml = await siteService.getPortalHtml(
           _req.query.lang as string | undefined,
@@ -142,12 +162,11 @@ export function bootstrapRouter(
       return;
     }
 
-    // Browsers send Accept: text/html — serve a custom portal template if the
-    // operator has set one (so the Template Editor actually changes what visitors
-    // see), otherwise redirect humans to the onboarding portal SPA.
-    // Skip both when ?format=json is set (used by AIs given the quick-start URL).
-    const accept = _req.headers.accept ?? '';
-    if (accept.includes('text/html') && !accept.includes('application/json') && _req.query.format !== 'json') {
+    // Everything that did not ask for JSON gets HTML: the operator's custom portal template when
+    // one is set (so the Template Editor actually changes what visitors see), otherwise the SPA
+    // served AT the root with the root's own head metadata. It used to 302 to /v1/portal, which
+    // cost the front door its canonical URL and made the root a redirect in every report.
+    if (!wantsJson) {
       if (siteService && config.siteEnabled && await siteService.hasCustomTemplate()) {
         const customHtml = await siteService.getPortalHtml(
           _req.query.lang as string | undefined,
@@ -160,6 +179,8 @@ export function bootstrapRouter(
         res.type('text/html').send(injectCspNonce(customHtml, res.locals.cspNonce as string | undefined));
         return;
       }
+      const spaPath = resolvePublicFile('spa.html');
+      if (spaPath) { serveSpa(res, spaPath, config, '/'); return; }
       res.redirect('/v1/portal');
       return;
     }

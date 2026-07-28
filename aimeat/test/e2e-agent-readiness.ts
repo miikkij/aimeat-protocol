@@ -14,7 +14,7 @@
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-readiness
 
-import { PUBLIC_PAGES, sitemapPages } from '../src/data/public-pages.js';
+import { PUBLIC_PAGES, sitemapPages, mirroredPages } from '../src/data/public-pages.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -184,6 +184,53 @@ function locs(xml: string): string[] {
         assert(full.body === llms.body, 'llms-full.txt must match llms.txt byte for byte');
     });
 
+    // ── Glossary (phase 06) ─────────────────────────────────────────────────────────────────
+
+    await test('glossary is served as JSON, markdown and JSON-LD from one registry', async () => {
+        const j = await fetch(`${BASE}/v1/glossary.json`);
+        assert(j.status === 200, `json status ${j.status}`);
+        const body = await j.json() as any;
+        const registry = body.data.terms as Array<{ term: string; area: string; definition: string }>;
+        assert(registry.length >= 30, `expected 30+ terms, got ${registry.length}`);
+        for (const t of registry) {
+            assert(t.term.length > 0 && t.definition.length >= 40, `${t.term}: definition too thin`);
+            assert(t.area.length > 0, `${t.term}: no area`);
+        }
+
+        const md = await text('/v1/glossary.md');
+        assert(md.ct.includes('text/markdown'), `md content-type ${md.ct}`);
+        assert(md.body.startsWith('---'), 'glossary markdown has no frontmatter');
+        for (const t of registry) assert(md.body.includes(t.term), `markdown omits ${t.term}`);
+
+        const ld = await (await fetch(`${BASE}/v1/glossary/jsonld.json`)).json() as any;
+        assert(ld['@type'] === 'DefinedTermSet', `@type ${ld['@type']}`);
+        assert(ld.hasDefinedTerm.length === registry.length, 'JSON-LD term count must match the registry');
+    });
+
+    await test('the three identity terms are all defined and distinct', async () => {
+        for (const term of ['GHII', 'GAII', 'GEAI']) {
+            const r = await fetch(`${BASE}/v1/glossary.json?term=${term}`);
+            assert(r.status === 200, `${term} → ${r.status}`);
+            const body = await r.json() as any;
+            assert(body.data.term.form?.includes('@'), `${term} has no identity form`);
+        }
+    });
+
+    await test('an unknown term answers 404, not an empty success', async () => {
+        const r = await fetch(`${BASE}/v1/glossary.json?term=notaterm`);
+        assert(r.status === 404, `expected 404, got ${r.status}`);
+    });
+
+    // P14: the link has to be in the markup a reader sees WITHOUT running JavaScript. The SPA nav
+    // is rendered by Preact, so a nav entry alone would be invisible to every crawler.
+    await test('every public page links to the glossary in its static HTML', async () => {
+        for (const p of sitemapPages()) {
+            const r = await text(p.path, { Accept: 'text/html' });
+            if (r.status !== 200) continue;
+            assert(r.body.includes('/v1/glossary'), `${p.path} has no glossary link in its static HTML`);
+        }
+    });
+
     // ── Protocol discovery documents (phase 09) ─────────────────────────────────────────────
 
     async function jsonDoc(path: string) {
@@ -239,6 +286,58 @@ function locs(xml: string): string[] {
         for (const t of body.transports) assert(t === 'rest', `advertises transport '${t}' that does not answer ACP`);
     });
 
+    // ── Markdown mirrors + per-route head (phases 07 + 08) ──────────────────────────────────
+
+    await test('every mirrored page has a .md URL with frontmatter and a site-map section', async () => {
+        for (const p of mirroredPages()) {
+            const path = p.path === '/' ? '/index.md' : `${p.path}.md`;
+            const r = await fetch(`${BASE}${path}`);
+            assert(r.status === 200, `${path} → ${r.status}`);
+            assert((r.headers.get('content-type') ?? '').includes('text/markdown'), `${path} content-type`);
+            assert((r.headers.get('link') ?? '').includes('rel="canonical"'), `${path} has no canonical Link header`);
+            const body = await r.text();
+            assert(body.startsWith('---\n'), `${path} has no frontmatter`);
+            assert(body.includes(`url: `), `${path} frontmatter has no url`);
+            assert(body.includes('## Site map'), `${path} has no site-map section`);
+            assert(!body.includes('{{BASE_URL}}'), `${path} has an unsubstituted BASE_URL token`);
+        }
+    });
+
+    await test('page URLs negotiate markdown', async () => {
+        for (const p of mirroredPages()) {
+            const r = await text(p.path, { Accept: 'text/markdown' });
+            assert(r.ct.includes('text/markdown'), `${p.path} with Accept: text/markdown → ${r.ct}`);
+        }
+    });
+
+    await test('each page head describes THAT page, not the shell', async () => {
+        const seen = new Map<string, string>();
+        for (const p of sitemapPages()) {
+            const r = await text(p.path, { Accept: 'text/html' });
+            if (r.status !== 200) continue;
+            const canonical = /rel="canonical" href="([^"]+)"/.exec(r.body)?.[1];
+            assert(canonical !== undefined, `${p.path} has no canonical`);
+            assert(canonical!.endsWith(p.path), `${p.path} claims canonical ${canonical}`);
+            // A shell-wide canonical would make every route look like a duplicate of one page.
+            const clash = [...seen.entries()].find(([, c]) => c === canonical);
+            assert(clash === undefined, `${p.path} and ${clash?.[0]} share canonical ${canonical}`);
+            seen.set(p.path, canonical!);
+            assert(r.body.includes('<html lang='), `${p.path} has no lang`);
+            assert(r.body.includes('name="description"'), `${p.path} has no description`);
+            assert(r.body.includes('og:title'), `${p.path} has no og:title`);
+            assert(r.body.includes('application/ld+json'), `${p.path} has no JSON-LD`);
+            assert((r.body.match(/<h1/g) ?? []).length === 1, `${p.path} has ${(r.body.match(/<h1/g) ?? []).length} h1 elements, expected 1`);
+        }
+    });
+
+    await test('mirrored pages advertise their markdown from the HTML head', async () => {
+        for (const p of mirroredPages()) {
+            const r = await text(p.path, { Accept: 'text/html' });
+            if (r.status !== 200) continue;
+            assert(r.body.includes('rel="alternate" type="text/markdown"'), `${p.path} has no alternate link`);
+        }
+    });
+
     // ── Apex-only guard ─────────────────────────────────────────────────────────────────────
     // These documents describe THIS node. Served from an app's own host they would describe
     // somebody else — a site map full of apex URLs, or the 145 kB app-BUILDING manual in which
@@ -249,6 +348,30 @@ function locs(xml: string): string[] {
             const r = await text(p, { 'x-app-origin': '1', 'x-subdomain': 'someapp' });
             assert(r.status === 404, `${p} on an app origin → ${r.status}, expected 404`);
         }
+    });
+
+    // ── Root content negotiation (phase 10) ─────────────────────────────────────────────────
+    // A wildcard Accept is what every crawler, unfurler and readability scanner sends, and it used
+    // to get the JSON bootstrap — so the node's front door was invisible to all of them.
+    await test('the root answers HTML by default and JSON only when asked', async () => {
+        const wildcard = await text('/', { Accept: '*/*' });
+        assert(wildcard.ct.includes('text/html'), `Accept: */* → ${wildcard.ct}, expected text/html`);
+        assert(wildcard.body.includes('rel="canonical"'), 'root HTML has no canonical');
+        assert(wildcard.body.includes('application/ld+json'), 'root HTML has no JSON-LD');
+
+        const json = await text('/', { Accept: 'application/json' });
+        assert(json.ct.includes('application/json'), `Accept: application/json → ${json.ct}`);
+        const forced = await text('/?format=json');
+        assert(forced.ct.includes('application/json'), `?format=json → ${forced.ct}`);
+        const md = await text('/', { Accept: 'text/markdown' });
+        assert(md.ct.includes('text/markdown'), `Accept: text/markdown → ${md.ct}`);
+    });
+
+    await test('the JSON bootstrap still carries what agents were told to look for', async () => {
+        const r = await fetch(`${BASE}/?format=json`);
+        const body = await r.json() as any;
+        assert(typeof body.data?.this_node?.base_url === 'string', 'bootstrap lost this_node.base_url');
+        assert(body.data?.for_ai_agents || body.data?.for_ai_assistants, 'bootstrap lost its guidance sections');
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

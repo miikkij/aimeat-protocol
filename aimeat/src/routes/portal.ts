@@ -57,6 +57,10 @@ import { PROMPT_SEEDS } from '../services/prompt-defaults.js';
 // i18n imports removed — SPA handles translations client-side
 import { buildStandaloneSnippetJs } from '../middleware/cookie-consent.js';
 import { getSoftwareVersion } from '../utils/version.js';
+import { injectAgentFooter } from '../utils/agent-footer.js';
+import { findPublicPage } from '../data/public-pages.js';
+import { renderPageMarkdown } from './markdown-mirrors.js';
+import { injectPageHead } from '../utils/page-head.js';
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 
 /**
@@ -175,7 +179,13 @@ const BUILD_ID = Date.now().toString(36);
  *    (static + dynamic imports from any view) get fresh URLs after restart
  *  - CSP nonce injected into all script and style tags
  */
-export function serveSpa(res: import('express').Response, spaPath: string, config: AimeatConfig): void {
+export function serveSpa(
+  res: import('express').Response,
+  spaPath: string,
+  config: AimeatConfig,
+  /** The route being served, so the head can describe THIS page and not the shell. */
+  routePath?: string,
+): void {
   const appOriginEnabled = config.appOriginEnabled && !!config.appHost;
   const v = `?v=${BUILD_ID}`;
   let html = readFileSync(spaPath, 'utf-8');
@@ -209,6 +219,11 @@ export function serveSpa(res: import('express').Response, spaPath: string, confi
     `document.addEventListener("visibilitychange",function(){if(!document.hidden)chk();});` +
     `setInterval(chk,60000);})();`;
   html = html.replace('</head>', `<script${nonceAttr}>${bootScript}</script>\n</head>`);
+
+  // Per-route head metadata: one spa.html shell answers ten routes, so the canonical link, the
+  // title and the description are stamped per request. Shared with the static info pages.
+  const page = routePath ? findPublicPage(routePath) : undefined;
+  if (page) html = injectPageHead(html, page, config, nonceAttr);
 
   // Make the running AIMEAT version visible from the page itself — a view-source comment plus a
   // queryable meta tag. Lets anyone confirm which version a node runs (esp. across federation peers)
@@ -251,7 +266,7 @@ export function serveSpa(res: import('express').Response, spaPath: string, confi
 }
 
 /** Resolve a file from public/ directory (works from both src/ and dist/). */
-function resolvePublicFile(filename: string): string | null {
+export function resolvePublicFile(filename: string): string | null {
   const candidates = [
     join(__dirname_portal, '..', '..', 'public', filename),      // dev: src/routes/../../public
     join(__dirname_portal, '..', '..', '..', 'public', filename), // dist: dist/src/routes/../../../public
@@ -422,13 +437,15 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   // the authenticated SPA app routes below stay HTML-only.
   router.get('/v1/portal', (_req, res) => {
     res.vary('Accept');
-    if (prefersMarkdown(_req)) {
-      sendMarkdown(res, buildLandingMarkdown(config));
+    const page = findPublicPage('/v1/portal');
+    if (prefersMarkdown(_req) || _req.query.format === 'md') {
+      res.set('Link', `<${config.baseUrl.replace(/\/$/, '')}/v1/portal>; rel="canonical"`);
+      sendMarkdown(res, page?.markdown ? renderPageMarkdown(page, config) : buildLandingMarkdown(config));
       return;
     }
     const spaPath = resolvePublicFile('spa.html');
     if (spaPath) {
-      serveSpa(res, spaPath, config);
+      serveSpa(res, spaPath, config, '/v1/portal');
     } else {
       res.redirect(302, '/spa.html');
     }
@@ -568,6 +585,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/publicworkspaceviewer',
     '/v1/pricing',
     '/v1/how-it-works',
+    '/v1/glossary',
     '/v1/business',
     '/v1/start',
     '/v1/app-grant',   // H-2 app-grant consent page (SPA)
@@ -581,10 +599,22 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   });
 
   for (const path of spaRoutes) {
-    router.get(path, (_req, res) => {
+    router.get(path, (req, res) => {
+      // Markdown for Agents: the SPA shell has no readable content, so a client that prefers
+      // markdown gets the authored rendering of THIS page instead of an empty document.
+      if (prefersMarkdown(req) || req.query.format === 'md') {
+        const page = findPublicPage(path);
+        if (page?.markdown) {
+          res.vary('Accept');
+          res.set('Link', `<${config.baseUrl.replace(/\/$/, '')}${page.path}>; rel="canonical"`);
+          sendMarkdown(res, renderPageMarkdown(page, config));
+          return;
+        }
+      }
+      res.vary('Accept');
       const spaPath = resolvePublicFile('spa.html');
       if (spaPath) {
-        serveSpa(res, spaPath, config);
+        serveSpa(res, spaPath, config, path);
       } else {
         res.redirect(302, '/spa.html');
       }
@@ -634,7 +664,7 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
   // self-hoster cannot accidentally ship a partly-filled-in policy that
   // still names the upstream author. See `missingOperatorConfig()` in
   // `src/config.ts` for the validation rule.
-  const serveStaticPage = (filename: string) => (_req: import('express').Request, res: import('express').Response) => {
+  const serveStaticPage = (filename: string, routePath?: string) => (_req: import('express').Request, res: import('express').Response) => {
     const htmlPath = resolvePublicFile(filename);
     if (!htmlPath) {
       res.status(404).type('text/plain').send('Page not found');
@@ -670,22 +700,32 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // The standalone info pages have no client-side nav at all, so without this a reader that
+    // does not run scripts leaves them with no route to the glossary or the machine-readable docs.
+    html = injectAgentFooter(html, config.baseUrl);
+
     const nonce = res.locals.cspNonce as string || '';
+    // Same head treatment the SPA routes get. These pages ship a canonical and a lang of their own
+    // but no og:*, no alternate link and no structured data, which left them describing themselves
+    // to a person and to nothing else.
+    const infoPage = routePath ? findPublicPage(routePath) : undefined;
+    if (infoPage) html = injectPageHead(html, infoPage, config, nonce ? ` nonce="${nonce}"` : '');
+
     if (nonce) {
       html = html.replace(/<script(?=[ >])/g, `<script nonce="${nonce}"`);
       html = html.replace(/<style(?=[ >])/g, `<style nonce="${nonce}"`);
     }
     res.type('text/html').send(html);
   };
-  router.get('/v1/privacy', serveStaticPage('privacy.html'));
+  router.get('/v1/privacy', serveStaticPage('privacy.html', '/v1/privacy'));
   router.get('/v1/privacy/fi', serveStaticPage('privacy.fi.html'));
-  router.get('/v1/terms', serveStaticPage('terms.html'));
+  router.get('/v1/terms', serveStaticPage('terms.html', '/v1/terms'));
   router.get('/v1/terms/fi', serveStaticPage('terms.fi.html'));
 
   // Connect / MCP attach page — standalone static HTML. Public-facing docs
   // required by the Anthropic Connectors Directory (3+ example prompts +
   // attach instructions for major MCP-aware clients).
-  router.get('/v1/connect', serveStaticPage('connect.html'));
+  router.get('/v1/connect', serveStaticPage('connect.html', '/v1/connect'));
   router.get('/v1/connect/fi', serveStaticPage('connect.fi.html'));
 
   // Encrypted chat example app — standalone HTML (not SPA)

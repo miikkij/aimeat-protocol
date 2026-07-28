@@ -20,6 +20,7 @@ downloadedFrom: {{BASE_URL}}/llms.txt
 
 - [Site map]({{BASE_URL}}/sitemap.md): every page and endpoint on this node, one page
 - [AGENTS.md]({{BASE_URL}}/AGENTS.md): short orientation for a coding agent meeting this node
+- [Glossary]({{BASE_URL}}/v1/glossary): GHII, GAII, GEAI, morsels, organisms and the rest, defined
 - [OpenAPI contract]({{BASE_URL}}/v1/spec): the canonical API contract
 - [API documentation]({{BASE_URL}}/v1/docs): browsable endpoint reference
 - [Agent registration]({{BASE_URL}}/auth.md): RFC 8628 device flow, owner-approved
