@@ -12,6 +12,8 @@
  *     upload) to satisfy max-file-lines; render output unchanged.
  *   v1.3.0 — 2026-07-14 — Add a source-repos row at the top: GitHub links to
  *     aimeat-protocol + crewaimeat, each with the GitHub Octocat mark.
+ *   v1.5.0 — 2026-07-28 — Community app list dropped: it offered Download for apps their authors
+ *     never made forkable, and the landing wall already shows the same apps.
  *   v1.4.0 — 2026-07-28 — Live counters read /v1/public/node-totals (agents + online, apps,
  *     organisms, knowledge packages) instead of /v1/stats fields that do not exist, which had
  *     every card rendering 0 on a node with 114 agents. New <StatCard> renders a placeholder
@@ -23,7 +25,7 @@ import { StatusDot } from '/components/StatusDot.js';
 import { html, NODE_URL, dt, CopyBtn } from './portal-dev.shared.js';
 import { BackgroundLayer, BgSelector } from './portal-dev.background.js';
 import { CapTabs } from './portal-dev.panels.js';
-import { UploadSection, CommunityApps } from './portal-dev.upload.js';
+import { UploadSection } from './portal-dev.upload.js';
 import { swallowed } from '/js/swallowed.js';
 
 // The familiar GitHub "Octocat" mark. fill=currentColor so it inherits the link's themed color.
@@ -211,9 +213,6 @@ export default function PortalDevView({ locale }) {
           <${UploadSection} locale=${locale} />
         </div>
       `}
-
-      <!-- Community Apps -->
-      <${CommunityApps} locale=${locale} isLoggedIn=${isLoggedIn} session=${session} />
     </div>
   `;
 }

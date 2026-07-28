@@ -543,6 +543,11 @@
     // Built-in public links. Operators can show/hide and reorder these via the admin
     // Portal tab (persisted at /v1/site/header-nav). Auth/role-gated links (Apps, Profile,
     // Admin) are NOT in this list — they stay forced by the session/role checks below.
+    // Companies / My Company are deliberately absent (2026-07-28). Doing business on AIMEAT does
+    // not need a separate "company" object: you stand up a node and run the company on it, which
+    // is one concept instead of two and works the same for every shape of organisation. Both
+    // routes still resolve for anyone holding a link; they are only off the menu.
+    //
     // `siteKey` entries are apps that belong to THIS node's operator, not protocol surfaces.
     // They render only when the node configured a URL for them (AIMEAT_SITE_* → window.__SITE),
     // so a fresh clone gets a nav without them instead of links into somebody else's apps.
@@ -552,7 +557,6 @@
       { id: 'learn',      siteKey: 'learn',            key: 'nav.learn',      fallback: 'Learn', external: true },
       { id: 'exchange',   siteKey: 'exchange',         key: 'nav.exchange',   fallback: 'EXCHANGE', external: true },
       { id: 'business',   path: '/v1/business',        key: 'nav.business',   fallback: 'For your business' },
-      { id: 'companies',  path: '/v1/companies',       key: 'nav.companies',  fallback: 'Companies' },
       { id: 'members',    path: '/v1/members',         key: 'nav.members',    fallback: 'Members' },
       { id: 'devView',    path: '/v1/portal?view=dev', key: 'nav.devView',    matchActive: false },
       { id: 'help',       path: '/v1/help',            key: 'nav.help' },
@@ -745,9 +749,6 @@
                     <a href="/app-catalog.html" target="_blank" onClick=${() => { setMeOpen(false); setMenuOpen(false); }} class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
                     <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/profile'); setMeOpen(false); setMenuOpen(false); }}>
                       ${t('nav.profile')}
-                    </a>
-                    <a href="/v1/my-company" class="${currentPath === '/v1/my-company' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/my-company'); setMeOpen(false); setMenuOpen(false); }}>
-                      ${t('nav.myCompany')}
                     </a>
                     ${session.roles && session.roles.includes('operator') && html`
                       <a href="/v1/admin" class="${currentPath === '/v1/admin' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/admin'); setMeOpen(false); setMenuOpen(false); }}>
