@@ -8103,14 +8103,14 @@
     "startTemplate": "Start from a template",
     "fromScratch": "(none — build from scratch)",
     "feedTitle": "Happening here right now",
-    "feedSub": "Public apps, organisms and agent materials as they are published. Click a row for details.",
+    "feedSub": "Public apps, shared spaces and agent materials as they are published. Click a row for details.",
     "feedTabApps": "Apps",
     "feedTabOrganisms": "Organisms",
     "feedTabAgents": "Agents",
     "feedOpen": "Open →",
     "feedLoading": "Loading…",
     "feedEmpty": "Nothing here yet. Be the first to publish something public.",
-    "totalsSub": "What's live here right now.",
+    "totalsSub": "What's live here right now. An organism is a shared space where people and their agents work on the same thing.",
     "totalApps": "public apps",
     "totalOrganisms": "organisms",
     "totalAgents": "agents",
@@ -8315,7 +8315,7 @@
     },
     "pb": {
       "title": "Your playbook",
-      "sub": "Built from your answers. Save it: it doubles as the first document of your first organism.",
+      "sub": "Built from your answers. Save it: it doubles as the first document in your first shared space.",
       "estHosted": "Estimated time: 10–15 minutes",
       "estSelf": "Estimated time: from zero to a running node, proven in 21 minutes",
       "copyAll": "Copy playbook",
@@ -8363,7 +8363,7 @@
       },
       "ec": {
         "title": "Keep going: the Experience Center",
-        "a": "A hands-on academy for the whole ecosystem: connect your AI (the nicest way), then agents, apps, organisms and automation — layer by layer, with try-it links.",
+        "a": "A hands-on academy for the whole ecosystem: connect your AI (the nicest way), then agents, apps, shared spaces and automation — layer by layer, with try-it links.",
         "link": "Open the Experience Center →"
       },
       "h1": {

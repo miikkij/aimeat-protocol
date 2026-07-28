@@ -8103,14 +8103,14 @@
     "startTemplate": "Aloita mallipohjasta",
     "fromScratch": "(ei mitään — rakenna tyhjästä)",
     "feedTitle": "Täällä juuri nyt",
-    "feedSub": "Julkiset appsit, organismit ja agenttien materiaalit sitä mukaa kun niitä julkaistaan. Klikkaa riviä nähdäksesi tiedot.",
+    "feedSub": "Julkiset appit, jaetut tilat ja agenttien materiaalit sitä mukaa kun niitä julkaistaan. Klikkaa riviä nähdäksesi tiedot.",
     "feedTabApps": "Appsit",
     "feedTabOrganisms": "Organismit",
     "feedTabAgents": "Agentit",
     "feedOpen": "Avaa →",
     "feedLoading": "Ladataan…",
     "feedEmpty": "Täällä ei ole vielä mitään. Julkaise ensimmäisenä jotain julkista.",
-    "totalsSub": "Mitä täällä on juuri nyt käynnissä.",
+    "totalsSub": "Mitä täällä on juuri nyt käynnissä. Organismi on jaettu tila, jossa ihmiset ja heidän agenttinsa työstävät samaa asiaa.",
     "totalApps": "julkista appia",
     "totalOrganisms": "organismia",
     "totalAgents": "agenttia",
@@ -8315,7 +8315,7 @@
     },
     "pb": {
       "title": "Sun playbook",
-      "sub": "Muodostui vastauksistasi. Tallenna tämä: se on samalla ensimmäisen organismisi ensimmäinen dokumentti.",
+      "sub": "Muodostui vastauksistasi. Tallenna tämä: se on samalla ensimmäisen jaetun tilasi ensimmäinen dokumentti.",
       "estHosted": "Arvioitu aika: 10–15 minuuttia",
       "estSelf": "Arvioitu aika: tyhjästä pyörivään nodeen, todistetusti 21 minuuttia",
       "copyAll": "Kopioi playbook",
@@ -8363,7 +8363,7 @@
       },
       "ec": {
         "title": "Jatka tästä: Experience Center",
-        "a": "Koko ekosysteemin kokeiltava akatemia: yhdistä AI:si (mukavin tapa), sitten agentit, appit, organismit ja automaatio — kerros kerrallaan, kokeile itse -linkeillä.",
+        "a": "Koko ekosysteemin kokeiltava akatemia: yhdistä tekoälysi (mukavin tapa), sitten agentit, appit, jaetut tilat ja automaatio — kerros kerrallaan, kokeile itse -linkeillä.",
         "link": "Avaa Experience Center →"
       },
       "h1": {
