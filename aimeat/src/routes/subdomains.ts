@@ -65,7 +65,7 @@ import { appToolNames } from '../services/app-tool-names.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { prefersMarkdown, sendMarkdown } from '../services/markdown-negotiation.js';
 import { serveAppAgentFace, buildAppAgentFace } from '../services/agent-face.js';
-import { appLlmsTxt, appAgentsMd, appSitemapMd } from '../services/app-agent-surfaces.js';
+import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../services/app-agent-surfaces.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { logger } from '../utils/logger.js';
 
@@ -631,9 +631,9 @@ Sitemap: ${origin}/sitemap.xml
   router.get(['/.md', '/index.md'], async (req: Request, res: Response, next) => {
     const app = await appForOrigin(req, config, storage);
     if (!app) return next();
+    const face = await buildAppAgentFace(config, storage, app);
     res.set('Link', `<${appOriginFor(req, config)}/>; rel="canonical"`);
-    if (await serveAppAgentFace(res, config, storage, app)) return;
-    return next();
+    sendMarkdown(res, appRootMirrorMd(config, app, appOriginFor(req, config), face?.markdown));
   });
 
   // App-origin path form: `apps.<apex>/<owner>/<filename>` on the bare app host. Apps need their

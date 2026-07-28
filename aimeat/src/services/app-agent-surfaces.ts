@@ -160,6 +160,41 @@ ${face ?? appSummary(app)}
 `;
 }
 
+/**
+ * The app root's markdown mirror: frontmatter, the Agent Face, and a Sitemap section.
+ *
+ * The root used to answer with the bare Agent Face. That is the right substance and the wrong
+ * envelope: a markdown mirror is expected to open with frontmatter naming the page and to close
+ * with a way onward, and the face has neither, so a reader landing on it learns what the app does
+ * and nothing about where anything else is.
+ */
+export function appRootMirrorMd(
+  config: AimeatConfig, app: AppRecord, origin: string, face?: string,
+): string {
+  const b = config.baseUrl.replace(/\/$/, '');
+  return `---
+title: ${appDisplayName(app)}
+description: ${appSummary(app).replace(/\n+/g, ' ')}
+url: ${origin}/
+owner: ${app.ownerName}
+app_id: ${app.filename}
+---
+
+# ${appDisplayName(app)}
+
+> ${appSummary(app)}
+
+${face ?? appSummary(app)}
+
+## Sitemap
+
+- [Application](${origin}/) · [llms.txt](${origin}/llms.txt) · [AGENTS.md](${origin}/AGENTS.md)
+- [Full site map](${origin}/sitemap.md): every document this origin serves
+- [MCP Server Card](${origin}/.well-known/mcp.json) · [Tool listing](${b}/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}/webmcp)
+- [AIMEAT node](${b}/) · [Node manual](${b}/llms.txt) · [Glossary](${b}/v1/glossary.md)
+`;
+}
+
 /** The app's site map: H2 sections, every entry a markdown link on this origin. */
 export function appSitemapMd(config: AimeatConfig, app: AppRecord, origin: string): string {
   const b = config.baseUrl.replace(/\/$/, '');

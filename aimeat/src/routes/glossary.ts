@@ -47,7 +47,7 @@ url: ${b}/v1/glossary
 
 ${areas}
 
-## Site map
+## Sitemap
 
 ${sitemapPages().filter((p) => p.path !== '/v1/glossary').map((p) => `- [${p.title}](${b}${p.path})`).join('\n')}
 - [Full manual](${b}/llms.txt) · [Machine-readable glossary](${b}/v1/glossary.json) · [API contract](${b}/v1/spec)

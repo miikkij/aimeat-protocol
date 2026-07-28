@@ -300,7 +300,7 @@ function locs(xml: string): string[] {
             const body = await r.text();
             assert(body.startsWith('---\n'), `${path} has no frontmatter`);
             assert(body.includes(`url: `), `${path} frontmatter has no url`);
-            assert(body.includes('## Site map'), `${path} has no site-map section`);
+            assert(body.includes('## Sitemap'), `${path} has no sitemap section`);
             assert(!body.includes('{{BASE_URL}}'), `${path} has an unsubstituted BASE_URL token`);
         }
     });

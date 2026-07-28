@@ -54,7 +54,7 @@ node: ${config.nodeId}
 
 ${sub(page.markdown ?? page.description)}
 
-## Site map
+## Sitemap
 
 ${siteMap}
 - [Full manual](${b}/llms.txt) · [Glossary](${b}/v1/glossary.md) · [API contract](${b}/v1/spec)
