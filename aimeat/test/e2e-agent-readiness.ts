@@ -184,6 +184,61 @@ function locs(xml: string): string[] {
         assert(full.body === llms.body, 'llms-full.txt must match llms.txt byte for byte');
     });
 
+    // ── Protocol discovery documents (phase 09) ─────────────────────────────────────────────
+
+    async function jsonDoc(path: string) {
+        const res = await fetch(`${BASE}${path}`);
+        return { status: res.status, cors: res.headers.get('access-control-allow-origin'), body: await res.json() as any };
+    }
+
+    await test('public discovery documents are readable cross-origin', async () => {
+        for (const p of ['/.well-known/aimeat', '/.well-known/mcp.json', '/.well-known/api-catalog',
+                         '/.well-known/ucp', '/.well-known/acp.json']) {
+            const r = await jsonDoc(p);
+            assert(r.status === 200, `${p} → ${r.status}`);
+            assert(r.cors === '*', `${p} has no Access-Control-Allow-Origin — a browser agent cannot read it`);
+        }
+    });
+
+    await test('MCP Server Card carries name, description and version at the root', async () => {
+        const { body } = await jsonDoc('/.well-known/mcp.json');
+        for (const f of ['name', 'description', 'version']) {
+            assert(typeof body[f] === 'string' && body[f].length > 0, `mcp.json root field '${f}' missing`);
+        }
+        assert(typeof body.serverInfo?.name === 'string', 'serverInfo kept for clients that read it');
+    });
+
+    await test('UCP capabilities is an object keyed by capability name', async () => {
+        const { body } = await jsonDoc('/.well-known/ucp');
+        const caps = body.ucp?.capabilities;
+        assert(caps !== undefined, 'ucp.capabilities missing');
+        assert(!Array.isArray(caps) && typeof caps === 'object',
+            `ucp.capabilities must be an object, got ${Array.isArray(caps) ? 'array' : typeof caps}`);
+        assert(/^\d{4}-\d{2}-\d{2}$/.test(body.ucp?.version ?? ''), `ucp.version must be YYYY-MM-DD, got ${body.ucp?.version}`);
+        assert(typeof body.ucp?.services === 'object', 'ucp.services must be an object');
+    });
+
+    await test('ACP discovery document carries the RFC-required fields', async () => {
+        const { body } = await jsonDoc('/.well-known/acp.json');
+        assert(body.protocol?.name === 'acp', `protocol.name: ${body.protocol?.name}`);
+        assert(/^\d{4}-\d{2}-\d{2}$/.test(body.protocol?.version ?? ''), `protocol.version must be YYYY-MM-DD, got ${body.protocol?.version}`);
+        assert(Array.isArray(body.protocol?.supported_versions) && body.protocol.supported_versions.length > 0,
+            'protocol.supported_versions must be a non-empty array');
+        assert(typeof body.api_base_url === 'string' && body.api_base_url.startsWith('http'), `api_base_url: ${body.api_base_url}`);
+        assert(Array.isArray(body.transports) && body.transports.includes('rest'), `transports must include "rest": ${JSON.stringify(body.transports)}`);
+        assert(Array.isArray(body.capabilities?.services) && body.capabilities.services.length > 0,
+            'capabilities.services must be a non-empty array');
+    });
+
+    // Honesty check: the document may only advertise services and transports this node actually
+    // serves. Claiming "orders" or an MCP transport sends a buyer agent to routes that do not exist.
+    await test('ACP advertises only services this node serves', async () => {
+        const { body } = await jsonDoc('/.well-known/acp.json');
+        const served = new Set(['checkout']);
+        for (const s of body.capabilities.services) assert(served.has(s), `advertises service '${s}' with no routes behind it`);
+        for (const t of body.transports) assert(t === 'rest', `advertises transport '${t}' that does not answer ACP`);
+    });
+
     // ── Apex-only guard ─────────────────────────────────────────────────────────────────────
     // These documents describe THIS node. Served from an app's own host they would describe
     // somebody else — a site map full of apex URLs, or the 145 kB app-BUILDING manual in which

@@ -117,8 +117,13 @@ await test('1. GET /.well-known/ucp — profile advertises checkout + the morsel
     assert(typeof profile.ucp?.version === 'string', 'missing ucp.version');
     assert(profile.ucp.services?.rest?.endpoint?.endsWith('/ucp/v1'), `rest endpoint: ${profile.ucp.services?.rest?.endpoint}`);
     assert(profile.ucp.services?.mcp?.endpoint?.endsWith('/v1/mcp'), 'missing mcp transport');
-    const checkout = (profile.ucp.capabilities || []).find((c: any) => String(c.name).includes('checkout'));
+    // UCP declares capabilities as an OBJECT keyed by capability name, each key holding an array
+    // of declarations. A validator reads the old array-of-{name} shape as "capabilities missing".
+    assert(!Array.isArray(profile.ucp.capabilities) && typeof profile.ucp.capabilities === 'object',
+        `ucp.capabilities must be an object, got ${Array.isArray(profile.ucp.capabilities) ? 'array' : typeof profile.ucp.capabilities}`);
+    const checkout = profile.ucp.capabilities['dev.ucp.shopping.checkout']?.[0];
     assert(!!checkout?.endpoints?.create, 'missing checkout capability endpoints');
+    assert(/^\d{4}-\d{2}-\d{2}$/.test(checkout.version), `capability version must be YYYY-MM-DD, got ${checkout.version}`);
     const handlers = (profile.ucp.payment_handlers || []).map((h: any) => h.id);
     assert(handlers.includes('io.aimeat.morsels'), `morsel handler missing: ${JSON.stringify(handlers)}`);
     assert(Array.isArray(profile.signing_keys) && profile.signing_keys[0]?.crv === 'Ed25519', 'missing Ed25519 signing key');

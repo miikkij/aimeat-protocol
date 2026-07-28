@@ -22,6 +22,10 @@
  *     `fulfillment: 'call' | 'task'` hint (TARGET-034 phase B)
  *   v1.1.0 — 2026-07-14 — app-tool products in the feed (sku "app-tool:<owner>/<appId>:<tool>")
  *     + app-tool sku checkout + caller JWT threaded into completeSession (TARGET-034 phase A)
+ *   v1.1.0 — 2026-07-28 — /.well-known/acp.json carries the four fields the ACP discovery RFC §10
+ *     requires — protocol{name,version,supported_versions}, api_base_url, transports,
+ *     capabilities.services — plus CORS. It previously said `version: 'draft'` and nothing else a
+ *     buyer agent could act on (agent-readability phase 09)
  *   v1.0.0 — 2026-07-13 — Initial ACP merchant surface (TARGET-033 phase 5)
  */
 import { Router } from 'express';
@@ -77,6 +81,13 @@ function parseSku(id: string): { kind: 'offer'; agent: string; offer_id: string 
 }
 
 /** ACP status vocabulary over our lifecycle. */
+/**
+ * The ACP specification version this node's discovery document and checkout surface are written
+ * against (agentic-commerce-protocol rfcs/rfc.discovery.md §5.1). Bump it together with the
+ * surface, never ahead of it — the field is a conformance claim a buyer agent acts on.
+ */
+const ACP_VERSION = '2026-01-30';
+
 const ACP_STATUS: Record<CheckoutSessionRecord['status'], string> = {
   open: 'ready_for_payment', completed: 'completed', cancelled: 'canceled', expired: 'expired',
 };
@@ -115,8 +126,27 @@ export function commerceAcpRouter(config: AimeatConfig, storage: Storage): Route
 
   router.get('/.well-known/acp.json', (_req, res) => {
     const b = config.baseUrl;
+    // Discovery is public metadata; a browser-resident buyer agent must be able to read it.
+    res.set('Access-Control-Allow-Origin', '*');
     res.json({
-      version: 'draft',
+      // ACP discovery RFC §10. This document previously carried `version: 'draft'` and none of the
+      // four required fields, so a buyer agent following the spec found no protocol, no API base
+      // and no service list — it could not tell this was an ACP seller at all.
+      protocol: {
+        name: 'acp',
+        version: ACP_VERSION,
+        supported_versions: [ACP_VERSION],
+      },
+      api_base_url: `${b}/acp/v1`,
+      // REST only, deliberately. The node runs an MCP server, but the ACP surface is not exposed
+      // over it, and listing "mcp" would send a buyer to a transport that does not answer ACP.
+      transports: ['rest'],
+      capabilities: {
+        // Only what this node actually serves: checkout session create / get / complete. Orders,
+        // carts and delegate_payment are ACP services we have no routes for.
+        services: ['checkout'],
+      },
+      version: ACP_VERSION,
       commerce_enabled: config.commerceEnabled,
       feed: { url: `${b}/v1/commerce/feed`, format: 'json' },
       checkout: { base_url: `${b}/acp/v1/checkout_sessions` },

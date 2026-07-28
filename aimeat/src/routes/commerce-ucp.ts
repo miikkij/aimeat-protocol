@@ -123,8 +123,17 @@ async function negotiate(req: Request): Promise<Array<{ name: string; version: s
   if (typeof profileUrl !== 'string' || !/^https?:\/\//.test(profileUrl)) return UCP_CAPABILITIES;
   try {
     const res = await safeFetch(profileUrl, { signal: AbortSignal.timeout(3000) });
-    const profile = await res.json() as { ucp?: { capabilities?: Array<{ name?: string }> } };
-    const theirs = new Set((profile.ucp?.capabilities ?? []).map((c) => c.name));
+    const profile = await res.json() as { ucp?: { capabilities?: unknown } };
+    // UCP declares `capabilities` as an object keyed by capability name. Profiles in the wild also
+    // carry the older array-of-{name} shape (this node served one until 2026-07-28), and a peer
+    // whose shape we do not read intersects to nothing — which silently degrades to "no shared
+    // capabilities" rather than failing loudly. Read both.
+    const caps = profile.ucp?.capabilities;
+    const theirs = new Set(
+      Array.isArray(caps)
+        ? (caps as Array<{ name?: string }>).map((c) => c.name)
+        : (caps && typeof caps === 'object' ? Object.keys(caps) : []),
+    );
     const shared = UCP_CAPABILITIES.filter((c) => theirs.has(c.name));
     return shared.length ? shared : UCP_CAPABILITIES;
   } catch (err) {

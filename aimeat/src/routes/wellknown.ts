@@ -14,6 +14,11 @@
  *   - discoveryLinkHeaders(): middleware stamping Link rel="api-catalog" + rel="service-desc" on GET/HEAD responses
  *
  * @version-history
+ *   v1.7.0 — 2026-07-28 — Discovery documents answer with Access-Control-Allow-Origin: * so a
+ *     browser-resident agent can read them; the MCP Server Card carries name/description/version at
+ *     the ROOT per server.json (SEP-2127) instead of only inside serverInfo; the UCP profile
+ *     declares capabilities as an object keyed by capability name, as the spec requires — the array
+ *     it used to send read as "capabilities missing" (agent-readability phase 09)
  *   v1.6.0 — 2026-07-14 — api-catalog links the Agent Skills discovery index (/.well-known/agent-skills/index.json)
  *   v1.5.0 — 2026-07-14 — Web Bot Auth key directory at /.well-known/http-message-signatures-directory
  *     (node Ed25519 JWKS, signed response; draft-meunier-http-message-signatures-directory)
@@ -50,8 +55,22 @@ export function discoveryLinkHeaders(): RequestHandler {
   };
 }
 
+/** The UCP specification version this node's profile and checkout surface are written against. */
+const UCP_PROFILE_VERSION = '2026-04-08';
+
+/**
+ * Public discovery documents are readable from any origin. They carry no auth, no per-caller data
+ * and nothing that is not already public, and a browser-resident agent trying to discover this node
+ * gets a CORS failure without the header — it cannot read the card that exists to be read.
+ */
+const publicDiscovery: RequestHandler = (_req, res, next) => {
+  res.set('Access-Control-Allow-Origin', '*');
+  next();
+};
+
 export function wellknownRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
+  router.use('/.well-known', publicDiscovery);
 
   router.get('/.well-known/aimeat', async (_req, res) => {
     const nodeKey = await storage.getNodeKey();
@@ -108,9 +127,17 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
         };
       }
     }
+    const description = 'AIMEAT protocol node — persistent memory, agent identity (GHII/GAII), organisms and workspaces, knowledge, tasks, skills, and morsel economy for AI agents.';
     res.json({
-      $schema: 'https://static.modelcontextprotocol.io/schemas/mcp-server-card/v1.json',
-      version: '1.0',
+      $schema: 'https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json',
+      // A Server Card follows the server.json shape (SEP-2127): name, description and version at
+      // the ROOT. The card previously put the name inside `serverInfo`, which is the shape of the
+      // MCP `initialize` RESULT, not of the card — two adjacent schemas, and a reader validating
+      // the card against server.json saw a card with no name at all. `serverInfo` stays because it
+      // is what the running server reports and some clients read it.
+      name: `io.aimeat/${config.nodeId}`,
+      description,
+      version: getSoftwareVersion(),
       protocolVersion: '2025-06-18',
       serverInfo: {
         // Matches what the MCP server itself reports on initialize (src/mcp/index.ts)
@@ -118,7 +145,6 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
         title: 'AIMEAT',
         version: getSoftwareVersion(),
       },
-      description: 'AIMEAT protocol node — persistent memory, agent identity (GHII/GAII), organisms and workspaces, knowledge, tasks, skills, and morsel economy for AI agents.',
       transport: {
         type: 'streamable-http',
         endpoint: `${config.baseUrl}/v1/mcp`,
@@ -198,7 +224,7 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
       : [];
     res.json({
       ucp: {
-        version: '2026-04-08',
+        version: UCP_PROFILE_VERSION,
         services: {
           rest: { endpoint: `${b}/ucp/v1`, spec: `${b}/v1/spec` },
           mcp: { endpoint: `${b}/v1/mcp` },
@@ -206,17 +232,25 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
           // document.modelContext; the HTTP listing mirrors them for non-browser agents.
           webmcp: { library: `${b}/v1/libs/aimeat-webmcp.js`, app_listing: `${b}/v1/apps/{owner}/{filename}/webmcp` },
         },
-        capabilities: config.commerceEnabled ? [
-          {
-            name: 'dev.ucp.shopping.checkout',
-            version: '1',
-            endpoints: {
-              create: { method: 'POST', url: `${b}/ucp/v1/checkout-sessions` },
-              update: { method: 'PATCH', url: `${b}/ucp/v1/checkout-sessions/{id}` },
-              complete: { method: 'POST', url: `${b}/ucp/v1/checkout-sessions/{id}/complete` },
+        // UCP declares capabilities as an OBJECT keyed by capability name, each key holding an
+        // array of declarations. This was an array of {name, ...}, which a validator reads as
+        // "capabilities missing" — a wrong type is indistinguishable from an absent field, so the
+        // whole commerce surface was invisible to anything that checked. `endpoints` is ours on
+        // top of the spec's version/spec/schema; a reader that does not know it ignores it.
+        capabilities: config.commerceEnabled ? {
+          'dev.ucp.shopping.checkout': [
+            {
+              version: UCP_PROFILE_VERSION,
+              spec: `https://ucp.dev/${UCP_PROFILE_VERSION}/specification/checkout`,
+              schema: `https://ucp.dev/${UCP_PROFILE_VERSION}/schemas/shopping/checkout.json`,
+              endpoints: {
+                create: { method: 'POST', url: `${b}/ucp/v1/checkout-sessions` },
+                update: { method: 'PATCH', url: `${b}/ucp/v1/checkout-sessions/{id}` },
+                complete: { method: 'POST', url: `${b}/ucp/v1/checkout-sessions/{id}/complete` },
+              },
             },
-          },
-        ] : [],
+          ],
+        } : {},
         payment_handlers: config.commerceEnabled ? listPaymentHandlers().map((h) => ({
           id: h.id, title: h.title, currencies: h.currencies,
         })) : [],
