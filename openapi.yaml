@@ -8261,6 +8261,46 @@ paths:
         '404':
           $ref: '#/components/responses/AimeatError'
 
+  /v1/app-grants/{grantId}/spend-cap:
+    patch:
+      operationId: appGrantSetSpendCap
+      summary: How much of your money a connected app may spend
+      description: >
+        The `contract:spend` scope answers WHETHER an app may buy on your behalf; this answers how much.
+        A yes with no number is a blank cheque, and until an app could be named apart from its owner the
+        question could not even be asked — an app grant presents the owner's own GHII, so at the money
+        layer a call from an app was indistinguishable from the person's own. Body:
+        `{ cap_morsels: number | null, reset?: boolean }`. `null` removes the ceiling (the scope alone);
+        `0` stops the app spending without withdrawing anything else it was trusted with; `reset: true`
+        puts the counter back to zero. Only morsel charges count against it — money is denominated in
+        micro-units and summing the two into one ceiling would conflate different numbers. Owner-only.
+      tags: [Auth]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: grantId
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                cap_morsels: { type: integer, nullable: true, description: Ceiling in morsels across the life of the grant. null removes it. }
+                reset: { type: boolean, description: Put the spent counter back to zero. }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/exchange/entitlements/merge:
     post:
       operationId: exchangeMergeEntitlements

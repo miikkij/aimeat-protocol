@@ -37,6 +37,9 @@ import {
 import { resolvePacingToll } from '../routes/extensions/pacing.js';
 import { settleMeteredCharge, burnPacingTollFor, type SettlementResult } from './metered-settlement.js';
 
+/** The permission a hosted app needs before it may draw on its owner's contracts. */
+export const SPEND_SCOPE = 'contract:spend';
+
 /** What a metered call is being made AGAINST — the coordinate the price is attached to. */
 export interface MeteredProduct {
   /** Metered coordinate: an extension name, `apptool:{owner}/{appId}`, or `agentwork:{owner}/{agent}`. */
@@ -61,6 +64,10 @@ export type MeteredOutcome =
   | { kind: 'free_owner' }
   /** Nothing authorises this call. The door decides what to offer instead (402, a checkout, a price list). */
   | { kind: 'no_right' }
+  /** A hosted app is calling, and its owner never gave it permission to spend. */
+  | { kind: 'scope_required'; scope: string }
+  /** The app may spend, but has reached the ceiling its owner set for it. */
+  | { kind: 'app_cap_reached'; capMorsels: number; spentMorsels: number }
   /** A right exists but is not usable right now. */
   | { kind: 'inactive'; entitlement: MeteredEntitlement }
   | { kind: 'refused_rate'; entitlement: MeteredEntitlement }
@@ -112,14 +119,39 @@ export async function authoriseMeteredCall(args: {
   /** The exact principal making the call — an agent GAII, a GEAI, or an owner GHII. */
   caller: string;
   product: MeteredProduct;
+  /**
+   * The session behind the call, when there is one. Absent on paths where the payer is not the
+   * requester (agent-work settles against the consumer's contract on the PROVIDER's request), and a
+   * missing session is never treated as a permission — it simply skips a check that does not apply.
+   */
+  session?: { roles: string[]; scopes: string[]; appGrantId?: string | null } | null;
 }): Promise<MeteredOutcome> {
-  const { config, storage, caller, product } = args;
+  const { config, storage, caller, product, session } = args;
 
   // 1. Own capability → free. Before the lookup: a provider holding a contract against themselves
   //    (which happens, because nothing stopped them buying it) must still not be charged for it.
   const providerOwner = product.providerOwner ?? providerOwnerOfCoordinate(product.ext);
   const callerOwner = ownerGhiiOf(caller).split('@')[0];
   if (providerOwner && callerOwner === providerOwner) return { kind: 'free_owner' };
+
+  // 1b. A hosted app spends its OWNER's money. Reading their memory and buying on their behalf are
+  //     different favours, and an app grant presents the owner's own GHII, so without this the
+  //     narrowest grant there is reached any contract they held. Checked after owner-free, because
+  //     an app calling its own owner's capability costs nobody anything.
+  if (session?.roles.includes('app')
+      && !session.scopes.includes('*')
+      && !session.scopes.includes(SPEND_SCOPE)
+      && !session.scopes.includes('contract:*')) {
+    return { kind: 'scope_required', scope: SPEND_SCOPE };
+  }
+
+  // 1c. The permission answers WHETHER; the ceiling answers HOW MUCH. Read before the call rather
+  //     than after, so an app is stopped at its limit instead of discovering it by exceeding it.
+  const appGrant = session?.appGrantId ? await storage.getAppGrant(session.appGrantId) : null;
+  if (appGrant && appGrant.spendCapMorsels !== null && appGrant.spendCapMorsels !== undefined
+      && (appGrant.spentMorsels ?? 0) >= appGrant.spendCapMorsels) {
+    return { kind: 'app_cap_reached', capMorsels: appGrant.spendCapMorsels, spentMorsels: appGrant.spentMorsels ?? 0 };
+  }
 
   // 2. Whatever authorises this call — a grant wins over a contract while it is active.
   const ent = await readEntitlementForCall(storage, caller, product.ext, product.action);
@@ -156,5 +188,11 @@ export async function authoriseMeteredCall(args: {
   });
   if (settled.kind === 'insufficient') return { kind: 'insufficient', entitlement: ent, needed: settled.needed, carried: false };
   if (settled.kind === 'failed') return { kind: 'settlement_failed', entitlement: ent, reason: settled.reason };
+  // What the app spent of its owner's money, so the ceiling means something on the next call. Only
+  // morsels are counted against it: a money charge is denominated in micro-units and the two are not
+  // the same number, so summing them into one ceiling would be the bug this file already fixed once.
+  if (appGrant && settled.charged > 0 && ent.unit === 'morsels') {
+    await storage.updateAppGrant(appGrant.grantId, { spentMorsels: (appGrant.spentMorsels ?? 0) + settled.charged });
+  }
   return { kind: 'settled', entitlement: ent, charged: settled.charged, refund: settled.refund };
 }

@@ -176,6 +176,9 @@ await test('Setup: the manifest prices those actions — one action sold three w
         { ...base, name: 'brief', description: 'The product', price: { morsels: 8 }, exchange: true },
         { ...base, name: 'cheap', description: 'Same capability, second listing', price: { morsels: 3 }, exchange: true },
         { ...base, name: 'open', description: 'Declares no price at all' },
+        // Two products, one capability, told apart by a field. `pinned` fixes it; `loose` leaves it to
+        // the caller — which is the shape production sells `search` and `budget-leads` in.
+        { ...base, name: 'pinned', description: 'Same capability, discriminator FIXED', price: { morsels: 5 }, lockedInput: { q: 'locked-by-the-tool' }, exchange: true },
         { ...base, name: 'usdonly', description: 'Priced ONLY through pricesMoney', pricesMoney: [{ amount: 250000, currency: 'USD' }] },
         // `ext:X:solo` — one capability, one product, so every door can name the price without asking.
         { ...base, name: 'solo', description: 'The only tool selling its action', action_id: SOLO, price: { morsels: 8 }, exchange: true },
@@ -475,6 +478,56 @@ await test('APP GRANT · an app the consumer connected cannot spend a contract i
         + `contract (meter ${before.budget.calls} → ${after.budget.calls}). A grant confers scopes, not a call-right.`);
     assert(after.budget.calls === before.budget.calls,
         `and the owner's meter must not move for it: ${before.budget.calls} → ${after.budget.calls}`);
+});
+
+await test('APP GRANT · with the permission, it spends — and the app is NAMED for it', async () => {
+    // The gate above proves an app cannot spend uninvited. This proves the other half: when the owner
+    // DOES invite it, the money still comes from the human, but the record says which app caused it.
+    // Until an app could be named, its spending was indistinguishable from its owner's own, so nobody
+    // could be told after the fact — and no ceiling could ever be per-app.
+    const cExt = `apptool:${provider.name}/${APP}`;
+    const APP_FILE = `spend-probe-${Date.now()}.html`;
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(consumer.token),
+        body: JSON.stringify({
+            filename: APP_FILE, content: Buffer.from('<!DOCTYPE html><html><body>probe</body></html>').toString('base64'),
+            name: 'Spend Probe', description: 'money audit probe', category: 'utility',
+        }),
+    });
+    assert(pub.status === 201 || pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const REDIRECT = 'http://localhost:9/cb';
+    const q = new URLSearchParams({
+        app: `${consumer.name}/${APP_FILE}`, response_type: 'code', scope: 'memory:read contract:spend',
+        redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(authz.headers.get('location') ?? '')?.[1] ?? '');
+    const con = await json('/v1/app-grants/authorize-consent', {
+        method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ request_id: rid }),
+    });
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', {
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }),
+    });
+    const appToken = tok.body.data.access_token as string;
+    assert(!!appToken, `grant token issued: ${JSON.stringify(tok.body?.error)}`);
+
+    const cb = await balance(consumer.token);
+    const r = await json(`/v1/ext/${EXT}/solo`, { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
+    assert(r.status === 200, `with contract:spend the app is served: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(cb - await balance(consumer.token) === 8, `and the HUMAN pays, moved ${cb - await balance(consumer.token)}`);
+
+    const rows = await callersOf(consumer.token, cExt, 'solo');
+    const appRow = rows.find(x => String(x.gaii).startsWith('eco:'));
+    assert(!!appRow, `the app is named in the breakdown, not merged into its owner: ${JSON.stringify(rows.map(r => r.gaii))}`);
+    assert(appRow.gaii.includes(`#${consumer.name}@`), `and the identity still carries the human who pays: ${appRow.gaii}`);
+
+    const tx = (await txns(consumer.token)).find(t => String(t.initiator_gaii ?? '').startsWith('eco:'));
+    assert(!!tx, "and the charge is in the human's own ledger, naming the app that caused it");
+    assert(tx.amount < 0, `filed as a debit against them: ${tx.amount}`);
 });
 
 await test('CEILING · switching currency on the same tool does not hand back a spent budget', async () => {
@@ -973,6 +1026,217 @@ await test('CHOKEPOINT · every door refuses the same way when a ceiling is hit'
         `the app-tool door gives the same code: ${tool.body?.error?.code} vs ${code}`);
     assert(mcp.error.startsWith(code),
         `and so does MCP, from the same function: ${JSON.stringify(mcp.error).slice(0, 160)} vs ${code}`);
+});
+
+await test('APP CAP · a ceiling on what an app may spend of your money holds, and clears', async () => {
+    // The permission answers whether; this answers how much. A yes with no number is a blank cheque.
+    const APP_FILE = `cap-probe-${Date.now()}.html`;
+    await json('/v1/apps', {
+        method: 'POST', headers: auth(consumer.token),
+        body: JSON.stringify({
+            filename: APP_FILE, content: Buffer.from('<!DOCTYPE html><html><body>probe</body></html>').toString('base64'),
+            name: 'Cap Probe', description: 'money audit probe', category: 'utility',
+        }),
+    });
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const REDIRECT = 'http://localhost:9/cb';
+    const q = new URLSearchParams({
+        app: `${consumer.name}/${APP_FILE}`, response_type: 'code', scope: 'memory:read contract:spend',
+        redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(authz.headers.get('location') ?? '')?.[1] ?? '');
+    const con = await json('/v1/app-grants/authorize-consent', { method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ request_id: rid }) });
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', { method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }) });
+    const appToken = tok.body.data.access_token as string;
+    const grantId = tok.body.data.grant_id as string;
+    assert(!!appToken && !!grantId, `grant issued: ${JSON.stringify(tok.body?.error)}`);
+
+    // A ceiling of 8 covers exactly one call at this price.
+    const cap = await json(`/v1/app-grants/${grantId}/spend-cap`, { method: 'PATCH', headers: auth(consumer.token), body: JSON.stringify({ cap_morsels: 8 }) });
+    assert(cap.status === 200 && cap.body.data.cap_morsels === 8, `cap set: ${cap.status} ${JSON.stringify(cap.body?.data ?? cap.body?.error)}`);
+
+    const call = () => json(`/v1/ext/${EXT}/solo`, { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
+    assert((await call()).status === 200, 'the call the ceiling allows');
+    const cb = await balance(consumer.token);
+    const blocked = await call();
+    assert(blocked.status === 402 && blocked.body?.error?.code === 'APP_SPEND_CAP',
+        `past the ceiling it is refused by NAME: ${blocked.status} ${JSON.stringify(blocked.body?.error)}`);
+    assert(await balance(consumer.token) === cb, 'and a refused call moves no money');
+
+    // Only this app is stopped — the human is not.
+    assert((await rawInvoke(consumer.token, 'solo')).status === 200, 'the owner themselves is unaffected by an app\'s ceiling');
+
+    // Clearing the counter lets it continue, without touching any other permission.
+    const reset = await json(`/v1/app-grants/${grantId}/spend-cap`, { method: 'PATCH', headers: auth(consumer.token), body: JSON.stringify({ reset: true }) });
+    assert(reset.status === 200 && reset.body.data.spent_morsels === 0, `counter cleared: ${JSON.stringify(reset.body?.data)}`);
+    assert((await call()).status === 200, 'and the app may spend again');
+});
+
+await test('LOCKED INPUT · a tool can fix a parameter the caller cannot talk their way past', async () => {
+    // One capability serves several products, told apart by a field the caller sends. On production
+    // `search` (0.01 EUR) and `budget-leads` (0.05 EUR) both bind one action and differ only by a
+    // `category` the manifest asks the CALLER to set — so the cheap contract could fetch the expensive
+    // product. The price gate cannot see it: it charges correctly and the extension decides what
+    // comes back. Pinning the field is what makes two products two calls.
+    const buyer = await setupOwner('lock');
+    const off = await json('/v1/exchange/offerings', { headers: auth(buyer.token) });
+    const o = (off.body.data.offerings as any[]).find(x => x.providerOwner === provider.name && x.action === 'pinned');
+    assert(!!o, 'the pinned tool is listed');
+    const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ offering_id: o.offeringId, cap_units: 50 }) });
+    assert(acc.status === 201, `accept ${acc.status}: ${JSON.stringify(acc.body?.error)}`);
+
+    // The caller sends their own value for the pinned field. The tool's wins.
+    const r = await json(`/v1/apps/${encodeURIComponent(provider.name)}/${encodeURIComponent(APP)}/webmcp/tools/pinned`,
+        { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ input: { q: 'caller-tried-this' } }) });
+    assert(r.status === 200, `pinned tool invokes: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(r.body.data.result.echo.q === 'locked-by-the-tool',
+        `the tool's own value survives the caller's: ${JSON.stringify(r.body.data.result.echo)}`);
+
+    // And a tool that pins nothing still passes the caller's input straight through.
+    const free = await json(`/v1/apps/${encodeURIComponent(provider.name)}/${encodeURIComponent(APP)}/webmcp/tools/open`,
+        { method: 'POST', headers: auth(buyer.token), body: JSON.stringify({ input: { q: 'callers-own' } }) });
+    assert(free.status === 200 && free.body.data.result.echo.q === 'callers-own',
+        `an unpinned tool is unchanged: ${JSON.stringify(free.body?.data?.result?.echo ?? free.body?.error)}`);
+});
+
+// ── THE SUPPLY CHAIN ─────────────────────────────────────────────────────────────────────────────
+//
+// The thing the whole market was built for: an app needs data it cannot produce, buys it from whoever
+// can, and sells the result onward. Three parties, two contracts, and neither end knows about the
+// other's. Until now the middle was impossible — an app's calls spend whoever is USING it, so it
+// could buy nothing on its own account.
+
+await test('CHAIN · a reseller buys from a supplier on ITS OWN account, and its user never pays the supplier', async () => {
+    // RESELLER: a second owner with an extension that, inside its action, buys the provider's tool.
+    const reseller = await setupOwner('resell');
+    const RESELL_EXT = `rext${Date.now()}`;
+    const RESELL_APP = `reseller-${Date.now()}.html`;
+    const inst = await json('/v1/extensions', {
+        method: 'POST', headers: auth(reseller.token),
+        body: JSON.stringify({
+            manifest: JSON.stringify({
+                metadata: { name: RESELL_EXT, version: '1.0.0', description: 'buys upstream', author: 'e2e' },
+                actions: [{ id: 'compose', method: 'POST', path: '/compose', script: 'compose' }],
+                config: { public_access: { default: true } },
+                limits: { timeout_ms: 8000, max_api_calls: 2 },
+            }, null, 2),
+            scripts: {
+                // The whole point: the extension buys, on its owner's account, and adds its own step.
+                compose: `export default async function(ctx, input){
+                    const bought = await ctx.buy(${JSON.stringify(`${'$'}{PROVIDER}/${'$'}{APP_ID}`)}, 'solo', { q: input.q });
+                    if (!bought.ok) return { ok: false, why: bought.code };
+                    return { ok: true, upstream: bought.result, refined: 'refined:' + input.q, cost: bought.charged };
+                }`.replace('${PROVIDER}', provider.name).replace('${APP_ID}', APP),
+            },
+        }),
+    });
+    assert(inst.status === 201 || inst.status === 200, `reseller ext install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+    assert((await json(`/v1/extensions/${RESELL_EXT}/activate`, { method: 'POST', headers: auth(reseller.token) })).status === 200, 'activate');
+    assert((await json('/v1/admin/capabilities/aggregate', { method: 'POST', headers: auth(operator.token) })).status === 200, 'aggregate');
+
+    // The reseller sells its own tool at its own price — 20 morsels, well over what it pays upstream.
+    const put = await json('/v1/memory', {
+        method: 'POST', headers: auth(reseller.token),
+        body: JSON.stringify({
+            key: `apps.${RESELL_APP}.tools`, visibility: 'public',
+            value: { version: 1, tools: [{
+                name: 'refine', description: 'Refines what it buys upstream', action_id: `ext:${RESELL_EXT}:compose`,
+                inputSchema: IN_SCHEMA, outputSchema: OUT_SCHEMA, usageTerms: TERMS,
+                price: { morsels: 20 }, exchange: true,
+            }] },
+        }),
+    });
+    assert(put.status === 201 || put.status === 200, `reseller manifest ${put.status}`);
+
+    // Without a contract upstream, the reseller cannot deliver — and says so rather than serving junk.
+    const enduser = await setupOwner('endu');
+    const offs = await json('/v1/exchange/offerings', { headers: auth(enduser.token) });
+    const refineOff = (offs.body.data.offerings as any[]).find(o => o.providerOwner === reseller.name && o.action === 'refine');
+    assert(!!refineOff, 'the reseller listing exists');
+    const buy = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(enduser.token), body: JSON.stringify({ offering_id: refineOff.offeringId, cap_units: 200 }) });
+    assert(buy.status === 201, `end user contracts the RESELLER: ${buy.status} ${JSON.stringify(buy.body?.error)}`);
+
+    const dry = await json(`/v1/apps/${encodeURIComponent(reseller.name)}/${encodeURIComponent(RESELL_APP)}/webmcp/tools/refine`,
+        { method: 'POST', headers: auth(enduser.token), body: JSON.stringify({ input: { q: 'hello' } }) });
+    assert(dry.status === 200 && dry.body.data.result.ok === false && dry.body.data.result.why === 'NO_CONTRACT',
+        `with no upstream contract the reseller reports it: ${JSON.stringify(dry.body?.data?.result ?? dry.body?.error)}`);
+
+    // Now the RESELLER takes its own contract with the supplier. The end user is not party to it.
+    const supplierOff = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(reseller.token), body: JSON.stringify({ offering_id: offeringSolo, cap_units: 200 }) });
+    assert(supplierOff.status === 201, `reseller contracts the supplier: ${supplierOff.status} ${JSON.stringify(supplierOff.body?.error)}`);
+
+    const uBefore = await balance(enduser.token);
+    const rBefore = await balance(reseller.token);
+    const pBefore = await balance(provider.token);
+
+    const r = await json(`/v1/apps/${encodeURIComponent(reseller.name)}/${encodeURIComponent(RESELL_APP)}/webmcp/tools/refine`,
+        { method: 'POST', headers: auth(enduser.token), body: JSON.stringify({ input: { q: 'hello' } }) });
+    assert(r.status === 200, `the chained call succeeds: ${r.status} ${JSON.stringify(r.body?.error)}`);
+    assert(r.body.data.result.ok === true, `and delivers: ${JSON.stringify(r.body.data.result)}`);
+    assert(r.body.data.result.refined === 'refined:hello', 'the reseller added its own step');
+    assert(!!r.body.data.result.upstream, 'on top of what it bought');
+
+    // The money: the user paid 20 to the reseller, the reseller paid 8 to the supplier.
+    const uPaid = uBefore - await balance(enduser.token);
+    const pGained = await balance(provider.token) - pBefore;
+    assert(uPaid === 20, `the end user pays the RESELLER's price and nothing else: moved ${uPaid}`);
+    assert(pGained > 0, `the supplier is paid: +${pGained}`);
+    assert(r.body.data.result.cost === 8, `and it cost the reseller the supplier's price: ${r.body.data.result.cost}`);
+    // Net: +20 in, −8 out, minus the platform's cut on each. The margin is the reseller's.
+    const rNet = await balance(reseller.token) - rBefore;
+    assert(rNet > 0 && rNet < 20, `the reseller keeps a margin, not the whole price: ${rNet}`);
+
+    // And the end user has no contract with the supplier, nor any way to know one was used.
+    const theirs = await json('/v1/exchange/entitlements', { headers: auth(enduser.token) });
+    const upstream = (theirs.body.data.entitlements as any[]).find(e => e.provider === provider.gaii);
+    assert(!upstream, `the end user holds nothing against the supplier: ${JSON.stringify(theirs.body.data.entitlements.map((e: any) => e.provider))}`);
+
+    // The supplier sees the RESELLER's extension as the buyer, named — not the end user.
+    const cons = await json(`/v1/exchange/offerings/${offeringSolo}/consumers`, { headers: auth(provider.token) });
+    const row = (cons.body.data.consumers as any[]).find(c => c.consumerGaii.includes(reseller.name));
+    assert(!!row, `the supplier's customer is the reseller: ${JSON.stringify((cons.body.data.consumers as any[]).map(c => c.consumerGaii))}`);
+    assert((row.callers ?? []).some((c: any) => String(c.gaii).startsWith('eco:')),
+        `and the buying capability is named: ${JSON.stringify(row.callers)}`);
+});
+
+await test('MERGE · applied for real, two rights of one human become one and nothing is lost', async () => {
+    // The state this migrates away from: rights were keyed on the exact caller, so a person could hold
+    // one contract as themselves and another through an agent, both drawing on the one balance. Five
+    // such pairs exist on production. This proves the fold keeps every call and every morsel.
+    const person = await setupOwner('mrg');
+    const bot = await setupAgent(person, 'mrgbot');
+    const cExt = `apptool:${provider.name}/${APP}`;
+
+    const acc = await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(person.token), body: JSON.stringify({ offering_id: offeringSolo, cap_units: 400 }) });
+    assert(acc.status === 201, `contract ${acc.status}`);
+    await rawInvoke(person.token, 'solo');
+    await rawInvoke(bot.token, 'solo');
+
+    const before = await contract(person.token, cExt, 'solo');
+    assert(before.budget.calls === 2, `both calls landed on the one right: ${before.budget.calls}`);
+
+    // Nothing to fold — the key is already the owner's, which is the point of the change. The
+    // migration must therefore be a NO-OP here, not a second merge that double-counts.
+    const run = await json('/v1/exchange/entitlements/merge', { method: 'POST', headers: auth(operator.token), body: JSON.stringify({ dry_run: false }) });
+    assert(run.status === 200, `merge ${run.status}: ${JSON.stringify(run.body?.error)}`);
+    assert(run.body.data.dry_run === false, 'it reports itself as applied');
+
+    const after = await contract(person.token, cExt, 'solo');
+    assert(after.budget.calls === before.budget.calls && after.budget.spent_units === before.budget.spent_units,
+        `an already-merged node is untouched: ${before.budget.calls}/${before.budget.spent_units} → ${after.budget.calls}/${after.budget.spent_units}`);
+
+    // Idempotent: running it twice must not move anything either.
+    const again = await json('/v1/exchange/entitlements/merge', { method: 'POST', headers: auth(operator.token), body: JSON.stringify({ dry_run: false }) });
+    assert(again.status === 200, `second run ${again.status}`);
+    const third = await contract(person.token, cExt, 'solo');
+    assert(third.budget.calls === before.budget.calls, `and again on a second run: ${third.budget.calls}`);
+
+    // The breakdown still names both principals after the migration touched the store.
+    const rows = await callersOf(person.token, cExt, 'solo');
+    assert(rows.length >= 2, `the human and their agent are both still named: ${JSON.stringify(rows.map((r: any) => r.gaii))}`);
 });
 
 console.log(`\n═══ MONEY AUDIT: ${passed} passed, ${failed} failed (${passed + failed} total) ═══\n`);

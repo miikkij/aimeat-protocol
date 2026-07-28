@@ -22,6 +22,7 @@ function toGrant(r: Selectable<AppGrant>): AppGrantRecord {
   return {
     grantId: r.grantId, app: r.app, appName: r.appName, appOrigin: r.appOrigin, owner: r.owner, gaii: r.gaii,
     scopes: r.scopes ?? [], refreshTokenHash: r.refreshTokenHash ?? null,
+    spendCapMorsels: r.spendCapMorsels ?? null, spentMorsels: r.spentMorsels ?? 0,
     createdAt: iso(r.createdAt), lastUsedAt: isoN(r.lastUsedAt), revoked: r.revoked,
   };
 }
@@ -31,6 +32,7 @@ export const appGrantMethods = {
     await this.db.insertInto('AppGrant').values({
       grantId: grant.grantId, app: grant.app, appName: grant.appName, appOrigin: grant.appOrigin,
       owner: grant.owner, gaii: grant.gaii, scopes: grant.scopes ?? [], refreshTokenHash: grant.refreshTokenHash ?? null,
+      spendCapMorsels: grant.spendCapMorsels ?? null, spentMorsels: grant.spentMorsels ?? 0,
       createdAt: new Date(grant.createdAt), lastUsedAt: grant.lastUsedAt ? new Date(grant.lastUsedAt) : null,
       revoked: grant.revoked ?? false,
     }).execute();
@@ -60,13 +62,15 @@ export const appGrantMethods = {
   async updateAppGrant(
     this: PostgresKyselyStorage,
     grantId: string,
-    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes'>>,
+    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels'>>,
   ): Promise<AppGrantRecord | null> {
     const data: Record<string, unknown> = {};
     if (updates.refreshTokenHash !== undefined) data.refreshTokenHash = updates.refreshTokenHash;
     if (updates.lastUsedAt !== undefined) data.lastUsedAt = updates.lastUsedAt ? new Date(updates.lastUsedAt) : null;
     if (updates.revoked !== undefined) data.revoked = updates.revoked;
     if (updates.scopes !== undefined) data.scopes = updates.scopes;
+    if (updates.spendCapMorsels !== undefined) data.spendCapMorsels = updates.spendCapMorsels;
+    if (updates.spentMorsels !== undefined) data.spentMorsels = updates.spentMorsels;
     if (Object.keys(data).length === 0) return this.getAppGrant(grantId);
     const rows = await this.db.updateTable('AppGrant').set(data as never).where('grantId', '=', grantId).returningAll().execute();
     return rows[0] ? toGrant(rows[0]) : null;

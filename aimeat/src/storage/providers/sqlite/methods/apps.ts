@@ -372,11 +372,12 @@ export const appsMethods = {
 
   async createAppGrant(this: SqliteStorage, grant: AppGrantRecord): Promise<AppGrantRecord> {
     this.db.prepare(
-      `INSERT INTO app_grants (grantId, app, appName, appOrigin, owner, gaii, scopes, refreshTokenHash, createdAt, lastUsedAt, revoked)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO app_grants (grantId, app, appName, appOrigin, owner, gaii, scopes, spendCapMorsels, spentMorsels, refreshTokenHash, createdAt, lastUsedAt, revoked)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       grant.grantId, grant.app, grant.appName, grant.appOrigin, grant.owner, grant.gaii,
-      JSON.stringify(grant.scopes), grant.refreshTokenHash, grant.createdAt, grant.lastUsedAt,
+      JSON.stringify(grant.scopes), grant.spendCapMorsels ?? null, grant.spentMorsels ?? 0,
+      grant.refreshTokenHash, grant.createdAt, grant.lastUsedAt,
       grant.revoked ? 1 : 0,
     );
     return grant;
@@ -412,7 +413,7 @@ export const appsMethods = {
 
   async updateAppGrant(this: SqliteStorage, 
     grantId: string,
-    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes'>>,
+    updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels'>>,
   ): Promise<AppGrantRecord | null> {
     const sets: string[] = [];
     const params: unknown[] = [];
@@ -420,6 +421,8 @@ export const appsMethods = {
     if (updates.lastUsedAt !== undefined) { sets.push('lastUsedAt = ?'); params.push(updates.lastUsedAt); }
     if (updates.revoked !== undefined) { sets.push('revoked = ?'); params.push(updates.revoked ? 1 : 0); }
     if (updates.scopes !== undefined) { sets.push('scopes = ?'); params.push(JSON.stringify(updates.scopes)); }
+    if (updates.spendCapMorsels !== undefined) { sets.push('spendCapMorsels = ?'); params.push(updates.spendCapMorsels); }
+    if (updates.spentMorsels !== undefined) { sets.push('spentMorsels = ?'); params.push(updates.spentMorsels); }
     if (sets.length === 0) return this.getAppGrant(grantId);
     params.push(grantId);
     const result = this.db.prepare(`UPDATE app_grants SET ${sets.join(', ')} WHERE grantId = ?`)
@@ -436,6 +439,8 @@ export const appsMethods = {
   deserializeAppGrant(this: SqliteStorage, row: Record<string, unknown>): AppGrantRecord {
     return {
       grantId: row.grantId as string,
+      spendCapMorsels: (row.spendCapMorsels as number | null) ?? null,
+      spentMorsels: (row.spentMorsels as number | null) ?? 0,
       app: row.app as string,
       appName: row.appName as string,
       appOrigin: row.appOrigin as string,

@@ -13,6 +13,8 @@
  *   - Chat instance + device-auth user-code helpers
  * @usage import { resolveIdentity, parseGEAI, isGEAI } from '../utils/gaii.js';
  * @version-history
+ *   v1.3.0 — 2026-07-28 — `callerPrincipal` + `appSlug`: a hosted app is named `eco:{app}#{owner}@{node}`
+ *     where the question is who acted. Storage identity is untouched, so no app's data moves.
  *   v1.2.0 — 2026-07-27 — `ownerGhiiOf`: the identity anything about MONEY keys on, since the wallet
  *     already collapses every agent to its owner. Rights that keyed on the exact caller instead went
  *     out of step with the balance paying for them.
@@ -138,6 +140,51 @@ export function resolveIdentity(auth: { sub: string; owner: string; roles: strin
   const isOwnerSession = auth.roles.includes('owner') &&
     !auth.roles.includes('agent') && !auth.roles.includes('ecosystem');
   return isOwnerSession ? `${auth.owner}@${nodeId}` : auth.sub;
+}
+
+/**
+ * An app id (`nuotta.html`) as a name the `eco:` grammar accepts.
+ *
+ * App ids are FILENAMES and carry an extension; GEAI names are `[a-z0-9][a-z0-9-]{1,62}[a-z0-9]`,
+ * with no dot. Runs of anything else collapse to a single hyphen, so `nuotta.html` is `nuotta-html`
+ * and the mapping is stable without storing anything.
+ *
+ * Two app ids that differ only in a character this flattens would collide (`a.b` and `a-b`). That is
+ * accepted here rather than hidden: the alternative is a stored slug, and a stored slug is a
+ * migration and a second source of truth for a name the filename already fixes.
+ */
+export function appSlug(appId: string): string {
+  const base = appId.includes('/') ? (appId.split('/').pop() as string) : appId;
+  const slug = base.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 64);
+  return slug.length >= 3 ? slug : `app-${slug}`.slice(0, 64);
+}
+
+/**
+ * WHO is making this request, as opposed to whose data space it acts in.
+ *
+ * For everything except a hosted app these are the same string, and this returns what
+ * {@link resolveIdentity} does. For an H-2 app grant they are NOT the same and never were: the token's
+ * `sub` is the OWNER's GHII, because a hosted app deliberately reads and writes the owner's namespace
+ * rather than a fenced one of its own. That makes the app invisible — at the money layer a call from
+ * an app the user once connected is indistinguishable from the user's own, so nobody can be told
+ * afterwards which of the two spent their morsels.
+ *
+ * So the app gets the identity the node already has a grammar for, `eco:{app}#{owner}@{node}`, and it
+ * is used where the QUESTION is "who did this": attribution, metering, consent. Storage keeps using
+ * `resolveIdentity`, so no app's data moves.
+ *
+ * Safe to bill against: `resolveGhii` walks an `eco:` name back to its owner exactly as it does a
+ * GAII, so the human still pays.
+ */
+export function callerPrincipal(
+  auth: { sub: string; owner: string; roles: string[]; app_grant?: string; app?: string },
+  nodeId: string,
+  appId?: string | null,
+): string {
+  if (!auth.roles.includes('app')) return resolveIdentity(auth, nodeId);
+  const id = appId ?? auth.app ?? '';
+  if (!id) return resolveIdentity(auth, nodeId);   // nothing to name it by — fall back rather than invent
+  return buildGEAI(appSlug(id), auth.owner, nodeId);
 }
 
 /**

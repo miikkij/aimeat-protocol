@@ -24,7 +24,7 @@ import { executeExtensionAction } from '../../services/extension-runtime.js';
 import type { ExtensionCtx } from '../../services/extension-runtime.js';
 import { makeExtensionFiles } from '../../services/extension-files.js';
 import { logger } from '../../utils/logger.js';
-import { resolveIdentity } from '../../utils/gaii.js';
+import { resolveIdentity, callerPrincipal } from '../../utils/gaii.js';
 import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
 import { recordCallDuration } from '../../services/call-timing.js';
@@ -41,6 +41,9 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
     const instanceId = req.params.instanceId as string;
     const actionId = req.params.actionId as string;
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    // Who PAYS and whose namespace this runs in is `callerGaii`; who ACTED may be a hosted app, and
+    // the money path is where that distinction has to survive or nobody can be told an app spent.
+    const meteredCaller = callerPrincipal(req.auth!, config.nodeId);
 
     try {
       // Look up the extension
@@ -88,9 +91,10 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       }
 
       // Per-call paywall: owner-free / anti-abuse toll / priced payment (design: paywall.ts).
-      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii, res, payToken: req.header('x-aimeat-pay-token') ?? undefined,
+      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii: meteredCaller, res, payToken: req.header('x-aimeat-pay-token') ?? undefined,
         internalPass: req.header(INTERNAL_PASS_HEADER) ?? undefined,
-        namedAppTool: req.header(APP_TOOL_HEADER) ?? undefined });
+        namedAppTool: req.header(APP_TOOL_HEADER) ?? undefined,
+        session: { roles: req.auth!.roles, scopes: req.auth!.scopes, appGrantId: req.auth!.app_grant ?? null } });
       if (!pay.ok) return;
 
       // Build the ExtensionCtx with instance-scoped memory namespace
@@ -244,6 +248,19 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           owner: req.auth!.owner,
           roles: req.auth!.roles,
         },
+        // Buy a capability from ANOTHER provider, on this extension's owner's account. The other half
+        // of a supply chain: the user pays the app, the app pays its supplier, and the difference is
+        // the owner's margin. Bills the extension's owner, never the caller — the person calling this
+        // app has no relationship with whoever it buys from and should not acquire one.
+        buy: async (appRef: string, tool: string, buyInput?: Record<string, unknown>) => {
+          const { buyForExtension } = await import('../../services/extension-purchase.js');
+          return buyForExtension({
+            config, storage, extName: ext.name, extOwner: ext.installedBy,
+            appRef, tool, input: buyInput ?? {},
+            jwt: (req.headers.authorization || '').replace('Bearer ', ''),
+            correlationId: req.header('x-aimeat-correlation') ?? null,
+          });
+        },
         // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
         config: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),
         instance: { id: instanceId, config: decryptSecretFields(instance.config, getInstanceSecretKeys(ext), getEncryptionKey(config)) },
@@ -333,6 +350,9 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
     const extName = req.params.extName as string;
     const actionId = req.params.actionId as string;
     const callerGaii = resolveIdentity(req.auth!, config.nodeId);
+    // Who PAYS and whose namespace this runs in is `callerGaii`; who ACTED may be a hosted app, and
+    // the money path is where that distinction has to survive or nobody can be told an app spent.
+    const meteredCaller = callerPrincipal(req.auth!, config.nodeId);
 
     try {
       // Look up the extension
@@ -365,9 +385,10 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       }
 
       // Per-call paywall: owner-free / anti-abuse toll / priced payment (design: paywall.ts).
-      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii, res, payToken: req.header('x-aimeat-pay-token') ?? undefined,
+      const pay = await enforcePaywall({ config, storage, ext, action, callerGaii: meteredCaller, res, payToken: req.header('x-aimeat-pay-token') ?? undefined,
         internalPass: req.header(INTERNAL_PASS_HEADER) ?? undefined,
-        namedAppTool: req.header(APP_TOOL_HEADER) ?? undefined });
+        namedAppTool: req.header(APP_TOOL_HEADER) ?? undefined,
+        session: { roles: req.auth!.roles, scopes: req.auth!.scopes, appGrantId: req.auth!.app_grant ?? null } });
       if (!pay.ok) return;
 
       // Build the ExtensionCtx
@@ -524,6 +545,19 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           gaii: callerGaii,
           owner: req.auth!.owner,
           roles: req.auth!.roles,
+        },
+        // Buy a capability from ANOTHER provider, on this extension's owner's account. The other half
+        // of a supply chain: the user pays the app, the app pays its supplier, and the difference is
+        // the owner's margin. Bills the extension's owner, never the caller — the person calling this
+        // app has no relationship with whoever it buys from and should not acquire one.
+        buy: async (appRef: string, tool: string, buyInput?: Record<string, unknown>) => {
+          const { buyForExtension } = await import('../../services/extension-purchase.js');
+          return buyForExtension({
+            config, storage, extName: ext.name, extOwner: ext.installedBy,
+            appRef, tool, input: buyInput ?? {},
+            jwt: (req.headers.authorization || '').replace('Bearer ', ''),
+            correlationId: req.header('x-aimeat-correlation') ?? null,
+          });
         },
         // Decrypt `type: 'secret'` config fields just before handing them to the sandbox VM.
         config: decryptSecretFields(ext.config, getExtSecretKeys(ext), getEncryptionKey(config)),

@@ -28,7 +28,7 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import type { Offer } from '../models/offer-schemas.js';
-import { AppToolsDocSchema, appToolsKey, type AppTool } from '../models/app-tool-schemas.js';
+import { AppToolsDocSchema, appToolsKey, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
 import type { Sellable } from './types.js';
 import { CommerceError } from './errors.js';
 import { listPaymentHandlers } from './payment-handlers.js';
@@ -232,7 +232,9 @@ export function appToolSellableResolver(): SellableResolver {
           // second time on whatever contract they hold, and refuses to serve them at all when they
           // hold none. Payment IS the invocation; the pass says the payment already happened.
           const invoked = await invokeCapability(
-            ctx.config, ctx.storage, cap, item.input ?? {}, session.buyerIdentity, callerJwt ?? '', 'normal',
+            ctx.config, ctx.storage, cap,
+            applyLockedInput(tool, (item.input ?? {}) as Record<string, unknown>),
+            session.buyerIdentity, callerJwt ?? '', 'normal',
             mintInternalPass(`apptool:${sellerOwner}/${appId}`, toolName),
           );
           return { result: invoked.result };

@@ -43,7 +43,7 @@ import {
 } from '../services/exchange-proposals.js';
 import { authoriseMeteredCall } from '../services/metered-access.js';
 import { meteredRefusalText } from '../routes/extensions/metered-response.js';
-import { appToolsKey, appIdFromToolsKey, AppToolsDocSchema } from '../models/app-tool-schemas.js';
+import { appToolsKey, appIdFromToolsKey, AppToolsDocSchema, applyLockedInput } from '../models/app-tool-schemas.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
@@ -159,8 +159,9 @@ export function registerExchangeRunTools(
                 // own HTTP surface and meets the raw paywall, which cannot know which product was bought —
                 // so it billed the same contract a second time. One call, one settlement, whichever twin
                 // of this route the caller reached (the REST WebMCP path carries the same pass).
-                const invoked = await invokeCapability(config, storage, cap, (input ?? {}) as Record<string, unknown>, callerGaii, getToken() ?? '', 'normal',
-                    mintInternalPass(coordExt, tool));
+                const invoked = await invokeCapability(config, storage, cap,
+                    applyLockedInput(toolDef, (input ?? {}) as Record<string, unknown>),
+                    callerGaii, getToken() ?? '', 'normal', mintInternalPass(coordExt, tool));
                 return ok({ app: `${ownerName}/${app}`, tool, iface_version: pinnedVersion ?? null, metered: true, result: invoked.result });
             } catch (err) {
                 if (outcome.kind === 'settled') await outcome.refund();

@@ -30,8 +30,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
-import { AppToolsDocSchema, appToolsKey, isToolPriced, type AppTool } from '../models/app-tool-schemas.js';
+import { resolveIdentity, callerPrincipal } from '../utils/gaii.js';
+import { AppToolsDocSchema, appToolsKey, isToolPriced, applyLockedInput, type AppTool } from '../models/app-tool-schemas.js';
 import { paymentChallenge } from '../commerce/x402.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { authoriseMeteredCall } from '../services/metered-access.js';
@@ -144,9 +144,13 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
     // they hold something" is exactly how that rule went missing here while three other doors had it.
     if (req.auth && !req.auth.anonymous) {
       const callerGaii = resolveIdentity(req.auth, config.nodeId);
+      // The capability runs as the owner, as it always has. The metered call names the app, so an
+      // app's spending is attributable instead of arriving as its owner's own.
+      const meteredCaller = callerPrincipal(req.auth, config.nodeId);
       const coordExt = `apptool:${ownerName}/${filename}`;
       const outcome = await authoriseMeteredCall({
-        config, storage, caller: callerGaii,
+        config, storage, caller: meteredCaller,
+        session: { roles: req.auth.roles, scopes: req.auth.scopes, appGrantId: req.auth.app_grant ?? null },
         product: { ext: coordExt, action: toolName, label: `${filename}/${toolName}`, providerOwner: ownerName },
       });
 
@@ -178,8 +182,9 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
           const startedAt = Date.now();
           // The capability runs over this node's own HTTP surface and meets the raw-invoke paywall,
           // which cannot know which product was bought. The pass says this call was already ruled on.
-          const invoked = await invokeCapability(config, storage, cap, req.body?.input ?? req.body ?? {}, callerGaii, jwt, 'normal',
-            mintInternalPass(coordExt, toolName));
+          const invoked = await invokeCapability(config, storage, cap,
+            applyLockedInput(tool, (req.body?.input ?? req.body ?? {}) as Record<string, unknown>),
+            callerGaii, jwt, 'normal', mintInternalPass(coordExt, toolName));
           // Measured so the provider can propose a service commitment from evidence (call-timing.ts).
           recordCallDuration(storage, providerGhii, coordExt, toolName, Date.now() - startedAt);
           res.json(success(config.nodeId, { app: appRef, tool: toolName, iface_version: pinnedVersion ?? null, metered: outcome.kind === 'settled', result: invoked.result }));
@@ -226,8 +231,9 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
         // still be sold under a sibling tool, and the raw paywall — which sees only the action —
         // would then bill this free call at that neighbour's price. Say what was decided instead of
         // letting it be re-decided by the one place with less information.
-        const invoked = await invokeCapability(config, storage, cap, req.body?.input ?? req.body ?? {}, callerGhii, jwt, 'normal',
-          mintInternalPass(`apptool:${ownerName}/${filename}`, toolName, 'unpriced'));
+        const invoked = await invokeCapability(config, storage, cap,
+          applyLockedInput(tool, (req.body?.input ?? req.body ?? {}) as Record<string, unknown>),
+          callerGhii, jwt, 'normal', mintInternalPass(`apptool:${ownerName}/${filename}`, toolName, 'unpriced'));
         res.json(success(config.nodeId, { app: appRef, tool: toolName, result: invoked.result }));
       } catch (err) {
         const e = err as { statusCode?: number; code?: string; message?: string };

@@ -11,6 +11,8 @@
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
  * @version-history
+ *   v1.6.0 — 2026-07-28 — `lockedInput` + applyLockedInput: a tool fixes the parameter that tells it
+ *     apart from its neighbour, so two products stop being one call the caller can steer.
  *   v1.5.0 — 2026-07-28 — `isToolPriced`: one definition of whether a tool carries a price. There were
  *     two and they disagreed about `pricesMoney`, which let a USD-only tool invoke free.
  *   v1.4.0 — 2026-07-25 — `tollMorsels`: a tool declares its own pacing burn, so a node default of 0
@@ -62,6 +64,18 @@ export const AppToolSchema = z.object({
    * TASK (phase B) — assigned to `agent`, or to the app owner's GHII when no agent is named.
    */
   action_id: z.string().max(200).optional(),
+  /**
+   * Input this tool FIXES, which the caller cannot override. Merged over whatever they send.
+   *
+   * One capability often serves several products, told apart by a parameter. Measured on production:
+   * `search` (0.01 EUR) and `budget-leads` (0.05 EUR) both bind `ext:kaiku-signals:search`, and the
+   * only thing between them is a `category` field the manifest DOCUMENTS as "Set to budget." while
+   * the caller supplies it. So a buyer of the cheap product could send `category: budget` and receive
+   * the expensive one, and a buyer of the expensive one who forgot it paid 5x for the cheap answer.
+   * A price gate cannot catch that: it charges correctly for the contract taken and the extension
+   * decides what comes back. Pinning the discriminator is what makes two products two calls.
+   */
+  lockedInput: z.record(z.string(), z.unknown()).optional(),
   /**
    * Task-path assignee (phase B): the bare name of the app owner's agent that receives the
    * fulfillment TASK when the tool has no action_id binding. Ignored for callable tools.
@@ -149,6 +163,18 @@ export const appIdFromToolsKey = (key: string): string | null => {
  * unrelated contract. "Is this priced" is a property of the manifest, so it belongs beside the schema
  * rather than in each route that happens to ask.
  */
+/**
+ * The input a tool actually runs with: what the caller sent, with the tool's own fixed fields laid
+ * over the top. Locked LAST on purpose — a caller must not be able to talk their way into a
+ * neighbouring product by sending the field themselves.
+ */
+export function applyLockedInput(
+  tool: { lockedInput?: Record<string, unknown> },
+  input: Record<string, unknown>,
+): Record<string, unknown> {
+  return tool.lockedInput ? { ...input, ...tool.lockedInput } : input;
+}
+
 export function isToolPriced(t: {
   price?: { morsels?: number } | null;
   priceMoney?: { amount?: number } | null;

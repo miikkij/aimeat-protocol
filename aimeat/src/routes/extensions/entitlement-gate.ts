@@ -44,10 +44,12 @@ export async function settleMeteredCoordinate(args: {
   callerGaii: string; res: Response;
   /** The selling owner, when the coordinate does not name one (a raw extension action). */
   providerOwner?: string | null;
+  /** The session behind the request, so the chokepoint can check what it is permitted to spend. */
+  session?: { roles: string[]; scopes: string[]; appGrantId?: string | null } | null;
 }): Promise<PaywallOutcome | null> {
-  const { config, storage, coordExt, coordAction, label, callerGaii, res, providerOwner } = args;
+  const { config, storage, coordExt, coordAction, label, callerGaii, res, providerOwner, session } = args;
   const outcome = await authoriseMeteredCall({
-    config, storage, caller: callerGaii,
+    config, storage, caller: callerGaii, session: session ?? null,
     product: { ext: coordExt, action: coordAction, label, providerOwner: providerOwner ?? null },
   });
   switch (outcome.kind) {
@@ -63,11 +65,12 @@ export async function settleMeteredCoordinate(args: {
 /** Settle a raw extension invoke (the ext-action wrapper), or return `null` to fall through. */
 export async function settleViaEntitlement(args: {
   config: AimeatConfig; storage: Storage; ext: ExtensionRecord; action: ExtAction; callerGaii: string; res: Response;
+  session?: { roles: string[]; scopes: string[]; appGrantId?: string | null } | null;
 }): Promise<PaywallOutcome | null> {
   return settleMeteredCoordinate({
     config: args.config, storage: args.storage,
     coordExt: args.ext.name, coordAction: args.action.id, label: `${args.ext.name}/${args.action.id}`,
-    callerGaii: args.callerGaii, res: args.res,
+    callerGaii: args.callerGaii, res: args.res, session: args.session ?? null,
     // A bare extension name carries no owner; the record does.
     providerOwner: args.ext.installedBy,
   });

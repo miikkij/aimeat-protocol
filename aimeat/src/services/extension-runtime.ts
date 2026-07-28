@@ -6,6 +6,8 @@
  *   Node.js globals (process, require, Buffer, etc.) -- only a controlled
  *   `ctx` API proxy.
  * @version-history
+ *   v1.1.0 — 2026-07-28 — `ctx.buy`: an extension buys another owner's app-tool on its OWN owner's
+ *     account — the supply-chain leg. Counted against maxApiCalls; answers with a decision, not a throw.
  *   v1.0.0 -- 2026-03-01 -- Initial V8 sandbox implementation (isolated-vm)
  *   v1.1.0 -- 2026-03-15 -- Add memory access tracking (MemoryAccessLog + trackMemoryAccess)
  *   v2.0.0 -- 2026-04-29 -- Replace isolated-vm with quickjs-emscripten (pure WASM, no C++ build tools)
@@ -40,6 +42,18 @@ export interface ExtensionCtx {
         consume?(amount: number, reason: string): Promise<{ success: boolean; error?: string }>;
         getBalance?(): Promise<number>;
     };
+    /**
+     * Buy one call of ANOTHER owner's app-tool, on this extension's owner's account.
+     *
+     * The supply-chain leg: a user pays the app, the app pays its supplier, and the difference is the
+     * app owner's margin. Billed to the extension's OWNER, never to whoever happens to be calling —
+     * the caller has no relationship with the supplier and should not acquire one by using the app.
+     * Requires a contract the owner already holds against that tool; without one it returns
+     * `{ ok: false, code: 'NO_CONTRACT' }` rather than throwing, so the extension can degrade.
+     */
+    buy?(appRef: string, tool: string, input?: Record<string, unknown>): Promise<{
+        ok: boolean; result?: unknown; code?: string; message?: string; charged?: number; correlation?: string;
+    }>;
     consent: {
         check?(gaii: string, scope: string): Promise<boolean>;
         require?(gaii: string, scope: string): Promise<void>;
@@ -241,6 +255,11 @@ ${userFnDecl}
             consume:    __wallet_consume    ? (async (amount, reason) => __call(__wallet_consume, [String(amount), reason]))  : undefined,
             getBalance: __wallet_balance    ? (async ()               => __call(__wallet_balance, []))                         : undefined,
         },
+        // Buy from another provider on this extension's owner's account. JSON both ways: the bridge
+        // moves strings, and the answer is a decision object rather than a throw so a supplier being
+        // unavailable is something the extension can handle instead of a failed call.
+        buy: __ext_buy ? (async (appRef, tool, input) =>
+            JSON.parse(await __call(__ext_buy, [appRef, tool, JSON.stringify(input ?? {})]))) : undefined,
         consent: {
             check:   __consent_check   ? (async (gaii, scope) => __call(__consent_check, [gaii, scope]))   : undefined,
             require: __consent_require ? (async (gaii, scope) => __call(__consent_require, [gaii, scope])) : undefined,
@@ -473,6 +492,16 @@ export async function executeExtensionAction(
         registerAsyncHostFn(vm, '__wallet_balance',
             ctx.wallet.getBalance
                 ? async () => ctx.wallet.getBalance!()
+                : null,
+            counter, limits.maxApiCalls, inflight);
+
+        // ── Purchase API ──────────────────────────────────────
+        // The supply-chain leg: this extension buying a capability from ANOTHER owner, billed to its
+        // own owner. Counted against maxApiCalls like any other outbound step, because it is one.
+        registerAsyncHostFn(vm, '__ext_buy',
+            ctx.buy
+                ? async (appRef, tool, inputJson) =>
+                    JSON.stringify(await ctx.buy!(appRef, tool, JSON.parse(inputJson || '{}') as Record<string, unknown>))
                 : null,
             counter, limits.maxApiCalls, inflight);
 

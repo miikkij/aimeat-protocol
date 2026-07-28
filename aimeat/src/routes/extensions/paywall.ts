@@ -124,8 +124,10 @@ export async function enforcePaywall(args: {
   internalPass?: string;
   /** `x-aimeat-app-tool` header — which product a caller holding several means. Validated, never trusted. */
   namedAppTool?: string;
+  /** The session behind the request — a hosted app needs an explicit permission to spend. */
+  session?: { roles: string[]; scopes: string[]; appGrantId?: string | null } | null;
 }): Promise<PaywallOutcome> {
-  const { config, storage, ext, action, callerGaii, res, payToken, internalPass, namedAppTool } = args;
+  const { config, storage, ext, action, callerGaii, res, payToken, internalPass, namedAppTool, session } = args;
   const ownerName = ext.installedBy;
   // Owner from any principal form: GHII (owner@node), GAII (agent#owner@node), or bare name.
   // (parseGAII only recognises the GAII form, so extract directly to catch owner GHII sessions.)
@@ -172,7 +174,7 @@ export async function enforcePaywall(args: {
   //    this exact (ext, action), it takes over BOTH the pacing burn and the commercial settlement —
   //    budget cap + platform rake — so a negotiated contract flows without a per-call checkout.
   //    Consulted before the pacing burn below so the toll is never charged twice for one call.
-  const viaEntitlement = await settleViaEntitlement({ config, storage, ext, action, callerGaii, res });
+  const viaEntitlement = await settleViaEntitlement({ config, storage, ext, action, callerGaii, res, session });
   if (viaEntitlement) return viaEntitlement;
 
   // 3.1 Uncontracted call: pace it here. Same burn, same rule — a burn, never revenue (M1).
@@ -226,7 +228,7 @@ export async function enforcePaywall(args: {
     if (chosen) {
       const viaTool = await settleMeteredCoordinate({
         config, storage, coordExt: `apptool:${ownerName}/${chosen.appId}`, coordAction: chosen.tool,
-        label: `${chosen.appId}/${chosen.tool}`, callerGaii, res,
+        label: `${chosen.appId}/${chosen.tool}`, callerGaii, res, session,
       });
       if (viaTool) return viaTool;                          // contracted → settled once, right here
     }

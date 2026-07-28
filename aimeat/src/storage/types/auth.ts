@@ -53,6 +53,15 @@ export interface AppGrantRecord {
   owner: string;              // bare owner name who granted
   gaii: string;               // owner GHII (alice@node) the issued token resolves to
   scopes: string[];           // granted agent scopes (JSON array)
+  /**
+   * Ceiling on what this app may spend of its owner's money, in morsels, across the life of the
+   * grant. `null` = no ceiling (the scope alone). A yes/no permission is a poor answer to "may this
+   * app buy for me" — the useful answer is an amount, and it only became expressible once an app
+   * could be named apart from its owner at all.
+   */
+  spendCapMorsels?: number | null;
+  /** Spent so far under this grant, in morsels. Only moves when the app itself causes a charge. */
+  spentMorsels?: number;
   refreshTokenHash: string | null;  // SHA-256 of current refresh token; null once revoked
   createdAt: string;          // ISO
   lastUsedAt: string | null;  // ISO

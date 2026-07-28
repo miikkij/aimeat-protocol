@@ -17,6 +17,9 @@
  *     POST /token, GET /v1/app-grants, DELETE /v1/app-grants/:grantId
  * @usage app.use(appGrantsRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-07-28 — `contract:spend` + a per-app ceiling (PATCH /:grantId/spend-cap). Reading your
+ *     data and buying with your money are separate favours, and the useful answer to the second is an
+ *     amount rather than a yes. The token now carries the app's own id so the caller can be NAMED.
  *   v1.0.0 — 2026-06-20 — Initial (H-2 app-origin isolation, Phase 3: explicit scoped app grants).
  *   v1.1.0 — 2026-06-20 — Add silent SSO bridge GET /v1/auth/app-grant-silent: when the owner is
  *     logged into the apex, their own app (bound by its per-app subdomain origin) gets a scoped
@@ -88,6 +91,12 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'workflow:read': 'See your automations (workflows) and their runs',
   'workflow:write': 'Create, save, and run your automations (workflows)',
   'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
+  // Spending is its own permission. Reading your memory and buying on your behalf are not the same
+  // favour, and until this existed the narrowest grant there is was enough to draw on any contract
+  // its owner held — the app presented the owner's own GHII, so the money layer could not tell them
+  // apart. Paired with a per-app ceiling (`spend_cap_units`) so the answer can be an amount rather
+  // than a yes.
+  'contract:spend': 'Buy on your behalf using contracts you hold (spends your morsels or money)',
   'notifications:send': 'Send you notifications (bell + browser push) that open this app',
   'organism:read': 'Read the published content of workspaces you are a member of (e.g. gated curriculum an app renders for you)',
   'organism:invite': 'Invite people into organisms you belong to (send email invitations / access keys on your behalf)',
@@ -373,9 +382,12 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
   }
 
   /** Mint a scoped access JWT for a grant: sub = owner GHII, role 'app', granted scopes only. */
-  async function issueAccessToken(grant: { gaii: string; owner: string; scopes: string[]; grantId: string }): Promise<{ token: string; expiresIn: number }> {
+  async function issueAccessToken(grant: { gaii: string; owner: string; scopes: string[]; grantId: string; app?: string }): Promise<{ token: string; expiresIn: number }> {
     const token = await issueJWT(
-      { sub: grant.gaii, owner: grant.owner, node: config.nodeId, roles: ['app'], scopes: grant.scopes, app_grant: grant.grantId },
+      // `sub` stays the OWNER's GHII: a hosted app reads and writes the owner's namespace, and moving
+      // that would move every existing app's data. `app` names the app beside it, so the caller can be
+      // identified where the question is who acted rather than whose space it acted in.
+      { sub: grant.gaii, owner: grant.owner, node: config.nodeId, roles: ['app'], scopes: grant.scopes, app_grant: grant.grantId, app: grant.app },
       config.accessTtlSeconds,
     );
     return { token, expiresIn: config.accessTtlSeconds };
@@ -471,7 +483,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       { app: grantTarget, appName: grantName, appOrigin: `https://${host}`, owner, gaii: ownerGhii, scopes },
       existing,
     );
-    const { token, expiresIn } = await issueAccessToken({ gaii: ownerGhii, owner, scopes, grantId });
+    const { token, expiresIn } = await issueAccessToken({ gaii: ownerGhii, owner, scopes, grantId, app: grantTarget });
     // The owner's display name (if set) so the app's login pill can show a human label instead of the
     // raw GHII. Non-sensitive (it's the public profile name); falls back to '' → the SDK shows the GHII.
     const ghiiRec = await storage.getGHII(ownerGhii);
@@ -510,7 +522,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
         { app: ac.app, appName: ac.appName, appOrigin: ac.appOrigin, owner: ac.owner, gaii: ac.gaii, scopes: ac.scopes },
         await storage.getAppGrantByOwnerAndApp(ac.owner, ac.app),
       );
-      const { token, expiresIn } = await issueAccessToken({ gaii: ac.gaii, owner: ac.owner, scopes: ac.scopes, grantId });
+      const { token, expiresIn } = await issueAccessToken({ gaii: ac.gaii, owner: ac.owner, scopes: ac.scopes, grantId, app: ac.app });
       // app + own: same metadata the silent bridge returns, so the SDK keeps the login pill's
       // grant-gear state correct when the session came through the visible consent flow instead.
       return res.json(success(config.nodeId, {
@@ -530,7 +542,7 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
       // Rotate the refresh token (one-time use).
       const newRaw = randomBytes(32).toString('hex');
       await storage.updateAppGrant(grant.grantId, { refreshTokenHash: hashToken(newRaw), lastUsedAt: new Date().toISOString() });
-      const { token, expiresIn } = await issueAccessToken({ gaii: grant.gaii, owner: grant.owner, scopes: grant.scopes, grantId: grant.grantId });
+      const { token, expiresIn } = await issueAccessToken({ gaii: grant.gaii, owner: grant.owner, scopes: grant.scopes, grantId: grant.grantId, app: grant.app });
       return res.json(success(config.nodeId, {
         access_token: token, token_type: 'Bearer', expires_in: expiresIn,
         refresh_token: newRaw, scope: grant.scopes.join(' '), grant_id: grant.grantId,
@@ -550,6 +562,40 @@ export function appGrantsRouter(config: AimeatConfig, storage: Storage): Router 
         scopes: g.scopes, granted_at: g.createdAt, last_used_at: g.lastUsedAt,
       })),
       total: grants.length,
+    }));
+  });
+
+  /**
+   * PATCH /v1/app-grants/:grantId/spend-cap — how much of your money this app may spend.
+   *
+   * The `contract:spend` scope answers whether an app may buy on your behalf. This answers how much,
+   * which is the answer most people actually want: a yes with no number is a blank cheque. Body:
+   * `{ cap_morsels: number | null }` — null clears the ceiling, 0 stops it without revoking anything
+   * else it was trusted with. `{ reset: true }` puts the counter back to zero (a new month, say).
+   */
+  router.patch('/v1/app-grants/:grantId/spend-cap', requireAuth(), requireRole('owner'), async (req: Request, res: Response) => {
+    const owner = req.auth!.owner;
+    const grant = await storage.getAppGrant(req.params.grantId as string);
+    if (!grant || grant.owner !== owner) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Grant not found'));
+    }
+    const b = (req.body ?? {}) as Record<string, unknown>;
+    const raw = b.cap_morsels;
+    if (raw !== undefined && raw !== null && !(typeof raw === 'number' && Number.isInteger(raw) && raw >= 0)) {
+      return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'cap_morsels must be a whole number of morsels, or null to remove the ceiling'));
+    }
+    const updates: Parameters<typeof storage.updateAppGrant>[1] = {};
+    if (raw !== undefined) updates.spendCapMorsels = raw === null ? null : (raw as number);
+    if (b.reset === true) updates.spentMorsels = 0;
+    if (!Object.keys(updates).length) {
+      return res.status(400).json(error(config.nodeId, 'BAD_REQUEST', 'Nothing to change — pass cap_morsels and/or reset'));
+    }
+    const updated = await storage.updateAppGrant(grant.grantId, updates);
+    return res.json(success(config.nodeId, {
+      grant_id: grant.grantId, app: grant.app,
+      cap_morsels: updated?.spendCapMorsels ?? null,
+      spent_morsels: updated?.spentMorsels ?? 0,
+      can_spend: (updated?.scopes ?? []).includes('contract:spend'),
     }));
   });
 

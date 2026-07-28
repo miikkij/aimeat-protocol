@@ -59,6 +59,16 @@ export function meteredRefusalText(outcome: Refusal, label: string): { status: n
             + 'under their grant, and their balance does not cover it right now. Morsels replenish daily.'
           : `This call needs ${outcome.needed} morsels and the balance does not cover it. Morsels replenish `
             + 'daily; the pacing toll bounds how fast a capability can be called, whatever it is paid in.' };
+    case 'scope_required':
+      return { status: 403, code: 'SCOPE_DENIED',
+        message: `This app may not spend on your behalf. It needs the "${outcome.scope}" permission, `
+          + 'which you can grant it from Profile > Access. Reading your data and buying with your '
+          + 'money are separate permissions.' };
+    case 'app_cap_reached':
+      return { status: 402, code: 'APP_SPEND_CAP',
+        message: `This app has spent the ${outcome.capMorsels}-morsel limit you set for it `
+          + `(${outcome.spentMorsels} used). Raise or clear the limit in Profile > Access to let it `
+          + 'keep buying on your behalf.' };
     case 'settlement_failed':
       return { status: 500, code: 'SETTLEMENT_FAILED',
         message: `Payment for ${label} could not be settled (${outcome.reason}); you were not charged.` };

@@ -56,6 +56,9 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('organisms', 'memberVisibility', 'TEXT');
   // Who made the call, beside whose balance moved — see WalletTransaction.initiatorGaii.
   safeAddColumn('wallet_transactions', 'initiatorGaii', 'TEXT');
+  // What a granted app may spend of its owner's money, and what it has spent so far.
+  safeAddColumn('app_grants', 'spendCapMorsels', 'INTEGER');
+  safeAddColumn('app_grants', 'spentMorsels', 'INTEGER NOT NULL DEFAULT 0');
 
   // Owner session refresh tokens — add columns to existing sessions tables, then
   // index the lookup columns (must run AFTER the ALTERs so the columns exist).

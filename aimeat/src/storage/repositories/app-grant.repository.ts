@@ -25,6 +25,6 @@ export interface AppGrantRepository {
    */
   getAppGrantByOwnerAndApp(owner: string, app: string): Promise<AppGrantRecord | null>;
   listAppGrantsByOwner(owner: string): Promise<AppGrantRecord[]>;
-  updateAppGrant(grantId: string, updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes'>>): Promise<AppGrantRecord | null>;
+  updateAppGrant(grantId: string, updates: Partial<Pick<AppGrantRecord, 'refreshTokenHash' | 'lastUsedAt' | 'revoked' | 'scopes' | 'spendCapMorsels' | 'spentMorsels'>>): Promise<AppGrantRecord | null>;
   deleteAppGrant(grantId: string): Promise<boolean>;
 }

@@ -275,6 +275,8 @@ export function applySchemaTables2(db: Database.Database): void {
       owner            TEXT NOT NULL,
       gaii             TEXT NOT NULL,
       scopes           TEXT NOT NULL DEFAULT '[]',
+      spendCapMorsels  INTEGER,
+      spentMorsels     INTEGER NOT NULL DEFAULT 0,
       refreshTokenHash TEXT,
       createdAt        TEXT NOT NULL,
       lastUsedAt       TEXT,

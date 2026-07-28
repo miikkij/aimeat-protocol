@@ -58,6 +58,8 @@ export interface JWTPayload {
   homeUrl?: string;     // home node base URL for federated sessions
   eco_app?: string;     // ecosystem app global name (e.g. "zendesk") for GEAI (role: ecosystem) sessions
   app_grant?: string;   // app-grant id for scoped, user-approved app tokens (role: app) — H-2
+  app?: string;         // the app's own id ("owner/filename") for role-'app' tokens, so the caller
+                        //   can be NAMED without a grant lookup — see gaii.ts callerPrincipal
 }
 
 /** Generate a unique session ID for JWT tracking. */
@@ -79,6 +81,7 @@ export async function issueJWT(payload: JWTPayload, ttlSeconds: number, sessionI
     ...(payload.homeUrl ? { homeUrl: payload.homeUrl } : {}),
     ...(payload.eco_app ? { eco_app: payload.eco_app } : {}),
     ...(payload.app_grant ? { app_grant: payload.app_grant } : {}),
+    ...(payload.app ? { app: payload.app } : {}),
   })
     .setProtectedHeader({ alg: 'EdDSA', typ: 'JWT' })
     .setSubject(payload.sub)
@@ -108,6 +111,7 @@ export interface VerifiedToken {
   homeUrl?: string;     // home node base URL for federated sessions
   eco_app?: string;     // ecosystem app global name for GEAI (role: ecosystem) sessions
   app_grant?: string;   // app-grant id for scoped, user-approved app tokens (role: app)
+  app?: string;         // the app's own id ("owner/filename") for role-'app' tokens
 }
 
 export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
@@ -131,6 +135,7 @@ export async function verifyJWT(token: string): Promise<VerifiedToken | null> {
       homeUrl: payload.homeUrl as string | undefined,
       eco_app: payload.eco_app as string | undefined,
       app_grant: payload.app_grant as string | undefined,
+      app: payload.app as string | undefined,
     };
   } catch {
     // Fail-closed by design: any verification error (bad signature, expiry, malformed claims) means
