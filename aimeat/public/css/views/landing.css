@@ -117,6 +117,18 @@
 .ld-case-proof:hover { text-decoration: underline; }
 .ld-case-proofnote { font-size: .8rem; color: var(--text-dim); font-style: italic; background: var(--bg-surface, var(--bg-dim)); border-radius: 6px; padding: .45rem .7rem; }
 
+/* Cases grouped by how far up the value ladder they sit: work happens without you →
+   the company runs on it → the company earns on it. A group with no cases is dropped in
+   JS (Group() returns null), not here — htm leaves whitespace nodes, so :empty never matches. */
+.ld-casegroup { margin: 2.5rem 0 0; }
+.ld-casegroup-title { font-size: 1.1rem; font-weight: 700; color: var(--accent); margin: 0; }
+.ld-casegroup .ld-cases { margin-top: .9rem; }
+
+/* Why owning it is the reason to buy — the regulated-buyer argument. */
+.ld-sovereignty { margin: 2.75rem 0 0; }
+.ld-sov-list { margin: .9rem 0 0; padding-left: 1.2rem; display: grid; gap: .5rem; }
+.ld-sov-list li { color: var(--text-dim); font-size: .9rem; line-height: 1.5; }
+
 /* ── Contact card (business + pricing only) ── */
 .ld-contact { max-width: 460px; margin: 2.25rem auto 0; padding: 1.25rem 1.5rem; border: 2px solid var(--accent); border-radius: 14px; background: var(--card); text-align: center; }
 .ld-contact-title { font-size: 1.15rem; font-weight: 800; margin-bottom: .4rem; }
