@@ -686,7 +686,8 @@
     "companies": "Yritykset",
     "learn": "Opi",
     "exchange": "EXCHANGE",
-    "members": "Jäsenet"
+    "members": "Jäsenet",
+    "me": "Minä"
   },
   "companies": {
     "title": "Yritykset",

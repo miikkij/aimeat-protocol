@@ -275,7 +275,7 @@
 
   <script type="module">
     import { h, render, Component } from 'preact';
-    import { useState, useEffect, useCallback } from 'preact/hooks';
+    import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
     import htm from 'htm';
     import { loadTranslations, t, getLocale, switchLocale, onLocaleChange } from '/js/i18n.js';
     import { initThemeSystem } from '/js/theme.js';
@@ -586,6 +586,9 @@
       const [session, setSession] = useState(null);
       const [morsels, setMorsels] = useState(null);
       const [menuOpen, setMenuOpen] = useState(false);
+      const [meOpen, setMeOpen] = useState(false);
+      const navRef = useRef(null);
+      const meRef = useRef(null);
       // Node feature flags from /v1/site/header-nav. Empty until the fetch resolves,
       // so optional surfaces stay hidden until we positively learn they're enabled (no flash).
       const [features, setFeatures] = useState({});
@@ -608,6 +611,47 @@
         window.addEventListener('aimeat-auth-change', checkAuth);
         return () => window.removeEventListener('aimeat-auth-change', checkAuth);
       }, []);
+
+      // Collapse to the hamburger by MEASUREMENT, not by a guessed pixel width.
+      //
+      // How much room the bar needs depends on state, not just on the screen: signing in adds
+      // the Me button, a notification bell and a wide gold pill, and an operator adds Admin
+      // inside Me. A fixed breakpoint cannot know any of that, which is how a 2000px window
+      // ended up with the nav hanging out underneath a 56px-tall bar.
+      //
+      // The test has to run with the bar EXPANDED (a collapsed bar always "fits"), so it drops
+      // the class, measures, and puts it back in the same frame — no paint happens in between.
+      useEffect(() => {
+        const nav = navRef.current;
+        if (!nav || typeof ResizeObserver === 'undefined') return undefined;
+        let raf = 0;
+        const measure = () => {
+          raf = 0;
+          const wasCompact = nav.classList.contains('topnav--compact');
+          if (wasCompact) nav.classList.remove('topnav--compact');
+          const overflows = nav.scrollWidth > nav.clientWidth + 1;
+          nav.classList.toggle('topnav--compact', overflows);
+          if (overflows !== wasCompact && !overflows) setMenuOpen(false);
+        };
+        const schedule = () => { if (!raf) raf = requestAnimationFrame(measure); };
+        const ro = new ResizeObserver(schedule);
+        ro.observe(nav);
+        schedule();
+        window.addEventListener('resize', schedule);
+        return () => { ro.disconnect(); window.removeEventListener('resize', schedule); if (raf) cancelAnimationFrame(raf); };
+        // Re-measures whenever the bar's contents change: signing in, the operator's Admin
+        // link appearing, a different nav config arriving, or the language switching.
+      }, [session, locale, navConfig, morsels]);
+
+      // Close the Me dropdown on an outside click, the way every other menu on the page behaves.
+      useEffect(() => {
+        if (!meOpen) return undefined;
+        const onDown = (e) => { if (meRef.current && !meRef.current.contains(e.target)) setMeOpen(false); };
+        const onKey = (e) => { if (e.key === 'Escape') setMeOpen(false); };
+        document.addEventListener('pointerdown', onDown);
+        document.addEventListener('keydown', onKey);
+        return () => { document.removeEventListener('pointerdown', onDown); document.removeEventListener('keydown', onKey); };
+      }, [meOpen]);
 
       // Load operator-configured header nav (public endpoint, no auth needed).
       useEffect(() => {
@@ -663,7 +707,7 @@
         .filter(l => l.path);
 
       return html`
-        <nav class="topnav">
+        <nav class="topnav" ref=${navRef}>
           <div style="display:flex;align-items:center;gap:20px">
             <a href="/v1/portal" class="topnav-brand" onClick=${(e) => handleNav(e, '/v1/portal')}>
               AIME<span class="heart">\u2665</span><span class="brand-at">AT</span>
@@ -688,19 +732,30 @@
                     onClick=${(e) => { handleNav(e, link.path); setMenuOpen(false); }}
                     class="${link.matchActive !== false && currentPath === link.path ? 'active' : ''}">${t(link.key) || link.fallback || link.key}</a>
                 `))}
+              <!-- Signing in used to append four more top-level links (Apps, Profile, My
+                   Company, Admin) next to a bell and a wide gold pill, which is what pushed
+                   the bar past its width even on a 2000px screen. They live behind one "Me"
+                   button now; inside the burger sheet the button disappears and the links
+                   simply join the list. -->
               ${session && html`
-                <a href="/app-catalog.html" target="_blank" onClick=${() => setMenuOpen(false)} class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
-                <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/profile'); setMenuOpen(false); }}>
-                  ${t('nav.profile')}
-                </a>
-                <a href="/v1/my-company" class="${currentPath === '/v1/my-company' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/my-company'); setMenuOpen(false); }}>
-                  ${t('nav.myCompany')}
-                </a>
-                ${session.roles && session.roles.includes('operator') && html`
-                  <a href="/v1/admin" class="${currentPath === '/v1/admin' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/admin'); setMenuOpen(false); }}>
-                    ${t('nav.admin')}
-                  </a>
-                `}
+                <div class="topnav-me" ref=${meRef}>
+                  <button type="button" class="topnav-me-btn" aria-haspopup="true" aria-expanded=${meOpen ? 'true' : 'false'}
+                    onClick=${() => setMeOpen(o => !o)}>${t('nav.me') || 'Me'}<span class="chev">▾</span></button>
+                  <div class="topnav-me-menu ${meOpen ? 'open' : ''}">
+                    <a href="/app-catalog.html" target="_blank" onClick=${() => { setMeOpen(false); setMenuOpen(false); }} class="${currentPath === '/app-catalog.html' ? 'active' : ''}">${t('nav.apps') || 'Apps'}</a>
+                    <a href="/v1/profile" class="profile-link visible ${currentPath === '/v1/profile' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/profile'); setMeOpen(false); setMenuOpen(false); }}>
+                      ${t('nav.profile')}
+                    </a>
+                    <a href="/v1/my-company" class="${currentPath === '/v1/my-company' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/my-company'); setMeOpen(false); setMenuOpen(false); }}>
+                      ${t('nav.myCompany')}
+                    </a>
+                    ${session.roles && session.roles.includes('operator') && html`
+                      <a href="/v1/admin" class="${currentPath === '/v1/admin' ? 'active' : ''}" onClick=${(e) => { handleNav(e, '/v1/admin'); setMeOpen(false); setMenuOpen(false); }}>
+                        ${t('nav.admin')}
+                      </a>
+                    `}
+                  </div>
+                </div>
               `}
               <div class="topnav-center">
                 <button class="lang-btn ${locale === 'en' ? 'active' : ''}" onClick=${() => handleLangSwitch('en')}>EN</button>

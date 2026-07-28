@@ -588,23 +588,35 @@ a { color: inherit; text-decoration: none; }
 }
 
 /* ── Header nav: desktop inline; mobile = hamburger + dropdown (see @media) ── */
-/* flex-wrap so a node with many public links drops to a second row instead of overflowing,
-   and nowrap on the labels so a two-word link never breaks mid-phrase ("Try / it"). */
-.topnav-menu { display: flex; align-items: center; gap: 0.75rem; flex-wrap: wrap; justify-content: flex-end; }
+/* .topnav is a FIXED-height row, so the menu must never wrap: a second row does not make
+   the bar taller, it spills out below it. Links stay on one line (no "Try / it" splits) and
+   the whole bar collapses to the hamburger the moment it stops fitting — see .topnav--compact. */
+.topnav-menu { display: flex; align-items: center; gap: 0.75rem; flex-wrap: nowrap; justify-content: flex-end; }
 .topnav-menu > a { white-space: nowrap; }
 .topnav-burger { display: none; }
 /* Truncate a long GHII in the gold pill so it never blows out the bar (desktop). */
 .aimeat-auth-ghii { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
-/* Collapse the header to a hamburger well before the full inline nav (links +
-   theme/lang + gold pill, wider still for operators with the Admin link) runs
-   out of room — otherwise the pill overflows in the ~900–1180px band. */
+/* Collapse the header to a hamburger the moment the inline nav stops fitting.
+   TWO triggers, one rule set:
+     - the media query is the floor (narrow screens always collapse);
+     - `.topnav--compact` is set by the header itself when it MEASURES an overflow.
+   The measurement matters because how much the bar needs is not a function of screen
+   width alone: signing in adds four links, a bell and a wide gold pill, and an operator
+   adds Admin on top. A fixed pixel breakpoint cannot know that, which is how a 2000px
+   window ended up with a nav hanging out below the bar. */
 @media (max-width: 1180px) {
   .topnav { padding: 0 0.5rem; }
   .topnav-right { gap: 0.5rem; }
   /* Free up bar width so the gold pill never overflows — the morsel count is
      still shown in the profile dashboard. */
   .brand-morsels { display: none !important; }
+}
+.topnav--compact { padding: 0 0.5rem; }
+.topnav--compact .topnav-right { gap: 0.5rem; }
+.topnav--compact .brand-morsels { display: none !important; }
+
+@media (max-width: 1180px) {
   .topnav-burger {
     display: inline-flex; align-items: center; justify-content: center;
     width: 38px; height: 34px; padding: 0; font-size: 1.2rem; line-height: 1;
@@ -616,6 +628,9 @@ a { color: inherit; text-decoration: none; }
     flex-direction: column; align-items: stretch; gap: 0;
     background: var(--bg-card); border-bottom: 1px solid var(--border);
     box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,.18)); padding: 0.4rem;
+    /* border-box so the padding + border count INSIDE the cap; content-box let the sheet
+       stand 14px past the fold on a short screen. */
+    box-sizing: border-box; max-height: calc(100dvh - var(--nav-height)); overflow-y: auto;
   }
   .topnav-menu.open { display: flex; }
   .topnav-menu a { width: 100%; padding: 0.7rem 0.9rem; font-size: 0.95rem; border-radius: var(--radius-xs); }
@@ -624,6 +639,61 @@ a { color: inherit; text-decoration: none; }
   .aimeat-auth-pill .aimeat-auth-label,
   .aimeat-auth-pill .aimeat-auth-ghii { display: none !important; }
   .aimeat-auth-pill { padding: 5px 11px !important; gap: 6px !important; }
+}
+.topnav--compact .topnav-burger {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 38px; height: 34px; padding: 0; font-size: 1.2rem; line-height: 1;
+  background: none; color: var(--text); border: 1px solid var(--border);
+  border-radius: var(--radius-xs); cursor: pointer;
+}
+.topnav--compact .topnav-menu {
+  display: none; position: absolute; top: var(--nav-height); left: 0; right: 0;
+  flex-direction: column; align-items: stretch; gap: 0;
+  background: var(--bg-card); border-bottom: 1px solid var(--border);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,.18)); padding: 0.4rem;
+  box-sizing: border-box; max-height: calc(100dvh - var(--nav-height)); overflow-y: auto;
+}
+.topnav--compact .topnav-menu.open { display: flex; }
+.topnav--compact .topnav-menu a { width: 100%; padding: 0.7rem 0.9rem; font-size: 0.95rem; border-radius: var(--radius-xs); }
+.topnav--compact .topnav-menu .topnav-center { width: fit-content; margin: 0.45rem 0.6rem 0.2rem; }
+.topnav--compact .aimeat-auth-pill .aimeat-auth-label,
+.topnav--compact .aimeat-auth-pill .aimeat-auth-ghii { display: none !important; }
+.topnav--compact .aimeat-auth-pill { padding: 5px 11px !important; gap: 6px !important; }
+
+/* Signed-in destinations live behind one "Me" button instead of four more top-level
+   links. Four links, a bell and a gold pill is what tipped the bar over. */
+.topnav-me { position: relative; }
+.topnav-me-btn {
+  display: inline-flex; align-items: center; gap: 0.3rem; white-space: nowrap;
+  padding: 6px 12px; background: none; color: var(--text); font: inherit; font-size: 0.84rem;
+  font-weight: 600; border: 1px solid var(--border); border-radius: var(--radius-xs); cursor: pointer;
+}
+.topnav-me-btn:hover { border-color: var(--accent); color: var(--accent); }
+.topnav-me-btn .chev { font-size: 0.7em; opacity: 0.7; }
+.topnav-me-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; min-width: 190px; z-index: 200;
+  /* Closed by default in the wide bar; the burger sheet overrides this to always-visible
+     below, so the dropdown's open state never has to know which mode it is in. */
+  display: none; flex-direction: column; padding: 0.3rem;
+  background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg, 0 8px 24px rgba(0,0,0,.18));
+}
+.topnav-me-menu.open { display: flex; }
+.topnav-me-menu a { padding: 0.55rem 0.75rem; border-radius: var(--radius-xs); font-size: 0.9rem; white-space: nowrap; }
+.topnav-me-menu a:hover { background: var(--bg-surface, var(--bg-dim)); }
+/* Inside the burger sheet the dropdown is pointless — the links just join the list.
+   Scoped to --compact ONLY: a bare `.topnav-menu .topnav-me` also matches the wide bar,
+   which drops the anchor and slides the dropdown out to the edge of the header. */
+.topnav--compact .topnav-me { position: static; }
+.topnav--compact .topnav-me-btn { display: none; }
+.topnav--compact .topnav-me-menu {
+  display: flex; position: static; min-width: 0; border: none; box-shadow: none; padding: 0; background: none;
+}
+@media (max-width: 1180px) {
+  .topnav-me-btn { display: none; }
+  .topnav-me-menu {
+    display: flex; position: static; min-width: 0; border: none; box-shadow: none; padding: 0; background: none;
+  }
 }
 
 /* ── Language Buttons ── */
