@@ -1,0 +1,377 @@
+/*
+ * @file aimeat-game/shell.css
+ * @description Shell and navigation styles for the aimeat-game kit: the full-screen menu, the
+ *   screen (header / scrolling body / fixed action bar), the modal dialog, the confirm and the
+ *   toast stack. Imported by /lib/aimeat-game.css — never linked on its own.
+ *
+ *   THE SCROLL RULE. Exactly one element scrolls in each surface: the menu's list, the screen's
+ *   body, the modal's body. Nothing here ever scrolls the page horizontally, and no surface
+ *   makes <body> a scroll container.
+ *
+ *   THE SHORT-VIEWPORT RULE. The modal centres with `margin: auto` inside a scrolling flex
+ *   container instead of `align-items: center`, because centring clips the top edge the moment
+ *   the dialog is taller than the viewport. At 1280x460 the dialog's top edge stays at the
+ *   container padding and its close control stays on screen.
+ * @structure layers · menu · screen · modal + confirm · toast
+ * @usage  @import'ed by /lib/aimeat-game.css. All values come from the --ag-* contract there.
+ * @version-history
+ *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 01).
+ */
+
+/* Stacking order inside the kit: screen < menu < modal < toast. */
+.ag-screen--full { z-index: 8000; }
+.ag-menu        { z-index: 9000; }
+.ag-modal       { z-index: 9500; }
+.ag-toasts      { z-index: 9800; }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   MENU — full-screen, keyboard and touch, nested via replace-in-place with a back affordance.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-menu {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  background-color: var(--ag-bg);
+  background-image: var(--ag-scene);
+  background-attachment: fixed;
+  color: var(--ag-ink);
+  font-family: var(--ag-font);
+  overflow: hidden;
+}
+
+.ag-menu[hidden] { display: none; }
+
+/* `head: false` — no title strip, so the list takes the whole surface. */
+.ag-menu--nohead { grid-template-rows: minmax(0, 1fr); }
+
+.ag-menu__item--back { min-height: var(--ag-touch); background-color: var(--ag-surface-2); }
+
+/* `full: false` — the same menu, filling the container it was mounted into. It draws no frame:
+   the box belongs to the host, and a stretched panel edge around a centred menu reads as debris. */
+.ag-menu--inline {
+  position: static;
+  inset: auto;
+  height: 100%;
+  min-height: 0;
+  background-color: transparent;
+  background-image: none;
+}
+
+.ag-menu__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--ag-gap);
+  padding: calc(var(--ag-pad) + env(safe-area-inset-top, 0px)) var(--ag-pad) var(--ag-pad);
+  border-bottom: var(--ag-line-w) solid var(--ag-line);
+  background-color: color-mix(in oklab, var(--ag-surface) 88%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.ag-menu__titles { min-width: 0; }
+
+.ag-menu__crumb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.ag-menu__sub {
+  margin: 4px 0 0;
+  color: var(--ag-ink-dim);
+  font-size: var(--ag-text-fine);
+}
+
+.ag-menu__list {
+  padding: var(--ag-pad);
+  padding-bottom: calc(var(--ag-pad) + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  gap: var(--ag-gap);
+  /* A game menu sits in the middle of the screen, not stretched across it. `safe center`
+     centres a short list and still scrolls a long one instead of clipping its top. */
+  align-content: safe center;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--ag-menu-col)), 1fr));
+  width: 100%;
+  max-width: var(--ag-menu-max);
+  margin-inline: auto;
+}
+
+.ag-menu__item {
+  font: inherit;
+  text-align: left;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ag-gap);
+  min-height: calc(var(--ag-touch) * 1.5);
+  padding: calc(var(--ag-pad) * 0.9) var(--ag-pad);
+  background-color: var(--ag-surface);
+  background-image: var(--ag-surface-image);
+  color: var(--ag-ink);
+  border: var(--ag-line-w) solid var(--ag-line);
+  border-radius: var(--ag-radius);
+  box-shadow: var(--ag-shadow);
+  transform: rotate(var(--ag-tilt));
+  cursor: pointer;
+  transition: transform var(--ag-motion) var(--ag-ease), border-color var(--ag-motion) var(--ag-ease);
+  min-width: 0;
+}
+
+/* The selected entry is unmistakable: accent edge, a thick marker down its left, a lift and
+   the skin's glow. Keyboard focus and pointer hover get the SAME treatment on purpose. */
+.ag-menu__item:hover,
+.ag-menu__item:focus-visible {
+  border-color: var(--ag-accent);
+  box-shadow: var(--ag-glow), inset var(--ag-select-w) 0 0 var(--ag-accent);
+  transform: rotate(var(--ag-tilt)) translateY(calc(-3px * var(--ag-juice))) scale(calc(1 + 0.012 * var(--ag-juice)));
+}
+
+.ag-menu__label {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-title);
+  font-weight: var(--ag-weight-display);
+  letter-spacing: var(--ag-tracking-display);
+  text-shadow: var(--ag-display-shadow);
+  line-height: 1.15;
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.ag-menu__sublabel {
+  display: block;
+  margin-top: 3px;
+  font-size: var(--ag-text-fine);
+  color: var(--ag-ink-dim);
+  overflow-wrap: anywhere;
+}
+
+.ag-menu__marks {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.ag-menu__item--done {
+  border-color: color-mix(in oklab, var(--ag-ok) 45%, var(--ag-surface));
+}
+
+.ag-menu__item--locked {
+  cursor: not-allowed;
+  color: var(--ag-locked);
+  background: var(--ag-surface-2);
+  box-shadow: none;
+}
+
+.ag-menu__item--locked:hover {
+  border-color: var(--ag-line);
+  transform: rotate(var(--ag-tilt));
+}
+
+.ag-menu__item--locked .ag-menu__sublabel { color: var(--ag-locked); }
+
+.ag-menu__reason {
+  display: block;
+  margin-top: 6px;
+  font-size: var(--ag-text-fine);
+  color: var(--ag-warn);
+}
+
+.ag-menu__arrow {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-title);
+  color: var(--ag-accent-text);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   SCREEN — header, the ONLY scrolling region, and a fixed action bar.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-screen {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background-color: var(--ag-bg);
+  background-image: var(--ag-scene);
+  background-attachment: fixed;
+  color: var(--ag-ink);
+  font-family: var(--ag-font);
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.ag-screen--full {
+  position: fixed;
+  inset: 0;
+  height: auto;
+}
+
+/* Mounted into a host box, the screen paints no backdrop of its own — the host already owns
+   one, and painting the scene twice leaves a visible seam where the box begins. */
+.ag-screen:not(.ag-screen--full) {
+  background-color: transparent;
+  background-image: none;
+}
+
+.ag-screen__head {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ag-gap);
+  padding: calc(var(--ag-pad) * 0.75 + env(safe-area-inset-top, 0px)) var(--ag-pad) calc(var(--ag-pad) * 0.75);
+  border-bottom: var(--ag-line-w) solid var(--ag-line);
+  background-color: color-mix(in oklab, var(--ag-surface) 88%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.ag-screen__head--noback { grid-template-columns: minmax(0, 1fr); }
+
+.ag-screen__titles { min-width: 0; }
+
+.ag-screen__sub {
+  margin: 2px 0 0;
+  font-size: var(--ag-text-fine);
+  color: var(--ag-ink-dim);
+}
+
+.ag-screen__body {
+  padding: var(--ag-pad);
+  display: grid;
+  gap: var(--ag-gap);
+  align-content: start;
+  min-width: 0;
+}
+
+.ag-screen__body > * { max-width: var(--ag-screen-max); width: 100%; margin-inline: auto; }
+
+.ag-screen__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ag-gap);
+  justify-content: var(--ag-actions-align);
+  padding: calc(var(--ag-pad) * 0.75) var(--ag-pad);
+  padding-bottom: calc(var(--ag-pad) * 0.75 + env(safe-area-inset-bottom, 0px));
+  border-top: var(--ag-line-w) solid var(--ag-line);
+  background-color: color-mix(in oklab, var(--ag-surface) 88%, transparent);
+  backdrop-filter: blur(6px);
+}
+
+.ag-screen__actions:empty { display: none; }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   MODAL + CONFIRM — the container scrolls, the dialog centres with margin:auto.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-modal {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: calc(var(--ag-pad) + env(safe-area-inset-top, 0px)) var(--ag-pad)
+           calc(var(--ag-pad) + env(safe-area-inset-bottom, 0px));
+  background: var(--ag-scrim);
+  font-family: var(--ag-font);
+  animation: ag-fade var(--ag-motion) var(--ag-ease);
+}
+
+.ag-modal__dialog {
+  margin: auto;                    /* centres AND never clips the top on a short viewport */
+  width: min(560px, 100%);
+  max-height: calc(100dvh - var(--ag-pad) * 2);
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  background-color: var(--ag-surface);
+  background-image: var(--ag-surface-image);
+  color: var(--ag-ink);
+  border: var(--ag-line-w) solid var(--ag-line);
+  border-radius: var(--ag-radius);
+  box-shadow: var(--ag-shadow-pop);
+  overflow: hidden;
+  animation: ag-rise var(--ag-motion) var(--ag-ease);
+}
+
+.ag-modal__head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ag-gap);
+  padding: var(--ag-pad);
+  border-bottom: var(--ag-line-w) solid var(--ag-line);
+}
+
+.ag-modal__body {
+  padding: var(--ag-pad);
+  display: grid;
+  gap: var(--ag-gap);
+  align-content: start;
+  min-width: 0;
+}
+
+.ag-modal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ag-gap);
+  justify-content: flex-end;
+  padding: var(--ag-pad);
+  border-top: var(--ag-line-w) solid var(--ag-line);
+}
+
+.ag-modal__actions:empty { display: none; }
+
+@keyframes ag-fade {
+  from { opacity: 0; }
+}
+
+@keyframes ag-rise {
+  from { opacity: 0; transform: translateY(10px); }
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   TOAST — bottom-centred stack, never covering the action bar on a phone.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-toasts {
+  position: fixed;
+  left: 50%;
+  bottom: calc(var(--ag-pad) + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  display: grid;
+  gap: 8px;
+  width: min(420px, calc(100vw - var(--ag-pad) * 2));
+  pointer-events: none;
+  font-family: var(--ag-font);
+}
+
+.ag-toast {
+  pointer-events: auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px var(--ag-pad);
+  border-radius: var(--ag-radius-sm);
+  border: var(--ag-line-w) solid var(--ag-line);
+  background-color: var(--ag-surface);
+  background-image: var(--ag-surface-image);
+  color: var(--ag-ink);
+  box-shadow: var(--ag-shadow-pop);
+  font-size: var(--ag-text-body);
+  animation: ag-rise var(--ag-motion) var(--ag-ease);
+  overflow-wrap: anywhere;
+}
+
+.ag-toast__mark {
+  font-family: var(--ag-font-mono);
+  font-weight: 700;
+}
+
+.ag-toast--ok   { border-color: color-mix(in oklab, var(--ag-ok)   50%, var(--ag-surface)); }
+.ag-toast--warn { border-color: color-mix(in oklab, var(--ag-warn) 50%, var(--ag-surface)); }
+.ag-toast--err  { border-color: color-mix(in oklab, var(--ag-err)  50%, var(--ag-surface)); }
+.ag-toast--info { border-color: color-mix(in oklab, var(--ag-info) 50%, var(--ag-surface)); }
+
+.ag-toast--ok   .ag-toast__mark { color: var(--ag-ok); }
+.ag-toast--warn .ag-toast__mark { color: var(--ag-warn); }
+.ag-toast--err  .ag-toast__mark { color: var(--ag-err); }
+.ag-toast--info .ag-toast__mark { color: var(--ag-info); }

@@ -1,0 +1,403 @@
+/*
+ * @file aimeat-game/progress.css
+ * @description Progression styles for the aimeat-game kit: the step rail, the labelled meter,
+ *   the clickable score breakdown, badges, the coming-soon card, the animating counter and the
+ *   streak tracker. Imported by /lib/aimeat-game.css — never linked on its own.
+ *
+ *   ONE SIZING EVERYWHERE. The rail node and the meter bar read `--ag-rail-dot` and `--ag-meter-h`
+ *   from the contract; an instance never sizes itself, so two rails on one page always match.
+ *
+ *   COMING SOON MUST READ AS INTENTIONAL. It is a full-strength card with a planned chip and a
+ *   dashed edge — deliberately NOT a greyed-out, half-disabled row, which reads as a bug.
+ * @structure rail · meter · score breakdown · badge · coming soon · counter · streak
+ * @usage  @import'ed by /lib/aimeat-game.css. All values come from the --ag-* contract there.
+ * @version-history
+ *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 01).
+ */
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   RAIL — horizontal step track. Scrolls inside itself rather than widening the page.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-rail {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+  padding: 4px 2px 2px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  font-family: var(--ag-font);
+}
+
+.ag-rail__step {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  min-width: max(72px, calc(var(--ag-rail-dot) * 2.6));
+  flex: 1 0 auto;
+  position: relative;
+  padding: 0 4px;
+}
+
+/* The connector sits behind the node and stops at the row's edges. */
+.ag-rail__step::before,
+.ag-rail__step::after {
+  content: '';
+  position: absolute;
+  top: calc(var(--ag-rail-dot) / 2 + 4px);
+  height: var(--ag-line-w);
+  background: var(--ag-line);
+}
+
+.ag-rail__step::before { left: 0; right: 50%; }
+.ag-rail__step::after  { left: 50%; right: 0; }
+.ag-rail__step:first-child::before { display: none; }
+.ag-rail__step:last-child::after   { display: none; }
+
+.ag-rail__step--done::before,
+.ag-rail__step--done::after,
+.ag-rail__step--current::before {
+  background: var(--ag-accent);
+}
+
+.ag-rail__dot {
+  position: relative;
+  width: var(--ag-rail-dot);
+  height: var(--ag-rail-dot);
+  border-radius: var(--ag-radius-round);
+  display: grid;
+  place-items: center;
+  border: calc(var(--ag-line-w) * 2) solid var(--ag-line);
+  background: var(--ag-surface);
+  color: var(--ag-ink-dim);
+  font-family: var(--ag-font-mono);
+  font-size: var(--ag-text-fine);
+  font-weight: 700;
+}
+
+.ag-rail__step--done .ag-rail__dot {
+  background: var(--ag-accent);
+  border-color: var(--ag-accent);
+  color: var(--ag-accent-ink);
+}
+
+.ag-rail__step--current .ag-rail__dot {
+  border-color: var(--ag-accent);
+  color: var(--ag-accent-text);
+  box-shadow: var(--ag-glow), 0 0 0 3px color-mix(in oklab, var(--ag-accent) 22%, transparent);
+  animation: ag-pop 1800ms var(--ag-ease) infinite;
+}
+
+.ag-rail__name {
+  font-size: var(--ag-text-fine);
+  color: var(--ag-ink-dim);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.ag-rail__step--current .ag-rail__name {
+  color: var(--ag-ink);
+  font-weight: 700;
+}
+
+button.ag-rail__step {
+  font: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   METER — a labelled 0..100 bar with an optional threshold marker.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-meter { display: grid; gap: 6px; min-width: 0; font-family: var(--ag-font); }
+
+.ag-meter__top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: var(--ag-gap);
+}
+
+.ag-meter__value {
+  font-family: var(--ag-font-display);
+  font-weight: var(--ag-weight-display);
+  font-variant-numeric: tabular-nums;
+}
+
+.ag-meter__track {
+  position: relative;
+  height: var(--ag-meter-h);
+  border-radius: var(--ag-radius-pill);
+  background: var(--ag-surface-2);
+  border: var(--ag-line-w) solid var(--ag-line);
+  overflow: hidden;
+}
+
+/* The percentage is DATA — JavaScript sets the custom property, the rule stays here. */
+.ag-meter__fill {
+  height: 100%;
+  width: var(--ag-fill, 0%);
+  border-radius: inherit;
+  background: var(--ag-accent);
+  transition: width var(--ag-motion) var(--ag-ease);
+}
+
+.ag-meter--ok   .ag-meter__fill { background: var(--ag-ok); }
+.ag-meter--warn .ag-meter__fill { background: var(--ag-warn); }
+.ag-meter--err  .ag-meter__fill { background: var(--ag-err); }
+
+.ag-meter__mark {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  left: var(--ag-at, 0%);
+  width: 2px;
+  background: var(--ag-ink);
+  opacity: 0.65;
+}
+
+.ag-meter__hint {
+  font-size: var(--ag-text-fine);
+  color: var(--ag-ink-dim);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   SCORE BREAKDOWN — a number turned into a to-do list. Every row is a button.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-score { display: grid; gap: var(--ag-gap); min-width: 0; font-family: var(--ag-font); }
+
+.ag-score__total {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: var(--ag-gap);
+}
+
+.ag-score__big {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-hero);
+  font-weight: var(--ag-weight-display);
+  letter-spacing: var(--ag-tracking-display);
+  text-shadow: var(--ag-display-shadow);
+  -webkit-text-stroke: var(--ag-display-stroke) var(--ag-ink);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  color: var(--ag-accent);
+}
+
+.ag-score__rows { display: grid; gap: 8px; }
+
+.ag-score__row {
+  font: inherit;
+  text-align: left;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--ag-gap);
+  align-items: center;
+  width: 100%;
+  min-height: var(--ag-touch);
+  padding: 10px var(--ag-pad);
+  background-color: var(--ag-surface-2);
+  background-image: var(--ag-surface-image);
+  color: var(--ag-ink);
+  border: var(--ag-line-w) solid var(--ag-line);
+  border-left: var(--ag-select-w) solid var(--ag-line);
+  border-radius: var(--ag-radius-sm);
+  cursor: pointer;
+  transition: border-color var(--ag-motion) var(--ag-ease), transform var(--ag-motion) var(--ag-ease);
+  min-width: 0;
+}
+
+.ag-score__row:hover,
+.ag-score__row:focus-visible {
+  border-left-color: var(--ag-accent);
+  transform: translateX(calc(3px * var(--ag-juice)));
+  box-shadow: var(--ag-glow);
+}
+
+.ag-score__row--full { border-left-color: var(--ag-ok); }
+.ag-score__row--part { border-left-color: var(--ag-warn); }
+.ag-score__row--zero { border-left-color: var(--ag-err); }
+
+.ag-score__name { font-weight: 600; display: block; overflow-wrap: anywhere; }
+
+.ag-score__why {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--ag-text-fine);
+  color: var(--ag-ink-dim);
+  overflow-wrap: anywhere;
+}
+
+.ag-score__pts {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--ag-font-mono);
+  white-space: nowrap;
+}
+
+.ag-score__go { color: var(--ag-ink-dim); }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   BADGE — an earned marker. Unearned is quiet, never marked as a failure.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-badge {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--ag-gap);
+  align-items: center;
+  font-family: var(--ag-font);
+}
+
+.ag-badge__seal {
+  width: calc(var(--ag-rail-dot) * 1.5);
+  height: calc(var(--ag-rail-dot) * 1.5);
+  border-radius: var(--ag-radius-round);
+  display: grid;
+  place-items: center;
+  border: calc(var(--ag-line-w) * 2) dashed var(--ag-line);
+  color: var(--ag-locked);
+  font-family: var(--ag-font-mono);
+  font-size: var(--ag-text-title);
+  font-weight: 700;
+  flex: none;
+}
+
+.ag-badge--earned .ag-badge__seal {
+  border-style: solid;
+  border-color: var(--ag-accent);
+  background-color: var(--ag-accent);
+  background-image: linear-gradient(160deg, var(--ag-accent-2), var(--ag-accent));
+  color: var(--ag-accent-ink);
+  box-shadow: var(--ag-glow);
+}
+
+.ag-badge__name {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-title);
+  font-weight: var(--ag-weight-display);
+  text-shadow: var(--ag-display-shadow);
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.ag-badge__desc,
+.ag-badge__when {
+  display: block;
+  font-size: var(--ag-text-fine);
+  color: var(--ag-ink-dim);
+  overflow-wrap: anywhere;
+}
+
+.ag-badge__when { margin-top: 3px; }
+
+.ag-badge:not(.ag-badge--earned) .ag-badge__name { color: var(--ag-ink-dim); }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   COMING SOON — a planned stage. Full strength, dashed edge, no dead controls.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-soon {
+  background-image: var(--ag-surface-image);
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  border-style: dashed;
+  font-family: var(--ag-font);
+}
+
+.ag-soon__top {
+  display: flex;
+  align-items: center;
+  gap: var(--ag-gap);
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.ag-soon__what {
+  color: var(--ag-ink-dim);
+  font-size: var(--ag-text-body);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.ag-soon__foot {
+  display: flex;
+  gap: var(--ag-gap);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.ag-soon__eta { font-size: var(--ag-text-fine); color: var(--ag-ink-dim); }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   COUNTER — a large number that counts up. Degrades to the final value under reduced motion.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-counter { display: grid; gap: 2px; justify-items: start; font-family: var(--ag-font); min-width: 0; }
+
+.ag-counter__n {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-hero);
+  font-weight: var(--ag-weight-display);
+  letter-spacing: var(--ag-tracking-display);
+  text-shadow: var(--ag-display-shadow);
+  -webkit-text-stroke: var(--ag-display-stroke) var(--ag-ink);
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   STREAK — consecutive periods. Generic: "day" is one caller's word, not the component's.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-streak { display: grid; gap: 10px; min-width: 0; font-family: var(--ag-font); }
+
+.ag-streak__top {
+  display: flex;
+  align-items: baseline;
+  gap: var(--ag-gap);
+  flex-wrap: wrap;
+}
+
+.ag-streak__count {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-title);
+  font-weight: var(--ag-weight-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--ag-accent-text);
+}
+
+.ag-streak__cells {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ag-streak__cell {
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  min-width: 30px;
+}
+
+.ag-streak__box {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--ag-radius-sm);
+  border: var(--ag-line-w) solid var(--ag-line);
+  background: var(--ag-surface-2);
+  display: grid;
+  place-items: center;
+  font-family: var(--ag-font-mono);
+  font-size: var(--ag-text-fine);
+  color: transparent;
+}
+
+.ag-streak__cell--done .ag-streak__box {
+  background: var(--ag-accent);
+  border-color: var(--ag-accent);
+  color: var(--ag-accent-ink);
+}
+
+.ag-streak__tick { font-size: var(--ag-text-fine); color: var(--ag-ink-dim); }

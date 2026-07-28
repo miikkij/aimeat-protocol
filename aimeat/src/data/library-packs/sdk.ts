@@ -8,6 +8,8 @@
  * @structure SDK_PACKS: LibraryPack[]
  * @usage Imported by ../library-packs.ts (registry assembly). Do not import directly.
  * @version-history
+ *   v1.2.0 — 2026-07-28 — Add aimeat-game (the general-purpose gamification UI kit). It requires
+ *     nothing: it makes no network calls and its look is a CSS-variable contract, not a dependency.
  *   v1.1.0 — 2026-07-28 — Add aimeat-exchange (the EXCHANGE marketplace browser client). It
  *     requires aimeat-commerce as well as aimeat-auth: money formatting is commerce's, not its own.
  *   v1.0.0 — 2026-07-16 — initial: 20 SDK packs migrated from libs.ts catalogue +
@@ -283,6 +285,31 @@ export const SDK_PACKS: LibraryPack[] = [
     modelTier: 'needs-doc',
     promptGroup: 'economy',
     promptLine: '- aimeat-exchange.js — the EXCHANGE marketplace from the browser: browse/search listings + their ODPS descriptors (`AIMEAT.exchange.list`, `get`, `odps`), publish your own supply (`publish` — needs input+output schema and `usageTerms`; price comes from the source, never the browser), see who is using it (`stats`, `consumers` — each row breaks down whether an app or an agent actually called), accept + switch off contracts (`accept`, `contracts`, `off`), read outbound `spend()` and accrued `earnings()`, and work the demand side (`needs`, `postNeed`, `bid`, `acceptBid`). Money stays integer micro-units — format with `fmtUnit`. Requires aimeat-auth + aimeat-commerce.',
+  },
+  {
+    id: 'aimeat-game',
+    kind: 'sdk',
+    category: 'ui',
+    title: 'Gamification UI kit',
+    description: 'Game-grade UI for any app, with nothing baked in: full-screen menus with locked/done states, screens (header + one scrolling body + fixed action bar), modals/toasts/confirms that stay correct on a short viewport, step rails, meters, the clickable score breakdown, badges, coming-soon cards, count-up numbers, streaks, leaderboards, stat grids, tables and showcase cards. Makes NO network calls — the host supplies the data. The whole look is a set of --ag-* CSS variables (/lib/aimeat-game.css), so a skin is authored without touching a selector or a line of JavaScript.',
+    url: '/v1/libs/aimeat-game.js',
+    include: [
+      '<link rel="stylesheet" href="{{BASE_URL}}/lib/aimeat-game.css">',
+      '<script src="{{BASE_URL}}/v1/libs/aimeat-game.js"></script>',
+    ],
+    requires: [],
+    license: 'MIT',
+    apiSurface: 'AIMEAT.game',
+    aiDoc: 'Gamification UI for ANY app — a quiz, an onboarding streak, a training tracker and a business simulation all use the same parts. It RENDERS ONLY: no fetch, no state, no auth; every component takes a spec and returns a handle { el, set(patch), destroy() }, and reports events instead of acting on them. Call AIMEAT.game.injectStyle() once (adds /lib/aimeat-game.css first in <head> so your own CSS still outranks it; pass { extraCss } for your overrides, which are appended last). SHELL: menu({ title, entries:[{ id, label, sublabel, state:"available"|"locked"|"done", badge, lockReason, entries }], onPick(entry, path) }) is a full-screen menu with nested submenus, arrow/Enter/Escape keyboard and a back affordance — pass { full: false } to fill a container instead and { head: false } to drop its title strip when your own screen already has one (an inline menu never steals focus, so a host that wants the keyboard focuses the first entry itself) — a LOCKED entry stays readable, shows its lockReason and still reports the pick, so you can point the player at what unlocks it. screen({ title, body, actions, onBack }) gives header + the ONLY scrolling region + a fixed action bar (handle.body is yours to fill). modal({ title, body, actions }), toast(msg, "info"|"ok"|"warn"|"err"), and await confirm({ title, danger:true }) → boolean for anything irreversible. PROGRESSION: rail(steps) with future/current/done; meter({ label, value: 0..100, threshold }); scoreBreakdown({ rows:[{ id, label, points, max, reason }], onPick(row) }) — THE component to reach for: every row is a button, so a score becomes a to-do list and the player knows what to fix; badge({ title, description, earned, earnedAt }) — unearned reads as "not yet", never as a failure; comingSoon({ title, description, eta, notify }) for a stage you have deliberately not built — it renders as an intentional plan, never a dead link or a broken-looking greyed button; counter({ value, label }) counts up and lands instantly under prefers-reduced-motion; streak({ count, periods, best }). BOARDS: leaderboard({ metrics:[{id,label,format}], rows:[{ id, name, you, values:{metricId:n} }], onSort, onPick }) sorts internally and shows "no one on the board yet" when empty; statGrid(tiles), dataTable({ columns, rows }) (scrolls inside its own box, never widening the page), card({ title, author, metric, image }). UNITS: money(micros, "EUR") — money is INTEGER 6-decimal micro-units, 1 EUR = 1000000, same as aimeat-commerce; morsels(n) is a plain integer plus a translated word, never the meat emoji. The two never appear in one figure — show them as separate rows. I18N: the kit ships EN + FI for its own words and follows the PLATFORM language (AIMEAT.auth.getLang / the aimeat-lang key / the aimeat-lang-change event) — never build a language switch, the login pill has one. Merge your own strings with AIMEAT.game.i18n.use({ en:{…}, fi:{…} }) and read them with i18n.t(key, vars). HELPERS: el/append/$/$$/clear (TDR-kit signatures), busy(el) + whileBusy(el, promise) + guardButtons(root) so a button answers instantly instead of double-firing. THEMING: never write a colour in JavaScript and never override an .ag-* selector. Set the --ag-* variables (surfaces --ag-bg/--ag-surface/--ag-surface-2, ink --ag-ink/--ag-ink-dim, --ag-line/--ag-line-w, --ag-accent/--ag-accent-ink, state --ag-ok/--ag-warn/--ag-err/--ag-info, FORM (this is what makes a skin look like a different GAME rather than a recolour) --ag-scene (backdrop layers), --ag-surface-image (a card is tinted, never flat), --ag-accent-2 (gradients), --ag-display-shadow + --ag-display-stroke (extruded/outlined display type), --ag-shine (a sweep across the primary action), --ag-juice (0 = calm, 1.6 = everything pops), shape --ag-radius/--ag-radius-sm/--ag-radius-pill/--ag-radius-round/--ag-shadow/--ag-shadow-pop/--ag-glow/--ag-tilt/--ag-select-w, type --ag-font/--ag-font-display/--ag-font-mono/--ag-text-hero|title|body|fine/--ag-weight-display/--ag-tracking-display/--ag-label-caps/--ag-label-tracking, density and measure --ag-gap/--ag-pad/--ag-touch/--ag-menu-col/--ag-menu-max/--ag-screen-max/--ag-actions-align/--ag-rail-dot/--ag-meter-h, motion --ag-motion/--ag-ease, plus --ag-scrim/--ag-locked/--ag-focus/--ag-tint/--ag-accent-text). Each falls back to the matching AIMEAT theme token and then to a literal, so it inherits /lib/aimeat-theme.css when present and still looks finished without it; light is the default and :root[data-theme="dark"] carries dark. Switching a skin changes no JavaScript at all.',
+    changelog: [],
+    demoTemplateId: undefined,
+    tierHint: 'T1',
+    interviewTriggers: ['game', 'quiz', 'level', 'score', 'leaderboard', 'badge', 'streak', 'progress', 'onboarding', 'peli', 'pisteet', 'tulostaulu', 'taso', 'putki'],
+    sizeEstimate: '~18KB',
+    status: 'preview',
+    modelTier: 'needs-doc',
+    promptGroup: 'media',
+    promptLine: '- aimeat-game.js — gamification UI for ANY app (`AIMEAT.game`): full-screen `menu` with locked/done entries, `screen` (header + one scrolling body + fixed action bar), `modal`/`toast`/`confirm`, `rail`, `meter`, `scoreBreakdown` (every row a button, so a score becomes a to-do list), `badge`, `comingSoon` (a planned stage that reads as intentional, never broken), `counter`, `streak`, `leaderboard`, `statGrid`, `dataTable`, `card`. It renders only — no fetch, no state. Add `<link rel="stylesheet" href="/lib/aimeat-game.css">` (or call `AIMEAT.game.injectStyle()`); the whole look is the `--ag-*` variables in that file, so a skin needs no selector override and no JS change. Requires nothing.',
   },
   {
     id: 'aimeat-audio',

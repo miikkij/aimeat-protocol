@@ -6,6 +6,11 @@
  *   bundles from src/static/sdk-libs/dist/ via sdkLibSource(); the /v1/libs catalogue; the dev harness.
  * @usage app.use(libsRouter(config, storage)) from the server setup.
  * @version-history
+ * v2.2.0 - 2026-07-28 - New library aimeat-game.js: the general-purpose gamification UI kit
+ *   (menus, screens, overlays, rails, meters, the clickable score breakdown, badges, coming-soon
+ *   cards, counters, streaks, leaderboards, stat grids, tables, showcase cards). It makes no
+ *   network calls; its look comes entirely from the --ag-* contract in /lib/aimeat-game.css.
+ *   Registered as a route and in the library-pack registry.
  * v2.1.0 - 2026-07-28 - New library aimeat-exchange.js: the EXCHANGE marketplace from a browser —
  *   browse/search listings, publish + manage your own supply, provider lineage (who called, and
  *   whether from an app or an agent), contracts, outbound spend, accrued earnings, and the demand
@@ -161,7 +166,7 @@ import { buildLibsCatalogue } from '../data/library-packs.js';
 const SDK_LIB_NAMES = [
   'speech', 'data', 'wallet', 'ai', 'capabilities', 'agents', 'agentface', 'intake', 'organism',
   'workflows', 'header', 'editor', 'live', 'storage', 'social', 'work', 'commerce', 'exchange',
-  'webmcp', 'markdown', 'audio', 'tunnel',
+  'webmcp', 'markdown', 'audio', 'tunnel', 'game',
 ] as const;
 
 function sendJavascriptLibrary(res: Response, source: string): void {

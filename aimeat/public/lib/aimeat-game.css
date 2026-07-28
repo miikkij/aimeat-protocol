@@ -1,0 +1,385 @@
+/*
+ * @file aimeat-game.css
+ * @description Stylesheet for the aimeat-game SDK library (/v1/libs/aimeat-game.js) — the
+ *   gamification UI kit any AIMEAT app can load: menus, screens, overlays, progression, score
+ *   breakdowns, badges, counters, leaderboards and tables.
+ *
+ *   THIS FILE IS THE THEMING CONTRACT. Every colour, radius, shadow, font, density, motion and
+ *   FORM value the components read is one of the `--ag-*` custom properties declared below. A skin
+ *   is authored by setting those properties and NOTHING else — no selector overrides, no component
+ *   patches. If a look cannot be reached from these variables, the missing value is a bug in this
+ *   contract: add a variable here rather than telling an author to override a class.
+ *
+ *   FORM LANGUAGE IS PART OF THE CONTRACT, not just palette. A game styled with nothing but bright
+ *   colours on flat white cards still reads as a dashboard, so the contract carries what actually
+ *   makes a game feel like one: `--ag-scene` (the backdrop the whole surface sits on),
+ *   `--ag-surface-image` (a card is tinted, never flat), `--ag-display-shadow` and
+ *   `--ag-display-stroke` (extruded, outlined display type), `--ag-accent-2` (a second colour, so
+ *   gradients are possible), `--ag-shine` (a sweep across the primary action) and `--ag-juice`
+ *   (how hard things pop). A skin that sets those looks like a different game — not a recolour.
+ *
+ *   Each variable falls back to the AIMEAT theme token that means the same thing
+ *   (`--color-base-100`, `--color-primary`, `--radius-box`, `--font-body`, …) and, failing that,
+ *   to a literal that works on a bare page. So the kit inherits a host that loads
+ *   /lib/aimeat-theme.css, and still looks finished on a host that loads nothing.
+ *
+ *   LIGHT IS THE DEFAULT; `:root[data-theme="dark"]` re-declares the literal fallbacks for dark.
+ *   No `rgba(255,255,255,…)` anywhere — light-on-dark washes are `color-mix()` against the
+ *   surface token, so they follow the skin instead of fighting it.
+ * @structure @import (shell · progress · board) · the --ag-* token contract (light) · dark
+ *   re-declaration · shared primitives (button, chip, label, scrollable, card, focus) · juice
+ *   keyframes · reduced-motion
+ * @usage  AIMEAT.game.injectStyle() adds it, or link it yourself BEFORE your own styles:
+ *   <link rel="stylesheet" href="/lib/aimeat-game.css">
+ * @version-history
+ *   v1.1.0 — 2026-07-28 — Form-language tokens, so a skin can look like a GAME rather than a
+ *     recolour of a dashboard: --ag-scene, --ag-surface-image, --ag-accent-2, --ag-display-shadow,
+ *     --ag-display-stroke, --ag-shine, --ag-juice, --ag-select-w, plus the pop/shake juice
+ *     keyframes. Contrast pass: --ag-accent-text (the accent pulled toward the ink until 13px
+ *     text passes) and a readable --ag-locked.
+ *   v1.0.0 — 2026-07-28 — Initial: the aimeat-game token contract + shared primitives (NOSTE prompt 01).
+ */
+
+@import url('./aimeat-game/shell.css');
+@import url('./aimeat-game/progress.css');
+@import url('./aimeat-game/board.css');
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   THE CONTRACT — light. Set these to author a skin; do not override component selectors.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+:root {
+  /* ── Surfaces and ink ─────────────────────────────────────────────────────────────────── */
+  --ag-bg:          var(--color-base-100, #f3f5f8);   /* page behind a full-screen surface   */
+  --ag-scene:       none;                             /* backdrop layers drawn ON that page  */
+  --ag-surface:     var(--color-base-200, #ffffff);   /* cards, panels, menu body            */
+  --ag-surface-image: none;                           /* tint/gradient inside a card         */
+  --ag-surface-2:   var(--color-base-100, #eceff4);   /* rows nested inside a surface        */
+  --ag-ink:         var(--color-base-content, #151a21);
+  --ag-ink-dim:     color-mix(in oklab, var(--ag-ink) 62%, var(--ag-surface));
+  --ag-line:        var(--color-base-300, #d7dce4);   /* hairlines, card edges, dividers     */
+  --ag-line-w:      var(--border-w, 1px);
+  --ag-scrim:       rgba(12, 14, 18, 0.55);           /* backdrop behind overlays            */
+
+  /* ── Meaningful colour ────────────────────────────────────────────────────────────────── */
+  --ag-accent:      var(--color-primary, #e8564a);    /* the one saturated colour            */
+  --ag-accent-2:    var(--ag-accent);                 /* second colour, for gradients        */
+  --ag-accent-ink:  var(--color-primary-content, #ffffff);
+  /* The accent is a FILL colour; at 13px on a tint it is often under 4.5:1. This is the same hue
+     pulled toward the ink until small text passes — darker in light, lighter in dark, for free. */
+  --ag-accent-text: color-mix(in oklab, var(--ag-accent) 74%, var(--ag-ink));
+  --ag-ok:          var(--color-success, #0f7a45);
+  --ag-warn:        var(--color-warning, #8a5300);
+  --ag-err:         var(--color-error, #b3261e);
+  --ag-info:        var(--color-info, #1f5fa8);
+  --ag-locked:      color-mix(in oklab, var(--ag-ink) 72%, var(--ag-surface));
+  --ag-focus:       var(--ag-accent);
+  --ag-tint:        14%;                              /* how strongly a state tints a fill   */
+
+  /* ── Shape, depth and form ────────────────────────────────────────────────────────────── */
+  --ag-radius:      var(--radius-box, 14px);          /* cards, panels, dialogs              */
+  --ag-radius-sm:   var(--radius-field, 9px);         /* buttons, rows                       */
+  --ag-radius-pill: 999px;                            /* chips, metric tabs, meter track     */
+  --ag-radius-round: 50%;                             /* rail nodes, badge seals             */
+  --ag-shadow:      0 1px 2px rgba(12, 14, 18, 0.06), 0 6px 18px rgba(12, 14, 18, 0.07);
+  --ag-shadow-pop:  0 20px 56px rgba(12, 14, 18, 0.26);
+  --ag-glow:        none;                             /* extra ring on the accent surfaces   */
+  --ag-tilt:        0deg;                             /* per-card rotation (sticker looks)   */
+  --ag-select-w:    3px;                              /* width of the "this one" marker      */
+  --ag-actions-align: flex-end;                       /* where a screen puts its action bar   */
+  --ag-shine:       none;                             /* sweep across the primary action     */
+
+  /* ── Type ─────────────────────────────────────────────────────────────────────────────── */
+  --ag-font:         var(--font-body, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+  --ag-font-display: var(--font-display, var(--ag-font));
+  --ag-font-mono:    var(--font-mono, ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Menlo, monospace);
+  --ag-text-hero:    clamp(2rem, 7vw, 3.1rem);
+  --ag-text-title:   clamp(1.1rem, 2.6vw, 1.45rem);
+  --ag-text-body:    0.95rem;
+  --ag-text-fine:    0.8125rem;                       /* 13px floor                          */
+  --ag-weight-display: 700;
+  --ag-tracking-display: -0.01em;
+  --ag-display-shadow: none;                          /* extrusion under display type        */
+  --ag-display-stroke: 0;                             /* outline around display type         */
+  --ag-label-caps:     uppercase;                     /* small labels: uppercase | none      */
+  --ag-label-tracking: 0.08em;
+
+  /* ── Density, space, motion ───────────────────────────────────────────────────────────── */
+  --ag-gap:     12px;
+  --ag-pad:     16px;
+  --ag-touch:   44px;                                 /* minimum interactive height          */
+  --ag-motion:  220ms;
+  --ag-ease:    cubic-bezier(0.2, 0.7, 0.3, 1);
+  --ag-juice:   1;                                    /* 0 turns every pop off               */
+
+  /* ── Component sizing (one sizing everywhere — instances never override these) ─────────── */
+  --ag-menu-col: 320px;                               /* menu grid: minimum column width     */
+  --ag-menu-max: none;                                /* menu list: capped, centred measure  */
+  --ag-screen-max: none;                              /* screen body: capped, centred measure */
+  --ag-rail-dot: 30px;
+  --ag-meter-h:  10px;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   THE CONTRACT — dark. Same names, dark literals. A skin re-declares only what it changes.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+:root[data-theme='dark'] {
+  --ag-bg:         var(--color-base-100, #0f1218);
+  --ag-surface:    var(--color-base-200, #171b23);
+  --ag-surface-2:  var(--color-base-100, #10141a);
+  --ag-ink:        var(--color-base-content, #e7ebf2);
+  --ag-line:       var(--color-base-300, #2b323d);
+  --ag-scrim:      rgba(4, 6, 9, 0.66);
+
+  --ag-accent:     var(--color-primary, #ff6f62);
+  --ag-accent-ink: var(--color-primary-content, #1a0d0b);
+  --ag-ok:         var(--color-success, #43c98a);
+  --ag-warn:       var(--color-warning, #e0a33a);
+  --ag-err:        var(--color-error, #f2695c);
+  --ag-info:       var(--color-info, #6fa8e8);
+  --ag-tint:       20%;
+
+  --ag-shadow:     0 1px 2px rgba(0, 0, 0, 0.4), 0 6px 20px rgba(0, 0, 0, 0.34);
+  --ag-shadow-pop: 0 22px 60px rgba(0, 0, 0, 0.6);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   SHARED PRIMITIVES — used by more than one component. All values come from the contract.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+
+.ag-root,
+.ag-root * {
+  box-sizing: border-box;
+}
+
+.ag-root {
+  font-family: var(--ag-font);
+  font-size: var(--ag-text-body);
+  color: var(--ag-ink);
+  line-height: 1.45;
+}
+
+/* Focus is never removed — only replaced with a ring that survives every skin. */
+.ag-root :focus-visible {
+  outline: 2px solid var(--ag-focus);
+  outline-offset: 2px;
+  border-radius: var(--ag-radius-sm);
+}
+
+/* ── Headings and labels. Display type carries the skin's extrusion and outline. ────────── */
+.ag-title {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-title);
+  font-weight: var(--ag-weight-display);
+  letter-spacing: var(--ag-tracking-display);
+  text-shadow: var(--ag-display-shadow);
+  margin: 0;
+}
+
+.ag-hero {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-hero);
+  font-weight: var(--ag-weight-display);
+  letter-spacing: var(--ag-tracking-display);
+  text-shadow: var(--ag-display-shadow);
+  -webkit-text-stroke: var(--ag-display-stroke) var(--ag-ink);
+  line-height: 1.05;
+  margin: 0;
+}
+
+.ag-label {
+  font-size: var(--ag-text-fine);
+  text-transform: var(--ag-label-caps);
+  letter-spacing: var(--ag-label-tracking);
+  color: var(--ag-ink-dim);
+  font-weight: 600;
+}
+
+.ag-dim { color: var(--ag-ink-dim); }
+
+.ag-num {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* ── Buttons ──────────────────────────────────────────────────────────────────────────── */
+.ag-btn {
+  position: relative;
+  overflow: hidden;
+  font: inherit;
+  font-family: var(--ag-font-display);
+  font-weight: 600;
+  min-height: var(--ag-touch);
+  padding: 0 calc(var(--ag-pad) * 0.9);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: var(--ag-line-w) solid var(--ag-line);
+  border-radius: var(--ag-radius-sm);
+  background-color: var(--ag-surface);
+  background-image: var(--ag-surface-image);
+  color: var(--ag-ink);
+  cursor: pointer;
+  transition: transform var(--ag-motion) var(--ag-ease), background-color var(--ag-motion) var(--ag-ease),
+              box-shadow var(--ag-motion) var(--ag-ease);
+}
+
+.ag-btn:hover:not(:disabled) {
+  background-color: color-mix(in oklab, var(--ag-ink) 6%, var(--ag-surface));
+  transform: translateY(calc(-1px * var(--ag-juice)));
+}
+
+.ag-btn:active:not(:disabled) { transform: translateY(1px) scale(calc(1 - 0.02 * var(--ag-juice))); }
+
+.ag-btn:disabled,
+.ag-btn[aria-disabled='true'] { opacity: 0.55; cursor: not-allowed; }
+
+.ag-btn--primary {
+  background-color: var(--ag-accent);
+  background-image: linear-gradient(160deg, var(--ag-accent-2), var(--ag-accent));
+  color: var(--ag-accent-ink);
+  border-color: var(--ag-accent);
+  box-shadow: var(--ag-glow);
+}
+
+.ag-btn--primary:hover:not(:disabled) {
+  background-color: color-mix(in oklab, var(--ag-accent) 88%, var(--ag-ink));
+}
+
+/* The sweep across the primary action. `--ag-shine: none` (the default) removes it entirely. */
+.ag-btn--primary::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 -60%;
+  width: 40%;
+  background: var(--ag-shine);
+  transform: skewX(-20deg);
+  pointer-events: none;
+  animation: ag-shine 3.4s var(--ag-ease) infinite;
+}
+
+.ag-btn--ghost {
+  background-color: transparent;
+  background-image: none;
+  border-color: transparent;
+  color: var(--ag-ink-dim);
+}
+
+.ag-btn--ghost:hover:not(:disabled) {
+  color: var(--ag-ink);
+  background-color: color-mix(in oklab, var(--ag-ink) 7%, var(--ag-surface));
+}
+
+.ag-btn--danger {
+  background-color: color-mix(in oklab, var(--ag-err) var(--ag-tint), var(--ag-surface));
+  background-image: none;
+  border-color: color-mix(in oklab, var(--ag-err) 45%, var(--ag-surface));
+  color: color-mix(in oklab, var(--ag-err) 74%, var(--ag-ink));
+}
+
+/* A guarded button that is mid-flight: it answers instantly instead of looking dead. */
+.ag-busy {
+  position: relative;
+  pointer-events: none;
+  color: transparent !important;
+}
+
+.ag-busy::after {
+  content: '';
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border: 2px solid currentcolor;
+  border-color: var(--ag-ink) transparent var(--ag-ink) transparent;
+  border-radius: 50%;
+  background: none;
+  transform: none;
+  animation: ag-spin 720ms linear infinite;
+}
+
+.ag-btn--primary.ag-busy::after {
+  border-color: var(--ag-accent-ink) transparent var(--ag-accent-ink) transparent;
+}
+
+/* ── Chips: one shape for every state marker in the kit ───────────────────────────────── */
+.ag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 9px;
+  border-radius: var(--ag-radius-pill);
+  font-size: var(--ag-text-fine);
+  font-weight: 700;
+  border: var(--ag-line-w) solid var(--ag-line);
+  background: var(--ag-surface-2);
+  color: var(--ag-ink-dim);
+  white-space: nowrap;
+}
+
+.ag-chip--accent { background: color-mix(in oklab, var(--ag-accent) var(--ag-tint), var(--ag-surface)); border-color: color-mix(in oklab, var(--ag-accent) 45%, var(--ag-surface)); color: var(--ag-accent-text); }
+.ag-chip--ok     { background: color-mix(in oklab, var(--ag-ok)   var(--ag-tint), var(--ag-surface)); border-color: color-mix(in oklab, var(--ag-ok)   45%, var(--ag-surface)); color: color-mix(in oklab, var(--ag-ok)   74%, var(--ag-ink)); }
+.ag-chip--warn   { background: color-mix(in oklab, var(--ag-warn) var(--ag-tint), var(--ag-surface)); border-color: color-mix(in oklab, var(--ag-warn) 45%, var(--ag-surface)); color: color-mix(in oklab, var(--ag-warn) 74%, var(--ag-ink)); }
+.ag-chip--err    { background: color-mix(in oklab, var(--ag-err)  var(--ag-tint), var(--ag-surface)); border-color: color-mix(in oklab, var(--ag-err)  45%, var(--ag-surface)); color: color-mix(in oklab, var(--ag-err)  74%, var(--ag-ink)); }
+.ag-chip--info   { background: color-mix(in oklab, var(--ag-info) var(--ag-tint), var(--ag-surface)); border-color: color-mix(in oklab, var(--ag-info) 45%, var(--ag-surface)); color: color-mix(in oklab, var(--ag-info) 74%, var(--ag-ink)); }
+
+/* ── The one scroll idiom: a box that scrolls inside itself, never the page ───────────── */
+.ag-scroll {
+  overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  min-height: 0;
+  min-width: 0;
+}
+
+/* ── Cards: the shared surface every component sits on ────────────────────────────────── */
+.ag-card {
+  background-color: var(--ag-surface);
+  background-image: var(--ag-surface-image);
+  border: var(--ag-line-w) solid var(--ag-line);
+  border-radius: var(--ag-radius);
+  box-shadow: var(--ag-shadow);
+  padding: var(--ag-pad);
+  transform: rotate(var(--ag-tilt));
+  min-width: 0;
+}
+
+.ag-empty {
+  padding: calc(var(--ag-pad) * 1.5) var(--ag-pad);
+  text-align: center;
+  color: var(--ag-ink-dim);
+  font-size: var(--ag-text-fine);
+}
+
+/* ── Juice. Every pop scales with --ag-juice, so a serious skin sets it to 0 and goes calm. ─ */
+@keyframes ag-spin { to { transform: rotate(360deg); } }
+
+@keyframes ag-shine { 0%, 62% { left: -60%; } 100% { left: 130%; } }
+
+@keyframes ag-pop {
+  0%   { transform: scale(1); }
+  38%  { transform: scale(calc(1 + 0.16 * var(--ag-juice))); }
+  100% { transform: scale(1); }
+}
+
+@keyframes ag-shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(calc(-5px * var(--ag-juice))); }
+  45% { transform: translateX(calc(4px * var(--ag-juice))); }
+  70% { transform: translateX(calc(-2px * var(--ag-juice))); }
+}
+
+.ag-pop   { animation: ag-pop 380ms var(--ag-ease); }
+.ag-shake { animation: ag-shake 420ms var(--ag-ease); }
+
+/* ── Reduced motion: every animated component degrades to its final state ─────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .ag-root *,
+  .ag-root *::before,
+  .ag-root *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+  }
+}

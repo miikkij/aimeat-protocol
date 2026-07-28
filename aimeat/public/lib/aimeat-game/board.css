@@ -1,0 +1,261 @@
+/*
+ * @file aimeat-game/board.css
+ * @description Competition and table styles for the aimeat-game kit: the leaderboard (sortable
+ *   metrics, a highlighted "you" row, an empty state that reads as "nobody yet"), the responsive
+ *   stat grid, the compact data table that scrolls inside its own container, and the showcase
+ *   card used by both leaderboards and galleries. Imported by /lib/aimeat-game.css.
+ *
+ *   THE GRID RULE. Every track is `minmax(0, …)` and every child sets `min-width: 0`, so a wide
+ *   cell scrolls its own wrapper instead of inflating the track and pushing the page sideways —
+ *   the single most common cause of a shrunk-to-fit phone layout.
+ * @structure leaderboard · stat grid · data table · showcase card
+ * @usage  @import'ed by /lib/aimeat-game.css. All values come from the --ag-* contract there.
+ * @version-history
+ *   v1.0.0 — 2026-07-28 — Initial (NOSTE prompt 01).
+ */
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   LEADERBOARD
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-lb { display: grid; gap: var(--ag-gap); min-width: 0; font-family: var(--ag-font); }
+
+.ag-lb__metrics {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ag-lb__metric {
+  font: inherit;
+  font-size: var(--ag-text-fine);
+  font-weight: 600;
+  min-height: calc(var(--ag-touch) * 0.75);
+  padding: 4px 12px;
+  border-radius: var(--ag-radius-pill);
+  border: var(--ag-line-w) solid var(--ag-line);
+  background: var(--ag-surface-2);
+  color: var(--ag-ink-dim);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ag-lb__metric[aria-pressed='true'] {
+  background: color-mix(in oklab, var(--ag-accent) var(--ag-tint), var(--ag-surface));
+  border-color: var(--ag-accent);
+  color: var(--ag-accent-text);
+}
+
+.ag-lb__rows { display: grid; gap: 6px; }
+
+.ag-lb__row {
+  font: inherit;
+  text-align: left;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--ag-gap);
+  width: 100%;
+  min-height: var(--ag-touch);
+  padding: 8px var(--ag-pad);
+  border: var(--ag-line-w) solid var(--ag-line);
+  border-radius: var(--ag-radius-sm);
+  background-color: var(--ag-surface);
+  background-image: var(--ag-surface-image);
+  color: var(--ag-ink);
+  min-width: 0;
+}
+
+button.ag-lb__row { cursor: pointer; }
+
+.ag-lb__row--you {
+  border-color: var(--ag-accent);
+  background-color: color-mix(in oklab, var(--ag-accent) var(--ag-tint), var(--ag-surface));
+  box-shadow: var(--ag-glow), inset var(--ag-select-w) 0 0 var(--ag-accent);
+}
+
+.ag-lb__rank {
+  font-family: var(--ag-font-mono);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  color: var(--ag-ink-dim);
+  min-width: 2.2ch;
+  text-align: right;
+}
+
+.ag-lb__row--you .ag-lb__rank { color: var(--ag-accent-text); }
+
+.ag-lb__who { min-width: 0; }
+
+.ag-lb__name { font-weight: 600; display: block; overflow-wrap: anywhere; }
+
+.ag-lb__sub {
+  display: block;
+  font-size: var(--ag-text-fine);
+  color: var(--ag-ink-dim);
+  overflow-wrap: anywhere;
+}
+
+.ag-lb__val {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-title);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   STAT GRID
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-stats {
+  display: grid;
+  gap: var(--ag-gap);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 160px), 1fr));
+  min-width: 0;
+  font-family: var(--ag-font);
+}
+
+.ag-stat {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  padding: calc(var(--ag-pad) * 0.85);
+  border: var(--ag-line-w) solid var(--ag-line);
+  border-radius: var(--ag-radius);
+  background-color: var(--ag-surface);
+  background-image: var(--ag-surface-image);
+  box-shadow: var(--ag-shadow);
+  transform: rotate(var(--ag-tilt));
+  min-width: 0;
+}
+
+.ag-stat__v {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-title);
+  font-weight: var(--ag-weight-display);
+  letter-spacing: var(--ag-tracking-display);
+  text-shadow: var(--ag-display-shadow);
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+
+.ag-stat__u { font-size: var(--ag-text-fine); color: var(--ag-ink-dim); margin-left: 4px; }
+
+.ag-stat__d { font-size: var(--ag-text-fine); font-weight: 600; }
+.ag-stat__d--up   { color: var(--ag-ok); }
+.ag-stat__d--down { color: var(--ag-err); }
+.ag-stat__d--flat { color: var(--ag-ink-dim); }
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   DATA TABLE — scrolls inside its own container in both axes.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-table {
+  border: var(--ag-line-w) solid var(--ag-line);
+  border-radius: var(--ag-radius);
+  background-color: var(--ag-surface);
+  background-image: var(--ag-surface-image);
+  overflow: auto;
+  max-height: 60vh;
+  min-width: 0;
+  font-family: var(--ag-font);
+}
+
+.ag-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--ag-text-fine);
+}
+
+.ag-table th,
+.ag-table td {
+  padding: 8px var(--ag-pad);
+  text-align: left;
+  border-bottom: var(--ag-line-w) solid var(--ag-line);
+  white-space: nowrap;
+}
+
+.ag-table th {
+  position: sticky;
+  top: 0;
+  background: var(--ag-surface-2);
+  color: var(--ag-ink-dim);
+  text-transform: var(--ag-label-caps);
+  letter-spacing: var(--ag-label-tracking);
+  font-size: var(--ag-text-fine);
+  font-weight: 700;
+  z-index: 1;
+}
+
+.ag-table tbody tr:last-child td { border-bottom: 0; }
+
+.ag-table tbody tr[data-ag-pick] { cursor: pointer; }
+
+.ag-table tbody tr:hover { background: var(--ag-surface-2); }
+
+.ag-table td.ag-td--num,
+.ag-table th.ag-th--num {
+  text-align: right;
+  font-family: var(--ag-font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   SHOWCASE CARD — one player's entry, used by leaderboards and galleries alike.
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.ag-showcase {
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  padding: 0;
+  overflow: hidden;
+  text-align: left;
+  font: inherit;
+  color: var(--ag-ink);
+  min-width: 0;
+  font-family: var(--ag-font);
+}
+
+button.ag-showcase { cursor: pointer; }
+
+.ag-showcase__img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  background: var(--ag-surface-2);
+  border-bottom: var(--ag-line-w) solid var(--ag-line);
+}
+
+.ag-showcase__body {
+  display: grid;
+  gap: 6px;
+  padding: var(--ag-pad);
+  min-width: 0;
+}
+
+.ag-showcase__title {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-title);
+  font-weight: var(--ag-weight-display);
+  letter-spacing: var(--ag-tracking-display);
+  text-shadow: var(--ag-display-shadow);
+  overflow-wrap: anywhere;
+}
+
+.ag-showcase__by { font-size: var(--ag-text-fine); color: var(--ag-ink-dim); overflow-wrap: anywhere; }
+
+.ag-showcase__metric {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.ag-showcase__mv {
+  font-family: var(--ag-font-display);
+  font-size: var(--ag-text-title);
+  font-weight: var(--ag-weight-display);
+  font-variant-numeric: tabular-nums;
+  color: var(--ag-accent-text);
+}
+
+.ag-showcase__tags { display: flex; gap: 6px; flex-wrap: wrap; }
