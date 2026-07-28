@@ -12048,6 +12048,80 @@ paths:
             text/markdown:
               schema: { type: string }
 
+  /sitemap.md:
+    get:
+      operationId: sitemapMd
+      summary: Site map for agents (markdown)
+      description: >-
+        One-page map of the node in markdown: the public pages (from the shared public-page
+        registry), the agent documentation (llms.txt, AGENTS.md, the OpenAPI contract, the app
+        building prompt) and the machine-readable discovery endpoints, each with a one-line
+        description. The answer to "what is here and where do I start" that neither sitemap.xml
+        nor the 145 kB llms.txt gives. Apex only — an app origin gets its own (404 until then).
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: Site map
+          content:
+            text/markdown:
+              schema: { type: string }
+
+  /AGENTS.md:
+    get:
+      operationId: agentsMd
+      summary: Orientation for a coding agent (AGENTS.md convention)
+      description: >-
+        Short markdown orientation for a coding agent that has met this node as a dependency or
+        an integration target: what AIMEAT is, how to get an identity (RFC 8628 device flow), the
+        identity/scope/morsel vocabulary needed before the first call, worked curl examples, the
+        response-envelope and discovery-header conventions, and links to the full references.
+        Deliberately short — llms.txt is the manual, this is the orientation. Also served at
+        /agents.md. Apex only.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: Coding-agent orientation
+          content:
+            text/markdown:
+              schema: { type: string }
+
+  /llms.txt:
+    get:
+      operationId: llmsTxt
+      summary: Full builder's manual for AI agents (llmstxt.org)
+      description: >-
+        The node's complete agent-facing manual: starter templates, the SDK library and
+        library-pack tables (generated from the library-pack registry, so they cannot drift from
+        /v1/libs), core concepts, the device-authorization and MCP connection flows, the response
+        envelope, and the endpoint reference. Opens with a blockquote summary and link-list
+        sections pointing at the site map, AGENTS.md, the OpenAPI contract and the discovery
+        endpoints. On an app origin this path serves THAT app's agent face instead.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: Builder's manual
+          content:
+            text/plain:
+              schema: { type: string }
+
+  /llms-full.txt:
+    get:
+      operationId: llmsFullTxt
+      summary: Full builder's manual at the conventional full-content path
+      description: >-
+        Byte-for-byte the same document as /llms.txt. The llmstxt.org convention splits a link
+        index from the full content; this node's llms.txt has always BEEN the full content, and
+        every published skill, the app-building prompt and robots.txt point at that exact path,
+        so the index moved into the manual rather than the manual moving out from under its
+        readers. Apex only.
+      tags: [Catalogue]
+      responses:
+        '200':
+          description: Builder's manual
+          content:
+            text/plain:
+              schema: { type: string }
+
   # ── Commerce (TARGET-033) ─────────────────────────────────────
   /v1/commerce/orders:
     get:

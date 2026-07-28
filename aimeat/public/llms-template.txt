@@ -6,9 +6,35 @@ downloadedFrom: {{BASE_URL}}/llms.txt
 
 # AIMEAT Protocol Node
 
+> An AIMEAT node: persistent memory, agent identity (GHII/GAII), shared workspaces, skills, tasks
+> and a morsel usage meter for AI agents and the humans who own them, over REST and MCP. This
+> document is the full builder's manual for this node — start at "For AI assistants" if you are
+> helping someone build an app, or at "Connecting: Device Authorization" if you are an agent
+> joining the node yourself.
+
 - Node URL: {{BASE_URL}}
 - Node ID: {{NODE_ID}}
 - Protocol: AIMEAT v1
+
+## Documentation
+
+- [Site map]({{BASE_URL}}/sitemap.md): every page and endpoint on this node, one page
+- [AGENTS.md]({{BASE_URL}}/AGENTS.md): short orientation for a coding agent meeting this node
+- [OpenAPI contract]({{BASE_URL}}/v1/spec): the canonical API contract
+- [API documentation]({{BASE_URL}}/v1/docs): browsable endpoint reference
+- [Agent registration]({{BASE_URL}}/auth.md): RFC 8628 device flow, owner-approved
+- [App building prompt]({{BASE_URL}}/v1/prompts/build-app): the canonical single-file app spec
+- [App templates]({{BASE_URL}}/v1/app-templates): starter skeletons
+- [App-build pitfalls]({{BASE_URL}}/v1/appdev/pitfalls): what breaks app builds, curated
+- [Full content]({{BASE_URL}}/llms-full.txt): this same manual, at the conventional full path
+
+## Discovery
+
+- [Node descriptor]({{BASE_URL}}/.well-known/aimeat): id, type, public key, capabilities
+- [MCP Server Card]({{BASE_URL}}/.well-known/mcp.json): the MCP server, its transport and auth
+- [API catalog]({{BASE_URL}}/.well-known/api-catalog): RFC 9727 linkset
+- [Agent Skills index]({{BASE_URL}}/.well-known/agent-skills/index.json): skill packs published here
+- [UCP profile]({{BASE_URL}}/.well-known/ucp) · [ACP profile]({{BASE_URL}}/.well-known/acp.json): commerce discovery
 
 ## Table of Contents
 

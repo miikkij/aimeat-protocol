@@ -23,6 +23,9 @@
  *   v1.7.0 -- 2026-07-28 -- sitemap.xml is generated from the shared public-page registry
  *     (src/data/public-pages.ts) and lists indexable HTML pages only; /v1/spec, /v1/catalogue and
  *     /v1/health dropped from it (agent-readability phase 02)
+ *   v1.8.0 -- 2026-07-28 -- /llms-full.txt serves the same manual as /llms.txt (llmstxt.org
+ *     convention), apex-only; the manual gained a blockquote summary and link-list sections
+ *     (agent-readability phase 05)
  */
 import { Router } from 'express';
 import { readFileSync } from 'node:fs';
@@ -39,6 +42,7 @@ import { substituteVariables, resolvePromptContent } from '../services/prompt-va
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
 import { sitemapPages } from '../data/public-pages.js';
+import { apexOnly } from './agent-docs.js';
 import { logger } from '../utils/logger.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -92,15 +96,28 @@ export function bootstrapRouter(
     res.type('image/svg+xml').send(FAVICON_SVG);
   });
 
-  router.get('/llms.txt', (_req, res) => {
-    const content = LLMS_TEMPLATE
-      // Library table first — generated from the library-pack registry (drift kill); its
-      // cells may carry {{BASE_URL}} placeholders, so substitute the token before BASE_URL.
-      .replaceAll('{{LIBRARY_PACKS_TABLE}}', buildLlmsPacksTable())
-      .replaceAll('{{BASE_URL}}', config.baseUrl)
-      .replaceAll('{{NODE_ID}}', config.nodeId);
-    res.type('text/plain; charset=utf-8').send(content);
-  });
+  const renderLlms = () => LLMS_TEMPLATE
+    // Library table first — generated from the library-pack registry (drift kill); its
+    // cells may carry {{BASE_URL}} placeholders, so substitute the token before BASE_URL.
+    .replaceAll('{{LIBRARY_PACKS_TABLE}}', buildLlmsPacksTable())
+    .replaceAll('{{BASE_URL}}', config.baseUrl)
+    .replaceAll('{{NODE_ID}}', config.nodeId);
+
+  // /llms.txt and /llms-full.txt serve the same document. The llmstxt.org convention splits an
+  // index from the full content, and ours is already the full content — 145 kB of manual that
+  // every published skill, the app-building prompt, robots.txt and the bootstrap response point
+  // at by that exact path. Swapping the two would turn the manual into a link list under a URL
+  // thousands of reads already trust, and none of them would notice they got the wrong document.
+  // So the index moved INTO the manual (the Documentation and Discovery sections at the top),
+  // and /llms-full.txt answers the conventional path with the content it promises.
+  const serveLlms = (_req: unknown, res: import('express').Response) => {
+    res.type('text/plain; charset=utf-8').send(renderLlms());
+  };
+  router.get('/llms.txt', serveLlms);
+  // An app origin serves ITS OWN agent face at /llms.txt (subdomainServeRouter, which runs first).
+  // /llms-full.txt has no such handler, so without the guard the node's 145 kB app-BUILDING manual
+  // would answer on an app's host — the wrong manual, in which the app's own name never appears.
+  router.get('/llms-full.txt', apexOnly, serveLlms);
 
   router.get('/', async (_req, res) => {
     // The root negotiates three ways: text/markdown (agents, Markdown for Agents

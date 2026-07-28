@@ -48,6 +48,7 @@ import { commerceAcpRouter } from '../routes/commerce-acp.js';
 
 // Routes
 import { bootstrapRouter } from '../routes/bootstrap.js';
+import { agentDocsRouter } from '../routes/agent-docs.js';
 import { wellknownRouter, discoveryLinkHeaders } from '../routes/wellknown.js';
 import { agentSkillsDiscoveryRouter } from '../routes/agent-skills-discovery.js';
 import { authRouter } from '../routes/auth.js';
@@ -277,6 +278,7 @@ export async function mountRoutes(
   // mapped `<sub>.<apex>` requests; apex requests fall through untouched.
   app.use(subdomainServeRouter(config, storage));
   app.use(bootstrapRouter(config, storage, tunnelManager ?? undefined, siteService));
+  app.use(agentDocsRouter(config));  // /sitemap.md + /AGENTS.md (apex only)
   app.use(statsRouter(config, storage, stats, metricsRegistry));
   app.use(wellknownRouter(config, storage));
   app.use(agentSkillsDiscoveryRouter(config, storage));  // /.well-known/agent-skills (RFC v0.2.0)

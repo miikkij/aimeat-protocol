@@ -104,6 +104,98 @@ function locs(xml: string): string[] {
         }
     });
 
+    // ── /sitemap.md (phase 03) ──────────────────────────────────────────────────────────────
+
+    const smd = await text('/sitemap.md');
+
+    await test('sitemap.md is served as markdown', async () => {
+        assert(smd.status === 200, `status ${smd.status}`);
+        assert(smd.ct.includes('text/markdown'), `content-type ${smd.ct}`);
+    });
+
+    await test('sitemap.md has headings and link lists', async () => {
+        const h2 = (smd.body.match(/^## /gm) ?? []).length;
+        const links = (smd.body.match(/\]\(/g) ?? []).length;
+        assert(h2 >= 3, `expected 3+ H2 sections, got ${h2}`);
+        assert(links >= 10, `expected 10+ markdown links, got ${links}`);
+        assert(/^# /m.test(smd.body), 'no H1');
+    });
+
+    await test('sitemap.md lists every live registry page', async () => {
+        for (const p of sitemapPages()) {
+            if (p.path === '/') continue;  // linked as "Home", not by title
+            assert(smd.body.includes(p.path), `sitemap.md omits ${p.path}`);
+        }
+    });
+
+    // ── /AGENTS.md (phase 04) ───────────────────────────────────────────────────────────────
+
+    const agents = await text('/AGENTS.md');
+
+    await test('AGENTS.md is served as markdown, under both spellings', async () => {
+        assert(agents.status === 200, `status ${agents.status}`);
+        assert(agents.ct.includes('text/markdown'), `content-type ${agents.ct}`);
+        const lower = await text('/agents.md');
+        assert(lower.status === 200, `/agents.md status ${lower.status}`);
+        assert(lower.body === agents.body, '/agents.md and /AGENTS.md must serve the same document');
+    });
+
+    await test('AGENTS.md carries the sections a coding agent needs', async () => {
+        for (const section of ['## Setup', '## Usage', '## Conventions']) {
+            assert(agents.body.includes(section), `AGENTS.md missing ${section}`);
+        }
+        assert(/^# /m.test(agents.body), 'no H1');
+        assert(/^> /m.test(agents.body), 'no blockquote summary');
+    });
+
+    // ── llms.txt structure + /llms-full.txt (phase 05) ──────────────────────────────────────
+
+    const llms = await text('/llms.txt');
+
+    await test('llms.txt has a blockquote summary after the H1', async () => {
+        assert(llms.status === 200, `status ${llms.status}`);
+        assert(llms.ct.includes('text/plain'), `content-type ${llms.ct}`);
+        const h1 = llms.body.indexOf('\n# ');
+        const bq = llms.body.indexOf('\n> ');
+        assert(bq > -1, 'no blockquote in llms.txt');
+        assert(bq > h1, 'blockquote must follow the H1');
+    });
+
+    await test('llms.txt has H2 sections with markdown link lists', async () => {
+        const links = (llms.body.match(/\]\(/g) ?? []).length;
+        assert(links >= 15, `expected 15+ markdown links, got ${links}`);
+        const docs = llms.body.slice(llms.body.indexOf('\n## Documentation'));
+        assert(/\n- \[/.test(docs.slice(0, 400)), 'Documentation section has no link list');
+    });
+
+    await test('llms.txt links are absolute and resolve', async () => {
+        const urls = [...new Set([...llms.body.matchAll(/\]\((https?:\/\/[^)]+)\)/g)].map(m => m[1]))];
+        assert(urls.length >= 15, `expected 15+ absolute links, got ${urls.length}`);
+        for (const u of urls) {
+            const r = await fetch(u, { method: 'GET' });
+            assert(r.status < 400, `${u} → ${r.status}`);
+        }
+    });
+
+    await test('llms-full.txt serves the same manual', async () => {
+        const full = await text('/llms-full.txt');
+        assert(full.status === 200, `status ${full.status}`);
+        assert(full.ct.includes('text/plain'), `content-type ${full.ct}`);
+        assert(full.body === llms.body, 'llms-full.txt must match llms.txt byte for byte');
+    });
+
+    // ── Apex-only guard ─────────────────────────────────────────────────────────────────────
+    // These documents describe THIS node. Served from an app's own host they would describe
+    // somebody else — a site map full of apex URLs, or the 145 kB app-BUILDING manual in which
+    // the app's own name never appears. Until phase 12 gives app origins their own versions, a
+    // 404 is the honest answer. `x-app-origin` is what nginx stamps on the app host family.
+    await test('node discovery documents do not answer on an app origin', async () => {
+        for (const p of ['/sitemap.md', '/AGENTS.md', '/agents.md', '/llms-full.txt']) {
+            const r = await text(p, { 'x-app-origin': '1', 'x-subdomain': 'someapp' });
+            assert(r.status === 404, `${p} on an app origin → ${r.status}, expected 404`);
+        }
+    });
+
     console.log(`\n  ${passed} passed, ${failed} failed`);
     process.exit(failed > 0 ? 1 : 0);
 })();
