@@ -1239,6 +1239,37 @@ await test('MERGE · applied for real, two rights of one human become one and no
     assert(rows.length >= 2, `the human and their agent are both still named: ${JSON.stringify(rows.map((r: any) => r.gaii))}`);
 });
 
+await test('APP GRANT · a grant given BEFORE the permission existed keeps working', async () => {
+    // Shipped without this, and it broke a live app mid-use: the owner had approved it under rules
+    // that had no such question, and the first they learned of the new one was a 403 in their browser.
+    // A permission invented today cannot reach backwards and cancel consent properly given yesterday.
+    const { authoriseMeteredCall } = await import('../src/services/metered-access.js');
+    const person = await setupOwner('gfa');
+    await json('/v1/exchange/entitlements', { method: 'POST', headers: auth(person.token), body: JSON.stringify({ offering_id: offeringSolo, cap_units: 400 }) });
+
+    const base = {
+        app: `${person.name}/legacy.html`, appName: 'Legacy', appOrigin: 'https://x.test',
+        owner: person.name, gaii: person.gaii, scopes: ['memory:read'],
+        refreshTokenHash: null, lastUsedAt: null, revoked: false,
+    };
+    // The state every grant on the node was in when the permission shipped.
+    await storage.createAppGrant({ ...base, grantId: `gf-old-${Date.now()}`, createdAt: '2026-07-01T00:00:00.000Z' } as never);
+    // And one given after it, which had the chance to ask and did not.
+    await storage.createAppGrant({ ...base, app: `${person.name}/fresh.html`, grantId: `gf-new-${Date.now()}`, createdAt: new Date().toISOString() } as never);
+    const grants = await storage.listAppGrantsByOwner(person.name);
+    const oldId = grants.find(g => g.createdAt.startsWith('2026-07-01'))!.grantId;
+    const newId = grants.find(g => !g.createdAt.startsWith('2026-07-01'))!.grantId;
+
+    const ask = (appGrantId: string) => authoriseMeteredCall({
+        config, storage, caller: person.gaii,
+        product: { ext: `apptool:${provider.name}/${APP}`, action: 'solo', label: 'probe', providerOwner: provider.name },
+        session: { roles: ['app'], scopes: ['memory:read'], appGrantId },
+    });
+
+    assert((await ask(oldId)).kind !== 'scope_required', 'a grant from before the rule is not refused by it');
+    assert((await ask(newId)).kind === 'scope_required', 'but a grant given after it still has to ask');
+});
+
 console.log(`\n═══ MONEY AUDIT: ${passed} passed, ${failed} failed (${passed + failed} total) ═══\n`);
 server.close();
 await storage.disconnect?.();

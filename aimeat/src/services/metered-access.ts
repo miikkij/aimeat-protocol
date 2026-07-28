@@ -100,6 +100,30 @@ export function providerOwnerOfCoordinate(coordExt: string): string | null {
 }
 
 /**
+ * When the spend permission began to exist. A grant given BEFORE this could not have been asked for
+ * it, so refusing it now would revoke access the owner already granted, without asking them anything.
+ */
+const SPEND_SCOPE_INTRODUCED = Date.parse('2026-07-28T00:00:00Z');
+
+/**
+ * Should an app without the spend permission be let through anyway?
+ *
+ * Only when its grant predates the permission. A new rule cannot reach backwards and cancel consent
+ * that was properly given under the old one — the owner said yes to an app that had no way to ask
+ * this question, and the first they would learn of the change is their app breaking mid-use. That is
+ * exactly what happened when this gate shipped: a live app stopped working for its user with a 403,
+ * having done nothing wrong.
+ *
+ * It expires by re-consent rather than by date: the moment the owner re-approves the app, the grant
+ * is reissued with whatever scopes it now asks for, and this stops applying to it.
+ */
+function grandfathered(grant: { createdAt?: string } | null): boolean {
+  if (!grant?.createdAt) return false;
+  const created = Date.parse(grant.createdAt);
+  return Number.isFinite(created) && created < SPEND_SCOPE_INTRODUCED;
+}
+
+/**
  * Decide, and settle, one metered call. The whole sequence, in the one place every door shares:
  *
  *   1. OWNER-FREE — calling your own capability costs nothing, and burns no toll. Checked FIRST,
@@ -138,16 +162,17 @@ export async function authoriseMeteredCall(args: {
   //     different favours, and an app grant presents the owner's own GHII, so without this the
   //     narrowest grant there is reached any contract they held. Checked after owner-free, because
   //     an app calling its own owner's capability costs nobody anything.
+  const appGrant = session?.appGrantId ? await storage.getAppGrant(session.appGrantId) : null;
   if (session?.roles.includes('app')
       && !session.scopes.includes('*')
       && !session.scopes.includes(SPEND_SCOPE)
-      && !session.scopes.includes('contract:*')) {
+      && !session.scopes.includes('contract:*')
+      && !grandfathered(appGrant)) {
     return { kind: 'scope_required', scope: SPEND_SCOPE };
   }
 
   // 1c. The permission answers WHETHER; the ceiling answers HOW MUCH. Read before the call rather
   //     than after, so an app is stopped at its limit instead of discovering it by exceeding it.
-  const appGrant = session?.appGrantId ? await storage.getAppGrant(session.appGrantId) : null;
   if (appGrant && appGrant.spendCapMorsels !== null && appGrant.spendCapMorsels !== undefined
       && (appGrant.spentMorsels ?? 0) >= appGrant.spendCapMorsels) {
     return { kind: 'app_cap_reached', capMorsels: appGrant.spendCapMorsels, spentMorsels: appGrant.spentMorsels ?? 0 };
