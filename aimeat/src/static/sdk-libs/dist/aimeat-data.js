@@ -122,9 +122,21 @@
       if (!res.ok) throw new Error(res.error?.message || "Failed to update memory");
       return res.data;
     },
-    // Delete an entry
-    async delete(key) {
-      const res = await authFetch2("/v1/memory/" + encodeURIComponent(key), { method: "DELETE" });
+    /**
+     * Delete an entry.
+     *
+     * `{ ownerScope: true }` deletes the key wherever it sits in this owner's scope — including a
+     * namespace one of their agents wrote it into. `list({ ownerScope: true })` already returns those
+     * keys, so without the same opt-in here an app can show a record it cannot remove.
+     *
+     * @param {string} key
+     * @param {{ ownerScope?: boolean }} [opts]
+     */
+    async delete(key, opts) {
+      const res = await authFetch2(withParams(
+        "/v1/memory/" + encodeURIComponent(key),
+        scopeParams(opts)
+      ), { method: "DELETE" });
       if (!res.ok) throw new Error(res.error?.message || "Failed to delete memory");
       return res.data;
     },

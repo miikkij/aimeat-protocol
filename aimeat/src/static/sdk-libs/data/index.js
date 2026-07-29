@@ -17,6 +17,8 @@
  *     list takes { meta, count } (+ data.count()). Agent-published keys live under the agent's GAII,
  *     and an app-grant token gets no automatic owner-scope broadening, so apps had to bypass this
  *     library entirely to read their own owner's fleet output. All options are additive.
+ *   v1.2.0 — 2026-07-29 — delete() takes { ownerScope } like the reads. list({ ownerScope }) already
+ *     returned agent-written keys, so an app could render a record and then 404 trying to remove it.
  */
 import { NODE_URL, NODE_ID } from '../_core/config.js';
 import { makeSession } from '../_core/session.js';
@@ -115,9 +117,19 @@ const data = {
     return res.data;
   },
 
-  // Delete an entry
-  async delete(key) {
-    const res = await authFetch('/v1/memory/' + encodeURIComponent(key), { method: 'DELETE' });
+  /**
+   * Delete an entry.
+   *
+   * `{ ownerScope: true }` deletes the key wherever it sits in this owner's scope — including a
+   * namespace one of their agents wrote it into. `list({ ownerScope: true })` already returns those
+   * keys, so without the same opt-in here an app can show a record it cannot remove.
+   *
+   * @param {string} key
+   * @param {{ ownerScope?: boolean }} [opts]
+   */
+  async delete(key, opts) {
+    const res = await authFetch(withParams(
+      '/v1/memory/' + encodeURIComponent(key), scopeParams(opts)), { method: 'DELETE' });
     if (!res.ok) throw new Error(res.error?.message || 'Failed to delete memory');
     return res.data;
   },

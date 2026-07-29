@@ -100,7 +100,7 @@ async function main() {
 
     await test('mint an app-grant token (sub = owner GHII, roles ["app"])', async () => {
         const q = new URLSearchParams({
-            app: `${owner}/${FILENAME}`, response_type: 'code', scope: 'memory:read memory:write',
+            app: `${owner}/${FILENAME}`, response_type: 'code', scope: 'memory:read memory:write memory:delete',
             redirect_uri: REDIRECT, code_challenge: codeChallenge, code_challenge_method: 'S256',
         });
         const res = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
@@ -222,6 +222,48 @@ async function main() {
         assert(after.body.data.value.by === 'app-updated', 'the owner record itself changed');
         assert(after.body.data.owner_gaii === undefined || after.body.data.owner_gaii === ownerGhii(),
             'still the owner copy');
+    });
+
+    // ── 5. …and can DELETE one, which is where the model had a hole ──────────
+    //
+    // An app-grant token lists across the owner scope, so an app renders keys its owner's AGENTS
+    // wrote. Deleting one was refused, because the cross-namespace lookup on DELETE was written for
+    // `roles:['owner']` alone. The result was a delete control pointing at a record it could never
+    // remove — and for an app whose whole premise is "your AI writes these for you", that is every
+    // record, for every user, not an edge case.
+    //
+    // This is not a widening of what an app may reach: the same credential already deletes anything
+    // in the owner's OWN namespace, so fencing off the agent-written subset protected nothing.
+    console.log('\nPhase 5: the app-grant credential deletes an agent-written key');
+
+    await test('without owner_scope, an app-grant delete of an agent-only key still 404s', async () => {
+        const d = await json(`/v1/memory/${encodeURIComponent(AGENT_ONLY_KEY)}`, {
+            method: 'DELETE', headers: { Authorization: `Bearer ${appToken}` },
+        });
+        assert(d.status === 404, `unscoped delete must stay in the caller's namespace, got ${d.status}`);
+        const still = await json(`/v1/memory/${encodeURIComponent(AGENT_ONLY_KEY)}?owner_scope=true`, {
+            headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        assert(still.status === 200, 'and the record is untouched');
+    });
+
+    await test('with ?owner_scope=true, the app-grant deletes the agent-written key', async () => {
+        const d = await json(`/v1/memory/${encodeURIComponent(AGENT_ONLY_KEY)}?owner_scope=true`, {
+            method: 'DELETE', headers: { Authorization: `Bearer ${appToken}` },
+        });
+        assert(d.status === 200, `owner-scope delete: ${d.status} ${JSON.stringify(d.body)}`);
+    });
+
+    await test('the record is gone from the owner scope, not merely hidden from the app', async () => {
+        const r = await json(`/v1/memory/${encodeURIComponent(AGENT_ONLY_KEY)}?owner_scope=true`, {
+            headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        assert(r.status === 404, `expected the key to be gone, got ${r.status}`);
+        const l = await json(`/v1/memory?owner_scope=true&prefix=${encodeURIComponent(AGENT_ONLY_KEY)}`, {
+            headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        const rows = (l.body.data.items ?? []).filter((i: any) => i.key === AGENT_ONLY_KEY);
+        assert(rows.length === 0, `owner-scope listing still returns it: ${JSON.stringify(rows)}`);
     });
 
     console.log(`\n${passed} passed, ${failed} failed\n`);

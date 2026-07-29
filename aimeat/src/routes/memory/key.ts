@@ -121,13 +121,19 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     let effectiveOwner = (ownerOverride && req.auth!.roles.includes('operator')) ? ownerOverride : gaii;
     let existing = await storage.getMemory(effectiveOwner, key);
 
-    // Owner sessions can delete any of their agents' memory entries. Mirrors
-    // the cross-agent lookup in PUT /v1/memory/:key — without this, an owner
-    // (whose GAII is the GHII) deleting a key stored under one of their agents
-    // would get a spurious 404. Only kicks in when no explicit operator
-    // ?owner= override was supplied.
+    // The owner can delete anything the owner owns, whoever wrote it. Mirrors the cross-agent
+    // lookup in PUT /v1/memory/:key — without it, an owner (whose GAII is the GHII) deleting a key
+    // stored under one of their agents would get a spurious 404. Only kicks in when no explicit
+    // operator ?owner= override was supplied.
+    //
+    // `?owner_scope=true` extends the same reach to another same-owner principal that already
+    // carries memory:delete — an app grant, or an agent — exactly as GET /v1/memory/:key does for
+    // reads (same-owner-access invariant). Without the opt-in an app the owner authorised could
+    // LIST an agent-written key (list defaults to the owner scope) and then fail to delete it,
+    // which is how a delete button came to point at a record it could never remove.
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
-    if (!existing && isOwnerSession && !ownerOverride) {
+    const ownerScopeDelete = isOwnerSession || req.query.owner_scope === 'true';
+    if (!existing && ownerScopeDelete && !ownerOverride) {
       const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
       for (const agent of agents) {
         const found = await storage.getMemory(agent.gaii, key);
@@ -195,11 +201,14 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    // Owner sessions can update any of their agents' memory entries
+    // The owner can update anything the owner owns, whoever wrote it; `?owner_scope=true` extends
+    // the same reach to another same-owner principal that already carries memory:write — an app
+    // grant, or an agent — as GET and DELETE do (same-owner-access invariant).
     const isOwnerSession = req.auth!.roles.includes('owner') && !req.auth!.roles.includes('agent');
+    const ownerScopeWrite = isOwnerSession || req.query.owner_scope === 'true';
     let existing = await storage.getMemory(gaii, key);
     let effectiveGaii = gaii;
-    if (!existing && isOwnerSession) {
+    if (!existing && ownerScopeWrite) {
       const agents = await storage.getAgentsByOwner(req.auth!.owner as string);
       for (const agent of agents) {
         const found = await storage.getMemory(agent.gaii, key);
