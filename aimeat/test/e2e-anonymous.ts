@@ -44,9 +44,13 @@ console.log(`Expected GAII: ${ANON_GAII}\n`);
 console.log('Phase 1 — Bootstrap & Anonymous Identity');
 
 await test('Bootstrap endpoint works', async () => {
-    const { status, body } = await json('/');
+    // GET / content-negotiates: without an Accept: application/json it serves the SPA HTML, the
+    // json() helper's ct.includes('json') branch never runs, and body.ok is undefined. The helper
+    // only ever sent Content-Type, which says nothing about what the caller wants back.
+    const { status, body } = await json('/', { headers: { Accept: 'application/json' } });
     assert(status === 200, `Expected 200, got ${status}`);
-    assert(body.ok === true, 'Expected ok: true');
+    assert(body.ok === true, `Expected ok: true — got ${JSON.stringify(body).slice(0, 120)}`);
+    assert(body.protocol === 'aimeat', `Expected the AIMEAT bootstrap envelope, got protocol ${JSON.stringify(body.protocol)}`);
 });
 
 await test('Anonymous agent exists in agent list', async () => {
@@ -188,23 +192,38 @@ await test('List micro-memory set without OTK', async () => {
     assert(body.data.entries.greeting === 'hello', 'Expected greeting=hello');
 });
 
-await test('Modify micro-memory entry without OTK', async () => {
+// `body.data.op` is the REQUEST PARAMETER echoed back, so asserting it proves only that the route
+// parsed the query string. Every mutating op below reads the set back afterwards instead.
+await test('Modify micro-memory entry without OTK — and the new value is stored', async () => {
     const { status, body } = await json(`/v1/mm?op=mod&set=${mmSet}&key=greeting&value=world`);
     assert(status === 200, `Expected 200, got ${status}`);
     assert(body.data.op === 'mod', 'Expected op: mod');
+    const after = await json(`/v1/mm?op=list&set=${mmSet}`);
+    assert(after.body.data.entries.greeting === 'world',
+        `the modified value must be stored, got ${JSON.stringify(after.body.data.entries)}`);
 });
 
-await test('Batch add micro-memory without OTK', async () => {
+await test('Batch add micro-memory without OTK — and both keys are stored', async () => {
     const { status, body } = await json(`/v1/mm?op=batch&set=${mmSet}&key0=a&value0=alpha&key1=b&value1=beta`);
     assert(status === 200, `Expected 200, got ${status}`);
     assert(body.data.op === 'batch', 'Expected op: batch');
     assert(body.data.count === 2, 'Expected count 2');
+    const after = await json(`/v1/mm?op=list&set=${mmSet}`);
+    assert(after.body.data.entries.a === 'alpha' && after.body.data.entries.b === 'beta',
+        `both batched keys must be stored, got ${JSON.stringify(after.body.data.entries)}`);
 });
 
-await test('Delete micro-memory entry without OTK', async () => {
+await test('Delete micro-memory entry without OTK — and it is actually gone', async () => {
     const { status, body } = await json(`/v1/mm?op=del&set=${mmSet}&key=greeting`);
     assert(status === 200, `Expected 200, got ${status}`);
     assert(body.data.op === 'del', 'Expected op: del');
+    assert(body.data.deleted === true, `Expected deleted: true, got ${JSON.stringify(body.data.deleted)}`);
+    const after = await json(`/v1/mm?op=list&set=${mmSet}`);
+    assert(after.body.data.entries.greeting === undefined,
+        `the deleted key must be gone from the set, got ${JSON.stringify(after.body.data.entries)}`);
+    // ...and the delete removed only what it was asked to.
+    assert(after.body.data.entries.a === 'alpha' && after.body.data.entries.b === 'beta',
+        `the other keys must survive the delete, got ${JSON.stringify(after.body.data.entries)}`);
 });
 
 await test('List all micro-memory sets without OTK', async () => {
