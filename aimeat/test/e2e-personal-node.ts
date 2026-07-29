@@ -1,5 +1,18 @@
-// E2E test for AIMEAT Personal Node lifecycle
-// Run: cd aimeat && pnpm exec tsx test/e2e-personal-node.ts
+/**
+ * @file e2e-personal-node.ts
+ * @description E2E for the AIMEAT personal-node lifecycle: anchor, status, operator inventory,
+ *   visibility toggle, cross-owner denial, mailbox stats, federation-directory visibility filtering,
+ *   bootstrap + admin dashboard exposure, deregister and cascade delete.
+ * @structure Phase 1 setup · 2 anchor · 3 status · 4 operator list · 4b visibility · 4c cross-owner
+ *   denial · 5 mailbox · 6 federation visibility · 7 bootstrap · 8 admin dashboard · 9 deregister ·
+ *   10 cleanup.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-personal-node
+ * @version-history
+ *   v1.1.0 — 2026-07-29 — Add a second, non-operator owner and the cross-owner denials for
+ *            PATCH/DELETE /v1/personal/anchor/:nodeId, GET /v1/personal/mailbox/:nodeId and
+ *            GET /v1/personal/nodes (batch 01, holes 7-10); make the bootstrap assertion depend on
+ *            the server's personal_nodes_enabled flag instead of the section's presence.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -192,6 +205,68 @@ await test('PATCH /v1/personal/anchor/:nodeId — empty body rejected', async ()
     assert(status === 400, `Expected 400 for empty body, got ${status}`);
 });
 
+// ─── Phase 4c: Cross-owner denial ───
+// Every ownership check in personal.ts is `node.ownerName !== ownerName && !roles.includes('operator')`.
+// With only one owner registered the suite could not express the denial, so all four checks were
+// deletable in silence (batch 01 mutations P1–P4).
+console.log('Phase 4c — Cross-owner denial');
+
+const ownerBName = `pnownerb${Date.now()}`;
+let ownerBToken = '';
+
+await test('Setup — a second, non-operator owner', async () => {
+    const reg = await json('/v1/owners', {
+        method: 'POST',
+        body: JSON.stringify({ name: ownerBName, public_key: 'placeholder' }),
+    });
+    assert(reg.status === 201, `owner B register ${reg.status}: ${JSON.stringify(reg.body)}`);
+    const timestamp = new Date().toISOString();
+    const signature = await signMsg(reg.body.data.private_key, ownerBName + NODE_ID + timestamp);
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({ owner: ownerBName, timestamp, signature }),
+    });
+    assert(tok.body.ok === true, `owner B token: ${JSON.stringify(tok.body.error)}`);
+    ownerBToken = tok.body.data.token;
+    // The two callers really are different privilege levels — A is the node's first owner and
+    // therefore an operator, B is not. Phase 4's "operator lists all" test depends on that.
+    const rolesOf = (t: string) => JSON.parse(Buffer.from(t.split('.')[1], 'base64url').toString()).roles ?? [];
+    assert(rolesOf(ownerToken).includes('operator'), `owner A should be the bootstrap operator, got ${JSON.stringify(rolesOf(ownerToken))}`);
+    assert(!rolesOf(ownerBToken).includes('operator'), `owner B must NOT be an operator, got ${JSON.stringify(rolesOf(ownerBToken))}`);
+});
+
+await test('cross-owner: owner B cannot read, flip or destroy owner A\'s personal node', async () => {
+    const bAuth = { Authorization: `Bearer ${ownerBToken}`, 'Content-Type': 'application/json' };
+    const url = `/v1/personal/anchor/${encodeURIComponent(personalNodeId)}`;
+
+    const patch = await json(url, { method: 'PATCH', headers: bAuth, body: JSON.stringify({ visibility: 'public' }) });
+    assert(patch.status === 403, `cross-owner PATCH must be 403, got ${patch.status}: ${JSON.stringify(patch.body)}`);
+    assert(patch.body.error?.code === 'FORBIDDEN', `expected FORBIDDEN, got ${patch.body.error?.code}`);
+
+    const mail = await json(`/v1/personal/mailbox/${encodeURIComponent(personalNodeId)}`, { headers: bAuth });
+    assert(mail.status === 403, `cross-owner mailbox read must be 403, got ${mail.status}`);
+    assert(mail.body.error?.code === 'FORBIDDEN', `expected FORBIDDEN, got ${mail.body.error?.code}`);
+
+    const del = await json(url, { method: 'DELETE', headers: bAuth });
+    assert(del.status === 403, `cross-owner DELETE must be 403, got ${del.status}`);
+    assert(del.body.error?.code === 'FORBIDDEN', `expected FORBIDDEN, got ${del.body.error?.code}`);
+
+    // The refusals were real: A's node is intact and still private.
+    const still = await json('/v1/personal/status', { headers: { Authorization: `Bearer ${ownerToken}` } });
+    assert(still.status === 200, `A's node must survive B's attempts, got ${still.status}`);
+    assert(still.body.data?.node_id === personalNodeId, `node_id after B's attempts: ${still.body.data?.node_id}`);
+    assert(still.body.data?.visibility !== 'public', `B must not have flipped A's node public: ${still.body.data?.visibility}`);
+});
+
+await test('GET /v1/personal/nodes — a NON-operator owner is refused the full inventory', async () => {
+    const { status, body } = await json('/v1/personal/nodes', {
+        headers: { Authorization: `Bearer ${ownerBToken}` },
+    });
+    assert(status === 403, `non-operator listing every personal node must be 403, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${body.error?.code}`);
+    assert(body.data?.personal_nodes === undefined, `the refusal must not carry the inventory: ${JSON.stringify(body.data)}`);
+});
+
 // ─── Phase 5: Mailbox — Check mailbox stats ───
 console.log('Phase 5 — Mailbox');
 
@@ -264,11 +339,13 @@ await test('GET /?format=json — personal nodes in bootstrap', async () => {
     assert(status === 200, `status ${status}`);
     assert(body.ok === true, 'ok');
     assert(body.protocol === 'aimeat', `protocol: ${body.protocol}`);
-    // personal_nodes section should be present in data when feature is enabled
-    if (body.data?.personal_nodes) {
-        assert(body.data.personal_nodes.enabled === true, 'personal_nodes enabled');
-        assert(typeof body.data.personal_nodes.tunnel_url === 'string', 'has tunnel_url');
-    }
+    // Condition on the server's own flag, not on the section's presence — otherwise the section
+    // can disappear entirely and this test still passes.
+    assert(body.data?.this_node?.personal_nodes_enabled === true,
+        `personal nodes must be enabled here (the anchor above succeeded): ${JSON.stringify(body.data?.this_node?.personal_nodes_enabled)}`);
+    assert(body.data?.personal_nodes, `personal_nodes section must be present when the feature is enabled: ${JSON.stringify(Object.keys(body.data ?? {}))}`);
+    assert(body.data.personal_nodes.enabled === true, 'personal_nodes enabled');
+    assert(typeof body.data.personal_nodes.tunnel_url === 'string', 'has tunnel_url');
 });
 
 // ─── Phase 8: Admin Dashboard — Check personal node stats ───
