@@ -1,6 +1,17 @@
-// E2E: owner-created Personal Access Tokens for agents.
-// Verifies plan 2026-06-03-agent-access-tokens (Phase 2: management CRUD + exchange).
-// Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=access-tokens
+/**
+ * @file e2e-access-tokens.ts
+ * @description E2E for owner-created Personal Access Tokens (plan 2026-06-03-agent-access-tokens,
+ *   Phase 2: management CRUD + exchange), plus the denial dimensions the route depends on: the
+ *   minting route is owner-only (a scoped agent must not be able to mint {grant_owner:true}), and
+ *   revocation is owner-scoped (owner A must not revoke owner B's tokens).
+ * @structure Phase 0 owners · 1 scoped token + scope enforcement · 1b direct PAT bearer · 2 owner
+ *   token · 3 operator gating · 3b owner-only minting · 4 list/revoke/expiry/bad input · 5 browser
+ *   cookie + access overview.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-access-tokens
+ * @version-history
+ *   v1.1.0 — 2026-07-29 — Add the owner-only minting/list/revoke denials for a scoped agent session,
+ *            cross-owner PAT revocation, and the create route's bad-input codes (batch 01, holes 1+5).
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -140,6 +151,30 @@ async function main() {
     assert(roles.includes('owner') && roles.includes('operator'), `operator token JWT must have operator, got ${roles}`);
   });
 
+  console.log('\nPhase 3b — The minting route is owner-only (scope escape)');
+  await test('a scoped agent session CANNOT mint, list or revoke access tokens', async () => {
+    // Without requireRole('owner') the handler takes its owner from req.auth!.owner, so a
+    // memory:read agent mints {grant_owner:true} and exchanges it for a full owner JWT.
+    const mint = await api('/v1/access/tokens', { bearer: scopedJwt, body: { label: 'escalate', grant_owner: true } });
+    assert(mint.status === 403, `scoped agent minting an owner token must be 403, got ${mint.status}`);
+    assert(mint.data?.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${mint.data?.error?.code}`);
+
+    const list = await api('/v1/access/tokens', { method: 'GET', bearer: scopedJwt });
+    assert(list.status === 403, `scoped agent listing owner tokens must be 403, got ${list.status}`);
+    assert(list.data?.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${list.data?.error?.code}`);
+
+    // ...and it cannot revoke one of the owner's real tokens either.
+    const own = await api('/v1/access/tokens', { method: 'GET', bearer: jwtB });
+    const victimId = own.data.data.tokens[0].id;
+    const del = await api(`/v1/access/tokens/${victimId}`, { method: 'DELETE', bearer: scopedJwt });
+    assert(del.status === 403, `scoped agent revoking an owner token must be 403, got ${del.status}`);
+    assert(del.data?.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${del.data?.error?.code}`);
+
+    // The escalation the mint would have bought must not exist: the agent still cannot write memory.
+    const write = await api('/v1/memory', { bearer: scopedJwt, body: { key: 'still-denied', value: { a: 1 }, visibility: 'private' } });
+    assert(write.status === 403, `the scoped agent must still be scope-limited, got ${write.status}`);
+  });
+
   console.log('\nPhase 4 — List, revoke, expiry, auth');
   await test('list shows the owner tokens and never the raw token', async () => {
     const r = await api('/v1/access/tokens', { method: 'GET', bearer: jwtB });
@@ -158,6 +193,35 @@ async function main() {
     // ...and the revoked token is rejected when used directly as a header too.
     const direct = await api('/v1/memory', { method: 'GET', bearer: tok });
     assert(direct.status === 401, `revoked token used directly should be 401, got ${direct.status}`);
+  });
+
+  await test('owner A CANNOT revoke owner B\'s token (revocation is owner-scoped)', async () => {
+    // The `AND owner = ?` lives inside storage.revokePat — exactly where a refactor drops it.
+    const c = await api('/v1/access/tokens', { bearer: jwtB, body: { label: 'victim', scopes: ['memory:read'] } });
+    assert(c.status === 201, `create victim token failed: ${c.status}`);
+    const victimId = c.data.data.id, victimTok = c.data.data.token;
+
+    const del = await api(`/v1/access/tokens/${victimId}`, { method: 'DELETE', bearer: jwtA });
+    assert(del.status === 404, `cross-owner revoke must be 404, got ${del.status}`);
+    assert(del.data?.error?.code === 'NOT_FOUND', `expected NOT_FOUND, got ${del.data?.error?.code}`);
+
+    // The refusal was real, not cosmetic: B's token still exchanges.
+    const x = await api('/v1/auth/token/exchange', { bearer: victimTok });
+    assert(x.status === 200, `B's token must still work after A's attempt, got ${x.status}`);
+  });
+
+  await test('create rejects bad input with the right code', async () => {
+    const cases: [Record<string, unknown>, string][] = [
+      [{ scopes: ['memory:read'] }, 'INVALID_INPUT'],                              // no label
+      [{ label: 'x'.repeat(121), scopes: ['memory:read'] }, 'INVALID_INPUT'],      // oversize label
+      [{ label: 'x' }, 'INVALID_INPUT'],                                           // scoped token, no scopes
+      [{ label: 'x', scopes: ['memory:read'], expires_in: -5 }, 'INVALID_INPUT'],  // negative expiry
+    ];
+    for (const [body, code] of cases) {
+      const r = await api('/v1/access/tokens', { bearer: jwtB, body });
+      assert(r.status === 400, `${JSON.stringify(body)} should be 400, got ${r.status}`);
+      assert(r.data?.error?.code === code, `expected ${code} for ${JSON.stringify(body)}, got ${r.data?.error?.code}`);
+    }
   });
 
   await test('expired token is rejected at exchange', async () => {
