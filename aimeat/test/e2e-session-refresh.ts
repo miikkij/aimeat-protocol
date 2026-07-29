@@ -1,8 +1,15 @@
-// E2E: owner session refresh tokens (httpOnly cookie, rotation, reuse-detection).
-// Verifies plan 2026-06-03-owner-session-refresh-tokens.
-// Server runs with AIMEAT_REFRESH_GRACE_MS=1500 (set by run-e2e-ci.ts) so the
-// prev-token-after-grace reuse path is testable without a 60s wait.
-// Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=session-refresh
+/**
+ * @file e2e-session-refresh.ts
+ * @description E2E for owner session refresh tokens (plan 2026-06-03-owner-session-refresh-tokens):
+ *   httpOnly cookie, rotation, concurrency grace, reuse detection, cross-device independence,
+ *   logout/session management incl. cross-owner denial, legacy Bearer refresh, and the agent
+ *   no-escalation guard. Server runs with AIMEAT_REFRESH_GRACE_MS=1500 (set by run-e2e-ci.ts) so
+ *   the prev-token-after-grace reuse path is testable without a 60s wait.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-session-refresh
+ * @version-history
+ *   v1.1.0 — 2026-07-29 — Register a second owner and assert that a session id belonging to another
+ *            owner cannot be revoked (batch 01, hole 4).
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 
@@ -86,11 +93,19 @@ async function login(username: string, password: string): Promise<{ token: strin
 async function main() {
     const username = `rt${Date.now()}`;
     const password = 'RefreshT0ken#Pw';
+    // A second owner, so the suite can express a cross-owner denial at all.
+    const otherUsername = `rtother${Date.now()}`;
+    const otherPassword = 'RefreshT0ken#Other';
 
     console.log('\nPhase 0 — Setup');
     await test('register owner with password', async () => {
         const r = await call('/v1/ghii', { body: { username, display_name: 'Refresh Tester', password } });
         assert(r.status === 201 && r.data?.ok, `register failed: ${r.status} ${r.data?.error?.message}`);
+    });
+
+    await test('register a SECOND owner (for cross-owner denial)', async () => {
+        const r = await call('/v1/ghii', { body: { username: otherUsername, display_name: 'Other Owner', password: otherPassword } });
+        assert(r.status === 201 && r.data?.ok, `register other failed: ${r.status} ${r.data?.error?.message}`);
     });
 
     console.log('\nPhase 1 — Login establishes a cookie session');
@@ -210,6 +225,28 @@ async function main() {
         assert(del.status === 200 && del.data?.ok, `delete session failed: ${del.status}`);
         const after = await call('/v1/auth/refresh', { cookie: l.rt, csrf: true });
         assert(after.status === 401, `refresh after session delete should be 401, got ${after.status}`);
+    });
+
+    await test('a session id belonging to ANOTHER owner cannot be revoked', async () => {
+        // DELETE /v1/auth/sessions/:id is requireAuth() only; the caller-owns-session check is the
+        // `if (!target) return 404` after listActiveSessions(req.auth.owner). Remove it and any
+        // authenticated caller who learns a session id can log that person out, repeatedly.
+        const victim = await login(username, password);
+        const attacker = await login(otherUsername, otherPassword);
+
+        const del = await call(`/v1/auth/sessions/${victim.sessionId}`, { method: 'DELETE', jwt: attacker.token });
+        assert(del.status === 404, `cross-owner session revoke must be 404, got ${del.status}`);
+        assert(del.data?.error?.code === 'NOT_FOUND', `expected NOT_FOUND, got ${del.data?.error?.code}`);
+
+        // The refusal was real: the victim's session still refreshes.
+        const still = await call('/v1/auth/refresh', { cookie: victim.rt, csrf: true });
+        assert(still.status === 200, `the victim's session must survive, got ${still.status} ${still.data?.error?.code}`);
+
+        // ...and the attacker's own session list never contained it.
+        const list = await call('/v1/auth/sessions', { method: 'GET', jwt: attacker.token });
+        assert(list.status === 200, `attacker session list ${list.status}`);
+        assert(!list.data.data.sessions.some((x: any) => x.session_id === victim.sessionId),
+            `the attacker must not even see the victim's session: ${JSON.stringify(list.data.data.sessions.map((x: any) => x.session_id))}`);
     });
 
     console.log('\nPhase 6 — Legacy Bearer refresh still works');
