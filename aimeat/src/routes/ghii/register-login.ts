@@ -115,10 +115,9 @@ export function registerRegisterLoginRoutes(
             }
         }
 
-        // Hash password if provided (validation already done above)
-        const passwordHash = (typeof password === 'string' && password.length >= 8)
-            ? await hashPassword(password)
-            : undefined;
+        // Hash if provided. The length rule stays in validatePasswordStrength above — when the
+        // hash line carried it too, weakening the gate stored NO password instead of refusing.
+        const passwordHash = typeof password === 'string' ? await hashPassword(password) : undefined;
 
         // Check if owner name is already taken
         const existingOwner = await storage.getOwner(username);
