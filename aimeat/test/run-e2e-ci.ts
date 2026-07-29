@@ -17,6 +17,9 @@
  *   v1.3.0 -- 2026-07-19 -- Add e2e-appdev-pitfalls.ts (AppDev Knowledge Base Phase 1).
  *   v1.4.0 -- 2026-07-26 -- Add e2e-agent-file-handoff.ts (giving an agent a file: owner-visibility
  *            read via /v1/pub, DM attachment refs, task attachments).
+ *   v1.5.0 -- 2026-07-29 -- --test= resolution: exact suite name wins over substring, and an
+ *            ambiguous substring exits non-zero instead of silently picking the first match
+ *            (--test=security ran e2e-zip-security and never ran e2e-security).
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -282,10 +285,20 @@ function parseArgs(): string[] {
     for (const arg of args) {
         if (arg.startsWith('--test=')) {
             const name = arg.slice(7);
-            // Find matching suite
-            const match = ALL_SUITES.find(s =>
-                basename(s, '.ts') === name || basename(s, '.ts') === `e2e-${name}` || s.includes(name)
+            // Exact match wins over substring. Without this ordering `--test=security`
+            // matched `e2e-zip-security` (first in ALL_SUITES) and `e2e-security` never
+            // ran — silently, exit code 0. An ambiguous substring is an error, not a
+            // first-match guess, for the same reason.
+            const exact = ALL_SUITES.find(s =>
+                basename(s, '.ts') === name || basename(s, '.ts') === `e2e-${name}`
             );
+            const fuzzy = ALL_SUITES.filter(s => s.includes(name));
+            if (!exact && fuzzy.length > 1) {
+                console.error(`Ambiguous test filter "${name}" matches ${fuzzy.length} suites: ${fuzzy.map(s => basename(s, '.ts')).join(', ')}`);
+                console.error('Spell the suite out, e.g. --test=e2e-security');
+                process.exit(1);
+            }
+            const match = exact ?? fuzzy[0];
             if (!match) {
                 console.error(`Unknown test suite: ${name}`);
                 console.error(`Available: ${ALL_SUITES.map(s => basename(s, '.ts')).join(', ')}`);
