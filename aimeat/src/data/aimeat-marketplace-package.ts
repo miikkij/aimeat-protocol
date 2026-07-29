@@ -19,6 +19,11 @@
  *   (component-registrar.rewriteComponentRefs).
  * @version-history
  *   v1.0.0 — 2026-06-26 — initial: extension (post/remove) + multi-seller storefront app.
+ *   v1.0.1 — 2026-07-30 — action schemas were declared as `input_schema:`/`output_schema:`, but the
+ *     extension manifest parser reads `input:`/`output:` (routes/extensions/manifest.ts), so both
+ *     schemas were dropped silently and every install advertised an action with no schema. Renamed
+ *     to the keys the parser and the authoring prompt actually document. Same bug in
+ *     aimeat-iam-package.ts; found while fixing nuotta-iam (TARGET-055).
  */
 import type { ExamplePackageDef } from './example-packages.js';
 
@@ -69,15 +74,15 @@ const EXTENSION_MARKETPLACE = JSON.stringify({
     '    method: POST',
     '    path: /post',
     '    description: Publish a listing. Any authenticated user; the seller is the caller.',
-    '    input_schema: { type: object, properties: { title: { type: string }, price: { type: string }, desc: { type: string }, imageUrl: { type: string }, id: { type: string }, at: { type: string } }, required: [title] }',
-    '    output_schema: { type: object, properties: { ok: { type: boolean }, id: { type: string } } }',
+    '    input: { type: object, properties: { title: { type: string }, price: { type: string }, desc: { type: string }, imageUrl: { type: string }, id: { type: string }, at: { type: string } }, required: [title] }',
+    '    output: { type: object, properties: { ok: { type: boolean }, id: { type: string } } }',
     '    script: post.js',
     '  - id: remove',
     '    method: POST',
     '    path: /remove',
     '    description: Remove your own listing by id (server-enforced by caller match).',
-    '    input_schema: { type: object, properties: { id: { type: string } }, required: [id] }',
-    '    output_schema: { type: object, properties: { ok: { type: boolean }, removed: { type: number } } }',
+    '    input: { type: object, properties: { id: { type: string } }, required: [id] }',
+    '    output: { type: object, properties: { ok: { type: boolean }, removed: { type: number } } }',
     '    script: remove.js',
   ].join('\n'),
   scripts: {

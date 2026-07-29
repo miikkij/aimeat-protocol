@@ -80,6 +80,35 @@ await test('Install + activate the evolved iam extension', async () => {
     assert(act.status === 200, `activate ${act.status}: ${JSON.stringify(act.body.error || act.body)}`);
 });
 
+/**
+ * The package declares a JSON Schema for both actions, and for a long time none of it survived
+ * installation: the manifest said `input_schema:` while the parser reads `input:`, so every install
+ * advertised check and admin with `{}` and an agent had no way to learn the gate's shape. Nothing
+ * failed loudly, because a dropped schema looks exactly like an action that never had one. Assert
+ * the schemas ARRIVE, not merely that the install returned 200.
+ */
+await test('Install carries the declared action schemas through the manifest parse', async () => {
+    const det = await json(`/v1/extensions/${EXT}`, { headers: authH(A.token) });
+    assert(det.status === 200, `detail ${det.status}`);
+    // This route serializes camelCase while the MCP twin serializes snake_case, so read either
+    // rather than pinning the test to one surface's spelling.
+    type Action = { id: string; inputSchema?: Record<string, unknown>; input_schema?: Record<string, unknown>;
+                    outputSchema?: Record<string, unknown>; output_schema?: Record<string, unknown> };
+    const actions: Action[] = (det.body.data.extension ?? det.body.data).actions;
+    const inOf = (a: Action) => a.inputSchema ?? a.input_schema;
+    const outOf = (a: Action) => a.outputSchema ?? a.output_schema;
+    for (const id of ['check', 'admin']) {
+        const a = actions.find(x => x.id === id);
+        assert(!!a, `action ${id} is installed`);
+        const inProps = (inOf(a!)?.properties ?? {}) as Record<string, unknown>;
+        const outProps = (outOf(a!)?.properties ?? {}) as Record<string, unknown>;
+        assert(Object.keys(inProps).length > 0, `${id} input schema survived the parse: ${JSON.stringify(inOf(a!))}`);
+        assert(Object.keys(outProps).length > 0, `${id} output schema survived the parse: ${JSON.stringify(outOf(a!))}`);
+    }
+    const props = inOf(actions.find(x => x.id === 'check')!)!.properties as Record<string, unknown>;
+    assert(!!props.permission && !!props.command, `check declares both modes: ${JSON.stringify(props)}`);
+});
+
 await test('1. claim + getState seed BBS levels + an empty command manifest', async () => {
     aGaii = data(await admin('claim')).ownerGhii;
     assert(!!aGaii, 'claim returned an ownerGhii');

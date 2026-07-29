@@ -21,6 +21,13 @@
  *   v1.0.0 — 2026-06-26 — initial: extension (enforcement) + dashboard app.
  *   v1.1.0 — 2026-06-26 — dashboard v2: plain fetch+JWT (fix load), structured role editor,
  *     assignments list, "use in your app / tell your AI" snippet, help text, default-role select.
+ *   v1.2.1 — 2026-07-30 — action schemas were declared as `input_schema:`/`output_schema:`, but the
+ *     extension manifest parser reads `input:`/`output:` (routes/extensions/manifest.ts), so BOTH
+ *     schemas were dropped silently: every extension installed from this package advertised check
+ *     and admin with no schema at all, which is why an agent could not discover the gate. Renamed to
+ *     the keys the parser and build-extension-prompt.ts actually document. Same bug was in
+ *     aimeat-marketplace-package.ts. Found while fixing nuotta-iam's keying (TARGET-055); the three
+ *     forks with empty schemas inherited it from here.
  *   v1.2.0 — 2026-07-02 — IAM P5: align to the shared level/capability model. BBS ordinal LEVELS per
  *     role (iam.levels, lower = more power, seeded admin:0/editor:10/viewer:20) + a COMMAND MANIFEST
  *     (iam.commands: {id, description, capability, tier}) so agents call app commands gated by the level
@@ -131,15 +138,15 @@ const EXTENSION_IAM = JSON.stringify({
     '    method: POST',
     '    path: /check',
     '    description: Check whether the caller may do something — pass { permission } for a raw capability or { command } to resolve an app command (returns its mutation tier + needsConfirmation). Any authenticated user.',
-    '    input_schema: { type: object, properties: { permission: { type: string }, command: { type: string } } }',
-    '    output_schema: { type: object, properties: { allowed: { type: boolean }, role: { type: string }, level: { type: number }, tier: { type: string }, needsConfirmation: { type: boolean } } }',
+    '    input: { type: object, properties: { permission: { type: string }, command: { type: string } } }',
+    '    output: { type: object, properties: { allowed: { type: boolean }, role: { type: string }, level: { type: number }, tier: { type: string }, needsConfirmation: { type: boolean } } }',
     '    script: check.js',
     '  - id: admin',
     '    method: POST',
     '    path: /admin',
     '    description: Owner-only role/assignment/config management (multiplexed by op).',
-    '    input_schema: { type: object, properties: { op: { type: string } }, required: [op] }',
-    '    output_schema: { type: object, properties: { ok: { type: boolean } } }',
+    '    input: { type: object, properties: { op: { type: string } }, required: [op] }',
+    '    output: { type: object, properties: { ok: { type: boolean } } }',
     '    script: admin.js',
   ].join('\n'),
   scripts: {
