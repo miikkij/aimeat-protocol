@@ -249,6 +249,9 @@ await test('Re-authenticate with agent key (simulates session.refresh())', async
 });
 
 // ─── Phase 7: Password Login ───
+// v1.1.0 — 2026-07-29 — Batch 01 holes 12 + the lockout suspicion: assert that a weak password is
+// refused with WEAK_PASSWORD and leaves no account behind, and that the brute-force lockout (not
+// the rate limiter, which shares its 429) is what refuses a hammered account.
 console.log('\nPhase 7 — Password Login');
 
 const pwUsername = `pwtest${Date.now()}`;
@@ -263,6 +266,32 @@ await test('POST /v1/ghii — register with password', async () => {
     assert(data.ok === true, `Registration failed: ${data.error?.message}`);
     assert(data._status === 201, `expected 201, got ${data._status}`);
     assert(data.data.has_password === true, 'should indicate password is set');
+});
+
+await test('POST /v1/ghii — a weak password is REFUSED, never silently dropped', async () => {
+    // The strength gate and the hashing line below it were independently conditioned on length:
+    // with the gate gone a short password produced passwordHash undefined and an account that
+    // silently could not be logged into. The refusal is what the suite has to hold.
+    const weakCases: [string, string][] = [
+        ['abc', 'too short'],
+        ['alllowercase1', 'no uppercase'],
+        ['ALLUPPERCASE1', 'no lowercase'],
+        ['NoDigitsHere', 'no digit'],
+        ['password', 'too common'],
+    ];
+    for (const [password, why] of weakCases) {
+        const name = `weak${Date.now()}${Math.random().toString(36).slice(2, 6)}`;
+        const data = await api('/v1/ghii', {
+            method: 'POST',
+            body: JSON.stringify({ username: name, display_name: 'Weak', password }),
+        });
+        assert(data._status === 400, `${why} (${JSON.stringify(password)}) should be 400, got ${data._status}`);
+        assert(data.error?.code === 'WEAK_PASSWORD', `expected WEAK_PASSWORD for ${why}, got ${data.error?.code}`);
+        // The refusal was real: no account was created behind it. (Checked via the owner profile
+        // rather than a login attempt — a login per case would spend the login rate limiter.)
+        const probe = await api(`/v1/owners/${name}`);
+        assert(probe._status === 404, `a refused registration must not create an account (${why}), got ${probe._status}`);
+    }
 });
 
 await test('POST /v1/ghii/login — login with correct password (new device requests key)', async () => {
@@ -337,6 +366,12 @@ await test('POST /v1/ghii/login — repeated wrong passwords LOCK the account (b
         if (r._status !== 401) { locked = true; break; }
     }
     assert(locked, `after ${attempts} wrong passwords the account was still not locked (last ${lastStatus} ${lastCode}) — the attempt counter is not persisting`);
+    // Which mechanism refused matters: accepting "any non-401" cannot tell the brute-force lockout
+    // from a plain rate limit, and that is what made the original dead-lockout bug survivable.
+    // The lockout answers 429 PASSWORD_LOCKED — the SAME status the rate limiter uses, which is
+    // exactly why "any non-401" could not tell the two apart. The code is the discriminator.
+    assert(lastCode === 'PASSWORD_LOCKED',
+        `the refusal must be the brute-force lockout, not the rate limiter — got ${lastStatus} ${lastCode}`);
 });
 
 await test('the lockout also refuses the CORRECT password while it holds', async () => {

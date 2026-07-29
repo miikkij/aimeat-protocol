@@ -328,6 +328,10 @@ async function startServer(): Promise<ChildProcess> {
         AIMEAT_RL_WORK: process.env.AIMEAT_RL_WORK ?? '1000',
         AIMEAT_RL_MEMORY: process.env.AIMEAT_RL_MEMORY ?? '1000',
         AIMEAT_RL_BOARDS: process.env.AIMEAT_RL_BOARDS ?? '1000',
+        // Registration is limited to 5 per 60s by default, which several suites already sit right
+        // against — hence their 429-retry loops. Pin it like the other limiters so a suite adding
+        // one more account does not cascade into unrelated failures. No suite asserts this 429.
+        AIMEAT_REGISTRATION_RATE_LIMIT_MAX: process.env.AIMEAT_REGISTRATION_RATE_LIMIT_MAX ?? '1000',
         AIMEAT_DEFAULT_AGENT_SCOPES: process.env.AIMEAT_DEFAULT_AGENT_SCOPES ?? '*',
         // Connector forward tunnel is opt-in (off by default in prod); enable it
         // for every e2e run so the tunnel suites work in CI too (the .env.test.*
