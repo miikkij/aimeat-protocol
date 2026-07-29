@@ -131,6 +131,40 @@ await test('POST /v1/capabilities — create manual capability', async () => {
     assert(body.data.id === capId, 'id matches');
 });
 
+await test('POST /v1/capabilities — a PARTIAL source is normalised, not crashed into a 500', async () => {
+    // {type:'manual'} with no ref used to build a record with ref undefined and hit the
+    // sourceRef NOT NULL constraint on both backends → 500 INTERNAL_ERROR.
+    const id = 'partial-src-' + Math.random().toString(36).slice(2, 8);
+    const { status, body } = await json('/v1/capabilities', {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${ownerToken}` },
+        body: JSON.stringify({ id, name: 'Partial source', summary: 'no ref supplied', visibility: 'private', source: { type: 'manual' } }),
+    });
+    assert(status === 201, `partial manual source should be accepted, got ${status}: ${JSON.stringify(body.error ?? body)}`);
+    assert(body.data.source.ref === 'manual', `ref should default to 'manual', got ${JSON.stringify(body.data.source)}`);
+    assert(body.data.source.version === '1.0.0', `version should default, got ${JSON.stringify(body.data.source)}`);
+    // ...and it is really stored, not just echoed.
+    const back = await json(`/v1/capabilities/${id}`, { headers: { 'Authorization': `Bearer ${ownerToken}` } });
+    assert(back.status === 200 && back.body.data.source.ref === 'manual', `stored source: ${back.status} ${JSON.stringify(back.body.data?.source)}`);
+});
+
+await test('POST /v1/capabilities — a bad source is a 400, not a 500', async () => {
+    const cases: [Record<string, unknown>, string][] = [
+        [{ type: 'nonsense' }, 'source.type must be one of'],
+        [{ type: 'cortex' }, "source.ref is required for source.type 'cortex'"],
+    ];
+    for (const [source, fragment] of cases) {
+        const { status, body } = await json('/v1/capabilities', {
+            method: 'POST',
+            headers: { 'Authorization': `Bearer ${ownerToken}` },
+            body: JSON.stringify({ name: 'Bad source', summary: 'x', visibility: 'private', source }),
+        });
+        assert(status === 400, `source ${JSON.stringify(source)} should be 400, got ${status}: ${JSON.stringify(body.error ?? body)}`);
+        assert(body.error?.code === 'INVALID_INPUT', `expected INVALID_INPUT, got ${body.error?.code}`);
+        assert((body.error?.message ?? '').includes(fragment), `expected message to mention "${fragment}", got ${body.error?.message}`);
+    }
+});
+
 await test('GET /v1/capabilities/:id — retrieve', async () => {
     const { status, body } = await json(`/v1/capabilities/${capId}`);
     assert(status === 200, `status ${status}`);

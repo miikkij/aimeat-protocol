@@ -3,6 +3,10 @@
  * @description Capability Layer REST API: discovery, CRUD, invoke proxy, telemetry, vouch, test.
  * @version-history
  *   v1.0.0 - 2026-05-02 - Initial capability layer endpoints
+ *   v1.0.1 - 2026-07-29 - POST /v1/capabilities: normalise `source` per field. A partial source
+ *            (e.g. {type:'manual'}) built a record with ref undefined and crashed the insert into a
+ *            500 (sourceRef is NOT NULL on both backends); an unknown type or a missing ref on a
+ *            non-manual type is now a 400 INVALID_INPUT.
  */
 import { Router } from 'express';
 import type { Request } from 'express';
@@ -13,6 +17,8 @@ import { success, error } from '../middleware/envelope.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
+
+const CAPABILITY_SOURCE_TYPES: CapabilityRecord['source']['type'][] = ['extension', 'action', 'cortex', 'app', 'manual', 'ecosystem'];
 
 function redactInput(input: Record<string, unknown>, redactedFields: string[]): Record<string, unknown> {
   if (!redactedFields.length) return input;
@@ -121,6 +127,24 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
       }
     }
 
+    // `source` is required in full by CapabilityRecord (type + ref + version), and both storage
+    // backends have sourceRef NOT NULL. The old `body.source || <full default>` only defaulted when
+    // source was ABSENT, so a partial object — e.g. the natural {type:'manual'} — reached the insert
+    // with ref undefined and crashed it into a 500. Normalise per field, and refuse the cases where
+    // a placeholder ref would silently produce an unresolvable record.
+    const rawSource = (body.source && typeof body.source === 'object') ? body.source as Record<string, unknown> : {};
+    const sourceType = (rawSource.type ?? 'manual') as CapabilityRecord['source']['type'];
+    if (!CAPABILITY_SOURCE_TYPES.includes(sourceType)) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `source.type must be one of: ${CAPABILITY_SOURCE_TYPES.join(', ')}`));
+    }
+    const sourceRef = typeof rawSource.ref === 'string' && rawSource.ref
+      ? rawSource.ref
+      : (sourceType === 'manual' ? 'manual' : '');
+    if (!sourceRef) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `source.ref is required for source.type '${sourceType}'`));
+    }
+    const sourceVersion = typeof rawSource.version === 'string' && rawSource.version ? rawSource.version : '1.0.0';
+
     const schemaHash = createHash('sha256')
       .update(JSON.stringify(body.inputSchema ?? {}) + JSON.stringify(body.outputSchema ?? {}))
       .digest('hex').slice(0, 16);
@@ -142,7 +166,7 @@ export function capabilitiesRouter(config: AimeatConfig, storage: Storage): Rout
       rejectionReason: null,
       deprecationMessage: null,
       replacedBy: null,
-      source: body.source || { type: 'manual', ref: 'manual', version: '1.0.0' },
+      source: { type: sourceType, ref: sourceRef, version: sourceVersion },
       authRequired: body.authRequired || 'registered',
       callable: body.callable ?? false,
       inputSchema: body.inputSchema ?? null,
