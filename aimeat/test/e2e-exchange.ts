@@ -255,6 +255,30 @@ await test('Legibility gate: listing WITHOUT usage_terms → 400 USAGE_TERMS_REQ
   assert(r.status === 400 && r.body?.error?.code === 'USAGE_TERMS_REQUIRED', `expected USAGE_TERMS_REQUIRED, got ${r.status}/${JSON.stringify(r.body?.error)}`);
 });
 
+await test('One capability, one listing: the same call offered as BOTH kinds -> 409, naming the first', async () => {
+  // The marketplace carried `ext:laake-fi:getPackage` twice — once raw, once as the app-tool bound
+  // to it — with two descriptions, two sets of usage terms and two completeness scores for one
+  // call. Nothing refused it and nothing connected them, so authoring one left the other bare and
+  // a buyer could not tell they were the same thing.
+  // Re-listing the same SURFACE is legitimate (that is how a listing is changed), so this offers
+  // the same underlying action through the OTHER kind: an app-tool bound to `ext:<EXT>:validate`.
+  const manifest = { tools: [{ name: 'dup-tool', description: 'the same call, sold twice',
+    action_id: `ext:${EXT}:validate`, price: { morsels: 10 },
+    inputSchema: { type: 'object', properties: { y: { type: 'string' } } },
+    outputSchema: { type: 'object', properties: { ok: { type: 'boolean' } } } }] };
+  const dupApp = `${provider.name}/dup-app`;
+  const w = await json('/v1/memory', { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ key: `apps.${dupApp}.tools`, value: manifest, visibility: 'private' }) });
+  assert(w.status === 201 || w.status === 200, `manifest write ${w.status}`);
+  const r = await json('/v1/exchange/offerings', { method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ kind: 'app-tool', app_id: dupApp, tool: 'dup-tool',
+      title: 'the same call, listed twice', usage_terms: validTerms }) });
+  assert(r.status === 409, `expected 409, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body?.error?.code === 'CAPABILITY_ALREADY_LISTED', `expected CAPABILITY_ALREADY_LISTED, got ${JSON.stringify(r.body?.error)}`);
+  assert(String(r.body?.error?.message ?? '').includes(offeringId),
+    `the refusal must name the listing that already exists: ${r.body?.error?.message}`);
+});
+
 await test('Browse offerings by capability finds the listing (public, no auth)', async () => {
   const r = await json(`/v1/exchange/offerings?ext=${EXT}&action=validate`);
   assert(r.status === 200, `browse ${r.status}`);

@@ -8628,7 +8628,10 @@ paths:
         method your APP sells cross-app (a getCompanyBrief-style tool from your `apps.{appId}.tools`
         manifest); price + plans read from the tool; the tool MUST be bound to a capability (`action_id`)
         and is snapshot into an immutable, pinned INTERFACE VERSION (a schema/binding change mints a new
-        version; existing contracts stay pinned to theirs); body `{ kind: 'app-tool', app_id, tool, title?,
+        version; existing contracts stay pinned to theirs). ONE CAPABILITY, ONE LISTING: re-listing the
+        same surface is how a listing is changed (idempotent), but offering the same underlying call
+        through the OTHER kind while one is live is refused with `409 CAPABILITY_ALREADY_LISTED`, naming
+        the listing that already exists. Body `{ kind: 'app-tool', app_id, tool, title?,
         description?, provenance?, usage_terms, tags? }`. LEGIBILITY GATE (both): a non-empty input AND
         output schema is required (else 400 SCHEMA_REQUIRED) and `usage_terms` is required (else 400
         USAGE_TERMS_REQUIRED). `usage_terms` = `{ derivatives?, resale?, attribution?, note? }`. Returns `{ offering }`.
@@ -8662,6 +8665,7 @@ paths:
         '400': { $ref: '#/components/responses/AimeatError' }
         '403': { $ref: '#/components/responses/AimeatError' }
         '404': { $ref: '#/components/responses/AimeatError' }
+        '409': { $ref: '#/components/responses/AimeatError' }
     get:
       operationId: exchangeBrowseOfferings
       summary: Browse listed EXCHANGE offerings (public) — by capability or free text (TARGET-045)

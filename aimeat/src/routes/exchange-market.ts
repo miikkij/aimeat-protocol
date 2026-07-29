@@ -125,6 +125,39 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
     const owner = req.auth!.owner;
     const b = (req.body ?? {}) as Record<string, unknown>;
 
+    /**
+     * Refuse a second listing of a capability this provider already sells.
+     *
+     * `ext:laake-fi:getPackage` was on the marketplace twice: once as the raw ext-action and once
+     * as the app-tool bound to it. Two titles, two descriptors, two completeness scores (77% and
+     * 31%) for one call, and nothing telling a buyer they were the same thing — or telling the
+     * provider that authoring one left the other bare.
+     *
+     * Same-kind republishing is untouched: this only fires when the SAME capability would appear
+     * under two listings at once, and it names the one that already exists.
+     */
+    const refuseDuplicate = async (binding: string, kind: Offering['kind']): Promise<Response | null> => {
+      if (!binding) return null;
+      const mine = (await listOfferings(storage)).filter(
+        o => o.providerOwner === owner && o.state === 'listed');
+      for (const o of mine) {
+        // Re-listing the SAME surface is how a listing is changed — the interface freeze is
+        // idempotent and the ODPS block is attached by re-listing — so only a listing of a
+        // DIFFERENT kind is a duplicate. That is the case that produced two live records.
+        if (o.kind === kind) continue;
+        const theirs = o.capabilityBinding
+          || (o.kind === 'ext-action' && o.ext && o.action ? `ext:${o.ext}:${o.action}` : null);
+        if (theirs && theirs === binding) {
+          return res.status(409).json(error(config.nodeId, 'CAPABILITY_ALREADY_LISTED',
+            `"${binding}" is already on the marketplace as "${o.title}" (${o.offeringId}, ${o.kind}). `
+            + 'One capability, one listing: a second one splits the description, the usage terms and the '
+            + 'ODPS descriptor across two records that have to be kept in step, and a buyer cannot tell '
+            + 'they are the same call. Take that listing down first, or sell this capability through it.'));
+        }
+      }
+      return null;
+    };
+
     // Provenance + the ODPS authoring block are validated once, before any kind branch: both are provider
     // promises that get republished as an ODPS document, so a malformed one fails the listing loudly (400).
     const prov = parseProvenance(b.provenance);
@@ -166,11 +199,14 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       const iface = await ensureInterfaceVersion(storage, providerGhii, appId, toolName, {
         inputSchema: tool.inputSchema ?? {}, outputSchema: tool.outputSchema ?? {}, binding: tool.action_id,
       });
+      const dup = await refuseDuplicate(tool.action_id, 'app-tool');
+      if (dup) return dup;
       const coord = appToolCoordinate(owner, appId, toolName);
       const now = new Date().toISOString();
       const offering: Offering = {
         offeringId: newOfferingId(), providerGhii, providerOwner: owner,
         kind: 'app-tool', ext: coord.ext, action: coord.action,
+        capabilityBinding: tool.action_id,
         surface: { kind: 'app-tool', ownerName: owner, appId, tool: toolName, ifaceVersion: iface.ifaceVersion },
         title: str(b.title) || `${appId} · ${toolName}`,
         description: str(b.description) || tool.description || '',
@@ -253,6 +289,8 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       return res.status(400).json(error(config.nodeId, 'USAGE_TERMS_REQUIRED',
         'usage_terms is required to list an offering — state { derivatives, resale, attribution, note? } so a consumer knows how they may use the output'));
     }
+    const dupExt = await refuseDuplicate(`ext:${ext}:${action}`, 'ext-action');
+    if (dupExt) return dupExt;
     const now = new Date().toISOString();
     const offering: Offering = {
       offeringId: newOfferingId(),
@@ -260,6 +298,7 @@ export function exchangeMarketRouter(config: AimeatConfig, storage: Storage): Ro
       providerOwner: owner,
       kind: 'ext-action', surface: null,
       ext, action,
+      capabilityBinding: `ext:${ext}:${action}`,
       title: str(b.title) || `${ext}/${action}`,
       description: str(b.description),
       unit: priced.unit, basePrice: priced.pricePerCall, currency: priced.currency,

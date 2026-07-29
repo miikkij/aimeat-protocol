@@ -151,6 +151,18 @@ export interface Offering {
   plans: OfferingPlan[];
   /** For kind==='agent-work': the task interface (what the consumer sends / the agent delivers). */
   taskSpec?: { inputSchema: Record<string, unknown>; outputSchema: Record<string, unknown> } | null;
+  /**
+   * The underlying capability this listing sells, as `ext:<extension>:<action>`.
+   *
+   * An ext-action listing and an app-tool listing can resolve to the SAME call — the tool's
+   * `action_id` binding IS that action — and until this was recorded nothing connected them. The
+   * marketplace showed one capability twice, under two titles, with two descriptors that had to be
+   * authored and kept in step separately. Buyers cannot tell they are the same call.
+   *
+   * Absent on offerings listed before this existed, and on agent-work, which has no extension
+   * behind it.
+   */
+  capabilityBinding?: string | null;
   provenance: Provenance | null;
   /**
    * Morsels burned per call on top of whatever this offering is paid in — the provider's own pacing.
