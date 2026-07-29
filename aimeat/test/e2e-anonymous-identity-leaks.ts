@@ -8,6 +8,9 @@
  *   appropriate extra data; the owner always sees their own.
  * @version-history
  *   v1.0.0 — 2026-07-03 — Initial: capabilities/boards/profile-roster/directory-opt-in.
+ *   v1.1.0 — 2026-07-29 — Add 2b: a DIFFERENT signed-in owner reading another owner's profile gets
+ *            no roles and no agent roster (batch 01, hole 3). Make the private-capability creation
+ *            in test 6 an explicit precondition instead of a silent skip that rendered as a tick.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=anonymous-identity-leaks
 
@@ -68,6 +71,24 @@ await test('2. GET /v1/owners/:name — anon gets NO roles + NO agent roster; th
     assert(Array.isArray(owner.body.data.roles) && Array.isArray(owner.body.data.agents), `owner should see roles+agents: ${JSON.stringify(owner.body.data)}`);
 });
 
+await test('2b. GET /v1/owners/:name — a DIFFERENT signed-in owner gets no roles and no roster', async () => {
+    // The route's `isSelf` is req.auth.owner === owner.name. Widen it to "any signed-in caller"
+    // and every member reads every other member's roles (revealing the operator) and full agent
+    // roster. B is a plain owner; A is the first registered owner here and therefore the operator,
+    // so the read has to go B -> A to express the denial.
+    const other = await json(`/v1/owners/${A.name}`, { headers: auth(B.token) });
+    assert(other.status === 200, `cross-owner read ${other.status}`);
+    assert(other.body.data.roles === undefined, `B must not see A's roles: ${JSON.stringify(other.body.data.roles)}`);
+    assert(other.body.data.agents === undefined, `B must not see A's agent roster: ${JSON.stringify(other.body.data.agents)}`);
+    assert(other.body.data.name === A.name && other.body.data.display_name, 'B still gets the minimal public card');
+    // ...and the same via the GHII profile route.
+    const ghiiRead = await json(`/v1/ghii/${encodeURIComponent(A.gaii)}`, { headers: auth(B.token) });
+    assert(ghiiRead.body.data.agents === undefined, `B must not see A's agents via /v1/ghii/:ghii either: ${JSON.stringify(ghiiRead.body.data.agents)}`);
+    // The control: A still sees their own.
+    const self = await json(`/v1/owners/${A.name}`, { headers: auth(A.token) });
+    assert(Array.isArray(self.body.data.roles) && Array.isArray(self.body.data.agents), `A must still see their own: ${JSON.stringify(self.body.data)}`);
+});
+
 await test('3. Member directory GET /v1/ghii/list — anon is REJECTED (must be signed in)', async () => {
     const anon = await json('/v1/ghii/list');
     assert(anon.status === 401, `anon should be 401, got ${anon.status}`);
@@ -104,18 +125,18 @@ await test('6. GET /v1/capabilities — a PRIVATE capability is invisible to ano
     const create = await json('/v1/capabilities', { method: 'POST', headers: auth(A.token), body: JSON.stringify({
         name: 'secret-cap', summary: 'private', visibility: 'private', source: { type: 'manual' },
     }) });
-    // Publishing policy may disable manual caps on some configs — only assert the leak guard when creation worked.
-    if (create.status === 200 || create.status === 201) {
-        const capId = create.body.data?.id;
-        const anon = await json('/v1/capabilities');
-        const anonHasPrivate = (anon.body.data?.capabilities || anon.body.data?.items || []).some((c: any) => c.id === capId);
-        assert(!anonHasPrivate, `anon must NOT see the private capability: ${JSON.stringify(anon.body.data)}`);
-        const owner = await json('/v1/capabilities?owner=' + encodeURIComponent(A.gaii), { headers: auth(A.token) });
-        const ownerHasPrivate = (owner.body.data?.capabilities || owner.body.data?.items || []).some((c: any) => c.id === capId);
-        assert(ownerHasPrivate, `owner should see their private capability: ${JSON.stringify(owner.body.data)}`);
-    } else {
-        console.log(`     (skipped private-cap creation — policy ${create.status})`);
-    }
+    // Creating the private capability is a PRECONDITION of this test, not a branch: gating the
+    // leak guard on it meant a refused creation rendered as a green tick in the summary.
+    assert(create.status === 200 || create.status === 201,
+        `private-capability creation is a precondition of this leak guard, got ${create.status}: ${JSON.stringify(create.body.error ?? create.body)}`);
+    const capId = create.body.data?.id;
+    assert(typeof capId === 'string' && capId.length > 0, `creation must return an id: ${JSON.stringify(create.body.data)}`);
+    const anon = await json('/v1/capabilities');
+    const anonHasPrivate = (anon.body.data?.capabilities || anon.body.data?.items || []).some((c: any) => c.id === capId);
+    assert(!anonHasPrivate, `anon must NOT see the private capability: ${JSON.stringify(anon.body.data)}`);
+    const owner = await json('/v1/capabilities?owner=' + encodeURIComponent(A.gaii), { headers: auth(A.token) });
+    const ownerHasPrivate = (owner.body.data?.capabilities || owner.body.data?.items || []).some((c: any) => c.id === capId);
+    assert(ownerHasPrivate, `owner should see their private capability: ${JSON.stringify(owner.body.data)}`);
 });
 
 await test('7. GET /v1/boards — anon gets NO owner_gaii/allowed_gaiis on public boards', async () => {
