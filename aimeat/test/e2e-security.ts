@@ -1,6 +1,15 @@
-// Security-focused E2E tests for AIMEAT
-// Run: cd aimeat && pnpm exec tsx test/e2e-security.ts
-// Requires: server running on port 40251
+/**
+ * @file e2e-security.ts
+ * @description Security-focused E2E: IDOR across owners and agents, rate limiting, scope
+ *   enforcement, SSRF blocking, self-work prevention, path traversal, idempotency keys, and the
+ *   Security tab composite (owner-only) with GHII CORS input validation.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-security
+ * @version-history
+ *   v1.1.0 — 2026-07-29 — Add 11b (GET /v1/security/overview is owner-only — an agent gets 403 and
+ *            no session list) and 11c (PUT /v1/ghii/cors refuses a non-URL origin, and the refusals
+ *            do not partially land) for batch 01 holes 6 and 11; drop 500 from test 5b's accepted
+ *            set so that branch can no longer pass on the route crashing.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -400,12 +409,13 @@ await test('5b. SSRF: Federation test with localhost is blocked', async () => {
         headers: { Authorization: `Bearer ${ownerAToken}` },
         body: JSON.stringify({ target_url: 'http://localhost:22/secret' }),
     });
-    // In dev mode, loopback is allowed for webhook testing; in production it's blocked
+    // In dev mode, loopback is allowed for webhook testing; in production it's blocked.
     if (status === 400) {
         assert(body.error?.code === 'INVALID_URL', `expected INVALID_URL, got ${body.error?.code}`);
     } else {
-        // Dev mode allows loopback — connection will fail or timeout, but SSRF check passes
-        assert(status === 200 || status === 502 || status === 504 || status === 500, `unexpected status ${status}`);
+        // Dev mode allows loopback: the connection fails or times out. 500 is NOT in the accepted
+        // set — this branch must not be able to pass on the route crashing.
+        assert(status === 200 || status === 502 || status === 504, `unexpected status ${status}: ${JSON.stringify(body.error ?? body)}`);
     }
 });
 
@@ -637,6 +647,56 @@ await test('11. GET /v1/security/overview folds GHII CORS + per-agent CORS + ses
     assert(agA.inherited_from === 'ghii' && agA.effective.includes('https://example.test'), `agent A inherits ghii cors: ${JSON.stringify(agA)}`);
     // sessions partition — array flagging the caller's own session
     assert(Array.isArray(d.sessions) && d.sessions.some((s: any) => s.current === true), 'sessions include the current session');
+});
+
+await test('11b. GET /v1/security/overview is owner-only (device-auth agent session → 403)', async () => {
+    // The composite hands back the CORS allowlist, per-agent effective CORS and the LIVE SESSION
+    // LIST. The sibling /v1/access/overview has an explicit agent→403 test; this one had none.
+    //
+    // The caller must be a DEVICE-AUTH agent (RFC 8628), which is how agents are registered today
+    // and which mints roles=['agent']. The suite's other agent tokens come from the deprecated
+    // /v1/auth/token challenge-response path, and THAT path merges the owner's owner+operator roles
+    // onto the agent token — so it clears requireRole('owner') and cannot express this denial.
+    const da = await json('/v1/agents/device-authorize', {
+        method: 'POST',
+        body: JSON.stringify({ agent_name: `secagent-e-${Date.now()}`, owner: ownerAName }),
+    });
+    assert(da.status === 200 && da.body?.ok, `device-authorize ${da.status}: ${JSON.stringify(da.body?.error)}`);
+    const approve = await json('/v1/agents/verify', {
+        method: 'POST',
+        body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read'], owner_token: ownerAToken }),
+    });
+    assert(approve.status === 200 && approve.body?.ok, `agent approve ${approve.status}: ${JSON.stringify(approve.body?.error)}`);
+    const poll = await json('/v1/agents/device-token', {
+        method: 'POST',
+        body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }),
+    });
+    assert(poll.status === 200 && typeof poll.body?.token === 'string', `device-token ${poll.status}: ${JSON.stringify(poll.body)}`);
+    const agentEToken: string = poll.body.token;
+    const roles = JSON.parse(Buffer.from(agentEToken.split('.')[1], 'base64url').toString()).roles;
+    assert(JSON.stringify(roles) === JSON.stringify(['agent']), `the device-auth agent must be agent-only, got ${JSON.stringify(roles)}`);
+
+    const { status, body } = await json('/v1/security/overview', { headers: { Authorization: `Bearer ${agentEToken}` } });
+    assert(status === 403, `agent security overview should be 403, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error?.code === 'ACCESS_DENIED', `expected ACCESS_DENIED, got ${body.error?.code}`);
+    assert(body.data?.sessions === undefined, `the refusal must not carry the session list: ${JSON.stringify(body.data)}`);
+});
+
+await test('11c. PUT /v1/ghii/cors refuses a non-URL origin', async () => {
+    // Without the origin format check anything lands in allowedOrigins and from there in the
+    // effective CORS allowlist for the owner and every agent inheriting it.
+    for (const bad of ['javascript:alert(1)', 'example.test', '', 42, { origin: 'https://x.test' }]) {
+        const r = await json('/v1/ghii/cors', {
+            method: 'PUT', headers: { Authorization: `Bearer ${ownerAToken}` },
+            body: JSON.stringify({ allowed_origins: [bad] }),
+        });
+        assert(r.status === 400, `origin ${JSON.stringify(bad)} should be 400, got ${r.status}: ${JSON.stringify(r.body)}`);
+        assert(r.body.error?.code === 'INVALID_INPUT', `expected INVALID_INPUT for ${JSON.stringify(bad)}, got ${r.body.error?.code}`);
+    }
+    // The refusals did not partially land — test 11's good value is still the only one there.
+    const now = await json('/v1/ghii/cors', { headers: { Authorization: `Bearer ${ownerAToken}` } });
+    assert(JSON.stringify(now.body.data.allowed_origins) === JSON.stringify(['https://example.test']),
+        `refused writes must not land: ${JSON.stringify(now.body.data.allowed_origins)}`);
 });
 
 // ─── Cleanup ───
