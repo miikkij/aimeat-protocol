@@ -68,6 +68,7 @@ import { serveAppAgentFace, buildAppAgentFace } from '../services/agent-face.js'
 import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../services/app-agent-surfaces.js';
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { logger } from '../utils/logger.js';
+import { registerAppOriginWebmcp } from './subdomain-webmcp.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -510,6 +511,8 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
     };
     serveApp(res, storage, app, appCspForRequest, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discover);  // the SDK (aimeat-auth.js) does the silent SSO itself
   });
+
+  registerAppOriginWebmcp(router, storage, { resolveApp: t => resolveAppTarget(storage, t), isRestricted: a => appIsRestricted(config, a as AppRecord) });
 
   // `llms.txt` on an APP origin is the app's own agent-facing document, not the node's.
   // The node-wide guide is 139 kB of app-BUILDING instructions in which the app's own name

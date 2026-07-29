@@ -254,6 +254,16 @@ await test('Subdomain root serves the app HTML', async () => {
     assert(typeof body._raw === 'string' && body._raw.includes('subdomain-e2e-marker'), 'app HTML served');
 });
 
+await test('The app origin answers the WebMCP tool listing, not only the apex', async () => {
+    // An agent lands on the app's own origin: the page, llms.txt, the MCP card and the RFC 9728
+    // document are all served there. The tools were on the apex alone, so the app's own agent
+    // document had to point away from the origin the agent was already on, and a POST here 404'd.
+    const { status, body } = await json('/webmcp', { headers: { 'X-Subdomain': SUB, 'Host': `${SUB}.aimeat.io` } });
+    assert(status === 200, `expected the tool listing on the app origin, got ${status}`);
+    const d = body.data ?? body;
+    assert(Array.isArray(d.tools), `the listing carries its tools: ${JSON.stringify(d).slice(0, 200)}`);
+});
+
 await test('Subdomain root negotiates text/markdown (Agent Face fallback + affordances footer)', async () => {
     const { status, body, headers } = await json('/', { headers: { 'X-Subdomain': SUB, 'Accept': 'text/markdown' } });
     assert(status === 200, `status ${status}`);
