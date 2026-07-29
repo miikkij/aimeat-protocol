@@ -8,6 +8,9 @@
  *   admin role may run. Proves the extension now runs on the shared level/capability model.
  * @version-history
  *   v1.0.0 — 2026-07-02 — Initial: level + command evolution + backward-compat, against the real package.
+ *   v1.1.0 — 2026-07-29 — Add a second owner and point it at the admin surface: the in-script
+ *            `isOwner` check is the ONLY gate there (the route is requireAuth() only), and batch 01
+ *            mutation I2 deleted it with the suite still 7/7 green.
  */
 // Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=iam-extension
 
@@ -60,6 +63,7 @@ const scripts = extDef.scripts;
 console.log('\n=== AIMEAT aimeat-iam Extension Evolution E2E ===\n');
 
 let A: Awaited<ReturnType<typeof setupOwner>>;
+let B: Awaited<ReturnType<typeof setupOwner>>;
 let aGaii = '';
 const admin = (op: string, extra: Record<string, unknown> = {}) =>
     json(`/v1/ext/${EXT}/admin`, { method: 'POST', headers: authH(A.token), body: JSON.stringify({ op, ...extra }) });
@@ -112,6 +116,41 @@ await test('4. the admin role runs the irreversible command with needsConfirmati
 await test('5. an unknown command is denied with an error', async () => {
     const u = data(await check({ command: 'nope' }));
     assert(u.allowed === false && /unknown/.test(u.error || ''), `unknown: ${JSON.stringify(u)}`);
+});
+
+await test('6. a DIFFERENT authenticated owner CANNOT drive the admin surface', async () => {
+    // /v1/ext/:name/:actionId is requireAuth() only, so the in-script `isOwner` check is the ONLY
+    // gate on setConfig/setRoles/setLevels/setCommands/assign. Any authenticated caller who gets
+    // past it owns the app's whole permission model.
+    B = await setupOwner('b');
+    const bGhii = `${B.name}@${NODE_ID}`;
+    const asB = (op: string, extra: Record<string, unknown> = {}) =>
+        json(`/v1/ext/${EXT}/admin`, { method: 'POST', headers: authH(B.token), body: JSON.stringify({ op, ...extra }) });
+
+    const st = data(await asB('getState'));
+    assert(st.isOwner === false, `B must not be the extension owner: ${JSON.stringify(st.isOwner)}`);
+    assert(st.ownerGhii === aGaii, `the extension owner must still be A: ${JSON.stringify(st.ownerGhii)}`);
+
+    const ops: [string, Record<string, unknown>][] = [
+        ['setConfig', { config: { defaultRole: 'admin' } }],
+        ['setRoles', { roles: { admin: ['*'], viewer: ['*'] } }],
+        ['setLevels', { levels: { admin: 0, editor: 0, viewer: 0 } }],
+        ['setCommands', { commands: [{ id: 'pwn', description: 'pwn', capability: 'read', tier: 'read' }] }],
+        ['assign', { ghii: bGhii, role: 'admin' }],
+        ['revoke', { ghii: aGaii }],
+    ];
+    for (const [op, extra] of ops) {
+        const r = data(await asB(op, extra));
+        assert(r.ok === false && /forbidden/.test(r.error || ''), `${op} by a non-owner must be refused, got ${JSON.stringify(r)}`);
+    }
+
+    // The refusals were real: none of what B tried to write landed.
+    const after = data(await admin('getState'));
+    assert(JSON.stringify(after.levels) === JSON.stringify({ admin: 0, editor: 10, viewer: 20 }), `levels must be untouched: ${JSON.stringify(after.levels)}`);
+    assert(after.roles.viewer.length === 1 && after.roles.viewer[0] === 'read', `viewer role must be untouched: ${JSON.stringify(after.roles.viewer)}`);
+    assert(after.commands.every((c: any) => c.id !== 'pwn'), `command manifest must be untouched: ${JSON.stringify(after.commands)}`);
+    assert(after.assignments[bGhii] === undefined, `B must not have assigned itself a role: ${JSON.stringify(after.assignments)}`);
+    assert(after.assignments[aGaii] === 'admin', `A's own assignment must survive B's revoke: ${JSON.stringify(after.assignments)}`);
 });
 
 console.log(`\naimeat-iam Extension Evolution E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
