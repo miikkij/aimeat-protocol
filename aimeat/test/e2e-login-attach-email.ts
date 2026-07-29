@@ -215,6 +215,32 @@ async function main() {
             assert(body.error?.code === 'EMAIL_TAKEN', `code ${body.error?.code}`);
         });
 
+        await test('attach-email on an ALREADY VERIFIED account → 409, recovery handle untouched', async () => {
+            // This endpoint takes NO session — only username + password. Without the
+            // verificationLevel >= 1 gate a verified account's notificationEmail can be re-pointed
+            // and magicLinkEnabled re-armed through it: post-compromise persistence on the recovery
+            // handle. emailOwner was provisioned by code-invite (the code IS the password) with a
+            // verified email, so it is the one verified account the suite holds.
+            const attacker = `attacker-${Date.now()}@example.com`;
+            const { status, body } = await json('/v1/ghii/login/attach-email', {
+                method: 'POST', body: JSON.stringify({ username: emailOwner, password: 'SuperSecret99', email: attacker }),
+            });
+            assert(status === 409, `expected 409 for an already-verified account, got ${status}: ${JSON.stringify(body.error ?? body)}`);
+            assert(body.error?.code === 'ALREADY_VERIFIED', `expected ALREADY_VERIFIED, got ${body.error?.code}`);
+
+            // The refusal was real: the recovery email still points where it did.
+            const login = await json('/v1/ghii/login', {
+                method: 'POST', body: JSON.stringify({ username: emailOwner, password: 'SuperSecret99' }),
+            });
+            assert(login.status === 200, `verified account should log in, got ${login.status}: ${JSON.stringify(login.body.error)}`);
+            const me = await json('/v1/ghii/me', { headers: { Authorization: `Bearer ${login.body.data.token}` } });
+            assert(me.status === 200, `me ${me.status}`);
+            assert(me.body.data.notification_email === takenEmail,
+                `the recovery email must be unchanged, got ${JSON.stringify(me.body.data.notification_email)}`);
+            assert(me.body.data.verification_level >= 1,
+                `the account must still be verified, got ${JSON.stringify(me.body.data.verification_level)}`);
+        });
+
         console.log('\nPhase 3 — happy send returns a verification_id wired to verify-email');
         await test('attach-email correct password + fresh email → 200 + verification_id', async () => {
             const { status, body } = await json('/v1/ghii/login/attach-email', {
