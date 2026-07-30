@@ -50,6 +50,7 @@
 
   // src/static/sdk-libs/iam/dialect.js
   var DIALECTS = {
+    node: { gate: null, admin: null, key: null, state: "state", assign: "assign", revoke: "revoke" },
     op: { gate: "check", admin: "admin", key: "op", state: "getState", assign: "assign", revoke: "revoke" },
     command: { gate: "check", admin: "admin", key: "command", state: "list", assign: "approve", revoke: "revoke" },
     level: { gate: "mylevel", admin: "admin", key: "op", state: "getState", assign: "assign", revoke: "revoke" }
@@ -554,12 +555,94 @@
     } };
   }
 
+  // src/static/sdk-libs/iam/node-roster.js
+  function base(appId) {
+    const [owner, filename] = String(appId).split("/");
+    return "/v1/apps/" + encodeURIComponent(owner || "") + "/" + encodeURIComponent(filename || "") + "/members";
+  }
+  async function un(p) {
+    const body = await p;
+    return body && body.data !== void 0 ? body.data : body;
+  }
+  async function nodeMe(call, appId) {
+    const d = await un(call(base(appId) + "/me"));
+    const m = d && d.member;
+    return {
+      role: d && d.isOwner ? "owner" : m ? m.role : null,
+      level: m && typeof m.level === "number" ? m.level : d && d.isOwner ? 0 : null,
+      isOwner: !!(d && d.isOwner),
+      member: !!m,
+      since: m ? m.since : null,
+      // The node roster is the person's row by construction, so a role always resolved through them.
+      via: m ? "owner" : "none",
+      requested: d ? d.requested : null
+    };
+  }
+  async function nodeState(call, appId, roles) {
+    const d = await un(call(base(appId)));
+    if (d && d.ok === false) return d;
+    const members = d && d.members || [];
+    const seen = new Set(roles || []);
+    for (const m of members) if (m.role) seen.add(m.role);
+    const roleMap = {};
+    for (const r of seen) roleMap[r] = [];
+    return {
+      ok: true,
+      isOwner: true,
+      roles: roleMap,
+      levels: {},
+      commands: [],
+      config: {},
+      assignments: Object.fromEntries(members.map((m) => [m.owner, m.role])),
+      requests: d && d.requests || [],
+      members
+    };
+  }
+  function nodeAssign(call, appId, args) {
+    const body = {
+      account: args.ghii || args.owner || args.account,
+      role: args.role
+    };
+    if (args.note) body.note = args.note;
+    if (Array.isArray(args.offerings)) body.offerings = args.offerings;
+    return un(call(base(appId), { method: "POST", body: JSON.stringify(body) }));
+  }
+  function nodeRevoke(call, appId, args) {
+    const who = args.ghii || args.owner || args.account;
+    return un(call(base(appId) + "/" + encodeURIComponent(String(who)), { method: "DELETE" }));
+  }
+  function nodeDecline(call, appId, args) {
+    const who = args.ghii || args.owner || args.account;
+    return un(call(base(appId) + "/requests/" + encodeURIComponent(String(who)), { method: "DELETE" }));
+  }
+  async function nodeRequest(call, appId, note) {
+    const r = await un(call(base(appId) + "/requests", {
+      method: "POST",
+      body: JSON.stringify(note ? { note } : {})
+    }));
+    return { recorded: r && r.recorded !== false, passive: false, alreadyMember: !!(r && r.alreadyMember) };
+  }
+
   // src/static/sdk-libs/iam/index.js
   var { authFetch: authFetch2 } = makeSession("aimeat-iam.js");
-  var state = { ext: null, dialect: (
-    /** @type {Dialect} */
-    "op"
-  ), hasRequest: false, me: null, roles: {} };
+  var state = {
+    ext: null,
+    app: (
+      /** @type {string|null} */
+      null
+    ),
+    roleNames: (
+      /** @type {string[]} */
+      []
+    ),
+    dialect: (
+      /** @type {Dialect} */
+      "op"
+    ),
+    hasRequest: false,
+    me: null,
+    roles: {}
+  };
   function normalise(raw, roles, dialect) {
     const r = raw || {};
     if (dialect === "command") {
@@ -605,12 +688,26 @@
     /**
      * Learn how this app's gate is shaped, then read the caller's standing. One detection round-trip,
      * after which nothing guesses. Pass `dialect` to skip detection entirely.
-     * @param {{ ext: string, dialect?: 'op'|'command'|'level' }} opts
+     * @param {Object} opts
+     * @param {string} [opts.app]   `owner/file.html` — use the NODE's roster (preferred for anything new).
+     * @param {string} [opts.ext]   An installed IAM extension, when the gate lives there.
+     * @param {string[]} [opts.roles] The app's role vocabulary. The node deliberately does not own it.
+     * @param {'node'|'op'|'command'|'level'} [opts.dialect] Skip detection.
      * @returns {Promise<IamMe>}
      */
     async init(opts) {
-      if (!opts || !opts.ext) throw new Error("aimeat-iam: init({ ext }) needs the installed extension name");
-      state.ext = opts.ext;
+      if (!opts || !opts.ext && !opts.app) {
+        throw new Error("aimeat-iam: init needs { app } for the node roster, or { ext } for an extension gate");
+      }
+      state.ext = opts.ext || null;
+      state.app = opts.app || null;
+      state.roleNames = Array.isArray(opts.roles) ? opts.roles : [];
+      if (state.app) {
+        state.dialect = /** @type {Dialect} */
+        "node";
+        state.hasRequest = true;
+        return iam.refresh();
+      }
       if (opts.dialect) {
         state.dialect = opts.dialect;
         state.hasRequest = opts.dialect === "command";
@@ -628,6 +725,25 @@
      */
     async refresh() {
       requireInit();
+      if (state.dialect === "node") {
+        const raw2 = await nodeMe(
+          authFetch2,
+          /** @type {string} */
+          state.app
+        );
+        state.me = {
+          member: raw2.member,
+          isOwner: raw2.isOwner,
+          role: raw2.role,
+          level: raw2.level,
+          caps: raw2.isOwner ? ["*"] : state.roles[raw2.role] || [],
+          mode: null,
+          via: raw2.via,
+          subject: "owner",
+          since: raw2.since
+        };
+        return state.me;
+      }
       let adminState = null;
       if (state.dialect !== "command") {
         adminState = await callAdmin(authFetch2, state.ext, state.dialect, "state").catch(() => null);
@@ -677,6 +793,12 @@
      */
     request(note) {
       requireInit();
+      if (state.dialect === "node") return nodeRequest(
+        authFetch2,
+        /** @type {string} */
+        state.app,
+        note
+      );
       return callRequest(authFetch2, state.ext, state.dialect, state.hasRequest, note);
     },
     /**
@@ -686,6 +808,25 @@
      */
     async roster() {
       requireInit();
+      if (state.dialect === "node") {
+        const st2 = await nodeState(
+          authFetch2,
+          /** @type {string} */
+          state.app,
+          state.roleNames
+        );
+        if (st2 && st2.ok === false) return { ok: false, members: [], error: st2.error };
+        return {
+          ok: true,
+          members: (st2.members || []).map((m) => ({
+            id: m.owner,
+            role: m.role || null,
+            level: typeof m.level === "number" ? m.level : null,
+            since: m.since || null,
+            grants: m.offerings || []
+          }))
+        };
+      }
       const st = await callAdmin(authFetch2, state.ext, state.dialect, "state");
       if (st && st.ok === false) return { ok: false, members: [], error: st.error };
       if (state.dialect === "command") {
@@ -723,6 +864,17 @@
      */
     admin(op, args) {
       requireInit();
+      if (state.dialect === "node") {
+        const app = (
+          /** @type {string} */
+          state.app
+        );
+        if (op === "state") return nodeState(authFetch2, app, state.roleNames);
+        if (op === "assign") return nodeAssign(authFetch2, app, args || {});
+        if (op === "revoke") return nodeRevoke(authFetch2, app, args || {});
+        if (op === "decline") return nodeDecline(authFetch2, app, args || {});
+        return Promise.resolve({ ok: false, error: `"${op}" is not a node-roster operation; the capability vocabulary lives in the app's extension` });
+      }
       return callAdmin(authFetch2, state.ext, state.dialect, op, args);
     },
     /**
@@ -755,7 +907,7 @@
     }
   };
   function requireInit() {
-    if (!state.ext) throw new Error("aimeat-iam: call AIMEAT.iam.init({ ext }) first");
+    if (!state.ext && !state.app) throw new Error("aimeat-iam: call AIMEAT.iam.init({ app }) or init({ ext }) first");
   }
   var gateApi = makeGate({ me: () => state.me }, (input) => iam.check(input));
   iam.can = gateApi.can;

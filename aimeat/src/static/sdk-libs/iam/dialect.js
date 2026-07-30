@@ -21,7 +21,10 @@
  */
 
 /**
- * @typedef {'op'|'command'|'level'} Dialect
+ * @typedef {'node'|'op'|'command'|'level'} Dialect
+ *   node    — the NODE's own roster (/v1/apps/{owner}/{file}/members). No extension needed for the
+ *             membership half at all: the node keeps who is a member, notifies them, and takes their
+ *             free access with the role. Prefer this for anything new.
  *   op      — the aimeat-iam pack and its forks: check {permission|command}, admin {op}.
  *   command — LÄÄKE's gate: check {}, request {note}, admin {command}.
  *   level   — a level registry (Experience Center): mylevel {}, admin {op}. Levels, no capability
@@ -30,6 +33,7 @@
 
 /** The admin op names, per dialect, for the operations this library performs. */
 export const DIALECTS = {
+  node: { gate: null, admin: null, key: null, state: 'state', assign: 'assign', revoke: 'revoke' },
   op: { gate: 'check', admin: 'admin', key: 'op', state: 'getState', assign: 'assign', revoke: 'revoke' },
   command: { gate: 'check', admin: 'admin', key: 'command', state: 'list', assign: 'approve', revoke: 'revoke' },
   level: { gate: 'mylevel', admin: 'admin', key: 'op', state: 'getState', assign: 'assign', revoke: 'revoke' },
