@@ -69,7 +69,18 @@ export interface ExtensionCtx {
         write(key: string, base64: string, opts?: { mime?: string; visibility?: string }):
             Promise<{ key: string; gaii: string; url: string; size: number }>;
     };
-    caller: { gaii: string; owner: string; roles: string[] };
+    /**
+     * Who invoked this action. `member` is their standing in the app this extension gates, resolved
+     * by the NODE before the sandbox starts and handed in: a gate needs the role, the roster is
+     * private, and reading it here means no lookup has to be opened to the sandbox. It is null when
+     * the extension declares no app (`config.app`), when the caller is the app's owner (who is not a
+     * member of their own app — `isAppOwner` says so), or when they simply are not one.
+     */
+    caller: {
+      gaii: string; owner: string; roles: string[];
+      member?: { role: string; level: number | null; since: string; note: string } | null;
+      isAppOwner?: boolean;
+    };
     config: Record<string, unknown>;
     instance?: {
         id: string;

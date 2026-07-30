@@ -26,6 +26,7 @@ import { executeExtensionAction } from '../../services/extension-runtime.js';
 import type { ExtensionCtx } from '../../services/extension-runtime.js';
 import { makeExtensionFiles } from '../../services/extension-files.js';
 import { logger } from '../../utils/logger.js';
+import { getMember, accountOf } from '../../services/app-members.js';
 import { resolveIdentity, callerPrincipal } from '../../utils/gaii.js';
 import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
@@ -62,6 +63,16 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           `Extension "${extName}" is not active`));
         return;
       }
+
+      // The caller's standing in the app this extension gates, resolved BEFORE the sandbox. A gate
+      // needs the role, but the roster is private and must stay that way, so the node reads it here
+      // rather than opening a lookup the sandbox could call. An extension declares which app it
+      // gates with `config: { app: owner/file.html }`; without that it gets null and keeps whatever
+      // membership model it already had.
+      const gatedApp = typeof ext.config?.app === 'string' ? ext.config.app : null;
+      const callerAccount = accountOf(callerGaii);
+      const isAppOwner = !!gatedApp && callerAccount === (gatedApp.split('/')[0] ?? '').toLowerCase();
+      const appMember = gatedApp && !isAppOwner ? await getMember(storage, gatedApp, callerAccount) : null;
 
       // Look up the instance
       const instance = await storage.getExtensionInstance(extName, instanceId);
@@ -250,6 +261,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           gaii: callerGaii,
           owner: req.auth!.owner,
           roles: req.auth!.roles,
+          // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
+          // handed in. A gate needs the role, but the roster is private and must stay that way, so
+          // the node reads it here rather than opening a lookup the sandbox could call. An
+          // extension declares which app it gates with `config: { app: owner/file.html }`; without
+          // that it gets null and keeps whatever membership model it already had.
+          member: appMember,
+          isAppOwner,
         },
         // Buy a capability from ANOTHER provider, on this extension's owner's account. The other half
         // of a supply chain: the user pays the app, the app pays its supplier, and the difference is
@@ -381,6 +399,16 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           `Extension "${extName}" is not active`));
         return;
       }
+
+      // The caller's standing in the app this extension gates, resolved BEFORE the sandbox. A gate
+      // needs the role, but the roster is private and must stay that way, so the node reads it here
+      // rather than opening a lookup the sandbox could call. An extension declares which app it
+      // gates with `config: { app: owner/file.html }`; without that it gets null and keeps whatever
+      // membership model it already had.
+      const gatedApp = typeof ext.config?.app === 'string' ? ext.config.app : null;
+      const callerAccount = accountOf(callerGaii);
+      const isAppOwner = !!gatedApp && callerAccount === (gatedApp.split('/')[0] ?? '').toLowerCase();
+      const appMember = gatedApp && !isAppOwner ? await getMember(storage, gatedApp, callerAccount) : null;
 
       // Find the action
       const action = ext.actions.find(a => a.id === actionId);
@@ -558,6 +586,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           gaii: callerGaii,
           owner: req.auth!.owner,
           roles: req.auth!.roles,
+          // The caller's standing in the app this extension gates, resolved BEFORE the sandbox and
+          // handed in. A gate needs the role, but the roster is private and must stay that way, so
+          // the node reads it here rather than opening a lookup the sandbox could call. An
+          // extension declares which app it gates with `config: { app: owner/file.html }`; without
+          // that it gets null and keeps whatever membership model it already had.
+          member: appMember,
+          isAppOwner,
         },
         // Buy a capability from ANOTHER provider, on this extension's owner's account. The other half
         // of a supply chain: the user pays the app, the app pays its supplier, and the difference is

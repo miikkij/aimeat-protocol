@@ -306,5 +306,103 @@ await test('removing the member takes the carried access with them', async () =>
         `a removed member must not keep calling free on the owner's tab, ${live.length} grant(s) survived`);
 });
 
+
+// ── the extension gate reads the node roster, without the roster leaving the node ───────────────
+// A gate needs the role. The roster is private and must stay that way, so the node resolves the
+// caller BEFORE the sandbox starts and hands the answer in. The extension keeps only the capability
+// vocabulary, which is the half that is genuinely per-app.
+
+let gateExt = '';
+
+await test('setup: an extension declares which app it gates', async () => {
+    gateExt = `gate${Date.now().toString(36)}`;
+    const manifest = [
+        'metadata:', `  name: ${gateExt}`, '  version: 1.0.0', '  description: reads the node roster', '  author: t',
+        'config:', `  app:`, '    type: string', `    default: ${appId}`,
+        'required_apis:', '  - memory', 'actions:',
+        '  - id: whoami', '    method: POST', '    path: /whoami',
+        '    input: { type: object }', '    output: { type: object }', '    script: whoami.js',
+    ].join('\n');
+    // The gate keeps the vocabulary and reads the ROLE from the caller the node resolved.
+    const scripts = {
+        'whoami.js': [
+            'const CAPS = { member: ["read"], admin: ["read", "write"] };',
+            'export default async function (ctx) {',
+            '  const m = ctx.caller && ctx.caller.member;',
+            '  const role = (ctx.caller && ctx.caller.isAppOwner) ? "owner" : (m ? m.role : null);',
+            '  const caps = role === "owner" ? ["*"] : (CAPS[role] || []);',
+            '  return { role: role, caps: caps, since: m ? m.since : null, isAppOwner: !!(ctx.caller && ctx.caller.isAppOwner) };',
+            '}',
+        ].join('\n'),
+    };
+    const inst = await json('/v1/extensions', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ manifest, scripts }) });
+    assert(inst.status === 200 || inst.status === 201, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+    assert((await json(`/v1/extensions/${gateExt}/activate`, { method: 'POST', headers: auth(owner.token), body: '{}' })).status === 200, 'activate');
+});
+
+const whoami = async (token: string) => (await json(`/v1/ext/${gateExt}/whoami`, { method: 'POST', headers: auth(token), body: '{}' })).body.data;
+
+await test('a stranger gets no role, and the roster never left the node to tell them so', async () => {
+    const r = await whoami(stranger.token);
+    assert(r.role === null, `a stranger holds nothing: ${JSON.stringify(r)}`);
+    assert(r.caps.length === 0, 'and reaches nothing');
+});
+
+await test('an approved member is seen by the gate, with the role the OWNER set', async () => {
+    const ok = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: stranger.name, role: 'member' }),
+    });
+    assert(ok.status === 201, `approve ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+
+    const r = await whoami(stranger.token);
+    assert(r.role === 'member', `the gate sees the role the node holds: ${JSON.stringify(r)}`);
+    assert(r.caps.includes('read'), `and maps it to its OWN vocabulary: ${JSON.stringify(r.caps)}`);
+    assert(!!r.since, 'carrying when it started');
+});
+
+await test('the member\'s AGENT is that member inside the sandbox too', async () => {
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: 'gatebot', owner: stranger.name }) });
+    const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes: ['memory:read'], owner_token: stranger.token }) });
+    assert(v.status === 200, `verify ${v.status}`);
+    const t = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+
+    const r = await whoami(t.body.token as string);
+    assert(r.role === 'member',
+        `the agent of a member resolves to its human's row, with no second entry: ${JSON.stringify(r)}`);
+});
+
+await test('the app OWNER is seen as the owner, not as a member of their own app', async () => {
+    const r = await whoami(owner.token);
+    assert(r.isAppOwner === true, `the owner is recognised: ${JSON.stringify(r)}`);
+    assert(r.role === 'owner' && r.caps.includes('*'), 'and reaches everything without a roster row');
+});
+
+await test('removing the member is visible to the gate on the very next call', async () => {
+    const gone = await json(`/v1/apps/${owner.name}/${APP}/members/${stranger.name}`, { method: 'DELETE', headers: auth(owner.token) });
+    assert(gone.status === 200, `remove ${gone.status}`);
+    const r = await whoami(stranger.token);
+    assert(r.role === null && r.caps.length === 0,
+        `a removed member is refused immediately rather than until some cache expires: ${JSON.stringify(r)}`);
+});
+
+await test('an extension that declares NO app is unaffected, and keeps whatever it already did', async () => {
+    const plain = `plain${Date.now().toString(36)}`;
+    const manifest = [
+        'metadata:', `  name: ${plain}`, '  version: 1.0.0', '  description: declares no app', '  author: t',
+        'required_apis:', '  - memory', 'actions:',
+        '  - id: whoami', '    method: POST', '    path: /whoami',
+        '    input: { type: object }', '    output: { type: object }', '    script: whoami.js',
+    ].join('\n');
+    const scripts = { 'whoami.js': 'export default async function (ctx) { return { member: (ctx.caller && ctx.caller.member) ?? null, isAppOwner: !!(ctx.caller && ctx.caller.isAppOwner) }; }' };
+    const inst = await json('/v1/extensions', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ manifest, scripts }) });
+    assert(inst.status === 200 || inst.status === 201, `install ${inst.status}`);
+    assert((await json(`/v1/extensions/${plain}/activate`, { method: 'POST', headers: auth(owner.token), body: '{}' })).status === 200, 'activate');
+
+    const r = (await json(`/v1/ext/${plain}/whoami`, { method: 'POST', headers: auth(owner.token), body: '{}' })).body.data;
+    assert(r.member === null && r.isAppOwner === false,
+        `no declaration means no membership resolution, not a wrong one: ${JSON.stringify(r)}`);
+});
+
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);
