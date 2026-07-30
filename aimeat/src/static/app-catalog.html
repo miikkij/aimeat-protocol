@@ -7260,6 +7260,18 @@
       var listEl = document.getElementById("detail-versions-list");
       if (!listEl) return;
       var versions = json.data && json.data.versions ? json.data.versions : [];
+      if (versions.length) {
+        var latestNum = versions[0].version_number || 0;
+        var cur = detailGetApp();
+        if (latestNum && cur && cur.publishedVersionNumber !== latestNum) {
+          cur.publishedVersionNumber = latestNum;
+          try {
+            saveApp(cur);
+          } catch (e) {
+          }
+          renderDetailView();
+        }
+      }
       if (versions.length === 0) {
         detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t("detail.noVersions") + "</span>";
         listEl.innerHTML = detailVersionsHtml;

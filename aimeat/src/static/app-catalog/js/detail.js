@@ -1320,6 +1320,20 @@ function detailLoadVersions(owner, filename) {
       var listEl = document.getElementById('detail-versions-list');
       if (!listEl) return;
       var versions = json.data && json.data.versions ? json.data.versions : [];
+      // The published version number was only ever written by THIS browser, at the moment it
+      // published. Publish from an agent, from MCP, from another machine, and the number here
+      // stayed where this browser left it: the band said "PUBLISHED v5" beside a list whose top
+      // entry was v9, and the publish button offered v6 when the server would have made it v10.
+      // This list comes from the server, so its newest entry IS the current version. Adopt it.
+      if (versions.length) {
+        var latestNum = versions[0].version_number || 0;
+        var cur = detailGetApp();
+        if (latestNum && cur && cur.publishedVersionNumber !== latestNum) {
+          cur.publishedVersionNumber = latestNum;
+          try { saveApp(cur); } catch (e) { /* the corrected number still shows for this session */ }
+          renderDetailView();
+        }
+      }
       if (versions.length === 0) { detailVersionsHtml = '<span style="color:var(--text-muted);font-size:.85rem">' + t('detail.noVersions') + '</span>'; listEl.innerHTML = detailVersionsHtml; return; }
       var ownerArg = "'" + escapeHtml(owner).replace(/'/g, "\\'") + "'";
       var fileArg = "'" + escapeHtml(filename).replace(/'/g, "\\'") + "'";

@@ -154,7 +154,10 @@ function Gallery() {
               // Version first, then the two numbers, and a zero is left out rather than printed:
               // "0 opens" on a freshly published app reads as a verdict on it.
               const facts = [];
-              if (m.version) facts.push('v' + escHtml(m.version));
+              // The node's own version is the incrementing publish number, the same v9 the
+              // catalogue shows. The manifest's semver is whatever the author typed and does not
+              // move when they republish, so it says nothing about how alive the app is.
+              if (a.version_number) facts.push('v' + a.version_number);
               if (a.downloads > 0) facts.push(`${a.downloads} ${a.downloads === 1 ? tr('landing.wallOpen1', 'open') : tr('landing.wallOpens', 'opens')}`);
               if (a.forks > 0) facts.push(`${a.forks} ${a.forks === 1 ? tr('landing.wallFork1', 'fork') : tr('landing.wallForks', 'forks')}`);
               return html`
