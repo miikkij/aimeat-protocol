@@ -48,7 +48,8 @@ required, upserts by slug, share:true publishes platform-wide) · \`aimeat_app_t
 1. RESEARCH: load the \`node:aimeat-app-builder\` skill (\`aimeat_skill_get\`), call
    \`aimeat_appdev_overview\`, and fetch the canonical spec \`GET /v1/prompts/build-app\` (it is law).
 2. FRAME: tier (T1 pure client / T2 +cortex / T3 +extension), packs, start point (fork a prior
-   app / template proposal / shell), own-users → aimeat-iam decided NOW.
+   app / template proposal / shell), own-users → aimeat-iam pack (gate) + AIMEAT.iam (panel),
+   decided NOW. A role belongs to the PERSON: a member's agents inherit it.
 3. PROPOSE the frame to the user in 3-5 lines; adjust.
 4. BUILD flexibly within the frame; verify locally; publish (presigned upload > ~1 KB).
 5. FINISH: agent face + bound skill (\`metadata.binding\`), \`aimeat_app_template_propose\`,

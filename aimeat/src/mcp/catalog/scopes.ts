@@ -134,6 +134,19 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_app_tools_publish: 'commerce:sell',
     aimeat_offer_price_set: 'commerce:sell',
     // aimeat_app_tools_get is intentionally ungated — it reads PUBLIC manifests (own always).
+    // Beneficiary splitting. Declaring who shares your revenue, and paying one of them, both move
+    // value out of the owner's own pocket, so they sit with the rest of the seller-side config.
+    // READING what you are owed is a wallet question, not a selling one: a beneficiary is usually
+    // not a seller at all, and gating their own receivables behind commerce:sell would mean an
+    // account could be owed money it had no way to see.
+    aimeat_commerce_beneficiary_split_set: 'commerce:sell',
+    aimeat_commerce_beneficiary_splits: 'commerce:sell',
+    aimeat_commerce_beneficiary_release: 'commerce:sell',
+    aimeat_commerce_beneficiary_earnings: 'wallet:read',
+    // The approval gate is operator-only at the handler; the scope keeps a narrow agent from even
+    // seeing the tool, so it is not offered to somebody who could never use it.
+    aimeat_commerce_beneficiary_approve: 'wallet:read',
+
     aimeat_checkout_open: 'commerce:buy',
     aimeat_checkout_complete: 'commerce:buy',
     aimeat_checkout_list: 'commerce:buy',

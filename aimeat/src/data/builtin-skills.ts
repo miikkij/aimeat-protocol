@@ -546,7 +546,9 @@ registry), \`aimeat_appdev_pitfall_list\` (learned, model-filterable), \`aimeat_
 \`binding=app:{owner}/{file}\` (how existing apps want to be driven).
 
 Frame the build from the research (tier T1/T2/T3, packs, whether the app needs its own
-users → aimeat-iam decided NOW), propose the frame to the user in 3-5 lines, then build.
+users → the aimeat-iam pack for the gate + AIMEAT.iam for the panel, decided NOW; a role
+belongs to the PERSON so a member's agents inherit it, and can() only paints while the extension
+enforces), propose the frame to the user in 3-5 lines, then build.
 If the user says to just build it the usual way, skip the research and go.
 
 ## Finish — this is where the acceleration compounds

@@ -28,7 +28,7 @@ export function buildAppdevFlowPrompt(config: AimeatConfig): string {
     p += `- Get the big picture in ONE call: \`${FLOW_TOOLS.overview}\` (pass your own model id). It returns my existing apps and template proposals (often the fastest correct starting point — fork or copy patterns), library packs with per-model proofs, T1/T2/T3 templates, and the pitfalls (curated + learned) for the areas you will touch.\n`;
     p += `- Fetch the canonical build spec and treat it as law: \`GET ${nodeUrl}/v1/prompts/build-app\` — it always wins on any conflict.\n\n`;
     p += '## 2. Frame\n';
-    p += 'Pick the tier (T1 pure client / T2 +cortex / T3 +extension), the capability packs, the starting point (fork a prior app / a template proposal / a shell), and whether the app needs its OWN users → the aimeat-iam pack, decided NOW, not retrofitted.\n\n';
+    p += 'Pick the tier (T1 pure client / T2 +cortex / T3 +extension), the capability packs, the starting point (fork a prior app / a template proposal / a shell), and whether the app needs its OWN users: the aimeat-iam pack for the gate plus AIMEAT.iam for the panel, decided NOW, not retrofitted. A role belongs to the PERSON, so the agents of a member inherit it.\n\n';
     p += '## 3. Propose\n';
     p += 'Give me the frame in 3-5 lines (tier, packs, start point, iam yes/no, anything you will reuse) and wait for my go-ahead or corrections.\n\n';
     p += '## 4. Build\n';

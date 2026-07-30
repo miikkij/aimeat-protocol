@@ -88,6 +88,8 @@ const ALL_SUITES = [
     'test/e2e-exchange-mcp.ts',
     // The second rake: revenue a provider shares with third parties, out of their own cut.
     'test/e2e-beneficiary-split.ts',
+    // The agent surface for the same thing: the REST routes shipped without one.
+    'test/e2e-mcp-beneficiary.ts',
     'test/e2e-extension-secrets.ts',
     'test/e2e-iam-extension.ts',
     'test/e2e-upsert.ts',

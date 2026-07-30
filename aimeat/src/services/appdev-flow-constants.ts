@@ -35,7 +35,7 @@ export function buildResearchStep(): string {
     let s = '## Step 0 — Research first (agents with AIMEAT MCP tools)\n';
     s += `If you have \`aimeat_*\` MCP tools, follow the ${FLOW_PHASES} flow — it is the promise an MCP connection makes: a better result than building cold.\n`;
     s += `1. RESEARCH: load \`${FLOW_TOOLS.skill}\` (\`${FLOW_TOOLS.skillGet}\`), then call \`${FLOW_TOOLS.overview}\` (pass your OWN model id — self-identify from your own configuration, never ask the user) — the owner's existing apps and template proposals are usually the fastest correct starting point; read the pitfalls for the areas you will touch.\n`;
-    s += '2. FRAME: pick the tier (decision tree in Step 2), the capability packs, and whether the app needs its OWN users (aimeat-iam) — decide this NOW, not after the data model exists.\n';
+    s += '2. FRAME: pick the tier (decision tree in Step 2), the capability packs, and whether the app needs its OWN users (the aimeat-iam pack for the gate + AIMEAT.iam for the panel) — decide this NOW, not after the data model exists.\n';
     s += '3. PROPOSE the frame to the user in 3-5 lines (tier, packs, start point: fork/template/scratch, iam yes/no) and adjust to their answer.\n';
     s += `SKIP CLAUSE: if the user says "${FLOW_SKIP_PHRASE}" (or equivalent), skip Steps 0-1 and build directly — the flow is a default, never a gate. Without MCP tools, go straight to Step 1.\n\n`;
     return s;

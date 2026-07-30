@@ -31,6 +31,9 @@ import { reconcileAfterSourceWrite } from '../services/exchange-projection.js';
 import { integerMicros, isSupportedMoneyCurrency } from '../commerce/money.js';
 import { createSession, getSession, completeSession, listSessions, CommerceError } from '../commerce/session-service.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
+import { putSplit, deleteSplit, listSplitsByProvider, BENEFICIARIES_MAX, type BeneficiaryShare } from '../commerce/beneficiary-split.js';
+import { listBeneficiaryEntries, listBeneficiaryObligations, type BeneficiaryEntry } from '../commerce/beneficiary-book.js';
+import { readApproval, putApproval, beneficiaryEligibility, releaseBeneficiaryShare } from '../commerce/beneficiary-release.js';
 import { issueJWT } from '../auth/jwt.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
@@ -345,6 +348,179 @@ export function registerCommerceTools(
         async ({ limit, response_format }) => {
             const sessions = await listSessions(storage, ownerGhii, limit ?? 20);
             return ok(shapeResponse('aimeat_checkout_list', response_format, sessions));
+        },
+    );
+
+    // ── Beneficiary splitting: the SECOND RAKE, taken from the seller's own cut ────
+    //
+    // The REST surface shipped without these, so configuring a split from a chat meant
+    // hand-rolling a bearer token. Every one of them resolves the caller's OWN owner GHII and
+    // never accepts a provider id from the argument list: the revenue being given away has to be
+    // the giver's, and that is the whole cross-owner question here.
+
+    /** Money micros and morsels are different KINDS of quantity, so they are bucketed, never summed. */
+    function totalsOf(entries: BeneficiaryEntry[]): Record<string, { accrued: number; released: number; reversed: number; entries: number }> {
+        const totals: Record<string, { accrued: number; released: number; reversed: number; entries: number }> = {};
+        for (const e of entries) {
+            const bucket = e.unit === 'money' ? (e.currency ?? 'EUR') : 'morsels';
+            const t = totals[bucket] ?? (totals[bucket] = { accrued: 0, released: 0, reversed: 0, entries: 0 });
+            t[e.status] += e.amount;
+            t.entries += 1;
+        }
+        return totals;
+    }
+
+    mcp.tool(
+        'aimeat_commerce_beneficiary_split_set',
+        descriptionFor('aimeat_commerce_beneficiary_split_set'),
+        {
+            ext: z.string().min(1).max(200),
+            action: z.string().min(1).max(200),
+            pool_percent: z.number().min(0).max(100),
+            beneficiaries: z.array(z.object({
+                ghii: z.string().min(3).max(200),
+                weight: z.number().positive().optional(),
+                note: z.string().max(200).optional(),
+            })).max(BENEFICIARIES_MAX).optional(),
+            dynamic: z.boolean().optional(),
+            capability: z.string().max(200).optional(),
+            state: z.enum(['active', 'paused']).optional(),
+        },
+        annotationsFor('aimeat_commerce_beneficiary_split_set'),
+        async ({ ext, action, pool_percent, beneficiaries, dynamic, capability, state }) => {
+            const rows: BeneficiaryShare[] = (beneficiaries ?? []).map(b => ({
+                ghii: b.ghii, weight: b.weight ?? 1, note: b.note ?? '',
+            }));
+            const bad = rows.find(b => b.ghii.indexOf('@') < 1);
+            if (bad) return fail(`INVALID_GHII: "${bad.ghii}" is not an owner GHII (owner@node-id)`);
+            if (!rows.length && !dynamic) {
+                return fail('EMPTY_SPLIT: a split with no beneficiaries and no dynamic:true would divide nothing. '
+                    + 'Either list who shares it, or set dynamic:true so the capability may name them per call.');
+            }
+            const split = await putSplit(storage, {
+                providerGhii: ownerGhii, ext, action, capabilityLabel: capability,
+                poolPercent: pool_percent, beneficiaries: rows, dynamic: dynamic ?? false,
+                state: state ?? 'active', createdBy: ownerGhii,
+            });
+            return ok({
+                split,
+                note: 'The pool is taken from YOUR cut, after the platform rake and never from the buyer\'s charge. '
+                    + 'Shares accrue on every settled call; releasing one needs the beneficiary to be verified.',
+            });
+        },
+    );
+
+    mcp.tool(
+        'aimeat_commerce_beneficiary_splits',
+        descriptionFor('aimeat_commerce_beneficiary_splits'),
+        {
+            remove_ext: z.string().max(200).optional(),
+            remove_action: z.string().max(200).optional(),
+        },
+        annotationsFor('aimeat_commerce_beneficiary_splits'),
+        async ({ remove_ext, remove_action }) => {
+            if (remove_ext || remove_action) {
+                if (!remove_ext || !remove_action) return fail('INVALID_INPUT: withdrawing needs both remove_ext and remove_action');
+                const removed = await deleteSplit(storage, ownerGhii, remove_ext, remove_action);
+                if (!removed) return fail('NOT_FOUND: you have no split declared on that coordinate');
+                return ok({
+                    removed: true,
+                    note: 'Future calls keep your whole cut. Shares already accrued still stand: what was earned does not un-happen.',
+                });
+            }
+            const splits = await listSplitsByProvider(storage, ownerGhii);
+            return ok({ splits, count: splits.length });
+        },
+    );
+
+    mcp.tool(
+        'aimeat_commerce_beneficiary_earnings',
+        descriptionFor('aimeat_commerce_beneficiary_earnings'),
+        {
+            role: z.enum(['beneficiary', 'provider']).optional(),
+            status: z.enum(['accrued', 'released', 'reversed']).optional(),
+            limit: z.number().int().min(1).max(1000).optional(),
+        },
+        annotationsFor('aimeat_commerce_beneficiary_earnings'),
+        async ({ role, status, limit }) => {
+            const max = limit ?? 200;
+            if (role === 'provider') {
+                const all = await listBeneficiaryObligations(storage, ownerGhii, max);
+                const entries = status ? all.filter(e => e.status === status) : all;
+                return ok({ role: 'provider', provider: ownerGhii, totals: totalsOf(entries), entries, count: entries.length });
+            }
+            const all = await listBeneficiaryEntries(storage, ownerGhii, max);
+            const entries = status ? all.filter(e => e.status === status) : all;
+            const gate = await beneficiaryEligibility(storage, config, ownerGhii);
+            return ok({
+                role: 'beneficiary', beneficiary: ownerGhii,
+                verification: { state: gate.state, payable: gate.eligible, reason: gate.reason, message: gate.message },
+                totals: totalsOf(entries), entries, count: entries.length,
+                note: 'A share is owed by the PROVIDER, not by the buyer. It comes out of what the provider earned.',
+            });
+        },
+    );
+
+    mcp.tool(
+        'aimeat_commerce_beneficiary_release',
+        descriptionFor('aimeat_commerce_beneficiary_release'),
+        {
+            tracking_code: z.string().min(1).max(200),
+            beneficiary: z.string().min(3).max(200),
+        },
+        annotationsFor('aimeat_commerce_beneficiary_release'),
+        async ({ tracking_code, beneficiary }) => {
+            const r = await releaseBeneficiaryShare(storage, config, {
+                providerGhii: ownerGhii, beneficiaryGhii: beneficiary, trackingCode: tracking_code,
+            });
+            if (!r.ok) return fail(`${r.reason}: ${r.message}`);
+            return ok({
+                released: true, beneficiary, tracking_code,
+                amount: r.entry.amount, unit: r.entry.unit, currency: r.entry.currency,
+                method: r.method, settled_here: r.settledHere,
+                note: r.settledHere
+                    ? 'Transferred from your morsel balance to theirs. Morsels are this node\'s pacing meter, so the '
+                      + 'transfer completes here; it moves consumption capacity, not currency.'
+                    : 'Booked onto their payable book. The node moves no fiat, so invoice and settle this off-node.',
+            });
+        },
+    );
+
+    mcp.tool(
+        'aimeat_commerce_beneficiary_approve',
+        descriptionFor('aimeat_commerce_beneficiary_approve'),
+        {
+            ghii: z.string().min(3).max(200).optional(),
+            state: z.enum(['verified', 'unverified', 'rejected']).optional(),
+            method: z.string().max(120).optional(),
+            subject: z.string().max(200).optional(),
+            evidence: z.string().max(500).optional(),
+        },
+        annotationsFor('aimeat_commerce_beneficiary_approve'),
+        async ({ ghii, state, method, subject, evidence }) => {
+            // Same runtime check the admin tools use (core-admin.ts): read the OWNER record rather
+            // than trust a session claim, because roles are not known at session-creation time.
+            const ownerRec = await storage.getOwner(owner);
+            const isOperator = !!ownerRec && ownerRec.roles.includes('operator');
+            // READ path. Your own is yours to see; somebody else's verification state is an operator question.
+            if (!state) {
+                const target = ghii || ownerGhii;
+                if (target !== ownerGhii && !isOperator) return fail('FORBIDDEN: you may read your own approval state only');
+                const approval = await readApproval(storage, target);
+                const gate = await beneficiaryEligibility(storage, config, target);
+                return ok({ ghii: target, approval, state: gate.state, payable: gate.eligible, message: gate.message });
+            }
+            // WRITE path. Operator only: a gate a provider could open for their own payees is not a gate.
+            if (!isOperator) return fail('FORBIDDEN: recording an approval is an operator action');
+            if (!ghii) return fail('INVALID_INPUT: name the beneficiary GHII to record an approval for');
+            if (state === 'verified' && !method) {
+                return fail('INVALID_INPUT: a verification must say HOW representation was established. '
+                    + 'Set method, e.g. "suomifi-valtuudet" or "contract-on-file".');
+            }
+            const approval = await putApproval(storage, {
+                ghii, state, method, subject: subject ?? null, evidence, verifiedBy: ownerGhii,
+            });
+            return ok({ approval });
         },
     );
 }

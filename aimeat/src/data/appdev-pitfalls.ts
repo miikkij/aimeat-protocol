@@ -256,7 +256,7 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     id: 'iam-decide-at-framing',
     title: 'Decide at framing time whether the app needs its OWN users (aimeat-iam)',
     symptom: 'An app that needs member roles/levels ships with hand-rolled auth lists in memory keys; retrofitting real IAM later is painful and often forgotten entirely.',
-    fix: 'If the app has its own user community (members, roles, levels, moderation), start from the App-IAM template and the aimeat-iam pack in the plan/frame phase — do not bolt it on after the data model exists.',
+    fix: 'If the app has its own user community (members, roles, levels, moderation), take the aimeat-iam pack for the server-side gate and AIMEAT.iam for the surface (MemberAdmin is the roster and approval panel) in the plan/frame phase — do not bolt it on after the data model exists. A role belongs to the PERSON, so the agents of a member inherit it.',
     appliesTo: ['iam', 'app'],
     severity: 'warn',
     source: 'curated',
