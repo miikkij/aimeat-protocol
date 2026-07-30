@@ -398,6 +398,15 @@ function BuildAppPrompt() {
           ${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}
         </button>
       </div>
+
+      <div class="ld-gen-step">
+        <div class="ld-gen-head"><span class="ld-gen-num">3</span><span>${tr('landing.genStep3', 'Add & publish your app')}</span></div>
+        <p class="ld-gen-hint">${tr('landing.genStep3Hint', 'Got the code or HTML file back from the AI? Create an account — it takes a minute — then paste it or upload the file. The app goes live at its own address and you get a link to share.')}</p>
+        <a class="btn-outline ld-gen-copy ld-gen-add" href="/app-catalog.html?add=1">
+          ${tr('landing.genStep3Btn', 'Register and add your app')}
+        </a>
+        <p class="ld-gen-hint ld-gen-mcp">${tr('landing.genStep3Mcp', 'If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you — no file to move by hand.')}</p>
+      </div>
     </div>`;
 }
 

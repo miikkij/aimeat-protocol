@@ -10243,6 +10243,23 @@
       } catch (e) {
       }
     }
+    if (_params.get("add") === "1") {
+      (function openAddWhenAuthReady(tries) {
+        if (window.AIMEAT && window.AIMEAT.auth || tries <= 0) {
+          requireSignInThen(function() {
+            showModal();
+            try {
+              switchTab("paste");
+            } catch (e) {
+            }
+          });
+          return;
+        }
+        setTimeout(function() {
+          openAddWhenAuthReady(tries - 1);
+        }, 100);
+      })(50);
+    }
     document.getElementById("search-input").addEventListener("input", function(e) {
       searchQuery = e.target.value.trim();
       renderApps4();

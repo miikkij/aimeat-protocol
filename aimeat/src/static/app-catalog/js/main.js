@@ -312,6 +312,26 @@ import { toggleFavorite } from './favorites.js';
       try { openPromptBuilder(null); } catch (e) { /* prompt builder optional */ }
     }
 
+    // Deep link ?add=1 — the landing page's step 3 sends people straight here with the file
+    // their AI just handed them. Same path the builder's own step 3 takes: sign in or register
+    // first, then Add App on the Paste tab.
+    //
+    // It waits for the auth library because requireSignInThen falls through to next() when the
+    // lib has not loaded yet — that would open the dialog with no session and the save would
+    // fail at the end, after the visitor had already pasted their app in.
+    if (_params.get('add') === '1') {
+      (function openAddWhenAuthReady(tries) {
+        if ((window.AIMEAT && window.AIMEAT.auth) || tries <= 0) {
+          requireSignInThen(function () {
+            showModal();
+            try { switchTab('paste'); } catch (e) { /* tab switch is best-effort */ }
+          });
+          return;
+        }
+        setTimeout(function () { openAddWhenAuthReady(tries - 1); }, 100);
+      })(50);
+    }
+
     // ── Search input ─────────────────────────────────
     document.getElementById('search-input').addEventListener('input', function (e) {
       searchQuery = e.target.value.trim();

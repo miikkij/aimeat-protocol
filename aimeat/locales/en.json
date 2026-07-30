@@ -7921,7 +7921,11 @@
       "any": "ANY MODEL",
       "frontier": "VERSION TRAP",
       "needs-doc": "READ THE DOC"
-    }
+    },
+    "genStep3": "Add & publish your app",
+    "genStep3Hint": "Got the code or HTML file back from the AI? Create an account — it takes a minute — then paste it or upload the file. The app goes live at its own address and you get a link to share.",
+    "genStep3Btn": "Register and add your app",
+    "genStep3Mcp": "If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you — no file to move by hand."
   },
   "pricing": {
     "title": "Pricing",

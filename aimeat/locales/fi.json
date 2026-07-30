@@ -7921,7 +7921,11 @@
       "any": "KAIKILLE MALLEILLE",
       "frontier": "VERSIOANSA",
       "needs-doc": "LUE DOKUMENTTI"
-    }
+    },
+    "genStep3": "Lisää ja julkaise appisi",
+    "genStep3Hint": "Saitko tekoälyltä koodin tai HTML-tiedoston? Tee tili — se vie minuutin — ja liitä koodi tai lataa tiedosto. Appi menee liveksi omaan osoitteeseensa ja saat linkin jaettavaksi.",
+    "genStep3Btn": "Rekisteröidy ja lisää appisi",
+    "genStep3Mcp": "Jos tekoäly johon liitit kehotteen on yhteydessä tähän nodeen MCP:llä, se julkaisee appin puolestasi — tiedostoa ei tarvitse siirtää käsin."
   },
   "pricing": {
     "title": "Hinnoittelu",

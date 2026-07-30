@@ -266,3 +266,7 @@
    complexity, the contents read as the reason it is long. */
 .ld-gen-contains { font-size: .8rem; color: var(--text-muted); margin: 0 0 12px; }
 .ld-gen-copy { width: 100%; justify-content: center; }
+/* Step 3's action is an anchor, not a button — it leaves the page — so it needs the
+   button box model spelled out that <button> gets for free. */
+.ld-gen-add { display: block; box-sizing: border-box; text-align: center; text-decoration: none; }
+.ld-gen-mcp { margin: 10px 0 0; }
