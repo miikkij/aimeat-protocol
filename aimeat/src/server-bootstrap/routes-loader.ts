@@ -106,6 +106,7 @@ import { appdevPitfallsRouter } from '../routes/appdev-pitfalls.js';
 import { appdevOverviewRouter } from '../routes/appdev-overview.js';
 import { libraryPacksRouter } from '../routes/library-packs.js';
 import { appsRouter } from '../routes/apps.js';
+import { appMembersRouter } from '../routes/app-members.js';
 import { appStoreRouter } from '../routes/app-store.js';
 import { flagsRouter } from '../routes/flags.js';
 import { feedbackRouter } from '../routes/feedback.js';
@@ -603,6 +604,9 @@ export async function mountRoutes(
   // Backup routes BEFORE appsRouter so /v1/apps/backup/* never collides with
   // the parameterized /v1/apps/:owner/:filename routes.
   app.use(appsBackupRouter(config, storage));
+  // Member roster BEFORE appsRouter for the same reason as backup: these are more specific paths
+  // under /v1/apps/:owner/:filename/ and must not be swallowed by the parameterized app routes.
+  app.use(appMembersRouter(config, storage));
   app.use(appsRouter(config, storage, peers));
   app.use(appStoreRouter(config, storage));
   // Node Extensions (Sandboxed)

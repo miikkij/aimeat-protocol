@@ -15380,6 +15380,175 @@ paths:
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { $ref: '#/components/responses/NotFound' }
 
+  /v1/apps/{owner}/{filename}/members:
+    get:
+      operationId: appMembersList
+      summary: The app's member roster and the people waiting on a decision
+      description: >
+        Owner-only. An app's OWN member list, kept by the node rather than by each app. It lives here
+        because three of the jobs a roster must do cannot be done from an app at all: telling the
+        approved person they were approved (the extension sandbox notifies the CALLER, so an approval
+        notifies the approver), keeping the list off the public internet (an `ext:` namespace is
+        world-readable by default), and taking free access away together with the role. The app keeps
+        what a member may DO; the node keeps who they are. Returns `{ members, requests, count }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': 
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: appMembersApprove
+      summary: Approve someone, or change the role they hold
+      description: >
+        Owner-only, idempotent. A role belongs to the PERSON, so the row is keyed to the bare account
+        name and every agent of theirs resolves to it without a second entry. A NEW member is
+        notified that they were approved; a role change is not, because re-sending "you were
+        approved" to somebody who already had access reads as a mistake. `since` survives a role
+        change. The owner cannot be a member of their own app. Body:
+        `{ account, role, level?, note?, offerings? }`. Returns `{ member, created }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [account, role]
+              properties:
+                account: { type: string, description: "The PERSON to approve — a bare account name, their GHII, or one of their agents' GAII; all three resolve to the same person." }
+                role: { type: string, description: "Role key this app uses. The app's own extension decides what it permits; the node only records who holds it." }
+                level: { type: integer, description: "BBS ordinal, LOWER is more power. Optional." }
+                note: { type: string, description: "Free text kept with the decision — the audit trail the app-side versions did not have." }
+                offerings:
+                  type: array
+                  items: { type: string }
+                  description: "EXCHANGE offering ids this approval carries, so a later demotion knows what to take back."
+      responses:
+        '200': 
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '201': 
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/apps/{owner}/{filename}/members/me:
+    get:
+      operationId: appMembersMe
+      summary: The caller's own standing with this app
+      description: >
+        Any authenticated caller. An AGENT asking this gets its human's answer, which is the whole
+        point of keying the roster to the person: a member who works through an agent is one member,
+        not two. Returns `{ member, isOwner, role, requested }`, with `role` null for a stranger.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': 
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+  /v1/apps/{owner}/{filename}/members/{account}:
+    delete:
+      operationId: appMembersRemove
+      summary: Remove a member
+      description: >
+        Owner-only. The removed person is notified. Removing somebody who is not a member answers 404
+        rather than a cheerful 200, because "removed" and "there was nobody" are different facts.
+        Returns `{ removed, member }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: account, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': 
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/apps/{owner}/{filename}/members/requests:
+    post:
+      operationId: appMembersRequest
+      summary: Ask the owner for access
+      description: >
+        Any authenticated caller. The OWNER is notified, which is the direction an extension can
+        never reach: there the caller is the applicant, so the applicant would only notify
+        themselves. Asking again updates the note rather than queueing a second ask. Somebody who is
+        already a member is told so instead of joining a queue. Body `{ note? }` (max 400 chars).
+        Returns `{ recorded, request }` or `{ recorded: false, alreadyMember: true, member }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                note: { type: string, description: "Who you are and what you need it for. Shown to the owner." }
+      responses:
+        '201': 
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '200': 
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+  /v1/apps/{owner}/{filename}/members/requests/{account}:
+    delete:
+      operationId: appMembersDecline
+      summary: Decline an ask
+      description: >
+        Owner-only. The ask is marked declined rather than deleted, so the same person asking again
+        does not look like a first-time visitor. Returns `{ declined }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+        - { name: account, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': 
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /v1/apps/{owner}/{filename}/draft:
     get:
       operationId: getAppDraft
