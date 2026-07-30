@@ -15442,6 +15442,13 @@ paths:
         notifies the approver), keeping the list off the public internet (an `ext:` namespace is
         world-readable by default), and taking free access away together with the role. The app keeps
         what a member may DO; the node keeps who they are. Returns `{ members, requests, count }`.
+
+
+        A MEMBER may also read it when the app's plan sets `rosterVisibility: members` - some apps
+        cannot work otherwise, because the roster IS their content index. That view is redacted to
+        names, roles and join dates and carries `redacted: true`: the note somebody wrote when they
+        asked, who approved them, what they are carried on, and anyone still waiting stay the
+        owner's. A non-member and an anonymous caller are refused either way.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -15464,7 +15471,13 @@ paths:
         notified that they were approved; a role change is not, because re-sending "you were
         approved" to somebody who already had access reads as a mistake. `since` survives a role
         change. The owner cannot be a member of their own app. Body:
-        `{ account, role, level?, note?, offerings? }`. Returns `{ member, created }`.
+        `{ account, role, level?, note?, offerings?, days?, expiresAt? }`. Returns
+        `{ member, created, access }`, where `access` reports which grants were issued, withdrawn or
+        left alone - an approval that only set a role would be a sentence with nothing behind it.
+
+
+        Refused with `409 SEATS_FULL` when the app's plan caps that role and every seat is taken.
+        Somebody already holding the role is not taking a new one, so a renewal never hits the cap.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -15486,7 +15499,9 @@ paths:
                 offerings:
                   type: array
                   items: { type: string }
-                  description: "EXCHANGE offering ids this approval carries, so a later demotion knows what to take back."
+                  description: "EXCHANGE offering ids this approval carries, so a later demotion knows what to take back. Omit to apply the app's declared carry plan, which is the point of having one: whoever clicks Approve should not have to know listing ids."
+                days: { type: integer, description: "How long this membership lasts, in days, counted from now. Omit to apply the role's declared term, or to leave an existing one alone." }
+                expiresAt: { type: string, nullable: true, description: "The exact moment this membership lapses, ISO 8601. Wins over days and over the declared term. Null for a membership that does not lapse." }
       responses:
         '200': 
           description: OK
@@ -15499,6 +15514,118 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/apps/{owner}/{filename}/members/plan:
+    get:
+      operationId: appMembersPlanGet
+      summary: What membership of this app means - carried offerings, seats, terms, who reads the roster, and what a call costs
+      description: >
+        Owner-only. The app's membership configuration, declared once and applied to every approval
+        after it. Null when the owner has declared none, in which case seats are unlimited,
+        memberships do not lapse, an approval carries nothing, and the app charges everybody who is
+        not a member.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    put:
+      operationId: appMembersPlanSet
+      summary: Declare what membership of this app means
+      description: >
+        Owner-only, and it replaces the whole plan. Applies to approvals from now on: people already
+        approved keep what they were given until they are approved again, because changing the plan
+        under them would move somebody's access with nobody deciding to.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roles]
+              properties:
+                roles:
+                  type: object
+                  additionalProperties:
+                    type: array
+                    items: { type: string }
+                  description: "Role key to the EXCHANGE offering ids that role is carried on. A role that is absent carries nothing, so somebody holding it is billed at list price while the panel shows them approved."
+                access:
+                  type: string
+                  enum: [members-free, free, members-only, open]
+                  description: >
+                    What calls cost, and to whom. `members-free` (the default) carries a member and
+                    charges everybody else, so membership is the free tier rather than the door.
+                    `free` charges nobody at all, and is applied BEFORE the entitlement gate so that a
+                    customer who contracted while the app was priced stops paying instead of going on
+                    paying unnoticed. `members-only` refuses anyone who is not a member even when they
+                    are holding money, and refuses them before any settlement. `open` is the former
+                    name for `members-free` and still reads as it. Applies only to an extension that
+                    names this app in its `config.app`, because without that there is no roster to
+                    check against.
+                rosterVisibility:
+                  type: string
+                  enum: [owner, members]
+                  description: "Who may read the roster. `owner` (the default) suits a paid service, where the customer list is nobody else's business. `members` suits an app where seeing each other IS the product, and that view is redacted."
+                seats:
+                  type: object
+                  additionalProperties: { type: integer }
+                  description: "Role key to how many people may hold it at once. An approval past the last seat is refused with 409 SEATS_FULL and says how many are taken. A role that is absent is uncapped."
+                terms:
+                  type: object
+                  additionalProperties:
+                    type: object
+                    properties:
+                      days: { type: integer, description: "How long this role lasts. Absent means it does not lapse." }
+                      renewal:
+                        type: string
+                        enum: [manual, self-serve, none]
+                        description: "What is MEANT to happen when the term ends. Descriptive only: nothing here charges anybody and no membership renews itself, so a monthly subscription is this plus whatever the app already uses to take money."
+                  description: "Role key to how long it lasts and how it is meant to continue."
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/apps/{owner}/{filename}/members/sweep:
+    post:
+      operationId: appMembersSweep
+      summary: Close every lapsed membership now, and take back what it was carrying
+      description: >
+        Owner-only. Access already stops on the CLOCK - somebody whose term ran out is refused on
+        their very next call - so this is not what ends a membership. What the clock cannot do is
+        withdraw the EXCHANGE grants, and until something does, a person the owner stopped selling to
+        keeps calling on the owner's money. A timer runs this hourly across the node; this is the
+        same act, now, for one app. Returns `{ swept, revoked, failed }`.
+      tags: [Apps]
+      security:
+        - BearerAuth: []
+      parameters:
+        - { name: owner, in: path, required: true, schema: { type: string } }
+        - { name: filename, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
         '403': { $ref: '#/components/responses/Forbidden' }
   /v1/apps/{owner}/{filename}/members/me:
     get:
