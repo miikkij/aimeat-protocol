@@ -404,5 +404,68 @@ await test('an extension that declares NO app is unaffected, and keeps whatever 
         `no declaration means no membership resolution, not a wrong one: ${JSON.stringify(r)}`);
 });
 
+
+// ── the bell carries the decision, not just the news ────────────────────────────────────────────
+// A notification that only says "somebody asked" makes the owner go and find the panel. The buttons
+// are set by the NODE, never by an app: an inline api action runs with the RECIPIENT's authority
+// when clicked, which is why the public notifications route refuses client-supplied actions.
+
+await test('the request notification carries working Approve and Decline buttons', async () => {
+    const asker = await setupOwner('bel');
+    await json(`/v1/apps/${owner.name}/${APP}/members/requests`, {
+        method: 'POST', headers: auth(asker.token), body: JSON.stringify({ note: 'let me in' }),
+    });
+    const note = (await bell(owner.token)).filter(n => n.type === 'app_member_request')
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))[0];
+    assert(!!note, 'the owner was told');
+    const actions = note.actions ?? [];
+    assert(actions.length === 2, `two decisions offered, got ${actions.length}: ${JSON.stringify(actions.map((a: any) => a.id))}`);
+
+    const approve = actions.find((a: any) => a.id === 'approve');
+    const decline = actions.find((a: any) => a.id === 'decline');
+    assert(!!approve && !!decline, 'approve and decline');
+    // The node does not own the role vocabulary, so the button must SAY which role it grants.
+    assert(/Approve as \w+/.test(approve.label), `the label names the role: ${approve.label}`);
+    assert(approve.kind === 'api' && approve.method === 'POST', `approve is a real call: ${JSON.stringify(approve)}`);
+    assert(approve.body.account === asker.name.toLowerCase(), `aimed at the right person: ${JSON.stringify(approve.body)}`);
+    assert(decline.confirm === true, 'declining asks first, because it is the one that ends something');
+
+    // Both endpoints are same-node paths, which is what the action guard requires.
+    for (const a of [approve, decline]) {
+        assert(a.endpoint.startsWith('/') && !a.endpoint.startsWith('//'), `same-node path: ${a.endpoint}`);
+    }
+
+    // Clicking Approve is exactly this call with the OWNER's token — verify it lands.
+    const clicked = await json(approve.endpoint, {
+        method: approve.method, headers: auth(owner.token), body: JSON.stringify(approve.body),
+    });
+    assert(clicked.status === 201, `the approve button's call works: ${clicked.status} ${JSON.stringify(clicked.body?.error)}`);
+    const roster = await json(`/v1/apps/${owner.name}/${APP}/members`, { headers: auth(owner.token) });
+    assert((roster.body.data.members as any[]).some(m => m.owner === asker.name.toLowerCase()),
+        'and the person is a member afterwards');
+
+    // A stranger clicking the same endpoint is still refused: the button carries no authority of its own.
+    const stolen = await json(approve.endpoint, {
+        method: approve.method, headers: auth(stranger.token), body: JSON.stringify(approve.body),
+    });
+    assert(stolen.status === 403, `the endpoint is not made public by being named in a bell, got ${stolen.status}`);
+});
+
+await test('the suggested role is read from the roster, not guessed', async () => {
+    // The app above now has members holding a role; a fresh asker's button should offer that role.
+    const asker2 = await setupOwner('bl2');
+    await json(`/v1/apps/${owner.name}/${APP}/members/requests`, {
+        method: 'POST', headers: auth(asker2.token), body: JSON.stringify({}),
+    });
+    const note = (await bell(owner.token)).filter(n => n.type === 'app_member_request')
+        .find(n => n.title.includes(asker2.name));
+    assert(!!note, 'the second ask rang too');
+    const approve = (note.actions ?? []).find((a: any) => a.id === 'approve');
+    const roster = await json(`/v1/apps/${owner.name}/${APP}/members`, { headers: auth(owner.token) });
+    const roles = (roster.body.data.members as any[]).map(m => m.role);
+    assert(roles.includes(approve.body.role),
+        `the offered role is one the app actually uses (${JSON.stringify(roles)}), got ${approve.body.role}`);
+});
+
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);

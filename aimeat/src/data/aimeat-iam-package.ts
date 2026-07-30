@@ -70,11 +70,22 @@ import type { ExamplePackageDef } from './example-packages.js';
  */
 const RESOLVE_FN = `
   function resolveRole(assignments, subject, caller, owner) {
+    // Under 'gaii' every identity is enrolled on its own and NOTHING inherits, so the row is
+    // whatever exactly matches the caller — a human under their GHII just as much as an agent
+    // under its GAII. Requiring '#' here would have meant a human could hold no role at all under
+    // this axis, which is the shape of bug an untested arm hides.
+    if (subject === 'gaii') {
+      if (caller && Object.prototype.hasOwnProperty.call(assignments, caller)) {
+        return { role: assignments[caller], via: caller.indexOf('#') !== -1 ? 'agent' : 'owner' };
+      }
+      return { role: null, via: 'none' };
+    }
+    // Under 'both' the override is an AGENT row, and the '#' keeps an owner GHII row from being
+    // read as one (it is the person, and the owner branch below is where they belong).
     if (subject !== 'owner' && caller && caller.indexOf('#') !== -1
         && Object.prototype.hasOwnProperty.call(assignments, caller)) {
       return { role: assignments[caller], via: 'agent' };
     }
-    if (subject === 'gaii') return { role: null, via: 'none' };
     if (owner) {
       if (Object.prototype.hasOwnProperty.call(assignments, owner)) return { role: assignments[owner], via: 'owner' };
       var keys = Object.keys(assignments);

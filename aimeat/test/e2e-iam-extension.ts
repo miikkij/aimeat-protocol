@@ -262,5 +262,49 @@ await test('9. the roster is NOT readable without a token, the capability vocabu
     assert(roles.status === 200, `iam.roles stays public (no personal data): ${roles.status}`);
 });
 
+
+/**
+ * The third value of the keying axis. `owner` and `both` were proven in production; `gaii` never was,
+ * and an axis with an untested arm is an axis with an untested arm however confident the other two
+ * make you. It exists for the case where an agent must NOT inherit its human's access — a shared
+ * machine account, a narrow bot — so the thing to prove is precisely that inheritance stops.
+ */
+await test('10. subject=gaii: an agent is enrolled on its OWN, and inherits nothing', async () => {
+    const agent = await setupAgent('solo', A.name, A.token);
+    // A holds admin from earlier. Under `owner` (and `both`) that reaches the agent; under `gaii` it must not.
+    const asAgent = (input: Record<string, unknown>) =>
+        json(`/v1/ext/${EXT}/check`, { method: 'POST', headers: authH(agent.token), body: JSON.stringify(input) });
+
+    const inherited = data(await asAgent({ permission: 'read' }));
+    assert(inherited.allowed === true && inherited.via === 'owner',
+        `before the switch the agent inherits, which is what makes the switch meaningful: ${JSON.stringify(inherited)}`);
+
+    const sw = data(await admin('setSubject', { subject: 'gaii' }));
+    assert(sw.subject === 'gaii', `switched: ${JSON.stringify(sw)}`);
+
+    const alone = data(await asAgent({ permission: 'read' }));
+    assert(alone.subject === 'gaii', `the answer says which axis decided it: ${JSON.stringify(alone)}`);
+    assert(alone.via === 'none',
+        `under gaii an agent must NOT resolve through its human: ${JSON.stringify(alone)}`);
+    assert(alone.role === 'viewer',
+        `it falls to the default role instead: ${JSON.stringify(alone)}`);
+
+    // The human is unaffected: their own row is still theirs.
+    const human = data(await check({ permission: 'read' }));
+    assert(human.allowed === true && human.role === 'admin',
+        `the person keeps what they hold: ${JSON.stringify(human)}`);
+
+    // Enrolling the agent explicitly is how it gets in under this axis.
+    await admin('assign', { ghii: agent.gaii, role: 'editor' });
+    const enrolled = data(await asAgent({ permission: 'create' }));
+    assert(enrolled.allowed === true && enrolled.role === 'editor' && enrolled.via === 'agent',
+        `an explicitly enrolled agent holds its OWN role: ${JSON.stringify(enrolled)}`);
+
+    // Put the axis back so later runs and any other assertion see the default.
+    await admin('setSubject', { subject: 'owner' });
+    const restored = data(await asAgent({ permission: 'read' }));
+    assert(restored.via === 'owner', `switching back restores inheritance: ${JSON.stringify(restored)}`);
+});
+
 console.log(`\naimeat-iam Extension Evolution E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);

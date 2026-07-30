@@ -191,12 +191,30 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     const rec = await putRequest(storage, { appId: c.appId, account: c.callerAccount, note });
     // The OWNER is the one who needs to know, and this is the direction an extension could never
     // reach: there the caller is the applicant, so the applicant would notify themselves.
+    // Decide FROM the roster rather than guessing: the node does not own the role vocabulary, so the
+    // one-click approval offers the role this app actually uses most, and the button says which one
+    // it will grant. A button that grants an unnamed role is worse than no button.
+    const roster = await listMembers(storage, c.appId);
+    const tally = new Map<string, number>();
+    for (const m of roster) tally.set(m.role, (tally.get(m.role) ?? 0) + 1);
+    const suggested = [...tally.entries()].sort((a2, b2) => b2[1] - a2[1])[0]?.[0] ?? 'member';
     try {
       await notify(storage, `${c.owner}@${config.nodeId}`, {
         type: 'app_member_request',
         title: `${c.callerAccount} asked for access to ${c.filename.replace(/\.html?$/i, '')}`,
         body: note || 'No message was left.',
         link: appLink(c.appId),
+        // Inline actions execute with the RECIPIENT's own authority when clicked, so they may only
+        // ever be set by trusted server code — which is what this is. The public notifications
+        // route rejects them outright for exactly that reason.
+        actions: [
+          { id: 'approve', label: `Approve as ${suggested}`, kind: 'api', method: 'POST',
+            endpoint: `/v1/apps/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.filename)}/members`,
+            body: { account: c.callerAccount, role: suggested }, style: 'primary' },
+          { id: 'decline', label: 'Decline', kind: 'api', method: 'DELETE',
+            endpoint: `/v1/apps/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.filename)}/members/requests/${encodeURIComponent(c.callerAccount)}`,
+            confirm: true, style: 'default' },
+        ],
       });
     } catch (err) {
       logger.warn('app-members: request notification failed, the request stands', { error: String(err) });
