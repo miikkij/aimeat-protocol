@@ -31,6 +31,7 @@ import { getEncryptionKey } from '../services/encryption.js';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, ExtensionRecord } from '../storage/interface.js';
 import { executeExtensionAction } from '../services/extension-runtime.js';
+import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import type { ExtensionCtx } from '../services/extension-runtime.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
@@ -365,9 +366,16 @@ export function registerExtensionsTools(
                     timeoutMs: Math.max(ext.limits.timeoutMs, config.extensionTimeoutMs),
                     maxApiCalls: Math.max(ext.limits.maxApiCalls, config.extensionMaxApiCalls),
                 };
-                const result = await executeExtensionAction(action.scriptContent, ctx, input ?? {}, limits);
+                const raw = await executeExtensionAction(action.scriptContent, ctx, input ?? {}, limits);
 
                 emitResourceUpdated(agentGaii, `aimeat://extensions/${encodeURIComponent(extension_name)}`);
+
+                // This door does NOT settle, so it accrues nothing — but it must still strip the
+                // provider's beneficiary designation. The key is the seller's commercial business,
+                // not a fact about the answer, and the REST door has always removed it. Leaving it
+                // here would mean which door you came through decided whether you saw who the
+                // seller shares its margin with.
+                const { result } = takeDesignations(raw);
 
                 return {
                     content: [{

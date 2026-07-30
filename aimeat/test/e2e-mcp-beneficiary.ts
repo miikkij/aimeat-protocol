@@ -161,7 +161,7 @@ await test('Setup: operator, provider, beneficiary and consumer, each with an MC
     benef = await setupOwner('ben');
 
     opAgent = await agentSession(operator.token, operator.name, 'opa', ['wallet:read']);
-    provAgent = await agentSession(provider.token, provider.name, 'prova', ['commerce:sell', 'wallet:read']);
+    provAgent = await agentSession(provider.token, provider.name, 'prova', ['commerce:sell', 'wallet:read', 'ext:write']);
     benefAgent = await agentSession(benef.token, benef.name, 'bena', ['wallet:read']);
     narrowAgent = await agentSession(provider.token, provider.name, 'narrow', ['memory:read']);
 
@@ -325,6 +325,18 @@ await test('Withdrawing a split over MCP leaves accrued shares standing', async 
     assert((after.data.totals?.morsels?.released ?? 0) === releasedBefore, 'what was earned survives the withdrawal');
     const gone = await provAgent.session.call('aimeat_commerce_beneficiary_splits', { remove_ext: EXT, remove_action: 'lookup' });
     assert(gone.isError && /NOT_FOUND/.test(gone.text), `second removal should 404, got ${gone.text}`);
+});
+
+await test('The MCP invoke door strips `_revenue` too, not just the REST one', async () => {
+  // Found in PRODUCTION: the raw MCP extension-invoke path returned the key verbatim while the
+  // REST path stripped it, so which door you came through decided whether you saw who the seller
+  // shares its margin with. That door settles nothing, but disclosure is not a settlement question.
+  const r = await provAgent.session.call('aimeat_extension_invoke', {
+    extension_name: EXT, action_id: 'lookup', input: { pay_to: benef.ghii },
+  });
+  assert(!r.isError, `invoke errored: ${r.text}`);
+  assert(!r.text.includes('_revenue'), `the designation key leaked over MCP: ${r.text.slice(0, 300)}`);
+  assert(r.data?.ok === true, `the rest of the result survives: ${r.text.slice(0, 200)}`);
 });
 
 console.log(`\n=== MCP BENEFICIARY E2E: ${passed} passed, ${failed} failed ===\n`);
