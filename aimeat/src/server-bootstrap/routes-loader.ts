@@ -45,6 +45,7 @@ import { registerSellableResolver, resetSellableResolvers, offerSellableResolver
 import { commerceRouter } from '../routes/commerce.js';
 import { commerceUcpRouter } from '../routes/commerce-ucp.js';
 import { commerceAcpRouter } from '../routes/commerce-acp.js';
+import { commerceBeneficiariesRouter } from '../routes/commerce-beneficiaries.js';
 
 // Routes
 import { bootstrapRouter } from '../routes/bootstrap.js';
@@ -401,6 +402,7 @@ export async function mountRoutes(
   app.use(commerceRouter(config, storage));
   app.use(commerceUcpRouter(config, storage));
   app.use(commerceAcpRouter(config, storage));
+  app.use(commerceBeneficiariesRouter(config, storage));  // the second rake: revenue shared with third parties
 
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
   app.use(agentTasksRouter(config, storage, webhookDispatcher));

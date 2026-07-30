@@ -17,8 +17,9 @@
  *   SECURITY. It carries no secrets and asks for none. Seller payment credentials are server-side
  *   and never readable. Authorisation is the server's job throughout: this sends the aimeat-auth
  *   session and renders what comes back — it never decides who may see what.
- * @structure imports the group modules (browse · sell · contracts · earnings · demand · format ·
- *   odps-completeness), composes the AIMEAT.exchange surface, attaches it via _core/namespace.
+ * @structure imports the group modules (browse · sell · contracts · earnings · beneficiaries ·
+ *   demand · format · odps-completeness), composes the AIMEAT.exchange surface, attaches it via
+ *   _core/namespace.
  * @usage
  *   <script src="/v1/libs/aimeat-auth.js"></script>
  *   <script src="/v1/libs/aimeat-commerce.js"></script>
@@ -26,6 +27,8 @@
  *   const { offerings } = await AIMEAT.exchange.list({ q: 'company' });
  *   const contract = await AIMEAT.exchange.accept(offerings[0].offeringId, { capUnits: 500 });
  * @version-history
+ *   v1.1.0 — 2026-07-30 — The second rake: declare who shares what a capability earns, read what you
+ *     are owed and what you owe, release a share, and see the verification that gates a payout.
  *   v1.0.0 — 2026-07-28 — Initial: the EXCHANGE browser library (NOSTE prompt 02 / requirements R-K3).
  */
 import { attach } from '../_core/namespace.js';
@@ -40,6 +43,10 @@ import {
   startWork, deliverWork, work,
 } from './contracts.js';
 import { earnings } from './earnings.js';
+import {
+  declareSplit, splits, deleteSplit, obligations, release, approval, approve,
+  earnings as beneficiaryEarnings,
+} from './beneficiaries.js';
 import { needs, postNeed, closeNeed, bids, bid, acceptBid } from './demand.js';
 import { fmtUnit, fmtMorsels } from './format.js';
 import { odpsCompleteness, ODPS_AUTHORED_FIELDS } from './odps-completeness.js';
@@ -59,6 +66,10 @@ const exchange = {
 
   // ── Earnings (read-only: the accrual, not a payout) ──
   earnings,
+
+  // ── Revenue you SHARE (the second rake — out of the seller's cut, never the buyer's charge) ──
+  declareSplit, splits, deleteSplit, obligations, release, approval, approve,
+  beneficiaryEarnings,
 
   // ── Demand ──
   needs, postNeed, closeNeed, bids, bid, acceptBid,

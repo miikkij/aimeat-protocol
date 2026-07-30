@@ -80,6 +80,8 @@ const ALL_SUITES = [
     // guarding the metered app-tool call an MCP client makes — which is how a stale session token
     // silently broke every one of them.
     'test/e2e-exchange-mcp.ts',
+    // The second rake: revenue a provider shares with third parties, out of their own cut.
+    'test/e2e-beneficiary-split.ts',
     'test/e2e-extension-secrets.ts',
     'test/e2e-iam-extension.ts',
     'test/e2e-upsert.ts',

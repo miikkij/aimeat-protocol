@@ -101,6 +101,10 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   // A membership gate that approves someone and cannot open the door for them is decoration, and
   // the owner is the one paying for what it gives away — so it is asked for, never assumed.
   'exchange:grant': 'Give and withdraw free access to capabilities you sell (you carry the cost)',
+  // Declaring that part of your revenue goes to someone else, and paying it out, both move value out
+  // of the owner's own pocket. That is a spending decision even though nobody is being charged for it,
+  // so an app that arranges revenue sharing asks for it rather than inheriting it from selling.
+  'exchange:beneficiary': 'Share part of what you earn with other accounts, and pay those shares out',
   'notifications:send': 'Send you notifications (bell + browser push) that open this app',
   'organism:read': 'Read the published content of workspaces you are a member of (e.g. gated curriculum an app renders for you)',
   'organism:invite': 'Invite people into organisms you belong to (send email invitations / access keys on your behalf)',

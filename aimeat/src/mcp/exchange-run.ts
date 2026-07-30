@@ -42,6 +42,7 @@ import {
     getProposal, listProposalsForOwner, supersedeWithProposal, putProposal,
 } from '../services/exchange-proposals.js';
 import { authoriseMeteredCall } from '../services/metered-access.js';
+import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { meteredRefusalText } from '../routes/extensions/metered-response.js';
 import { appToolsKey, appIdFromToolsKey, AppToolsDocSchema, applyLockedInput } from '../models/app-tool-schemas.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
@@ -162,7 +163,10 @@ export function registerExchangeRunTools(
                 const invoked = await invokeCapability(config, storage, cap,
                     applyLockedInput(toolDef, (input ?? {}) as Record<string, unknown>),
                     callerGaii, getToken() ?? '', 'normal', mintInternalPass(coordExt, tool));
-                return ok({ app: `${ownerName}/${app}`, tool, iface_version: pinnedVersion ?? null, metered: true, result: invoked.result });
+                // Delivered → book whoever the provider owes a share of this call, out of their own cut.
+                const shared = takeDesignations(invoked.result);
+                if (outcome.kind === 'settled') await outcome.accrue(shared.designations);
+                return ok({ app: `${ownerName}/${app}`, tool, iface_version: pinnedVersion ?? null, metered: true, result: shared.result });
             } catch (err) {
                 if (outcome.kind === 'settled') await outcome.refund();
                 const e = err as { code?: string; message?: string };
@@ -235,7 +239,11 @@ export function registerExchangeRunTools(
             }
             const after = await readEntitlementForCall(storage, w.consumerGaii, w.ext, w.action);
             const charged = after && before ? Math.max(0, after.budget.spentUnits - before.budget.spentUnits) : 0;
-            w.state = 'delivered'; w.output = output ?? null; w.chargedUnits = charged; w.deliveredAt = new Date().toISOString();
+            // The delivering provider may name who shares this task's revenue, the same way a
+            // capability does — it is their own cut either way, and the pool size stays their config.
+            const shared = takeDesignations(output ?? null);
+            if (outcome.kind === 'settled') await outcome.accrue(shared.designations);
+            w.state = 'delivered'; w.output = shared.result ?? null; w.chargedUnits = charged; w.deliveredAt = new Date().toISOString();
             if (note) w.note = note.slice(0, 2000);
             await putWork(storage, w);
             await notify(w.consumerOwner, 'EXCHANGE — your agent work was delivered',

@@ -434,6 +434,74 @@
     );
   }
 
+  // src/static/sdk-libs/exchange/beneficiaries.js
+  function declareSplit(spec) {
+    const s = spec || /** @type {any} */
+    {};
+    return send("/v1/commerce/beneficiary-splits", "POST", {
+      ext: s.ext,
+      action: s.action,
+      pool_percent: s.poolPercent,
+      beneficiaries: s.beneficiaries || [],
+      dynamic: !!s.dynamic,
+      capability: s.capability,
+      state: s.state
+    }, "Failed to declare the revenue split");
+  }
+  function splits() {
+    return authed("/v1/commerce/beneficiary-splits", void 0, "Failed to read your revenue splits");
+  }
+  function deleteSplit(ext, action) {
+    return send(
+      "/v1/commerce/beneficiary-splits" + qs({ ext, action }),
+      "DELETE",
+      void 0,
+      "Failed to withdraw the revenue split"
+    );
+  }
+  function earnings2(opts) {
+    const o = opts || {};
+    return authed(
+      "/v1/commerce/beneficiary/earnings" + qs({ status: o.status, limit: o.limit }),
+      void 0,
+      "Failed to read what you are owed"
+    );
+  }
+  function obligations(opts) {
+    const o = opts || {};
+    return authed(
+      "/v1/commerce/beneficiary/obligations" + qs({ status: o.status, limit: o.limit }),
+      void 0,
+      "Failed to read what you owe"
+    );
+  }
+  function release(trackingCode, beneficiary) {
+    return send(
+      "/v1/commerce/beneficiary/release",
+      "POST",
+      { tracking_code: trackingCode, beneficiary },
+      "Failed to release the share"
+    );
+  }
+  function approval(ghii) {
+    return authed(
+      "/v1/commerce/beneficiary/approvals" + qs({ ghii }),
+      void 0,
+      "Failed to read the verification state"
+    );
+  }
+  function approve(finding) {
+    const f = finding || /** @type {any} */
+    {};
+    return send("/v1/commerce/beneficiary/approvals", "POST", {
+      ghii: f.ghii,
+      state: f.state,
+      method: f.method,
+      subject: f.subject,
+      evidence: f.evidence
+    }, "Failed to record the verification");
+  }
+
   // src/static/sdk-libs/exchange/demand.js
   var enc4 = encodeURIComponent;
   function compact3(obj) {
@@ -669,6 +737,15 @@
     work,
     // ── Earnings (read-only: the accrual, not a payout) ──
     earnings,
+    // ── Revenue you SHARE (the second rake — out of the seller's cut, never the buyer's charge) ──
+    declareSplit,
+    splits,
+    deleteSplit,
+    obligations,
+    release,
+    approval,
+    approve,
+    beneficiaryEarnings: earnings2,
     // ── Demand ──
     needs,
     postNeed,

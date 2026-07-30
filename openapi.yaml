@@ -8556,6 +8556,184 @@ paths:
         '401': { $ref: '#/components/responses/AimeatError' }
         '403': { $ref: '#/components/responses/AimeatError' }
 
+  /v1/commerce/beneficiary-splits:
+    post:
+      operationId: commerceDeclareBeneficiarySplit
+      summary: Declare who shares what this capability earns — the second rake (beneficiary splitting)
+      description: >
+        THE SECOND RAKE. The platform rake takes a percent of what the CONSUMER pays and routes it to one
+        operator account; this takes a percent of what the PROVIDER earns and routes it to N beneficiary
+        GHIIs who are neither the consumer nor the seller. The pool comes out of YOUR cut, after the
+        platform rake and never out of the buyer's charge — so the buyer is charged the list price and
+        nothing more, and is never billed an obligation to a party they did not contract with.
+        Body `{ ext, action, pool_percent, beneficiaries: [{ ghii, weight, note? }], dynamic?, capability?,
+        state? }`. `pool_percent` (0-100) is the share of your cut that leaves you; `weight` divides that
+        pool between beneficiaries (two at weight 1 split it evenly, 3 and 1 split it 75/25). Set
+        `dynamic: true` to let the capability ALSO name beneficiaries per call by returning
+        `_revenue: { beneficiaries: [{ ghii, weight? }] }` — it names destinations only, never an amount,
+        so it can redirect a share you already committed and can never enlarge its own payout; the key is
+        stripped before the buyer sees the result. Always written for the CALLER's own resolved owner: the
+        revenue being given away has to be the giver's. Requires scope `exchange:beneficiary`.
+        Returns `{ split, note }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [ext, action, pool_percent], properties: {
+          ext: { type: string, description: 'Metered coordinate — an extension name, apptool:{owner}/{appId}, or agentwork:{owner}/{agent}.' },
+          action: { type: string, description: 'Metered coordinate — the action id, tool name, or task type.' },
+          pool_percent: { type: number, minimum: 0, maximum: 100, description: 'Share of YOUR cut routed to beneficiaries.' },
+          beneficiaries: { type: array, maxItems: 32, items: { type: object, required: [ghii], properties: {
+            ghii: { type: string, description: 'Beneficiary owner GHII (owner@node-id).' },
+            weight: { type: number, exclusiveMinimum: 0, description: 'Relative slice of the pool. Defaults to 1.' },
+            note: { type: string, maxLength: 200 } } } },
+          dynamic: { type: boolean, description: 'Allow the capability to name beneficiaries per call.' },
+          capability: { type: string, description: 'Human label; defaults to "{ext}/{action}".' },
+          state: { type: string, enum: [active, paused] } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+    get:
+      operationId: commerceListBeneficiarySplits
+      summary: Every beneficiary split you have declared
+      description: "Owner-scoped: only the caller's own splits. Returns `{ splits, count }`."
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+    delete:
+      operationId: commerceDeleteBeneficiarySplit
+      summary: Withdraw a beneficiary split
+      description: >
+        Future calls at that coordinate keep your whole cut. Shares ALREADY accrued still stand — what was
+        earned does not un-happen. Requires scope `exchange:beneficiary`. Returns `{ removed, note }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: ext, in: query, required: true, schema: { type: string } }
+        - { name: action, in: query, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/commerce/beneficiary/earnings:
+    get:
+      operationId: commerceBeneficiaryEarnings
+      summary: What you have been given a share of — accrued beneficiary income
+      description: >
+        A share is owed by the PROVIDER, not by the buyer: it comes out of what the provider earned on a
+        call, so the debtor on every entry is the seller. `accrued` means booked and unpaid; it becomes
+        payable only once an operator has recorded a verification for your account, which the
+        `verification` block reports. Amounts stay in their own unit — money in integer micro-units under
+        the currency code, morsels as whole integers under `morsels`, never summed together. Owner-scoped
+        on the money identity; `wallet:read` gates non-owner principals. Returns
+        `{ beneficiary, verification: { state, payable, reason, message }, totals, entries, count, note }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [accrued, released, reversed] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000 } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/commerce/beneficiary/obligations:
+    get:
+      operationId: commerceBeneficiaryObligations
+      summary: What you OWE your beneficiaries
+      description: >
+        The provider's side of the same book: every share booked against the caller, across all
+        beneficiaries. Nothing was withheld at settlement — you received your whole cut and hold the
+        money, and these are the obligations against it. `wallet:read` gates non-owner principals.
+        Returns `{ provider, totals, entries: [{ ..., beneficiary }], count }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [accrued, released, reversed] } }
+        - { name: limit, in: query, schema: { type: integer, minimum: 1, maximum: 1000 } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/commerce/beneficiary/release:
+    post:
+      operationId: commerceReleaseBeneficiaryShare
+      summary: Pay one accrued beneficiary share
+      description: >
+        Only the PROVIDER who owes it may release it, and only their own obligations — the value moves out
+        of the caller's own account. GATED: refuses with 409 `BENEFICIARY_UNVERIFIED` until an operator has
+        recorded a `verified` approval for that beneficiary, because paying a party nobody has checked is
+        how a self-declared claimant collects on someone else's identity. What release DOES differs by rail:
+        `morsels` transfers atomically from your balance to theirs (`moved: true`); `money` books the amount
+        onto their payable book as `pending` (`moved: false`) — the node pushes no fiat, because pushing
+        fiat means first holding it, so you invoice and settle that leg off-node. A beneficiary with no PSP
+        configured is never blocked either way. Idempotent: a second release of the same share is 404
+        `NOTHING_ACCRUED`. Requires scope `exchange:beneficiary`.
+        Returns `{ released, beneficiary, tracking_code, amount, unit, currency, method, moved, note }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [tracking_code, beneficiary], properties: {
+          tracking_code: { type: string, description: 'From /v1/commerce/beneficiary/obligations.' },
+          beneficiary: { type: string, description: 'The beneficiary owner GHII.' } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+        '409': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/commerce/beneficiary/approvals:
+    post:
+      operationId: commerceSetBeneficiaryApproval
+      summary: Record whether a beneficiary may be paid at all (OPERATOR ONLY)
+      description: >
+        OPERATOR ONLY, deliberately: a payout gate a provider could open for their own payees is not a gate.
+        Records what was established about a beneficiary before money may reach them. `method` says HOW
+        representation was established (`suomifi-valtuudet`, `manual-operator`, `contract-on-file`) and is
+        REQUIRED when setting `verified` — the core keeps no list of acceptable methods, because which
+        evidence suffices is a legal judgement that varies by jurisdiction. `subject` optionally names the
+        external identity the approval attests the GHII may act for (`fi-ytunnus:3323553-5`), opaque to the
+        core. Absence of an approval means `unverified`: the gate fails closed. Returns `{ approval }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [ghii, state], properties: {
+          ghii: { type: string, description: 'Beneficiary owner GHII (owner@node-id).' },
+          state: { type: string, enum: [verified, unverified, rejected] },
+          method: { type: string, maxLength: 120, description: 'Required when state is verified.' },
+          subject: { type: string, maxLength: 200, description: 'Namespaced external identity, opaque to the core.' },
+          evidence: { type: string, maxLength: 500 } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+    get:
+      operationId: commerceGetBeneficiaryApproval
+      summary: Whether an account may be paid a beneficiary share
+      description: >
+        Anyone may read their OWN state; reading another account's is an operator question and 403s
+        otherwise. Returns `{ ghii, approval, state, payable, message }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: ghii, in: query, description: 'Defaults to the caller. Another account requires the operator role.', schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+
   /v1/exchange/work:
     post:
       operationId: exchangeStartWork

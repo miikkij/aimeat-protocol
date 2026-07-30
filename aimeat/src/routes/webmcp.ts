@@ -38,6 +38,7 @@ import { AppToolsDocSchema, appToolsKey, isToolPriced, applyLockedInput, type Ap
 import { paymentChallenge } from '../commerce/x402.js';
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { authoriseMeteredCall } from '../services/metered-access.js';
+import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { respondMeteredRefusal } from './extensions/metered-response.js';
 import { mintInternalPass } from './extensions/internal-pass.js';
 import { recordCallDuration } from '../services/call-timing.js';
@@ -212,7 +213,10 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
             callerGaii, jwt, 'normal', mintInternalPass(coordExt, toolName));
           // Measured so the provider can propose a service commitment from evidence (call-timing.ts).
           recordCallDuration(storage, providerGhii, coordExt, toolName, Date.now() - startedAt);
-          res.json(success(config.nodeId, { app: appRef, tool: toolName, iface_version: pinnedVersion ?? null, metered: outcome.kind === 'settled', result: invoked.result }));
+          // Delivered → book the provider's beneficiaries out of the provider's own cut.
+          const shared = takeDesignations(invoked.result);
+          if (outcome.kind === 'settled') await outcome.accrue(shared.designations);
+          res.json(success(config.nodeId, { app: appRef, tool: toolName, iface_version: pinnedVersion ?? null, metered: outcome.kind === 'settled', result: shared.result }));
         } catch (err) {
           if (outcome.kind === 'settled') await outcome.refund();
           const e = err as { statusCode?: number; code?: string; message?: string };

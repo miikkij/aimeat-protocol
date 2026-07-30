@@ -30,6 +30,7 @@ import type { Storage } from '../storage/interface.js';
 import { buildGEAI, appSlug } from '../utils/gaii.js';
 import { AppToolsDocSchema, appToolsKey, applyLockedInput } from '../models/app-tool-schemas.js';
 import { authoriseMeteredCall } from './metered-access.js';
+import { takeDesignations } from '../commerce/beneficiary-designation.js';
 import { logger } from '../utils/logger.js';
 
 /** What an extension's purchase produced — or why it could not be made. */
@@ -124,12 +125,16 @@ export async function buyForExtension(args: {
       // Already settled on the product's own coordinate — the raw paywall must not charge it again.
       mintInternalPass(coordExt, tool),
     );
+    // Delivered → book the SELLER's beneficiaries out of the seller's own cut, exactly as the REST
+    // and MCP doors do. A capability buying from another capability is still a sale.
+    const shared = takeDesignations(invoked.result);
+    if (outcome.kind === 'settled') await outcome.accrue(shared.designations);
     logger.info('Extension purchased from another provider', {
       buyer, seller: `${sellerOwner}/${appId}`, tool, correlation,
       charged: outcome.kind === 'settled' ? outcome.charged : 0,
     });
     return {
-      ok: true, result: invoked.result, correlation,
+      ok: true, result: shared.result, correlation,
       charged: outcome.kind === 'settled' ? outcome.charged : 0,
     };
   } catch (err) {

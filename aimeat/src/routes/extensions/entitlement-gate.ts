@@ -55,7 +55,7 @@ export async function settleMeteredCoordinate(args: {
   switch (outcome.kind) {
     case 'no_right': return null;
     case 'free_owner': return { ok: true };
-    case 'settled': return { ok: true, refund: outcome.refund };
+    case 'settled': return { ok: true, refund: outcome.refund, accrue: outcome.accrue };
     default:
       respondMeteredRefusal(config, res, outcome, label);
       return { ok: false };

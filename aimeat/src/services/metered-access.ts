@@ -23,6 +23,10 @@
  *   const outcome = await authoriseMeteredCall({ config, storage, caller, product });
  *   if (outcome.kind === 'settled') { try { …invoke… } catch { await outcome.refund(); } }
  * @version-history
+ *   v1.1.0 — 2026-07-30 — A settled outcome now also carries `accrue()`, the other half of `refund()`:
+ *     the door calls it after a successful invoke so the provider's beneficiaries are booked. Kept on
+ *     the outcome rather than given its own entry point, because a second door is how the six money
+ *     defects of 2026-07-27 got in.
  *   v1.0.0 — 2026-07-28 — Extracted from routes/extensions/entitlement-gate.ts so one function owns the
  *     whole sequence, and the owner-free rule finally applies on every door (an owner calling their own
  *     app-tool was paying the platform rake to themselves).
@@ -35,7 +39,10 @@ import {
   type MeteredEntitlement,
 } from './metered-entitlements.js';
 import { resolvePacingToll } from '../routes/extensions/pacing.js';
-import { settleMeteredCharge, burnPacingTollFor, type SettlementResult } from './metered-settlement.js';
+import {
+  settleMeteredCharge, burnPacingTollFor,
+  type SettlementResult, type BeneficiaryAccrual,
+} from './metered-settlement.js';
 
 /** The permission a hosted app needs before it may draw on its owner's contracts. */
 export const SPEND_SCOPE = 'contract:spend';
@@ -79,10 +86,15 @@ export type MeteredOutcome =
   /** Payment could not be moved; the caller was NOT charged. */
   | { kind: 'settlement_failed'; entitlement: MeteredEntitlement; reason: string }
   /**
-   * Charged (possibly 0, under a grant or within a bundle quota) and recorded. Invoke now; call
-   * `refund()` if the work then fails, so money never leaves without delivery.
+   * Charged (possibly 0, under a grant or within a bundle quota) and recorded. Invoke now, then call
+   * exactly one of the two callbacks: `refund()` if the work failed, so money never leaves without
+   * delivery, or `accrue()` if it succeeded, so anyone the provider owes a share of this call is
+   * booked. `accrue()` takes the beneficiaries the capability named for THIS call, if any.
    */
-  | { kind: 'settled'; entitlement: MeteredEntitlement; charged: number; refund: () => Promise<void> };
+  | {
+      kind: 'settled'; entitlement: MeteredEntitlement; charged: number;
+      refund: () => Promise<void>; accrue: BeneficiaryAccrual;
+    };
 
 /**
  * The owner selling at a coordinate, when the coordinate says so. `apptool:alice/app.html` and
@@ -219,5 +231,8 @@ export async function authoriseMeteredCall(args: {
   if (appGrant && settled.charged > 0 && ent.unit === 'morsels') {
     await storage.updateAppGrant(appGrant.grantId, { spentMorsels: (appGrant.spentMorsels ?? 0) + settled.charged });
   }
-  return { kind: 'settled', entitlement: ent, charged: settled.charged, refund: settled.refund };
+  return {
+    kind: 'settled', entitlement: ent, charged: settled.charged,
+    refund: settled.refund, accrue: settled.accrue,
+  };
 }

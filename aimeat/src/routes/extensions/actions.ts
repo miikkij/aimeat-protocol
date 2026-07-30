@@ -5,6 +5,8 @@
  *   consent/trust/notify/email) and runs the action script. Extracted from src/routes/extensions.ts to
  *   satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-07-30 — Accrue the provider's beneficiary shares after a delivered call, and strip
+ *     the capability's `_revenue` designation key from what the buyer is shown.
  *   v1.4.0 — 2026-07-27 — Forward `x-aimeat-app-tool` to the paywall, so a caller holding contracts for
  *     several products sold on one action can name which one they mean.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/extensions.ts (max-file-lines)
@@ -27,6 +29,7 @@ import { logger } from '../../utils/logger.js';
 import { resolveIdentity, callerPrincipal } from '../../utils/gaii.js';
 import { INTERNAL_PASS_HEADER } from './internal-pass.js';
 import { enforcePaywall, APP_TOOL_HEADER } from './paywall.js';
+import { takeDesignations } from '../../commerce/beneficiary-designation.js';
 import { recordCallDuration } from '../../services/call-timing.js';
 import { safeFetch } from '../../utils/url-validator.js';
 import { enforceExtensionMemoryLimits } from '../../services/quota.js';
@@ -324,7 +327,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       }
       recordCallDuration(storage, `${ext.installedBy}@${config.nodeId}`, ext.name, action.id, Date.now() - startedAt);
 
-      res.json(success(config.nodeId, result, [
+      // The call delivered, so whoever the provider owes a share of it is booked — out of the
+      // provider's own cut, never the consumer's charge. The designation key is the capability's own
+      // output and is stripped before the buyer sees it (commerce/beneficiary-designation.ts).
+      const shared = takeDesignations(result);
+      if (pay.accrue) await pay.accrue(shared.designations);
+
+      res.json(success(config.nodeId, shared.result, [
         { description: 'View extension', method: 'GET', url: `/v1/extensions/${extName}` },
       ]));
       emitChange('extensions');
@@ -621,7 +630,13 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       }
       recordCallDuration(storage, `${ext.installedBy}@${config.nodeId}`, ext.name, action.id, Date.now() - startedAt);
 
-      res.json(success(config.nodeId, result, [
+      // The call delivered, so whoever the provider owes a share of it is booked — out of the
+      // provider's own cut, never the consumer's charge. The designation key is the capability's own
+      // output and is stripped before the buyer sees it (commerce/beneficiary-designation.ts).
+      const shared = takeDesignations(result);
+      if (pay.accrue) await pay.accrue(shared.designations);
+
+      res.json(success(config.nodeId, shared.result, [
         { description: 'View extension', method: 'GET', url: `/v1/extensions/${extName}` },
       ]));
       emitChange('extensions');

@@ -34,6 +34,7 @@ import { consumeExtPayToken } from '../../services/ext-pay-token.js';
 import { settleViaEntitlement, settleMeteredCoordinate } from './entitlement-gate.js';
 import { pricedAppToolsFor, type PricedBinding } from './priced-binding.js';
 import { readEntitlementForCall, computeCharge, type MeteredEntitlement } from '../../services/metered-entitlements.js';
+import type { BeneficiaryAccrual } from '../../services/metered-settlement.js';
 import { consumeInternalPass } from './internal-pass.js';
 import { burnPacingToll, resolvePacingToll } from './pacing.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
@@ -45,10 +46,13 @@ type ExtAction = ExtensionRecord['actions'][number];
  * Result of the paywall. `ok:false` means a response has already been sent (402/500) — the caller
  * must `return`. `refund` (when present) reverses a collected payment; the invoke handler calls it
  * if the sandbox script throws AFTER payment (M1/no-mint: money never leaves without delivery).
+ * `accrue` is its mirror image on the success side: the invoke handler calls it once the script has
+ * delivered, so anyone the provider owes a share of this call is booked out of the provider's own cut.
  */
 export interface PaywallOutcome {
   ok: boolean;
   refund?: () => Promise<void>;
+  accrue?: BeneficiaryAccrual;
 }
 
 const isPosInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v > 0 && Number.isFinite(v);
@@ -271,6 +275,12 @@ export async function enforcePaywall(args: {
   }
 
   // 5. Morsel payment — REVENUE (M1): atomic debit caller + credit owner. Refund on script throw.
+  //
+  //    NO BENEFICIARY SPLIT HERE, deliberately. This is the uncontracted per-call channel and it
+  //    settles on its own, not through `settleMeteredCharge`; splitting it would mean a second copy of
+  //    the split arithmetic, which is the shape metered-access.ts exists to prevent. A provider who
+  //    declares a split gets it on every contracted call at that coordinate (step 3) and not on this
+  //    one — so a capability meant to share revenue should be sold through EXCHANGE, where it is.
   const payMorsels = action.commercial.payMorsels;
   if (isPosInt(payMorsels)) {
     const ownerGhii = `${ownerName}@${config.nodeId}`;
