@@ -166,18 +166,24 @@ export interface AppCarryPlan {
    */
   rosterVisibility: 'owner' | 'members';
   /**
-   * Who may reach this app's priced calls at all.
+   * What this app's priced calls cost, and to whom. Named for what each one DOES, because the pair
+   * this replaced ("open" / "members-only") described neither: one of them charged everybody who was
+   * not a member, and the other refused people who had paid.
    *
-   * `open` (default) — anybody may call. A member is carried and pays nothing; everybody else pays,
-   * by contract or per call. This is the shape most paid apps want: membership is the free tier.
+   * `members-free` (default) — a member is carried and pays nothing; everybody else pays, by contract
+   *   or per call. Membership is the free tier, not the door. This is what most paid apps want, and
+   *   it is what an app with no plan already did.
+   *
+   * `free` — nobody pays. The whole service is free to anyone signed in, member or not. Rate pacing
+   *   still applies, because that is abuse protection rather than revenue; no money moves.
    *
    * `members-only` — nobody but a member gets in, even holding money. The refusal happens BEFORE any
-   * settlement, which is the whole point: LÄÄKE expressed this stance inside its own action scripts,
-   * where the paywall had already charged by the time the refusal ran, so somebody who took a
-   * contract and paid was told they were not on the list and kept neither the answer nor the money.
-   * A stance about who your customers are has to be taken before the till opens.
+   *   settlement, which is the whole point: LÄÄKE expressed this stance inside its own action
+   *   scripts, where the paywall had already charged by the time the refusal ran, so somebody who
+   *   took a contract and paid kept neither the answer nor the money. A stance about who you sell to
+   *   has to be taken before the till opens.
    */
-  access: 'open' | 'members-only';
+  access: 'members-free' | 'free' | 'members-only';
   /**
    * How many members a role may hold at once. A role that is absent is uncapped. A seat count is a
    * product decision with teeth: an approval past the last seat is REFUSED and says how many are
@@ -225,7 +231,7 @@ export async function getCarryPlan(storage: Storage, appId: string): Promise<App
 export async function putCarryPlan(
   storage: Storage,
   input: { appId: string; roles: Record<string, string[]>; rosterVisibility?: 'owner' | 'members';
-    access?: 'open' | 'members-only'; seats?: Record<string, number>; terms?: AppCarryPlan['terms']; setBy: string },
+    access?: AppCarryPlan['access'] | 'open'; seats?: Record<string, number>; terms?: AppCarryPlan['terms']; setBy: string },
 ): Promise<AppCarryPlan> {
   const roles: Record<string, string[]> = {};
   for (const [role, ids] of Object.entries(input.roles || {})) {
@@ -245,7 +251,11 @@ export async function putCarryPlan(
   }
   const rec: AppCarryPlan = {
     appId: input.appId, roles, seats, terms,
-    access: input.access === 'members-only' ? 'members-only' : 'open',
+    // `open` is the name the first cut of this used for what is now `members-free`. Stored records
+    // carry it, so it is read as what it always meant rather than silently becoming something else.
+    access: input.access === 'members-only' ? 'members-only'
+      : input.access === 'free' ? 'free'
+      : 'members-free',
     rosterVisibility: input.rosterVisibility === 'members' ? 'members' : 'owner',
     updatedAt: new Date().toISOString(), setBy: input.setBy,
   };

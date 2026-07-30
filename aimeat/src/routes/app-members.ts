@@ -32,7 +32,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import {
   listMembers, getMember, putMember, removeMember,
   listRequests, putRequest, removeRequest, accountOf,
-  getCarryPlan, putCarryPlan, seatsTaken,
+  getCarryPlan, putCarryPlan, seatsTaken, type AppCarryPlan,
 } from '../services/app-members.js';
 import { notify } from '../services/notify.js';
 import { syncGrantsForMember } from '../services/grant-sync.js';
@@ -131,10 +131,12 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
       roles?: Record<string, unknown>; rosterVisibility?: string; access?: string;
       seats?: Record<string, unknown>; terms?: Record<string, unknown>;
     };
-    if (b.access !== undefined && b.access !== 'open' && b.access !== 'members-only') {
+    const ACCESS = ['members-free', 'free', 'members-only', 'open'];
+    if (b.access !== undefined && !ACCESS.includes(String(b.access))) {
       return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        'access must be "open" (default: anybody may call, a member is carried) or "members-only" '
-        + '(nobody but a member gets in, even holding money — refused before any settlement).'));
+        'access must be "members-free" (default: a member pays nothing, everybody else pays), '
+        + '"free" (nobody pays at all) or "members-only" (nobody but a member gets in, even holding '
+        + 'money, refused before any settlement). "open" is accepted as the old name for members-free.'));
     }
     if (b.rosterVisibility !== undefined && b.rosterVisibility !== 'owner' && b.rosterVisibility !== 'members') {
       return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
@@ -182,7 +184,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     }
     const plan = await putCarryPlan(storage, {
       appId: c.appId, roles, seats, terms, setBy: c.callerAccount,
-      access: b.access === 'members-only' ? 'members-only' : 'open',
+      access: b.access as AppCarryPlan['access'] | 'open' | undefined,
       rosterVisibility: b.rosterVisibility === 'members' ? 'members' : 'owner',
     });
     return res.json(success(config.nodeId, {

@@ -952,9 +952,9 @@ await test('access members-only: an outsider holding an entitlement is refused, 
     const call = async (token: string) =>
         await json(`/v1/ext/${ext}/${OFFER_A}`, { method: 'POST', headers: auth(token), body: '{}' });
 
-    // OPEN (the default): both get in. The member is carried; the outsider settles their entitlement.
+    // MEMBERS-FREE (the default): both get in. The member is carried; the outsider settles theirs.
     await json(`/v1/apps/${owner.name}/${APP}/members/plan`, {
-        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ roles: {}, access: 'open' }),
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ roles: {}, access: 'members-free' }),
     });
     assert((await call(member.token)).status === 200, 'open: a member gets in');
     assert((await call(stranger.token)).status === 200, 'open: an outsider holding an entitlement gets in');
@@ -977,9 +977,58 @@ await test('access members-only: an outsider holding an entitlement is refused, 
 
     // Put it back so the rest of the suite sees the default.
     await json(`/v1/apps/${owner.name}/${APP}/members/plan`, {
-        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ roles: {}, access: 'open' }),
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ roles: {}, access: 'members-free' }),
     });
     await json(`/v1/apps/${owner.name}/${APP}/members/${member.name}`, { method: 'DELETE', headers: auth(owner.token) });
+});
+
+// ── free: nobody pays, including the customer who already contracted ──────────────────
+// Turning the price off has to reach the people already paying. A contract settles at its agreed
+// price wherever the gate is consulted, so a check placed after it would keep charging exactly the
+// group most likely to hold one — quietly, because nothing about their call would look different.
+await test('access free: nobody pays, not the stranger and not the contract holder', async () => {
+    const APP8 = 'freebie.html';
+    await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename: APP8, description: 'free mode', content: Buffer.from('<html>x</html>').toString('base64') }),
+    });
+    // An extension that names APP8, so the node has a plan to consult.
+    const fext = `freeext${Date.now().toString(36)}`;
+    const manifest = [
+        'metadata:', `  name: ${fext}`, '  version: 1.0.0', '  description: free-mode fixture', '  author: t',
+        'config:', '  app:', '    type: string', `    default: ${owner.name}/${APP8}`,
+        'required_apis:', '  - memory', 'actions:',
+        '  - id: ask', '    method: POST', '    path: /ask',
+        '    input: { type: object }', '    output: { type: object }', '    script: ask.js',
+        '    commercial: { payMoney: { amount: 5000, currency: EUR } }',
+    ].join(String.fromCharCode(10));
+    const inst = await json('/v1/extensions', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ manifest, scripts: { 'ask.js': 'export default async function () { return { ok: true }; }' } }),
+    });
+    assert(inst.status === 200 || inst.status === 201, `install: ${inst.status} ${JSON.stringify(inst.body?.error)}`);
+    await json(`/v1/extensions/${fext}/activate`, { method: 'POST', headers: auth(owner.token), body: '{}' });
+
+    const call = async (token: string) =>
+        await json(`/v1/ext/${fext}/ask`, { method: 'POST', headers: auth(token), body: '{}' });
+
+    // Priced by default: a stranger has to pay.
+    const priced = await call(stranger.token);
+    assert(priced.status === 402, `while it is priced, a stranger pays: ${priced.status}`);
+
+    // Now the owner makes it free.
+    await json(`/v1/apps/${owner.name}/${APP8}/members/plan`, {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ roles: {}, access: 'free' }),
+    });
+    assert((await call(stranger.token)).status === 200, 'free: a stranger with no contract gets in, unpaid');
+    assert((await call(member.token)).status === 200, 'free: so does anybody else');
+    assert((await call(owner.token)).status === 200, 'free: and the owner, as always');
+
+    // Nothing was settled for the stranger — free is free, not "billed to somebody else".
+    const grants = await json(`/v1/exchange/grants?app_id=${encodeURIComponent(`${owner.name}/${APP8}`)}`, { headers: auth(owner.token) });
+    const theirs = (grants.body.data.grants as { consumer_gaii: string }[] ?? [])
+        .filter(g => g.consumer_gaii.startsWith(stranger.name));
+    assert(theirs.length === 0, `and no entitlement was invented to pay for it: ${JSON.stringify(theirs)}`);
 });
 
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

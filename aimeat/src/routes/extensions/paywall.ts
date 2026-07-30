@@ -183,9 +183,9 @@ export async function enforcePaywall(args: {
   //     `open` (the default) leaves this alone: anybody may call, a member is carried and pays
   //     nothing, everybody else pays. Membership is the free tier, not the door.
   const gatedApp = typeof ext.config?.app === 'string' ? ext.config.app : null;
+  const appPlan = gatedApp ? await getCarryPlan(storage, gatedApp) : null;
   if (gatedApp) {
-    const plan = await getCarryPlan(storage, gatedApp);
-    if (plan?.access === 'members-only') {
+    if (appPlan?.access === 'members-only') {
       const member = await getMember(storage, gatedApp, callerGaii);
       if (!member) {
         const [appOwner, file] = gatedApp.split('/');
@@ -219,6 +219,25 @@ export async function enforcePaywall(args: {
         `tollMorsels (${toll}) exceeds the per-call cap (${config.extensionMaxDebitPerCall})`));
       return { ok: false };
     }
+  }
+
+  // 2.5 The app is free to everybody. No money moves for anyone — member or not, contract or not.
+  //
+  //     BEFORE the entitlement gate, not after. The gate settles a contract at its agreed price, so
+  //     checking further down would have charged the one group most likely to be holding one: a
+  //     customer who contracted while the app was priced would keep paying after the owner made it
+  //     free, and nobody would see it happen. Turning the price off has to reach them first.
+  //
+  //     Pacing still runs, because that is abuse protection rather than revenue: free means nothing
+  //     is charged, not that nothing is counted, and a free service still has to survive one caller
+  //     hammering it.
+  if (appPlan?.access === 'free') {
+    const pacedFree = await burnPacingToll({
+      config, storage, callerGaii, providerOwner: ownerName,
+      label: `ext:${ext.name}:${action.id}`, toll: resolvePacingToll(config, toll), res,
+    });
+    if (!pacedFree.ok) return { ok: false };
+    return { ok: true };
   }
 
   // 3. EXCHANGE metered-call gateway (G2, TARGET-045): when the caller holds a durable entitlement for
