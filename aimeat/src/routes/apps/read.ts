@@ -4,6 +4,9 @@
  *   and the app download (GET /v1/apps/:owner/:filename incl. draft preview + H-2 app-origin redirect +
  *   copy-protection). Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-07-30 — The inline + draft CSP now comes from utils/app-csp.ts (shared with the
+ *     app origin) and permits WebAssembly compilation ('wasm-unsafe-eval'); wasm apps could not
+ *     compile at all before, self-hosted bytes included. No 'unsafe-eval', no COOP/COEP.
  *   v1.1.0 — 2026-07-14 — Agent Face: the download route negotiates text/markdown (Accept or
  *     ?format=md) — serves the public apps.{filename}.agentface record (else converted HTML)
  *     with the agent-affordances footer, after the hidden/access-code/paid gates.
@@ -18,6 +21,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { injectAimeatBadge } from '../../utils/app-badge.js';
+import { appCsp } from '../../utils/app-csp.js';
 import { collectAppLineage, resolveAppStatus } from '../../services/app-lineage.js';
 import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js';
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
@@ -315,7 +319,7 @@ export function registerReadRoutes(
             res.setHeader('Content-Length', draftBody.length.toString());
             // Same inline CSP a published app gets, so the draft behaves identically to
             // what it will once published. A draft is never cached (no-store).
-            res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'self' 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src 'self' data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors 'self'");
+            res.setHeader('Content-Security-Policy', appCsp());
             res.setHeader('Cache-Control', 'no-store');
             res.setHeader('X-Content-Type-Options', 'nosniff');
             res.status(200).send(draftBody);
@@ -437,9 +441,8 @@ export function registerReadRoutes(
         res.setHeader('Content-Length', body.length.toString());
 
         if (mode === 'inline') {
-            // font-src includes 'self' so an app can load fonts from its own origin's public
-            // storage (/v1/pub/...) — https: does not cover the http://*.apps.localhost dev origin.
-            res.setHeader('Content-Security-Policy', "default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'self' 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src 'self' data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*; frame-ancestors 'self'");
+            // No apex argument: this response comes FROM the apex, so 'self' already covers it.
+            res.setHeader('Content-Security-Policy', appCsp());
             // Force browsers to always validate with the server (ETag round-trip).
             // Without this, heuristic caching can keep users on a stale app
             // version for hours after a republish. We still respond 304 when

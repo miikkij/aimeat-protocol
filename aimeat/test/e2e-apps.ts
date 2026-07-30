@@ -43,6 +43,8 @@
  *   v1.11.0 — 2026-07-21 — Phase 11 owner-scope face: an owner's AGENT can publish the face under its
  *     own GAII and it resolves for the owner's app (a private owner-GHII copy doesn't shadow the public
  *     agent copy); a non-public agent face still falls back like no face.
+ *   v1.12.0 — 2026-07-30 — Phase 10: the inline app CSP permits WebAssembly compilation
+ *     ('wasm-unsafe-eval') and still refuses eval() (no 'unsafe-eval').
  */
 
 import * as ed from '@noble/ed25519';
@@ -598,6 +600,17 @@ await test('GET ?mode=inline appends the AIMEAT badge', async () => {
     assert(text.includes('id="aimeat-app-badge"'), 'inline body carries the badge element');
     assert(text.includes('Publish your own app'), 'badge shows the publish CTA');
     assert(/<\/body\s*>\s*$/i.test(text.trim()) === false || text.indexOf('aimeat-app-badge') < text.lastIndexOf('</body>'), 'badge injected before </body>');
+});
+
+await test('GET ?mode=inline CSP permits wasm compilation, not eval()', async () => {
+    const res = await fetch(`${BASE}/v1/apps/${ownerName}/${FILENAME}?mode=inline`, { redirect: 'manual' });
+    if (res.status === 301) { console.log('    (app origin on — inline 301s; CSP covered by e2e-app-origin)'); return; }
+    assert(res.status === 200, `status ${res.status}`);
+    const scriptSrc = ((res.headers.get('content-security-policy') ?? '').match(/script-src ([^;]*)/) ?? ['', ''])[1];
+    // Without 'wasm-unsafe-eval' the browser refuses to COMPILE wasm — self-hosting the
+    // .wasm does not help, so ffmpeg.wasm / sqlite-wasm / codec apps are impossible.
+    assert(scriptSrc.includes("'wasm-unsafe-eval'"), `wasm is blocked: script-src ${scriptSrc}`);
+    assert(!scriptSrc.includes("'unsafe-eval'"), `script-src must not permit eval(): ${scriptSrc}`);
 });
 
 // Regression: apps whose JS contains the literal string '</body>' (e.g. building/exporting

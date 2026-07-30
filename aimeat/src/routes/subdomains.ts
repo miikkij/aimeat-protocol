@@ -12,6 +12,9 @@
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  *        app.use(subdomainAdminRouter(config, storage));
  * @version-history
+ *   v1.10.0 — 2026-07-30 — appCsp moved to utils/app-csp.ts (one policy, shared with the /v1/apps
+ *     inline + draft routes) and its script-src gains 'wasm-unsafe-eval', so an app can compile
+ *     WebAssembly. Wasm compilation only — no 'unsafe-eval', and COOP/COEP stay off.
  *   v1.9.0 — 2026-07-28 — Every app served on an app origin also loads the WebMCP bridge
  *     (`?expose=app`), so its tools are CALLABLE by a browser-resident agent and not merely listed
  *     in a document. Apps that carry their own bridge call, or set
@@ -60,6 +63,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { injectAimeatBadge } from '../utils/app-badge.js';
 import { injectAgentDiscovery } from '../utils/app-agent-discovery.js';
+import { appCsp } from '../utils/app-csp.js';
 import { injectAppHeadMeta } from '../utils/app-head-meta.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
@@ -79,38 +83,6 @@ export const RESERVED_SUBDOMAINS = new Set([
 
 /** Valid subdomain label: lowercase alphanumeric + hyphens, 2–63 chars, no edge hyphens. */
 export const SUBDOMAIN_RE = /^[a-z0-9][a-z0-9-]{0,61}[a-z0-9]$/;
-
-/**
- * CSP for an app served on the app origin. Same as /v1/apps inline mode, but `frame-ancestors`
- * also allows the apex origin: the in-SPA sandboxed viewer (on the apex) frames the app
- * cross-origin (H-2), so without the apex here the browser would block it. `'self'` keeps the
- * app frameable within its own origin; we do NOT open it to `*` (clickjacking).
- *
- * `grantedOrigin` is the single origin named by a verified frame grant (?frame=<token>), when one
- * is present on this request. One origin, per response, authorized — not a standing list.
- */
-function appCsp(apexOrigin: string, grantedOrigin?: string): string {
-  // At most ONE granted origin, from a verified frame grant. Never a list: an earlier attempt
-  // enumerated the owner's app origins here, and at 76 apps the header outgrew the reverse
-  // proxy's buffer and every app subdomain answered 502. Size here must not depend on how much
-  // the user has accumulated.
-  const ancestors = [
-    "'self'",
-    ...(apexOrigin ? [apexOrigin] : []),
-    ...(grantedOrigin ? [grantedOrigin] : []),
-  ].join(' ');
-  // The app frames the apex silent-SSO bridge (hidden iframe → apex/app-silent.html), so frame-src
-  // must allow the apex origin explicitly (https://aimeat.io is also covered by `https:`, but an http
-  // dev apex like http://localtest.me is not — include it so seamless SSO works there too).
-  // The app also fetches the apex directly for the H-2 grant token exchange (POST
-  // /v1/app-grants/token) and the silent bridge, so connect-src must allow the apex origin
-  // (https://aimeat.io is covered by `https:`; an http dev apex like http://localtest.me is not).
-  const apexAllow = apexOrigin ? ' ' + apexOrigin : '';
-  // font-src includes 'self' so apps can @font-face fonts from their own origin's public
-  // storage (/v1/pub/...) — https: covers prod app origins but not the http://*.apps.localhost
-  // dev origin. Mirrors the same addition on the /v1/apps inline route (apps.ts v1.14.0).
-  return `default-src 'none'; script-src 'self' 'unsafe-inline' blob: https: http://localhost:*; style-src 'self' 'unsafe-inline' https: http://localhost:*; img-src * data: blob:; font-src 'self' data: https:; connect-src 'self' https: http://localhost:* wss: ws: data:${apexAllow}; worker-src blob:; object-src 'none'; frame-src 'self' blob: data: https: http://localhost:*${apexAllow}; frame-ancestors ${ancestors}`;
-}
 
 /**
  * Ensure an app has a per-app subdomain (creating one if needed) and return its label. This makes

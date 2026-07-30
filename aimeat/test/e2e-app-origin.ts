@@ -10,6 +10,8 @@
  *       subdomain form (x-app-origin + x-subdomain).
  * @usage cd aimeat && pnpm exec node --import tsx test/e2e-app-origin.ts
  * @version-history
+ *   v1.2.0 — 2026-07-30 — Phase 4: the app-origin CSP permits WebAssembly compilation
+ *     ('wasm-unsafe-eval'), still refuses eval(), and COEP stays off (no cross-origin isolation).
  *   v1.1.0 — 2026-07-28 — Phase 6: the app origin answers as itself — RFC 9728 protected-resource
  *     metadata naming this origin + the app's declared scopes, the 401 discovery hint, the injected
  *     self-activating WebMCP bridge (and its opt-out), and a WebMCP listing that describes an app
@@ -240,6 +242,19 @@ async function main() {
             const { csp } = await cspOf(SUB);
             cspSmall = csp;
             assert(csp.length > 0, 'expected a CSP header');
+        });
+
+        await test('script-src permits WebAssembly compilation but still refuses eval()', async () => {
+            const { csp, res } = await cspOf(SUB);
+            const scriptSrc = (csp.match(/script-src ([^;]*)/) ?? ['', ''])[1];
+            // Without this an app cannot run wasm AT ALL — the browser blocks compilation, so
+            // self-hosting the .wasm does not help (verified on Chrome, 2026-07-30).
+            assert(scriptSrc.includes("'wasm-unsafe-eval'"), `wasm is blocked: script-src ${scriptSrc}`);
+            // 'unsafe-eval' would also unlock eval()/new Function(); nothing needs it.
+            assert(!scriptSrc.includes("'unsafe-eval'"), `script-src must not permit eval(): ${scriptSrc}`);
+            // Wasm here is single-threaded: no COOP/COEP, so crossOriginIsolated stays false and
+            // node libs without CORP keep loading.
+            assert(!res.headers.get('cross-origin-embedder-policy'), 'COEP must stay off on app origins');
         });
 
         await test('publish 100 more apps for the SAME owner', async () => {
