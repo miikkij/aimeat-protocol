@@ -76,6 +76,10 @@ const manifest = (name: string) => JSON.stringify({
     { id: 'dyn', method: 'POST', path: '/dyn', script: 'designating', commercial: { payMorsels: PRICE } },
     { id: 'fails', method: 'POST', path: '/fails', script: 'boom', commercial: { payMorsels: PRICE } },
     { id: 'paid', method: 'POST', path: '/paid', script: 'echo', commercial: { payMoney: { amount: 500_000, currency: 'EUR' } } },
+    // Money price AND a per-call destination: the exact combination kumppani sells (0.50 EUR a
+    // lookup, the share going to whichever company was looked up). Each rail and each source had
+    // been proven, and their product had not.
+    { id: 'paiddyn', method: 'POST', path: '/paiddyn', script: 'designating', commercial: { payMoney: { amount: 500_000, currency: 'EUR' } } },
   ],
   config: { public_access: { default: true } },
   limits: { timeout_ms: 5000, max_api_calls: 1 },
@@ -400,6 +404,42 @@ await test('Releasing a money share books it as an invoiceable payable — the n
   const line = earned.body.data.entries.find((x: any) => x.method === 'beneficiary-share');
   assert(!!line, `the released share must appear on the payable book: ${JSON.stringify(earned.body.data.entries)}`);
   assert(line.status === 'pending' && line.amount === entry.amount, `payable line: ${JSON.stringify(line)}`);
+});
+
+// ── Dynamic + money together: what kumppani actually sells ───────────────────
+
+await test('A money-priced call whose capability names the beneficiary per call accrues in micro-units', async () => {
+  const d = await declare(provider.token, { ext: EXT, action: 'paiddyn', pool_percent: 70, dynamic: true });
+  assert(d.status === 200, `declare paiddyn ${d.status}: ${JSON.stringify(d.body?.error)}`);
+  const a = await accept(consumer.token, 'paiddyn', { cap_units: 5_000_000 });
+  assert(a.status === 201, `accept paiddyn ${a.status}: ${JSON.stringify(a.body?.error)}`);
+  const rake = Number(a.body.data.entitlement.rake_per_call);
+
+  const before = Number((await earnings(beta.token)).body.data.totals?.EUR?.accrued ?? 0);
+  const r = await invoke(consumer.token, 'paiddyn', { pay_to: beta.ghii });
+  assert(r.status === 200, `paiddyn call ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(!('_revenue' in (r.body.data ?? {})), 'the designation key must not reach the buyer on the money rail either');
+
+  const after = Number((await earnings(beta.token)).body.data.totals?.EUR?.accrued ?? 0);
+  const expected = Math.floor((500_000 - rake) * 70 / 100);
+  assert(after - before === expected, `EUR share from a per-call designation: expected ${expected}, got ${after - before}`);
+});
+
+await test('That share is money, kept apart from the morsel meter on the same account', async () => {
+  const t = (await earnings(beta.token)).body.data.totals;
+  assert(t.EUR && t.EUR.accrued > 0, `EUR bucket: ${JSON.stringify(t)}`);
+  assert(t.morsels && t.morsels.accrued > 0, `beta also holds morsel shares: ${JSON.stringify(t)}`);
+  // The two are different KINDS of thing: money is income, morsels are capacity to call. A total
+  // over both would be meaningless, so they are never in the same bucket.
+  assert(t.EUR.accrued !== t.morsels.accrued, 'the two units are counted separately');
+});
+
+await test('The money-rail entry names the per-call source and the right unit', async () => {
+  const list = await obligations(provider.token);
+  const e = list.body.data.entries.find((x: any) => x.beneficiary === beta.ghii && x.unit === 'money');
+  assert(!!e, `expected a money obligation to beta: ${JSON.stringify(list.body.data.entries.map((x: any) => [x.beneficiary, x.unit, x.kind]))}`);
+  assert(e.kind === 'dynamic', `named per call, got kind=${e.kind}`);
+  assert(e.currency === 'EUR' && e.unit === 'money', `unit/currency: ${e.unit}/${e.currency}`);
 });
 
 // ── Cross-owner isolation ─────────────────────────────────────────────────────
