@@ -224,35 +224,109 @@ function appendTemplateBlock(p, templateContent) {
 // research-first, no T1/T2/T3 tier choice, no capability packs. Both call sites now wait for
 // the canonical text rather than offering a stale one. Git history has it if ever needed.
 
+/* The generator, in the app-catalog's shape: numbered steps, an idea box, a template picker,
+   the capability packs, then the prompt. Deliberately the same STRUCTURE and look as the
+   catalog's "Generate App with AI" so the two do not feel like two different products, but its
+   own implementation — the catalog is a vanilla-JS esbuild bundle and this page is Preact, and
+   welding them together for a page that is still changing weekly would cost more than it saves.
+
+   The prompt text itself is NOT rebuilt here: it comes from GET /v1/prompts/build-app, so the
+   node stays the single source of truth and this page cannot drift from it. Only the parts a
+   person chooses (idea, template, packs) are assembled on top. */
+
+// Same filter the catalog applies: engines and wrappers a person would pick on purpose.
+const PACK_CATEGORIES = ['visualization', 'diagrams', 'canvas', 'game', '3d', 'realtime'];
+
+// The canonical prompt carries a placeholder for the idea. Replacing it beats appending, so the
+// AI reads the idea where it expects to and the interview step adapts itself.
+const IDEA_PLACEHOLDER = 'My initial idea: (not given yet — ask me what to build)';
+
+function packMatchesIdea(pack, ideaText) {
+  const text = (ideaText || '').toLowerCase();
+  if (!text) return false;
+  return (pack.interviewTriggers || []).some((trigger) => {
+    const esc = String(trigger).toLowerCase().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return new RegExp('(^|[^a-zà-öø-ÿ])' + esc).test(text);
+  });
+}
+
 function BuildAppPrompt() {
   const [copied, setCopied] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [tplId, setTplId] = useState('');
   const [tplContent, setTplContent] = useState('');
+  const [canonical, setCanonical] = useState('');
+  const [idea, setIdea] = useState('');
+  const [packs, setPacks] = useState([]);
+  const [packDocs, setPackDocs] = useState({});
+  const [chosen, setChosen] = useState({});      // id → true/false, set only by a real click
+  const [showAllPacks, setShowAllPacks] = useState(false);
+
   useEffect(() => {
     // Starting points only: full use-case scaffolds first, then blank app-shells (not components).
     fetch('/v1/app-templates?lang=' + encodeURIComponent(getLocale())).then(r => r.json()).then(d => {
       const list = ((d.data && d.data.templates) || []).filter(t => t.kind !== 'component');
       list.sort((a, b) => (a.kind === 'use-case' ? 0 : 1) - (b.kind === 'use-case' ? 0 : 1));
       setTemplates(list);
-    }).catch(err => { swallowed('landing: list', err); });
+    }).catch(err => { swallowed('landing: templates', err); });
+
+    fetch('/v1/library-packs?lang=' + encodeURIComponent(getLocale())).then(r => r.json()).then(d => {
+      const all = (d.data && d.data.packs) || [];
+      setPacks(all.filter(pk => {
+        if (pk.status === 'deprecated') return false;
+        if (pk.kind === 'vendored' || pk.kind === 'bundle') return PACK_CATEGORIES.includes(pk.category);
+        if (pk.kind === 'cortex') return PACK_CATEGORIES.includes(pk.category) && pk.id !== 'aimeat-charts';
+        return false;
+      }));
+    }).catch(err => { swallowed('landing: packs', err); });
+
+    fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(err => { swallowed('landing: prompt', err); });
   }, []);
-  const onPick = async (e) => {
+
+  const onPickTemplate = async (e) => {
     const id = e.target.value; setTplId(id);
     if (!id) { setTplContent(''); return; }
     try { const d = await (await fetch('/v1/app-templates/' + encodeURIComponent(id))).json(); setTplContent((d.data && d.data.template && d.data.template.content) || ''); }
-    catch (err) { swallowed('landing', err); setTplContent(''); }
+    catch (err) { swallowed('landing: template', err); setTplContent(''); }
   };
-  const [canonical, setCanonical] = useState('');
-  const [expanded, setExpanded] = useState(false);
-  useEffect(() => { fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(err => { swallowed('landing: onPick', err); }); }, []);
-  // Only the node's canonical prompt is offered. The in-file fallback predates research-first,
-  // the T1/T2/T3 tiers and the capability packs, so copying it by accident during the first
-  // second of page life would send someone off building the wrong shape.
-  const prompt = canonical ? appendTemplateBlock(canonical, tplContent) : '';
-  // 46k characters of prompt is correct to copy and wrong to dump on a landing page. Show the
-  // opening, keep the rest one click away, and copy the whole thing either way.
-  const preview = prompt.split('\n').slice(0, 14).join('\n');
+
+  // A pack is on when the person ticked it, and otherwise when their idea text names it. A manual
+  // choice always wins: typing more words must never silently untick something they chose.
+  const isOn = (pack) => (pack.id in chosen ? chosen[pack.id] : packMatchesIdea(pack, idea));
+  const selected = packs.filter(isOn);
+
+  // Fetch the usage doc for whatever is on — a chat AI cannot fetch the pack endpoint itself, so
+  // the doc has to travel inside the prompt.
+  useEffect(() => {
+    selected.forEach((pack) => {
+      if (packDocs[pack.id]) return;
+      fetch('/v1/library-packs/' + encodeURIComponent(pack.id))
+        .then(r => r.json())
+        .then(d => { const doc = d?.data?.pack; if (doc) setPackDocs(prev => ({ ...prev, [pack.id]: doc })); })
+        .catch(err => { swallowed('landing: pack doc', err); });
+    });
+    // selected is derived; the ids are what actually matter for re-running this.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selected.map(pk => pk.id).join(','), packDocs]);
+
+  const prompt = (() => {
+    if (!canonical) return '';
+    let out = idea.trim()
+      ? canonical.replace(IDEA_PLACEHOLDER, 'My initial idea: ' + idea.trim())
+      : canonical;
+    out = appendTemplateBlock(out, tplContent);
+    const docs = selected.map(pk => packDocs[pk.id]).filter(Boolean);
+    if (docs.length) {
+      out += '\n## Selected capability packs (self-hosted on my node — use these, never a CDN)\n';
+      for (const doc of docs) {
+        out += '\n### Pack: ' + doc.id + ' — ' + (doc.title || '') + '\n';
+        out += 'Include (in order):\n' + (doc.include || []).join('\n') + '\n';
+        if (doc.ai_doc) out += 'Usage:\n' + doc.ai_doc + '\n';
+      }
+    }
+    return out;
+  })();
+
   const copy = async () => {
     if (!prompt) return;
     try {
@@ -262,20 +336,68 @@ function BuildAppPrompt() {
     // eslint-disable-next-line aimeat/no-silent-catch -- prompt is visible to select manually
     } catch { /* prompt is visible to select manually */ }
   };
+
+  // What the prompt CONTAINS, rather than how many characters it is. A character count reads as
+  // complexity; the contents read as value, and they are the reason the prompt is long.
+  const contains = [];
+  if (tplId) contains.push(tr('landing.promptHasTemplate', 'your starting template'));
+  if (selected.length) {
+    contains.push(selected.length === 1
+      ? tr('landing.promptHasPack', 'one capability pack with its usage doc')
+      : `${selected.length} ${tr('landing.promptHasPacks', 'capability packs with their usage docs')}`);
+  }
+  contains.push(tr('landing.promptHasPitfalls', 'this node’s libraries and the pitfalls already written down'));
+
+  // Only what the idea pre-selected is shown; the rest sits behind one toggle. Fourteen unexplained
+  // checkboxes is a wall, and most people need none of them.
+  const visiblePacks = showAllPacks ? packs : packs.filter(isOn);
+
   return html`
-    <section class="ld-askai">
-      <h2 class="ld-askai-title">${tr('landing.buildTitle', 'Build your app in 10 minutes — copy this prompt')}</h2>
-      <p class="ld-askai-sub">${tr('landing.buildSub', 'Paste into Claude, ChatGPT or any AI. It asks about your idea, builds the app and publishes it to your node. Share the link when done.')}</p>
-      ${templates.length ? html`<div class="ld-askai-tpl mb-half">${tr('landing.startTemplate', 'Start from a template')}: <select class="input-field" onChange=${onPick} value=${tplId}><option value="">${tr('landing.fromScratch', '(none — build from scratch)')}</option>${templates.map(t => html`<option value=${t.id}>${t.kind === 'use-case' ? '★ ' : ''}${t.title}</option>`)}</select></div>` : ''}
-      <div class="ld-askai-box">
-        <pre class="ld-askai-prompt">${prompt ? (expanded ? prompt : preview) : tr('landing.buildLoading', 'Loading the build prompt from this node…')}</pre>
-        ${prompt && !expanded ? html`
-          <button class="btn-ghost ld-askai-more" type="button" onClick=${() => setExpanded(true)}>
-            ${tr('landing.buildShowFull', 'Show the full prompt')} (${prompt.length.toLocaleString()} ${tr('landing.buildChars', 'characters')})
+    <div class="ld-gen">
+      <p class="ld-gen-intro">${tr('landing.genIntro', 'No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file.')}</p>
+
+      <div class="ld-gen-step">
+        <div class="ld-gen-head"><span class="ld-gen-num">1</span><span>${tr('landing.genStep1', 'Describe your app')}</span></div>
+        <textarea class="ld-gen-idea" rows="3" value=${idea} onInput=${(e) => setIdea(e.target.value)}
+          placeholder=${tr('landing.genIdeaPh', 'Describe what the app should do…')}></textarea>
+
+        ${templates.length ? html`
+          <label class="ld-gen-label" for="ld-gen-tpl">${tr('landing.startTemplate', 'Start from a template')} <span class="ld-gen-opt">${tr('landing.genOptional', '(optional)')}</span></label>
+          <select id="ld-gen-tpl" class="input-field ld-gen-select" onChange=${onPickTemplate} value=${tplId}>
+            <option value="">${tr('landing.fromScratch', '(none — build from scratch)')}</option>
+            ${templates.map(t => html`<option value=${t.id} key=${t.id}>${t.kind === 'use-case' ? '★ ' : ''}${t.title}</option>`)}
+          </select>` : ''}
+
+        ${packs.length ? html`
+          <div class="ld-gen-label">${tr('landing.genPacks', 'Capability packs')} <span class="ld-gen-opt">${tr('landing.genOptional', '(optional)')}</span></div>
+          <p class="ld-gen-hint">${tr('landing.genPacksHint', 'Charts, editable diagrams, games, 3D. Self-hosted libraries whose instructions travel inside the prompt. What you type above pre-selects the matching ones.')}</p>
+          <div class="ld-gen-packs">
+            ${visiblePacks.map(pk => html`
+              <label class=${`ld-gen-pack ${isOn(pk) ? 'on' : ''}`} key=${pk.id}>
+                <input type="checkbox" checked=${isOn(pk)} onChange=${(e) => setChosen(prev => ({ ...prev, [pk.id]: e.target.checked }))} />
+                <span class="ld-gen-pack-text">
+                  <span class="ld-gen-pack-title">${pk.title || pk.id}</span>
+                  ${pk.description ? html`<span class="ld-gen-pack-desc">${pk.description}</span>` : ''}
+                </span>
+              </label>`)}
+            ${!visiblePacks.length ? html`<p class="ld-gen-hint">${tr('landing.genPacksNone', 'Nothing needed for what you described. Open the list if you want to add something.')}</p>` : ''}
+          </div>
+          <button type="button" class="btn-ghost ld-gen-toggle" onClick=${() => setShowAllPacks(v => !v)}>
+            ${showAllPacks ? tr('landing.genPacksLess', 'Show only what I need') : `${tr('landing.genPacksAll', 'Show all packs')} (${packs.length})`}
           </button>` : ''}
-        <button class="btn-primary ld-askai-copy" onClick=${copy} disabled=${!prompt}>${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}</button>
       </div>
-    </section>`;
+
+      <div class="ld-gen-step">
+        <div class="ld-gen-head"><span class="ld-gen-num">2</span><span>${tr('landing.genStep2', 'Copy the prompt and paste it into your AI')}</span></div>
+        <p class="ld-gen-hint">${tr('landing.genStep2Hint', 'Open Claude, ChatGPT or any AI chat, paste this in and answer its questions. It builds your app and hands you a single HTML file.')}</p>
+        <div class="ld-gen-preview-label">${tr('landing.genPreview', 'Prompt preview')}</div>
+        <div class="ld-gen-preview">${prompt || tr('landing.buildLoading', 'Loading the build prompt from this node…')}</div>
+        ${prompt ? html`<p class="ld-gen-contains">${tr('landing.promptContains', 'Includes')}: ${contains.join(' · ')}.</p>` : ''}
+        <button class="btn-primary ld-gen-copy" onClick=${copy} disabled=${!prompt}>
+          ${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}
+        </button>
+      </div>
+    </div>`;
 }
 
 // Build-an-AGENT prompt (distinct from the build-an-APP prompt above). Points the visitor's own AI
