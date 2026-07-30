@@ -7,6 +7,9 @@
  *   /v1/agents/:name/offers for offer pricing; and the generic /v1/memory routes (memory:write authz
  *   unchanged) for the commerce.psp / apps.{id}.tools records the server MCP writes directly.
  * @version-history
+ *   v1.1.0 -- 2026-07-30 -- Beneficiary splits: declare/list/withdraw, earnings + obligations, release,
+ *     operator approval and payout quote/settle. The server registered these six; the connector did
+ *     not, so `--surface service` was six tools short of what it claims to serve.
  *   v1.0.0 -- 2026-07-19 -- Initial: psp set/status/delete, app_tools publish/get, offer_price_set,
  *     checkout open/complete/list — connector-surface coverage.
  */
@@ -113,5 +116,78 @@ export function registerCommerceTools(mcp: McpServer, registry: AgentRegistry): 
     limit: z.number().int().min(1).max(200).optional().describe('Max sessions to return (default 20, max 200).'),
   }, annotationsFor('aimeat_checkout_list'), async ({ limit }) => {
     return out(await client.get(`/v1/commerce/checkout-sessions${limit ? `?limit=${limit}` : ''}`));
+  });
+
+  // Beneficiary splits — a seller declares who else earns from a sale, releases what accrued and pays
+  // it out; a beneficiary reads its own earnings. The connector proxies /v1/commerce/beneficiary*;
+  // the arithmetic, the verification gate and the ledger all stay on the node.
+  const q = (params: Record<string, string | number | undefined>) => {
+    const parts = Object.entries(params)
+      .filter(([, v]) => v !== undefined && v !== '')
+      .map(([k, v]) => `${k}=${encodeURIComponent(String(v))}`);
+    return parts.length ? `?${parts.join('&')}` : '';
+  };
+
+  mcp.tool('aimeat_commerce_beneficiary_split_set', descriptionFor('aimeat_commerce_beneficiary_split_set'), {
+    ext: z.string().describe('Extension name of the priced coordinate.'),
+    action: z.string().describe('Action id of the priced coordinate.'),
+    mode: z.enum(['pool', 'roles']).optional().describe('"pool" divides one percentage by weight; "roles" gives each named role its own independent percent.'),
+    pool_percent: z.number().min(0).max(100).optional().describe('Pool mode: the share of YOUR cut that goes to beneficiaries.'),
+    roles: z.array(z.record(z.string(), z.unknown())).optional().describe('Roles mode: [{ role, percent, ghii?, note? }]. Percents total at most 100 and nobody dilutes anybody.'),
+    beneficiaries: z.array(z.record(z.string(), z.unknown())).optional().describe('Pool mode: [{ ghii, weight?, note? }].'),
+    dynamic: z.boolean().optional().describe('Let the capability name its beneficiaries per call.'),
+    capability: z.string().optional().describe('Human label for the coordinate.'),
+    state: z.enum(['active', 'paused']).optional(),
+  }, annotationsFor('aimeat_commerce_beneficiary_split_set'), async (args) => {
+    return out(await client.post('/v1/commerce/beneficiary-splits', args));
+  });
+
+  mcp.tool('aimeat_commerce_beneficiary_splits', descriptionFor('aimeat_commerce_beneficiary_splits'), {
+    remove_ext: z.string().optional().describe('Withdraw the split on this coordinate (with remove_action).'),
+    remove_action: z.string().optional().describe('Withdraw the split on this coordinate (with remove_ext).'),
+  }, annotationsFor('aimeat_commerce_beneficiary_splits'), async ({ remove_ext, remove_action }) => {
+    if (remove_ext || remove_action) {
+      if (!remove_ext || !remove_action) {
+        return out({ ok: false, data: { error: 'INVALID_INPUT: withdrawing needs both remove_ext and remove_action' } });
+      }
+      return out(await client.delete(`/v1/commerce/beneficiary-splits${q({ ext: remove_ext, action: remove_action })}`));
+    }
+    return out(await client.get('/v1/commerce/beneficiary-splits'));
+  });
+
+  mcp.tool('aimeat_commerce_beneficiary_earnings', descriptionFor('aimeat_commerce_beneficiary_earnings'), {
+    role: z.enum(['beneficiary', 'provider']).optional().describe('"beneficiary" (default) is what you are owed; "provider" is what you owe.'),
+    status: z.enum(['accrued', 'released', 'paid', 'reversed']).optional(),
+    limit: z.number().int().min(1).max(1000).optional(),
+  }, annotationsFor('aimeat_commerce_beneficiary_earnings'), async ({ role, status, limit }) => {
+    const path = role === 'provider' ? 'obligations' : 'earnings';
+    return out(await client.get(`/v1/commerce/beneficiary/${path}${q({ status, limit })}`));
+  });
+
+  mcp.tool('aimeat_commerce_beneficiary_release', descriptionFor('aimeat_commerce_beneficiary_release'), {
+    tracking_code: z.string().describe('The tracking code of the accrued share.'),
+    beneficiary: z.string().describe('Beneficiary GHII (owner@node-id).'),
+  }, annotationsFor('aimeat_commerce_beneficiary_release'), async ({ tracking_code, beneficiary }) => {
+    return out(await client.post('/v1/commerce/beneficiary/release', { tracking_code, beneficiary }));
+  });
+
+  mcp.tool('aimeat_commerce_beneficiary_approve', descriptionFor('aimeat_commerce_beneficiary_approve'), {
+    ghii: z.string().optional().describe('Beneficiary GHII. Omit to read your own state.'),
+    state: z.enum(['verified', 'unverified', 'rejected']).optional().describe('Omit to READ. Recording a state is an operator action.'),
+    method: z.string().optional().describe('How representation was established, e.g. "contract-on-file". Required to verify.'),
+    subject: z.string().optional(),
+    evidence: z.string().optional(),
+  }, annotationsFor('aimeat_commerce_beneficiary_approve'), async ({ ghii, state, method, subject, evidence }) => {
+    if (!state) return out(await client.get(`/v1/commerce/beneficiary/approvals${q({ ghii })}`));
+    return out(await client.post('/v1/commerce/beneficiary/approvals', { ghii, state, method, subject, evidence }));
+  });
+
+  mcp.tool('aimeat_commerce_beneficiary_payout', descriptionFor('aimeat_commerce_beneficiary_payout'), {
+    beneficiary: z.string().describe('Beneficiary GHII to pay.'),
+    currency: z.string().optional().describe('Currency of the released entries to settle.'),
+    payment: z.record(z.string(), z.unknown()).optional().describe('The signed authorisation. Omit to get a QUOTE: the node never holds a key, so the payer signs.'),
+  }, annotationsFor('aimeat_commerce_beneficiary_payout'), async ({ beneficiary, currency, payment }) => {
+    if (!payment) return out(await client.get(`/v1/commerce/beneficiary/payout${q({ beneficiary, currency })}`));
+    return out(await client.post('/v1/commerce/beneficiary/payout', { beneficiary, currency, payment }));
   });
 }

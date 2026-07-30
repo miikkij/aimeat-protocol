@@ -21226,7 +21226,7 @@ paths:
               required: [title]
               properties:
                 title: { type: string, maxLength: 200, description: Short title shown in the bell and push }
-                body: { type: string, maxLength: 1000, description: Optional longer context }
+                body: { type: string, maxLength: 10000, description: Optional longer context }
                 link: { type: string, maxLength: 500, description: "Same-node path the notification deep-links to (must start with '/'), e.g. '/v1/profile?tab=messages'" }
                 type: { type: string, pattern: "^[a-zA-Z0-9_:.-]{1,64}$", description: "Machine type; defaults to 'app' / 'agent' / 'custom' by caller role" }
       responses:
@@ -21642,7 +21642,7 @@ paths:
               properties:
                 reason:
                   type: string
-                  maxLength: 2000
+                  maxLength: 10000
                   description: Reason for the appeal
       responses:
         '201':

@@ -7,6 +7,7 @@
  * @structure MessageAttachmentInputSchema, InteractivePayloadSchema, MessageSendSchema
  * @usage import { MessageSendSchema } from '../models/message-schemas.js';
  * @version-history
+ *   Text limits raised — 2026-07-30 — prompts/labels to 10 000 and bodies to 200 000.
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 2: local messaging).
  *   v1.1.0 -- 2026-06-23 -- Interactive messages: InteractivePayloadSchema + `interactive` on send.
  */
@@ -34,14 +35,14 @@ export const MessageAttachmentInputSchema = z.object({
 /** One selectable option in an interactive question. */
 export const InteractiveOptionSchema = z.object({
   id: z.string().min(1).max(64),
-  label: z.string().min(1).max(500),
+  label: z.string().min(1).max(2_000),
 });
 
 /** A single structured question (mirrors the AskUserQuestion shape). */
 export const InteractiveQuestionSchema = z.object({
   id: z.string().min(1).max(64),
   header: z.string().min(1).max(80),
-  prompt: z.string().min(1).max(2000),
+  prompt: z.string().min(1).max(10_000),
   options: z.array(InteractiveOptionSchema).min(1).max(20),
   multiSelect: z.boolean().optional().default(false),
   allowOther: z.boolean().optional().default(true),
@@ -77,7 +78,7 @@ export const MessageSendSchema = z.object({
   /** Recipient — a human GHII (owner@node). */
   to: z.string().min(3).max(256),
   /** GFM markdown body. May be empty when sending attachment-only. */
-  body: z.string().max(50000).optional().default(''),
+  body: z.string().max(200_000).optional().default(''),
   /** Id of a message being replied to (same conversation). */
   reply_to: z.string().uuid().optional(),
   /** Continue a specific thread by id (e.g. an existing subject thread). Omit for the default pair thread. */
@@ -102,7 +103,7 @@ export const BroadcastSendSchema = z.object({
   group_id: z.string().min(1).max(64).optional(),
   audience: z.enum(['node-users', 'federation-users']).optional(),  // OPERATOR-only (gated at the route)
   mode: z.enum(['broadcast', 'announcement']).optional().default('broadcast'),
-  body: z.string().max(50000).optional().default(''),
+  body: z.string().max(200_000).optional().default(''),
   attachments: z.array(MessageAttachmentInputSchema).max(20).optional(),
   interactive: InteractivePayloadSchema.optional(),
 }).refine(

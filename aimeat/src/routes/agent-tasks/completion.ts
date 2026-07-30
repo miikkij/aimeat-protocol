@@ -2,6 +2,7 @@
  * @file src/routes/agent-tasks/completion.ts
  * @description Agent-task completion + review routes (event, complete, fail, rate, triage, todos, events, deliverables). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
+ *   Task metadata limit 4 096 → 200 000 bytes — 2026-07-30 — metadata is JSON and 4 KB truncated real payloads.
  *   v1.0.0 — 2026-07-13 — Extracted from agent-tasks.ts (max-file-lines)
  */
 
@@ -295,8 +296,8 @@ export function registerTaskCompletionRoutes(
     const { stars, context, comment, source_grounded, unsupported, evaluated_model, metadata } = parsed.data;
 
     // Cap the free-form metadata so it can't be used to bloat the rating blob.
-    if (metadata && JSON.stringify(metadata).length > 4096) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'metadata too large (max 4096 bytes serialized)'));
+    if (metadata && JSON.stringify(metadata).length > 200_000) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'metadata too large (max 200000 bytes serialized)'));
       return;
     }
 

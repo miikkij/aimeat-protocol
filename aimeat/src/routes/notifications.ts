@@ -12,6 +12,7 @@
  *   - DELETE /v1/notifications      — clear notifications (all, or a given { ids }) — the bell's "Clear all"
  * @usage app.use(notificationsRouter(config, storage));
  * @version-history
+ *   Notification body limit 1 000 → 10 000 — 2026-07-30 — matched in openapi.yaml.
  *   v1.3.0 -- 2026-07-19 -- DELETE /v1/notifications: "Clear all" from the header bell removes the owner's
  *     notif rows (owner-scoped list → bulkDeleteMemory, per-key fallback); optional { ids } to clear a subset.
  *   v1.0.0 -- 2026-06-08 -- Initial: memory-backed notification inbox.
@@ -70,8 +71,8 @@ export function notificationsRouter(config: AimeatConfig, storage: Storage): Rou
         res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'title is required (string, max 200 chars)'));
         return;
       }
-      if (body !== undefined && (typeof body !== 'string' || body.length > 1000)) {
-        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'body must be a string (max 1000 chars)'));
+      if (body !== undefined && (typeof body !== 'string' || body.length > 10_000)) {
+        res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'body must be a string (max 10000 chars)'));
         return;
       }
       // Same-node paths only ('/...', not '//host' or absolute URLs) — a notification never

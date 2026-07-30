@@ -2,6 +2,7 @@
  * @file agent-message-schemas.ts
  * @description Zod validation schemas for agent message creation and status updates
  * @version-history
+ *   Text limits raised — 2026-07-30 — content to 200 000, tool descriptions to 10 000.
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  *   v1.1.0 -- 2026-05-30 -- Add single-select option-prompts: metadata.prompt (agent
  *     attaches a question + option list to an outbound message) and metadata.prompt_answer
@@ -31,7 +32,7 @@ export const MessagePromptAnswerSchema = z.object({
 });
 
 export const AgentMessageCreateSchema = z.object({
-  content: z.string().min(1).max(10000),
+  content: z.string().min(1).max(200_000),
   direction: z.enum(['inbound', 'outbound']),
   thread_id: z.string().uuid().optional(),
   linked_task_id: z.string().uuid().optional(),
@@ -40,7 +41,7 @@ export const AgentMessageCreateSchema = z.object({
     processing_ms: z.number().optional(),
     proposed_task: z.object({
       title: z.string().min(1).max(256),
-      description: z.string().max(5000),
+      description: z.string().max(10_000),
     }).optional(),
     prompt: MessagePromptSchema.optional(),
     prompt_answer: MessagePromptAnswerSchema.optional(),

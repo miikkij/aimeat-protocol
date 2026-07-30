@@ -4,6 +4,7 @@
  *   PATCH /v1/apps/:filename (rename/access-code/parked/forkable/protection/cortex), DELETE /v1/apps/:filename.
  *   Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   Fork description limits 2 000 → 10 000 — 2026-07-30.
  *   v1.1.0 — 2026-07-17 — Agent-Bundled Apps: PATCH accepts `cortex` — edit/clear the bundled
  *     crew-defs in place (validated fail-loud like publish) without re-uploading the HTML.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
@@ -252,8 +253,8 @@ export function registerForkManageRoutes(
                 return;
             }
             const trimmedDesc = body.description.trim();
-            if (trimmedDesc.length > 2000) {
-                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'description must be at most 2000 characters'));
+            if (trimmedDesc.length > 10_000) {
+                res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'description must be at most 10000 characters'));
                 return;
             }
             if (trimmedDesc.length === 0) {
@@ -276,8 +277,8 @@ export function registerForkManageRoutes(
                     return;
                 }
                 const trimmed = val.trim();
-                if (trimmed.length > 2000) {
-                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `descriptions.${loc} must be at most 2000 characters`));
+                if (trimmed.length > 10_000) {
+                    res.status(400).json(error(config.nodeId, 'INVALID_INPUT', `descriptions.${loc} must be at most 10000 characters`));
                     return;
                 }
                 if (trimmed.length > 0) cleaned[loc] = trimmed;

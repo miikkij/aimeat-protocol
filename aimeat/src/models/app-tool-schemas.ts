@@ -11,6 +11,8 @@
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
  * @version-history
+ *   v1.7.0 — 2026-07-30 — Authored text is no longer clipped: descriptions/notes to 10 000, 200 tools
+ *     and 40 plans per app. The old 500-character description silently delisted a live paid offering.
  *   v1.6.0 — 2026-07-28 — `lockedInput` + applyLockedInput: a tool fixes the parameter that tells it
  *     apart from its neighbour, so two products stop being one call the caller can steer.
  *   v1.5.0 — 2026-07-28 — `isToolPriced`: one definition of whether a tool carries a price. There were
@@ -49,7 +51,7 @@ export const AppToolPlanSchema = z.discriminatedUnion('model', [
 export const AppToolSchema = z.object({
   /** Tool name — the sku's last segment and the checkout line item's tool reference. */
   name: z.string().min(1).max(80).regex(/^[a-z0-9][a-z0-9._-]*$/i, 'Tool names are alphanumeric with . _ -'),
-  description: z.string().max(500).optional(),
+  description: z.string().max(10_000).optional(),
   /** Free-form JSON-schema-ish shape of the tool input (documentation for buyers). */
   inputSchema: z.record(z.string(), z.unknown()).optional(),
   /** Free-form JSON-schema-ish shape of the tool OUTPUT — what a caller gets back. Mandatory (non-empty)
@@ -57,7 +59,7 @@ export const AppToolSchema = z.object({
   outputSchema: z.record(z.string(), z.unknown()).optional(),
   /** EXCHANGE pricing plans (per_call / bundle / subscription) surfaced on the tool's offering. The base
    *  per-call price stays in `price`/`priceMoney`; a plan lets a volume consumer prepay or subscribe. */
-  plans: z.array(AppToolPlanSchema).max(12).optional(),
+  plans: z.array(AppToolPlanSchema).max(40).optional(),
   /**
    * Callable fulfillment binding: the backing capability invoked on checkout completion
    * (e.g. "ext:my-extension:summarize"). Without a binding the tool is fulfilled as an agent
@@ -119,7 +121,7 @@ export const AppToolSchema = z.object({
     derivatives: z.boolean().optional(),
     resale: z.boolean().optional(),
     attribution: z.boolean().optional(),
-    note: z.string().max(500).optional(),
+    note: z.string().max(10_000).optional(),
   }).optional(),
   /** Provenance attestation carried onto the projected offering + its ODPS document. */
   provenance: ProvenanceSchema.optional(),
@@ -140,7 +142,7 @@ export const AppToolsDocSchema = z.object({
   odps: OdpsExtrasSchema.optional(),
   /** App-level provenance attestation inherited by every tool (overridable per tool). */
   provenance: ProvenanceSchema.optional(),
-  tools: z.array(AppToolSchema).max(40),
+  tools: z.array(AppToolSchema).max(200),
 });
 
 export type AppTool = z.infer<typeof AppToolSchema>;

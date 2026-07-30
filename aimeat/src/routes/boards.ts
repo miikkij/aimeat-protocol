@@ -11,6 +11,7 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   Post body limit 500 → 200 000 — 2026-07-30 — 500 characters is a sentence, not a post.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { Router } from 'express';
@@ -412,8 +413,8 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     }
     const title = (req.query.title as string) ?? 'Untitled';
     const body = (req.query.body as string) ?? '';
-    if (body.length > 500) {
-      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Tier 0.5 board posts are limited to 500 characters'));
+    if (body.length > 200_000) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Board posts are limited to 200000 characters'));
       return;
     }
     const postId = `post-${randomBytes(8).toString('hex')}`;

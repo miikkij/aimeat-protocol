@@ -9,6 +9,7 @@
  *   - appealsRouter(config, storage): POST /v1/flags/:flagId/appeal, GET /v1/appeals, POST /v1/appeals/:id/review
  *
  * @version-history
+ *   Appeal reason limit 1 000 → 10 000 — 2026-07-30 — the gate was tighter than the spec promised (2 000).
  *   v1.1.0 — 2026-07-16 — review response reads the related flag once (was getFlag twice in one hint)
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -86,8 +87,8 @@ export function appealsRouter(config: AimeatConfig, storage: Storage): Router {
             return;
         }
 
-        if (reason.length > 1000) {
-            res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'reason must be 1000 characters or fewer'));
+        if (reason.length > 10_000) {
+            res.status(400).json(error(config.nodeId, 'VALIDATION_ERROR', 'reason must be 10000 characters or fewer'));
             return;
         }
 

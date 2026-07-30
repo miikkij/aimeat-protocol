@@ -7,6 +7,7 @@
  *   - Step-specific confirmation schemas (IdentifyPlatformSchema, etc.)
  *   - createDefaultSteps() -- factory for fresh onboarding step list
  * @version-history
+ *   Text limits raised — 2026-07-30 — declared-service descriptions to 10 000.
  *   2026-07-19 — model/modelDetectedBy: indicative primary-LLM attribution on agents (AppDev KB Phase 3)
  *   v1.0.0 -- 2026-05-23 -- Initial creation for Agent Integration Phase B
  *   v1.1.0 -- 2026-05-28 -- Add publish_commands + publish_config as required
@@ -350,7 +351,7 @@ export const ReadDirectivesSchema = z.object({
 export const DeclareServicesSchema = z.object({
   services: z.array(z.object({
     name: z.string().min(1).max(100),
-    description: z.string().max(500).optional(),
+    description: z.string().max(10_000).optional(),
   })).default([]),
 });
 

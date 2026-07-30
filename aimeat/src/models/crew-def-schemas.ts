@@ -34,7 +34,7 @@ const CrewAgentSchema = z.object({
 /** One crew task. `agent` references a CrewAgentSchema role; `context` references earlier task ids. */
 const CrewTaskSchema = z.object({
   id: z.string().min(1).max(128).optional(),
-  description: z.string().min(1).max(10000),
+  description: z.string().min(1).max(10_000),
   expected_output: z.string().min(1).max(4000),
   agent: z.string().min(1).max(256),
   context: z.array(z.string().min(1).max(128)).max(20).optional(),

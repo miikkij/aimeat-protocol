@@ -12,6 +12,8 @@
  * @usage import { OffersDocSchema } from '../models/offer-schemas.js';
  *   const parsed = OffersDocSchema.safeParse(req.body);
  * @version-history
+ *   Text limits raised — 2026-07-30 — notes/instructions/examples to 10 000 and `sample` to 200 000:
+ *     a worked sample is JSON, and 8 000 characters cut it off mid-document.
  *   v2.5.0 -- 2026-07-25 -- `tollMorsels`: an offer declares its own pacing burn (see AppTool).
  *   v1.0.0 -- 2026-06-12 -- Initial: offer descriptor (Agent Offers surface v1).
  *   v2.0.0 -- 2026-06-12 -- Billable offers: price + visibility + callable binding. An offer is a
@@ -59,7 +61,7 @@ const CallableSchema = z.object({
 const RequirementSchema = z.object({
   need: z.string().min(1).max(200),
   fix: z.string().max(64).optional(),          // a one-click fix chip id (e.g. 'join', 'adopt-contract')
-  instruction: z.string().max(500).optional(), // guidance text when no one-click fix exists (machine-local preconditions)
+  instruction: z.string().max(10_000).optional(), // guidance text when no one-click fix exists (machine-local preconditions)
 });
 
 const ConsequenceSchema = z.object({
@@ -73,7 +75,7 @@ const ConsequenceSchema = z.object({
   dynamic: z.boolean().optional(),          // the real chain renders live from task events, not the manifest
   ratesThirdParties: z.boolean().optional(), // a coordinator may write ratings to the agents it delegates to
   allowlist: z.array(z.string().max(200)).max(50).optional(), // for external-send
-  note: z.string().max(300).optional(),
+  note: z.string().max(10_000).optional(),
 });
 
 const AvailabilitySchema = z.object({
@@ -98,7 +100,7 @@ const DeliverableSchema = z.object({
     visibility: z.string().max(40).optional(),
   }).optional(),
   // A REAL excerpt from the last successful deliverable, or the literal "untested". Object | string.
-  sample: z.union([z.string().max(8000), z.record(z.string(), z.unknown()), z.literal('untested')]).optional(),
+  sample: z.union([z.string().max(200_000), z.record(z.string(), z.unknown()), z.literal('untested')]).optional(),
 });
 
 // ── Prerequisites (Agent Workflows; optional) ──────────────────────────────────
@@ -114,12 +116,12 @@ const DependencySchema = z.union([
     offer: z.string().min(1).max(100),
     agent: z.string().max(100).optional(),       // defaults to this offer's own agent
     hard: z.boolean().optional(),                // default true
-    label: z.string().max(200).optional(),       // human label for the card ("needs first: …")
+    label: z.string().max(2_000).optional(),       // human label for the card ("needs first: …")
   }),
   z.object({
     signal: SignalSchema,
     hard: z.boolean().optional(),                // default true
-    label: z.string().min(1).max(200),           // required: there's no offer id to fall back to
+    label: z.string().min(1).max(2_000),           // required: there's no offer id to fall back to
   }),
 ]);
 
@@ -127,7 +129,7 @@ export const OfferSchema = z.object({
   id: z.string().min(1).max(100),
   title: z.string().min(1).max(120),
   ask: z.string().min(1).max(500),                         // plain-language invite incl. negative scope
-  example: z.string().max(500).optional(),
+  example: z.string().max(10_000).optional(),
   tags: z.array(z.string().max(64)).max(20).optional(),    // reuse existing machine tags for goal-search
   cost: z.enum(['free', 'cheap', 'expensive']).optional(),
   latency: z.enum(['seconds', 'minutes', 'long-running']).optional(),
@@ -187,7 +189,7 @@ export const OfferSchema = z.object({
     derivatives: z.boolean().optional(),
     resale: z.boolean().optional(),
     attribution: z.boolean().optional(),
-    note: z.string().max(500).optional(),
+    note: z.string().max(10_000).optional(),
   }).optional(),
   /** Provenance attestation carried onto the projected offering + its ODPS document. */
   provenance: ProvenanceSchema.optional(),

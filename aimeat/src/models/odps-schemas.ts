@@ -15,6 +15,8 @@
  *   const parsed = OdpsExtrasSchema.safeParse(req.body.odps);
  *   if (!parsed.success) return res.status(400).json(error(nodeId, 'INVALID_ODPS', parsed.error.message));
  * @version-history
+ *   Text limits raised 10x (shortText 4 000, longText 40 000, valueProposition 4 000) — 2026-07-30 —
+ *     none of them came from ODPS; they were ours, and they truncated real descriptors.
  *   v1.1.0 — 2026-07-25 — Pinned to ODPS v4.1 (the version the addendum's Q2 named): `language` (v4.1
  *     keys details + pricing by ISO 639-1 code), `governanceProfile`, `portfolioPriority`, TOON format.
  *   v1.0.0 — 2026-07-25 — Initial ODPS authoring contract + provenance attestation (TARGET-045 §4,
@@ -54,9 +56,9 @@ export const ODPS_GOVERNANCE_PROFILES = ['structured', 'enforced', 'automated', 
 /** ODPS v4.1 `details.portfolioPriority` — how important the product is in its owner's portfolio. */
 export const ODPS_PORTFOLIO_PRIORITIES = ['critical', 'high', 'medium', 'low'] as const;
 
-const shortText = z.string().trim().min(1).max(400);
-const longText = z.string().trim().min(1).max(4000);
-const shortList = z.array(z.string().trim().min(1).max(120)).max(30);
+const shortText = z.string().trim().min(1).max(4_000);
+const longText = z.string().trim().min(1).max(40_000);
+const shortList = z.array(z.string().trim().min(1).max(400)).max(100);
 
 /** One hop of upstream lineage for DERIVED data — where a component came from and what was done to it. */
 export const ProvenanceLineageHopSchema = z.object({
@@ -163,7 +165,7 @@ export const OdpsExtrasSchema = z.object({
   /** v4.1: importance of this product in the provider's portfolio. */
   portfolioPriority: z.enum(ODPS_PORTFOLIO_PRIORITIES).optional(),
   /** ODPS caps the value proposition at 512 characters. */
-  valueProposition: z.string().trim().min(1).max(512).optional(),
+  valueProposition: z.string().trim().min(1).max(4_000).optional(),
   productSeries: shortText.optional(),
   categories: shortList.optional(),
   standards: shortList.optional(),

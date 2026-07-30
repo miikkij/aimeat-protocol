@@ -13,6 +13,7 @@
  *   - validateBody(schema, nodeId): Express middleware wiring a schema to the request pipeline
  *
  * @version-history
+ *   Text limits raised — 2026-07-30 — descriptions/reasons/messages to 10 000, bodies to 200 000.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
 import { z } from 'zod';
@@ -50,7 +51,7 @@ export const AgentRegistrationSchema = z.object({
     name: z.string().min(3).max(64).regex(/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/),
     owner: z.string().min(3).max(64),
     display_name: z.string().max(128).optional(),
-    description: z.string().max(1024).optional(),
+    description: z.string().max(10_000).optional(),
     capabilities: z.array(z.string()).optional(),
     scopes: z.array(z.string().max(64)).max(50).optional(),
     mode: z.enum(['autonomous', 'interactive', 'task-runner', 'coordinator', 'workstation']).optional(),
@@ -119,7 +120,7 @@ export const ActionPricingSchema = z.object({
 export const ActionPublishSchema = z.object({
     id: z.string().min(1).max(128).regex(/^[a-z0-9][a-z0-9_-]{0,126}[a-z0-9]$/),
     display_name: z.string().min(1).max(256),
-    description: z.string().min(1).max(4096),
+    description: z.string().min(1).max(10_000),
     category: z.string().max(64).optional(),
     input_schema: z.record(z.string(), z.unknown()),
     output_schema: z.record(z.string(), z.unknown()),
@@ -133,7 +134,7 @@ export const ActionPublishSchema = z.object({
 
 export const ActionUpdateSchema = z.object({
     display_name: z.string().min(1).max(256).optional(),
-    description: z.string().min(1).max(4096).optional(),
+    description: z.string().min(1).max(10_000).optional(),
     category: z.string().max(64).optional(),
     input_schema: z.record(z.string(), z.unknown()).optional(),
     output_schema: z.record(z.string(), z.unknown()).optional(),
@@ -166,26 +167,26 @@ export const WorkDeliverySchema = z.object({
 
 export const WorkRatingSchema = z.object({
     rating: z.enum(['positive', 'negative']),
-    comment: z.string().max(1024).optional(),
+    comment: z.string().max(10_000).optional(),
 });
 
 export const WorkRejectSchema = z.object({
-    reason: z.string().max(1024).optional(),
+    reason: z.string().max(10_000).optional(),
 });
 
 // ── Disputes ────────────────────────────────────────────────
 
 export const DisputeOpenSchema = z.object({
-    reason: z.string().min(1).max(4096),
+    reason: z.string().min(1).max(10_000),
 });
 
 export const CounterDisputeSchema = z.object({
-    reason: z.string().min(1).max(4096),
+    reason: z.string().min(1).max(10_000),
 });
 
 export const PartialOfferSchema = z.object({
     refund_morsels: z.number().int().positive(),
-    message: z.string().max(1024).optional(),
+    message: z.string().max(10_000).optional(),
 });
 
 export const OperatorRulingSchema = z.object({
@@ -195,7 +196,7 @@ export const OperatorRulingSchema = z.object({
         to_provider: z.number().int().nonnegative().optional(),
         burned: z.number().int().nonnegative().optional(),
     }),
-    reason: z.string().max(4096).optional(),
+    reason: z.string().max(10_000).optional(),
 });
 
 // ── Boards ──────────────────────────────────────────────────
@@ -203,13 +204,13 @@ export const OperatorRulingSchema = z.object({
 export const BoardCreateSchema = z.object({
     name: z.string().min(1).max(128),
     visibility: z.enum(['private', 'shared', 'public', 'system']),
-    description: z.string().max(1024).optional(),
+    description: z.string().max(10_000).optional(),
     allowed_gaiis: z.array(z.string()).optional(),
 });
 
 export const BoardPostSchema = z.object({
     title: z.string().min(1).max(256),
-    body: z.string().min(1).max(10000),
+    body: z.string().min(1).max(200_000),
     category: z.string().max(64).optional(),
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().optional(),
@@ -220,7 +221,7 @@ export const BoardReactionSchema = z.object({
 });
 
 export const BoardReplySchema = z.object({
-    body: z.string().min(1).max(10000),
+    body: z.string().min(1).max(200_000),
 });
 
 // ── Federation ──────────────────────────────────────────────
@@ -229,12 +230,12 @@ export const PeeringRequestSchema = z.object({
     target_url: z.string().url(),
     target_node_id: z.string().optional(),
     public_key: z.string().optional(),
-    message: z.string().max(1024).optional(),
+    message: z.string().max(10_000).optional(),
 });
 
 export const PeeringDecisionSchema = z.object({
     decision: z.enum(['approve', 'reject']),
-    reason: z.string().max(1024).optional(),
+    reason: z.string().max(10_000).optional(),
 });
 
 export const HeartbeatSchema = z.object({
@@ -264,7 +265,7 @@ export const RoleGrantSchema = z.object({
 
 export const MorselRequestSchema = z.object({
     amount: z.number().int().positive().max(1000),
-    reason: z.string().max(256).optional(),
+    reason: z.string().max(10_000).optional(),
 });
 
 // ── Storage ─────────────────────────────────────────────────
@@ -370,7 +371,7 @@ export function validateBody<T>(schema: z.ZodType<T>, nodeId: string) {
 export const GhiiRegistrationSchema = z.object({
     username: z.string().min(1).max(64),
     display_name: z.string().max(128).optional(),
-    bio: z.string().max(500).optional(),
+    bio: z.string().max(10_000).optional(),
     avatar: z.string().max(128).optional(),
     locale: z.string().max(10).optional(),
     password: z.string().max(256).optional(),
@@ -406,7 +407,7 @@ export const FlagCreateSchema = z.object({
     targetType: z.enum(['memory', 'board_post', 'action', 'agent']),
     targetId: z.string().min(1).max(256),
     reason: z.enum(['unreliable', 'inappropriate', 'illegal', 'spam', 'other']),
-    description: z.string().max(1000).optional(),
+    description: z.string().max(10_000).optional(),
 });
 
 // ── Extensions Install (security audit -- authenticated endpoints) ──
