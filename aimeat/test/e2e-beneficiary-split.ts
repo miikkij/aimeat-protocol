@@ -68,6 +68,23 @@ const SCRIPTS = {
   // Names its beneficiary for THIS call. The node resolves the destination and strips the key.
   designating: 'export default async function(ctx, input){ return { echo: input, _revenue: { beneficiaries: [{ ghii: input.pay_to, weight: 1 }] } }; }',
   boom: 'export default async function(){ throw new Error("delivery failed on purpose"); }',
+  // Kumppani's shape, in miniature. A company declares itself, and separately CONSENTS; only a
+  // consenting one is named for a share. The consent row carries the GHII to pay, because a
+  // business id is not an account and the node cannot accrue to a number.
+  consentRegistry: `export default async function(ctx, input){
+    if (input.consent) {
+      await ctx.memory.set('member.' + input.businessId, { ghii: input.ghii, consented: !!input.consented });
+      return { ok: true, businessId: input.businessId, consented: !!input.consented };
+    }
+    const named = [];
+    const looked = [];
+    for (const id of (input.businessIds || [])) {
+      const m = await ctx.memory.get('member.' + id);
+      looked.push({ businessId: id, consented: !!(m && m.consented) });
+      if (m && m.consented && m.ghii) named.push({ ghii: m.ghii, weight: 1, note: 'looked-up party ' + id });
+    }
+    return { ok: true, companies: looked, _revenue: { beneficiaries: named } };
+  }`,
 };
 const manifest = (name: string) => JSON.stringify({
   metadata: { name, version: '1.0.0', description: 'beneficiary split e2e provider', author: 'e2e' },
@@ -80,6 +97,9 @@ const manifest = (name: string) => JSON.stringify({
     // lookup, the share going to whichever company was looked up). Each rail and each source had
     // been proven, and their product had not.
     { id: 'paiddyn', method: 'POST', path: '/paiddyn', script: 'designating', commercial: { payMoney: { amount: 500_000, currency: 'EUR' } } },
+    // The consent-gated lookup: same money price, but the destination set comes from a registry the
+    // capability owns, so "has this company consented" decides whether anybody is owed anything.
+    { id: 'registerChanges', method: 'POST', path: '/registerChanges', script: 'consentRegistry', commercial: { payMoney: { amount: 500_000, currency: 'EUR' } } },
   ],
   config: { public_access: { default: true } },
   limits: { timeout_ms: 5000, max_api_calls: 1 },
@@ -116,6 +136,12 @@ const declare = (token: string, body: Record<string, unknown>) =>
   json('/v1/commerce/beneficiary-splits', { method: 'POST', headers: auth(token), body: JSON.stringify(body) });
 const earnings = (token: string) => json('/v1/commerce/beneficiary/earnings', { headers: auth(token) });
 const obligations = (token: string) => json('/v1/commerce/beneficiary/obligations', { headers: auth(token) });
+
+/** The caller's MORSEL balance. Named to make the assertion read honestly: a money call must not
+ *  touch the pacing meter, and the two are not interchangeable quantities. */
+async function balanceEur(token: string): Promise<number> {
+  return balance(token);
+}
 
 /** Everything a beneficiary has been booked, in one number, so a delta is easy to assert. */
 async function accrued(token: string): Promise<number> {
@@ -440,6 +466,95 @@ await test('The money-rail entry names the per-call source and the right unit', 
   assert(!!e, `expected a money obligation to beta: ${JSON.stringify(list.body.data.entries.map((x: any) => [x.beneficiary, x.unit, x.kind]))}`);
   assert(e.kind === 'dynamic', `named per call, got kind=${e.kind}`);
   assert(e.currency === 'EUR' && e.unit === 'money', `unit/currency: ${e.unit}/${e.currency}`);
+});
+
+// ── THE PRODUCT SCENARIO: consent is what turns the share on ─────────────────
+//
+// Everything above proves the mechanism. This proves the THING THE MECHANISM IS FOR, in the shape
+// the driving use case actually has: a lookup service priced in money, whose share goes to the
+// party that was looked up, but ONLY once that party has consented and named an account to pay.
+//
+// It exists because the production app had zero consenting companies, so no live call could ever
+// have shown a non-zero share. "It will work when somebody consents" is a claim, and a claim about
+// money is worth exactly as much as the test that makes it fail first.
+
+let scenarioRake = 0;
+
+await test('SCENARIO 1: a lookup of a NON-consenting company pays nobody', async () => {
+  const d = await declare(provider.token, { ext: EXT, action: 'registerChanges', pool_percent: 70, dynamic: true, capability: 'Register changes' });
+  assert(d.status === 200, `declare ${d.status}: ${JSON.stringify(d.body?.error)}`);
+  const a = await accept(consumer.token, 'registerChanges', { cap_units: 5_000_000 });
+  assert(a.status === 201, `accept ${a.status}: ${JSON.stringify(a.body?.error)}`);
+  scenarioRake = Number(a.body.data.entitlement.rake_per_call);
+
+  // alpha is the account behind the company, but the company has not consented yet.
+  const before = Number((await earnings(alpha.token)).body.data.totals?.EUR?.accrued ?? 0);
+  const r = await invoke(consumer.token, 'registerChanges', { businessIds: ['3323553-5'] });
+  assert(r.status === 200, `lookup ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.companies[0].consented === false, 'the capability reports it as not consented');
+  const after = Number((await earnings(alpha.token)).body.data.totals?.EUR?.accrued ?? 0);
+  assert(after === before, `nobody is owed anything yet: ${before} -> ${after}`);
+});
+
+await test('SCENARIO 2: the company consents, naming the account to pay', async () => {
+  const r = await invoke(provider.token, 'registerChanges', {
+    consent: true, businessId: '3323553-5', ghii: alpha.ghii, consented: true,
+  });
+  assert(r.status === 200 && r.body.data.consented === true, `consent ${r.status}: ${JSON.stringify(r.body?.data)}`);
+});
+
+await test('SCENARIO 3: the SAME lookup now accrues to that account, and the buyer pays the same price', async () => {
+  const consumerBefore = await balanceEur(consumer.token);
+  const before = Number((await earnings(alpha.token)).body.data.totals?.EUR?.accrued ?? 0);
+  const r = await invoke(consumer.token, 'registerChanges', { businessIds: ['3323553-5'] });
+  assert(r.status === 200, `lookup ${r.status}`);
+  assert(r.body.data.companies[0].consented === true, 'the capability now reports it as consented');
+  assert(!('_revenue' in (r.body.data ?? {})), 'the designation key stays out of the buyer\'s result');
+
+  const after = Number((await earnings(alpha.token)).body.data.totals?.EUR?.accrued ?? 0);
+  const expected = Math.floor((500_000 - scenarioRake) * 70 / 100);
+  assert(after - before === expected, `consent turned the share on: expected ${expected}, got ${after - before}`);
+  // The whole argument for taking it out of the provider's cut: the buyer never notices.
+  assert(await balanceEur(consumer.token) === consumerBefore, 'the buyer\'s morsel balance is untouched by a money call');
+});
+
+await test('SCENARIO 4: two companies looked up, one consenting, and only the consenting one is paid', async () => {
+  await invoke(provider.token, 'registerChanges', { consent: true, businessId: '0109862-8', ghii: beta.ghii, consented: false });
+  const aBefore = Number((await earnings(alpha.token)).body.data.totals?.EUR?.accrued ?? 0);
+  const bBefore = Number((await earnings(beta.token)).body.data.totals?.EUR?.accrued ?? 0);
+
+  const r = await invoke(consumer.token, 'registerChanges', { businessIds: ['3323553-5', '0109862-8'] });
+  assert(r.status === 200, `lookup ${r.status}`);
+  const expected = Math.floor((500_000 - scenarioRake) * 70 / 100);
+  assert(Number((await earnings(alpha.token)).body.data.totals?.EUR?.accrued ?? 0) - aBefore === expected,
+    'the consenting company takes the whole pool when it is the only one named');
+  assert(Number((await earnings(beta.token)).body.data.totals?.EUR?.accrued ?? 0) === bBefore,
+    'a declared but NOT consenting company is owed nothing');
+});
+
+await test('SCENARIO 5: both consent, and the pool splits evenly between them', async () => {
+  await invoke(provider.token, 'registerChanges', { consent: true, businessId: '0109862-8', ghii: beta.ghii, consented: true });
+  const aBefore = Number((await earnings(alpha.token)).body.data.totals?.EUR?.accrued ?? 0);
+  const bBefore = Number((await earnings(beta.token)).body.data.totals?.EUR?.accrued ?? 0);
+
+  const r = await invoke(consumer.token, 'registerChanges', { businessIds: ['3323553-5', '0109862-8'] });
+  assert(r.status === 200, `lookup ${r.status}`);
+  const aGot = Number((await earnings(alpha.token)).body.data.totals?.EUR?.accrued ?? 0) - aBefore;
+  const bGot = Number((await earnings(beta.token)).body.data.totals?.EUR?.accrued ?? 0) - bBefore;
+  const pool = Math.floor((500_000 - scenarioRake) * 70 / 100);
+  assert(aGot + bGot === pool, `the two shares sum to the pool exactly: ${aGot} + ${bGot} !== ${pool}`);
+  assert(Math.abs(aGot - bGot) <= 1, `equal weights split evenly (within the odd micro-unit): ${aGot} vs ${bGot}`);
+});
+
+await test('SCENARIO 6: withdrawing consent stops future shares and keeps past ones', async () => {
+  const before = Number((await earnings(alpha.token)).body.data.totals?.EUR?.accrued ?? 0);
+  assert(before > 0, 'alpha has earned something to keep');
+  await invoke(provider.token, 'registerChanges', { consent: true, businessId: '3323553-5', ghii: alpha.ghii, consented: false });
+
+  const r = await invoke(consumer.token, 'registerChanges', { businessIds: ['3323553-5'] });
+  assert(r.status === 200, `lookup ${r.status}`);
+  assert(Number((await earnings(alpha.token)).body.data.totals?.EUR?.accrued ?? 0) === before,
+    'no new share after consent is withdrawn, and what was already earned still stands');
 });
 
 // ── Cross-owner isolation ─────────────────────────────────────────────────────
