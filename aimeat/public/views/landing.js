@@ -89,7 +89,7 @@ function StatsPanel({ navigate }) {
       <div class="ld-stats-line">
         ${parts.length > 0
           ? html`${tr('landing.todayPrefix', 'This node today:')} ${parts.join(' · ')} · 0 ${tr('landing.humanHours', 'human hours')}`
-          : tr('landing.statsFallback', 'This node runs agents around the clock — schedules, tasks and publishing without human hours.')}
+          : tr('landing.statsFallback', 'This node runs agents around the clock: schedules, tasks and publishing without human hours.')}
       </div>
       <div class="ld-stats-own">
         ${tr('landing.ownLine', 'The same could run for you. Your own node, your data, your agents.')}
@@ -137,7 +137,7 @@ function Gallery() {
         aria-label=${tr('landing.wallSearch', 'Search apps')} />
       ${shown.length === 0
         ? html`<p class="ld-app-desc">${apps.length === 0
-            ? tr('landing.wallEmpty', 'Be the first — copy the prompt above, build something, and it lands here.')
+            ? tr('landing.wallEmpty', 'Be the first. Copy the prompt above, build something, and it lands here.')
             : tr('landing.wallNoMatch', 'No apps match your search.')}</p>`
         : html`<div class="ld-gallery">
             ${shown.map((a) => {
@@ -371,13 +371,13 @@ function BuildAppPrompt() {
         ${templates.length ? html`
           <label class="ld-gen-label" for="ld-gen-tpl">${tr('landing.startTemplate', 'Start from a template')} <span class="ld-gen-opt">${tr('landing.genOptional', '(optional)')}</span></label>
           <select id="ld-gen-tpl" class="input-field ld-gen-select" onChange=${onPickTemplate} value=${tplId}>
-            <option value="">${tr('landing.fromScratch', '(none — build from scratch)')}</option>
+            <option value="">${tr('landing.fromScratch', '(none, build from scratch)')}</option>
             ${templates.map(t => html`<option value=${t.id} key=${t.id}>${t.kind === 'use-case' ? '★ ' : ''}${t.title}</option>`)}
           </select>` : ''}
 
         ${packs.length ? html`
           <div class="ld-gen-label">${tr('landing.genPacks', 'Capability packs')} <span class="ld-gen-opt">${tr('landing.genOptional', '(optional)')}</span></div>
-          <p class="ld-gen-hint">${tr('landing.genPacksHint', 'Charts, editable flow diagrams, games, 3D… — self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.')}</p>
+          <p class="ld-gen-hint">${tr('landing.genPacksHint', 'Charts, editable flow diagrams, games, 3D. Self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.')}</p>
           <div class="ld-gen-packs">
             ${packs.map(pk => html`
               <label class="ld-gen-pack" key=${pk.id} title=${pk.description || ''}>
@@ -401,11 +401,11 @@ function BuildAppPrompt() {
 
       <div class="ld-gen-step">
         <div class="ld-gen-head"><span class="ld-gen-num">3</span><span>${tr('landing.genStep3', 'Add & publish your app')}</span></div>
-        <p class="ld-gen-hint">${tr('landing.genStep3Hint', 'Got the code or HTML file back from the AI? Create an account — it takes a minute — then paste it or upload the file. The app goes live at its own address and you get a link to share.')}</p>
+        <p class="ld-gen-hint">${tr('landing.genStep3Hint', 'Got the code or HTML file back from the AI? Create an account, it takes a minute, then paste the code or upload the file. The app goes live at its own address and you get a link to share.')}</p>
         <a class="btn-outline ld-gen-copy ld-gen-add" href="/app-catalog.html?add=1">
           ${tr('landing.genStep3Btn', 'Register and add your app')}
         </a>
-        <p class="ld-gen-hint ld-gen-mcp">${tr('landing.genStep3Mcp', 'If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you — no file to move by hand.')}</p>
+        <p class="ld-gen-hint ld-gen-mcp">${tr('landing.genStep3Mcp', 'If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you, with no file to move by hand.')}</p>
       </div>
     </div>`;
 }
@@ -498,8 +498,8 @@ function BuildAgentPrompt() {
   };
   return html`
     <section class="ld-askai">
-      <h2 class="ld-askai-title">${tr('landing.agentBuildTitle', 'Build an agent in 10 minutes — copy this prompt')}</h2>
-      <p class="ld-askai-sub">${tr('landing.agentBuildSub', 'Paste into Claude, ChatGPT or any AI. It builds a local AI agent — running on your own machine, no API keys — connected to your node, and shows you how to share it. For coders and tinkerers; beginners can use the desktop app instead.')}</p>
+      <h2 class="ld-askai-title">${tr('landing.agentBuildTitle', 'Build an agent in 10 minutes. Copy this prompt')}</h2>
+      <p class="ld-askai-sub">${tr('landing.agentBuildSub', 'Paste into Claude, ChatGPT or any AI. It builds a local AI agent that runs on your own machine with no API keys, connected to your node, and shows you how to share it. For coders and tinkerers; beginners can use the desktop app instead.')}</p>
       <div class="ld-askai-box">
         <pre class="ld-askai-prompt">${prompt}</pre>
         <button class="btn-primary ld-askai-copy" onClick=${copy}>${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}</button>
@@ -522,8 +522,8 @@ function AskYourAI() {
   };
   return html`
     <section class="ld-askai">
-      <h2 class="ld-askai-title">${tr('landing.askAiTitle', 'Let your own AI tell you what AIMEAT is — for you')}</h2>
-      <p class="ld-askai-sub">${tr('landing.askAiSub', 'Paste this into Claude, ChatGPT or any AI. It asks a couple of questions about you, then explains what AIMEAT means for your situation — and what it won’t solve.')}</p>
+      <h2 class="ld-askai-title">${tr('landing.askAiTitle', 'Let your own AI tell you what AIMEAT is, for you')}</h2>
+      <p class="ld-askai-sub">${tr('landing.askAiSub', 'Paste this into Claude, ChatGPT or any AI. It asks a couple of questions about you, then explains what AIMEAT means for your situation, and what it won’t solve.')}</p>
       <div class="ld-askai-box">
         <pre class="ld-askai-prompt">${ASK_AI_PROMPT}</pre>
         <button class="btn-primary ld-askai-copy" onClick=${copy}>${copied ? tr('landing.askAiCopied', 'Copied ✓') : tr('landing.askAiCopy', 'Copy prompt')}</button>
@@ -551,7 +551,7 @@ function BuildInvite() {
       <${Collapsible}
         title=${html`
           <span class="ld-invite-title">${tr('landing.inviteTitle', 'Build your app in 10 minutes')}</span>
-          <span class="ld-invite-sub">${tr('landing.inviteSub', 'Click here and start designing. Your AI builds it — publishing it here takes an account.')}</span>
+          <span class="ld-invite-sub">${tr('landing.inviteSub', 'Click here and start designing. Your AI builds it; publishing it here takes an account.')}</span>
         `}
         open=${open} onToggle=${() => setOpen(o => !o)}>
         <div class="ld-loop">
@@ -621,9 +621,18 @@ export default function Landing({ navigate }) {
            after, because it answers a question the visitor only has once they have seen the
            thing work. -->
 
+      <!-- 0. What this place IS, in one sentence, before anything asks the visitor to do
+              something. The fold below opens onto a tool for building an app, and a tool
+              answers "what can I make" while leaving "what is this" unanswered. The lead-in
+              line frames the fold as one example rather than the whole product. -->
+      <section class="ld-pitch">
+        <p class="ld-pitch-line">${tr('landing.pitch', 'AIMEAT is a digital agency where people, AI, agents and apps work under one roof and everyone owns their own data.')}</p>
+        <p class="ld-pitch-lead">${tr('landing.pitchLead', 'This is one of the things you can do with AIMEAT.')}</p>
+      </section>
+
       <!-- 1. The invitation, folded. Measured behaviour beat the theory here: with the generator
               open on the page, two visitors produced a throwaway chat app and stopped. What holds
-              attention is the wall directly below — it shows the place is alive, which is what
+              attention is the wall directly below: it shows the place is alive, which is what
               makes someone want to add to it. So the builder is one line until it is wanted. -->
       <${BuildInvite} />
 

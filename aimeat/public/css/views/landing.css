@@ -190,7 +190,15 @@
    The generator used to sit open at the top. Two visitors made a throwaway chat app
    and stopped, while the wall below is what reads as a living place. So the builder is
    one prominent line until someone wants it, and the wall leads. */
-.ld-invite { max-width: 760px; margin: 1.5rem auto 2rem; }
+/* The one sentence that says what this is, above the first thing that asks for a click.
+   It carries the page, so it is set at heading weight without being an <h1> competitor to the
+   ownership question further down; the lead-in under it is deliberately quiet, because its
+   whole job is to stop the fold from reading as the entire product. */
+.ld-pitch { max-width: 760px; margin: 2rem auto 1rem; text-align: left; }
+.ld-pitch-line { font-size: 1.35rem; line-height: 1.4; font-weight: 700; color: var(--text); margin: 0; }
+.ld-pitch-lead { font-size: .95rem; color: var(--text-muted); margin: .75rem 0 0; }
+
+.ld-invite { max-width: 760px; margin: 0 auto 2rem; }
 .ld-invite .collapsible {
   border: 1px solid var(--border); border-radius: 16px;
   background: var(--card); overflow: hidden;
