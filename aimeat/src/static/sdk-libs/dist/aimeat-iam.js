@@ -108,12 +108,12 @@
       return caps.indexOf("*") !== -1 || caps.indexOf(cap) !== -1;
     }
     function gate(target, cap) {
-      const el = (
+      const el2 = (
         /** @type {HTMLElement|null} */
         typeof target === "string" ? document.querySelector(target) : target
       );
-      if (!el) return;
-      el.hidden = !can(cap);
+      if (!el2) return;
+      el2.hidden = !can(cap);
     }
     async function guard(cap, fn) {
       const verdict = await serverCheck({ permission: cap });
@@ -121,6 +121,437 @@
       return fn();
     }
     return { can, gate, guard };
+  }
+
+  // src/static/sdk-libs/iam/dom.js
+  var STYLE_ID = "aimeat-iam-style";
+  function el(tag, opts, children) {
+    const node = document.createElement(tag);
+    const o = opts || {};
+    if (o.cls) node.className = o.cls;
+    if (o.text != null) node.textContent = o.text;
+    if (o.attrs) for (const k of Object.keys(o.attrs)) node.setAttribute(k, o.attrs[k]);
+    if (o.on) for (const k of Object.keys(o.on)) node.addEventListener(k, o.on[k]);
+    for (const c of children || []) if (c) node.appendChild(c);
+    return node;
+  }
+  function injectPanelStyle(enabled) {
+    if (enabled === false) return;
+    if (document.getElementById(STYLE_ID)) return;
+    const css = [
+      ".aim-iam{display:flex;flex-direction:column;gap:1rem;color:inherit;font:inherit}",
+      ".aim-iam-sec{display:flex;flex-direction:column;gap:.5rem}",
+      ".aim-iam-h{font-weight:600;margin:0}",
+      ".aim-iam-lead{opacity:.75;font-size:.9em;margin:0;max-width:66ch}",
+      ".aim-iam-row{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center;padding:.4rem 0;border-bottom:1px solid currentColor;border-bottom-color:color-mix(in srgb,currentColor 15%,transparent)}",
+      ".aim-iam-id{font-family:ui-monospace,monospace;font-size:.85em;word-break:break-all;min-width:0;flex:1 1 12rem}",
+      ".aim-iam-badge{font-size:.75em;padding:.1rem .5rem;border:1px solid currentColor;border-radius:999px;opacity:.85;white-space:nowrap}",
+      ".aim-iam-muted{opacity:.65;font-size:.85em}",
+      ".aim-iam-warn{opacity:1;font-weight:600}",
+      ".aim-iam-note{opacity:.8;font-size:.85em;font-style:italic;flex-basis:100%}",
+      // The panel is often narrow inside an app tab, so the controls wrap instead of forcing the page
+      // to scroll sideways. A horizontal scrollbar on an admin panel reads as a broken layout.
+      ".aim-iam-form{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}",
+      ".aim-iam-form input,.aim-iam-form select{min-width:0;flex:1 1 12rem;font:inherit;padding:.35rem .5rem}",
+      ".aim-iam-form button,.aim-iam-row button{font:inherit;padding:.3rem .7rem;cursor:pointer}",
+      ".aim-iam-empty{opacity:.65;font-size:.9em;padding:.4rem 0}"
+    ].join("");
+    const tag = document.createElement("style");
+    tag.id = STYLE_ID;
+    tag.textContent = css;
+    document.head.appendChild(tag);
+  }
+  function fmtDate(iso) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return isNaN(d.getTime()) ? String(iso) : d.toISOString().slice(0, 10);
+  }
+
+  // src/static/sdk-libs/iam/i18n.js
+  var STRINGS = {
+    en: {
+      whoTitle: "Who may use this",
+      modeLabel: "Mode",
+      modeOpen: "open",
+      modeMembers: "members-only",
+      modeInvite: "invite-only",
+      modeSwitch: "Switch",
+      modeMeaningOpen: "Anyone signed in may use it. Approving someone still changes what they pay.",
+      modeMeaningMembers: "Only approved members may use it. Everyone else is refused and told how to ask.",
+      approveTitle: "Approve someone",
+      approvePlaceholder: "account name, or owner@node",
+      approveBtn: "Approve",
+      approveHelp: "A role belongs to the person, so their agents inherit it. Add a row for agent#owner@node only to give that one agent something different.",
+      pendingTitle: "Asked for access",
+      pendingNone: "Nobody is waiting.",
+      seenTitle: "Turned up, holds no role",
+      seenNone: "Nobody has turned up yet.",
+      visits: "{n} visits, last {d}",
+      membersTitle: "Approved",
+      membersNone: "Nobody is approved yet.",
+      colAccount: "Account",
+      colRole: "Role",
+      colSince: "Member since",
+      colGrants: "Free access",
+      remove: "Remove",
+      decline: "Decline",
+      carried: "{n} / {of} carried",
+      carriedNone: "none carried",
+      carriedWarn: "{n} not carried",
+      payingTitle: "Paying customers: {n}",
+      payingLead: "They took a contract and let themselves in. Nothing here is waiting for you.",
+      payingNone: "No paying customers yet.",
+      strangerTitle: "What a stranger gets",
+      strangerRole: 'Anyone signed in who is not on the list gets "{role}".',
+      strangerDeny: "Anyone not on the list is refused.",
+      settingsTitle: "Settings",
+      joinTitle: "Ask for access",
+      joinNote: "Who you are and what you need it for",
+      joinBtn: "Send request",
+      joinSent: "Your request was recorded. The owner decides.",
+      joinPassive: "Your visit has been recorded. The owner sees you in their list and can approve you.",
+      joinAlready: "You already have access.",
+      notOwner: "Only the owner manages members.",
+      failed: "That did not go through.",
+      loading: "Loading…"
+    },
+    fi: {
+      whoTitle: "Ketkä saavat käyttää",
+      modeLabel: "Tila",
+      modeOpen: "avoin",
+      modeMembers: "vain jäsenet",
+      modeInvite: "vain kutsutut",
+      modeSwitch: "Vaihda",
+      modeMeaningOpen: "Kuka tahansa kirjautunut saa käyttää. Hyväksyntä muuttaa silti sen mitä käyttäjä maksaa.",
+      modeMeaningMembers: "Vain hyväksytyt jäsenet saavat käyttää. Muille kerrotaan miten pääsyä pyydetään.",
+      approveTitle: "Hyväksy käyttäjä",
+      approvePlaceholder: "tilinimi tai omistaja@solmu",
+      approveBtn: "Hyväksy",
+      approveHelp: "Rooli kuuluu ihmiselle, joten hänen agenttinsa perivät sen. Lisää rivi muodossa agentti#omistaja@solmu vain jos haluat että juuri se agentti pitää jotain muuta.",
+      pendingTitle: "Pyytäneet pääsyä",
+      pendingNone: "Kukaan ei odota.",
+      seenTitle: "Käyneet, ei roolia",
+      seenNone: "Kukaan ei ole vielä käynyt.",
+      visits: "{n} käyntiä, viimeksi {d}",
+      membersTitle: "Hyväksytyt",
+      membersNone: "Ketään ei ole vielä hyväksytty.",
+      colAccount: "Tili",
+      colRole: "Rooli",
+      colSince: "Jäsen alkaen",
+      colGrants: "Maksuton käyttö",
+      remove: "Poista",
+      decline: "Hylkää",
+      carried: "{n} / {of} katettu",
+      carriedNone: "ei katettuja",
+      carriedWarn: "{n} kattamatta",
+      payingTitle: "Maksavat asiakkaat: {n}",
+      payingLead: "He ottivat sopimuksen ja päästivät itsensä sisään. Täällä ei odota mitään päätöstä.",
+      payingNone: "Ei vielä maksavia asiakkaita.",
+      strangerTitle: "Mitä tuntematon saa",
+      strangerRole: 'Kirjautunut joka ei ole listalla saa roolin "{role}".',
+      strangerDeny: "Listan ulkopuolinen ei saa käyttää tätä.",
+      settingsTitle: "Asetukset",
+      joinTitle: "Pyydä pääsyä",
+      joinNote: "Kuka olet ja mihin tarvitset tätä",
+      joinBtn: "Lähetä pyyntö",
+      joinSent: "Pyyntösi on kirjattu. Omistaja päättää.",
+      joinPassive: "Käyntisi on kirjattu. Omistaja näkee sinut listallaan ja voi hyväksyä sinut.",
+      joinAlready: "Sinulla on jo pääsy.",
+      notOwner: "Vain omistaja hallinnoi jäseniä.",
+      failed: "Se ei mennyt läpi.",
+      loading: "Ladataan…"
+    }
+  };
+  function pickLang(explicit) {
+    const raw = explicit || document.documentElement && document.documentElement.lang || "en";
+    const short = String(raw).toLowerCase().slice(0, 2);
+    return STRINGS[short] ? short : "en";
+  }
+  function t(lang, key, vars, overrides) {
+    const table = STRINGS[lang] || STRINGS.en;
+    let s = overrides && overrides[key] || table[key] || STRINGS.en[key] || key;
+    if (vars) {
+      for (const k of Object.keys(vars)) s = s.split("{" + k + "}").join(String(vars[k]));
+    }
+    return s;
+  }
+
+  // src/static/sdk-libs/iam/panel.js
+  var MODES = ["open", "members-only", "invite-only"];
+  function mountMemberAdmin(iam2, opts) {
+    const host = typeof opts.target === "string" ? document.querySelector(opts.target) : opts.target;
+    if (!host) throw new Error("aimeat-iam: MemberAdmin target not found");
+    injectPanelStyle(opts.styles);
+    const lang = pickLang(opts.lang);
+    const S = (k, v) => t(lang, k, v, opts.strings);
+    const cls = (hook) => hook + (opts.classMap && opts.classMap[hook] ? " " + opts.classMap[hook] : "");
+    let grants = (
+      /** @type {Record<string, { carried: number, total: number }>} */
+      {}
+    );
+    let paying = (
+      /** @type {Array<{id:string,label?:string,spend?:string}>} */
+      []
+    );
+    async function loadGrants() {
+      if (!opts.appId) return;
+      try {
+        const body = await iam2.adminFetch("/v1/exchange/grants?app_id=" + encodeURIComponent(opts.appId));
+        const rows = body && body.grants || [];
+        const byConsumer = {};
+        for (const g of rows) {
+          const who = String(g.consumer || "").toLowerCase().split("@")[0];
+          if (!who) continue;
+          byConsumer[who] = byConsumer[who] || { carried: 0, total: 0 };
+          byConsumer[who].total += 1;
+          if (g.status === "active") byConsumer[who].carried += 1;
+        }
+        grants = byConsumer;
+      } catch {
+        grants = {};
+      }
+    }
+    async function loadPaying() {
+      if (!opts.payingCustomers) return;
+      try {
+        paying = await opts.payingCustomers() || [];
+      } catch {
+        paying = [];
+      }
+    }
+    function grantCell(id) {
+      const key = String(id).toLowerCase().split("@")[0].split("#").pop();
+      const g = grants[key];
+      if (!g || !g.total) return null;
+      const done = g.carried === g.total;
+      return el("span", {
+        cls: cls("aim-iam-badge") + (done ? "" : " aim-iam-warn"),
+        text: done ? S("carried", { n: g.carried, of: g.total }) : S("carriedWarn", { n: g.total - g.carried })
+      });
+    }
+    async function act(fn) {
+      try {
+        await fn();
+      } catch {
+      }
+      await render();
+    }
+    async function render() {
+      host.textContent = "";
+      const me = iam2.me();
+      const wrap = el("div", { cls: cls("aim-iam") });
+      host.appendChild(wrap);
+      if (!me || !me.isOwner) {
+        wrap.appendChild(el("p", { cls: cls("aim-iam-empty"), text: S("notOwner") }));
+        return;
+      }
+      const state2 = await iam2.admin("state").catch(() => null);
+      const roster = await iam2.roster().catch(() => ({ ok: false, members: [] }));
+      await loadGrants();
+      await loadPaying();
+      const roles = state2 && state2.roles ? Object.keys(state2.roles) : [];
+      const defaultRole = state2 && state2.config && state2.config.defaultRole || null;
+      if (me.mode) {
+        const next = MODES[(MODES.indexOf(me.mode) + 1) % MODES.length];
+        wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, [
+          el("h3", { cls: cls("aim-iam-h"), text: S("whoTitle") }),
+          el("div", { cls: cls("aim-iam-form") }, [
+            el("span", { cls: cls("aim-iam-muted"), text: S("modeLabel") }),
+            el("span", { cls: cls("aim-iam-badge"), text: me.mode }),
+            el("button", {
+              cls: cls("aim-iam-btn"),
+              text: S("modeSwitch"),
+              attrs: { type: "button" },
+              on: { click: () => act(() => iam2.admin("setMode", { set: next, subject: next })) }
+            })
+          ]),
+          el("p", {
+            cls: cls("aim-iam-lead"),
+            text: me.mode === "open" ? S("modeMeaningOpen") : S("modeMeaningMembers")
+          })
+        ]));
+      }
+      const input = el("input", { attrs: { type: "text", placeholder: S("approvePlaceholder"), "aria-label": S("approveTitle") } });
+      const roleSel = el(
+        "select",
+        { attrs: { "aria-label": S("colRole") } },
+        roles.map((r) => el("option", { text: r, attrs: { value: r } }))
+      );
+      wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, [
+        el("h3", { cls: cls("aim-iam-h"), text: S("approveTitle") }),
+        el("div", { cls: cls("aim-iam-form") }, [
+          input,
+          roles.length ? roleSel : null,
+          el("button", {
+            cls: cls("aim-iam-btn"),
+            text: S("approveBtn"),
+            attrs: { type: "button" },
+            on: { click: () => {
+              const id = (
+                /** @type {HTMLInputElement} */
+                input.value.trim()
+              );
+              if (!id) return;
+              const role = roles.length ? (
+                /** @type {HTMLSelectElement} */
+                roleSel.value
+              ) : void 0;
+              return act(() => iam2.admin("assign", role ? { ghii: id, role, owner: id } : { ghii: id, owner: id }));
+            } }
+          })
+        ]),
+        el("p", { cls: cls("aim-iam-lead"), text: S("approveHelp") })
+      ]));
+      if (opts.payingCustomers) {
+        const body = [
+          el("h3", { cls: cls("aim-iam-h"), text: S("payingTitle", { n: paying.length }) }),
+          el("p", { cls: cls("aim-iam-lead"), text: S("payingLead") })
+        ];
+        if (!paying.length) body.push(el("p", { cls: cls("aim-iam-empty"), text: S("payingNone") }));
+        for (const c of paying) {
+          body.push(el("div", { cls: cls("aim-iam-row") }, [
+            el("span", { cls: cls("aim-iam-id"), text: c.label || c.id }),
+            c.spend ? el("span", { cls: cls("aim-iam-muted"), text: c.spend }) : null
+          ]));
+        }
+        wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, body));
+      }
+      const payingIds = new Set(paying.map((p) => String(p.id).toLowerCase().split("@")[0]));
+      const pending = collectPending(state2).filter((p) => !payingIds.has(String(p.id).toLowerCase().split("@")[0]));
+      const isPassive = !state2 || !state2.requests;
+      const qBody = [el("h3", { cls: cls("aim-iam-h"), text: isPassive ? S("seenTitle") : S("pendingTitle") })];
+      if (!pending.length) {
+        qBody.push(el("p", { cls: cls("aim-iam-empty"), text: isPassive ? S("seenNone") : S("pendingNone") }));
+      }
+      for (const p of pending) {
+        qBody.push(el("div", { cls: cls("aim-iam-row") }, [
+          el("span", { cls: cls("aim-iam-id"), text: p.id }),
+          p.visits ? el("span", { cls: cls("aim-iam-muted"), text: S("visits", { n: p.visits, d: fmtDate(p.lastSeen) }) }) : null,
+          el("button", {
+            cls: cls("aim-iam-btn"),
+            text: S("approveBtn"),
+            attrs: { type: "button" },
+            on: { click: () => act(() => iam2.admin("assign", { ghii: p.id, owner: p.id, role: roles[roles.length - 1] || void 0, note: p.note })) }
+          }),
+          isPassive ? null : el("button", {
+            cls: cls("aim-iam-btn"),
+            text: S("decline"),
+            attrs: { type: "button" },
+            on: { click: () => act(() => iam2.admin("decline", { owner: p.id, ghii: p.id })) }
+          }),
+          p.note ? el("span", { cls: cls("aim-iam-note"), text: p.note }) : null
+        ]));
+      }
+      wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, qBody));
+      const mBody = [el("h3", { cls: cls("aim-iam-h"), text: S("membersTitle") + ": " + roster.members.length })];
+      if (!roster.members.length) mBody.push(el("p", { cls: cls("aim-iam-empty"), text: S("membersNone") }));
+      for (const m of roster.members) {
+        const sel = roles.length ? el(
+          "select",
+          { attrs: { "aria-label": S("colRole") } },
+          roles.map((r) => el("option", { text: r, attrs: Object.assign({ value: r }, r === m.role ? { selected: "selected" } : {}) }))
+        ) : null;
+        if (sel) sel.addEventListener("change", () => act(() => iam2.admin(
+          "assign",
+          { ghii: m.id, owner: m.id, role: (
+            /** @type {HTMLSelectElement} */
+            sel.value
+          ) }
+        )));
+        mBody.push(el("div", { cls: cls("aim-iam-row") }, [
+          el("span", { cls: cls("aim-iam-id"), text: m.id }),
+          // The select IS the role display when there is one. Showing a badge beside it repeats the
+          // same word twice and, at 390px, costs a whole row per member for nothing.
+          !sel && m.role ? el("span", { cls: cls("aim-iam-badge"), text: m.role }) : null,
+          m.since ? el("span", { cls: cls("aim-iam-muted"), text: fmtDate(m.since) }) : null,
+          grantCell(m.id),
+          sel,
+          el("button", {
+            cls: cls("aim-iam-btn"),
+            text: S("remove"),
+            attrs: { type: "button" },
+            on: { click: () => act(() => iam2.admin("revoke", { ghii: m.id, owner: m.id })) }
+          })
+        ]));
+      }
+      wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, mBody));
+      if (opts.sections && opts.sections.length) {
+        const sBody = [el("h3", { cls: cls("aim-iam-h"), text: S("settingsTitle") })];
+        for (const s of opts.sections) {
+          const ctrl = s.type === "toggle" ? el("button", {
+            cls: cls("aim-iam-btn"),
+            text: s.value ? "on" : "off",
+            attrs: { type: "button" },
+            on: { click: () => act(async () => {
+              await s.onChange(!s.value);
+              s.value = !s.value;
+            }) }
+          }) : el("input", {
+            attrs: { type: "text", value: s.value == null ? "" : String(s.value) },
+            on: { change: (e) => s.onChange(
+              /** @type {HTMLInputElement} */
+              e.target.value
+            ) }
+          });
+          sBody.push(el("div", { cls: cls("aim-iam-row") }, [
+            el("span", { cls: cls("aim-iam-id"), text: s.label }),
+            ctrl,
+            s.help ? el("span", { cls: cls("aim-iam-note"), text: s.help }) : null
+          ]));
+        }
+        wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, sBody));
+      }
+      wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, [
+        el("h3", { cls: cls("aim-iam-h"), text: S("strangerTitle") }),
+        el("p", {
+          cls: cls("aim-iam-lead"),
+          text: defaultRole ? S("strangerRole", { role: defaultRole }) : S("strangerDeny")
+        })
+      ]));
+    }
+    render();
+    return { refresh: render, destroy: () => {
+      host.textContent = "";
+    } };
+  }
+  function collectPending(state2) {
+    if (!state2) return [];
+    if (Array.isArray(state2.requests)) {
+      return state2.requests.map((r) => ({ id: r.owner || r.gaii || r.id, note: r.note, lastSeen: r.at }));
+    }
+    const seen = state2.seen || {};
+    return Object.keys(seen).map((id) => ({ id, visits: seen[id].visits, lastSeen: seen[id].lastSeen }));
+  }
+  function mountJoinPanel(iam2, opts) {
+    const host = typeof opts.target === "string" ? document.querySelector(opts.target) : opts.target;
+    if (!host) throw new Error("aimeat-iam: JoinPanel target not found");
+    injectPanelStyle(opts.styles);
+    const lang = pickLang(opts.lang);
+    const S = (k, v) => t(lang, k, v, opts.strings);
+    const cls = (hook) => hook + (opts.classMap && opts.classMap[hook] ? " " + opts.classMap[hook] : "");
+    host.textContent = "";
+    const out = el("p", { cls: cls("aim-iam-lead") });
+    const note = el("input", { attrs: { type: "text", placeholder: S("joinNote"), "aria-label": S("joinNote") } });
+    const btn = el("button", { cls: cls("aim-iam-btn"), text: S("joinBtn"), attrs: { type: "button" } });
+    btn.addEventListener("click", async () => {
+      try {
+        const r = await iam2.request(
+          /** @type {HTMLInputElement} */
+          note.value.trim()
+        );
+        out.textContent = r.alreadyMember ? S("joinAlready") : r.passive ? S("joinPassive") : S("joinSent");
+      } catch {
+        out.textContent = S("failed");
+      }
+    });
+    host.appendChild(el("section", { cls: cls("aim-iam") }, [
+      el("h3", { cls: cls("aim-iam-h"), text: S("joinTitle") }),
+      el("div", { cls: cls("aim-iam-form") }, [note, btn]),
+      out
+    ]));
+    return { destroy: () => {
+      host.textContent = "";
+    } };
   }
 
   // src/static/sdk-libs/iam/index.js
@@ -197,13 +628,15 @@
      */
     async refresh() {
       requireInit();
+      let adminState = null;
       if (state.dialect !== "command") {
-        const st = await callAdmin(authFetch2, state.ext, state.dialect, "state").catch(() => null);
-        if (st && st.roles) state.roles = st.roles;
+        adminState = await callAdmin(authFetch2, state.ext, state.dialect, "state").catch(() => null);
+        if (adminState && adminState.roles) state.roles = adminState.roles;
       }
       const probe = state.dialect === "op" ? { permission: "\0probe" } : {};
       const raw = await callCheck(authFetch2, state.ext, state.dialect, probe);
       state.me = normalise(raw, state.roles, state.dialect);
+      if (adminState && typeof adminState.isOwner === "boolean") state.me.isOwner = adminState.isOwner;
       return state.me;
     },
     /**
@@ -291,6 +724,34 @@
     admin(op, args) {
       requireInit();
       return callAdmin(authFetch2, state.ext, state.dialect, op, args);
+    },
+    /**
+     * An authed GET against the node, for the panel's free-access column. It reads
+     * /v1/exchange/grants?app_id=, which is a NODE surface rather than the extension's, so it works
+     * for any app that issues zero-priced grants on approval without that app writing the lookup.
+     * @param {string} path
+     * @returns {Promise<any>}
+     */
+    async adminFetch(path) {
+      const body = await authFetch2(path);
+      return body && body.data !== void 0 ? body.data : body;
+    },
+    /**
+     * The owner's panel: the union of the six that already exist on this node. See panel.js for what
+     * each section is and which app it came from.
+     * @param {import('./panel.js').PanelOpts} opts
+     */
+    MemberAdmin(opts) {
+      requireInit();
+      return mountMemberAdmin(iam, opts);
+    },
+    /**
+     * The applicant's side.
+     * @param {{ target: string|Element, lang?: string, strings?: Record<string,string>, classMap?: Record<string,string>, styles?: boolean }} opts
+     */
+    JoinPanel(opts) {
+      requireInit();
+      return mountJoinPanel(iam, opts);
     }
   };
   function requireInit() {
