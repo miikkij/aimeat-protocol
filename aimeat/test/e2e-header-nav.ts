@@ -11,7 +11,13 @@
  *            the off path is covered by e2e-secretary-disabled.ts (self-spawns a flag-off server).
  *   v1.2.0 — 2026-07-10 — Drop the features.secretary assertion; the Secretary feature was removed
  *            (the `features` map is now empty). Generic header-nav tests unchanged.
+ *   v1.3.0 — 2026-07-30 — Take the known link ids from PUBLIC_NAV_LINK_IDS instead of a hand-copied
+ *            list. The copy had fallen two links behind the node (`learn`, `exchange`), failing three
+ *            tests over a correct change; and the reorder fixture now covers every id, because the
+ *            service normalizes a saved order to include them all and a partial list cannot round-trip.
  */
+import { PUBLIC_NAV_LINK_IDS } from '../src/services/site.js';
+
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -55,7 +61,10 @@ async function signMsg(privateKeyB64: string, message: string): Promise<string> 
 }
 
 // ─── State ───
-const KNOWN = ['try', 'howItWorks', 'business', 'devView', 'help'];
+// Imported rather than restated. A hand-copied list is a second source of truth for the same fact,
+// and this one silently fell two links behind the node (`learn` and `exchange` were added and the
+// copy was not), so three tests failed on a nav change that was entirely correct.
+const KNOWN = [...PUBLIC_NAV_LINK_IDS];
 
 let opToken = '';
 let opPrivKey = '';
@@ -146,7 +155,9 @@ await test('PUT /v1/site/header-nav with non-operator token → 403', async () =
 // ─── Save round-trip ───
 console.log('\nSave round-trip');
 
-const NEW_ORDER = ['help', 'try', 'howItWorks', 'devView', 'business'];
+// A real reorder that still covers EVERY known id: the service normalizes a saved order to include
+// all of them, so a partial list comes back with the missing ones appended and never round-trips.
+const NEW_ORDER = ['help', ...KNOWN.filter(id => id !== 'help')];
 
 await test('PUT /v1/site/header-nav (operator) — reorder + hide one → 200', async () => {
     const { status, body } = await json('/v1/site/header-nav', authed({
