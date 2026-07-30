@@ -156,7 +156,21 @@ export const appMethods = {
       apps = apps.filter(a => !a.operatorHidden || (opts?.viewerGhii && a.ownerGaii === opts.viewerGhii));
     }
     const total = apps.length;
-    apps.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    // 'popular' was accepted and then ignored here: every caller asking for it got the newest
+    // apps instead, silently. SQLite has always ordered by the download count, so the two
+    // backends disagreed about what the same query means. One row per downloaded app makes the
+    // whole counter table cheap to read, and it has to be read before the slice or the ordering
+    // would only shuffle whichever page the newest-first cut happened to produce.
+    if (opts?.sort === 'popular') {
+      const counts = new Map<string, number>();
+      const rows = await this.db.selectFrom('AppDownload').select(['ownerGaii', 'filename', 'count']).execute();
+      for (const r of rows) counts.set(`${r.ownerGaii} ${r.filename}`, r.count ?? 0);
+      const of = (a: AppRecord) => counts.get(`${a.ownerGaii} ${a.filename}`) ?? 0;
+      // Newest first among apps nobody has opened yet, so the tail stays meaningful.
+      apps.sort((a, b) => (of(b) - of(a)) || b.createdAt.localeCompare(a.createdAt));
+    } else {
+      apps.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    }
     const offset = opts?.offset ?? 0;
     const limit = opts?.limit ?? 50;
     return { apps: apps.slice(offset, offset + limit), total };
