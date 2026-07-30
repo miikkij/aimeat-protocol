@@ -7900,7 +7900,9 @@
     "heroCtaLoading": "Ladataan rakennusohjetta…",
     "buildLoading": "Ladataan rakennusohjetta…",
     "buildShowFull": "Näytä koko ohje",
-    "buildChars": "merkkiä"
+    "buildChars": "merkkiä",
+    "ecLinkShort": "Opi käytännössä, ilmaiseksi →",
+    "heroPricing": "Hinnat →"
   },
   "pricing": {
     "title": "Hinnoittelu",

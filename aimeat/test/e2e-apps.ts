@@ -781,5 +781,69 @@ await test('/v1/libs catalogue lists aimeat-agentface (requires aimeat-auth)', a
 });
 
 // ── Summary ──
+
+// ── a re-publish must not rename the app after its own file ────────────────────────
+// The carry-forward list already covered description, category, tags, icon, pricing and protection.
+// It left out the two fields a person actually reads. A run of routine re-publishes renamed five live
+// apps to their own filenames in the public catalogue, and nothing in any response said so.
+await test('a re-publish that omits the name keeps the name, inline and presigned', async () => {
+    const file = `named-${Date.now().toString(36)}.html`;
+    const b64 = (h: string) => Buffer.from(h).toString('base64');
+
+    const first = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({
+            filename: file, name: 'PROPER NAME', description: 'first publish',
+            version: '2.3.0', tags: ['alpha'], icon: '\u2728', content: b64('<html>one</html>'),
+        }),
+    }));
+    assert(first.status === 200 || first.status === 201, `published: ${first.status} ${JSON.stringify(first.body?.error)}`);
+
+    const read = async () => {
+        const r = await json(`/v1/apps/${ownerName}/${file}/meta`, authed());
+        const d = r.body?.data ?? {};
+        return (d.app ?? d).manifest ?? {};
+    };
+    assert((await read()).name === 'PROPER NAME', 'the name it was given');
+
+    // INLINE update with no name and no version — what a content-only republish looks like.
+    const second = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: file, description: 'second publish', content: b64('<html>two</html>') }),
+    }));
+    assert(second.status === 200 || second.status === 201, `updated: ${second.status}`);
+    const afterInline = await read();
+    assert(afterInline.name === 'PROPER NAME',
+        `an update that omits the name leaves it alone: ${JSON.stringify(afterInline.name)}`);
+    assert(afterInline.version === '2.3.0',
+        `and does not renumber it either: ${JSON.stringify(afterInline.version)}`);
+    assert(afterInline.icon === '\u2728' && (afterInline.tags ?? []).length === 1,
+        `the fields that already carried still carry: ${JSON.stringify(afterInline)}`);
+
+    // PRESIGNED update with no name — the path that actually did the damage.
+    const pre = await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: file, description: 'third publish', mode: 'presigned' }),
+    }));
+    const url = pre.body?.data?.upload_url as string;
+    assert(!!url, `presigned url: ${JSON.stringify(pre.body?.error ?? pre.body)}`);
+    const put = await fetch(url.startsWith('http') ? url : `${BASE}${url}`, {
+        method: 'PUT', headers: { 'Content-Type': 'text/html' }, body: '<html>three</html>',
+    });
+    assert(put.ok, `uploaded: ${put.status}`);
+    const afterPresigned = await read();
+    assert(afterPresigned.name === 'PROPER NAME',
+        `a presigned update that omits the name leaves it alone: ${JSON.stringify(afterPresigned.name)}`);
+    assert(afterPresigned.version === '2.3.0',
+        `and leaves the version alone: ${JSON.stringify(afterPresigned.version)}`);
+
+    // Naming it explicitly still renames it: this is a carry-forward, not a lock.
+    await json('/v1/apps', authed({
+        method: 'POST',
+        body: JSON.stringify({ filename: file, name: 'RENAMED', description: 'fourth', content: b64('<html>four</html>') }),
+    }));
+    assert((await read()).name === 'RENAMED', 'an explicit name still renames it');
+});
+
 console.log(`\n${passed} passed, ${failed} failed\n`);
 process.exit(failed > 0 ? 1 : 0);

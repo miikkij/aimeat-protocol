@@ -71,7 +71,15 @@ export function registerPublishRoutes(
             const token = await generateUploadToken({
                 sub: ownerGhii,
                 utype: 'app',
-                meta: { filename, name: req.body.name ?? filename, description, category, tags, icon, version: semver },
+                // Only what the caller ACTUALLY sent. Defaulting the name to the filename here made
+                // "the caller omitted it" indistinguishable from "the caller asked for it" by the
+                // time the upload completed, so every presigned update renamed the app to its own
+                // filename — NUOTTA became "nuotta.html" in the catalogue, in public.
+                meta: {
+                    filename, description, category, tags, icon,
+                    ...(typeof req.body.name === 'string' ? { name: req.body.name } : {}),
+                    ...(typeof semver === 'string' ? { version: semver } : {}),
+                },
                 maxBytes: MAX_APP_SIZE,
                 contentType: 'text/html',
             });
@@ -194,6 +202,9 @@ export function registerPublishRoutes(
         // silently turn a paid app free.
         let carriedPriceMorsels: number | undefined;
         let carriedLicenseType: AppManifest['licenseType'] | undefined;
+        // The two most visible fields an app has, and the two the carry-forward list forgot.
+        let carriedName: string | undefined;
+        let carriedVersion: string | undefined;
         if (isUpdate) {
             const existingApp = await storage.getApp(ownerGhii, filename);
             parkedState = !!existingApp?.parked;
@@ -206,6 +217,8 @@ export function registerPublishRoutes(
             carriedCategory = existingApp?.manifest?.category;
             carriedUsesCortex = existingApp?.manifest?.usesCortex;
             carriedIcon = existingApp?.manifest?.icon;
+            carriedName = existingApp?.manifest?.name;
+            carriedVersion = existingApp?.manifest?.version;
             carriedCortex = existingApp?.manifest?.cortex;
             carriedDescriptions = existingApp?.manifest?.descriptions;
             carriedPriceMorsels = existingApp?.manifest?.priceMorsels;
@@ -227,9 +240,12 @@ export function registerPublishRoutes(
 
         const now = new Date().toISOString();
         const manifest: AppManifest = {
-            name: typeof name === 'string' ? name : filename.replace(/\.html?$/i, ''),
+            // Carried forward on an update, like description and icon below it. The display name is
+            // the single most visible thing an app has, and an update that omits it means "leave it
+            // alone" — never "rename it after the file it happens to live in".
+            name: typeof name === 'string' ? name : (carriedName ?? filename.replace(/\.html?$/i, '')),
             description: effectiveDescription,
-            version: typeof semver === 'string' ? semver : `1.0.${newVersion - 1}`,
+            version: typeof semver === 'string' ? semver : (carriedVersion ?? `1.0.${newVersion - 1}`),
             category: typeof category === 'string' ? category : (carriedCategory ?? 'utility'),
             tags: Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === 'string') : [],
             authorDisplay: owner,

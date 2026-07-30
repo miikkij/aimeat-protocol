@@ -1,16 +1,21 @@
 /**
  * @file landing.js
- * @description Logged-out landing page: reward first, explanation second. Hero is the
- *   build-prompt pitch — copy one prompt and your AI builds you a real app on AIMEAT that you
- *   own and publish. Two CTAs (copy build prompt · get your own) → LIVE wall of the real apps
- *   people published here (manifest-driven, from the apps API) → node totals panel →
- *   the 3-step build loop + build prompt → "ask your own AI" → today's node stats +
- *   ownership line (the sales close) → footer. Logged-in visitors are forwarded to the
+ * @description Logged-out landing page, in the order a visitor needs it (TARGET-056):
+ *   the three-step loop → the generator itself → live counters as its evidence → the
+ *   ownership question (owner or tenant) → the wall of published apps → agent prompt →
+ *   ask-your-own-AI → today's stats → footer. Logged-in visitors are forwarded to the
  *   profile Home dashboard. No protocol terms (GHII/GAII/CSM/federation) above the fold;
  *   a working result does the selling.
  * @structure default export Landing({ navigate }) + BuildHero/Gallery(live wall)/StatsPanel/BuildAppPrompt/BuildAgentPrompt/AskYourAI
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v5.0.0 — 2026-07-30 — TARGET-056: order reversed. The generator led the page's value and
+ *     sat below a wall of other people's work; it is first now, with the three steps above it
+ *     and the live counters directly under it as its evidence. The ownership question moved
+ *     below them, because it answers a question a visitor only has after seeing the thing work.
+ *     Hero keeps ONE primary button (four of equal weight asked for a choice before there was
+ *     enough to choose from); the rest are one quiet line. Its old copy button was dropped as a
+ *     duplicate of the generator's, now directly above it.
  *   v4.0.0 — 2026-07-28 — Hero states the fork (owner or tenant) with three entrances: build,
  *     business, own node. The Experience Center line and every other app reference now come
  *     from siteLinks, so a node that is not aimeat.io renders without them. The build button
@@ -397,37 +402,23 @@ function AskYourAI() {
    you own + publish them. One copyable prompt is the whole on-ramp; the live wall below is the
    proof that your creation lands on the same shelf as everyone else's. ── */
 function BuildHero({ onNavigate }) {
-  const [copied, setCopied] = useState(false);
-  const [canonical, setCanonical] = useState('');
-  useEffect(() => { fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(err => { swallowed('landing', err); return {}; }); }, []);
-  // Until the node's canonical prompt arrives, the button copies the in-file fallback — which
-  // predates research-first (Step 0), the T1/T2/T3 tiers and the capability packs. Copying that
-  // by accident sends someone off to build the wrong shape, so the button waits.
-  const prompt = canonical;
-  const copy = async () => {
-    if (!prompt) return;
-    try { await navigator.clipboard.writeText(prompt); setCopied(true); setTimeout(() => setCopied(false), 2000); }
-    // eslint-disable-next-line aimeat/no-silent-catch -- the full prompt is also visible lower on the page
-    catch { /* the full prompt is also visible lower on the page */ }
-  };
-  // Three entrances, in the order the three audiences arrive: build something (the
-  // fastest reward), see what it does for a business, run a node of your own.
+  // ONE primary action. This section used to carry four buttons of equal weight, which asks the
+  // visitor to choose before they know enough to choose. It also sits BELOW the generator now, so
+  // its old "Build something, free" button duplicated the copy button directly above it — the
+  // remaining paths are the ones a person reaches for AFTER the ownership question lands.
   return html`
     <section class="ld-hero2">
       <p class="ld-hero2-kicker">${tr('landing.heroKicker', 'Two roles in the agent economy.')}</p>
       <h1 class="ld-hero2-title">${tr('landing.heroTitle', 'Owner, or tenant. Which one do you want to be?')}</h1>
       <p class="ld-hero2-sub">${tr('landing.heroSub', 'Your memory, your agents, your balance sheet. On a rented platform you build a tool and pay for it. Here the tool can bill someone else, and it is yours.')}</p>
       <div class="ld-hero2-cta">
-        <button class="btn-primary" type="button" onClick=${copy} disabled=${!prompt}>
-          ${copied ? tr('landing.buildHeroCopied', 'Copied ✓ — paste into your AI')
-            : prompt ? tr('landing.heroCtaBuild', 'Build something, free →')
-            : tr('landing.heroCtaLoading', 'Loading the build prompt…')}
-        </button>
-        <a class="btn-outline" href="/v1/business" onClick=${(e) => { e.preventDefault(); onNavigate('/v1/business'); }}>${tr('landing.heroCtaBusiness', 'See what it does for a business →')}</a>
-        <a class="btn-outline" href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Run your own node →')}</a>
+        <a class="btn-primary" href="/v1/business" onClick=${(e) => { e.preventDefault(); onNavigate('/v1/business'); }}>${tr('landing.heroCtaBusiness', 'See what it does for a business →')}</a>
       </div>
-      ${hasSite('learn') ? html`<p class="ld-hero2-after"><a href=${siteLink('learn')} target="_blank" rel="noopener">${tr('landing.ecLink', 'New here? Learn the whole ecosystem hands-on — open the Experience Center →')}</a></p>` : ''}
-      ${copied ? html`<p class="ld-hero2-after">${tr('landing.buildHeroAfter', 'Paste it into your AI and answer its questions. When your app is ready,')} <a href="/app-catalog.html">${tr('landing.openAppsToPublish', 'open your apps to add & publish it →')}</a> ${tr('landing.buildHeroAfter2', '(signing in takes seconds — Google or email).')}</p>` : ''}
+      <div class="ld-hero2-more">
+        <a href="https://github.com/miikkij/aimeat-protocol/releases/latest" target="_blank" rel="noopener">${tr('landing.heroGetOwn', 'Run it on your own server →')}</a>
+        ${hasSite('learn') ? html`<a href=${siteLink('learn')} target="_blank" rel="noopener">${tr('landing.ecLinkShort', 'Learn it hands-on, free →')}</a>` : ''}
+        <a href="/v1/pricing" onClick=${(e) => { e.preventDefault(); onNavigate('/v1/pricing'); }}>${tr('landing.heroPricing', 'Pricing →')}</a>
+      </div>
     </section>
   `;
 }
@@ -458,32 +449,41 @@ export default function Landing({ navigate }) {
 
   return html`
     <div class="ld">
-      <!-- 1. Hero — the fork: owner or tenant, and three entrances under it. -->
-      <${BuildHero} onNavigate=${navigate} />
+      <!-- Order reversed 2026-07-30 (TARGET-056). The strongest thing on this page is that a
+           sentence becomes a published app, and it used to sit below the fold under a wall of
+           other people's work. It leads now; the reason it matters (owner or tenant) comes
+           after, because it answers a question the visitor only has once they have seen the
+           thing work. -->
 
-      <!-- 2. Live wall — the real apps people built with their AI and published here (yours goes here). -->
-      <${Gallery} />
-
-      <!-- 3. Node totals — cumulative "this node has X" counters; never empty, always proof it's alive. -->
-      <${NodeTotals} />
-
-      <!-- 4. How building works: the 3-step loop + the copyable build prompt. -->
+      <!-- 1. The loop, in three steps. What actually happens, before anything is asked of you. -->
       <div class="ld-loop">
         <span class="ld-loop-step">① ${tr('landing.loop1', 'Copy the prompt into your AI chat')}</span>
         <span class="ld-loop-arrow">→</span>
         <span class="ld-loop-step">② ${tr('landing.loop2', 'The AI interviews you and builds the app')}</span>
         <span class="ld-loop-arrow">→</span>
-        <span class="ld-loop-step">③ ${tr('landing.loop3', 'The app lives on your node. Share the link.')}</span>
+        <span class="ld-loop-step">③ ${tr('landing.loop3', 'The app goes live at its own address. Share the link.')}</span>
       </div>
+
+      <!-- 2. The generator itself. No account, no sign-in prompt, all the way to a copied prompt. -->
       <${BuildAppPrompt} />
 
-      <!-- 4b. Build an AGENT (local crewaimeat fleet on Ollama/Gemma) — the coder/tinkerer on-ramp. -->
+      <!-- 3. Live counters sit WITH the generator: they are the evidence that the loop above is
+              not a diagram. "N agents, M online now" is the strongest single number on the page. -->
+      <${NodeTotals} />
+
+      <!-- 4. Why it matters: owner or tenant. Below the proof on purpose. -->
+      <${BuildHero} onNavigate=${navigate} />
+
+      <!-- 5. The wall — the real apps people built with their AI and published here. -->
+      <${Gallery} />
+
+      <!-- 6. Build an AGENT (local crewaimeat fleet on Ollama/Gemma) — the coder/tinkerer on-ramp. -->
       <${BuildAgentPrompt} />
 
-      <!-- 5. Ask your own AI what AIMEAT is — for you (a homework path, for the already-curious). -->
+      <!-- 7. Ask your own AI what AIMEAT is — for you (a homework path, for the already-curious). -->
       <${AskYourAI} />
 
-      <!-- 6. Today's stats + ownership line — the sales close. -->
+      <!-- 8. Today's stats + ownership line — the sales close. -->
       <${StatsPanel} navigate=${navigate} />
 
       <!-- 7. Footer -->

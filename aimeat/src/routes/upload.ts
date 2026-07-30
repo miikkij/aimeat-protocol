@@ -183,9 +183,14 @@ async function handleAppUpload(
 
     // On an UPDATE, a presigned publish that omits metadata must NEVER blank what the live
     // app already declares — MCP callers rarely resend every field, and the presigned meta
-    // cannot express some of them at all. Mirrors POST /v1/apps: description, per-locale
-    // descriptions, category, tags, icon, pricing, copy-protection, forkable and the
-    // operator-hidden state all carry forward when the meta leaves them out.
+    // cannot express some of them at all. Mirrors POST /v1/apps: the NAME, the version,
+    // description, per-locale descriptions, category, tags, icon, pricing, copy-protection,
+    // forkable and the operator-hidden state all carry forward when the meta leaves them out.
+    //
+    // The name and the version were missing from that list while every other field was in it,
+    // which is the worst possible place for an omission: they are the two a person actually reads.
+    // A run of routine re-publishes renamed five live apps to their own filenames in the public
+    // catalogue, and nothing in the response said so.
     const existingApp = isUpdate ? await storage.getApp(ownerGaii, filename) : null;
     const prev = existingApp?.manifest;
 
@@ -195,9 +200,9 @@ async function handleAppUpload(
         : undefined;
 
     const manifest: AppManifest = {
-        name: (meta.name as string) ?? filename.replace(/\.html?$/i, ''),
+        name: (meta.name as string) ?? prev?.name ?? filename.replace(/\.html?$/i, ''),
         description: metaDescription || (prev?.description ?? ''),
-        version: (meta.version as string) ?? `1.0.${newVersion - 1}`,
+        version: (meta.version as string) ?? prev?.version ?? `1.0.${newVersion - 1}`,
         category: (meta.category as string) ?? prev?.category ?? 'tool',
         tags: metaTags ?? prev?.tags ?? [],
         authorDisplay: ownerName,

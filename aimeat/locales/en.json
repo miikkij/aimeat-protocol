@@ -7900,7 +7900,9 @@
     "heroCtaLoading": "Loading the build prompt…",
     "buildLoading": "Loading the build prompt…",
     "buildShowFull": "Show the full prompt",
-    "buildChars": "characters"
+    "buildChars": "characters",
+    "ecLinkShort": "Learn it hands-on, free →",
+    "heroPricing": "Pricing →"
   },
   "pricing": {
     "title": "Pricing",
