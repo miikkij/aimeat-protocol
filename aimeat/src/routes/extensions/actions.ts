@@ -330,7 +330,11 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       // The call delivered, so whoever the provider owes a share of it is booked — out of the
       // provider's own cut, never the consumer's charge. The designation key is the capability's own
       // output and is stripped before the buyer sees it (commerce/beneficiary-designation.ts).
-      const shared = takeDesignations(result);
+      // EXCEPT on an internal hop, where an upstream door already settled and is invoking through
+      // this one. There the designation belongs to THAT door: the node is the only thing reading
+      // this response, and stripping it here left the outer door with nothing to accrue while its
+      // buyer had already paid — every app-tool sale settled and shared with nobody.
+      const shared = pay.upstream ? { designations: [], result } : takeDesignations(result);
       if (pay.accrue) await pay.accrue(shared.designations);
 
       res.json(success(config.nodeId, shared.result, [
@@ -633,7 +637,11 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
       // The call delivered, so whoever the provider owes a share of it is booked — out of the
       // provider's own cut, never the consumer's charge. The designation key is the capability's own
       // output and is stripped before the buyer sees it (commerce/beneficiary-designation.ts).
-      const shared = takeDesignations(result);
+      // EXCEPT on an internal hop, where an upstream door already settled and is invoking through
+      // this one. There the designation belongs to THAT door: the node is the only thing reading
+      // this response, and stripping it here left the outer door with nothing to accrue while its
+      // buyer had already paid — every app-tool sale settled and shared with nobody.
+      const shared = pay.upstream ? { designations: [], result } : takeDesignations(result);
       if (pay.accrue) await pay.accrue(shared.designations);
 
       res.json(success(config.nodeId, shared.result, [

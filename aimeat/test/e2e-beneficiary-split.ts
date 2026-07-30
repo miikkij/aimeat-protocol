@@ -557,6 +557,68 @@ await test('SCENARIO 6: withdrawing consent stops future shares and keeps past o
     'no new share after consent is withdrawn, and what was already earned still stands');
 });
 
+// ── THE APP-TOOL CHAIN: the door that actually sells, and the hop underneath it ──
+//
+// Found in PRODUCTION, on the first real settled call. An app-tool sale settles at the OUTER door
+// (/v1/apps/.../webmcp/tools/...), which then invokes the capability over the node's own HTTP
+// surface and lands on the raw extension door. That inner hop was stripping `_revenue` before the
+// outer door could read it, so the share went to nobody while the buyer's response still said
+// `metered: true`. Every earlier test drove a door that both settled AND stripped, so none of them
+// could see it. This drives the whole chain, the way a provider actually sells.
+
+await test('APP-TOOL: a sale through the outer door accrues the share the capability designated', async () => {
+  const APP_ID = 'chain.html';
+  const coord = `apptool:${provider.name}/${APP_ID}`;
+  const capId = `ext:${EXT}:dyn`;
+
+  // Aggregation turns the extension action into a callable capability the tool can bind.
+  const agg = await json('/v1/admin/capabilities/aggregate', { method: 'POST', headers: auth(operator.token) });
+  assert(agg.status === 200, `aggregate ${agg.status}: ${JSON.stringify(agg.body?.error)}`);
+
+  const IN = { type: 'object', properties: { pay_to: { type: 'string' } } };
+  const OUT = { type: 'object', properties: { echo: { type: 'object' } } };
+  const w = await json('/v1/memory', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ key: `apps.${APP_ID}.tools`, visibility: 'public', value: { version: 1, tools: [
+      { name: 'lookup', description: 'chain proof', action_id: capId, inputSchema: IN, outputSchema: OUT,
+        price: { morsels: PRICE } },
+    ] } }),
+  });
+  assert(w.status === 200 || w.status === 201, `write manifest ${w.status}: ${JSON.stringify(w.body?.error)}`);
+
+  const listed = await json('/v1/exchange/offerings', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ kind: 'app-tool', app_id: APP_ID, tool: 'lookup', title: 'Chain proof',
+      usage_terms: { derivatives: true, resale: false, attribution: true } }),
+  });
+  assert(listed.status === 201, `list app-tool ${listed.status}: ${JSON.stringify(listed.body?.error)}`);
+  const offeringId = listed.body.data.offering.offeringId;
+
+  const d = await declare(provider.token, { ext: coord, action: 'lookup', pool_percent: 50, dynamic: true });
+  assert(d.status === 200, `declare ${d.status}: ${JSON.stringify(d.body?.error)}`);
+
+  const a = await json('/v1/exchange/entitlements', {
+    method: 'POST', headers: auth(consumer.token),
+    body: JSON.stringify({ offering_id: offeringId, contract_ref: 'c-chain', cap_units: 500 }),
+  });
+  assert(a.status === 201, `accept app-tool ${a.status}: ${JSON.stringify(a.body?.error)}`);
+  const rake = Number(a.body.data.entitlement.rake_per_call);
+
+  const before = await accrued(gamma.token);
+  const call = await json(`/v1/apps/${provider.name}/${APP_ID}/webmcp/tools/lookup`, {
+    method: 'POST', headers: auth(consumer.token),
+    body: JSON.stringify({ input: { pay_to: gamma.ghii } }),
+  });
+  assert(call.status === 200, `app-tool call ${call.status}: ${JSON.stringify(call.body?.error)}`);
+  assert(call.body.data.metered === true, 'the outer door settled it');
+  // The inner hop must pass the designation through, and the OUTER door must strip it.
+  assert(!('_revenue' in (call.body.data.result ?? {})), 'the buyer never sees the designation');
+
+  const expected = Math.floor((PRICE - rake) * 50 / 100);
+  assert(await accrued(gamma.token) - before === expected,
+    `the designation must survive the inner hop: expected ${expected}, got ${await accrued(gamma.token) - before}`);
+});
+
 // ── Cross-owner isolation ─────────────────────────────────────────────────────
 
 await test('A stranger cannot read another account\'s verification state → 403', async () => {

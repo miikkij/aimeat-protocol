@@ -53,6 +53,17 @@ export interface PaywallOutcome {
   ok: boolean;
   refund?: () => Promise<void>;
   accrue?: BeneficiaryAccrual;
+  /**
+   * This call is an INTERNAL HOP: an upstream door already ruled on it and is invoking the
+   * capability over the node's own HTTP surface. The hop's "caller" is the node, not a buyer, so
+   * the door must pass the provider's `_revenue` designation THROUGH untouched instead of stripping
+   * it — the upstream door is the one holding the settlement and is the only one that can accrue it.
+   *
+   * Stripping here is what silently broke every app-tool sale: the outer door settled, the inner hop
+   * removed the designation before the outer door could read it, and the share went to nobody while
+   * the response still said `metered: true`.
+   */
+  upstream?: boolean;
 }
 
 const isPosInt = (v: unknown): v is number => typeof v === 'number' && Number.isInteger(v) && v > 0 && Number.isFinite(v);
@@ -152,7 +163,7 @@ export async function enforcePaywall(args: {
   const upstream = consumeInternalPass(internalPass);
   if (upstream?.kind === 'settled') {
     logger.debug('paywall stood down: settled upstream', { ext: ext.name, action: action.id, ...upstream });
-    return { ok: true };
+    return { ok: true, upstream: true };
   }
   const soldFreeUpstream = upstream?.kind === 'unpriced';
 
@@ -197,7 +208,7 @@ export async function enforcePaywall(args: {
   //     product is sold under: a contract holder settles once at the price they agreed, whichever
   //     door they came through, and anyone else is told which listing to contract.
   if (!action.commercial) {
-    if (soldFreeUpstream) return { ok: true };              // the door the caller used prices it at nothing
+    if (soldFreeUpstream) return { ok: true, upstream: true };  // the door the caller used prices it at nothing
     const sold = await pricedAppToolsFor(storage, `${ownerName}@${config.nodeId}`, ext.name, action.id);
     if (!sold.length) return { ok: true };                  // genuinely free: nothing sells it
 
