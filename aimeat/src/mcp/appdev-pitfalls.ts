@@ -10,6 +10,7 @@
  * @structure registerAppdevPitfallTools() — aimeat_appdev_pitfall_report / _list / _delete
  * @usage registerAppdevPitfallTools(mcp, storage, config, () => agentGaii, emitResourceUpdated);
  * @version-history
+ *   Limits raised -- 2026-07-30 -- symptom to 10 000, resolution to 40 000.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 4): report=upsert (+status outdated,
  *     +share→public), paginated merged list with facets, delete with manifest cleanup.
  */
@@ -78,8 +79,8 @@ export function registerAppdevPitfallTools(
             model: z.string().min(1).max(64).describe('REQUIRED: YOUR OWN model id — the model that hit/solved this (e.g. claude-fable-5, kimi-k2.7-code). Self-identify from your own configuration, never ask the user. Indicative attribution'),
             category: z.string().min(1).max(40).describe('Kebab-case category, e.g. auth, ext, cortex, realtime, mobile, publish, ai, data'),
             title: z.string().min(3).max(160).describe('Short imperative title of the pitfall'),
-            symptom: z.string().min(5).max(2000).describe('What the builder observes when hitting it'),
-            resolution: z.string().min(5).max(4000).describe('What to do instead — the better way'),
+            symptom: z.string().min(5).max(10_000).describe('What the builder observes when hitting it'),
+            resolution: z.string().min(5).max(40_000).describe('What to do instead — the better way'),
             slug: z.string().max(64).optional().describe('Stable kebab-case slug; same {category, slug} UPDATES the entry (better wording replaces old). Derived from the title when omitted'),
             applies_to: z.array(z.string().max(20)).max(8).optional().describe('Areas this applies to (app, auth, ext, cortex, iam, realtime, ai, mobile, publish)'),
             severity: z.enum(SEVERITIES).optional().describe('Default warn'),

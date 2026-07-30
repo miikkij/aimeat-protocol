@@ -8,6 +8,7 @@
  * @structure registerAppTemplateProposalTools()
  * @usage registerAppTemplateProposalTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   Limits raised -- 2026-07-30 -- description/rationale/notes to 10 000, reuse_notes to 40 000.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 6).
  */
 
@@ -39,19 +40,19 @@ export function registerAppTemplateProposalTools(
         {
             id: z.string().min(1).max(64).describe('Stable kebab-case template id; proposing the same id again UPDATES the proposal'),
             title: z.string().min(3).max(160),
-            description: z.string().min(5).max(1000),
+            description: z.string().min(5).max(10_000),
             derived_from: z.object({
                 owner: z.string().min(1).describe('Your own owner name'),
                 filename: z.string().min(1).describe('The published app this template distills'),
             }),
             tier: z.enum(['T1', 'T2', 'T3']).describe('T1 pure client · T2 +cortex · T3 +extension'),
-            reuse_notes: z.string().min(10).max(8000).describe('What generalizes: the parts a next build should copy/keep'),
+            reuse_notes: z.string().min(10).max(40_000).describe('What generalizes: the parts a next build should copy/keep'),
             model: z.string().min(1).max(64).describe('REQUIRED: YOUR OWN model id — the model that built the source app. Self-identify, never ask the user (indicative)'),
             tags: z.array(z.string().max(30)).max(12).optional(),
             start_mode: z.enum(['fork', 'scaffold', 'either']).optional().describe('How the next build should start (default either)'),
-            start_mode_rationale: z.string().max(500).optional(),
+            start_mode_rationale: z.string().max(10_000).optional(),
             model_notes: z.array(z.object({
-                model: z.string().max(64), notes: z.string().max(1000), evidence: z.string().max(300).optional(),
+                model: z.string().max(64), notes: z.string().max(10_000), evidence: z.string().max(10_000).optional(),
             })).max(10).optional().describe('Per-model observations (which models handle this well/badly)'),
             packs: z.array(z.string().max(40)).max(20).optional().describe('Library-pack ids the template relies on'),
             composes: z.array(z.string().max(40)).max(20).optional().describe('Component template ids it composes'),

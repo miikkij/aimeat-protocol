@@ -16,6 +16,8 @@
  *   import { registerCommerceTools } from './commerce.js';
  *   registerCommerceTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   Limits aligned with the raised model schemas -- 2026-07-30 -- the tool kept its own max(40) on
+ *     `tools`, which shadowed the manifest's raised 200 and refused a 41st tool anyway.
  *   v1.0.0 — 2026-07-14 — Initial commerce MCP surface (PSP, app-tools, offer pricing, checkout)
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -156,7 +158,7 @@ export function registerCommerceTools(
         descriptionFor('aimeat_app_tools_publish'),
         {
             app_id: z.string().min(1).max(120).regex(/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/),
-            tools: z.array(z.record(z.string(), z.unknown())).max(40),
+            tools: z.array(z.record(z.string(), z.unknown())).max(200),
             odps: z.record(z.string(), z.unknown()).optional(),
             provenance: z.record(z.string(), z.unknown()).optional(),
         },
@@ -385,15 +387,15 @@ export function registerCommerceTools(
                 role: z.string().min(1).max(80),
                 percent: z.number().positive().max(100),
                 ghii: z.string().min(3).max(200).nullable().optional(),
-                note: z.string().max(200).optional(),
+                note: z.string().max(2_000).optional(),
             })).max(BENEFICIARIES_MAX).optional(),
             beneficiaries: z.array(z.object({
                 ghii: z.string().min(3).max(200),
                 weight: z.number().positive().optional(),
-                note: z.string().max(200).optional(),
+                note: z.string().max(2_000).optional(),
             })).max(BENEFICIARIES_MAX).optional(),
             dynamic: z.boolean().optional(),
-            capability: z.string().max(200).optional(),
+            capability: z.string().max(2_000).optional(),
             state: z.enum(['active', 'paused']).optional(),
         },
         annotationsFor('aimeat_commerce_beneficiary_split_set'),
@@ -514,7 +516,7 @@ export function registerCommerceTools(
             state: z.enum(['verified', 'unverified', 'rejected']).optional(),
             method: z.string().max(120).optional(),
             subject: z.string().max(200).optional(),
-            evidence: z.string().max(500).optional(),
+            evidence: z.string().max(10_000).optional(),
         },
         annotationsFor('aimeat_commerce_beneficiary_approve'),
         async ({ ghii, state, method, subject, evidence }) => {

@@ -6,6 +6,7 @@
  * @usage
  *   import { registerAgentMessageTools } from './agent-messages.js';
  * @version-history
+ *   Limits raised -- 2026-07-30 -- content to 200 000, tool descriptions to 10 000.
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
@@ -66,7 +67,7 @@ export function registerAgentMessageTools(
         'aimeat_message_send',
         descriptionFor('aimeat_message_send'),
         {
-            content: z.string().min(1).max(10000).describe('Message content (markdown supported)'),
+            content: z.string().min(1).max(200_000).describe('Message content (markdown supported)'),
             thread_id: z.string().uuid().optional().describe('Thread ID to reply in (omit to start a new conversation; if you pass linked_task_id, the message auto-joins that task\'s thread)'),
             linked_task_id: z.string().uuid().optional().describe('Link this message to a task ID. Strongly recommended for task-related messages: all messages sharing a linked_task_id are grouped into one conversation thread (the task\'s thread), instead of each message starting a new thread.'),
             metadata: z.object({
@@ -74,7 +75,7 @@ export function registerAgentMessageTools(
                 processing_ms: z.number().optional().describe('Processing time in ms'),
                 proposed_task: z.object({
                     title: z.string().min(1).max(256),
-                    description: z.string().max(5000),
+                    description: z.string().max(10_000),
                 }).optional().describe('Propose a task for user approval'),
             }).optional().describe('Optional message metadata'),
         },
