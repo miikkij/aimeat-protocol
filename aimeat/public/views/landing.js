@@ -70,6 +70,10 @@ const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fa
 // The familiar GitHub "Octocat" mark. fill=currentColor so it inherits the link's themed color.
 const GhMark = html`<svg class="gh-mark" viewBox="0 0 16 16" width="16" height="16" fill="currentColor" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path></svg>`;
 
+// An eye, drawn rather than typed: an emoji would render as a different picture on every
+// platform and the house rule keeps emoji out of the UI. currentColor so the accent is set in CSS.
+const EyeMark = html`<svg class="ld-eye" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+
 /* ── Today's stats + ownership line — THE sales core. Real numbers; zeros are omitted. ── */
 function StatsPanel({ navigate }) {
   const [stats, setStats] = useState(null);
@@ -153,13 +157,16 @@ function Gallery() {
               const open = () => openAppSandboxed(href, m.name || a.filename);
               // Version first, then the two numbers, and a zero is left out rather than printed:
               // "0 opens" on a freshly published app reads as a verdict on it.
-              const facts = [];
-              // The node's own version is the incrementing publish number, the same v9 the
+              // The node's own version is the incrementing publish number, the same v30 the
               // catalogue shows. The manifest's semver is whatever the author typed and does not
               // move when they republish, so it says nothing about how alive the app is.
-              if (a.version_number) facts.push('v' + a.version_number);
-              if (a.downloads > 0) facts.push(`${a.downloads} ${a.downloads === 1 ? tr('landing.wallOpen1', 'open') : tr('landing.wallOpens', 'opens')}`);
-              if (a.forks > 0) facts.push(`${a.forks} ${a.forks === 1 ? tr('landing.wallFork1', 'fork') : tr('landing.wallForks', 'forks')}`);
+              const opensLabel = `${a.downloads} ${a.downloads === 1 ? tr('landing.wallOpen1', 'open') : tr('landing.wallOpens', 'opens')}`;
+              const facts = [];
+              if (a.version_number) facts.push(html`<span>v${a.version_number}</span>`);
+              // The count carries the mark; the word it replaces stays as the accessible name, so
+              // a screen reader still says "41 opens" and a hover still spells it out.
+              if (a.downloads > 0) facts.push(html`<span class="ld-app-opens" title=${opensLabel} aria-label=${opensLabel}>${EyeMark}${a.downloads}</span>`);
+              if (a.forks > 0) facts.push(html`<span>${a.forks} ${a.forks === 1 ? tr('landing.wallFork1', 'fork') : tr('landing.wallForks', 'forks')}</span>`);
               return html`
                 <div key=${a.owner + '/' + a.filename} class="ld-app-card" role="button" tabindex="0"
                   onClick=${open} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
@@ -167,7 +174,7 @@ function Gallery() {
                   <div class="ld-app-name">${m.icon ? escHtml(m.icon) + ' ' : ''}${escHtml(m.name || a.filename)}</div>
                   ${desc && html`<div class="ld-app-desc">${escHtml(desc)}</div>`}
                   <div class="ld-app-foot">
-                    <span class="ld-app-facts">${facts.join(' · ')}</span>
+                    <span class="ld-app-facts">${facts.map((f, i) => html`${i ? html`<span class="ld-app-sep">·</span>` : ''}${f}`)}</span>
                     <span class="ld-app-by">${escHtml(author)}${when ? ' · ' + when : ''}</span>
                   </div>
                 </div>`;

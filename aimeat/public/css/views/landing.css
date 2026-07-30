@@ -93,7 +93,12 @@
   margin-top: auto; padding-top: .55rem; border-top: 1px solid var(--border);
   display: flex; align-items: baseline; justify-content: space-between; gap: .5rem .75rem; flex-wrap: wrap;
 }
-.ld-app-facts { font-size: .74rem; font-weight: 600; color: var(--text); letter-spacing: .01em; }
+.ld-app-facts { font-size: .74rem; font-weight: 600; color: var(--text); letter-spacing: .01em; display: inline-flex; align-items: center; gap: .3rem; }
+.ld-app-sep { color: var(--text-muted); font-weight: 400; }
+/* The one coloured thing on the card. Everything else on this line is ink, so the accent lands
+   on the number that says whether anyone has actually opened the app. */
+.ld-app-opens { display: inline-flex; align-items: center; gap: .22rem; color: var(--accent); }
+.ld-eye { flex: 0 0 auto; }
 .ld-app-by { font-size: .7rem; color: var(--text-muted); }
 .ld-footer { display: flex; gap: 1.25rem; flex-wrap: wrap; justify-content: center; margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); font-size: .88rem; }
 .ld-footer a { color: var(--text-dim); text-decoration: none; }
