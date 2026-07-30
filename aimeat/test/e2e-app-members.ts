@@ -1031,6 +1031,78 @@ await test('access free: nobody pays, not the stranger and not the contract hold
     assert(theirs.length === 0, `and no entitlement was invented to pay for it: ${JSON.stringify(theirs)}`);
 });
 
+// ── the third group: everybody who turned up ─────────────────────────────────────
+// An app with members has three groups and the roster only ever named two: approved, and asking.
+// The third is everybody else who actually came, and they are the ones an owner most wants to see —
+// a roster says who you already said yes to, this says who is there to say yes TO. The shared panel
+// has rendered an empty "turned up, holds no role" section since it was written.
+await test('guests: turning up is recorded, and one person appears in exactly one place', async () => {
+    const APP9 = 'guestbook.html';
+    await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename: APP9, description: 'guests', content: Buffer.from('<html>x</html>').toString('base64') }),
+    });
+    const roster = async () => (await json(`/v1/apps/${owner.name}/${APP9}/members`, { headers: auth(owner.token) })).body.data;
+    const me = async (token: string) => await json(`/v1/apps/${owner.name}/${APP9}/members/me`, { headers: auth(token) });
+
+    assert((await roster()).seen.length === 0, 'nobody has turned up yet');
+
+    // Somebody asks where they stand, which is what an app does when it loads.
+    await me(stranger.token);
+    const afterVisit = await roster();
+    const guest = afterVisit.seen.find((v: { owner: string }) => v.owner === stranger.name.toLowerCase());
+    assert(!!guest, `they are on the guest list: ${JSON.stringify(afterVisit.seen)}`);
+    assert(guest.visits === 1 && !!guest.firstSeen && !!guest.lastSeen, `with when and how often: ${JSON.stringify(guest)}`);
+
+    // Looking again inside the window is the same visit. A page that re-renders must not turn one
+    // person into a hundred, and it must not write on every call either.
+    await me(stranger.token);
+    await me(stranger.token);
+    const again = (await roster()).seen.find((v: { owner: string }) => v.owner === stranger.name.toLowerCase());
+    assert(again.visits === 1, `a repeat look inside the window is the same visit: ${JSON.stringify(again)}`);
+
+    // The OWNER is not a guest in their own app.
+    await me(owner.token);
+    assert(!(await roster()).seen.some((v: { owner: string }) => v.owner === owner.name.toLowerCase()),
+        'the owner is not a guest in their own app');
+
+    // Asking for access moves them out of the guest list and into the queue — one person, one place.
+    await json(`/v1/apps/${owner.name}/${APP9}/members/requests`, {
+        method: 'POST', headers: auth(stranger.token), body: JSON.stringify({ note: 'let me in' }),
+    });
+    const queued = await roster();
+    assert(queued.requests.length === 1, `they are in the queue: ${JSON.stringify(queued.requests)}`);
+    assert(!queued.seen.some((v: { owner: string }) => v.owner === stranger.name.toLowerCase()),
+        `and no longer listed as merely present: ${JSON.stringify(queued.seen)}`);
+
+    // Approving them moves them once more, and leaves nothing behind in the other two lists.
+    await json(`/v1/apps/${owner.name}/${APP9}/members`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: stranger.name, role: 'member' }),
+    });
+    const approved = await roster();
+    assert(approved.members.some((m: { owner: string }) => m.owner === stranger.name.toLowerCase()), 'approved');
+    assert(approved.seen.length === 0 && approved.requests.length === 0,
+        `and gone from both other lists: seen=${JSON.stringify(approved.seen)} requests=${JSON.stringify(approved.requests)}`);
+
+    // A member is not a guest either, however often they come back.
+    await me(stranger.token);
+    assert((await roster()).seen.length === 0, 'a member looking again is not recorded as a guest');
+
+    // The owner can dismiss a guest, and it is not a block: they come back on their next visit.
+    await json(`/v1/apps/${owner.name}/${APP9}/members/${stranger.name}`, { method: 'DELETE', headers: auth(owner.token) });
+    await me(stranger.token);
+    assert((await roster()).seen.length === 1, 'removed from the roster, they are a visitor again');
+    const dismissed = await json(`/v1/apps/${owner.name}/${APP9}/members/seen/${stranger.name}`, {
+        method: 'DELETE', headers: auth(owner.token),
+    });
+    assert(dismissed.status === 200, `the owner can dismiss one: ${dismissed.status}`);
+    assert((await roster()).seen.length === 0, 'and the list is clear');
+
+    // The guest list is the owner's. It is personal data about other people.
+    const nosy = await json(`/v1/apps/${owner.name}/${APP9}/members`, { headers: auth(stranger.token) });
+    assert(nosy.status === 403, `a stranger cannot read who else has been here: ${nosy.status}`);
+});
+
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);
 

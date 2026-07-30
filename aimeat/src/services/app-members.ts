@@ -27,6 +27,7 @@ import type { Storage } from '../storage/interface.js';
 const NS_MEMBER = 'app-member';
 const NS_REQUEST = 'app-member-request';
 const NS_PLAN = 'app-member-plan';
+const NS_SEEN = 'app-member-seen';
 
 /** One approved member of one app. `level` is BBS-ordinal, LOWER is more power, as everywhere else. */
 export interface AppMemberRecord {
@@ -59,6 +60,71 @@ export function isLive(rec: AppMemberRecord | null, now: Date = new Date()): boo
   if (!rec) return false;
   if (!rec.expiresAt) return true;
   return new Date(rec.expiresAt).getTime() > now.getTime();
+}
+
+/**
+ * Somebody who turned up and holds no role. A guest.
+ *
+ * Every app with members has the same three groups and only ever had names for two: the people you
+ * approved, and the people who asked. The third is everybody else who actually came — and they are
+ * the ones an owner most wants to see, because a roster tells you who you already said yes to while
+ * this tells you who is there to say yes TO. The forks recorded it as a `seen` map; the node roster
+ * launched without it and the shared panel has been rendering an empty "turned up, holds no role"
+ * section ever since.
+ *
+ * Private, like the roster: who visited your app is personal data about them.
+ */
+export interface AppMemberVisit {
+  appId: string;
+  owner: string;
+  firstSeen: string;
+  lastSeen: string;
+  visits: number;
+}
+
+export const seenKey = (appId: string, account: string) => `appmemseen.${slugOf(appId)}.${accountOf(account)}`;
+
+/** How long a repeat visit is folded into the last one rather than counted again. */
+const VISIT_WINDOW_MS = 3_600_000;
+
+/**
+ * Note that somebody was here. Throttled: a visit inside the window updates nothing, so a page that
+ * asks on every render, or an agent in a loop, does not turn one person into a thousand and does not
+ * write on every call.
+ *
+ * Returns true when something was actually written, so callers can stay quiet about the rest.
+ */
+export async function noteVisit(storage: Storage, appId: string, principal: string): Promise<boolean> {
+  const account = accountOf(principal);
+  if (!account) return false;
+  const now = new Date();
+  const prev = (await storage.getMemory(NS_SEEN, seenKey(appId, account)))?.value as AppMemberVisit | undefined;
+  if (prev && prev.appId === appId && now.getTime() - new Date(prev.lastSeen).getTime() < VISIT_WINDOW_MS) {
+    return false;
+  }
+  const rec: AppMemberVisit = {
+    appId,
+    owner: account,
+    firstSeen: prev?.firstSeen ?? now.toISOString(),
+    lastSeen: now.toISOString(),
+    visits: (prev?.visits ?? 0) + 1,
+  };
+  await write(storage, NS_SEEN, seenKey(appId, account), rec, prev ? undefined : rec.firstSeen);
+  return true;
+}
+
+/** Everybody who turned up. The owner's view of who is there to approve. */
+export async function listVisits(storage: Storage, appId: string): Promise<AppMemberVisit[]> {
+  const { items } = await storage.listAllMemory({ prefix: `appmemseen.${slugOf(appId)}.`, limit: 2000 });
+  return items
+    .map(r => r.value as AppMemberVisit)
+    .filter(v => v && v.appId === appId)
+    .sort((a, b) => (a.lastSeen < b.lastSeen ? 1 : -1));
+}
+
+/** Forget one visitor. Used when they become a member, and when the owner dismisses them. */
+export async function forgetVisit(storage: Storage, appId: string, principal: string): Promise<void> {
+  await storage.deleteMemory(NS_SEEN, seenKey(appId, principal));
 }
 
 /** Somebody asking to be let in. */

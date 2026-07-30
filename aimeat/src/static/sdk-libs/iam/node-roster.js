@@ -76,6 +76,10 @@ export async function nodeState(call, appId, roles) {
     config: {},
     assignments: Object.fromEntries(members.map((m) => [m.owner, m.role])),
     requests: (d && d.requests) || [],
+    // Everybody who turned up and holds no role. The panel has had a section for these since it was
+    // written and the node had nothing to put in it, so it rendered "nobody has turned up yet" on
+    // apps people were visiting daily.
+    seen: Object.fromEntries(((d && d.seen) || []).map((v) => [v.owner, { visits: v.visits, lastSeen: v.lastSeen }])),
     members,
   };
 }

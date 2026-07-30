@@ -33,6 +33,7 @@ import {
   listMembers, getMember, putMember, removeMember,
   listRequests, putRequest, removeRequest, accountOf,
   getCarryPlan, putCarryPlan, seatsTaken, type AppCarryPlan,
+  noteVisit, listVisits, forgetVisit,
 } from '../services/app-members.js';
 import { notify } from '../services/notify.js';
 import { syncGrantsForMember } from '../services/grant-sync.js';
@@ -88,8 +89,16 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
         .map(m => ({ appId: m.appId, owner: m.owner, role: m.role, level: m.level, since: m.since }));
       return res.json(success(config.nodeId, { members: visible, requests: [], count: visible.length, redacted: true }));
     }
-    const [members, requests] = await Promise.all([listMembers(storage, c.appId), listRequests(storage, c.appId)]);
-    return res.json(success(config.nodeId, { members, requests, count: members.length }));
+    const [members, requests, seen] = await Promise.all([
+      listMembers(storage, c.appId), listRequests(storage, c.appId), listVisits(storage, c.appId),
+    ]);
+    // Everybody who turned up and holds no role. A roster tells the owner who they already said yes
+    // to; this tells them who is there to say yes TO, which is the more useful of the two on an app
+    // nobody has joined yet. Filtered against the roster and the queue so a person appears in exactly
+    // one place: promoted, waiting, or just here.
+    const decided = new Set([...members.map(m => m.owner), ...requests.map(r => r.owner)]);
+    const guests = seen.filter(v => !decided.has(v.owner));
+    return res.json(success(config.nodeId, { members, requests, seen: guests, count: members.length }));
   });
 
   // ── GET .../members/me — the caller's own standing. Any authenticated caller. ──
@@ -98,6 +107,18 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
     const member = await getMember(storage, c.appId, c.callerAccount);
+    // Asking "where do I stand" IS turning up: this is what the library calls when an app loads, so
+    // it is the honest moment to record a visit. Throttled to one write an hour per person, so a page
+    // that re-renders does not turn one visitor into a hundred. The owner is not a guest in their own
+    // app, and neither is somebody who already holds a role.
+    if (!c.isOwner && !member) {
+      try {
+        await noteVisit(storage, c.appId, c.callerAccount);
+      } catch (err) {
+        // Nobody's standing depends on this being written. Losing a visit is not worth an error.
+        logger.warn('app-members: could not note a visit', { error: String(err) });
+      }
+    }
     const requests = c.isOwner ? [] : await listRequests(storage, c.appId, 'all');
     const mine = requests.find(r => r.owner === c.callerAccount) ?? null;
     return res.json(success(config.nodeId, {
@@ -195,6 +216,20 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     }));
   });
 
+  // ── DELETE .../members/seen/{account} — dismiss a guest from the list. Owner only. ──
+  // Not a punishment and not a block: it only says "I have looked at this one". They are recorded
+  // again the next time they turn up, because the list answers who is here, not who is unread.
+  router.delete('/v1/apps/:owner/:filename/members/seen/:account', requireAuth(), async (req, res) => {
+    const c = await context(req);
+    if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner manages its guest list'));
+    await forgetVisit(storage, c.appId, String(req.params.account ?? ''));
+    return res.json(success(config.nodeId, {
+      dismissed: true,
+      note: 'Removed from the list of people who turned up. They are recorded again on their next visit.',
+    }));
+  });
+
   // ── POST .../members/sweep — close every lapsed membership NOW. Owner only. ──
   // The timer runs hourly, which bounds how long somebody the owner stopped selling to can keep
   // calling on the owner's money. An owner who has just ended a term should not have to wait for it.
@@ -274,6 +309,8 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
       ...(term?.renewal ? { renewal: term.renewal } : {}),
     });
     await removeRequest(storage, c.appId, account);
+    // They are decided now, so they leave the guest list rather than appearing in two places.
+    await forgetVisit(storage, c.appId, account);
 
     // The role decides WHAT they may reach; the grant is what lets them reach it without being
     // billed. Doing both here is the point of the roster living on the node: an approval that only
