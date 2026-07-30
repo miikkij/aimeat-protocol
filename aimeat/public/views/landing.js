@@ -241,6 +241,18 @@ const PACK_CATEGORIES = ['visualization', 'diagrams', 'canvas', 'game', '3d', 'r
 // AI reads the idea where it expects to and the interview step adapts itself.
 const IDEA_PLACEHOLDER = 'My initial idea: (not given yet — ask me what to build)';
 
+/* AEB reliability tier, shown exactly as the catalogue shows it. The label is the INSTRUCTION,
+   not the raw key: `needs-doc` reads as "documentation missing" when it means "no priors — the
+   AI must read the doc first". */
+const TIER_FALLBACK = { any: 'ANY MODEL', frontier: 'VERSION TRAP', 'needs-doc': 'READ THE DOC' };
+
+function tierTitle(pack) {
+  const proven = (pack.proofs || []).map(pr => pr.model + '→' + pr.verdict).join(', ');
+  return 'AEB reliability tier: ' + pack.modelTier
+    + (proven ? ' · proven on ' + proven : ' · not yet AEB-run')
+    + (pack.apiCaveat ? ' · ' + pack.apiCaveat : '');
+}
+
 function packMatchesIdea(pack, ideaText) {
   const text = (ideaText || '').toLowerCase();
   if (!text) return false;
@@ -260,7 +272,6 @@ function BuildAppPrompt() {
   const [packs, setPacks] = useState([]);
   const [packDocs, setPackDocs] = useState({});
   const [chosen, setChosen] = useState({});      // id → true/false, set only by a real click
-  const [showAllPacks, setShowAllPacks] = useState(false);
 
   useEffect(() => {
     // Starting points only: full use-case scaffolds first, then blank app-shells (not components).
@@ -348,10 +359,6 @@ function BuildAppPrompt() {
   }
   contains.push(tr('landing.promptHasPitfalls', 'this node’s libraries and the pitfalls already written down'));
 
-  // Only what the idea pre-selected is shown; the rest sits behind one toggle. Fourteen unexplained
-  // checkboxes is a wall, and most people need none of them.
-  const visiblePacks = showAllPacks ? packs : packs.filter(isOn);
-
   return html`
     <div class="ld-gen">
       <p class="ld-gen-intro">${tr('landing.genIntro', 'No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file.')}</p>
@@ -370,21 +377,15 @@ function BuildAppPrompt() {
 
         ${packs.length ? html`
           <div class="ld-gen-label">${tr('landing.genPacks', 'Capability packs')} <span class="ld-gen-opt">${tr('landing.genOptional', '(optional)')}</span></div>
-          <p class="ld-gen-hint">${tr('landing.genPacksHint', 'Charts, editable diagrams, games, 3D. Self-hosted libraries whose instructions travel inside the prompt. What you type above pre-selects the matching ones.')}</p>
+          <p class="ld-gen-hint">${tr('landing.genPacksHint', 'Charts, editable flow diagrams, games, 3D… — self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.')}</p>
           <div class="ld-gen-packs">
-            ${visiblePacks.map(pk => html`
-              <label class=${`ld-gen-pack ${isOn(pk) ? 'on' : ''}`} key=${pk.id}>
+            ${packs.map(pk => html`
+              <label class="ld-gen-pack" key=${pk.id} title=${pk.description || ''}>
                 <input type="checkbox" checked=${isOn(pk)} onChange=${(e) => setChosen(prev => ({ ...prev, [pk.id]: e.target.checked }))} />
-                <span class="ld-gen-pack-text">
-                  <span class="ld-gen-pack-title">${pk.title || pk.id}</span>
-                  ${pk.description ? html`<span class="ld-gen-pack-desc">${pk.description}</span>` : ''}
-                </span>
+                <span>${pk.title || pk.id}</span>
+                ${pk.modelTier ? html`<span class=${`ld-gen-tier ${pk.modelTier === 'frontier' ? 'is-frontier' : ''}`} title=${tierTitle(pk)}>${tr('landing.tier.' + pk.modelTier, TIER_FALLBACK[pk.modelTier] || pk.modelTier)}</span>` : ''}
               </label>`)}
-            ${!visiblePacks.length ? html`<p class="ld-gen-hint">${tr('landing.genPacksNone', 'Nothing needed for what you described. Open the list if you want to add something.')}</p>` : ''}
-          </div>
-          <button type="button" class="btn-ghost ld-gen-toggle" onClick=${() => setShowAllPacks(v => !v)}>
-            ${showAllPacks ? tr('landing.genPacksLess', 'Show only what I need') : `${tr('landing.genPacksAll', 'Show all packs')} (${packs.length})`}
-          </button>` : ''}
+          </div>` : ''}
       </div>
 
       <div class="ld-gen-step">

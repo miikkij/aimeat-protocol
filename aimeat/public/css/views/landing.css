@@ -192,64 +192,69 @@
    one prominent line until someone wants it, and the wall leads. */
 .ld-invite { max-width: 760px; margin: 1.5rem auto 2rem; }
 .ld-invite .collapsible {
-  border: 1px solid var(--accent-border, var(--border)); border-radius: var(--radius-md, 12px);
-  background: var(--accent-subtle, var(--card)); overflow: hidden;
+  border: 1px solid var(--border-subtle); border-radius: 16px;
+  background: var(--surface); overflow: hidden;
+  box-shadow: 0 8px 40px rgba(0, 0, 0, .06);
 }
-.ld-invite .collapsible-header { padding: 1rem 1.25rem; width: 100%; }
+.ld-invite .collapsible-header { padding: 20px 28px; width: 100%; }
 .ld-invite .collapsible-title { display: flex; flex-direction: column; gap: .15rem; text-align: left; }
 .ld-invite-title { font-size: 1.15rem; font-weight: 800; color: var(--text); }
 .ld-invite-sub { font-size: .88rem; color: var(--text-dim); font-weight: 400; }
-.ld-invite .collapsible-body { padding: 0 1rem 1rem; }
+.ld-invite .collapsible-body { padding: 0 28px 28px; }
 /* Inside the fold the loop and the prompt box lose their standalone page margins. */
 .ld-invite .ld-loop { margin-top: .25rem; }
 .ld-invite .ld-askai { margin-top: 1rem; }
 
-/* ── Generator, in the app-catalog's shape (TARGET-056) ─────────────────────
-   Same structure and look as the catalog's "Generate App with AI" so the two do not read
-   as two different products: numbered steps, an idea box, template, packs, prompt. */
+/* ── Generator — a direct port of the app-catalog's .pb-* rules (TARGET-056) ──────────
+   Every value here is the catalog's value, translated only where the two stylesheets name the
+   same token differently (--bg-subtle → --bg-dim, --text-muted is shared). Kept literal on
+   purpose: a "similar" generator on the front page and in the catalog reads as two products,
+   and every private deviation is a place they drift apart again. */
 .ld-gen { text-align: left; }
-.ld-gen-intro { font-size: .85rem; color: var(--text-dim); line-height: 1.55; margin: 0 0 1.1rem; }
-.ld-gen-step { border-top: 1px solid var(--border); padding-top: 1rem; margin-bottom: 1rem; }
+.ld-gen-intro { font-size: .82rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 18px; }
+.ld-gen-step { border-top: 1px solid var(--border-subtle); padding-top: 16px; margin-bottom: 16px; }
 .ld-gen-step:first-of-type { border-top: none; padding-top: 0; }
-.ld-gen-head { display: flex; align-items: center; gap: .6rem; font-weight: 700; font-size: 1rem; margin-bottom: .75rem; }
+.ld-gen-head { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: .98rem; margin-bottom: 12px; }
 .ld-gen-num {
   display: inline-flex; align-items: center; justify-content: center;
-  width: 24px; height: 24px; border-radius: var(--radius-full, 50%); flex: 0 0 auto;
+  width: 24px; height: 24px; border-radius: 50%; flex: 0 0 auto;
   background: var(--accent); color: #fff; font-size: .82rem; font-weight: 700;
 }
 .ld-gen-idea {
-  width: 100%; box-sizing: border-box; padding: .7rem .85rem; margin-bottom: .8rem;
-  border: 1px solid var(--accent-border, var(--border)); border-radius: var(--radius-sm, 8px);
-  background: var(--card); color: var(--text); font: inherit; font-size: .92rem; resize: vertical;
+  width: 100%; box-sizing: border-box; min-height: 60px; max-height: 120px; resize: vertical;
+  background: var(--bg-dim); border: 1px solid var(--border-subtle);
+  border-radius: 10px; padding: 10px 14px; color: inherit; font-size: .85rem;
+  font-family: inherit; line-height: 1.5; margin-bottom: 14px;
 }
-.ld-gen-label { display: block; font-size: .88rem; font-weight: 600; margin: .9rem 0 .35rem; }
-.ld-gen-opt { font-weight: 400; color: var(--text-dim); font-size: .82rem; }
-.ld-gen-select { width: 100%; }
-.ld-gen-hint { font-size: .8rem; color: var(--text-dim); line-height: 1.55; margin: 0 0 .7rem; }
-/* One pack per row, because the description is the point: a bare name told nobody what
-   `noste-cortex` does, and the explanation was hidden in a native tooltip. */
-.ld-gen-packs { display: grid; gap: .4rem; }
+.ld-gen-idea:focus { outline: none; border-color: var(--accent); }
+.ld-gen-label { display: flex; align-items: center; gap: 8px; font-size: .85rem; margin-bottom: 10px; }
+.ld-gen-opt { color: var(--text-muted); }
+.ld-gen-select { width: 100%; margin-bottom: 8px; }
+.ld-gen-hint { font-size: .8rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 12px; }
+.ld-gen-packs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .ld-gen-pack {
-  display: flex; align-items: flex-start; gap: .6rem; padding: .55rem .7rem;
-  border: 1px solid var(--border); border-radius: var(--radius-sm, 8px);
-  background: var(--card); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px;
+  border: 1px solid var(--border); border-radius: 999px; background: var(--card);
+  font-size: 13px; cursor: pointer; user-select: none;
 }
 .ld-gen-pack:hover { border-color: var(--accent); }
-.ld-gen-pack.on { border-color: var(--accent); background: var(--accent-subtle, var(--card)); }
-.ld-gen-pack input { accent-color: var(--accent); margin: .2rem 0 0; flex: 0 0 auto; }
-.ld-gen-pack-text { display: flex; flex-direction: column; gap: .1rem; min-width: 0; }
-.ld-gen-pack-title { font-size: .88rem; font-weight: 600; }
-.ld-gen-pack-desc { font-size: .78rem; color: var(--text-dim); line-height: 1.45; }
-.ld-gen-toggle { margin-top: .6rem; font-size: .82rem; }
-.ld-gen-preview-label { font-size: .72rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-dim); margin-bottom: .35rem; }
+.ld-gen-pack input { accent-color: var(--accent); margin: 0; }
+.ld-gen-pack:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+.ld-gen-tier {
+  font-size: 10px; text-transform: uppercase; letter-spacing: .03em; padding: 1px 5px;
+  border-radius: 999px; background: color-mix(in srgb, var(--text-muted) 15%, transparent);
+  color: var(--text-muted); font-weight: 600; cursor: help;
+}
+.ld-gen-tier.is-frontier { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+.ld-gen-preview-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-bottom: 6px; }
 .ld-gen-preview {
-  max-height: 190px; overflow-y: auto; padding: .75rem .85rem;
-  border: 1px solid var(--border); border-radius: var(--radius-sm, 8px);
-  background: var(--bg-surface, var(--bg-dim)); color: var(--text-dim);
-  font-family: var(--font-mono, monospace); font-size: .75rem; line-height: 1.5;
-  white-space: pre-wrap; word-break: break-word;
+  min-height: 90px; max-height: 150px; overflow-y: auto; margin-bottom: 12px; padding: 12px;
+  background: var(--bg-dim); border: 1px solid var(--border-subtle);
+  border-radius: 10px; font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+  font-size: .75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+  color: var(--text-muted);
 }
 /* What the prompt contains, instead of how many characters it is: a count reads as
    complexity, the contents read as the reason it is long. */
-.ld-gen-contains { font-size: .8rem; color: var(--text-dim); margin: .55rem 0 0; }
-.ld-gen-copy { margin-top: .9rem; width: 100%; }
+.ld-gen-contains { font-size: .8rem; color: var(--text-muted); margin: 0 0 12px; }
+.ld-gen-copy { width: 100%; justify-content: center; }

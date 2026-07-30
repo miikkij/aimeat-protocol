@@ -7908,10 +7908,7 @@
     "genIdeaPh": "Kerro mitä appin pitäisi tehdä…",
     "genOptional": "(valinnainen)",
     "genPacks": "Kyvykkyyspaketit",
-    "genPacksHint": "Kaaviot, muokattavat vuokaaviot, pelit, 3D. Itse ylläpidettyjä kirjastoja, joiden ohjeet kulkevat kehotteen mukana. Yllä kirjoittamasi teksti valitsee sopivat valmiiksi.",
-    "genPacksNone": "Kuvailemaasi ei tarvita mitään näistä. Avaa lista jos haluat lisätä jotain.",
-    "genPacksAll": "Näytä kaikki paketit",
-    "genPacksLess": "Näytä vain tarvitsemani",
+    "genPacksHint": "Kaaviot, muokattavat vuokaaviot, pelit, 3D… — itse ylläpidettyjä kirjastoja, joiden AI-ohjeet leipoutuvat kehotteeseen. Ideatekstisi esivalitsee sopivat paketit.",
     "genStep2": "Kopioi kehote ja liitä se tekoälyllesi",
     "genStep2Hint": "Avaa Claude, ChatGPT tai mikä tahansa AI-chat, liitä tämä sinne ja vastaa sen kysymyksiin. Se rakentaa appisi ja antaa sinulle yhden HTML-tiedoston.",
     "genPreview": "Kehotteen esikatselu",
@@ -7919,7 +7916,12 @@
     "promptHasTemplate": "valitsemasi aloituspohjan",
     "promptHasPacks": "kyvykkyyspakettia käyttöohjeineen",
     "promptHasPitfalls": "tämän noden kirjastot ja valmiiksi kirjatut sudenkuopat",
-    "promptHasPack": "yhden kyvykkyyspaketin käyttöohjeineen"
+    "promptHasPack": "yhden kyvykkyyspaketin käyttöohjeineen",
+    "tier": {
+      "any": "KAIKILLE MALLEILLE",
+      "frontier": "VERSIOANSA",
+      "needs-doc": "LUE DOKUMENTTI"
+    }
   },
   "pricing": {
     "title": "Hinnoittelu",

@@ -7908,18 +7908,20 @@
     "genIdeaPh": "Describe what the app should do…",
     "genOptional": "(optional)",
     "genPacks": "Capability packs",
-    "genPacksHint": "Charts, editable diagrams, games, 3D. Self-hosted libraries whose instructions travel inside the prompt. What you type above pre-selects the matching ones.",
-    "genPacksNone": "Nothing needed for what you described. Open the list if you want to add something.",
-    "genPacksAll": "Show all packs",
-    "genPacksLess": "Show only what I need",
-    "genStep2": "Copy the prompt and paste it into your AI",
+    "genPacksHint": "Charts, editable flow diagrams, games, 3D… — self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.",
+    "genStep2": "Copy the prompt & paste it into your AI",
     "genStep2Hint": "Open Claude, ChatGPT or any AI chat, paste this in and answer its questions. It builds your app and hands you a single HTML file.",
     "genPreview": "Prompt preview",
     "promptContains": "Includes",
     "promptHasTemplate": "your starting template",
     "promptHasPacks": "capability packs with their usage docs",
     "promptHasPitfalls": "this node’s libraries and the pitfalls already written down",
-    "promptHasPack": "one capability pack with its usage doc"
+    "promptHasPack": "one capability pack with its usage doc",
+    "tier": {
+      "any": "ANY MODEL",
+      "frontier": "VERSION TRAP",
+      "needs-doc": "READ THE DOC"
+    }
   },
   "pricing": {
     "title": "Pricing",
