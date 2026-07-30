@@ -652,6 +652,12 @@
       /** @type {Dialect} */
       "op"
     ),
+    // Which dialect the CAPABILITY gate speaks, when the roster is the node's and the vocabulary an
+    // extension's. Null means there is no extension to ask, not that the app is ungated.
+    gateDialect: (
+      /** @type {Dialect|null} */
+      null
+    ),
     hasRequest: false,
     me: null,
     roles: {}
@@ -719,6 +725,15 @@
         state.dialect = /** @type {Dialect} */
         "node";
         state.hasRequest = true;
+        state.gateDialect = null;
+        if (state.ext) {
+          try {
+            const d = await detectDialect(resolveNodeUrl(), state.ext);
+            state.gateDialect = d.dialect;
+          } catch {
+            state.gateDialect = null;
+          }
+        }
         return iam.refresh();
       }
       if (opts.dialect) {
@@ -788,6 +803,20 @@
      */
     async check(input) {
       requireInit();
+      if (state.dialect === "node") {
+        if (!state.gateDialect) {
+          const me = state.me || await iam.refresh();
+          const cap = input && (input.permission || input.command) || "";
+          return { allowed: me.caps.indexOf("*") !== -1 || me.caps.indexOf(cap) !== -1, role: me.role || void 0 };
+        }
+        return callCheck(
+          authFetch2,
+          /** @type {string} */
+          state.ext,
+          state.gateDialect,
+          input || {}
+        );
+      }
       if (state.dialect === "command") {
         const raw = await callCheck(authFetch2, state.ext, state.dialect, {});
         const me = normalise(raw, state.roles, state.dialect);

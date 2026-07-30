@@ -46,9 +46,13 @@ const { authFetch } = makeSession('aimeat-iam.js');
 
 /** @typedef {import('./dialect.js').Dialect} Dialect */
 
-/** @type {{ ext: string|null, app: string|null, roleNames: string[], dialect: Dialect, hasRequest: boolean, me: IamMe|null, roles: Record<string,string[]> }} */
+/** @type {{ ext: string|null, app: string|null, roleNames: string[], dialect: Dialect, gateDialect: Dialect|null, hasRequest: boolean, me: IamMe|null, roles: Record<string,string[]> }} */
 const state = { ext: null, app: /** @type {string|null} */ (null), roleNames: /** @type {string[]} */ ([]),
-  dialect: /** @type {Dialect} */ ('op'), hasRequest: false, me: null, roles: {} };
+  dialect: /** @type {Dialect} */ ('op'),
+  // Which dialect the CAPABILITY gate speaks, when the roster is the node's and the vocabulary an
+  // extension's. Null means there is no extension to ask, not that the app is ungated.
+  gateDialect: /** @type {Dialect|null} */ (null),
+  hasRequest: false, me: null, roles: {} };
 
 /**
  * Turn one dialect's answer into the shape every app can read. The `op` family answers per
@@ -128,6 +132,22 @@ const iam = {
     if (state.app) {
       state.dialect = /** @type {Dialect} */ ('node');
       state.hasRequest = true;
+      // The roster is the node's, but the CAPABILITY question still belongs to the extension when
+      // one is named — and naming both is the recommended shape, not an exotic one. Without this the
+      // gate action resolved to the node dialect's `null` and every check() posted to an action
+      // called "null", which 404s. The app's own hand-written fetch kept working, so the library
+      // looked fine right up until an app actually used it.
+      state.gateDialect = null;
+      if (state.ext) {
+        try {
+          const d = await detectDialect(resolveNodeUrl(), state.ext);
+          state.gateDialect = d.dialect;
+        } catch {
+          // A gate that cannot be described is a gate this library will not guess at: can() then
+          // answers from the roster role alone, which is the truthful narrower answer.
+          state.gateDialect = null;
+        }
+      }
       return iam.refresh();
     }
     if (opts.dialect) {
@@ -193,6 +213,16 @@ const iam = {
    */
   async check(input) {
     requireInit();
+    // With the roster on the node and the vocabulary in an extension, the gate is the extension's.
+    if (state.dialect === 'node') {
+      if (!state.gateDialect) {
+        // No extension to ask: answer from the roster role, which is all there is to know.
+        const me = state.me || await iam.refresh();
+        const cap = (input && (input.permission || input.command)) || '';
+        return { allowed: me.caps.indexOf('*') !== -1 || me.caps.indexOf(cap) !== -1, role: me.role || undefined };
+      }
+      return callCheck(authFetch, /** @type {string} */ (state.ext), state.gateDialect, input || {});
+    }
     if (state.dialect === 'command') {
       // This gate answers with the whole list, so a per-capability question is decided from it
       // rather than by a call the extension does not offer.

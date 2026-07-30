@@ -32,6 +32,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import {
   listMembers, getMember, putMember, removeMember,
   listRequests, putRequest, removeRequest, accountOf,
+  getCarryPlan, putCarryPlan,
 } from '../services/app-members.js';
 import { notify } from '../services/notify.js';
 import { syncGrantsForMember } from '../services/grant-sync.js';
@@ -87,6 +88,48 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     }));
   });
 
+  // ── GET/PUT .../members/plan — what each role is CARRIED on. Owner only. ──
+  // Declared once, applied on every approval after it. An approval that set a role and carried
+  // nothing was the gap that made the panel's "approved" and the member's invoice disagree.
+  router.get('/v1/apps/:owner/:filename/members/plan', requireAuth(), async (req, res) => {
+    const c = await context(req);
+    if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner reads its carry plan'));
+    const plan = await getCarryPlan(storage, c.appId);
+    return res.json(success(config.nodeId, {
+      plan,
+      meaning: plan
+        ? 'Approving somebody as one of these roles issues a zero-priced grant over the listed offerings, and removing them withdraws those grants again.'
+        : 'No plan declared: an approval sets a role and carries nothing, so a member is billed at list price unless the approval names the offerings itself.',
+    }));
+  });
+
+  router.put('/v1/apps/:owner/:filename/members/plan', requireAuth(), async (req, res) => {
+    const c = await context(req);
+    if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner sets its carry plan'));
+    const b = (req.body ?? {}) as { roles?: Record<string, unknown> };
+    if (!b.roles || typeof b.roles !== 'object' || Array.isArray(b.roles)) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        'roles is required: an object of role name to the offering ids that role is carried on.'));
+    }
+    const roles: Record<string, string[]> = {};
+    for (const [role, ids] of Object.entries(b.roles)) {
+      if (!Array.isArray(ids)) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          `roles.${role} must be an array of offering ids.`));
+      }
+      roles[role] = ids.filter((x): x is string => typeof x === 'string');
+    }
+    const plan = await putCarryPlan(storage, { appId: c.appId, roles, setBy: c.callerAccount });
+    return res.json(success(config.nodeId, {
+      plan,
+      // Existing members are NOT re-synced here. Changing the plan under people who were approved on
+      // the old one would move their access without anybody deciding to; re-approving them applies it.
+      note: 'Applies to approvals from now on. Members approved before this keep what they were given until they are approved again.',
+    }));
+  });
+
   // ── POST .../members — approve someone, or change their role. Owner only. ──
   router.post('/v1/apps/:owner/:filename/members', requireAuth(), async (req, res) => {
     const c = await context(req);
@@ -103,12 +146,20 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
         'The owner already reaches everything; a row for them would only be one more thing to keep in step.'));
     }
     const before = await getMember(storage, c.appId, account);
+    // What this role is carried on. An explicit list wins, because a caller who names one means it;
+    // otherwise the app's declared plan applies. Without the plan an approval from the panel set a
+    // role and carried nothing, so the member was billed at list price on every call while the panel
+    // showed them approved — the panel's word and the invoice disagreeing is the worst of the three.
+    const plan = await getCarryPlan(storage, c.appId);
+    const carried = Array.isArray(b.offerings)
+      ? b.offerings.filter(x => typeof x === 'string') as string[]
+      : (plan?.roles[role] ?? (before ? undefined : []));
     const rec = await putMember(storage, {
       appId: c.appId, account, role,
       level: typeof b.level === 'number' ? b.level : undefined,
       note: typeof b.note === 'string' ? b.note : undefined,
       approvedBy: c.callerAccount,
-      offerings: Array.isArray(b.offerings) ? b.offerings.filter(x => typeof x === 'string') as string[] : undefined,
+      offerings: carried,
     });
     await removeRequest(storage, c.appId, account);
 
@@ -116,7 +167,10 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     // billed. Doing both here is the point of the roster living on the node: an approval that only
     // set a role would be a sentence with nothing behind it, and a demotion that left the grants
     // would keep billing the owner for somebody they just narrowed.
-    const sync = Array.isArray(b.offerings)
+    // Reconcile whenever there is a plan to reconcile AGAINST — an explicit list, a declared plan, or
+    // an existing member whose set may now be wrong for their new role. Skipping it when the caller
+    // simply did not pass a list is what let a role change keep the grants of the role it replaced.
+    const sync = (Array.isArray(b.offerings) || plan || before)
       ? await syncGrantsForMember(storage, {
           providerOwner: c.owner.toLowerCase(), providerGhii: `${c.owner}@${config.nodeId}`,
           consumer: `${account}@${config.nodeId}`, appId: c.appId, role,

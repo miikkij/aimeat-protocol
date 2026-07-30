@@ -29,6 +29,13 @@ export interface GenerateIamExtensionInput {
   levels: LevelDef[];
   commands: CommandDef[];
   author?: string;
+  /**
+   * What a signed-in caller who is on no roster row holds. Omitted means nothing, which is right for
+   * a members-only app. An app with a public tier needs it: NUOTTA lets anyone read its guides and
+   * only charges for the corpus, and a gate that cannot say that would have shut the front door on
+   * every visitor the moment its roster moved to the node.
+   */
+  defaultRole?: string;
 }
 
 export interface GeneratedExtension {
@@ -46,7 +53,7 @@ function slug(appId: string): string {
  * The gate script. Baked constants rather than memory reads, because the vocabulary IS the spec and
  * a spec that can be edited in two places is a spec that disagrees with itself.
  */
-function checkScript(levels: LevelDef[], commands: CommandDef[]): string {
+function checkScript(levels: LevelDef[], commands: CommandDef[], defaultRole?: string): string {
   const roleCaps: Record<string, string[]> = {};
   const roleLevel: Record<string, number> = {};
   for (const l of levels) { roleCaps[l.key] = l.capabilities; roleLevel[l.key] = l.level; }
@@ -54,6 +61,8 @@ function checkScript(levels: LevelDef[], commands: CommandDef[]): string {
 const CAPS = ${JSON.stringify(roleCaps)};
 const LEVELS = ${JSON.stringify(roleLevel)};
 const COMMANDS = ${JSON.stringify(commands)};
+// What somebody signed in but on no roster row holds. null is a members-only app.
+const DEFAULT_ROLE = ${JSON.stringify(defaultRole ?? null)};
 
 export default async function (ctx, input) {
   // The caller's standing arrives already resolved: the node reads the app's roster BEFORE this
@@ -61,15 +70,20 @@ export default async function (ctx, input) {
   // nothing to keep in step — a removal is visible on the very next call.
   const caller = ctx.caller || {};
   const isOwner = !!caller.isAppOwner;
-  const role = isOwner ? 'owner' : (caller.member ? caller.member.role : null);
+  // A signed-in stranger falls to DEFAULT_ROLE, so an app with a public tier keeps it. Anyone with
+  // no principal at all falls to nothing, whatever the default says: a default is what a KNOWN
+  // caller holds, and reading it as "and everybody else too" would open the app to the world.
+  const member = caller.member || null;
+  const signedIn = !!(caller.gaii || caller.owner);
+  const role = isOwner ? 'owner' : (member ? member.role : (signedIn ? DEFAULT_ROLE : null));
   const caps = isOwner ? ['*'] : ((role && CAPS[role]) || []);
   const level = isOwner ? 0 : (role && Object.prototype.hasOwnProperty.call(LEVELS, role) ? LEVELS[role] : null);
   const has = function (cap) { return caps.indexOf('*') !== -1 || caps.indexOf(cap) !== -1; };
   const base = {
-    role: role, level: level, caps: caps, isOwner: isOwner,
+    role: role, level: level, caps: caps, isOwner: isOwner, member: !!member,
     // A role always resolves through the PERSON here, because that is how the node keeps the roster.
-    via: isOwner ? 'owner' : (caller.member ? 'owner' : 'none'),
-    since: caller.member ? caller.member.since : null,
+    via: isOwner ? 'owner' : (member ? 'owner' : (role ? 'default' : 'none')),
+    since: member ? member.since : null,
   };
 
   if (input && input.command) {
@@ -88,19 +102,21 @@ export default async function (ctx, input) {
 }
 
 /** The discovery script: an agent asks what it may call before calling anything. */
-function commandsScript(levels: LevelDef[], commands: CommandDef[]): string {
+function commandsScript(levels: LevelDef[], commands: CommandDef[], defaultRole?: string): string {
   const roleCaps: Record<string, string[]> = {};
   for (const l of levels) roleCaps[l.key] = l.capabilities;
   return `// GENERATED from this app's IAM spec. Edit the spec and regenerate; hand edits are lost.
 const CAPS = ${JSON.stringify(roleCaps)};
 const COMMANDS = ${JSON.stringify(commands)};
+const DEFAULT_ROLE = ${JSON.stringify(defaultRole ?? null)};
 
 export default async function (ctx) {
   // What THIS caller may run, not a catalogue they have to filter themselves. An agent that has to
   // guess which of a list applies to it will guess wrong and be refused mid-task.
   const caller = ctx.caller || {};
   const isOwner = !!caller.isAppOwner;
-  const role = isOwner ? 'owner' : (caller.member ? caller.member.role : null);
+  const signedIn = !!(caller.gaii || caller.owner);
+  const role = isOwner ? 'owner' : (caller.member ? caller.member.role : (signedIn ? DEFAULT_ROLE : null));
   const caps = isOwner ? ['*'] : ((role && CAPS[role]) || []);
   const has = function (cap) { return caps.indexOf('*') !== -1 || caps.indexOf(cap) !== -1; };
   return {
@@ -126,7 +142,11 @@ export function generateIamExtension(input: GenerateIamExtensionInput): Generate
     `  name: ${name}`,
     '  version: 1.0.0',
     `  description: ${JSON.stringify(
-      `Capability gate for ${input.appId}. Roles: ${roleKeys.join(', ')}. The NODE keeps who is a member; `
+      `Capability gate for ${input.appId}. Roles: ${roleKeys.join(', ')}. `
+      + (input.defaultRole
+        ? `Anyone signed in who is on no roster row holds "${input.defaultRole}". `
+        : 'Anyone signed in who is on no roster row holds nothing. ')
+      + 'The NODE keeps who is a member; '
       + 'this keeps what each role may do, and reads the caller\'s role from ctx.caller.member. Generated from the app\'s IAM spec.',
     )}`,
     `  author: ${input.author || 'generated'}`,
@@ -169,8 +189,8 @@ export function generateIamExtension(input: GenerateIamExtensionInput): Generate
     name,
     manifest,
     scripts: {
-      'check.js': checkScript(input.levels, input.commands),
-      'commands.js': commandsScript(input.levels, input.commands),
+      'check.js': checkScript(input.levels, input.commands, input.defaultRole),
+      'commands.js': commandsScript(input.levels, input.commands, input.defaultRole),
     },
   };
 }

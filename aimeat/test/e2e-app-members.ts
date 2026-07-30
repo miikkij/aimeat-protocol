@@ -563,5 +563,120 @@ await test('the generated gate stores NOTHING, so it has nothing to leak', async
     }
 });
 
+// ── a public tier survives the move ──────────────────────────────────────────────────────────────
+// The roster moving to the node must not shut an app's front door. NUOTTA lets anyone signed in read
+// its guides and only charges for the corpus, so a gate that can only say "member or nothing" would
+// have turned every visitor into a refusal the moment it was regenerated.
+await test('defaultRole: a signed-in stranger holds the public tier, an anonymous caller holds nothing', async () => {
+    const { generateIamExtension } = await import('../src/services/iam/generate-extension.js');
+    const APP2 = 'public-tier.html';
+    await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename: APP2, description: 'public tier gate', content: Buffer.from('<html>x</html>').toString('base64') }),
+    });
+    const gen = generateIamExtension({
+        appId: `${owner.name}/${APP2}`,
+        author: owner.name,
+        defaultRole: 'guest',
+        levels: [
+            { level: 0, key: 'admin', label: 'Admin', capabilities: ['*'] },
+            { level: 10, key: 'member', label: 'Member', capabilities: ['corpus', 'guides'] },
+            { level: 90, key: 'guest', label: 'Guest', capabilities: ['guides'] },
+        ],
+        commands: [
+            { id: 'guides.read', description: 'Read the guides', capability: 'guides', tier: 'read' },
+            { id: 'corpus.search', description: 'Search the corpus', capability: 'corpus', tier: 'read' },
+        ],
+    });
+    const inst = await json('/v1/extensions', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ manifest: gen.manifest, scripts: gen.scripts }),
+    });
+    assert(inst.status === 200 || inst.status === 201, `installs: ${inst.status} ${JSON.stringify(inst.body?.error)}`);
+    assert((await json(`/v1/extensions/${gen.name}/activate`, { method: 'POST', headers: auth(owner.token), body: '{}' })).status === 200, 'activate');
+
+    const stranger = await setupOwner('pub');
+    const call = async (token: string, body: Record<string, unknown>) =>
+        (await json(`/v1/ext/${gen.name}/check`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) })).body.data;
+
+    // The whole point: on no roster row, and still holding the public tier.
+    const guides = await call(stranger.token, { permission: 'guides' });
+    assert(guides.allowed === true && guides.role === 'guest' && guides.via === 'default' && guides.member === false,
+        `a signed-in stranger holds the public tier: ${JSON.stringify(guides)}`);
+
+    // And no further: a default is a front door, not a membership.
+    const corpus = await call(stranger.token, { permission: 'corpus' });
+    assert(corpus.allowed === false, `the paid capability is still refused: ${JSON.stringify(corpus)}`);
+
+    // Discovery agrees with the gate rather than listing everything as callable.
+    const list = (await json(`/v1/ext/${gen.name}/commands`, { method: 'POST', headers: auth(stranger.token), body: '{}' })).body.data;
+    const byId = Object.fromEntries(list.commands.map((c: { id: string; allowed: boolean }) => [c.id, c.allowed]));
+    assert(byId['guides.read'] === true && byId['corpus.search'] === false,
+        `discovery marks the public one open and the paid one shut: ${JSON.stringify(byId)}`);
+
+    // Approving them lifts the tier, with nothing to sync.
+    await json(`/v1/apps/${owner.name}/${APP2}/members`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: stranger.name, role: 'member' }),
+    });
+    const asMember = await call(stranger.token, { permission: 'corpus' });
+    assert(asMember.allowed === true && asMember.role === 'member' && asMember.via === 'owner' && asMember.member === true,
+        `an approval overrides the default: ${JSON.stringify(asMember)}`);
+
+    // Removing them drops back to the public tier rather than to nothing, which is what keeps a
+    // revoked member able to see what they lost and ask again.
+    await json(`/v1/apps/${owner.name}/${APP2}/members/${stranger.name}`, { method: 'DELETE', headers: auth(owner.token) });
+    const after = await call(stranger.token, { permission: 'guides' });
+    assert(after.allowed === true && after.role === 'guest',
+        `removal falls back to the public tier: ${JSON.stringify(after)}`);
+});
+
+// ── an approval has to CARRY, not just label ────────────────────────────────────────
+// The panel's Approve button passes a role and no offerings, because the person clicking it should
+// not have to know listing ids. Without a declared plan that approval set a role and carried
+// nothing: the panel said "approved" and the member was billed at list price on every call. The two
+// disagreeing is worse than either alone, so the plan is declared once and applied from then on.
+await test('a declared carry plan makes a bare approval actually carry the member', async () => {
+    const plan = await json(`/v1/apps/${owner.name}/${APP}/members/plan`, {
+        method: 'PUT', headers: auth(owner.token),
+        body: JSON.stringify({ roles: { member: [offA, offB], guest: [] } }),
+    });
+    assert(plan.status === 200, `the plan is declarable: ${plan.status} ${JSON.stringify(plan.body?.error)}`);
+    assert(plan.body.data.plan.roles.member.length === 2, `and reads back: ${JSON.stringify(plan.body.data.plan.roles)}`);
+
+    // A stranger, approved the way the panel approves: a role and nothing else.
+    const newcomer = await setupOwner('carry');
+    const approved = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: newcomer.name, role: 'member' }),
+    });
+    assert(approved.status === 200 || approved.status === 201, `approve: ${approved.status} ${JSON.stringify(approved.body?.error)}`);
+    assert(approved.body.data.member.offerings.length === 2,
+        `the plan filled in what the approval did not name: ${JSON.stringify(approved.body.data.member.offerings)}`);
+    assert((approved.body.data.access?.granted ?? []).length === 2,
+        `and the grants were actually issued: ${JSON.stringify(approved.body.data.access)}`);
+
+    // A role with an empty plan carries nothing, and moving somebody to it TAKES the grants back
+    // rather than leaving the provider paying for a tier the member no longer holds.
+    const demoted = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: newcomer.name, role: 'guest' }),
+    });
+    assert((demoted.body.data.access?.revoked ?? []).length === 2,
+        `a demotion withdraws what the old role carried: ${JSON.stringify(demoted.body.data.access)}`);
+    assert(demoted.body.data.member.offerings.length === 0,
+        `and the record agrees: ${JSON.stringify(demoted.body.data.member.offerings)}`);
+
+    // An explicit list still wins: a caller who names offerings meant them.
+    const explicit = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: newcomer.name, role: 'member', offerings: [offA] }),
+    });
+    assert(explicit.body.data.member.offerings.length === 1,
+        `an explicit list overrides the plan: ${JSON.stringify(explicit.body.data.member.offerings)}`);
+
+    await json(`/v1/apps/${owner.name}/${APP}/members/${newcomer.name}`, { method: 'DELETE', headers: auth(owner.token) });
+});
+
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);
+

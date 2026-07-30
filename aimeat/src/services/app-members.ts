@@ -26,6 +26,7 @@ import type { Storage } from '../storage/interface.js';
 /** Platform-owned namespaces. Never an `ext:` one: that is the namespace the world can read. */
 const NS_MEMBER = 'app-member';
 const NS_REQUEST = 'app-member-request';
+const NS_PLAN = 'app-member-plan';
 
 /** One approved member of one app. `level` is BBS-ordinal, LOWER is more power, as everywhere else. */
 export interface AppMemberRecord {
@@ -107,6 +108,47 @@ export async function putMember(
     offerings: input.offerings ?? prev?.offerings ?? [],
   };
   await write(storage, NS_MEMBER, memberKey(input.appId, account), rec, prev ? undefined : now);
+  return rec;
+}
+
+/**
+ * What each role is CARRIED on: the offerings an approval issues a zero-priced grant over.
+ *
+ * Without this an approval made from the panel sets a role and carries nothing, because the caller
+ * has no way to say which listings a member calls free — and a member who holds the role but not the
+ * grants is billed at list price on every call while the panel shows them approved. That reads as a
+ * platform lie rather than as a configuration gap, so the plan is declared once per app and applied
+ * on every approval after it.
+ */
+export interface AppCarryPlan {
+  appId: string;
+  /** role key → offering ids carried for that role. A role that is absent carries nothing. */
+  roles: Record<string, string[]>;
+  updatedAt: string;
+  setBy: string;
+}
+
+export const planKey = (appId: string) => `appmemplan.${slugOf(appId)}`;
+
+/** The app's carry plan, or null if the owner has not declared one. */
+export async function getCarryPlan(storage: Storage, appId: string): Promise<AppCarryPlan | null> {
+  const rec = await storage.getMemory(NS_PLAN, planKey(appId));
+  const v = rec?.value as AppCarryPlan | undefined;
+  return v && v.appId === appId ? v : null;
+}
+
+/** Declare (or replace) it. Roles are taken as given: the node has no opinion about their names. */
+export async function putCarryPlan(
+  storage: Storage,
+  input: { appId: string; roles: Record<string, string[]>; setBy: string },
+): Promise<AppCarryPlan> {
+  const roles: Record<string, string[]> = {};
+  for (const [role, ids] of Object.entries(input.roles || {})) {
+    if (!Array.isArray(ids)) continue;
+    roles[String(role)] = [...new Set(ids.filter(x => typeof x === 'string' && x))];
+  }
+  const rec: AppCarryPlan = { appId: input.appId, roles, updatedAt: new Date().toISOString(), setBy: input.setBy };
+  await write(storage, NS_PLAN, planKey(input.appId), rec);
   return rec;
 }
 
