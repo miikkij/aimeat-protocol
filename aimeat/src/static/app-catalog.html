@@ -8284,23 +8284,59 @@
     }
   }
   function parseAppMeta(html) {
-    var meta = { name: "", description: "" };
+    var meta = { name: "", description: "", icon: "", tags: "" };
+    var src = html || "";
     try {
-      var m = (html || "").match(/AIMEAT App Manifest([\s\S]*?)-->/i);
+      var m = src.match(/AIMEAT App Manifest([\s\S]*?)-->/i);
       if (m) {
         var nm = m[1].match(/\bname:\s*(.+)/i);
         if (nm) meta.name = nm[1].trim();
         var dm = m[1].match(/\bdescription:\s*(.+)/i);
         if (dm) meta.description = dm[1].trim();
+        var im = m[1].match(/\bicon:\s*(.+)/i);
+        if (im) meta.icon = im[1].trim();
+        var gm = m[1].match(/\btags:\s*(.+)/i);
+        if (gm) meta.tags = gm[1].trim();
       }
-      if (!meta.name) {
-        var tt = (html || "").match(/<title>([^<]+)<\/title>/i);
-        if (tt) meta.name = tt[1].trim();
+      var titleText = "";
+      var tt = src.match(/<title>([^<]+)<\/title>/i);
+      if (tt) titleText = tt[1].trim();
+      if (!meta.name && titleText) meta.name = titleText;
+      if (!meta.icon && titleText) {
+        var lead = titleText.match(/^(\p{Extended_Pictographic}️?)\s+/u);
+        if (lead) {
+          meta.icon = lead[1];
+          if (meta.name === titleText) meta.name = titleText.slice(lead[0].length).trim();
+        }
+      }
+      if (!meta.icon) {
+        var fav = src.match(/<link[^>]*rel=["'][^"']*icon[^"']*["'][^>]*>/i);
+        if (fav) {
+          var glyph = decodeURIComponent(fav[0]).match(/<text[^>]*>([^<]+)<\/text>/i);
+          if (glyph) meta.icon = glyph[1].trim();
+        }
+      }
+      if (!meta.tags) {
+        var kw = src.match(/<meta[^>]*name=["']keywords["'][^>]*content=["']([^"']+)["']/i);
+        if (kw) meta.tags = kw[1].trim();
       }
     } catch (e) {
     }
     if (/\{\{.*\}\}/.test(meta.name)) meta.name = "";
     if (/\{\{.*\}\}/.test(meta.description)) meta.description = "";
+    if (/\{\{.*\}\}/.test(meta.icon)) meta.icon = "";
+    if (/\{\{.*\}\}/.test(meta.tags)) meta.tags = "";
+    return meta;
+  }
+  function prefillFromHtml(html, fallbackName) {
+    var meta = parseAppMeta(html);
+    var setIfEmpty = function(id, value) {
+      var el = document.getElementById(id);
+      if (el && !el.value.trim() && value) el.value = value;
+    };
+    setIfEmpty("app-name", meta.name || fallbackName || "");
+    setIfEmpty("app-icon", meta.icon);
+    setIfEmpty("app-tags", meta.tags);
     return meta;
   }
   function closeModal() {
@@ -8349,10 +8385,13 @@
     }
     selectedFile = file;
     document.getElementById("selected-file-name").textContent = file.name;
-    var nameInput = document.getElementById("app-name");
-    if (!nameInput.value.trim()) {
-      nameInput.value = file.name.replace(/\.html?$/i, "");
-    }
+    var fallback = file.name.replace(/\.html?$/i, "");
+    readFileAsText2(file).then(function(html) {
+      prefillFromHtml(html, fallback);
+    }).catch(function() {
+      var nameInput2 = document.getElementById("app-name");
+      if (nameInput2 && !nameInput2.value.trim()) nameInput2.value = fallback;
+    });
   }
   function handleSave() {
     var name = document.getElementById("app-name").value.trim();
@@ -10394,11 +10433,7 @@
     var pasteArea = document.getElementById("app-paste-code");
     if (pasteArea) {
       pasteArea.addEventListener("input", function() {
-        var nameInput = document.getElementById("app-name");
-        if (nameInput && !nameInput.value.trim()) {
-          var meta = parseAppMeta(pasteArea.value);
-          if (meta.name) nameInput.value = meta.name;
-        }
+        prefillFromHtml(pasteArea.value);
       });
     }
     dropZone.addEventListener("dragover", function(e) {

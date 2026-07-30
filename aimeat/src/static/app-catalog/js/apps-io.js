@@ -85,21 +85,67 @@ function requireSignInThen(next) {
   }
 }
 
-// Read the app name + description the templates embed (AIMEAT App Manifest comment),
-// falling back to <title>, so the Add dialog can pre-fill them from pasted code.
+// Everything the Add dialog can learn from the file itself: the AIMEAT App Manifest comment the
+// templates embed, then the ordinary HTML head. Measured against six apps published on aimeat.io
+// before writing this: four carry a <title>, three carry a manifest, and NOT ONE carries a favicon
+// or a keywords meta. So the name is the field this reliably fills; icon and tags are read where
+// they exist and left empty where they do not, rather than guessed at.
 function parseAppMeta(html) {
-  var meta = { name: '', description: '' };
+  var meta = { name: '', description: '', icon: '', tags: '' };
+  var src = html || '';
   try {
-    var m = (html || '').match(/AIMEAT App Manifest([\s\S]*?)-->/i);
+    var m = src.match(/AIMEAT App Manifest([\s\S]*?)-->/i);
     if (m) {
       var nm = m[1].match(/\bname:\s*(.+)/i); if (nm) meta.name = nm[1].trim();
       var dm = m[1].match(/\bdescription:\s*(.+)/i); if (dm) meta.description = dm[1].trim();
+      var im = m[1].match(/\bicon:\s*(.+)/i); if (im) meta.icon = im[1].trim();
+      var gm = m[1].match(/\btags:\s*(.+)/i); if (gm) meta.tags = gm[1].trim();
     }
-    if (!meta.name) { var tt = (html || '').match(/<title>([^<]+)<\/title>/i); if (tt) meta.name = tt[1].trim(); }
-  } catch (e) {}
+    var titleText = '';
+    var tt = src.match(/<title>([^<]+)<\/title>/i);
+    if (tt) titleText = tt[1].trim();
+    if (!meta.name && titleText) meta.name = titleText;
+    // A leading emoji in the title is the icon nearly every single-file app actually has, and it
+    // belongs in the icon field rather than doubled into the name.
+    if (!meta.icon && titleText) {
+      var lead = titleText.match(/^(\p{Extended_Pictographic}️?)\s+/u);
+      if (lead) {
+        meta.icon = lead[1];
+        if (meta.name === titleText) meta.name = titleText.slice(lead[0].length).trim();
+      }
+    }
+    // The other real source: an emoji drawn into a data-URI SVG favicon.
+    if (!meta.icon) {
+      var fav = src.match(/<link[^>]*rel=["'][^"']*icon[^"']*["'][^>]*>/i);
+      if (fav) {
+        var glyph = decodeURIComponent(fav[0]).match(/<text[^>]*>([^<]+)<\/text>/i);
+        if (glyph) meta.icon = glyph[1].trim();
+      }
+    }
+    if (!meta.tags) {
+      var kw = src.match(/<meta[^>]*name=["']keywords["'][^>]*content=["']([^"']+)["']/i);
+      if (kw) meta.tags = kw[1].trim();
+    }
+  } catch (e) { /* a half-written file still publishes; the fields just stay empty */ }
   // Drop unfilled {{template}} placeholders.
   if (/\{\{.*\}\}/.test(meta.name)) meta.name = '';
   if (/\{\{.*\}\}/.test(meta.description)) meta.description = '';
+  if (/\{\{.*\}\}/.test(meta.icon)) meta.icon = '';
+  if (/\{\{.*\}\}/.test(meta.tags)) meta.tags = '';
+  return meta;
+}
+
+// Fill what the person has not typed, and never touch what they have. Typing beats the file:
+// someone who names their app before pasting it meant that name.
+function prefillFromHtml(html, fallbackName) {
+  var meta = parseAppMeta(html);
+  var setIfEmpty = function (id, value) {
+    var el = document.getElementById(id);
+    if (el && !el.value.trim() && value) el.value = value;
+  };
+  setIfEmpty('app-name', meta.name || fallbackName || '');
+  setIfEmpty('app-icon', meta.icon);
+  setIfEmpty('app-tags', meta.tags);
   return meta;
 }
 
@@ -154,11 +200,16 @@ function handleFileDrop(file) {
   }
   selectedFile = file;
   document.getElementById('selected-file-name').textContent = file.name;
-  // Auto-fill name from filename if empty
-  var nameInput = document.getElementById('app-name');
-  if (!nameInput.value.trim()) {
-    nameInput.value = file.name.replace(/\.html?$/i, '');
-  }
+  // Read the file, not its name. Naming an app after its file is how a wall ends up full of
+  // nuotta.html; the <title> inside is the name its author actually chose. The filename stays
+  // as the fallback for a file that carries no title at all.
+  var fallback = file.name.replace(/\.html?$/i, '');
+  readFileAsText(file)
+    .then(function (html) { prefillFromHtml(html, fallback); })
+    .catch(function () {
+      var nameInput = document.getElementById('app-name');
+      if (nameInput && !nameInput.value.trim()) nameInput.value = fallback;
+    });
 }
 
 function handleSave() {
@@ -229,6 +280,7 @@ export {
   showModal,
   requireSignInThen,
   parseAppMeta,
+  prefillFromHtml,
   closeModal,
   switchTab,
   handleFileDrop,
