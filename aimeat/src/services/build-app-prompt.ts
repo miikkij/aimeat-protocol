@@ -317,6 +317,12 @@ export function buildAppPrompt(
   // the game form-language block, which ended by telling every tool app that a flat daisyUI page was
   // "the right default" — so the paved path reliably produced nine identical grey cards with one type
   // size and no focal point. Components are not design; hierarchy is. (ODPS app review, 2026-07-25.)
+  // The surface ladder, said out loud. base-100 is the PAGE and the fill daisyUI puts inside form
+  // controls; base-200 is the raised card. Ten published apps wrote `card bg-base-100` before that
+  // was written down anywhere, and on 2026-07-25 base-100 moved from near-white to the page beige
+  // — at which point every one of those cards became exactly the colour of the page behind it.
+  body += '### Surfaces — which base is which\n';
+  body += 'The theme ladder is fixed and worth memorising, because getting it backwards makes an app look broken rather than merely plain: **`base-100` is the PAGE** (and the fill daisyUI puts inside inputs and selects), **`base-200` is a raised CARD**, and **`base-300` is wells, dividers and borders**. So a card is `card bg-base-200`, never `bg-base-100`: painting a card with the page colour makes it vanish into the background, and the inputs inside it go with it, because they are filled with that same colour. Never hardcode a hex value for any of these — five palettes ship and they move underneath you.\n\n';
   body += '### Visual design — components are not a design\n';
   body += 'daisyUI gives you correct, accessible COMPONENTS. It does not give you a design, and a page of stacked `card bg-base-200` blocks with one type size reads as unfinished no matter how good the logic underneath is. Six rules turn components into something worth looking at. They cost minutes, not hours:\n';
   body += '- **One focal point per screen.** Decide the single most important thing (the verdict, the number, the next action) and make it visually dominant — bigger, heavier, or the only saturated colour in view. If everything is the same weight, the eye has nowhere to land and the page reads as a wall.\n';
