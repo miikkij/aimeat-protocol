@@ -104,10 +104,11 @@ function StatsPanel({ navigate }) {
 /* ── Live wall — the REAL apps people built with their AI and published to this node (from the
    apps API, manifest-driven). Three per row + a filter. Each card: name · description · who made
    it · when. The proof the loop works: your creation lands on this same wall. ── */
+// Date only. The clock time of a publish tells a visitor nothing, and it was the part that
+// pushed the card's footer onto a second line, so half the grid wrapped and half did not.
 function fmtPublished(iso) {
   try {
-    const d = new Date(iso);
-    return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    return new Date(iso).toLocaleDateString();
   } catch (err) { swallowed('landing: fmtPublished', err); return ''; }
 }
 
@@ -150,17 +151,21 @@ function Gallery() {
               const author = m.authorDisplay || a.owner || tr('landing.wallAnon', 'someone');
               const when = a.created_at ? fmtPublished(a.created_at) : '';
               const open = () => openAppSandboxed(href, m.name || a.filename);
+              // Version first, then the two numbers, and a zero is left out rather than printed:
+              // "0 opens" on a freshly published app reads as a verdict on it.
+              const facts = [];
+              if (m.version) facts.push('v' + escHtml(m.version));
+              if (a.downloads > 0) facts.push(`${a.downloads} ${a.downloads === 1 ? tr('landing.wallOpen1', 'open') : tr('landing.wallOpens', 'opens')}`);
+              if (a.forks > 0) facts.push(`${a.forks} ${a.forks === 1 ? tr('landing.wallFork1', 'fork') : tr('landing.wallForks', 'forks')}`);
               return html`
                 <div key=${a.owner + '/' + a.filename} class="ld-app-card" role="button" tabindex="0"
                   onClick=${open} onKeyDown=${(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(); } }}>
                   ${a.screenshot_url ? html`<img class="ld-app-shot" src=${a.screenshot_url} loading="lazy" alt="" />` : ''}
                   <div class="ld-app-name">${m.icon ? escHtml(m.icon) + ' ' : ''}${escHtml(m.name || a.filename)}</div>
                   ${desc && html`<div class="ld-app-desc">${escHtml(desc)}</div>`}
-                  <div class="ld-app-meta">${escHtml(author)}${when ? ' · ' + when : ''}</div>
-                  <div class="ld-app-stats">
-                    ${m.version ? html`<span class="ld-app-stat">v${escHtml(m.version)}</span>` : ''}
-                    ${a.downloads > 0 ? html`<span class="ld-app-stat">${a.downloads} ${a.downloads === 1 ? tr('landing.wallOpen1', 'open') : tr('landing.wallOpens', 'opens')}</span>` : ''}
-                    ${a.forks > 0 ? html`<span class="ld-app-stat">${a.forks} ${a.forks === 1 ? tr('landing.wallFork1', 'fork') : tr('landing.wallForks', 'forks')}</span>` : ''}
+                  <div class="ld-app-foot">
+                    <span class="ld-app-facts">${facts.join(' · ')}</span>
+                    <span class="ld-app-by">${escHtml(author)}${when ? ' · ' + when : ''}</span>
                   </div>
                 </div>`;
             })}

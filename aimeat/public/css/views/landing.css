@@ -74,12 +74,27 @@
 .ld-gallery { display: grid; grid-template-columns: repeat(3, 1fr); gap: .9rem; }
 @media (max-width: 900px) { .ld-gallery { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 560px) { .ld-gallery { grid-template-columns: 1fr; } }
-.ld-app-card { display: block; border: 1px solid var(--border); border-radius: 10px; background: var(--card); padding: .9rem 1rem; text-decoration: none; color: var(--text); cursor: pointer; }
+/* A column so the footer can be pushed to the bottom edge. Cards in a row are as tall as the
+   longest description, and a footer that floated up behind a short one left the ragged gap that
+   made the grid look unfinished. */
+.ld-app-card {
+  display: flex; flex-direction: column; border: 1px solid var(--border); border-radius: 10px;
+  background: var(--card); padding: .9rem 1rem; text-decoration: none; color: var(--text); cursor: pointer;
+}
 .ld-app-card:hover { border-color: var(--accent); }
 .ld-app-shot { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); margin-bottom: .55rem; background: var(--bg-dim); }
 .ld-app-name { font-weight: 700; margin-bottom: .25rem; }
-.ld-app-desc { font-size: .82rem; color: var(--text-dim); margin-bottom: .4rem; }
+.ld-app-desc { font-size: .82rem; color: var(--text-dim); margin-bottom: .55rem; }
 .ld-app-meta { font-size: .72rem; color: var(--muted); }
+/* One rule, then one line: what the app IS on the left, who made it and when on the right.
+   Pills turned four short facts into four boxes and made the card look busier than the app.
+   Emphasis carries the version and the counts instead of a border. */
+.ld-app-foot {
+  margin-top: auto; padding-top: .55rem; border-top: 1px solid var(--border);
+  display: flex; align-items: baseline; justify-content: space-between; gap: .5rem .75rem; flex-wrap: wrap;
+}
+.ld-app-facts { font-size: .74rem; font-weight: 600; color: var(--text); letter-spacing: .01em; }
+.ld-app-by { font-size: .7rem; color: var(--text-muted); }
 .ld-footer { display: flex; gap: 1.25rem; flex-wrap: wrap; justify-content: center; margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); font-size: .88rem; }
 .ld-footer a { color: var(--text-dim); text-decoration: none; }
 .ld-footer a:hover { color: var(--text); }
@@ -197,11 +212,6 @@
 /* An app that has been opened forty times and revised to v1.2.0 is a different thing from one
    published yesterday and never touched, and the wall showed neither. A zero is omitted rather
    than printed: "0 opens" on a new app reads as a verdict on it. */
-.ld-app-stats { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .35rem; }
-.ld-app-stat {
-  font-size: .7rem; color: var(--text-muted); background: var(--surface);
-  border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px;
-}
 
 .ld-pitch { max-width: 760px; margin: 2rem auto 1rem; text-align: left; }
 .ld-pitch-line { font-size: 1.35rem; line-height: 1.4; font-weight: 700; color: var(--text); margin: 0; }
