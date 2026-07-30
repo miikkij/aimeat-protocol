@@ -17,12 +17,14 @@
  *   share, and it cannot make one payable. `pool_percent` is server-held provider configuration read
  *   at settlement, and the verification gate is operator-only — so nothing a page sends can enlarge a
  *   payout or open the gate on its own. Amounts here are always REPORTED, never proposed.
- * @structure declareSplit · splits · deleteSplit · earnings · obligations · release · approval · approve
+ * @structure declareSplit · splits · deleteSplit · earnings · obligations · release · approval ·
+ *   approve · payoutQuote · payout
  * @usage
  *   await AIMEAT.exchange.declareSplit({ ext: 'kumppani', action: 'getRegisterChanges',
  *     poolPercent: 70, dynamic: true });
  *   const owed = await AIMEAT.exchange.beneficiaryEarnings();   // owed.verification.payable
  * @version-history
+ *   v1.1.0 — 2026-07-30 — payoutQuote + payout: the leg where the money actually reaches them.
  *   v1.0.0 — 2026-07-30 — Initial: the beneficiary surface of the EXCHANGE library.
  */
 import { authed, send, qs } from './client.js';
@@ -166,4 +168,40 @@ export function approve(finding) {
   return send('/v1/commerce/beneficiary/approvals', 'POST', {
     ghii: f.ghii, state: f.state, method: f.method, subject: f.subject, evidence: f.evidence,
   }, 'Failed to record the verification');
+}
+
+/**
+ * What you still owe a beneficiary, and the x402 requirements to pay it.
+ *
+ * The last leg. Neither money handler can push a provider's funds to a third party, so a
+ * provider-to-beneficiary transfer is a separate payment that its payer authorises: this returns
+ * exact-scheme requirements to sign with the wallet holding the funds, and {@link payout} settles
+ * them. Aggregated across everything released and unpaid in one currency, so one signature clears
+ * the balance instead of paying gas on every sub-euro share.
+ *
+ * `payable: false` with `reason: 'BENEFICIARY_NO_ADDRESS'` is not an error: they have set no payout
+ * address, so the obligation simply stays owed, which is what an unpaid invoice is.
+ * @param {string} beneficiary  Their owner GHII.
+ * @param {string} [currency]   Defaults to EUR.
+ * @returns {Promise<any>}  `{ payable, reason, message, amount, currency, entries, pay_to, accepts }`
+ */
+export function payoutQuote(beneficiary, currency) {
+  return authed('/v1/commerce/beneficiary/payout' + qs({ beneficiary, currency }), undefined,
+    'Failed to read what you owe this beneficiary');
+}
+
+/**
+ * Settle it with the signed authorisation from {@link payoutQuote}.
+ *
+ * The quote is rebuilt server-side, so a signature can only ever move what is genuinely owed at that
+ * instant. Entries become `paid` only once the facilitator confirms, so a failed settlement leaves
+ * them payable and a confirmation arriving twice cannot pay twice.
+ * @param {string} beneficiary  Their owner GHII.
+ * @param {any} payment         The signed x402 exact-scheme payload.
+ * @param {string} [currency]
+ * @returns {Promise<any>}  `{ paid, amount, currency, entries, tx_hash, pay_to }`
+ */
+export function payout(beneficiary, payment, currency) {
+  return send('/v1/commerce/beneficiary/payout', 'POST', { beneficiary, payment, currency },
+    'Failed to settle the beneficiary payout');
 }

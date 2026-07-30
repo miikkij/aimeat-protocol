@@ -89,6 +89,19 @@ export const commerceTools: AimeatToolDefinition[] = [
         },
     },
     {
+        name: 'aimeat_commerce_beneficiary_payout',
+        description: 'Pay a beneficiary what you owe them, onchain. The last leg, and the one no existing payout could do: neither money handler can push a provider\'s funds to a third party (Stripe has no Connect platform here by design, and x402\'s payout is a no-op because the money moved buyer-to-seller at collect time), so a provider-to-beneficiary transfer is a DIFFERENT payment that its payer has to authorise. Call with no `payment` to QUOTE: you get what is owed plus the x402 exact-scheme requirements to sign with the wallet that holds the funds. Sign them, then call again with the signed `payment` to settle. AGGREGATED across everything released and unpaid in one currency, so one signature clears the balance instead of paying gas on every sub-euro share. The quote is rebuilt server-side on settle, so a signature can only move what is genuinely owed at that instant. Entries become `paid` only after the facilitator confirms, so a failed settlement leaves them payable and a confirmation arriving twice cannot pay twice. A beneficiary who has set no payout address returns BENEFICIARY_NO_ADDRESS and the obligation simply stays owed, which is what an unpaid invoice is. The node holds no key and no funds at any instant.',
+        caller: 'agent',
+        // MCP-server only: no connector REST twin and no CLI handler, so the catalog says so
+        // rather than promising surfaces that would 404. (audit-mcp-tools enforces the parity.)
+        visibility: { publicMcp: true, connectorMcp: false, cliFallback: false },
+        input: {
+            beneficiary: { type: 'string', required: true, description: 'The beneficiary owner GHII you owe.' },
+            currency: { type: 'string', required: false, description: 'Defaults to EUR.' },
+            payment: { type: 'object', required: false, description: 'The signed x402 exact-scheme payload. Omit to quote.' },
+        },
+    },
+    {
         name: 'aimeat_commerce_psp_set',
         description: 'Store YOUR OWNER\'s payment-provider credentials for selling in money currencies (the commerce.psp record the checkout payment handlers read — e.g. a Stripe secret key). Money sales always settle on the SELLER\'s own PSP account, never the node\'s. The secret is stored server-side and NEVER returned by any tool — reads show a masked hint only. Morsel-only selling needs no PSP.',
         caller: 'agent',

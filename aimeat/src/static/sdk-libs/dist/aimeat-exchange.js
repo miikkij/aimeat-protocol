@@ -501,6 +501,21 @@
       evidence: f.evidence
     }, "Failed to record the verification");
   }
+  function payoutQuote(beneficiary, currency) {
+    return authed(
+      "/v1/commerce/beneficiary/payout" + qs({ beneficiary, currency }),
+      void 0,
+      "Failed to read what you owe this beneficiary"
+    );
+  }
+  function payout(beneficiary, payment, currency) {
+    return send(
+      "/v1/commerce/beneficiary/payout",
+      "POST",
+      { beneficiary, payment, currency },
+      "Failed to settle the beneficiary payout"
+    );
+  }
 
   // src/static/sdk-libs/exchange/demand.js
   var enc4 = encodeURIComponent;
@@ -745,6 +760,8 @@
     release,
     approval,
     approve,
+    payoutQuote,
+    payout,
     beneficiaryEarnings: earnings2,
     // ── Demand ──
     needs,

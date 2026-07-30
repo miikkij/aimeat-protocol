@@ -142,6 +142,9 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_commerce_beneficiary_split_set: 'commerce:sell',
     aimeat_commerce_beneficiary_splits: 'commerce:sell',
     aimeat_commerce_beneficiary_release: 'commerce:sell',
+    // Paying moves value out of the owner's own wallet, so it sits with the seller-side config
+    // rather than with the reads.
+    aimeat_commerce_beneficiary_payout: 'commerce:sell',
     aimeat_commerce_beneficiary_earnings: 'wallet:read',
     // The approval gate is operator-only at the handler; the scope keeps a narrow agent from even
     // seeing the tool, so it is not offered to somebody who could never use it.

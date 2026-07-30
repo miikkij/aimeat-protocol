@@ -283,6 +283,7 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_commerce_beneficiary_splits: { title: 'Your Revenue Splits', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_commerce_beneficiary_earnings: { title: 'Beneficiary Shares Owed', readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_commerce_beneficiary_release: { title: 'Release a Beneficiary Share', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_commerce_beneficiary_payout: { title: 'Pay a Beneficiary Onchain', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_commerce_beneficiary_approve: { title: 'Approve a Beneficiary for Payout', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_commerce_psp_set: { title: 'Set Seller PSP Credentials', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
     aimeat_commerce_psp_status: { title: 'Check PSP Status (masked)', readOnlyHint: true },

@@ -45,7 +45,7 @@ import {
 import { earnings } from './earnings.js';
 import {
   declareSplit, splits, deleteSplit, obligations, release, approval, approve,
-  earnings as beneficiaryEarnings,
+  payoutQuote, payout, earnings as beneficiaryEarnings,
 } from './beneficiaries.js';
 import { needs, postNeed, closeNeed, bids, bid, acceptBid } from './demand.js';
 import { fmtUnit, fmtMorsels } from './format.js';
@@ -69,7 +69,7 @@ const exchange = {
 
   // ── Revenue you SHARE (the second rake — out of the seller's cut, never the buyer's charge) ──
   declareSplit, splits, deleteSplit, obligations, release, approval, approve,
-  beneficiaryEarnings,
+  payoutQuote, payout, beneficiaryEarnings,
 
   // ── Demand ──
   needs, postNeed, closeNeed, bids, bid, acceptBid,

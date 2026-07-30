@@ -34,6 +34,8 @@ import { PaymentError } from '../commerce/payment-handlers.js';
 import { putSplit, deleteSplit, listSplitsByProvider, BENEFICIARIES_MAX, type BeneficiaryShare } from '../commerce/beneficiary-split.js';
 import { listBeneficiaryEntries, listBeneficiaryObligations, type BeneficiaryEntry } from '../commerce/beneficiary-book.js';
 import { readApproval, putApproval, beneficiaryEligibility, releaseBeneficiaryShare } from '../commerce/beneficiary-release.js';
+import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/beneficiary-payout.js';
+import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 import { issueJWT } from '../auth/jwt.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
@@ -521,6 +523,44 @@ export function registerCommerceTools(
                 ghii, state, method, subject: subject ?? null, evidence, verifiedBy: ownerGhii,
             });
             return ok({ approval });
+        },
+    );
+
+    mcp.tool(
+        'aimeat_commerce_beneficiary_payout',
+        descriptionFor('aimeat_commerce_beneficiary_payout'),
+        {
+            beneficiary: z.string().min(3).max(200),
+            currency: z.string().max(10).optional(),
+            payment: z.record(z.string(), z.unknown()).optional(),
+        },
+        annotationsFor('aimeat_commerce_beneficiary_payout'),
+        async ({ beneficiary, currency, payment }) => {
+            // No signature yet -> QUOTE. The agent hands these requirements to whatever holds the
+            // wallet; the node never sees a key.
+            if (!payment) {
+                const q = await quoteBeneficiaryPayout(storage, config, {
+                    providerGhii: ownerGhii, beneficiaryGhii: beneficiary, currency,
+                });
+                if (!q.ok) return fail(`${q.reason}: ${q.message}`);
+                return ok({
+                    payable: true, beneficiary, amount: q.amount, currency: q.currency,
+                    entries: q.entries.length, pay_to: q.payTo, accepts: [q.requirements],
+                    note: 'Sign these requirements with the wallet that holds the funds, then call this '
+                        + 'tool again with the signed payload as `payment`.',
+                });
+            }
+            const r = await settleBeneficiaryPayout(storage, config, {
+                providerGhii: ownerGhii, beneficiaryGhii: beneficiary, currency,
+                payload: payment as unknown as X402PaymentPayload,
+            });
+            if (!r.ok) return fail(`${r.reason}: ${r.message}`);
+            return ok({
+                paid: true, beneficiary, amount: r.amount, currency: r.currency,
+                entries: r.entries, tx_hash: r.txHash, pay_to: r.payTo,
+                note: 'Settled onchain from your address into theirs. The node held nothing; the '
+                    + 'transaction hash is the proof and those entries now read `paid`.',
+            });
         },
     );
 }

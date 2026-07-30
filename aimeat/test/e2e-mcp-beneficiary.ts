@@ -339,5 +339,13 @@ await test('The MCP invoke door strips `_revenue` too, not just the REST one', a
   assert(r.data?.ok === true, `the rest of the result survives: ${r.text.slice(0, 200)}`);
 });
 
+await test('MCP: the payout tool quotes what is owed, and refuses without an address', async () => {
+  // The last leg reached the agent surface too. A quote is a read; settling needs a signature the
+  // node never holds, so the tool hands back requirements rather than moving anything itself.
+  const r = await provAgent.session.call('aimeat_commerce_beneficiary_payout', { beneficiary: benef.ghii });
+  assert(r.isError, `no payout address is configured, so a quote must refuse: ${r.text}`);
+  assert(/BENEFICIARY_NO_ADDRESS|NOTHING_OWED/.test(r.text), `expected a named reason, got ${r.text}`);
+});
+
 console.log(`\n=== MCP BENEFICIARY E2E: ${passed} passed, ${failed} failed ===\n`);
 process.exit(failed > 0 ? 1 : 0);
