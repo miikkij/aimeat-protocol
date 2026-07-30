@@ -61,6 +61,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'game', entry: 'game/index.js' },
   { name: 'webmcp', entry: 'webmcp/index.js' },
   { name: 'markdown', entry: 'markdown/index.js' },
+  { name: 'iam', entry: 'iam/index.js' },
   { name: 'audio', entry: 'audio/index.js' },
   { name: 'tunnel', entry: 'tunnel/index.js' },
   { name: 'auth', entry: 'auth/index.js' },
