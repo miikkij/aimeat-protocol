@@ -200,5 +200,111 @@ await test('the owner is not a member of their own app, and cannot ask to be', a
     assert(me.body.data.isOwner === true && me.body.data.role === 'owner', `but they read as the owner: ${JSON.stringify(me.body.data)}`);
 });
 
+
+// ── the role and the free access change together ────────────────────────────────────────────────
+// Approving somebody without the grants underneath is a sentence with nothing behind it: the role
+// opens the tabs and the first data call answers 402. Every app that sold anything wrote this loop
+// itself, had to be right twice (promotion AND demotion), and one of them ran it from the browser.
+
+let ext = '';
+const OFFER_A = 'alpha', OFFER_B = 'beta';
+let offA = '', offB = '';
+
+await test('setup: the owner lists two priced capabilities', async () => {
+    // An EXCHANGE listing is a projection of the app's TOOL manifest, not of a priced extension
+    // action, so the fixture has to declare the tools the way a real app does.
+    ext = `rosterext${Date.now().toString(36)}`;
+    const manifest = [
+        'metadata:', `  name: ${ext}`, '  version: 1.0.0', '  description: roster sync fixture', '  author: t',
+        'required_apis:', '  - memory', 'actions:',
+        `  - id: ${OFFER_A}`, '    method: POST', `    path: /${OFFER_A}`,
+        '    input: { type: object }', '    output: { type: object }', `    script: ${OFFER_A}.js`,
+        `  - id: ${OFFER_B}`, '    method: POST', `    path: /${OFFER_B}`,
+        '    input: { type: object }', '    output: { type: object }', `    script: ${OFFER_B}.js`,
+    ].join('\n');
+    const scripts = {
+        [`${OFFER_A}.js`]: 'export default async function () { return { ok: true }; }',
+        [`${OFFER_B}.js`]: 'export default async function () { return { ok: true }; }',
+    };
+    const inst = await json('/v1/extensions', { method: 'POST', headers: auth(owner.token), body: JSON.stringify({ manifest, scripts }) });
+    assert(inst.status === 200 || inst.status === 201, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
+    assert((await json(`/v1/extensions/${ext}/activate`, { method: 'POST', headers: auth(owner.token), body: '{}' })).status === 200, 'activate');
+
+    const schema = { type: 'object', properties: { q: { type: 'string' } } };
+    const tools = [
+        { name: OFFER_A, description: 'first', action_id: `ext:${ext}:${OFFER_A}`, inputSchema: schema, outputSchema: schema, price: { morsels: 5 }, exchange: true },
+        { name: OFFER_B, description: 'second', action_id: `ext:${ext}:${OFFER_B}`, inputSchema: schema, outputSchema: schema, price: { morsels: 7 }, exchange: true },
+    ];
+    const put = await json('/v1/memory', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ key: `apps.${APP}.tools`, visibility: 'public', value: { version: 1, tools } }),
+    });
+    assert(put.status === 200 || put.status === 201, `tool manifest ${put.status}: ${JSON.stringify(put.body?.error)}`);
+
+    const listed = await json('/v1/exchange/offerings', { headers: auth(owner.token) });
+    const mine = (listed.body.data.offerings as any[]).filter(o => o.providerOwner === owner.name);
+    offA = mine.find(o => o.action === OFFER_A)?.offeringId ?? '';
+    offB = mine.find(o => o.action === OFFER_B)?.offeringId ?? '';
+    assert(!!offA && !!offB, `both are listed: ${JSON.stringify(mine.map(o => o.action))}`);
+});
+
+const carried = async (account: string) => {
+    const r = await json(`/v1/exchange/grants?app_id=${encodeURIComponent(appId)}`, { headers: auth(owner.token) });
+    // The view names these `consumer_gaii` and `state`; reading `consumer`/`status` finds nothing
+    // and would have made a working sync look broken.
+    return ((r.body.data.grants as any[]) ?? []).filter(g => String(g.consumer_gaii).toLowerCase().includes(account.toLowerCase()) && g.state === 'active');
+};
+
+await test('approving with offerings carries them, and says so rather than answering a bare ok', async () => {
+    const ok = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: member.name, role: 'member', offerings: [offA, offB] }),
+    });
+    assert(ok.status === 201, `approve ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
+    const acc = ok.body.data.access;
+    assert(!!acc, 'the answer reports what access actually happened');
+    assert(acc.granted.length === 2, `both listings carried: ${JSON.stringify(acc)}`);
+    assert(acc.failed.length === 0, `and nothing failed quietly: ${JSON.stringify(acc.failed)}`);
+    assert((await carried(member.name)).length === 2, 'the node agrees two grants are live');
+});
+
+await test('a demotion WITHDRAWS what the smaller role no longer covers, in the same call', async () => {
+    const down = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: member.name, role: 'reader', offerings: [offA] }),
+    });
+    assert(down.status === 200, `demote ${down.status}: ${JSON.stringify(down.body?.error)}`);
+    const acc = down.body.data.access;
+    assert(acc.revoked.length === 1, `the dropped listing is withdrawn: ${JSON.stringify(acc)}`);
+    assert(acc.unchanged.length === 1, 'and the kept one is left alone rather than churned');
+    assert(acc.granted.length === 0, 'nothing new was issued');
+    const live = await carried(member.name);
+    assert(live.length === 1, `one grant remains, got ${live.length}`);
+});
+
+await test('an offering that is not the owner\'s is REPORTED, not skipped', async () => {
+    const theirs = await setupOwner('oth');
+    // A listing the approver does not own must not be silently dropped from the promise.
+    const r = await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: member.name, role: 'reader', offerings: [offA, 'off-does-not-exist'] }),
+    });
+    assert(r.status === 200, `approve ${r.status}`);
+    const acc = r.body.data.access;
+    assert(acc.failed.length === 1, `the bad one is named: ${JSON.stringify(acc.failed)}`);
+    assert(acc.failed[0].offeringId === 'off-does-not-exist', 'by id');
+    assert(acc.unchanged.length === 1, 'and the good one still stands');
+    void theirs;
+});
+
+await test('removing the member takes the carried access with them', async () => {
+    assert((await carried(member.name)).length === 1, 'they are carried before the removal');
+    const gone = await json(`/v1/apps/${owner.name}/${APP}/members/${member.name}`, { method: 'DELETE', headers: auth(owner.token) });
+    assert(gone.status === 200, `remove ${gone.status}`);
+    const live = await carried(member.name);
+    assert(live.length === 0,
+        `a removed member must not keep calling free on the owner's tab, ${live.length} grant(s) survived`);
+});
+
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);

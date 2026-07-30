@@ -34,6 +34,7 @@ import {
   listRequests, putRequest, removeRequest, accountOf,
 } from '../services/app-members.js';
 import { notify } from '../services/notify.js';
+import { syncGrantsForMember } from '../services/grant-sync.js';
 import { logger } from '../utils/logger.js';
 
 const FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
@@ -111,6 +112,18 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     });
     await removeRequest(storage, c.appId, account);
 
+    // The role decides WHAT they may reach; the grant is what lets them reach it without being
+    // billed. Doing both here is the point of the roster living on the node: an approval that only
+    // set a role would be a sentence with nothing behind it, and a demotion that left the grants
+    // would keep billing the owner for somebody they just narrowed.
+    const sync = Array.isArray(b.offerings)
+      ? await syncGrantsForMember(storage, {
+          providerOwner: c.owner.toLowerCase(), providerGhii: `${c.owner}@${config.nodeId}`,
+          consumer: `${account}@${config.nodeId}`, appId: c.appId, role,
+          offeringIds: rec.offerings, note: rec.note,
+        })
+      : null;
+
     // Only a NEW member is told they were approved. A role change is a different message, and
     // sending "you were approved" again to somebody who already had access reads as a mistake.
     if (!before) {
@@ -126,7 +139,12 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
         logger.warn('app-members: approval notification failed, the membership stands', { error: String(err) });
       }
     }
-    return res.status(before ? 200 : 201).json(success(config.nodeId, { member: rec, created: !before }));
+    return res.status(before ? 200 : 201).json(success(config.nodeId, {
+      member: rec, created: !before,
+      // Never a bare ok: an approval that carried less than it promised must say so here, because
+      // the member finds out as a 402 on their first call otherwise.
+      access: sync ? { granted: sync.granted, revoked: sync.revoked, unchanged: sync.unchanged, failed: sync.failed } : null,
+    }));
   });
 
   // ── DELETE .../members/:account — remove a member. Owner only. ──
@@ -136,6 +154,15 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner removes its members'));
     const account = accountOf(String(req.params.account ?? ''));
     const gone = await removeMember(storage, c.appId, account);
+    // Taking the role away takes the access with it. Leaving the grants behind would mean a removed
+    // member keeps calling free and the owner keeps paying for it.
+    if (gone && gone.offerings.length) {
+      await syncGrantsForMember(storage, {
+        providerOwner: c.owner.toLowerCase(), providerGhii: `${c.owner}@${config.nodeId}`,
+        consumer: `${account}@${config.nodeId}`, appId: c.appId, role: gone.role,
+        offeringIds: [],
+      });
+    }
     if (!gone) return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such member'));
     try {
       await notify(storage, `${account}@${config.nodeId}`, {
