@@ -21,6 +21,19 @@
  *   v1.0.0 — 2026-06-26 — initial: extension (enforcement) + dashboard app.
  *   v1.1.0 — 2026-06-26 — dashboard v2: plain fetch+JWT (fix load), structured role editor,
  *     assignments list, "use in your app / tell your AI" snippet, help text, default-role select.
+ *   v1.3.0 — 2026-07-30 — a role now resolves against the caller's OWNER, not the acting GAII, and
+ *     the keying is a CONFIGURED axis (`iam.config.subject`: owner | gaii | both) rather than a
+ *     constant. Before this, a member's own agent matched no row and silently fell to the default
+ *     role, so an approved member lost every paid surface the moment they worked through an agent;
+ *     three of the six iam-family extensions on this node exist only as forks that changed that one
+ *     line. Resolution accepts all three key shapes (bare account name, owner@node, agent#owner@node)
+ *     so an app with an existing roster does not have to migrate it. Also: administration is gated by
+ *     CAPABILITY instead of comparing the caller's gaii to config.ownerGhii, which had refused the
+ *     owner's OWN agent (and, where an agent did the first claim, locked out the human); the roster
+ *     and config are written PRIVATE, because an ext: namespace is world-readable by default and the
+ *     old writes served the membership list to anyone who asked; and both actions now return `via`
+ *     so a verdict can be checked against its reason. New op setSubject. Backward-compatible:
+ *     check{permission}/check{command} keep their shape and gain two fields. See TARGET-055.
  *   v1.2.1 — 2026-07-30 — action schemas were declared as `input_schema:`/`output_schema:`, but the
  *     extension manifest parser reads `input:`/`output:` (routes/extensions/manifest.ts), so BOTH
  *     schemas were dropped silently: every extension installed from this package advertised check
@@ -39,6 +52,42 @@ import type { ExamplePackageDef } from './example-packages.js';
 
 // ── Extension `iam` — server-side enforcement (V8 sandbox: export default async (ctx, input)) ──
 
+/**
+ * Resolution shared verbatim by check and admin. Two answers to "who is this caller" inside one
+ * extension is how a gate starts disagreeing with the panel that configures it, so this text is
+ * identical in both scripts.
+ *
+ * `subject` decides who a role is keyed to:
+ *   owner (default) — a member's agents inherit the member's right; one revoke removes it from all.
+ *   gaii            — every agent is enrolled on its own.
+ *   both            — owner-keyed, plus an optional per-agent override row.
+ *
+ * A per-agent override is only an override when the key names an AGENT, i.e. it carries '#'. An
+ * owner GHII row (owner@node) has no '#' and IS the person, so matching it in the override branch
+ * would report the owner's own sign-in as an agent override and let a GHII row outrank the person.
+ * Accepting all three historical key shapes is deliberate: an app that already has a roster does
+ * not have to migrate it to become safe.
+ */
+const RESOLVE_FN = `
+  function resolveRole(assignments, subject, caller, owner) {
+    if (subject !== 'owner' && caller && caller.indexOf('#') !== -1
+        && Object.prototype.hasOwnProperty.call(assignments, caller)) {
+      return { role: assignments[caller], via: 'agent' };
+    }
+    if (subject === 'gaii') return { role: null, via: 'none' };
+    if (owner) {
+      if (Object.prototype.hasOwnProperty.call(assignments, owner)) return { role: assignments[owner], via: 'owner' };
+      var keys = Object.keys(assignments);
+      for (var i = 0; i < keys.length; i++) {
+        var k = keys[i];
+        if (k.indexOf('#') === -1 && String(k).toLowerCase().split('@')[0] === owner) {
+          return { role: assignments[k], via: 'owner' };
+        }
+      }
+    }
+    return { role: null, via: 'none' };
+  }`;
+
 const SCRIPT_CHECK = `export default async function (ctx, input) {
   const config = (await ctx.memory.get('iam.config')) || {};
   const roles = (await ctx.memory.get('iam.roles')) || {};
@@ -46,7 +95,13 @@ const SCRIPT_CHECK = `export default async function (ctx, input) {
   const commands = (await ctx.memory.get('iam.commands')) || [];
   const assignments = (await ctx.memory.get('iam.assignments')) || {};
   const caller = ctx.caller && ctx.caller.gaii;
-  const role = (caller && assignments[caller]) || config.defaultRole || null;
+  // ctx.caller.owner is the bare account name and is the SAME for the human and for every agent
+  // they have connected; ctx.caller.gaii is the GHII for the human and the full GAII for an agent.
+  const owner = (ctx.caller && ctx.caller.owner) ? String(ctx.caller.owner).toLowerCase() : null;
+  const subject = config.subject || 'owner';
+${RESOLVE_FN}
+  const hit = resolveRole(assignments, subject, caller, owner);
+  const role = hit.role || config.defaultRole || null;
   const perms = (role && roles[role]) || [];
   const level = (role && Object.prototype.hasOwnProperty.call(levels, role)) ? levels[role] : null;
   const has = function (cap) { return perms.indexOf('*') !== -1 || perms.indexOf(cap) !== -1; };
@@ -55,24 +110,33 @@ const SCRIPT_CHECK = `export default async function (ctx, input) {
   if (input && input.command) {
     let cmd = null;
     for (let i = 0; i < commands.length; i++) { if (commands[i] && commands[i].id === input.command) { cmd = commands[i]; break; } }
-    if (!cmd) return { allowed: false, error: 'unknown command', command: input.command, role: role, level: level };
+    if (!cmd) return { allowed: false, error: 'unknown command', command: input.command, role: role, level: level, subject: subject, via: hit.via };
     return {
       allowed: has(cmd.capability), role: role, level: level, command: cmd.id, capability: cmd.capability,
       tier: cmd.tier || 'write', needsConfirmation: cmd.tier === 'irreversible',
+      subject: subject, via: hit.via,
     };
   }
-  // Permission mode (legacy — unchanged shape): check { permission }.
+  // Permission mode (legacy — unchanged shape plus the two new fields): check { permission }.
+  // \`via\` says WHY the role resolved ('owner' | 'agent' | 'none'). It is not decoration: an
+  // allowed:true can be right for the wrong reason, and that is invisible without it.
   const permission = input && input.permission;
   if (!permission) return { allowed: false, error: 'permission or command required' };
-  return { allowed: has(permission), role: role, permission: permission, level: level };
+  return { allowed: has(permission), role: role, permission: permission, level: level, subject: subject, via: hit.via };
 }`;
 
 const SCRIPT_ADMIN = `export default async function (ctx, input) {
   const caller = ctx.caller && ctx.caller.gaii;
+  const owner = (ctx.caller && ctx.caller.owner) ? String(ctx.caller.owner).toLowerCase() : null;
   const op = input && input.op;
   let config = (await ctx.memory.get('iam.config')) || {};
   let roles = await ctx.memory.get('iam.roles');
   let assignments = (await ctx.memory.get('iam.assignments')) || {};
+  // Who is a member is personal data about other people, and an extension namespace is
+  // world-readable BY DEFAULT: a roster written the plain way is served to anyone who asks for the
+  // key. The roster and the config carry PRIV; roles, levels and commands stay public because a
+  // capability vocabulary is product configuration, not personal data.
+  const PRIV = { visibility: 'private' };
   if (!roles) {
     roles = { admin: ['*'], editor: ['read', 'create', 'edit'], viewer: ['read'] };
     await ctx.memory.set('iam.roles', roles);
@@ -83,22 +147,48 @@ const SCRIPT_ADMIN = `export default async function (ctx, input) {
     await ctx.memory.set('iam.levels', levels);
   }
   let commands = (await ctx.memory.get('iam.commands')) || [];
+  const subject = config.subject || 'owner';
+${RESOLVE_FN}
+  // Administration is gated by CAPABILITY, not by an identity string match. Comparing the caller's
+  // gaii against a stored ownerGhii refused the OWNER'S OWN agent, so the owner could not manage
+  // members from an AI chat at all; and where an AGENT did the first claim, it locked out the human.
+  // ctx.caller.owner cannot tell a human from their agents on its own, because it is the same bare
+  // name for both: the human is the caller whose gaii carries no '#'. An agent the owner
+  // deliberately narrowed simply does not hold '*', so the narrowing keeps working.
+  const ownerBare = config.ownerGhii ? String(config.ownerGhii).toLowerCase().split('@')[0].split('#').pop() : null;
+  const isHumanOwner = !!(ownerBare && owner && ownerBare === owner && caller && caller.indexOf('#') === -1);
+  const myRole = resolveRole(assignments, subject, caller, owner).role;
+  const myPerms = (myRole && roles[myRole]) || [];
+  // Three ways in, and claim seeds no role, so the roster stays exactly what the owner put there:
+  //   - the identity that claimed it (unchanged from before, so nobody loses access on upgrade),
+  //   - the human owner, which is what the old identity match wrongly excluded when an AGENT claimed,
+  //   - anyone whose resolved role holds '*', which is what lets the owner's own agent administer.
+  const canAdmin = !config.ownerGhii || config.ownerGhii === caller || isHumanOwner || myPerms.indexOf('*') !== -1;
   if (op === 'claim') {
     if (!config.ownerGhii) {
       config.ownerGhii = caller;
       if (config.defaultRole === undefined) config.defaultRole = 'viewer';
-      await ctx.memory.set('iam.config', config);
+      if (config.subject === undefined) config.subject = 'owner';
+      await ctx.memory.set('iam.config', config, PRIV);
+      return { ok: true, ownerGhii: config.ownerGhii, isOwner: true, subject: config.subject };
     }
-    return { ok: true, ownerGhii: config.ownerGhii, isOwner: config.ownerGhii === caller };
+    return { ok: true, ownerGhii: config.ownerGhii, isOwner: canAdmin, subject: config.subject || 'owner' };
   }
-  const isOwner = !config.ownerGhii || config.ownerGhii === caller;
   if (op === 'getState') {
-    return { ok: true, ownerGhii: config.ownerGhii || null, isOwner: isOwner, config: config, roles: roles, levels: levels, commands: commands, assignments: assignments };
+    if (!canAdmin) return { ok: true, ownerGhii: config.ownerGhii || null, isOwner: false, roles: roles, levels: levels, commands: commands, config: { defaultRole: config.defaultRole, subject: subject }, assignments: {}, subject: subject };
+    return { ok: true, ownerGhii: config.ownerGhii || null, isOwner: true, config: config, roles: roles, levels: levels, commands: commands, assignments: assignments, subject: subject };
   }
-  if (!isOwner) return { ok: false, error: 'forbidden: owner only' };
+  if (!canAdmin) return { ok: false, error: 'forbidden: owner only' };
+  if (op === 'setSubject') {
+    if (input.subject === 'owner' || input.subject === 'gaii' || input.subject === 'both') {
+      config = Object.assign({}, config, { subject: input.subject });
+      await ctx.memory.set('iam.config', config, PRIV);
+    }
+    return { ok: true, subject: config.subject || 'owner' };
+  }
   if (op === 'setConfig') {
     config = Object.assign({}, config, input.config || {});
-    await ctx.memory.set('iam.config', config);
+    await ctx.memory.set('iam.config', config, PRIV);
     return { ok: true, config: config };
   }
   if (op === 'setRoles') {
@@ -114,11 +204,11 @@ const SCRIPT_ADMIN = `export default async function (ctx, input) {
     return { ok: true, commands: commands };
   }
   if (op === 'assign') {
-    if (input.ghii && input.role) { assignments[input.ghii] = input.role; await ctx.memory.set('iam.assignments', assignments); }
+    if (input.ghii && input.role) { assignments[input.ghii] = input.role; await ctx.memory.set('iam.assignments', assignments, PRIV); }
     return { ok: true, assignments: assignments };
   }
   if (op === 'revoke') {
-    if (input.ghii) { delete assignments[input.ghii]; await ctx.memory.set('iam.assignments', assignments); }
+    if (input.ghii) { delete assignments[input.ghii]; await ctx.memory.set('iam.assignments', assignments, PRIV); }
     return { ok: true, assignments: assignments };
   }
   return { ok: false, error: 'unknown op' };
@@ -128,8 +218,8 @@ const EXTENSION_IAM = JSON.stringify({
   manifest: [
     'metadata:',
     '  name: iam',
-    '  version: 1.1.0',
-    '  description: In-app role & permission management with server-side enforcement (BBS levels + command manifest).',
+    '  version: 1.2.0',
+    '  description: In-app role & permission management with server-side enforcement. A role is keyed to the caller OWNER by default, so a member who works through an agent is covered by one entry and one revoke removes it from all of their agents; subject gaii or both change that. BBS levels + command manifest.',
     '  author: operator',
     'required_apis:',
     '  - memory',
@@ -137,16 +227,16 @@ const EXTENSION_IAM = JSON.stringify({
     '  - id: check',
     '    method: POST',
     '    path: /check',
-    '    description: Check whether the caller may do something — pass { permission } for a raw capability or { command } to resolve an app command (returns its mutation tier + needsConfirmation). Any authenticated user.',
+    '    description: "Check whether the caller may do something — pass { permission } for a raw capability or { command } to resolve an app command (returns its mutation tier + needsConfirmation). Any authenticated user. The answer carries `via` (owner | agent | none) so the reason a role resolved is visible, not just the verdict."',
     '    input: { type: object, properties: { permission: { type: string }, command: { type: string } } }',
-    '    output: { type: object, properties: { allowed: { type: boolean }, role: { type: string }, level: { type: number }, tier: { type: string }, needsConfirmation: { type: boolean } } }',
+    '    output: { type: object, properties: { allowed: { type: boolean }, role: { type: string }, level: { type: number }, tier: { type: string }, needsConfirmation: { type: boolean }, subject: { type: string }, via: { type: string } } }',
     '    script: check.js',
     '  - id: admin',
     '    method: POST',
     '    path: /admin',
-    '    description: Owner-only role/assignment/config management (multiplexed by op).',
-    '    input: { type: object, properties: { op: { type: string } }, required: [op] }',
-    '    output: { type: object, properties: { ok: { type: boolean } } }',
+    '    description: "Role, assignment and config management, multiplexed by op (claim, getState, setConfig, setSubject, setRoles, setLevels, setCommands, assign, revoke). Gated by capability: the human owner always qualifies, and so does any caller whose resolved role holds *, which is what lets the owner manage members through their own agent."',
+    '    input: { type: object, properties: { op: { type: string }, ghii: { type: string }, role: { type: string }, subject: { type: string }, roles: { type: object }, levels: { type: object }, config: { type: object }, commands: { type: array } }, required: [op] }',
+    '    output: { type: object, properties: { ok: { type: boolean }, isOwner: { type: boolean }, ownerGhii: { type: string }, subject: { type: string }, assignments: { type: object }, roles: { type: object }, levels: { type: object }, commands: { type: array }, config: { type: object }, error: { type: string } } }',
     '    script: admin.js',
   ].join('\n'),
   scripts: {

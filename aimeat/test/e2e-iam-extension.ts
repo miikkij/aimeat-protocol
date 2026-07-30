@@ -53,6 +53,17 @@ async function setupOwner(label: string) {
 }
 const authH = (t: string) => ({ Authorization: `Bearer ${t}` });
 
+/** Connect an agent for `ownerName` via device authorization and return its token + full GAII. */
+async function setupAgent(agentName: string, ownerName: string, ownerToken: string, scopes: string[] = ['memory:read', 'memory:write']) {
+    const da = await json('/v1/agents/device-authorize', { method: 'POST', body: JSON.stringify({ agent_name: agentName, owner: ownerName }) });
+    assert(da.status === 200, `device-authorize ${da.status}: ${JSON.stringify(da.body)}`);
+    const v = await json('/v1/agents/verify', { method: 'POST', body: JSON.stringify({ user_code: da.body.data.user_code, action: 'approve', scopes, owner_token: ownerToken }) });
+    assert(v.status === 200, `verify ${v.status}: ${JSON.stringify(v.body.error ?? v.body)}`);
+    const t = await json('/v1/agents/device-token', { method: 'POST', body: JSON.stringify({ device_code: da.body.data.device_code, grant_type: 'urn:ietf:params:oauth:grant-type:device_code' }) });
+    assert(t.status === 200, `device-token ${t.status}: ${JSON.stringify(t.body)}`);
+    return { token: t.body.token as string, gaii: t.body.gaii as string };
+}
+
 // The evolved extension, extracted from the real package under a unique name (avoids collisions + re-runnable).
 const EXT = `iamx${Date.now()}`;
 const extComponent = aimeatIamPackage().components.find(c => c.type === 'extension')!;
@@ -180,6 +191,75 @@ await test('6. a DIFFERENT authenticated owner CANNOT drive the admin surface', 
     assert(after.commands.every((c: any) => c.id !== 'pwn'), `command manifest must be untouched: ${JSON.stringify(after.commands)}`);
     assert(after.assignments[bGhii] === undefined, `B must not have assigned itself a role: ${JSON.stringify(after.assignments)}`);
     assert(after.assignments[aGaii] === 'admin', `A's own assignment must survive B's revoke: ${JSON.stringify(after.assignments)}`);
+});
+
+/**
+ * The reason three of the six iam-family extensions on this node exist: a role used to be keyed to
+ * the ACTING identity, so an approved member who worked through an agent matched no row and fell to
+ * the default role. In a members-only app that is the guest tier, and nothing reports it: from the
+ * agent's side the app simply does not offer those tools.
+ */
+await test('7. a member\'s AGENT inherits the member\'s role (owner-keyed by default)', async () => {
+    const agent = await setupAgent('helper', A.name, A.token);
+    assert(agent.gaii.includes('#'), `an agent gaii carries '#': ${agent.gaii}`);
+    assert(agent.gaii !== aGaii, `the agent identity differs from the human's: ${agent.gaii}`);
+
+    const asAgent = (input: Record<string, unknown>) =>
+        json(`/v1/ext/${EXT}/check`, { method: 'POST', headers: authH(agent.token), body: JSON.stringify(input) });
+
+    // A holds 'admin' from test 4, assigned under A's own GHII. The agent has NO row of its own.
+    const r = data(await asAgent({ permission: 'read' }));
+    assert(r.allowed === true, `the agent must inherit its human's access: ${JSON.stringify(r)}`);
+    assert(r.role === 'admin', `the agent resolves to the human's role: ${JSON.stringify(r)}`);
+    assert(r.via === 'owner', `and it must resolve VIA THE OWNER, not by an agent row: ${JSON.stringify(r)}`);
+
+    // The irreversible command still asks for confirmation when an agent is the caller.
+    const purge = data(await asAgent({ command: 'purge' }));
+    assert(purge.allowed === true && purge.needsConfirmation === true, `purge via agent: ${JSON.stringify(purge)}`);
+
+    // One revoke on the PERSON takes the right from every agent they have.
+    await admin('revoke', { ghii: aGaii });
+    const after = data(await asAgent({ permission: 'read' }));
+    assert(after.role === 'viewer' && after.via === 'none',
+        `revoking the person must drop their agents to the default role: ${JSON.stringify(after)}`);
+    await admin('assign', { ghii: aGaii, role: 'admin' });
+});
+
+/**
+ * Comparing the caller's gaii against config.ownerGhii refused the OWNER'S OWN agent, so an owner
+ * could not manage members from an AI chat at all. Administration is gated by capability instead:
+ * the agent inherits '*' from its human and gets in, while a stranger's agent does not.
+ */
+await test('8. the owner administers through their own agent, a stranger\'s agent does not', async () => {
+    const mine = await setupAgent('admin-hand', A.name, A.token);
+    const theirs = await setupAgent('intruder', B.name, B.token);
+    const adminAs = (token: string, op: string, extra: Record<string, unknown> = {}) =>
+        json(`/v1/ext/${EXT}/admin`, { method: 'POST', headers: authH(token), body: JSON.stringify({ op, ...extra }) });
+
+    const ok = data(await adminAs(mine.token, 'getState'));
+    assert(ok.isOwner === true, `the owner's own agent must administer: ${JSON.stringify(ok.isOwner)}`);
+    assert(Object.keys(ok.assignments || {}).length > 0, `and it must see the roster: ${JSON.stringify(ok.assignments)}`);
+
+    const no = data(await adminAs(theirs.token, 'getState'));
+    assert(no.isOwner === false, `another owner's agent must NOT administer: ${JSON.stringify(no.isOwner)}`);
+    assert(Object.keys(no.assignments || {}).length === 0, `and must not see the roster: ${JSON.stringify(no.assignments)}`);
+
+    const w = data(await adminAs(theirs.token, 'assign', { ghii: `${B.name}@${NODE_ID}`, role: 'admin' }));
+    assert(w.ok === false && /forbidden/.test(w.error || ''), `a stranger's agent must not write: ${JSON.stringify(w)}`);
+});
+
+/** An ext: namespace is world-readable by default, so a roster written the plain way is served to
+ *  anyone who asks for the key. The roster and config must be private; the capability vocabulary
+ *  is product configuration and stays public. */
+await test('9. the roster is NOT readable without a token, the capability vocabulary still is', async () => {
+    const anon = (key: string) => json(`/v1/memory/ext:${EXT}/${key}`);
+
+    for (const key of ['iam.assignments', 'iam.config']) {
+        const r = await anon(key);
+        assert(r.status !== 200, `${key} must not be world-readable, got ${r.status}: ${JSON.stringify(r.body.data)}`);
+    }
+    const roles = await anon('iam.roles');
+    assert(roles.status === 200, `iam.roles stays public (no personal data): ${roles.status}`);
 });
 
 console.log(`\naimeat-iam Extension Evolution E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
