@@ -98,7 +98,7 @@ type Args = Parameters<typeof settleMeteredCharge>[0];
  */
 function beneficiaryAccrualFor(
   { storage, ent, caller, product }: Args,
-  args: { providerCut: number; trackingCode: string; unit: 'money' | 'morsels'; currency: string | null; reference: string },
+  args: { providerCut: number; trackingCode: string; currency: string; reference: string },
 ): BeneficiaryAccrual {
   return async (designations = []) => {
     if (args.providerCut <= 0) return null;
@@ -108,7 +108,7 @@ function beneficiaryAccrualFor(
       if (!result.lines.length) return null;
       await bookBeneficiaryShares(storage, {
         lines: result.lines, trackingCode: args.trackingCode, fromGhii: ent.providerGhii,
-        unit: args.unit, currency: args.currency, buyerGhii: ownerGhiiOf(caller), reference: args.reference,
+        currency: args.currency, buyerGhii: ownerGhiiOf(caller), reference: args.reference,
       });
       return result;
     } catch (err) {
@@ -130,10 +130,6 @@ async function settleMorsels(args: Args): Promise<SettlementResult> {
   const fee = percentFee(price, rakePct);          // ceils — a positive charge always carries its rake
   const providerCut = price - fee;
   const track = `exchange:${product.ext}:${product.action}:${ent.contractRef}`;
-  // A per-CALL code. `track` names the contract and repeats on every call under it, so keying an
-  // obligation on it would collapse a hundred calls into one payable and make the second accrual look
-  // like a retry of the first.
-  const benTrack = `mor_${randomUUID()}`;
   const ts = new Date().toISOString();
 
   if (price > 0) {
@@ -154,22 +150,18 @@ async function settleMorsels(args: Args): Promise<SettlementResult> {
   await commitSpend(storage, ent, price, newPricing, caller);
   return {
     kind: 'settled', charged: price,
-    accrue: beneficiaryAccrualFor(args, {
-      providerCut, trackingCode: benTrack, unit: 'morsels', currency: null, reference: track,
-    }),
+    // MORSELS ARE NEVER SHARED. They are the node's pacing meter: they bound how often a capability
+    // may be called. They are not money, not convertible to it, and not a proportion of anything a
+    // beneficiary could be owed — so there is nothing here to divide. A provider who declares a
+    // split gets it on their MONEY sales; a morsel-priced call simply paces and settles.
+    accrue: async () => null,
     refund: async () => {
       if (price > 0) {
         if (providerCut > 0) await storage.debitBalance(ent.providerGhii, providerCut);
         await storage.creditBalance(caller, price);
       }
       await refundSpend(storage, caller, product.ext, product.action, price, caller);
-      // A GUARD, not a hot path. Every door today calls exactly one of `accrue` and `refund`, so a
-      // refunded call has booked nothing and this finds nothing to reverse — which is the invariant
-      // the E2E actually asserts. It is kept because the day a door does accrue before it fails, the
-      // failure mode is a permanent phantom creditor, and that is not a thing to discover later.
-      // Reverses only entries still `accrued`: a released share is money in a third party's hands
-      // and this does not pretend it can reach back for it.
-      await reverseAccrual(storage, benTrack, ent.providerGhii);
+      // Nothing to reverse: the morsel rail books no beneficiary share in the first place.
       logger.warn(`[metered-settlement] refunded ${price} morsels (the call failed after payment)`, { label: product.label });
     },
   };
@@ -200,11 +192,16 @@ async function settleMoney(args: Args): Promise<SettlementResult> {
   return {
     kind: 'settled', charged: price,
     accrue: beneficiaryAccrualFor(args, {
-      providerCut: providerNet, trackingCode, unit: 'money', currency, reference,
+      providerCut: providerNet, trackingCode, currency, reference,
     }),
     refund: async () => {
       if (price > 0) await refundEntitlementMoney(storage, config, { consumerGhii: ownerGhiiOf(caller), providerGhii: ent.providerGhii, priceMicros: price, currency, trackingCode });
       await refundSpend(storage, caller, product.ext, product.action, price, caller);
+      // Undo any beneficiary share booked for this call. Reachable: three of the call paths book
+      // the share inside the same try whose catch refunds, so a failure after the booking (rendering
+      // the response, for one) lands here with something real to reverse. Only touches entries still
+      // `accrued` — a released share is a debt the provider has taken on, and a refund of the
+      // underlying call does not reach into that.
       if (trackingCode) await reverseAccrual(storage, trackingCode, ent.providerGhii);
       logger.warn('[metered-settlement] refunded a money charge (the call failed after payment)', { label: product.label, currency });
     },

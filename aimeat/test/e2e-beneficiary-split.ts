@@ -59,10 +59,11 @@ async function balance(token: string): Promise<number> {
 console.log('\n=== AIMEAT BENEFICIARY SPLIT E2E (the second rake) ===\n');
 
 const EXT = `bsplit${Date.now()}`;
-// A fresh owner is welcomed with 100 morsels, so the price has to leave room for the whole suite to
-// call more than once. A 50 % pool of a 10-morsel call still divides 3:1 into visible whole numbers.
-const PRICE = 10;
+// The real kumppani figure: 0.50 EUR in 6-decimal micro-units. A share is REVENUE, so the whole
+// suite is priced in money. Morsels appear here only to prove they are NEVER shared.
+const PRICE = 500_000;
 const POOL_PCT = 50;
+const MORSEL_PRICE = 10;
 const SCRIPTS = {
   echo: 'export default async function(ctx, input){ return { echo: input }; }',
   // Names its beneficiary for THIS call. The node resolves the destination and strips the key.
@@ -89,9 +90,11 @@ const SCRIPTS = {
 const manifest = (name: string) => JSON.stringify({
   metadata: { name, version: '1.0.0', description: 'beneficiary split e2e provider', author: 'e2e' },
   actions: [
-    { id: 'shared', method: 'POST', path: '/shared', script: 'echo', commercial: { payMorsels: PRICE } },
-    { id: 'dyn', method: 'POST', path: '/dyn', script: 'designating', commercial: { payMorsels: PRICE } },
-    { id: 'fails', method: 'POST', path: '/fails', script: 'boom', commercial: { payMorsels: PRICE } },
+    { id: 'shared', method: 'POST', path: '/shared', script: 'echo', commercial: { payMoney: { amount: PRICE, currency: 'EUR' } } },
+    { id: 'dyn', method: 'POST', path: '/dyn', script: 'designating', commercial: { payMoney: { amount: PRICE, currency: 'EUR' } } },
+    { id: 'fails', method: 'POST', path: '/fails', script: 'boom', commercial: { payMoney: { amount: PRICE, currency: 'EUR' } } },
+    // Priced in the PACING meter. It exists so the suite can prove a morsel call shares nothing.
+    { id: 'paced', method: 'POST', path: '/paced', script: 'designating', commercial: { payMorsels: MORSEL_PRICE } },
     { id: 'paid', method: 'POST', path: '/paid', script: 'echo', commercial: { payMoney: { amount: 500_000, currency: 'EUR' } } },
     // Money price AND a per-call destination: the exact combination kumppani sells (0.50 EUR a
     // lookup, the share going to whichever company was looked up). Each rail and each source had
@@ -147,7 +150,7 @@ async function balanceEur(token: string): Promise<number> {
 async function accrued(token: string): Promise<number> {
   const r = await earnings(token);
   assert(r.status === 200, `earnings ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  return Number(r.body.data.totals?.morsels?.accrued ?? 0);
+  return Number(r.body.data.totals?.EUR?.accrued ?? 0);
 }
 
 // ── Declaring a split ─────────────────────────────────────────────────────────
@@ -186,7 +189,7 @@ await test('Provider declares a 50 % pool shared alpha:beta = 3:1', async () => 
 // ── The happy path, and where the money comes from ────────────────────────────
 
 await test('Contract accepted at the authoritative price', async () => {
-  const r = await accept(consumer.token, 'shared', { cap_units: 10_000 });
+  const r = await accept(consumer.token, 'shared', { cap_units: 50_000_000 });
   assert(r.status === 201, `accept ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.entitlement.price_per_call === PRICE, `price ${r.body.data.entitlement.price_per_call}`);
   rakePerCall = r.body.data.entitlement.rake_per_call;
@@ -197,7 +200,9 @@ await test('A settled call: the CONSUMER pays exactly the list price — a split
   const before = await balance(consumer.token);
   const r = await invoke(consumer.token, 'shared');
   assert(r.status === 200, `call ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  assert(await balance(consumer.token) === before - PRICE, 'the buyer is charged the price and not a micro-unit more');
+  // A money call settles in EUR on the accrual rail; the pacing meter is a different quantity and
+  // must not move because somebody paid money.
+  assert(await balance(consumer.token) === before, 'a money call does not touch the morsel balance');
 });
 
 await test('The PROVIDER received their whole cut — the share is an obligation, not a deduction', async () => {
@@ -226,7 +231,7 @@ await test('A beneficiary sees only their OWN share, with the amount explained',
   assert(r.body.data.entries.length === 1, `alpha must see one entry, got ${r.body.data.entries.length}`);
   assert(e.from === provider.ghii, `the debtor is the provider, got ${e.from}`);
   assert(e.buyer === consumer.ghii, `the buyer is context, got ${e.buyer}`);
-  assert(e.status === 'accrued' && e.unit === 'morsels', `entry: ${JSON.stringify(e)}`);
+  assert(e.status === 'accrued' && e.currency === 'EUR', `entry: ${JSON.stringify(e)}`);
   assert(e.weight === 3 && e.kind === 'static', `weight/kind: ${JSON.stringify(e)}`);
 });
 
@@ -235,7 +240,7 @@ await test('A beneficiary sees only their OWN share, with the amount explained',
 await test('A dynamic split lets the capability name this call\'s beneficiary', async () => {
   const d = await declare(provider.token, { ext: EXT, action: 'dyn', pool_percent: 100, dynamic: true });
   assert(d.status === 200, `declare dyn ${d.status}: ${JSON.stringify(d.body?.error)}`);
-  const a = await accept(consumer.token, 'dyn', { cap_units: 10_000 });
+  const a = await accept(consumer.token, 'dyn', { cap_units: 50_000_000 });
   assert(a.status === 201, `accept dyn ${a.status}`);
 
   const before = await accrued(gamma.token);
@@ -264,7 +269,7 @@ await test('A dynamic call that designates nobody leaves the whole cut with the 
 await test('Refund unwind: a call that fails after payment leaves no beneficiary paid from nothing', async () => {
   const d = await declare(provider.token, { ext: EXT, action: 'fails', pool_percent: 50, beneficiaries: [{ ghii: alpha.ghii, weight: 1 }] });
   assert(d.status === 200, `declare fails ${d.status}`);
-  const a = await accept(consumer.token, 'fails', { cap_units: 10_000 });
+  const a = await accept(consumer.token, 'fails', { cap_units: 50_000_000 });
   assert(a.status === 201, `accept fails ${a.status}`);
 
   const consumerBefore = await balance(consumer.token);
@@ -281,7 +286,7 @@ await test('An unverified beneficiary reads their accrual and is told it is not 
   const r = await earnings(alpha.token);
   assert(r.body.data.verification.state === 'unverified', `state: ${JSON.stringify(r.body.data.verification)}`);
   assert(r.body.data.verification.payable === false, 'nothing is payable before an approval exists');
-  assert(Number(r.body.data.totals.morsels.accrued) > 0, 'the accrual is visible regardless — it must not vanish');
+  assert(Number(r.body.data.totals.EUR.accrued) > 0, 'the accrual is visible regardless — it must not vanish');
 });
 
 let alphaTracking = '';
@@ -318,26 +323,23 @@ await test('An operator verification must say HOW representation was established
   assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
 });
 
-await test('Operator verifies alpha → the release now succeeds and morsels actually move', async () => {
+await test('Operator verifies alpha → the release books the debt onto their payable book', async () => {
   const ok = await json('/v1/commerce/beneficiary/approvals', {
     method: 'POST', headers: auth(operator.token),
     body: JSON.stringify({ ghii: alpha.ghii, state: 'verified', method: 'manual-operator', subject: 'fi-ytunnus:3323553-5', evidence: 'e2e' }),
   });
   assert(ok.status === 200, `approve ${ok.status}: ${JSON.stringify(ok.body?.error)}`);
 
-  const alphaBefore = await balance(alpha.token);
-  const providerBefore = await balance(provider.token);
+  const morselsBefore = await balance(alpha.token);
   const r = await json('/v1/commerce/beneficiary/release', {
     method: 'POST', headers: auth(provider.token),
     body: JSON.stringify({ tracking_code: alphaTracking, beneficiary: alpha.ghii }),
   });
   assert(r.status === 200, `release ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  assert(r.body.data.settled_here === true, 'a morsel release completes on this node');
-  assert(r.body.data.method === 'morsel-transfer', `release method: ${r.body.data.method}`);
-  const amount = Number(r.body.data.amount);
-  assert(amount > 0, `released amount ${amount}`);
-  assert(await balance(alpha.token) === alphaBefore + amount, 'the beneficiary was credited');
-  assert(await balance(provider.token) === providerBefore - amount, 'out of the PROVIDER\'s balance, not the node\'s');
+  assert(r.body.data.method === 'payable-booked', `method: ${r.body.data.method}`);
+  assert(r.body.data.currency === 'EUR' && Number(r.body.data.amount) > 0, `amount: ${JSON.stringify(r.body.data)}`);
+  // Releasing is taking on the debt, not paying it, and it certainly does not touch the pacing meter.
+  assert(await balance(alpha.token) === morselsBefore, 'no morsels move when a money share is released');
 });
 
 await test('The released entry records HOW it was released, not a placeholder', async () => {
@@ -346,7 +348,7 @@ await test('The released entry records HOW it was released, not a placeholder', 
   const r = await earnings(alpha.token);
   const rel = r.body.data.entries.find((e: any) => e.status === 'released');
   assert(!!rel, `expected a released entry: ${JSON.stringify(r.body.data.entries)}`);
-  assert(rel.release_method === 'morsel-transfer', `release_method: ${rel.release_method}`);
+  assert(rel.release_method === 'payable-booked', `release_method: ${rel.release_method}`);
   assert(!!rel.released_at, 'a released entry is stamped');
 });
 
@@ -372,12 +374,12 @@ await test('A rejected beneficiary stays accrued and unpayable', async () => {
     body: JSON.stringify({ tracking_code: entry.tracking_code, beneficiary: beta.ghii }),
   });
   assert(r.status === 409 && r.body?.error?.code === 'BENEFICIARY_UNVERIFIED', `expected refusal, got ${r.status}`);
-  assert(Number((await earnings(beta.token)).body.data.totals.morsels.accrued) > 0, 'the accrual survives a rejection');
+  assert(Number((await earnings(beta.token)).body.data.totals.EUR.accrued) > 0, 'the accrual survives a rejection');
 });
 
 // ── The money rail, and a beneficiary with no PSP ─────────────────────────────
 
-await test('Money rail: a share accrues in micro-units for a beneficiary who has configured no PSP', async () => {
+await test('A share accrues in micro-units for a beneficiary who has configured no PSP', async () => {
   const d = await declare(provider.token, { ext: EXT, action: 'paid', pool_percent: 70, beneficiaries: [{ ghii: gamma.ghii, weight: 1 }] });
   assert(d.status === 200, `declare paid ${d.status}: ${JSON.stringify(d.body?.error)}`);
   const a = await accept(consumer.token, 'paid', { cap_units: 5_000_000 });
@@ -387,18 +389,16 @@ await test('Money rail: a share accrues in micro-units for a beneficiary who has
   const moneyRake = Number(a.body.data.entitlement.rake_per_call);
   assert(moneyRake > 0, `a positive money price must carry a rake, got ${moneyRake}`);
 
+  const gammaBefore = await accrued(gamma.token);
   const r = await invoke(consumer.token, 'paid');
   assert(r.status === 200, `money call ${r.status}: ${JSON.stringify(r.body?.error)}`);
 
-  const e = await earnings(gamma.token);
-  const totals = e.body.data.totals ?? {};
-  const eur = totals.EUR;
-  assert(!!eur && eur.accrued > 0, `gamma must have a EUR accrual with no PSP configured: ${JSON.stringify(totals)}`);
-  assert(eur.accrued === Math.floor((500_000 - moneyRake) * 70 / 100),
-    `EUR share should be 70 % of the provider's net (${500_000 - moneyRake}): got ${eur.accrued}`);
-  // Money micro-units and morsels are counted in separate buckets and never summed into one figure.
-  assert(totals.morsels === undefined || totals.morsels.accrued < eur.accrued,
-    `micro-units must not be folded into the morsel total: ${JSON.stringify(totals)}`);
+  const after = await accrued(gamma.token);
+  assert(after - gammaBefore === Math.floor((500_000 - moneyRake) * 70 / 100),
+    `EUR share should be 70 % of the provider's net (${500_000 - moneyRake}): got ${after - gammaBefore}`);
+  // There is no morsel bucket to confuse it with: morsels pace usage and are never shared.
+  const totals = (await earnings(gamma.token)).body.data.totals ?? {};
+  assert(totals.morsels === undefined, `no morsel bucket may exist: ${JSON.stringify(totals)}`);
 });
 
 await test('Releasing a money share books it as an invoiceable payable — the node moves no fiat', async () => {
@@ -408,8 +408,8 @@ await test('Releasing a money share books it as an invoiceable payable — the n
   });
   assert(ok.status === 200, `approve gamma ${ok.status}`);
   const list = await obligations(provider.token);
-  const entry = list.body.data.entries.find((e: any) => e.beneficiary === gamma.ghii && e.unit === 'money' && e.status === 'accrued');
-  assert(!!entry, `expected a money obligation to gamma: ${JSON.stringify(list.body.data.entries.map((x: any) => [x.beneficiary, x.unit, x.status]))}`);
+  const entry = list.body.data.entries.find((e: any) => e.beneficiary === gamma.ghii && e.status === 'accrued');
+  assert(!!entry, `expected a money obligation to gamma: ${JSON.stringify(list.body.data.entries.map((x: any) => [x.beneficiary, x.currency, x.status]))}`);
 
   const balBefore = await balance(gamma.token);
   const r = await json('/v1/commerce/beneficiary/release', {
@@ -417,11 +417,11 @@ await test('Releasing a money share books it as an invoiceable payable — the n
     body: JSON.stringify({ tracking_code: entry.tracking_code, beneficiary: gamma.ghii }),
   });
   assert(r.status === 200, `release money ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  assert(r.body.data.settled_here === false, 'money is booked as an obligation, never pushed by the node');
+  assert(r.body.data.method === 'payable-booked', 'money is booked as an obligation, never pushed by the node');
   assert(await balance(gamma.token) === balBefore, 'a EUR share must not touch a morsel balance');
 
   const gEarn = await earnings(gamma.token);
-  const gRel = gEarn.body.data.entries.find((e: any) => e.status === 'released' && e.unit === 'money');
+  const gRel = gEarn.body.data.entries.find((e: any) => e.status === 'released');
   assert(gRel && gRel.release_method === 'payable-booked', `money release_method: ${gRel?.release_method}`);
 
   // It lands where a seller already looks for what they are owed.
@@ -451,21 +451,12 @@ await test('A money-priced call whose capability names the beneficiary per call 
   assert(after - before === expected, `EUR share from a per-call designation: expected ${expected}, got ${after - before}`);
 });
 
-await test('That share is money, kept apart from the morsel meter on the same account', async () => {
-  const t = (await earnings(beta.token)).body.data.totals;
-  assert(t.EUR && t.EUR.accrued > 0, `EUR bucket: ${JSON.stringify(t)}`);
-  assert(t.morsels && t.morsels.accrued > 0, `beta also holds morsel shares: ${JSON.stringify(t)}`);
-  // The two are different KINDS of thing: money is income, morsels are capacity to call. A total
-  // over both would be meaningless, so they are never in the same bucket.
-  assert(t.EUR.accrued !== t.morsels.accrued, 'the two units are counted separately');
-});
-
 await test('The money-rail entry names the per-call source and the right unit', async () => {
   const list = await obligations(provider.token);
-  const e = list.body.data.entries.find((x: any) => x.beneficiary === beta.ghii && x.unit === 'money');
-  assert(!!e, `expected a money obligation to beta: ${JSON.stringify(list.body.data.entries.map((x: any) => [x.beneficiary, x.unit, x.kind]))}`);
+  const e = list.body.data.entries.find((x: any) => x.beneficiary === beta.ghii && x.kind === 'dynamic');
+  assert(!!e, `expected a money obligation to beta: ${JSON.stringify(list.body.data.entries.map((x: any) => [x.beneficiary, x.currency, x.kind]))}`);
   assert(e.kind === 'dynamic', `named per call, got kind=${e.kind}`);
-  assert(e.currency === 'EUR' && e.unit === 'money', `unit/currency: ${e.unit}/${e.currency}`);
+  assert(e.currency === 'EUR', `currency: ${e.currency}`);
 });
 
 // ── THE PRODUCT SCENARIO: consent is what turns the share on ─────────────────
@@ -581,7 +572,7 @@ await test('APP-TOOL: a sale through the outer door accrues the share the capabi
     method: 'POST', headers: auth(provider.token),
     body: JSON.stringify({ key: `apps.${APP_ID}.tools`, visibility: 'public', value: { version: 1, tools: [
       { name: 'lookup', description: 'chain proof', action_id: capId, inputSchema: IN, outputSchema: OUT,
-        price: { morsels: PRICE } },
+        price: { morsels: 0 }, priceMoney: { amount: PRICE, currency: 'EUR' } },
     ] } }),
   });
   assert(w.status === 200 || w.status === 201, `write manifest ${w.status}: ${JSON.stringify(w.body?.error)}`);
@@ -599,7 +590,7 @@ await test('APP-TOOL: a sale through the outer door accrues the share the capabi
 
   const a = await json('/v1/exchange/entitlements', {
     method: 'POST', headers: auth(consumer.token),
-    body: JSON.stringify({ offering_id: offeringId, contract_ref: 'c-chain', cap_units: 500 }),
+    body: JSON.stringify({ offering_id: offeringId, contract_ref: 'c-chain', cap_units: 50_000_000 }),
   });
   assert(a.status === 201, `accept app-tool ${a.status}: ${JSON.stringify(a.body?.error)}`);
   const rake = Number(a.body.data.entitlement.rake_per_call);
@@ -727,6 +718,40 @@ await test('PAYOUT: a stranger cannot settle somebody else\'s debt', async () =>
   const q = await json('/v1/commerce/beneficiary/payout?beneficiary=' + encodeURIComponent(gamma.ghii), { headers: auth(stranger.token) });
   assert(q.body.data.payable === false, 'a stranger owes them nothing, so there is nothing to sign');
   assert(q.body.data.reason === 'NOTHING_OWED', `reason: ${q.body.data.reason}`);
+});
+
+// ── MORSELS ARE NEVER SHARED ─────────────────────────────────────────────────
+//
+// Morsels are the node's PACING meter: they bound how often a capability may be called. They are not
+// money, not convertible to it, and a fraction of them is not income. So a morsel-priced call books
+// no beneficiary share at all, even when the provider has declared one on that exact coordinate.
+// This was built the wrong way round first — rail-agnostic, as if a morsel were a small euro — and
+// this test is what keeps it from drifting back.
+
+await test('A morsel-priced call shares NOTHING, even with a split declared on it', async () => {
+  const d = await declare(provider.token, { ext: EXT, action: 'paced', pool_percent: 100, dynamic: true });
+  assert(d.status === 200, `declare paced ${d.status}: ${JSON.stringify(d.body?.error)}`);
+  const a = await accept(consumer.token, 'paced', { cap_units: 500 });
+  assert(a.status === 201, `accept paced ${a.status}: ${JSON.stringify(a.body?.error)}`);
+
+  const eurBefore = await accrued(gamma.token);
+  const providerMorselsBefore = await balance(provider.token);
+  const consumerMorselsBefore = await balance(consumer.token);
+
+  const r = await invoke(consumer.token, 'paced', { pay_to: gamma.ghii });
+  assert(r.status === 200, `paced call ${r.status}: ${JSON.stringify(r.body?.error)}`);
+
+  // The call paced and settled in morsels exactly as before: buyer down, provider up by its cut.
+  assert(await balance(consumer.token) < consumerMorselsBefore, 'the caller burned morsels');
+  assert(await balance(provider.token) > providerMorselsBefore, 'the provider received its morsel cut in full');
+
+  // And nobody was booked a share of it, in any unit.
+  assert(await accrued(gamma.token) === eurBefore, 'no EUR share from a morsel call');
+  const e = await earnings(gamma.token);
+  assert(e.body.data.totals?.morsels === undefined, `there is no morsel bucket at all: ${JSON.stringify(e.body.data.totals)}`);
+  const obl = await obligations(provider.token);
+  assert(obl.body.data.entries.every((x: any) => x.currency && x.currency !== 'morsels'),
+    'every obligation is denominated in a currency, never in the pacing meter');
 });
 
 // ── Cross-owner isolation ─────────────────────────────────────────────────────

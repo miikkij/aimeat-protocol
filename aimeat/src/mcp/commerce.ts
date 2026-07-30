@@ -364,7 +364,8 @@ export function registerCommerceTools(
     function totalsOf(entries: BeneficiaryEntry[]): Record<string, { accrued: number; released: number; paid: number; reversed: number; entries: number }> {
         const totals: Record<string, { accrued: number; released: number; paid: number; reversed: number; entries: number }> = {};
         for (const e of entries) {
-            const bucket = e.unit === 'money' ? (e.currency ?? 'EUR') : 'morsels';
+            // Keyed by currency. No morsel bucket: morsels pace usage and are never shared.
+            const bucket = e.currency;
             const t = totals[bucket] ?? (totals[bucket] = { accrued: 0, released: 0, paid: 0, reversed: 0, entries: 0 });
             t[e.status] += e.amount;
             t.entries += 1;
@@ -478,12 +479,9 @@ export function registerCommerceTools(
             if (!r.ok) return fail(`${r.reason}: ${r.message}`);
             return ok({
                 released: true, beneficiary, tracking_code,
-                amount: r.entry.amount, unit: r.entry.unit, currency: r.entry.currency,
-                method: r.method, settled_here: r.settledHere,
-                note: r.settledHere
-                    ? 'Transferred from your morsel balance to theirs. Morsels are this node\'s pacing meter, so the '
-                      + 'transfer completes here; it moves consumption capacity, not currency.'
-                    : 'Booked onto their payable book. The node moves no fiat, so invoice and settle this off-node.',
+                amount: r.entry.amount, currency: r.entry.currency, method: r.method,
+                note: 'Booked onto their payable book. The money itself moves when you sign for it '
+                    + 'with aimeat_commerce_beneficiary_payout.',
             });
         },
     );

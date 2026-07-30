@@ -25,11 +25,15 @@ import type { SplitLine } from './beneficiary-split.js';
 
 /** One line in a beneficiary's book — a share of one settled call. */
 export interface BeneficiaryEntry {
-  /** Amount in `unit`: integer micro-units for money, whole morsels for morsels. Never mixed. */
+  /**
+   * Integer 6-decimal micro-units of `currency`. ALWAYS money.
+   *
+   * Morsels never appear in this book. They are the node's pacing meter — they bound how often a
+   * capability may be called — and are neither money nor a proportion of it, so a morsel-priced call
+   * has nothing here to divide. A beneficiary share is revenue or it is not a share.
+   */
   amount: number;
-  unit: 'money' | 'morsels';
-  /** ISO code when `unit === 'money'`; null for morsels. */
-  currency: string | null;
+  currency: string;
   /** The DEBTOR — the provider whose cut this came out of, and who releases it. */
   fromGhii: string;
   /** Who paid for the call. Context for the beneficiary, never a party to this obligation. */
@@ -77,8 +81,7 @@ export async function bookBeneficiaryShares(
     lines: SplitLine[];
     trackingCode: string;
     fromGhii: string;
-    unit: 'money' | 'morsels';
-    currency: string | null;
+    currency: string;
     buyerGhii?: string;
     reference?: string;
   },
@@ -93,7 +96,6 @@ export async function bookBeneficiaryShares(
     if (items.some(i => i.fromGhii === args.fromGhii)) continue;   // already booked — a retry, not a second sale
     items.push({
       amount: line.amount,
-      unit: args.unit,
       currency: args.currency,
       fromGhii: args.fromGhii,
       buyerGhii: args.buyerGhii,

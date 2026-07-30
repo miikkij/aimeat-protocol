@@ -30,6 +30,12 @@ export interface GenerateIamExtensionInput {
   commands: CommandDef[];
   author?: string;
   /**
+   * Manifest version to publish as. Defaults to 1.0.0, which is right for a NEW gate and wrong for a
+   * regenerated one: NUOTTA's went 1.4.0 -> 1.0.0 and read in the extension list as a rollback.
+   * Regenerating over a live gate should pass the next version.
+   */
+  version?: string;
+  /**
    * What a signed-in caller who is on no roster row holds. Omitted means nothing, which is right for
    * a members-only app. An app with a public tier needs it: NUOTTA lets anyone read its guides and
    * only charges for the corpus, and a gate that cannot say that would have shut the front door on
@@ -130,17 +136,65 @@ export default async function (ctx) {
 }
 
 /**
+ * The vocabulary, answered by the gate rather than retyped by every client.
+ *
+ * Without this the owner's panel had no way to know which roles exist, so the app had to pass them
+ * to the library by hand — and when NUOTTA did not, the role select rendered empty and Approve posted
+ * no role at all, which the node refused with a 400. A gate that knows its own roles should say so.
+ */
+function rolesScript(levels: LevelDef[], commands: CommandDef[], defaultRole?: string): string {
+  const roleCaps: Record<string, string[]> = {};
+  const roleLevel: Record<string, number> = {};
+  for (const l of levels) { roleCaps[l.key] = l.capabilities; roleLevel[l.key] = l.level; }
+  const labels: Record<string, string> = {};
+  for (const l of levels) labels[l.key] = l.label;
+  return `// GENERATED from this app's IAM spec. Edit the spec and regenerate; hand edits are lost.
+const CAPS = ${JSON.stringify(roleCaps)};
+const LEVELS = ${JSON.stringify(roleLevel)};
+const LABELS = ${JSON.stringify(labels)};
+const COMMANDS = ${JSON.stringify(commands)};
+const DEFAULT_ROLE = ${JSON.stringify(defaultRole ?? null)};
+
+export default async function () {
+  // No caller check: a capability VOCABULARY is not personal data, and a visitor deciding whether to
+  // ask for access needs to see what the tiers are. Who holds which role is the node's roster, and
+  // that stays private.
+  const assignable = Object.keys(CAPS).filter(function (r) { return r !== DEFAULT_ROLE; });
+  return {
+    roles: CAPS, levels: LEVELS, labels: LABELS, defaultRole: DEFAULT_ROLE,
+    // What an owner may hand OUT, which is not the same as what exists: approving somebody into the
+    // role they already hold by default is an act with no effect.
+    assignable: assignable,
+    capabilities: Object.keys(CAPS).reduce(function (acc, r) {
+      CAPS[r].forEach(function (c) { if (c !== '*' && acc.indexOf(c) === -1) acc.push(c); });
+      return acc;
+    }, []),
+    commands: COMMANDS.map(function (c) {
+      return { id: c.id, description: c.description, capability: c.capability, tier: c.tier };
+    }),
+  };
+}`;
+}
+
+/**
  * Build the installable extension for one app's IAM design. The design is assumed already validated
  * by defineAppIam; this only renders it.
  */
 export function generateIamExtension(input: GenerateIamExtensionInput): GeneratedExtension {
   const name = input.extName || `${slug(input.appId)}-iam`;
-  const caps = [...new Set(input.levels.flatMap(l => l.capabilities).filter(c => c !== '*'))];
+  // Every capability the gate can be ASKED about, which is not the same as the ones a role lists.
+  // NOSTE's commands name `adjust` and `configure` that only the wildcard role holds, so reading the
+  // enum off the roles alone would have advertised a gate that cannot be asked about two of its own
+  // commands — and an enum is the only thing an agent has to go on.
+  const caps = [...new Set([
+    ...input.levels.flatMap(l => l.capabilities),
+    ...input.commands.map(c => c.capability),
+  ].filter(c => c !== '*'))];
   const roleKeys = input.levels.map(l => l.key);
   const manifest = [
     'metadata:',
     `  name: ${name}`,
-    '  version: 1.0.0',
+    `  version: ${input.version || '1.0.0'}`,
     `  description: ${JSON.stringify(
       `Capability gate for ${input.appId}. Roles: ${roleKeys.join(', ')}. `
       + (input.defaultRole
@@ -183,6 +237,19 @@ export function generateIamExtension(input: GenerateIamExtensionInput): Generate
     '    input: { type: object, properties: {} }',
     '    output: { type: object, properties: { role: { type: string }, caps: { type: array }, commands: { type: array } } }',
     '    script: commands.js',
+    '  - id: roles',
+    '    method: POST',
+    '    path: /roles',
+    `    description: ${JSON.stringify(
+      'The role vocabulary this gate enforces: every role with its capabilities, level and label, '
+      + 'which of them an owner may hand out, and what a signed-in stranger holds. Read this to build '
+      + 'an approval UI instead of hardcoding role names. A vocabulary is not personal data; who holds '
+      + 'which role stays on the node roster.',
+    )}`,
+    '    input: { type: object, properties: {} }',
+    '    output: { type: object, properties: { roles: { type: object }, levels: { type: object }, labels: { type: object },'
+      + ' defaultRole: { type: string }, assignable: { type: array }, capabilities: { type: array }, commands: { type: array } } }',
+    '    script: roles.js',
   ].join('\n');
 
   return {
@@ -191,6 +258,7 @@ export function generateIamExtension(input: GenerateIamExtensionInput): Generate
     scripts: {
       'check.js': checkScript(input.levels, input.commands, input.defaultRole),
       'commands.js': commandsScript(input.levels, input.commands, input.defaultRole),
+      'roles.js': rolesScript(input.levels, input.commands, input.defaultRole),
     },
   };
 }

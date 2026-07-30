@@ -15,18 +15,16 @@
  *   without the core ever interpreting it: what a `fi-ytunnus:` means, and what evidence is good enough
  *   for one, is the application's business and the operator's judgement, not this file's.
  *
- *   WHAT RELEASE ACTUALLY DOES, per rail, and it is deliberately not the same thing. Note what the
- *   difference is NOT: it is not "one rail is real and the other is not". Morsels are the node's own
- *   PACING meter, a consumption budget that bounds how fast a capability can be called; they are not
- *   currency, and a morsel share is capacity rather than income. EUR and USD are the real money. Both
- *   are recorded in the ledger; what differs is whether settlement COMPLETES here.
- *     - `morsels` — an atomic in-repo `transferBalance` from the provider to the beneficiary. It
- *       completes here, because the meter is ours to move.
- *     - `money`   — books the amount onto the beneficiary's own payable book as `pending`. The node
- *       does not push fiat, because pushing fiat means first holding it. This is the same accrual
- *       every money sale on this node already settles through, and it is what makes the obligation
- *       invoiceable: the beneficiary bills the PROVIDER, one aggregate invoice per period, with a VAT
- *       chain that matches who actually supplied whom.
+ *   MONEY ONLY. Morsels are the node's pacing meter: they bound how often a capability may be
+ *   called. They are not money, not convertible to it, and a fraction of them is not income — so no
+ *   morsel-priced call ever produces a share to release. Everything here is EUR or USD.
+ *
+ *   WHAT RELEASE DOES: books the amount onto the beneficiary's own payable book as `pending`. The
+ *   node does not push fiat, because pushing fiat means first holding it. This is the same accrual
+ *   every money sale on this node already settles through, and it is what makes the obligation
+ *   invoiceable: the beneficiary bills the PROVIDER, one aggregate invoice per period, with a VAT
+ *   chain that matches who actually supplied whom. `beneficiary-payout.ts` is the leg where the
+ *   money actually moves, signed by the provider.
  *
  *   A beneficiary with no PSP configured is therefore never blocked and never a special case. A PSP
  *   is how fiat eventually reaches them OUTSIDE this node; it has no bearing on whether the obligation
@@ -43,8 +41,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { bookPayable } from './payable-book.js';
-import { settleEntryStatus, readAccruedEntry, type BeneficiaryEntry } from './beneficiary-book.js';
-import { logger } from '../utils/logger.js';
+import { settleEntryStatus, type BeneficiaryEntry } from './beneficiary-book.js';
 
 /** System namespace — an approval is a server-trusted fact, so never in a principal-writable space. */
 export const NS_BENEFICIARY_APPROVAL = 'beneficiary-approval';
@@ -156,13 +153,14 @@ export async function beneficiaryEligibility(
 }
 
 /**
- * What a release attempt produced. `settledHere` says whether the release COMPLETED on this node or
- * left an off-node leg still to do. It is NOT a claim about which rail carries real money: the morsel
- * rail completes here because morsels are the node's own pacing meter, and the money rail does not
- * because the node will not hold fiat. The rail that settles instantly is the one that is not currency.
+ * What a release attempt produced.
+ *
+ * There is no "did it complete here" flag any more, because the answer is always no: releasing books
+ * an obligation, and the money moves in `beneficiary-payout.ts` when the provider signs for it. The
+ * flag only ever meant something while morsels were treated as a shareable unit, which they are not.
  */
 export type ReleaseResult =
-  | { ok: true; entry: BeneficiaryEntry; method: string; settledHere: boolean }
+  | { ok: true; entry: BeneficiaryEntry; method: string }
   | { ok: false; reason: string; message: string };
 
 /**
@@ -188,67 +186,22 @@ export async function releaseBeneficiaryShare(
     ok: false, reason: 'NOTHING_ACCRUED',
     message: 'No accrued share from you to this beneficiary under that tracking code. It may already be released',
   };
-  const pending = await readAccruedEntry(storage, args.beneficiaryGhii, args.trackingCode, args.providerGhii);
-  if (!pending) return nothing;
-  const method = pending.unit === 'morsels' ? 'morsel-transfer' : 'payable-booked';
-
   const entry = await settleEntryStatus(storage, {
     beneficiaryGhii: args.beneficiaryGhii, trackingCode: args.trackingCode,
-    fromGhii: args.providerGhii, to: 'released', releaseMethod: method,
+    fromGhii: args.providerGhii, to: 'released', releaseMethod: 'payable-booked',
   });
   if (!entry) return nothing;
 
-  if (entry.unit === 'morsels') {
-    const moved = await storage.transferBalance(args.providerGhii, args.beneficiaryGhii, entry.amount);
-    if (!moved) {
-      // Put it back. An obligation that reads `released` while the balance never moved is the one
-      // outcome that cannot be corrected by looking at the ledger.
-      await revertRelease(storage, args, entry);
-      return {
-        ok: false, reason: 'INSUFFICIENT_BALANCE',
-        message: `Releasing this share needs ${entry.amount} morsels and your balance does not cover it`,
-      };
-    }
-    await storage.addTransaction({
-      id: `benef-${randomUUID()}`, gaii: args.beneficiaryGhii, type: 'commerce_earn', amount: entry.amount,
-      counterpartyGaii: args.providerGhii, trackingCode: `beneficiary:${args.trackingCode}`,
-      initiatorGaii: args.providerGhii, timestamp: new Date().toISOString(),
-    });
-    return { ok: true, entry, method, settledHere: true };
-  }
-
-  // Money: book it onto the beneficiary's own payable book, where `/v1/exchange/earnings` reads it.
-  // The node moves no fiat — this makes the obligation invoiceable against the provider.
+  // Book it onto the beneficiary's own payable book, where `/v1/exchange/earnings` already reads it.
+  // The node moves no fiat — this makes the obligation invoiceable against the provider, and
+  // `beneficiary-payout.ts` is where the money actually moves once the provider signs for it.
   await bookPayable({ config, storage }, args.beneficiaryGhii, `benef_${args.trackingCode}`, {
-    amount: entry.amount, currency: entry.currency ?? 'EUR', buyerGhii: args.providerGhii,
+    amount: entry.amount, currency: entry.currency, buyerGhii: args.providerGhii,
     reference: entry.reference, method: 'beneficiary-share', status: 'pending',
   });
-  return { ok: true, entry, method, settledHere: false };
+  return { ok: true, entry, method: 'payable-booked' };
 }
 
-/** Undo a status flip after a failed transfer, so the obligation stays visible and payable. */
-async function revertRelease(
-  storage: Storage,
-  args: { beneficiaryGhii: string; trackingCode: string; providerGhii: string },
-  entry: BeneficiaryEntry,
-): Promise<void> {
-  const key = `commerce.benefit.${args.trackingCode}`;
-  const rec = await storage.getMemory(args.beneficiaryGhii, key);
-  if (!rec) return;
-  const value = rec.value as { items?: BeneficiaryEntry[] };
-  const row = (value.items ?? []).find(i => i.fromGhii === args.providerGhii && i.status === 'released');
-  if (!row) return;
-  row.status = 'accrued';
-  delete row.releasedAt;
-  delete row.releaseMethod;
-  await storage.setMemory({
-    key, ownerGaii: args.beneficiaryGhii, value, visibility: 'owner', tags: ['commerce', 'beneficiary'],
-    ttlHours: null, version: (rec.version ?? 0) + 1, createdAt: rec.createdAt, updatedAt: new Date().toISOString(),
-  });
-  logger.warn('[beneficiary-release] transfer failed; the obligation was returned to accrued', {
-    beneficiary: args.beneficiaryGhii, amount: entry.amount,
-  });
-}
 
 function splitGhii(ghii: string): [string, string] {
   const at = ghii.lastIndexOf('@');

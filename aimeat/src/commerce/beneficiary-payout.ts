@@ -72,8 +72,7 @@ export async function quoteBeneficiaryPayout(
   // `released` is the payable state: accrued means the provider has not agreed to pay it yet, and
   // paid means it already left. Anything else is not owed today.
   const entries = all
-    .filter(e => e.fromGhii === args.providerGhii && e.unit === 'money'
-      && (e.currency ?? 'EUR') === currency && e.status === 'released')
+    .filter(e => e.fromGhii === args.providerGhii && e.currency === currency && e.status === 'released')
     .sort((a, b) => (a.at ?? '').localeCompare(b.at ?? ''));
   const amount = entries.reduce((sum, e) => sum + e.amount, 0);
 

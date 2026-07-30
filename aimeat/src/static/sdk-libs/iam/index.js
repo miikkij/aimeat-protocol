@@ -24,7 +24,7 @@
 import { makeSession } from '../_core/session.js';
 import { resolveNodeUrl } from '../_core/config.js';
 import { attach } from '../_core/namespace.js';
-import { detectDialect, callCheck, callAdmin, callRequest } from './dialect.js';
+import { detectDialect, callCheck, callAdmin, callRequest, callVocabulary } from './dialect.js';
 import { makeGate } from './gate.js';
 import { mountMemberAdmin, mountJoinPanel } from './panel.js';
 import { nodeMe, nodeState, nodeAssign, nodeRevoke, nodeDecline, nodeRequest } from './node-roster.js';
@@ -142,6 +142,20 @@ const iam = {
         try {
           const d = await detectDialect(resolveNodeUrl(), state.ext);
           state.gateDialect = d.dialect;
+          // A generated gate declares its own vocabulary. Reading it here is what lets the panel
+          // render a role select without the app retyping the role names — and an app that did not
+          // retype them got an empty select and an Approve that posted no role, which the node
+          // refused with a 400. An explicit `roles` option still wins: the app knows which of them
+          // it actually wants handed out.
+          if (!state.roleNames.length && d.actions.indexOf('roles') !== -1) {
+            const vocab = await callVocabulary(authFetch, state.ext).catch(() => null);
+            if (vocab && vocab.roles) {
+              state.roles = vocab.roles;
+              state.roleNames = Array.isArray(vocab.assignable) && vocab.assignable.length
+                ? vocab.assignable
+                : Object.keys(vocab.roles);
+            }
+          }
         } catch {
           // A gate that cannot be described is a gate this library will not guess at: can() then
           // answers from the roster role alone, which is the truthful narrower answer.

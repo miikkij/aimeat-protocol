@@ -13,7 +13,7 @@
  *   detection cannot be the only signal: the action list decides first, the schema refines, and the
  *   `op` family is the fallback because it is what the pack ships. Any app may skip detection
  *   entirely by passing `dialect`.
- * @structure DIALECTS · detectDialect(nodeUrl, ext) · callCheck / callAdmin / callRequest
+ * @structure DIALECTS · detectDialect(nodeUrl, ext) · callCheck / callAdmin / callRequest / callVocabulary
  * @usage import { detectDialect, callCheck } from './dialect.js';
  * @version-history
  *   v1.0.0 — 2026-07-30 — Initial (TARGET-055 phase 1): op | command | level, detected from the
@@ -88,6 +88,18 @@ export function callCheck(call, ext, dialect, input) {
     ? (input && input.owner ? { owner: input.owner } : {})
     : (input || {});
   return unwrap(call('/v1/ext/' + ext + '/' + d.gate, { method: 'POST', body: JSON.stringify(body) }));
+}
+
+/**
+ * Read a generated gate's own role vocabulary. Separate from callAdmin because it is not an admin
+ * surface at all: a vocabulary is public by design and the roster it applies to is not, so this
+ * needs no dialect translation and answers the same to everyone.
+ * @param {(path: string, opts?: RequestInit) => Promise<any>} call
+ * @param {string} ext
+ * @returns {Promise<any>}
+ */
+export function callVocabulary(call, ext) {
+  return unwrap(call('/v1/ext/' + ext + '/roles', { method: 'POST', body: '{}' }));
 }
 
 /**

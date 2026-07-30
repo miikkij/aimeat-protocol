@@ -133,13 +133,14 @@ async function agentSession(ownerToken: string, ownerName: string, label: string
 console.log('\n=== AIMEAT MCP BENEFICIARY E2E (the agent surface for the second rake) ===\n');
 
 const EXT = `mcpben${Date.now().toString(36)}`;
-const PRICE = 10;
+// Money: a share is revenue. Morsels pace usage and are never shared, so nothing here is priced in them.
+const PRICE = 500_000;
 const SCRIPTS = {
     designating: 'export default async function(ctx, input){ return { ok: true, _revenue: { beneficiaries: [{ ghii: input.pay_to, weight: 1 }] } }; }',
 };
 const manifest = (name: string) => JSON.stringify({
     metadata: { name, version: '1.0.0', description: 'mcp beneficiary e2e provider', author: 'e2e' },
-    actions: [{ id: 'lookup', method: 'POST', path: '/lookup', script: 'designating', commercial: { payMorsels: PRICE } }],
+    actions: [{ id: 'lookup', method: 'POST', path: '/lookup', script: 'designating', commercial: { payMoney: { amount: PRICE, currency: 'EUR' } } }],
     config: { public_access: { default: true } },
     limits: { timeout_ms: 5000, max_api_calls: 1 },
 });
@@ -228,7 +229,7 @@ await test('The agent lists its owner\'s splits, and only those', async () => {
 await test('A settled call accrues a share the BENEFICIARY reads over MCP', async () => {
     const a = await json('/v1/exchange/entitlements', {
         method: 'POST', headers: auth(consumer.token),
-        body: JSON.stringify({ ext: EXT, action: 'lookup', contract_ref: 'c-mcpben', cap_units: 500 }),
+        body: JSON.stringify({ ext: EXT, action: 'lookup', contract_ref: 'c-mcpben', cap_units: 50_000_000 }),
     });
     assert(a.status === 201, `accept ${a.status}: ${JSON.stringify(a.body?.error)}`);
     const rake = Number(a.body.data.entitlement.rake_per_call);
@@ -242,7 +243,7 @@ await test('A settled call accrues a share the BENEFICIARY reads over MCP', asyn
     assert(!r.isError, `earnings errored: ${r.text}`);
     assert(r.data.role === 'beneficiary' && r.data.beneficiary === benef.ghii, `identity: ${JSON.stringify(r.data.beneficiary)}`);
     const expected = Math.floor((PRICE - rake) * 50 / 100);
-    assert(r.data.totals?.morsels?.accrued === expected, `accrued: expected ${expected}, got ${JSON.stringify(r.data.totals)}`);
+    assert(r.data.totals?.EUR?.accrued === expected, `accrued: expected ${expected}, got ${JSON.stringify(r.data.totals)}`);
     assert(r.data.verification.payable === false, 'nothing is payable before an approval exists');
 });
 
@@ -298,15 +299,17 @@ await test('The OPERATOR verifies, and the release then settles over MCP', async
     assert(!ap.isError, `approve errored: ${ap.text}`);
     assert(ap.data.approval.state === 'verified' && ap.data.approval.method === 'manual-operator', `approval: ${JSON.stringify(ap.data.approval)}`);
 
-    const before = Number((await json('/v1/wallet', { headers: auth(benef.token) })).body.data.balance);
+    const morselsBefore = Number((await json('/v1/wallet', { headers: auth(benef.token) })).body.data.balance);
     const rel = await provAgent.session.call('aimeat_commerce_beneficiary_release', {
         tracking_code: trackingCode, beneficiary: benef.ghii,
     });
     assert(!rel.isError, `release errored: ${rel.text}`);
-    assert(rel.data.settled_here === true, 'a morsel release completes on this node');
-    assert(rel.data.method === 'morsel-transfer', `method: ${rel.data.method}`);
-    const after = Number((await json('/v1/wallet', { headers: auth(benef.token) })).body.data.balance);
-    assert(after === before + rel.data.amount, `the beneficiary was credited ${rel.data.amount}: ${before} -> ${after}`);
+    assert(rel.data.method === 'payable-booked', `method: ${rel.data.method}`);
+    assert(rel.data.currency === 'EUR' && Number(rel.data.amount) > 0, `released: ${rel.text}`);
+    // Releasing takes on the debt; the money moves when the provider signs a payout. And it never
+    // touches the pacing meter, which is a different quantity entirely.
+    const morselsAfter = Number((await json('/v1/wallet', { headers: auth(benef.token) })).body.data.balance);
+    assert(morselsAfter === morselsBefore, `no morsels move on a money release: ${morselsBefore} -> ${morselsAfter}`);
 });
 
 await test('The same share cannot be released twice over MCP', async () => {

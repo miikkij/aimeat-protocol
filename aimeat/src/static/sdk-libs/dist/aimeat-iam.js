@@ -77,6 +77,9 @@
     const body = dialect === "command" ? input && input.owner ? { owner: input.owner } : {} : input || {};
     return unwrap(call("/v1/ext/" + ext + "/" + d.gate, { method: "POST", body: JSON.stringify(body) }));
   }
+  function callVocabulary(call, ext) {
+    return unwrap(call("/v1/ext/" + ext + "/roles", { method: "POST", body: "{}" }));
+  }
   function callAdmin(call, ext, dialect, op, args) {
     const d = DIALECTS[dialect];
     const resolved = d[op] || op;
@@ -730,6 +733,13 @@
           try {
             const d = await detectDialect(resolveNodeUrl(), state.ext);
             state.gateDialect = d.dialect;
+            if (!state.roleNames.length && d.actions.indexOf("roles") !== -1) {
+              const vocab = await callVocabulary(authFetch2, state.ext).catch(() => null);
+              if (vocab && vocab.roles) {
+                state.roles = vocab.roles;
+                state.roleNames = Array.isArray(vocab.assignable) && vocab.assignable.length ? vocab.assignable : Object.keys(vocab.roles);
+              }
+            }
           } catch {
             state.gateDialect = null;
           }

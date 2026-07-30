@@ -32,6 +32,10 @@ import { CommerceError } from './errors.js';
 import { createFulfillmentTask } from './fulfillment.js';
 import { commerceFeePercent, settleMarketplaceFee, resolveOperatorFeeGhii } from '../services/marketplace-fee.js';
 import { isMoneyCurrency, percentFee } from './money.js';
+import { logger } from '../utils/logger.js';
+import { readSplit, computeSplit, type DynamicDesignation } from './beneficiary-split.js';
+import { bookBeneficiaryShares } from './beneficiary-book.js';
+import { takeDesignations } from './beneficiary-designation.js';
 import { emitChange } from '../services/event-bus.js';
 
 export { CommerceError } from './errors.js';
@@ -216,6 +220,72 @@ export async function cancelSession(
  * rethrows, leaving the session open for retry. Payout/fee legs run after fulfillment and are
  * best-effort ordered — the buyer's money moves exactly once.
  */
+/**
+ * The metered coordinate a checkout line is sold under, or null when it has none.
+ *
+ * A beneficiary split is declared against the same `(ext, action)` pair a contract is keyed on, so
+ * a purchase made through checkout has to resolve to that same pair or the seller's declared split
+ * would apply on one route and be silently skipped on the other. Agent offers have no such
+ * coordinate today and return null, which means their revenue is not split.
+ */
+function meteredCoordinateOf(sellable: Sellable): { ext: string; action: string } | null {
+  if (sellable.kind === 'app-tool') {
+    return { ext: `apptool:${sellable.sellerOwner}/${sellable.agentName}`, action: sellable.offerId };
+  }
+  if (sellable.kind === 'ext-call') {
+    return { ext: sellable.agentName, action: sellable.offerId };
+  }
+  return null;
+}
+
+/**
+ * Book the seller's beneficiary shares for one settled checkout line.
+ *
+ * THE SAME SPLIT AS A CONTRACTED CALL. A buyer can reach a priced capability two ways: by holding an
+ * EXCHANGE contract, or by paying for it once through a checkout. Both are sales, both hand the
+ * seller their cut, and a split declared on the coordinate has to apply to both — otherwise a
+ * provider who promised a company a share of every lookup quietly stops paying it the moment
+ * somebody buys the same lookup through the other route.
+ *
+ * `net` is what the seller actually received, after the platform fee, so the share is a percentage
+ * of their real revenue rather than of the buyer's gross. Money only: morsels are the pacing meter
+ * and are never shared.
+ *
+ * Never throws: the money has already moved and the buyer already has their answer. A bookkeeping
+ * failure is logged, not turned into a failed purchase.
+ */
+async function bookCheckoutBeneficiaries(
+  ctx: PaymentContext,
+  args: {
+    sellable: Sellable; session: CheckoutSessionRecord; net: number;
+    trackingCode: string; designations: DynamicDesignation[];
+  },
+): Promise<void> {
+  if (args.net <= 0) return;
+  // MONEY ONLY. Morsels pace usage; they are not revenue and a fraction of them is not a share, so
+  // a morsel-priced checkout line books nothing here, exactly as a morsel-priced contract does not.
+  if (!isMoneyCurrency(args.session.currency)) return;
+  const coord = meteredCoordinateOf(args.sellable);
+  if (!coord) return;
+  try {
+    const split = await readSplit(ctx.storage, args.sellable.sellerGhii, coord.ext, coord.action);
+    const result = computeSplit(args.net, split, args.designations);
+    if (!result.lines.length) return;
+    await bookBeneficiaryShares(ctx.storage, {
+      lines: result.lines,
+      trackingCode: `chk_${args.trackingCode}_${coord.action}`,
+      fromGhii: args.sellable.sellerGhii,
+      currency: args.session.currency,
+      buyerGhii: args.session.buyerGhii,
+      reference: `checkout:${args.session.id}:${coord.ext}:${coord.action}`,
+    });
+  } catch (err) {
+    logger.error('[commerce] checkout beneficiary accrual failed; the seller keeps the whole cut for this line', {
+      session: args.session.id, seller: args.sellable.sellerGhii, error: String(err),
+    });
+  }
+}
+
 export async function completeSession(
   storage: Storage,
   config: AimeatConfig,
@@ -275,6 +345,8 @@ export async function completeSession(
   //    (app-tool: synchronous capability invoke whose result rides on the session).
   const taskIds: string[] = [];
   const results: Array<{ sku: string; result: unknown }> = [];
+  // Per-line, because one session can carry several priced lines with different sellers.
+  const lineDesignations: DynamicDesignation[][] = [];
   try {
     for (let i = 0; i < session.items.length; i++) {
       const item = session.items[i]!;
@@ -283,7 +355,12 @@ export async function completeSession(
         const outcome = await sellable.fulfill(ctx, { session, item, callerJwt });
         if (outcome.taskId) taskIds.push(outcome.taskId);
         if (outcome.result !== undefined) {
-          results.push({ sku: `${item.kind}:${item.agent}:${item.offerId}`, result: outcome.result });
+          // The capability may name who shares this sale, the same way it does on a contracted
+          // call. Captured here because fulfillment runs before the payouts below, and stripped so
+          // the buyer's receipt never carries the seller's commercial arrangement.
+          const shared = takeDesignations(outcome.result);
+          lineDesignations[i] = shared.designations;
+          results.push({ sku: `${item.kind}:${item.agent}:${item.offerId}`, result: shared.result });
         }
       } else {
         taskIds.push(await createFulfillmentTask(storage, session, item));
@@ -308,6 +385,12 @@ export async function completeSession(
       } else {
         await handler.payout(ctx, { toGhii: sellable.sellerGhii, amount: net, currency: session.currency, buyerGhii: session.buyerGhii, trackingCode: collected.trackingCode, reference: session.id });
       }
+      // The seller has their cut; now whoever they owe a share of it. Out of the seller's net,
+      // never added to what the buyer paid — identical to the contracted path.
+      await bookCheckoutBeneficiaries(ctx, {
+        sellable, session, net, trackingCode: collected.trackingCode,
+        designations: lineDesignations[i] ?? [],
+      });
     }
     // Fee leg. Morsels: route to operator|burn on the ledger. Money: no ledger movement — record
     // the operator's platform-fee entry (collected live via Stripe Connect application-fee, or an

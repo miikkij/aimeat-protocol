@@ -677,6 +677,65 @@ await test('a declared carry plan makes a bare approval actually carry the membe
     await json(`/v1/apps/${owner.name}/${APP}/members/${newcomer.name}`, { method: 'DELETE', headers: auth(owner.token) });
 });
 
+// ── the gate declares its own vocabulary ─────────────────────────────────────────────
+// The owner's panel has to render a role select. Where the gate could not say which roles exist, the
+// app had to retype them — and NUOTTA did not, so the select rendered empty and Approve posted no
+// role at all, which the node refused with a 400. A gate that enforces a vocabulary should state it.
+await test('the generated gate states its role vocabulary, and versions where it is told to', async () => {
+    const { generateIamExtension } = await import('../src/services/iam/generate-extension.js');
+    const APP3 = 'vocab.html';
+    await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename: APP3, description: 'vocabulary gate', content: Buffer.from('<html>x</html>').toString('base64') }),
+    });
+    const gen = generateIamExtension({
+        appId: `${owner.name}/${APP3}`,
+        author: owner.name,
+        defaultRole: 'guest',
+        version: '2.4.0',
+        levels: [
+            { level: 0, key: 'admin', label: 'Admin', capabilities: ['*'] },
+            { level: 10, key: 'member', label: 'Member', capabilities: ['corpus'] },
+            { level: 90, key: 'guest', label: 'Guest', capabilities: ['guides'] },
+        ],
+        commands: [{ id: 'corpus.search', description: 'Search', capability: 'corpus', tier: 'read' }],
+    });
+    const inst = await json('/v1/extensions', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ manifest: gen.manifest, scripts: gen.scripts }),
+    });
+    assert(inst.status === 200 || inst.status === 201, `installs: ${inst.status} ${JSON.stringify(inst.body?.error)}`);
+    assert((await json(`/v1/extensions/${gen.name}/activate`, { method: 'POST', headers: auth(owner.token), body: '{}' })).status === 200, 'activate');
+
+    // A regenerated gate must not read as a rollback in the extension list.
+    const det = await json(`/v1/extensions/${gen.name}`, { headers: auth(owner.token) });
+    const rec = det.body.data.extension ?? det.body.data;
+    assert(String(rec.version) === '2.4.0', `the version it was told to publish as: ${rec.version}`);
+
+    // The vocabulary itself.
+    const stranger = await setupOwner('vocab');
+    const vocab = (await json(`/v1/ext/${gen.name}/roles`, {
+        method: 'POST', headers: auth(stranger.token), body: '{}',
+    })).body.data;
+    assert(!!vocab && !!vocab.roles, `the gate answers its vocabulary: ${JSON.stringify(vocab)}`);
+    assert(Object.keys(vocab.roles).sort().join(',') === 'admin,guest,member',
+        `every role, with its capabilities: ${JSON.stringify(vocab.roles)}`);
+    assert(vocab.defaultRole === 'guest', `and what a stranger holds: ${vocab.defaultRole}`);
+    // Assignable is not the same as existing: approving somebody into the role they already hold by
+    // default is an act with no effect, so the panel should not offer it.
+    assert(vocab.assignable.sort().join(',') === 'admin,member',
+        `what an owner may hand out excludes the default: ${JSON.stringify(vocab.assignable)}`);
+    assert(vocab.labels.member === 'Member', `labels survive for the UI: ${JSON.stringify(vocab.labels)}`);
+
+    // The vocabulary is public; the ROSTER is not. That split is the whole reason this is safe.
+    const anon = await json(`/v1/ext/${gen.name}/roles`, { method: 'POST', body: '{}' });
+    const anonOk = anon.status === 200 || anon.status === 401;
+    assert(anonOk, `a vocabulary read is not an error: ${anon.status}`);
+    const rosterAnon = await json(`/v1/apps/${owner.name}/${APP3}/members`);
+    assert(rosterAnon.status === 401 || rosterAnon.status === 403,
+        `the roster still refuses an unauthenticated read: ${rosterAnon.status}`);
+});
+
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);
 

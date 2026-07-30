@@ -62,7 +62,6 @@ function entryView(e: BeneficiaryEntry & { trackingCode: string }): Record<strin
   return {
     tracking_code: e.trackingCode,
     amount: e.amount,
-    unit: e.unit,
     currency: e.currency,
     from: e.fromGhii,
     buyer: e.buyerGhii ?? null,
@@ -84,8 +83,8 @@ function entryView(e: BeneficiaryEntry & { trackingCode: string }): Record<strin
 function totalsOf(entries: Array<BeneficiaryEntry & { trackingCode: string }>): Record<string, unknown> {
   const totals: Record<string, { accrued: number; released: number; paid: number; reversed: number; entries: number }> = {};
   for (const e of entries) {
-    // Morsels and money micro-units are different quantities and are never summed into one figure.
-    const bucket = e.unit === 'money' ? (e.currency ?? 'EUR') : 'morsels';
+    // Keyed by currency. There is no morsel bucket: morsels pace usage and are never shared.
+    const bucket = e.currency;
     const t = totals[bucket] ?? (totals[bucket] = { accrued: 0, released: 0, paid: 0, reversed: 0, entries: 0 });
     t[e.status] += e.amount;
     t.entries += 1;
@@ -261,16 +260,10 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
       beneficiary,
       tracking_code: trackingCode,
       amount: result.entry.amount,
-      unit: result.entry.unit,
       currency: result.entry.currency,
       method: result.method,
-      /** Whether the release COMPLETED on this node, or left an off-node leg still to settle. */
-      settled_here: result.settledHere,
-      note: result.settledHere
-        ? 'Transferred from your morsel balance to theirs. Morsels are this node\'s pacing meter, so '
-          + 'the transfer completes here; it moves consumption capacity, not currency.'
-        : 'Booked onto their payable book. The node moves no fiat, so invoice and settle this off-node, '
-          + 'which is what keeps AIMEAT out of holding anyone\'s money.',
+      note: 'Booked onto their payable book. The node moves no fiat, so the money itself moves '
+        + 'when you sign for it at POST /v1/commerce/beneficiary/payout.',
     }));
   });
 

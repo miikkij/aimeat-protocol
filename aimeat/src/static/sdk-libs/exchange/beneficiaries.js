@@ -91,11 +91,11 @@ export function deleteSplit(ext, action) {
  * I get this": false means the amount is booked and real but no operator has verified the account yet,
  * and it stays booked until one does.
  *
- * `totals` is keyed by unit: a currency code for real money (integer micro-units), and `morsels` for
- * the node's pacing meter. They are never added together and they are not the same KIND of thing, so
- * render them separately with {@link module:exchange/format.fmtUnit} and never sum them into a
- * headline figure. A EUR share is income; a morsel share is capacity to call things.
- * @param {{ status?: 'accrued'|'released'|'reversed', limit?: number }} [opts]
+ * `totals` is keyed by CURRENCY, in integer micro-units. There is no morsel bucket: morsels are the
+ * node's pacing meter, they bound how often a capability may be called, and a fraction of them is not
+ * income — so a morsel-priced call never produces a share at all. A share is revenue or it is not a
+ * share. Render amounts with {@link module:exchange/format.fmtUnit}, never by dividing by hand.
+ * @param {{ status?: 'accrued'|'released'|'paid'|'reversed', limit?: number }} [opts]
  * @returns {Promise<any>}  `{ beneficiary, verification, totals, entries, count, note }`
  */
 export function earnings(opts) {
@@ -109,7 +109,7 @@ export function earnings(opts) {
  *
  * Nothing was withheld when the call settled: you received your whole cut and are holding it. These
  * are the obligations against it, each with the `tracking_code` {@link release} needs.
- * @param {{ status?: 'accrued'|'released'|'reversed', limit?: number }} [opts]
+ * @param {{ status?: 'accrued'|'released'|'paid'|'reversed', limit?: number }} [opts]
  * @returns {Promise<any>}  `{ provider, totals, entries, count }`
  */
 export function obligations(opts) {
@@ -125,15 +125,12 @@ export function obligations(opts) {
  * `earnings().verification` or {@link approval} before offering the button, so a user is told why
  * rather than shown a failure.
  *
- * `settled_here` says whether the release COMPLETED on this node. On morsels it did, because morsels
- * are the node's own pacing meter and moving them moves consumption capacity rather than currency. On
- * money it did not: the amount is booked onto the beneficiary's payable book and the fiat leg is
- * invoiced off-node, because a node that pushed fiat would first have to hold it. Read it as "is
- * there anything left to do", never as "which rail is the real one" — the rail that settles instantly
- * is precisely the one that is not money.
+ * Releasing books the amount onto the beneficiary's payable book: it is the provider taking on the
+ * debt, not paying it. The money itself moves in {@link payout}, which the provider signs. The node
+ * never holds funds, so nothing is pushed on its own.
  * @param {string} trackingCode  From {@link obligations}.
  * @param {string} beneficiary   The beneficiary's owner GHII.
- * @returns {Promise<any>}  `{ released, amount, unit, currency, method, settled_here, note }`
+ * @returns {Promise<any>}  `{ released, amount, currency, method, note }`
  */
 export function release(trackingCode, beneficiary) {
   return send('/v1/commerce/beneficiary/release', 'POST',
