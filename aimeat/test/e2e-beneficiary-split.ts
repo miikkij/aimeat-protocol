@@ -303,10 +303,21 @@ await test('Operator verifies alpha → the release now succeeds and morsels act
   });
   assert(r.status === 200, `release ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.settled_here === true, 'a morsel release completes on this node');
+  assert(r.body.data.method === 'morsel-transfer', `release method: ${r.body.data.method}`);
   const amount = Number(r.body.data.amount);
   assert(amount > 0, `released amount ${amount}`);
   assert(await balance(alpha.token) === alphaBefore + amount, 'the beneficiary was credited');
   assert(await balance(provider.token) === providerBefore - amount, 'out of the PROVIDER\'s balance, not the node\'s');
+});
+
+await test('The released entry records HOW it was released, not a placeholder', async () => {
+  // It stored the literal string 'pending' for every rail until 2026-07-30: the status was written
+  // before the fact it described, so the entry could not say what had actually happened to it.
+  const r = await earnings(alpha.token);
+  const rel = r.body.data.entries.find((e: any) => e.status === 'released');
+  assert(!!rel, `expected a released entry: ${JSON.stringify(r.body.data.entries)}`);
+  assert(rel.release_method === 'morsel-transfer', `release_method: ${rel.release_method}`);
+  assert(!!rel.released_at, 'a released entry is stamped');
 });
 
 await test('The same share cannot be released twice → 404 NOTHING_ACCRUED', async () => {
@@ -378,6 +389,10 @@ await test('Releasing a money share books it as an invoiceable payable — the n
   assert(r.status === 200, `release money ${r.status}: ${JSON.stringify(r.body?.error)}`);
   assert(r.body.data.settled_here === false, 'money is booked as an obligation, never pushed by the node');
   assert(await balance(gamma.token) === balBefore, 'a EUR share must not touch a morsel balance');
+
+  const gEarn = await earnings(gamma.token);
+  const gRel = gEarn.body.data.entries.find((e: any) => e.status === 'released' && e.unit === 'money');
+  assert(gRel && gRel.release_method === 'payable-booked', `money release_method: ${gRel?.release_method}`);
 
   // It lands where a seller already looks for what they are owed.
   const earned = await json('/v1/exchange/earnings', { headers: auth(gamma.token) });

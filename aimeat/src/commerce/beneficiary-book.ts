@@ -131,6 +131,22 @@ export async function listBeneficiaryObligations(
 }
 
 /**
+ * The still-accrued entry owed by one provider under one tracking code, or null.
+ *
+ * Exists so a caller can learn the RAIL before it flips the status. Deciding how a share will be
+ * released needs to know whether it is denominated in the pacing meter or in currency, and that fact
+ * lives on the entry — so reading it after the flip means writing the status first and the truth
+ * about it second, which is how `release_method` came to be stored as the literal string "pending".
+ */
+export async function readAccruedEntry(
+  storage: Storage, beneficiaryGhii: string, trackingCode: string, fromGhii: string,
+): Promise<BeneficiaryEntry | null> {
+  const rec = await storage.getMemory(beneficiaryGhii, benefitKey(trackingCode));
+  if (!rec) return null;
+  return entriesOf(rec.value).find(i => i.fromGhii === fromGhii && i.status === 'accrued') ?? null;
+}
+
+/**
  * Flip one accrued entry to a terminal state, in place.
  *
  * Only ever moves `accrued` onwards, so a double release cannot pay twice and a reversal cannot undo

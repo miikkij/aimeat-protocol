@@ -43,7 +43,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { bookPayable } from './payable-book.js';
-import { settleEntryStatus, type BeneficiaryEntry } from './beneficiary-book.js';
+import { settleEntryStatus, readAccruedEntry, type BeneficiaryEntry } from './beneficiary-book.js';
 import { logger } from '../utils/logger.js';
 
 /** System namespace — an approval is a server-trusted fact, so never in a principal-writable space. */
@@ -181,17 +181,22 @@ export async function releaseBeneficiaryShare(
   const gate = await beneficiaryEligibility(storage, config, args.beneficiaryGhii);
   if (!gate.eligible) return { ok: false, reason: gate.reason, message: gate.message };
 
-  const method = 'pending';
+  // Learn the RAIL before writing the status, so the entry records how it was actually released
+  // rather than a placeholder. Reading it afterwards means the status is written before the truth
+  // about it, and every released entry then claims a method of "pending".
+  const nothing: ReleaseResult = {
+    ok: false, reason: 'NOTHING_ACCRUED',
+    message: 'No accrued share from you to this beneficiary under that tracking code. It may already be released',
+  };
+  const pending = await readAccruedEntry(storage, args.beneficiaryGhii, args.trackingCode, args.providerGhii);
+  if (!pending) return nothing;
+  const method = pending.unit === 'morsels' ? 'morsel-transfer' : 'payable-booked';
+
   const entry = await settleEntryStatus(storage, {
     beneficiaryGhii: args.beneficiaryGhii, trackingCode: args.trackingCode,
     fromGhii: args.providerGhii, to: 'released', releaseMethod: method,
   });
-  if (!entry) {
-    return {
-      ok: false, reason: 'NOTHING_ACCRUED',
-      message: 'No accrued share from you to this beneficiary under that tracking code. It may already be released',
-    };
-  }
+  if (!entry) return nothing;
 
   if (entry.unit === 'morsels') {
     const moved = await storage.transferBalance(args.providerGhii, args.beneficiaryGhii, entry.amount);
@@ -209,7 +214,7 @@ export async function releaseBeneficiaryShare(
       counterpartyGaii: args.providerGhii, trackingCode: `beneficiary:${args.trackingCode}`,
       initiatorGaii: args.providerGhii, timestamp: new Date().toISOString(),
     });
-    return { ok: true, entry, method: 'morsel-transfer', settledHere: true };
+    return { ok: true, entry, method, settledHere: true };
   }
 
   // Money: book it onto the beneficiary's own payable book, where `/v1/exchange/earnings` reads it.
@@ -218,7 +223,7 @@ export async function releaseBeneficiaryShare(
     amount: entry.amount, currency: entry.currency ?? 'EUR', buyerGhii: args.providerGhii,
     reference: entry.reference, method: 'beneficiary-share', status: 'pending',
   });
-  return { ok: true, entry, method: 'payable-booked', settledHere: false };
+  return { ok: true, entry, method, settledHere: false };
 }
 
 /** Undo a status flip after a failed transfer, so the obligation stays visible and payable. */
