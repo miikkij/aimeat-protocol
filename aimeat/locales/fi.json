@@ -7932,7 +7932,10 @@
     "wallOpens": "avausta",
     "wallForks": "haaraa",
     "wallOpen1": "avaus",
-    "wallFork1": "haara"
+    "wallFork1": "haara",
+    "wallSortLabel": "Appien järjestys",
+    "wallSortNewest": "Viimeksi päivitetyt",
+    "wallSortPopular": "Eniten avatut"
   },
   "pricing": {
     "title": "Hinnoittelu",

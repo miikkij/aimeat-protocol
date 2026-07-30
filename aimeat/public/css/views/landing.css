@@ -82,6 +82,17 @@
   background: var(--card); padding: .9rem 1rem; text-decoration: none; color: var(--text); cursor: pointer;
 }
 .ld-app-card:hover { border-color: var(--accent); }
+/* Search and order on one row; the order buttons wrap under the search on a narrow screen. */
+.ld-wall-bar { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; margin-bottom: .8rem; }
+.ld-wall-bar .ld-wall-search { flex: 1 1 220px; margin-bottom: 0; }
+.ld-wall-sort { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; background: var(--card); }
+.ld-wall-sort-btn {
+  border: 0; background: transparent; cursor: pointer; font: inherit; font-size: .78rem;
+  color: var(--text-muted); padding: .32rem .8rem;
+}
+.ld-wall-sort-btn:hover { color: var(--text); }
+.ld-wall-sort-btn.is-on { background: var(--accent); color: #fff; }
+
 .ld-app-shot { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; border-radius: 8px; border: 1px solid var(--border); margin-bottom: .55rem; background: var(--bg-dim); }
 .ld-app-name { font-weight: 700; margin-bottom: .25rem; }
 .ld-app-desc { font-size: .82rem; color: var(--text-dim); margin-bottom: .55rem; }
@@ -93,11 +104,12 @@
   margin-top: auto; padding-top: .55rem; border-top: 1px solid var(--border);
   display: flex; align-items: baseline; justify-content: space-between; gap: .5rem .75rem; flex-wrap: wrap;
 }
-.ld-app-facts { font-size: .74rem; font-weight: 600; color: var(--text); letter-spacing: .01em; display: inline-flex; align-items: center; gap: .3rem; }
-.ld-app-sep { color: var(--text-muted); font-weight: 400; }
-/* The one coloured thing on the card. Everything else on this line is ink, so the accent lands
-   on the number that says whether anyone has actually opened the app. */
-.ld-app-opens { display: inline-flex; align-items: center; gap: .22rem; color: var(--accent); }
+/* The footer is one quiet line, all of it the same grey. The facts were ink and the count was
+   accent, which pulled the eye to the corner of every card at once and turned a wall of thirty
+   into thirty competing signals. They are there for whoever looks; they do not ask to be looked at. */
+.ld-app-facts { font-size: .72rem; color: var(--text-muted); letter-spacing: .01em; display: inline-flex; align-items: center; gap: .3rem; }
+.ld-app-sep { color: var(--text-muted); }
+.ld-app-opens { display: inline-flex; align-items: center; gap: .22rem; }
 .ld-eye { flex: 0 0 auto; }
 .ld-app-by { font-size: .7rem; color: var(--text-muted); }
 .ld-footer { display: flex; gap: 1.25rem; flex-wrap: wrap; justify-content: center; margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); font-size: .88rem; }

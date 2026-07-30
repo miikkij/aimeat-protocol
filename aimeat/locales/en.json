@@ -7932,7 +7932,10 @@
     "wallOpens": "opens",
     "wallForks": "forks",
     "wallOpen1": "open",
-    "wallFork1": "fork"
+    "wallFork1": "fork",
+    "wallSortLabel": "Order the apps",
+    "wallSortNewest": "Recently updated",
+    "wallSortPopular": "Most opened"
   },
   "pricing": {
     "title": "Pricing",

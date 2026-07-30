@@ -119,13 +119,16 @@ function fmtPublished(iso) {
 function Gallery() {
   const [apps, setApps] = useState([]);
   const [q, setQ] = useState('');
+  // Newest first by default: the wall's job is to show the place is alive, and the freshest
+  // publish says that better than a leaderboard whose top has not moved in weeks.
+  const [sort, setSort] = useState('newest');
   useEffect(() => {
     // Public proof wall: the default listing already excludes parked + operator-hidden
     // apps (no manage flag), so the wall never surfaces moderated/hidden apps.
-    fetch('/v1/apps?sort=popular&limit=60').then(r => r.json())
+    fetch(`/v1/apps?sort=${encodeURIComponent(sort)}&limit=60`).then(r => r.json())
       .then(j => setApps(j?.data?.apps || []))
       .catch(err => { swallowed('landing: Gallery', err); });
-  }, []);
+  }, [sort]);
 
   const ql = q.trim().toLowerCase();
   const shown = !ql ? apps : apps.filter((a) => {
@@ -136,10 +139,22 @@ function Gallery() {
   return html`
     <div class="ld-section">
       <h2 class="ld-h2">${tr('landing.wallTitle', 'Built by people with their AI. Yours goes here too.')}</h2>
-      <input class="ld-wall-search" type="search" value=${q}
-        onInput=${(e) => setQ(e.target.value)}
-        placeholder=${tr('landing.wallSearch', 'Search apps…')}
-        aria-label=${tr('landing.wallSearch', 'Search apps')} />
+      <div class="ld-wall-bar">
+        <input class="ld-wall-search" type="search" value=${q}
+          onInput=${(e) => setQ(e.target.value)}
+          placeholder=${tr('landing.wallSearch', 'Search apps…')}
+          aria-label=${tr('landing.wallSearch', 'Search apps')} />
+        <div class="ld-wall-sort" role="group" aria-label=${tr('landing.wallSortLabel', 'Order the apps')}>
+          <button type="button" class=${`ld-wall-sort-btn ${sort === 'newest' ? 'is-on' : ''}`}
+            aria-pressed=${sort === 'newest'} onClick=${() => setSort('newest')}>
+            ${tr('landing.wallSortNewest', 'Recently updated')}
+          </button>
+          <button type="button" class=${`ld-wall-sort-btn ${sort === 'popular' ? 'is-on' : ''}`}
+            aria-pressed=${sort === 'popular'} onClick=${() => setSort('popular')}>
+            ${tr('landing.wallSortPopular', 'Most opened')}
+          </button>
+        </div>
+      </div>
       ${shown.length === 0
         ? html`<p class="ld-app-desc">${apps.length === 0
             ? tr('landing.wallEmpty', 'Be the first. Copy the prompt above, build something, and it lands here.')
