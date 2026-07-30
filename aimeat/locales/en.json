@@ -7902,7 +7902,9 @@
     "buildShowFull": "Show the full prompt",
     "buildChars": "characters",
     "ecLinkShort": "Learn it hands-on, free →",
-    "heroPricing": "Pricing →"
+    "heroPricing": "Pricing →",
+    "inviteTitle": "Build your app in 10 minutes",
+    "inviteSub": "One prompt into the AI you already use. No account needed to start."
   },
   "pricing": {
     "title": "Pricing",

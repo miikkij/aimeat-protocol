@@ -7902,7 +7902,9 @@
     "buildShowFull": "Näytä koko ohje",
     "buildChars": "merkkiä",
     "ecLinkShort": "Opi käytännössä, ilmaiseksi →",
-    "heroPricing": "Hinnat →"
+    "heroPricing": "Hinnat →",
+    "inviteTitle": "Rakenna appisi 10 minuutissa",
+    "inviteSub": "Yksi kehote siihen tekoälyyn jota jo käytät. Aloittamiseen ei tarvita tunnusta."
   },
   "pricing": {
     "title": "Hinnoittelu",

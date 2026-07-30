@@ -185,3 +185,21 @@
 .nt-value { font-size: 1.6rem; font-weight: 800; font-variant-numeric: tabular-nums; color: var(--text); }
 .nt-label { font-size: .8rem; color: var(--text-dim); }
 .nt-sub { font-size: .72rem; font-weight: 600; color: var(--accent); }
+
+/* ── Build invitation, folded (TARGET-056) ──────────────────────────────────
+   The generator used to sit open at the top. Two visitors made a throwaway chat app
+   and stopped, while the wall below is what reads as a living place. So the builder is
+   one prominent line until someone wants it, and the wall leads. */
+.ld-invite { max-width: 760px; margin: 1.5rem auto 2rem; }
+.ld-invite .collapsible {
+  border: 1px solid var(--accent-border, var(--border)); border-radius: var(--radius-md, 12px);
+  background: var(--accent-subtle, var(--card)); overflow: hidden;
+}
+.ld-invite .collapsible-header { padding: 1rem 1.25rem; width: 100%; }
+.ld-invite .collapsible-title { display: flex; flex-direction: column; gap: .15rem; text-align: left; }
+.ld-invite-title { font-size: 1.15rem; font-weight: 800; color: var(--text); }
+.ld-invite-sub { font-size: .88rem; color: var(--text-dim); font-weight: 400; }
+.ld-invite .collapsible-body { padding: 0 1rem 1rem; }
+/* Inside the fold the loop and the prompt box lose their standalone page margins. */
+.ld-invite .ld-loop { margin-top: .25rem; }
+.ld-invite .ld-askai { margin-top: 1rem; }

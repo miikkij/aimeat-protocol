@@ -60,6 +60,7 @@ import { t, getLocale } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import { siteLink, hasSite } from '/js/site.js';
+import { Collapsible } from '/components/Collapsible.js';
 import NodeTotals from './landing-node-totals.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -401,6 +402,34 @@ function AskYourAI() {
 /* ── Hero — value first: AIMEAT is a safe place to build real apps with your AI in minutes, and
    you own + publish them. One copyable prompt is the whole on-ramp; the live wall below is the
    proof that your creation lands on the same shelf as everyone else's. ── */
+/* The build invitation, folded shut.
+   Evidence over theory: an open generator on the front page produced two throwaway chat apps
+   and nothing else, while the wall underneath is what actually reads as a living place. So the
+   whole builder — the three steps and the prompt with its templates — sits behind one line, and
+   the page leads with what people made. Opening it costs one click and asks for no account. */
+function BuildInvite() {
+  const [open, setOpen] = useState(false);
+  return html`
+    <section class="ld-invite">
+      <${Collapsible}
+        title=${html`
+          <span class="ld-invite-title">${tr('landing.inviteTitle', 'Build your app in 10 minutes')}</span>
+          <span class="ld-invite-sub">${tr('landing.inviteSub', 'One prompt into the AI you already use. No account needed to start.')}</span>
+        `}
+        open=${open} onToggle=${() => setOpen(o => !o)}>
+        <div class="ld-loop">
+          <span class="ld-loop-step">① ${tr('landing.loop1', 'Copy the prompt into your AI chat')}</span>
+          <span class="ld-loop-arrow">→</span>
+          <span class="ld-loop-step">② ${tr('landing.loop2', 'The AI interviews you and builds the app')}</span>
+          <span class="ld-loop-arrow">→</span>
+          <span class="ld-loop-step">③ ${tr('landing.loop3', 'The app goes live at its own address. Share the link.')}</span>
+        </div>
+        <${BuildAppPrompt} />
+      <//>
+    </section>
+  `;
+}
+
 function BuildHero({ onNavigate }) {
   // ONE primary action. This section used to carry four buttons of equal weight, which asks the
   // visitor to choose before they know enough to choose. It also sits BELOW the generator now, so
@@ -455,27 +484,21 @@ export default function Landing({ navigate }) {
            after, because it answers a question the visitor only has once they have seen the
            thing work. -->
 
-      <!-- 1. The loop, in three steps. What actually happens, before anything is asked of you. -->
-      <div class="ld-loop">
-        <span class="ld-loop-step">① ${tr('landing.loop1', 'Copy the prompt into your AI chat')}</span>
-        <span class="ld-loop-arrow">→</span>
-        <span class="ld-loop-step">② ${tr('landing.loop2', 'The AI interviews you and builds the app')}</span>
-        <span class="ld-loop-arrow">→</span>
-        <span class="ld-loop-step">③ ${tr('landing.loop3', 'The app goes live at its own address. Share the link.')}</span>
-      </div>
+      <!-- 1. The invitation, folded. Measured behaviour beat the theory here: with the generator
+              open on the page, two visitors produced a throwaway chat app and stopped. What holds
+              attention is the wall directly below — it shows the place is alive, which is what
+              makes someone want to add to it. So the builder is one line until it is wanted. -->
+      <${BuildInvite} />
 
-      <!-- 2. The generator itself. No account, no sign-in prompt, all the way to a copied prompt. -->
-      <${BuildAppPrompt} />
+      <!-- 2. The wall, immediately visible. The best thing on this page for showing activity. -->
+      <${Gallery} />
 
-      <!-- 3. Live counters sit WITH the generator: they are the evidence that the loop above is
-              not a diagram. "N agents, M online now" is the strongest single number on the page. -->
+      <!-- 3. Live counters close the activity block. "N agents, M online now" is the strongest
+              single number here. -->
       <${NodeTotals} />
 
-      <!-- 4. Why it matters: owner or tenant. Below the proof on purpose. -->
+      <!-- 4. Why it matters: owner or tenant. After the proof, not before it. -->
       <${BuildHero} onNavigate=${navigate} />
-
-      <!-- 5. The wall — the real apps people built with their AI and published here. -->
-      <${Gallery} />
 
       <!-- 6. Build an AGENT (local crewaimeat fleet on Ollama/Gemma) — the coder/tinkerer on-ramp. -->
       <${BuildAgentPrompt} />
