@@ -254,11 +254,11 @@ export const appMethods = {
 
   async getAppDownloadsForApps(this: PostgresKyselyStorage, refs: Array<{ ownerGaii: string; filename: string }>): Promise<Record<string, number>> {
     const out: Record<string, number> = {};
-    for (const r of refs) out[`${r.ownerGaii} ${r.filename}`] = 0;
+    for (const r of refs) out[`${r.ownerGaii} ${r.filename}`] = 0;
     if (refs.length === 0) return out;
     const rows = await this.db.selectFrom('AppDownload').select(['ownerGaii', 'filename', 'count'])
       .where(eb => eb.or(refs.map(r => eb.and([eb('ownerGaii', '=', r.ownerGaii), eb('filename', '=', r.filename)])))).execute();
-    for (const row of rows) out[`${row.ownerGaii} ${row.filename}`] = row.count ?? 0;
+    for (const row of rows) out[`${row.ownerGaii} ${row.filename}`] = row.count ?? 0;
     return out;
   },
 
