@@ -255,6 +255,11 @@ async function main() {
             // Wasm here is single-threaded: no COOP/COEP, so crossOriginIsolated stays false and
             // node libs without CORP keep loading.
             assert(!res.headers.get('cross-origin-embedder-policy'), 'COEP must stay off on app origins');
+            // Compiling is half of it: a wasm runtime fetches its own module from a blob: URL the
+            // app made (the ffmpeg.wasm toBlobURL idiom). Without blob: here a real encode dies at
+            // "Refused to connect", after the module has already been allowed to compile.
+            const connectSrc = (csp.match(/connect-src ([^;]*)/) ?? ['', ''])[1];
+            assert(connectSrc.includes('blob:'), `a wasm runtime cannot fetch its own module: connect-src ${connectSrc}`);
         });
 
         await test('publish 100 more apps for the SAME owner', async () => {

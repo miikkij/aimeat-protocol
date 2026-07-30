@@ -9,7 +9,12 @@
  *   (unknown pack id → 404 NOT_FOUND).
  * @usage registered in test/run-e2e-ci.ts; run via the e2e harness
  *   (cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=library-packs).
- * @version-history v1.0.0 — 2026-07-16 — initial (Library Acceleration Program, Phase 1).
+ * @version-history
+ *   v1.0.0 — 2026-07-16 — initial (Library Acceleration Program, Phase 1).
+ *   v1.1.0 — 2026-07-30 — ffmpeg-core: the loader, its classic-script twin and the fetched 32 MB
+ *     wasm are served with the right content-type and an immutable cache. The wasm is checked with
+ *     HEAD (no 32 MB transfer) and the failure message names `pnpm vendor:libs`, since a missing
+ *     vendored asset is the one way this pack breaks.
  */
 import { readFileSync } from 'node:fs';
 import { resolve, dirname } from 'node:path';
@@ -87,6 +92,30 @@ await test('GET /v1/library-packs/:id returns ai_doc + changelog (rendered)', as
   assert(Array.isArray(pack?.changelog) && pack.changelog.length > 0, 'changelog missing');
   assert(!pack.ai_doc.includes('{{BASE_URL}}'), 'ai_doc not rendered');
   assert(pack.changelog.every((c: any) => c.version && c.date && c.summary), 'changelog entry missing fields');
+});
+
+// The ffmpeg core is the one pack whose binary is NOT in git — it is fetched by
+// `pnpm vendor:libs` (public/lib/vendored-assets.json). A deploy that skips that step serves 404s
+// here, which is indistinguishable from "the app is broken" until someone reads a CSP-free console.
+// The include line carries no src="" attribute (it builds blob URLs at runtime), so the generic
+// include-URL sweep below cannot see these paths — they are asserted by hand, and the wasm with
+// HEAD so the suite does not pull 32 MB.
+await test('ffmpeg-core: loader is served as JavaScript, immutable', async () => {
+  const res = await fetch(`${BASE}/lib/ffmpeg-core@0.12.6/ffmpeg-core.js`);
+  assert(res.status === 200, `ffmpeg-core.js → ${res.status} (run: pnpm vendor:libs)`);
+  assert(/javascript/i.test(res.headers.get('content-type') ?? ''), `content-type ${res.headers.get('content-type')}`);
+  assert((res.headers.get('cache-control') ?? '').includes('immutable'), `a fully version-pinned path should be immutable, got ${res.headers.get('cache-control')}`);
+  const umd = await fetch(`${BASE}/lib/ffmpeg-core@0.12.6/ffmpeg-core.umd.js`, { method: 'HEAD' });
+  assert(umd.status === 200, `the classic-script twin is missing → ${umd.status}`);
+});
+
+await test('ffmpeg-core: the 32 MB wasm is served as application/wasm, immutable', async () => {
+  const res = await fetch(`${BASE}/lib/ffmpeg-core@0.12.6/ffmpeg-core.wasm`, { method: 'HEAD' });
+  assert(res.status === 200, `ffmpeg-core.wasm → ${res.status}. It is fetched, not committed: run pnpm vendor:libs`);
+  // A wrong type breaks WebAssembly.instantiateStreaming in some paths, and browsers do not guess.
+  assert(res.headers.get('content-type') === 'application/wasm', `content-type ${res.headers.get('content-type')}`);
+  assert(res.headers.get('content-length') === '32129114', `size ${res.headers.get('content-length')} — expected the pinned 32129114 bytes`);
+  assert((res.headers.get('cache-control') ?? '').includes('immutable'), `32 MB must not be refetched per visit, got ${res.headers.get('cache-control')}`);
 });
 
 await test('unknown pack id → 404 NOT_FOUND', async () => {

@@ -70,6 +70,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:no-max-tokens
 
+      - name: Vendored /lib assets present and hash-verified (fetched, not committed)
+        working-directory: aimeat
+        run: pnpm check:vendored
+
       - name: Library-pack doc-truth (assets exist + ai_doc claims executed)
         working-directory: aimeat
         run: pnpm check:packs-doc

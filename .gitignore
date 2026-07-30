@@ -180,3 +180,10 @@ scripts/.env
 # pre-commit hook + CI. Re-include them from the blanket `dist/` rule above.
 !aimeat/src/static/sdk-libs/dist/
 !aimeat/src/static/sdk-libs/dist/**
+
+# Vendored WebAssembly binaries are fetched, not committed: @ffmpeg/core alone is 32 MB and a
+# repo carries every version it ever held. `pnpm vendor:libs` (postinstall, dev and build all run
+# it) downloads them from the pinned URL in aimeat/public/lib/vendored-assets.json and verifies
+# the sha256; `pnpm check:vendored` says whether they are in place. Everything else under
+# public/lib/ IS committed, including the small .js loaders next to these.
+aimeat/public/lib/**/*.wasm

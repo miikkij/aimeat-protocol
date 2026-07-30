@@ -55,6 +55,29 @@ function resolveServerDir(): string {
 }
 
 /**
+ * Say so at boot when a vendored /lib/ asset the manifest promises is not on disk. These are the
+ * files too large for git (see public/lib/vendored-assets.json, `pnpm vendor:libs`), so a deploy
+ * that skipped the vendor step serves a 404 for them — and a 404 on a library path is exactly the
+ * failure that looks like an app bug for a day. Presence only: hashing 32 MB on every boot is not
+ * worth it, and `pnpm check:vendored` verifies content.
+ */
+function warnAboutMissingVendoredAssets(publicDir: string): void {
+  const manifestPath = join(publicDir, 'lib', 'vendored-assets.json');
+  if (!existsSync(manifestPath)) return;
+  let assets: Array<{ path: string }>;
+  try {
+    assets = (JSON.parse(readFileSync(manifestPath, 'utf-8')) as { assets?: Array<{ path: string }> }).assets ?? [];
+  } catch (err) {
+    console.warn(`[static] vendored-assets.json is unreadable: ${(err as Error).message}`);
+    return;
+  }
+  const missing = assets.filter(a => !existsSync(join(publicDir, a.path)));
+  if (missing.length === 0) return;
+  console.warn(`[static] ${missing.length} vendored /lib asset(s) missing — those paths will 404. Run: pnpm vendor:libs`);
+  for (const a of missing) console.warn(`[static]   /${a.path}`);
+}
+
+/**
  * Set up static file serving, CSP headers, locale files, and PWA assets.
  */
 /**
@@ -109,6 +132,7 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
 
   const publicDir = publicCandidates.find(p => existsSync(p));
   if (publicDir) {
+    warnAboutMissingVendoredAssets(publicDir);
     // Redirect legacy and template HTML URLs to canonical /v1/ routes.
     // The privacy and connect pages are TEMPLATES with {{placeholder}} tokens
     // substituted server-side at /v1/privacy and /v1/connect — direct
@@ -204,6 +228,14 @@ export function setupStaticFiles(app: express.Express, config: AimeatConfig): vo
       setHeaders: (res, filePath) => {
         if (/\.(js|css|html)$/.test(filePath)) {
           res.setHeader('Cache-Control', 'no-cache');
+        }
+        // A /lib/ asset whose directory pins a FULL version (ffmpeg-core@0.12.6/) can never change
+        // under that path — the vendoring policy ships even a patch bump as a new directory — so it
+        // is cacheable for a year. This is what makes a 32 MB wasm core usable: without it the
+        // browser refetches it on every visit. Deliberately not applied to major-only pins
+        // (pdfjs@6/, chartjs@4.js), where minor updates DO land in place and must revalidate.
+        if (/[/\\]lib[/\\][^/\\]+@\d+\.\d+\.\d+[/\\]/.test(filePath)) {
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
         }
         // Fonts are CORS-gated by the font-fetch spec even between our own subdomains: a published
         // app on <name>.apps.<domain> loads /lib/aimeat-theme.css (or /lib/fonts.css) from the apex,

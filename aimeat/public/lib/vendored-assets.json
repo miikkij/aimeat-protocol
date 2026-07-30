@@ -1,0 +1,15 @@
+{
+  "note": "Large vendored assets that are NOT stored in git. `pnpm vendor:libs` (also run by postinstall and by the build) downloads each one to public/<path> and verifies its sha256. Everything else under /lib/ is committed — see VENDORED.md for the vendoring and version-pin policy.",
+  "assets": [
+    {
+      "path": "lib/ffmpeg-core@0.12.6/ffmpeg-core.wasm",
+      "url": "https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/ffmpeg-core.wasm",
+      "sha256": "2390efa7fb66e7e42dbae15427571a5ffc96b829480904c30f471f0a78967f61",
+      "bytes": 32129114,
+      "package": "@ffmpeg/core@0.12.6",
+      "license": "GPL-2.0-or-later",
+      "licenseNote": "The COMPILED ffmpeg is GPL (--enable-gpl with libx264/libx265); npm's `license: MIT` field covers only the packaging. AIMEAT itself stays MIT: this binary is installed separately by this script, is not committed to the repository and is not part of any AIMEAT distribution. Source: https://github.com/ffmpegwasm/ffmpeg.wasm (build scripts) and https://ffmpeg.org (ffmpeg 5.1.4).",
+      "why": "32 MB. The dist/umd and dist/esm builds ship the SAME binary (verified byte-identical), so one copy serves both loaders. Too large to carry in git; the pinned URL plus the hash makes the fetch reproducible."
+    }
+  ]
+}

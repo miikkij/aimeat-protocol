@@ -25,10 +25,42 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 | `realtime.js` | AIMEAT-local (WS/WebRTC/Yjs client + `SharedClock` synced timeline) | 1 | `realtime` | this repo | MIT |
 | `toastui/toastui-editor-all.min.js` + `.min.css` | TOAST UI Editor | (SPA-internal) | — | `https://uicdn.toast.com` | MIT |
 | `pdfjs@6/pdf.min.mjs` + `pdf.worker.min.mjs` | `pdfjs-dist` (ESM + worker) | 6.1.200 | `pdfjs` | `https://cdn.jsdelivr.net/npm/pdfjs-dist@6.1.200/build/` | Apache-2.0 |
+| `ffmpeg-core@0.12.6/ffmpeg-core.js` + `.umd.js` + `ffmpeg-core.wasm` | `@ffmpeg/core` (ffmpeg 5.1.4, single-threaded) | 0.12.6 | `ffmpeg-core` | `https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm/` (UMD loader from `dist/umd/`) | GPL-2.0-or-later (the compiled ffmpeg: `--enable-gpl --enable-libx264 --enable-libx265`; the npm `license: MIT` covers only the packaging) |
 | `yaml.mjs` | `yaml` (ESM) | 2.x | `yaml` | jsdelivr | ISC |
 | `preact.mjs`, `preact-hooks.mjs`, `htm.mjs`, `minidenticons.min.js` | preact / htm / minidenticons (ESM) | (SPA-internal, importmap) | — | jsdelivr | MIT |
 | `live-updates.js` | AIMEAT-local (SSE ESM wrapper) | (SPA-internal) | — | this repo | MIT |
 | `samples/` | audio samples for aimeat-audio | — | — | CC | CC |
+
+## Assets that are fetched, not committed
+
+Anything listed in [`vendored-assets.json`](vendored-assets.json) is **not in git** — today that is
+the 32 MB `ffmpeg-core.wasm`. A repository carries every version of every binary it has ever held,
+and one 32 MB blob per ffmpeg bump is a permanent tax on every clone.
+
+```bash
+pnpm vendor:libs       # download what is missing, verify the pinned sha256 (idempotent)
+pnpm check:vendored    # "are they in place?" — non-zero exit and the missing paths if not
+```
+
+`postinstall`, `pnpm dev` and `pnpm build` all run the fetch, so a normal install or deploy has the
+files without anyone remembering. The server also names any missing asset at boot, because a 404 on
+a library path otherwise looks like an application bug for a day. Offline machine:
+`AIMEAT_SKIP_VENDOR=1` opts out, and the affected `/lib/` paths then 404.
+
+Fetched assets are **hash-pinned**, not just URL-pinned: if the registry ever serves different bytes
+the script refuses them rather than shipping something nobody reviewed. Add a new one by appending
+to `vendored-assets.json` (path, url, sha256, bytes) and to the table above.
+
+This is also how a GPL binary sits next to an MIT codebase without a licence question: the ffmpeg
+core is **installed separately** by the fetch step and is in neither the repository nor any AIMEAT
+distribution. AIMEAT stays MIT; the node serves an unmodified upstream build whose source is at
+[ffmpegwasm/ffmpeg.wasm](https://github.com/ffmpegwasm/ffmpeg.wasm) (build scripts) and
+[ffmpeg.org](https://ffmpeg.org) (ffmpeg 5.1.4). Owner-approved 2026-07-31, same route as the
+LGPL p5 pack.
+
+Directories that pin a **full** version (`ffmpeg-core@0.12.6/`) are served `immutable` for a year —
+that path can never change, since even a patch bump ships as a new directory. Major-only pins
+(`pdfjs@6/`, `chartjs@4.js`) keep revalidating, because minor updates land in them in place.
 
 ## Version policy — the major-pinned filename IS the compatibility contract
 

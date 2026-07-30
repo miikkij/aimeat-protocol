@@ -16,9 +16,12 @@
     "docs/csm-examples/"
   ],
   "scripts": {
-    "dev": "tsx scripts/kill-port.ts && tsx scripts/build-app-catalog.ts && tsx scripts/build-sdk-libs.ts && node --env-file=.env --import tsx src/index.ts start",
+    "postinstall": "node scripts/vendor-libs.mjs",
+    "vendor:libs": "node scripts/vendor-libs.mjs",
+    "check:vendored": "node scripts/vendor-libs.mjs --check",
+    "dev": "node scripts/vendor-libs.mjs && tsx scripts/kill-port.ts && tsx scripts/build-app-catalog.ts && tsx scripts/build-sdk-libs.ts && node --env-file=.env --import tsx src/index.ts start",
     "dev:watch": "tsx watch src/index.ts",
-    "build": "tsc && node --input-type=module -e \"import fs from 'fs';fs.cpSync('locales','dist/locales',{recursive:true});fs.cpSync('public','dist/public',{recursive:true});fs.cpSync('src/static','dist/static',{recursive:true});fs.cpSync('.env.example','dist/.env.example');fs.cpSync('src/storage/providers/postgres-kysely/migrations','dist/src/storage/providers/postgres-kysely/migrations',{recursive:true});\"",
+    "build": "node scripts/vendor-libs.mjs && tsc && node --input-type=module -e \"import fs from 'fs';fs.cpSync('locales','dist/locales',{recursive:true});fs.cpSync('public','dist/public',{recursive:true});fs.cpSync('src/static','dist/static',{recursive:true});fs.cpSync('.env.example','dist/.env.example');fs.cpSync('src/storage/providers/postgres-kysely/migrations','dist/src/storage/providers/postgres-kysely/migrations',{recursive:true});\"",
     "build:app-catalog": "tsx scripts/build-app-catalog.ts",
     "check:app-catalog": "tsx scripts/build-app-catalog.ts --check",
     "build:sdk": "tsx scripts/build-sdk-libs.ts",

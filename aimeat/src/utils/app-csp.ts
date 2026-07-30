@@ -39,6 +39,13 @@
  *
  * font-src carries 'self' so an app can @font-face from its own origin's public storage
  * (/v1/pub/...) — `https:` covers prod app origins but not http://*.apps.localhost in dev.
+ *
+ * connect-src carries `blob:` because a wasm runtime fetches its own module: the ffmpeg.wasm idiom
+ * is toBlobURL(coreURL) + toBlobURL(wasmURL), and the emscripten glue then fetch()es that blob. A
+ * blob: URL is an object the page itself created and already holds — allowing it grants no
+ * destination the app did not have, next to a connect-src that already permits all of https:.
+ * Measured, not assumed: with wasm compilation allowed and this missing, a real encode still died
+ * on "Refused to connect ... blob:".
  */
 export function appCsp(apexOrigin = '', grantedOrigin = ''): string {
   const apexAllow = apexOrigin ? ' ' + apexOrigin : '';
@@ -48,7 +55,7 @@ export function appCsp(apexOrigin = '', grantedOrigin = ''): string {
     + "style-src 'self' 'unsafe-inline' https: http://localhost:*; "
     + 'img-src * data: blob:; '
     + "font-src 'self' data: https:; "
-    + `connect-src 'self' https: http://localhost:* wss: ws: data:${apexAllow}; `
+    + `connect-src 'self' https: http://localhost:* wss: ws: data: blob:${apexAllow}; `
     + 'worker-src blob:; '
     + "object-src 'none'; "
     + `frame-src 'self' blob: data: https: http://localhost:*${apexAllow}; `
