@@ -199,6 +199,7 @@
       colGrants: "Free access",
       remove: "Remove",
       decline: "Decline",
+      dismiss: "Seen it",
       carried: "{n} / {of} carried",
       carriedNone: "none carried",
       usage: "{n} calls, {cost} carried",
@@ -246,6 +247,7 @@
       colGrants: "Maksuton käyttö",
       remove: "Poista",
       decline: "Hylkää",
+      dismiss: "Kuitattu",
       carried: "{n} / {of} katettu",
       carriedNone: "ei katettuja",
       usage: "{n} kutsua, {cost} katettu",
@@ -435,30 +437,54 @@
       const payingIds = new Set(paying.map((p) => String(p.id).toLowerCase().split("@")[0]));
       const pending = collectPending(state2).filter((p) => !payingIds.has(String(p.id).toLowerCase().split("@")[0]));
       const isPassive = !state2 || !state2.requests;
-      const qBody = [el("h3", { cls: cls("aim-iam-h"), text: isPassive ? S("seenTitle") : S("pendingTitle") })];
-      if (!pending.length) {
-        qBody.push(el("p", { cls: cls("aim-iam-empty"), text: isPassive ? S("seenNone") : S("pendingNone") }));
+      const approveRole = roles[roles.length - 1] || void 0;
+      if (!isPassive) {
+        const qBody = [el("h3", { cls: cls("aim-iam-h"), text: S("pendingTitle") })];
+        if (!pending.length) qBody.push(el("p", { cls: cls("aim-iam-empty"), text: S("pendingNone") }));
+        for (const p of pending) {
+          qBody.push(el("div", { cls: cls("aim-iam-row") }, [
+            el("span", { cls: cls("aim-iam-id"), text: p.id }),
+            el("button", {
+              cls: cls("aim-iam-btn"),
+              text: S("approveBtn"),
+              attrs: { type: "button" },
+              on: { click: () => act(() => iam2.admin("assign", { ghii: p.id, owner: p.id, role: approveRole, note: p.note })) }
+            }),
+            el("button", {
+              cls: cls("aim-iam-btn"),
+              text: S("decline"),
+              attrs: { type: "button" },
+              on: { click: () => act(() => iam2.admin("decline", { owner: p.id, ghii: p.id })) }
+            }),
+            p.note ? el("span", { cls: cls("aim-iam-note"), text: p.note }) : null
+          ]));
+        }
+        wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, qBody));
       }
-      for (const p of pending) {
-        qBody.push(el("div", { cls: cls("aim-iam-row") }, [
-          el("span", { cls: cls("aim-iam-id"), text: p.id }),
-          p.visits ? el("span", { cls: cls("aim-iam-muted"), text: S("visits", { n: p.visits, d: fmtDate(p.lastSeen) }) }) : null,
+      const guests = collectSeen(state2).filter((g) => !payingIds.has(String(g.id).toLowerCase().split("@")[0]));
+      const gBody = [el("h3", { cls: cls("aim-iam-h"), text: S("seenTitle") })];
+      if (!guests.length) gBody.push(el("p", { cls: cls("aim-iam-empty"), text: S("seenNone") }));
+      for (const g of guests) {
+        gBody.push(el("div", { cls: cls("aim-iam-row") }, [
+          el("span", { cls: cls("aim-iam-id"), text: g.id }),
+          g.visits ? el("span", { cls: cls("aim-iam-muted"), text: S("visits", { n: g.visits, d: fmtDate(g.lastSeen) }) }) : null,
           el("button", {
             cls: cls("aim-iam-btn"),
             text: S("approveBtn"),
             attrs: { type: "button" },
-            on: { click: () => act(() => iam2.admin("assign", { ghii: p.id, owner: p.id, role: roles[roles.length - 1] || void 0, note: p.note })) }
+            on: { click: () => act(() => iam2.admin("assign", { ghii: g.id, owner: g.id, role: approveRole })) }
           }),
-          isPassive ? null : el("button", {
+          // Dismissing is not a block and does not refuse anybody: it says "I have looked at this one",
+          // and they are recorded again the next time they come.
+          el("button", {
             cls: cls("aim-iam-btn"),
-            text: S("decline"),
+            text: S("dismiss"),
             attrs: { type: "button" },
-            on: { click: () => act(() => iam2.admin("decline", { owner: p.id, ghii: p.id })) }
-          }),
-          p.note ? el("span", { cls: cls("aim-iam-note"), text: p.note }) : null
+            on: { click: () => act(() => iam2.dismissGuest(g.id)) }
+          })
         ]));
       }
-      wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, qBody));
+      wrap.appendChild(el("section", { cls: cls("aim-iam-sec") }, gBody));
       const mBody = [el("h3", { cls: cls("aim-iam-h"), text: S("membersTitle") + ": " + roster.members.length })];
       if (!roster.members.length) mBody.push(el("p", { cls: cls("aim-iam-empty"), text: S("membersNone") }));
       for (const m of roster.members) {
@@ -532,11 +558,11 @@
     } };
   }
   function collectPending(state2) {
-    if (!state2) return [];
-    if (Array.isArray(state2.requests)) {
-      return state2.requests.map((r) => ({ id: r.owner || r.gaii || r.id, note: r.note, lastSeen: r.at }));
-    }
-    const seen = state2.seen || {};
+    if (!state2 || !Array.isArray(state2.requests)) return [];
+    return state2.requests.map((r) => ({ id: r.owner || r.gaii || r.id, note: r.note, lastSeen: r.at }));
+  }
+  function collectSeen(state2) {
+    const seen = state2 && state2.seen || {};
     return Object.keys(seen).map((id) => ({ id, visits: seen[id].visits, lastSeen: seen[id].lastSeen }));
   }
   function mountJoinPanel(iam2, opts) {
@@ -641,6 +667,9 @@
       body: JSON.stringify(note ? { note } : {})
     }));
     return { recorded: r && r.recorded !== false, passive: false, alreadyMember: !!(r && r.alreadyMember) };
+  }
+  function nodeDismissGuest(call, appId, who) {
+    return un(call(base(appId) + "/seen/" + encodeURIComponent(String(who)), { method: "DELETE" }));
   }
 
   // src/static/sdk-libs/iam/index.js
@@ -943,6 +972,24 @@
     async adminFetch(path) {
       const body = await authFetch2(path);
       return body && body.data !== void 0 ? body.data : body;
+    },
+    /**
+     * Take somebody off the list of people who turned up. Owner only, and only where the node keeps
+     * the roster — a gate that records visits in its own memory has no such list to clear.
+     * @param {string} who
+     * @returns {Promise<any>}
+     */
+    dismissGuest(who) {
+      requireInit();
+      if (!state.app) {
+        return Promise.resolve({ ok: false, error: "the guest list belongs to the node roster; init with { app }" });
+      }
+      return nodeDismissGuest(
+        authFetch2,
+        /** @type {string} */
+        state.app,
+        who
+      );
     },
     /**
      * The owner's panel: the union of the six that already exist on this node. See panel.js for what

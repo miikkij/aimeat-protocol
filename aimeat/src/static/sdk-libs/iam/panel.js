@@ -196,23 +196,45 @@ export function mountMemberAdmin(iam, opts) {
     // ── who is waiting: real requests where the shape has them, the visitor log where it does not ──
     const payingIds = new Set(paying.map((p) => String(p.id).toLowerCase().split('@')[0]));
     const pending = collectPending(state).filter((p) => !payingIds.has(String(p.id).toLowerCase().split('@')[0]));
+    // A gate with no request action cannot have a queue; there, turning up IS the application, and
+    // the guests below are the only list. Everywhere else the two are shown apart.
     const isPassive = !state || !state.requests;
-    const qBody = [el('h3', { cls: cls('aim-iam-h'), text: isPassive ? S('seenTitle') : S('pendingTitle') })];
-    if (!pending.length) {
-      qBody.push(el('p', { cls: cls('aim-iam-empty'), text: isPassive ? S('seenNone') : S('pendingNone') }));
+    const approveRole = roles[roles.length - 1] || undefined;
+    if (!isPassive) {
+      const qBody = [el('h3', { cls: cls('aim-iam-h'), text: S('pendingTitle') })];
+      if (!pending.length) qBody.push(el('p', { cls: cls('aim-iam-empty'), text: S('pendingNone') }));
+      for (const p of pending) {
+        qBody.push(el('div', { cls: cls('aim-iam-row') }, [
+          el('span', { cls: cls('aim-iam-id'), text: p.id }),
+          el('button', { cls: cls('aim-iam-btn'), text: S('approveBtn'), attrs: { type: 'button' },
+            on: { click: () => act(() => iam.admin('assign', { ghii: p.id, owner: p.id, role: approveRole, note: p.note })) } }),
+          el('button', { cls: cls('aim-iam-btn'), text: S('decline'), attrs: { type: 'button' },
+            on: { click: () => act(() => iam.admin('decline', { owner: p.id, ghii: p.id })) } }),
+          p.note ? el('span', { cls: cls('aim-iam-note'), text: p.note }) : null,
+        ]));
+      }
+      wrap.appendChild(el('section', { cls: cls('aim-iam-sec') }, qBody));
     }
-    for (const p of pending) {
-      qBody.push(el('div', { cls: cls('aim-iam-row') }, [
-        el('span', { cls: cls('aim-iam-id'), text: p.id }),
-        p.visits ? el('span', { cls: cls('aim-iam-muted'), text: S('visits', { n: p.visits, d: fmtDate(p.lastSeen) }) }) : null,
+
+    // ── who merely turned up ──
+    // On an app nobody has joined yet this is the only group with anything in it: the roster says who
+    // the owner already said yes to, and this says who is there to say yes TO.
+    const guests = collectSeen(state).filter((g) => !payingIds.has(String(g.id).toLowerCase().split('@')[0]));
+    const gBody = [el('h3', { cls: cls('aim-iam-h'), text: S('seenTitle') })];
+    if (!guests.length) gBody.push(el('p', { cls: cls('aim-iam-empty'), text: S('seenNone') }));
+    for (const g of guests) {
+      gBody.push(el('div', { cls: cls('aim-iam-row') }, [
+        el('span', { cls: cls('aim-iam-id'), text: g.id }),
+        g.visits ? el('span', { cls: cls('aim-iam-muted'), text: S('visits', { n: g.visits, d: fmtDate(g.lastSeen) }) }) : null,
         el('button', { cls: cls('aim-iam-btn'), text: S('approveBtn'), attrs: { type: 'button' },
-          on: { click: () => act(() => iam.admin('assign', { ghii: p.id, owner: p.id, role: roles[roles.length - 1] || undefined, note: p.note })) } }),
-        isPassive ? null : el('button', { cls: cls('aim-iam-btn'), text: S('decline'), attrs: { type: 'button' },
-          on: { click: () => act(() => iam.admin('decline', { owner: p.id, ghii: p.id })) } }),
-        p.note ? el('span', { cls: cls('aim-iam-note'), text: p.note }) : null,
+          on: { click: () => act(() => iam.admin('assign', { ghii: g.id, owner: g.id, role: approveRole })) } }),
+        // Dismissing is not a block and does not refuse anybody: it says "I have looked at this one",
+        // and they are recorded again the next time they come.
+        el('button', { cls: cls('aim-iam-btn'), text: S('dismiss'), attrs: { type: 'button' },
+          on: { click: () => act(() => iam.dismissGuest(g.id)) } }),
       ]));
     }
-    wrap.appendChild(el('section', { cls: cls('aim-iam-sec') }, qBody));
+    wrap.appendChild(el('section', { cls: cls('aim-iam-sec') }, gBody));
 
     // ── the roster ──
     const mBody = [el('h3', { cls: cls('aim-iam-h'), text: S('membersTitle') + ': ' + roster.members.length })];
@@ -274,11 +296,22 @@ export function mountMemberAdmin(iam, opts) {
  * @returns {Array<{ id: string, note?: string, visits?: number, lastSeen?: string }>}
  */
 function collectPending(state) {
-  if (!state) return [];
-  if (Array.isArray(state.requests)) {
-    return state.requests.map((r) => ({ id: r.owner || r.gaii || r.id, note: r.note, lastSeen: r.at }));
-  }
-  const seen = state.seen || {};
+  if (!state || !Array.isArray(state.requests)) return [];
+  return state.requests.map((r) => ({ id: r.owner || r.gaii || r.id, note: r.note, lastSeen: r.at }));
+}
+
+/**
+ * Everybody who turned up and holds no role.
+ *
+ * Separate from the queue because asking and merely arriving are different states, and an app can
+ * have people in both at once. Reading them as one list meant a node-roster app showed its pending
+ * requests and silently dropped every visitor — which, on an app nobody has joined yet, is the only
+ * group there was anything to see.
+ * @param {any} state
+ * @returns {Array<{ id: string, visits?: number, lastSeen?: string }>}
+ */
+function collectSeen(state) {
+  const seen = (state && state.seen) || {};
   return Object.keys(seen).map((id) => ({ id, visits: seen[id].visits, lastSeen: seen[id].lastSeen }));
 }
 

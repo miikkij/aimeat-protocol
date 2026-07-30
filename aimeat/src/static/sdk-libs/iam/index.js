@@ -27,7 +27,7 @@ import { attach } from '../_core/namespace.js';
 import { detectDialect, callCheck, callAdmin, callRequest, callVocabulary } from './dialect.js';
 import { makeGate } from './gate.js';
 import { mountMemberAdmin, mountJoinPanel } from './panel.js';
-import { nodeMe, nodeState, nodeAssign, nodeRevoke, nodeDecline, nodeRequest } from './node-roster.js';
+import { nodeMe, nodeState, nodeAssign, nodeRevoke, nodeDecline, nodeRequest, nodeDismissGuest } from './node-roster.js';
 
 const { authFetch } = makeSession('aimeat-iam.js');
 
@@ -338,6 +338,20 @@ const iam = {
   async adminFetch(path) {
     const body = await authFetch(path);
     return body && body.data !== undefined ? body.data : body;
+  },
+
+  /**
+   * Take somebody off the list of people who turned up. Owner only, and only where the node keeps
+   * the roster — a gate that records visits in its own memory has no such list to clear.
+   * @param {string} who
+   * @returns {Promise<any>}
+   */
+  dismissGuest(who) {
+    requireInit();
+    if (!state.app) {
+      return Promise.resolve({ ok: false, error: 'the guest list belongs to the node roster; init with { app }' });
+    }
+    return nodeDismissGuest(authFetch, /** @type {string} */ (state.app), who);
   },
 
   /**

@@ -117,3 +117,17 @@ export async function nodeRequest(call, appId, note) {
   }));
   return { recorded: r && r.recorded !== false, passive: false, alreadyMember: !!(r && r.alreadyMember) };
 }
+
+/**
+ * Take somebody off the list of people who turned up.
+ *
+ * Not a block and not a refusal: it says the owner has looked at this one. They are recorded again
+ * on their next visit, because the list answers who is here rather than who is unread.
+ * @param {(path: string, opts?: RequestInit) => Promise<any>} call
+ * @param {string} appId
+ * @param {string} who
+ * @returns {Promise<any>}
+ */
+export function nodeDismissGuest(call, appId, who) {
+  return un(call(base(appId) + '/seen/' + encodeURIComponent(String(who)), { method: 'DELETE' }));
+}
