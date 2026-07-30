@@ -32,10 +32,11 @@ import { resolveIdentity } from '../utils/gaii.js';
 import {
   listMembers, getMember, putMember, removeMember,
   listRequests, putRequest, removeRequest, accountOf,
-  getCarryPlan, putCarryPlan,
+  getCarryPlan, putCarryPlan, seatsTaken,
 } from '../services/app-members.js';
 import { notify } from '../services/notify.js';
 import { syncGrantsForMember } from '../services/grant-sync.js';
+import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
 import { logger } from '../utils/logger.js';
 
 const FILENAME_RE = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
@@ -126,7 +127,10 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner sets its carry plan'));
-    const b = (req.body ?? {}) as { roles?: Record<string, unknown>; rosterVisibility?: string };
+    const b = (req.body ?? {}) as {
+      roles?: Record<string, unknown>; rosterVisibility?: string;
+      seats?: Record<string, unknown>; terms?: Record<string, unknown>;
+    };
     if (b.rosterVisibility !== undefined && b.rosterVisibility !== 'owner' && b.rosterVisibility !== 'members') {
       return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
         'rosterVisibility must be "owner" (default) or "members".'));
@@ -143,8 +147,36 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
       }
       roles[role] = ids.filter((x): x is string => typeof x === 'string');
     }
+    const seats: Record<string, number> = {};
+    for (const [role, v] of Object.entries(b.seats || {})) {
+      if (typeof v !== 'number' || !Number.isFinite(v) || v < 0) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          `seats.${role} must be a non-negative number of seats.`));
+      }
+      seats[role] = v;
+    }
+    const terms: Record<string, { days?: number; renewal?: 'manual' | 'self-serve' | 'none' }> = {};
+    for (const [role, v] of Object.entries(b.terms || {})) {
+      const t = v as { days?: unknown; renewal?: unknown };
+      if (!t || typeof t !== 'object') {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          `terms.${role} must be an object: { days, renewal }.`));
+      }
+      if (t.days !== undefined && (typeof t.days !== 'number' || t.days <= 0)) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          `terms.${role}.days must be a positive number of days, or absent for a membership that does not lapse.`));
+      }
+      if (t.renewal !== undefined && !['manual', 'self-serve', 'none'].includes(String(t.renewal))) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          `terms.${role}.renewal must be "manual", "self-serve" or "none". Nothing here charges anybody; it says what is MEANT to happen when the term ends.`));
+      }
+      terms[role] = {
+        ...(t.days !== undefined ? { days: t.days as number } : {}),
+        ...(t.renewal !== undefined ? { renewal: t.renewal as 'manual' | 'self-serve' | 'none' } : {}),
+      };
+    }
     const plan = await putCarryPlan(storage, {
-      appId: c.appId, roles, setBy: c.callerAccount,
+      appId: c.appId, roles, seats, terms, setBy: c.callerAccount,
       rosterVisibility: b.rosterVisibility === 'members' ? 'members' : 'owner',
     });
     return res.json(success(config.nodeId, {
@@ -152,6 +184,22 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
       // Existing members are NOT re-synced here. Changing the plan under people who were approved on
       // the old one would move their access without anybody deciding to; re-approving them applies it.
       note: 'Applies to approvals from now on. Members approved before this keep what they were given until they are approved again.',
+    }));
+  });
+
+  // ── POST .../members/sweep — close every lapsed membership NOW. Owner only. ──
+  // The timer runs hourly, which bounds how long somebody the owner stopped selling to can keep
+  // calling on the owner's money. An owner who has just ended a term should not have to wait for it.
+  router.post('/v1/apps/:owner/:filename/members/sweep', requireAuth(), async (req, res) => {
+    const c = await context(req);
+    if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
+    if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner sweeps its roster'));
+    const result = await sweepLapsedMemberships(storage, config, c.appId);
+    return res.json(success(config.nodeId, {
+      ...result,
+      meaning: result.swept
+        ? `${result.swept} lapsed membership(s) closed and ${result.revoked} grant(s) withdrawn.`
+        : 'Nothing had lapsed. Access already stops on the clock; this only takes the free access back.',
     }));
   });
 
@@ -171,11 +219,40 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
         'The owner already reaches everything; a row for them would only be one more thing to keep in step.'));
     }
     const before = await getMember(storage, c.appId, account);
+    const planEarly = await getCarryPlan(storage, c.appId);
+
+    // A seat count is a product decision with teeth. Refusing past the last seat, and saying how
+    // many are taken, is the difference between a limit and a number in a settings screen.
+    // Somebody already holding the role is not taking a new seat: this must not block a renewal.
+    const cap = planEarly?.seats?.[role];
+    if (typeof cap === 'number' && (!before || before.role !== role)) {
+      const taken = await seatsTaken(storage, c.appId, role);
+      if (taken >= cap) {
+        return res.status(409).json(error(config.nodeId, 'SEATS_FULL',
+          `All ${cap} "${role}" seats are taken (${taken} in use). Remove somebody, raise the seat count, `
+          + 'or approve them into a different role.'));
+      }
+    }
+
+    // How long the term runs. An explicit date wins; otherwise the role's declared length applies,
+    // counted from NOW, so re-approving somebody is a renewal rather than an extension of a date
+    // that may already be in the past.
+    const term = planEarly?.terms?.[role];
+    let expiresAt: string | null | undefined;
+    if (b.expiresAt !== undefined) {
+      expiresAt = b.expiresAt === null ? null : String(b.expiresAt);
+    } else if (typeof b.days === 'number' && b.days > 0) {
+      expiresAt = new Date(Date.now() + Math.floor(b.days) * 86400_000).toISOString();
+    } else if (term?.days) {
+      expiresAt = new Date(Date.now() + term.days * 86400_000).toISOString();
+    } else if (!before) {
+      expiresAt = null;
+    }
     // What this role is carried on. An explicit list wins, because a caller who names one means it;
     // otherwise the app's declared plan applies. Without the plan an approval from the panel set a
     // role and carried nothing, so the member was billed at list price on every call while the panel
     // showed them approved — the panel's word and the invoice disagreeing is the worst of the three.
-    const plan = await getCarryPlan(storage, c.appId);
+    const plan = planEarly;
     const carried = Array.isArray(b.offerings)
       ? b.offerings.filter(x => typeof x === 'string') as string[]
       : (plan?.roles[role] ?? (before ? undefined : []));
@@ -185,6 +262,8 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
       note: typeof b.note === 'string' ? b.note : undefined,
       approvedBy: c.callerAccount,
       offerings: carried,
+      ...(expiresAt !== undefined ? { expiresAt } : {}),
+      ...(term?.renewal ? { renewal: term.renewal } : {}),
     });
     await removeRequest(storage, c.appId, account);
 

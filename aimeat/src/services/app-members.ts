@@ -43,6 +43,22 @@ export interface AppMemberRecord {
   approvedBy: string;
   /** Offering ids the approval carries, so a demotion knows what to take back. */
   offerings: string[];
+  /**
+   * When this membership lapses, or null for one that does not. An expired row stops counting the
+   * moment it lapses — resolution checks the clock rather than waiting for a sweep — because a
+   * membership that outlives its term by however long the sweep interval is, is a membership the
+   * owner did not sell.
+   */
+  expiresAt: string | null;
+  /** How the term is meant to continue. Descriptive: nothing here charges anybody. */
+  renewal: 'manual' | 'self-serve' | 'none' | null;
+}
+
+/** A row is live if it has no term, or its term has not run out yet. */
+export function isLive(rec: AppMemberRecord | null, now: Date = new Date()): boolean {
+  if (!rec) return false;
+  if (!rec.expiresAt) return true;
+  return new Date(rec.expiresAt).getTime() > now.getTime();
 }
 
 /** Somebody asking to be let in. */
@@ -85,16 +101,29 @@ export async function listMembers(storage: Storage, appId: string): Promise<AppM
 export async function getMember(storage: Storage, appId: string, principal: string): Promise<AppMemberRecord | null> {
   const rec = await storage.getMemory(NS_MEMBER, memberKey(appId, principal));
   const v = rec?.value as AppMemberRecord | undefined;
+  if (!v || v.appId !== appId) return null;
+  // The clock decides, not the sweep. A lapsed member stops reaching the app at the moment their
+  // term runs out; the sweep exists to take the GRANTS back, which is the part money depends on.
+  return isLive(v) ? v : null;
+}
+
+/** The raw row including a lapsed one, for the owner's panel and the sweep. */
+export async function getMemberRow(storage: Storage, appId: string, principal: string): Promise<AppMemberRecord | null> {
+  const rec = await storage.getMemory(NS_MEMBER, memberKey(appId, principal));
+  const v = rec?.value as AppMemberRecord | undefined;
   return v && v.appId === appId ? v : null;
 }
 
 /** Approve someone, or change what their role is. Idempotent: `since` survives a role change. */
 export async function putMember(
   storage: Storage,
-  input: { appId: string; account: string; role: string; level?: number | null; note?: string; approvedBy: string; offerings?: string[] },
+  input: { appId: string; account: string; role: string; level?: number | null; note?: string;
+    approvedBy: string; offerings?: string[]; expiresAt?: string | null; renewal?: AppMemberRecord['renewal'] },
 ): Promise<AppMemberRecord> {
   const account = accountOf(input.account);
-  const prev = await getMember(storage, input.appId, account);
+  // The RAW row, so re-approving somebody whose term lapsed renews them rather than treating them
+  // as brand new and losing when they first joined.
+  const prev = await getMemberRow(storage, input.appId, account);
   const now = new Date().toISOString();
   const rec: AppMemberRecord = {
     appId: input.appId,
@@ -106,6 +135,8 @@ export async function putMember(
     note: input.note ?? prev?.note ?? '',
     approvedBy: input.approvedBy,
     offerings: input.offerings ?? prev?.offerings ?? [],
+    expiresAt: input.expiresAt !== undefined ? input.expiresAt : (prev?.expiresAt ?? null),
+    renewal: input.renewal !== undefined ? input.renewal : (prev?.renewal ?? null),
   };
   await write(storage, NS_MEMBER, memberKey(input.appId, account), rec, prev ? undefined : now);
   return rec;
@@ -134,8 +165,38 @@ export interface AppCarryPlan {
    * they asked, who approved them and what they are carried on stay the owner's.
    */
   rosterVisibility: 'owner' | 'members';
+  /**
+   * How many members a role may hold at once. A role that is absent is uncapped. A seat count is a
+   * product decision with teeth: an approval past the last seat is REFUSED and says how many are
+   * taken, rather than quietly making the eleventh member of a ten-seat plan.
+   */
+  seats: Record<string, number>;
+  /**
+   * How long a role lasts, in days, and how it is meant to continue. `days` absent means the
+   * membership does not lapse. `renewal` is descriptive: `manual` means the owner re-approves,
+   * `self-serve` means the member is expected to buy another term, `none` means it simply ends.
+   *
+   * NOTHING here charges anybody. A monthly subscription is expressed as `{ days: 30, renewal:
+   * 'self-serve' }` plus whatever the app already uses to take money; the node enforces the TERM,
+   * not the payment, and saying otherwise would be a promise it cannot keep.
+   */
+  terms: Record<string, { days?: number; renewal?: 'manual' | 'self-serve' | 'none' }>;
   updatedAt: string;
   setBy: string;
+}
+
+/** Everyone on one app's roster whose term has run out. The sweep's input. */
+export async function listLapsed(storage: Storage, now: Date = new Date()): Promise<AppMemberRecord[]> {
+  const { items } = await storage.listAllMemory({ prefix: 'appmember.', limit: 5000 });
+  return items
+    .map(r => r.value as AppMemberRecord)
+    .filter(v => v && v.expiresAt && !isLive(v, now));
+}
+
+/** How many members currently hold a role, counting only live ones. */
+export async function seatsTaken(storage: Storage, appId: string, role: string): Promise<number> {
+  const rows = await listMembers(storage, appId);
+  return rows.filter(m => m.role === role && isLive(m)).length;
 }
 
 export const planKey = (appId: string) => `appmemplan.${slugOf(appId)}`;
@@ -150,15 +211,27 @@ export async function getCarryPlan(storage: Storage, appId: string): Promise<App
 /** Declare (or replace) it. Roles are taken as given: the node has no opinion about their names. */
 export async function putCarryPlan(
   storage: Storage,
-  input: { appId: string; roles: Record<string, string[]>; rosterVisibility?: 'owner' | 'members'; setBy: string },
+  input: { appId: string; roles: Record<string, string[]>; rosterVisibility?: 'owner' | 'members';
+    seats?: Record<string, number>; terms?: AppCarryPlan['terms']; setBy: string },
 ): Promise<AppCarryPlan> {
   const roles: Record<string, string[]> = {};
   for (const [role, ids] of Object.entries(input.roles || {})) {
     if (!Array.isArray(ids)) continue;
     roles[String(role)] = [...new Set(ids.filter(x => typeof x === 'string' && x))];
   }
+  const seats: Record<string, number> = {};
+  for (const [role, n] of Object.entries(input.seats || {})) {
+    if (typeof n === 'number' && Number.isFinite(n) && n >= 0) seats[String(role)] = Math.floor(n);
+  }
+  const terms: AppCarryPlan['terms'] = {};
+  for (const [role, t] of Object.entries(input.terms || {})) {
+    if (!t || typeof t !== 'object') continue;
+    const days = typeof t.days === 'number' && t.days > 0 ? Math.floor(t.days) : undefined;
+    const renewal = t.renewal === 'manual' || t.renewal === 'self-serve' || t.renewal === 'none' ? t.renewal : undefined;
+    if (days !== undefined || renewal !== undefined) terms[String(role)] = { ...(days !== undefined ? { days } : {}), ...(renewal ? { renewal } : {}) };
+  }
   const rec: AppCarryPlan = {
-    appId: input.appId, roles,
+    appId: input.appId, roles, seats, terms,
     rosterVisibility: input.rosterVisibility === 'members' ? 'members' : 'owner',
     updatedAt: new Date().toISOString(), setBy: input.setBy,
   };
@@ -168,7 +241,10 @@ export async function putCarryPlan(
 
 /** Remove a member. Returns whether there was one. */
 export async function removeMember(storage: Storage, appId: string, principal: string): Promise<AppMemberRecord | null> {
-  const prev = await getMember(storage, appId, principal);
+  // The RAW row: a lapsed membership is exactly the one the sweep needs to remove, and reading it
+  // through getMember — which hides lapsed rows — left the sweep revoking the grants and then
+  // finding nothing to delete, so the dead row stayed on the roster and kept holding a seat.
+  const prev = await getMemberRow(storage, appId, principal);
   if (!prev) return null;
   await storage.deleteMemory(NS_MEMBER, memberKey(appId, principal));
   return prev;

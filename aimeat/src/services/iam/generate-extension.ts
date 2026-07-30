@@ -56,14 +56,39 @@ function slug(appId: string): string {
 }
 
 /**
+ * Capabilities ACCUMULATE down the ladder: a role holds its own plus everything every weaker role
+ * holds. Levels are BBS ordinals — lower is more power — so "weaker" means a higher number.
+ *
+ * This is not a convenience. NUOTTA declared guest:['guides'] and member:[...everything else], and a
+ * literal reading gave the paying member no access to the introduction and the scoring maths that a
+ * passer-by could read. Nobody decided that; it fell out of listing each tier separately, which is
+ * how anyone would write it. A tier that is above another and holds less is a bug every time, so the
+ * generator resolves it once here rather than asking each app to remember.
+ */
+function accumulate(levels: LevelDef[]): Record<string, string[]> {
+  const out: Record<string, string[]> = {};
+  for (const role of levels) {
+    if (role.capabilities.includes('*')) { out[role.key] = ['*']; continue; }
+    const acc = new Set(role.capabilities);
+    for (const weaker of levels) {
+      if (weaker.level > role.level) for (const c of weaker.capabilities) if (c !== '*') acc.add(c);
+    }
+    out[role.key] = [...acc];
+  }
+  return out;
+}
+
+/**
  * The gate script. Baked constants rather than memory reads, because the vocabulary IS the spec and
  * a spec that can be edited in two places is a spec that disagrees with itself.
  */
 function checkScript(levels: LevelDef[], commands: CommandDef[], defaultRole?: string): string {
-  const roleCaps: Record<string, string[]> = {};
+  const roleCaps = accumulate(levels);
   const roleLevel: Record<string, number> = {};
-  for (const l of levels) { roleCaps[l.key] = l.capabilities; roleLevel[l.key] = l.level; }
+  for (const l of levels) roleLevel[l.key] = l.level;
   return `// GENERATED from this app's IAM spec. Edit the spec and regenerate; hand edits are lost.
+// CAPS is already ACCUMULATED: each role holds its own plus every weaker role's. A tier that sits
+// above another and holds less of it is a bug, so the ladder is resolved once at generation.
 const CAPS = ${JSON.stringify(roleCaps)};
 const LEVELS = ${JSON.stringify(roleLevel)};
 const COMMANDS = ${JSON.stringify(commands)};
@@ -109,8 +134,7 @@ export default async function (ctx, input) {
 
 /** The discovery script: an agent asks what it may call before calling anything. */
 function commandsScript(levels: LevelDef[], commands: CommandDef[], defaultRole?: string): string {
-  const roleCaps: Record<string, string[]> = {};
-  for (const l of levels) roleCaps[l.key] = l.capabilities;
+  const roleCaps = accumulate(levels);
   return `// GENERATED from this app's IAM spec. Edit the spec and regenerate; hand edits are lost.
 const CAPS = ${JSON.stringify(roleCaps)};
 const COMMANDS = ${JSON.stringify(commands)};
@@ -143,9 +167,9 @@ export default async function (ctx) {
  * no role at all, which the node refused with a 400. A gate that knows its own roles should say so.
  */
 function rolesScript(levels: LevelDef[], commands: CommandDef[], defaultRole?: string): string {
-  const roleCaps: Record<string, string[]> = {};
+  const roleCaps = accumulate(levels);
   const roleLevel: Record<string, number> = {};
-  for (const l of levels) { roleCaps[l.key] = l.capabilities; roleLevel[l.key] = l.level; }
+  for (const l of levels) roleLevel[l.key] = l.level;
   const labels: Record<string, string> = {};
   for (const l of levels) labels[l.key] = l.label;
   return `// GENERATED from this app's IAM spec. Edit the spec and regenerate; hand edits are lost.
@@ -243,8 +267,9 @@ export function generateIamExtension(input: GenerateIamExtensionInput): Generate
     `    description: ${JSON.stringify(
       'The role vocabulary this gate enforces: every role with its capabilities, level and label, '
       + 'which of them an owner may hand out, and what a signed-in stranger holds. Read this to build '
-      + 'an approval UI instead of hardcoding role names. A vocabulary is not personal data; who holds '
-      + 'which role stays on the node roster.',
+      + 'an approval UI instead of hardcoding role names. Any signed-in caller: a vocabulary is not '
+      + 'personal data, and who holds which role stays on the node roster. (This node authenticates '
+      + 'every extension call, so that means "not owner-only", not "anonymous".)',
     )}`,
     '    input: { type: object, properties: {} }',
     '    output: { type: object, properties: { roles: { type: object }, levels: { type: object }, labels: { type: object },'

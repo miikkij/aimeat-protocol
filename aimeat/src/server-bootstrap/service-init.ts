@@ -46,6 +46,7 @@ import { createEmailService, setActiveEmailService } from '../services/email.js'
 import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
 import { initializeNode } from '../auth/node-keys.js';
 import { logger } from '../utils/logger.js';
+import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
 
 export interface ServiceInitResult {
@@ -232,6 +233,21 @@ export async function initializeServices(
     };
     setTimeout(tick, 15_000); // initial run shortly after boot
     setInterval(tick, BOOK_INTERVAL_MS);
+  }
+
+  // Take the free access back when an app membership term runs out. Access itself already stops on
+  // the clock — a lapsed member is refused on their next call — but the EXCHANGE grants have to be
+  // withdrawn by something, and until they are, somebody the provider stopped selling to is still
+  // calling on the provider's money. Hourly is fine: the money leak is bounded by the interval, and
+  // the access leak does not exist.
+  {
+    const SWEEP_INTERVAL_MS = 3_600_000;
+    const sweep = () => {
+      sweepLapsedMemberships(storage, config)
+        .catch(err => logger.warn('app-member sweep failed', { error: String(err) }));
+    };
+    setTimeout(sweep, 45_000); // once shortly after boot, so a restart closes anything overdue
+    setInterval(sweep, SWEEP_INTERVAL_MS);
   }
 
   // A.4: Wire peer recovery to key exchange + future full sync

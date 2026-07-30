@@ -644,7 +644,7 @@ await test('a declared carry plan makes a bare approval actually carry the membe
     assert(plan.body.data.plan.roles.member.length === 2, `and reads back: ${JSON.stringify(plan.body.data.plan.roles)}`);
 
     // A stranger, approved the way the panel approves: a role and nothing else.
-    const newcomer = await setupOwner('carry');
+    const newcomer = stranger;
     const approved = await json(`/v1/apps/${owner.name}/${APP}/members`, {
         method: 'POST', headers: auth(owner.token),
         body: JSON.stringify({ account: newcomer.name, role: 'member' }),
@@ -728,9 +728,11 @@ await test('the generated gate states its role vocabulary, and versions where it
     assert(vocab.labels.member === 'Member', `labels survive for the UI: ${JSON.stringify(vocab.labels)}`);
 
     // The vocabulary is public; the ROSTER is not. That split is the whole reason this is safe.
+    // "Open" here means not owner-only, NOT anonymous: this node authenticates every extension call,
+    // and a description that said otherwise would be the kind of false promise this target exists to
+    // remove. A signed-in stranger reading it (above) is the actual guarantee.
     const anon = await json(`/v1/ext/${gen.name}/roles`, { method: 'POST', body: '{}' });
-    const anonOk = anon.status === 200 || anon.status === 401;
-    assert(anonOk, `a vocabulary read is not an error: ${anon.status}`);
+    assert(anon.status === 401, `an extension call still needs a principal: ${anon.status}`);
     const rosterAnon = await json(`/v1/apps/${owner.name}/${APP3}/members`);
     assert(rosterAnon.status === 401 || rosterAnon.status === 403,
         `the roster still refuses an unauthenticated read: ${rosterAnon.status}`);
@@ -746,8 +748,8 @@ await test('rosterVisibility members: a member reads the roster, and only the pa
         method: 'POST', headers: auth(owner.token),
         body: JSON.stringify({ filename: APP4, description: 'roster visibility', content: Buffer.from('<html>x</html>').toString('base64') }),
     });
-    const insider = await setupOwner('vis1');
-    const outsider = await setupOwner('vis2');
+    const insider = member;
+    const outsider = stranger;
 
     // Shut by default, even for a member.
     await json(`/v1/apps/${owner.name}/${APP4}/members`, {
@@ -782,6 +784,150 @@ await test('rosterVisibility members: a member reads the roster, and only the pa
     const asOwner = await json(`/v1/apps/${owner.name}/${APP4}/members`, { headers: auth(owner.token) });
     const full = asOwner.body.data.members.find((m: { owner: string }) => m.owner === insider.name.toLowerCase());
     assert(full.note === 'private note about them', `the owner still sees their own note: ${JSON.stringify(full)}`);
+});
+
+// ── a tier above another holds everything it holds ────────────────────────────────────
+// NUOTTA declared guest:['guides'] and member:[everything else], and a literal reading gave the
+// paying member no access to the introduction a passer-by could read. Nobody decided that; it fell
+// out of listing each tier separately, which is how anyone would write it.
+await test('capabilities accumulate down the ladder: a member holds what a guest holds', async () => {
+    const { generateIamExtension } = await import('../src/services/iam/generate-extension.js');
+    const APP5 = 'ladder.html';
+    await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename: APP5, description: 'ladder', content: Buffer.from('<html>x</html>').toString('base64') }),
+    });
+    const gen = generateIamExtension({
+        appId: `${owner.name}/${APP5}`, author: owner.name, defaultRole: 'guest', version: '1.0.0',
+        levels: [
+            { level: 0, key: 'admin', label: 'Admin', capabilities: ['*'] },
+            // Written the natural way: each tier lists only what is NEW at that tier.
+            { level: 10, key: 'member', label: 'Member', capabilities: ['corpus'] },
+            { level: 20, key: 'guest', label: 'Guest', capabilities: ['guides'] },
+        ],
+        commands: [
+            { id: 'guides.read', description: 'Read the guides', capability: 'guides', tier: 'read' },
+            { id: 'corpus.search', description: 'Search the corpus', capability: 'corpus', tier: 'read' },
+        ],
+    });
+    await json('/v1/extensions', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ manifest: gen.manifest, scripts: gen.scripts }),
+    });
+    await json(`/v1/extensions/${gen.name}/activate`, { method: 'POST', headers: auth(owner.token), body: '{}' });
+
+    const ladderMember = member;
+    await json(`/v1/apps/${owner.name}/${APP5}/members`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: ladderMember.name, role: 'member' }),
+    });
+    const call = async (body: Record<string, unknown>) =>
+        (await json(`/v1/ext/${gen.name}/check`, { method: 'POST', headers: auth(ladderMember.token), body: JSON.stringify(body) })).body.data;
+
+    // The whole point: the paying tier is not locked out of the free one.
+    const guides = await call({ permission: 'guides' });
+    assert(guides.allowed === true, `a member holds what a guest holds: ${JSON.stringify(guides)}`);
+    const corpus = await call({ permission: 'corpus' });
+    assert(corpus.allowed === true, `and its own tier too: ${JSON.stringify(corpus)}`);
+
+    // The vocabulary states the accumulated set, so a UI painting from it agrees with the gate.
+    const vocab = (await json(`/v1/ext/${gen.name}/roles`, { method: 'POST', headers: auth(ladderMember.token), body: '{}' })).body.data;
+    assert(vocab.roles.member.includes('guides') && vocab.roles.member.includes('corpus'),
+        `the declared vocabulary accumulates too: ${JSON.stringify(vocab.roles)}`);
+    assert(vocab.roles.guest.length === 1, `and a weaker tier gains nothing from a stronger one: ${JSON.stringify(vocab.roles.guest)}`);
+
+    // Discovery agrees with the gate, which is what an agent reads before calling anything.
+    const list = (await json(`/v1/ext/${gen.name}/commands`, { method: 'POST', headers: auth(ladderMember.token), body: '{}' })).body.data;
+    const byId = Object.fromEntries(list.commands.map((c: { id: string; allowed: boolean }) => [c.id, c.allowed]));
+    assert(byId['guides.read'] === true && byId['corpus.search'] === true,
+        `discovery marks both open for a member: ${JSON.stringify(byId)}`);
+});
+
+// ── seats and terms: the two axes the spec named and nobody had built ───────────────────
+await test('seats: an approval past the last seat is refused and says how many are taken', async () => {
+    const APP6 = 'seated.html';
+    await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename: APP6, description: 'seats', content: Buffer.from('<html>x</html>').toString('base64') }),
+    });
+    await json(`/v1/apps/${owner.name}/${APP6}/members/plan`, {
+        method: 'PUT', headers: auth(owner.token),
+        body: JSON.stringify({ roles: {}, seats: { member: 1 } }),
+    });
+    const first = member;
+    const second = stranger;
+    const ok = await json(`/v1/apps/${owner.name}/${APP6}/members`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: first.name, role: 'member' }),
+    });
+    assert(ok.status === 200 || ok.status === 201, `the first seat fills: ${ok.status}`);
+
+    const full = await json(`/v1/apps/${owner.name}/${APP6}/members`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: second.name, role: 'member' }),
+    });
+    assert(full.status === 409 && full.body.error.code === 'SEATS_FULL',
+        `the second is refused rather than quietly made: ${full.status} ${JSON.stringify(full.body?.error)}`);
+    assert(/1/.test(full.body.error.message), `and the refusal says how many: ${full.body.error.message}`);
+
+    // A seat holder is not taking a NEW seat, so renewing them must not hit the cap.
+    const renew = await json(`/v1/apps/${owner.name}/${APP6}/members`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: first.name, role: 'member', note: 'renewed' }),
+    });
+    assert(renew.status === 200 || renew.status === 201, `a renewal is not a new seat: ${renew.status}`);
+
+    // Freeing the seat lets the next person in, which is what makes it a queue and not a wall.
+    await json(`/v1/apps/${owner.name}/${APP6}/members/${first.name}`, { method: 'DELETE', headers: auth(owner.token) });
+    const after = await json(`/v1/apps/${owner.name}/${APP6}/members`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: second.name, role: 'member' }),
+    });
+    assert(after.status === 200 || after.status === 201, `the freed seat is usable: ${after.status}`);
+});
+
+await test('terms: a membership lapses on the clock, and the sweep takes the free access back', async () => {
+    const APP7 = 'termed.html';
+    await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename: APP7, description: 'terms', content: Buffer.from('<html>x</html>').toString('base64') }),
+    });
+    await json(`/v1/apps/${owner.name}/${APP7}/members/plan`, {
+        method: 'PUT', headers: auth(owner.token),
+        body: JSON.stringify({ roles: { member: [offA] }, terms: { member: { days: 30, renewal: 'self-serve' } } }),
+    });
+    const sub = member;   // reuse: each new account is a login, and the limiter is real
+    const made = await json(`/v1/apps/${owner.name}/${APP7}/members`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: sub.name, role: 'member' }),
+    });
+    const rec = made.body.data.member;
+    assert(!!rec.expiresAt, `the declared term is applied without the caller naming it: ${JSON.stringify(rec)}`);
+    assert(rec.renewal === 'self-serve', `and how it is meant to continue is recorded: ${rec.renewal}`);
+    const days = Math.round((new Date(rec.expiresAt).getTime() - Date.now()) / 86400_000);
+    assert(days === 30, `counted from now, not from some earlier date: ${days} days`);
+    assert((made.body.data.access?.granted ?? []).length === 1, `and it carries: ${JSON.stringify(made.body.data.access)}`);
+
+    // While it runs, they are a member.
+    const live = await json(`/v1/apps/${owner.name}/${APP7}/members/me`, { headers: auth(sub.token) });
+    assert(live.body.data.member !== null && live.body.data.role === 'member', `live: ${JSON.stringify(live.body.data)}`);
+
+    // Now end the term by hand and watch the CLOCK decide, with no sweep involved.
+    await json(`/v1/apps/${owner.name}/${APP7}/members`, {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: sub.name, role: 'member', expiresAt: new Date(Date.now() - 1000).toISOString() }),
+    });
+    const lapsed = await json(`/v1/apps/${owner.name}/${APP7}/members/me`, { headers: auth(sub.token) });
+    assert(lapsed.body.data.member === null && lapsed.body.data.role === null,
+        `a lapsed term stops reaching the app immediately, whatever the sweep is doing: ${JSON.stringify(lapsed.body.data)}`);
+
+    // The grants, though, are still live — which is exactly why a sweep has to exist.
+    const sweep = await json(`/v1/apps/${owner.name}/${APP7}/members/sweep`, { method: 'POST', headers: auth(owner.token), body: '{}' });
+    const swept = sweep.body.data;
+    assert(swept.swept >= 1 && swept.revoked >= 1,
+        `the sweep withdraws what the lapsed membership was carrying: ${JSON.stringify(swept)}`);
+
+    // And it is the OWNER's act: nobody else may run it over somebody else's app.
+    const refused = await json(`/v1/apps/${owner.name}/${APP7}/members/sweep`, { method: 'POST', headers: auth(stranger.token), body: '{}' });
+    assert(refused.status === 403, `a stranger cannot sweep somebody else's roster: ${refused.status}`);
+
+    const gone = await json(`/v1/apps/${owner.name}/${APP7}/members`, { headers: auth(owner.token) });
+    assert(!gone.body.data.members.some((m: { owner: string }) => m.owner === sub.name.toLowerCase()),
+        'and the row goes, so the seat count is not wrong afterwards');
 });
 
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
