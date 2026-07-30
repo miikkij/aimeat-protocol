@@ -192,14 +192,14 @@
    one prominent line until someone wants it, and the wall leads. */
 .ld-invite { max-width: 760px; margin: 1.5rem auto 2rem; }
 .ld-invite .collapsible {
-  border: 1px solid var(--border-subtle); border-radius: 16px;
-  background: var(--surface); overflow: hidden;
+  border: 1px solid var(--border); border-radius: 16px;
+  background: var(--card); overflow: hidden;
   box-shadow: 0 8px 40px rgba(0, 0, 0, .06);
 }
 .ld-invite .collapsible-header { padding: 20px 28px; width: 100%; cursor: pointer; }
 /* The header IS the door — it needs to look like one, or the invitation reads as a heading
    with a decorative chevron and nobody opens it. */
-.ld-invite .collapsible-header:hover { background: var(--bg-dim); }
+.ld-invite .collapsible-header:hover { background: var(--surface); }
 .ld-invite .collapsible-header:hover .ld-invite-sub { color: var(--accent); }
 .ld-invite .collapsible-title { display: flex; flex-direction: column; gap: .15rem; text-align: left; }
 .ld-invite-title { font-size: 1.15rem; font-weight: 800; color: var(--text); }
@@ -216,7 +216,7 @@
    and every private deviation is a place they drift apart again. */
 .ld-gen { text-align: left; }
 .ld-gen-intro { font-size: .82rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 18px; }
-.ld-gen-step { border-top: 1px solid var(--border-subtle); padding-top: 16px; margin-bottom: 16px; }
+.ld-gen-step { border-top: 1px solid var(--border); padding-top: 16px; margin-bottom: 16px; }
 .ld-gen-step:first-of-type { border-top: none; padding-top: 0; }
 .ld-gen-head { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: .98rem; margin-bottom: 12px; }
 .ld-gen-num {
@@ -226,24 +226,28 @@
 }
 .ld-gen-idea {
   width: 100%; box-sizing: border-box; min-height: 60px; max-height: 120px; resize: vertical;
-  background: var(--bg-dim); border: 1px solid var(--border-subtle);
+  background: var(--surface); border: 1px solid var(--border);
   border-radius: 10px; padding: 10px 14px; color: inherit; font-size: .85rem;
   font-family: inherit; line-height: 1.5; margin-bottom: 14px;
 }
 .ld-gen-idea:focus { outline: none; border-color: var(--accent); }
 .ld-gen-label { display: flex; align-items: center; gap: 8px; font-size: .85rem; margin-bottom: 10px; }
 .ld-gen-opt { color: var(--text-muted); }
-.ld-gen-select { width: 100%; margin-bottom: 8px; }
+.ld-gen-select {
+  width: 100%; margin-bottom: 8px; font-size: .85rem;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 10px 14px; color: inherit;
+}
 .ld-gen-hint { font-size: .8rem; color: var(--text-muted); line-height: 1.55; margin: 0 0 12px; }
 .ld-gen-packs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .ld-gen-pack {
   display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px;
-  border: 1px solid var(--border); border-radius: 999px; background: var(--card);
+  border: 1px solid var(--border); border-radius: 999px; background: var(--surface);
   font-size: 13px; cursor: pointer; user-select: none;
 }
 .ld-gen-pack:hover { border-color: var(--accent); }
 .ld-gen-pack input { accent-color: var(--accent); margin: 0; }
-.ld-gen-pack:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--card)); }
+.ld-gen-pack:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, var(--card)); }
 .ld-gen-tier {
   font-size: 10px; text-transform: uppercase; letter-spacing: .03em; padding: 1px 5px;
   border-radius: 999px; background: color-mix(in srgb, var(--text-muted) 15%, transparent);
@@ -253,7 +257,7 @@
 .ld-gen-preview-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-bottom: 6px; }
 .ld-gen-preview {
   min-height: 90px; max-height: 150px; overflow-y: auto; margin-bottom: 12px; padding: 12px;
-  background: var(--bg-dim); border: 1px solid var(--border-subtle);
+  background: var(--surface); border: 1px solid var(--border);
   border-radius: 10px; font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
   font-size: .75rem; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
   color: var(--text-muted);
