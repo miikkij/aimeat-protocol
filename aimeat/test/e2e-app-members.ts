@@ -216,6 +216,9 @@ await test('setup: the owner lists two priced capabilities', async () => {
     ext = `rosterext${Date.now().toString(36)}`;
     const manifest = [
         'metadata:', `  name: ${ext}`, '  version: 1.0.0', '  description: roster sync fixture', '  author: t',
+        // Naming the app is what lets the node resolve the caller against its roster BEFORE the
+        // paywall settles. Without it there is no roster to consult and `members-only` cannot apply.
+        'config:', '  app:', '    type: string', `    default: ${owner.name}/${APP}`,
         'required_apis:', '  - memory', 'actions:',
         `  - id: ${OFFER_A}`, '    method: POST', `    path: /${OFFER_A}`,
         '    input: { type: object }', '    output: { type: object }', `    script: ${OFFER_A}.js`,
@@ -928,6 +931,55 @@ await test('terms: a membership lapses on the clock, and the sweep takes the fre
     const gone = await json(`/v1/apps/${owner.name}/${APP7}/members`, { headers: auth(owner.token) });
     assert(!gone.body.data.members.some((m: { owner: string }) => m.owner === sub.name.toLowerCase()),
         'and the row goes, so the seat count is not wrong afterwards');
+});
+
+// ── members-only refuses BEFORE the till opens ───────────────────────────────────
+// "Only my members get in, money or no money" is a real product position. LÄÄKE took it inside its
+// own action scripts, where the paywall had already settled by the time the refusal ran — so somebody
+// who took a contract and PAID was told they were not on the list, and kept neither the answer nor
+// the money. The stance has to be taken before the charge.
+await test('access members-only: an outsider holding an entitlement is refused, and not charged', async () => {
+    // A member and an outsider, both holding an entitlement for the priced action.
+    await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: member.name, role: 'member', offerings: [offA] }),
+    });
+    await json('/v1/exchange/grants', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ consumer: stranger.name, offering_id: offA, note: 'outsider with a contract' }),
+    });
+
+    const call = async (token: string) =>
+        await json(`/v1/ext/${ext}/${OFFER_A}`, { method: 'POST', headers: auth(token), body: '{}' });
+
+    // OPEN (the default): both get in. The member is carried; the outsider settles their entitlement.
+    await json(`/v1/apps/${owner.name}/${APP}/members/plan`, {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ roles: {}, access: 'open' }),
+    });
+    assert((await call(member.token)).status === 200, 'open: a member gets in');
+    assert((await call(stranger.token)).status === 200, 'open: an outsider holding an entitlement gets in');
+
+    // MEMBERS-ONLY: the outsider is refused, and the refusal is a REFUSAL, not a receipt.
+    await json(`/v1/apps/${owner.name}/${APP}/members/plan`, {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ roles: {}, access: 'members-only' }),
+    });
+    const shut = await call(stranger.token);
+    assert(shut.status === 403 && shut.body.error.code === 'MEMBERS_ONLY',
+        `an outsider is refused even holding money: ${shut.status} ${JSON.stringify(shut.body?.error)}`);
+    assert(/not been charged/.test(shut.body.error.message), `and told so: ${shut.body.error.message}`);
+    assert(/members\/request/.test(JSON.stringify(shut.body.hints ?? {})),
+        `with somewhere to go: ${JSON.stringify(shut.body.hints)}`);
+
+    // The member is untouched by the stance — that is the whole point of it.
+    assert((await call(member.token)).status === 200, 'members-only: a member still gets in');
+    // And the owner, who is nobody's customer.
+    assert((await call(owner.token)).status === 200, 'members-only: the owner still gets in');
+
+    // Put it back so the rest of the suite sees the default.
+    await json(`/v1/apps/${owner.name}/${APP}/members/plan`, {
+        method: 'PUT', headers: auth(owner.token), body: JSON.stringify({ roles: {}, access: 'open' }),
+    });
+    await json(`/v1/apps/${owner.name}/${APP}/members/${member.name}`, { method: 'DELETE', headers: auth(owner.token) });
 });
 
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);

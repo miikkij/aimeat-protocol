@@ -128,9 +128,14 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner sets its carry plan'));
     const b = (req.body ?? {}) as {
-      roles?: Record<string, unknown>; rosterVisibility?: string;
+      roles?: Record<string, unknown>; rosterVisibility?: string; access?: string;
       seats?: Record<string, unknown>; terms?: Record<string, unknown>;
     };
+    if (b.access !== undefined && b.access !== 'open' && b.access !== 'members-only') {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        'access must be "open" (default: anybody may call, a member is carried) or "members-only" '
+        + '(nobody but a member gets in, even holding money — refused before any settlement).'));
+    }
     if (b.rosterVisibility !== undefined && b.rosterVisibility !== 'owner' && b.rosterVisibility !== 'members') {
       return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
         'rosterVisibility must be "owner" (default) or "members".'));
@@ -177,6 +182,7 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     }
     const plan = await putCarryPlan(storage, {
       appId: c.appId, roles, seats, terms, setBy: c.callerAccount,
+      access: b.access === 'members-only' ? 'members-only' : 'open',
       rosterVisibility: b.rosterVisibility === 'members' ? 'members' : 'owner',
     });
     return res.json(success(config.nodeId, {

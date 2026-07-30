@@ -166,6 +166,19 @@ export interface AppCarryPlan {
    */
   rosterVisibility: 'owner' | 'members';
   /**
+   * Who may reach this app's priced calls at all.
+   *
+   * `open` (default) — anybody may call. A member is carried and pays nothing; everybody else pays,
+   * by contract or per call. This is the shape most paid apps want: membership is the free tier.
+   *
+   * `members-only` — nobody but a member gets in, even holding money. The refusal happens BEFORE any
+   * settlement, which is the whole point: LÄÄKE expressed this stance inside its own action scripts,
+   * where the paywall had already charged by the time the refusal ran, so somebody who took a
+   * contract and paid was told they were not on the list and kept neither the answer nor the money.
+   * A stance about who your customers are has to be taken before the till opens.
+   */
+  access: 'open' | 'members-only';
+  /**
    * How many members a role may hold at once. A role that is absent is uncapped. A seat count is a
    * product decision with teeth: an approval past the last seat is REFUSED and says how many are
    * taken, rather than quietly making the eleventh member of a ten-seat plan.
@@ -212,7 +225,7 @@ export async function getCarryPlan(storage: Storage, appId: string): Promise<App
 export async function putCarryPlan(
   storage: Storage,
   input: { appId: string; roles: Record<string, string[]>; rosterVisibility?: 'owner' | 'members';
-    seats?: Record<string, number>; terms?: AppCarryPlan['terms']; setBy: string },
+    access?: 'open' | 'members-only'; seats?: Record<string, number>; terms?: AppCarryPlan['terms']; setBy: string },
 ): Promise<AppCarryPlan> {
   const roles: Record<string, string[]> = {};
   for (const [role, ids] of Object.entries(input.roles || {})) {
@@ -232,6 +245,7 @@ export async function putCarryPlan(
   }
   const rec: AppCarryPlan = {
     appId: input.appId, roles, seats, terms,
+    access: input.access === 'members-only' ? 'members-only' : 'open',
     rosterVisibility: input.rosterVisibility === 'members' ? 'members' : 'owner',
     updatedAt: new Date().toISOString(), setBy: input.setBy,
   };

@@ -32,6 +32,7 @@ import { error } from '../../middleware/envelope.js';
 import { paymentChallenge } from '../../commerce/x402.js';
 import { consumeExtPayToken } from '../../services/ext-pay-token.js';
 import { settleViaEntitlement, settleMeteredCoordinate } from './entitlement-gate.js';
+import { getCarryPlan, getMember } from '../../services/app-members.js';
 import { pricedAppToolsFor, type PricedBinding } from './priced-binding.js';
 import { readEntitlementForCall, computeCharge, type MeteredEntitlement } from '../../services/metered-entitlements.js';
 import type { BeneficiaryAccrual } from '../../services/metered-settlement.js';
@@ -169,6 +170,41 @@ export async function enforcePaywall(args: {
 
   // 1. Owner (and their own principals) always free — no toll, no payment.
   if (callerOwner === ownerName) return { ok: true };
+
+  // 1.5 The app's own stance on who its customers are, taken BEFORE the till opens.
+  //
+  //     An app whose plan says `members-only` refuses everybody but its members, money or no money.
+  //     That is a real product position — a registry that is not for sale to just anybody — and it
+  //     used to be expressed inside the app's own action scripts, where the paywall had already
+  //     settled by the time the refusal ran. Somebody who took a contract and paid was then told they
+  //     were not on the list, and because a refusal is a normal return rather than a throw, nothing
+  //     gave the money back. A stance about who you sell to has to be taken before you charge.
+  //
+  //     `open` (the default) leaves this alone: anybody may call, a member is carried and pays
+  //     nothing, everybody else pays. Membership is the free tier, not the door.
+  const gatedApp = typeof ext.config?.app === 'string' ? ext.config.app : null;
+  if (gatedApp) {
+    const plan = await getCarryPlan(storage, gatedApp);
+    if (plan?.access === 'members-only') {
+      const member = await getMember(storage, gatedApp, callerGaii);
+      if (!member) {
+        const [appOwner, file] = gatedApp.split('/');
+        res.status(403).json({
+          ...error(config.nodeId, 'MEMBERS_ONLY',
+            'This is open to approved members only, so there is nothing to buy here yet. Ask the owner '
+            + 'for access; nothing is charged for asking, and you have not been charged for this call.'),
+          hints: {
+            next_actions: [{
+              description: 'Ask the owner for access',
+              method: 'POST',
+              url: `/v1/apps/${encodeURIComponent(appOwner ?? '')}/${encodeURIComponent(file ?? '')}/members/request`,
+            }],
+          },
+        });
+        return { ok: false };
+      }
+    }
+  }
 
   // 2. Declared toll bounds this action's call rate. Validated here (it is extension config); the burn
   //    itself happens once, either inside the entitlement chokepoint below or on the uncontracted path.
