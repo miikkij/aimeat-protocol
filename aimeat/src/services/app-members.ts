@@ -124,6 +124,16 @@ export interface AppCarryPlan {
   appId: string;
   /** role key → offering ids carried for that role. A role that is absent carries nothing. */
   roles: Record<string, string[]>;
+  /**
+   * Who may read the roster. `owner` (default) is right for a paid service, where the customer list
+   * is nobody else's business. `members` is right where seeing each other IS the product — a club
+   * board renders by reading each member's own posts, so a roster only the owner can read leaves
+   * every member looking at an empty board.
+   *
+   * Even under `members` a member sees names, roles and join dates only. The note somebody wrote when
+   * they asked, who approved them and what they are carried on stay the owner's.
+   */
+  rosterVisibility: 'owner' | 'members';
   updatedAt: string;
   setBy: string;
 }
@@ -140,14 +150,18 @@ export async function getCarryPlan(storage: Storage, appId: string): Promise<App
 /** Declare (or replace) it. Roles are taken as given: the node has no opinion about their names. */
 export async function putCarryPlan(
   storage: Storage,
-  input: { appId: string; roles: Record<string, string[]>; setBy: string },
+  input: { appId: string; roles: Record<string, string[]>; rosterVisibility?: 'owner' | 'members'; setBy: string },
 ): Promise<AppCarryPlan> {
   const roles: Record<string, string[]> = {};
   for (const [role, ids] of Object.entries(input.roles || {})) {
     if (!Array.isArray(ids)) continue;
     roles[String(role)] = [...new Set(ids.filter(x => typeof x === 'string' && x))];
   }
-  const rec: AppCarryPlan = { appId: input.appId, roles, updatedAt: new Date().toISOString(), setBy: input.setBy };
+  const rec: AppCarryPlan = {
+    appId: input.appId, roles,
+    rosterVisibility: input.rosterVisibility === 'members' ? 'members' : 'owner',
+    updatedAt: new Date().toISOString(), setBy: input.setBy,
+  };
   await write(storage, NS_PLAN, planKey(input.appId), rec);
   return rec;
 }

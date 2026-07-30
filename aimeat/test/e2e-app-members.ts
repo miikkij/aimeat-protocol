@@ -736,6 +736,54 @@ await test('the generated gate states its role vocabulary, and versions where it
         `the roster still refuses an unauthenticated read: ${rosterAnon.status}`);
 });
 
+// ── a roster a member may read, redacted ───────────────────────────────────────────
+// Shut by default is right for a paid service. It is wrong for an app where seeing each other IS the
+// product: a club board renders by reading each member's own posts, so a roster only the owner can
+// read leaves every member looking at an empty page.
+await test('rosterVisibility members: a member reads the roster, and only the part that is theirs to see', async () => {
+    const APP4 = 'boardish.html';
+    await json('/v1/apps', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ filename: APP4, description: 'roster visibility', content: Buffer.from('<html>x</html>').toString('base64') }),
+    });
+    const insider = await setupOwner('vis1');
+    const outsider = await setupOwner('vis2');
+
+    // Shut by default, even for a member.
+    await json(`/v1/apps/${owner.name}/${APP4}/members`, {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ account: insider.name, role: 'editor', note: 'private note about them' }),
+    });
+    const shut = await json(`/v1/apps/${owner.name}/${APP4}/members`, { headers: auth(insider.token) });
+    assert(shut.status === 403, `default is owner-only even for a member: ${shut.status}`);
+
+    await json(`/v1/apps/${owner.name}/${APP4}/members/plan`, {
+        method: 'PUT', headers: auth(owner.token),
+        body: JSON.stringify({ roles: {}, rosterVisibility: 'members' }),
+    });
+
+    // Now a member sees the list — but not the owner's notes about people.
+    const open = await json(`/v1/apps/${owner.name}/${APP4}/members`, { headers: auth(insider.token) });
+    assert(open.status === 200, `a member reads it: ${open.status} ${JSON.stringify(open.body?.error)}`);
+    const row = open.body.data.members.find((m: { owner: string }) => m.owner === insider.name.toLowerCase());
+    assert(!!row, `and finds the roster in it: ${JSON.stringify(open.body.data.members)}`);
+    assert(row.note === undefined && row.approvedBy === undefined && row.offerings === undefined,
+        `the owner's own columns are not handed over: ${JSON.stringify(row)}`);
+    assert(open.body.data.requests.length === 0 && open.body.data.redacted === true,
+        `pending requests are nobody else's business, and the answer says it is redacted: ${JSON.stringify(open.body.data)}`);
+
+    // Opening it to MEMBERS is not opening it to everyone.
+    const strangerRead = await json(`/v1/apps/${owner.name}/${APP4}/members`, { headers: auth(outsider.token) });
+    assert(strangerRead.status === 403, `a non-member is still refused: ${strangerRead.status}`);
+    const anonRead = await json(`/v1/apps/${owner.name}/${APP4}/members`);
+    assert(anonRead.status === 401 || anonRead.status === 403, `and so is an anonymous caller: ${anonRead.status}`);
+
+    // The owner keeps the full view.
+    const asOwner = await json(`/v1/apps/${owner.name}/${APP4}/members`, { headers: auth(owner.token) });
+    const full = asOwner.body.data.members.find((m: { owner: string }) => m.owner === insider.name.toLowerCase());
+    assert(full.note === 'private note about them', `the owner still sees their own note: ${JSON.stringify(full)}`);
+});
+
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);
 

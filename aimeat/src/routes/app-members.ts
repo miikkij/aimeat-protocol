@@ -68,7 +68,25 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
   router.get('/v1/apps/:owner/:filename/members', requireAuth(), async (req, res) => {
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
-    if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner reads its roster'));
+    const plan = await getCarryPlan(storage, c.appId);
+    if (!c.isOwner) {
+      // An app can open the roster to its own members, and some have to: a board that renders by
+      // reading each member's posts shows an empty page to everyone if only the owner may see who
+      // the members are. It stays shut unless the app says otherwise.
+      if (plan?.rosterVisibility !== 'members') {
+        return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner reads its roster'));
+      }
+      const me = await getMember(storage, c.appId, c.callerAccount);
+      if (!me) {
+        return res.status(403).json(error(config.nodeId, 'FORBIDDEN',
+          'This app shows its roster to its members. You are not one yet.'));
+      }
+      // Names, roles and join dates. The note somebody wrote when they asked, who approved them and
+      // what they are carried on are the owner's business, not the other members'.
+      const visible = (await listMembers(storage, c.appId))
+        .map(m => ({ appId: m.appId, owner: m.owner, role: m.role, level: m.level, since: m.since }));
+      return res.json(success(config.nodeId, { members: visible, requests: [], count: visible.length, redacted: true }));
+    }
     const [members, requests] = await Promise.all([listMembers(storage, c.appId), listRequests(storage, c.appId)]);
     return res.json(success(config.nodeId, { members, requests, count: members.length }));
   });
@@ -108,7 +126,11 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
     const c = await context(req);
     if ('bad' in c) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', c.bad));
     if (!c.isOwner) return res.status(403).json(error(config.nodeId, 'FORBIDDEN', 'Only the app owner sets its carry plan'));
-    const b = (req.body ?? {}) as { roles?: Record<string, unknown> };
+    const b = (req.body ?? {}) as { roles?: Record<string, unknown>; rosterVisibility?: string };
+    if (b.rosterVisibility !== undefined && b.rosterVisibility !== 'owner' && b.rosterVisibility !== 'members') {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        'rosterVisibility must be "owner" (default) or "members".'));
+    }
     if (!b.roles || typeof b.roles !== 'object' || Array.isArray(b.roles)) {
       return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
         'roles is required: an object of role name to the offering ids that role is carried on.'));
@@ -121,7 +143,10 @@ export function appMembersRouter(config: AimeatConfig, storage: Storage): Router
       }
       roles[role] = ids.filter((x): x is string => typeof x === 'string');
     }
-    const plan = await putCarryPlan(storage, { appId: c.appId, roles, setBy: c.callerAccount });
+    const plan = await putCarryPlan(storage, {
+      appId: c.appId, roles, setBy: c.callerAccount,
+      rosterVisibility: b.rosterVisibility === 'members' ? 'members' : 'owner',
+    });
     return res.json(success(config.nodeId, {
       plan,
       // Existing members are NOT re-synced here. Changing the plan under people who were approved on
