@@ -205,6 +205,7 @@ export function registerPublishRoutes(
         // The two most visible fields an app has, and the two the carry-forward list forgot.
         let carriedName: string | undefined;
         let carriedVersion: string | undefined;
+        let carriedTags: string[] | undefined;
         if (isUpdate) {
             const existingApp = await storage.getApp(ownerGhii, filename);
             parkedState = !!existingApp?.parked;
@@ -219,6 +220,7 @@ export function registerPublishRoutes(
             carriedIcon = existingApp?.manifest?.icon;
             carriedName = existingApp?.manifest?.name;
             carriedVersion = existingApp?.manifest?.version;
+            carriedTags = existingApp?.manifest?.tags;
             carriedCortex = existingApp?.manifest?.cortex;
             carriedDescriptions = existingApp?.manifest?.descriptions;
             carriedPriceMorsels = existingApp?.manifest?.priceMorsels;
@@ -247,7 +249,9 @@ export function registerPublishRoutes(
             description: effectiveDescription,
             version: typeof semver === 'string' ? semver : (carriedVersion ?? `1.0.${newVersion - 1}`),
             category: typeof category === 'string' ? category : (carriedCategory ?? 'utility'),
-            tags: Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === 'string') : [],
+            // Carried like the rest. The presigned path already did this; the inline one dropped them,
+            // so which door an update came through decided whether an app kept its tags.
+            tags: Array.isArray(tags) ? tags.filter((t: unknown) => typeof t === 'string') : (carriedTags ?? []),
             authorDisplay: owner,
             usesCortex: Array.isArray(uses_cortex) ? uses_cortex.filter((c: unknown) => typeof c === 'string') : (carriedUsesCortex ?? []),
         };

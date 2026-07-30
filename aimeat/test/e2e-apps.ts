@@ -799,10 +799,12 @@ await test('a re-publish that omits the name keeps the name, inline and presigne
     }));
     assert(first.status === 200 || first.status === 201, `published: ${first.status} ${JSON.stringify(first.body?.error)}`);
 
+    // The catalogue listing is where a person SEES the name, so read it from there rather than from
+    // a shape only this test would know about.
     const read = async () => {
-        const r = await json(`/v1/apps/${ownerName}/${file}/meta`, authed());
-        const d = r.body?.data ?? {};
-        return (d.app ?? d).manifest ?? {};
+        const r = await json('/v1/apps?limit=200', authed());
+        const apps = (r.body?.data?.apps ?? r.body?.data ?? []) as Array<{ filename: string; manifest: Record<string, unknown> }>;
+        return apps.find(a => a.filename === file)?.manifest ?? {};
     };
     assert((await read()).name === 'PROPER NAME', 'the name it was given');
 
