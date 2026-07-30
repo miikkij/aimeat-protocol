@@ -241,6 +241,36 @@ const PACK_CATEGORIES = ['visualization', 'diagrams', 'canvas', 'game', '3d', 'r
 // AI reads the idea where it expects to and the interview step adapts itself.
 const IDEA_PLACEHOLDER = 'My initial idea: (not given yet — ask me what to build)';
 
+/* The half-finished thought, kept for the length of the browser tab.
+   sessionStorage rather than localStorage on purpose: this is an unfinished draft, not a
+   setting, and a stranger who looks once should not find their idea waiting weeks later on a
+   shared machine. Closing the tab is the intent to drop it. */
+const BUILDER_DRAFT_KEY = 'aimeat.landing.builder';
+
+function readBuilderDraft() {
+  try {
+    const raw = sessionStorage.getItem(BUILDER_DRAFT_KEY);
+    const d = raw ? JSON.parse(raw) : null;
+    if (!d || typeof d !== 'object') return {};
+    return {
+      idea: typeof d.idea === 'string' ? d.idea : '',
+      tplId: typeof d.tplId === 'string' ? d.tplId : '',
+      chosen: d.chosen && typeof d.chosen === 'object' ? d.chosen : {},
+    };
+  } catch (err) { swallowed('landing: read builder draft', err); return {}; }
+}
+
+function writeBuilderDraft(draft) {
+  try {
+    // Nothing decided is nothing to keep, and a kept-but-empty record would re-open the fold onto
+    // a blank form. Emptiness counts only packs that are ON: unticking leaves an explicit `false`,
+    // which is a decision about idea-matching and is meaningless once the idea box is empty too.
+    const anyPackOn = Object.values(draft.chosen || {}).some(Boolean);
+    if (!draft.idea && !draft.tplId && !anyPackOn) sessionStorage.removeItem(BUILDER_DRAFT_KEY);
+    else sessionStorage.setItem(BUILDER_DRAFT_KEY, JSON.stringify(draft));
+  } catch (err) { swallowed('landing: write builder draft', err); }
+}
+
 /* AEB reliability tier, shown exactly as the catalogue shows it. The label is the INSTRUCTION,
    not the raw key: `needs-doc` reads as "documentation missing" when it means "no priors — the
    AI must read the doc first". */
@@ -265,13 +295,19 @@ function packMatchesIdea(pack, ideaText) {
 function BuildAppPrompt() {
   const [copied, setCopied] = useState(false);
   const [templates, setTemplates] = useState([]);
-  const [tplId, setTplId] = useState('');
   const [tplContent, setTplContent] = useState('');
   const [canonical, setCanonical] = useState('');
-  const [idea, setIdea] = useState('');
   const [packs, setPacks] = useState([]);
   const [packDocs, setPackDocs] = useState({});
-  const [chosen, setChosen] = useState({});      // id → true/false, set only by a real click
+  // Restored from the tab, so the three things a person actually decides survive the round trip
+  // through registration. Step 3 sends them to the catalogue and signing in reloads the page;
+  // without this they come back to an empty box and have to describe their app a second time.
+  const saved = readBuilderDraft();
+  const [tplId, setTplId] = useState(saved.tplId || '');
+  const [idea, setIdea] = useState(saved.idea || '');
+  const [chosen, setChosen] = useState(saved.chosen || {});   // id → true/false, set only by a real click
+
+  useEffect(() => { writeBuilderDraft({ idea, tplId, chosen }); }, [idea, tplId, chosen]);
 
   useEffect(() => {
     // Starting points only: full use-case scaffolds first, then blank app-shells (not components).
@@ -292,14 +328,19 @@ function BuildAppPrompt() {
     }).catch(err => { swallowed('landing: packs', err); });
 
     fetchCanonicalBuildPrompt(getLocale()).then(setCanonical).catch(err => { swallowed('landing: prompt', err); });
+
+    // A restored template id names the template but carries none of its content, and the content
+    // is what the prompt appends.
+    if (saved.tplId) loadTemplate(saved.tplId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const onPickTemplate = async (e) => {
-    const id = e.target.value; setTplId(id);
+  const loadTemplate = async (id) => {
     if (!id) { setTplContent(''); return; }
     try { const d = await (await fetch('/v1/app-templates/' + encodeURIComponent(id))).json(); setTplContent((d.data && d.data.template && d.data.template.content) || ''); }
     catch (err) { swallowed('landing: template', err); setTplContent(''); }
   };
+  const onPickTemplate = (e) => { const id = e.target.value; setTplId(id); loadTemplate(id); };
 
   // A pack is on when the person ticked it, and otherwise when their idea text names it. A manual
   // choice always wins: typing more words must never silently untick something they chose.
@@ -545,7 +586,11 @@ function AskYourAI() {
    still free — /v1/prompts/build-app, /v1/app-templates and /v1/library-packs all answer
    anonymously — and that is the distinction the subline has to carry. */
 function BuildInvite() {
-  const [open, setOpen] = useState(false);
+  // Shut by default, but a draft left in this tab means the visitor was mid-thought: open onto it.
+  const [open, setOpen] = useState(() => {
+    const d = readBuilderDraft();
+    return !!(d.idea || d.tplId || Object.values(d.chosen || {}).some(Boolean));
+  });
   return html`
     <section class="ld-invite">
       <${Collapsible}
