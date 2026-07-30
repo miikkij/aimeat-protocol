@@ -529,7 +529,12 @@ function AskYourAI() {
    Evidence over theory: an open generator on the front page produced two throwaway chat apps
    and nothing else, while the wall underneath is what actually reads as a living place. So the
    whole builder — the three steps and the prompt with its templates — sits behind one line, and
-   the page leads with what people made. Opening it costs one click and asks for no account. */
+   the page leads with what people made.
+
+   The line invites the click and stops short of the old "no account needed to start", which was
+   false: anonymous access is off, so an app only reaches the server behind a login. Designing is
+   still free — /v1/prompts/build-app, /v1/app-templates and /v1/library-packs all answer
+   anonymously — and that is the distinction the subline has to carry. */
 function BuildInvite() {
   const [open, setOpen] = useState(false);
   return html`
@@ -537,7 +542,7 @@ function BuildInvite() {
       <${Collapsible}
         title=${html`
           <span class="ld-invite-title">${tr('landing.inviteTitle', 'Build your app in 10 minutes')}</span>
-          <span class="ld-invite-sub">${tr('landing.inviteSub', 'One prompt into the AI you already use. No account needed to start.')}</span>
+          <span class="ld-invite-sub">${tr('landing.inviteSub', 'Click here and start designing. Your AI builds it — publishing it here takes an account.')}</span>
         `}
         open=${open} onToggle=${() => setOpen(o => !o)}>
         <div class="ld-loop">

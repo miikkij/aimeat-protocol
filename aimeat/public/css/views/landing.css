@@ -196,7 +196,11 @@
   background: var(--surface); overflow: hidden;
   box-shadow: 0 8px 40px rgba(0, 0, 0, .06);
 }
-.ld-invite .collapsible-header { padding: 20px 28px; width: 100%; }
+.ld-invite .collapsible-header { padding: 20px 28px; width: 100%; cursor: pointer; }
+/* The header IS the door — it needs to look like one, or the invitation reads as a heading
+   with a decorative chevron and nobody opens it. */
+.ld-invite .collapsible-header:hover { background: var(--bg-dim); }
+.ld-invite .collapsible-header:hover .ld-invite-sub { color: var(--accent); }
 .ld-invite .collapsible-title { display: flex; flex-direction: column; gap: .15rem; text-align: left; }
 .ld-invite-title { font-size: 1.15rem; font-weight: 800; color: var(--text); }
 .ld-invite-sub { font-size: .88rem; color: var(--text-dim); font-weight: 400; }
