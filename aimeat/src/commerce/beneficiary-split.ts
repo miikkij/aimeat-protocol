@@ -56,6 +56,30 @@ export interface DynamicDesignation {
   ghii: string;
   weight?: number;
   note?: string;
+  /** In `roles` mode, WHICH role this account is filling for this call. Ignored in `pool` mode. */
+  role?: string;
+}
+
+/**
+ * One role in a value chain, with its OWN percent of the provider's cut.
+ *
+ * A role is not a slice of a shared pot: the distributor's 10 % does not shrink because a label was
+ * added. That is the difference between a chain and a pool, and it is why the two are separate modes
+ * rather than one clever formula — a company told "you get 40 %" must not find out it meant 40 % of
+ * whatever is left after everybody else.
+ *
+ * `ghii: null` means the role exists but nobody is holding it on this call. Its percent stays with
+ * the provider: there is no account to pay, so there is nothing to pay. The capability may fill it
+ * per call by naming the account for that role.
+ */
+export interface BeneficiaryRole {
+  /** The role's name, e.g. `muusikko`. What a listing shows and what a capability fills by name. */
+  role: string;
+  /** 0–100 of the provider's cut. Independent of every other role. */
+  percent: number;
+  /** Filled statically, or null to be filled per call. */
+  ghii: string | null;
+  note: string;
 }
 
 /** The provider's declared split for one metered coordinate. */
@@ -67,8 +91,19 @@ export interface BeneficiarySplit {
   ext: string;
   action: string;
   capabilityLabel: string;
-  /** 0–100: the share of the provider's cut that goes to beneficiaries rather than to the provider. */
+  /**
+   * How the cut is divided.
+   *   `pool`  — one percentage of the provider's cut, divided between beneficiaries by weight. Right
+   *             when there is one thing to share and the sharers split it: adding a beneficiary
+   *             dilutes the others, because the buyer paid once.
+   *   `roles` — named roles, each with its OWN percent, all paid on every sale. Right for a value
+   *             chain: distributor, performer, label, marketplace. Nobody dilutes anybody.
+   */
+  mode: 'pool' | 'roles';
+  /** `pool` mode: 0–100 of the provider's cut that leaves them. Ignored in `roles` mode. */
   poolPercent: number;
+  /** `roles` mode: the chain. Their percents are independent and must total at most 100. */
+  roles: BeneficiaryRole[];
   /** Beneficiaries that share every call at this coordinate. May be empty when the split is dynamic. */
   beneficiaries: BeneficiaryShare[];
   /** Whether the capability may name additional beneficiaries per call. */
@@ -87,6 +122,8 @@ export interface SplitLine {
   weight: number;
   kind: 'static' | 'dynamic';
   note: string;
+  /** In `roles` mode, which role earned this. Absent in `pool` mode. */
+  role?: string;
 }
 
 /** What one call's revenue divides into, below the platform rake. */
@@ -115,7 +152,13 @@ export function computeSplit(
 ): SplitResult {
   const gross = Math.max(0, Math.floor(providerGross));
   const none: SplitResult = { pool: 0, lines: [], providerNet: gross };
-  if (!split || split.state !== 'active' || split.poolPercent <= 0 || gross <= 0) return none;
+  if (!split || split.state !== 'active' || gross <= 0) return none;
+
+  // Roles first: a chain carries no pool at all, so the pool check below would send every chain home
+  // empty. That is exactly what it did until an end-to-end sale caught it — the unit tests could not,
+  // because their fixture happened to leave a pool percent set on a chain that never reads one.
+  if (split.mode === 'roles') return divideByRoles(gross, split, designations);
+  if (split.poolPercent <= 0) return none;
 
   const rows = mergeRows(split, designations);
   if (!rows.length) return none;
@@ -124,6 +167,46 @@ export function computeSplit(
   if (pool <= 0) return none;
 
   return { pool, lines: divide(pool, rows), providerNet: gross - pool };
+}
+
+/**
+ * Pay each filled role its OWN percent of the provider's cut.
+ *
+ * No pool and no largest-remainder pass, because these are not shares of one amount: each percent
+ * floors on its own and the rounding residue stays with the provider, which is the only party whose
+ * share is defined as "whatever is left". Conservation still holds — the percents total at most 100
+ * and every line floors — so the lines can never exceed the cut.
+ *
+ * An unfilled role contributes nothing and costs nothing. That is deliberate: a chain missing its
+ * label should pay the label's percent to nobody rather than quietly redistributing it to the
+ * others, who agreed to their own number and not to a share of somebody's absence.
+ */
+function divideByRoles(
+  gross: number, split: BeneficiarySplit, designations: DynamicDesignation[],
+): SplitResult {
+  // Who holds which role on THIS call. A per-call filling wins over the standing one, so a chain can
+  // name the performer for this track without rewriting its declaration.
+  const filled = new Map<string, { ghii: string; kind: 'static' | 'dynamic'; note: string }>();
+  for (const r of split.roles) {
+    if (r.ghii) filled.set(r.role, { ghii: r.ghii, kind: 'static', note: r.note ?? '' });
+  }
+  if (split.dynamic) {
+    for (const d of designations) {
+      if (!d.role || !d.ghii) continue;
+      filled.set(d.role, { ghii: d.ghii, kind: 'dynamic', note: (d.note ?? '').slice(0, 200) });
+    }
+  }
+
+  const lines: SplitLine[] = [];
+  for (const r of split.roles) {
+    const who = filled.get(r.role);
+    if (!who) continue;                                   // nobody holds it; the percent stays put
+    const amount = percentCut(gross, Math.min(100, Math.max(0, r.percent)));
+    if (amount <= 0) continue;
+    lines.push({ ghii: who.ghii, amount, weight: r.percent, kind: who.kind, note: who.note, role: r.role });
+  }
+  const paid = lines.reduce((sum, l) => sum + l.amount, 0);
+  return { pool: paid, lines, providerNet: gross - paid };
 }
 
 /** The row set for one call: the declared beneficiaries, plus this call's designations if allowed. */
@@ -200,8 +283,10 @@ export async function putSplit(
   storage: Storage,
   input: {
     providerGhii: string; ext: string; action: string; capabilityLabel?: string;
-    poolPercent: number; beneficiaries: BeneficiaryShare[]; dynamic?: boolean;
-    state?: 'active' | 'paused'; createdBy: string;
+    mode?: 'pool' | 'roles';
+    poolPercent?: number; beneficiaries?: BeneficiaryShare[];
+    roles?: BeneficiaryRole[];
+    dynamic?: boolean; state?: 'active' | 'paused'; createdBy: string;
   },
 ): Promise<BeneficiarySplit> {
   const now = new Date().toISOString();
@@ -212,8 +297,15 @@ export async function putSplit(
     ext: input.ext,
     action: input.action,
     capabilityLabel: input.capabilityLabel || `${input.ext}/${input.action}`,
-    poolPercent: clampPercent(input.poolPercent),
-    beneficiaries: input.beneficiaries.slice(0, BENEFICIARIES_MAX).map(b => ({
+    mode: input.mode ?? 'pool',
+    poolPercent: clampPercent(input.poolPercent ?? 0),
+    roles: (input.roles ?? []).slice(0, BENEFICIARIES_MAX).map(r => ({
+      role: r.role,
+      percent: clampPercent(r.percent),
+      ghii: r.ghii || null,
+      note: (r.note ?? '').slice(0, 200),
+    })),
+    beneficiaries: (input.beneficiaries ?? []).slice(0, BENEFICIARIES_MAX).map(b => ({
       ghii: b.ghii,
       weight: Number.isFinite(b.weight) ? Math.max(0, b.weight) : 0,
       note: (b.note ?? '').slice(0, 200),

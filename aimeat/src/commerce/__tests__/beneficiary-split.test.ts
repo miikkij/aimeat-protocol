@@ -13,7 +13,7 @@
  *   v1.0.0 — 2026-07-30 — Initial: conservation, floor policy, dedupe, and the empty cases.
  */
 import { describe, it, expect } from 'vitest';
-import { computeSplit, type BeneficiarySplit, type DynamicDesignation } from '../beneficiary-split.js';
+import { computeSplit, type BeneficiarySplit, type BeneficiaryRole, type DynamicDesignation } from '../beneficiary-split.js';
 import { percentFee } from '../money.js';
 
 /** The amounts a proportional split is most likely to lose a unit on, plus the real kumppani price. */
@@ -23,7 +23,7 @@ const PERCENTS = [1, 3, 7, 30, 33, 50, 70, 99, 100];
 function split(over: Partial<BeneficiarySplit> = {}): BeneficiarySplit {
   return {
     splitId: 's1', providerGhii: 'prov@n', ext: 'kumppani', action: 'getRegisterChanges',
-    capabilityLabel: 'kumppani/getRegisterChanges', poolPercent: 70,
+    capabilityLabel: 'kumppani/getRegisterChanges', mode: 'pool', poolPercent: 70, roles: [],
     beneficiaries: [{ ghii: 'a@n', weight: 1, note: '' }],
     dynamic: false, state: 'active',
     createdAt: '', createdBy: '', updatedAt: '', ...over,
@@ -172,5 +172,77 @@ describe('the cases where nothing is shared', () => {
   });
   it('a negative gross cannot become a payout', () => {
     expect(computeSplit(-500, split()).pool).toBe(0);
+  });
+});
+
+describe('roles — a value chain, where nobody dilutes anybody', () => {
+  const CHAIN: BeneficiaryRole[] = [
+    { role: 'levittaja', percent: 10, ghii: 'dist@n', note: '' },
+    { role: 'muusikko', percent: 40, ghii: 'artist@n', note: '' },
+    { role: 'levy-yhtio', percent: 20, ghii: 'label@n', note: '' },
+    { role: 'kauppapaikka', percent: 30, ghii: 'shop@n', note: '' },
+  ];
+  const chain = (over: Partial<BeneficiarySplit> = {}) =>
+    // poolPercent 0, as a real chain has: a chain divides by role, never from a pool.
+    split({ mode: 'roles', poolPercent: 0, roles: CHAIN, beneficiaries: [], ...over });
+
+  it('pays the worked example exactly: 10 EUR, 2 % rake, four roles', () => {
+    const price = 10_000_000;
+    const fee = percentFee(price, 2);              // 200 000
+    const r = computeSplit(price - fee, chain());  // 9 800 000 to divide
+    const by = (role: string) => r.lines.find(l => l.role === role)?.amount;
+    expect(fee).toBe(200_000);
+    expect(by('levittaja')).toBe(980_000);
+    expect(by('muusikko')).toBe(3_920_000);
+    expect(by('levy-yhtio')).toBe(1_960_000);
+    expect(by('kauppapaikka')).toBe(2_940_000);
+    expect(fee + r.providerNet + sum(r.lines.map(l => l.amount))).toBe(price);
+  });
+
+  it('an unfilled role pays nobody, and does NOT enlarge the others', () => {
+    // The whole point of a chain: 40 % going unclaimed must not become somebody else's windfall.
+    const filled = computeSplit(9_800_000, chain());
+    const missing = computeSplit(9_800_000, chain({
+      roles: CHAIN.map(r => (r.role === 'muusikko' ? { ...r, ghii: null } : r)),
+    }));
+    const by = (r: ReturnType<typeof computeSplit>, role: string) => r.lines.find(l => l.role === role)?.amount;
+    expect(by(missing, 'muusikko')).toBeUndefined();
+    for (const role of ['levittaja', 'levy-yhtio', 'kauppapaikka']) {
+      expect(by(missing, role)).toBe(by(filled, role));
+    }
+    // The unclaimed 40 % stays with the provider rather than vanishing or being redistributed.
+    expect(missing.providerNet).toBe(filled.providerNet + 3_920_000);
+  });
+
+  it('a role can be filled per call, and that wins over the standing holder', () => {
+    const r = computeSplit(9_800_000, chain({ dynamic: true }),
+      [{ ghii: 'guest@n', role: 'muusikko' }]);
+    const artist = r.lines.find(l => l.role === 'muusikko');
+    expect(artist?.ghii).toBe('guest@n');
+    expect(artist?.amount).toBe(3_920_000);
+    expect(artist?.kind).toBe('dynamic');
+  });
+
+  it('a per-call filling is ignored unless the split is dynamic', () => {
+    const r = computeSplit(9_800_000, chain({ dynamic: false }), [{ ghii: 'guest@n', role: 'muusikko' }]);
+    expect(r.lines.find(l => l.role === 'muusikko')?.ghii).toBe('artist@n');
+  });
+
+  it('conserves at every amount: the lines never exceed the cut', () => {
+    for (const gross of ADVERSARIAL) {
+      const r = computeSplit(gross, chain());
+      expect(sum(r.lines.map(l => l.amount))).toBe(r.pool);
+      expect(r.pool + r.providerNet).toBe(gross);
+      expect(r.pool).toBeLessThanOrEqual(gross);
+    }
+  });
+
+  it('each role floors on its own, and the residue stays with the provider', () => {
+    // 7 at 10/40/20/30 is 0.7/2.8/1.4/2.1 → 0/2/1/2 = 5, and 2 stays put. The provider is the only
+    // party whose share is defined as "what is left", so that is where the rounding lands.
+    const r = computeSplit(7, chain());
+    expect(r.lines.map(l => l.amount)).toEqual([2, 1, 2]);
+    expect(r.pool).toBe(5);
+    expect(r.providerNet).toBe(2);
   });
 });

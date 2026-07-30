@@ -379,7 +379,14 @@ export function registerCommerceTools(
         {
             ext: z.string().min(1).max(200),
             action: z.string().min(1).max(200),
-            pool_percent: z.number().min(0).max(100),
+            mode: z.enum(['pool', 'roles']).optional(),
+            pool_percent: z.number().min(0).max(100).optional(),
+            roles: z.array(z.object({
+                role: z.string().min(1).max(80),
+                percent: z.number().positive().max(100),
+                ghii: z.string().min(3).max(200).nullable().optional(),
+                note: z.string().max(200).optional(),
+            })).max(BENEFICIARIES_MAX).optional(),
             beneficiaries: z.array(z.object({
                 ghii: z.string().min(3).max(200),
                 weight: z.number().positive().optional(),
@@ -390,19 +397,32 @@ export function registerCommerceTools(
             state: z.enum(['active', 'paused']).optional(),
         },
         annotationsFor('aimeat_commerce_beneficiary_split_set'),
-        async ({ ext, action, pool_percent, beneficiaries, dynamic, capability, state }) => {
+        async ({ ext, action, mode, pool_percent, roles, beneficiaries, dynamic, capability, state }) => {
             const rows: BeneficiaryShare[] = (beneficiaries ?? []).map(b => ({
                 ghii: b.ghii, weight: b.weight ?? 1, note: b.note ?? '',
             }));
             const bad = rows.find(b => b.ghii.indexOf('@') < 1);
             if (bad) return fail(`INVALID_GHII: "${bad.ghii}" is not an owner GHII (owner@node-id)`);
-            if (!rows.length && !dynamic) {
+            const chain = (roles ?? []).map(r => ({
+                role: r.role, percent: r.percent, ghii: r.ghii ?? null, note: r.note ?? '',
+            }));
+            const useRoles = (mode ?? 'pool') === 'roles';
+            if (useRoles) {
+                if (!chain.length) return fail('EMPTY_CHAIN: a role chain needs at least one role.');
+                const total = chain.reduce((sum, r) => sum + r.percent, 0);
+                if (total > 100) {
+                    return fail(`ROLES_EXCEED_CUT: the roles total ${total} % of your cut, which is more than `
+                        + 'you receive. Each role takes its own percent independently, so they must total at most 100.');
+                }
+            } else if (!rows.length && !dynamic) {
                 return fail('EMPTY_SPLIT: a split with no beneficiaries and no dynamic:true would divide nothing. '
                     + 'Either list who shares it, or set dynamic:true so the capability may name them per call.');
             }
             const split = await putSplit(storage, {
                 providerGhii: ownerGhii, ext, action, capabilityLabel: capability,
-                poolPercent: pool_percent, beneficiaries: rows, dynamic: dynamic ?? false,
+                mode: useRoles ? 'roles' : 'pool',
+                poolPercent: useRoles ? 0 : (pool_percent ?? 0),
+                beneficiaries: rows, roles: chain, dynamic: dynamic ?? false,
                 state: state ?? 'active', createdBy: ownerGhii,
             });
             return ok({

@@ -56,16 +56,26 @@ export function takeDesignations(result: unknown): { designations: DynamicDesign
   if (!(REVENUE_KEY in bag)) return { designations: [], result };
 
   const { [REVENUE_KEY]: raw, ...rest } = bag;
-  const rows = (raw as { beneficiaries?: unknown })?.beneficiaries;
-  if (!Array.isArray(rows)) return { designations: [], result: rest };
+  // `beneficiaries` names accounts for a pool split; `roles` names WHO holds a role in a chain.
+  // Both name destinations only — neither can carry an amount, a percent or a currency.
+  const bag2 = raw as { beneficiaries?: unknown; roles?: unknown };
+  const rows = [
+    ...(Array.isArray(bag2?.beneficiaries) ? bag2.beneficiaries : []),
+    ...(Array.isArray(bag2?.roles) ? bag2.roles : []),
+  ];
+  if (!rows.length) return { designations: [], result: rest };
 
   const designations: DynamicDesignation[] = [];
   for (const row of rows.slice(0, BENEFICIARIES_MAX)) {
     if (!row || typeof row !== 'object') continue;
-    const { ghii, weight, note } = row as Record<string, unknown>;
+    const { ghii, weight, note, role } = row as Record<string, unknown>;
     if (!isGhii(ghii)) continue;
     const w = typeof weight === 'number' && Number.isFinite(weight) && weight > 0 ? weight : 1;
-    designations.push({ ghii, weight: w, note: typeof note === 'string' ? note : undefined });
+    designations.push({
+      ghii, weight: w,
+      note: typeof note === 'string' ? note : undefined,
+      role: typeof role === 'string' && role ? role.slice(0, 80) : undefined,
+    });
   }
   return { designations, result: rest };
 }

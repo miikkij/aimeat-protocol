@@ -69,6 +69,8 @@ const SCRIPTS = {
   // Names its beneficiary for THIS call. The node resolves the destination and strips the key.
   designating: 'export default async function(ctx, input){ return { echo: input, _revenue: { beneficiaries: [{ ghii: input.pay_to, weight: 1 }] } }; }',
   boom: 'export default async function(){ throw new Error("delivery failed on purpose"); }',
+  // Fills ONE role for this sale. It names who holds the role, never what the role is worth.
+  rolefiller: 'export default async function(ctx, input){ return { ok: true, _revenue: { roles: [{ role: "muusikko", ghii: input.performer }] } }; }',
   // Kumppani's shape, in miniature. A company declares itself, and separately CONSENTS; only a
   // consenting one is named for a share. The consent row carries the GHII to pay, because a
   // business id is not an account and the node cannot accrue to a number.
@@ -94,6 +96,7 @@ const manifest = (name: string) => JSON.stringify({
     { id: 'dyn', method: 'POST', path: '/dyn', script: 'designating', commercial: { payMoney: { amount: PRICE, currency: 'EUR' } } },
     { id: 'fails', method: 'POST', path: '/fails', script: 'boom', commercial: { payMoney: { amount: PRICE, currency: 'EUR' } } },
     // Priced in the PACING meter. It exists so the suite can prove a morsel call shares nothing.
+    { id: 'chain', method: 'POST', path: '/chain', script: 'rolefiller', commercial: { payMoney: { amount: PRICE, currency: 'EUR' } } },
     { id: 'paced', method: 'POST', path: '/paced', script: 'designating', commercial: { payMorsels: MORSEL_PRICE } },
     { id: 'paid', method: 'POST', path: '/paid', script: 'echo', commercial: { payMoney: { amount: 500_000, currency: 'EUR' } } },
     // Money price AND a per-call destination: the exact combination kumppani sells (0.50 EUR a
@@ -114,6 +117,7 @@ let consumer: Awaited<ReturnType<typeof setupOwner>>;
 let alpha: Awaited<ReturnType<typeof setupOwner>>;     // beneficiary, weight 3
 let beta: Awaited<ReturnType<typeof setupOwner>>;      // beneficiary, weight 1
 let gamma: Awaited<ReturnType<typeof setupOwner>>;     // beneficiary named per call
+let delta: Awaited<ReturnType<typeof setupOwner>>;     // fills a role per sale in the chain
 let stranger: Awaited<ReturnType<typeof setupOwner>>;
 let rakePerCall = 0;
 
@@ -124,6 +128,7 @@ await test('Setup: a provider with priced actions, a consumer, three would-be be
   alpha = await setupOwner('alpha');
   beta = await setupOwner('beta');
   gamma = await setupOwner('gamma');
+  delta = await setupOwner('delta');
   stranger = await setupOwner('str');
   const inst = await json('/v1/extensions', { method: 'POST', headers: auth(provider.token), body: JSON.stringify({ manifest: manifest(EXT), scripts: SCRIPTS }) });
   assert(inst.status === 201 || inst.status === 200, `install ${inst.status}: ${JSON.stringify(inst.body?.error)}`);
@@ -718,6 +723,80 @@ await test('PAYOUT: a stranger cannot settle somebody else\'s debt', async () =>
   const q = await json('/v1/commerce/beneficiary/payout?beneficiary=' + encodeURIComponent(gamma.ghii), { headers: auth(stranger.token) });
   assert(q.body.data.payable === false, 'a stranger owes them nothing, so there is nothing to sign');
   assert(q.body.data.reason === 'NOTHING_OWED', `reason: ${q.body.data.reason}`);
+});
+
+// ── THE ROLE CHAIN: a value chain where nobody dilutes anybody ───────────────
+//
+// A pool is right when there is one thing to share and the sharers split it. A CHAIN is different:
+// a distributor's 10 % does not shrink because a label joined. Each role carries its own percent and
+// all of them are paid on every sale. Getting this wrong would mean telling somebody "you get 40 %"
+// and handing them 40 % of whatever was left after everyone else.
+
+await test('ROLES: a chain is declared, and the listing can state it in one line', async () => {
+  const r = await declare(provider.token, {
+    ext: EXT, action: 'chain', mode: 'roles', dynamic: true, capability: 'Chain proof',
+    roles: [
+      { role: 'levittaja', percent: 10, ghii: alpha.ghii },
+      { role: 'muusikko', percent: 40 },
+      { role: 'levy-yhtio', percent: 20, ghii: beta.ghii },
+      { role: 'kauppapaikka', percent: 30, ghii: gamma.ghii },
+    ],
+  });
+  assert(r.status === 200, `declare chain ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const sp = r.body.data.split;
+  assert(sp.mode === 'roles' && sp.roles.length === 4, `mode/roles: ${JSON.stringify(sp.mode)} ${sp.roles?.length}`);
+  assert(sp.roles.find((x: any) => x.role === 'muusikko').ghii === null, 'the performer is filled per sale');
+  // Derived from the record settlement reads, so a listing cannot advertise terms the node would not honour.
+  assert(/levittaja 10 %/.test(sp.arrangement) && /muusikko 40 %/.test(sp.arrangement),
+    `arrangement: ${sp.arrangement}`);
+  assert(/filled per sale/.test(sp.arrangement), `it says which roles are open: ${sp.arrangement}`);
+});
+
+await test('ROLES: a chain promising more than the seller receives is refused', async () => {
+  const r = await declare(provider.token, {
+    ext: EXT, action: 'chain', mode: 'roles',
+    roles: [{ role: 'a', percent: 60 }, { role: 'b', percent: 60 }],
+  });
+  assert(r.status === 400, `expected 400, got ${r.status}`);
+  assert(/120 %/.test(r.body?.error?.message ?? ''), `the message names the total: ${r.body?.error?.message}`);
+});
+
+await test('ROLES: every role is paid its own percent from one sale', async () => {
+  const a = await accept(consumer.token, 'chain', { cap_units: 50_000_000 });
+  assert(a.status === 201, `accept chain ${a.status}: ${JSON.stringify(a.body?.error)}`);
+  const rake = Number(a.body.data.entitlement.rake_per_call);
+  const cut = PRICE - rake;
+
+  const before = { a: await accrued(alpha.token), b: await accrued(beta.token), g: await accrued(gamma.token), d: await accrued(delta.token) };
+  const call = await invoke(consumer.token, 'chain', { performer: delta.ghii });
+  assert(call.status === 200, `chain call ${call.status}: ${JSON.stringify(call.body?.error)}`);
+
+  const got = {
+    a: await accrued(alpha.token) - before.a,
+    b: await accrued(beta.token) - before.b,
+    g: await accrued(gamma.token) - before.g,
+    d: await accrued(delta.token) - before.d,
+  };
+  assert(got.a === Math.floor(cut * 10 / 100), `levittaja 10 %: expected ${Math.floor(cut * 10 / 100)}, got ${got.a}`);
+  assert(got.d === Math.floor(cut * 40 / 100), `muusikko 40 % (filled per sale): expected ${Math.floor(cut * 40 / 100)}, got ${got.d}`);
+  assert(got.b === Math.floor(cut * 20 / 100), `levy-yhtio 20 %: expected ${Math.floor(cut * 20 / 100)}, got ${got.b}`);
+  assert(got.g === Math.floor(cut * 30 / 100), `kauppapaikka 30 %: expected ${Math.floor(cut * 30 / 100)}, got ${got.g}`);
+  // Conservation: four independent percents totalling 100 leave the seller only the rounding residue.
+  const paid = got.a + got.b + got.g + got.d;
+  assert(paid <= cut, `the chain never exceeds the cut: ${paid} > ${cut}`);
+});
+
+await test('ROLES: an unfilled role pays nobody and does not enlarge the others', async () => {
+  const before = { a: await accrued(alpha.token), b: await accrued(beta.token), g: await accrued(gamma.token), d: await accrued(delta.token) };
+  // No performer named this time: the 40 % has no holder.
+  const call = await invoke(consumer.token, 'chain', {});
+  assert(call.status === 200, `chain call ${call.status}: ${JSON.stringify(call.body?.error)}`);
+
+  const cut = PRICE - 10_000;
+  assert(await accrued(delta.token) === before.d, 'the unfilled performer role paid nobody');
+  assert(await accrued(alpha.token) - before.a === Math.floor(cut * 10 / 100), 'the distributor still got exactly 10 %');
+  assert(await accrued(beta.token) - before.b === Math.floor(cut * 20 / 100), 'the label still got exactly 20 %');
+  assert(await accrued(gamma.token) - before.g === Math.floor(cut * 30 / 100), 'the marketplace still got exactly 30 %');
 });
 
 // ── MORSELS ARE NEVER SHARED ─────────────────────────────────────────────────

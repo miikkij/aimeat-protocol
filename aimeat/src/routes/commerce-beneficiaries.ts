@@ -30,7 +30,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import {
   putSplit, deleteSplit, listSplitsByProvider,
-  BENEFICIARIES_MAX, type BeneficiarySplit, type BeneficiaryShare,
+  BENEFICIARIES_MAX, type BeneficiarySplit, type BeneficiaryShare, type BeneficiaryRole,
 } from '../commerce/beneficiary-split.js';
 import {
   listBeneficiaryEntries, listBeneficiaryObligations, type BeneficiaryEntry,
@@ -49,7 +49,11 @@ function splitView(s: BeneficiarySplit): Record<string, unknown> {
     ext: s.ext,
     action: s.action,
     capability: s.capabilityLabel,
+    mode: s.mode,
     pool_percent: s.poolPercent,
+    roles: s.roles.map(r => ({ role: r.role, percent: r.percent, ghii: r.ghii, note: r.note })),
+    /** One line a listing can show without the reader working it out. */
+    arrangement: describeSplit(s),
     dynamic: s.dynamic,
     state: s.state,
     beneficiaries: s.beneficiaries.map(b => ({ ghii: b.ghii, weight: b.weight, note: b.note })),
@@ -90,6 +94,63 @@ function totalsOf(entries: Array<BeneficiaryEntry & { trackingCode: string }>): 
     t.entries += 1;
   }
   return totals;
+}
+
+/**
+ * The arrangement in one sentence, derived from the record settlement actually reads.
+ *
+ * Derived rather than authored, so a listing cannot advertise a split the node would not honour. A
+ * seller writing their own sentence here would be marketing; this is a description.
+ */
+function describeSplit(s: BeneficiarySplit): string {
+  if (s.state !== 'active') return 'No revenue is shared at present.';
+  if (s.mode === 'roles') {
+    const named = s.roles.map(r => `${r.role} ${r.percent} %`).join(', ');
+    const open = s.roles.filter(r => !r.ghii).length;
+    return named
+      ? `${s.roles.length} roles, each paid its own share of the seller's revenue: ${named}.`
+        + (open ? ` ${open} of them are filled per sale.` : '')
+      : 'A role chain with no roles declared.';
+  }
+  if (s.poolPercent <= 0) return 'No revenue is shared at present.';
+  if (s.dynamic && !s.beneficiaries.length) {
+    return `${s.poolPercent} % of the seller's revenue is shared with the accounts each sale names.`;
+  }
+  const n = s.beneficiaries.length;
+  const weights = s.beneficiaries.map(b => b.weight).join(':');
+  return `${s.poolPercent} % of the seller's revenue is shared between ${n} account${n === 1 ? '' : 's'}`
+    + (n > 1 ? ` in the ratio ${weights}` : '')
+    + (s.dynamic ? ', plus any the sale itself names' : '') + '.';
+}
+
+/** Parse and validate the role rows. A chain that promises more than exists is refused outright. */
+function parseRoles(raw: unknown): { rows: BeneficiaryRole[] } | { bad: string } {
+  if (raw === undefined || raw === null) return { rows: [] };
+  if (!Array.isArray(raw)) return { bad: '`roles` must be an array' };
+  if (raw.length > BENEFICIARIES_MAX) return { bad: `At most ${BENEFICIARIES_MAX} roles per split` };
+  const rows: BeneficiaryRole[] = [];
+  const seen = new Set<string>();
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') return { bad: 'Each role must be an object' };
+    const { role, percent, ghii, note } = item as Record<string, unknown>;
+    if (typeof role !== 'string' || !role.trim()) return { bad: 'Each role needs a `role` name' };
+    if (seen.has(role)) return { bad: `Role "${role}" is declared twice` };
+    seen.add(role);
+    const pct = Number(percent);
+    if (!Number.isFinite(pct) || pct <= 0 || pct > 100) {
+      return { bad: `Role "${role}" needs a \`percent\` between 0 and 100` };
+    }
+    if (ghii !== undefined && ghii !== null && (typeof ghii !== 'string' || ghii.indexOf('@') < 1)) {
+      return { bad: `Role "${role}" has a \`ghii\` that is not an owner GHII` };
+    }
+    rows.push({ role: role.trim(), percent: pct, ghii: (ghii as string) ?? null, note: typeof note === 'string' ? note : '' });
+  }
+  const total = rows.reduce((sum, r) => sum + r.percent, 0);
+  if (total > 100) {
+    return { bad: `The roles total ${total} % of your cut, which is more than you receive. `
+      + 'Each role takes its own percent independently, so they must total at most 100.' };
+  }
+  return { rows };
 }
 
 /** Parse and validate the beneficiary rows off a request body. Rejects rather than silently dropping. */
@@ -133,26 +194,38 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
         'Name the metered coordinate this split applies to: `ext` and `action`'));
     }
 
-    const pool = Number(body.pool_percent);
-    if (!Number.isFinite(pool) || pool < 0 || pool > 100) {
-      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        '`pool_percent` is the share of YOUR cut that goes to beneficiaries, 0-100'));
-    }
+    const mode = body.mode === 'roles' ? 'roles' : 'pool';
+    const dynamic = body.dynamic === true;
 
+    const roles = parseRoles(body.roles);
+    if ('bad' in roles) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', roles.bad));
     const parsed = parseBeneficiaries(body.beneficiaries);
     if ('bad' in parsed) return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', parsed.bad));
 
-    const dynamic = body.dynamic === true;
-    if (!parsed.rows.length && !dynamic) {
-      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
-        'A split with no beneficiaries and no `dynamic: true` would divide nothing. Either list who '
-        + 'shares it, or set `dynamic: true` so the capability may name them per call.'));
+    let pool = 0;
+    if (mode === 'roles') {
+      if (!roles.rows.length) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          'A role chain needs at least one role. Each role takes its own percent of your cut and they '
+          + 'total at most 100; an unfilled role simply pays nobody.'));
+      }
+    } else {
+      pool = Number(body.pool_percent);
+      if (!Number.isFinite(pool) || pool < 0 || pool > 100) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          '`pool_percent` is the share of YOUR cut that goes to beneficiaries, 0-100'));
+      }
+      if (!parsed.rows.length && !dynamic) {
+        return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+          'A split with no beneficiaries and no `dynamic: true` would divide nothing. Either list who '
+          + 'shares it, or set `dynamic: true` so the capability may name them per call.'));
+      }
     }
 
     const split = await putSplit(storage, {
       providerGhii, ext, action,
       capabilityLabel: typeof body.capability === 'string' ? body.capability : undefined,
-      poolPercent: pool, beneficiaries: parsed.rows, dynamic,
+      mode, poolPercent: pool, beneficiaries: parsed.rows, roles: roles.rows, dynamic,
       state: body.state === 'paused' ? 'paused' : 'active',
       createdBy: resolveIdentity(req.auth!, config.nodeId),
     });
