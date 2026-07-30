@@ -62,6 +62,7 @@ import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
 import { settleMeteredCoordinate } from './extensions/entitlement-gate.js';
 import { logger } from '../utils/logger.js';
+import { notifyGrantIssued, notifyGrantsRevoked } from '../services/membership-notify.js';
 import {
   type AgentWork, newWorkId, putWork, getWork, listWorkByConsumer, listWorkByProvider,
 } from '../services/exchange-work.js';
@@ -296,6 +297,10 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     const reason = typeof rawReason.app_id === 'string' && typeof rawReason.role === 'string'
       ? { appId: rawReason.app_id, role: rawReason.role } : null;
 
+    // Read the provider's existing grants BEFORE writing this one: the notification is coalesced on
+    // whether this membership already existed, and reading after the write cannot tell the two apart.
+    const grantsBefore = await listGrantsByProvider(storage, priced.providerGhii);
+
     const ent = await issueGrant(storage, {
       consumerGaii: consumer, appId: typeof b.app_id === 'string' && b.app_id ? b.app_id : null,
       providerGhii: priced.providerGhii, ext: priced.ext, action: priced.action,
@@ -306,6 +311,13 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
     });
     logger.info('EXCHANGE grant issued: the provider carries this consumer', {
       provider: owner, consumer, ext: priced.ext, action: priced.action, listPrice: priced.pricePerCall,
+    });
+    // Tell the person they were let in. An app cannot do this for itself: the sandbox notify writes
+    // to the CALLER's owner, which at approval time is the provider notifying themselves.
+    await notifyGrantIssued(storage, config, {
+      providerOwner: owner, consumerGaii: consumer,
+      appId: (typeof b.app_id === 'string' && b.app_id) ? b.app_id : (reason?.appId ?? null),
+      capabilityLabel: priced.capabilityLabel, existing: grantsBefore,
     });
     return res.status(201).json(success(config.nodeId, { grant: grantView(config, ent) }, [
       { description: 'Everyone you are carrying', method: 'GET', url: '/v1/exchange/grants' },
@@ -359,8 +371,12 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
       const g = await readGrantForCall(storage, consumer, o.ext, o.action);
       if (g?.grant) targets = [g];
     } else if (appId) {
+      // An approval records the app in EITHER place: `reason.app_id` when the caller also named a
+      // role, and the entitlement's own `appId` when it passed the top-level `app_id`. Matching
+      // only the first made this bulk form answer `revoked: 0` for the apps that use the second,
+      // which is the exact silent nothing it exists to prevent.
       targets = (await listGrantsByProvider(storage, providerGhii)).filter(g =>
-        g.grant?.reason?.appId === appId
+        (g.grant?.reason?.appId ?? g.appId) === appId
         && (!role || g.grant?.reason?.role === role)
         && (!consumer || g.consumerGaii === consumer));
     } else {
@@ -374,6 +390,12 @@ export function exchangeRouter(config: AimeatConfig, storage: Storage): Router {
       if (await revokeGrant(storage, g.consumerGaii, g.ext, g.action)) revoked += 1;
     }
     logger.info('EXCHANGE grants withdrawn', { provider: owner, revoked, appId: appId || null, role: role || null });
+    // One notification per person, and only when nothing of that membership is left: withdrawing one
+    // listing of twelve changes a membership rather than ending it.
+    if (revoked > 0) {
+      const remaining = await listGrantsByProvider(storage, providerGhii);
+      await notifyGrantsRevoked(storage, config, { providerOwner: owner, revoked: targets, remaining });
+    }
     return res.json(success(config.nodeId, {
       revoked,
       grants: targets.map(g => ({ consumer: g.consumerGaii, ext: g.ext, action: g.action, capability: g.capabilityLabel })),

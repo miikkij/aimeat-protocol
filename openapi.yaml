@@ -8346,6 +8346,10 @@ paths:
         the list price per call) and can be bounded (`cap_carried_units`). Requires scope
         `exchange:grant`, so an app issuing these on an owner's approval must say so. Body:
         `{ consumer, offering_id, cap_carried_units?, note?, app_id?, reason? }`. Returns `{ grant }`.
+        The consumer is NOTIFIED that they were approved, which an app cannot do for itself: the
+        extension sandbox notifies the CALLER's owner, so at approval time the provider would only
+        notify themselves. It rings once per membership, not once per listing, so an approval that
+        carries twelve offerings is one bell.
       tags: [Commerce]
       security:
         - BearerAuth: []
@@ -8409,8 +8413,11 @@ paths:
         Immediate: the next call reads a non-active grant and falls back to whatever the consumer bought
         for themselves, which for most of them is nothing. Two forms — `{ consumer, offering_id }` for one,
         or `{ app_id, role?, consumer? }` for every grant issued under an approval being taken back, so an
-        app demoting a member does not have to remember each listing. Provider-only; requires scope
-        `exchange:grant`. Returns `{ revoked, grants }`.
+        app demoting a member does not have to remember each listing. `app_id` matches the app recorded
+        EITHER as the grant's own `app_id` or inside `reason.app_id`. Provider-only; requires scope
+        `exchange:grant`. Returns `{ revoked, grants }`. The consumer is notified when the LAST grant
+        of a membership goes; withdrawing one listing of several changes a membership rather than
+        ending it, and is not announced as a removal.
       tags: [Commerce]
       security:
         - BearerAuth: []

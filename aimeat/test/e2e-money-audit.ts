@@ -785,6 +785,75 @@ await test('GRANT · revoking it takes access away immediately', async () => {
     assert(r.status === 402, `a withdrawn approval is not access, got ${r.status}`);
 });
 
+/**
+ * Being approved is something the member should learn WITHOUT being told out of band, and an app
+ * cannot deliver it: the sandbox notify writes to the caller's own owner, so at approval time the
+ * provider notifies themselves. The node emits it off the grant it already authorised.
+ *
+ * Coalescing is half the requirement. Approving one member commonly issues a grant per offering, so
+ * a notification per grant would ring twelve times for one decision and train people to ignore the
+ * channel. It rings when the relationship begins and when it ends, not in between.
+ */
+await test('GRANT · being approved notifies the MEMBER, once per decision rather than once per listing', async () => {
+    const newcomer = await setupOwner('ntf');
+    const bell = async () => {
+        const r = await json('/v1/notifications', { headers: auth(newcomer.token) });
+        return (r.body.data.notifications as any[]) ?? [];
+    };
+    assert((await bell()).length === 0, 'a fresh account starts with an empty bell');
+
+    const APP_REF = `${provider.name}/${APP}`;
+    const g1 = await json('/v1/exchange/grants', {
+        method: 'POST', headers: auth(provider.token),
+        body: JSON.stringify({ consumer: newcomer.name, offering_id: offeringSolo, app_id: APP_REF }),
+    });
+    assert(g1.status === 201, `first grant ${g1.status}: ${JSON.stringify(g1.body?.error)}`);
+
+    let notes = await bell();
+    const approved = notes.filter(n => n.type === 'app_member_approved');
+    assert(approved.length === 1, `approving rings exactly once, got ${approved.length}: ${JSON.stringify(notes.map(n => n.type))}`);
+    assert(approved[0].title.includes(APP.replace('.html', '')), `the message names the app: ${approved[0].title}`);
+    assert(/free/i.test(approved[0].body), `and says what changed for them: ${approved[0].body}`);
+
+    // The SAME approval carrying a second listing must not ring again.
+    const g2 = await json('/v1/exchange/grants', {
+        method: 'POST', headers: auth(provider.token),
+        body: JSON.stringify({ consumer: newcomer.name, offering_id: offeringBrief, app_id: APP_REF }),
+    });
+    assert(g2.status === 201, `second grant ${g2.status}: ${JSON.stringify(g2.body?.error)}`);
+    notes = await bell();
+    assert(notes.filter(n => n.type === 'app_member_approved').length === 1,
+        `a twelve-listing approval is ONE decision, not twelve bells — got ${notes.filter(n => n.type === 'app_member_approved').length}`);
+
+    // Withdrawing one of two changes the membership; it does not end it, so saying "removed" would lie.
+    const partial = await json('/v1/exchange/grants/revoke', {
+        method: 'POST', headers: auth(provider.token),
+        body: JSON.stringify({ consumer: newcomer.name, offering_id: offeringSolo }),
+    });
+    assert(partial.status === 200 && partial.body.data.revoked === 1, `partial revoke: ${JSON.stringify(partial.body?.data)}`);
+    notes = await bell();
+    assert(notes.filter(n => n.type === 'app_member_revoked').length === 0,
+        'losing one listing of two is not being removed, and must not say so');
+
+    // Taking the last one ends it, and that rings once.
+    const rest = await json('/v1/exchange/grants/revoke', {
+        method: 'POST', headers: auth(provider.token),
+        body: JSON.stringify({ app_id: APP_REF, consumer: newcomer.name }),
+    });
+    assert(rest.status === 200 && rest.body.data.revoked === 1, `final revoke: ${JSON.stringify(rest.body?.data)}`);
+    notes = await bell();
+    const revoked = notes.filter(n => n.type === 'app_member_revoked');
+    assert(revoked.length === 1, `ending the membership rings once, got ${revoked.length}`);
+    assert(/list price/i.test(revoked[0].body), `and says what it means for them now: ${revoked[0].body}`);
+});
+
+await test('GRANT · the provider is never notified about their own approval', async () => {
+    const before = await json('/v1/notifications', { headers: auth(provider.token) });
+    const mine = ((before.body.data.notifications as any[]) ?? []).filter(n => n.type?.startsWith('app_member_'));
+    assert(mine.length === 0,
+        `the person doing the approving already knows; their bell must stay clean, got ${JSON.stringify(mine.map(n => n.title))}`);
+});
+
 await test('GRANT · a gift never overwrites a purchase, and withdrawing it returns the buyer to what they bought', async () => {
     // The consumer BOUGHT the solo product earlier in this run. Granting over it must not touch that.
     const cExt = `apptool:${provider.name}/${APP}`;
