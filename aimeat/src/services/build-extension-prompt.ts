@@ -16,6 +16,10 @@
  * @usage import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
  *   const { full, body } = buildExtensionPrompt(config, { lang: 'en', owner: 'alice' });
  * @version-history
+ *   v1.1.0 — 2026-07-30 — Beneficiary splitting: how to route part of what you earn to other
+ *     accounts, and the `_revenue` key an action returns to name a destination PER CALL. The
+ *     capability shipped with no way for an author to discover it, so nobody but its implementer
+ *     could have used it.
  *   v1.0.0 — 2026-07-27 — Moved off the Extensions tab into the node and completed with the four
  *     things it never said: the commercial block + exchange listing, the install route, secret
  *     config fields, and binary file I/O.
@@ -161,8 +165,9 @@ function filesSection(): string {
   ].join('\n');
 }
 
-/** Commerce, transcribed from manifest.ts validateActionPricing + exchange-projection desiredFromExtActions. */
-function commerceSection(): string {
+/** Commerce, transcribed from manifest.ts validateActionPricing + exchange-projection desiredFromExtActions,
+ *  plus beneficiary splitting from commerce/beneficiary-{split,designation}.ts. */
+function commerceSection(url: string): string {
   return [
     '## Selling it: the block that turns an action into a product',
     '',
@@ -201,6 +206,58 @@ function commerceSection(): string {
     'You do not call a listing endpoint. The manifest IS the listing: write the price, and the',
     'market follows on the next write. Change the price later and the same card updates rather',
     'than a rival one appearing.',
+    '',
+    '## Sharing what you earn with somebody else',
+    '',
+    'Sometimes the money you take for a call is not all yours to keep. A lookup service owes the',
+    'party it looked up; a dataset owes whoever maintains it. You can route part of YOUR cut to',
+    'other accounts, and the buyer is not charged a cent more for it: the share comes out of what',
+    'you earned, after the platform rake, never out of their price.',
+    '',
+    'Declare it once, as the owner, against the coordinate you sell at:',
+    '',
+    '```bash',
+    `curl -X POST ${url}/v1/commerce/beneficiary-splits \\`,
+    '  -H "Authorization: Bearer $TOKEN" -H \'Content-Type: application/json\' \\',
+    '  -d \'{ "ext": "my-ext", "action": "lookup", "pool_percent": 70, "dynamic": true,',
+    '        "beneficiaries": [{ "ghii": "alice@node-id", "weight": 3, "note": "data steward" }] }\'',
+    '```',
+    '',
+    '`pool_percent` is how much of your cut leaves you. `weight` divides that pool: two rows at',
+    'weight 1 split it evenly, 3 and 1 split it 75/25.',
+    '',
+    'That covers a standing arrangement. When WHO deserves a share depends on what the call was',
+    'about, set `dynamic: true` and name the destinations from inside the action itself, by putting',
+    'a `_revenue` key on what you return:',
+    '',
+    '```javascript',
+    'export default async function (ctx, input) {',
+    '  const company = await lookUp(input.businessId);',
+    '  return {',
+    '    company,',
+    '    // Stripped by the node before the buyer sees this. They asked about a company, not about',
+    '    // who you share your margin with.',
+    '    _revenue: { beneficiaries: [{ ghii: company.ownerGhii, weight: 1 }] },',
+    '  };',
+    '}',
+    '```',
+    '',
+    'What that key can and cannot do, because the limits are the reason it is allowed at all:',
+    '',
+    '- It names DESTINATIONS only. There is no way to put an amount, a percent or a currency in it.',
+    '  The pool size stays your server-held declaration, so an action can redirect a share you',
+    '  already committed and can never enlarge its own payout.',
+    '- It is ignored unless the declaration says `dynamic: true`.',
+    '- A call that names nobody simply leaves your whole cut with you. The share was never anyone',
+    '  else\'s until somebody was named for it.',
+    '- A malformed entry is dropped, not fatal. A bookkeeping typo must not deny a buyer the answer',
+    '  they already paid for.',
+    '',
+    'Shares ACCRUE on every settled call and are visible to the beneficiary immediately',
+    `(\`GET ${url}/v1/commerce/beneficiary/earnings\`). PAYING one out is a separate, gated act: the`,
+    'node refuses until an operator has recorded that the beneficiary may be paid. Accruing to an',
+    'unverified account is fine and useful; paying it is how a self-declared claimant would collect',
+    'on somebody else\'s identity, so it does not happen by itself.',
     '',
   ].join('\n');
 }
@@ -281,7 +338,7 @@ export function buildExtensionPrompt(
     manifestSection(owner),
     secretsSection(),
     filesSection(),
-    commerceSection(),
+    commerceSection(url),
     installSection(url),
     verifySection(url),
   ].join('\n');

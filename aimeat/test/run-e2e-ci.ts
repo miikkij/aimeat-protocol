@@ -20,6 +20,12 @@
  *   v1.5.0 -- 2026-07-29 -- --test= resolution: exact suite name wins over substring, and an
  *            ambiguous substring exits non-zero instead of silently picking the first match
  *            (--test=security ran e2e-zip-security and never ran e2e-security).
+ *   v1.6.0 -- 2026-07-30 -- A suite that never RAN no longer renders as a tick. One with a syntax
+ *            error exits non-zero having reported nothing, so `failed` was 0 and the row printed
+ *            "OK 0 0 0" -- which reads as "nothing to test here" rather than "this never compiled".
+ *            The overall exit code was already correct; the human-readable report was not, and the
+ *            report is what anyone actually reads. Now marked "!  DID NOT RUN (exit N)" with a
+ *            count under the totals.
  */
 
 import { spawn, type ChildProcess } from 'node:child_process';
@@ -554,7 +560,7 @@ async function main() {
         }
     }
 
-    const results: { name: string; passed: number; failed: number; total: number; time: string }[] = [];
+    const results: { name: string; passed: number; failed: number; total: number; time: string; exitCode: number }[] = [];
     let anyFailed = false;
 
     try {
@@ -580,7 +586,7 @@ async function main() {
             const parsed = parseResults(output);
 
             if (parsed.failed > 0 || exitCode !== 0) anyFailed = true;
-            results.push({ name, ...parsed, time: `${elapsed}s` });
+            results.push({ name, ...parsed, time: `${elapsed}s`, exitCode });
         }
     } finally {
         if (server) {
@@ -597,9 +603,16 @@ async function main() {
     console.log('');
     console.log('Suite'.padEnd(30) + 'Passed'.padEnd(10) + 'Failed'.padEnd(10) + 'Total'.padEnd(10) + 'Time');
     console.log('-'.repeat(70));
+    let crashed = 0;
     for (const r of results) {
-        const status = r.failed === 0 ? '✓' : '✗';
-        console.log(`${status} ${r.name.padEnd(28)}${String(r.passed).padEnd(10)}${String(r.failed).padEnd(10)}${String(r.total).padEnd(10)}${r.time}`);
+        // A suite that never RAN is not a suite that passed. One with a syntax error exits non-zero
+        // having reported nothing, so `failed` is 0 and the row used to render as a tick beside
+        // "0 0 0" — which reads as "nothing to test here" rather than "this never compiled".
+        const didNotRun = r.exitCode !== 0 && r.total === 0;
+        const status = didNotRun ? '!' : r.failed === 0 ? '✓' : '✗';
+        const note = didNotRun ? `  DID NOT RUN (exit ${r.exitCode})` : '';
+        if (didNotRun) crashed++;
+        console.log(`${status} ${r.name.padEnd(28)}${String(r.passed).padEnd(10)}${String(r.failed).padEnd(10)}${String(r.total).padEnd(10)}${r.time}${note}`);
     }
 
     const totalPassed = results.reduce((s, r) => s + r.passed, 0);
@@ -607,6 +620,9 @@ async function main() {
     const totalTests = results.reduce((s, r) => s + r.total, 0);
     console.log('-'.repeat(70));
     console.log(`  Total: ${totalPassed} passed, ${totalFailed} failed out of ${totalTests}`);
+    if (crashed > 0) {
+        console.log(`  ${crashed} suite(s) DID NOT RUN — they exited non-zero without reporting a single test.`);
+    }
 
     process.exit(anyFailed ? 1 : 0);
 }

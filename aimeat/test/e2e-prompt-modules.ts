@@ -326,6 +326,25 @@ await test('build-extension: it teaches the COMMERCIAL block, in the units the n
     assert(p.includes('1000000') || p.includes('1 EUR = 1000000'), 'gives the micro-unit conversion');
 });
 
+await test('build-extension: it teaches REVENUE SHARING, including the per-call `_revenue` key', async () => {
+    // The capability shipped with no way for an author to discover it. A feature nobody but its
+    // implementer can find is not a feature, and a served prompt is the only place they would look.
+    const { body } = await json('/v1/prompts/build-extension');
+    const p: string = body.data.prompt;
+    assert(p.includes('/v1/commerce/beneficiary-splits'), 'gives the route that declares a split');
+    assert(p.includes('pool_percent'), 'names the field that sizes the pool');
+    assert(p.includes('_revenue'), 'names the per-call designation key');
+    assert(p.includes('dynamic'), 'says which flag turns per-call designation on');
+    // The two facts that make the key safe to hand a sandboxed author, and the one that stops them
+    // expecting money to arrive on its own.
+    // Matched on phrases that do not straddle the prompt's own line wrap, so a reflow of the copy
+    // does not fail the test for the wrong reason.
+    assert(p.includes('not charged a cent more'), 'says a split costs the buyer nothing');
+    assert(p.includes('never out of their price'), 'says the share comes out of the seller');
+    assert(/can never enlarge its own payout/i.test(p), 'says an action cannot raise its own share');
+    assert(/refuses until an operator|gated act/i.test(p), 'says a payout is gated, so accrual is not payment');
+});
+
 await test('build-extension: it says how to INSTALL, and who may', async () => {
     const { body } = await json('/v1/prompts/build-extension');
     const p: string = body.data.prompt;
