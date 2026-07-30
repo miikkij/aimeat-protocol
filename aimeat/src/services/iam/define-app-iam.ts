@@ -16,11 +16,14 @@
  */
 import type { LevelSchema, LevelDef } from './model.js';
 import { validateCommandManifest, deriveAppCommandDecision, type CommandDef } from './app-commands.js';
+import { generateIamExtension, type GeneratedExtension } from './generate-extension.js';
 
 export interface DefineAppIamInput {
+  /** `owner/file.html` to also GENERATE the installable gate; a bare label only validates. */
   appId?: string;
   levels: LevelDef[];
   commands: CommandDef[];
+  author?: string;
 }
 
 /**
@@ -56,6 +59,12 @@ export type DefineAppIamResult =
       matrix: Record<string, { canRun: string[]; needsConfirmation: string[] }>;
       /** Ready-to-apply aimeat-iam `admin` payloads — send each to the ext's admin action in order. */
       apply: Array<Record<string, unknown>>;
+      /**
+       * The INSTALLABLE gate, when an appId was given. This is the point of the tool: a design that
+       * only returns payloads still leaves somebody forking a package and editing JavaScript, which
+       * is how six gates on this node came to disagree. Install it with PUT /v1/extensions/{name}.
+       */
+      extension?: GeneratedExtension;
     };
 
 /**
@@ -87,6 +96,11 @@ export function defineAppIam(input: DefineAppIamInput): DefineAppIamResult {
 
   return {
     ok: true, schema, commands: input.commands, matrix,
+    // Only when the design names the app it gates: without that the node cannot resolve a caller's
+    // membership, and a generated gate would answer "no role" to everyone forever.
+    ...(input.appId && input.appId.includes('/')
+      ? { extension: generateIamExtension({ appId: input.appId, levels: input.levels, commands: input.commands, author: input.author }) }
+      : {}),
     apply: [
       { op: 'setRoles', roles: iamRoles },
       { op: 'setLevels', levels: iamLevels },

@@ -93,6 +93,43 @@ provision calls, the processing loop, schema rules, discovery tags:
 - Apps call cortex public methods only — never \`callExt\`/\`/v1/ext/\` directly.
 - Extension actions use \`export default async function(ctx, input) { ... }\` (ES module default export).
 
+## Your app's own members (aimeat-iam)
+
+Three layers, and the boundary between them is the whole point. Six apps on this node each built
+their own member model before this existed and disagreed six ways, so the split is now fixed:
+
+- **The NODE owns who is a member.** \`/v1/apps/{owner}/{file}/members\` — approve, remove, ask,
+  read your own standing. It lives here because three of the jobs cannot be done from an app at all:
+  telling the approved person they were approved (the sandbox \`ctx.notify\` reaches the CALLER, so an
+  approval notifies the approver), keeping the list private (an \`ext:\` namespace is world-readable by
+  default), and taking free access away together with the role.
+- **The EXTENSION owns what a member may do.** The capability vocabulary is genuinely per-app, and a
+  browser can never enforce it. Declare the app in your manifest \`config:\` as \`app: owner/file.html\`
+  and the node hands your script \`ctx.caller.member\` and \`ctx.caller.isAppOwner\`, resolved before the
+  sandbox starts. Do NOT keep your own roster in \`ctx.memory\`.
+- **The LIBRARY owns the surface.** \`/v1/libs/aimeat-iam.js\`: \`init({ app })\`, \`me()\`,
+  \`MemberAdmin({ target })\` for the owner's panel, \`JoinPanel({ target })\` for the applicant.
+
+### can() is a HINT, never a gate
+
+\`AIMEAT.iam.can(cap)\` reads a cached capability list and exists so a user is not shown a control that
+will refuse them. It is defeated by anyone who opens devtools. \`guard(cap, fn)\` asks the SERVER before
+running, so a list that went stale (a revoke while the page was open) refuses instead of proceeding.
+
+**Enforce in the action that mutates data.** A client check is decoration on top of a server decision;
+where there is no server decision underneath, there is no access control at all.
+
+### A role belongs to the PERSON
+
+The roster row is keyed to the bare account name, so a member working through an agent resolves to the
+same row without a second entry, and one revoke removes it from all of them. \`subject\` changes this
+only when you mean it: \`gaii\` enrols every identity on its own and nothing inherits; \`both\` is
+owner-keyed with an optional per-agent override.
+
+Keying a role to the acting identity is the single most expensive mistake made here: it silently drops
+an approved member's agent to the default role, and in a members-only app that is the guest tier.
+
+
 ## Boundaries
 No agent/owner work (memory beyond build state, tasks, messages), no marketplace, no admin here. If
 you need those, switch surfaces.

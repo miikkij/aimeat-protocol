@@ -467,5 +467,101 @@ await test('the suggested role is read from the roster, not guessed', async () =
         `the offered role is one the app actually uses (${JSON.stringify(roles)}), got ${approve.body.role}`);
 });
 
+
+// ── the spec becomes the gate ───────────────────────────────────────────────────────────────────
+// Six gates on this node were forks of one package and every difference between them was hand-typed.
+// A generated gate cannot drift, so the thing worth proving is that the generated one INSTALLS and
+// DECIDES correctly — not that a string was produced.
+
+await test('a declared IAM spec generates a gate that installs and runs', async () => {
+    const { defineAppIam } = await import('../src/services/iam/define-app-iam.js');
+    const design = defineAppIam({
+        appId: `${owner.name}/${APP}`,
+        author: owner.name,
+        levels: [
+            { level: 0, key: 'admin', label: 'Admin', capabilities: ['*'] },
+            { level: 10, key: 'member', label: 'Member', capabilities: ['read', 'write'] },
+            { level: 20, key: 'guest', label: 'Guest', capabilities: ['read'] },
+        ],
+        commands: [
+            { id: 'doc.read', description: 'Read a document', capability: 'read', tier: 'read' },
+            { id: 'doc.write', description: 'Write one', capability: 'write', tier: 'write' },
+            { id: 'doc.purge', description: 'Delete everything', capability: 'admin', tier: 'irreversible' },
+        ],
+    });
+    assert(design.ok === true, `design validates: ${JSON.stringify(design)}`);
+    const gen = (design as any).extension;
+    assert(!!gen, 'naming the app produces the installable gate, not just payloads');
+    assert(gen.name === `${owner.name.toLowerCase()}-${APP.replace('.html', '')}-iam`.replace(/[^a-z0-9-]/g, '-'),
+        `the name is derived from the app: ${gen.name}`);
+
+    const inst = await json('/v1/extensions', {
+        method: 'POST', headers: auth(owner.token),
+        body: JSON.stringify({ manifest: gen.manifest, scripts: gen.scripts }),
+    });
+    assert(inst.status === 200 || inst.status === 201, `the generated manifest installs: ${inst.status} ${JSON.stringify(inst.body?.error)}`);
+    assert((await json(`/v1/extensions/${gen.name}/activate`, { method: 'POST', headers: auth(owner.token), body: '{}' })).status === 200, 'activate');
+
+    // The schemas must ARRIVE — three of the six live gates advertise none, which is why an agent
+    // could not discover them, and that came from a key the parser ignores.
+    const det = await json(`/v1/extensions/${gen.name}`, { headers: auth(owner.token) });
+    const check = (det.body.data.extension ?? det.body.data).actions.find((a: any) => a.id === 'check');
+    const props = (check.inputSchema ?? check.input_schema)?.properties ?? {};
+    assert(!!props.permission && !!props.command, `the generated gate advertises its shape: ${JSON.stringify(props)}`);
+    assert(Array.isArray(props.permission.enum) && props.permission.enum.includes('write'),
+        `and names the capabilities it knows: ${JSON.stringify(props.permission.enum)}`);
+
+    const call = async (token: string, body: Record<string, unknown>) =>
+        (await json(`/v1/ext/${gen.name}/check`, { method: 'POST', headers: auth(token), body: JSON.stringify(body) })).body.data;
+
+    // The OWNER reaches everything without a roster row.
+    const asOwner = await call(owner.token, { permission: 'write' });
+    assert(asOwner.allowed === true && asOwner.isOwner === true, `owner: ${JSON.stringify(asOwner)}`);
+
+    // A stranger holds nothing, and the gate keeps NO roster of its own to be wrong about it.
+    const nobody = await setupOwner('gen');
+    const asNobody = await call(nobody.token, { permission: 'read' });
+    assert(asNobody.allowed === false && asNobody.role === null, `stranger: ${JSON.stringify(asNobody)}`);
+
+    // Approving them on the NODE is what changes the gate's answer — no sync, no second write.
+    await json(`/v1/apps/${owner.name}/${APP}/members`, {
+        method: 'POST', headers: auth(owner.token), body: JSON.stringify({ account: nobody.name, role: 'member' }),
+    });
+    const asMember = await call(nobody.token, { permission: 'write' });
+    assert(asMember.allowed === true && asMember.role === 'member' && asMember.level === 10,
+        `an approval on the node reaches the generated gate: ${JSON.stringify(asMember)}`);
+    const denied = await call(nobody.token, { command: 'doc.purge' });
+    assert(denied.allowed === false && denied.tier === 'irreversible',
+        `a member is refused the irreversible command but still learns its tier: ${JSON.stringify(denied)}`);
+
+    // Discovery: an agent asks what it may run rather than guessing from a catalogue.
+    const list = (await json(`/v1/ext/${gen.name}/commands`, { method: 'POST', headers: auth(nobody.token), body: '{}' })).body.data;
+    assert(list.commands.length === 3, `all commands listed: ${list.commands.length}`);
+    const purge = list.commands.find((c: any) => c.id === 'doc.purge');
+    const write = list.commands.find((c: any) => c.id === 'doc.write');
+    assert(write.allowed === true && purge.allowed === false,
+        `each is marked for THIS caller: ${JSON.stringify(list.commands.map((c: any) => [c.id, c.allowed]))}`);
+    assert(purge.needsConfirmation === true, 'and the irreversible one asks for a human');
+
+    // Removing them on the node is visible immediately, with nothing to keep in step.
+    await json(`/v1/apps/${owner.name}/${APP}/members/${nobody.name}`, { method: 'DELETE', headers: auth(owner.token) });
+    const after = await call(nobody.token, { permission: 'read' });
+    assert(after.allowed === false && after.role === null,
+        `a removal reaches the gate on the next call: ${JSON.stringify(after)}`);
+});
+
+await test('the generated gate stores NOTHING, so it has nothing to leak', async () => {
+    const { generateIamExtension } = await import('../src/services/iam/generate-extension.js');
+    const gen = generateIamExtension({
+        appId: `${owner.name}/${APP}`,
+        levels: [{ level: 0, key: 'admin', label: 'A', capabilities: ['*'] }],
+        commands: [{ id: 'x', description: 'x', capability: 'admin', tier: 'read' }],
+    });
+    for (const [file, src] of Object.entries(gen.scripts)) {
+        assert(!/memory\.set/.test(src as string), `${file} writes no memory`);
+        assert(!/assignments/.test(src as string), `${file} keeps no roster`);
+    }
+});
+
 console.log(`\napp member roster E2E: ${passed} passed, ${failed} failed (${passed + failed} total)\n`);
 if (failed > 0) process.exit(1);

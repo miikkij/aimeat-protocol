@@ -49,7 +49,7 @@ import {
   COMP_PHASER_ARCADE,
   COMP_FLOW_EDITOR,
 } from './app-templates/components.js';
-import { USECASE_REALTIME_SOCIAL, USECASE_MARKETPLACE, USECASE_HOMEPAGE } from './app-templates/use-cases.js';
+import { USECASE_REALTIME_SOCIAL, USECASE_MARKETPLACE, USECASE_HOMEPAGE, USECASE_APP_IAM } from './app-templates/use-cases.js';
 
 export interface AppTemplate {
   /** Stable id, e.g. "shell-pure-client". */
@@ -143,6 +143,15 @@ const TEMPLATES: AppTemplate[] = [
     libs: ['aimeat-auth', 'aimeat-data', 'aimeat-storage', 'aimeat-ai', 'aimeat-markdown'],
     composes: ['comp-markdown', 'comp-image-upload', 'comp-ai-action', 'comp-auth-gated'],
     content: USECASE_HOMEPAGE,
+  },
+  {
+    id: 'usecase-app-iam',
+    kind: 'use-case',
+    title: 'Members and roles (own user community)',
+    description: "An app with its OWN members. The NODE keeps who is a member — it tells them when they are approved or removed, keeps the list private, and moves their free access with their role — and the app keeps what a role may do. Ships the owner's roster panel and the applicant's request form.",
+    libs: ['aimeat-auth', 'aimeat-iam', 'aimeat-data'],
+    composes: ['comp-auth-gated'],
+    content: USECASE_APP_IAM,
   },
 ];
 

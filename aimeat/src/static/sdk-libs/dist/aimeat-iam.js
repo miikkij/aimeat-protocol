@@ -198,6 +198,7 @@
       decline: "Decline",
       carried: "{n} / {of} carried",
       carriedNone: "none carried",
+      usage: "{n} calls, {cost} carried",
       carriedWarn: "{n} not carried",
       payingTitle: "Paying customers: {n}",
       payingLead: "They took a contract and let themselves in. Nothing here is waiting for you.",
@@ -244,6 +245,7 @@
       decline: "Hylkää",
       carried: "{n} / {of} katettu",
       carriedNone: "ei katettuja",
+      usage: "{n} kutsua, {cost} katettu",
       carriedWarn: "{n} kattamatta",
       payingTitle: "Maksavat asiakkaat: {n}",
       payingLead: "He ottivat sopimuksen ja päästivät itsensä sisään. Täällä ei odota mitään päätöstä.",
@@ -287,7 +289,7 @@
     const S = (k, v) => t(lang, k, v, opts.strings);
     const cls = (hook) => hook + (opts.classMap && opts.classMap[hook] ? " " + opts.classMap[hook] : "");
     let grants = (
-      /** @type {Record<string, { carried: number, total: number }>} */
+      /** @type {Record<string, { carried: number, total: number, calls: number, units: number, unit: string }>} */
       {}
     );
     let paying = (
@@ -301,11 +303,14 @@
         const rows = body && body.grants || [];
         const byConsumer = {};
         for (const g of rows) {
-          const who = String(g.consumer || "").toLowerCase().split("@")[0];
+          const who = String(g.consumer_gaii || g.consumer || "").toLowerCase().split("@")[0].split("#").pop();
           if (!who) continue;
-          byConsumer[who] = byConsumer[who] || { carried: 0, total: 0 };
+          byConsumer[who] = byConsumer[who] || { carried: 0, total: 0, calls: 0, units: 0, unit: "" };
           byConsumer[who].total += 1;
-          if (g.status === "active") byConsumer[who].carried += 1;
+          if ((g.state || g.status) === "active") byConsumer[who].carried += 1;
+          byConsumer[who].calls += g.budget && g.budget.calls || 0;
+          byConsumer[who].units += g.carried_units || 0;
+          if (!byConsumer[who].unit) byConsumer[who].unit = g.unit === "money" ? g.currency || "EUR" : "morsels";
         }
         grants = byConsumer;
       } catch {
@@ -319,6 +324,13 @@
       } catch {
         paying = [];
       }
+    }
+    function usageCell(id) {
+      const key = String(id).toLowerCase().split("@")[0].split("#").pop();
+      const g = grants[key];
+      if (!g || !g.calls) return null;
+      const cost = g.unit === "morsels" ? `${g.units} ${g.unit}` : `${(g.units / 1e6).toFixed(2)} ${g.unit}`;
+      return el("span", { cls: cls("aim-iam-muted"), text: S("usage", { n: g.calls, cost }) });
     }
     function grantCell(id) {
       const key = String(id).toLowerCase().split("@")[0].split("#").pop();
@@ -466,6 +478,7 @@
           !sel && m.role ? el("span", { cls: cls("aim-iam-badge"), text: m.role }) : null,
           m.since ? el("span", { cls: cls("aim-iam-muted"), text: fmtDate(m.since) }) : null,
           grantCell(m.id),
+          usageCell(m.id),
           sel,
           el("button", {
             cls: cls("aim-iam-btn"),

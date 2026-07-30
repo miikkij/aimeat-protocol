@@ -59,7 +59,7 @@ export function mountMemberAdmin(iam, opts) {
   const S = (k, v) => t(lang, k, v, opts.strings);
   const cls = (hook) => hook + ((opts.classMap && opts.classMap[hook]) ? ' ' + opts.classMap[hook] : '');
 
-  let grants = /** @type {Record<string, { carried: number, total: number }>} */ ({});
+  let grants = /** @type {Record<string, { carried: number, total: number, calls: number, units: number, unit: string }>} */ ({});
   let paying = /** @type {Array<{id:string,label?:string,spend?:string}>} */ ([]);
 
   async function loadGrants() {
@@ -67,14 +67,21 @@ export function mountMemberAdmin(iam, opts) {
     try {
       const body = await iam.adminFetch('/v1/exchange/grants?app_id=' + encodeURIComponent(opts.appId));
       const rows = (body && body.grants) || [];
-      /** @type {Record<string, { carried: number, total: number }>} */
+      /** @type {Record<string, { carried: number, total: number, calls: number, units: number, unit: string }>} */
       const byConsumer = {};
       for (const g of rows) {
-        const who = String(g.consumer || '').toLowerCase().split('@')[0];
+        // The view names these consumer_gaii / state / carried_units; reading `consumer`/`status`
+        // finds nothing and makes a working sync look like a broken one.
+        const who = String(g.consumer_gaii || g.consumer || '').toLowerCase().split('@')[0].split('#').pop();
         if (!who) continue;
-        byConsumer[who] = byConsumer[who] || { carried: 0, total: 0 };
+        byConsumer[who] = byConsumer[who] || { carried: 0, total: 0, calls: 0, units: 0, unit: '' };
         byConsumer[who].total += 1;
-        if (g.status === 'active') byConsumer[who].carried += 1;
+        if ((g.state || g.status) === 'active') byConsumer[who].carried += 1;
+        // What carrying this person has actually COST, from the same answer. The provider is the one
+        // paying for a guest list, so the number belongs beside the name rather than in a report.
+        byConsumer[who].calls += (g.budget && g.budget.calls) || 0;
+        byConsumer[who].units += g.carried_units || 0;
+        if (!byConsumer[who].unit) byConsumer[who].unit = g.unit === 'money' ? (g.currency || 'EUR') : 'morsels';
       }
       grants = byConsumer;
     } catch {
@@ -87,6 +94,18 @@ export function mountMemberAdmin(iam, opts) {
   async function loadPaying() {
     if (!opts.payingCustomers) return;
     try { paying = (await opts.payingCustomers()) || []; } catch { paying = []; }
+  }
+
+  /**
+   * What this member has used, and what carrying them has cost. Rendered only when there is
+   * something to say: a member who has not called yet should read as new, not as a zero.
+   */
+  function usageCell(id) {
+    const key = String(id).toLowerCase().split('@')[0].split('#').pop();
+    const g = grants[key];
+    if (!g || !g.calls) return null;
+    const cost = g.unit === 'morsels' ? `${g.units} ${g.unit}` : `${(g.units / 1000000).toFixed(2)} ${g.unit}`;
+    return el('span', { cls: cls('aim-iam-muted'), text: S('usage', { n: g.calls, cost: cost }) });
   }
 
   function grantCell(id) {
@@ -210,6 +229,7 @@ export function mountMemberAdmin(iam, opts) {
         (!sel && m.role) ? el('span', { cls: cls('aim-iam-badge'), text: m.role }) : null,
         m.since ? el('span', { cls: cls('aim-iam-muted'), text: fmtDate(m.since) }) : null,
         grantCell(m.id),
+        usageCell(m.id),
         sel,
         el('button', { cls: cls('aim-iam-btn'), text: S('remove'), attrs: { type: 'button' },
           on: { click: () => act(() => iam.admin('revoke', { ghii: m.id, owner: m.id })) } }),

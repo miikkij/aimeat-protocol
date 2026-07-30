@@ -3,7 +3,7 @@
  * @description Full working-scaffold use-case template bodies for the authoring-template registry.
  *   Pure data — each composes app-shells + components into a complete, customisable app.
  *   {{app}} = memory namespace; {{owner-ghii}} = the owner's GHII. Consumed by ../app-templates.ts.
- * @structure USECASE_REALTIME_SOCIAL · USECASE_MARKETPLACE · USECASE_HOMEPAGE
+ * @structure USECASE_REALTIME_SOCIAL · USECASE_MARKETPLACE · USECASE_HOMEPAGE · USECASE_APP_IAM
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/data/app-templates.ts (max-file-lines)
  */
@@ -463,3 +463,101 @@ entry: index.html
   </script>
 </body>
 </html>`;
+
+// ── Use-case: app-iam (members, roles and an owner panel) ────────────
+// An app with its OWN member community. The NODE keeps who is a member — it notifies them, keeps the
+// list private, and moves their free access with their role — and this app keeps what a role may do.
+// Six apps on this node each built this by hand before the platform had it, and disagreed six ways;
+// this is that work done once. {{app}} = memory namespace.
+
+export const USECASE_APP_IAM = `<!DOCTYPE html>
+<!-- AIMEAT App Manifest
+name: {{app-name}}
+version: 1.0.0
+description: {{one-line description — REQUIRED for publishing}}
+entry: index.html
+-->
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="aimeat-scopes" content="memory:read memory:write" />
+  <title>{{App Title}}</title>
+  <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
+  <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
+  <script src="/lib/tailwindcss@4.js"></script>
+</head>
+<body class="bg-base-100 text-base-content min-h-screen">
+  <nav class="navbar bg-base-200 px-4 shadow-sm sticky top-0 z-50">
+    <div class="flex-1"><span class="text-lg font-bold">{{App Title}}</span></div>
+    <div class="flex-none"><span id="login"></span></div>
+  </nav>
+
+  <main class="max-w-3xl mx-auto p-4 flex flex-col gap-4">
+    <!-- What everyone sees. Keep something here: an app that shows a stranger nothing but a refusal
+         gives them no way to judge whether it is worth asking for. -->
+    <section class="card bg-base-200 shadow"><div class="card-body">
+      <h2 class="card-title">{{What this app is}}</h2>
+      <p class="text-sm opacity-70">{{One paragraph anyone may read, member or not.}}</p>
+    </section></div>
+
+    <!-- Members only. can() decides what to PAINT; the extension decides what is allowed. -->
+    <section id="members-only" hidden class="card bg-base-200 shadow"><div class="card-body">
+      <h2 class="card-title">{{The paid or private surface}}</h2>
+      <button id="do-it" class="btn btn-primary self-start">{{Do the thing}}</button>
+      <pre id="out" class="text-xs mt-2"></pre>
+    </div></section>
+
+    <!-- Shown to anyone who is not yet a member. The OWNER is notified, with Approve and Decline
+         on their bell, so a request does not depend on them opening this page. -->
+    <div id="join"></div>
+
+    <!-- Owner only: roster, approvals, free access, and this app's own settings in one place. -->
+    <div id="members"></div>
+  </main>
+
+  <script src="/v1/libs/aimeat-auth.js"></script>
+  <script src="/v1/libs/aimeat-iam.js"></script>
+  <script>
+    var APP = '{{owner}}/{{app}}.html';        // the app whose roster the node keeps
+    var session = null;
+
+    async function boot(s) {
+      session = s;
+      // The node keeps the roster; \`roles\` is this app's own vocabulary, which the node does not own.
+      var me = await AIMEAT.iam.init({ app: APP, roles: ['member', 'admin'] });
+
+      // A HINT for painting. The gate is server-side: enforce in the action that mutates data.
+      AIMEAT.iam.gate('#members-only', 'use');
+      document.getElementById('join').hidden = me.member || me.isOwner;
+      if (!me.member && !me.isOwner) AIMEAT.iam.JoinPanel({ target: '#join' });
+
+      if (me.isOwner) {
+        AIMEAT.iam.MemberAdmin({
+          target: '#members',
+          appId: APP,
+          // Your own settings belong in the panel owners already open, not a second admin screen.
+          sections: [
+            // { id: 'x', type: 'toggle', label: '{{A setting}}', value: true, onChange: function (v) { AIMEAT.data.set('{{app}}.settings.x', v); } },
+          ],
+        });
+      }
+    }
+
+    document.getElementById('do-it').addEventListener('click', async function () {
+      // guard() asks the SERVER before running, so a role revoked while this page was open refuses
+      // instead of proceeding on a stale answer.
+      var ran = await AIMEAT.iam.guard('use', async function () {
+        return await AIMEAT.data.get('{{app}}.something');
+      });
+      document.getElementById('out').textContent = ran === undefined
+        ? 'You do not have access to that.'
+        : JSON.stringify(ran, null, 2);
+    });
+
+    AIMEAT.auth.mountLoginButton('#login', { onLogin: boot, onLogout: function () { location.reload(); } });
+    AIMEAT.auth.login().then(function (s) { if (s) boot(s); });
+  </script>
+</body>
+</html>`;
+
