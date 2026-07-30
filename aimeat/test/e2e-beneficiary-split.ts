@@ -302,7 +302,7 @@ await test('Operator verifies alpha → the release now succeeds and morsels act
     body: JSON.stringify({ tracking_code: alphaTracking, beneficiary: alpha.ghii }),
   });
   assert(r.status === 200, `release ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  assert(r.body.data.moved === true, 'a morsel release moves value for real');
+  assert(r.body.data.settled_here === true, 'a morsel release completes on this node');
   const amount = Number(r.body.data.amount);
   assert(amount > 0, `released amount ${amount}`);
   assert(await balance(alpha.token) === alphaBefore + amount, 'the beneficiary was credited');
@@ -376,7 +376,7 @@ await test('Releasing a money share books it as an invoiceable payable — the n
     body: JSON.stringify({ tracking_code: entry.tracking_code, beneficiary: gamma.ghii }),
   });
   assert(r.status === 200, `release money ${r.status}: ${JSON.stringify(r.body?.error)}`);
-  assert(r.body.data.moved === false, 'money is booked as an obligation, never pushed by the node');
+  assert(r.body.data.settled_here === false, 'money is booked as an obligation, never pushed by the node');
   assert(await balance(gamma.token) === balBefore, 'a EUR share must not touch a morsel balance');
 
   // It lands where a seller already looks for what they are owed.

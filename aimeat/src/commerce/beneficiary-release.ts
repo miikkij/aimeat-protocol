@@ -15,9 +15,13 @@
  *   without the core ever interpreting it: what a `fi-ytunnus:` means, and what evidence is good enough
  *   for one, is the application's business and the operator's judgement, not this file's.
  *
- *   WHAT RELEASE ACTUALLY DOES, per rail, and it is deliberately not the same thing:
- *     - `morsels` — an atomic in-repo `transferBalance` from the provider to the beneficiary. Real
- *       movement, because the ledger is ours.
+ *   WHAT RELEASE ACTUALLY DOES, per rail, and it is deliberately not the same thing. Note what the
+ *   difference is NOT: it is not "one rail is real and the other is not". Morsels are the node's own
+ *   PACING meter, a consumption budget that bounds how fast a capability can be called; they are not
+ *   currency, and a morsel share is capacity rather than income. EUR and USD are the real money. Both
+ *   are recorded in the ledger; what differs is whether settlement COMPLETES here.
+ *     - `morsels` — an atomic in-repo `transferBalance` from the provider to the beneficiary. It
+ *       completes here, because the meter is ours to move.
  *     - `money`   — books the amount onto the beneficiary's own payable book as `pending`. The node
  *       does not push fiat, because pushing fiat means first holding it. This is the same accrual
  *       every money sale on this node already settles through, and it is what makes the obligation
@@ -121,7 +125,7 @@ export interface EligibilityVerdict {
 }
 
 /**
- * May money be released to this beneficiary?
+ * May a share be released to this beneficiary?
  *
  * Two conditions, both about whether there is a real party at the other end: the GHII resolves to an
  * owner on this node, and an operator has recorded a `verified` approval for it. Absence of an
@@ -151,16 +155,21 @@ export async function beneficiaryEligibility(
   };
 }
 
-/** What a release attempt produced. `moved` is true only when value actually changed hands. */
+/**
+ * What a release attempt produced. `settledHere` says whether the release COMPLETED on this node or
+ * left an off-node leg still to do. It is NOT a claim about which rail carries real money: the morsel
+ * rail completes here because morsels are the node's own pacing meter, and the money rail does not
+ * because the node will not hold fiat. The rail that settles instantly is the one that is not currency.
+ */
 export type ReleaseResult =
-  | { ok: true; entry: BeneficiaryEntry; method: string; moved: boolean }
+  | { ok: true; entry: BeneficiaryEntry; method: string; settledHere: boolean }
   | { ok: false; reason: string; message: string };
 
 /**
  * Release ONE accrued share, on whichever rail it was accrued in.
  *
  * The gate is re-checked here rather than trusted from the route, because this is the last point
- * before value moves and it is reachable from more than one door. The entry is flipped to `released`
+ * before anything is paid out and it is reachable from more than one door. The entry is flipped to `released`
  * BEFORE the morsel transfer and rolled back if the transfer fails, so a crash between the two leaves
  * an unpaid obligation (recoverable) rather than a paid one marked unpaid (payable twice).
  */
@@ -200,7 +209,7 @@ export async function releaseBeneficiaryShare(
       counterpartyGaii: args.providerGhii, trackingCode: `beneficiary:${args.trackingCode}`,
       initiatorGaii: args.providerGhii, timestamp: new Date().toISOString(),
     });
-    return { ok: true, entry, method: 'morsel-transfer', moved: true };
+    return { ok: true, entry, method: 'morsel-transfer', settledHere: true };
   }
 
   // Money: book it onto the beneficiary's own payable book, where `/v1/exchange/earnings` reads it.
@@ -209,7 +218,7 @@ export async function releaseBeneficiaryShare(
     amount: entry.amount, currency: entry.currency ?? 'EUR', buyerGhii: args.providerGhii,
     reference: entry.reference, method: 'beneficiary-share', status: 'pending',
   });
-  return { ok: true, entry, method: 'payable-booked', moved: false };
+  return { ok: true, entry, method: 'payable-booked', settledHere: false };
 }
 
 /** Undo a status flip after a failed transfer, so the obligation stays visible and payable. */

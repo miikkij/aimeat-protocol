@@ -8629,8 +8629,10 @@ paths:
         A share is owed by the PROVIDER, not by the buyer: it comes out of what the provider earned on a
         call, so the debtor on every entry is the seller. `accrued` means booked and unpaid; it becomes
         payable only once an operator has recorded a verification for your account, which the
-        `verification` block reports. Amounts stay in their own unit — money in integer micro-units under
-        the currency code, morsels as whole integers under `morsels`, never summed together. Owner-scoped
+        `verification` block reports. Amounts stay in their own unit and are never summed together: real
+        money in integer micro-units under its currency code, and the node's pacing meter as whole integers
+        under `morsels`. They are not the same kind of thing, so do not render one headline figure over
+        both: a EUR share is income, a morsel share is capacity to call things. Owner-scoped
         on the money identity; `wallet:read` gates non-owner principals. Returns
         `{ beneficiary, verification: { state, payable, reason, message }, totals, entries, count, note }`.
       tags: [Commerce]
@@ -8670,13 +8672,17 @@ paths:
         Only the PROVIDER who owes it may release it, and only their own obligations — the value moves out
         of the caller's own account. GATED: refuses with 409 `BENEFICIARY_UNVERIFIED` until an operator has
         recorded a `verified` approval for that beneficiary, because paying a party nobody has checked is
-        how a self-declared claimant collects on someone else's identity. What release DOES differs by rail:
-        `morsels` transfers atomically from your balance to theirs (`moved: true`); `money` books the amount
-        onto their payable book as `pending` (`moved: false`) — the node pushes no fiat, because pushing
-        fiat means first holding it, so you invoice and settle that leg off-node. A beneficiary with no PSP
-        configured is never blocked either way. Idempotent: a second release of the same share is 404
-        `NOTHING_ACCRUED`. Requires scope `exchange:beneficiary`.
-        Returns `{ released, beneficiary, tracking_code, amount, unit, currency, method, moved, note }`.
+        how a self-declared claimant collects on someone else's identity. What release DOES differs by rail,
+        and `settled_here` reports which happened. `morsels` transfers atomically from your balance to
+        theirs and COMPLETES here (`settled_here: true`) — morsels are this node's own pacing meter, so the
+        transfer moves consumption capacity rather than currency. `money` books the amount onto their
+        payable book as `pending` (`settled_here: false`); the node pushes no fiat, because pushing fiat
+        means first holding it, so you invoice and settle that leg off-node. Read `settled_here` as "is
+        there anything left to do", never as "which rail is the real one": the rail that settles instantly
+        is precisely the one that is not money. A beneficiary with no PSP configured is never blocked either
+        way. Idempotent: a second release of the same share is 404 `NOTHING_ACCRUED`. Requires scope
+        `exchange:beneficiary`.
+        Returns `{ released, beneficiary, tracking_code, amount, unit, currency, method, settled_here, note }`.
       tags: [Commerce]
       security: [{ BearerAuth: [] }]
       requestBody:

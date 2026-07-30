@@ -259,10 +259,11 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
       unit: result.entry.unit,
       currency: result.entry.currency,
       method: result.method,
-      /** True only when value actually changed hands here; money is booked as an obligation instead. */
-      moved: result.moved,
-      note: result.moved
-        ? 'Transferred from your balance to theirs.'
+      /** Whether the release COMPLETED on this node, or left an off-node leg still to settle. */
+      settled_here: result.settledHere,
+      note: result.settledHere
+        ? 'Transferred from your morsel balance to theirs. Morsels are this node\'s pacing meter, so '
+          + 'the transfer completes here; it moves consumption capacity, not currency.'
         : 'Booked onto their payable book. The node moves no fiat, so invoice and settle this off-node, '
           + 'which is what keeps AIMEAT out of holding anyone\'s money.',
     }));
