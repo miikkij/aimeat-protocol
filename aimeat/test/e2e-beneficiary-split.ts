@@ -619,6 +619,116 @@ await test('APP-TOOL: a sale through the outer door accrues the share the capabi
     `the designation must survive the inner hop: expected ${expected}, got ${await accrued(gamma.token) - before}`);
 });
 
+// ── THE LAST LEG: money actually reaching the beneficiary ───────────────────
+//
+// Accruing and releasing are bookkeeping; this is the part where funds move. Neither money handler
+// can push a provider's money to a third party (Stripe has no Connect platform here by design, and
+// x402's payout leg is a no-op because the money moved buyer-to-seller at collect time), so a
+// provider-to-beneficiary transfer is a DIFFERENT payment and its payer has to authorise it. The
+// node quotes what is owed, the PROVIDER signs, the facilitator settles into the beneficiary's own
+// address, and the node holds nothing at any instant.
+
+const X402_ADDR = '0x1111111111111111111111111111111111111111';
+const signedPayment = (reqs: any) => ({
+  x402Version: 1,
+  scheme: 'exact',
+  network: reqs.network,
+  payload: {
+    signature: '0x' + 'ab'.repeat(65),
+    authorization: {
+      from: '0x2222222222222222222222222222222222222222',
+      to: reqs.payTo,
+      value: reqs.maxAmountRequired,
+      validAfter: '0',
+      validBefore: String(Math.floor(Date.now() / 1000) + 3600),
+      nonce: '0x' + Date.now().toString(16).padStart(64, '0'),
+    },
+  },
+});
+
+const payoutQuote = (token: string, beneficiary: string) =>
+  json(`/v1/commerce/beneficiary/payout?beneficiary=${encodeURIComponent(beneficiary)}`, { headers: auth(token) });
+
+await test('PAYOUT: a beneficiary with no address cannot be pushed to, and is told why', async () => {
+  const r = await payoutQuote(provider.token, gamma.ghii);
+  assert(r.status === 200, `quote ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.payable === false, 'not payable without an address');
+  assert(r.body.data.reason === 'BENEFICIARY_NO_ADDRESS', `reason: ${r.body.data.reason}`);
+  // The obligation is not lost, only unpayable: this is what an unpaid invoice looks like.
+  assert(r.body.data.amount > 0, `still owed: ${r.body.data.amount}`);
+});
+
+await test('PAYOUT: once the beneficiary sets their OWN address, the node quotes what to sign', async () => {
+  const w = await json('/v1/memory', {
+    method: 'POST', headers: auth(gamma.token),
+    body: JSON.stringify({ key: 'commerce.psp', value: { provider: 'x402', payTo: X402_ADDR }, visibility: 'private' }),
+  });
+  assert(w.status === 200 || w.status === 201, `psp write ${w.status}`);
+
+  const r = await payoutQuote(provider.token, gamma.ghii);
+  assert(r.body.data.payable === true, `payable: ${JSON.stringify(r.body.data)}`);
+  assert(r.body.data.pay_to === X402_ADDR, `pays to THEIR address: ${r.body.data.pay_to}`);
+  assert(r.body.data.accepts.length === 1, 'one exact-scheme requirement to sign');
+  assert(r.body.data.accepts[0].payTo === X402_ADDR, 'the requirement names their address');
+  assert(String(r.body.data.accepts[0].maxAmountRequired) === String(r.body.data.amount),
+    `the amount signed is the amount owed: ${r.body.data.accepts[0].maxAmountRequired} vs ${r.body.data.amount}`);
+});
+
+await test('PAYOUT: an unsigned request is refused with 402, nothing marked paid', async () => {
+  const r = await json('/v1/commerce/beneficiary/payout', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ beneficiary: gamma.ghii, payment: { x402Version: 1, scheme: 'exact', payload: {} } }),
+  });
+  assert(r.status === 402, `expected 402, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  const after = await earnings(gamma.token);
+  assert(Number(after.body.data.totals?.EUR?.paid ?? 0) === 0, 'nothing was marked paid');
+});
+
+let paidAmount = 0;
+await test('PAYOUT: the provider signs, it settles onchain, and the entries read `paid`', async () => {
+  const q = await payoutQuote(provider.token, gamma.ghii);
+  const owed = Number(q.body.data.amount);
+  assert(owed > 0, `owed ${owed}`);
+
+  const r = await json('/v1/commerce/beneficiary/payout', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ beneficiary: gamma.ghii, payment: signedPayment(q.body.data.accepts[0]) }),
+  });
+  assert(r.status === 200, `settle ${r.status}: ${JSON.stringify(r.body?.error)}`);
+  assert(r.body.data.paid === true, 'paid');
+  assert(r.body.data.amount === owed, `settled the whole balance: ${r.body.data.amount} vs ${owed}`);
+  assert(r.body.data.entries >= 1, `entries marked: ${r.body.data.entries}`);
+  assert(typeof r.body.data.tx_hash === 'string' && r.body.data.tx_hash.length > 0,
+    `an onchain reference proves it: ${r.body.data.tx_hash}`);
+  paidAmount = owed;
+
+  const e = await earnings(gamma.token);
+  assert(Number(e.body.data.totals?.EUR?.paid ?? 0) === owed, `paid total: ${JSON.stringify(e.body.data.totals?.EUR)}`);
+  assert(Number(e.body.data.totals?.EUR?.released ?? 0) === 0, 'nothing is still merely released');
+  const entry = e.body.data.entries.find((x: any) => x.status === 'paid');
+  assert(!!entry && entry.payout_rail?.startsWith('x402:'), `rail recorded: ${entry?.payout_rail}`);
+  assert(!!entry.payout_reference && !!entry.paid_at, 'the proof and the moment are both kept');
+});
+
+await test('PAYOUT: paying again finds nothing owed — a confirmation cannot pay twice', async () => {
+  const q = await payoutQuote(provider.token, gamma.ghii);
+  assert(q.body.data.payable === false && q.body.data.reason === 'NOTHING_OWED',
+    `expected NOTHING_OWED, got ${JSON.stringify(q.body.data.reason)}`);
+  const r = await json('/v1/commerce/beneficiary/payout', {
+    method: 'POST', headers: auth(provider.token),
+    body: JSON.stringify({ beneficiary: gamma.ghii, payment: signedPayment({ network: 'base-sepolia', payTo: X402_ADDR, maxAmountRequired: '1' }) }),
+  });
+  assert(r.status === 404, `expected 404, got ${r.status}`);
+  const e = await earnings(gamma.token);
+  assert(Number(e.body.data.totals?.EUR?.paid ?? 0) === paidAmount, 'the paid total did not move');
+});
+
+await test('PAYOUT: a stranger cannot settle somebody else\'s debt', async () => {
+  const q = await json('/v1/commerce/beneficiary/payout?beneficiary=' + encodeURIComponent(gamma.ghii), { headers: auth(stranger.token) });
+  assert(q.body.data.payable === false, 'a stranger owes them nothing, so there is nothing to sign');
+  assert(q.body.data.reason === 'NOTHING_OWED', `reason: ${q.body.data.reason}`);
+});
+
 // ── Cross-owner isolation ─────────────────────────────────────────────────────
 
 await test('A stranger cannot read another account\'s verification state → 403', async () => {

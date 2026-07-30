@@ -359,11 +359,11 @@ export function registerCommerceTools(
     // the giver's, and that is the whole cross-owner question here.
 
     /** Money micros and morsels are different KINDS of quantity, so they are bucketed, never summed. */
-    function totalsOf(entries: BeneficiaryEntry[]): Record<string, { accrued: number; released: number; reversed: number; entries: number }> {
-        const totals: Record<string, { accrued: number; released: number; reversed: number; entries: number }> = {};
+    function totalsOf(entries: BeneficiaryEntry[]): Record<string, { accrued: number; released: number; paid: number; reversed: number; entries: number }> {
+        const totals: Record<string, { accrued: number; released: number; paid: number; reversed: number; entries: number }> = {};
         for (const e of entries) {
             const bucket = e.unit === 'money' ? (e.currency ?? 'EUR') : 'morsels';
-            const t = totals[bucket] ?? (totals[bucket] = { accrued: 0, released: 0, reversed: 0, entries: 0 });
+            const t = totals[bucket] ?? (totals[bucket] = { accrued: 0, released: 0, paid: 0, reversed: 0, entries: 0 });
             t[e.status] += e.amount;
             t.entries += 1;
         }
@@ -438,7 +438,7 @@ export function registerCommerceTools(
         descriptionFor('aimeat_commerce_beneficiary_earnings'),
         {
             role: z.enum(['beneficiary', 'provider']).optional(),
-            status: z.enum(['accrued', 'released', 'reversed']).optional(),
+            status: z.enum(['accrued', 'released', 'paid', 'reversed']).optional(),
             limit: z.number().int().min(1).max(1000).optional(),
         },
         annotationsFor('aimeat_commerce_beneficiary_earnings'),

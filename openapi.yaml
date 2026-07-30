@@ -8705,6 +8705,62 @@ paths:
         '404': { $ref: '#/components/responses/AimeatError' }
         '409': { $ref: '#/components/responses/AimeatError' }
 
+  /v1/commerce/beneficiary/payout:
+    get:
+      operationId: commerceBeneficiaryPayoutQuote
+      summary: What you still owe a beneficiary, and the x402 requirements to pay it
+      description: >
+        The last leg, and the one neither money handler could do. Stripe's payout is a book entry
+        because there is no Connect platform here by design, and x402's is a no-op because the money
+        moved buyer-to-seller at collect time; a provider-to-beneficiary transfer is a DIFFERENT
+        payment and its payer has to authorise it. So the node quotes and the PROVIDER signs: this
+        returns x402 exact-scheme requirements to sign with the wallet that holds the funds, and the
+        facilitator settles from your address into theirs. The node holds no key and no funds at any
+        instant. AGGREGATED across every released-and-unpaid entry in one currency, because a share is
+        a fraction of a sub-euro call and one signature clearing the balance beats gas on each. The
+        beneficiary's address comes from THEIR own `commerce.psp`, so nobody sets where somebody else
+        is paid; one who has set nothing returns `BENEFICIARY_NO_ADDRESS` and the obligation stays
+        released and unpaid, which is what an unpaid invoice is. Returns
+        `{ payable, reason, message, beneficiary, amount, currency, entries, pay_to, accepts, note }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: beneficiary, in: query, required: true, schema: { type: string } }
+        - { name: currency, in: query, schema: { type: string, default: EUR } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+    post:
+      operationId: commerceBeneficiaryPayoutSettle
+      summary: Settle what you owe a beneficiary with your signed authorisation
+      description: >
+        Send the signed exact-scheme payload from the GET. The quote is rebuilt server-side rather
+        than trusted from the body, so a signature can only ever move what is genuinely owed at this
+        instant: a stale or hand-edited amount verifies against the current requirements and fails.
+        Entries flip to `paid` only AFTER the facilitator confirms, so a failed settlement leaves them
+        payable rather than recording a delivery that did not happen, and a confirmation that arrives
+        twice cannot pay twice. Requires scope `exchange:beneficiary`. Returns
+        `{ paid, beneficiary, amount, currency, entries, tx_hash, pay_to, note }`.
+      tags: [Commerce]
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, required: [beneficiary, payment], properties: {
+          beneficiary: { type: string, description: 'The beneficiary owner GHII.' },
+          currency: { type: string, default: EUR },
+          payment: { type: object, description: 'The signed x402 exact-scheme payload (X-PAYMENT shape).' } } } } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/AimeatError' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '402': { $ref: '#/components/responses/AimeatError' }
+        '403': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/AimeatError' }
+        '409': { $ref: '#/components/responses/AimeatError' }
+        '422': { $ref: '#/components/responses/AimeatError' }
+
   /v1/commerce/beneficiary/approvals:
     post:
       operationId: commerceSetBeneficiaryApproval

@@ -40,12 +40,25 @@ export interface BeneficiaryEntry {
   /** Whether the provider's standing configuration named them, or this particular call did. */
   kind: 'static' | 'dynamic';
   note?: string;
-  /** `accrued` — owed, unpaid. `released` — the provider has paid or invoiced it. `reversed` — the
-   *  call it came from was refunded, so the obligation never matured. */
-  status: 'accrued' | 'released' | 'reversed';
+  /**
+   * `accrued` — owed, and the provider has not agreed to pay it yet.
+   * `released` — the provider owns the debt: payable, and on the beneficiary's book.
+   * `paid` — the money actually reached them, with the rail and the external reference that proves it.
+   * `reversed` — the call it came from was refunded, so the obligation never matured.
+   *
+   * `released` and `paid` are deliberately separate. Collapsing them would mean a book that cannot
+   * tell an agreed debt from a settled one, which is the difference a beneficiary actually cares about.
+   */
+  status: 'accrued' | 'released' | 'paid' | 'reversed';
   releasedAt?: string;
   /** How it was released: a morsel transfer, or booked onto the beneficiary's payable book. */
   releaseMethod?: string;
+  /** When the money actually landed. */
+  paidAt?: string;
+  /** The rail that moved it, e.g. `x402:base-sepolia` or `invoice`. */
+  payoutRail?: string;
+  /** What proves it: an onchain transaction hash, a bank reference, an invoice number. */
+  payoutReference?: string;
   at: string;
 }
 
@@ -197,6 +210,41 @@ export async function reverseAccrual(
     if (changed) reversed += 1;
   }
   return reversed;
+}
+
+/**
+ * Mark released entries as PAID, once a rail has confirmed the money moved.
+ *
+ * Only ever moves `released` onwards, so a confirmation that arrives twice cannot pay twice and a
+ * still-accrued share cannot be marked settled without the provider first owning the debt. Returns
+ * how many entries it actually changed, which is what the caller reports rather than what it asked for.
+ */
+export async function markEntriesPaid(
+  storage: Storage,
+  args: { beneficiaryGhii: string; fromGhii: string; trackingCodes: string[]; rail: string; reference: string },
+): Promise<number> {
+  const now = new Date().toISOString();
+  let changed = 0;
+  for (const trackingCode of args.trackingCodes) {
+    const key = benefitKey(trackingCode);
+    const rec = await storage.getMemory(args.beneficiaryGhii, key);
+    if (!rec) continue;
+    const value = rec.value as { items?: BeneficiaryEntry[] };
+    const items = Array.isArray(value.items) ? value.items : [];
+    const entry = items.find(i => i.fromGhii === args.fromGhii && i.status === 'released');
+    if (!entry) continue;
+    entry.status = 'paid';
+    entry.paidAt = now;
+    entry.payoutRail = args.rail;
+    if (args.reference) entry.payoutReference = args.reference;
+    await storage.setMemory({
+      key, ownerGaii: args.beneficiaryGhii, value: { ...value, items }, visibility: 'owner',
+      tags: ['commerce', 'beneficiary'], ttlHours: null, version: (rec.version ?? 0) + 1,
+      createdAt: rec.createdAt, updatedAt: now,
+    });
+    changed += 1;
+  }
+  return changed;
 }
 
 function entriesOf(value: unknown): BeneficiaryEntry[] {

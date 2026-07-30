@@ -38,6 +38,8 @@ import {
 import {
   readApproval, putApproval, beneficiaryEligibility, releaseBeneficiaryShare,
 } from '../commerce/beneficiary-release.js';
+import { quoteBeneficiaryPayout, settleBeneficiaryPayout } from '../commerce/beneficiary-payout.js';
+import type { X402PaymentPayload } from '../commerce/x402-facilitator.js';
 
 /** What a split looks like on the wire. Snake-case, like every other commerce surface. */
 function splitView(s: BeneficiarySplit): Record<string, unknown> {
@@ -71,17 +73,20 @@ function entryView(e: BeneficiaryEntry & { trackingCode: string }): Record<strin
     status: e.status,
     released_at: e.releasedAt ?? null,
     release_method: e.releaseMethod ?? null,
+    paid_at: e.paidAt ?? null,
+    payout_rail: e.payoutRail ?? null,
+    payout_reference: e.payoutReference ?? null,
     at: e.at,
   };
 }
 
 /** Sum the entries into the headline the reader actually wants, split by status and by unit. */
 function totalsOf(entries: Array<BeneficiaryEntry & { trackingCode: string }>): Record<string, unknown> {
-  const totals: Record<string, { accrued: number; released: number; reversed: number; entries: number }> = {};
+  const totals: Record<string, { accrued: number; released: number; paid: number; reversed: number; entries: number }> = {};
   for (const e of entries) {
     // Morsels and money micro-units are different quantities and are never summed into one figure.
     const bucket = e.unit === 'money' ? (e.currency ?? 'EUR') : 'morsels';
-    const t = totals[bucket] ?? (totals[bucket] = { accrued: 0, released: 0, reversed: 0, entries: 0 });
+    const t = totals[bucket] ?? (totals[bucket] = { accrued: 0, released: 0, paid: 0, reversed: 0, entries: 0 });
     t[e.status] += e.amount;
     t.entries += 1;
   }
@@ -319,6 +324,81 @@ export function commerceBeneficiariesRouter(config: AimeatConfig, storage: Stora
       state: gate.state,
       payable: gate.eligible,
       message: gate.message,
+    }));
+  });
+
+  // ── The last leg: money actually reaching them ───────────────────────────────
+
+  /**
+   * GET /v1/commerce/beneficiary/payout — what you still owe one beneficiary, and how to pay it.
+   *
+   * Returns the x402 exact-scheme requirements for the provider to SIGN. The node orchestrates and
+   * holds nothing: neither money handler can push a provider's funds to a third party (Stripe has no
+   * Connect platform here by design, and x402's own payout leg is a no-op because the money moved
+   * buyer-to-seller at collect time), so a provider-to-beneficiary transfer is a different payment
+   * that its payer has to authorise.
+   *
+   * AGGREGATED across every released-and-unpaid entry in one currency: a share is a fraction of a
+   * sub-euro call, and one signature clearing the whole balance is both cheaper than the gas on each
+   * and closer to how an invoice period actually works.
+   */
+  router.get('/v1/commerce/beneficiary/payout', requireAuth(), requireScope('wallet:read'), async (req: Request, res: Response) => {
+    const providerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
+    const beneficiary = typeof req.query.beneficiary === 'string' ? req.query.beneficiary.trim() : '';
+    if (!beneficiary) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'Name the beneficiary: ?beneficiary=owner@node-id'));
+    }
+    const currency = typeof req.query.currency === 'string' ? req.query.currency : undefined;
+    const q = await quoteBeneficiaryPayout(storage, config, { providerGhii, beneficiaryGhii: beneficiary, currency });
+    return res.json(success(config.nodeId, {
+      payable: q.ok,
+      reason: q.ok ? null : q.reason,
+      message: q.message ?? null,
+      beneficiary,
+      amount: q.amount,
+      currency: q.currency,
+      entries: q.entries.length,
+      pay_to: q.payTo ?? null,
+      accepts: q.requirements ? [q.requirements] : [],
+      note: q.ok
+        ? 'Sign these requirements with the wallet that holds the funds and POST the signed payload '
+          + 'back here. The node never holds the money: it settles from your address into theirs.'
+        : null,
+    }));
+  });
+
+  /**
+   * POST /v1/commerce/beneficiary/payout — settle it with the provider's signed authorisation.
+   *
+   * The quote is rebuilt server-side rather than trusted from the body, so a signature can only move
+   * what is genuinely owed at this instant. Entries flip to `paid` only after the facilitator
+   * confirms, so a failed settlement leaves them payable rather than recording a delivery that did
+   * not happen.
+   */
+  router.post('/v1/commerce/beneficiary/payout', requireAuth(), requireScope('exchange:beneficiary'), async (req: Request, res: Response) => {
+    const providerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
+    const body = (req.body ?? {}) as Record<string, unknown>;
+    const beneficiary = typeof body.beneficiary === 'string' ? body.beneficiary.trim() : '';
+    if (!beneficiary || !body.payment) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+        'Send `beneficiary` and the signed `payment` payload from GET /v1/commerce/beneficiary/payout'));
+    }
+    const r = await settleBeneficiaryPayout(storage, config, {
+      providerGhii, beneficiaryGhii: beneficiary,
+      currency: typeof body.currency === 'string' ? body.currency : undefined,
+      payload: body.payment as X402PaymentPayload,
+    });
+    if (!r.ok) {
+      const status = r.reason === 'NOTHING_OWED' ? 404
+        : r.reason === 'BENEFICIARY_NO_ADDRESS' ? 409
+        : r.reason === 'PAYMENT_REQUIRED' ? 402 : 422;
+      return res.status(status).json(error(config.nodeId, r.reason, r.message));
+    }
+    return res.json(success(config.nodeId, {
+      paid: true, beneficiary, amount: r.amount, currency: r.currency,
+      entries: r.entries, tx_hash: r.txHash, pay_to: r.payTo,
+      note: 'Settled onchain from your address into theirs. The node held nothing at any point; the '
+        + 'transaction hash is the proof, and those entries now read `paid`.',
     }));
   });
 
