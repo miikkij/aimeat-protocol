@@ -262,6 +262,18 @@
   color: var(--text-muted); font-weight: 600; cursor: help;
 }
 .ld-gen-tier.is-frontier { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+/* What the pack you are pointing at actually does. The name alone told nobody what
+   `noste-cortex` is, and the description was hidden in a native tooltip that never appears on a
+   phone. Sits under the pills so the grid stays compact. */
+.ld-gen-packinfo {
+  margin: 10px 0 0; padding: 10px 12px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+}
+.ld-gen-packinfo-line { margin: 0 0 6px; font-size: .8rem; line-height: 1.5; color: var(--text-muted); }
+.ld-gen-packinfo-line:last-child { margin-bottom: 0; }
+.ld-gen-packinfo-name { font-weight: 700; color: var(--text); }
+/* The three badge words are instructions, not statuses, and unexplained they read as warnings. */
+.ld-gen-legend { margin: 8px 0 0; font-size: .72rem; line-height: 1.55; color: var(--text-muted); }
 .ld-gen-preview-label { font-size: .75rem; text-transform: uppercase; letter-spacing: .1em; color: var(--text-muted); margin-bottom: 6px; }
 .ld-gen-preview {
   min-height: 90px; max-height: 150px; overflow-y: auto; margin-bottom: 12px; padding: 12px;

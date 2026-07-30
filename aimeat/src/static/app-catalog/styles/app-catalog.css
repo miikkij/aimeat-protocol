@@ -2193,6 +2193,18 @@
 /* AEB reliability-tier badge on each pack (tools/aeb/acceleration-tiers.md). */
 .pb-pack-tier { font-size: 10px; text-transform: uppercase; letter-spacing: .03em; padding: 1px 5px; border-radius: 999px; background: color-mix(in srgb, var(--text-muted) 15%, transparent); color: var(--text-muted); font-weight: 600; cursor: help; }
 .pb-pack-tier.pb-tier-frontier { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
+    /* What the pack you are pointing at actually does. The name alone told nobody what
+       `noste-cortex` is, and the description was hidden in a title attribute that never
+       appears on a phone. Sits under the pills so the grid stays compact. */
+    .pb-packinfo:not(:empty) {
+      margin: 10px 0 0; padding: 10px 12px;
+      background: var(--bg-subtle); border: 1px solid var(--border-subtle); border-radius: 10px;
+    }
+    .pb-packinfo-line { margin: 0 0 6px; font-size: .8rem; line-height: 1.5; color: var(--text-muted); }
+    .pb-packinfo-line:last-child { margin-bottom: 0; }
+    .pb-packinfo-name { font-weight: 700; color: var(--text); }
+    /* The three badge words are instructions, not statuses, and unexplained they read as warnings. */
+    .pb-legend { margin: 8px 0 0; font-size: .72rem; line-height: 1.55; color: var(--text-muted); }
 
 /* ── Bundled-agents modal (Agent-Bundled Apps) — inspector, hosted instances, deploy form ── */
 .aga-app-ref { font-size: .78rem; color: var(--text-muted); font-weight: normal; margin-left: 6px; }

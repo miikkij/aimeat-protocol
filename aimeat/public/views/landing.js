@@ -299,6 +299,7 @@ function BuildAppPrompt() {
   const [canonical, setCanonical] = useState('');
   const [packs, setPacks] = useState([]);
   const [packDocs, setPackDocs] = useState({});
+  const [hovered, setHovered] = useState(null);   // pack the pointer or keyboard focus is on
   // Restored from the tab, so the three things a person actually decides survive the round trip
   // through registration. Step 3 sends them to the catalogue and signing in reloads the page;
   // without this they come back to an empty box and have to describe their app a second time.
@@ -400,6 +401,12 @@ function BuildAppPrompt() {
   }
   contains.push(tr('landing.promptHasPitfalls', 'this node’s libraries and the pitfalls already written down'));
 
+  // Which pack's description to spell out. Pointing at one wins, because that is a question being
+  // asked right now; otherwise the ones that are ON, which is what the prompt will actually carry.
+  // A description in a title attribute is invisible on touch and to anyone not hunting for it.
+  const hoveredPack = packs.find(pk => pk.id === hovered);
+  const described = hoveredPack ? [hoveredPack] : selected;
+
   return html`
     <div class="ld-gen">
       <p class="ld-gen-intro">${tr('landing.genIntro', 'No coding. Describe your idea, copy the prompt, and paste it into any AI chat (Claude, ChatGPT…). The AI asks a few questions, builds a ready-to-use app, and gives you one HTML file.')}</p>
@@ -421,12 +428,22 @@ function BuildAppPrompt() {
           <p class="ld-gen-hint">${tr('landing.genPacksHint', 'Charts, editable flow diagrams, games, 3D. Self-hosted libraries with AI instructions baked into the prompt. Your idea text pre-selects matching packs.')}</p>
           <div class="ld-gen-packs">
             ${packs.map(pk => html`
-              <label class="ld-gen-pack" key=${pk.id} title=${pk.description || ''}>
-                <input type="checkbox" checked=${isOn(pk)} onChange=${(e) => setChosen(prev => ({ ...prev, [pk.id]: e.target.checked }))} />
+              <label class="ld-gen-pack" key=${pk.id}
+                onMouseEnter=${() => setHovered(pk.id)} onMouseLeave=${() => setHovered(null)}>
+                <input type="checkbox" checked=${isOn(pk)}
+                  onFocus=${() => setHovered(pk.id)} onBlur=${() => setHovered(null)}
+                  onChange=${(e) => setChosen(prev => ({ ...prev, [pk.id]: e.target.checked }))} />
                 <span>${pk.title || pk.id}</span>
                 ${pk.modelTier ? html`<span class=${`ld-gen-tier ${pk.modelTier === 'frontier' ? 'is-frontier' : ''}`} title=${tierTitle(pk)}>${tr('landing.tier.' + pk.modelTier, TIER_FALLBACK[pk.modelTier] || pk.modelTier)}</span>` : ''}
               </label>`)}
-          </div>` : ''}
+          </div>
+          ${described.length ? html`
+            <div class="ld-gen-packinfo">
+              ${described.map(pk => html`<p class="ld-gen-packinfo-line" key=${pk.id}>
+                <span class="ld-gen-packinfo-name">${pk.title || pk.id}:</span> ${pk.description || ''}
+              </p>`)}
+            </div>` : ''}
+          <p class="ld-gen-legend">${tr('landing.tierLegend', 'ANY MODEL = any model can build with it · READ THE DOC = the model has no priors for it, so the usage doc travels in the prompt · VERSION TRAP = the model remembers an older version, so follow the version in the doc')}</p>` : ''}
       </div>
 
       <div class="ld-gen-step">

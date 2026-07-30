@@ -482,8 +482,15 @@ function loadPbPacks() {
         cb.type = 'checkbox'; cb.className = 'pb-pack-cb'; cb.value = p.id;
         cb.onchange = function () {
           pbPackTouched[p.id] = true;
+          renderPbPackInfo();
           if (cb.checked) loadPbPackDoc(base, p.id); else updatePbPreview();
         };
+        // Pointing at a pack asks "what is this one?" right now, so answer that one; otherwise
+        // the panel below describes whatever is ticked, which is what the prompt will carry.
+        label.onmouseenter = function () { renderPbPackInfo(p.id); };
+        label.onmouseleave = function () { renderPbPackInfo(); };
+        cb.onfocus = function () { renderPbPackInfo(p.id); };
+        cb.onblur = function () { renderPbPackInfo(); };
         var span = document.createElement('span');
         span.textContent = p.title;
         label.appendChild(cb); label.appendChild(span);
@@ -503,6 +510,7 @@ function loadPbPacks() {
         }
         wrap.appendChild(label);
       });
+      renderPbPackInfo();
       // Pre-select from the idea text as the user types (never override a manual choice).
       var desc = document.getElementById('pb-description');
       if (desc && !desc._pbPackListener) {
@@ -512,6 +520,29 @@ function loadPbPacks() {
       pbMatchPacksToIdea(base);
     })
     .catch(function () { /* older node without the endpoint — picker stays empty */ });
+}
+
+// Spell out what the described packs actually do, under the pill grid. The description used to
+// live only in a title attribute: invisible on a phone, and invisible to anyone not hunting for
+// it. Pass an id to describe that one pack (pointer or keyboard focus); pass nothing to describe
+// everything currently ticked.
+function renderPbPackInfo(focusId) {
+  var box = document.getElementById('pb-packinfo');
+  if (!box) return;
+  var ids = focusId ? [focusId] : pbSelectedPackIds();
+  var shown = pbPacks.filter(function (p) { return ids.indexOf(p.id) !== -1; });
+  box.innerHTML = '';
+  shown.forEach(function (p) {
+    if (!p.description) return;
+    var line = document.createElement('p');
+    line.className = 'pb-packinfo-line';
+    var name = document.createElement('span');
+    name.className = 'pb-packinfo-name';
+    name.textContent = (p.title || p.id) + ':';
+    line.appendChild(name);
+    line.appendChild(document.createTextNode(' ' + p.description));
+    box.appendChild(line);
+  });
 }
 
 function pbMatchPacksToIdea(base) {
@@ -531,6 +562,8 @@ function pbMatchPacksToIdea(base) {
     if (hit && !cb.checked) { cb.checked = true; loadPbPackDoc(base, p.id); }
     else if (!hit && cb.checked) { cb.checked = false; updatePbPreview(); }
   });
+  // These ticks are set in code, so no change event fires and the panel would go stale.
+  renderPbPackInfo();
 }
 
 function loadPbPackDoc(base, id) {
