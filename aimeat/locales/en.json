@@ -7928,7 +7928,11 @@
     "genStep3Mcp": "If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you, with no file to move by hand.",
     "pitch": "AIMEAT is a digital agency where people, AI, agents and apps work under one roof and everyone owns their own data.",
     "pitchLead": "This is one of the things you can do with AIMEAT.",
-    "tierLegend": "ANY MODEL = any model can build with it · READ THE DOC = the model has no priors for it, so the usage doc travels in the prompt · VERSION TRAP = the model remembers an older version, so follow the version in the doc"
+    "tierLegend": "ANY MODEL = any model can build with it · READ THE DOC = the model has no priors for it, so the usage doc travels in the prompt · VERSION TRAP = the model remembers an older version, so follow the version in the doc",
+    "wallOpens": "opens",
+    "wallForks": "forks",
+    "wallOpen1": "open",
+    "wallFork1": "fork"
   },
   "pricing": {
     "title": "Pricing",

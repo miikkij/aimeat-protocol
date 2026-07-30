@@ -7928,7 +7928,11 @@
     "genStep3Mcp": "Jos tekoäly johon liitit kehotteen on yhteydessä tähän nodeen MCP:llä, se julkaisee appin puolestasi, eikä tiedostoa tarvitse siirtää käsin.",
     "pitch": "AIMEAT on digitoimisto, jossa ihmiset, tekoäly, agentit ja appit tekevät työtä saman katon alla ja jokainen omistaa oman datansa.",
     "pitchLead": "Tämä on yksi asia jonka voit tehdä AIMEATilla.",
-    "tierLegend": "KAIKILLE MALLEILLE = mikä tahansa malli osaa rakentaa sillä · LUE DOKUMENTTI = mallilla ei ole siitä ennakkotietoa, joten käyttöohje kulkee kehotteen mukana · VERSIOANSA = malli muistaa vanhemman version, joten seuraa ohjeen versiota"
+    "tierLegend": "KAIKILLE MALLEILLE = mikä tahansa malli osaa rakentaa sillä · LUE DOKUMENTTI = mallilla ei ole siitä ennakkotietoa, joten käyttöohje kulkee kehotteen mukana · VERSIOANSA = malli muistaa vanhemman version, joten seuraa ohjeen versiota",
+    "wallOpens": "avausta",
+    "wallForks": "haaraa",
+    "wallOpen1": "avaus",
+    "wallFork1": "haara"
   },
   "pricing": {
     "title": "Hinnoittelu",

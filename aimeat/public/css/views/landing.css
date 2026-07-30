@@ -194,6 +194,15 @@
    It carries the page, so it is set at heading weight without being an <h1> competitor to the
    ownership question further down; the lead-in under it is deliberately quiet, because its
    whole job is to stop the fold from reading as the entire product. */
+/* An app that has been opened forty times and revised to v1.2.0 is a different thing from one
+   published yesterday and never touched, and the wall showed neither. A zero is omitted rather
+   than printed: "0 opens" on a new app reads as a verdict on it. */
+.ld-app-stats { display: flex; flex-wrap: wrap; gap: .4rem; margin-top: .35rem; }
+.ld-app-stat {
+  font-size: .7rem; color: var(--text-muted); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 999px; padding: 1px 7px;
+}
+
 .ld-pitch { max-width: 760px; margin: 2rem auto 1rem; text-align: left; }
 .ld-pitch-line { font-size: 1.35rem; line-height: 1.4; font-weight: 700; color: var(--text); margin: 0; }
 .ld-pitch-lead { font-size: .95rem; color: var(--text-muted); margin: .75rem 0 0; }

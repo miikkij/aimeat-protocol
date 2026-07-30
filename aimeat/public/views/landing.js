@@ -157,6 +157,11 @@ function Gallery() {
                   <div class="ld-app-name">${m.icon ? escHtml(m.icon) + ' ' : ''}${escHtml(m.name || a.filename)}</div>
                   ${desc && html`<div class="ld-app-desc">${escHtml(desc)}</div>`}
                   <div class="ld-app-meta">${escHtml(author)}${when ? ' · ' + when : ''}</div>
+                  <div class="ld-app-stats">
+                    ${m.version ? html`<span class="ld-app-stat">v${escHtml(m.version)}</span>` : ''}
+                    ${a.downloads > 0 ? html`<span class="ld-app-stat">${a.downloads} ${a.downloads === 1 ? tr('landing.wallOpen1', 'open') : tr('landing.wallOpens', 'opens')}</span>` : ''}
+                    ${a.forks > 0 ? html`<span class="ld-app-stat">${a.forks} ${a.forks === 1 ? tr('landing.wallFork1', 'fork') : tr('landing.wallForks', 'forks')}</span>` : ''}
+                  </div>
                 </div>`;
             })}
           </div>`}
