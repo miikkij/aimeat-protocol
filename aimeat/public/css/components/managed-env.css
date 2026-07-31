@@ -1,0 +1,51 @@
+/**
+ * @file css/components/managed-env.css
+ * @description Styles for ManagedEnvNote (`.mgd-note`), the note that sits above every copyable
+ *   prompt on the public pages. Deliberately neutral chrome — border + surface, a dim left rule,
+ *   no alert colour — because it explains the reader's environment rather than warning about this
+ *   page. All colours are theme tokens, so it flips with light/dark like everything else.
+ * @structure .mgd-note · .mgd-note-title · .mgd-note-body · .mgd-note-routes · .mgd-note-link
+ * @usage loaded from spa.html; the two static connect pages carry their own copy of these rules
+ * @version-history
+ *   v1.0.0 — 2026-07-31 — Initial, alongside components/ManagedEnvNote.js
+ */
+
+.mgd-note {
+  margin: 0.75rem 0 0;
+  padding: 0.8rem 0.95rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--text-dim);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.mgd-note-title {
+  margin: 0 0 7px;
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.mgd-note-body {
+  margin: 0 0 7px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.mgd-note-routes {
+  margin: 0 0 7px;
+  padding-left: 20px;
+}
+
+.mgd-note-routes li {
+  margin-bottom: 5px;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.mgd-note-link {
+  font-size: 0.8125rem;
+  font-weight: 700;
+}

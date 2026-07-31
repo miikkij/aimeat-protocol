@@ -12,11 +12,15 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-07-31 — ManagedEnvNote above each of the three copy buttons (app-builder full,
+ *     agent and connect compact): what a company-managed AI tool's untrusted-source notice means
+ *     and the three routes round it. The prompt builders themselves are unchanged.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { CopyButton } from '/components/CopyButton.js';
+import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import { t as globalT } from '/js/i18n.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { swallowed } from '/js/swallowed.js';
@@ -402,6 +406,7 @@ export default function PortalClassicView({ navigate }) {
         <p class="cl-starter-hint">\u{1F4A1} ${ct('groups.forMe.starterHint')}</p>
         <div class="cl-mega-prompt-section">
           <textarea class="cl-prompt-box" readonly value=${appPrompt} />
+          <${ManagedEnvNote} />
           <div class="cl-prompt-actions">
             <${CopyPromptBtn}
               text=${appPrompt}
@@ -449,6 +454,7 @@ export default function PortalClassicView({ navigate }) {
         <p class="cl-starter-hint">\u{1F4A1} ${ct('groups.forAgents.starterHint')}</p>
         <div class="cl-mega-prompt-section">
           <textarea class="cl-prompt-box" readonly value=${agentPrompt} />
+          <${ManagedEnvNote} compact=${true} />
           <div class="cl-prompt-actions">
             <${CopyPromptBtn}
               text=${agentPrompt}
@@ -470,6 +476,7 @@ export default function PortalClassicView({ navigate }) {
           <p class="cl-connect-desc">${ct('groups.forAgents.connectDesc')}</p>
           <div class="cl-mega-prompt-section">
             <textarea class="cl-prompt-box" readonly value=${connectPrompt} />
+            <${ManagedEnvNote} compact=${true} />
             <div class="cl-prompt-actions">
               <${CopyPromptBtn}
                 text=${connectPrompt}

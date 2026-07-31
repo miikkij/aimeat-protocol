@@ -7799,6 +7799,16 @@
     "accountDesc": "The owner shares these documents with signed-in users only. Sign in from the top-right corner of this page, then try again.",
     "accountRetry": "I signed in — try again"
   },
+  "managedEnv": {
+    "title": "On a company-managed account: what those notices mean",
+    "why": "Company-managed AI tools (Claude Enterprise, Team and similar) may show a notice about prompt injection or an untrusted source when you use a prompt from this page. The notice appears before anything has run. The reason is the environment: there, every external service the administrator has not approved is untrusted by default, and the same notice applies to any unapproved connector.",
+    "read": "Do not click past it out of habit. If you do not know where a prompt came from, do not run it. The prompt above is shown in full before you copy it.",
+    "routesTitle": "Three routes, in this order:",
+    "route1": "Ask your administrator to approve the connector. They approve the MCP endpoint, the OAuth sign-in (each person signs in as themselves, there are no shared keys), and the tool set the connector exposes. Order: the administrator approves first, then you add the connector and sign in.",
+    "route2": "Use the manual route. This page works with no connector at all: you copy the prompt, read it, paste it into your chat, and bring the answer back. Nothing is connected, and nothing leaves the chat until you send it.",
+    "route3": "Run AIMEAT yourself. The whole codebase is MIT licensed and self-hostable: you can read exactly what the prompt does, run it on your own server, and check it yourself. We are not asking you to trust it, we are asking you to check it.",
+    "link": "Connector technical details for your administrator →"
+  },
   "landing": {
     "heroTitle": "Owner, or tenant. Which one do you want to be?",
     "heroSub": "Your memory, your agents, your balance sheet. On a rented platform you build a tool and pay for it. Here the tool can bill someone else, and it is yours.",

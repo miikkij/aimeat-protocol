@@ -51,6 +51,10 @@
  *     (github.com/miikkij/aimeat-protocol) + add the GitHub Octocat mark.
  *   v3.5.0 — 2026-07-17 — Hero gains an Experience Center line (the hands-on academy at
  *     experience-center.apps.aimeat.io) under the two CTAs.
+ *   v3.6.0 — 2026-07-31 — ManagedEnvNote above each of the three copy buttons (build-app full,
+ *     build-agent and ask-your-AI compact): what a company-managed AI tool's untrusted-source
+ *     notice means and the three routes round it. A security team met that notice cold and did
+ *     not continue. No prompt text changed anywhere.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -61,6 +65,7 @@ import { escHtml } from '/js/utils.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import { siteLink, hasSite } from '/js/site.js';
 import { Collapsible } from '/components/Collapsible.js';
+import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import NodeTotals from './landing-node-totals.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -487,6 +492,7 @@ function BuildAppPrompt() {
         <div class="ld-gen-preview-label">${tr('landing.genPreview', 'Prompt preview')}</div>
         <div class="ld-gen-preview">${prompt || tr('landing.buildLoading', 'Loading the build prompt from this node…')}</div>
         ${prompt ? html`<p class="ld-gen-contains">${tr('landing.promptContains', 'Includes')}: ${contains.join(' · ')}.</p>` : ''}
+        <${ManagedEnvNote} />
         <button class="btn-primary ld-gen-copy" onClick=${copy} disabled=${!prompt}>
           ${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}
         </button>
@@ -595,6 +601,7 @@ function BuildAgentPrompt() {
       <p class="ld-askai-sub">${tr('landing.agentBuildSub', 'Paste into Claude, ChatGPT or any AI. It builds a local AI agent that runs on your own machine with no API keys, connected to your node, and shows you how to share it. For coders and tinkerers; beginners can use the desktop app instead.')}</p>
       <div class="ld-askai-box">
         <pre class="ld-askai-prompt">${prompt}</pre>
+        <${ManagedEnvNote} compact=${true} />
         <button class="btn-primary ld-askai-copy" onClick=${copy}>${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}</button>
       </div>
     </section>`;
@@ -619,6 +626,7 @@ function AskYourAI() {
       <p class="ld-askai-sub">${tr('landing.askAiSub', 'Paste this into Claude, ChatGPT or any AI. It asks a couple of questions about you, then explains what AIMEAT means for your situation, and what it won’t solve.')}</p>
       <div class="ld-askai-box">
         <pre class="ld-askai-prompt">${ASK_AI_PROMPT}</pre>
+        <${ManagedEnvNote} compact=${true} />
         <button class="btn-primary ld-askai-copy" onClick=${copy}>${copied ? tr('landing.askAiCopied', 'Copied ✓') : tr('landing.askAiCopy', 'Copy prompt')}</button>
       </div>
     </section>`;

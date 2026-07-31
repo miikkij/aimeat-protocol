@@ -14,6 +14,9 @@
  *     → build → playbook), print/copy support, three doors at the end.
  *   v1.0.1 — 2026-06-12 — Add body.st-active marker while mounted so start.css print
  *     rules apply only on this view (they blanked printing everywhere else).
+ *   v1.1.0 — 2026-07-31 — ManagedEnvNote above the playbook's copyable prompt: what a
+ *     company-managed AI tool's untrusted-source notice means, and the three routes round
+ *     it. The playbook text itself is unchanged.
  */
 import { h } from 'preact';
 import { useState, useEffect, useMemo } from 'preact/hooks';
@@ -21,6 +24,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
+import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import {
   entranceFor, buildQuestionsFor, scoreAnswers, tierFor,
   buildPlaybook, playbookToMarkdown,
@@ -88,6 +92,7 @@ function PlaybookItem({ item }) {
       ${item.prompt && html`
         <div class="st-pb-prompt">
           <blockquote>${trr(item.prompt)}</blockquote>
+          <${ManagedEnvNote} />
           <${CopyButton} text=${trr(item.prompt)} className="btn-primary"
             label=${tr('start.copyPrompt', 'Copy the prompt')} copiedLabel=${tr('start.copied', 'Copied')} />
         </div>`}

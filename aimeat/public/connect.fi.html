@@ -159,6 +159,18 @@
     font-size: 15px;
   }
 
+  /* Hallitun ympäristön ohjelaatikko. Neutraali tarkoituksella: se selittää lukijan
+     ympäristöä, ei varoita tästä sivusta. Sama teksti kuin components/ManagedEnvNote.js. */
+  .callout-managed {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--fg-muted);
+    font-size: 14px;
+  }
+  .callout-managed p { margin: 8px 0 0; color: var(--fg-muted); line-height: 1.6; }
+  .callout-managed ol { margin: 8px 0 0; padding-left: 20px; color: var(--fg-muted); line-height: 1.6; }
+  .callout-managed li { margin-bottom: 6px; }
+
   details {
     background: var(--surface);
     border-radius: 8px;
@@ -205,6 +217,27 @@
 
     <h2>Liitä alle minuutissa</h2>
     <p>Valitse tekoälyalustasi ja seuraa vaiheita. OAuth-kirjautuminen avautuu selaimeen — kirjaudu aimeat.io-tiliisi kerran, ja tekoäly saa pysyvän muistin ja jaetun työtilan.</p>
+
+    <div class="callout callout-managed">
+      <strong>Yritysympäristössä? Lue tämä ensin.</strong>
+      <p>Kun lisäät konnektorin, jota ylläpitäjä ei ole hyväksynyt, tai liität AIMEATin kehotteen, hallitussa
+      ympäristössä voi tulla ilmoitus prompt injectionista tai epäluotettavasta lähteestä. Ilmoitus tulee
+      ennen kuin mitään on ajettu. Syy on ympäristössä: siellä jokainen ulkoinen palvelu, jota ylläpitäjä
+      ei ole hyväksynyt, on lähtökohtaisesti epäluotettava, ja sama ilmoitus koskee mitä tahansa
+      hyväksymätöntä konnektoria.</p>
+      <p>Älä silti klikkaa sitä ohi tottumuksesta. Kolme reittiä, tässä järjestyksessä:</p>
+      <ol>
+        <li>Pyydä ylläpitäjältä konnektorin hyväksyntä. Hän hyväksyy MCP-päätepisteen
+        <code>{{mcpUrl}}</code>, OAuth 2.1 + PKCE -kirjautumisen tähän nodeen (jokainen kirjautuu omana
+        itsenään, jaettuja avaimia ei ole) ja alla luetellun työkalujoukon. Järjestys: ylläpitäjä
+        hyväksyy ensin, sitten sinä lisäät konnektorin ja kirjaudut.</li>
+        <li>Käytä käsin-reittiä. AIMEAT toimii kokonaan ilman konnektoria: appi kirjoittaa kehotteen, sinä
+        luet sen, viet sen käsin chattiisi ja tuot vastauksen takaisin.</li>
+        <li>Aja AIMEAT itse. Koko koodi on MIT-lisensoitu ja itse ajettavissa: voit lukea täsmälleen mitä
+        kehote tekee, ajaa sen omalla palvelimellasi ja tarkistaa sen. Emme pyydä luottamaan, vaan
+        tarkistamaan.</li>
+      </ol>
+    </div>
 
     <div class="client-grid">
 

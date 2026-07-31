@@ -162,6 +162,18 @@
     font-size: 15px;
   }
 
+  /* The managed-environment note. Neutral chrome on purpose: it explains the reader's
+     environment, it does not warn about this page. Same text as components/ManagedEnvNote.js. */
+  .callout-managed {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--fg-muted);
+    font-size: 14px;
+  }
+  .callout-managed p { margin: 8px 0 0; color: var(--fg-muted); line-height: 1.6; }
+  .callout-managed ol { margin: 8px 0 0; padding-left: 20px; color: var(--fg-muted); line-height: 1.6; }
+  .callout-managed li { margin-bottom: 6px; }
+
   details {
     background: var(--surface);
     border-radius: 8px;
@@ -208,6 +220,27 @@
 
     <h2>Attach in under a minute</h2>
     <p>Pick your AI client and follow the steps. The OAuth flow opens in a browser tab — sign in to your aimeat.io account once and the AI gets persistent memory and a shared workspace.</p>
+
+    <div class="callout callout-managed">
+      <strong>On a company-managed account, read this first.</strong>
+      <p>Adding a custom connector your administrator has not approved, or pasting an AIMEAT prompt, can
+      produce a prompt injection or untrusted source notice in a managed environment. The notice appears
+      before anything has run. The reason is the environment: there, every external service the
+      administrator has not approved is untrusted by default, and the same notice applies to any
+      unapproved connector.</p>
+      <p>Do not click past it out of habit. Three routes, in this order:</p>
+      <ol>
+        <li>Ask your administrator to approve the connector. They approve the MCP endpoint
+        <code>{{mcpUrl}}</code>, the OAuth 2.1 + PKCE sign-in to this node (each person signs in as
+        themselves, there are no shared keys), and the tool set listed below. Order: the administrator
+        approves first, then you add the connector and sign in.</li>
+        <li>Use the manual route. AIMEAT also works with no connector at all: an app writes the prompt,
+        you read it, you carry it to your chat by hand and bring the answer back.</li>
+        <li>Run AIMEAT yourself. The whole codebase is MIT licensed and self-hostable, so you can read
+        exactly what a prompt does, run it on your own server, and check it. We are not asking you to
+        trust it, we are asking you to check it.</li>
+      </ol>
+    </div>
 
     <div class="client-grid">
 

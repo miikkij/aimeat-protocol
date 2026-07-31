@@ -7799,6 +7799,16 @@
     "accountDesc": "Omistaja jakaa nämä dokumentit vain kirjautuneille käyttäjille. Kirjaudu sisään sivun oikeasta yläkulmasta ja yritä sitten uudelleen.",
     "accountRetry": "Kirjauduin sisään — yritä uudelleen"
   },
+  "managedEnv": {
+    "title": "Yritysympäristössä? Näin nämä ilmoitukset tulkitaan",
+    "why": "Yrityksen hallitusti asennetuissa AI-työkaluissa (Claude Enterprise, Team ja vastaavat) voi tulla vastaan ilmoitus prompt injectionista tai epäluotettavasta lähteestä, kun käytät tämän sivun kehotetta. Ilmoitus tulee ennen kuin mitään on ajettu. Syy on ympäristössä: siellä jokainen ulkoinen palvelu, jota ylläpitäjä ei ole hyväksynyt, on lähtökohtaisesti epäluotettava, ja sama ilmoitus koskee mitä tahansa hyväksymätöntä konnektoria.",
+    "read": "Älä silti klikkaa sitä ohi tottumuksesta. Jos et tunne kehotteen lähdettä, älä aja sitä. Yllä oleva kehote näkyy kokonaan ennen kuin kopioit sen.",
+    "routesTitle": "Kolme reittiä, tässä järjestyksessä:",
+    "route1": "Pyydä ylläpitäjältä konnektorin hyväksyntä. Hän hyväksyy MCP-päätepisteen, OAuth-kirjautumisen (jokainen kirjautuu omana itsenään, jaettuja avaimia ei ole) ja konnektorin tarjoaman työkalujoukon. Järjestys: ylläpitäjä hyväksyy ensin, sitten sinä lisäät konnektorin ja kirjaudut.",
+    "route2": "Käytä käsin-reittiä. Tämä sivu toimii kokonaan ilman konnektoria: kopioit kehotteen, luet sen, liität sen chattiisi ja tuot vastauksen takaisin. Mitään ei ole kytketty, eikä mitään lähde ulos ennen kuin lähetät sen itse.",
+    "route3": "Aja AIMEAT itse. Koko koodi on MIT-lisensoitu ja itse ajettavissa: voit lukea täsmälleen mitä kehote tekee, ajaa sen omalla palvelimellasi ja tarkistaa sen itse. Emme pyydä luottamaan, vaan tarkistamaan.",
+    "link": "Konnektorin tekniset tiedot ylläpitäjälle →"
+  },
   "landing": {
     "heroTitle": "Omistaja vai vuokralainen. Kumpi haluat olla?",
     "heroSub": "Oma muisti, omat agentit, oma tase. Vuokratulla alustalla rakennat työkalun ja maksat siitä. Täällä työkalu voi laskuttaa jotakuta toista, ja se on sinun.",
