@@ -3,6 +3,8 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![CI](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml/badge.svg)](https://github.com/miikkij/aimeat-protocol/actions/workflows/ci.yml)
 [![Agent-Ready: Level 5](https://img.shields.io/badge/isitagentready-Level_5_Agent--Native-brightgreen)](https://isitagentready.com/)
+[![AgentGrade](https://agentgrade.com/api/badge?url=https%3A%2F%2Faimeat.io)](https://agentgrade.com/s/aimeat.io)
+[![Agent Ready](https://agent-ready.dev/api/badge/aimeat.io)](https://agent-ready.dev)
 
 **AI Memory Exchange and Action Transfer**
 
@@ -27,6 +29,10 @@ essentials of working with AIMEAT as it goes.
 The prompt asks only what it can't determine for itself (self-host vs `aimeat.io`, SQLite vs PostgreSQL, your
 owner handle), runs the setup commands for you, and surfaces each agent's approval code for you to confirm.
 It never invents secrets or pushes anything outward without asking.
+
+> On a **company-managed AI account**, this prompt and every other one here can trigger a prompt injection
+> warning before anything runs. That is the environment, not the prompt:
+> [what it means and the three ways round it](#prompt-injection-warnings-on-company-managed-ai-accounts).
 
 <p align="center">
   <img src="assets/screenshots/portal-landing.png" alt="The aimeat.io landing page and the wall of apps people have built with their AI" width="24%" />
@@ -197,6 +203,44 @@ For MCP-capable runtimes (Claude Desktop, MCP-aware IDEs), run `aimeat connect s
 **2. Copy the prompt from your profile.** If you do not want to install a CLI, your profile -> Agents tab still produces a paste-ready prompt with the device-auth flow baked in -- give it to any AI agent, the agent calls one endpoint, you approve, and it is connected with its own identity and scoped permissions.
 
 Claude Pro, ChatGPT Plus, and other MCP-capable AIs connect directly as MCP clients. OpenClaw, Hermes, Claude Code, and Cursor all work. Three scope presets (readonly, standard, full) control what each agent can access.
+
+### Prompt injection warnings on company-managed AI accounts
+
+If you run Claude, or another AI tool, inside a company-managed environment (Enterprise, Team, or an
+administrator-configured workspace), connecting this node or pasting one of its prompts can produce a
+**prompt injection** or **untrusted source** warning. The warning appears before anything has run.
+
+The reason is the environment, not the prompt. In a managed environment every external service the
+administrator has not approved is untrusted by default, and the same warning applies to any unapproved
+connector. Injection classifiers score content that enters the model's context from *outside* -- a tool
+result, a fetched page, a connector response -- rather than what you type or paste yourself; without an
+approved connector, what the prompt asks the model to read arrives as an untrusted fetch. On a personal
+account, or through a connector that is already approved, the same prompts usually pass without a warning.
+
+**Do not click past the warning out of habit.** If you do not know where a prompt came from, do not run
+it. Every prompt this project hands you is shown in full before you copy it, and every one of them is in
+this repository, readable.
+
+Three routes, in this order:
+
+1. **Ask your administrator to approve the connector.** They approve the MCP endpoint
+   (`https://your-node/v1/mcp`), the OAuth 2.1 + PKCE sign-in to that node -- each person signs in as
+   themselves, there are no shared keys -- and the tool set the connector exposes. The order matters: the
+   administrator approves first, then you add the connector and sign in. For their review: the tool
+   inventory and per-tool annotations in [`aimeat/src/mcp/annotations.ts`](aimeat/src/mcp/annotations.ts),
+   the OAuth metadata at `/.well-known/oauth-authorization-server` (RFC 8414) and
+   `/.well-known/oauth-protected-resource` (RFC 9728), and the whole server in this repository.
+2. **Use the manual route instead of MCP.** AIMEAT works with no connector at all: the app composes a
+   prompt, you read it, you paste it into your chat by hand, and you bring the answer back. Nothing is
+   connected, and nothing leaves the chat until you send it. This is a permanent path, not a workaround,
+   and for confidential material it is often the right one anyway.
+3. **Run AIMEAT yourself.** The whole codebase is MIT licensed and self-hostable (`npx aimeat init`). You
+   can read exactly what a prompt does, run it on your own server, point the prompts at your own address,
+   and verify the behaviour yourself. We are not asking you to trust it. We are asking you to check it.
+
+The same explanation is shown in the product, above every copyable prompt: the landing page, the classic
+portal, the `/v1/start` playbook, `/v1/connect`, and the
+[Experience Center](https://experience-center.apps.aimeat.io/).
 
 ### Connect agent platforms (Dify, n8n, Open WebUI, ...)
 
