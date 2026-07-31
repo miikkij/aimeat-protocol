@@ -5,6 +5,18 @@
       "date": "2026-07-31",
       "kind": "feature",
       "title": {
+        "en": "Messages can be listened to",
+        "fi": "Viestit voi kuunnella"
+      },
+      "body": {
+        "en": "A speaker button on every message reads it aloud, and one on the conversation header reads the whole thread, sender by sender, with pause and continue. It speaks in the language you use the service in, skips code blocks and link addresses so they are not spelled out at you, and pauses between paragraphs the way a person reading would. Nothing leaves the browser.",
+        "fi": "Kaiutinnappi jokaisessa viestissä lukee sen ääneen, ja keskustelun otsikkorivin nappi lukee koko ketjun lähettäjä kerrallaan, tauko ja jatka mukana. Puhe tulee sillä kielellä jolla palvelua käytät, koodilohkot ja linkkiosoitteet jäävät lukematta ääneen, ja kappaleiden väliin tulee tauko kuten ihmisellä joka lukee. Mikään ei lähde selaimesta minnekään."
+      }
+    },
+    {
+      "date": "2026-07-31",
+      "kind": "feature",
+      "title": {
         "en": "The front page says what we shipped",
         "fi": "Etusivu kertoo mitä on tehty"
       },
