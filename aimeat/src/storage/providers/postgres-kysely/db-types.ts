@@ -141,6 +141,8 @@ export interface AgentTask {
   automation: Json | null;
   completedAt: Timestamp | null;
   createdAt: Generated<Timestamp>;
+  /** Commission fingerprint; a partial unique index over the open statuses enforces one live run. */
+  dedupeKey: string | null;
   deliverableKey: string | null;
   description: Generated<string>;
   id: Generated<string>;

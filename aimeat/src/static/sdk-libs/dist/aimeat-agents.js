@@ -306,11 +306,17 @@
      *  collapsed by default: while an identical commission (same agent + title + description) is in
      *  flight — and for 60s after it succeeded — every further call returns THAT task instead of
      *  queueing another. Five clicks = one task.
-     *  opts: { confirm, allowDuplicate, dedupeMs }
+     *  The NODE runs the same guard where this page cannot see — across a reload, a second tab, a
+     *  retrying script: while an identical commission is still open it returns THAT task and marks it
+     *  `task.deduplicated === true` (+ `task.deduplicated_reason`). Show that instead of "queued!".
+     *
+     *  opts: { confirm, allowDuplicate, dedupeMs, idempotencyKey }
      *    confirm       — true (or an object for AIMEAT.spend.confirm) asks the user first; a cancel
      *                    rejects with `.code === 'SPEND_CANCELLED'`
-     *    allowDuplicate— genuinely commission the same thing twice (skips the guard entirely)
-     *    dedupeMs      — widen/narrow the 60s settle window */
+     *    allowDuplicate— genuinely commission the same thing twice (skips both guards)
+     *    dedupeMs      — widen/narrow the 60s settle window (this page only)
+     *    idempotencyKey— name the job yourself (a form submit id, a row id) instead of letting the
+     *                    node fingerprint title+description */
     async createTask(name, task, opts) {
       if (!task || !task.description) throw new Error("createTask requires { description }");
       var body = {
@@ -338,6 +344,8 @@
       if (task.rules) body.rules = task.rules;
       if (task.resources) body.resources = task.resources;
       var o = opts || {};
+      if (o.idempotencyKey) body.idempotency_key = o.idempotencyKey;
+      if (o.allowDuplicate) body.allow_duplicate = true;
       var commission = async function() {
         if (o.confirm) {
           var c = typeof o.confirm === "object" ? o.confirm : {};
@@ -352,10 +360,15 @@
           });
           if (!okToSpend) throw cancelledError("The commission");
         }
-        return unwrap(await authFetch2("/v1/agents/" + enc(name) + "/tasks", {
+        var data = unwrap(await authFetch2("/v1/agents/" + enc(name) + "/tasks", {
           method: "POST",
           body: JSON.stringify(body)
-        }), "create task").task;
+        }), "create task");
+        if (data.deduplicated && data.task) {
+          data.task.deduplicated = true;
+          data.task.deduplicated_reason = data.deduplicated_reason;
+        }
+        return data.task;
       };
       if (o.allowDuplicate) return commission();
       return once(keyOf(["agents.createTask", name, body.title, body.description]), commission, {

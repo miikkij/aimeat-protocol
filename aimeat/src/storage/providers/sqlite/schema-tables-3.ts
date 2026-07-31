@@ -265,6 +265,7 @@ export function applySchemaTables3(db: Database.Database): void {
       resources       TEXT,
       todos           TEXT NOT NULL DEFAULT '[]',
       status          TEXT NOT NULL DEFAULT 'draft',
+      dedupeKey       TEXT,
       parentTaskId    TEXT,
       workTrackingCode TEXT,
       telemetry       TEXT,

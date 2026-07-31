@@ -58,6 +58,13 @@ export const AgentTaskCreateSchema = z.object({
   })).optional().default([]),
   status: z.enum(['draft', 'queued']).optional().default('draft'),
   parent_task_id: z.string().optional(),
+  // One-live-commission guard. A caller that knows which job this is (a form submit id, a row id)
+  // sends its own key; everyone else gets a server-derived fingerprint over agent + title +
+  // description. `allow_duplicate` is the deliberate "yes, run this a second time in parallel".
+  // Distinct from the platform's `Idempotency-Key` HEADER (middleware/idempotency.ts), which is a
+  // UUID-keyed 24h replay cache of the whole response; this one asks "is this job already running?".
+  idempotency_key: z.string().min(1).max(200).optional(),
+  allow_duplicate: z.boolean().optional(),
 });
 
 export const AgentTaskUpdateSchema = z.object({

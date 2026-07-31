@@ -382,6 +382,10 @@ export const capabilityAgentsMethods = {
     return agentTaskRepo.getAgentTask(this.db, id);
   },
 
+  async findLiveTaskByDedupeKey(this: SqliteStorage, agentGaii: string, dedupeKey: string): Promise<AgentTaskRecord | null> {
+    return agentTaskRepo.findLiveTaskByDedupeKey(this.db, agentGaii, dedupeKey);
+  },
+
   async listAgentTasks(this: SqliteStorage, agentGaii: string, opts?: { status?: string; page?: number; perPage?: number }): Promise<{ tasks: AgentTaskRecord[]; total: number }> {
     return agentTaskRepo.listAgentTasks(this.db, agentGaii, opts);
   },

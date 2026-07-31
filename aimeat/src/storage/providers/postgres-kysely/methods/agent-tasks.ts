@@ -13,6 +13,7 @@
 import { sql } from 'kysely';
 import type { Selectable } from 'kysely';
 import type { AgentTaskRecord, AgentTaskEventRecord } from '../../../interface.js';
+import { LIVE_TASK_STATUSES } from '../../../interface.js';
 import type { AgentTask, AgentTaskEvent } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 import { jsonb } from '../helpers.js';
@@ -35,6 +36,7 @@ function toTask(r: Selectable<AgentTask>): AgentTaskRecord {
     createdAt: iso(r.createdAt),
     updatedAt: iso(r.updatedAt),
   };
+  if (r.dedupeKey != null) rec.dedupeKey = r.dedupeKey;
   if (r.resources != null) rec.resources = r.resources as AgentTaskRecord['resources'];
   if (r.parentTaskId != null) rec.parentTaskId = r.parentTaskId;
   if (r.workTrackingCode != null) rec.workTrackingCode = r.workTrackingCode;
@@ -74,6 +76,7 @@ export const agentTaskMethods = {
       resources: jsonb(record.resources ?? null),
       todos: jsonb(record.todos),
       status: record.status,
+      dedupeKey: record.dedupeKey ?? null,
       parentTaskId: record.parentTaskId ?? null,
       workTrackingCode: record.workTrackingCode ?? null,
       telemetry: jsonb(record.telemetry ?? null),
@@ -92,6 +95,16 @@ export const agentTaskMethods = {
 
   async getAgentTask(this: PostgresKyselyStorage, id: string): Promise<AgentTaskRecord | null> {
     const r = await this.db.selectFrom('AgentTask').selectAll().where('id', '=', id).executeTakeFirst();
+    return r ? toTask(r) : null;
+  },
+
+  async findLiveTaskByDedupeKey(this: PostgresKyselyStorage, agentGaii: string, dedupeKey: string): Promise<AgentTaskRecord | null> {
+    const r = await this.db.selectFrom('AgentTask').selectAll()
+      .where('agentGaii', '=', agentGaii)
+      .where('dedupeKey', '=', dedupeKey)
+      .where('status', 'in', [...LIVE_TASK_STATUSES])
+      .orderBy('createdAt', 'desc')
+      .executeTakeFirst();
     return r ? toTask(r) : null;
   },
 

@@ -2665,6 +2665,12 @@ components:
           nullable: true
           enum: [kept, archived]
           description: Tasks-tab triage bucket override (null = default Recent/auto-archive).
+        dedupeKey:
+          type: string
+          description: >
+            Commission fingerprint (caller `idempotency_key` or a hash of agent + title +
+            description). A partial unique index over the open statuses makes a second identical
+            commission impossible while this one is still running.
 
     AgentTaskRating:
       type: object
@@ -28907,6 +28913,19 @@ paths:
                       done: { type: boolean, default: false }
                 resources:
                   $ref: '#/components/schemas/AgentTaskResources'
+                idempotency_key:
+                  type: string
+                  maxLength: 200
+                  description: >
+                    Names this commission, so re-sending it does not buy a second agent run. Omit and
+                    the node fingerprints agent + title + description instead. Distinct from the
+                    platform's `Idempotency-Key` header (a UUID-keyed 24h replay cache of the whole
+                    response, applied to every POST); this field asks "is this job already running?".
+                allow_duplicate:
+                  type: boolean
+                  description: >
+                    Deliberately commission the same job again while one is still open (a genuine
+                    parallel run). Skips the guard entirely.
       responses:
         '201':
           description: Task created
@@ -28919,6 +28938,30 @@ paths:
                     properties:
                       data:
                         $ref: '#/components/schemas/AgentTask'
+        '200':
+          description: >
+            Nothing was created — an identical commission for this agent is already open (draft,
+            queued, revision_requested, active or paused), so the existing task is returned instead
+            of a second agent run being queued. `task` is in the same place as on a 201, so a client
+            that ignores the flags still works. A finished, failed or stalled task never matches:
+            the same work can always be ordered again.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          task:
+                            $ref: '#/components/schemas/AgentTask'
+                          deduplicated: { type: boolean, enum: [true] }
+                          existing_task_id: { type: string }
+                          deduplicated_reason:
+                            type: string
+                            description: Human-readable explanation, safe to show to the user.
         '400':
           $ref: '#/components/responses/BadRequest'
         '401':

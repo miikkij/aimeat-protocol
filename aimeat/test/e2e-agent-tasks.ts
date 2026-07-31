@@ -692,6 +692,136 @@ await test('33. Triage rejects an invalid value (400)', async () => {
     assert(status === 400, `expected 400, got ${status}`);
 });
 
+// ─── Phase: one live commission per (agent, fingerprint) ───
+// The browser guard cannot see across a reload or a second tab; these are exactly those cases,
+// where every duplicate would be a second agent run the owner pays for.
+console.log('\nPhase 9 -- Commission dedupe');
+
+const dedupeBody = {
+    title: 'Summarise the week',
+    description: 'Read this week entries and write one summary',
+    status: 'queued' as const,
+};
+let firstDedupeId = '';
+
+await test('34. First commission is created (201)', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify(dedupeBody),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(!body.data.deduplicated, 'a first commission is not a duplicate');
+    firstDedupeId = body.data.task.id;
+});
+
+await test('35. Identical commission returns the SAME task, not a second run (200)', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify(dedupeBody),
+    });
+    assert(status === 200, `expected 200 (nothing created), got ${status}`);
+    assert(body.data.deduplicated === true, 'response says deduplicated');
+    assert(body.data.task.id === firstDedupeId, `same task: ${body.data.task.id} vs ${firstDedupeId}`);
+    assert(body.data.existing_task_id === firstDedupeId, 'existing_task_id points at the open run');
+    assert(typeof body.data.deduplicated_reason === 'string' && body.data.deduplicated_reason.length > 0,
+        'carries a reason the UI can show');
+});
+
+await test('36. Whitespace/case noise is still the same commission', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ ...dedupeBody, title: '  Summarise   the WEEK ' }),
+    });
+    assert(status === 200, `expected 200, got ${status}`);
+    assert(body.data.task.id === firstDedupeId, 'normalised to the same fingerprint');
+});
+
+await test('37. Five rapid identical commissions produce ONE task', async () => {
+    const results = await Promise.all([1, 2, 3, 4, 5].map(() => json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ ...dedupeBody, title: 'Race the guard' }),
+    })));
+    const ids = new Set(results.map(r => r.body?.data?.task?.id));
+    assert(ids.size === 1, `expected 1 task from 5 clicks, got ${ids.size}: ${[...ids].join(', ')}`);
+    const created = results.filter(r => r.status === 201).length;
+    assert(created === 1, `exactly one 201, got ${created}`);
+});
+
+await test('38. A different job is not blocked', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ ...dedupeBody, description: 'A genuinely different job' }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.id !== firstDedupeId, 'a new task');
+});
+
+await test('39. allow_duplicate commissions it again on purpose', async () => {
+    const { status, body } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ ...dedupeBody, allow_duplicate: true }),
+    });
+    assert(status === 201, `status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data.task.id !== firstDedupeId, 'a second, deliberate run');
+});
+
+await test('40. idempotency_key names the job even when the text differs', async () => {
+    const first = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Order 1', description: 'first wording', idempotency_key: 'order-4711' }),
+    });
+    assert(first.status === 201, `first: ${first.status}`);
+    const second = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify({ title: 'Order 1 again', description: 'different wording', idempotency_key: 'order-4711' }),
+    });
+    assert(second.status === 200, `expected 200, got ${second.status}`);
+    assert(second.body.data.task.id === first.body.data.task.id, 'same key, same task');
+});
+
+await test('41. The platform Idempotency-Key header still replays (no second task)', async () => {
+    // A different, older mechanism (middleware/idempotency.ts): a UUID key replays the whole first
+    // response for 24h. It must keep working on this route — and it must not create a second run.
+    const h = { Authorization: `Bearer ${ownerToken}`, 'Idempotency-Key': crypto.randomUUID() };
+    const first = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: h, body: JSON.stringify({ title: 'Header order', description: 'one' }),
+    });
+    assert(first.status === 201, `first: ${first.status} ${JSON.stringify(first.body)}`);
+    const second = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: h, body: JSON.stringify({ title: 'Header order', description: 'two' }),
+    });
+    assert(second.body.data.task.id === first.body.data.task.id, 'replayed the first response');
+});
+
+await test('41b. A non-UUID Idempotency-Key is rejected (400), unchanged', async () => {
+    const { status } = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${ownerToken}`, 'Idempotency-Key': 'not-a-uuid' },
+        body: JSON.stringify({ title: 'Bad key', description: 'x' }),
+    });
+    assert(status === 400, `expected 400, got ${status}`);
+});
+
+await test('42. Once the run is finished, the same job can be ordered again', async () => {
+    // Take the first commission to a terminal state the way the agent would.
+    const start = await json(`/v1/agents/${agentName}/tasks/${firstDedupeId}/start`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+    });
+    assert(start.status === 200, `start: ${start.status} ${JSON.stringify(start.body)}`);
+    const done = await json(`/v1/agents/${agentName}/tasks/${firstDedupeId}/complete`, {
+        method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+        body: JSON.stringify({ message: 'Summary written' }),
+    });
+    assert(done.status === 200, `complete: ${done.status} ${JSON.stringify(done.body)}`);
+
+    const again = await json(`/v1/agents/${agentName}/tasks`, {
+        method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+        body: JSON.stringify(dedupeBody),
+    });
+    assert(again.status === 201, `expected a fresh 201, got ${again.status}: ${JSON.stringify(again.body)}`);
+    assert(again.body.data.task.id !== firstDedupeId, 'a new run, not the finished one');
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

@@ -10,6 +10,12 @@ import type { AgentTaskRecord, AgentTaskEventRecord } from '../interface.js';
 export interface AgentTaskRepository {
   createAgentTask(record: AgentTaskRecord): Promise<AgentTaskRecord>;
   getAgentTask(id: string): Promise<AgentTaskRecord | null>;
+  /**
+   * The OPEN task (LIVE_TASK_STATUSES) carrying this commission fingerprint, or null. Backs the
+   * one-live-commission guard on POST /v1/agents/:name/tasks: a reload or a second tab re-orders the
+   * same job, and the owner gets the run they already have instead of paying for a second one.
+   */
+  findLiveTaskByDedupeKey(agentGaii: string, dedupeKey: string): Promise<AgentTaskRecord | null>;
   listAgentTasks(agentGaii: string, opts?: {
     status?: string;
     page?: number;

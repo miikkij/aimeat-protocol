@@ -257,6 +257,7 @@ export function buildAppPrompt(
   body += 'const r = await AIMEAT.ai.complete({ app_id: "my-app", prompt,\n';
   body += '  confirm: { what: "Summarise " + rows.length + " rows", estimate: "~" + rows.length + " AI calls" } });\n';
   body += 'const task = await AIMEAT.agents.createTask("news-agent", { description }, { confirm: true });\n';
+  body += 'if (task.deduplicated) show("That run is already going — here it is.");   // see below\n';
   body += '// Your own flows (buying, bidding, anything paid): AIMEAT.spend.confirm returns true/false\n';
   body += 'if (!await AIMEAT.spend.confirm({ what, detail, estimate, remember: "myapp:bulk" })) return;\n';
   body += '```\n';
@@ -264,7 +265,8 @@ export function buildAppPrompt(
   body += '- **A user action starts a spend — never the page.** No AI call on load, none from an `AIMEAT.live` event, none on a timer, none on every keystroke. If a field feeds AI, debounce it AND require an explicit button.\n';
   body += "- **Show the cost and what is left.** Every completion returns `r.budget` (`spent_today_usd`, `remaining_usd`, `daily_budget_usd`) — put it near the AI control (\"$0.29 of $1.00 used today\"), and the confirm dialog will show the last figure it saw automatically. `AIMEAT.ai.usage()` gives today's snapshot to owner sessions.\n";
   body += '- **A failure gets a message, never an automatic retry.** `QUOTA_EXHAUSTED` / `APP_QUOTA_EXHAUSTED` / `RATE_LIMITED` mean stop and tell the user what happened; a retry loop around a paid call burns the budget it is reacting to. Let the user click again.\n';
-  body += '- **Give a running job a way out.** After a commission, show the task and its status (`AIMEAT.agents.watch()`), and offer `AIMEAT.agents.cancelTask(name, id)`. An app that fires an agent and shows nothing invites the user to fire it again.\n\n';
+  body += '- **Give a running job a way out.** After a commission, show the task and its status (`AIMEAT.agents.watch()`), and offer `AIMEAT.agents.cancelTask(name, id)`. An app that fires an agent and shows nothing invites the user to fire it again.\n';
+  body += '- **Say when the node hands back a run you already have.** The page-level guard is blind across a reload or a second tab, so the NODE holds the same line: while an identical commission is still open it returns THAT task and sets `task.deduplicated` (with `task.deduplicated_reason`). Show it — "that run is already going, here it is" — instead of reporting a queue that never happened. Name the job yourself with `{ idempotencyKey: "order-" + row.id }` when the wording varies but the work is the same, and use `{ allowDuplicate: true }` for a genuine parallel run.\n\n';
 
   // Real-time / multiplayer
   body += '### Real-time / multiplayer (optional)\n';
@@ -402,7 +404,7 @@ export function buildAppPrompt(
   body += '1. **Three viewports, every interactive surface**: 390x844, 1280x900 and **1280x460**. The short one is the one that catches it: a centred/overlay panel that looks perfect at 900px high often clips its own top, becomes unscrollable, or renders below the page at 460px. Check `document.documentElement.scrollWidth - clientWidth === 0` at each, and that the dialog\'s top edge is >= 0 and its close control reachable.\n';
   body += '2. **Live channel connected, dialog open, count the repaints.** Put a `MutationObserver` on the open panel\'s content node and watch for 20 seconds while other work is happening on the account. Expected: **zero**. Anything above zero means a live event is repainting a surface the user is reading.\n';
   body += '3. **Read the network log after 60 idle seconds.** A repeating full listing is a bug even when nothing visibly breaks: it is a poll you did not intend. Gate it (see the live-updates section) so an idle app is idle.\n';
-  body += '4. **If anything in the app costs money** (an AI call, an agent commission): open the network log, click that control FIVE times as fast as you can, and count the requests. Expected: **one**. Then reload mid-run and click again — a second identical commission inside the 60s window must return the first task, not queue another. Report both numbers.\n';
+  body += '4. **If anything in the app costs money** (an AI call, an agent commission): open the network log, click that control FIVE times as fast as you can, and count the requests. Expected: **one**. Then RELOAD the page and commission the same job again — the node answers with the run you already have (`task.deduplicated`), and your UI must say so rather than claim a new one. Report both.\n';
   body += 'Verify the FEATURE too, not just the render: perform the real interaction (commission the thing, save the thing, delete the thing) and confirm the result actually appears and persists. "It did not crash" is not a pass.\n\n';
 
   // Game form language — palette alone reads as a dashboard; the FORM LANGUAGE makes the game.

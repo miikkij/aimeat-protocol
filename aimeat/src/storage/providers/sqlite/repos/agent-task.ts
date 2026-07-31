@@ -2,6 +2,7 @@
  * @file agent-task.ts
  * @description SQLite implementation for agent task CRUD, events, and stall detection
  * @version-history
+ *   v1.3.0 -- 2026-07-31 -- Persist dedupeKey + findLiveTaskByDedupeKey (one live commission per agent+fingerprint)
  *   v1.2.0 -- 2026-06-15 -- Persist the `automation` field (ecosystem-app recipe provenance/routing, B5/B6)
  *   v1.1.0 -- 2026-06-05 -- deleteAgentTask now removes any non-active task (was draft/queued only)
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
@@ -9,6 +10,7 @@
 
 import type Database from 'better-sqlite3';
 import type { AgentTaskRecord, AgentTaskEventRecord } from '../../../interface.js';
+import { LIVE_TASK_STATUSES } from '../../../interface.js';
 
 // ── Helpers ──
 
@@ -27,6 +29,7 @@ function deserializeTask(row: Record<string, unknown>): AgentTaskRecord {
     createdAt: row.createdAt as string,
     updatedAt: row.updatedAt as string,
   };
+  if (row.dedupeKey) record.dedupeKey = row.dedupeKey as string;
   if (row.resources) record.resources = JSON.parse(row.resources as string);
   if (row.parentTaskId) record.parentTaskId = row.parentTaskId as string;
   if (row.workTrackingCode) record.workTrackingCode = row.workTrackingCode as string;
@@ -58,9 +61,9 @@ export function createAgentTask(db: Database.Database, record: AgentTaskRecord):
   db.prepare(
     `INSERT INTO agent_tasks
      (id, agentGaii, ownerGaii, title, description, scope, rules, verification,
-      resources, todos, status, parentTaskId, workTrackingCode, telemetry,
+      resources, todos, status, dedupeKey, parentTaskId, workTrackingCode, telemetry,
       lastEventAt, createdAt, updatedAt, completedAt, deliverableKey, rating, triage, automation)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.agentGaii,
@@ -73,6 +76,7 @@ export function createAgentTask(db: Database.Database, record: AgentTaskRecord):
     record.resources ? JSON.stringify(record.resources) : null,
     JSON.stringify(record.todos),
     record.status,
+    record.dedupeKey ?? null,
     record.parentTaskId ?? null,
     record.workTrackingCode ?? null,
     record.telemetry ? JSON.stringify(record.telemetry) : null,
@@ -90,6 +94,18 @@ export function createAgentTask(db: Database.Database, record: AgentTaskRecord):
 
 export function getAgentTask(db: Database.Database, id: string): AgentTaskRecord | null {
   const row = db.prepare('SELECT * FROM agent_tasks WHERE id = ?').get(id) as Record<string, unknown> | undefined;
+  return row ? deserializeTask(row) : null;
+}
+
+/** The open commission carrying this fingerprint, if the owner already has one running. */
+export function findLiveTaskByDedupeKey(
+  db: Database.Database, agentGaii: string, dedupeKey: string,
+): AgentTaskRecord | null {
+  const placeholders = LIVE_TASK_STATUSES.map(() => '?').join(',');
+  const row = db.prepare(
+    `SELECT * FROM agent_tasks WHERE agentGaii = ? AND dedupeKey = ? AND status IN (${placeholders})
+     ORDER BY createdAt DESC LIMIT 1`,
+  ).get(agentGaii, dedupeKey, ...LIVE_TASK_STATUSES) as Record<string, unknown> | undefined;
   return row ? deserializeTask(row) : null;
 }
 

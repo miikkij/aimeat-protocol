@@ -197,6 +197,14 @@ export interface AgentTaskFileRef {
   name?: string;
 }
 
+/**
+ * The task statuses that count as an OPEN commission: the work is queued, being planned, running, or
+ * paused. Used by the one-live-commission guard (the partial unique index on agent_tasks.dedupeKey
+ * covers exactly these, and findLiveTaskByDedupeKey filters by them). 'stalled' is deliberately NOT
+ * here — an agent that went quiet must not block the owner from ordering the job again.
+ */
+export const LIVE_TASK_STATUSES = ['draft', 'queued', 'revision_requested', 'active', 'paused'] as const;
+
 export interface AgentTaskRecord {
   id: string;
   agentGaii: string;
@@ -230,6 +238,15 @@ export interface AgentTaskRecord {
   // owner's message, then call aimeat_task_propose_todos again. Old todos are
   // kept marked 'outdated' for context.
   status: 'draft' | 'queued' | 'revision_requested' | 'active' | 'paused' | 'stalled' | 'done' | 'failed';
+  /**
+   * Commission fingerprint — the server-side half of the "one click, one run" guard. Set by
+   * POST /v1/agents/:name/tasks from the caller's `idempotency_key` or, failing that, derived from
+   * agent + title + description. A partial UNIQUE index over (agentGaii, dedupeKey) covering only
+   * LIVE statuses makes a second identical commission impossible while the first is still open —
+   * the browser guard cannot see across a reload or a second tab, this can. Once the task reaches
+   * done/failed/stalled it drops out of the index and the same job is commissionable again.
+   */
+  dedupeKey?: string;
   parentTaskId?: string;
   workTrackingCode?: string;
   telemetry?: {

@@ -19,6 +19,9 @@
  *     active rows only, archived rows in memory_archive_fts, trigger-routed by archived).
  *   v1.2.0 — 2026-07-13 — Split DDL into schema-tables-1/2/3.ts (max-file-lines); pure
  *     extraction — table/index creation order and every SQL string are unchanged.
+ *   v1.4.0 — 2026-07-31 — One-live-commission-per-(agent, fingerprint): agent_tasks.dedupeKey +
+ *     a partial unique index over the open statuses, so a reload or a second tab cannot queue the
+ *     same agent run twice. Mirrors Postgres migration 0016.
  *   v1.3.0 — 2026-07-25 — One-live-grant-per-(owner, app): dedupe app_grants (revoke every
  *     stale duplicate) then enforce it with a partial unique index. Mirrors Postgres
  *     migration 0012. Dedupe must precede the index or boot crashes on existing data.
@@ -136,6 +139,15 @@ export function initializeSchema(db: Database.Database): void {
   // Ecosystem-app automation provenance/routing (B5/B6): JSON
   // { recipeId, app, organism?, email?, requireApproval? } | NULL
   safeAddColumn('agent_tasks', 'automation', 'TEXT');
+  // One-live-commission-per-(agent, fingerprint). The browser-side guard collapses repeat clicks in
+  // one tab, but a reload or a second tab starts a fresh page with an empty in-flight map — so the
+  // same job could still be queued twice, and each duplicate is a real agent run the owner pays for.
+  // The partial UNIQUE index covers only OPEN statuses, so once a task finishes (or stalls) the same
+  // work is commissionable again. Created AFTER the ALTER per the index-ordering rule; no dedupe
+  // pass is needed first because every pre-existing row has dedupeKey = NULL (outside the index).
+  safeAddColumn('agent_tasks', 'dedupeKey', 'TEXT');
+  db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS ux_agent_tasks_live_dedupe ON agent_tasks(agentGaii, dedupeKey)
+           WHERE dedupeKey IS NOT NULL AND status IN ('draft','queued','revision_requested','active','paused')`);
 
   // Package instance status rename: 'active' -> 'installed'
   db.exec("UPDATE package_instances SET status = 'installed' WHERE status = 'active'");

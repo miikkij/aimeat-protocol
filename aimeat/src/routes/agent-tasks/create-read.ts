@@ -3,6 +3,9 @@
  * @description Agent-task create + read routes (POST create, GET list, GET detail). Extracted from agent-tasks.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from agent-tasks.ts (max-file-lines)
+ *   v1.2.0 — 2026-07-31 — One live commission per (agent, fingerprint): an identical open task wins
+ *     instead of a second agent run being queued (200 + `deduplicated`), with the unique index as the
+ *     race backstop. `idempotency_key` / Idempotency-Key names the job; `allow_duplicate` opts out.
  *   v1.1.0 — 2026-07-26 — resources.files: a task can be created WITH file attachments (checked against
  *     the creator's own read access, mime/size taken from the stored file), and the detail read returns
  *     each one as a presigned handle authorized for the reader. Before this, handing an agent a PDF
@@ -22,6 +25,7 @@ import { emitResourceUpdated } from '../../mcp/index.js';
 import { AgentTaskCreateSchema } from '../../models/agent-task-schemas.js';
 import { resolveTaskFileInputs, taskWithFileHandles } from '../../services/task-files.js';
 import type { TaskRouteHelpers } from './helpers.js';
+import { commissionFingerprint, isUniqueViolation, respondDeduplicated } from './dedupe.js';
 
 export function registerTaskCreateReadRoutes(
   router: Router, config: AimeatConfig, storage: Storage, helpers: TaskRouteHelpers,
@@ -114,6 +118,26 @@ export function registerTaskCreateReadRoutes(
       return;
     }
 
+    // ── One live commission per (agent, fingerprint) ──
+    // The browser SDK collapses repeat clicks within a page, but a reload or a second tab starts
+    // with an empty in-flight map — and every duplicate here is a real agent run the owner pays for.
+    // The key is the caller's own `idempotency_key` or a fingerprint of what makes two commissions
+    // the same job. A matching OPEN task wins; a finished, failed or stalled one does not, so the
+    // same work is orderable again tomorrow.
+    // (The platform's `Idempotency-Key` HEADER is a different, older mechanism — a node-wide 24h
+    // replay cache of the exact first response, keyed by a UUID, in middleware/idempotency.ts. It
+    // works on this route too; this guard is the one that needs no client bookkeeping at all.)
+    const dedupeKey = body.allow_duplicate
+      ? undefined
+      : commissionFingerprint(agentGaii, body.idempotency_key, body.title, body.description);
+    if (dedupeKey) {
+      const live = await storage.findLiveTaskByDedupeKey(agentGaii, dedupeKey);
+      if (live) {
+        respondDeduplicated(res, config, agentName, live);
+        return;
+      }
+    }
+
     const now = new Date().toISOString();
     const id = randomUUID();
 
@@ -160,13 +184,26 @@ export function registerTaskCreateReadRoutes(
       } : undefined,
       todos,
       status: effectiveStatus,
+      ...(dedupeKey ? { dedupeKey } : {}),
       parentTaskId: body.parent_task_id,
       createdAt: now,
       updatedAt: now,
       lastEventAt: autoActivated ? now : undefined,
     };
 
-    const created = await storage.createAgentTask(record);
+    // The pre-check above closes the ordinary window; the unique index closes the racing one. When
+    // two identical commissions arrive together, one inserts and the other lands here — read back
+    // the winner and answer with it rather than failing a click the owner is entitled to.
+    let created: AgentTaskRecord;
+    try {
+      created = await storage.createAgentTask(record);
+    } catch (err) {
+      if (dedupeKey && isUniqueViolation(err)) {
+        const live = await storage.findLiveTaskByDedupeKey(agentGaii, dedupeKey);
+        if (live) { respondDeduplicated(res, config, agentName, live); return; }
+      }
+      throw err;
+    }
 
     // Append the matching 'started' event so the task history shows the same
     // transition that POST /start would have appended. Keeps auto-activated
