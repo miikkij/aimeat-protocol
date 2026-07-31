@@ -8287,7 +8287,14 @@
       "purposeLabel": "Mihin käytät sitä? (vapaaehtoinen: jätä tyhjäksi niin tekoäly kysyy sinulta)",
       "purposePh": "esim. konsultointityöni, tai tuote jota rakennan",
       "copy": "Kopioi kehote",
-      "refresh": "Se on luotu, näytä se"
+      "refresh": "Se on luotu, näytä se",
+      "refreshing": "Katsotaan…",
+      "foundOne": "Löytyi:",
+      "foundTail": "Se on valittuna alla kohdassa 5.",
+      "foundFailed": "Organismejasi ei juuri nyt saatu luettua. Yritä hetken päästä uudelleen.",
+      "foundNoneButHave": "Ei uutta organismia. Sinulla on jo",
+      "foundNoneButHaveTail": " kappaletta, ja voit valita niistä kohdassa 5. Jos tekoälysi oli tarkoitus luoda uusi, tarkista että se oikeasti ajoi kehotteen.",
+      "foundNone": "Ei vielä organismia. Kopioi yllä oleva kehote AI-chattiisi, anna sen tehdä työ loppuun, ja paina tätä sitten uudelleen."
     },
     "block": {
       "title": "Kerro tekoälyllesi kerran missä asiat ovat",

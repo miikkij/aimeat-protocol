@@ -8287,7 +8287,14 @@
       "purposeLabel": "What will you use it for? (optional: leave it empty and the AI asks you)",
       "purposePh": "e.g. my consulting work, or a product I am building",
       "copy": "Copy the prompt",
-      "refresh": "It is created, show it"
+      "refresh": "It is created, show it",
+      "refreshing": "Looking…",
+      "foundOne": "Found it:",
+      "foundTail": "It is selected in step 5 below.",
+      "foundFailed": "Could not read your organisms just now. Try again shortly.",
+      "foundNoneButHave": "No new organism. You already have",
+      "foundNoneButHaveTail": ", and you can pick one in step 5. If your AI was supposed to create a new one, check that it actually ran the prompt.",
+      "foundNone": "No organism yet. Copy the prompt above into your AI chat, let it finish, then press this again."
     },
     "block": {
       "title": "Teach your AI where things are, once",

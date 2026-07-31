@@ -370,3 +370,13 @@
 }
 
 .ast-modal { max-width: 720px; }
+
+/* The refresh result. Always says something: a button whose only effect is invisible reads as
+   broken, which is the failure this panel exists to remove. */
+.hm-found {
+  margin: 0.55rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+.hm-found--ok { color: var(--success); font-weight: 600; }

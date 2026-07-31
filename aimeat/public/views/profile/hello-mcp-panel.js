@@ -101,6 +101,8 @@ function AfterPass() {
   const [prompt, setPrompt] = useState('');
   const [orgs, setOrgs] = useState(null);
   const [orgId, setOrgId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [found, setFound] = useState(null);   // what the last explicit refresh actually found
 
   useEffect(() => {
     fetchOrganismSetupPrompt(purpose).then(setPrompt)
@@ -110,18 +112,35 @@ function AfterPass() {
   // getOrganismsTab().mine, not listOrganisms({member:'me'}): the member filter returns nothing
   // for the owner's own organisms, and listOrganisms hands back the raw envelope rather than a
   // list. `mine` is the owner's set in one call, which is what this step is asking for.
-  const loadOrgs = useCallback(() => {
-    getOrganismsTab()
+  //
+  // The refresh button ALWAYS reports what it found. Its first version just refetched, so for a
+  // user who already had organisms it changed nothing on screen and read as a dead button — the
+  // exact silent-failure shape this whole panel exists to remove.
+  const loadOrgs = useCallback((announce) => {
+    if (announce) { setBusy(true); setFound(null); }
+    return getOrganismsTab()
       .then(tab => {
         const arr = (tab && tab.mine) || [];
-        setOrgs(arr);
-        if (arr.length && !orgId) setOrgId(arr[0].id);
+        setOrgs(prev => {
+          if (announce) {
+            const before = new Set((prev || []).map(o => o.id));
+            // mine comes newest-first, so the first unseen entry is the one just created.
+            const fresh = arr.find(o => !before.has(o.id));
+            if (fresh) { setOrgId(fresh.id); setFound({ ok: true, name: fresh.name || fresh.id }); }
+            else setFound({ ok: false, count: arr.length });
+          }
+          return arr;
+        });
+        setOrgId(prev => prev || (arr[0] ? arr[0].id : ''));
       })
-      .catch(err => { swallowed('hello-mcp-panel: organisms', err); setOrgs([]); });
-    // orgId intentionally read, not tracked: reloading must not fight the user's own selection.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+      .catch(err => {
+        swallowed('hello-mcp-panel: organisms', err);
+        setOrgs([]);
+        if (announce) setFound({ ok: false, failed: true });
+      })
+      .finally(() => { if (announce) setBusy(false); });
   }, []);
-  useEffect(() => { loadOrgs(); }, [loadOrgs]);
+  useEffect(() => { loadOrgs(false); }, [loadOrgs]);
 
   return html`
     <div class="hm-after">
@@ -136,8 +155,19 @@ function AfterPass() {
           <${CopyButton} text=${prompt} className="btn-primary"
             label=${tr('helloMcp.org.copy', 'Copy the prompt')}
             copiedLabel=${tr('helloMcp.proof.copied', 'Copied')} />
-          <button class="btn-ghost" onClick=${loadOrgs}>${tr('helloMcp.org.refresh', 'It is created, show it')}</button>
+          <button class="btn-ghost" onClick=${() => loadOrgs(true)} disabled=${busy}>
+            ${busy ? tr('helloMcp.org.refreshing', 'Looking…') : tr('helloMcp.org.refresh', 'It is created, show it')}
+          </button>
         </div>
+        ${found ? html`<p class=${'hm-found' + (found.ok ? ' hm-found--ok' : '')}>
+          ${found.ok
+            ? `${tr('helloMcp.org.foundOne', 'Found it:')} ${found.name}. ${tr('helloMcp.org.foundTail', 'It is selected in step 5 below.')}`
+            : found.failed
+              ? tr('helloMcp.org.foundFailed', 'Could not read your organisms just now. Try again shortly.')
+              : found.count
+                ? `${tr('helloMcp.org.foundNoneButHave', 'No new organism. You already have')} ${found.count}${tr('helloMcp.org.foundNoneButHaveTail', ', and you can pick one in step 5. If your AI was supposed to create a new one, check that it actually ran the prompt.')}`
+                : tr('helloMcp.org.foundNone', 'No organism yet. Copy the prompt above into your AI chat, let it finish, then press this again.')}
+        </p>` : null}
       </div>
 
       <div class="hm-step">
