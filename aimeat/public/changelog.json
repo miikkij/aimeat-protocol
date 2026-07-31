@@ -5,6 +5,18 @@
       "date": "2026-07-31",
       "kind": "feature",
       "title": {
+        "en": "Move a whole set of pages in one go",
+        "fi": "Siirrä koko sivunippu yhdellä kertaa"
+      },
+      "body": {
+        "en": "Your AI can now write many documents or records into a workspace in a single step. Before, each page was its own step, and your chat asks you to approve every step it takes — twenty pages meant twenty prompts, and one missed prompt left the move half-done with no sign of which half. Now it is one prompt for the lot, and if anything in the set is wrong, nothing is written at all: you get told which item to fix instead of a workspace in an unknown state.",
+        "fi": "Tekoälysi voi nyt kirjoittaa monta dokumenttia tai tietuetta työtilaan yhdellä askeleella. Ennen jokainen sivu oli oma askeleensa, ja chat pyytää sinulta hyväksynnän joka askeleelle: kaksikymmentä sivua tarkoitti kahtakymmentä kysymystä, ja yksi huomaamatta jäänyt jätti siirron puolitiehen ilman tietoa siitä kumpi puoli meni. Nyt kysymyksiä on yksi, ja jos nipussa on jotain pielessä, mitään ei kirjoiteta: saat tiedon siitä mikä kohta korjataan sen sijaan että työtilan tila jäisi arvailun varaan."
+      }
+    },
+    {
+      "date": "2026-07-31",
+      "kind": "feature",
+      "title": {
         "en": "Hello MCP: prove your AI is really connected",
         "fi": "Hello MCP: todista että tekoälysi on oikeasti kiinni"
       },
