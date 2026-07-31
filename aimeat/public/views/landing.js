@@ -736,16 +736,16 @@ export default function Landing({ navigate }) {
         <p class="ld-pitch-lead">${tr('landing.pitchLead', 'This is one of the things you can do with AIMEAT.')}</p>
       </section>
 
-      <!-- 0. What we shipped, folded to one line. It sits above the invitation on purpose: a
-              visitor who arrives the week something changed should see that this place is worked
-              on, and it costs a single line to say so. -->
-      <${NodeChangeLog} />
-
       <!-- 1. The invitation, folded. Measured behaviour beat the theory here: with the generator
               open on the page, two visitors produced a throwaway chat app and stopped. What holds
               attention is the wall directly below: it shows the place is alive, which is what
-              makes someone want to add to it. So the builder is one line until it is wanted. -->
+              makes someone want to add to it. So the builder is one line until it is wanted.
+              It leads the page: the visitor's own first move outranks our release notes. -->
       <${BuildInvite} />
+
+      <!-- 1b. What we shipped, folded to one line, directly under the invitation — near enough
+               to say the place is worked on, below the thing the visitor came to do. -->
+      <${NodeChangeLog} />
 
       <!-- 2. The wall, immediately visible. The best thing on this page for showing activity. -->
       <${Gallery} />
