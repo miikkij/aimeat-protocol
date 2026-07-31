@@ -3,6 +3,18 @@
   "entries": [
     {
       "date": "2026-07-31",
+      "kind": "feature",
+      "title": {
+        "en": "The front page says what we shipped",
+        "fi": "Etusivu kertoo mitä on tehty"
+      },
+      "body": {
+        "en": "A folded line under the build invitation shows the newest change on this node; opening it shows the history.",
+        "fi": "Taitettu rivi rakennuskutsun alla näyttää tuoreimman muutoksen tässä nodessa; avaamalla näkee historian."
+      }
+    },
+    {
+      "date": "2026-07-31",
       "version": "2.3.0",
       "kind": "feature",
       "title": {
