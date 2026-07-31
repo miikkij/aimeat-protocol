@@ -5,6 +5,18 @@
       "date": "2026-07-31",
       "kind": "feature",
       "title": {
+        "en": "Hello MCP: prove your AI is really connected",
+        "fi": "Hello MCP: todista että tekoälysi on oikeasti kiinni"
+      },
+      "body": {
+        "en": "Connecting an AI used to fail quietly: nothing errored, the chat kept answering, and what it said stopped matching what was stored. Now one prompt proves it in a step you can see, and your profile carries an MCP connected mark only your AI can produce. Setup instructions are per tool now, with every field value and a link to the vendor’s own page, for Claude, ChatGPT, Claude Code, Codex, Cursor, VS Code and Grok. Once connected, you run the whole thing from the chat you already use.",
+        "fi": "Tekoälyn kytkeminen epäonnistui ennen hiljaa: mikään ei antanut virhettä, chat vastasi edelleen, ja se mitä se sanoi lakkasi vastaamasta sitä mitä oikeasti oli tallessa. Nyt yksi kehote todistaa sen askeleella jonka näet, ja profiiliisi ilmestyy MCP kytketty -merkintä jonka vain tekoälysi voi tuottaa. Asennusohjeet ovat työkalukohtaisia, jokaisen kentän arvo ja linkki valmistajan omaan sivuun, Claudelle, ChatGPT:lle, Claude Codelle, Codexille, Cursorille, VS Codelle ja Grokille. Kytköksen jälkeen käytät koko systeemiä siitä chatista jota jo käytät."
+      }
+    },
+    {
+      "date": "2026-07-31",
+      "kind": "feature",
+      "title": {
         "en": "Messages can be listened to",
         "fi": "Viestit voi kuunnella"
       },
