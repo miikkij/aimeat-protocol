@@ -135,6 +135,12 @@ When creating an application to AIMEAT: **You have `aimeat_*` MCP tools — foll
 
 This is a hard precondition of the build, not an optional preamble, and it comes **before** reading repo source: existing published apps and the KB show which libs/patterns are already proven, so reuse beats re-deriving from lib sources. Full non-negotiables (theme vars, `<meta name="aimeat-scopes">`, `/v1/libs/` vs `/lib/`, reuse over duplicate): see **App-building prompt system** below.
 
+### Rule 14: When the Work Is Done, Ask About the Change Log
+
+`aimeat/public/changelog.json` is what the landing page shows visitors under "What's new on this node" — newest entry first, `{ date, kind: feature|fix|security|notice, title, body }`, where title/body is a string or `{ en, fi }`. **When a piece of work is finished, ask the developer whether to add an entry** and propose the wording; they decide. Never add one on your own, and never for internal refactors a visitor would not notice.
+
+Write what a person gets, not what the code does. `pnpm check:changelog` (in the pre-commit gate) rejects a malformed file or a list that is not newest-first — a broken file makes the section vanish silently.
+
 ---
 
 ## Coding Guidelines Reference
