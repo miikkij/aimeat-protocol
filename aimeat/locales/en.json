@@ -2571,7 +2571,11 @@
       "openInTab": "Open in new tab",
       "previewLoading": "Loading preview…",
       "previewError": "Couldn’t load this file",
-      "noPreview": "No preview for this file type — download it instead"
+      "noPreview": "No preview for this file type — download it instead",
+      "uploadNoUrl": "The node did not issue an upload URL for \"{name}\".",
+      "uploadTooLarge": "\"{name}\" is {size} MB. This node accepts files up to {max} MB.",
+      "uploadHttpFailed": "Upload of \"{name}\" failed (HTTP {status}).",
+      "sizeLimitMb": "Max {mb}MB per file"
     },
     "work": {
       "title": "Work History",

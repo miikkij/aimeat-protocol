@@ -13,6 +13,9 @@
  *   v1.0.0 — 2026-05-02 — Initial implementation
  *   v1.1.0 — 2026-07-05 — Add 'skill' upload type; add a jti nonce (deterministic EdDSA made
  *     same-second identical mints collide with the single-use guard).
+ *   v1.3.0 — 2026-07-31 — storage meta carries `tags` and `workspace_refs`, so the presigned path can
+ *     express everything the inline /v1/memory/files body can. Without them a presigned upload of a
+ *     workspace-shared or tagged file silently landed as an untagged private file.
  *   v1.2.0 — 2026-07-26 — PRESIGNED_META_KEYS + buildUploadMeta(): the options each upload type must
  *     carry are declared once, next to the token, instead of a hand-written meta at every minting
  *     site. Hand-written metas is how aimeat_extension_install's `update` flag was accepted and then
@@ -90,7 +93,7 @@ export class UploadTokenError extends Error {
  */
 export const PRESIGNED_META_KEYS = {
     app: ['filename', 'name', 'description', 'category', 'tags', 'icon', 'version'],
-    storage: ['key', 'mime_type', 'visibility', 'group_id'],
+    storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs'],
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],
     skill: ['scope', 'visibility', 'organism_id', 'workspace_id'],

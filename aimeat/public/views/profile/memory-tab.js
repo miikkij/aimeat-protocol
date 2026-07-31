@@ -3,6 +3,9 @@
  * @description Profile tab for memory entries and file management — CRUD, search,
  *   visibility cycling, tag editing, sharing rules, and file upload with drag-and-drop.
  * @version-history
+ *   v2.8.0 — 2026-07-31 — File upload goes through the PRESIGNED path (mint URL, raw PUT) instead of
+ *     base64-in-JSON, which capped uploads at ~3.7 MB with a bare 413 regardless of the node's
+ *     configured 50 MB. Upload failures now surface their reason instead of "Upload failed".
  *   v2.7.0 — 2026-07-13 — Split into ./memory-tab/ sibling modules (max-file-lines): pure helpers
  *     (helpers.js, file-helpers.js), standalone sub-components (components.js), and the entries /
  *     files / browse render functions (entries-view.js, files-view.js, browse-view.js) which receive
@@ -88,7 +91,7 @@ import { listGroups } from '/js/services/sharing-groups.js';
 import { listOrganisms, currentGhii } from '/js/services/organisms.js';
 import { useConfirm } from '/components/Modal.js';
 import { shortTok } from './memory-tab/helpers.js';
-import { fetchFileBytes } from './memory-tab/file-helpers.js';
+import { fetchFileBytes, uploadFilesPresigned } from './memory-tab/file-helpers.js';
 import { CartTray, EditMemoryModal, FilePreviewModal } from './memory-tab/components.js';
 import { renderEntries } from './memory-tab/entries-view.js';
 import { renderFilesList } from './memory-tab/files-view.js';
@@ -100,6 +103,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
   const NODE_URL = getNodeUrl();
   const [memories, setMemories] = useState(null);
   const [files, setFiles] = useState(null);
+  const [fileSizeLimitMb, setFileSizeLimitMb] = useState(null);   // what the NODE accepts, not a constant
   const [memSubTab, setMemSubTab] = useState('entries');
   const [showMemForm, setShowMemForm] = useState(false);
   const [showFileForm, setShowFileForm] = useState(false);
@@ -318,6 +322,8 @@ export default function MemoryTab({ session, showToast, onStats }) {
     const fileList = ov.files?.files || [];
     setFiles(fileList);
     onStats?.({ files: fileList.length });
+    const limitBytes = Number(ov.files?.max_file_size_bytes);
+    if (Number.isFinite(limitBytes) && limitBytes > 0) setFileSizeLimitMb(Math.round(limitBytes / 1048576));
     // federation consents + the active-consent set (mirrors loadFedConsents)
     const consents = ov.consents?.consents || [];
     const fedMap = {};
@@ -496,6 +502,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
       const list = await memoryService.listFiles();
       setFiles(Array.isArray(list) ? list : []);
       onStats?.({ files: Array.isArray(list) ? list.length : 0 });
+      // The form used to state a hardcoded "Max 10MB per file". Ask the node instead: an operator who
+      // raises quota.storage_max_file_size_mb should see the new number, not be told a smaller lie.
+      const mb = await memoryService.fileSizeLimitMb();
+      if (mb) setFileSizeLimitMb(mb);
     } catch (err) { swallowed('memory-tab', err); setFiles([]); }
   }
 
@@ -536,27 +546,10 @@ export default function MemoryTab({ session, showToast, onStats }) {
   }
 
   async function handleUploadFiles(fileItems, visibility, tags) {
-    if (!fileItems || fileItems.length === 0) return;
-    let ok = 0, fail = 0;
-    for (const item of fileItems) {
-      try {
-        const base64 = await readFileAsBase64(item.file);
-        await memoryService.uploadFile(item.key, base64, item.file.type || 'application/octet-stream', visibility, tags);
-        ok++;
-      } catch (err) { swallowed('memory-tab', err); fail++; }
-    }
+    const { ok, failures } = await uploadFilesPresigned(fileItems, visibility, tags);
     if (ok > 0) showToast(ok === 1 ? t('profile.files.uploaded') : `${ok} ${t('profile.files.filesUploaded')}`);
-    if (fail > 0) showToast(`${fail} ${t('profile.files.uploadFailed')}`, true);
+    for (const message of failures) showToast(message || t('profile.files.uploadFailed'), true);
     if (ok > 0) { setShowFileForm(false); loadFiles(); }
-  }
-
-  function readFileAsBase64(file) {
-    return new Promise((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(/** @type {string} */ (reader.result).split(',')[1]);
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
   }
 
   // Download works on the owner_gaii-aware URL (with a /v1/pub fallback) so agent-owned files —
@@ -732,7 +725,7 @@ export default function MemoryTab({ session, showToast, onStats }) {
     // files
     files, showFileForm, setShowFileForm, handleUploadFiles, fileFilterText, setFileFilterText, fileTagFilter,
     setFileTagFilter, editingFileTags, setEditingFileTags, handleUpdateFileTags, handleUpdateFileVisibility,
-    setPreviewFile, handleDownloadFile, handleDeleteFile,
+    setPreviewFile, handleDownloadFile, handleDeleteFile, fileSizeLimitMb,
     // browse
     setBrowseMode, setBrowseLoading, setBrowseError, setRemoteEntries, setSelectedPeer, setRemotePeers,
     setPullingKeys, setDiscoverLoading, setDiscoverError, setDiscoverEntries, setExpandedDiscover, setCopyingKeys,

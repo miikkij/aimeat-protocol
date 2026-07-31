@@ -4,8 +4,11 @@
  *   icons, authenticated blob fetch, and owner_gaii-aware byte-URL builders. Extracted from
  *   memory-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-07-31 — uploadFilesPresigned(): the Files tab's upload loop, moved here whole.
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
  */
+import * as memoryService from '/js/services/memory.js';
+import { swallowed } from '/js/swallowed.js';
 
 export function fileIcon(type) {
   if (type?.startsWith('image')) return '\u{1F5BC}️';
@@ -89,4 +92,30 @@ export async function fetchFileBytes(f, nodeUrl) {
     }
     throw e;
   }
+}
+
+/** Upload queued files through the PRESIGNED path and report per-file outcomes.
+ *
+ *  PRESIGNED, never base64: the bytes are PUT raw to a one-shot URL, so the only ceiling is the
+ *  node's own quota.storage_max_file_size_mb. Reading each file as base64 and posting it as JSON
+ *  (the previous version) had to fit the file, inflated by 4/3, inside security.json_body_limit_mb —
+ *  so anything over ~3.7 MB answered 413 Content Too Large on a node configured for 50 MB.
+ *
+ *  Failures are returned as MESSAGES, not counted. The reason is the useful part (too large / no
+ *  URL / HTTP status); collapsing it to "Upload failed" hid a limit the user could fix in one
+ *  setting. */
+export async function uploadFilesPresigned(fileItems, visibility, tags) {
+  if (!fileItems || fileItems.length === 0) return { ok: 0, failures: [] };
+  let ok = 0;
+  const failures = [];
+  for (const item of fileItems) {
+    try {
+      await memoryService.uploadFilePresigned(item.file, item.key, item.file.type, visibility, tags);
+      ok++;
+    } catch (err) {
+      swallowed('memory-tab: upload', err);
+      failures.push(err instanceof Error ? err.message : String(err));
+    }
+  }
+  return { ok, failures };
 }

@@ -10182,7 +10182,16 @@ paths:
     post:
       operationId: uploadMemoryFile
       summary: Upload file to memory
-      description: Upload a file as base64 JSON body. Stored alongside memory entries.
+      description: |
+        Store a file alongside memory entries, two ways.
+
+        `mode: presigned` (recommended, and required for anything large) returns a one-shot
+        `upload_url`; PUT the raw bytes there. That path skips JSON body parsing entirely, so the
+        only ceiling is the node's `quota.storage_max_file_size_mb`, reported back as
+        `max_size_bytes`.
+
+        Omitting `mode` uploads inline: the file is base64 in this JSON body, which inflates it by
+        4/3 and must fit `security.json_body_limit_large_mb`. Use it for small files only.
       tags: [Memory]
       security:
         - BearerAuth: []
@@ -10192,13 +10201,17 @@ paths:
           application/json:
             schema:
               type: object
-              required: [key, content, mime_type]
+              required: [key]
               properties:
                 key:
                   type: string
+                mode:
+                  type: string
+                  enum: [presigned]
+                  description: Return an upload URL instead of accepting bytes. `content` is not used.
                 content:
                   type: string
-                  description: Base64-encoded file content
+                  description: Base64-encoded file content (inline mode only; required unless `mode` is `presigned`)
                 mime_type:
                   type: string
                 tags:
@@ -10207,11 +10220,27 @@ paths:
                     type: string
                 visibility:
                   $ref: '#/components/schemas/Visibility'
+                workspace_refs:
+                  description: 'For `visibility: workspace` — one or more `<organismId>/<workspaceId>`.'
+                  oneOf:
+                    - type: string
+                    - type: array
+                      items:
+                        type: string
+                group_id:
+                  type: string
+                  description: 'For `visibility: group`.'
       responses:
+        '200':
+          description: Presigned mode — `{ upload_url, upload_method, content_type, max_size_bytes, expires_in_seconds }`.
+          $ref: '#/components/responses/AimeatSuccess'
         '201':
+          description: Inline mode — the stored file record.
           $ref: '#/components/responses/AimeatSuccess'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '413':
+          description: File exceeds the per-file limit or the account storage quota.
     get:
       operationId: listMemoryFiles
       summary: List memory files

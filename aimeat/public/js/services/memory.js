@@ -7,9 +7,13 @@
  *                          for keys that may not exist yet (kills browser-console 404 noise).
  *   v1.3.0 — 2026-06-22 — Scalable Memory tab helpers: listMemoriesMeta (include=meta, values omitted),
  *                          searchMemory prefix arg, exportMemory/importMemory/bulkDeleteMemory.
+ *   v1.4.0 — 2026-07-31 — uploadFilePresigned(): mint an upload URL and PUT the raw bytes, so a file
+ *                          upload is capped by quota.storage_max_file_size_mb instead of by how much
+ *                          base64 fits in a JSON body (~3.7 MB, reported as a bare 413).
  */
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { t } from '/js/i18n.js';
 
 /** List all memory entries. Returns array. Optional agentGaii to view another agent's memory. */
 export async function listMemories(agentGaii, opts) {
@@ -211,13 +215,70 @@ export async function listFiles() {
   return Array.isArray(list) ? list : [];
 }
 
+/** The node's per-file limit in MB, so the upload form can state the real number instead of a
+ *  hardcoded one. Returns null when the node does not report it (older node, keep the old copy). */
+export async function fileSizeLimitMb() {
+  const data = await apiGet('/v1/memory/files?count=true');
+  const bytes = Number(data?.data?.max_file_size_bytes);
+  return Number.isFinite(bytes) && bytes > 0 ? Math.round(bytes / 1048576) : null;
+}
+
 /** Cheap count of files (no metadata transferred). For stat displays. */
 export async function countFiles() {
   const data = await apiGet('/v1/memory/files?count=true');
   return data?.data?.count ?? 0;
 }
 
-/** Upload a file (base64). */
+/** The node mints an ABSOLUTE upload URL from its configured base URL. Collapse it to a path when the
+ *  origin already matches, so the PUT stays a plain same-origin request instead of a preflighted one. */
+function uploadTarget(url) {
+  try {
+    const u = new URL(url, window.location.origin);
+    return u.origin === window.location.origin ? u.pathname + u.search : u.href;
+  } catch { return url; }   // an unparseable URL is used verbatim; the PUT below reports the failure
+}
+
+/** Upload a File/Blob through the PRESIGNED path: mint a one-shot URL, then PUT the raw bytes.
+ *
+ *  This is the only path that respects the node's actual file limit. The inline base64 form below
+ *  has to fit the whole file, inflated by 4/3, inside a JSON body — and /v1/memory/files parses that
+ *  body at security.json_body_limit_mb, so a 4 MB file used to answer a bare 413 on a node whose
+ *  quota.storage_max_file_size_mb said 50. /v1/upload/ skips body parsing and streams instead.
+ *
+ *  Returns the upload response payload (key, size, embed_url, ...). Throws with a readable reason. */
+export async function uploadFilePresigned(file, key, mimeType, visibility, tags, workspaceRefs) {
+  const mime = mimeType || file.type || 'application/octet-stream';
+  const body = { key, mime_type: mime, visibility: visibility || 'private', mode: 'presigned' };
+  if (tags && tags.length > 0) body.tags = tags;
+  if (workspaceRefs) body.workspace_refs = workspaceRefs;
+
+  const mint = await api('/v1/memory/files', { method: 'POST', body: JSON.stringify(body) });
+  const uploadUrl = mint?.data?.upload_url;
+  if (!uploadUrl) throw new Error(mint?.error?.message || t('profile.files.uploadNoUrl', { name: file.name }));
+
+  // Check the size against the node's own answer BEFORE spending the token: it is single-use, so an
+  // oversized PUT burns it and reports a bare 413 instead of naming the file and the node's limit.
+  const maxBytes = Number(mint?.data?.max_size_bytes) || 0;
+  if (maxBytes && file.size > maxBytes) {
+    throw new Error(t('profile.files.uploadTooLarge', {
+      name: file.name, size: (file.size / 1048576).toFixed(1), max: (maxBytes / 1048576).toFixed(0),
+    }));
+  }
+
+  // Plain fetch, deliberately NOT api(): the presigned token IS the capability (no Authorization
+  // header), api() retries 5xx (a retried one-shot token answers 409 TOKEN_USED), and its 30 s
+  // timeout would cut a large file on a slow uplink.
+  const resp = await fetch(uploadTarget(uploadUrl), {
+    method: 'PUT', headers: { 'Content-Type': mime }, body: file,
+  });
+  const payload = await resp.json().catch(() => null);   // eslint-disable-line aimeat/no-silent-catch -- a non-JSON error body falls back to the status line below
+  if (!resp.ok) {
+    throw new Error(payload?.message || t('profile.files.uploadHttpFailed', { name: file.name, status: resp.status }));
+  }
+  return payload;
+}
+
+/** Upload a file (base64). Small files only — prefer uploadFilePresigned(). */
 export async function uploadFile(key, base64Content, mimeType, visibility, tags) {
   const body = {
     key,

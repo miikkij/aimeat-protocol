@@ -54,7 +54,7 @@
 
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppManifest, ExtensionRecord } from '../storage/interface.js';
+import type { Storage, AppManifest, ExtensionRecord, StorageFileRecord } from '../storage/interface.js';
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
@@ -284,8 +284,16 @@ async function handleStorageUpload(
     sub: string, meta: Record<string, unknown>, data: Buffer,
 ): Promise<void> {
     const key = meta.key as string;
-    const visibility = (meta.visibility as 'private' | 'owner' | 'public') ?? 'private';
+    const visibility = (meta.visibility as StorageFileRecord['visibility']) ?? 'private';
     const mimeType = (meta.mime_type as string) ?? 'application/octet-stream';
+    // tags + workspace_refs ride in the token meta (PRESIGNED_META_KEYS.storage). Dropping them here
+    // is how a presigned upload of a workspace-shared file would land as an untagged private one —
+    // the file exists, nobody it was meant for can see it, and nothing says why.
+    const tags = Array.isArray(meta.tags)
+        ? (meta.tags as unknown[]).filter((t): t is string => typeof t === 'string')
+        : undefined;
+    const workspaceRef = typeof meta.workspace_refs === 'string' ? meta.workspace_refs : undefined;
+    const groupId = typeof meta.group_id === 'string' ? meta.group_id : undefined;
 
     // The token's maxBytes caps ONE file; the account-wide quota (M-2 §8.4) is a separate gate that
     // only the inline POST /v1/storage used to run. Without it here, the presigned route was an
@@ -300,9 +308,12 @@ async function handleStorageUpload(
         key,
         ownerGaii: sub,
         visibility,
+        groupId: visibility === 'group' ? groupId : undefined,
+        workspaceRef: visibility === 'workspace' ? workspaceRef : undefined,
         mimeType,
         size: data.length,
         data,
+        ...(tags?.length ? { tags } : {}),
         createdAt: new Date().toISOString(),
     });
 

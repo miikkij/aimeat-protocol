@@ -26,7 +26,7 @@ export function renderFilesList(ctx) {
     files, NODE_URL, showFileForm, setShowFileForm, handleUploadFiles, fileFilterText,
     setFileFilterText, fileTagFilter, setFileTagFilter, editingFileTags, setEditingFileTags,
     handleUpdateFileTags, handleUpdateFileVisibility, inCart, fileCartItem, toggleCartItem,
-    setPreviewFile, handleDownloadFile, handleDeleteFile, showToast,
+    setPreviewFile, handleDownloadFile, handleDeleteFile, showToast, fileSizeLimitMb,
   } = ctx;
 
   // Public, no-auth file URL (mirrors memory's /v1/memory/:gaii/:key public read):
@@ -80,7 +80,9 @@ export function renderFilesList(ctx) {
         title="Copy file URLs"
         className="btn-outline btn-sm"
         onCopied=${() => showToast(t('profile.files.urlsCopied') || `${filtered.length} URLs copied`)} />`}
-      <span class="text-meta-sm">${t('profile.files.sizeLimit')}</span>
+      <span class="text-meta-sm">${fileSizeLimitMb
+        ? t('profile.files.sizeLimitMb', { mb: fileSizeLimitMb })
+        : t('profile.files.sizeLimit')}</span>
     </div>
     <div class="search-bar mem-file-search mb-half">
       <input type="text" class="input-field" placeholder=${t('profile.files.searchPlaceholder') || 'Search files by name, tag, or type…'}

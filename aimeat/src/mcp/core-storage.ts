@@ -22,7 +22,7 @@ import { z } from 'zod';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
-import { generateUploadToken } from '../services/upload-token.js';
+import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { resolveFileRef, handleFromResolved } from '../services/file-refs.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
 import { annotationsFor } from './annotations.js';
@@ -61,12 +61,18 @@ export function registerCoreStorageTools(
         async ({ key, data_base64, mime_type, visibility, group_id }) => {
             // --- UPLOAD MODE ---
             if (!data_base64) {
-                const maxBytes = 10 * 1024 * 1024;
+                // The operator's own setting, not a constant. This was hardcoded to 10 MB, so a node
+                // configured for 50 MB still minted 10 MB tokens and refused everything above it with
+                // 413 FILE_TOO_LARGE — the admin page said 50 and the tool said 10, with nothing
+                // connecting the two.
+                const maxBytes = config.storageMaxFileSizeMb * 1024 * 1024;
                 const contentType = mime_type ?? 'application/octet-stream';
                 const token = await generateUploadToken({
                     sub: agentGaii,
                     utype: 'storage',
-                    meta: { key, mime_type: contentType, visibility: visibility ?? 'private' },
+                    meta: buildUploadMeta('storage', {
+                        key, mime_type: contentType, visibility: visibility ?? 'private', group_id,
+                    }),
                     maxBytes,
                     contentType,
                 });
@@ -91,8 +97,14 @@ export function registerCoreStorageTools(
 
             // --- INLINE MODE ---
             const fileData = Buffer.from(data_base64, 'base64');
-            if (fileData.length > 10 * 1024 * 1024) {
-                return { content: [{ type: 'text' as const, text: 'File exceeds 10MB limit' }], isError: true };
+            if (fileData.length > config.storageMaxFileSizeMb * 1024 * 1024) {
+                return {
+                    content: [{
+                        type: 'text' as const,
+                        text: `File exceeds this node's ${config.storageMaxFileSizeMb}MB per-file limit. Omit data_base64 to get a presigned upload URL instead.`,
+                    }],
+                    isError: true,
+                };
             }
             const file = await storage.createStorageFile({
                 key,

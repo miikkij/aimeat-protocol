@@ -11,6 +11,7 @@
  * @structure MemoryTabService.overview(ownerName, ownerGhii) → { agents, memory, files, consents, groups, organisms }
  * @usage const m = await createMemoryTabService(config, storage).overview(owner, `${owner}@${nodeId}`);
  * @version-history
+ *   v1.1.0 — 2026-07-31 — files carries max_file_size_bytes so the upload form states the node's real limit.
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the Memory tab's 6-request fan-out into one composite (meta-only memory).
  */
 import type { AimeatConfig } from '../../config.js';
@@ -25,7 +26,7 @@ import { visibilityToZone } from '../../routes/memory/shared.js';
 export interface MemoryTabOverview {
   agents: unknown[];
   memory: { items: Array<Record<string, unknown>>; total: number; quota: Record<string, number> };
-  files: { files: Array<Record<string, unknown>>; total: number };
+  files: { files: Array<Record<string, unknown>>; total: number; max_file_size_bytes: number };
   consents: { consents: Array<Record<string, unknown>>; total: number };
   groups: { groups: unknown[] };
   organisms: { organisms: unknown[] };
@@ -107,7 +108,9 @@ export class MemoryTabService {
       return {
         agents,
         memory,
-        files: { files: fileRows, total: fileRows.length },
+        // The tab states the upload limit from this number. Hardcoding it in the form is how it
+        // came to say "Max 10MB per file" on a node configured for 50.
+        files: { files: fileRows, total: fileRows.length, max_file_size_bytes: this.config.storageMaxFileSizeMb * 1024 * 1024 },
         consents: { consents: consentRows, total: consentRows.length },
         groups: { groups: groupList },
         organisms: { organisms },

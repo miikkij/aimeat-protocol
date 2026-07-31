@@ -2571,7 +2571,11 @@
       "openInTab": "Avaa uuteen välilehteen",
       "previewLoading": "Ladataan esikatselua…",
       "previewError": "Tiedostoa ei voitu ladata",
-      "noPreview": "Tälle tiedostotyypille ei ole esikatselua — lataa se sen sijaan"
+      "noPreview": "Tälle tiedostotyypille ei ole esikatselua — lataa se sen sijaan",
+      "uploadNoUrl": "Noodi ei antanut lataus-URLia tiedostolle \"{name}\".",
+      "uploadTooLarge": "Tiedosto \"{name}\" on {size} MB. Tämä noodi ottaa vastaan enintään {max} MB.",
+      "uploadHttpFailed": "Tiedoston \"{name}\" lataus epäonnistui (HTTP {status}).",
+      "sizeLimitMb": "Enintään {mb} MB per tiedosto"
     },
     "work": {
       "title": "Työhistoria",

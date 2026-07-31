@@ -97,7 +97,11 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     // /v1/storage accepts base64-encoded files in JSON; sized at the same envelope
     // as apps/extensions/cortex so it can carry files up to storageMaxFileSizeMb
     // without 413s. (Raw-body and chunked paths are unaffected by this limit.)
-    const needsLargeBody = req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage');
+    // /v1/memory/files is the SAME file-upload surface as /v1/storage (it is what the profile's
+    // Files tab posts to) and was missing from this list, so an inline upload there was capped at
+    // jsonBodyLimitMb — 5 MB of JSON, about 3.7 MB of actual file, no matter what the operator set
+    // quota.storage_max_file_size_mb to. Prefer `mode: 'presigned'`, which skips parsing entirely.
+    const needsLargeBody = req.path.startsWith('/v1/apps') || req.path.startsWith('/v1/extensions') || req.path.startsWith('/v1/cortex') || req.path.startsWith('/v1/storage') || req.path.startsWith('/v1/memory/files');
     const limit = needsLargeBody ? `${config.jsonBodyLimitLargeMb}mb` : `${config.jsonBodyLimitMb}mb`;
     express.json({ limit })(req, res, next);
   });

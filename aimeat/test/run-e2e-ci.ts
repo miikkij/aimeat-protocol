@@ -196,6 +196,7 @@ const ALL_SUITES = [
     'test/e2e-security.ts',
     'test/e2e-memory-namespaces.ts',
     'test/e2e-presigned-meta.ts',
+    'test/e2e-memory-file-presigned.ts',
     'test/e2e-storage-visibility.ts',
     'test/e2e-subdomains.ts',
     'test/e2e-capabilities.ts',

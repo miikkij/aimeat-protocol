@@ -1,8 +1,13 @@
 /**
  * @file src/routes/memory/files.ts
- * @description File-storage routes under /v1/memory/files: upload, visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
+ * @description File-storage routes under /v1/memory/files: upload (presigned or inline base64),
+ *   visibility/tags PATCH, list, download, delete. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
+ *   v1.1.0 — 2026-07-31 — POST accepts `mode: 'presigned'` and mints an upload URL, so a file no
+ *     longer has to fit inside a JSON body. Inline base64 was the ONLY way in, and this route is not
+ *     on server.ts's large-body list, so every upload here died at security.json_body_limit_mb (5 MB
+ *     of JSON = ~3.7 MB of file) with a bare 413 — while quota.storage_max_file_size_mb said 50.
  */
 
 import type { Router } from 'express';
@@ -15,6 +20,7 @@ import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js
 import { pubEmbedUrl, pubEmbedMarkdown } from '../../services/doc-images.js';
 import { emitChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
+import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import type { MemoryRouteCtx } from './shared.js';
 
 export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
@@ -22,12 +28,13 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
   // ── /v1/memory/files — File storage (MUST be before :key routes) ──
 
-  // POST /v1/memory/files — upload file (base64 JSON body)
+  // POST /v1/memory/files — upload file (presigned URL, or inline base64 JSON body)
   router.post('/v1/memory/files', requireAuth(), requireExternalPrincipal(), async (req, res) => {
     const gaii = resolve(req);
-    const { key, content, mime_type, visibility, tags, workspaceRef, workspace_refs } = req.body ?? {};
+    const { key, content, mime_type, visibility, tags, workspaceRef, workspace_refs, mode, group_id } = req.body ?? {};
 
-    if (!key || !content) {
+    // `content` is required only for the inline path; a presigned mint carries no bytes at all.
+    if (!key || (mode !== 'presigned' && !content)) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'key and content (base64) are required'));
       return;
     }
@@ -42,6 +49,32 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     const wsRefStr = normalizeWorkspaceRefs(workspace_refs, workspaceRef);
     if (visibility === 'workspace' && !wsRefStr) {
       res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'visibility "workspace" requires workspace_refs (or workspaceRef) as one or more "<organismId>/<workspaceId>"'));
+      return;
+    }
+
+    // ── PRESIGNED MODE: mint a one-shot URL, the caller PUTs the raw bytes to /v1/upload/:token ──
+    // The bytes then skip body parsing entirely (server.ts excludes /v1/upload/), so the only ceiling
+    // left is the one the operator actually set: quota.storage_max_file_size_mb.
+    if (mode === 'presigned') {
+      const contentType = (mime_type as string) ?? 'application/octet-stream';
+      const maxBytes = config.storageMaxFileSizeMb * 1024 * 1024;
+      const token = await generateUploadToken({
+        sub: gaii,
+        utype: 'storage',
+        meta: buildUploadMeta('storage', {
+          key, mime_type: contentType, visibility: visibility ?? 'private',
+          group_id, tags, workspace_refs: wsRefStr,
+        }),
+        maxBytes,
+        contentType,
+      });
+      res.json(success(config.nodeId, {
+        upload_url: `${config.baseUrl}/v1/upload/${token}`,
+        upload_method: 'PUT',
+        content_type: contentType,
+        max_size_bytes: maxBytes,
+        expires_in_seconds: 3600,
+      }, [{ description: 'PUT the raw file bytes here', method: 'PUT', url: `/v1/upload/${token}` }]));
       return;
     }
 
@@ -186,7 +219,10 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
     }
 
     if (req.query.count === 'true') {
-      res.json(success(config.nodeId, { count: files.length }));
+      res.json(success(config.nodeId, {
+        count: files.length,
+        max_file_size_bytes: config.storageMaxFileSizeMb * 1024 * 1024,
+      }));
       return;
     }
 
@@ -201,6 +237,10 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
         created_at: f.createdAt,
       })),
       total: files.length,
+      // So a client can state the REAL limit instead of a hardcoded one. The upload form said
+      // "Max 10MB per file" on a node configured for 50, which is the same lie from the other side
+      // as the 10 MB the MCP tool used to mint.
+      max_file_size_bytes: config.storageMaxFileSizeMb * 1024 * 1024,
     }));
   });
 
