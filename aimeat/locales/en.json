@@ -3676,8 +3676,8 @@
         "buildAppDesc": "Open the catalog, describe your idea, and your AI builds it from a prompt.",
         "useSharedAgentsTitle": "Use agents others shared",
         "useSharedAgentsDesc": "Browse ready agents people published and put them to work for you.",
-        "helloMcpTitle": "Connect your AI, and prove it",
-        "helloMcpDesc": "Everything here is used through your AI. Five minutes, one prompt, and you see for certain that the connection works."
+        "helloMcpTitle": "Hello MCP! Connect your AI",
+        "helloMcpDesc": "Once it is connected, you run the whole system from the chat you already use. Five minutes, one prompt, and you see for certain that it works."
       },
       "heroTitle": "Welcome! Start here",
       "heroSubtitle": "You have four paths forward. Start anywhere. All lead to something useful.",
@@ -8241,7 +8241,7 @@
   "nav.glossary": "Glossary",
   "helloMcp": {
     "title": "Hello MCP",
-    "intro": "Connect your AI to this node and prove it works. Three steps, and the third one is a button. Until it passes, everything else here is guesswork.",
+    "intro": "Connect your AI to this node and prove the connection works. After that you run the whole system from the chat you are already used to: memory, organisms, tasks and agents, in the same window, without learning a new tool. Three steps, and the third one is a button.",
     "pre": {
       "title": "Before you start",
       "paid": "Check what your tier allows. Claude gives a free account exactly one custom connector, which is enough for this, though free usage limits run out fast in real work. ChatGPT needs Plus, Pro, Business, Enterprise or Education, and only in the browser. Grok needs a paid tier. Getting this wrong is the single most common reason onboarding fails, and it fails in a way that looks like our fault rather than a missing feature.",

@@ -3676,8 +3676,8 @@
         "buildAppDesc": "Avaa katalogi ja kuvaile ideasi, niin tekoälysi rakentaa sen promptista.",
         "useSharedAgentsTitle": "Käytä muiden jakamia agentteja",
         "useSharedAgentsDesc": "Selaa valmiita agentteja joita muut ovat julkaisseet ja valjasta ne käyttöösi.",
-        "helloMcpTitle": "Kytke tekoälysi, ja todista se",
-        "helloMcpDesc": "Kaikkea täällä käytetään tekoälysi kautta. Viisi minuuttia, yksi kehote, ja näet varmasti että kytkös toimii."
+        "helloMcpTitle": "Hello MCP! Kytke tekoälysi",
+        "helloMcpDesc": "Kun kytkös on tehty, käytät koko systeemiä siitä chatista jota jo käytät. Viisi minuuttia, yksi kehote, ja näet varmasti että se toimii."
       },
       "heroTitle": "Tervetuloa! Aloita tästä",
       "heroSubtitle": "Sinulla on neljä polkua eteenpäin. Aloita mistä tahansa. Kaikki johtavat siihen että sinulla on jotain hyödyllistä.",
@@ -8241,7 +8241,7 @@
   "nav.glossary": "Sanasto",
   "helloMcp": {
     "title": "Hello MCP",
-    "intro": "Kytke tekoälysi tähän nodeen ja todista että kytkös toimii. Kolme askelta, joista kolmas on nappi. Ennen kuin se menee läpi, kaikki muu täällä on arvailua.",
+    "intro": "Kytke tekoälysi tähän nodeen ja todista että kytkös toimii. Sen jälkeen käytät koko systeemiä siitä chatista johon olet jo tottunut: muisti, organismit, tehtävät ja agentit, samasta ikkunasta, ilman uuden työkalun opettelua. Kolme askelta, joista kolmas on nappi.",
     "pre": {
       "title": "Ennen kuin aloitat",
       "paid": "Tarkista mitä tasosi sallii. Claude antaa ilmaiselle tilille tasan yhden oman konnektorin, mikä riittää tähän, joskin ilmaisen tason käyttörajat loppuvat oikeassa työssä nopeasti. ChatGPT vaatii Plus-, Pro-, Business-, Enterprise- tai Education-tason, ja vain selaimessa. Grok vaatii maksullisen tason. Tämän menminen väärin on yleisin yksittäinen syy käyttöönoton epäonnistumiseen, ja se epäonnistuu tavalla joka näyttää meidän vialtamme eikä puuttuvalta ominaisuudelta.",

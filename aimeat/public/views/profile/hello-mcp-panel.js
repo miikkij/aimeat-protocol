@@ -215,7 +215,7 @@ export function HelloMcpPanel({ onPassed }) {
     <div class="hm">
       <div class="hm-intro">
         <div class="hm-intro-title">${tr('helloMcp.title', 'Hello MCP')}</div>
-        <p class="hm-p">${tr('helloMcp.intro', 'Connect your AI to this node and prove it works. Three steps, and the third one is a button. Until it passes, everything else here is guesswork.')}</p>
+        <p class="hm-p">${tr('helloMcp.intro', 'Connect your AI to this node and prove the connection works. After that you run the whole system from the chat you are already used to: memory, organisms, tasks and agents, in the same window, without learning a new tool. Three steps, and the third one is a button.')}</p>
       </div>
       <${Preconditions} />
       <${Connect} />
