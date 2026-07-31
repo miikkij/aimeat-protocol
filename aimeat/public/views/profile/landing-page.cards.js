@@ -26,6 +26,7 @@ import { listRecents } from "/js/recents.js";
 import { listInbox } from "/js/services/messages.js";
 import { apiGet } from "/js/api.js";
 import { checkHelloMcp } from "/js/services/hello-mcp.js";
+import { InstructionsDialog } from "/views/profile/ai-setup-guide.js";
 import { UsageChart, colorForIndex } from "/components/UsageChart.js";
 import { minidenticon } from "/lib/minidenticons.min.js";
 import { PresencePill } from "./landing-page.modals.js";
@@ -421,6 +422,7 @@ function McpConnectedBadge() {
 
 export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) {
   const NODE_URL = getNodeUrl();
+  const [instrOpen, setInstrOpen] = useState(false);
   const isNew = tier === 'new';
   const isExperienced = tier === 'experienced';
   const avatarSvg = minidenticon(typeof session.owner === 'string' && session.owner ? session.owner : 'user');
@@ -455,6 +457,9 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
         </div>
         <div class="pf-lp-actions">
           <${PresencePill} />
+          <button class="btn-outline btn-sm" onClick=${() => setInstrOpen(true)}
+            title=${t('setup.instrBtnHint') || 'The block to paste into your AI chat’s instructions, and where it goes in your tool'}>
+            ${t('setup.instrBtn') || 'AI chat instructions'}</button>
           <button class="btn-outline btn-sm" onClick=${() => onEditProfile?.()}>
             ${t('profile.landing.profileBtn') || 'Profile'}</button>
         </div>
@@ -473,6 +478,7 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
           ${isExperienced && stats.agents > 0 && stat('\u{1F916}', stats.agents, 'profile.stats.agents', 'agents')}
         `}
       </div>
+      <${InstructionsDialog} open=${instrOpen} onClose=${() => setInstrOpen(false)} />
     </div>
   `;
 }

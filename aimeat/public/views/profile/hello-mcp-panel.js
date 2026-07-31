@@ -25,8 +25,8 @@ import { CopyButton } from '/components/CopyButton.js';
 import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import { checkHelloMcp, fetchHelloMcpPrompt, fetchOrganismSetupPrompt } from '/js/services/hello-mcp.js';
 import { InstructionBlock } from '/views/profile/instruction-block.js';
+import { McpSetupGuide } from '/views/profile/ai-setup-guide.js';
 import { getOrganismsTab } from '/js/services/organisms.js';
-import { getNodeUrl } from '/js/services/auth.js';
 import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
@@ -39,28 +39,24 @@ function Preconditions() {
     <div class="hm-step">
       <div class="hm-step-head"><span class="hm-step-n">0</span>${tr('helloMcp.pre.title', 'Before you start')}</div>
       <ul class="hm-list">
-        <li>${tr('helloMcp.pre.paid', 'A paid tier of your AI tool. Custom connectors are not on the free tiers, and an attempt on a free tier fails in a way that looks like our fault rather than a missing feature. This is the single most common reason onboarding does not work.')}</li>
-        <li>${tr('helloMcp.pre.tools', 'An AI tool that supports MCP: Claude (app or web), Claude Code, Cursor, VS Code with Copilot, Codex CLI, Gemini CLI. The Gemini consumer app and Microsoft Copilot do not, and for those the copy-paste route is the one that works.')}</li>
+        <li>${tr('helloMcp.pre.paid', 'Check what your tier allows. Claude gives a free account exactly one custom connector, which is enough for this, though free usage limits run out fast in real work. ChatGPT needs Plus, Pro, Business, Enterprise or Education, and only in the browser. Grok needs a paid tier. Getting this wrong is the single most common reason onboarding fails, and it fails in a way that looks like our fault rather than a missing feature.')}</li>
+        <li>${tr('helloMcp.pre.tools', 'An AI tool that supports MCP: Claude (app or web), Claude Code, ChatGPT in developer mode, Codex CLI, Cursor, VS Code with Copilot, Grok. The Gemini consumer app and Microsoft Copilot do not, and for those the copy-paste route is the one that works.')}</li>
+        <li>${tr('helloMcp.pre.public', 'A node the tool can reach. Some tools connect from their own cloud rather than from your machine, so a node running on localhost is not reachable by them.')}</li>
         <li>${tr('helloMcp.pre.time', 'About five minutes, and the ability to paste one prompt into your chat.')}</li>
       </ul>
       <${ManagedEnvNote} compact=${true} />
     </div>`;
 }
 
-/* ── Step 1: the connection, in the order it actually has to happen ── */
+/* ── Step 1: the connection, per tool, in the order it actually has to happen ── */
 function Connect() {
-  const node = getNodeUrl();
   return html`
     <div class="hm-step">
       <div class="hm-step-head"><span class="hm-step-n">1</span>${tr('helloMcp.connect.title', 'Connect your AI to this node')}</div>
       <p class="hm-p">${tr('helloMcp.connect.lead', 'Everything else is done through this connection, so it goes first.')}</p>
-      <ol class="hm-list hm-list--ol">
-        <li>${tr('helloMcp.connect.s1', 'In your AI tool, open Settings and find Connectors (in Claude Code, run the one-line command on the connect page instead).')}</li>
-        <li>${tr('helloMcp.connect.s2', 'Add a custom connector with this address:')} <code class="hm-code">${node}/v1/mcp</code></li>
-        <li>${tr('helloMcp.connect.s3', 'Sign in to this node when the browser tab opens. You sign in as yourself; there is no shared key to paste.')}</li>
-        <li>${tr('helloMcp.connect.s4', 'Start a NEW conversation. A chat that was already open does not pick up a connector added after it started, and that alone accounts for several failed attempts.')}</li>
-      </ol>
-      <a class="hm-link" href="/v1/connect" target="_blank" rel="noopener">${tr('helloMcp.connect.more', 'Per-tool instructions and the technical details →')}</a>
+      <${McpSetupGuide} />
+      <p class="hm-p hm-p--dim">${tr('helloMcp.connect.newChat', 'Whichever tool you use: when it is connected, start a NEW conversation. A chat that was already open does not pick up a connector added after it started, and that alone accounts for several failed attempts.')}</p>
+      <a class="hm-link" href="/v1/connect" target="_blank" rel="noopener">${tr('helloMcp.connect.more', 'The connect page: one-click installs and the technical details →')}</a>
     </div>`;
 }
 
@@ -92,7 +88,7 @@ function FailureChecklist() {
         <li>${tr('helloMcp.fail.s1', 'Is the connector actually connected? In your AI tool, open Settings and Connectors and look at this node. If it is missing or shows an error, nothing else on this list matters.')}</li>
         <li>${tr('helloMcp.fail.s2', 'Did you start a new conversation after adding it? An older chat does not have the tools.')}</li>
         <li>${tr('helloMcp.fail.s3', 'What did the AI actually say? If it described what it would do, or produced code, it does not have the tools and told you so indirectly. The prompt asks it to say that plainly; some models still hedge.')}</li>
-        <li>${tr('helloMcp.fail.s4', 'Are you on a paid tier? Custom connectors are not available on the free tiers.')}</li>
+        <li>${tr('helloMcp.fail.s4', 'Does your tier allow it? ChatGPT needs a paid plan and the browser, Grok needs a paid tier, and a free Claude account can hold only one custom connector at a time.')}</li>
         <li>${tr('helloMcp.fail.s5', 'Company-managed account? Your administrator may have to approve the connector before it works at all.')}</li>
       </ol>
       <p class="hm-p hm-p--dim">${tr('helloMcp.fail.retry', 'Fix one thing, run the prompt again, and press check again. Nothing is lost by repeating it.')}</p>

@@ -8244,9 +8244,10 @@
     "intro": "Connect your AI to this node and prove it works. Three steps, and the third one is a button. Until it passes, everything else here is guesswork.",
     "pre": {
       "title": "Before you start",
-      "paid": "A paid tier of your AI tool. Custom connectors are not on the free tiers, and an attempt on a free tier fails in a way that looks like our fault rather than a missing feature. This is the single most common reason onboarding does not work.",
-      "tools": "An AI tool that supports MCP: Claude (app or web), Claude Code, Cursor, VS Code with Copilot, Codex CLI, Gemini CLI. The Gemini consumer app and Microsoft Copilot do not, and for those the copy-paste route is the one that works.",
-      "time": "About five minutes, and the ability to paste one prompt into your chat."
+      "paid": "Check what your tier allows. Claude gives a free account exactly one custom connector, which is enough for this, though free usage limits run out fast in real work. ChatGPT needs Plus, Pro, Business, Enterprise or Education, and only in the browser. Grok needs a paid tier. Getting this wrong is the single most common reason onboarding fails, and it fails in a way that looks like our fault rather than a missing feature.",
+      "tools": "An AI tool that supports MCP: Claude (app or web), Claude Code, ChatGPT in developer mode, Codex CLI, Cursor, VS Code with Copilot, Grok. The Gemini consumer app and Microsoft Copilot do not, and for those the copy-paste route is the one that works.",
+      "time": "About five minutes, and the ability to paste one prompt into your chat.",
+      "public": "A node the tool can reach. Some tools connect from their own cloud rather than from your machine, so a node running on localhost is not reachable by them."
     },
     "connect": {
       "title": "Connect your AI to this node",
@@ -8255,7 +8256,8 @@
       "s2": "Add a custom connector with this address:",
       "s3": "Sign in to this node when the browser tab opens. You sign in as yourself; there is no shared key to paste.",
       "s4": "Start a NEW conversation. A chat that was already open does not pick up a connector added after it started, and that alone accounts for several failed attempts.",
-      "more": "Per-tool instructions and the technical details →"
+      "more": "The connect page: one-click installs and the technical details →",
+      "newChat": "Whichever tool you use: when it is connected, start a NEW conversation. A chat that was already open does not pick up a connector added after it started, and that alone accounts for several failed attempts."
     },
     "proof": {
       "title": "Prove the connection works",
@@ -8271,7 +8273,7 @@
       "s1": "Is the connector actually connected? In your AI tool, open Settings and Connectors and look at this node. If it is missing or shows an error, nothing else on this list matters.",
       "s2": "Did you start a new conversation after adding it? An older chat does not have the tools.",
       "s3": "What did the AI actually say? If it described what it would do, or produced code, it does not have the tools and told you so indirectly. The prompt asks it to say that plainly; some models still hedge.",
-      "s4": "Are you on a paid tier? Custom connectors are not available on the free tiers.",
+      "s4": "Does your tier allow it? ChatGPT needs a paid plan and the browser, Grok needs a paid tier, and a free Claude account can hold only one custom connector at a time.",
       "s5": "Company-managed account? Your administrator may have to approve the connector before it works at all.",
       "retry": "Fix one thing, run the prompt again, and press check again. Nothing is lost by repeating it."
     },
@@ -8306,5 +8308,122 @@
     "workspaces": "workspaces",
     "loading": "Reading the structure…",
     "failed": "Could not read this organism’s structure just now. Try again shortly."
+  },
+  "setup": {
+    "pickTool": "Which AI tool are you connecting? The steps differ enough that the general version is not usable.",
+    "paramsTitle": "What to put in each field",
+    "copy": "Copy",
+    "copied": "Copied",
+    "copyCmd": "Copy the command",
+    "leaveEmpty": "leave empty",
+    "officialDocs": "Official instructions from",
+    "instrBtn": "AI chat instructions",
+    "instrBtnHint": "The block to paste into your AI chat’s instructions, and where it goes in your tool",
+    "instrTitle": "AI chat instructions",
+    "instrLead": "Paste this into your AI’s instructions and every conversation starts already knowing your structure. You stop re-explaining it, the AI stops guessing where things go, your agents write into the same places so they can build on each other’s work, and the same context stops being re-sent as tokens in every chat.",
+    "loadingOrgs": "Reading your organisms…",
+    "noOrgs": "You have no organism yet, and the block is generated from one. Create it first: the Hello MCP step on the MCP tab has a ready prompt for it.",
+    "whichOrg": "Which organism?",
+    "whereTitle": "Where it goes in your tool"
+  },
+  "tool": {
+    "param": {
+      "name": "Name",
+      "url": "Remote MCP server URL",
+      "description": "Description",
+      "nameNote": "Free text. It is only the label you will see in the connector list.",
+      "oauth": "Advanced settings: OAuth Client ID / Client Secret",
+      "oauthNote": "Leave both empty. This node registers the client automatically (RFC 7591), so there is nothing to paste.",
+      "transport": "--transport",
+      "transportNote": "Streamable HTTP. In JSON config the same transport is also spelled streamable-http.",
+      "serverName": "Server name",
+      "serverNameNote": "Your own choice. It is the name you will see in /mcp.",
+      "scope": "-s / --scope",
+      "scopeNote": "local is the default (this project, only you). user makes it available in all your projects. project writes it into .mcp.json and shares it with the team.",
+      "configFile": "Config file",
+      "configFileNote": "For one project only, .codex/config.toml in the project (trusted projects only).",
+      "cursorTransportNote": "Cursor supports HTTP and stdio. SSE and mcp-remote do not work.",
+      "vscodeConfigNote": "Workspace scope. For your user profile, run MCP: Open User Configuration.",
+      "urlPlain": "URL"
+    },
+    "claude": {
+      "plans": "Free, Pro, Max, Team and Enterprise. A free account can hold exactly one custom connector, which is enough for this."
+    },
+    "claudeDesktop": {
+      "mcp": {
+        "s1": "Open Claude Desktop, click your initials in the bottom left, and choose Settings.",
+        "s2": "Open Connectors.",
+        "s3": "Click Add custom connector.",
+        "s4": "Fill the fields with the values below and click Add.",
+        "s5": "A browser tab opens for sign-in. Sign in to this node with your own account and approve the access it asks for.",
+        "s6": "Start a NEW conversation. A chat that was already open does not get the tools."
+      },
+      "instr": "Settings > General > Instructions for Claude. Applies to every new conversation on the account."
+    },
+    "claudeWeb": {
+      "mcp": {
+        "s1": "Open claude.ai and go to Settings, then Connectors. On Pro and Max the path is Customize > Connectors.",
+        "s2": "Click + and then Add custom connector.",
+        "s3": "Fill the fields with the values below and click Add.",
+        "s4": "Sign in to this node in the tab that opens, with your own account.",
+        "s5": "Start a NEW conversation."
+      },
+      "plans": "Free, Pro, Max, Team and Enterprise. On Team and Enterprise an owner adds it under Organization settings > Connectors > Add > Custom > Web, and until they do, you cannot.",
+      "instr": "Settings > General > Instructions for Claude (shown under Profile in some versions). Applies to every new conversation on the account."
+    },
+    "claudeCode": {
+      "mcp": {
+        "s1": "Run the command below in a terminal. Add -s user to make it available in all your projects; without it the server is added for the current project only.",
+        "s2": "Run claude mcp list. The node should show as Connected. Needs authentication means the sign-in has not been completed yet.",
+        "s3": "Inside Claude Code, type /mcp to see the server and its tool count."
+      },
+      "instr": "CLAUDE.md at the root of the project. Claude Code reads it at the start of every session. For all your projects at once, ~/.claude/CLAUDE.md."
+    },
+    "chatgpt": {
+      "mcp": {
+        "s1": "Open ChatGPT in a browser. The desktop and mobile apps cannot do this.",
+        "s2": "Settings > Security and login: turn Developer mode on. In a workspace the switch is under Workspace settings > Permissions & Roles.",
+        "s3": "Open the connector list and create a new developer-mode app.",
+        "s4": "Fill the fields with the values below. The URL must end in /v1/mcp; without the path it will not connect.",
+        "s5": "Complete the sign-in, then start a new conversation and enable the connector in it."
+      },
+      "plans": "Plus, Pro, Business, Enterprise and Education. Not on the free tier, and not in the apps: browser only.",
+      "warn": "OpenAI marks developer mode as being for people who understand the risk: it grants both read and write tools. Their own warning is worth reading before you switch it on.",
+      "instr": "Settings > Personalization > Custom instructions, in the field for what ChatGPT should know about you."
+    },
+    "codex": {
+      "mcp": {
+        "s1": "Run the command below in a terminal. It writes the server into ~/.codex/config.toml.",
+        "s2": "Run codex mcp list and check that the node is listed."
+      },
+      "note": "Codex versions differ in how remote servers are given on the command line. If the command is rejected, run codex mcp --help and check the flag name, or write the server straight into config.toml.",
+      "instr": "AGENTS.md at the root of the project. Codex reads it before it starts working, and it travels with the repository."
+    },
+    "cursor": {
+      "mcp": {
+        "s1": "Use the one-click install button on this node’s connect page: it opens Cursor and pre-fills everything.",
+        "s2": "Cursor asks for confirmation. Accept it, and complete the sign-in in the browser.",
+        "s3": "By hand instead: Settings > MCP > Add new MCP server, transport HTTP, with the values below."
+      },
+      "instr": "AGENTS.md at the root of the project, or Cursor Settings > Rules for a rule that applies to every project."
+    },
+    "vscode": {
+      "mcp": {
+        "s1": "Open the Command Palette (Ctrl+Shift+P, on a Mac Cmd+Shift+P) and run MCP: Add Server.",
+        "s2": "Choose HTTP as the type, then give the values below.",
+        "s3": "Choose Global to make it available everywhere, or Workspace to write it into .vscode/mcp.json in this project.",
+        "s4": "Complete the sign-in in the browser, then open Agent mode and check the node is in the tool list."
+      },
+      "instr": "AGENTS.md at the root of the project, or .github/copilot-instructions.md, which Copilot reads in every chat in that repository."
+    },
+    "grok": {
+      "mcp": {
+        "s1": "Open grok.com/connectors.",
+        "s2": "Click New Connector and choose Custom.",
+        "s3": "Give the MCP server URL below and complete the sign-in it asks for."
+      },
+      "plans": "Paid tiers only. The node also has to be reachable from the public internet, so a node on localhost will not work here.",
+      "instr": "Open the mode menu next to the chat box, find Custom Instructions and click Customize. Applies to all your conversations."
+    }
   }
 }

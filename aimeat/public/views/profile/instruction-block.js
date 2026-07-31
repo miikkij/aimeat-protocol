@@ -18,7 +18,7 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
-import { t } from '/js/i18n.js';
+import { t, getLocale } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { fetchInstructionBlock } from '/js/services/hello-mcp.js';
 import { swallowed } from '/js/swallowed.js';
@@ -38,6 +38,16 @@ export function InstructionBlock({ orgId }) {
   const [fmt, setFmt] = useState('chat_instructions');
   const [failed, setFailed] = useState(false);
 
+  // The block is generated server-side in the caller's language, so a language switch has to
+  // refetch it. Without this, switching the portal to English left a Finnish block on screen and
+  // the placement lines around it in English.
+  const [lang, setLang] = useState(getLocale());
+  useEffect(() => {
+    const onLang = () => setLang(getLocale());
+    window.addEventListener('lang-change', onLang);
+    return () => window.removeEventListener('lang-change', onLang);
+  }, []);
+
   useEffect(() => {
     if (!orgId) { setData(null); return undefined; }
     let cancelled = false;
@@ -46,7 +56,7 @@ export function InstructionBlock({ orgId }) {
       .then(d => { if (!cancelled) setData(d); })
       .catch(err => { swallowed('instruction-block: fetch', err); if (!cancelled) setFailed(true); });
     return () => { cancelled = true; };
-  }, [orgId]);
+  }, [orgId, lang]);
 
   if (failed) return html`<p class="ib-note">${tr('instrBlock.failed', 'Could not read this organism’s structure just now. Try again shortly.')}</p>`;
   if (!data) return html`<p class="ib-note">${tr('instrBlock.loading', 'Reading the structure…')}</p>`;
