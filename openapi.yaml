@@ -7036,6 +7036,34 @@ paths:
         '200':
           description: The flow prompt (JSON envelope, or text/plain with format=txt)
 
+  /v1/ai-tools:
+    get:
+      operationId: listAiToolSetup
+      summary: Per-tool MCP setup + instructions-field table
+      description: >-
+        For each AI tool (Claude Desktop, claude.ai, Claude Code, ChatGPT, Codex CLI, Cursor,
+        VS Code, Grok): how to attach THIS node over MCP, and where that tool keeps its
+        persistent instructions field. Steps are written as things to click or type with the
+        literal UI label; every field a form asks for is listed with the value to put in it,
+        including the ones to leave empty (`value: ""` means leave the field blank on purpose,
+        not "unknown"). Each tool carries its vendor's own documentation URL.
+
+        Served rather than shipped inside each client because the clients cannot share code: the
+        portal SPA and the Experience Center are separate origins, and a copy in each would
+        drift. Drifting setup instructions are worse than none, since the reader follows them,
+        fails, and blames the product rather than the page. URLs come back already resolved
+        against this node, so a self-hosted node shows its own address. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi] }
+          description: Language of the steps, notes and placement lines (default en)
+      responses:
+        '200':
+          description: The tool table, plus this node's mcp_url
+
   /v1/prompts/hello-mcp:
     get:
       operationId: getHelloMcpPrompt

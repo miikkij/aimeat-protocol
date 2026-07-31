@@ -32,6 +32,7 @@ import { buildAppPrompt } from '../services/build-app-prompt.js';
 import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
+import { buildAiToolSetup } from '../services/ai-tool-setup.js';
 import { logger } from '../utils/logger.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
@@ -364,6 +365,22 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       system_prompt: prompt,
     }, [
       { description: 'The instruction block for the organism it creates', method: 'GET', url: '/v1/organisms/{id}/instruction-block' },
+    ]));
+  });
+
+  // GET /v1/ai-tools — the per-tool setup table: how to attach THIS node over MCP for each AI
+  // tool, and where that tool keeps its persistent instructions field. Served rather than shipped
+  // in each client because the clients cannot share code: the SPA and the Experience Center are
+  // separate origins, and a copy in each would drift. Drifting setup instructions are worse than
+  // none, since the reader follows them, fails, and blames the product. Public: setup guidance.
+  // ?lang=en|fi. URLs come back already resolved against this node, so a self-hosted node shows
+  // its own address and never aimeat.io.
+  router.get('/v1/ai-tools', (req, res) => {
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
+    const tools = buildAiToolSetup(config, { lang });
+    res.json(success(config.nodeId, { lang, mcp_url: `${config.baseUrl.replace(/\/+$/, '')}/v1/mcp`, tools }, [
+      { description: 'The proof prompt to run once a tool is connected', method: 'GET', url: '/v1/prompts/hello-mcp' },
+      { description: 'One-click installs and the technical details', method: 'GET', url: '/v1/connect' },
     ]));
   });
 
