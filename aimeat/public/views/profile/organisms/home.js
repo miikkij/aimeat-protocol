@@ -37,6 +37,7 @@ import { WorkspaceList } from '/views/profile/organisms/workspace-list.js';
 import { OrgMemberManager } from '/views/profile/organisms/members.js';
 import { OrgAgentsPanel } from '/views/profile/organisms/agents.js';
 import { BoardPreview } from '/views/profile/organisms/panels.js';
+import { InstructionBlock } from '/views/profile/instruction-block.js';
 import { swallowed } from '/js/swallowed.js';
 
 /* ───────────────── Organism home page ─────────────────
@@ -49,6 +50,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
   const { confirm, ConfirmUI } = useConfirm();
   const [tab, setTab] = useState(() => { try { return sessionStorage.getItem('aimeat.org.tab') || 'workspaces'; } catch { return 'workspaces'; } });
   const [showSettings, setShowSettings] = useState(!!initialSettings);
+  const [showInstr, setShowInstr] = useState(false);   // AI instruction block, folded until asked for
   const [wsCount, setWsCount] = useState(null);
   const [pendingJoin, setPendingJoin] = useState(0);   // Members tab pill — visible without opening the tab
   useEffect(() => { try { sessionStorage.setItem('aimeat.org.tab', tab); } catch { /* noop */ } }, [tab]);   // eslint-disable-line aimeat/no-silent-catch -- noop
@@ -377,11 +379,21 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
           ${org.description ? html`<div class="section-desc pj-org-home-desc">${(org.description)}</div>` : null}
         </div>
         <div class="pj-org-home-actions">
+          <button class="btn-outline btn-sm ${showInstr ? 'pj-org-btn-active' : ''}"
+            title=${t('organisms.instrBlockHint') || 'A ready block for your AI chat instructions, generated from this organism’s real structure'}
+            onClick=${() => setShowInstr(s => !s)}>${t('organisms.instrBlockBtn') || 'AI instructions'}</button>
           <button class="btn-outline btn-sm" title=${t('organisms.exportOrgHint') || 'Download a ZIP backup of the whole organism (all workspaces)'}
             onClick=${() => exportOrganismZip(org, showToast)}>${'⬇ '}${t('organisms.exportOrg') || 'Export'}</button>
           <button class="btn-outline btn-sm ${showSettings ? 'pj-org-btn-active' : ''}" onClick=${() => guardDirty(() => setShowSettings(s => !s))}>${'⚙ '}${t('organisms.settings') || 'Settings'}</button>
         </div>
       </div>
+
+      ${showInstr ? html`
+        <div class="pj-org-instr">
+          <div class="pj-org-instr-lead">${t('organisms.instrBlockLead')
+            || 'Paste this into your AI’s instructions and every conversation starts already knowing this organism’s structure. Less re-explaining, fewer tokens spent re-sending the same context, and your agents write into the same places so they can build on each other’s work.'}</div>
+          <${InstructionBlock} orgId=${org.id} />
+        </div>` : null}
 
       <${ReadmePanel} markdown=${readme} canEdit=${canEdit} kind="organism" name=${org.name}
         aiPromptSeed=${tocSeed} onSave=${saveReadme} />

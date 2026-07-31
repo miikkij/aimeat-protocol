@@ -15,6 +15,7 @@ import { escHtml, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { listChatInstances, deleteChatInstance } from '/js/services/agents.js';
+import { HelloMcpPanel } from '/views/profile/hello-mcp-panel.js';
 import { swallowed } from '/js/swallowed.js';
 
 export default function McpTab({ session, showToast, onStats }) {
@@ -73,6 +74,8 @@ export default function McpTab({ session, showToast, onStats }) {
   return html`
     <div class="section-title">${t('profile.mcp.title')}</div>
     <div class="section-desc">${t('profile.mcp.desc')}</div>
+
+    <${HelloMcpPanel} />
 
     <div class="mcp-hint-box">
       <span>${t('profile.mcp.setupHint')}</span>

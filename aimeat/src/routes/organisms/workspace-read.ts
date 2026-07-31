@@ -23,7 +23,8 @@ import { emitChange } from '../../services/event-bus.js';
 import { searchOrganismContent } from '../../services/organism-search.js';
 import { scanOrganismDanglingRefs } from '../../services/dangling-refs.js';
 import { canAccessWorkspaceComments, addComment, listComments, commentPrefix, type WorkspaceComment } from '../../services/organism-comments.js';
-import { buildOrganismOverview, buildWorkspaceOverview } from '../../services/structure-overview.js';
+import { buildOrganismOverview, buildWorkspaceOverview, listWorkspaces, collectWorkspaceSummary } from '../../services/structure-overview.js';
+import { buildInstructionBlocks } from '../../services/hello-mcp.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../../services/structure-graph.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
 import { fresherRec } from './shared.js';
@@ -229,6 +230,56 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     res.json(success(config.nodeId, { markdown, workspaces, archivedWorkspaces }, [
       { description: 'Drill into one workspace', method: 'GET', url: `/v1/organisms/${id}/workspace/overview?ws=<ws>` },
       ...(archivedWorkspaces && !includeArchived ? [{ description: 'Include archived workspaces', method: 'GET', url: `/v1/organisms/${id}/overview?includeArchived=true` }] : []),
+    ]));
+  });
+
+  /* ── GET /v1/organisms/:id/instruction-block — the paste-into-your-AI's-instructions block ──
+   * Generated from the organism's REAL structure (id, name, its actual workspaces and their
+   * spaces), never from a template: an AI that reads it knows where things live before it asks,
+   * which is the whole point. Three formats for three paste targets (CLAUDE.md, AGENTS.md, the
+   * chat's own instructions field) plus where each one goes. Same membership gate as /overview.
+   * ?lang=en|fi, ?format=txt → the chat-instructions variant as raw text. */
+  router.get('/v1/organisms/:id/instruction-block', requireAuth(), async (req, res) => {
+    const id = req.params.id as string;
+    const organism = await storage.getOrganism(id);
+    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
+    const callerSub = req.auth!.sub;
+    const ownerName = req.auth!.owner;
+    let isMember = !!callerSub && organism.agentGaiis.includes(callerSub);
+    if (!isMember && ownerName) { const m = await storage.getMembership(id, ownerName); isMember = !!m && m.status === 'active'; }
+    if (!isMember) { res.status(403).json(error(config.nodeId, 'ACCESS_DENIED', 'Not an active member of this organism')); return; }
+
+    const viewerGaii = resolveIdentity(req.auth!, config.nodeId);
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
+    // Active workspaces only: an archived one is not where the next piece of work should land.
+    const wss = (await listWorkspaces(storage, id)).filter(w => !w.archived);
+    const workspaces = [];
+    for (const w of wss) {
+      // Per-workspace summary rather than the registry name alone, so the block carries the
+      // spaces an agent will actually write into. Unreadable workspaces are listed by name only.
+      const s = await collectWorkspaceSummary(storage, config, { orgId: id, ws: w.id, name: w.name, viewerGaii });
+      workspaces.push({
+        id: w.id,
+        name: s.name,
+        description: s.readme ? s.readme.replace(/[#*`>\r\n]+/g, ' ').trim().slice(0, 140) : undefined,
+        spaces: s.spaces.map(sp => sp.name),
+      });
+    }
+    const blocks = buildInstructionBlocks(config, { orgId: id, orgName: organism.name || id, workspaces }, { lang });
+    if (req.query.format === 'txt') { res.type('text/plain; charset=utf-8').send(blocks.chatInstructions); return; }
+    res.json(success(config.nodeId, {
+      organism_id: id,
+      organism_name: organism.name || id,
+      lang,
+      workspaces,
+      blocks: {
+        claude_md: blocks.claudeMd,
+        agents_md: blocks.agentsMd,
+        chat_instructions: blocks.chatInstructions,
+      },
+      placement: blocks.placement,
+    }, [
+      { description: 'The full organism overview this block is generated from', method: 'GET', url: `/v1/organisms/${id}/overview` },
     ]));
   });
 

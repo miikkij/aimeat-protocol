@@ -25,6 +25,7 @@ import { onLiveUpdate } from "/lib/live-updates.js";
 import { listRecents } from "/js/recents.js";
 import { listInbox } from "/js/services/messages.js";
 import { apiGet } from "/js/api.js";
+import { checkHelloMcp } from "/js/services/hello-mcp.js";
 import { UsageChart, colorForIndex } from "/components/UsageChart.js";
 import { minidenticon } from "/lib/minidenticons.min.js";
 import { PresencePill } from "./landing-page.modals.js";
@@ -399,6 +400,25 @@ export function AgentLedgerCard() {
 
 /* ───── Sub-components ───── */
 
+/* The MCP-connected mark. DERIVED from the Hello MCP proof key on every read, never stored and
+ * never settable by the user: only their AI can produce it, by writing through the connection.
+ * Renders nothing at all until the read resolves, and nothing when unproven — an unproven state
+ * belongs in the next-steps list as an action, not in the identity card as a complaint. */
+function McpConnectedBadge() {
+  const [proven, setProven] = useState(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    checkHelloMcp()
+      .then(r => { if (!cancelled) setProven(r.passed); })
+      .catch((err) => { swallowed('landing-page.cards: McpConnectedBadge', err); });
+    return () => { cancelled = true; };
+  }, []);
+  if (!proven) return null;
+  return html`<div class="pf-federation-badge pf-mcp-badge">
+    <span class="pf-fed-dot"></span>${t('profile.mcpConnected') || 'MCP connected'}
+  </div>`;
+}
+
 export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) {
   const NODE_URL = getNodeUrl();
   const isNew = tier === 'new';
@@ -422,6 +442,7 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
           </div>
           <div class="pf-lp-ghii">${escHtml(session.ghii || '')}</div>
           <div class="pf-lp-node">${t('profile.node')}: ${escHtml(NODE_URL)}</div>
+          <${McpConnectedBadge} />
           ${typeof stats.nodes === 'number' && stats.nodes > 0
             ? html`<div class="pf-federation-badge">
                 <span class="pf-fed-dot"></span>
@@ -473,6 +494,17 @@ export function ProfileCard({ tier, stats, session, onEditProfile, switchTab }) 
 export function NextSteps({ switchTab, hasApps }) {
   // hasPortfolio: undefined = loading, true = published config exists, false = none yet.
   const [hasPortfolio, setHasPortfolio] = useState(undefined);
+  // Hello MCP outranks everything else while it is unproven: until the connection is verified,
+  // every other suggestion here is advice the user cannot act on properly. undefined = still
+  // reading, so the step never flashes in for someone who already passed.
+  const [mcpProven, setMcpProven] = useState(undefined);
+  useEffect(() => {
+    let cancelled = false;
+    checkHelloMcp()
+      .then(r => { if (!cancelled) setMcpProven(r.passed); })
+      .catch((err) => { swallowed('landing-page.cards: helloMcp', err); if (!cancelled) setMcpProven(true); });
+    return () => { cancelled = true; };
+  }, []);
   useEffect(() => {
     let cancelled = false;
     apiGet('/v1/portfolio/config')
@@ -482,9 +514,11 @@ export function NextSteps({ switchTab, hasApps }) {
   }, []);
 
   const buildAppUrl = `/app-catalog.html?lang=${encodeURIComponent(getLocale())}&create=1`;
-  const steps = [
-    { icon: '\u{1F9E0}', key: 'writeNotes', go: () => switchTab('notebook') },
-  ];
+  const steps = [];
+  // First and most important until it passes, then gone: a proven connection is the thing the
+  // rest of the product is used through.
+  if (mcpProven === false) steps.push({ icon: '\u{1F50C}', key: 'helloMcp', go: () => switchTab('mcp') });
+  steps.push({ icon: '\u{1F9E0}', key: 'writeNotes', go: () => switchTab('notebook') });
   if (hasPortfolio === false) steps.push({ icon: '\u{1F3A8}', key: 'portfolio', go: () => switchTab('portfolio') });
   if (hasApps === false) steps.push({ icon: '\u{26A1}', key: 'buildApp', go: () => window.open(buildAppUrl, '_blank', 'noopener') });
   steps.push({ icon: '\u{1F91D}', key: 'useSharedAgents', go: () => switchTab('offers') });

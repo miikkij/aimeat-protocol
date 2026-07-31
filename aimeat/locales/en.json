@@ -3675,7 +3675,9 @@
         "buildAppTitle": "Build an app",
         "buildAppDesc": "Open the catalog, describe your idea, and your AI builds it from a prompt.",
         "useSharedAgentsTitle": "Use agents others shared",
-        "useSharedAgentsDesc": "Browse ready agents people published and put them to work for you."
+        "useSharedAgentsDesc": "Browse ready agents people published and put them to work for you.",
+        "helloMcpTitle": "Connect your AI, and prove it",
+        "helloMcpDesc": "Everything here is used through your AI. Five minutes, one prompt, and you see for certain that the connection works."
       },
       "heroTitle": "Welcome! Start here",
       "heroSubtitle": "You have four paths forward. Start anywhere. All lead to something useful.",
@@ -3809,7 +3811,8 @@
       "pinAdd": "Pin",
       "pinRemove": "Unpin",
       "pinLimit": "Max 5 pinned items"
-    }
+    },
+    "mcpConnected": "MCP connected"
   },
   "dev": {
     "title": "Connect your AI to this node",
@@ -6984,7 +6987,10 @@
     },
     "addDocSpaceTitle": "Add a document space",
     "addDocSpaceDesc": "A document space is a free-form wiki (sections + markdown pages). Record types need a schema, so they are designed with AI in Settings → Process (restructure).",
-    "docSpaceNamePlaceholder": "New document space name"
+    "docSpaceNamePlaceholder": "New document space name",
+    "instrBlockBtn": "AI instructions",
+    "instrBlockHint": "A ready block for your AI chat instructions, generated from this organism’s real structure",
+    "instrBlockLead": "Paste this into your AI’s instructions and every conversation starts already knowing this organism’s structure. Less re-explaining, fewer tokens spent re-sending the same context, and your agents write into the same places so they can build on each other’s work."
   },
   "tags": {
     "clear": "Clear",
@@ -8232,5 +8238,73 @@
   "glossary.loading": "Loading…",
   "glossary.noMatch": "No term matches that.",
   "glossary.failed": "The glossary could not be loaded.",
-  "nav.glossary": "Glossary"
+  "nav.glossary": "Glossary",
+  "helloMcp": {
+    "title": "Hello MCP",
+    "intro": "Connect your AI to this node and prove it works. Three steps, and the third one is a button. Until it passes, everything else here is guesswork.",
+    "pre": {
+      "title": "Before you start",
+      "paid": "A paid tier of your AI tool. Custom connectors are not on the free tiers, and an attempt on a free tier fails in a way that looks like our fault rather than a missing feature. This is the single most common reason onboarding does not work.",
+      "tools": "An AI tool that supports MCP: Claude (app or web), Claude Code, Cursor, VS Code with Copilot, Codex CLI, Gemini CLI. The Gemini consumer app and Microsoft Copilot do not, and for those the copy-paste route is the one that works.",
+      "time": "About five minutes, and the ability to paste one prompt into your chat."
+    },
+    "connect": {
+      "title": "Connect your AI to this node",
+      "lead": "Everything else is done through this connection, so it goes first.",
+      "s1": "In your AI tool, open Settings and find Connectors (in Claude Code, run the one-line command on the connect page instead).",
+      "s2": "Add a custom connector with this address:",
+      "s3": "Sign in to this node when the browser tab opens. You sign in as yourself; there is no shared key to paste.",
+      "s4": "Start a NEW conversation. A chat that was already open does not pick up a connector added after it started, and that alone accounts for several failed attempts.",
+      "more": "Per-tool instructions and the technical details →"
+    },
+    "proof": {
+      "title": "Prove the connection works",
+      "lead": "Do this before anything else. A connection that looks fine and is not there fails quietly: the AI keeps answering, nothing errors, and what it says stops matching what is really stored. This prompt makes that visible in one step. Paste it into the chat you just opened.",
+      "loading": "Loading the prompt from this node…",
+      "copy": "Copy the prompt",
+      "copied": "Copied",
+      "check": "I ran it, check now",
+      "checking": "Checking…"
+    },
+    "fail": {
+      "title": "Not there yet. Check these, in this order:",
+      "s1": "Is the connector actually connected? In your AI tool, open Settings and Connectors and look at this node. If it is missing or shows an error, nothing else on this list matters.",
+      "s2": "Did you start a new conversation after adding it? An older chat does not have the tools.",
+      "s3": "What did the AI actually say? If it described what it would do, or produced code, it does not have the tools and told you so indirectly. The prompt asks it to say that plainly; some models still hedge.",
+      "s4": "Are you on a paid tier? Custom connectors are not available on the free tiers.",
+      "s5": "Company-managed account? Your administrator may have to approve the connector before it works at all.",
+      "retry": "Fix one thing, run the prompt again, and press check again. Nothing is lost by repeating it."
+    },
+    "passed": {
+      "title": "MCP connected, and proven",
+      "sub": "Your AI wrote through the connection."
+    },
+    "org": {
+      "title": "Let your AI build your organism",
+      "lead": "An organism is where the work lives between conversations: notes, documents, tasks and decisions, in one place every one of your agents reads from. Your AI creates it over the connection you just proved, and you watch it appear here.",
+      "purposeLabel": "What will you use it for? (optional: leave it empty and the AI asks you)",
+      "purposePh": "e.g. my consulting work, or a product I am building",
+      "copy": "Copy the prompt",
+      "refresh": "It is created, show it"
+    },
+    "block": {
+      "title": "Teach your AI where things are, once",
+      "lead": "Paste this block into your AI’s instructions and every conversation starts already knowing your structure. You stop re-explaining it, the AI stops guessing where things go, your agents write into the same places so they can build on each other’s work, and the same context stops being re-sent as tokens in every chat.",
+      "loading": "Reading your organisms…",
+      "none": "No organism yet. Run the prompt above first, then press \"It is created, show it\"."
+    }
+  },
+  "instrBlock": {
+    "fmt": {
+      "chat": "AI chat instructions",
+      "claude": "CLAUDE.md",
+      "agents": "AGENTS.md"
+    },
+    "copy": "Copy the block",
+    "copied": "Copied",
+    "from": "Generated from",
+    "workspaces": "workspaces",
+    "loading": "Reading the structure…",
+    "failed": "Could not read this organism’s structure just now. Try again shortly."
+  }
 }

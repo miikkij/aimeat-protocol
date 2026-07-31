@@ -7036,6 +7036,61 @@ paths:
         '200':
           description: The flow prompt (JSON envelope, or text/plain with format=txt)
 
+  /v1/prompts/hello-mcp:
+    get:
+      operationId: getHelloMcpPrompt
+      summary: Hello MCP proof prompt (paste-able)
+      description: >-
+        The prompt a user pastes into their own AI chat immediately after connecting it over MCP.
+        Running it writes the memory key `onboarding.hello_mcp` through the connection, and the
+        existence of that key is the entire pass condition for Hello MCP — there is no other
+        state. The key is returned in `data.key` so a client never has to hardcode it. Check it
+        with GET /v1/memory/onboarding.hello_mcp?soft=1 from an owner session: that route
+        broadens to owner scope, so it finds the key even though the AI wrote it under its own
+        agent GAII. Public — onboarding guidance, not a secret.
+      tags:
+        - Discovery
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi] }
+          description: Prompt language (default en)
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the prompt as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The proof prompt plus the key it writes (JSON envelope, or text/plain with format=txt)
+
+  /v1/prompts/organism-setup:
+    get:
+      operationId: getOrganismSetupPrompt
+      summary: Create-your-organism prompt (paste-able, MCP)
+      description: >-
+        Onboarding step after Hello MCP passes: the prompt that has the user's own MCP-connected
+        AI create their personal organism and its workspaces, which the user then watches appear
+        in the UI. Without ?purpose the prompt interviews the user first (what the organism is
+        for, who else is involved) before proposing a name and workspaces. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi] }
+          description: Prompt language (default en)
+        - name: purpose
+          in: query
+          schema: { type: string }
+          description: What the user already said the organism is for; folded into the prompt so it skips the interview
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the prompt as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The organism-setup prompt (JSON envelope, or text/plain with format=txt)
+
   /v1/library-packs:
     get:
       operationId: listLibraryPacks
@@ -20028,6 +20083,47 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '403':
           description: Not the workspace creator (or an org admin)
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /v1/organisms/{id}/instruction-block:
+    get:
+      operationId: getOrganismInstructionBlock
+      summary: Paste-into-your-AI instruction block for one organism (3 formats)
+      description: |
+        The block a user pastes into their AI's persistent instructions so every conversation
+        starts already knowing this organism: its id, its actual workspaces and their spaces,
+        and the rules for working in it (read the current state first, write results back, ask
+        before creating structure). Generated from LIVE structure, never a template, so an AI
+        reading it knows where things live instead of asking or guessing.
+
+        Returns three formats for three paste targets — `chat_instructions` (the AI chat's own
+        instructions field), `claude_md` (CLAUDE.md at a project root) and `agents_md`
+        (AGENTS.md) — plus `placement`, a one-line statement of where each one goes, in the
+        requested language. Archived workspaces are excluded: they are not where the next piece
+        of work should land. Same membership gate as /overview.
+      tags: [Organisms]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: Organism ID
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi] }
+          description: Language of the block and of the placement lines (default en)
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the chat-instructions variant as text/plain
+      responses:
+        '200':
+          description: The instruction block in three formats, with placement guidance
+        '403':
+          description: Not an active member of this organism
         '404':
           $ref: '#/components/responses/NotFound'
 

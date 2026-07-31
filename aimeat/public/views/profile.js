@@ -95,7 +95,9 @@ const TABS = [
   { id: 'scheduler',     key: 'profile.tabs.scheduler',      component: SchedulerTab,      minTier: 'active' },
   { id: 'workflows',     key: 'profile.tabs.workflows',      component: WorkflowsTab,      minTier: 'active' },
   { id: 'chatsessions',  key: 'profile.tabs.chatSessions',   component: ChatSessionsTab,   minTier: 'active' },
-  { id: 'mcp',           key: 'profile.tabs.mcp',            component: McpTab,            minTier: 'active' },
+  // 'new', not 'active': this tab hosts Hello MCP, which is the FIRST thing a brand-new user is
+  // sent to. Gating it behind 'active' hid the onboarding surface from exactly the people it is for.
+  { id: 'mcp',           key: 'profile.tabs.mcp',            component: McpTab,            minTier: 'new' },
   { id: 'wallet',        key: 'profile.tabs.wallet',         component: WalletTab,         minTier: 'new' },
   { id: 'knowledge',     key: 'knowledge.tabLabel',          component: KnowledgeTab,      minTier: 'active' },
   { id: 'skills',        key: 'skills.tabLabel',             component: SkillsTab,         minTier: 'active' },

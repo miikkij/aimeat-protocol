@@ -1,0 +1,237 @@
+/**
+ * @file css/components/hello-mcp.css
+ * @description Styles for the Hello MCP panel (`.hm-*`) and the organism instruction block
+ *   (`.ib-*`). Both are onboarding surfaces, so the visual job is to make ONE thing obviously
+ *   next at any moment: the proof step is the only one with an accent edge, and the pass state
+ *   is the only place a success colour appears. All colours are theme tokens.
+ * @structure .hm (panel) · .hm-step · .hm-step--proof · .hm-prompt · .hm-fail · .hm-passed ·
+ *   .ib (instruction block) · .ib-tabs · .ib-block
+ * @usage loaded from spa.html
+ * @version-history
+ *   v1.0.0 — 2026-07-31 — Initial.
+ */
+
+/* ── Hello MCP panel ── */
+.hm { margin: 0 0 1.5rem; }
+
+.hm-intro { margin-bottom: 0.9rem; }
+.hm-intro-title {
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 0.25rem;
+}
+
+.hm-step {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.7rem;
+}
+
+/* The proof is the only step with an accent edge: at any moment exactly one thing is next. */
+.hm-step--proof { border-left: 3px solid var(--accent); }
+
+.hm-step-head {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+
+.hm-step-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: var(--radius-full);
+  background: var(--bg-dim);
+  color: var(--text-dim);
+  font-size: 0.75rem;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.hm-p {
+  margin: 0 0 0.6rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.hm-p--dim { font-size: 0.8125rem; }
+
+.hm-list {
+  margin: 0 0 0.6rem;
+  padding-left: 1.15rem;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.hm-list li { margin-bottom: 0.4rem; }
+.hm-list--ol { padding-left: 1.3rem; }
+
+.hm-code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.8125rem;
+  background: var(--bg-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  padding: 0.1rem 0.35rem;
+  overflow-wrap: anywhere;
+}
+
+.hm-prompt {
+  margin: 0 0 0.6rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--bg-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.hm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.hm-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-dim);
+  margin: 0 0 0.3rem;
+}
+
+.hm-select { margin-bottom: 0.6rem; }
+
+.hm-link {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+/* ── Failure path ── */
+.hm-fail {
+  margin-top: 0.75rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--warn, var(--accent-2));
+  border-radius: var(--radius-xs);
+  background: var(--bg-dim);
+}
+.hm-fail-title {
+  font-weight: 700;
+  font-size: 0.875rem;
+  color: var(--text);
+  margin-bottom: 0.5rem;
+}
+
+/* ── Passed ── */
+.hm-passed {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--success);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  margin-bottom: 0.9rem;
+}
+.hm-passed-dot {
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: var(--radius-full);
+  background: var(--success);
+  margin-top: 0.35rem;
+  flex-shrink: 0;
+}
+.hm-passed-title { font-weight: 800; font-size: 0.95rem; color: var(--text); }
+.hm-passed-sub { font-size: 0.8125rem; color: var(--text-dim); margin-top: 0.15rem; }
+
+.hm-after { margin-top: 0.2rem; }
+
+/* ── Instruction block (also used standalone on every organism) ── */
+.ib { margin: 0.4rem 0 0; }
+
+.ib-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-bottom: 0.5rem;
+}
+.ib-tab {
+  padding: 0.35rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+}
+.ib-tab--active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.ib-place {
+  margin: 0 0 0.45rem;
+  font-size: 0.8125rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+
+.ib-block {
+  margin: 0 0 0.55rem;
+  padding: 0.7rem 0.8rem;
+  background: var(--bg-dim);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xs);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: var(--text-dim);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.ib-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+}
+.ib-meta { font-size: 0.75rem; color: var(--text-muted); }
+.ib-note { font-size: 0.8125rem; color: var(--text-dim); margin: 0.4rem 0; }
+
+/* ── The organism-page wrapper for the same block ── */
+.pj-org-instr {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  padding: 0.9rem 1rem;
+  margin-bottom: 0.8rem;
+}
+.pj-org-instr-lead {
+  font-size: 0.875rem;
+  line-height: 1.6;
+  color: var(--text-dim);
+  margin-bottom: 0.6rem;
+}

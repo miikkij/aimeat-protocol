@@ -84,6 +84,10 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     res.json(success(config.nodeId, {
       key: record.key,
+      // Always present, both ways. The soft-miss branch above returns exists:false, and a HIT used
+      // to return no `exists` field at all — so a caller written as `if (!data.exists)` read every
+      // successful read as a miss, silently, and only on the path where the data WAS there.
+      exists: true,
       value: record.value,
       visibility: record.visibility,
       zone: visibilityToZone(record.visibility),

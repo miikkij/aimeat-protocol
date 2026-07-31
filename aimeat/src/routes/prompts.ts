@@ -31,6 +31,7 @@ import { OFFERINGS_HANDBOOK } from '../services/offerings-handbook.js';
 import { buildAppPrompt } from '../services/build-app-prompt.js';
 import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
+import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
 import { logger } from '../utils/logger.js';
 
 export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
@@ -311,6 +312,58 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
       { description: 'The canonical build spec', method: 'GET', url: '/v1/prompts/build-app' },
       { description: 'The one-call research surface (MCP: aimeat_appdev_overview)', method: 'GET', url: '/v1/appdev/overview' },
       { description: 'Curated pitfalls', method: 'GET', url: '/v1/appdev/pitfalls' },
+    ]));
+  });
+
+  // GET /v1/prompts/hello-mcp — the proof prompt. Running it in the user's own AI chat writes
+  // `onboarding.hello_mcp` through the MCP connection, which is the entire pass condition for
+  // Hello MCP. Served from the node, and from the same module that exports the key, so the text
+  // and the key it names can never drift apart: that drift would be a silent failure in exactly
+  // the way this whole feature exists to prevent. Public — onboarding guidance, not a secret.
+  // ?lang=en|fi, ?format=txt. MUST be registered before /v1/prompts/:tier.
+  router.get('/v1/prompts/hello-mcp', (req, res) => {
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
+    const prompt = buildHelloMcpPrompt(config, { lang });
+    if (req.query.format === 'txt') {
+      res.type('text/plain; charset=utf-8').send(prompt);
+      return;
+    }
+    res.json(success(config.nodeId, {
+      id: 'hello-mcp',
+      name: 'Hello MCP',
+      description: 'Paste into your AI chat right after connecting it over MCP. Running it writes the proof key; until that key exists the connection is unverified.',
+      lang,
+      key: HELLO_MCP_KEY,
+      prompt,
+      system_prompt: prompt,
+    }, [
+      { description: 'Check whether the proof key exists (owner session, one lookup)', method: 'GET', url: `/v1/memory/${encodeURIComponent(HELLO_MCP_KEY)}?soft=1` },
+      { description: 'Next: have your AI create your organism', method: 'GET', url: '/v1/prompts/organism-setup' },
+    ]));
+  });
+
+  // GET /v1/prompts/organism-setup — step 4 of onboarding: the user's own AI creates their
+  // personal organism over MCP and they watch it appear in the UI. ?purpose=<what it is for>
+  // is folded in when the user already said; without it the prompt asks first, because an
+  // organism named after nothing collects nothing. Public. ?lang, ?format=txt.
+  // MUST be registered before /v1/prompts/:tier.
+  router.get('/v1/prompts/organism-setup', (req, res) => {
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
+    const purpose = typeof req.query.purpose === 'string' ? req.query.purpose : '';
+    const prompt = buildOrganismSetupPrompt(config, { lang, purpose });
+    if (req.query.format === 'txt') {
+      res.type('text/plain; charset=utf-8').send(prompt);
+      return;
+    }
+    res.json(success(config.nodeId, {
+      id: 'organism-setup',
+      name: 'Create your organism',
+      description: 'Paste into an MCP-connected AI chat. It asks what the organism is for (unless you said), then creates it and its workspaces, and you watch it appear in your profile.',
+      lang,
+      prompt,
+      system_prompt: prompt,
+    }, [
+      { description: 'The instruction block for the organism it creates', method: 'GET', url: '/v1/organisms/{id}/instruction-block' },
     ]));
   });
 
