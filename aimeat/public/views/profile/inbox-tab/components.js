@@ -6,6 +6,9 @@
  *   chat.commands), SchedulePanel (own-agent scheduler), and ReplyWithAiPopover (TARGET-031). Each is
  *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.10.0 — 2026-07-31 — MessageBubble gets a 🔊 read-aloud action (BubbleSpeakButton from
+ *     ./read-aloud.js): speaks that one message via the Web Speech API, like the Sanomat app's per-article
+ *     "Puhu". Hidden when the browser can't speak or the message has no speakable body.
  *   v1.9.0 — 2026-07-25 — MessageBubble gets a ⧉ copy action next to the other bubble buttons: copies the
  *     message's raw markdown to the clipboard (✓ for ~1.6s as feedback).
  *   v1.8.0 — 2026-07-21 — MessageBubble renders link-preview cards under the body (MessageLinkPreviews),
@@ -44,6 +47,7 @@ import { minidenticon } from '/lib/minidenticons.min.js';
 import * as schedules from '/js/services/schedules.js';
 import { MODES } from '/js/services/messages-ai-prompts.js';
 import { loadToastUI, prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, ATTACH_ICO, attachKind, IFORM_OTHER } from './helpers.js';
+import { BubbleSpeakButton } from './read-aloud.js';
 import { swallowed } from '/js/swallowed.js';
 
 export function Avatar({ seed, size = 36 }) {
@@ -284,6 +288,7 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
         <div class="inbox-bubble-actions">
           ${onQuote ? html`<button class="inbox-bubble-act" title=${t('inbox.quoteReply')}
             onClick=${() => onQuote(msg)}>↩</button>` : null}
+          <${BubbleSpeakButton} msgId=${msg.id} body=${msg.body} />
           <button class=${`inbox-bubble-act${copied ? ' inbox-bubble-act--on' : ''}`}
             title=${copied ? t('inbox.copied') : t('inbox.copyMessage')}
             aria-label=${t('inbox.copyMessage')} onClick=${copyBody}>${copied ? '✓' : '⧉'}</button>

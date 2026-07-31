@@ -6,6 +6,8 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-07-31 — ThreadPanel head hosts ThreadReadAloud (./read-aloud.js): reads the whole open
+ *     conversation aloud (Listen / Pause / Continue + ✕), the thread-level twin of the per-bubble 🔊.
  *   v1.4.0 — 2026-07-21 — ThreadPanel head: "Show all messages / Last 50" toggle (threadAll/
  *     toggleThreadAll), shown once a thread has ≥50 messages. Threads default to the full history;
  *     the toggle collapses to the newest 50.
@@ -27,6 +29,7 @@ import { Markdown } from '/components/Markdown.js';
 import { PresenceDot } from '/components/PresenceDot.js';
 import { getSession } from '/js/services/auth.js';
 import { Avatar, MessageBubble, Composer, CommandBar, CommandFill, SchedulePanel } from './components.js';
+import { ThreadReadAloud } from './read-aloud.js';
 import { peerName, ownerKeyOf, isAgentPeer, ownerDisplayName, subThreadLabel, groupConversations, timeShort, dayKey, dayLabel, trackStateLabel, tallyPoll, quoteSnippet } from './helpers.js';
 
 export function ListPanel({ requests, conversations, activeConv, peerDisplay, accept, block, openConversation }) {
@@ -147,6 +150,7 @@ export function ThreadPanel({
           ${viaAgentName ? html`<div class="inbox-thread-via">🤖 ${t('inbox.sentByAgent')} ${escHtml(viaAgentName)}</div>` : null}
           <div class="inbox-sub">${escHtml(activeConv.peerGhii)}</div>
         </div>
+        <${ThreadReadAloud} thread=${thread} peerLabelText=${peerDisplay(activeConv.peerGhii)} convId=${activeConv.conversationId} />
         ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationAi} title=${t('inbox.ai.replyWithAi')}>✨ <span class="inbox-ai-btn-label">${t('inbox.ai.replyWithAi')}</span></button>` : null}
         ${!viaAgentName ? html`<button class="btn-ghost btn-sm inbox-ai-btn" onClick=${openConversationNotebook} title=${t('inbox.notebook.toNotebook')}>📓 <span class="inbox-ai-btn-label">${t('inbox.notebook.toNotebookShort')}</span></button>` : null}
         <button class=${`btn-ghost btn-sm inbox-linkprev-toggle${showLinkPreviews ? ' inbox-linkprev-toggle--on' : ''}`}

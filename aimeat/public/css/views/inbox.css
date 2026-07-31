@@ -5,6 +5,9 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.8.0 -- 2026-07-31 -- Read-aloud controls: the thread-head Listen/Pause/Continue pill
+ *     (.inbox-speak-group/-btn/-ico/-stop) that speaks the open conversation. The per-message 🔊 reuses
+ *     the existing .inbox-bubble-act pill.
  *   v1.7.0 -- 2026-07-21 -- Link-preview (unfurl) cards under a pasted link (.inbox-linkcard*) + the
  *     thread-head show/hide toggle (.inbox-linkprev-toggle).
  *   v1.6.0 -- 2026-07-18 -- TRUE full-screen mobile chat: ≤760px open panel becomes `position:fixed;inset:0`
@@ -108,8 +111,9 @@
   .inbox-thread-head { padding: 10px 12px; gap: 8px; }
   .inbox-composer { padding: 8px 10px; }
   .inbox-compose-fields { padding: 10px 10px 0; }
-  /* Collapse the "Reply with AI" button to just its ✨ icon so it never crowds the thread header. */
+  /* Collapse the "Reply with AI" and "Listen" buttons to just their icon so they never crowd the header. */
   .inbox-ai-btn .inbox-ai-btn-label { display: none; }
+  .inbox-speak-btn .inbox-ai-btn-label { display: none; }
 }
 
 /* ── Avatars ── */
@@ -789,3 +793,11 @@
 /* Thread-head toggle: show/hide all link previews (persisted). --on marks the active state. */
 .inbox-linkprev-toggle { flex: none; white-space: nowrap; }
 .inbox-linkprev-toggle--on { background: var(--accent-subtle); border-color: var(--accent-border); color: var(--accent); }
+
+/* ── Read aloud (Web Speech): thread-head Listen/Pause/Continue + ✕ stop. The per-bubble 🔊 reuses
+   .inbox-bubble-act / --on, so it needs no rules of its own. --on marks a reading in progress. */
+.inbox-speak-group { display: inline-flex; align-items: center; gap: 2px; flex: none; }
+.inbox-speak-btn { flex: none; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
+.inbox-speak-btn--on { background: var(--accent-subtle); border-color: var(--accent-border); color: var(--accent); }
+.inbox-speak-ico { font-size: 13px; line-height: 1; }
+.inbox-speak-stop { flex: none; padding-inline: 8px; }
