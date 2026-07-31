@@ -3,6 +3,8 @@
  * @description Public memory reads, organism + workspace lifecycle, wallet transactions, HTML apps, extensions, IAM design, and cortex tool definitions (incl. operator-only aimeat_admin_mint).
  *   One slice of CLI_FALLBACK_TOOL_DEFINITIONS; re-assembled in order by definitions.ts.
  * @version-history
+ *   v1.1.0 — 2026-07-31 — aimeat_workspace_write documents its `items` batch (space/value become
+ *     optional; one call carries a whole migration).
  *   v1.0.0 — 2026-07-13 — Extracted from definitions.ts (pure extraction; no behavior change).
  */
 
@@ -237,16 +239,17 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_write',
-        description: "Create or overwrite a DRAFT item in a workspace — a record OR a document — in one tool. Give the space NAME (the objectType, e.g. 'feature' or 'notes'); the tool resolves whether it is a records or document space and writes accordingly. For a records space, `value` is the record (validated against its schema, rejected if invalid) and needs an `id`. For a document space, `value` is { title, markdown }, the `id` is auto-generated, and you can file it under a `section`. Document markdown renders rich: ```mermaid fenced blocks become diagrams, and ```aimeat-memory fenced blocks become LIVE data (body lines `key: <memory key>`, optional `view: table|props|list`, `fields: a,b`, `title: …`) — the document shows the key's CURRENT value on every open, so for data that changes, write it with aimeat_memory_write as an array of objects and embed the key instead of pasting a static table. Drafts are NOT live until published (aimeat_workspace_publish). Embed images by uploading with aimeat_storage_upload and using the embed_markdown / embed_url it returns (the owner-addressed /v1/pub form) — NOT a hand-written /v1/storage/<key> path, which loads only for you. On save the embedded image is scoped to this workspace's members (not the public internet). Member-only.",
+        description: "Create or overwrite DRAFT items in a workspace — records OR documents — in one tool. ONE item: pass `space` + `value`. MANY: pass `items: [{ value, space?, id?, section? }]` (up to 50) and they are all written in a SINGLE call — do this for any migration or multi-page import, because your client asks the human to approve every tool CALL, so twenty separate writes are twenty approval prompts and one unanswered prompt leaves the job half-done. A batch is all-or-nothing: every item is checked first, and one bad item writes nothing (the error names its index). Items inherit the top-level `space`/`section` unless they carry their own. Give the space NAME (the objectType, e.g. 'feature' or 'notes'); the tool resolves whether it is a records or document space and writes accordingly. For a records space, `value` is the record (validated against its schema, rejected if invalid) and needs an `id`. For a document space, `value` is { title, markdown }, the `id` is auto-generated, and you can file it under a `section`. Document markdown renders rich: ```mermaid fenced blocks become diagrams, and ```aimeat-memory fenced blocks become LIVE data (body lines `key: <memory key>`, optional `view: table|props|list`, `fields: a,b`, `title: …`) — the document shows the key's CURRENT value on every open, so for data that changes, write it with aimeat_memory_write as an array of objects and embed the key instead of pasting a static table. Drafts are NOT live until published (aimeat_workspace_publish). Embed images by uploading with aimeat_storage_upload and using the embed_markdown / embed_url it returns (the owner-addressed /v1/pub form) — NOT a hand-written /v1/storage/<key> path, which loads only for you. On save the embedded image is scoped to this workspace's members (not the public internet). Member-only.",
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', required: true, description: 'Workspace id.' },
-            space: { type: 'string', required: true, description: "The objectType (space) NAME from the manifest, e.g. 'feature' or 'notes'." },
-            value: { type: 'object', required: true, description: 'The content object. Records: the record (matching its schema). Documents: { title, markdown }.' },
+            space: { type: 'string', description: "The objectType (space) NAME from the manifest, e.g. 'feature' or 'notes'. Required for a single write; with `items` it is the default each item inherits." },
+            value: { type: 'object', description: 'The content object for a SINGLE write. Records: the record (matching its schema). Documents: { title, markdown }. Omit when using `items`.' },
             id: { type: 'string', description: 'Instance id. Required for a records space (or include id in value); auto-generated for a document.' },
             section: { type: 'string', description: 'Document spaces only: section id/name to file the document under.' },
+            items: { type: 'array', description: 'BATCH: [{ value, space?, id?, section? }] — up to 50 items written in one call (one approval prompt for the whole migration). All-or-nothing.' },
         },
     },
     {

@@ -2,13 +2,16 @@
  * @file cli/connect/tool-call-defs-organism.ts
  * @description Public-memory, organism, workspace and schedule connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 -- 2026-07-31 -- workspace_write takes `items: [...]` (batch, all-or-nothing) through the
+ *     shared services/workspace-write-items normalisation — parity with both MCP surfaces.
  *   v1.1.0 -- 2026-07-16 -- invite passes role + workspaces; add member_add / invitation_update /
  *     invitation_cancel handlers (name-invite parity with the server MCP).
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import { randomUUID } from 'node:crypto';
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
-import { query, requiredString, optionalString, optionalArray, requiredArray, requiredValue, coerceObject, stampValue, genDocId, genWsId, wsRoot } from './tool-call-helpers.js';
+import { query, requiredString, optionalString, optionalArray, requiredArray, coerceObject, stampValue, genWsId, wsRoot } from './tool-call-helpers.js';
+import { normalizeWriteItems, resolveWriteItem, type ResolvedWriteItem, type WriteObjectType } from '../../services/workspace-write-items.js';
 
 export const organismTools: ConnectCliToolDefinition[] = [
     {
@@ -219,29 +222,37 @@ export const organismTools: ConnectCliToolDefinition[] = [
         handler: async ({ client }, input) => {
             const orgId = requiredString(input, 'organism_id');
             const ws = requiredString(input, 'ws');
-            const space = requiredString(input, 'space');
+            const norm = normalizeWriteItems({
+                space: input.space, value: input.value, id: input.id, section: input.section, items: input.items,
+            });
+            if ('error' in norm) return { ok: false, error: { code: 'INVALID_INPUT', message: norm.error } };
+            const batch = input.items !== undefined && input.items !== null;
             const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(orgId)}/workspace${query({ ws })}`);
             if (!wsResp.ok) return wsResp;
-            const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string; mode?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.name === space);
-            if (!ot || !ot.namespace) return { ok: false, error: { code: 'NO_SPACE', message: `No space named "${space}" in this workspace.` } };
-            const isDoc = ot.mode === 'document';
-            const v0 = coerceObject(requiredValue(input, 'value'));
-            let instanceId = optionalString(input, 'id') ?? (v0 && typeof v0 === 'object' && !Array.isArray(v0) ? String((v0 as JsonObject).id ?? '').trim() : '');
-            if (!instanceId && isDoc) instanceId = genDocId();
-            if (!instanceId) return { ok: false, error: { code: 'NO_ID', message: 'A records write needs an id (pass id, or include id in value).' } };
-            const v = stampValue(v0, instanceId);
-            const key = `${wsRoot(orgId, ws)}.${ot.namespace}.${instanceId}.draft`;
-            const wr = await client.post('/v1/memory', { key, value: v, visibility: 'private' });
-            if (!wr.ok) return wr;
-            const section = optionalString(input, 'section');
-            if (isDoc && section) {
-                const secKey = `${wsRoot(orgId, ws)}.meta.sections.${ot.name}`;
-                const secResp = await client.get(`/v1/memory${query({ prefix: secKey })}`);
-                const sections = (secResp.data as { items?: { key: string; value?: { sections?: { id: string; name?: string; documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections ?? [];
-                const targetSec = sections.find(s => s.id === section || s.name === section);
-                if (targetSec) { targetSec.documents = [...(targetSec.documents ?? []).filter(d => d !== instanceId), instanceId]; await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' }); }
+            const types = (wsResp.data as { manifest?: { objectTypes?: WriteObjectType[] } } | undefined)?.manifest?.objectTypes ?? [];
+            // Resolve every item before writing any: a document with no id gets a generated one, so a
+            // half-written batch the caller retries would duplicate whatever already landed.
+            const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];
+            for (const [i, want] of norm.items.entries()) {
+                const item = resolveWriteItem(want, types, batch ? `items[${i}]` : undefined);
+                if ('error' in item) return { ok: false, error: { code: 'NO_SPACE', message: item.error } };
+                const key = `${wsRoot(orgId, ws)}.${item.namespace}.${item.instanceId}.draft`;
+                planned.push({ key, v: stampValue(coerceObject(item.value), item.instanceId), item });
             }
-            return { ok: true, data: { written: key, id: instanceId, space, mode: ot.mode ?? 'records', section: section ?? null } };
+            const written: JsonObject[] = [];
+            for (const { key, v, item } of planned) {
+                const wr = await client.post('/v1/memory', { key, value: v, visibility: 'private' });
+                if (!wr.ok) return wr;
+                if (item.isDoc && item.section) {
+                    const secKey = `${wsRoot(orgId, ws)}.meta.sections.${item.space}`;
+                    const secResp = await client.get(`/v1/memory${query({ prefix: secKey })}`);
+                    const sections = (secResp.data as { items?: { key: string; value?: { sections?: { id: string; name?: string; documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections ?? [];
+                    const targetSec = sections.find(s => s.id === item.section || s.name === item.section);
+                    if (targetSec) { targetSec.documents = [...(targetSec.documents ?? []).filter(d => d !== item.instanceId), item.instanceId]; await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' }); }
+                }
+                written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null });
+            }
+            return { ok: true, data: batch ? { count: written.length, items: written } : written[0] };
         },
     },
     {

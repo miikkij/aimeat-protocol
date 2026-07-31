@@ -77,6 +77,11 @@
  *     (they were loaded with full values then discarded), _publish computes maxN value-free and
  *     prunes history beyond the retention window (services/workspace-versions; append-only spaces
  *     are never pruned).
+ *   v1.18.0 -- 2026-07-31 -- _write takes `items: [...]` (up to 50) and writes them in ONE call, so a
+ *     migration costs one client approval prompt instead of one per document (an unanswered prompt
+ *     left migrations half-done). All-or-nothing: every item is resolved + schema-validated before
+ *     anything is written, because an id-less document gets a generated id and a retried half-batch
+ *     would duplicate. Shared normalisation in services/workspace-write-items.ts (all three surfaces).
  *   v1.17.0 -- 2026-07-25 -- _create backfills the whole manifest envelope (manifestVersion/id/name/
  *     kind/status) via the shared backfillManifestEnvelope() instead of only id+status — so a create
  *     supplying just objectTypes validates on the first call (the missing manifestVersion default was
@@ -103,6 +108,7 @@ import { recordSecurityIncident } from '../services/security-incident.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { normalizeDocValueImages } from '../services/doc-images.js';
+import { normalizeWriteItems, resolveWriteItem, MAX_BATCH_ITEMS, type ResolvedWriteItem } from '../services/workspace-write-items.js';
 import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole } from '../services/workspace-roles.js';
 import { listVersionRefs, maxVersionOf, pruneVersionsAfterPublish } from '../services/workspace-versions.js';
 import { registerWorkspaceMemberTools } from './workspace-members.js';
@@ -397,59 +403,55 @@ export function registerWorkspaceTools(
     mcp.tool('aimeat_workspace_write', descriptionFor('aimeat_workspace_write'),
         {
             organism_id: z.string(), ws: z.string(),
-            space: z.string().describe("The objectType (space) NAME — e.g. 'feedback' or 'task' (the manifest's objectTypes[].name, NOT its namespace like 'shared.feedback'). The tool resolves whether it is a records or document space."),
+            space: z.string().optional().describe("The objectType (space) NAME — e.g. 'feedback' or 'task' (the manifest's objectTypes[].name, NOT its namespace like 'shared.feedback'). The tool resolves whether it is a records or document space. With `items`, this is the default each item inherits."),
             // z.any(): some clients JSON-stringify an object param — coerceValue parses it back so records
             // validate and documents aren't stored corrupt. (A z.record/union here breaks the MCP SDK.)
-            value: z.any().describe('The content as a JSON OBJECT (not a string). For a records space, the record (matching its schema). For a document space, { title, markdown }.'),
+            value: z.any().optional().describe('The content as a JSON OBJECT (not a string). For a records space, the record (matching its schema). For a document space, { title, markdown }. Omit when using `items`.'),
             id: z.string().optional().describe('Instance id. Required for a records space (or include id in value); auto-generated for a document.'),
             section: z.string().optional().describe('Document spaces only: section id/name to file the document under.'),
+            items: z.any().optional().describe(`BATCH: an ARRAY of { value, space?, id?, section? } — up to ${MAX_BATCH_ITEMS} — written in ONE call. Each item inherits the top-level space/section unless it names its own. Use this for a migration: your client asks the human to approve every tool CALL, so twenty separate writes are twenty prompts and one missed prompt ends the job half-done. All-or-nothing: every item is checked first, and a single bad item writes nothing.`),
         },
         annotationsFor('aimeat_workspace_write'),
-        async ({ organism_id, ws, space, value, id, section }): Promise<TextResult> => {
+        async ({ organism_id, ws, space, value, id, section, items }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             if (!(await canWriteWs(organism_id, ws))) return fail('You are not approved to write to this workspace. Request access with aimeat_workspace_access(action:"request") and wait for the creator to approve.');
+            const norm = normalizeWriteItems({ space, value, id, section, items });
+            if ('error' in norm) return fail(norm.error);
+            const batch = items !== undefined && items !== null;
             const root = wsRoot(organism_id, ws);
             // Aggregate the manifest across members so a member who didn't create the workspace can write,
             // and accept either the space NAME or its namespace (small models often pass the namespace).
-            const man = await readManifest(organism_id, ws);
-            const types = (man?.objectTypes ?? []);
-            const ot = types.find(o => o.name === space || o.namespace === space);
-            if (!ot || !ot.namespace) {
-                const names = types.map(o => o.name).filter(Boolean).join(', ');
-                return fail(`No space named "${space}" in this workspace. Available spaces: ${names || '(none)'}. Pass the space NAME, not its namespace.`);
+            const types = (await readManifest(organism_id, ws))?.objectTypes ?? [];
+            // Resolve and validate EVERY item before writing ANY of them. A document with no id gets a
+            // generated one, so a batch that half-lands and is then retried would duplicate what landed.
+            const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];
+            for (const [i, want] of norm.items.entries()) {
+                const item = resolveWriteItem(want, types, batch ? `items[${i}]` : undefined);
+                if ('error' in item) return fail(item.error);
+                const key = `${root}.${item.namespace}.${item.instanceId}.draft`;
+                let v = coerceValue(item.value, item.instanceId);
+                // Rewrite embedded image URLs to the owner-addressed /v1/pub form and scope those files to
+                // THIS workspace (members-only). MCP-authored docs otherwise store raw /v1/storage URLs that
+                // load for nobody but the file owner — the exact reason chat-written docs showed broken images.
+                if (item.isDoc) v = await normalizeDocValueImages(storage, config, v, ownerName, `${organism_id}/${ws}`);
+                const valid = await validateMemoryWrite(key, v, storage);
+                if (!valid.valid) return fail(`${batch ? `items[${i}]: ` : ''}Draft rejected by schema: ` + JSON.stringify(valid.errors));
+                planned.push({ key, v, item });
             }
-            // A non-memory space's data does NOT live in workspace records — writing it here would
-            // store memory keys that no read surface (workspace_read / REST / the UI) ever lists.
-            // That silent black hole is exactly how 16 published documents once went invisible.
-            if (!isMemoryBackedSpace(ot)) {
-                return fail(ot.backing === 'tasks'
-                    ? `Space "${ot.name}" is backed by the task system (backing:'tasks') — create tasks with the task tools (aimeat_task_create), not workspace writes.`
-                    : `Space "${ot.name}" has backing '${ot.backing}', which workspace writes do not support. Update the space to backing:'memory' (aimeat_workspace_update); files and knowledge packages attach via workspace Sources or embedded document images.`);
-            }
-            // Old manifests declared documents as kind:'document' without a mode (the open envelope
-            // swallowed the unknown field) — honour the intent instead of falling into records mode.
-            const isDoc = ot.mode === 'document' || (!ot.mode && ot.kind === 'document');
-            let instanceId = (id && String(id).trim()) || (value && typeof value === 'object' && !Array.isArray(value) ? String((value as Record<string, unknown>).id ?? '').trim() : '');
-            if (!instanceId && isDoc) instanceId = 'doc-' + Math.random().toString(36).slice(2, 9);
-            if (!instanceId) return fail('A records write needs an id (pass `id`, or include `id` in `value`).');
-            const key = `${root}.${ot.namespace}.${instanceId}.draft`;
-            let v = coerceValue(value, instanceId);
-            // Rewrite embedded image URLs to the owner-addressed /v1/pub form and scope those files to
-            // THIS workspace (members-only). MCP-authored docs otherwise store raw /v1/storage URLs that
-            // load for nobody but the file owner — the exact reason chat-written docs showed broken images.
-            if (isDoc) v = await normalizeDocValueImages(storage, config, v, ownerName, `${organism_id}/${ws}`);
-            const valid = await validateMemoryWrite(key, v, storage);
-            if (!valid.valid) return fail('Draft rejected by schema: ' + JSON.stringify(valid.errors));
-            await writeRecord(key, v, await findByKey(key));   // content → authored by the calling agent
-            if (isDoc && section) {
-                const secKey = `${root}.meta.sections.${ot.name}`;
-                const secRec = await findByKey(secKey);
-                const sections = ((secRec?.value as { sections?: { id: string; name?: string; documents?: string[] }[] } | undefined)?.sections) ?? [];
-                const target = sections.find(s => s.id === section || s.name === section);
-                if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== instanceId), instanceId]; await writeRecord(secKey, { sections }, secRec, ownerGhii); }  // section tree = creator meta
+            const written: Record<string, unknown>[] = [];
+            for (const { key, v, item } of planned) {
+                await writeRecord(key, v, await findByKey(key));   // content → authored by the calling agent
+                if (item.isDoc && item.section) {
+                    const secKey = `${root}.meta.sections.${item.space}`;
+                    const secRec = await findByKey(secKey);
+                    const sections = ((secRec?.value as { sections?: { id: string; name?: string; documents?: string[] }[] } | undefined)?.sections) ?? [];
+                    const target = sections.find(s => s.id === item.section || s.name === item.section);
+                    if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== item.instanceId), item.instanceId]; await writeRecord(secKey, { sections }, secRec, ownerGhii); }  // section tree = creator meta
+                }
+                written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null });
             }
             emitChange('organisms');
-            return ok({ written: key, id: instanceId, space, mode: isDoc ? 'document' : 'records', section: section ?? null });
+            return ok(batch ? { count: written.length, items: written } : written[0]);
         });
 
     // ── aimeat_workspace_publish ──

@@ -18,6 +18,8 @@
  *     small instead of dumping every object in one blob.
  *   v1.3.0 -- 2026-07-11 -- TARGET-028: _member_grant / _member_revoke (multi-workspace, REST-wrapped) +
  *     _members; _access decide passes an optional `role`. Parity with the server MCP surface.
+ *   v1.5.0 -- 2026-07-31 -- _write takes `items: [...]` (batch, all-or-nothing) via the shared
+ *     services/workspace-write-items normalisation — parity with the server MCP surface.
  *   v1.4.0 -- 2026-07-25 -- _create backfills the whole manifest envelope (manifestVersion/id/name/kind/
  *     status) via backfillManifestEnvelope() instead of only id+status, matching the server MCP fix so a
  *     create supplying just objectTypes validates first try over the connector too.
@@ -27,7 +29,8 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
-import { normalizeObjectTypes, isMemoryBackedSpace, WorkspaceMetaError, backfillManifestEnvelope } from '../../../../services/workspace-meta.js';
+import { normalizeObjectTypes, WorkspaceMetaError, backfillManifestEnvelope } from '../../../../services/workspace-meta.js';
+import { normalizeWriteItems, resolveWriteItem, MAX_BATCH_ITEMS, type ResolvedWriteItem, type WriteObjectType } from '../../../../services/workspace-write-items.js';
 import { entryTitle } from '../../../../services/structure-overview.js';
 
 export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry): void {
@@ -146,42 +149,43 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
   mcp.tool('aimeat_workspace_write', descriptionFor('aimeat_workspace_write'),
     {
       organism_id: z.string(), ws: z.string(),
-      space: z.string().describe("The objectType (space) NAME — e.g. 'feature' or 'notes'. The tool resolves records vs document."),
+      space: z.string().optional().describe("The objectType (space) NAME — e.g. 'feature' or 'notes'. The tool resolves records vs document. With `items`, this is the default each item inherits."),
       // z.any() so a JSON-stringified object param is parsed back (a z.record/union breaks the MCP SDK).
-      value: z.any().describe('The content as a JSON OBJECT (not a string). Records: the record (matching its schema). Documents: { title, markdown }.'),
+      value: z.any().optional().describe('The content as a JSON OBJECT (not a string). Records: the record (matching its schema). Documents: { title, markdown }. Omit when using `items`.'),
       id: z.string().optional().describe('Instance id. Required for records (or include id in value); auto-generated for documents.'),
       section: z.string().optional().describe('Document spaces only: section id/name to file the document under.'),
+      items: z.any().optional().describe(`BATCH: an ARRAY of { value, space?, id?, section? } — up to ${MAX_BATCH_ITEMS} — written in ONE call, so a migration costs one approval prompt instead of one per document. All-or-nothing: a single bad item writes nothing.`),
     },
     annotationsFor('aimeat_workspace_write'),
-    async ({ organism_id, ws, space, value, id, section }) => {
+    async ({ organism_id, ws, space, value, id, section, items }) => {
+      const norm = normalizeWriteItems({ space, value, id, section, items });
+      if ('error' in norm) return text({ error: norm.error }, true);
+      const batch = items !== undefined && items !== null;
       const wsResp = await client.get(`/v1/organisms/${encodeURIComponent(organism_id)}/workspace?ws=${encodeURIComponent(ws)}`);
-      const ot = ((wsResp.data as { manifest?: { objectTypes?: { name: string; namespace?: string; mode?: string; backing?: string; kind?: string }[] } } | undefined)?.manifest?.objectTypes ?? []).find(o => o.name === space || o.namespace === space);
-      if (!ot || !ot.namespace) return text({ error: `No space named "${space}" in this workspace.` }, true);
-      // A non-memory space's data does not live in workspace records — writing here would store
-      // memory keys no read surface ever lists (the invisible-documents bug). Refuse loudly.
-      if (!isMemoryBackedSpace(ot)) {
-        return text({ error: ot.backing === 'tasks'
-          ? `Space "${ot.name}" is backed by the task system (backing:'tasks') — create tasks with the task tools, not workspace writes.`
-          : `Space "${ot.name}" has backing '${ot.backing}', which workspace writes do not support. Update the space to backing:'memory' (aimeat_workspace_update); files and knowledge packages attach via workspace Sources or embedded document images.` }, true);
+      const types = (wsResp.data as { manifest?: { objectTypes?: WriteObjectType[] } } | undefined)?.manifest?.objectTypes ?? [];
+      // Resolve every item before writing any of them: a document with no id gets a generated one,
+      // so a batch that half-lands and is then retried would duplicate what already landed.
+      const planned: { key: string; v: unknown; item: ResolvedWriteItem }[] = [];
+      for (const [i, want] of norm.items.entries()) {
+        const item = resolveWriteItem(want, types, batch ? `items[${i}]` : undefined);
+        if ('error' in item) return text({ error: item.error }, true);
+        const key = `${root(organism_id, ws)}.${item.namespace}.${item.instanceId}.draft`;
+        planned.push({ key, v: coerceValue(parseObj(item.value), item.instanceId), item });
       }
-      // Old manifests declared documents as kind:'document' without a mode — honour the intent.
-      const isDoc = ot.mode === 'document' || (!ot.mode && ot.kind === 'document');
-      const v0 = parseObj(value);
-      let instanceId = (id && String(id).trim()) || (v0 && typeof v0 === 'object' && !Array.isArray(v0) ? String((v0 as Record<string, unknown>).id ?? '').trim() : '');
-      if (!instanceId && isDoc) instanceId = 'doc-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
-      if (!instanceId) return text({ error: 'A records write needs an id (pass id, or include id in value).' }, true);
-      const v = coerceValue(v0, instanceId);
-      const key = `${root(organism_id, ws)}.${ot.namespace}.${instanceId}.draft`;
-      const wr = await client.post('/v1/memory', { key, value: v, visibility: 'private' });
-      if (wr.ok === false) return text(wr.error ?? wr, true);
-      if (isDoc && section) {
-        const secKey = `${root(organism_id, ws)}.meta.sections.${ot.name}`;
-        const secResp = await client.get(`/v1/memory?prefix=${encodeURIComponent(secKey)}`);
-        const sections = (secResp.data as { items?: { key: string; value?: { sections?: { id: string; name?: string; documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections ?? [];
-        const target = sections.find(s => s.id === section || s.name === section);
-        if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== instanceId), instanceId]; await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' }); }
+      const written: Record<string, unknown>[] = [];
+      for (const { key, v, item } of planned) {
+        const wr = await client.post('/v1/memory', { key, value: v, visibility: 'private' });
+        if (wr.ok === false) return text({ error: wr.error ?? wr, written_before_failure: written }, true);
+        if (item.isDoc && item.section) {
+          const secKey = `${root(organism_id, ws)}.meta.sections.${item.space}`;
+          const secResp = await client.get(`/v1/memory?prefix=${encodeURIComponent(secKey)}`);
+          const sections = (secResp.data as { items?: { key: string; value?: { sections?: { id: string; name?: string; documents?: string[] }[] } }[] } | undefined)?.items?.find(i => i.key === secKey)?.value?.sections ?? [];
+          const target = sections.find(s => s.id === item.section || s.name === item.section);
+          if (target) { target.documents = [...(target.documents ?? []).filter(d => d !== item.instanceId), item.instanceId]; await client.post('/v1/memory', { key: secKey, value: { sections }, visibility: 'private' }); }
+        }
+        written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null });
       }
-      return text({ written: key, id: instanceId, space, mode: isDoc ? 'document' : 'records', section: section ?? null });
+      return text(batch ? { count: written.length, items: written } : written[0]);
     });
 
   mcp.tool('aimeat_workspace_publish', descriptionFor('aimeat_workspace_publish'),

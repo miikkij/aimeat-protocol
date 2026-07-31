@@ -683,6 +683,99 @@ await test('34. workspace_access decide honors an explicit role, defaults to con
     assert(JSON.parse(ap2.result.content[0].text).role === 'contributor', 'decide default (no role) stays contributor');
 });
 
+// ── Batch writes: one tool CALL for a whole migration ──
+// An MCP client asks the human to approve every call, so N documents used to mean N approval
+// prompts — and one unanswered prompt left the migration half-done ("No approval received").
+const readIds = async (ids: string[], id: number) => {
+    const rd = await A.client.call('aimeat_workspace_read', { organism_id: orgId, ws: WS, ids }, id);
+    return (JSON.parse(rd.result.content[0].text).items || []) as any[];
+};
+
+await test('35. items[] writes several records in ONE call', async () => {
+    const b = await A.client.call('aimeat_workspace_write', {
+        organism_id: orgId, ws: WS, space: 'note',
+        items: [
+            { id: 'batch-1', value: { title: 'One', body: 'first' } },
+            { id: 'batch-2', value: { title: 'Two', body: 'second' } },
+            { id: 'batch-3', value: { title: 'Three', body: 'third' } },
+        ],
+    }, 135);
+    assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
+    const data = JSON.parse(b.result.content[0].text);
+    assert(data.count === 3, `count 3, got ${data.count}`);
+    assert(data.items.length === 3 && data.items.every((i: any) => i.written.endsWith('.draft')), 'every item reports its key');
+    const found = await readIds(['batch-1', 'batch-2', 'batch-3'], 1351);
+    assert(found.length === 3, `all three readable, got ${found.length}`);
+    assert(found.find((d: any) => d.id === 'batch-2')?.value.title === 'Two', 'content landed intact');
+});
+
+await test('36. items inherit the top-level space', async () => {
+    const b = await A.client.call('aimeat_workspace_write', {
+        organism_id: orgId, ws: WS, space: 'note',
+        items: [{ id: 'inherit-1', value: { title: 'Inherited' } }],
+    }, 136);
+    assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
+    assert(JSON.parse(b.result.content[0].text).items[0].written.includes('shared.notes.inherit-1'), 'used the top-level space');
+});
+
+await test('37. ONE bad item writes NOTHING (all-or-nothing) and names its index', async () => {
+    const b = await A.client.call('aimeat_workspace_write', {
+        organism_id: orgId, ws: WS, space: 'note',
+        items: [
+            { id: 'aon-1', value: { title: 'Good one' } },
+            { id: 'aon-2', value: { body: 'no title — schema-invalid' } },
+            { id: 'aon-3', value: { title: 'Good three' } },
+        ],
+    }, 137);
+    assert(b.result.isError === true, 'the batch was rejected');
+    const msg = b.result.content[0].text;
+    assert(msg.includes('items[1]'), `error names the failing item: ${msg}`);
+    const found = await readIds(['aon-1', 'aon-3'], 1371);
+    assert(found.length === 0, `nothing was written, found ${found.length}: ${found.map((f: any) => f.id).join(',')}`);
+});
+
+await test('38. An unknown space in one item stops the batch too', async () => {
+    const b = await A.client.call('aimeat_workspace_write', {
+        organism_id: orgId, ws: WS, space: 'note',
+        items: [
+            { id: 'space-1', value: { title: 'Fine' } },
+            { space: 'no-such-space', id: 'space-2', value: { title: 'Nowhere' } },
+        ],
+    }, 138);
+    assert(b.result.isError === true, 'rejected');
+    assert(b.result.content[0].text.includes('items[1]'), 'names the item');
+    assert((await readIds(['space-1'], 1381)).length === 0, 'the good item was not written either');
+});
+
+await test('39. Documents in a batch get distinct auto-generated ids', async () => {
+    const b = await A.client.call('aimeat_workspace_write', {
+        organism_id: orgId, ws: WS, space: 'page',
+        items: [
+            { value: { title: 'Page A', markdown: '# A' } },
+            { value: { title: 'Page B', markdown: '# B' } },
+        ],
+    }, 139);
+    assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
+    const data = JSON.parse(b.result.content[0].text);
+    const ids = data.items.map((i: any) => i.id);
+    assert(new Set(ids).size === 2, `two distinct ids, got ${JSON.stringify(ids)}`);
+    assert(data.items.every((i: any) => i.mode === 'document'), 'both written as documents');
+});
+
+await test('40. Over the batch cap is refused with the cap in the message', async () => {
+    const items = Array.from({ length: 51 }, (_, i) => ({ id: `cap-${i}`, value: { title: `T${i}` } }));
+    const b = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'note', items }, 140);
+    assert(b.result.isError === true, 'rejected');
+    assert(b.result.content[0].text.includes('50'), `mentions the cap: ${b.result.content[0].text}`);
+});
+
+await test('41. A single write still works unchanged', async () => {
+    const b = await A.client.call('aimeat_workspace_write', { organism_id: orgId, ws: WS, space: 'note', id: 'single-1', value: { title: 'Alone' } }, 141);
+    assert(b.result.isError !== true, `error: ${b.result.content?.[0]?.text}`);
+    const data = JSON.parse(b.result.content[0].text);
+    assert(data.written.endsWith('shared.notes.single-1.draft') && data.count === undefined, 'single-write shape unchanged (no count wrapper)');
+});
+
 await test('Cleanup owner 1', async () => { const r = await json(`/v1/owners/${A.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${A.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
 await test('Cleanup owner 2', async () => { const r = await json(`/v1/owners/${B.ownerName}`, { method: 'DELETE', headers: { Authorization: `Bearer ${B.ownerToken}` } }); assert(r.status === 200, `del ${r.status}`); });
 
