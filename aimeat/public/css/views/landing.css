@@ -253,6 +253,44 @@
 .ld-invite .ld-loop { margin-top: .25rem; }
 .ld-invite .ld-askai { margin-top: 1rem; }
 
+/* ── Node change log — folded, one line until it is wanted ────────────────────────────
+   Same door as .ld-invite (one collapsible on the page should not read as two components),
+   but quieter: this is a status line, not the page's invitation. Shut it shows the freshest
+   entry; open it scrolls its own history instead of pushing the wall off the screen. */
+.ld-log { max-width: 760px; margin: 0 auto 1.25rem; }
+.ld-log .collapsible {
+  border: 1px solid var(--border); border-radius: 14px;
+  background: var(--card); overflow: hidden;
+}
+.ld-log .collapsible-header { padding: 12px 20px; width: 100%; cursor: pointer; }
+.ld-log .collapsible-header:hover { background: var(--surface); }
+.ld-log .collapsible-title { text-align: left; }
+.ld-log-head { display: flex; flex-direction: column; gap: .2rem; }
+.ld-log-label { font-size: .78rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--text-muted); }
+.ld-log-latest { display: flex; align-items: baseline; gap: .5rem; flex-wrap: wrap; }
+.ld-log-newest { font-size: .95rem; font-weight: 600; color: var(--text); }
+.ld-log-date { font-size: .78rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.ld-log-version { font-size: .74rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.ld-log-kind {
+  font-size: .68rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  padding: 2px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--text-dim);
+  white-space: nowrap;
+}
+/* Colour carries meaning here and nowhere else in the row: what KIND of change this was. */
+.ld-log-kind-feature { color: var(--accent); border-color: var(--accent); }
+.ld-log-kind-security { color: var(--danger); border-color: var(--danger); }
+/* The open history scrolls inside itself — an unbounded list would bury the app wall. */
+.ld-log-list { max-height: 380px; overflow-y: auto; padding: 0 20px 16px; text-align: left; }
+.ld-log-item { padding: 14px 0; border-top: 1px solid var(--border); }
+.ld-log-item:first-child { border-top: none; padding-top: 4px; }
+.ld-log-meta { display: flex; align-items: center; gap: .5rem; flex-wrap: wrap; margin-bottom: .3rem; }
+.ld-log-title { margin: 0 0 .25rem; font-size: 1rem; font-weight: 700; color: var(--text); }
+.ld-log-body { margin: 0; font-size: .87rem; line-height: 1.55; color: var(--text-dim); }
+@media (max-width: 600px) {
+  .ld-log .collapsible-header { padding: 12px 14px; }
+  .ld-log-list { padding: 0 14px 14px; max-height: 320px; }
+}
+
 /* ── Generator — a direct port of the app-catalog's .pb-* rules (TARGET-056) ──────────
    Every value here is the catalog's value, translated only where the two stylesheets name the
    same token differently (--bg-subtle → --bg-dim, --text-muted is shared). Kept literal on

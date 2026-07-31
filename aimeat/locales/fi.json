@@ -7785,7 +7785,12 @@
     "wallFork1": "haara",
     "wallSortLabel": "Appien järjestys",
     "wallSortNewest": "Viimeksi päivitetyt",
-    "wallSortPopular": "Eniten avatut"
+    "wallSortPopular": "Eniten avatut",
+    "logTitle": "Mitä tähän nodeen on tehty",
+    "logKindFeature": "Uutta",
+    "logKindFix": "Korjattu",
+    "logKindSecurity": "Tietoturva",
+    "logKindNotice": "Tiedote"
   },
   "pricing": {
     "title": "Hinnoittelu",

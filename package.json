@@ -30,6 +30,7 @@
     "check:vendored": "cd aimeat && pnpm check:vendored",
     "build:app-catalog": "cd aimeat && pnpm build:app-catalog",
     "check:app-catalog": "cd aimeat && pnpm check:app-catalog",
+    "check:changelog": "cd aimeat && pnpm check:changelog",
     "build:sdk": "cd aimeat && pnpm build:sdk",
     "check:sdk": "cd aimeat && pnpm check:sdk",
     "check:mcp-tools": "cd aimeat && pnpm check:mcp-tools",

@@ -67,6 +67,7 @@ import { siteLink, hasSite } from '/js/site.js';
 import { Collapsible } from '/components/Collapsible.js';
 import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import NodeTotals from './landing-node-totals.js';
+import NodeChangeLog from './landing-changelog.js';
 import { swallowed } from '/js/swallowed.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
@@ -734,6 +735,11 @@ export default function Landing({ navigate }) {
         <p class="ld-pitch-line">${tr('landing.pitch', 'AIMEAT is a digital agency where people, AI, agents and apps work under one roof and everyone owns their own data.')}</p>
         <p class="ld-pitch-lead">${tr('landing.pitchLead', 'This is one of the things you can do with AIMEAT.')}</p>
       </section>
+
+      <!-- 0. What we shipped, folded to one line. It sits above the invitation on purpose: a
+              visitor who arrives the week something changed should see that this place is worked
+              on, and it costs a single line to say so. -->
+      <${NodeChangeLog} />
 
       <!-- 1. The invitation, folded. Measured behaviour beat the theory here: with the generator
               open on the page, two visitors produced a throwaway chat app and stopped. What holds

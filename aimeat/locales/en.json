@@ -7785,7 +7785,12 @@
     "wallFork1": "fork",
     "wallSortLabel": "Order the apps",
     "wallSortNewest": "Recently updated",
-    "wallSortPopular": "Most opened"
+    "wallSortPopular": "Most opened",
+    "logTitle": "What's new on this node",
+    "logKindFeature": "New",
+    "logKindFix": "Fixed",
+    "logKindSecurity": "Security",
+    "logKindNotice": "Notice"
   },
   "pricing": {
     "title": "Pricing",

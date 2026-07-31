@@ -24,6 +24,7 @@
     "build": "node scripts/vendor-libs.mjs && tsc && node --input-type=module -e \"import fs from 'fs';fs.cpSync('locales','dist/locales',{recursive:true});fs.cpSync('public','dist/public',{recursive:true});fs.cpSync('src/static','dist/static',{recursive:true});fs.cpSync('.env.example','dist/.env.example');fs.cpSync('src/storage/providers/postgres-kysely/migrations','dist/src/storage/providers/postgres-kysely/migrations',{recursive:true});\"",
     "build:app-catalog": "tsx scripts/build-app-catalog.ts",
     "check:app-catalog": "tsx scripts/build-app-catalog.ts --check",
+    "check:changelog": "tsx scripts/check-changelog.ts",
     "build:sdk": "tsx scripts/build-sdk-libs.ts",
     "check:sdk": "tsx scripts/build-sdk-libs.ts --check",
     "check:mcp-tools": "tsx scripts/audit-mcp-tools.ts --check",

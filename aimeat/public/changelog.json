@@ -1,0 +1,54 @@
+{
+  "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
+  "entries": [
+    {
+      "date": "2026-07-31",
+      "version": "2.3.0",
+      "kind": "feature",
+      "title": {
+        "en": "One click on a paid button buys one run, not five",
+        "fi": "Yksi klikkaus maksullista nappia ostaa yhden ajon, ei viittä"
+      },
+      "body": {
+        "en": "An AI call spends your own OpenRouter credit and commissioning an agent spends a real agent run. Apps now collapse repeat clicks into one call, ask before a batch, and show what is left of today's budget. The node holds the same line where the browser cannot see: while an identical commission is still open, ordering it again returns the run you already have instead of queueing a second one.",
+        "fi": "AI-kutsu kuluttaa omaa OpenRouter-saldoasi ja agentin komissiointi oikean agenttiajon. Appit niputtavat toistetut klikkaukset yhdeksi kutsuksi, kysyvät ennen erää ja näyttävät paljonko päivän budjetista on jäljellä. Node pitää saman linjan siellä minne selain ei näe: kun sama komissio on yhä auki, uusi tilaus palauttaa jo käynnissä olevan ajon eikä jonota toista."
+      }
+    },
+    {
+      "date": "2026-07-30",
+      "kind": "feature",
+      "title": {
+        "en": "The app wall says which apps are alive",
+        "fi": "Appiseinä kertoo mitkä appit elävät"
+      },
+      "body": {
+        "en": "Every app card carries how many times it has been opened, and you can order the wall by newest or by most opened. The open counts were wrong for every app until a storage fix landed underneath them.",
+        "fi": "Jokainen appikortti kertoo montako kertaa se on avattu, ja seinän voi järjestää tuoreimman tai avatuimman mukaan. Avausluvut olivat kaikilla appeilla väärin, kunnes tallennuskerroksen korjaus tuli alle."
+      }
+    },
+    {
+      "date": "2026-07-29",
+      "kind": "feature",
+      "title": {
+        "en": "An app can encode video in the browser",
+        "fi": "Appi voi enkoodata videota selaimessa"
+      },
+      "body": {
+        "en": "The node serves an ffmpeg core, so an app can cut, convert and encode video without sending a single frame to an outside service.",
+        "fi": "Node tarjoaa ffmpeg-ytimen, joten appi voi leikata, muuntaa ja enkoodata videota lähettämättä yhtään ruutua ulkopuoliseen palveluun."
+      }
+    },
+    {
+      "date": "2026-07-29",
+      "kind": "fix",
+      "title": {
+        "en": "A half-written idea survives registration",
+        "fi": "Puolivalmis idea selviää rekisteröitymisestä"
+      },
+      "body": {
+        "en": "Start describing an app, sign up in the middle of it, and your text is still there when you come back.",
+        "fi": "Aloita appin kuvaaminen, rekisteröidy kesken kaiken, ja tekstisi on yhä tallella kun palaat."
+      }
+    }
+  ]
+}

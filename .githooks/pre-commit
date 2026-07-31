@@ -9,6 +9,7 @@
 #   6. No max_tokens caps on AI calls    — pnpm check:no-max-tokens
 #   7. openapi.yaml parse + $ref health  — pnpm check:openapi
 #   8. app-catalog.html ↔ its sources    — pnpm check:app-catalog
+#   8b. Landing change log is well-formed — pnpm check:changelog
 #   8. SDK-libs dist ↔ their sources     — pnpm check:sdk
 #   9. MCP tool surface/handler parity    — pnpm check:mcp-tools
 #  10. Cortex pack integrity (embed + versions) — pnpm check:viewport
@@ -46,6 +47,9 @@ pnpm -s check:openapi
 
 echo "[pre-commit] app-catalog.html ↔ sources in sync (check:app-catalog)…"
 pnpm -s check:app-catalog
+
+echo "[pre-commit] Landing change log parses + newest first (check:changelog)…"
+pnpm -s check:changelog
 
 echo "[pre-commit] SDK-libs dist ↔ sources in sync (check:sdk)…"
 pnpm -s check:sdk
