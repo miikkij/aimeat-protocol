@@ -12,6 +12,10 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-07-31 — "Spending the user's money" section (AI calls + agent commissions): one click =
+ *     one run on the SDK's own repeat guard, confirm before a batch via AIMEAT.spend.confirm,
+ *     budget on screen, no automatic retry of a paid call, a cancel path for a running job — plus
+ *     the matching publish check (five fast clicks must produce exactly one request).
  *   2026-07-25 — Fleet-facing app sections, all three born from real DESK build failures: "Reading
  *     data your AGENTS produced" (agent keys live under the agent GAII; an app-grant token needs
  *     ownerScope/agent explicitly, so an unscoped list() returns [] and the app looks empty; meta/
@@ -241,6 +245,27 @@ export function buildAppPrompt(
   body += '```\n';
   body += 'Always handle isAvailable()===false and catch errors; never hardcode an API key in the app.\n\n';
 
+  // Spending guard. Both money paths (the user's OpenRouter credit via aimeat-ai, an agent run via
+  // aimeat-agents) are one click away, and the classic accident is five clicks on a button that
+  // showed no feedback = five paid runs of the same job. The libs collapse repeats themselves; this
+  // section tells the builder to keep that, to ask before a batch, and to show the cost.
+  body += '### Spending the user\'s money (AI calls and agent commissions)\n';
+  body += "Two things here spend real money on the signed-in user's own account: an `AIMEAT.ai.*` call (their OpenRouter credit) and an `AIMEAT.agents.createTask()`/`run()` commission (an agent run, plus that agent's own model spend). Every control that triggers one is a spending control — build it like one:\n";
+  body += '- **One click, one run.** Both libraries already collapse repeats: an identical `ai.complete()` that is still in flight returns the SAME promise, and an identical commission returns THAT task for 60 seconds instead of queueing a second one. Keep that default — pass `allowDuplicate: true` only when the user genuinely asked for a second, parallel run. On top of it, disable the control while its call runs and show the in-flight state, so the screen says what actually happened.\n';
+  body += '- **Ask before a batch, and before commissioning an agent.** One summary the user just clicked: run it. "Summarise all 200 rows", "commission the agent", "regenerate everything": confirm first, naming the count and the cost.\n';
+  body += '```javascript\n';
+  body += 'const r = await AIMEAT.ai.complete({ app_id: "my-app", prompt,\n';
+  body += '  confirm: { what: "Summarise " + rows.length + " rows", estimate: "~" + rows.length + " AI calls" } });\n';
+  body += 'const task = await AIMEAT.agents.createTask("news-agent", { description }, { confirm: true });\n';
+  body += '// Your own flows (buying, bidding, anything paid): AIMEAT.spend.confirm returns true/false\n';
+  body += 'if (!await AIMEAT.spend.confirm({ what, detail, estimate, remember: "myapp:bulk" })) return;\n';
+  body += '```\n';
+  body += 'The dialog is theme-aware, arms its confirm button late (a double-click cannot travel through it), and with `remember` it offers "don\'t ask again in this session". A cancel rejects with `.code === "SPEND_CANCELLED"` — catch that and just return; it is a choice, not an error to report.\n';
+  body += '- **A user action starts a spend — never the page.** No AI call on load, none from an `AIMEAT.live` event, none on a timer, none on every keystroke. If a field feeds AI, debounce it AND require an explicit button.\n';
+  body += "- **Show the cost and what is left.** Every completion returns `r.budget` (`spent_today_usd`, `remaining_usd`, `daily_budget_usd`) — put it near the AI control (\"$0.29 of $1.00 used today\"), and the confirm dialog will show the last figure it saw automatically. `AIMEAT.ai.usage()` gives today's snapshot to owner sessions.\n";
+  body += '- **A failure gets a message, never an automatic retry.** `QUOTA_EXHAUSTED` / `APP_QUOTA_EXHAUSTED` / `RATE_LIMITED` mean stop and tell the user what happened; a retry loop around a paid call burns the budget it is reacting to. Let the user click again.\n';
+  body += '- **Give a running job a way out.** After a commission, show the task and its status (`AIMEAT.agents.watch()`), and offer `AIMEAT.agents.cancelTask(name, id)`. An app that fires an agent and shows nothing invites the user to fire it again.\n\n';
+
   // Real-time / multiplayer
   body += '### Real-time / multiplayer (optional)\n';
   body += 'For shared live state (presence boards, 1v1 games) use realtime rooms via your authenticated session.fetch:\n';
@@ -377,6 +402,7 @@ export function buildAppPrompt(
   body += '1. **Three viewports, every interactive surface**: 390x844, 1280x900 and **1280x460**. The short one is the one that catches it: a centred/overlay panel that looks perfect at 900px high often clips its own top, becomes unscrollable, or renders below the page at 460px. Check `document.documentElement.scrollWidth - clientWidth === 0` at each, and that the dialog\'s top edge is >= 0 and its close control reachable.\n';
   body += '2. **Live channel connected, dialog open, count the repaints.** Put a `MutationObserver` on the open panel\'s content node and watch for 20 seconds while other work is happening on the account. Expected: **zero**. Anything above zero means a live event is repainting a surface the user is reading.\n';
   body += '3. **Read the network log after 60 idle seconds.** A repeating full listing is a bug even when nothing visibly breaks: it is a poll you did not intend. Gate it (see the live-updates section) so an idle app is idle.\n';
+  body += '4. **If anything in the app costs money** (an AI call, an agent commission): open the network log, click that control FIVE times as fast as you can, and count the requests. Expected: **one**. Then reload mid-run and click again — a second identical commission inside the 60s window must return the first task, not queue another. Report both numbers.\n';
   body += 'Verify the FEATURE too, not just the render: perform the real interaction (commission the thing, save the thing, delete the thing) and confirm the result actually appears and persists. "It did not crash" is not a pass.\n\n';
 
   // Game form language — palette alone reads as a dashboard; the FORM LANGUAGE makes the game.
@@ -397,6 +423,7 @@ export function buildAppPrompt(
   body += '- Keep it as a single self-contained HTML file\n';
   body += '- Load only the libraries you actually use; load aimeat-auth before libs that need a session\n';
   body += '- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n';
+  body += '- Treat every paid control (AI call, agent commission) as spending: one click = one run, confirm before a batch, show the budget, never retry a failed paid call automatically\n';
   body += "- Theme with the platform tokens; respect BOTH user choices — light/dark mode (localStorage \"aimeat-theme\", OS-preference fallback) and palette (localStorage \"aimeat-palette\") — and never build your own theme/language/palette control (the login pill carries the cluster)\n";
   body += '- Include error handling and loading states for API calls\n\n';
 

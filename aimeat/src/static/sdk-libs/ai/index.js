@@ -5,16 +5,20 @@
  *   the user's own OpenRouter key via the AIMEAT.auth session, so the key never leaves the server;
  *   short in-memory caches + typed error `.code`s. Componentized ESM source esbuild bundles to the
  *   IIFE served, unchanged, at /v1/libs/aimeat-ai.js. Ported verbatim from lib-ai.ts.
- * @structure imports authFetch (session) + attach (namespace); _availCache / _modelsCache; the `ai`
- *   facade; attach('ai', …).
+ * @structure imports authFetch (session) + attach (namespace) + the _core spend guard; _availCache /
+ *   _modelsCache; the `ai` facade; attach('ai', …) + attachSpend().
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-ai.js"></script>
  *   if (await AIMEAT.ai.isAvailable()) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-ai.ts (SDK-libs migration Phase 1).
+ *   v1.1.0 — 2026-07-31 — Spend guard: identical in-flight completions collapse to one paid call
+ *     (allowDuplicate/dedupeMs opt out), `confirm` asks the user first (SPEND_CANCELLED on a no),
+ *     and each response's budget is remembered so a later confirm can show what is left.
  */
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-ai.js');
 import { attach } from '../_core/namespace.js';
+import { once, keyOf, confirmSpend, noteBudget, cancelledError, attachSpend } from '../_core/spend.js';
 
 // 60s in-memory cache for isAvailable so apps can call it on every render
 // without hammering the server. Cleared on logout via storage event.
@@ -54,6 +58,15 @@ const ai = {
    * Run a single completion. Returns { content, model, usage, budget }.
    * Throws an Error with .code set on quota/permission/auth failures.
    *
+   * This spends the signed-in user's own OpenRouter money, so two guards ride along:
+   *   • repeats collapse — while an identical call (same app_id + model + prompts) is in flight,
+   *     every further call gets the SAME promise. Five clicks on "Summarise" = one paid call.
+   *     `allowDuplicate: true` opts out; `dedupeMs: N` also returns the result to a click made
+   *     within N ms of the first one finishing.
+   *   • `confirm: true` (or an object passed straight to AIMEAT.spend.confirm) asks the user
+   *     first — use it for batches and anything the user did not directly click for. A cancel
+   *     rejects with `.code === 'SPEND_CANCELLED'`.
+   *
    * Recognized error codes (see routes/ai.ts):
    *   NO_API_KEY            — user hasn't set up a key yet
    *   QUOTA_EXHAUSTED       — daily user budget hit
@@ -63,6 +76,7 @@ const ai = {
    *   INVALID_API_KEY       — provider rejected the key
    *   RATE_LIMITED          — provider rate limit
    *   PROVIDER_ERROR        — upstream provider failed
+   *   SPEND_CANCELLED       — the user declined the confirm dialog
    */
   async complete(opts) {
     if (!opts || typeof opts !== 'object') throw new Error('opts object required');
@@ -77,18 +91,34 @@ const ai = {
       max_tokens: opts.max_tokens,
       app_id: opts.app_id,
     };
-    const r = await authFetch('/v1/ai/complete', {
-      method: 'POST',
-      body: JSON.stringify(body),
-    });
-    if (!r || !r.ok) {
-      const code = (r && r.error && r.error.code) || 'UNKNOWN';
-      const msg = (r && r.error && r.error.message) || 'AI call failed';
-      const err = /** @type {Error & { code?: string }} */ (new Error(msg));
-      err.code = code;
-      throw err;
-    }
-    return r.data;
+    const call = async () => {
+      if (opts.confirm) {
+        const c = typeof opts.confirm === 'object' ? opts.confirm : {};
+        const okToSpend = await confirmSpend({
+          what: c.what || 'Run an AI request on your own OpenRouter key.',
+          detail: c.detail, estimate: c.estimate, remaining: c.remaining,
+          okLabel: c.okLabel, cancelLabel: c.cancelLabel,
+          remember: c.remember || ('ai:' + (opts.app_id || 'app')),
+        });
+        if (!okToSpend) throw cancelledError('The AI request');
+      }
+      const r = await authFetch('/v1/ai/complete', {
+        method: 'POST',
+        body: JSON.stringify(body),
+      });
+      if (!r || !r.ok) {
+        const code = (r && r.error && r.error.code) || 'UNKNOWN';
+        const msg = (r && r.error && r.error.message) || 'AI call failed';
+        const err = /** @type {Error & { code?: string }} */ (new Error(msg));
+        err.code = code;
+        throw err;
+      }
+      if (r.data) noteBudget(r.data.budget);
+      return r.data;
+    };
+    if (opts.allowDuplicate) return call();
+    const key = keyOf(['ai', opts.app_id, opts.model || opts.modelRole, opts.systemPrompt, opts.prompt]);
+    return once(key, call, { ttlMs: opts.dedupeMs || 0 });
   },
 
   /**
@@ -151,3 +181,4 @@ const ai = {
 };
 
 attach('ai', ai);
+attachSpend();

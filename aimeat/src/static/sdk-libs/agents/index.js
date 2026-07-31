@@ -12,6 +12,9 @@
  *   const { task, deliverable } = await AIMEAT.agents.run('my-agent', { description: '…' });
  * @version-history
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-agents.ts (SDK-libs migration Phase 1).
+ *   v1.2.0 — 2026-07-31 — Spend guard: an identical commission in flight (and for 60s after it
+ *     succeeded) returns THAT task instead of queueing a second one, so a double-click no longer
+ *     buys two agent runs; createTask/run take { confirm, allowDuplicate, dedupeMs }.
  *   v1.1.0 — 2026-07-25 — createTask() forwards scope/verification/rules/resources (previously it
  *     sent only title+description+status, so an app could not tag its own runs through this library
  *     and had to hand-roll the POST). deliverable() falls back to the `task:<id>` memory tag when the
@@ -20,6 +23,10 @@
 import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-agents.js');
 import { attach } from '../_core/namespace.js';
+import { once, keyOf, confirmSpend, cancelledError, attachSpend } from '../_core/spend.js';
+
+// A second identical commission this soon after the first is a double-click, not a second job.
+var DEDUPE_MS = 60000;
 
 var enc = encodeURIComponent;
 
@@ -64,8 +71,18 @@ var agents = {
    *  instead of trying to parse the agent's memory-key slug. Pass the same array in a
    *  schedule's `task_template.scope` so scheduled runs carry it too.
    *  task.verification: { user_expects, technical_checks } — what a good result looks like.
-   *  Both were silently dropped before v1.1.0. */
-  async createTask(name, task) {
+   *  Both were silently dropped before v1.1.0.
+   *
+   *  A commission costs the owner real work (an agent run, its model spend), so repeats are
+   *  collapsed by default: while an identical commission (same agent + title + description) is in
+   *  flight — and for 60s after it succeeded — every further call returns THAT task instead of
+   *  queueing another. Five clicks = one task.
+   *  opts: { confirm, allowDuplicate, dedupeMs }
+   *    confirm       — true (or an object for AIMEAT.spend.confirm) asks the user first; a cancel
+   *                    rejects with `.code === 'SPEND_CANCELLED'`
+   *    allowDuplicate— genuinely commission the same thing twice (skips the guard entirely)
+   *    dedupeMs      — widen/narrow the 60s settle window */
+  async createTask(name, task, opts) {
     if (!task || !task.description) throw new Error('createTask requires { description }');
     var body = {
       title: task.title || task.description.slice(0, 80),
@@ -88,10 +105,26 @@ var agents = {
     }
     if (task.rules) body.rules = task.rules;
     if (task.resources) body.resources = task.resources;
-    var data = unwrap(await authFetch('/v1/agents/' + enc(name) + '/tasks', {
-      method: 'POST', body: JSON.stringify(body),
-    }), 'create task');
-    return data.task;
+    var o = opts || {};
+    var commission = async function () {
+      if (o.confirm) {
+        var c = typeof o.confirm === 'object' ? o.confirm : {};
+        var okToSpend = await confirmSpend({
+          what: c.what || ('Commission ' + name + ': ' + body.title),
+          detail: c.detail !== undefined ? c.detail : body.description,
+          estimate: c.estimate, remaining: c.remaining,
+          okLabel: c.okLabel, cancelLabel: c.cancelLabel, remember: c.remember,
+        });
+        if (!okToSpend) throw cancelledError('The commission');
+      }
+      return unwrap(await authFetch('/v1/agents/' + enc(name) + '/tasks', {
+        method: 'POST', body: JSON.stringify(body),
+      }), 'create task').task;
+    };
+    if (o.allowDuplicate) return commission();
+    return once(keyOf(['agents.createTask', name, body.title, body.description]), commission, {
+      ttlMs: typeof o.dedupeMs === 'number' ? o.dedupeMs : DEDUPE_MS,
+    });
   },
 
   /** Get a single task. */
@@ -219,9 +252,11 @@ var agents = {
 
   /** Commission + watch until done/failed/stalled, then resolve
    *  { task, deliverable }. Best for task-runner agents (which auto-activate).
-   *  opts: { onProgress(task, events), timeoutMs, pollMs }. */
+   *  opts: { onProgress(task, events), timeoutMs, pollMs } plus createTask's spend options
+   *  ({ confirm, allowDuplicate, dedupeMs }), which are forwarded — so a second run() of the same
+   *  job attaches to the FIRST task rather than commissioning a second one. */
   async run(name, task, opts) {
-    var created = await agents.createTask(name, task);
+    var created = await agents.createTask(name, task, opts);
     var id = created.id;
     return await new Promise(function (resolve, reject) {
       var done = false, to = null;
@@ -303,3 +338,4 @@ var agents = {
 };
 
 attach('agents', agents);
+attachSpend();
