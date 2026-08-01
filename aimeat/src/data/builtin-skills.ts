@@ -686,8 +686,14 @@ After a successful publish (the publish response's \`next_steps\` shows what is 
    \`AIMEAT.auth.mountLoginButton(...)\` + \`AIMEAT.auth.login()\` for sign-in,
    \`AIMEAT.data.get/set(key, value, { visibility })\` for storage, and the node UI helpers.
    Respect the light/dark theme via \`data-theme\` + CSS variables — never hardcode colors.
-3. **Verify locally before publishing.** Syntax-check the inline JS (\`node --check\` on the
-   extracted script); verify the script tags resolve to real node URLs.
+3. **Verify locally before publishing.** Syntax-check the inline JS, then verify the script
+   tags resolve to real node URLs. Use a check that names the file explicitly:
+   \`\`\`bash
+   node -e 'const f=process.argv[1],s=require("fs").readFileSync(f,"utf8");new (require("vm").Script)(s,{filename:f});console.log("parsed:",f)' app-script.js
+   \`\`\`
+   Do **not** use bare \`node --check $VAR\`: with an empty or unset variable it reads empty
+   stdin, parses that, and exits 0 printing nothing — which reads exactly like a pass for a
+   file nobody looked at.
 4. **Publish over MCP.** \`aimeat_app_publish\` — for any file over ~1 KB use **presigned
    upload** (omit the content param → PUT the raw HTML to the returned \`upload_url\`).
    Re-publishing the same \`filename\` bumps the version — it does not duplicate.

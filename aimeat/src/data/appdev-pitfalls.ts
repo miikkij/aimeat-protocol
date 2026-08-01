@@ -283,6 +283,17 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     docRef: 'docs/pitfalls.md §12',
     updatedAt: '2026-07-19',
   }),
+  E({
+    id: 'syntax-check-that-checked-nothing',
+    title: 'A syntax check handed no file reports a pass for nothing',
+    symptom: '"SYNTAX OK" for a file that was never parsed. `node --check bad.js` correctly exits 1, but `node --check $FILE` with $FILE empty or unset reads empty stdin, parses that, and exits 0 printing nothing — identical to a real pass. One unset variable voids every syntax claim in the session.',
+    fix: 'Name the file explicitly and let a read error be an error: node -e \'const f=process.argv[1],s=require("fs").readFileSync(f,"utf8");new (require("vm").Script)(s,{filename:f});console.log("parsed:",f)\' app-script.js — or, in this repo, `cd aimeat && pnpm check:js-syntax <file>.html`, which parses every inline <script> body, treats no input as an error, and re-proves its own sentinels on every run.',
+    appliesTo: ['publish'],
+    severity: 'warn',
+    source: 'curated',
+    docRef: 'docs/pitfalls.md §12',
+    updatedAt: '2026-08-01',
+  }),
 
   // ---- iam --------------------------------------------------------------
   E({

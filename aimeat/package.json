@@ -98,6 +98,7 @@
     "check:no-max-tokens": "tsx scripts/check-no-max-tokens.ts",
     "check:openapi": "tsx scripts/check-openapi.ts",
     "check:silent-catch": "tsx scripts/check-silent-catch.ts",
+    "check:js-syntax": "node --experimental-vm-modules --import tsx scripts/check-js-syntax.ts",
     "screenshot:worker": "tsx scripts/screenshot-worker.ts",
     "generate:types": "openapi-typescript ../openapi.yaml -o src/generated/api-types.ts",
     "db:reset": "node --env-file=.env --import tsx scripts/db-reset.ts",

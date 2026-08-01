@@ -67,7 +67,13 @@ the libraries the spec names.
    `AIMEAT.ui.*` helpers for lists/forms. Respect the AIMEAT light/dark theme via
    `data-theme` + the theme CSS variables (never hardcode brand colors).
 3. **Verify locally before publishing.** Do not publish blind:
-   - Check JS syntax (`node --check` on the extracted script, or serve the file and load it).
+   - Check JS syntax with a command that names the file explicitly, so a missing path cannot
+     read as a pass:
+     ```bash
+     node -e 'const f=process.argv[1],s=require("fs").readFileSync(f,"utf8");new (require("vm").Script)(s,{filename:f});console.log("parsed:",f)' app-script.js
+     ```
+     Avoid bare `node --check $VAR`: with an empty or unset variable it reads empty stdin,
+     parses that, and exits 0 printing nothing — indistinguishable from a real pass.
    - Serve the file locally and `curl` it back; confirm it is well-formed and the script tags
      resolve to real node URLs.
 4. **Publish over MCP.** Call the `aimeat_app_publish` tool. For any file bigger than ~1 KB
