@@ -611,5 +611,27 @@ export function applySchemaTables3(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_publish_delegation ON publish_attempts(delegationId, createdAt);
     CREATE INDEX IF NOT EXISTS idx_publish_connection ON publish_attempts(connectionId, createdAt);
 
+    -- Client credentials this node holds AT a provider instance (TARGET-057). NOT the user's token
+    -- and not .env either. A fixed provider's client id/secret (Google, Bluesky) are one per node
+    -- and live in config; an instance-scoped provider (Mastodon) issues them PER INSTANCE, there is
+    -- no way to know which instance the next user arrives from, and there are hundreds -- so they
+    -- are runtime configuration the node acquires by registering itself and remembers here.
+    -- clientSecret is ciphertext: not personal data, but a table that stores a secret in the clear
+    -- teaches the next table to do the same.
+    CREATE TABLE IF NOT EXISTS provider_clients (
+      id           TEXT PRIMARY KEY,
+      provider     TEXT NOT NULL,
+      -- Normalised and validated before it gets here: it originates from a USER-SUPPLIED address,
+      -- which makes it an SSRF vector, and every request to it goes through safeFetch.
+      instance     TEXT NOT NULL,
+      clientId     TEXT NOT NULL,
+      clientSecret TEXT NOT NULL,
+      registeredAt TEXT NOT NULL
+    );
+    -- Two users arriving from the same instance at the same moment must converge on ONE
+    -- registration rather than each minting their own.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_provider_clients_key
+      ON provider_clients(provider, instance);
+
   `);
 }

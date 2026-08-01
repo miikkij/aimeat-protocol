@@ -19,6 +19,7 @@ import type { ConnectionQuery, PublishAttemptQuery } from '../../../repositories
 import type {
   ConnectionRecord, ConnectionStatus, CredentialShape, ConnectionMode,
   DelegationRecord, ModerationMode, PublishAttempt, NewPublishAttempt, PublishStatus,
+  ProviderClientRecord,
 } from '../../../../models/connection-schemas.js';
 import type { SqliteStorage } from '../index.js';
 
@@ -74,6 +75,17 @@ function toAttempt(r: Row): PublishAttempt {
     error: (r.error as string | null) ?? null,
     createdAt: r.createdAt as string,
     updatedAt: r.updatedAt as string,
+  };
+}
+
+function toProviderClient(r: Row): ProviderClientRecord {
+  return {
+    id: r.id as string,
+    provider: r.provider as string,
+    instance: r.instance as string,
+    clientId: r.clientId as string,
+    clientSecret: r.clientSecret as string,
+    registeredAt: r.registeredAt as string,
   };
 }
 
@@ -303,5 +315,31 @@ export const connectionMethods = {
       `SELECT COUNT(*) AS n FROM publish_attempts${w.sql}`,
     ).get(...w.params) as { n: number };
     return Number(r?.n ?? 0);
+  },
+
+  /**
+   * Insert-if-new, then read back. Two users arriving from the same Mastodon instance at the same
+   * moment must converge on ONE registration; a check-then-insert would let both register and orphan
+   * the loser's credentials at the instance with nothing pointing at them.
+   */
+  async upsertProviderClient(
+    this: SqliteStorage, row: ProviderClientRecord,
+  ): Promise<ProviderClientRecord> {
+    this.db.prepare(`
+      INSERT INTO provider_clients (id, provider, instance, clientId, clientSecret, registeredAt)
+      VALUES (?, ?, ?, ?, ?, ?)
+      ON CONFLICT(provider, instance) DO NOTHING
+    `).run(row.id, row.provider, row.instance, row.clientId, row.clientSecret, row.registeredAt);
+    const r = this.db.prepare('SELECT * FROM provider_clients WHERE provider = ? AND instance = ?')
+      .get(row.provider, row.instance) as Row;
+    return toProviderClient(r);
+  },
+
+  async getProviderClient(
+    this: SqliteStorage, provider: string, instance: string,
+  ): Promise<ProviderClientRecord | undefined> {
+    const r = this.db.prepare('SELECT * FROM provider_clients WHERE provider = ? AND instance = ?')
+      .get(provider, instance) as Row | undefined;
+    return r ? toProviderClient(r) : undefined;
   },
 };

@@ -22,11 +22,13 @@ import type { ConnectionQuery, PublishAttemptQuery } from '../../../repositories
 import type {
   ConnectionRecord, ConnectionStatus, CredentialShape, ConnectionMode,
   DelegationRecord, ModerationMode, PublishAttempt, NewPublishAttempt, PublishStatus,
+  ProviderClientRecord,
 } from '../../../../models/connection-schemas.js';
 import type {
   Connection as ConnectionRow,
   ConnectionDelegation as DelegationRow,
   PublishAttempt as PublishAttemptRow,
+  ProviderClient as ProviderClientRow,
   Json,
 } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -81,6 +83,17 @@ function toAttempt(r: Selectable<PublishAttemptRow>): PublishAttempt {
     error: r.error ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
+  };
+}
+
+function toProviderClient(r: Selectable<ProviderClientRow>): ProviderClientRecord {
+  return {
+    id: r.id,
+    provider: r.provider,
+    instance: r.instance,
+    clientId: r.clientId,
+    clientSecret: r.clientSecret,
+    registeredAt: r.registeredAt,
   };
 }
 
@@ -328,5 +341,37 @@ export const connectionMethods = {
     if (query.since) q = q.where('createdAt', '>=', query.since);
     const r = await q.executeTakeFirst();
     return Number(r?.n ?? 0);
+  },
+
+  /**
+   * Insert-if-new, then read back. Two users arriving from the same Mastodon instance at the same
+   * moment must converge on ONE registration; a check-then-insert would let both register and orphan
+   * the loser's credentials at the instance with nothing pointing at them.
+   */
+  async upsertProviderClient(
+    this: PostgresKyselyStorage, row: ProviderClientRecord,
+  ): Promise<ProviderClientRecord> {
+    await this.db.insertInto('ProviderClient').values({
+      id: row.id,
+      provider: row.provider,
+      instance: row.instance,
+      clientId: row.clientId,
+      clientSecret: row.clientSecret,
+      registeredAt: row.registeredAt,
+    }).onConflict((oc) => oc.columns(['provider', 'instance']).doNothing()).execute();
+
+    const r = await this.db.selectFrom('ProviderClient').selectAll()
+      .where('provider', '=', row.provider).where('instance', '=', row.instance)
+      .executeTakeFirst();
+    return toProviderClient(r as Selectable<ProviderClientRow>);
+  },
+
+  async getProviderClient(
+    this: PostgresKyselyStorage, provider: string, instance: string,
+  ): Promise<ProviderClientRecord | undefined> {
+    const r = await this.db.selectFrom('ProviderClient').selectAll()
+      .where('provider', '=', provider).where('instance', '=', instance)
+      .executeTakeFirst();
+    return r ? toProviderClient(r) : undefined;
   },
 };

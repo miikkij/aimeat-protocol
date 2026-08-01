@@ -497,6 +497,12 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     entraOAuthClientId: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_ID ?? '',
     entraOAuthClientSecret: process.env.AIMEAT_ENTRA_OAUTH_CLIENT_SECRET ?? '',
     entraOAuthRedirectUri: process.env.AIMEAT_ENTRA_OAUTH_REDIRECT_URI ?? '',
+    // Outbound connections (TARGET-057). Opt-IN: `=== 'true'`, so a node that has never heard of
+    // this feature does not start offering to hold people's accounts.
+    connectionsEnabled: process.env.AIMEAT_CONNECTIONS_ENABLED === 'true',
+    connectGoogleClientId: process.env.AIMEAT_CONNECT_GOOGLE_CLIENT_ID ?? '',
+    connectGoogleClientSecret: process.env.AIMEAT_CONNECT_GOOGLE_CLIENT_SECRET ?? '',
+    connectRedirectUri: process.env.AIMEAT_CONNECT_REDIRECT_URI ?? '',
     crossFederationEnabled: process.env.AIMEAT_CROSS_FEDERATION_ENABLED !== 'false',
     maxGenesisPeers: parseInt(process.env.AIMEAT_MAX_GENESIS_PEERS ?? '10', 10),
     genesisSyncIntervalHours: parseInt(process.env.AIMEAT_GENESIS_SYNC_INTERVAL_HOURS ?? '6', 10),

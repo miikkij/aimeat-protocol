@@ -28,7 +28,7 @@
  */
 import type {
   ConnectionRecord, ConnectionStatus, DelegationRecord,
-  PublishAttempt, NewPublishAttempt, PublishStatus,
+  PublishAttempt, NewPublishAttempt, PublishStatus, ProviderClientRecord,
 } from '../../models/connection-schemas.js';
 
 /** Narrowing for a listing. All fields optional; omitted means "any". */
@@ -137,4 +137,20 @@ export interface ConnectionRepository {
    * than per user. Paging rows in to count them would make the ceiling mean "in the first page".
    */
   countPublishAttempts(query: PublishAttemptQuery): Promise<number>;
+
+  /**
+   * Remember the client registration this node holds at one provider instance, or return the
+   * registration that already exists.
+   *
+   * Insert-if-new and read back, for the same reason openPublishAttempt() is: two users arriving
+   * from the same Mastodon instance at the same moment must converge on ONE registration. A
+   * check-then-insert would let both register, and the loser's credentials would be orphaned at the
+   * instance with nothing pointing at them.
+   *
+   * `clientSecret` is ciphertext on the way in and out. This layer never encrypts.
+   */
+  upsertProviderClient(row: ProviderClientRecord): Promise<ProviderClientRecord>;
+
+  /** The registration for one (provider, instance), or undefined if this node has never registered. */
+  getProviderClient(provider: string, instance: string): Promise<ProviderClientRecord | undefined>;
 }

@@ -505,6 +505,19 @@ export interface AimeatConfig {
   entraOAuthClientSecret: string;
   entraOAuthRedirectUri: string;     // empty = derive from baseUrl
 
+  // ── OUTBOUND connections (TARGET-057, aimeat-connect) ──
+  // The other direction entirely from the sign-in blocks above, and deliberately its own client:
+  // signing IN with Google and PUBLISHING to a Google account are different consent and must be
+  // separately revocable. Off by default — the safe PUBLIC value — and switched on per node.
+  connectionsEnabled: boolean;
+  // Fixed-endpoint provider credentials. Identify the APPLICATION, one per node, the same for every
+  // user. The USER's tokens never come near config: they live encrypted in Connection.credential.
+  // An instance-scoped provider (Mastodon) has nothing here at all — its client credentials are
+  // per instance and acquired at runtime (storage ProviderClient).
+  connectGoogleClientId: string;
+  connectGoogleClientSecret: string;
+  connectRedirectUri: string;        // empty = derive from baseUrl
+
   // Cross-Federation (Phase 3.4)
   crossFederationEnabled: boolean;
   maxGenesisPeers: number;

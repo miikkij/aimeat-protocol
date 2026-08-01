@@ -191,6 +191,28 @@ export type PublishStatus =
   | 'failed'
   | 'rejected';
 
+/**
+ * The client registration this node holds AT one provider instance.
+ *
+ * Not the user's token, and not `.env` either. It is the third secret in this feature: an
+ * instance-scoped provider (Mastodon) issues client credentials PER INSTANCE, and since there is no
+ * way to know which instance the next user arrives from, they cannot be configuration. The node
+ * registers itself on first contact and remembers the result so the second user from that instance
+ * reuses it.
+ *
+ * `clientSecret` is ciphertext. It is not personal data, but a table that stores a secret in the
+ * clear teaches the next table to do the same.
+ */
+export interface ProviderClientRecord {
+  id: string;
+  provider: string;
+  /** Instance origin, normalised and validated: it comes from a user, so it is an SSRF vector. */
+  instance: string;
+  clientId: string;
+  clientSecret: string;
+  registeredAt: string;
+}
+
 /** Rows a caller may set when opening an attempt; the rest is the store's business. */
 export type NewPublishAttempt = Pick<
   PublishAttempt,

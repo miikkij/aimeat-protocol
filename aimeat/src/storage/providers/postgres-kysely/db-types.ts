@@ -257,6 +257,19 @@ export interface ConnectionDelegation {
   updatedAt: string;
 }
 
+/**
+ * TARGET-057. The client registration this node holds AT one provider instance. Not the user's
+ * token (that is Connection.credential) and not .env either (that is for fixed-endpoint providers).
+ */
+export interface ProviderClient {
+  clientId: string;
+  clientSecret: string;
+  id: string;
+  instance: string;
+  provider: string;
+  registeredAt: string;
+}
+
 /** TARGET-057. Written BEFORE the publish is attempted — that order is what stops the double post. */
 export interface PublishAttempt {
   connectionId: string;
@@ -1702,6 +1715,7 @@ export interface DB {
   PersonalAccessToken: PersonalAccessToken;
   PersonalNode: PersonalNode;
   PersonalPushSubscription: PersonalPushSubscription;
+  ProviderClient: ProviderClient;
   PublishAttempt: PublishAttempt;
   Purchase: Purchase;
   PushSubscription: PushSubscription;
