@@ -14,12 +14,19 @@
  *   module, so the statement cannot drift away from what the node actually does: turn provenance off
  *   and this says so, set the detail knob to `minimal` and this says so.
  * @structure
- *   - GET /v1/ai-transparency     — the JSON statement (AIMEAT envelope)
- *   - GET /v1/ai-transparency.md  — the same facts as markdown, for an agent that reads prose
+ *   - GET /v1/ai-transparency                  — the JSON statement (AIMEAT envelope)
+ *   - GET /v1/ai-transparency.md               — the same facts as markdown, for an agent
+ *   - GET /v1/admin/ai-transparency-report     — operator: the documentation duty, from data
+ *   - GET /v1/ai-transparency/mine             — owner: what your agents published, and how labelled
+ *   - GET /v1/ai-transparency/logging-policy   — owner: what is logged, for how long, and by whom
  * @usage
  *   import { aiTransparencyRouter } from './routes/ai-transparency.js';
- *   app.use(aiTransparencyRouter(config));
+ *   app.use(aiTransparencyRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 8. The operator report (Code of Practice Section 2,
+ *     Commitment 2 — documentation, answered from records rather than a spreadsheet), the per-owner
+ *     view (most publishing here is done by accounts, so an account must see its own exposure), and
+ *     the logging policy (Sub-measure 1.1.3 — the deployer gets access to it).
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3. `ai_market_surveillance` is answered from
  *     AIMEAT_AI_SUPERVISORY_NAME/_URL instead of being permanently null, and `posture.visible_label`
  *     publishes AIMEAT_AI_LABEL_PUBLIC so a reader can tell a legally required label from one this
@@ -29,9 +36,15 @@
 import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
+import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
+import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success } from '../middleware/envelope.js';
 import { sendMarkdown } from '../services/markdown-negotiation.js';
+import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { AI_PROVENANCE_SPEC_V1, AI_PROVENANCE_SCHEMA_PATH } from '../models/ai-provenance-schemas.js';
+import {
+  buildAiTransparencyReport, listUnlabelledPublic, DEFAULT_TREND_DAYS,
+} from '../services/ai-transparency-report.js';
 
 /** The node's own statement about how it marks AI-generated content. */
 export function buildAiTransparency(config: AimeatConfig): Record<string, unknown> {
@@ -76,6 +89,17 @@ export function buildAiTransparency(config: AimeatConfig): Record<string, unknow
       scope: 'Records describing content that is publicly readable on this node. Absence means UNSTATED, never "a human wrote it".',
     },
     labelling: { icons: 'eu-ai-office-2026-06-10', languages: ['en', 'fi'] },
+    // The correction procedure the Code of Practice asks for (Section 2, Commitment 2), named in the
+    // artefact a regulator or a reader reads first. It routes into the node's existing moderation
+    // queue — the one that already has reviewers, an auto-hide threshold and an appeal path —
+    // rather than a second inbox that would look like a procedure without being one.
+    correction: {
+      how: `POST ${b}/v1/flags`,
+      body: { targetType: 'ai_provenance | app | memory', targetId: '<record id, owner/filename, or gaii::key>', reason: 'undisclosed_ai' },
+      reaches: 'the node operator\'s moderation queue, and an organism admin for organism content',
+      appeal: `POST ${b}/v1/flags/{flagId}/appeal`,
+      note: 'A visible AI label links to its own record; that record id is what to report.',
+    },
     code_of_practice: { signatory: false, sections: [] },
     posture: {
       provenance: config.aiProvenance ? 'on' : 'off',
@@ -97,6 +121,7 @@ function renderMarkdown(config: AimeatConfig, s: Record<string, unknown>): strin
   const posture = s.posture as Record<string, string>;
   const authorities = s.supervisory_authority as Record<string, unknown>;
   const ams = authorities.ai_market_surveillance as { name: string; url: string | null } | null;
+  const correction = s.correction as Record<string, string>;
   return [
     '---',
     `title: AI transparency statement`,
@@ -137,6 +162,15 @@ function renderMarkdown(config: AimeatConfig, s: Record<string, unknown>): strin
         : ''),
     `- Code of Practice signatory: **no**`,
     '',
+    '## If a label is missing or wrong',
+    '',
+    'Anyone can report content that should carry an AI label and does not. A visible label links to',
+    'its own provenance record; that record id is what to report.',
+    '',
+    `- Report it: \`${correction.how}\` with \`reason: "undisclosed_ai"\``,
+    `- It reaches ${correction.reaches}`,
+    `- Appeal a decision: \`${correction.appeal}\``,
+    '',
     '## Who supervises this',
     '',
     ams
@@ -149,7 +183,75 @@ function renderMarkdown(config: AimeatConfig, s: Record<string, unknown>): strin
   ].join('\n');
 }
 
-export function aiTransparencyRouter(config: AimeatConfig): Router {
+/**
+ * What the node records about a model call, how long it keeps it, and what the owner can do about
+ * it — the deployer's access to the logging policy that Sub-measure 1.1.3 of the Code of Practice
+ * asks for where logging is used as a marking layer.
+ *
+ * DERIVED FROM CONFIG, like everything else in this file. A policy page that is prose somebody
+ * edited by hand drifts away from what the software does, and a wrong retention promise is worse
+ * than none — it is the one thing a deployer would rely on.
+ */
+function buildLoggingPolicy(config: AimeatConfig): Record<string, unknown> {
+  const b = config.baseUrl.replace(/\/+$/, '');
+  return {
+    why: 'This node records how content was made so it can be labelled, and records model calls so '
+      + 'they can be metered. The provenance record is the marking layer; the usage ledger is the '
+      + 'billing layer. They are joined by provenanceId and neither contains prompt text.',
+    records: [
+      {
+        what: 'AI provenance record',
+        contains: 'level, human involvement, timestamp, model, provider, principal, node id, a '
+          + 'SHA-256 of the exact bytes, and the pre-rendered disclosure text',
+        never_contains: 'prompt text, response text, cost',
+        retention: 'kept for as long as the content it describes exists — a record is an '
+          + 'attributable statement about specific bytes, so it is append-only and is never edited; '
+          + 'a correction is a NEW record about the new bytes',
+        who_can_read: 'you, always. Anyone, but only while the content it describes is itself '
+          + 'publicly readable — make the content private and the record returns to a 404.',
+        your_controls: [
+          `See your own: GET ${b}/v1/ai-transparency/mine`,
+          'Stop a record being publicly resolvable: make the content it describes non-public',
+        ],
+      },
+      {
+        what: 'Usage ledger event (one per model call)',
+        contains: 'agent, owner, model, provider, token counts, cost, source, and the provenance id',
+        never_contains: 'prompt text, response text',
+        retention: 'append-only; it is the billing source of truth',
+        who_can_read: 'you, and the node operator',
+        your_controls: [`See your own spend: GET ${b}/v1/ledger/usage`],
+      },
+      {
+        what: 'Execution log (scheduled jobs and extension runs)',
+        contains: 'timing, result, memory reads/writes',
+        never_contains: 'prompt text',
+        retention: `pruned after ${config.executionLogRetentionDays} days on this node`,
+        who_can_read: 'you, and the node operator',
+        your_controls: ['Set by the operator via AIMEAT_EXECUTION_LOG_RETENTION_DAYS'],
+      },
+      {
+        what: 'Consent audit',
+        contains: 'who was granted what, and when',
+        never_contains: 'content',
+        retention: `pruned after ${config.consentAuditRetentionDays} days on this node`,
+        who_can_read: 'you, and the node operator',
+        your_controls: ['Set by the operator via AIMEAT_CONSENT_AUDIT_RETENTION_DAYS'],
+      },
+    ],
+    posture: {
+      provenance: config.aiProvenance ? 'on' : 'off',
+      detail_served_publicly: config.aiProvenanceDetail,
+      visible_label: config.aiLabelPublic,
+    },
+    // The honest limit. Saying it here costs nothing and stops the policy reading as a promise the
+    // node cannot keep.
+    note: 'This node does not watermark text — it does not sample the tokens, and that layer belongs '
+      + 'to whoever runs the model. What it does is record how content was made, attributably.',
+  };
+}
+
+export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
   router.get('/v1/ai-transparency', (_req: Request, res: Response) => {
@@ -167,5 +269,87 @@ export function aiTransparencyRouter(config: AimeatConfig): Router {
     sendMarkdown(res, renderMarkdown(config, buildAiTransparency(config)));
   });
 
+  // ── GET /v1/admin/ai-transparency-report — the operator's documentation duty, from data ──
+  // Section 2, Commitment 2 of the Code of Practice asks a provider to keep documentation of what it
+  // marks and how. This answers it from the records the node already holds rather than from a
+  // spreadsheet somebody maintains, which means it cannot go stale.
+  router.get('/v1/admin/ai-transparency-report',
+    requireAuth(), requireRole('operator'),
+    async (req: Request, res: Response) => {
+      const sinceDays = Number.parseInt(String(req.query.since_days ?? ''), 10);
+      const report = await buildAiTransparencyReport(storage, {
+        sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined,
+      });
+      const detail = await listUnlabelledPublic(storage, {
+        sinceDays: Number.isFinite(sinceDays) ? sinceDays : DEFAULT_TREND_DAYS,
+        limit: 50,
+      });
+      res.json(success(config.nodeId, {
+        ...report,
+        unlabelled_detail: {
+          // `total` beside a capped list, always: a truncated list with no total reads as the whole
+          // story, which is precisely how a compliance report comes to overstate coverage.
+          total: detail.total,
+          shown: detail.items.length,
+          items: detail.items.map(serveRow),
+        },
+      }, [
+        { description: 'The node\'s public transparency statement', method: 'GET', url: '/v1/ai-transparency' },
+        { description: 'Report unlabelled AI content (anyone can)', method: 'POST', url: '/v1/flags' },
+      ]));
+    });
+
+  // ── GET /v1/ai-transparency/mine — what YOUR agents published, and how it was labelled ──
+  // Most publishing on this node is done by accounts, so an account has to be able to see its own
+  // exposure without asking the operator. Scoped by resolveIdentity(), never by a query parameter.
+  router.get('/v1/ai-transparency/mine', requireAuth(), async (req: Request, res: Response) => {
+    const ownerGhii = ownerGhiiOf(resolveIdentity(req.auth!, config.nodeId));
+    const sinceDays = Number.parseInt(String(req.query.since_days ?? ''), 10);
+    const opts = { ownerGhii, sinceDays: Number.isFinite(sinceDays) ? sinceDays : undefined };
+    const [report, recent, unlabelled] = await Promise.all([
+      buildAiTransparencyReport(storage, opts),
+      storage.listAiProvenance({ ownerGhii, limit: 25 }),
+      listUnlabelledPublic(storage, { ...opts, limit: 25 }),
+    ]);
+    res.json(success(config.nodeId, {
+      ...report,
+      recent: { total: recent.total, shown: recent.items.length, items: recent.items.map(serveRow) },
+      unlabelled_detail: {
+        total: unlabelled.total,
+        shown: unlabelled.items.length,
+        items: unlabelled.items.map(serveRow),
+      },
+    }, [
+      { description: 'What this node logs about a model call, and for how long', method: 'GET', url: '/v1/ai-transparency/logging-policy' },
+      { description: 'Report content that should carry a label and does not', method: 'POST', url: '/v1/flags' },
+    ]));
+  });
+
+  // ── GET /v1/ai-transparency/logging-policy — the deployer's access to the logging policy ──
+  // Sub-measure 1.1.3: where logging is used as a marking layer, the deployer gets access to the
+  // policy and control over retention. The ledger existed; the owner had no view of it AS a policy.
+  router.get('/v1/ai-transparency/logging-policy', requireAuth(), (_req: Request, res: Response) => {
+    res.json(success(config.nodeId, buildLoggingPolicy(config), [
+      { description: 'What you have published, and how it was labelled', method: 'GET', url: '/v1/ai-transparency/mine' },
+      { description: 'Your own spend, joined to what it produced', method: 'GET', url: '/v1/ledger/usage' },
+    ]));
+  });
+
   return router;
+}
+
+/** One provenance row as this surface serves it: enough to act on, and a link to the whole record. */
+function serveRow(row: AiProvenanceRecordRow): Record<string, unknown> {
+  return {
+    id: row.id,
+    principal: row.principal,
+    content_hash: row.contentHash,
+    generated_at: row.generatedAt,
+    level: row.record.level,
+    human_involvement: row.record.humanInvolvement,
+    disclosure_required: row.record.disclosure?.required ?? false,
+    pipeline: row.record.generator?.pipeline ?? null,
+    model: row.record.generator?.model ?? null,
+    record_url: row.record.attestation?.recordUrl ?? null,
+  };
 }

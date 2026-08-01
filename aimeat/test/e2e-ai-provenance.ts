@@ -671,6 +671,110 @@ async function startStub(): Promise<void> {
     });
 
 
+    // ── 12. PHASE 8: the surfaces that make this hold after everyone stops paying attention ──
+
+    await test('GET /v1/ai-transparency/mine shows the owner their OWN exposure', async () => {
+        const r = await json('/v1/ai-transparency/mine', { headers: auth(a.token) });
+        assert(r.status === 200, `mine ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const d = r.body.data;
+        assert(d.scope.owner_ghii === `${a.name}@${NODE_ID}`, `scoped to ${d.scope.owner_ghii}`);
+        assert(d.total >= 1, `owner A has minted records; got total=${d.total}`);
+        assert(Array.isArray(d.recent.items) && d.recent.items.length >= 1, 'no recent records shown');
+        assert(typeof d.recent.total === 'number', 'a capped list without a total reads as the whole story');
+        // The sentence that stops a total being read as "everything published on this node".
+        assert(String(d.scope.note).includes('UNSTATED'), 'the scope note must say what absence means');
+    });
+
+    await test('...and it is scoped by the token, not by a query parameter', async () => {
+        const mine = await json('/v1/ai-transparency/mine', { headers: auth(a.token) });
+        const theirs = await json('/v1/ai-transparency/mine', { headers: auth(b.token) });
+        assert(mine.status === 200 && theirs.status === 200, 'both owners can read their own view');
+        assert(theirs.body.data.scope.owner_ghii === `${b.name}@${NODE_ID}`,
+            `B must see B, got ${theirs.body.data.scope.owner_ghii}`);
+        const aIds = new Set<string>((mine.body.data.recent.items ?? []).map((i: any) => i.id));
+        const bIds = (theirs.body.data.recent.items ?? []).map((i: any) => i.id);
+        assert(!bIds.some((id: string) => aIds.has(id)), 'one owner\'s view is showing another owner\'s records');
+    });
+
+    await test('GET /v1/ai-transparency/logging-policy tells the owner what is kept and for how long', async () => {
+        const r = await json('/v1/ai-transparency/logging-policy', { headers: auth(a.token) });
+        assert(r.status === 200, `policy ${r.status}`);
+        const d = r.body.data;
+        assert(Array.isArray(d.records) && d.records.length >= 2, 'the policy lists nothing');
+        const prov = d.records.find((x: any) => String(x.what).includes('provenance'));
+        assert(!!prov, 'the policy does not describe the provenance record');
+        assert(String(prov.never_contains).includes('prompt'),
+            'the policy must state that prompt text is never in the record');
+        assert(d.posture.provenance === 'on', `posture ${d.posture.provenance}`);
+    });
+
+    await test('The logging policy needs a session — it describes YOUR data', async () => {
+        const r = await json('/v1/ai-transparency/logging-policy');
+        assert(r.status === 401 || r.status === 403, `anonymous → 401/403, got ${r.status}`);
+    });
+
+    await test('GET /v1/admin/ai-transparency-report refuses a non-operator (403)', async () => {
+        // Owner B, deliberately. The node promotes the FIRST owner to operator when none exists, so
+        // on a shared test server whether owner A holds that role depends on which suite ran first —
+        // but B is created after A, so B is never it. The operator's 200 is proven in
+        // e2e-admin-features, which owns an operator token by construction.
+        const r = await json('/v1/admin/ai-transparency-report', { headers: auth(b.token) });
+        assert(r.status === 403, `non-operator → 403, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    });
+
+    await test('...and refuses an anonymous caller too', async () => {
+        const r = await json('/v1/admin/ai-transparency-report');
+        assert(r.status === 401 || r.status === 403, `anonymous → 401/403, got ${r.status}`);
+    });
+
+    // ── The correction procedure (Code of Practice Section 2, Commitment 2) ──
+    // A person who thinks something is unlabelled must be able to say so, and it must land where a
+    // human looks. It is the EXISTING flag queue on purpose: a fourth inbox would be a queue nobody
+    // watches, which is the same as no procedure while looking like one.
+
+    await test('The public transparency statement names the correction procedure', async () => {
+        const r = await json('/v1/ai-transparency');
+        assert(r.status === 200, `transparency ${r.status}`);
+        const c = r.body.data.correction;
+        assert(!!c && String(c.how).includes('/v1/flags'), `no correction path: ${JSON.stringify(c)}`);
+        assert(String(c.body?.reason ?? '').includes('undisclosed_ai'), 'the statement does not name the reason to use');
+        assert(String(c.appeal).includes('appeal'), 'a correction procedure with no appeal path is half a procedure');
+    });
+
+    await test('A provenance record points a reader at the way to report it', async () => {
+        const r = await json(`/v1/provenance/${publicId}`);
+        assert(r.status === 200, `resolve ${r.status}`);
+        const hints = JSON.stringify(r.body.hints ?? {});
+        assert(hints.includes('/v1/flags'), 'the page a label links to must offer the correction path');
+    });
+
+    await test('Anyone signed in can report undisclosed AI content, and it reaches the queue', async () => {
+        const r = await json('/v1/flags', {
+            method: 'POST', headers: auth(b.token),
+            body: JSON.stringify({
+                targetType: 'ai_provenance',
+                targetId: publicId,
+                reason: 'undisclosed_ai',
+                description: 'This article reads as if a person wrote it and carries no label.',
+            }),
+        });
+        assert(r.status === 201, `flag ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.reason === 'undisclosed_ai', `reason ${r.body.data.reason}`);
+        assert(r.body.data.targetType === 'ai_provenance', `targetType ${r.body.data.targetType}`);
+        // It landed somewhere a human looks: the public summary for that target now counts it.
+        const s = await json(`/v1/flags/summary/ai_provenance/${publicId}`);
+        assert(s.status === 200, `summary ${s.status}`);
+        assert(s.body.data.totalFlags >= 1, `the report did not reach the queue: ${JSON.stringify(s.body.data)}`);
+    });
+
+    await test('A published APP can be reported the same way', async () => {
+        const r = await json('/v1/flags', {
+            method: 'POST', headers: auth(b.token),
+            body: JSON.stringify({ targetType: 'app', targetId: `${a.name}/some-app.html`, reason: 'undisclosed_ai' }),
+        });
+        assert(r.status === 201, `app flag ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    });
+
     // LAST, deliberately: this exhausts a 60-per-minute IP bucket, and every anonymous by-hash
     // assertion above needs that bucket. Ordering is the fix; widening the limit would not be.
     await test('The public detection lookup is rate-limited (unauthenticated flood → 429)', async () => {

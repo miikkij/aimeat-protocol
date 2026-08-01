@@ -511,6 +511,44 @@ await test('GET /v1/admin/translations?lang=fi → navServices equals "Palvelut"
     );
 });
 
+// ─── AI transparency report (TARGET-058 Phase 8) ───
+// The Code of Practice documentation duty (Section 2, Commitment 2), answered from the records the
+// node holds rather than from a spreadsheet. Proven with a real operator token — the 403 for a
+// non-operator lives in e2e-ai-provenance, where a guaranteed non-operator owner exists.
+console.log('\nAI transparency report');
+
+await test('GET /v1/admin/ai-transparency-report answers the operator from real data', async () => {
+    const { status, body } = await json('/v1/admin/ai-transparency-report', authed());
+    assert(status === 200, `status ${status}: ${JSON.stringify(body.error)}`);
+    const d = body.data;
+    assert(typeof d.total === 'number' && typeof d.public_total === 'number', 'no counts');
+    assert(typeof d.unlabelled === 'number', 'the one number an operator acts on is missing');
+    assert(d.public_total >= d.unlabelled, 'unlabelled cannot exceed the public population it is drawn from');
+    assert(Array.isArray(d.trend), 'no trend');
+    assert(Array.isArray(d.apps_declaring_generation_with_gap), 'the app-side half is missing');
+    // A truncated list with no total beside it reads as the whole story — which is exactly how a
+    // compliance report comes to overstate coverage.
+    assert(typeof d.unlabelled_detail?.total === 'number', 'the detail list has no honest total');
+    assert(d.unlabelled_detail.shown <= d.unlabelled_detail.total, 'shown exceeds total');
+    // The sentence that stops a total being read as "everything published on this node".
+    assert(String(d.scope.note).includes('UNSTATED'), 'the scope note must say what absence means');
+});
+
+await test('...and honours a since_days window', async () => {
+    const { status, body } = await json('/v1/admin/ai-transparency-report?since_days=1', authed());
+    assert(status === 200, `status ${status}`);
+    assert(typeof body.data.scope.since === 'string', 'the window is not reported back');
+    const ageMs = Date.now() - Date.parse(body.data.scope.since);
+    assert(ageMs > 0 && ageMs < 3 * 86_400_000, `since should be ~1 day ago, got ${body.data.scope.since}`);
+});
+
+await test('...and refuses a non-operator owner (403)', async () => {
+    const { status } = await json('/v1/admin/ai-transparency-report', {
+        headers: { Authorization: `Bearer ${nonOpToken}` },
+    });
+    assert(status === 403, `non-operator → 403, got ${status}`);
+});
+
 // ─── Cleanup ───
 console.log('\nCleanup');
 

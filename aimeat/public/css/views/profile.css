@@ -3449,3 +3449,29 @@
 .pf-adk-sev--warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
 .pf-adk-sev--info { background: var(--bg-dim); color: var(--muted); }
 .pf-adk-empty { color: var(--muted); font-size: 0.9rem; padding: 0.9rem; margin-bottom: 0.7rem; }
+
+/* ── AI transparency card (pf-aitr-*) — TARGET-058 Phase 8 ──
+   The owner's own view of what they published with a model in it. The one visual decision here is
+   that the "public and unlabelled" tile changes colour only when the number is ABOVE zero: a
+   compliance surface that is always red teaches people to stop looking at it. */
+.pf-aitr-head { display: flex; align-items: center; justify-content: space-between; gap: 0.8rem; width: 100%; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: inherit; font: inherit; }
+.pf-aitr-chevron { color: var(--muted); font-size: 1.1rem; line-height: 1; flex-shrink: 0; }
+.pf-aitr-body { margin-top: 0.9rem; border-top: 1px solid var(--border); padding-top: 0.9rem; }
+/* auto-fit, so four tiles become two rows on a phone instead of overflowing the card. */
+.pf-aitr-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(7.5rem, 1fr)); gap: 0.6rem; }
+.pf-aitr-stat { display: flex; flex-direction: column; gap: 0.15rem; padding: 0.7rem 0.8rem; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-dim); min-width: 0; }
+.pf-aitr-stat-warn { border-color: var(--warn); }
+.pf-aitr-stat-warn .pf-aitr-num { color: var(--warn); }
+.pf-aitr-num { font-size: 1.5rem; font-weight: 700; line-height: 1.1; }
+.pf-aitr-lbl { font-size: 0.75rem; color: var(--muted); overflow-wrap: anywhere; }
+.pf-aitr-note { margin: 0.8rem 0 0; font-size: 0.82rem; color: var(--muted); }
+.pf-aitr-warn-line { margin: 0.9rem 0 0.4rem; font-size: 0.85rem; color: var(--fg); }
+.pf-aitr-error { margin: 0; font-size: 0.85rem; color: var(--danger); }
+.pf-aitr-muted { margin: 0.5rem 0 0; font-size: 0.8rem; color: var(--muted); }
+.pf-aitr-sub { margin: 1.2rem 0 0.4rem; font-size: 0.9rem; font-weight: 600; }
+.pf-aitr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.pf-aitr-row, .pf-aitr-policy { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0.3rem 0.7rem; padding: 0.55rem 0.7rem; border: 1px solid var(--border); border-radius: 8px; background: var(--bg-dim); min-width: 0; }
+.pf-aitr-policy { flex-direction: column; }
+.pf-aitr-row-main { font-size: 0.85rem; font-weight: 600; overflow-wrap: anywhere; }
+.pf-aitr-row-meta { font-size: 0.78rem; color: var(--muted); overflow-wrap: anywhere; }
+.pf-aitr-row-link { font-size: 0.78rem; color: var(--accent); }

@@ -8377,5 +8377,22 @@
       "aiBasic": "Tekoäly on ollut mukana tämän sisällön tekemisessä",
       "unstated": "Tekoälyn osuutta ei ole kerrottu"
     }
-  }
+  },
+  "aiTransparency.title": "Tekoälyn läpinäkyvyys — mitä olet julkaissut",
+  "aiTransparency.desc": "Kuinka suuren osan julkaisemastasi sisällöstä on kirjoittanut malli, ja kuinka suuri osa siitä on merkitty.",
+  "aiTransparency.unlabelled": "julkista, merkitsemättä",
+  "aiTransparency.labelled": "julkista, merkittynä",
+  "aiTransparency.publicTotal": "julkista kohdetta",
+  "aiTransparency.total": "tietuetta kaikkiaan",
+  "aiTransparency.scopeNote": "Luvut kattavat sen sisällön, josta tällä solmulla on alkuperätietue. Sisältö, jolla ei ole tietuetta, jää toteamatta eikä näy täällä.",
+  "aiTransparency.unlabelledHelp": "Nämä on tuottanut malli, kukaan ei ole kirjannut tarkastaneensa niitä, ja kuka tahansa voi lukea ne. Artiklan 50(4) mukaan tästä yhdistelmästä seuraa merkintävelvollisuus. Jos ihminen on lukenut ja hyväksynyt sisällön, kirjaa se — silloin merkintää ei enää tarvita.",
+  "aiTransparency.unknownSource": "lähde tuntematon",
+  "aiTransparency.openRecord": "Avaa tietue",
+  "aiTransparency.showingOf": "Näytetään {shown}/{total}.",
+  "aiTransparency.appsWithGap": "Sovellukset, jotka tuottavat sisältöä eivätkä kerro siitä",
+  "aiTransparency.policyTitle": "Mitä tämä solmu kirjaa mallikutsusta",
+  "aiTransparency.retention": "Säilytys",
+  "aiTransparency.neverContains": "Ei koskaan sisällä",
+  "aiTransparency.loadFailed": "Läpinäkyvyystietojasi ei voitu lukea.",
+  "aiTransparency.loading": "Luetaan tietueitasi…"
 }

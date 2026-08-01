@@ -83,6 +83,39 @@ export interface AiProvenanceRecordRow {
   record: AiProvenance;
 }
 
+/** Shared filters for the report/sweep/owner reads. Every field narrows; omit all for the whole node. */
+export interface AiProvenanceFacetQuery {
+  /** Restrict to one account — the per-owner view. */
+  ownerGhii?: string;
+  /** ISO timestamp; records generated at or after it. The trend window. */
+  since?: string;
+}
+
+/** One distinct combination of what a record says, and how many records fall in it. */
+export interface AiProvenanceFacet {
+  /** `none` | `light-review` | `editorial-control` | `full-human`, as stored in the document. */
+  humanInvolvement: string;
+  /** `original` | `assisted` | `synthesized` | `ai-generated`. */
+  level: string;
+  /** `YYYY-MM-DD` of `generatedAt` — the trend axis. */
+  day: string;
+  /** Is the content this record describes readable by an anonymous visitor right now? */
+  publiclyLinked: boolean;
+  /** Does the record's pre-rendered `disclosure` block say a label was required? */
+  disclosureRequired: boolean;
+  count: number;
+}
+
+export interface AiProvenanceListQuery extends AiProvenanceFacetQuery {
+  /**
+   * Only records whose content is public, where nobody reviewed the substance, and whose disclosure
+   * block does not say a label was required — the sweep's population, and the case nobody thought of.
+   */
+  unlabelledPublicOnly?: boolean;
+  limit?: number;
+  offset?: number;
+}
+
 /** Filter for the hash lookup. `ownerGhii` widens a public-only read to include the caller's own. */
 export interface AiProvenanceHashQuery {
   /** Restrict to records the caller owns, in ADDITION to every publicly linked one. Omit for public-only. */

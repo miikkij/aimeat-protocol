@@ -153,6 +153,7 @@ Before merging any change to `src/routes/`, `src/auth/`, `src/services/`, `src/s
 - [ ] **Anonymous:** no `if(!req.auth)` gate; `members` reads check `!req.auth.anonymous` (Inv. 6).
 - [ ] **Secrets:** encrypted at rest, never returned/logged, destination allowlisted (Inv. 7).
 - [ ] **Config:** any security value that differs local↔public is in `.env.example` with a safe public default (Inv. 10).
+- [ ] **Provenance:** does this path produce or serve model output? If yes, does it mint or propagate provenance? Minting goes through `services/ai-provenance.ts`; serving carries it via `services/ai-provenance-marks.ts`. A new publishing container also goes in `PUBLICLY_LINKED_CONTAINERS` and both providers' predicates, or the labels it produces resolve to a 404 and read as "no provenance". `pnpm check:ai-disclosure` enforces the parts it can see.
 - [ ] **Spec + campsite:** `openapi.yaml` marks the route's auth; fixed any adjacent gaps you passed.
 - [ ] Ran `/security-review` on the diff (or the branch security review) for anything non-trivial.
 

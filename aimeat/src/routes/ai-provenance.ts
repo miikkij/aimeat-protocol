@@ -179,7 +179,17 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     if (!row || (!isPublic && !isOwner)) {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such provenance record.'));
     }
-    res.json(success(config.nodeId, serve(row, isOwner)));
+    // The correction procedure, offered where a person actually arrives: a visible label's "details"
+    // link lands here, so this is the one page where somebody who thinks a label is wrong or missing
+    // already has the identifier in front of them (Code of Practice Section 2, Commitment 2).
+    res.json(success(config.nodeId, serve(row, isOwner), [
+      {
+        description: 'Report this as mislabelled or undisclosed AI content',
+        method: 'POST',
+        url: '/v1/flags',
+      },
+      { description: 'How this node marks AI content', method: 'GET', url: '/v1/ai-transparency' },
+    ]));
   });
 
   // ── POST /v1/provenance ──

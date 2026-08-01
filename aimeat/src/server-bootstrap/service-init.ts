@@ -47,6 +47,7 @@ import { enqueueCatalogueSync } from '../services/catalogue-sync.js';
 import { initializeNode } from '../auth/node-keys.js';
 import { logger } from '../utils/logger.js';
 import { sweepLapsedMemberships } from '../services/app-member-sweep.js';
+import { sweepUndisclosedPublicContent } from '../services/ai-disclosure-sweep.js';
 import { registerCoreHandlers } from '../services/core-jobs.js';
 
 export interface ServiceInitResult {
@@ -248,6 +249,23 @@ export async function initializeServices(
     };
     setTimeout(sweep, 45_000); // once shortly after boot, so a restart closes anything overdue
     setInterval(sweep, SWEEP_INTERVAL_MS);
+  }
+
+  // TARGET-058: the mechanism that catches the case nobody thought of. Every other gate in that
+  // programme protects a path somebody has already considered; this one asks the database whether
+  // any publicly readable item exists that a model wrote, nobody reviewed, and nothing labelled —
+  // and tells the account that published it. Phases 4, 5 and 6 each found a door that had been
+  // missed, so looking for the OUTCOME rather than for a known route is what keeps working when the
+  // next door appears. Six-hourly: the window is two days, so nothing falls between sweeps, and a
+  // person who publishes a lot is told once rather than nagged.
+  {
+    const DISCLOSURE_SWEEP_MS = 6 * 3_600_000;
+    const disclosureSweep = () => {
+      sweepUndisclosedPublicContent(storage, config)
+        .catch(err => logger.warn('ai-disclosure sweep failed', { error: String(err) }));
+    };
+    setTimeout(disclosureSweep, 90_000);
+    setInterval(disclosureSweep, DISCLOSURE_SWEEP_MS);
   }
 
   // A.4: Wire peer recovery to key exchange + future full sync

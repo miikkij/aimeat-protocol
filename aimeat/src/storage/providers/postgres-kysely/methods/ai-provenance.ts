@@ -12,9 +12,12 @@
  *   choice — it means a third party's non-public row never enters the process at all on the
  *   anonymous detection path, so there is nothing there to leak by a later mistake.
  * @structure aiProvenanceMethods — createAiProvenance · getAiProvenance · getAiProvenanceMany ·
- *   findAiProvenanceByHash · publiclyLinkedProvenanceIds
+ *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8. aiProvenanceFacets() + listAiProvenance(): the read
+ *     side for the operator report, the unlabelled-content sweep and the per-owner view. No
+ *     migration — both read existing columns and the jsonb document.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 4 step 0b. getAiProvenanceMany(): one query for a page of
  *     items instead of one per item. No migration — it reads the primary key.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. Visibility follows the content: the stored flag is
@@ -23,7 +26,10 @@
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1. Schema: migrations/0017_ai_provenance.sql.
  */
 import { sql, type Selectable } from 'kysely';
-import type { AiProvenanceRecordRow, AiProvenanceHashQuery } from '../../../interface.js';
+import type {
+  AiProvenanceRecordRow, AiProvenanceHashQuery,
+  AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery,
+} from '../../../interface.js';
 import type { AiProvenance as AiProvenanceDoc } from '../../../../models/ai-provenance-schemas.js';
 import type { AiProvenance as AiProvenanceRow, Json } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -57,6 +63,15 @@ const publiclyLinked = (idColumn: string) => sql<boolean>`(
 
 /** Bind-parameter budget for one `IN (...)` statement. Well under the Postgres 65535 ceiling. */
 const ID_CHUNK = 1_000;
+
+// The three document fields the report and the sweep group by, read out of the jsonb in SQL. Named
+// constants so the facet query and the list query cannot drift on what "unlabelled" means — a sweep
+// that counts one population while the report shows another is the kind of disagreement nobody
+// notices until a regulator asks. Mirrors the SQLite provider's json_extract() trio.
+const HUMAN_INVOLVEMENT = sql<string | null>`p."record"->>'humanInvolvement'`;
+const LEVEL = sql<string | null>`p."record"->>'level'`;
+/** COALESCE, because an ABSENT disclosure block means no label was computed as required. */
+const DISCLOSURE_REQUIRED = sql<boolean>`COALESCE((p."record"->'disclosure'->>'required')::boolean, false)`;
 
 export const aiProvenanceMethods = {
   async createAiProvenance(this: PostgresKyselyStorage, row: AiProvenanceRecordRow): Promise<void> {
@@ -119,5 +134,65 @@ export const aiProvenanceMethods = {
       .where(publiclyLinked('"AiProvenance"."id"'), '=', true)
       .execute();
     return rows.map((r) => r.id);
+  },
+
+  async aiProvenanceFacets(
+    this: PostgresKyselyStorage, query?: AiProvenanceFacetQuery,
+  ): Promise<AiProvenanceFacet[]> {
+    let q = this.db.selectFrom('AiProvenance as p')
+      .select([
+        HUMAN_INVOLVEMENT.as('hi'),
+        LEVEL.as('lvl'),
+        sql<string>`substr(p."generatedAt", 1, 10)`.as('day'),
+        publiclyLinked('p."id"').as('pub'),
+        DISCLOSURE_REQUIRED.as('req'),
+        sql<string>`COUNT(*)`.as('n'),
+      ])
+      .groupBy(['hi', 'lvl', 'day', 'pub', 'req']);
+    if (query?.ownerGhii) q = q.where('p.ownerGhii', '=', query.ownerGhii);
+    if (query?.since) q = q.where('p.generatedAt', '>=', query.since);
+    const rows = await q.execute();
+    return rows.map((r) => ({
+      // `unstated` rather than null: a record whose document somehow lacks the field says nothing
+      // about human involvement, and "nothing" must never be counted as "a human was involved".
+      humanInvolvement: r.hi ?? 'unstated',
+      level: r.lvl ?? 'unstated',
+      day: r.day,
+      publiclyLinked: r.pub === true,
+      disclosureRequired: r.req === true,
+      // COUNT() comes back as a bigint string on this driver; Number() is exact well past any
+      // plausible record count.
+      count: Number(r.n),
+    }));
+  },
+
+  async listAiProvenance(
+    this: PostgresKyselyStorage, query?: AiProvenanceListQuery,
+  ): Promise<{ items: AiProvenanceRecordRow[]; total: number }> {
+    // One WHERE, built once and used by both the count and the page — so a total can never describe
+    // a different population from the rows shown under it.
+    const conditions = sql<boolean>`${sql.join([
+      sql`TRUE`,
+      ...(query?.ownerGhii ? [sql`p."ownerGhii" = ${query.ownerGhii}`] : []),
+      ...(query?.since ? [sql`p."generatedAt" >= ${query.since}`] : []),
+      ...(query?.unlabelledPublicOnly ? [
+        publiclyLinked('p."id"'),
+        sql`${HUMAN_INVOLVEMENT} IN ('none', 'light-review')`,
+        sql`NOT ${DISCLOSURE_REQUIRED}`,
+      ] : []),
+    ], sql` AND `)}`;
+
+    const counted = await this.db.selectFrom('AiProvenance as p')
+      .select(sql<string>`COUNT(*)`.as('n'))
+      .where(conditions)
+      .executeTakeFirst();
+    const limit = Math.min(Math.max(query?.limit ?? 50, 1), 500);
+    const rows = await this.db.selectFrom('AiProvenance as p').selectAll()
+      .where(conditions)
+      .orderBy('p.generatedAt', 'desc')
+      .limit(limit)
+      .offset(Math.max(query?.offset ?? 0, 0))
+      .execute();
+    return { items: rows.map(toRecord), total: Number(counted?.n ?? 0) };
   },
 };

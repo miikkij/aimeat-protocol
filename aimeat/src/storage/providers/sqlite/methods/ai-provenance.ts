@@ -12,9 +12,13 @@
  *   choice — it means a third party's non-public row never enters the process at all on the
  *   anonymous detection path, so there is nothing there to leak by a later mistake.
  * @structure aiProvenanceMethods — createAiProvenance · getAiProvenance · getAiProvenanceMany ·
- *   findAiProvenanceByHash · publiclyLinkedProvenanceIds
+ *   findAiProvenanceByHash · publiclyLinkedProvenanceIds · aiProvenanceFacets · listAiProvenance
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8. aiProvenanceFacets() + listAiProvenance(): the read
+ *     side for the operator report, the unlabelled-content sweep and the per-owner view. Grouped in
+ *     SQL over the whole table — a capped page would make "how many public items carry no label" a
+ *     number that quietly means something else.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 4 step 0b. getAiProvenanceMany(): one query for a page of
  *     items instead of one per item. The N+1 it replaces grew with the CONTENT rather than with the
  *     traffic, and Phase 4's MCP read tools hit the same path.
@@ -22,7 +26,10 @@
  *     gone and the public test is an EXISTS over the items that point at the record.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
  */
-import type { AiProvenanceRecordRow, AiProvenanceHashQuery } from '../../../interface.js';
+import type {
+  AiProvenanceRecordRow, AiProvenanceHashQuery,
+  AiProvenanceFacet, AiProvenanceFacetQuery, AiProvenanceListQuery,
+} from '../../../interface.js';
 import type { AiProvenance } from '../../../../models/ai-provenance-schemas.js';
 import type { SqliteStorage } from '../index.js';
 
@@ -54,6 +61,15 @@ const PUBLICLY_LINKED = `(
 
 /** Bound-parameter budget for one `IN (...)` statement. Well under SQLite's 999-parameter default. */
 const ID_CHUNK = 500;
+
+// The three document fields the report and the sweep group by, read out of the JSON in SQL. Named
+// constants so the facet query and the list query cannot drift on what "unlabelled" means — a sweep
+// that counts one population while the report shows another is the kind of disagreement nobody
+// notices until a regulator asks.
+const HUMAN_INVOLVEMENT = "json_extract(p.record, '$.humanInvolvement')";
+const LEVEL = "json_extract(p.record, '$.level')";
+/** SQLite reads a JSON `true` as the integer 1. */
+const DISCLOSURE_REQUIRED = "json_extract(p.record, '$.disclosure.required') = 1";
 
 export const aiProvenanceMethods = {
   async createAiProvenance(this: SqliteStorage, row: AiProvenanceRecordRow): Promise<void> {
@@ -113,5 +129,55 @@ export const aiProvenanceMethods = {
       `SELECT p.id FROM ai_provenance p WHERE p.id IN (${placeholders}) AND ${PUBLICLY_LINKED}`
     ).all(...ids) as { id: string }[];
     return rows.map((r) => r.id);
+  },
+
+  async aiProvenanceFacets(
+    this: SqliteStorage, query?: AiProvenanceFacetQuery,
+  ): Promise<AiProvenanceFacet[]> {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    if (query?.ownerGhii) { where.push('p.ownerGhii = ?'); params.push(query.ownerGhii); }
+    if (query?.since) { where.push('p.generatedAt >= ?'); params.push(query.since); }
+    const rows = this.db.prepare(
+      `SELECT ${HUMAN_INVOLVEMENT} AS hi, ${LEVEL} AS lvl, substr(p.generatedAt, 1, 10) AS day,
+              CASE WHEN ${PUBLICLY_LINKED} THEN 1 ELSE 0 END AS pub,
+              CASE WHEN ${DISCLOSURE_REQUIRED} THEN 1 ELSE 0 END AS req,
+              COUNT(*) AS n
+         FROM ai_provenance p
+        ${where.length ? `WHERE ${where.join(' AND ')}` : ''}
+        GROUP BY hi, lvl, day, pub, req`
+    ).all(...params) as Array<{ hi: string | null; lvl: string | null; day: string; pub: number; req: number; n: number }>;
+    return rows.map((r) => ({
+      // `unstated` rather than null: a record whose document somehow lacks the field says nothing
+      // about human involvement, and "nothing" must never be counted as "a human was involved".
+      humanInvolvement: r.hi ?? 'unstated',
+      level: r.lvl ?? 'unstated',
+      day: r.day,
+      publiclyLinked: r.pub === 1,
+      disclosureRequired: r.req === 1,
+      count: r.n,
+    }));
+  },
+
+  async listAiProvenance(
+    this: SqliteStorage, query?: AiProvenanceListQuery,
+  ): Promise<{ items: AiProvenanceRecordRow[]; total: number }> {
+    const where: string[] = [];
+    const params: unknown[] = [];
+    if (query?.ownerGhii) { where.push('p.ownerGhii = ?'); params.push(query.ownerGhii); }
+    if (query?.since) { where.push('p.generatedAt >= ?'); params.push(query.since); }
+    if (query?.unlabelledPublicOnly) {
+      where.push(PUBLICLY_LINKED);
+      where.push(`${HUMAN_INVOLVEMENT} IN ('none', 'light-review')`);
+      where.push(`NOT (${DISCLOSURE_REQUIRED})`);
+    }
+    const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
+    const total = (this.db.prepare(`SELECT COUNT(*) AS n FROM ai_provenance p ${clause}`)
+      .get(...params) as { n: number }).n;
+    const limit = Math.min(Math.max(query?.limit ?? 50, 1), 500);
+    const rows = this.db.prepare(
+      `SELECT p.* FROM ai_provenance p ${clause} ORDER BY p.generatedAt DESC LIMIT ? OFFSET ?`
+    ).all(...params, limit, Math.max(query?.offset ?? 0, 0)) as Record<string, unknown>[];
+    return { items: rows.map(deserialize), total };
   },
 };

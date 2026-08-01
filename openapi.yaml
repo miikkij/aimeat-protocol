@@ -1617,17 +1617,23 @@ components:
       properties:
         targetType:
           type: string
-          enum: [profile, memory, action, board_post]
-          description: Type of resource being flagged
-          example: profile
+          enum: [memory, board_post, action, agent, app, ai_provenance]
+          description: >
+            Type of resource being flagged. `app` names a published app as `owner/filename`;
+            `ai_provenance` names a provenance record id - the identifier a reader already has,
+            because a visible AI label links to `/v1/provenance/{id}`.
+          example: ai_provenance
         targetId:
           type: string
           description: ID of the flagged resource
           example: bad-actor-001
         reason:
           type: string
-          enum: [spam, inappropriate, misleading, duplicate, other]
-          description: Reason for the flag
+          enum: [unreliable, inappropriate, illegal, spam, other, undisclosed_ai]
+          description: >
+            Reason for the flag. `undisclosed_ai` is the AI Act correction procedure (Code of
+            Practice Section 2, Commitment 2): content that should carry an AI label and does not.
+            It routes into this same moderation queue rather than a separate inbox.
           example: spam
         description:
           type: string
@@ -8533,6 +8539,100 @@ paths:
             text/markdown:
               schema:
                 type: string
+
+  /v1/admin/ai-transparency-report:
+    get:
+      operationId: aiTransparencyReport
+      summary: Operator report - what this node published, and how much of it carries a label
+      description: >
+        The GPAI Code of Practice documentation duty (Section 2, Commitment 2), answered from the
+        provenance records the node already holds rather than from a spreadsheet somebody maintains -
+        so it cannot go stale.
+
+        Response `data`: `{ scope, total, public_total, public_by_human_involvement, public_by_level,
+        unlabelled, labelled, trend, apps_declaring_generation_with_gap, unlabelled_detail }`.
+
+        `unlabelled` is the number an operator acts on: content that is publicly readable, that a
+        model produced, that nobody recorded reviewing, and for which no label was computed as
+        required. `unlabelled_detail` carries an honest `total` beside a capped `items` list - a
+        truncated list without one reads as the whole story.
+
+        `scope.note` states what the counts do NOT cover: content with no provenance record at all is
+        UNSTATED and does not appear here. Absence of a record is not evidence that a person wrote
+        something.
+      tags: [AI Transparency]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: since_days
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 3650
+            default: 30
+          description: Window for the whole report, not only the trend.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /v1/ai-transparency/mine:
+    get:
+      operationId: aiTransparencyMine
+      summary: What your agents published, and how it was labelled
+      description: >
+        The per-owner view of the same roll-up. Most publishing on this node is done by accounts
+        rather than by the operator, so an account has to be able to see its own exposure without
+        asking anyone.
+
+        Scoped by the session's resolved identity, never by a query parameter: there is no request
+        shape that names another owner. Response `data` is the operator report's shape plus `recent`
+        (your newest records) and `unlabelled_detail` (yours that are public and unlabelled), each
+        carrying an honest `total` beside a capped `items` list.
+      tags: [AI Transparency]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: since_days
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 3650
+            default: 30
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/ai-transparency/logging-policy:
+    get:
+      operationId: aiLoggingPolicy
+      summary: What this node records about a model call, for how long, and who can read it
+      description: >
+        GPAI Code of Practice Sub-measure 1.1.3: where logging is used as a marking layer, the
+        deployer gets access to the logging policy and control over retention. The ledger existed;
+        the owner had no view of it AS a policy.
+
+        Response `data`: `{ why, records[], posture, note }`. Each entry in `records` states what it
+        contains, what it NEVER contains (prompt text and response text, in every case), how long it
+        is kept, who can read it, and the controls the owner has. Derived from configuration, so a
+        retention figure here is the one the software actually applies.
+      tags: [AI Transparency]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
 
   /v1/ledger/usage:
     get:

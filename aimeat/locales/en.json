@@ -8377,5 +8377,22 @@
       "aiBasic": "AI was involved in making this content",
       "unstated": "AI involvement unstated"
     }
-  }
+  },
+  "aiTransparency.title": "AI transparency — what you published",
+  "aiTransparency.desc": "How much of what you have published was written by a model, and how much of that carries a label.",
+  "aiTransparency.unlabelled": "public, unlabelled",
+  "aiTransparency.labelled": "public, labelled",
+  "aiTransparency.publicTotal": "public items",
+  "aiTransparency.total": "records in all",
+  "aiTransparency.scopeNote": "These counts cover content this node holds a provenance record for. Content with no record is unstated and does not appear here.",
+  "aiTransparency.unlabelledHelp": "A model produced these, nobody recorded reviewing them, and anyone can read them. Under Article 50(4) that combination owes a label. If a person did read and approve the substance, record that and the label stops being owed.",
+  "aiTransparency.unknownSource": "unknown source",
+  "aiTransparency.openRecord": "Open the record",
+  "aiTransparency.showingOf": "Showing {shown} of {total}.",
+  "aiTransparency.appsWithGap": "Apps that generate content and say nothing about it",
+  "aiTransparency.policyTitle": "What this node records about a model call",
+  "aiTransparency.retention": "Kept",
+  "aiTransparency.neverContains": "Never contains",
+  "aiTransparency.loadFailed": "Could not read your transparency summary.",
+  "aiTransparency.loading": "Reading your records…"
 }

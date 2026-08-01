@@ -413,9 +413,15 @@ export const GhiiLoginSchema = z.object({
 // ── Flags (security audit -- authenticated endpoints) ──
 
 export const FlagCreateSchema = z.object({
-    targetType: z.enum(['memory', 'board_post', 'action', 'agent']),
+    // `app` and `ai_provenance` added for the AI Act correction procedure (TARGET-058 Phase 8):
+    // Section 2, Commitment 2 of the Code of Practice requires a way for a person to report content
+    // that should carry an AI label and does not. That path is THIS queue — the one operators and
+    // organism admins already review — rather than a fourth inbox nobody would watch. `app` names a
+    // published app as `owner/filename`; `ai_provenance` names a record id from a label's own
+    // "details" link, which is the identifier a reader actually has in front of them.
+    targetType: z.enum(['memory', 'board_post', 'action', 'agent', 'app', 'ai_provenance']),
     targetId: z.string().min(1).max(256),
-    reason: z.enum(['unreliable', 'inappropriate', 'illegal', 'spam', 'other']),
+    reason: z.enum(['unreliable', 'inappropriate', 'illegal', 'spam', 'other', 'undisclosed_ai']),
     description: z.string().max(10_000).optional(),
 });
 

@@ -451,7 +451,7 @@ export async function mountRoutes(
   app.use(aiProvenanceRouter(config, storage));
   // The node's own AI transparency statement — what it marks, how, in which posture, and who runs
   // it. Linked from llms.txt, AGENTS.md and the bootstrap document so an agent finds it first.
-  app.use(aiTransparencyRouter(config));
+  app.use(aiTransparencyRouter(config, storage));
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
   app.use(actionsRouter(config, storage));

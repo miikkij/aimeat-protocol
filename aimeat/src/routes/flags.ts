@@ -22,8 +22,21 @@ import { emitChange } from '../services/event-bus.js';
 import { FlagCreateSchema, validateBody } from '../models/schemas.js';
 import { logger } from '../utils/logger.js';
 
-const VALID_TARGET_TYPES = ['memory', 'board_post', 'action', 'agent'] as const;
-const VALID_REASONS = ['unreliable', 'inappropriate', 'illegal', 'spam', 'other'] as const;
+/**
+ * `app` and `ai_provenance` exist for the AI Act correction procedure (TARGET-058 Phase 8).
+ *
+ * The Code of Practice (Section 2, Commitment 2) requires a way for a person to report content that
+ * should carry an AI label and does not, and until now this node had none. It is deliberately THIS
+ * queue rather than a new one: flags already have a review surface, an auto-hide threshold, an
+ * appeal path and a set of people who look at them. A fourth inbox would be a queue nobody watches,
+ * which is the same as no correction procedure while looking like one.
+ *
+ * `ai_provenance` takes a record id because that is the identifier a reader actually holds — the
+ * label's own "details" link goes to `/v1/provenance/<id>`, so reporting it is a copy-paste rather
+ * than an investigation.
+ */
+const VALID_TARGET_TYPES = ['memory', 'board_post', 'action', 'agent', 'app', 'ai_provenance'] as const;
+const VALID_REASONS = ['unreliable', 'inappropriate', 'illegal', 'spam', 'other', 'undisclosed_ai'] as const;
 const VALID_REVIEW_STATUSES = ['dismissed', 'actioned'] as const;
 
 function param(p: string | string[]): string {

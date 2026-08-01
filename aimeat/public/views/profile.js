@@ -65,6 +65,7 @@ import OrganismsTab from './profile/organisms-tab.js';
 import OffersTab from './profile/offers-tab.js';
 import NotificationsTab from './profile/notifications-tab.js';
 import { OpenRouterSettings } from './profile/openrouter-settings.js';
+import { AiTransparencyCard } from './profile/ai-transparency-card.js';
 import CalibratorTab from './profile/calibrator-tab.js';
 import PackagesTab from './profile/packages-tab.js';
 import CapabilitiesTab from './profile/capabilities-tab.js';
@@ -82,7 +83,14 @@ import LibrariesTab from './profile/libraries-tab.js';
 // Deep links (?tab=X) bypass tier filtering.
 // The former "Generator" tab now hosts only the AI-provider (OpenRouter) settings,
 // opened by default. The Generator feature itself was removed.
-function OpenRouterTab(props) { return html`<${OpenRouterSettings} ...${props} startOpen=${true} />`; }
+// The AI tab hosts the provider settings AND, below them, the owner's own transparency view: what
+// they published with a model in it, how much of it carries a label, and what this node records
+// about a model call (TARGET-058 Phase 8 — the deployer's access to the logging policy).
+function OpenRouterTab(props) {
+  return html`
+    <${OpenRouterSettings} ...${props} startOpen=${true} />
+    <${AiTransparencyCard} />`;
+}
 
 const TABS = [
   { id: 'messages',      key: 'profile.tabs.inbox',          component: InboxTab,          minTier: 'new' },
