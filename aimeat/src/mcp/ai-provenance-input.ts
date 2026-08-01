@@ -26,6 +26,8 @@
  *   - aiProvenanceInput      — the optional zod fragment, spread into a write tool's input shape
  *   - aiProvenanceIdInput    — the sibling `ai_provenance_id` fragment (attach an existing record)
  *   - toDeclaredProvenance() — the snake→camel mapping into services/ai-provenance.ts's input type
+ *   - parseDeclaredProvenanceInput() — validate + map for a surface with no zod layer (a REST body,
+ *                               a presigned token's meta)
  * @usage
  *   import { aiProvenanceInput, toDeclaredProvenance } from './ai-provenance-input.js';
  *   mcp.tool('aimeat_memory_write', descriptionFor('aimeat_memory_write'),
@@ -37,6 +39,10 @@
  *         declared: toDeclaredProvenance(ai_provenance), declaredId: ai_provenance_id, ... });
  *     });
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058. parseDeclaredProvenanceInput(): the same validation + mapping
+ *     for the doors that have no zod of their own. The app publish surface had four of them and only
+ *     ONE carried a declaration, so the recommended presigned route published every app with
+ *     `aiProvenanceId: null` while advertising the parameter.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 11. The block schema is exported. The connector's two
  *     surfaces carried NO provenance at all and stripped a caller's block as an unknown key; they now
  *     validate against this same object rather than a second, drifting copy of the enums.
@@ -111,6 +117,35 @@ export const aiProvenanceInputs = { ...aiProvenanceInput, ...aiProvenanceIdInput
 
 /** The declared block as it arrives over MCP, before the boundary mapping below. */
 export type AiProvenanceToolInput = z.infer<typeof AiProvenanceBlockSchema>;
+
+/**
+ * Validate + map a declaration that arrived on a surface with NO zod layer of its own — a REST JSON
+ * body, or a presigned upload token's `meta`.
+ *
+ * It exists so those surfaces cannot grow a second, drifting idea of what a declaration may say.
+ * That is not hypothetical: the app publish doors are how this function came to be written. The MCP
+ * inline branch carried a declaration and the other three did not, so `POST /v1/apps`, the
+ * publish-draft route and the whole presigned path — the one the tooling recommends for anything
+ * over 1 KB — accepted `ai_provenance` and threw it away, and every app on the node published with
+ * no record.
+ *
+ * `undefined` in, `{ ok: true, declared: undefined }` out: a caller that said nothing is not an
+ * error, it is the ordinary case, and the mint path already knows what silence means.
+ */
+export function parseDeclaredProvenanceInput(
+  raw: unknown,
+): { ok: true; declared: DeclaredProvenance | undefined }
+  | { ok: false; violations: { path: string; message: string }[] } {
+  if (raw === undefined || raw === null) return { ok: true, declared: undefined };
+  const parsed = AiProvenanceBlockSchema.safeParse(raw);
+  if (!parsed.success) {
+    return {
+      ok: false,
+      violations: parsed.error.issues.map((i) => ({ path: i.path.join('.'), message: i.message })),
+    };
+  }
+  return { ok: true, declared: toDeclaredProvenance(parsed.data) };
+}
 
 /**
  * Map the wire block onto the internal shape. The only interesting line is `humanInvolvement`, which

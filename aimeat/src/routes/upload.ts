@@ -50,6 +50,11 @@
  *     that had explicitly requested an upsert was forced into delete + reinstall - which also
  *     throws away the extension's ext:{name} memory. Upsert swaps the same code+metadata field
  *     set as PUT /v1/extensions/:name and preserves lifecycle fields; owner mismatch is 403.
+ *   v1.12.0 - 2026-08-01 - TARGET-058: handleAppUpload reads the caller's OWN `ai_provenance` /
+ *     `ai_provenance_id` out of the token meta, so a declared statement survives the presigned route.
+ *     v1.11.0 below gave this door the node's MINT-3 stamp — what an agent SAID about its own work
+ *     still could not get here, because the token never carried it. The publish tool advertised the
+ *     parameter and discarded it at mint, which is why no app on the node had a declared record.
  *   v1.11.0 - 2026-08-01 - TARGET-058 Phase 5: handleAppUpload stamps the published bytes with a
  *     provenance record (MINT-3) and runs the AI transparency check, both of which POST /v1/apps has
  *     run and this path had not. Presigned upload is the DEFAULT door for anything over ~1 KB, so it
@@ -67,6 +72,8 @@ import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.j
 import { publishSkill, type SkillScope } from '../services/skills.js';
 import { parseGAII } from '../utils/gaii.js';
 import { publishApp } from '../services/app-publish.js';
+import { parseDeclaredProvenanceInput } from '../mcp/ai-provenance-input.js';
+import type { DeclaredProvenance } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
@@ -164,6 +171,25 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
     return router;
 }
 
+/**
+ * The `ai_provenance` block a presigned token carries, mapped to the mint path's input — or
+ * undefined when there is none, or when what is there no longer validates.
+ *
+ * Shared by every utype that grows a declaration, which is why it sits here rather than inside
+ * handleAppUpload: the app door is simply the first one to need it, and the next one must not
+ * hand-roll a second reading of the same key.
+ */
+function declaredFromMeta(meta: Record<string, unknown>): DeclaredProvenance | undefined {
+    const parsed = parseDeclaredProvenanceInput(meta.ai_provenance);
+    if (!parsed.ok) {
+        logger.warn('Upload token carried an ai_provenance block that no longer validates — publishing without it', {
+            violations: parsed.violations.map((v) => `${v.path}: ${v.message}`).join('; '),
+        });
+        return undefined;
+    }
+    return parsed.declared;
+}
+
 // ── Handler: App ──
 
 async function handleAppUpload(
@@ -208,6 +234,14 @@ async function handleAppUpload(
         },
         accessCode: { mode: 'carry' },
         source: 'presigned',
+        // The declaration the caller made when they asked for this URL, carried in the signed token.
+        // Re-validated rather than trusted: the token is ours and cannot be forged, but a block that
+        // no longer parses (an enum retired between mint and PUT, an hour apart at most, but still)
+        // must not reach the mint path as a half-shape. An invalid block is dropped, not fatal —
+        // refusing the upload would lose the BYTES over a metadata problem, and this door's failure
+        // mode has already been "the app is published, the record is missing" once.
+        declaredProvenance: declaredFromMeta(meta),
+        declaredProvenanceId: typeof meta.ai_provenance_id === 'string' ? meta.ai_provenance_id : undefined,
     });
     if ('refusal' in out) {
         res.status(out.refusal.status).json({

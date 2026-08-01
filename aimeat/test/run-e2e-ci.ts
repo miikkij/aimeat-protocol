@@ -114,6 +114,9 @@ const ALL_SUITES = [
     // Spawns the real `aimeat connect serve --http` daemon: the CONNECTOR's two tool surfaces
     // (MCP + shell-callable) are separate code from src/mcp/, and they carried no provenance at all.
     'test/e2e-ai-provenance-connector.ts',
+    // Every publish door, because for a while the answer to "did the declaration survive?" depended
+    // on which one you came through — and three of the four said no, in silence.
+    'test/e2e-app-publish-provenance-doors.ts',
     'test/e2e-app-ai-posture.ts',
     'test/e2e-notifications.ts',
     'test/e2e-feedback.ts',

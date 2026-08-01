@@ -21,6 +21,10 @@
  *     site. Hand-written metas is how aimeat_extension_install's `update` flag was accepted and then
  *     dropped (meta: {}), so a requested upsert failed ALREADY_EXISTS with nothing pointing at the
  *     flag. Covered by test/e2e-presigned-meta.ts.
+ *   v1.5.0 — 2026-08-01 — TARGET-058: PRESIGNED_META_KEYS.app carries `ai_provenance` /
+ *     `ai_provenance_id`. Phase 4 wired the declaration into the INLINE publish only, so the
+ *     presigned door — the one the tooling tells every author to use above 1 KB — accepted a
+ *     declaration and dropped it at mint. Exactly the failure this list exists to prevent.
  *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 5: the token carries `actor`, the principal that asked for
  *     the URL, alongside `sub`, the owner bucket it lands in. For an app publish those differ — `sub`
  *     is always the owner — so an agent publishing through the recommended presigned route arrived
@@ -110,7 +114,15 @@ export class UploadTokenError extends Error {
  * forgotten key a test failure instead of a support ticket.
  */
 export const PRESIGNED_META_KEYS = {
-    app: ['filename', 'name', 'description', 'category', 'tags', 'icon', 'version'],
+    // `ai_provenance` / `ai_provenance_id` are on this list because the presigned door is the
+    // RECOMMENDED one for any bundle over 1 KB — which is every real app. While they were missing,
+    // the publish tool advertised a declaration parameter, accepted it, minted a token without it
+    // and published an app with `aiProvenanceId: null`: the one door an author is told to use was
+    // the one door that could not carry the statement, and the observable result was a node on
+    // which no app had a provenance record at all. Carried through the SIGNED token, so the
+    // declaration that arrives with the bytes is the one the caller made when they asked for the URL.
+    app: ['filename', 'name', 'description', 'category', 'tags', 'icon', 'version',
+          'ai_provenance', 'ai_provenance_id'],
     storage: ['key', 'mime_type', 'visibility', 'group_id', 'tags', 'workspace_refs'],
     extension: ['update', 'activate'],
     cortex: ['update', 'activate'],
