@@ -327,6 +327,53 @@ await test('ai_provenance_id minted over REST attaches through the connector wri
     `attached record reads ${JSON.stringify({ level: record.level, humanInvolvement: record.humanInvolvement })}`);
 });
 
+// ─── 4b. THE READ DIRECTION ───
+// Reported by the crewaimeat developer on 2026-08-01: read_provenance() never returns anything for
+// memory reads. Same class as the write-side strip, pointing the other way — the node serves the
+// record on the ENVELOPE carrier (`meta.provenance`, the one carrier 22-frozen-vocabulary.md §A4
+// froze), and the connector unwraps `resp.data` and throws the envelope away.
+console.log('\nPhase 4b — Reading it back through the connector');
+
+await test('CONNECTOR MCP: aimeat_memory_read returns the record, not just the id', async () => {
+  const key = 'crew.read.back';
+  const w = await mcpCall(mcp!, 'aimeat_memory_write', {
+    key,
+    value: { brief: 'A person wrote this; the crew relayed it.' },
+    ai_provenance: { level: 'original', human_involvement: 'full-human' },
+  });
+  assert(!w.isError, `write failed: ${w.raw}`);
+
+  const r = await mcpCall(mcp!, 'aimeat_memory_read', { key });
+  assert(!r.isError, `read failed: ${r.raw}`);
+  const block = r.payload?.ai_provenance;
+  assert(!!block,
+    `the read result carries no ai_provenance block, so a crew reading its own content back cannot `
+    + `state how it was made. The node DOES send it (meta.provenance); the connector dropped it. `
+    + `Result keys: ${Object.keys(r.payload ?? {}).join(', ')}`);
+  assert(block.record?.spec === 'aimeat.provenance/v1',
+    `no aimeat.provenance/v1 document in the block, so read_provenance() reads it as UNSTATED: ${JSON.stringify(block)}`);
+  assert(block.record.level === 'original',
+    `read back the wrong level: ${JSON.stringify(block.record)}`);
+  assert(typeof block.id === 'string' && typeof block.record_url === 'string',
+    `the block is not the { id, record, record_url } shape every other read surface uses: ${JSON.stringify(block)}`);
+});
+
+await test('SHELL: /local/call/aimeat_memory_read returns the record too', async () => {
+  const key = 'crew.read.back.shell';
+  const w = await json(loopbackBase, '/local/call/aimeat_memory_write', {
+    method: 'POST',
+    body: JSON.stringify({ key, value: { brief: 'Relayed.' }, ai_provenance: { level: 'original', human_involvement: 'full-human' } }),
+  });
+  assert(w.status === 200 && w.body.ok === true, `shell write: ${w.status} ${JSON.stringify(w.body)}`);
+
+  const r = await json(loopbackBase, '/local/call/aimeat_memory_read', { method: 'POST', body: JSON.stringify({ key }) });
+  assert(r.status === 200 && r.body.ok === true, `shell read: ${r.status} ${JSON.stringify(r.body)}`);
+  const block = r.body.data?.ai_provenance;
+  assert(!!block, `the shell read dropped the record: ${JSON.stringify(r.body.data)}`);
+  assert(block.record?.spec === 'aimeat.provenance/v1' && block.record.level === 'original',
+    `shell read block is wrong: ${JSON.stringify(block)}`);
+});
+
 // ─── 5. The tools whose node door cannot carry a declaration say so ───
 console.log('\nPhase 5 — A door that cannot carry a declaration says so out loud');
 

@@ -3,6 +3,7 @@
  * @description MCP tool registrations for knowledge package browsing,
  *   retrieval, contribution, and link discovery.
  * @version-history
+ *   v1.4.0 -- 2026-08-01 -- TARGET-058 Phase 11b: aimeat_knowledge_get folds meta.provenance.
  *   v1.3.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_knowledge_contribute carries
  *     `ai_provenance` / `ai_provenance_id` and echoes what was recorded.
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -17,7 +18,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
-import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
+import { provenanceEchoedResult, readPayloadWithProvenance } from '../../ai-provenance-carry.js';
 
 export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -31,7 +32,8 @@ export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry):
     package_id: z.string().describe('Knowledge package identifier'),
   }, annotationsFor('aimeat_knowledge_get'), async ({ package_id }) => {
     const resp = await client.get(`/v1/knowledge/${encodeURIComponent(package_id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    // The package manifest read serves its record on meta.provenance — see core.ts memory_read.
+    return { content: [{ type: 'text' as const, text: JSON.stringify(readPayloadWithProvenance(resp), null, 2) }] };
   });
 
   mcp.tool('aimeat_knowledge_contribute', descriptionFor('aimeat_knowledge_contribute'), {

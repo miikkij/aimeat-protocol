@@ -20,6 +20,8 @@
  *   v1.6.0 -- 2026-05-30 -- F10 drift reconciliation: align connector core tool inputs with server MCP +
  *     REST (catalogue_search search/category; memory_write group_id+ttl_hours; memory_search visibility;
  *     board read/post/create/subscribe filters; work_deliver output; message_send content; storage_upload).
+ *   v1.8.0 -- 2026-08-01 -- TARGET-058 Phase 11b: aimeat_memory_read folds meta.provenance, so a
+ *     crew reading its own content back gets the record and not just an id it cannot resolve.
  *   v1.7.0 -- 2026-08-01 -- TARGET-058 Phase 11: memory_write and board_post carry `ai_provenance` /
  *     `ai_provenance_id`. The catalog had advertised both since Phase 4 while these shapes stripped
  *     them as unknown keys, so a crew's declaration vanished behind an ok:true.
@@ -30,7 +32,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
-import { carrierAttach, provenanceEchoedResult } from '../../ai-provenance-carry.js';
+import { carrierAttach, provenanceEchoedResult, readPayloadWithProvenance } from '../../ai-provenance-carry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 
 export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void {
@@ -43,7 +45,10 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
   }, annotationsFor('aimeat_memory_read'), async ({ agent_name, key, response_format }) => {
     const { client } = pickAgent(registry, agent_name);
     const resp = await client.get(`/v1/memory/${encodeURIComponent(key)}`);
-    return jsonContent(shapeResponse('aimeat_memory_read', response_format, resp.data ?? resp));
+    // readPayloadWithProvenance, not `resp.data ?? resp`: this route serves the record on the
+    // ENVELOPE carrier (meta.provenance), and the plain unwrap threw the envelope away — so a crew
+    // reading its own content back got the id and no statement. TARGET-058 Phase 11b.
+    return jsonContent(shapeResponse('aimeat_memory_read', response_format, readPayloadWithProvenance(resp)));
   });
 
   mcp.tool('aimeat_memory_write', descriptionFor('aimeat_memory_write'), {

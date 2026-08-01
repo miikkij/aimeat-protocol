@@ -26,6 +26,8 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 11b. Assertion 2c: the READ direction. Phase 11 fixed
+ *     writes and left reads broken, which is the same mistake one layer along.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 11. Assertion 2b: the gate reads BOTH MCP surfaces and the
  *     shell-callable dispatch, not just src/mcp/. It reported green for eight phases on a connector
  *     surface it could not see — where a declared write returned ok:true and the block was stripped
@@ -392,10 +394,92 @@ function checkConnectorSurfaces(): void {
       + 'the same tool is the drift this assertion exists to stop.');
   }
 
+  checkConnectorReadDirection(carrierSrc, connectorBlocks);
+
   const notCarried = [...carrierSrc.matchAll(/^\s{2}(aimeat_[a-z0-9_]+):\s*\{\s*kind:\s*'not-carried'/gm)].map(m => m[1]);
   if (notCarried.length) {
     notes.push(`  connector declarations NOT recorded (the node route accepts none): ${notCarried.length} tool(s) — `
       + `${notCarried.join(', ')}. Each returns ai_provenance.recorded=false with the reason.`);
+  }
+}
+
+// ── 2c. THE READ DIRECTION LOSES NOTHING ────────────────────────────────────────────────────────
+// Phase 11 fixed writes and left reads broken, which is the same mistake one layer along: a route
+// that serves its record on the ENVELOPE carrier (`meta.provenance`, the one carrier §A4 froze) hands
+// it to a connector tool that does `resp.data ?? resp` and drops the envelope. A crew reading its own
+// content back got `ai_provenance_id` — a pointer — and no statement.
+//
+// Route → tool is not statically derivable, so the routes are a LIST you have to edit. A seventh one
+// fails this check until somebody says what wraps it, which is the same shape as
+// CREATE_APP_DISTINCT_ACTS and LLM_TRANSPORT_LEGACY_CALLERS.
+
+/** Routes that serve a provenance record on `meta.provenance`, and what carries it to a caller. */
+const ENVELOPE_PROVENANCE_ROUTES: Record<string, string> = {
+  'src/routes/memory/key.ts':
+    'GET /v1/memory/:key (+ the public read) — connector: aimeat_memory_read, folded.',
+  'src/routes/apps/read.ts':
+    'the app detail read — connector: aimeat_app_get, folded.',
+  'src/routes/knowledge/packages-core.ts':
+    'the knowledge package manifest read — connector: aimeat_knowledge_get, folded.',
+  'src/routes/ai.ts':
+    'POST /v1/ai/complete — no connector tool wraps it; apps read it via the browser SDK, which '
+    + 'reads r.meta.provenance directly (sdk-libs/ai/index.js).',
+  'src/routes/openrouter.ts':
+    'POST /v1/openrouter/complete — owner-facing, same as ai.ts: no connector tool.',
+};
+
+/** Connector MCP read tools that MUST fold the envelope carrier onto their payload. */
+const CONNECTOR_META_READS = ['aimeat_memory_read', 'aimeat_app_get', 'aimeat_knowledge_get'];
+
+const READ_FOLD = 'readPayloadWithProvenance';
+
+function checkConnectorReadDirection(
+  carrierSrc: string, connectorBlocks: Array<{ name: string; file: string; block: string }>,
+): void {
+  // The shell surface folds UNCONDITIONALLY inside withProvenanceCarrying — no list to forget. That
+  // property is what is asserted; deleting the fold from inside the wrapper would otherwise pass the
+  // `.map(withProvenanceCarrying)` check above while losing every record on the shell path.
+  if (!carrierSrc.includes(READ_FOLD)) {
+    fail('connector-provenance', `${CONNECTOR_CARRIERS} no longer folds meta.provenance onto read payloads`,
+      `restore ${READ_FOLD}() and its use inside withProvenanceCarrying(). Without it every `
+      + 'shell-callable read drops the record the node served on the envelope, and a crew sees a '
+      + 'provenance id it cannot resolve into a statement.');
+  }
+
+  const byName = new Map(connectorBlocks.map(b => [b.name, b]));
+  for (const name of CONNECTOR_META_READS) {
+    const b = byName.get(name);
+    if (!b) {
+      fail('connector-provenance', `${name} is listed in CONNECTOR_META_READS but is not registered on the connector MCP surface`,
+        'either it was renamed — update the list — or it was removed, in which case delete the entry.');
+      continue;
+    }
+    if (!b.block.includes(READ_FOLD)) {
+      fail('connector-provenance', `connector MCP tool ${name} unwraps the envelope without folding meta.provenance`,
+        `use ${READ_FOLD}(resp) instead of \`resp.data ?? resp\`. Its node route serves the whole `
+        + 'record on meta.provenance; the plain unwrap returns the id and throws the statement away.');
+    }
+  }
+
+  const seen = new Set<string>();
+  for (const file of walk(join(root, 'src', 'routes'))) {
+    const r = rel(file);
+    if (!/\benvelopeMeta\s*\(/.test(stripComments(readFileSync(file, 'utf8')))) continue;
+    seen.add(r);
+    if (!(r in ENVELOPE_PROVENANCE_ROUTES)) {
+      fail('connector-provenance', `${r} serves provenance on meta.provenance and nobody has said what carries it to a caller`,
+        'add it to ENVELOPE_PROVENANCE_ROUTES in this file, naming the connector tool that folds it '
+        + `with ${READ_FOLD}() — or saying that no connector tool wraps this route. The envelope is `
+        + 'dropped by every `resp.data ?? resp` in the connector, so a new one here is a record lost '
+        + 'silently.');
+    }
+  }
+  for (const r of Object.keys(ENVELOPE_PROVENANCE_ROUTES)) {
+    if (!seen.has(r)) {
+      fail('connector-provenance', `${r} is listed as serving meta.provenance but no longer calls envelopeMeta()`,
+        'remove it from ENVELOPE_PROVENANCE_ROUTES — a stale entry makes the list read as bigger '
+        + 'coverage than it has.');
+    }
   }
 }
 

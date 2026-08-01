@@ -3,6 +3,7 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   v1.4.0 -- 2026-08-01 -- TARGET-058 Phase 11b: aimeat_app_get folds meta.provenance.
  *   v1.3.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_app_publish / aimeat_app_draft_publish
  *     carry `ai_provenance` / `ai_provenance_id` and echo what was recorded.
  *   v1.2.0 -- 2026-07-19 -- Connector reachability: add aimeat_app_fork + app draft save/publish/discard
@@ -17,7 +18,7 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
 import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
-import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
+import { provenanceEchoedResult, readPayloadWithProvenance } from '../../ai-provenance-carry.js';
 
 export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client, owner } = registry.resolve();
@@ -47,7 +48,8 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     group_id: z.string().describe('App group identifier'),
   }, annotationsFor('aimeat_app_get'), async ({ group_id }) => {
     const resp = await client.get(`/v1/packages/${encodeURIComponent(group_id)}`);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    // The app detail read serves its record on meta.provenance — see core.ts memory_read.
+    return { content: [{ type: 'text' as const, text: JSON.stringify(readPayloadWithProvenance(resp), null, 2) }] };
   });
 
   mcp.tool('aimeat_app_delete', descriptionFor('aimeat_app_delete'), {

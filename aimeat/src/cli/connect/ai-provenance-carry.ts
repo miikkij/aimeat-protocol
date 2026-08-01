@@ -45,6 +45,8 @@
  *   - withProvenanceEcho()          — fold the echo into a tool result payload
  *   - withProvenanceCarrying()      — wrap a SHELL-callable handler (applied once, in tool-call.ts)
  *   - provenanceEchoedResult()      — the MCP-tool one-liner: carry, echo, return the text result
+ *   - provenanceFromMeta()          — READ: lift meta.provenance out of the envelope
+ *   - readPayloadWithProvenance()   — READ: `resp.data ?? resp` without losing the envelope
  * @usage
  *   const echo = await carryDeclaration(client, {
  *     tool: 'aimeat_memory_write', declared: ai_provenance, declaredId: ai_provenance_id,
@@ -52,6 +54,9 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 11b: the READ direction. Reported from the crewaimeat
+ *     side as "read_provenance() never returns anything for memory reads" — the node serves the
+ *     record on the envelope carrier and every `resp.data ?? resp` in the connector dropped it.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 11.
  */
 import { AiProvenanceBlockSchema, type AiProvenanceToolInput } from '../../mcp/ai-provenance-input.js';
@@ -296,12 +301,47 @@ export function withProvenanceEcho(payload: unknown, echo: ProvenanceEcho | unde
 }
 
 /**
+ * The READ direction: lift `meta.provenance` out of the envelope onto the tool result.
+ *
+ * Six node routes serve a record on the envelope carrier rather than per-item — `GET /v1/memory/:key`,
+ * the app and knowledge detail reads, and the two completion routes. The connector unwraps `resp.data`
+ * and the envelope goes in the bin, so a crew reading its own content back saw `ai_provenance_id` (a
+ * pointer) and no statement. Reported from the crewaimeat side as "read_provenance() never returns
+ * anything for memory reads", and it is the write-side strip pointing the other way.
+ *
+ * The block produced here is `{ id, record, record_url }` — deliberately the SAME shape
+ * `provenanceItemBlock()` puts on every per-item read and the same shape the node's own MCP
+ * `aimeat_memory_read` returns. One spelling on every surface is the whole point; a connector-only
+ * variant would mean `read_provenance()` needs to know which door it came through.
+ */
+export function provenanceFromMeta(resp: ApiResponse): Record<string, unknown> {
+  const p = resp.meta?.provenance as { id?: string; record?: unknown; recordUrl?: string } | undefined;
+  if (!p?.id || !p.record) return {};
+  return { ai_provenance: { id: p.id, record: p.record, record_url: p.recordUrl } };
+}
+
+/**
+ * A read tool's payload with the envelope's provenance folded in. `resp.data ?? resp` with the one
+ * thing that unwrap was losing.
+ */
+export function readPayloadWithProvenance(resp: ApiResponse): unknown {
+  const data = resp.data ?? resp;
+  if (!resp.ok || !data || typeof data !== 'object' || Array.isArray(data)) return data;
+  return { ...(data as Record<string, unknown>), ...provenanceFromMeta(resp) };
+}
+
+/**
  * Wrap a SHELL-callable tool handler so it carries a declaration the same way the MCP tool does.
  *
  * Applied once where `CONNECT_CLI_TOOLS` is assembled, so `aimeat connect call` and
- * `POST /local/call/:tool` — the deterministic path fleet crews use — get this without thirteen
- * hand-edited handlers. A tool with no carrier entry is returned untouched: nobody declares on it,
- * and wrapping it would cost a closure per call for nothing.
+ * `POST /local/call/:tool` — the deterministic path fleet crews use — get this without hand-editing
+ * every handler.
+ *
+ * BOTH DIRECTIONS, AND WRAPPING EVERY TOOL IS THE POINT. Writes get the declaration carried and
+ * echoed; reads get `meta.provenance` folded onto the payload. The read fold is UNCONDITIONAL rather
+ * than driven by a list of read tools, because a list is a thing to forget: it is a no-op when the
+ * envelope carries no provenance, and the next route that starts serving some is covered the day it
+ * ships instead of the day somebody notices.
  *
  * `parseDeclarationInput` runs BEFORE the inner handler, so a bogus `level` refuses the whole call
  * and nothing is written. That is the shell path's substitute for the zod layer the MCP path gets
@@ -310,15 +350,16 @@ export function withProvenanceEcho(payload: unknown, echo: ProvenanceEcho | unde
 export function withProvenanceCarrying<Ctx extends { client: AimeatClient }>(
   def: { name: string; handler: (ctx: Ctx, input: Record<string, unknown>) => Promise<ApiResponse> },
 ): typeof def {
-  if (!CONNECTOR_PROVENANCE_CARRIERS[def.name]) return def;
   const inner = def.handler;
+  const carries = !!CONNECTOR_PROVENANCE_CARRIERS[def.name];
   return {
     ...def,
     handler: async (ctx: Ctx, input: Record<string, unknown>): Promise<ApiResponse> => {
-      const declared = parseDeclarationInput(input.ai_provenance);
-      const declaredId = typeof input.ai_provenance_id === 'string' ? input.ai_provenance_id : undefined;
+      const declared = carries ? parseDeclarationInput(input.ai_provenance) : undefined;
+      const declaredId = carries && typeof input.ai_provenance_id === 'string' ? input.ai_provenance_id : undefined;
       const resp = await inner(ctx, input);
-      if (!resp.ok || (!declared && !declaredId)) return resp;
+      if (!resp.ok) return resp;
+      if (!declared && !declaredId) return { ...resp, data: readPayloadWithProvenance(resp) };
       const echo = await carryDeclaration(ctx.client, {
         tool: def.name, declared, declaredId, attach: carrierAttach(def.name, input),
       });

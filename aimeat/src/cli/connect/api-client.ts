@@ -10,6 +10,8 @@
  * @version-history
  *   v1.9.4 — 2026-05-28 — Update connector guidance and close one-shot CLI HTTP connections.
  *   v2.0.0 — 2026-06-10 — Phase 4: Transport seam (direct fetch default, tunnel override).
+ *   v2.1.0 — 2026-08-01 — TARGET-058 Phase 11b: ApiResponse models `meta`. It always arrived; not
+ *     being in the type is why every tool handler dropped meta.provenance without anyone noticing.
  */
 import { getToken } from './keychain.js';
 import { loadConfig } from './config.js';
@@ -18,6 +20,17 @@ export interface ApiResponse {
   ok: boolean;
   data?: unknown;
   error?: { code: string; message: string };
+  /**
+   * The envelope's `meta` slot. It has always ARRIVED — every transport here returns the parsed
+   * envelope whole — but it was not in this type, so every `resp.data ?? resp` in a tool handler
+   * dropped it and nothing complained.
+   *
+   * That matters because `meta.provenance` is the ONE carrier the AI-provenance work froze for a
+   * response that IS a piece of generated content (22-frozen-vocabulary.md §A4). `GET /v1/memory/:key`
+   * serves the whole record there, and a crew reading its own content back through the connector got
+   * only `ai_provenance_id` — the pointer, not the statement. TARGET-058 Phase 11b.
+   */
+  meta?: Record<string, unknown>;
 }
 
 /**
