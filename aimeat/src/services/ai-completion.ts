@@ -12,11 +12,19 @@
  *   - getTodayUsage(storage, gaii) — read today's spend record (constraints/UI)
  *   - getUsageHistory(storage, gaii, days) — per-day series + 24h/7d/30d rollups (charts)
  *   - getDailyBudgetUsd(prefs) / todayKey() — small shared helpers
+ *   - assertProviderAllowed / assertAppAllowed / decryptOwnerKey / assertWithinBudget / recordAiUsage
+ *     — the shared gate every owner-billed provider call runs through (see ai-transcription.ts)
  *   - AiCompletionError — typed error carrying { code, status } for the route
  * @usage
  *   import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
  *   const r = await completeForOwner(storage, config, gaii, { prompt });
  * @version-history
+ *   v1.8.0 — 2026-08-01 — Speech-to-text groundwork: the preflight (provider allowlist, app
+ *     allowlist, key decrypt, budget) and the usage write are now exported helpers, so
+ *     ai-transcription.ts runs the IDENTICAL gate instead of a second copy that could drift — this
+ *     is the path that decides where a decrypted key goes. UsageRecord gains optional
+ *     `audio_seconds` (missing = 0 on every old record), so STT shares one budget and one chart
+ *     with text. completeForOwner behaviour is unchanged.
  *   v1.0.0 — 2026-06-03 — Extracted from routes/ai.ts for reuse by the scheduler
  *   v1.1.0 — 2026-06-24 — Optional `images` (data:/https URLs) threaded to the
  *     provider for vision-capable completions (used by the Secretary doc/image
@@ -66,7 +74,10 @@ export interface UsageRecord {
   total_cost_usd: number;
   total_calls: number;
   total_tokens: number;
-  per_app: Record<string, { cost_usd: number; calls: number; tokens: number }>;
+  /** Audio seconds transcribed today. Optional: records written before speech-to-text existed do not
+   *  have it, and every reader treats a missing value as 0. */
+  audio_seconds?: number;
+  per_app: Record<string, { cost_usd: number; calls: number; tokens: number; audio_seconds?: number }>;
   updated_at: string;
 }
 
@@ -93,6 +104,118 @@ export class AiCompletionError extends Error {
     this.code = code;
     this.status = status;
   }
+}
+
+/**
+ * Provider host allowlist — the guard that stands between a decrypted AI key and wherever an
+ * owner- (or app-) supplied baseUrl points.
+ *
+ * On a public multi-tenant node `config.aiProviderAllowlist` restricts which HOST the key may be
+ * sent to, so a poisoned baseUrl cannot exfiltrate it. Empty = any host (local dev, self-hosted
+ * models). Exported because EVERY path that decrypts a key must run it, and one shared function is
+ * how that invariant stays true as paths are added. See docs/coding-guidelines/security-development-dna.md.
+ */
+export function assertProviderAllowed(config: AimeatConfig, baseUrl: string): void {
+  if (config.aiProviderAllowlist.length === 0) return;
+  let providerHost: string;
+  try { providerHost = new URL(baseUrl).hostname.toLowerCase(); }
+  catch { throw new AiCompletionError('INVALID_BASE_URL', 400, `Invalid AI provider baseUrl: ${baseUrl}`); }
+  if (!config.aiProviderAllowlist.includes(providerHost)) {
+    throw new AiCompletionError('PROVIDER_NOT_ALLOWED', 403,
+      `AI provider host "${providerHost}" is not in this node's allowlist. Ask the operator to allow it.`);
+  }
+}
+
+/** The owner's per-app allowlist (only meaningful once they configured one). */
+export function assertAppAllowed(prefs: Record<string, unknown>, appId?: string): void {
+  const allowlist = Array.isArray(prefs.app_allowlist) ? (prefs.app_allowlist as string[]) : null;
+  if (!allowlist) return;
+  if (appId && !allowlist.includes(appId)) {
+    throw new AiCompletionError('APP_NOT_ALLOWED', 403,
+      `App "${appId}" is not in your AI allowlist. Enable it from Settings.`);
+  }
+  if (!appId) {
+    throw new AiCompletionError('APP_ID_REQUIRED', 403,
+      'app_id is required because you have configured an AI app allowlist.');
+  }
+}
+
+/** Decrypt the owner's stored provider key. Undefined is legitimate for a keyless self-hosted
+ *  provider; OpenRouter without a key is not, and says so. */
+export function decryptOwnerKey(
+  config: AimeatConfig, apiKeyRecordValue: unknown, provider: ProviderType,
+): string | undefined {
+  const encrypted = (apiKeyRecordValue as { encrypted?: string } | undefined)?.encrypted;
+  if (encrypted) {
+    const encKey = getEncryptionKey(config);
+    if (!encKey) {
+      throw new AiCompletionError('ENCRYPTION_NOT_CONFIGURED', 503,
+        'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY or AIMEAT_TOTP_ENCRYPTION_KEY.');
+    }
+    return decrypt(encrypted, encKey);
+  }
+  if (provider === 'openrouter') {
+    throw new AiCompletionError('NO_API_KEY', 400, 'No OpenRouter API key configured. Set one in Settings.');
+  }
+  return undefined;
+}
+
+/**
+ * Daily budget + per-app cap. Both are pre-call checks against what has ALREADY been spent, so a
+ * single call can overshoot the budget by its own cost; the cap stops the next one. Returns the
+ * resolved daily budget so the caller can report it.
+ */
+export function assertWithinBudget(
+  usage: UsageRecord, prefs: Record<string, unknown>, appId?: string,
+): number {
+  const dailyBudget = getDailyBudgetUsd(prefs);
+  if (usage.total_cost_usd >= dailyBudget) {
+    throw new AiCompletionError('QUOTA_EXHAUSTED', 402,
+      `Daily AI budget hit ($${usage.total_cost_usd.toFixed(4)} / $${dailyBudget}). Raise it in Settings or wait until midnight UTC.`);
+  }
+  if (appId) {
+    // Per-app cap. By DEFAULT an app may spend the whole daily budget the owner set (the "AI apps
+    // daily budget") — there is no separate hidden per-app default. An explicit app_quotas.<app>
+    // override throttles that one app below the budget when the owner wants it.
+    const appQuotas = (prefs.app_quotas as Record<string, { daily_usd?: number }> | undefined) ?? {};
+    const appQuota = appQuotas[appId]?.daily_usd ?? dailyBudget;
+    const appSpent = usage.per_app[appId]?.cost_usd ?? 0;
+    if (appSpent >= appQuota) {
+      throw new AiCompletionError('APP_QUOTA_EXHAUSTED', 402,
+        `Daily AI quota for "${appId}" hit ($${appSpent.toFixed(4)} / $${appQuota}). Raise it in Settings.`);
+    }
+  }
+  return dailyBudget;
+}
+
+/**
+ * Fold one call into today's usage record and persist it. Text completions and transcriptions share
+ * ONE record, so the daily budget covers both and the spend charts show them together — an owner
+ * whose budget is being eaten by voice messages sees it in the same place as everything else.
+ */
+export async function recordAiUsage(
+  storage: Storage, gaii: string, usage: UsageRecord,
+  call: { costUsd: number; tokens: number; audioSeconds?: number; appId?: string },
+): Promise<UsageRecord> {
+  const updated: UsageRecord = {
+    date: todayKey(),
+    total_cost_usd: usage.total_cost_usd + call.costUsd,
+    total_calls: usage.total_calls + 1,
+    total_tokens: usage.total_tokens + call.tokens,
+    audio_seconds: (usage.audio_seconds ?? 0) + (call.audioSeconds ?? 0),
+    per_app: { ...usage.per_app },
+    updated_at: new Date().toISOString(),
+  };
+  const appKey = call.appId || '_unknown';
+  const existing = updated.per_app[appKey] ?? { cost_usd: 0, calls: 0, tokens: 0 };
+  updated.per_app[appKey] = {
+    cost_usd: existing.cost_usd + call.costUsd,
+    calls: existing.calls + 1,
+    tokens: existing.tokens + call.tokens,
+    audio_seconds: (existing.audio_seconds ?? 0) + (call.audioSeconds ?? 0),
+  };
+  await upsertUsage(storage, gaii, updated);
+  return updated;
 }
 
 export interface CompleteForOwnerOptions {
@@ -151,7 +274,9 @@ export interface UsageWindow {
   cost_usd: number;
   tokens: number;
   calls: number;
-  per_app: Record<string, { cost_usd: number; tokens: number; calls: number }>;
+  /** Transcribed audio seconds in the window (0 before speech-to-text existed). */
+  audio_seconds: number;
+  per_app: Record<string, { cost_usd: number; tokens: number; calls: number; audio_seconds: number }>;
 }
 
 export interface UsageHistory {
@@ -163,17 +288,19 @@ export interface UsageHistory {
   windows: { d1: UsageWindow; d7: UsageWindow; d30: UsageWindow };
 }
 
-const emptyWindow = (): UsageWindow => ({ cost_usd: 0, tokens: 0, calls: 0, per_app: {} });
+const emptyWindow = (): UsageWindow => ({ cost_usd: 0, tokens: 0, calls: 0, audio_seconds: 0, per_app: {} });
 
 function accumulateWindow(win: UsageWindow, rec: UsageRecord): void {
   win.cost_usd += rec.total_cost_usd || 0;
   win.tokens += rec.total_tokens || 0;
   win.calls += rec.total_calls || 0;
+  win.audio_seconds += rec.audio_seconds || 0;
   for (const [app, m] of Object.entries(rec.per_app || {})) {
-    const cur = win.per_app[app] ?? (win.per_app[app] = { cost_usd: 0, tokens: 0, calls: 0 });
+    const cur = win.per_app[app] ?? (win.per_app[app] = { cost_usd: 0, tokens: 0, calls: 0, audio_seconds: 0 });
     cur.cost_usd += m.cost_usd || 0;
     cur.tokens += m.tokens || 0;
     cur.calls += m.calls || 0;
+    cur.audio_seconds += m.audio_seconds || 0;
   }
 }
 
@@ -258,65 +385,12 @@ export async function completeForOwner(
   const provider = (prefs.provider as ProviderType) || 'openrouter';
   const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
 
-  // ── Provider host allowlist (protects the decrypted key from a poisoned baseUrl) ──
-  // On a public multi-tenant node, config.aiProviderAllowlist restricts which HOST a decrypted AI
-  // key may be sent to, so an owner- (or app-) supplied baseUrl can't exfiltrate it. Empty = any
-  // host (local dev / self-hosted models). See docs/coding-guidelines/security-development-dna.md.
-  if (config.aiProviderAllowlist.length > 0) {
-    let providerHost: string;
-    try { providerHost = new URL(baseUrl).hostname.toLowerCase(); }
-    catch { throw new AiCompletionError('INVALID_BASE_URL', 400, `Invalid AI provider baseUrl: ${baseUrl}`); }
-    if (!config.aiProviderAllowlist.includes(providerHost)) {
-      throw new AiCompletionError('PROVIDER_NOT_ALLOWED', 403,
-        `AI provider host "${providerHost}" is not in this node's allowlist. Ask the operator to allow it.`);
-    }
-  }
+  assertProviderAllowed(config, baseUrl);
+  assertAppAllowed(prefs, opts.appId);
+  const decryptedKey = decryptOwnerKey(config, apiKeyRecord?.value, provider);
 
-  // ── App allowlist (only when an appId is supplied / configured) ──
-  const allowlist = Array.isArray(prefs.app_allowlist) ? (prefs.app_allowlist as string[]) : null;
-  if (allowlist && opts.appId && !allowlist.includes(opts.appId)) {
-    throw new AiCompletionError('APP_NOT_ALLOWED', 403,
-      `App "${opts.appId}" is not in your AI allowlist. Enable it from Settings.`);
-  }
-  if (allowlist && !opts.appId) {
-    throw new AiCompletionError('APP_ID_REQUIRED', 403,
-      'app_id is required because you have configured an AI app allowlist.');
-  }
-
-  // ── Decrypt key (optional for non-openrouter providers) ──
-  let decryptedKey: string | undefined;
-  const encrypted = (apiKeyRecord?.value as { encrypted?: string } | undefined)?.encrypted;
-  if (encrypted) {
-    const encKey = getEncryptionKey(config);
-    if (!encKey) {
-      throw new AiCompletionError('ENCRYPTION_NOT_CONFIGURED', 503,
-        'Encryption key not configured. Set AIMEAT_ENCRYPTION_KEY or AIMEAT_TOTP_ENCRYPTION_KEY.');
-    }
-    decryptedKey = decrypt(encrypted, encKey);
-  } else if (provider === 'openrouter') {
-    throw new AiCompletionError('NO_API_KEY', 400,
-      'No OpenRouter API key configured. Set one in Settings.');
-  }
-
-  // ── Budget check ──
   const usage = (usageRecord?.value as UsageRecord | undefined) ?? emptyUsage();
-  const dailyBudget = getDailyBudgetUsd(prefs);
-  if (usage.total_cost_usd >= dailyBudget) {
-    throw new AiCompletionError('QUOTA_EXHAUSTED', 402,
-      `Daily AI budget hit ($${usage.total_cost_usd.toFixed(4)} / $${dailyBudget}). Raise it in Settings or wait until midnight UTC.`);
-  }
-  const appQuotas = (prefs.app_quotas as Record<string, { daily_usd?: number }> | undefined) ?? {};
-  if (opts.appId) {
-    // Per-app cap. By DEFAULT an app may spend the whole daily budget the owner set (the "AI apps
-    // daily budget") — there is no separate hidden per-app default. An explicit app_quotas.<app>
-    // override throttles that one app below the budget when the owner wants it.
-    const appQuota = appQuotas[opts.appId]?.daily_usd ?? dailyBudget;
-    const appSpent = usage.per_app[opts.appId]?.cost_usd ?? 0;
-    if (appSpent >= appQuota) {
-      throw new AiCompletionError('APP_QUOTA_EXHAUSTED', 402,
-        `Daily AI quota for "${opts.appId}" hit ($${appSpent.toFixed(4)} / $${appQuota}). Raise it in Settings.`);
-    }
-  }
+  const dailyBudget = assertWithinBudget(usage, prefs, opts.appId);
 
   // ── Model selection ──
   const hasImages = Array.isArray(opts.images) && opts.images.length > 0;
@@ -364,24 +438,11 @@ export async function completeForOwner(
   const costUsd = costExact ? result.usage!.cost_usd! : estimateCostUsd(promptTok, completionTok);
 
   // ── Record usage (idempotent within the day) ──
-  const updated: UsageRecord = {
-    date: todayKey(),
-    total_cost_usd: usage.total_cost_usd + costUsd,
-    total_calls: usage.total_calls + 1,
-    total_tokens: usage.total_tokens + totalTok,
-    per_app: { ...usage.per_app },
-    updated_at: new Date().toISOString(),
-  };
-  const appKey = opts.appId || '_unknown';
-  const existing = updated.per_app[appKey] ?? { cost_usd: 0, calls: 0, tokens: 0 };
-  updated.per_app[appKey] = {
-    cost_usd: existing.cost_usd + costUsd,
-    calls: existing.calls + 1,
-    tokens: existing.tokens + totalTok,
-  };
-  await upsertUsage(storage, gaii, updated);
+  const updated = await recordAiUsage(storage, gaii, usage, {
+    costUsd, tokens: totalTok, appId: opts.appId,
+  });
 
-  logger.info(`[ai] gaii=${gaii} app=${appKey} model=${result.model} tokens=${totalTok} cost=$${costUsd.toFixed(4)} day_total=$${updated.total_cost_usd.toFixed(4)}`);
+  logger.info(`[ai] gaii=${gaii} app=${opts.appId || '_unknown'} model=${result.model} tokens=${totalTok} cost=$${costUsd.toFixed(4)} day_total=$${updated.total_cost_usd.toFixed(4)}`);
 
   // ── Mint the provenance record (TARGET-058) ──
   // THE mint point for an observed generation. The node just watched a model produce these exact

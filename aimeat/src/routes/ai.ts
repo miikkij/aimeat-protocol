@@ -8,6 +8,7 @@
  *   this router is a thin HTTP wrapper + the owner-only settings/usage endpoints.
  * @structure
  *   - POST /v1/ai/complete       — owner or any token with ai:use scope, runs one completion
+ *   - POST /v1/ai/transcribe     — same gate, speech-to-text over a stored (or inline) audio file
  *   - GET  /v1/ai/available      — owner or ai:use token, boolean "is AI configured?" probe
  *   - GET  /v1/ai/usage          — owner-only, today's spend per-app breakdown
  *   - GET  /v1/ai/usage/history  — owner-only, per-day spend series + 24h/7d/30d rollups (charts)
@@ -28,6 +29,10 @@
  *     GET /v1/ai/available so such apps can gate their UI without owner-only settings.
  *   v1.4.0 — 2026-07-05 — Add GET /v1/ai/usage/history (owner per-day series + rollups) and
  *     GET /v1/admin/ai-usage (operator cross-user aggregate) backing the AI-spend charts.
+ *   v1.6.0 — 2026-08-01 — POST /v1/ai/transcribe: speech-to-text on the owner's own key, behind the
+ *     same gate, the same daily budget and the same usage ledger as completions. Audio comes from a
+ *     storage key resolved against the CALLER's namespace (an inline base64 fallback is capped hard),
+ *     so the endpoint cannot be pointed at another account's files.
  *   v1.5.0 — 2026-08-01 — TARGET-058: /v1/ai/complete carries the minted provenance record in
  *     `meta.provenance` and in the AI-Disclosure / Link response headers. The `data` shape is
  *     untouched, so nothing that reads `content` changes.
@@ -45,7 +50,12 @@ import {
   DEFAULT_DAILY_BUDGET_USD,
 } from '../services/ai-completion.js';
 import { getAdminAiUsage } from '../services/ai-usage-admin.js';
+import { transcribeForOwner } from '../services/ai-transcription.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
+
+/** ~6 MB of audio once decoded. Inline base64 is the fallback path, so it is bounded well below the
+ *  JSON body limit; anything real goes through storage. */
+const INLINE_AUDIO_MAX_CHARS = 8_000_000;
 
 export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -144,6 +154,88 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
             remaining_usd: r.budget.remainingUsd,
           },
         }, undefined, envelopeMeta(prov)));
+      } catch (e) {
+        if (e instanceof AiCompletionError) {
+          return res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        }
+        return res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
+      }
+    });
+
+  // ── POST /v1/ai/transcribe ── speech-to-text, gated identically to /complete.
+  //
+  // Two audio sources, and the ORDER matters: `storage_key` is the real one. The bytes of anything
+  // worth transcribing are already on this node (a voice message attachment, an uploaded recording),
+  // so reading them here avoids a pointless round trip through the browser and the base64 inflation
+  // that comes with it. `audio_base64` exists for the case where a browser recorded something it has
+  // not stored yet, and is capped hard because it travels inside a JSON body.
+  //
+  // The key is resolved against the CALLER's own namespace — never an owner supplied in the body —
+  // so one account cannot transcribe another's files. A key belonging to someone else answers 404
+  // rather than 403: whether it exists is not information this route gives away.
+  router.post('/v1/ai/transcribe',
+    requireAuth(), aiRateLimit,
+    async (req: Request, res: Response) => {
+      if (!gateOwnerOrAiUseAgent(req, res)) return;
+      req.setTimeout(180_000);
+      res.setTimeout(180_000);
+
+      const gaii = resolve(req);
+      const { storage_key, audio_base64, mime, filename, model, language, verbose, app_id } = req.body as {
+        storage_key?: string; audio_base64?: string; mime?: string; filename?: string;
+        model?: string; language?: string; verbose?: boolean; app_id?: string;
+      };
+
+      let audio: { data: Buffer; mime: string; filename: string };
+
+      if (typeof storage_key === 'string' && storage_key) {
+        const file = await storage.getStorageFile(gaii, storage_key);
+        if (!file) {
+          return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such file in your storage.'));
+        }
+        audio = {
+          data: file.data,
+          mime: mime || file.mimeType || 'application/octet-stream',
+          filename: filename || storage_key.split('/').pop() || 'audio',
+        };
+      } else if (typeof audio_base64 === 'string' && audio_base64) {
+        // A base64 string is 4/3 of the bytes it carries, and it has to fit the JSON body limit —
+        // a separate ceiling from the storage quota, which is exactly the trap that made large
+        // message attachments fail mysteriously before they moved to presigned upload.
+        if (audio_base64.length > INLINE_AUDIO_MAX_CHARS) {
+          return res.status(400).json(error(config.nodeId, 'AUDIO_TOO_LARGE',
+            `Inline audio is limited to ~${Math.round(INLINE_AUDIO_MAX_CHARS * 0.75 / 1048576)} MB. Upload it to storage and pass storage_key instead.`));
+        }
+        audio = {
+          data: Buffer.from(audio_base64, 'base64'),
+          mime: mime || 'audio/webm',
+          filename: filename || 'audio.webm',
+        };
+      } else {
+        return res.status(400).json(error(config.nodeId, 'INVALID_BODY',
+          'Provide storage_key (preferred) or audio_base64.'));
+      }
+
+      try {
+        const r = await transcribeForOwner(storage, config, gaii, {
+          audio, model, language, verbose: !!verbose, appId: app_id,
+        });
+        res.json(success(config.nodeId, {
+          text: r.text,
+          model: r.model,
+          language: r.language ?? null,
+          seconds: r.seconds,
+          usage: {
+            total_tokens: r.usage.totalTokens,
+            cost_usd: r.usage.costUsd,
+            cost_exact: r.usage.costExact,
+          },
+          budget: {
+            daily_budget_usd: r.budget.dailyBudgetUsd,
+            spent_today_usd: r.budget.spentTodayUsd,
+            remaining_usd: r.budget.remainingUsd,
+          },
+        }));
       } catch (e) {
         if (e instanceof AiCompletionError) {
           return res.status(e.status).json(error(config.nodeId, e.code, e.message));

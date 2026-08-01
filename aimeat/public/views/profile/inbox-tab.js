@@ -14,6 +14,11 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.27.0 -- 2026-08-01 -- Voice messages: 🎤 in the composer records a clip that travels the normal
+ *     attachment path, an audio bubble plays in place, and a voice attachment can be turned into text
+ *     with the owner's own key (useVoiceMessages → POST /v1/messages/:id/attachments/:attId/transcribe).
+ *     Never automatic — transcription spends the owner's AI budget, so it is always a click. parkMessage
+ *     and openTrackedRecord moved to helpers.js to stay under max-file-lines.
  *   v1.26.0 -- 2026-07-27 -- Failed sends toast the thrown REASON (helpers.sendFailure); the flat generic line hid every actionable attachment error.
  *   v1.25.0 -- 2026-07-21 -- Thread history is no longer capped at the newest 50: threads open showing
  *     their FULL history by default (getConversation(all)); a header "Show last 50 / all" toggle
@@ -130,17 +135,16 @@ import { escHtml } from '/js/utils.js';
 import * as messages from '/js/services/messages.js';
 import * as tracked from '/js/services/tracked-responses.js';
 import * as agentsSvc from '/js/services/agents.js';
-import { parkMessageToNotebook } from '/js/services/notebook.js';
-import { firstLine } from './notebook-helpers.js';
 import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
 import { peerLabel } from '/js/services/messages-ai-prompts.js';
-import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure } from './inbox-tab/helpers.js';
+import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, parkMessage, openTrackedRecord } from './inbox-tab/helpers.js';
 import { Composer, PollBuilder, MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { buildConversationReplyProps, buildMessageReplyProps, buildConversationNotebookProps } from './inbox-tab/ai-actions.js';
 import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel } from './inbox-tab/panels.js';
 import { useThreadAutoScroll, useMobileComposerKeyboard, useLinkPreviewToggle } from './inbox-tab/use-thread-ux.js';
+import { useVoiceMessages } from './inbox-tab/use-voice.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -148,6 +152,9 @@ export default function InboxTab({ showToast }) {
   const [requests, setRequests] = useState([]);
   const [conversations, setConversations] = useState([]);
   const [activeConv, setActiveConv] = useState(null);     // { conversationId, peerGhii }
+  // Mirrored into a ref so []-memoized callbacks (transcribeVoice) can reload the OPEN thread
+  // without taking activeConv as a dependency and being rebuilt on every thread switch.
+  const activeConvRef = useRef(null); activeConvRef.current = activeConv;
   const [thread, setThread] = useState([]);
   const [urlMap, setUrlMap] = useState({});
   const { showLinkPreviews, toggleLinkPreviews } = useLinkPreviewToggle(); const [mdViewer, setMdViewer] = useState(null); // link-preview toggle (persisted) + markdown viewer state
@@ -266,12 +273,7 @@ export default function InboxTab({ showToast }) {
 
   // Clicking 📓: copy the message straight into the notebook for later processing (no AI step) — keeps the
   // source link + reply intent so it can be replied to or enriched/filed from the notebook later.
-  const onParkMsg = async (msg) => {
-    try {
-      await parkMessageToNotebook(msg, { title: firstLine(msg.body) });
-      showToast?.(t('inbox.parkedToNotebook'));
-    } catch (e) { showToast?.(e?.message || t('inbox.trackFailed'), true); }
-  };
+  const onParkMsg = (msg) => parkMessage(msg, showToast);
 
   const cancelTracked = async (tr) => {
     let resp;
@@ -299,20 +301,8 @@ export default function InboxTab({ showToast }) {
     setReplyingTrId(tr.id);
   };
 
-  // Open the workspace record this tracked response watches (so you can jump straight to the bug). Set
-  // BOTH the saved-tab (so the profile loads straight onto Organisms) and the workspace deep-link
-  // (so the Organisms tab opens that exact workspace), then hard-navigate.
-  const openRecord = (tr) => {
-    const r = tr.references || {};
-    if (!r.organismId || !r.workspaceId) { showToast?.(t('inbox.trackNoRecord'), true); return; }
-    try {
-      sessionStorage.setItem('aimeat-profile-tab', 'organisms');
-      sessionStorage.setItem('aimeat.ws.openId', r.organismId);
-      sessionStorage.setItem('aimeat.ws.openWs', r.workspaceId);
-    // eslint-disable-next-line aimeat/no-silent-catch -- noop
-    } catch { /* noop */ }
-    window.location.assign('/v1/profile?tab=organisms');
-  };
+  // Jump to the workspace record this tracked response watches (straight to the bug it is about).
+  const openRecord = (tr) => openTrackedRecord(tr, showToast);
 
   // Fetch the suggested-reply body for each awaiting contract in the open conversation (for the bubble).
   const awaitingIds = awaitingForConv.map(t => t.id).join(',');
@@ -355,6 +345,9 @@ export default function InboxTab({ showToast }) {
     if (markRead && !conv.viaAgent) await messages.markConversationRead(conv.conversationId).catch(err => { swallowed('inbox-tab: msgs', err); });
   }, []);
   const toggleThreadAll = () => setThreadAll(v => { const nv = !v; threadAllRef.current = nv; if (activeConv) loadThread(activeConv); return nv; });
+
+  // Voice messages: can this owner transcribe, how long may a recording run, and the call that does it.
+  const { canTranscribe, voiceMaxSeconds, transcribeVoice } = useVoiceMessages(loadThread, activeConvRef);
 
   // Mount: one composite call seeds all six sections (requests/conversations/important/tracked/agents/groups).
   useEffect(() => { loadOverview(); }, [loadOverview]);
@@ -774,7 +767,8 @@ export default function InboxTab({ showToast }) {
           onTrackMsg=${onTrackMsg} onParkMsg=${onParkMsg} openMessageAi=${openMessageAi} submitInteractiveAnswers=${submitInteractiveAnswers}
           setMdViewer=${setMdViewer} openConversationAi=${openConversationAi} openConversationNotebook=${openConversationNotebook} insertCommand=${insertCommand} setCmdFill=${setCmdFill}
           cancelTracked=${cancelTracked} openRecord=${openRecord} startSuggestedReply=${startSuggestedReply} doSend=${doSend} showLinkPreviews=${showLinkPreviews} toggleLinkPreviews=${toggleLinkPreviews}
-          threadAll=${threadAll} toggleThreadAll=${toggleThreadAll} />` : null}
+          threadAll=${threadAll} toggleThreadAll=${toggleThreadAll}
+          onTranscribe=${transcribeVoice} canTranscribe=${canTranscribe} voiceMaxSeconds=${voiceMaxSeconds} />` : null}
 
         ${mode === 'tracked' ? html`<${TrackedPanel} activeTracked=${activeTracked} doneCount=${doneCount}
           openRecord=${openRecord} openTracked=${openTracked} cancelTracked=${cancelTracked} />` : null}

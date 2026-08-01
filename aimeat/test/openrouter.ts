@@ -4,6 +4,9 @@
  *   Tests save/retrieve/delete of encrypted API key and preferences,
  *   auth enforcement (401 without token), and validation errors on /complete.
  * @version-history
+ *   v1.1.0 — 2026-08-01 — Phase 5: speech-to-text settings (sttModel/sttLanguage round-trip, empty
+ *     clears rather than falling back), the node limits served with the settings, and the
+ *     ?modality= parameter on the model listing.
  *   v1.0.0 — 2026-03-20 — Initial implementation
  */
 
@@ -314,6 +317,63 @@ await test('POST /v1/openrouter/complete with non-existent project → 404', asy
   });
   assert(status === 404, `expected 404, got ${status}: ${JSON.stringify(body)}`);
   assert(body.error?.code === 'NOT_FOUND', `error code: ${body.error?.code}`);
+});
+
+// ─── Phase 5: Speech-to-text settings ───
+console.log('\nPhase 5 — Speech-to-text settings');
+
+await test('PUT settings — sttModel + sttLanguage round-trip', async () => {
+  if (!encryptionAvailable) { console.log('    (Skipped — encryption not available)'); return; }
+  const put = await json('/v1/openrouter/settings', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ sttModel: 'openai/whisper-large-v3', sttLanguage: 'fi' }),
+  });
+  assert(put.status === 200, `PUT status ${put.status}: ${JSON.stringify(put.body)}`);
+
+  const get = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  assert(get.body.data?.sttModel === 'openai/whisper-large-v3', `sttModel: ${get.body.data?.sttModel}`);
+  assert(get.body.data?.sttLanguage === 'fi', `sttLanguage: ${get.body.data?.sttLanguage}`);
+});
+
+await test('PUT settings — empty sttModel CLEARS it (transcription off, no silent fallback)', async () => {
+  if (!encryptionAvailable) { console.log('    (Skipped — encryption not available)'); return; }
+  await json('/v1/openrouter/settings', {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${ownerToken}` },
+    body: JSON.stringify({ sttModel: '' }),
+  });
+  const get = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  // null, not the default model: sending audio to a text model would produce an opaque provider
+  // error instead of "choose a transcription model".
+  assert(get.body.data?.sttModel === null, `expected null, got ${JSON.stringify(get.body.data?.sttModel)}`);
+});
+
+await test('GET settings — node limits are served with the settings', async () => {
+  const { body } = await json('/v1/openrouter/settings', { headers: { Authorization: `Bearer ${ownerToken}` } });
+  const limits = body.data?.limits;
+  assert(!!limits, 'limits present');
+  assert(typeof limits.voice_msg_max_seconds === 'number' && limits.voice_msg_max_seconds > 0,
+    `voice_msg_max_seconds: ${limits.voice_msg_max_seconds}`);
+  assert(typeof limits.stt_max_mb === 'number' && limits.stt_max_mb > 0, `stt_max_mb: ${limits.stt_max_mb}`);
+});
+
+await test('GET /v1/openrouter/models?modality=transcription — accepted and echoed', async () => {
+  const { status, body } = await json('/v1/openrouter/models?modality=transcription', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  // Without a real provider key this is a 400/502; what matters here is that the parameter is
+  // ACCEPTED rather than rejected as unknown, and that a success echoes which catalogue was read.
+  assert(status !== 404 && status !== 422, `unexpected status ${status}: ${JSON.stringify(body)}`);
+  if (status === 200) assert(body.data?.modality === 'transcription', `modality echo: ${body.data?.modality}`);
+});
+
+await test('GET /v1/openrouter/models?modality=bogus — falls back to chat, never errors', async () => {
+  const { status, body } = await json('/v1/openrouter/models?modality=bogus', {
+    headers: { Authorization: `Bearer ${ownerToken}` },
+  });
+  assert(status !== 500, `unexpected 500: ${JSON.stringify(body)}`);
+  if (status === 200) assert(body.data?.modality === 'chat', `modality: ${body.data?.modality}`);
 });
 
 // ─── Cleanup ───

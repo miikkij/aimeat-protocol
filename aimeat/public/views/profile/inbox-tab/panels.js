@@ -6,6 +6,9 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-08-01 — Voice messages threaded through: ThreadPanel passes onTranscribe /
+ *     canTranscribe to each bubble and voiceMaxSeconds to the Composer. An agent-owned ("via
+ *     <agent>") thread is read-only for the owner, so it gets no transcribe action.
  *   v1.5.0 — 2026-07-31 — ThreadPanel head hosts ThreadReadAloud (./read-aloud.js): reads the whole open
  *     conversation aloud (Listen / Pause / Continue + ✕), the thread-level twin of the per-bubble 🔊.
  *   v1.4.0 — 2026-07-21 — ThreadPanel head: "Show all messages / Last 50" toggle (threadAll/
@@ -109,7 +112,7 @@ export function ThreadPanel({
   peerDisplay, showToast, toggleImportant, onTrackMsg, onParkMsg, openMessageAi, submitInteractiveAnswers,
   setMdViewer, openConversationAi, openConversationNotebook, insertCommand, setCmdFill, cancelTracked, openRecord, startSuggestedReply, doSend,
   replyQuote, setReplyQuote, onQuoteReply, composerFocus, showLinkPreviews, toggleLinkPreviews,
-  threadAll, toggleThreadAll,
+  threadAll, toggleThreadAll, onTranscribe, canTranscribe, voiceMaxSeconds,
 }) {
   let lastDay = '';
   // Reply-to quotes: resolve a message's `replyToId` to the original within the loaded page (a parent
@@ -179,6 +182,7 @@ export function ThreadPanel({
               starred=${important.has(m.id)} onStar=${toggleImportant} onTrack=${onTrackMsg} onPark=${onParkMsg} onReplyAi=${openMessageAi} tracked=${trackedByMsg[m.id]}
               answeredWith=${m.interactive?.role === 'questions' ? answersByQ[m.id] : null}
               onAnswer=${submitInteractiveAnswers} submitting=${sending} showLinkPreviews=${showLinkPreviews}
+              onTranscribe=${activeConv.viaAgent ? null : onTranscribe} canTranscribe=${canTranscribe}
               onOpenMarkdown=${(url, name) => setMdViewer({ url, name })} />`;
         })}
       </div>
@@ -214,6 +218,7 @@ export function ThreadPanel({
           </div>` : null}
           <${Composer} key=${'c-' + activeConv.conversationId + (draftPrefill ? '-d' + prefillNonce : '')} recipient=${activeConv.peerGhii}
             sendLabel=${t('inbox.reply')} sending=${sending} onSend=${doSend} initialText=${draftPrefill}
+            voiceMaxSeconds=${voiceMaxSeconds}
             focusNonce=${composerFocus} draftKey=${'aimeat.inbox.draft.' + activeConv.conversationId} />`}
     </div>`;
 }

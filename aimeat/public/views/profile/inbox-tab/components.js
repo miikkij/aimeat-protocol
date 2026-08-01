@@ -6,6 +6,11 @@
  *   chat.commands), SchedulePanel (own-agent scheduler), and ReplyWithAiPopover (TARGET-031). Each is
  *   self-contained (owns its own hooks). Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.11.0 — 2026-08-01 — Voice messages. AttachmentItem hands an audio attachment to AudioAttachment
+ *     (./voice-parts.js) so it plays in the bubble instead of opening in a browser tab, which is a
+ *     download and not a conversation. The Composer gains a 🎤 recorder feeding the SAME attachment
+ *     queue as 📎 (one upload path), and a recording's chip carries a player + its length so a bad
+ *     take is caught here rather than in the other person's mailbox.
  *   v1.10.0 — 2026-07-31 — MessageBubble gets a 🔊 read-aloud action (BubbleSpeakButton from
  *     ./read-aloud.js): speaks that one message via the Web Speech API, like the Sanomat app's per-article
  *     "Puhu". Hidden when the browser can't speak or the message has no speakable body.
@@ -51,6 +56,8 @@ import * as schedules from '/js/services/schedules.js';
 import { MODES } from '/js/services/messages-ai-prompts.js';
 import { loadToastUI, prepareBody, quoteSnippet, statusTick, timeShort, trackStateLabel, ATTACH_ICO, attachKind, IFORM_OTHER } from './helpers.js';
 import { BubbleSpeakButton } from './read-aloud.js';
+import { AudioAttachment, fmtClock, stopOtherAudio } from './voice-parts.js';
+import { VoiceRecorder } from '/components/VoiceRecorder.js';
 import { swallowed } from '/js/swallowed.js';
 
 export function Avatar({ seed, size = 36 }) {
@@ -59,10 +66,12 @@ export function Avatar({ seed, size = 36 }) {
     dangerouslySetInnerHTML=${{ __html: svg }}></span>`;
 }
 
+
 /** One received/sent attachment. Images render as a thumbnail (click → full-size in a new tab);
- *  PDF/audio/video/file open natively in a new tab; markdown opens the in-app rendered viewer. Every
- *  ready attachment gets a download button. Not-yet-duplicated / expired attachments show their state. */
-export function AttachmentItem({ a, url, onOpenMarkdown }) {
+ *  audio plays in place; PDF/video/file open natively in a new tab; markdown opens the in-app
+ *  rendered viewer. Every ready attachment gets a download button. Not-yet-duplicated / expired
+ *  attachments show their state. */
+export function AttachmentItem({ a, url, onOpenMarkdown, msgId, onTranscribe, canTranscribe }) {
   const kind = attachKind(a);
   const name = a.name || a.storageKey;
   const ready = !!url && !a.expired;
@@ -93,7 +102,11 @@ export function AttachmentItem({ a, url, onOpenMarkdown }) {
       </button>${download}
     </div>`;
   }
-  // pdf / audio / video / file — let the browser open it in a new tab.
+  if (kind === 'audio') {
+    return html`<${AudioAttachment} a=${a} url=${url} name=${name} download=${download}
+      msgId=${msgId} onTranscribe=${onTranscribe} canTranscribe=${canTranscribe} />`;
+  }
+  // pdf / video / file — let the browser open it in a new tab.
   return html`<div class="inbox-attach-chip">
     <a class="inbox-attach-open" href=${url} target="_blank" rel="noopener" title=${t('inbox.attachmentOpen')}>
       <span class="inbox-attach-ico">${ATTACH_ICO[kind]}</span><span class="inbox-attach-name">${escHtml(name)}</span>
@@ -261,7 +274,7 @@ export function PollBuilder({ questions, setQuestions }) {
     </div>`;
 }
 
-export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews }) {
+export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews, onTranscribe, canTranscribe }) {
   // Copy the message text to the clipboard (the raw markdown the sender wrote — that's what pastes
   // usefully into an AI chat or a document; the rendered body's presigned image URLs are transient).
   const [copied, setCopied] = useState(false);
@@ -319,7 +332,9 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
         ) : null}
         ${nonInline.length > 0 && html`
           <div class="inbox-attach-row">
-            ${nonInline.map(a => html`<${AttachmentItem} key=${a.id} a=${a} url=${urls[a.id]} onOpenMarkdown=${onOpenMarkdown} />`)}
+            ${nonInline.map(a => html`<${AttachmentItem} key=${a.id} a=${a} url=${urls[a.id]}
+              onOpenMarkdown=${onOpenMarkdown} msgId=${msg.id}
+              onTranscribe=${onTranscribe} canTranscribe=${canTranscribe} />`)}
           </div>`}
         <div class="inbox-bubble-meta">
           ${trk ? html`<span class=${`inbox-track-badge inbox-track-badge--${trk.tone}`} title=${t('inbox.trackResponse')}>🔗 ${trk.text}</span>` : null}
@@ -334,7 +349,10 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
  * markdown-textarea + live-preview fallback if the editor can't load. Owns its own draft + file
  * state; calls onSend(recipient, markdown, files, reset). Remount it (via key) per conversation so
  * the draft doesn't leak between threads. */
-export function Composer({ recipient, sendLabel, sending, onSend, initialText = '', draftKey = '', focusNonce = 0 }) {
+export function Composer({
+  recipient, sendLabel, sending, onSend, initialText = '', draftKey = '', focusNonce = 0,
+  voiceMaxSeconds = 300,
+}) {
   // Restore an in-progress draft for this conversation/compose (localStorage), or the passed initialText.
   const readDraft = () => { try { return draftKey ? (localStorage.getItem(draftKey) || '') : ''; } catch { return ''; } };   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
   const seeded = initialText || readDraft();   // an explicit suggested reply wins; else restore a draft
@@ -379,6 +397,21 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
     const file = (blob instanceof File && !generic) ? blob : new File([blob], name, { type: blob.type || 'image/png' });
     setFiles((prev) => [...prev, file]);
   };
+  // A finished recording joins the same attachment queue as a picked file, so it travels the one
+  // upload path (presigned PUT) everything else uses. The measured length rides ON the File: the
+  // send path reads it back as `duration_seconds`, which lets the recipient's thread show "0:14"
+  // before a single byte of audio has been fetched.
+  const addRecording = (file, durationSeconds) => {
+    file.durationSeconds = durationSeconds;
+    // Minted ONCE here, not in render: createObjectURL in a render body allocates a new blob URL on
+    // every re-render and never releases the old ones.
+    file.previewUrl = URL.createObjectURL(file);
+    setFiles((prev) => [...prev, file]);
+  };
+  const releasePreview = (file) => {
+    if (file?.previewUrl) { URL.revokeObjectURL(file.previewUrl); file.previewUrl = null; }
+  };
+
   // Pull image files out of a clipboard/drop event; returns true if any were handled (caller preventDefaults).
   const handleImagePaste = (e) => {
     const items = Array.from(e.clipboardData?.items || e.dataTransfer?.items || []);
@@ -479,7 +512,9 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   const getText = () => (mode === 'rich' && editorRef.current) ? editorRef.current.getMarkdown() : md;
   const reset = () => {
     try { editorRef.current?.setMarkdown(''); } catch (err) { swallowed('components: reset', err); }
-    setMd(''); setFiles([]); if (fileRef.current) fileRef.current.value = '';
+    setMd('');
+    setFiles((prev) => { prev.forEach(releasePreview); return []; });
+    if (fileRef.current) fileRef.current.value = '';
     if (mode === 'simple' && taRef.current) taRef.current.style.height = 'auto';
     clearDraft();   // a sent message is no longer a draft
   };
@@ -487,6 +522,7 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   // Remove one queued attachment before sending (a mis-paste shouldn't force starting the message over).
   // Also clear the hidden file input when the last chip goes, so re-picking the same file fires onChange.
   const removeFile = (idx) => setFiles((prev) => {
+    releasePreview(prev[idx]);
     const next = prev.filter((_, j) => j !== idx);
     if (next.length === 0 && fileRef.current) fileRef.current.value = '';
     return next;
@@ -495,8 +531,20 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
   return html`
     <div class="inbox-composer ${expanded ? 'inbox-composer--tall' : ''}">
       ${files.length > 0 ? html`<div class="inbox-file-chips">
-        ${files.map((f, i) => html`<span class="inbox-file-chip" key=${f.name + i}>📎 ${escHtml(f.name)}
-          <button class="inbox-bc-chip-x" title=${t('inbox.attachmentRemove')} onClick=${() => removeFile(i)}>✕</button></span>`)}
+        ${files.map((f, i) => {
+          // A recording gets its own chip with a player: a bad take should be caught here, not in
+          // the other person's mailbox.
+          const isVoice = (f.type || '').startsWith('audio/') && f.durationSeconds;
+          return html`<span class=${`inbox-file-chip${isVoice ? ' inbox-file-chip--voice' : ''}`} key=${f.name + i}>
+            ${isVoice
+              ? html`<span class="inbox-chip-voice">🎤 ${fmtClock(f.durationSeconds)}
+                  <audio class="inbox-audio inbox-audio--chip" controls preload="metadata"
+                         src=${f.previewUrl}
+                         onPlay=${(e) => stopOtherAudio(e.currentTarget)}></audio></span>`
+              : html`<span>📎 ${escHtml(f.name)}</span>`}
+            <button class="inbox-bc-chip-x" title=${t('inbox.attachmentRemove')} onClick=${() => removeFile(i)}>✕</button>
+          </span>`;
+        })}
       </div>` : null}
       ${mode === 'rich'
         ? html`<div class="inbox-editor" ref=${containerRef}></div>`
@@ -515,6 +563,8 @@ export function Composer({ recipient, sendLabel, sending, onSend, initialText = 
           <label class="inbox-attach-btn" title=${t('inbox.attach')}>
             📎<input ref=${fileRef} type="file" multiple hidden onChange=${(e) => setFiles(Array.from(e.target.files || []))} />
           </label>
+          <${VoiceRecorder} maxSeconds=${voiceMaxSeconds} className="inbox-attach-btn"
+            onRecorded=${addRecording} />
           <button type="button" class="inbox-attach-btn" title=${expanded ? t('inbox.collapse') : t('inbox.expand')}
             aria-pressed=${expanded} onClick=${() => setExpanded((v) => !v)}>${expanded ? '⤡' : '⤢'}</button>
         </div>

@@ -5,9 +5,12 @@
  *   block), plus small storage helpers used to upload and resolve message attachments.
  * @structure send / listInbox / listConversations / getConversation / markConversationRead /
  *   markRead / deleteMessage / listRequests / acceptRequest / blockContact / listContacts /
- *   uploadAttachment / attachmentUrl
+ *   uploadAttachment / attachmentUrl / transcribeAttachment
  * @usage import * as messages from '/js/services/messages.js';
  * @version-history
+ *   v1.4.0 -- 2026-08-01 -- Voice messages: uploadAttachment carries a recording's measured
+ *     `duration_seconds` into the descriptor (so a thread can show "0:14" before fetching the audio),
+ *     and transcribeAttachment() turns one voice attachment into text on the caller's own copy.
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 5: Inbox tab).
  *   v1.0.1 -- 2026-06-19 -- JSDoc type annotations for frontend type-checking
  *   v1.1.0 -- 2026-06-23 -- send() carries the optional `interactive` payload (federated AskUserQuestion).
@@ -177,7 +180,23 @@ export async function uploadAttachment(file, kindOverride) {
   const kind = kindOverride || (mime.startsWith('image/') ? 'image'
     : mime.startsWith('audio/') ? 'audio'
     : mime.startsWith('video/') ? 'video' : 'file');
-  return { storage_key: key, mime, size: file.size, kind, name: file.name };
+  const desc = { storage_key: key, mime, size: file.size, kind, name: file.name };
+  // A voice recording arrives with its measured length attached (composer addRecording). Carrying it
+  // in the descriptor lets the recipient's thread show "0:14" without downloading the audio first.
+  if (Number(file.durationSeconds) > 0) desc.duration_seconds = Number(file.durationSeconds);
+  return desc;
+}
+
+/** Transcribe a voice attachment on the caller's own copy of a message, with the caller's own AI key.
+ *  Idempotent server-side: a second call returns the stored transcript instead of paying again. */
+export async function transcribeAttachment(messageId, attachmentId, opts = {}) {
+  return api(`/v1/messages/${enc(messageId)}/attachments/${enc(attachmentId)}/transcribe`, {
+    method: 'POST',
+    body: JSON.stringify({ force: !!opts.force, model: opts.model, language: opts.language }),
+    // Speech-to-text is a provider round trip over an audio file; the default 30 s client timeout
+    // cuts a perfectly good transcription off at the knees.
+    timeoutMs: 180_000,
+  });
 }
 
 /** Resolve a presigned, no-auth download URL for one of the caller's own storage keys (for <img>). */

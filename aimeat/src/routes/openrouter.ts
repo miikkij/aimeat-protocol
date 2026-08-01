@@ -8,10 +8,15 @@
  *   - PUT /v1/openrouter/settings — save encrypted API key + preferences
  *   - GET /v1/openrouter/settings — read preferences (no key returned)
  *   - DELETE /v1/openrouter/settings — remove key + preferences
- *   - GET /v1/openrouter/models — list available OpenRouter models
+ *   - GET /v1/openrouter/models — list available models (?modality=chat|transcription|speech)
  *   - POST /v1/openrouter/test — test API key validity
  *   - POST /v1/openrouter/complete — run AI completion for generator step
  * @version-history
+ *   v1.8.0 — 2026-08-01 — Speech-to-text settings: `sttModel` + `sttLanguage` persist alongside
+ *     visionModel, and GET /models takes `?modality=`. The modality is load-bearing rather than
+ *     cosmetic — OpenRouter's default catalogue has no transcription models in it, so without the
+ *     parameter no STT model can be offered anywhere in the UI. The cache key gained the modality so
+ *     two different listings cannot overwrite each other.
  *   v1.7.0 — 2026-08-01 — TARGET-058 Phase 8b. The two completing routes (/complete and /test) go
  *     through services/ai-completion.ts instead of speaking to the provider themselves. They predated
  *     the chokepoint and were the last two paths on the node producing model output that nothing
@@ -53,7 +58,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { logger } from '../utils/logger.js';
-import { listModels, DEFAULT_BASE_URLS, type ProviderType } from '../services/openrouter.js';
+import { listModels, DEFAULT_BASE_URLS, type ProviderType, type ModelModality } from '../services/openrouter.js';
 import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 
@@ -134,12 +139,14 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
     requireAuth(), requireRole('owner'),
     async (req: Request, res: Response) => {
       const gaii = resolve(req);
-      const { apiKey, model, reasoningModel, executionModel, visionModel, autoRetry, maxRetries, provider, baseUrl, temperature, top_p, max_tokens } = req.body as {
+      const { apiKey, model, reasoningModel, executionModel, visionModel, sttModel, sttLanguage, autoRetry, maxRetries, provider, baseUrl, temperature, top_p, max_tokens } = req.body as {
         apiKey?: string;
         model?: string;
         reasoningModel?: string;
         executionModel?: string;
         visionModel?: string;
+        sttModel?: string;
+        sttLanguage?: string;
         autoRetry?: unknown;
         maxRetries?: unknown;
         provider?: string;
@@ -200,6 +207,14 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       // visionModel: a vision-capable model (e.g. qwen/qwen-2.5-vl-...) used for image inputs
       // (the Secretary's doc/image intake). '' / null clears it → image calls fall back to the default.
       if (visionModel !== undefined) prefs.visionModel = (visionModel === null || visionModel === '') ? null : visionModel;
+      // sttModel: a transcription model (e.g. openai/whisper-large-v3) for voice messages and
+      // /v1/ai/transcribe. Cleared means transcription is OFF, not "fall back to the default model" —
+      // the default is a text model, and handing it audio yields an opaque provider error instead of
+      // an instruction the owner can act on.
+      if (sttModel !== undefined) prefs.sttModel = (sttModel === null || sttModel === '') ? null : sttModel;
+      // sttLanguage: ISO-639-1 hint. Empty = auto-detect, which is what mixed-language speech wants;
+      // a hint measurably helps a single known language (Finnish in particular).
+      if (sttLanguage !== undefined) prefs.sttLanguage = (sttLanguage === null || sttLanguage === '') ? null : String(sttLanguage).slice(0, 8);
       if (autoRetry !== undefined) prefs.autoRetry = !!autoRetry;
       if (maxRetries !== undefined) prefs.maxRetries = Math.max(1, Math.min(10, Number(maxRetries) || 3));
       // null = clear (use model default), number = set explicit value, undefined = don't change
@@ -231,6 +246,8 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         reasoningModel: prefs.reasoningModel ?? null,
         executionModel: prefs.executionModel ?? null,
         visionModel: prefs.visionModel ?? null,
+        sttModel: prefs.sttModel ?? null,
+        sttLanguage: prefs.sttLanguage ?? null,
         autoRetry: prefs.autoRetry ?? true,
         maxRetries: prefs.maxRetries ?? 3,
         provider: prefs.provider ?? 'openrouter',
@@ -238,6 +255,14 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
         temperature: prefs.temperature ?? null,
         top_p: prefs.top_p ?? null,
         max_tokens: prefs.max_tokens ?? null,
+        // Node-level ceilings, served with the settings that live under them. The browser recorder
+        // needs to stop at THIS node's number rather than a figure compiled into the page, and this
+        // response is already fetched wherever that matters.
+        limits: {
+          voice_msg_max_seconds: config.voiceMsgMaxSeconds,
+          stt_max_mb: config.sttMaxMb,
+          stt_max_seconds: config.sttMaxSeconds,
+        },
       }));
     });
 
@@ -269,11 +294,18 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       const provider = (prefs.provider as ProviderType) || 'openrouter';
       const baseUrl = (prefs.baseUrl as string) || DEFAULT_BASE_URLS[provider];
 
-      // Check cache (keyed by baseUrl to avoid cross-provider collisions)
-      const cacheKey = `${gaii}:${baseUrl}`;
+      // Which slice of the catalogue. This is NOT a client-side filter dressed up as a parameter:
+      // OpenRouter's default catalogue contains no transcription or speech models at all (measured
+      // 2026-08-01: 336 models, zero whisper), so `chat` and `transcription` are different listings.
+      const requested = String(req.query.modality ?? 'chat');
+      const modality: ModelModality =
+        (requested === 'transcription' || requested === 'speech') ? requested : 'chat';
+
+      // Check cache (keyed by baseUrl AND modality — different listings must not share an entry)
+      const cacheKey = `${gaii}:${baseUrl}:${modality}`;
       const cached = modelCache.get(cacheKey);
       if (cached && cached.expiresAt > Date.now()) {
-        return res.json(success(config.nodeId, { models: cached.models }));
+        return res.json(success(config.nodeId, { models: cached.models, modality }));
       }
 
       // Decrypt API key (optional for non-openrouter providers)
@@ -289,9 +321,9 @@ export function openrouterRouter(config: AimeatConfig, storage: Storage): Router
       }
 
       try {
-        const models = await listModels(decryptedKey, baseUrl);
+        const models = await listModels(decryptedKey, baseUrl, modality);
         modelCache.set(cacheKey, { models, expiresAt: Date.now() + MODEL_CACHE_TTL });
-        res.json(success(config.nodeId, { models }));
+        res.json(success(config.nodeId, { models, modality }));
       } catch (e) {
         const status = (e as { status?: number }).status;
         if (status === 401) {

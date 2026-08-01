@@ -9,6 +9,10 @@
  * @version-history
  *   Text limits raised — 2026-07-30 — prompts/labels to 10 000 and bodies to 200 000.
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 2: local messaging).
+ *   v1.2.0 -- 2026-08-01 -- Voice messages: an attachment may carry `duration_seconds` and a
+ *     `transcript`. Both are optional and additive, but the schema HAD to learn them — zod strips
+ *     unknown keys, so a sender's transcript would otherwise have vanished silently between the
+ *     request body and the stored record.
  *   v1.1.0 -- 2026-06-23 -- Interactive messages: InteractivePayloadSchema + `interactive` on send.
  */
 
@@ -28,6 +32,25 @@ export const MessageAttachmentInputSchema = z.object({
   name: z.string().max(256).optional(),
   inline: z.boolean().optional().default(false),
   id: z.string().min(1).max(64).optional(),
+  /** Playing length of an audio/video attachment, measured by the sender's browser. Lets a thread
+   *  show "0:14" before any bytes are fetched. */
+  duration_seconds: z.number().nonnegative().max(86_400).optional(),
+  /**
+   * A transcript the SENDER attached. It travels with the message, so the recipient reads a voice
+   * message without paying for their own transcription.
+   *
+   * `by` is accepted here only because the shape is shared with the stored record; the send path
+   * overwrites it with 'sender'. A recipient's own transcript never arrives over the wire — it is
+   * written to their own copy of the message and nowhere else.
+   */
+  transcript: z.object({
+    text: z.string().max(20_000),
+    by: z.enum(['sender', 'recipient']).optional(),
+    model: z.string().max(128).optional(),
+    lang: z.string().max(16).optional(),
+    seconds: z.number().nonnegative().max(86_400).optional(),
+    at: z.string().max(40).optional(),
+  }).optional(),
 });
 
 // ── Interactive messages (federated AskUserQuestion) ──

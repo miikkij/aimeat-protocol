@@ -28,7 +28,7 @@ import { randomUUID } from 'node:crypto';
 import type { DirectMessageRecord, DirectMessageAttachment, InteractivePayload } from '../storage/interface.js';
 import type { MessageAttachmentInput } from '../models/message-schemas.js';
 import { isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
-import { conversationIdFor, messagePreview, deliveryTargetFor } from '../utils/messaging.js';
+import { conversationIdFor, messagePreview, messagePreviewWithAttachments, deliveryTargetFor } from '../utils/messaging.js';
 import { notify } from './notify.js';
 import { emitChange, emitDelivery } from './event-bus.js';
 import { deliverDirectMessage, logDelivery, type DeliveryCtx } from './message-delivery.js';
@@ -92,6 +92,20 @@ export function mapMessageAttachments(
     size: a.size,
     name: a.name,
     kind: a.kind,
+    durationSeconds: a.duration_seconds,
+    // A transcript that arrives with a message is the SENDER's, whatever the client claimed: `by` is
+    // provenance, and a reader deciding whether to trust the text needs it to mean something. A
+    // recipient's own transcript is written to their own copy after delivery, never sent.
+    transcript: a.transcript
+      ? {
+        text: a.transcript.text,
+        by: 'sender' as const,
+        model: a.transcript.model,
+        lang: a.transcript.lang,
+        seconds: a.transcript.seconds,
+        at: a.transcript.at ?? new Date().toISOString(),
+      }
+      : undefined,
   }));
 }
 
@@ -203,7 +217,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
       await notify(storage, deliveryGhii, {
         type: isRequest ? 'direct_message_request' : 'direct_message',
         title: isRequest ? `${senderGhii} wants to message you` : `New message from ${senderGhii}`,
-        body: messagePreview(body),
+        body: messagePreviewWithAttachments(body, attachments),
         // Request → 'req:<conversationId>': while pending it lands on the inbox requests list, but once
         // the request is accepted the same notification opens the now-existing thread (see inbox-tab
         // consumeDeepLink). A delivered DM deep-links straight to its conversation.

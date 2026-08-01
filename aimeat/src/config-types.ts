@@ -281,6 +281,15 @@ export interface AimeatConfig {
   storageQuotaMb: number;
   storageMaxFileSizeMb: number;
   storageMaxChunkedFileSizeGb: number;
+  /** Largest audio file accepted for transcription. 25 is the provider-side multipart ceiling, so a
+   *  larger value here only converts a clear local refusal into an opaque upstream one. */
+  sttMaxMb: number;
+  /** Duration guideline in seconds. Checked AFTER the call (nothing before the response knows the
+   *  duration) and logged, never used to withhold a transcription already paid for. 0 = no warning. */
+  sttMaxSeconds: number;
+  /** Hard cap on a browser voice-message recording, in seconds. Served to the UI so the recorder
+   *  stops at the node's own number instead of a hardcoded one. */
+  voiceMsgMaxSeconds: number;
   microMemoryQuotaKb: number;
   microMemoryMaxSetsPerAgent: number;
   microMemoryMaxKeysPerSet: number;

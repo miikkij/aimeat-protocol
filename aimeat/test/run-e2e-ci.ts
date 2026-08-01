@@ -211,6 +211,8 @@ const ALL_SUITES = [
     'test/e2e-upload.ts',
     'test/cortex-ui-e2e.ts',
     'test/openrouter.ts',
+    'test/e2e-ai-transcribe.ts',
+    'test/e2e-message-transcript.ts',
     'test/ai.ts',
     'test/e2e-sharing-groups.ts',
     'test/e2e-agent-tasks.ts',

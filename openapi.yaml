@@ -3236,6 +3236,28 @@ components:
         kind:
           type: string
           enum: [image, audio, video, file]
+        durationSeconds:
+          type: number
+          description: >
+            Playing length of audio/video, measured when it was recorded. Lets a thread show "0:14"
+            before any bytes are fetched.
+        transcript:
+          type: object
+          description: >
+            Text of a spoken attachment. `by: sender` arrived WITH the message and is identical in
+            both mailbox copies (so the recipient reads it without paying). `by: recipient` was
+            produced locally with the reader's own key and exists ONLY in their copy —
+            updateMessageAttachments is owner-keyed, so there is no path back to the sender.
+          properties:
+            text: { type: string, maxLength: 20000 }
+            by:
+              type: string
+              enum: [sender, recipient]
+              description: Server-set on send; a client claim of `recipient` is overwritten with `sender`.
+            model: { type: string }
+            lang: { type: string }
+            seconds: { type: number }
+            at: { type: string, format: date-time }
 
     DirectMessageRecord:
       type: object
@@ -8249,6 +8271,127 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '403':
           $ref: '#/components/responses/AimeatError'
+
+  /v1/ai/transcribe:
+    post:
+      operationId: aiTranscribe
+      summary: Transcribe audio with the owner's own speech-to-text model
+      description: >
+        Speech-to-text on the owner's own provider key, behind the same gate as /v1/ai/complete
+        (an owner session, or any token carrying `ai:use`). Spends the SAME daily AI budget as text
+        completions and lands in the same usage ledger, so a budget eaten by voice messages is
+        visible in the same place as everything else.
+
+
+        Audio comes from `storage_key` — resolved against the CALLER's own namespace, never an owner
+        supplied in the body, so the endpoint cannot be pointed at another account's files (a key
+        belonging to someone else answers 404, not 403: whether it exists is not information this
+        route gives away). `audio_base64` is a bounded fallback for a browser recording that has not
+        been stored yet; anything of real size goes through storage.
+
+
+        Requires `sttModel` in the owner's settings. There is deliberately no fallback to the default
+        model — it is a text model, and handing it audio produces an opaque provider error instead of
+        an instruction the owner can act on.
+      tags: [AI]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                storage_key:
+                  type: string
+                  description: Key of an audio file in the CALLER's own storage. Preferred.
+                audio_base64:
+                  type: string
+                  description: 'Raw base64 audio (no data: prefix). Capped well below the JSON body limit.'
+                mime:
+                  type: string
+                  description: Content type of the audio (e.g. audio/webm). Defaults to the stored file's.
+                filename:
+                  type: string
+                model:
+                  type: string
+                  description: Override the owner's configured sttModel for this call.
+                language:
+                  type: string
+                  description: ISO-639-1 hint. Omitted = the owner's sttLanguage, then auto-detect.
+                verbose:
+                  type: boolean
+                  description: Ask for segment timestamps (verbose_json).
+                app_id:
+                  type: string
+                  description: Attribution for the per-app quota and the spend breakdown.
+      responses:
+        '200':
+          description: Transcription
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          text: { type: string }
+                          model: { type: string }
+                          language: { type: string, nullable: true }
+                          seconds:
+                            type: number
+                            description: Audio duration as the provider measured it; 0 if unreported.
+                          usage:
+                            type: object
+                            properties:
+                              total_tokens: { type: integer }
+                              cost_usd:
+                                type: number
+                                description: >
+                                  The provider's reported charge. 0 with cost_exact false when the
+                                  provider reports none — no estimate is derived from duration,
+                                  because audio pricing units differ between providers.
+                              cost_exact: { type: boolean }
+                          budget:
+                            type: object
+                            properties:
+                              daily_budget_usd: { type: number }
+                              spent_today_usd: { type: number }
+                              remaining_usd: { type: number }
+        '400':
+          description: Bad request (no audio, oversized audio, or NO_STT_MODEL / NO_API_KEY)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '402':
+          description: Daily AI budget or per-app quota exhausted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: Missing ai:use scope, app not allowlisted, or provider host not allowlisted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '404':
+          description: No such file in the caller's storage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '502':
+          description: Provider error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   /v1/ai/available:
     get:
@@ -28381,6 +28524,41 @@ paths:
                     Vision-capable model (e.g. qwen-2.5-VL) used for requests carrying image inputs
                     (the Secretary's doc/image intake). null/'' clears it. When unset, image requests
                     fall back to the default model (which may be text-only).
+                sttModel:
+                  type: string
+                  nullable: true
+                  description: >
+                    Transcription model (e.g. openai/whisper-large-v3) used by POST /v1/ai/transcribe
+                    and voice messages. null/'' turns transcription OFF — there is deliberately no
+                    fallback to the default model, which is a text model and would only produce an
+                    opaque provider error. Discover candidates via
+                    GET /v1/openrouter/models?modality=transcription.
+                sttLanguage:
+                  type: string
+                  nullable: true
+                  description: >
+                    ISO-639-1 hint for transcription (e.g. "fi"). null/'' = auto-detect, which is the
+                    right choice for mixed-language speech.
+                reasoningModel:
+                  type: string
+                  nullable: true
+                  description: Model used when a caller asks for the `reasoning` role.
+                executionModel:
+                  type: string
+                  nullable: true
+                  description: Model used when a caller asks for the `execution` role.
+                temperature:
+                  type: number
+                  nullable: true
+                  description: Default sampling temperature (0-2). null clears it.
+                top_p:
+                  type: number
+                  nullable: true
+                  description: Default nucleus sampling (0-1). null clears it.
+                max_tokens:
+                  type: integer
+                  nullable: true
+                  description: Default output ceiling. null clears it.
                 autoRetry:
                   type: boolean
                   description: Whether to automatically retry failed completions
@@ -28445,6 +28623,20 @@ paths:
                             type: string
                             nullable: true
                             description: Currently configured default model
+                          reasoningModel: { type: string, nullable: true }
+                          executionModel: { type: string, nullable: true }
+                          visionModel:
+                            type: string
+                            nullable: true
+                            description: Vision-capable model for image inputs
+                          sttModel:
+                            type: string
+                            nullable: true
+                            description: Transcription model; null = transcription is off
+                          sttLanguage:
+                            type: string
+                            nullable: true
+                            description: ISO-639-1 transcription hint; null = auto-detect
                           autoRetry:
                             type: boolean
                             description: Whether auto-retry is enabled
@@ -28460,6 +28652,25 @@ paths:
                             type: string
                             format: uri
                             description: Custom API base URL
+                          temperature: { type: number, nullable: true }
+                          top_p: { type: number, nullable: true }
+                          max_tokens: { type: integer, nullable: true }
+                          limits:
+                            type: object
+                            description: >
+                              Node-level ceilings served alongside the settings that live under them,
+                              so a browser recorder stops at THIS node's number instead of one
+                              compiled into the page.
+                            properties:
+                              voice_msg_max_seconds:
+                                type: integer
+                                description: Hard cap on one browser voice recording
+                              stt_max_mb:
+                                type: integer
+                                description: Largest audio file accepted for transcription
+                              stt_max_seconds:
+                                type: integer
+                                description: Duration guideline (warned about after the fact, never withheld)
         '401':
           $ref: '#/components/responses/Unauthorized'
         '503':
@@ -28497,10 +28708,27 @@ paths:
     get:
       operationId: listOpenRouterModels
       summary: List available OpenRouter models
-      description: Fetches the list of available models from OpenRouter using the configured API key. Owner-only.
+      description: >
+        Fetches available models from the configured provider using the stored API key. Owner-only.
+
+
+        `modality` selects which catalogue. This is not a client-side filter behind a parameter:
+        OpenRouter's default `/models` listing contains NO transcription or speech models (measured
+        2026-08-01 — 336 models, zero whisper), so `chat` and `transcription` are genuinely different
+        listings and an STT model cannot be discovered without asking for its modality. Non-OpenRouter
+        OpenAI-compatible providers ignore the parameter and return their whole catalogue.
       tags: [OpenRouter]
       security:
         - BearerAuth: []
+      parameters:
+        - name: modality
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [chat, transcription, speech]
+            default: chat
+          description: Which slice of the provider's catalogue to list.
       responses:
         '200':
           description: List of available models
@@ -28531,15 +28759,39 @@ paths:
                                 context_length:
                                   type: integer
                                   description: Maximum context window in tokens
+                                input_modalities:
+                                  type: array
+                                  items: { type: string }
+                                  description: >
+                                    What the model ACCEPTS (text, image, audio, file), straight from
+                                    the provider. A picker filters on this rather than guessing from
+                                    the name — 180 of 336 catalogue models read images and no naming
+                                    convention identifies them.
+                                output_modalities:
+                                  type: array
+                                  items: { type: string }
+                                  description: What the model PRODUCES (text, transcription, speech, image).
                                 pricing:
                                   type: object
+                                  description: >
+                                    Provider-reported pricing. For CHAT models `prompt`/`completion`
+                                    are consistently per token. For AUDIO models the unit is NOT
+                                    self-describing and varies by upstream provider — the same
+                                    openai/whisper-large-v3 reports 0.0015 on Together and 0.111 on
+                                    Groq (per minute vs per hour) — so a derived "$/min" label would
+                                    be wrong for whole providers. The trustworthy price for a
+                                    transcription is `usage.cost_usd` on the actual response.
                                   properties:
                                     prompt:
                                       type: string
-                                      description: Cost per prompt token
+                                      description: Cost per prompt token (chat) / provider-native unit (audio)
                                     completion:
                                       type: string
                                       description: Cost per completion token
+                          modality:
+                            type: string
+                            enum: [chat, transcription, speech]
+                            description: Which catalogue these models came from (echoes the request).
         '400':
           description: No API key configured
           content:
@@ -31517,6 +31769,106 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
+
+  /v1/messages/{id}/attachments/{attId}/transcribe:
+    post:
+      operationId: transcribeMessageAttachment
+      summary: Turn a voice attachment into text
+      description: >
+        Transcribes one audio attachment with the caller's own speech-to-text model and writes the
+        result onto the CALLER's copy of the message. Mailbox copies are per-owner, so a recipient's
+        transcript stays with the recipient and never travels back to the sender.
+
+
+        Idempotent by default: an attachment that already has a transcript returns it without calling
+        the provider, because a second click on a button is not a request to be charged twice. Pass
+        `force` to re-run (a different model, or a bad first result).
+
+
+        Never automatic anywhere in the product — transcription spends the owner's AI budget, so it is
+        always an explicit action.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - name: attId
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                force:
+                  type: boolean
+                  description: Re-transcribe even when a transcript already exists (costs again).
+                model: { type: string, description: Override the configured sttModel. }
+                language: { type: string, description: ISO-639-1 hint. }
+      responses:
+        '200':
+          description: Transcript (fresh or reused)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          attachment_id: { type: string }
+                          transcript:
+                            type: object
+                            description: Same shape as DirectMessageAttachment.transcript.
+                          reused:
+                            type: boolean
+                            description: true = returned from storage, no provider call, no charge.
+                          usage:
+                            type: object
+                            properties:
+                              cost_usd: { type: number }
+                              cost_exact: { type: boolean }
+                              seconds: { type: number }
+                          budget:
+                            type: object
+                            properties:
+                              daily_budget_usd: { type: number }
+                              spent_today_usd: { type: number }
+                              remaining_usd: { type: number }
+        '400':
+          description: Not an audio attachment, or no transcription model configured
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '402':
+          description: Daily AI budget exhausted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '404':
+          description: Message or attachment not found in the caller's mailbox
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '409':
+          description: >
+            ATTACHMENT_NOT_READY — the bytes have not been duplicated locally yet (or the attachment
+            expired before they could be).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
 
   /v1/messages/{id}:
     delete:

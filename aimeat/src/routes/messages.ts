@@ -11,6 +11,7 @@
  *   - GET    /v1/messages/conversations/:conversationId    -- full thread
  *   - POST   /v1/messages/conversations/:conversationId/read -- mark thread read (+ local receipt)
  *   - PATCH  /v1/messages/:id/read                         -- mark one message read (+ local receipt)
+ *   - POST   /v1/messages/:id/attachments/:attId/transcribe -- transcribe a voice attachment
  *   - DELETE /v1/messages/:id                              -- delete the caller's copy
  *   - GET    /v1/messages/requests                         -- pending first-contact requests
  *   - POST   /v1/messages/requests/:contactId/accept       -- accept a contact
@@ -31,6 +32,10 @@
  *     read (getDirectMessagesByIds) instead of getDirectMessage per pending contact.
  *   v1.5.0 -- 2026-07-16 -- GET /messages/overview: the inbox mount's 6-request fan-out folded into one
  *     composite (MessagesInboxService, Phase 4). Individual list endpoints stay for interactive re-fetch.
+ *   v1.7.0 -- 2026-08-01 -- Voice messages: POST /:id/attachments/:attId/transcribe turns a spoken
+ *     attachment into text with the caller's own key. The result is written to the CALLER's copy of
+ *     the message only (updateMessageAttachments is owner-keyed), so a reader's transcript never
+ *     travels back to the sender. Idempotent unless `force`.
  *   v1.6.0 -- 2026-07-21 -- Reading a thread (POST /conversations/:id/read) now also dismisses that
  *     conversation's header-bell notifications (dismissConversationNotifications), so a message you've
  *     opened stops lingering in the bell; owner-scoped 'notifications' emit refreshes the bell live.
@@ -53,6 +58,8 @@ import { resolveAudience, sendBroadcast, broadcastToFederation } from '../servic
 import { duplicateMessageAttachments } from '../services/attachment-duplication.js';
 import { createMessagingDbService } from '../services/db/messaging-db-service.js';
 import { createMessagesInboxService } from '../services/db/messages-inbox-db-service.js';
+import { transcribeForOwner } from '../services/ai-transcription.js';
+import { AiCompletionError } from '../services/ai-completion.js';
 import { logger } from '../utils/logger.js';
 
 export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Map<string, PeerInfo>): Router {
@@ -336,6 +343,95 @@ export function messagesRouter(config: AimeatConfig, storage: Storage, peers: Ma
     await propagateReadReceipt(deliveryCtx, updated, updated.readAt ?? new Date().toISOString());
     emitChange('messages');
     res.json(success(config.nodeId, { message: updated }));
+  });
+
+  /* ── POST /v1/messages/:id/attachments/:attId/transcribe — transcribe a voice attachment ──
+   *
+   * A thin binding on top of /v1/ai/transcribe. It exists for one reason: the result has to land on
+   * the right copy of the message. Mailbox copies are per-owner, and updateMessageAttachments is
+   * keyed by owner, so a recipient's transcript is written to THEIR copy and cannot reach the sender.
+   *
+   * Idempotent by default. An attachment that already has a transcript returns it without calling the
+   * provider, because the second click on a button is not a request to be charged twice; `force: true`
+   * re-runs it (a different model, or a bad first result).
+   */
+  router.post('/v1/messages/:id/attachments/:attId/transcribe', requireAuth(), requireRole('owner'), async (req, res) => {
+    const ghii = resolve(req);
+    const id = req.params.id as string;
+    const attId = req.params.attId as string;
+    const { force, model, language } = (req.body ?? {}) as { force?: boolean; model?: string; language?: string };
+
+    const message = await storage.getDirectMessage(id, ghii);
+    if (!message) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Message not found'));
+      return;
+    }
+    const attachments = message.attachments ?? [];
+    const att = attachments.find(a => a.id === attId);
+    if (!att) {
+      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Attachment not found on this message'));
+      return;
+    }
+    if (att.kind !== 'audio' && !att.mime?.startsWith('audio/')) {
+      res.status(400).json(error(config.nodeId, 'NOT_AUDIO', 'Only audio attachments can be transcribed.'));
+      return;
+    }
+    if (att.transcript && !force) {
+      res.json(success(config.nodeId, { attachment_id: attId, transcript: att.transcript, reused: true }));
+      return;
+    }
+
+    // Which bytes: a received attachment was duplicated into the recipient's own storage (localKey);
+    // a sent one is still the sender's original. Anything not yet duplicated has no local bytes to
+    // read, and saying so beats a confusing 404 on a file the user can see in the thread.
+    const key = att.mode === 'duplicate' ? att.localKey : att.storageKey;
+    if (!key || att.expired) {
+      res.status(409).json(error(config.nodeId, 'ATTACHMENT_NOT_READY',
+        att.expired ? 'This attachment expired before it could be stored.' : 'This attachment has not been stored locally yet. Try again shortly.'));
+      return;
+    }
+    const file = await storage.getStorageFile(ghii, key);
+    if (!file) {
+      res.status(409).json(error(config.nodeId, 'ATTACHMENT_NOT_READY', 'Attachment bytes are not available on this node.'));
+      return;
+    }
+
+    try {
+      const r = await transcribeForOwner(storage, config, ghii, {
+        audio: { data: file.data, mime: att.mime || file.mimeType, filename: att.name || 'voice-message' },
+        model, language, appId: 'inbox',
+      });
+      const transcript = {
+        text: r.text,
+        // Who produced it decides how a reader weighs it, and this one was produced HERE, by the
+        // person reading. Direction of the message is what tells the two apart.
+        by: (message.direction === 'outbound' ? 'sender' : 'recipient') as 'sender' | 'recipient',
+        model: r.model,
+        lang: r.language,
+        seconds: r.seconds,
+        at: new Date().toISOString(),
+      };
+      const next = attachments.map(a => (a.id === attId ? { ...a, transcript } : a));
+      await storage.updateMessageAttachments(id, ghii, next);
+      emitChange('messages');
+      res.json(success(config.nodeId, {
+        attachment_id: attId,
+        transcript,
+        reused: false,
+        usage: { cost_usd: r.usage.costUsd, cost_exact: r.usage.costExact, seconds: r.seconds },
+        budget: {
+          daily_budget_usd: r.budget.dailyBudgetUsd,
+          spent_today_usd: r.budget.spentTodayUsd,
+          remaining_usd: r.budget.remainingUsd,
+        },
+      }));
+    } catch (e) {
+      if (e instanceof AiCompletionError) {
+        res.status(e.status).json(error(config.nodeId, e.code, e.message));
+        return;
+      }
+      res.status(502).json(error(config.nodeId, 'PROVIDER_ERROR', (e as Error).message));
+    }
   });
 
   /* ── DELETE /v1/messages/:id — delete the caller's copy ── */

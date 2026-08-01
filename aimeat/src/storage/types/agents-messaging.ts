@@ -460,6 +460,25 @@ export interface DirectMessageAttachment {
   /** Original filename / caption. */
   name?: string;
   kind: 'image' | 'audio' | 'video' | 'file';
+  /** Playing length of audio/video, measured when it was recorded. Lets the thread show a duration
+   *  before the bytes are fetched. */
+  durationSeconds?: number;
+  /**
+   * Text of a spoken attachment.
+   *
+   * `by: 'sender'` arrived with the message and is identical in both mailbox copies. `by: 'recipient'`
+   * was produced locally with the reader's own key and lives ONLY in their copy — updateMessageAttachments
+   * is keyed by owner, so there is no path for it to reach the other party.
+   */
+  transcript?: {
+    text: string;
+    by: 'sender' | 'recipient';
+    model?: string;
+    lang?: string;
+    seconds?: number;
+    /** ISO timestamp of when the transcription ran. */
+    at: string;
+  };
 }
 
 /** One option in an interactive question. `id` is stable; `label` is the human-facing text. */

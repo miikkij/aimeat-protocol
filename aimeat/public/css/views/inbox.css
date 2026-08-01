@@ -801,3 +801,44 @@
 .inbox-speak-btn--on { background: var(--accent-subtle); border-color: var(--accent-border); color: var(--accent); }
 .inbox-speak-ico { font-size: 13px; line-height: 1; }
 .inbox-speak-stop { flex: none; padding-inline: 8px; }
+
+/* ── Voice messages (2026-08-01) ──
+   A voice message plays where it sits. It used to fall into the generic attachment chip and open in
+   a new browser tab, which is a download, not a conversation. */
+.inbox-attach-audio { display: flex; flex-direction: column; gap: 4px; width: 100%; max-width: 380px; }
+.inbox-audio { width: 100%; height: 34px; }
+.inbox-audio--chip { max-width: 190px; height: 30px; }
+.inbox-audio-dur { font-size: 11px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.inbox-file-chip--voice { align-items: center; gap: 6px; }
+.inbox-chip-voice { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; }
+
+/* Transcript: collapsed by default so a thread of voice messages stays scannable, and the label
+   always says who produced the text — the sender's own transcript and one this reader paid for are
+   not the same claim. */
+.inbox-transcript { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 2px; }
+.inbox-transcript-toggle {
+  background: none; border: none; cursor: pointer; padding: 2px 0;
+  font-size: 11px; color: var(--text-dim); display: inline-flex; align-items: center; gap: 6px;
+}
+.inbox-transcript-toggle:hover { color: var(--text); }
+.inbox-transcript-src { color: var(--text-muted); }
+.inbox-transcript-text {
+  flex-basis: 100%; font-size: 13px; white-space: pre-wrap; word-break: break-word;
+  padding: 8px; border-radius: var(--radius, 8px);
+  background: var(--bg-dim); border: 1px solid var(--border);
+}
+.inbox-transcript-btn {
+  background: none; border: 1px solid var(--border); border-radius: 999px; cursor: pointer;
+  font-size: 11px; padding: 2px 10px; color: var(--text-dim);
+}
+.inbox-transcript-btn:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.inbox-transcript-btn:disabled { opacity: .6; cursor: progress; }
+.inbox-transcript-hint { font-size: 11px; color: var(--text-muted); }
+.inbox-transcript-err { font-size: 11px; color: var(--danger); }
+
+@media (max-width: 520px) {
+  /* Full width on a phone: a 380px cap would leave the player floating in a narrow column. */
+  .inbox-attach-audio { max-width: 100%; }
+  .inbox-audio--chip { max-width: 100%; }
+}

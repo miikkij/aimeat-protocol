@@ -1114,7 +1114,7 @@
      textareas a comfortable touch height and let the prompt box scroll. */
   .pf-gen-ws-pane .pf-gen-prompt-box { max-height: 220px; }
   .pf-gen-ws-pane .pf-gen-result-area { min-height: 200px; }
-  .pf-gen-or-run-all-bar { flex-direction: column; align-items: stretch; gap: 8px; }
+  .pf-or-run-all-bar { flex-direction: column; align-items: stretch; gap: 8px; }
 }
 
 /* ══ Shared Profile Utilities (2026-03-17) ══════════════ */
@@ -1249,15 +1249,15 @@
 .pf-gen-agent-actions { display: flex; gap: 8px; }
 .pf-gen-stop-btn { margin-left: auto; }
 
-/* ── OpenRouter Settings (pf-gen-or-*) ──────────────── */
-.pf-gen-or-wrapper {
+/* ── OpenRouter Settings (pf-or-*) ──────────────── */
+.pf-or-wrapper {
   margin-bottom: 1.25rem;
   background: var(--card, #FFFFFF);
   border: 1px solid var(--border, #E5E7EB);
   border-radius: 8px;
   overflow: hidden;
 }
-.pf-gen-or-toggle {
+.pf-or-toggle {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1271,22 +1271,22 @@
   color: var(--text, #1A1A2E);
   text-align: left;
 }
-.pf-gen-or-toggle:hover { background: var(--bg-dim, #F3F4F6); }
-.pf-gen-or-toggle-icon { font-size: 0.65em; color: var(--text-dim, #6B7280); width: 1rem; flex-shrink: 0; }
-.pf-gen-or-status-dot {
+.pf-or-toggle:hover { background: var(--bg-dim, #F3F4F6); }
+.pf-or-toggle-icon { font-size: 0.65em; color: var(--text-dim, #6B7280); width: 1rem; flex-shrink: 0; }
+.pf-or-status-dot {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--success, #22c55e);
   box-shadow: 0 0 6px rgba(34, 197, 94, 0.4);
   flex-shrink: 0;
   margin-left: auto;
 }
-.pf-gen-or-panel {
+.pf-or-panel {
   padding: 0 14px 14px;
 }
-.pf-gen-or-field {
+.pf-or-field {
   margin-bottom: 12px;
 }
-.pf-gen-or-label {
+.pf-or-label {
   display: block;
   font-size: 0.8em;
   color: var(--text-dim, #6B7280);
@@ -1294,7 +1294,7 @@
   margin-bottom: 4px;
   font-weight: 600;
 }
-.pf-gen-or-input {
+.pf-or-input {
   width: 100%;
   padding: 8px 12px;
   background: var(--surface, #F9FAFB);
@@ -1305,15 +1305,15 @@
   font-family: inherit;
   box-sizing: border-box;
 }
-.pf-gen-or-input:focus { outline: none; border-color: var(--accent, #E8564A); box-shadow: 0 0 0 3px rgba(232, 86, 74, 0.1); }
-.pf-gen-or-input-sm { max-width: 100px; }
-.pf-gen-or-param-row { display: flex; align-items: center; gap: 10px; }
-.pf-gen-or-param-hint { font-size: 0.8em; color: var(--text-dim, #888); white-space: nowrap; }
+.pf-or-input:focus { outline: none; border-color: var(--accent, #E8564A); box-shadow: 0 0 0 3px rgba(232, 86, 74, 0.1); }
+.pf-or-input-sm { max-width: 100px; }
+.pf-or-param-row { display: flex; align-items: center; gap: 10px; }
+.pf-or-param-hint { font-size: 0.8em; color: var(--text-dim, #888); white-space: nowrap; }
 /* Model refresh row: sits below the model <select>; let the hint/error wrap on narrow widths. */
-.pf-gen-or-model-row { margin-top: 8px; flex-wrap: wrap; }
-.pf-gen-or-model-row .pf-gen-or-param-hint { white-space: normal; }
-.pf-gen-or-model-error { color: var(--danger, #ef4444); }
-.pf-gen-or-select {
+.pf-or-model-row { margin-top: 8px; flex-wrap: wrap; }
+.pf-or-model-row .pf-or-param-hint { white-space: normal; }
+.pf-or-model-error { color: var(--danger, #ef4444); }
+.pf-or-select {
   width: 100%;
   padding: 8px 12px;
   background: var(--surface, #F9FAFB);
@@ -1324,9 +1324,9 @@
   font-family: inherit;
   cursor: pointer;
 }
-.pf-gen-or-select:disabled { opacity: 0.5; cursor: not-allowed; }
-.pf-gen-or-select:focus { outline: none; border-color: var(--accent, #E8564A); }
-.pf-gen-or-checkbox {
+.pf-or-select:disabled { opacity: 0.5; cursor: not-allowed; }
+.pf-or-select:focus { outline: none; border-color: var(--accent, #E8564A); }
+.pf-or-checkbox {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1334,13 +1334,13 @@
   color: var(--text, #1A1A2E);
   cursor: pointer;
 }
-.pf-gen-or-checkbox input[type="checkbox"] { accent-color: var(--accent, #E8564A); width: 16px; height: 16px; cursor: pointer; }
-.pf-gen-or-radio-group {
+.pf-or-checkbox input[type="checkbox"] { accent-color: var(--accent, #E8564A); width: 16px; height: 16px; cursor: pointer; }
+.pf-or-radio-group {
   display: flex;
   flex-direction: column;
   gap: 6px;
 }
-.pf-gen-or-radio-label {
+.pf-or-radio-label {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1348,34 +1348,34 @@
   color: var(--text, #1A1A2E);
   cursor: pointer;
 }
-.pf-gen-or-radio-label input[type="radio"] { accent-color: var(--accent, #E8564A); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
-.pf-gen-or-loading { font-size: 0.85em; color: var(--text-dim, #6B7280); font-style: italic; }
-.pf-gen-or-actions {
+.pf-or-radio-label input[type="radio"] { accent-color: var(--accent, #E8564A); width: 16px; height: 16px; cursor: pointer; flex-shrink: 0; }
+.pf-or-loading { font-size: 0.85em; color: var(--text-dim, #6B7280); font-style: italic; }
+.pf-or-actions {
   display: flex;
   gap: 8px;
   margin-top: 14px;
   flex-wrap: wrap;
 }
-.pf-gen-or-delete {
+.pf-or-delete {
   color: var(--danger, #ef4444);
   border-color: var(--danger, #ef4444);
 }
-.pf-gen-or-delete:hover {
+.pf-or-delete:hover {
   background: var(--danger, #ef4444);
   color: #fff;
 }
-.pf-gen-or-message {
+.pf-or-message {
   padding: 8px 12px;
   border-radius: 6px;
   font-size: 0.85em;
   margin-top: 8px;
 }
-.pf-gen-or-message-success {
+.pf-or-message-success {
   background: rgba(34, 197, 94, 0.1);
   color: var(--success, #22c55e);
   border: 1px solid rgba(34, 197, 94, 0.25);
 }
-.pf-gen-or-message-error {
+.pf-or-message-error {
   background: rgba(239, 68, 68, 0.1);
   color: var(--danger, #ef4444);
   border: 1px solid rgba(239, 68, 68, 0.25);
@@ -1383,57 +1383,133 @@
 
 /* ── AI-apps daily-budget / spend section (generator-settings OpenRouterSettings) ──
    Lifted out of ~28 inline styles + hardcoded hex; all tokenized so it flips in dark mode. */
-.pf-gen-spend-section { border-top: 2px solid var(--border); padding-top: 14px; margin-top: 14px; }
-.pf-gen-spend-desc { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
-.pf-gen-spend-bar-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.pf-gen-spend-bar { flex: 1; min-width: 200px; background: var(--bg-surface); border-radius: 4px; height: 20px; position: relative; overflow: hidden; }
-.pf-gen-spend-bar-fill { position: absolute; top: 0; left: 0; bottom: 0; transition: width .3s; background: var(--success); }
-.pf-gen-spend-bar-fill.warn { background: var(--warn); }
-.pf-gen-spend-bar-fill.crit { background: var(--danger); }
-.pf-gen-spend-bar-label { position: relative; text-align: center; font-size: 11px; line-height: 20px; font-weight: 700; }
-.pf-gen-spend-budget-input { width: 90px; padding: 4px 6px; font-size: 13px; }
-.pf-gen-spend-details { margin-top: 10px; }
-.pf-gen-spend-summary { cursor: pointer; font-size: 12px; color: var(--text-dim); }
-.pf-gen-spend-hint { font-size: 11px; color: var(--text-muted); margin: 6px 0; }
-.pf-gen-spend-table { width: 100%; margin-top: 4px; font-size: 12px; border-collapse: collapse; }
-.pf-gen-spend-table th, .pf-gen-spend-table td { padding: 4px; text-align: left; }
-.pf-gen-spend-table th.num, .pf-gen-spend-table td.num { text-align: right; }
-.pf-gen-spend-table thead tr { border-bottom: 1px solid var(--border); }
-.pf-gen-spend-cap-input { width: 74px; padding: 3px 5px; font-size: 12px; text-align: right; }
-.pf-gen-spend-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
-.pf-gen-spend-msg { margin-top: 8px; }
-.pf-gen-spend-chart-wrap { margin-top: 14px; }
-.pf-gen-spend-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
-.pf-gen-spend-chart-title { font-size: 12px; font-weight: 600; color: var(--text-dim); }
-.pf-gen-spend-metric-toggle { display: inline-flex; gap: 4px; }
-.pf-gen-spend-footnote { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
+.pf-or-spend-section { border-top: 2px solid var(--border); padding-top: 14px; margin-top: 14px; }
+.pf-or-spend-desc { font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+.pf-or-spend-bar-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.pf-or-spend-bar { flex: 1; min-width: 200px; background: var(--bg-surface); border-radius: 4px; height: 20px; position: relative; overflow: hidden; }
+.pf-or-spend-bar-fill { position: absolute; top: 0; left: 0; bottom: 0; transition: width .3s; background: var(--success); }
+.pf-or-spend-bar-fill.warn { background: var(--warn); }
+.pf-or-spend-bar-fill.crit { background: var(--danger); }
+.pf-or-spend-bar-label { position: relative; text-align: center; font-size: 11px; line-height: 20px; font-weight: 700; }
+.pf-or-spend-budget-input { width: 90px; padding: 4px 6px; font-size: 13px; }
+.pf-or-spend-details { margin-top: 10px; }
+.pf-or-spend-summary { cursor: pointer; font-size: 12px; color: var(--text-dim); }
+.pf-or-spend-hint { font-size: 11px; color: var(--text-muted); margin: 6px 0; }
+.pf-or-spend-table { width: 100%; margin-top: 4px; font-size: 12px; border-collapse: collapse; }
+.pf-or-spend-table th, .pf-or-spend-table td { padding: 4px; text-align: left; }
+.pf-or-spend-table th.num, .pf-or-spend-table td.num { text-align: right; }
+.pf-or-spend-table thead tr { border-bottom: 1px solid var(--border); }
+.pf-or-spend-cap-input { width: 74px; padding: 3px 5px; font-size: 12px; text-align: right; }
+.pf-or-spend-actions { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.pf-or-spend-msg { margin-top: 8px; }
+.pf-or-spend-chart-wrap { margin-top: 14px; }
+.pf-or-spend-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px; }
+.pf-or-spend-chart-title { font-size: 12px; font-weight: 600; color: var(--text-dim); }
+.pf-or-spend-metric-toggle { display: inline-flex; gap: 4px; }
+.pf-or-spend-footnote { font-size: 11px; color: var(--text-muted); margin-top: 8px; }
 
-/* ── OpenRouter Autopilot (pf-gen-or-*) ──────────────── */
-.pf-gen-or-btn-row {
+/* ── AI provider settings v3: sections, model picker, STT (2026-08-01) ──
+   The panel is four sections that each save their own fields, so the answer to "did that save?"
+   appears where the question is asked instead of at the bottom of one long form. */
+.pf-or-section { padding: 14px 0; border-top: 1px solid var(--border); }
+.pf-or-section:first-child { border-top: none; padding-top: 4px; }
+.pf-or-section-title { font-size: 13px; font-weight: 700; margin: 0 0 10px; color: var(--text); }
+
+.pf-or-status { margin-left: auto; font-size: 11px; color: var(--text-muted); font-weight: 500; }
+.pf-or-status--on { color: var(--success); }
+
+/* Key row: the save button sits next to the field it saves. */
+.pf-or-key-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.pf-or-key-input { flex: 1; min-width: 220px; }
+.pf-or-links { display: flex; gap: 14px; margin-top: 8px; font-size: 12px; flex-wrap: wrap; }
+
+.pf-or-models-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 10px; }
+.pf-or-hint { font-size: 11px; color: var(--text-muted); display: block; margin-top: 4px; }
+.pf-or-hint--error { color: var(--danger); }
+.pf-or-loading { font-size: 12px; color: var(--text-dim); padding: 8px 0; }
+.pf-or-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+
+.pf-or-roles-summary,
+.pf-or-params-summary { cursor: pointer; font-size: 12px; color: var(--text-dim); margin-bottom: 8px; }
+.pf-or-params-summary { font-size: 13px; font-weight: 700; color: var(--text); }
+
+.pf-or-inline-field { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+.pf-or-label--inline { margin: 0; }
+.pf-or-select--sm { width: auto; min-width: 150px; }
+
+/* ── Model picker ──
+   Replaces a <select> holding the provider's whole catalogue (336 options on OpenRouter, unlabelled
+   and unsearchable). Prices are tabular so a column of them can actually be compared. */
+.pf-or-picker { border: 1px solid var(--border); border-radius: var(--radius, 8px); padding: 8px; background: var(--bg-surface); }
+.pf-or-picker--off { opacity: .55; }
+.pf-or-picker-head { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.pf-or-picked-id { font-size: 12px; word-break: break-all; }
+.pf-or-picked-none { font-size: 12px; color: var(--text-muted); }
+.pf-or-picked-warn { font-size: 11px; color: var(--warn); margin-left: 6px; }
+.pf-or-msearch { width: 100%; }
+
+.pf-or-mlist { list-style: none; margin: 8px 0 0; padding: 0; max-height: 260px; overflow-y: auto; }
+.pf-or-mgroup { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--text-muted); padding: 4px 2px; }
+.pf-or-mrow { display: flex; align-items: center; gap: 4px; border-radius: 6px; }
+.pf-or-mrow:hover { background: var(--bg-dim); }
+.pf-or-mrow--on { background: var(--bg-dim); box-shadow: inset 2px 0 0 var(--accent); }
+.pf-or-mpick {
+  flex: 1; min-width: 0; text-align: left; background: none; border: none; cursor: pointer;
+  padding: 6px 6px; color: var(--text); display: flex; flex-direction: column; gap: 2px;
+}
+.pf-or-mname { font-size: 13px; font-weight: 600; }
+.pf-or-mid { font-size: 11px; color: var(--text-muted); word-break: break-all; }
+.pf-or-mmeta { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11px; color: var(--text-dim); }
+.pf-or-mprice { font-variant-numeric: tabular-nums; }
+.pf-or-mlink { padding: 0 6px; color: var(--text-dim); text-decoration: none; font-size: 13px; }
+.pf-or-mlink:hover { color: var(--accent); }
+.pf-or-mempty { font-size: 12px; color: var(--text-muted); padding: 10px 4px; }
+.pf-or-mall { margin-top: 6px; }
+.pf-or-mcustom { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.pf-or-mcustom .pf-or-input { flex: 1; min-width: 180px; }
+
+/* ── Speech-to-text ──
+   The measured result is the point of the test: an audio model's listed price carries no unit, so
+   one real transcription says more than any number derived from the catalogue. */
+.pf-or-stt { border-top: 1px dashed var(--border); padding-top: 12px; margin-top: 12px; }
+.pf-or-stt-test { margin-top: 10px; }
+.pf-or-stt-test-head { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.pf-or-stt-result { margin-top: 8px; padding: 8px; border-radius: var(--radius, 8px); background: var(--bg-dim); border: 1px solid var(--border); }
+.pf-or-stt-text { font-size: 13px; white-space: pre-wrap; word-break: break-word; }
+.pf-or-stt-meta { font-size: 11px; color: var(--text-muted); margin-top: 6px; font-variant-numeric: tabular-nums; }
+
+@media (max-width: 520px) {
+  .pf-or-key-row { flex-direction: column; align-items: stretch; }
+  .pf-or-key-input { min-width: 0; }
+  .pf-or-mmeta { flex-direction: column; gap: 2px; }
+}
+
+/* ── OpenRouter Autopilot (pf-or-*) ──────────────── */
+.pf-or-btn-row {
   display: flex;
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
-.pf-gen-or-run-btn {
+.pf-or-run-btn {
   display: inline-flex;
   align-items: center;
   gap: 6px;
 }
-.pf-gen-or-run-btn.pf-gen-or-running {
+.pf-or-run-btn.pf-or-running {
   opacity: 0.8;
   cursor: wait;
 }
-.pf-gen-or-spinner {
+.pf-or-spinner {
   display: inline-block;
   width: 14px;
   height: 14px;
   border: 2px solid var(--border, #E5E7EB);
   border-top-color: var(--accent, #E8564A);
   border-radius: 50%;
-  animation: pf-gen-or-spin 0.7s linear infinite;
+  animation: pf-or-spin 0.7s linear infinite;
 }
-@keyframes pf-gen-or-spin {
+@keyframes pf-or-spin {
   to { transform: rotate(360deg); }
 }
 .pf-gen-data-viewer {
@@ -1458,7 +1534,7 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
-.pf-gen-or-run-all-bar {
+.pf-or-run-all-bar {
   display: flex;
   align-items: center;
   gap: 12px;
@@ -1468,7 +1544,7 @@
   border: 1px solid var(--border, #E5E7EB);
   border-radius: 8px;
 }
-.pf-gen-or-run-all-status {
+.pf-or-run-all-status {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2058,8 +2134,8 @@
 .pf-gen-test-scope-compact {
   display: flex; gap: 8px; align-items: center; margin: 0; font-size: 0.85em;
 }
-.pf-gen-test-scope-compact .pf-gen-or-radio-label { margin: 0; white-space: nowrap; }
-.pf-gen-or-run-all-controls {
+.pf-gen-test-scope-compact .pf-or-radio-label { margin: 0; white-space: nowrap; }
+.pf-or-run-all-controls {
   display: flex; align-items: center; gap: 12px; width: 100%;
 }
 

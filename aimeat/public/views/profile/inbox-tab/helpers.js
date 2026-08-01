@@ -5,6 +5,9 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.4.0 — 2026-08-01 — parkMessage() + openTrackedRecord() moved here from inbox-tab.js: two
+ *     self-contained actions that needed nothing from the tab's state beyond a toast, pulled out to
+ *     keep the tab under max-file-lines while voice messages were added to it.
  *   v1.3.0 — 2026-07-27 — sendFailure(): pick the toast text for a failed send, preferring the thrown
  *     reason (attachment too large, out of quota) over the generic "could not send".
  *   v1.2.0 — 2026-07-21 — resolveThreadAttachmentUrls(): resolve non-inline attachment URLs for a loaded
@@ -14,6 +17,36 @@
  */
 import { t, getLocale } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
+import { parkMessageToNotebook } from '/js/services/notebook.js';
+import { firstLine } from '../notebook-helpers.js';
+
+/** 📓 on a message: copy it straight into the notebook for later processing (no AI step), keeping the
+ *  source link + reply intent so it can be replied to or filed from there. */
+export async function parkMessage(msg, showToast) {
+  try {
+    await parkMessageToNotebook(msg, { title: firstLine(msg.body) });
+    showToast?.(t('inbox.parkedToNotebook'));
+  } catch (e) {
+    showToast?.(e?.message || t('inbox.trackFailed'), true);
+  }
+}
+
+/** Open the workspace record a tracked response watches. Sets BOTH the saved tab (so the profile
+ *  loads onto Organisms) and the workspace deep-link (so that exact workspace opens), then navigates. */
+export function openTrackedRecord(tr, showToast) {
+  const r = tr.references || {};
+  if (!r.organismId || !r.workspaceId) { showToast?.(t('inbox.trackNoRecord'), true); return; }
+  try {
+    sessionStorage.setItem('aimeat-profile-tab', 'organisms');
+    sessionStorage.setItem('aimeat.ws.openId', r.organismId);
+    sessionStorage.setItem('aimeat.ws.openWs', r.workspaceId);
+  } catch (err) {
+    // Storage refused (private mode, quota): the navigation below still happens, it just lands on
+    // the Organisms tab without pre-opening the workspace.
+    swallowed('inbox helpers: openTrackedRecord deep-link', err);
+  }
+  window.location.assign('/v1/profile?tab=organisms');
+}
 
 /**
  * Toast text for a failed send. An attachment upload throws for reasons the sender can act on: the file

@@ -1,0 +1,66 @@
+/**
+ * @file voice-recorder.css
+ * @description Styles for /components/VoiceRecorder.js — the record button and its active state
+ *   (pulsing dot, elapsed time, input-level meter, stop and cancel). Shared by the inbox composer and
+ *   the OpenRouter settings transcription test, so it lives with the component rather than inside a
+ *   view stylesheet.
+ * @structure .vr-wrap/.vr-btn (idle) · .vr-active (recording) · .vr-dot · .vr-time · .vr-meter
+ * @version-history
+ *   v1.0.0 — 2026-08-01 — Initial version (voice messages).
+ */
+
+.vr-wrap { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+
+.vr-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: none; border: none; cursor: pointer;
+  color: var(--text-dim); font-size: 18px; line-height: 1;
+  padding: 4px 6px; border-radius: var(--radius, 8px);
+}
+.vr-btn:hover:not(:disabled) { background: var(--bg-dim); color: var(--text); }
+.vr-btn:disabled { opacity: .45; cursor: not-allowed; }
+.vr-label { font-size: 13px; }
+
+.vr-active {
+  display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 4px 8px; border-radius: var(--radius, 8px);
+  background: var(--bg-dim); border: 1px solid var(--border);
+}
+
+.vr-dot {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--danger);
+  animation: vr-pulse 1.4s ease-in-out infinite;
+}
+@keyframes vr-pulse { 0%, 100% { opacity: 1; } 50% { opacity: .25; } }
+/* Someone who has asked for less motion still needs to see that recording is live — the colour and
+   the running timer carry that; only the pulse stops. */
+@media (prefers-reduced-motion: reduce) {
+  .vr-dot { animation: none; }
+}
+
+.vr-time {
+  font-variant-numeric: tabular-nums;
+  font-size: 13px; font-weight: 600; min-width: 3.2em;
+}
+.vr-time--near { color: var(--danger); }
+
+.vr-meter {
+  width: 56px; height: 6px; border-radius: 3px;
+  background: var(--bg-surface); overflow: hidden;
+}
+.vr-meter-fill {
+  display: block; height: 100%; width: 0;
+  background: var(--success);
+  transition: width 80ms linear;
+}
+
+.vr-note, .vr-error { font-size: 11px; color: var(--text-muted); }
+.vr-error { color: var(--danger); }
+
+@media (max-width: 520px) {
+  /* The meter is the first thing to go: on a narrow composer the timer and the two buttons are what
+     the user needs, and a decorative bar must never push the stop button out of reach. */
+  .vr-meter { display: none; }
+  .vr-active { width: 100%; }
+}
