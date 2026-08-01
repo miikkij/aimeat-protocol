@@ -181,6 +181,32 @@ export function workflowsRouter(config: AimeatConfig, storage: Storage, schedule
       return;
     }
     emitChange('workflows');
+
+    // SIGNALS-ONLY ANSWERS THE QUESTION IT WAS ASKED. The run completes synchronously, so the
+    // verdicts exist by the time we reply — and the tool catalog has always described this mode as
+    // "an instant health check — returns each step's verdict inline". This route returned
+    // `{ runId, mode }`, so the caller got a receipt and had to go read the run to learn anything.
+    // The node's own MCP surface did return them, which is what made it invisible: only callers on
+    // the REST route (and therefore the CONNECTOR, a thin proxy over it) saw the empty version, and
+    // a crew checking a pipeline before a scheduled edition is exactly such a caller (2026-08-01).
+    //
+    // `vars` rides along because it is the other thing a pre-flight check needs and cannot otherwise
+    // see: it is where `<run-date>` became a concrete date, and a wrong date there is the difference
+    // between a run that publishes and one that greens every step against yesterday's output.
+    if (mode === 'signals-only') {
+      const run = (await listRuns(storage, ownerGhiiOf(req), id)).find(r => r.runId === result.runId);
+      if (run) {
+        res.json(success(config.nodeId, {
+          runId: result.runId, mode, status: run.status, vars: run.vars,
+          steps: Object.fromEntries(Object.entries(run.steps).map(([k, s]) => [k, {
+            state: s.state, reads: s.reads, writes: s.writes,
+          }])),
+        }, [
+          { description: 'View the run', method: 'GET', url: `/v1/workflows/${id}/runs/${result.runId}` },
+        ]));
+        return;
+      }
+    }
     res.json(success(config.nodeId, { runId: result.runId, mode }, [
       { description: 'View the run', method: 'GET', url: `/v1/workflows/${id}/runs/${result.runId}` },
     ]));
