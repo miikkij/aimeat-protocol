@@ -681,7 +681,8 @@ After a successful publish (the publish response's \`next_steps\` shows what is 
 
 1. **Fetch the spec** (above). Skim the templates; pick the closest one.
 2. **Build one HTML file.** Single file, no bundler. Include the required meta tags the
-   spec lists (at minimum \`aimeat-app\` + \`aimeat-scopes\`). Use
+   spec lists (at minimum \`aimeat-app\` + \`aimeat-scopes\`, plus \`aimeat-ai\` when the app
+   generates content). Use
    \`AIMEAT.auth.mountLoginButton(...)\` + \`AIMEAT.auth.login()\` for sign-in,
    \`AIMEAT.data.get/set(key, value, { visibility })\` for storage, and the node UI helpers.
    Respect the light/dark theme via \`data-theme\` + CSS variables — never hardcode colors.
@@ -691,6 +692,29 @@ After a successful publish (the publish response's \`next_steps\` shows what is 
    upload** (omit the content param → PUT the raw HTML to the returned \`upload_url\`).
    Re-publishing the same \`filename\` bumps the version — it does not duplicate.
 5. **Return the live URL** and confirm with \`aimeat_app_list\` if unsure.
+
+## When the app generates content, say so — it is two lines
+
+An app that generates text, images, audio or video is, in EU AI Act terms, a system whose
+PROVIDER is the app owner. You do not have to read the law; the SDK carries it:
+
+\`\`\`javascript
+const r = await AIMEAT.ai.complete({ app_id: 'my-app', prompt });
+render(r.content);
+AIMEAT.ai.disclose(r.provenance, { target: '#ai-label' });   // official EU label, your theme
+await AIMEAT.data.set(key, AIMEAT.ai.declare(item, r.provenance));  // record follows the content
+AIMEAT.ai.chatNotice({ target: '#chat-top' });               // a chat says so first thing
+\`\`\`
+
+Declare it in the head so the catalogue can show it:
+\`<meta name="aimeat-ai" content="generates=text,image; discloses=yes; public-interest=no">\`.
+\`disclose()\` draws nothing when no label is owed — the node decides, you pass the object.
+Publishing warns (never blocks) when an app asks for \`ai:use\` and says nothing at all, and the
+warning names the exact call to add.
+
+**Emotion, mood, attention or any biometric inference about a person** is the app owner's OWN
+duty to declare to the people exposed, in their own words, before the inference happens.
+\`AIMEAT.ai.chatNotice({ title, body })\` renders your wording; it cannot write it for you.
 
 ## When the app needs external data (an extension)
 
@@ -705,6 +729,7 @@ extension — just auth + data + UI libs.
 - **Do** fetch \`/v1/prompts/build-app\` every time — it is canonical and it changes.
 - **Do** research existing apps/packs/pitfalls first; start from a template.
 - **Do** verify locally, publish over MCP (presigned for >1 KB), hand back the live URL.
+- **Do** call \`AIMEAT.ai.disclose()\` and declare \`aimeat-ai\` in any app that generates content.
 - **Don't** invent library/script URLs or reference files the spec doesn't list.
 - **Don't** build a separate backend, a bundler, or a multi-file app.
 - **Don't** hardcode brand colors or bypass the AIMEAT auth/data/UI libraries.

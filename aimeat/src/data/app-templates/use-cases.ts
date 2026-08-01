@@ -5,6 +5,10 @@
  *   {{app}} = memory namespace; {{owner-ghii}} = the owner's GHII. Consumed by ../app-templates.ts.
  * @structure USECASE_REALTIME_SOCIAL · USECASE_MARKETPLACE · USECASE_HOMEPAGE · USECASE_APP_IAM
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5: USECASE_HOMEPAGE ships the AI disclosure wired —
+ *     `<meta name="aimeat-ai">`, AIMEAT.ai.disclose() on the generated draft, and
+ *     AIMEAT.ai.declare() on the published post. A builder who starts from this template and
+ *     changes nothing is compliant, which is the only version of this that scales.
  *   v1.0.0 — 2026-07-13 — Extracted from src/data/app-templates.ts (max-file-lines)
  */
 
@@ -302,6 +306,9 @@ entry: index.html
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="aimeat-scopes" content="ai:use" />   <!-- lets the owner's "Write with AI" button spend their AI budget -->
+  <!-- What this app does with a model. The catalogue reads it, and it is what makes the app
+       EU-transparency-ready without its author reading Article 50. -->
+  <meta name="aimeat-ai" content="generates=text; discloses=yes; public-interest=no" />
   <title>{{App Title}}</title>
   <link href="/lib/daisyui@5.css" rel="stylesheet" type="text/css" />
   <link href="/lib/aimeat-daisyui-bridge.css" rel="stylesheet" type="text/css" />
@@ -349,6 +356,8 @@ entry: index.html
           <button type="button" id="ai-btn" class="btn-info px-3" hidden>✨ Write with AI</button>
         </div>
         <textarea id="f-body" class="textarea textarea-bordered font-mono text-sm" placeholder="Write in markdown… (## heading, **bold**, - lists, links, images)" rows="8"></textarea>
+        <!-- The AI label lands here. Empty until the model writes something. -->
+        <div id="ai-label"></div>
         <input id="f-image" type="file" accept="image/*" class="file-input file-input-bordered" />
         <div class="flex gap-2 justify-end">
           <button type="button" class="btn-ghost px-4" onclick="document.getElementById('post-modal').style.display='none'">Cancel</button>
@@ -367,6 +376,7 @@ entry: index.html
     var OWNER = '{{owner-ghii}}';        // the site owner's GHII (owner@node-id) — content is read from here
     var PROFILE_KEY = '{{app}}.profile';
     var POSTS_KEY = '{{app}}.posts';
+    var draftProvenance = null;   // set when the model writes the draft; attached to the saved post
     var session = null, profile = {}, posts = [];
 
     function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
@@ -423,6 +433,10 @@ entry: index.html
       try {
         var r = await AIMEAT.ai.complete({ prompt: 'Write a short, engaging blog post in markdown about: ' + idea, app_id: '{{app}}' });
         document.getElementById('f-body').value = r.content;
+        // The reader is entitled to know a model wrote this. One call; it draws nothing when no
+        // label is owed, and it follows this app's own theme.
+        draftProvenance = r.provenance;
+        AIMEAT.ai.disclose(r.provenance, { target: '#ai-label' });
       } catch (e) { alert('AI error: ' + (e.message || e)); }
       this.disabled = false; this.textContent = '✨ Write with AI';
     };
@@ -446,9 +460,15 @@ entry: index.html
         var imageUrl = '';
         var fi = document.getElementById('f-image');
         if (fi.files[0]) { var up = await AIMEAT.storage.upload(fi.files[0], { visibility: 'public' }); imageUrl = '/v1/pub/' + encodeURIComponent(session.ghii) + '/' + encodeURIComponent(up.key); }
-        posts.unshift({ id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), title: document.getElementById('f-title').value.trim(), body: document.getElementById('f-body').value, imageUrl: imageUrl, at: new Date().toISOString() });
+        var post = { id: Date.now() + '-' + Math.random().toString(36).slice(2, 7), title: document.getElementById('f-title').value.trim(), body: document.getElementById('f-body').value, imageUrl: imageUrl, at: new Date().toISOString() };
+        // The record travels WITH the post, so a reader of the stored data still knows how it was
+        // made. declare() returns a copy; it leaves the original alone.
+        if (draftProvenance) post = AIMEAT.ai.declare(post, draftProvenance);
+        posts.unshift(post);
         await AIMEAT.data.set(POSTS_KEY, posts, { visibility: 'public' });
-        document.getElementById('post-form').reset(); hide('post-modal'); renderPosts();
+        document.getElementById('post-form').reset(); draftProvenance = null;
+        document.getElementById('ai-label').textContent = '';
+        hide('post-modal'); renderPosts();
       } catch (e) { alert('Could not publish: ' + (e.message || e)); }
       btn.disabled = false; btn.textContent = 'Publish';
     });

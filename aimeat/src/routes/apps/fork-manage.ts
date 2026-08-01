@@ -7,12 +7,16 @@
  *   Fork description limits 2 000 → 10 000 — 2026-07-30.
  *   v1.1.0 — 2026-07-17 — Agent-Bundled Apps: PATCH accepts `cortex` — edit/clear the bundled
  *     crew-defs in place (validated fail-loud like publish) without re-uploading the HTML.
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 5: a fork keeps the source's AI transparency posture
+ *     and its provenance record. A fork of a generative app is still a generative app, and the
+ *     statement used to reset to silence exactly when somebody else took the code over.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppManifest, AppProtection } from '../../storage/interface.js';
 import { validateCortexAgents } from '../../models/crew-def-schemas.js';
+import { lintAppAiDisclosure } from '../../services/app-ai-posture.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
@@ -115,6 +119,16 @@ export function registerForkManageRoutes(
         };
         delete forkedManifest.priceMorsels;
         delete forkedManifest.licenseType;
+        // TARGET-058 Phase 5: A FORK OF A GENERATIVE APP IS STILL A GENERATIVE APP. The manifest
+        // spread above already brings the posture across, and this re-measures the observed half
+        // against the bytes actually being stored while keeping what the source DECLARED — so the
+        // statement neither resets to silence nor becomes a claim about code that moved on. Without
+        // it the posture would quietly vanish exactly when somebody else takes the code over.
+        if (/html/i.test(source.mimeType)) {
+            forkedManifest.aiPosture = lintAppAiDisclosure(
+                Buffer.from(source.data).toString('utf8'), source.manifest.aiPosture,
+            ).posture;
+        }
 
         await storage.createApp({
             ownerGaii: callerGhii,
@@ -128,6 +142,10 @@ export function registerForkManageRoutes(
             parked: false,
             forkable: false,   // the forker decides their own copy's forkability later
             createdAt: now,
+            // The record describes how these BYTES were made, and a fork copies the bytes exactly —
+            // so the statement travels with them. A fork that dropped it would read as unstated
+            // content that is in fact known to be model-written.
+            ...(source.aiProvenanceId ? { aiProvenanceId: source.aiProvenanceId } : {}),
         });
 
         // Copy the source screenshot into the fork's bucket (best-effort) so the fork

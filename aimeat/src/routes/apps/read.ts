@@ -26,7 +26,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
-import { injectAimeatBadge } from '../../utils/app-badge.js';
+import { applyServeMarks } from '../../services/app-serve-marks.js';
 import { appCsp } from '../../utils/app-csp.js';
 import { appContentType } from '../../utils/app-content-type.js';
 import { detectLocale } from '../../i18n.js';
@@ -37,7 +37,7 @@ import { serveAppAgentFace } from '../../services/agent-face.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 import {
-    loadServedProvenance, envelopeMeta, setProvenanceHeaders, injectAiDisclosure,
+    loadServedProvenance, envelopeMeta, setProvenanceHeaders,
 } from '../../services/ai-provenance-marks.js';
 
 export function registerReadRoutes(
@@ -331,7 +331,7 @@ export function registerReadRoutes(
             }
             res.setHeader('Content-Type', appContentType(draft.mimeType));
             const draftIsHtml = /html/i.test(draft.mimeType);
-            const draftBody = draftIsHtml ? injectAimeatBadge(draft.data) : draft.data;
+            const draftBody = draftIsHtml ? applyServeMarks(draft.data, { badge: true }) : draft.data;
             res.setHeader('Content-Length', draftBody.length.toString());
             // Same inline CSP a published app gets, so the draft behaves identically to
             // what it will once published. A draft is never cached (no-store).
@@ -457,7 +457,11 @@ export function registerReadRoutes(
         let body = (mode === 'inline' && isHtml)
             // The visible label rides ONLY on the inline (runnable) form. A raw download stays
             // byte-for-byte, which is what keeps the content hash in the record verifiable.
-            ? injectAiDisclosure(injectAimeatBadge(app.data), prov, { config, locale: detectLocale(req.headers['accept-language']) })
+            ? applyServeMarks(app.data, {
+                badge: true,
+                provenance: prov,
+                visibleLabel: { config, locale: detectLocale(req.headers['accept-language']) },
+            })
             : app.data;
         if (mode === 'inline' && isHtml && hasAnyProtection(app.manifest.protection)) {
             body = applyAppProtection(body, {

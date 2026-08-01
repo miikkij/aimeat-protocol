@@ -24,10 +24,15 @@
  *
  * @structure
  *   - AppHeadSpec — what the serving route knows
- *   - injectAppHeadMeta(html, spec) — pure string transform
+ *   - applyAppHeadMeta(text, spec) — pure string transform over the document's head
  * @usage
- *   buf = injectAppHeadMeta(buf, { owner, filename, appName, description, origin, baseUrl, tools });
+ *   text = applyAppHeadMeta(text, { owner, filename, appName, description, origin, baseUrl, tools });
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: takes and returns a string, so the single
+ *     serve-time-marks pass (services/app-serve-marks.ts) decodes the document once instead of four
+ *     times. Head-gap detection still runs against the text WITH the body marks already in it, which
+ *     is load-bearing: a JSON-LD block added by the AI-disclosure marks legitimately suppresses the
+ *     SoftwareApplication one here, and that was the behaviour before the consolidation too.
  *   v1.1.0 — 2026-07-28 — Works on a document with no <head> (or no <html>) — the common shape for
  *     a single-file app, and the one the first version silently skipped, so it did nothing at all
  *     for exactly the apps that needed it. Heading injection dropped, see rule 2 (phase 12b)
@@ -70,11 +75,7 @@ function esc(t: string): string {
 const has = (html: string, re: RegExp) => re.test(html);
 
 /** Add the tags the document does not already carry. Returns the input unchanged if it is not a document. */
-export function injectAppHeadMeta(
-  data: Buffer | Uint8Array | string,
-  spec: AppHeadSpec,
-): Buffer {
-  const text = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
+export function applyAppHeadMeta(text: string, spec: AppHeadSpec): string {
   // A single-file app is frequently a bare fragment. The one measured here opens with
   // `<meta charset>` and has no doctype, no <html> and no <head> at all, leaving the parser to
   // build them — and the first version of this function bailed out on the missing </head>, so it
@@ -82,7 +83,7 @@ export function injectAppHeadMeta(
   const hasHtmlEl = /<html[\s>]/i.test(text);
   const hasHeadEl = /<\/head\s*>/i.test(text);
   if (!hasHtmlEl && !hasHeadEl && !/<\/body\s*>/i.test(text) && !/<\/html\s*>/i.test(text)) {
-    return Buffer.from(text, 'utf-8');  // not an HTML document
+    return text;  // not an HTML document
   }
 
   const name = spec.appName?.trim() || spec.filename.replace(/\.[^.]+$/, '');
@@ -156,5 +157,5 @@ export function injectAppHeadMeta(
     out = out.replace(/<html(\s|>)/i, (m, tail: string) => `<html lang="en"${tail === '>' ? '>' : ' '}`);
   }
 
-  return Buffer.from(out, 'utf-8');
+  return out;
 }

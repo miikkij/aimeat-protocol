@@ -21,6 +21,10 @@
  *     site. Hand-written metas is how aimeat_extension_install's `update` flag was accepted and then
  *     dropped (meta: {}), so a requested upsert failed ALREADY_EXISTS with nothing pointing at the
  *     flag. Covered by test/e2e-presigned-meta.ts.
+ *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 5: the token carries `actor`, the principal that asked for
+ *     the URL, alongside `sub`, the owner bucket it lands in. For an app publish those differ — `sub`
+ *     is always the owner — so an agent publishing through the recommended presigned route arrived
+ *     with the agent erased, and the node had nothing left to infer provenance from.
  */
 
 import { SignJWT, jwtVerify } from 'jose';
@@ -53,6 +57,18 @@ export function initUploadTokenKeys(privateKey: CryptoKey, publicKey: CryptoKey)
 
 export interface UploadTokenPayload {
     sub: string;
+    /**
+     * WHO IS ACTUALLY UPLOADING, when that is not the same principal as `sub`.
+     *
+     * `sub` is the OWNER bucket the upload lands in — for an app that is always the owner's GHII, so
+     * a presigned publish requested by an agent arrived with the agent erased. That is not a
+     * bookkeeping detail: the node's rule is that silence from a NON-HUMAN principal must not read as
+     * "a human wrote it" (TARGET-058 MINT-3), and with the agent gone there was nothing left to infer
+     * from, so the recommended publish route produced apps with no provenance at all.
+     *
+     * Set server-side at mint time from resolveIdentity(), NEVER from anything a client sends.
+     */
+    actor?: string;
     utype: 'app' | 'storage' | 'extension' | 'cortex' | 'skill';
     meta: Record<string, unknown>;
     maxBytes: number;
@@ -61,6 +77,8 @@ export interface UploadTokenPayload {
 
 export interface VerifiedUploadToken {
     sub: string;
+    /** The principal that requested the URL — the GAII of an agent, or `sub` when they are the same. */
+    actor: string;
     utype: 'app' | 'storage' | 'extension' | 'cortex' | 'skill';
     meta: Record<string, unknown>;
     maxBytes: number;
@@ -123,6 +141,7 @@ export async function generateUploadToken(payload: UploadTokenPayload, ttlSecond
     return new SignJWT({
         typ: 'upload',
         utype: payload.utype,
+        ...(payload.actor && payload.actor !== payload.sub ? { actor: payload.actor } : {}),
         meta: payload.meta,
         maxBytes: payload.maxBytes,
         contentType: payload.contentType,
@@ -174,6 +193,9 @@ export async function verifyUploadToken(token: string): Promise<VerifiedUploadTo
 
     return {
         sub: payload.sub as string,
+        // Falls back to `sub`, so a token minted before this field existed still resolves to a
+        // principal rather than to undefined.
+        actor: (payload.actor as string | undefined) ?? (payload.sub as string),
         utype: payload.utype as VerifiedUploadToken['utype'],
         meta: payload.meta as Record<string, unknown>,
         maxBytes: payload.maxBytes as number,

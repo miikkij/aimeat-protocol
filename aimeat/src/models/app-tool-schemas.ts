@@ -11,6 +11,11 @@
  *   const rec = await storage.getMemory(sellerGhii, appToolsKey(appId));
  *   const doc = AppToolsDocSchema.parse(rec.value);
  * @version-history
+ *   v1.8.0 — 2026-08-01 — TARGET-058 Phase 5: optional `aiProvenance` on a tool and on the manifest
+ *     root — an `aimeat.provenance/v1` document describing the tool's OUTPUT, beside the ODPS
+ *     `provenance` that describes its data. Permissive (passthrough) and optional on purpose: a
+ *     manifest is all-or-nothing, so a strict field here could silently delist every offering an app
+ *     has the day a v2 record appears. Existing manifests validate unchanged.
  *   v1.7.0 — 2026-07-30 — Authored text is no longer clipped: descriptions/notes to 10 000, 200 tools
  *     and 40 plans per app. The old 500-character description silently delisted a live paid offering.
  *   v1.6.0 — 2026-07-28 — `lockedInput` + applyLockedInput: a tool fixes the parameter that tells it
@@ -125,6 +130,18 @@ export const AppToolSchema = z.object({
   }).optional(),
   /** Provenance attestation carried onto the projected offering + its ODPS document. */
   provenance: ProvenanceSchema.optional(),
+  /**
+   * How much of what this tool RETURNS a model wrote — an `aimeat.provenance/v1` document
+   * (TARGET-058). Distinct from `provenance` above, which is the ODPS attestation about the DATA the
+   * tool draws on; this one is about the output a buyer receives, and it is what an agent shopping
+   * for a capability reads to know whether the answer it is buying is model-written.
+   *
+   * `passthrough` deliberately: the record is a self-describing document with its own `spec`, so a
+   * newer version of it must not be able to fail validation here. THE MANIFEST IS ALL-OR-NOTHING —
+   * one field the validator rejects silently delists EVERY offering the app has — which is exactly
+   * why this is optional and permissive rather than strict.
+   */
+  aiProvenance: z.record(z.string(), z.unknown()).optional(),
   /** ODPS v4.1 fields the node cannot derive (value proposition, SLA/quality commitments, data holder…). */
   odps: OdpsExtrasSchema.optional(),
 });
@@ -142,6 +159,8 @@ export const AppToolsDocSchema = z.object({
   odps: OdpsExtrasSchema.optional(),
   /** App-level provenance attestation inherited by every tool (overridable per tool). */
   provenance: ProvenanceSchema.optional(),
+  /** App-level AI provenance inherited by every tool that states none of its own (TARGET-058). */
+  aiProvenance: z.record(z.string(), z.unknown()).optional(),
   tools: z.array(AppToolSchema).max(200),
 });
 

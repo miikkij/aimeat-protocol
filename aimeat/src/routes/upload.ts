@@ -50,6 +50,11 @@
  *     that had explicitly requested an upsert was forced into delete + reinstall - which also
  *     throws away the extension's ext:{name} memory. Upsert swaps the same code+metadata field
  *     set as PUT /v1/extensions/:name and preserves lifecycle fields; owner mismatch is 403.
+ *   v1.11.0 - 2026-08-01 - TARGET-058 Phase 5: handleAppUpload stamps the published bytes with a
+ *     provenance record (MINT-3) and runs the AI transparency check, both of which POST /v1/apps has
+ *     run and this path had not. Presigned upload is the DEFAULT door for anything over ~1 KB, so it
+ *     is the door most agent-published apps come through: publishing the recommended way produced an
+ *     app with no record at all, while the identical bytes posted inline were stamped.
  */
 
 import { Router, type Request, type Response } from 'express';
@@ -62,6 +67,8 @@ import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.j
 import { publishSkill, type SkillScope } from '../services/skills.js';
 import { parseGAII } from '../utils/gaii.js';
 import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
+import { lintAppAiDisclosure } from '../services/app-ai-posture.js';
+import { stampAgentWrite } from '../services/ai-provenance.js';
 import { invalidateProtectionCache } from '../utils/app-protect.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../mcp/index.js';
@@ -126,7 +133,7 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
         try {
             switch (verified.utype) {
                 case 'app':
-                    await handleAppUpload(res, config, storage, verified.sub, verified.meta, data);
+                    await handleAppUpload(res, config, storage, verified.sub, verified.actor, verified.meta, data);
                     return;
                 case 'storage':
                     await handleStorageUpload(res, config, storage, verified.sub, verified.meta, data);
@@ -165,7 +172,7 @@ export function uploadRouter(config: AimeatConfig, storage: Storage): Router {
 
 async function handleAppUpload(
     res: Response, config: AimeatConfig, storage: Storage,
-    sub: string, meta: Record<string, unknown>, data: Buffer,
+    sub: string, actor: string, meta: Record<string, unknown>, data: Buffer,
 ): Promise<void> {
     // `sub` is the presigned token subject: a full GAII (agent#owner@node) for
     // agent uploads, or the owner's GHII (owner@node) for owner uploads. Either
@@ -220,8 +227,31 @@ async function handleAppUpload(
     if (prev?.usesCortex?.length) manifest.usesCortex = prev.usesCortex;
     if (prev?.cortex?.agents?.length) manifest.cortex = prev.cortex;
 
+    // TARGET-058 Phase 5: the AI transparency check, and the check that this path was missing it.
+    // Presigned upload is the DEFAULT door for anything over ~1 KB, so it is the door most
+    // agent-published apps come through — and it ran neither the disclosure lint nor the provenance
+    // stamp that POST /v1/apps has run since Phase 4. An app published the recommended way arrived
+    // with no record at all.
+    const aiLint = lintAppAiDisclosure(data.toString('utf8'), prev?.aiPosture);
+    manifest.aiPosture = aiLint.posture;
+
     // A re-publish changes the bytes → drop any cached obfuscated/locked base.
     invalidateProtectionCache(ownerName, filename);
+
+    // MINT-3: the hash is of the bytes AS STORED, so the serve-time marks cannot change the answer.
+    const aiProvenanceId = await stampAgentWrite(storage, {
+        // `actor`, not `sub`: an app always lands in the OWNER's bucket, so `sub` is the owner even
+        // when an agent is the one publishing. Stamping off `sub` here meant a MINT-3 stamp could
+        // never fire on this path at all.
+        principal: actor,
+        content: data,
+        pipeline: 'app.publish',
+        surface: { visibility: existingApp?.parked ? 'private' : 'public', humanAudience: true },
+        labelPolicy: config.aiLabelPublic,
+        nodeId: config.nodeId,
+        baseUrl: config.baseUrl,
+        enabled: config.aiProvenance,
+    });
 
     await storage.createApp({
         ownerGaii,
@@ -230,6 +260,7 @@ async function handleAppUpload(
         versionNumber: newVersion,
         manifest,
         mimeType: 'text/html',
+        ...(aiProvenanceId ? { aiProvenanceId } : {}),
         size: data.length,
         data,
         parked: !!existingApp?.parked,
@@ -274,6 +305,8 @@ async function handleAppUpload(
         download_url: downloadUrl,
         inline_url: `${downloadUrl}?mode=inline`,
         ...(mobileHints.length ? { mobile_hints: mobileHints } : {}),
+        ai_posture: aiLint.posture,
+        ...(aiLint.hints.length ? { ai_hints: aiLint.hints } : {}),
     });
 }
 

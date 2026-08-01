@@ -8,9 +8,16 @@
  *   the serving node — it appears on self-hosted nodes too, like a "powered by" credit. Narrowly-
  *   scoped exception to the "serve app HTML raw" rule; used by both serving paths (apex inline in
  *   apps.ts and the isolated app origin in subdomains.ts) so the behaviour is identical.
- * @structure injectAimeatBadge(html) — pure string transform, returns a Buffer.
- * @usage const body = injectAimeatBadge(app.data);
+ * @structure BADGE_MARK — the idempotency marker; badgeSnippet() — the markup, with no opinion about
+ *   where it goes. The document detection, the idempotency check and the `</body>`-inside-app-JS
+ *   trap all live ONCE in services/app-serve-marks.ts, which is what actually puts it in the page.
+ * @usage import { badgeSnippet } from '../utils/app-badge.js';  // via applyServeMarks({ badge: true })
  * @version-history
+ *   v2.0.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: injectAimeatBadge() becomes badgeSnippet().
+ *     Four serve-time injectors each re-parsed the same document and each carried its own copy of
+ *     the last-</body> rule; they are now one pass (services/app-serve-marks.ts) and this file
+ *     supplies only the markup. Byte-for-byte identical output, proved by the golden fixtures in
+ *     test/fixtures/serve-marks-golden.json.
  *   v1.6.0 — 2026-08-01 — TARGET-058 Phase 4 step 0c: the em dash is REWORDED out of the badge
  *     ("Publish your own app for free", "Publish your own app on aimeat.io") rather than escaped.
  *     v1.5.0 encoded it, which renders the same glyph — the house style bans the character, not its
@@ -34,11 +41,12 @@
  *     for pages that load no theme. This injector was why every served app measured 2-3 hardcoded
  *     corals even when the app source had none.
  */
-import { injectBeforeClosingTag } from './html-inject.js';
-
 /** Permanent attribution target — the project home, not the serving node. */
 const AIMEAT_HOME = 'https://aimeat.io/';
 const AIMEAT_LABEL = 'aimeat.io';
+
+/** Present in an already-badged document. The one string that makes a re-serve idempotent. */
+export const BADGE_MARK = 'id="aimeat-app-badge"';
 
 /**
  * Every non-ASCII character as a numeric HTML entity.
@@ -56,21 +64,14 @@ function entities(s: string): string {
 }
 
 /**
- * Append the badge before the LAST `</body>` (fallback last `</html>`, else end). The label + link are the fixed
- * aimeat.io attribution (deliberate, since publishing/hosting is free). Pure static markup + a scoped
- * `<style>` block — no script, so it needs nothing the inline CSP doesn't already allow (style-src
- * 'unsafe-inline' governs `<style>` elements and style attributes alike). On narrow viewports the pill
- * collapses to a small round ⚡ button so it doesn't cover app UI; tapping toggles the full pill via a
- * hidden-checkbox CSS toggle (the only way to get tap-to-expand without a script). Returns the input
- * unchanged when the payload isn't an HTML document or already carries the badge (idempotent).
+ * The badge markup. The label + link are the fixed aimeat.io attribution (deliberate, since
+ * publishing/hosting is free). Pure static markup + a scoped `<style>` block — no script, so it needs
+ * nothing the inline CSP doesn't already allow (style-src 'unsafe-inline' governs `<style>` elements
+ * and style attributes alike). On narrow viewports the pill collapses to a small round ⚡ button so it
+ * doesn't cover app UI; tapping toggles the full pill via a hidden-checkbox CSS toggle (the only way
+ * to get tap-to-expand without a script).
  */
-export function injectAimeatBadge(data: Buffer | Uint8Array | string): Buffer {
-    const text = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
-    // Only touch real HTML documents; never corrupt JSON/SVG/other inline payloads.
-    if (!/<\/body\s*>/i.test(text) && !/<\/html\s*>/i.test(text)) return Buffer.from(text, 'utf-8');
-    // Idempotent: don't double-inject if a badged document is ever re-served.
-    if (text.includes('id="aimeat-app-badge"')) return Buffer.from(text, 'utf-8');
-
+export function badgeSnippet(): string {
     // Shared surface look for both the pill and the collapsed ⚡ button. Everything is !important
     // so arbitrary app CSS (resets, `a{...}`, `label{...}`) can't restyle the badge.
     const surface =
@@ -110,8 +111,7 @@ export function injectAimeatBadge(data: Buffer | Uint8Array | string): Buffer {
 
     // Every user-visible string goes through entities(): the glyphs here are exactly the ones that
     // were rendering as mojibake in a charset-less document.
-    const badge =
-        '<div id="aimeat-app-badge">'
+    return '<div ' + BADGE_MARK + '>'
         + '<style>' + css + '</style>'
         + '<input type="checkbox" id="aimeat-app-badge-open">'
         + '<label for="aimeat-app-badge-open" aria-label="' + entities('Publish your own app on ' + AIMEAT_LABEL) + '">' + entities('⚡') + '</label>'
@@ -122,6 +122,4 @@ export function injectAimeatBadge(data: Buffer | Uint8Array | string): Buffer {
         + '<span>' + entities('· Publish your own app for free') + '</span>'
         + '</a>'
         + '</div>';
-
-    return Buffer.from(injectBeforeClosingTag(text, badge), 'utf-8');
 }

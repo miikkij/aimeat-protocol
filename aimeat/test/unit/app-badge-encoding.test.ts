@@ -15,17 +15,19 @@
  *   compliance statement reading "TekoÃ¤lyn tuottama" is a legal disclosure a Finnish reader cannot
  *   read.
  * @structure
- *   - injectAimeatBadge output is pure ASCII, and still carries the glyphs as entities
- *   - injectAiDisclosure's visible label is pure ASCII in both locales
+ *   - the badge is pure ASCII, and still carries the glyphs as entities
+ *   - the visible AI label is pure ASCII in both locales
  * @usage pnpm exec vitest run test/unit/app-badge-encoding.test.ts
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: driven through applyServeMarks(), the single
+ *     serve-time pass that replaced the four injectors. Same assertions, same bytes.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4 step 0c: the em-dash assertion flips from "present as an
  *     entity" to ABSENT. Escaping it still renders the banned character, so the badge was reworded.
  *   v1.0.0 — 2026-08-01 — Written after the mojibake was seen in a real browser.
  */
 import { describe, it, expect } from 'vitest';
-import { injectAimeatBadge } from '../../src/utils/app-badge.js';
-import { injectAiDisclosure, type ServedProvenance } from '../../src/services/ai-provenance-marks.js';
+import { applyServeMarks } from '../../src/services/app-serve-marks.js';
+import type { ServedProvenance } from '../../src/services/ai-provenance-marks.js';
 import { AI_PROVENANCE_SPEC_V1, type AiProvenance } from '../../src/models/ai-provenance-schemas.js';
 import type { AimeatConfig } from '../../src/config.js';
 
@@ -41,7 +43,7 @@ function nonAscii(html: string): string[] {
 }
 
 describe('the attribution badge survives a document with no charset', () => {
-  const html = injectAimeatBadge(DOC).toString('utf-8');
+  const html = applyServeMarks(DOC, { badge: true }).toString('utf-8');
 
   it('injects no non-ASCII byte at all', () => {
     expect(nonAscii(html)).toEqual([]);
@@ -86,14 +88,14 @@ describe('the visible AI label survives it too, in every language the node ships
 
   for (const locale of ['en', 'fi'] as const) {
     it(`${locale}: no non-ASCII byte reaches the app document`, () => {
-      const html = injectAiDisclosure(DOC, served, { config, locale }).toString('utf-8');
+      const html = applyServeMarks(DOC, { provenance: served, visibleLabel: { config, locale } }).toString('utf-8');
       expect(nonAscii(html)).toEqual([]);
       expect(html).toContain('id="aimeat-ai-label"');
     });
   }
 
   it('fi: the Finnish compliance string is present as entities, not dropped', () => {
-    const html = injectAiDisclosure(DOC, served, { config, locale: 'fi' }).toString('utf-8');
+    const html = applyServeMarks(DOC, { provenance: served, visibleLabel: { config, locale: 'fi' } }).toString('utf-8');
     // "Tekoälyn tuottama" — the ä as &#228;.
     expect(html).toContain('Teko&#228;lyn tuottama');
   });

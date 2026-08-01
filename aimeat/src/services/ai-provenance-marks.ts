@@ -16,10 +16,10 @@
  *   of Practice's two-layer logic and also plain resilience: strip the HTML and the record survives;
  *   take the record offline and the in-band metadata survives.
  *
- *   SERVE-TIME ONLY, FOR HTML. injectAiDisclosure() runs on the bytes on their way out and NEVER on
+ *   SERVE-TIME ONLY, FOR HTML. The HTML marks are built on the bytes on their way out and NEVER on
  *   the bytes on their way in. A published app bundle is what its author uploaded; a served copy is
  *   that plus the node's marks. This codebase has been bitten by publishing from a served copy, so
- *   the injectors live on the serving path and the stored bundle is byte-identical after a serve.
+ *   the marks live on the serving path and the stored bundle is byte-identical after a serve.
  * @structure
  *   - loadServedProvenance(storage, config, id, opts) — fetch + project, for a route that has
  *     ALREADY authorized the content read
@@ -27,8 +27,10 @@
  *     reads a PAGE of items; one query rather than one per item
  *   - envelopeMeta(p)                — the `meta.provenance` value; the single envelope carrier
  *   - setProvenanceHeaders(res, p)   — `AI-Disclosure` + `Link: rel="ai-provenance"`
- *   - injectAiDisclosure(bytes, p, visible?) — serve-time HTML marks (meta, attribute, JSON-LD),
- *     plus the visible label chip when the caller is serving a runnable app document
+ *   - aiDisclosureParts(p, visible?) — the serve-time HTML marks (meta, link, JSON-LD, plus the
+ *     visible label chip for a runnable app document) and the `ai-disclosure` value for the document
+ *     element; PROVENANCE_HTML_MARK + markDocumentElement() go with them. app-serve-marks.ts is what
+ *     puts them in a page.
  *   - provenanceFrontmatter(p)       — YAML lines for a markdown face
  *   - provenanceMarkdownNote(p)      — ONE human-readable line for the body
  * @usage
@@ -36,6 +38,11 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a. injectAiDisclosure() becomes
+ *     aiDisclosureParts(): the document detection, the idempotency check and the last-</body> rule
+ *     are now shared with the other three serve-time marks in services/app-serve-marks.ts, which is
+ *     what stops the SDK work below from creating a fifth injector. Byte-identical output, held by
+ *     test/fixtures/serve-marks-golden.json.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 4 step 0b. loadServedProvenanceMany(): the batch loader,
  *     so a surface that reads a page of items costs one query instead of one per item.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3. injectAiDisclosure() gained the VISIBLE label chip for
@@ -50,7 +57,6 @@ import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import type { AiProvenance } from '../models/ai-provenance-schemas.js';
 import { toIetfHeader, toW3cHtml, toIptc, toEuIcon } from './ai-provenance-adapters.js';
 import { projectForDetail } from './ai-provenance.js';
-import { injectBeforeClosingTag } from '../utils/html-inject.js';
 import { createT, type Locale } from '../i18n.js';
 
 /** A record ready to be served, with the URL a third party resolves it at. */
@@ -164,7 +170,8 @@ export function setProvenanceHeaders(res: Response, p: ServedProvenance | undefi
 
 // ── HTML ────────────────────────────────────────────────────────────────────────────────────────
 
-const HTML_MARK = 'id="aimeat-ai-provenance"';
+/** Present in a document that already carries the marks — what makes a re-serve idempotent. */
+export const PROVENANCE_HTML_MARK = 'id="aimeat-ai-provenance"';
 
 /** The visible chip's element id. Distinct from `aimeat-app-badge` — two chips, two corners. */
 const VISIBLE_LABEL_ID = 'aimeat-ai-label';
@@ -223,7 +230,7 @@ function jsonLd(p: ServedProvenance): string {
  * unmarked document is a much smaller problem than a broken one, so this returns the input unchanged
  * whenever it is not certain.
  */
-function markDocumentElement(text: string, value: string): string {
+export function markDocumentElement(text: string, value: string): string {
   const head = text.slice(0, 512);
   const m = /<html(\s[^>]*)?>/i.exec(head);
   if (!m) return text;
@@ -351,42 +358,34 @@ function visibleLabelMarkup(p: ServedProvenance, config: AimeatConfig, locale: L
 }
 
 /**
- * Serve-time AI-disclosure marks for an HTML document: the `ai-disclosure` attribute on `<html>`, a
- * `<meta name="ai-disclosure">`, a `<link rel="ai-provenance">` to the addressable record, a
- * schema.org JSON-LD block, and — for a RUNNABLE app document — the visible label a person sees.
+ * The serve-time AI-disclosure marks for an HTML document: a `<meta name="ai-disclosure">`, a
+ * `<link rel="ai-provenance">` to the addressable record, a schema.org JSON-LD block, and — for a
+ * RUNNABLE app document — the visible label a person sees; plus `w3c`, the value that goes on the
+ * document element (apply it with markDocumentElement).
  *
- * NEVER CALL THIS ON THE WAY IN. The output is what a visitor receives; the stored bundle stays the
- * author's bytes. Returns the input unchanged for a non-HTML payload, for unstated provenance, and
- * for a document that already carries the block (idempotent — a served document can be re-served
- * through the same path).
+ * NEVER PUT THESE IN ON THE WAY IN. They belong on what a visitor receives; the stored bundle stays
+ * the author's bytes.
  *
- * Nothing here executes, so it needs no CSP allowance a static document does not already have: the
- * inline `<style>` rides the same `style-src 'unsafe-inline'` the attribution badge already needs,
- * and the icon rides `img-src *`.
+ * Nothing here executes beyond the label's own three lines, and none of it needs a CSP allowance a
+ * static app document does not already have: the inline `<style>` rides the same
+ * `style-src 'unsafe-inline'` the attribution badge already needs, and the icon rides `img-src *`.
  *
  * `visible` is opt-in per caller rather than automatic, because the machine marks belong on every
  * HTML face while the chip belongs only where a person is looking at a rendered app. The raw
  * (attachment) download gets neither — it stays byte-for-byte, which is what keeps the content hash
  * in the record verifiable.
  */
-export function injectAiDisclosure(
-  data: Buffer | Uint8Array | string, p: ServedProvenance | undefined,
+export function aiDisclosureParts(
+  p: ServedProvenance,
   visible?: { config: AimeatConfig; locale: Locale },
-): Buffer {
-  const text = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
-  if (!p) return Buffer.from(text, 'utf-8');
-  if (!/<\/body\s*>/i.test(text) && !/<\/html\s*>/i.test(text)) return Buffer.from(text, 'utf-8');
-  if (text.includes(HTML_MARK)) return Buffer.from(text, 'utf-8');
-
+): { block: string; w3c: string | undefined } {
   const w3c = toW3cHtml(p.record);
   const block =
     (w3c ? `<meta name="ai-disclosure" content="${esc(w3c)}">` : '')
     + `<link rel="ai-provenance" href="${esc(p.recordUrl)}">`
-    + `<script type="application/ld+json" ${HTML_MARK}>${jsonLd(p)}</script>`
+    + `<script type="application/ld+json" ${PROVENANCE_HTML_MARK}>${jsonLd(p)}</script>`
     + (visible ? visibleLabelMarkup(p, visible.config, visible.locale) : '');
-
-  const marked = w3c ? markDocumentElement(text, w3c) : text;
-  return Buffer.from(injectBeforeClosingTag(marked, block), 'utf-8');
+  return { block, w3c };
 }
 
 // ── Markdown ────────────────────────────────────────────────────────────────────────────────────

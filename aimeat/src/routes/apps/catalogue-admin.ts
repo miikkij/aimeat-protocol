@@ -10,6 +10,10 @@
  *     batch listAppDraftFilenames query) so the catalogue can badge a pending staging draft
  *   v1.3.0 — 2026-07-16 — GET /v1/admin/apps moderation metrics via 2 batch queries
  *     (getAppDownloadsForApps + countAppForksForApps), was getAppDownloads + countAppForks PER app (2N)
+ *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 5: GET /v1/apps carries `ai_posture` so a catalogue card
+ *     can show a generative marker. The publish check's GAP is owner-only and is stripped for
+ *     everyone else — including inside `manifest`, which is where it would otherwise have travelled
+ *     to the whole public listing unnoticed.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -22,6 +26,7 @@ import { randomBytes } from 'node:crypto';
 import { validateOutboundUrl } from '../../utils/url-validator.js';
 import { decodeWatermark } from '../../utils/app-protect.js';
 import { scanCatalogForCopies } from '../../services/app-similarity.js';
+import { publicPosture } from '../../services/app-ai-posture.js';
 import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 
@@ -79,11 +84,19 @@ export function registerCatalogueAdminRoutes(
             const downloads = downloadsByApp[metricKey] ?? 0;
             const forks = forksByApp[metricKey] ?? 0;
             const hasScreenshot = screenshotKeys.has(`${app.ownerGaii} apps/screenshots/${app.filename}`);
+            // TARGET-058: the transparency posture is public — it is what the catalogue card's
+            // generative marker is drawn from, and an app being AI-generative is not a secret. The
+            // publish check's GAP is not: it is a note to the OWNER about their own app, so it is
+            // stripped for everyone else, here AND inside the manifest the card renders from.
+            const isOwn = !!viewerGhii && app.ownerGaii === viewerGhii;
+            const posture = app.manifest.aiPosture;
+            const shownPosture = isOwn ? posture : publicPosture(posture);
             return {
                 owner: app.ownerName,
                 filename: app.filename,
                 version_number: app.versionNumber,
-                manifest: app.manifest,
+                manifest: posture && !isOwn ? { ...app.manifest, aiPosture: shownPosture } : app.manifest,
+                ai_posture: shownPosture ?? null,
                 size: app.size,
                 mime_type: app.mimeType,
                 protected: !!app.accessCode,

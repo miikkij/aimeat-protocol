@@ -10,6 +10,11 @@
  *   v1.2.0 — 2026-07-25 — POST .../frame-token: a frame grant naming the CALLER'S origin as the
  *     one page allowed to embed this app. Owner-only. Constant-size, unlike listing origins in
  *     frame-ancestors, which scaled with the owner's app count and 502'd production.
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 5: publish-draft now does what POST /v1/apps already did —
+ *     it stamps the bytes with a provenance record (MINT-3) and runs the AI transparency check. It
+ *     did neither, so an app that went through the STAGING flow (the one the catalogue's own editor
+ *     uses) arrived live unstamped while the identical bytes posted directly were stamped. Two doors
+ *     to the same act have to give the same answer.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -23,6 +28,8 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { randomBytes } from 'node:crypto';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
+import { lintAppAiDisclosure } from '../../services/app-ai-posture.js';
+import { stampAgentWrite } from '../../services/ai-provenance.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
 
@@ -256,6 +263,7 @@ export function registerDraftRoutes(
         let parkedState = false, forkableState = false, operatorHiddenState = false;
         let operatorHiddenBy: string | undefined, operatorHiddenAt: string | undefined, operatorHideReason: string | undefined;
         let accessCode: string | undefined;
+        let carriedAiPosture: AppManifest['aiPosture'];
         if (isUpdate) {
             const live = await storage.getApp(ownerGhii, filename);
             parkedState = !!live?.parked;
@@ -265,11 +273,33 @@ export function registerDraftRoutes(
             operatorHiddenAt = live?.operatorHiddenAt;
             operatorHideReason = live?.operatorHideReason;
             accessCode = live?.accessCode;
+            carriedAiPosture = live?.manifest?.aiPosture;
         }
 
         const now = new Date().toISOString();
         const manifest: AppManifest = { ...draft.manifest, version: draft.manifest.version || `1.0.${newVersion - 1}`, authorDisplay: owner };
+        // TARGET-058 Phase 5: the same AI transparency check the direct publish runs. Two doors to the
+        // same act have to give the same answer, or a builder learns which door skips the check.
+        const aiLint = /html/i.test(draft.mimeType)
+            ? lintAppAiDisclosure(draft.data.toString('utf8'), carriedAiPosture)
+            : null;
+        if (aiLint) manifest.aiPosture = aiLint.posture;
         invalidateProtectionCache(owner, filename);
+
+        // TARGET-058 MINT-3: stamp the bytes here too. POST /v1/apps stamps and this path did not, so
+        // an app that went through the staging flow — the flow the catalogue's own editor uses —
+        // arrived live with NO provenance at all while the identical bytes posted directly were
+        // stamped. The hash is of the bytes AS STORED, so a serve-time mark cannot change the answer.
+        const aiProvenanceId = await stampAgentWrite(storage, {
+            principal: callerGaii,
+            content: draft.data,
+            pipeline: 'app.publish',
+            surface: { visibility: accessCode || parkedState ? 'private' : 'public', humanAudience: true },
+            labelPolicy: config.aiLabelPublic,
+            nodeId: config.nodeId,
+            baseUrl: config.baseUrl,
+            enabled: config.aiProvenance,
+        });
 
         await storage.createApp({
             ownerGaii: ownerGhii,
@@ -288,6 +318,7 @@ export function registerDraftRoutes(
             operatorHiddenAt,
             operatorHideReason,
             createdAt: now,
+            ...(aiProvenanceId ? { aiProvenanceId } : {}),
         });
         await storage.deleteAppDraft(ownerGhii, filename);
 
@@ -319,6 +350,8 @@ export function registerDraftRoutes(
             note: isUpdate
                 ? `Draft published as version ${newVersion}. It is now the live app; the draft slot is cleared.`
                 : 'Draft published as version 1. It is now live; the draft slot is cleared.',
+            ...(aiLint ? { ai_posture: aiLint.posture } : {}),
+            ...(aiLint?.hints.length ? { ai_hints: aiLint.hints } : {}),
         }, [
             { description: 'View all versions', method: 'GET', url: `${downloadUrl}/versions` },
         ]));

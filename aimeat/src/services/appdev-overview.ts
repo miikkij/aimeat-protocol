@@ -12,6 +12,9 @@
  *   import { buildAppdevOverview } from '../services/appdev-overview.js';
  *   const overview = await buildAppdevOverview(storage, config, identity, { model, sections });
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5: each app carries its `ai_posture`, and the section
+ *     states the disclosure contract. Research-first is the moment to learn this — an agent that
+ *     sees which of its own apps already declare copies that wiring instead of re-deriving it.
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB Phase 5).
  */
 
@@ -106,10 +109,22 @@ export async function buildAppdevOverview(
                 version: a.versionNumber,
                 forkable: a.forkable ?? false,
                 forked_from: a.manifest?.forkedFrom ?? null,
+                // TARGET-058: what this app says about the AI inside it. An agent researching
+                // before a build reads this to find the apps that already do it right and copy
+                // THAT, rather than re-deriving the disclosure wiring from the spec. These are the
+                // owner's OWN apps, so the publish check's gap travels with them — it is a note to
+                // the owner about their own work, and here it is exactly the useful part.
+                ai_posture: a.manifest?.aiPosture ?? null,
             })),
             total,
             truncated: total > CAP,
             drill_down: 'aimeat_app_get {filename} for metadata; the app URL for source',
+            ai_transparency: 'An app that generates text/images/audio/video calls '
+                + 'AIMEAT.ai.disclose(r.provenance) so the reader sees the label, attaches the record '
+                + 'to what it stores with AIMEAT.ai.declare(item, r.provenance), and declares '
+                + '<meta name="aimeat-ai" content="generates=text; discloses=yes; public-interest=no">. '
+                + 'Start from an app whose ai_posture below reads source:"declared" and copy how it '
+                + 'wires that up. A gap here is the publish check telling you what is missing.',
         };
     }
 

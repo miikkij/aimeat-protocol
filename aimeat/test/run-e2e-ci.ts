@@ -111,6 +111,7 @@ const ALL_SUITES = [
     'test/e2e-ai-provenance.ts',
     'test/e2e-ai-provenance-surfaces.ts',
     'test/e2e-ai-provenance-agent-plane.ts',
+    'test/e2e-app-ai-posture.ts',
     'test/e2e-notifications.ts',
     'test/e2e-feedback.ts',
     'test/e2e-hooks.ts',

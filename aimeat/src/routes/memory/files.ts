@@ -20,6 +20,7 @@ import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js
 import { pubEmbedUrl, pubEmbedMarkdown } from '../../services/doc-images.js';
 import { emitChange } from '../../services/event-bus.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
+import { sniffedContentType } from '../../utils/app-content-type.js';
 import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
 import type { MemoryRouteCtx } from './shared.js';
 
@@ -255,7 +256,7 @@ export function registerFilesRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
-    res.setHeader('Content-Type', file.mimeType);
+    res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
     res.setHeader('Content-Length', file.size);
     res.end(file.data);
   });

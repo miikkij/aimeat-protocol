@@ -9,6 +9,8 @@
  *   COMP_MERMAID_DIAGRAM · COMP_THREE_SCENE · COMP_P5_SKETCH · COMP_PIXI_STAGE · COMP_PHASER_ARCADE ·
  *   COMP_FLOW_EDITOR
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5: COMP_AI_ACTION discloses. The component every app
+ *     copies its AI call from is the highest-leverage place to put the label call.
  *   v1.0.0 — 2026-07-13 — Extracted from src/data/app-templates.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — COMP_MERMAID_DIAGRAM + COMP_THREE_SCENE (library-pack demos)
  *   v1.2.0 — 2026-07-16 — COMP_P5_SKETCH + COMP_PIXI_STAGE + COMP_PHASER_ARCADE (Wave 1 packs)
@@ -78,12 +80,24 @@ async function renderAndSubmit(orgId, ws, formId, values) {
 // validates against the namespace schema — write only the allowed fields; extras are dropped.`;
 
 export const COMP_AI_ACTION = `// ai-action — run the user's own LLM on demand (aimeat-ai; load it + aimeat-auth).
-async function aiSuggest(promptText, outEl) {
+// Declare it in the head too: <meta name="aimeat-ai" content="generates=text; discloses=yes; public-interest=no">
+var lastProvenance = null;
+async function aiSuggest(promptText, outEl, labelSel) {
   if (!(await AIMEAT.ai.isAvailable())) { outEl.value = 'Log in and add an OpenRouter key to enable AI.'; return; }
-  try { var r = await AIMEAT.ai.complete({ app_id: '{{app}}', prompt: promptText }); outEl.value = r.content; }
+  try {
+    var r = await AIMEAT.ai.complete({ app_id: '{{app}}', prompt: promptText });
+    outEl.value = r.content;
+    // Say a model wrote it. One call, official EU label, your theme, the reader's language — and
+    // nothing at all when no label is owed (the node decides; you pass the object).
+    lastProvenance = r.provenance;
+    AIMEAT.ai.disclose(r.provenance, { target: labelSel || '#ai-label' });
+  }
   catch (e) { outEl.value = 'AI error: ' + (e.message || e); }
 }
-// Render into an EDITABLE field so the user reviews before saving. Gate the button on isAvailable().`;
+// Keep the record with the content when you save it:
+//   await AIMEAT.data.set(key, AIMEAT.ai.declare(item, lastProvenance));
+// Render into an EDITABLE field so the user reviews before saving. Gate the button on isAvailable().
+// Put an empty <div id="ai-label"></div> next to the field for the label to land in.`;
 
 export const COMP_DATA_TABLE = `// data-table — sortable / filterable / paginated table (aimeat-ui-viewers cortex).
 // Load: <script src="/v1/cortex/aimeat-ui-viewers/libs/aimeat-ui-viewers.js"></script>

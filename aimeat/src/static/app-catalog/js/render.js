@@ -178,6 +178,31 @@ export let serverStateByFilename = {};
 export let ownAppProtection = {};
 export let serverAppManifests = {}; // moved out of server-io: SSOT for the owner-app manifest cache (detail reads via getServerManifests)
 
+/**
+ * The card's AI markers (TARGET-058).
+ *
+ * TWO different things, and they are deliberately not one badge:
+ *   - GENERATIVE — this app makes text/images/audio/video with a model. Public, on every card,
+ *     because it is a property of the app that anyone choosing it should be able to see.
+ *   - UNLABELLED — the publish check found the app asks for `ai:use` and tells its users nothing.
+ *     The node only sends that to the app's OWNER, so its presence here already means "yours".
+ *     It is a nudge to fix, never a public scarlet letter.
+ */
+function aiPostureMarkers(e) {
+  var p = e.aiPosture;
+  if (!p) return '';
+  var out = '';
+  if (p.generates && p.generates.length) {
+    out += ' <span class="pcb-ai-gen" title="' + escapeHtml(t('card.aiGenerativeHint')) + '">'
+      + escapeHtml(t('card.aiGenerative')) + '</span>';
+  }
+  if (p.gap) {
+    out += ' <span class="pcb-ai-gap" title="' + escapeHtml(t('card.aiUnlabelledHint')) + '">'
+      + escapeHtml(t('card.aiUnlabelled')) + '</span>';
+  }
+  return out;
+}
+
 // Status of a unified entry, for its badge. The badge shows the app's PUBLICATION
 // state on the server — Listed / Unlisted / (browser-only) Local — NOT whether this
 // browser happens to hold a local copy. A published app with no local twin (e.g.
@@ -241,6 +266,7 @@ function buildLibraryEntries(localApps, serverApps) {
       m.forkable = !!sa.forkable; m.forks = sa.forks || 0;
       m.hasDraft = !!sa.has_draft;
       m.hasAgents = shipsAgent;
+      m.aiPosture = sa.ai_posture || null;
       m.protection = prot;
       // EXACTLY what the old "View" used: the CONSTRUCTED served URL (aimeatUrl/v1/apps/<owner>/<file>),
       // NOT the local publishedUrl — so Open opens the app top-level on its origin (and it SSOs)
@@ -262,7 +288,10 @@ function buildLibraryEntries(localApps, serverApps) {
         filename: fn, owner: sa.owner || '',
         versionNumber: sa.version_number || null,
         viewUrl: (base && fn) ? (base + '/v1/apps/' + encodeURIComponent(sa.owner || '') + '/' + encodeURIComponent(fn)) : '',
-        forkable: !!sa.forkable, forks: sa.forks || 0, protection: prot, hasAgents: shipsAgent
+        forkable: !!sa.forkable, forks: sa.forks || 0, protection: prot, hasAgents: shipsAgent,
+        // TARGET-058: what the app says about the AI inside it. The node strips the publish check's
+        // gap for everyone but the owner, so a gap arriving here IS the viewer's own app.
+        aiPosture: sa.ai_posture || null
       };
       entries.push(se);
       if (fn) byFilename[fn] = se;
@@ -411,7 +440,8 @@ function libraryCardHtml(e, i) {
       '<div class="app-icon">' + escapeHtml(e.icon || '\u{1F4DD}') + '</div>' +
       '<div class="app-name">' + escapeHtml(e.name) +
         (e.origin === 'ai-published' ? ' <span class="ai-origin-badge">AI</span>' : '') +
-        (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') + '</div>' +
+        (e.hasAgents ? ' <span class="pcb-agent" title="' + escapeHtml(t('card.agentHint')) + '">\u{1F916}</span>' : '') +
+        aiPostureMarkers(e) + '</div>' +
       (function () {
         // Show the description in the current UI language, falling back to the canonical one.
         var d = (e.descriptions && e.descriptions[getLang()]) || e.description || '';

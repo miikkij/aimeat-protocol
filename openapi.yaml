@@ -2462,6 +2462,41 @@ components:
         process: { type: string, enum: [sequential, hierarchical] }
         signals: { type: object, description: crewaimeat workflow signal shape (required_to_function / success_signal / deliverable_location) }
 
+    AppAiPosture:
+      type: object
+      description: >
+        What a published app says about the AI inside it (TARGET-058), plus what the node observed
+        at publish time. Stored on the app manifest. The `gap` member is OWNER-ONLY: it is the
+        publish check telling the app's owner what is missing, and it is stripped from every
+        response served to anyone else.
+      properties:
+        generates:
+          type: array
+          description: Modalities the app declares it generates.
+          items: { type: string, enum: [text, image, audio, video] }
+        discloses: { type: boolean, description: "Does the app show the reader an AI label?" }
+        publicInterest: { type: boolean, description: "Does it publish on matters of public interest (a stronger labelling duty)?" }
+        source:
+          type: string
+          enum: [declared, observed]
+          description: >
+            `declared` — the app carries `<meta name="aimeat-ai">`, or inherited one from the version
+            it replaces or the app it was forked from. `observed` — the node worked it out from the
+            source.
+        disclosureCallFound: { type: boolean, description: "Did the published source contain a disclosure call?" }
+        usesAi: { type: boolean, description: "Does the app request the `ai:use` scope?" }
+        gap:
+          type: object
+          nullable: true
+          description: >
+            OWNER-ONLY. Present when the app requests `ai:use` and tells its users nothing at all.
+            The publish WARNS and proceeds; it never blocks (a publish that fails is a publish that
+            gets worked around, and the app then ships with less transparency rather than more).
+          properties:
+            code: { type: string, example: AI_DISCLOSURE_MISSING }
+            message: { type: string, description: Written for the model that built the app — it names the exact calls to add. }
+            at: { type: string, format: date-time }
+
     AppSummary:
       type: object
       description: Catalogue/publish view of an app (latest version), as returned by the apps endpoints.
@@ -2484,6 +2519,10 @@ components:
         download_url: { type: string }
         screenshot_url: { type: string, nullable: true }
         created_at: { type: string, format: date-time }
+        ai_posture:
+          allOf: [{ $ref: '#/components/schemas/AppAiPosture' }]
+          nullable: true
+          description: The app's AI transparency posture, or null when it has none. The `gap` member appears only for the app's own owner.
 
     # === Package & Template Schemas ===
     PackageComponent:
@@ -15581,7 +15620,11 @@ paths:
                       items: { $ref: '#/components/schemas/CrewDef' }
       responses:
         '201':
-          description: App published or updated
+          description: |
+            App published or updated. `data.ai_posture` states what the node now believes about the
+            AI inside the app, and `data.ai_hints` carries the non-blocking transparency findings —
+            worded for the model that built the app, so the fix happens in the same session. The
+            publish NEVER fails on a transparency finding.
           content:
             application/json:
               schema:
@@ -15589,7 +15632,19 @@ paths:
                   - $ref: '#/components/schemas/AimeatEnvelope'
                   - type: object
                     properties:
-                      data: { $ref: '#/components/schemas/AppSummary' }
+                      data:
+                        allOf:
+                          - $ref: '#/components/schemas/AppSummary'
+                          - type: object
+                            properties:
+                              mobile_hints:
+                                type: array
+                                description: Non-blocking static hints about phone rendering.
+                                items: { type: string }
+                              ai_hints:
+                                type: array
+                                description: Non-blocking AI-transparency findings. Never a reason to reject a publish.
+                                items: { type: string }
         '200':
           description: Presigned upload URL (when mode=presigned)
         '400':
@@ -16511,6 +16566,9 @@ paths:
         parked/forkable/protection/operator-hidden state forward exactly like a normal re-publish, then
         clears the draft slot. THIS is the moment the live app changes and the public activity feed
         fires — saving/testing a draft never does. Requires a saved draft (`404` otherwise).
+
+        The promoted bytes are stamped with a provenance record and run the same non-blocking AI
+        transparency check as `POST /v1/apps` — two doors to the same act give the same answer.
       tags: [Apps]
       security:
         - BearerAuth: []
@@ -16536,6 +16594,13 @@ paths:
                           forkable: { type: boolean }
                           download_url: { type: string }
                           note: { type: string }
+                          ai_posture:
+                            allOf: [{ $ref: '#/components/schemas/AppAiPosture' }]
+                            nullable: true
+                          ai_hints:
+                            type: array
+                            description: Non-blocking AI-transparency findings. Never a reason to reject a publish.
+                            items: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { description: No draft to publish }
         '429': { description: Publishing a first-version draft would exceed the published-app quota }

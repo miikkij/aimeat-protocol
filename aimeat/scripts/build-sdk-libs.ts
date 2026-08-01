@@ -13,6 +13,10 @@
  *   - checkSdkLibs()  → --check: fail (non-zero) if any committed bundle is stale vs its sources
  * @usage  pnpm build:sdk   ·   pnpm check:sdk   (also run by `pnpm dev`)
  * @version-history
+ *   v1.3.0 — 2026-08-01 — `.css` files import as TEXT. aimeat-ai's disclose() needs the platform's
+ *     own public/css/components/ai-label.css rather than a second copy of it, and a text import is
+ *     what makes one stylesheet serve both the apex SPA and an app on its own origin. Without the
+ *     loader esbuild would emit a separate CSS output file, which a served IIFE cannot use.
  *   v1.2.0 — 2026-07-28 — Register aimeat-game (the general-purpose gamification UI kit).
  *   v1.1.0 — 2026-07-28 — Register aimeat-exchange (the EXCHANGE marketplace browser client).
  *   v1.0.0 — 2026-07-19 — Initial: esbuild IIFE bundler + drift check for the SDK-libs migration (Phase 0, pilot: speech).
@@ -84,6 +88,9 @@ async function bundleLib(lib: SdkLib): Promise<string> {
     platform: 'browser',
     charset: 'utf8',
     legalComments: 'none',
+    // A stylesheet a served library needs is inlined as a string, not emitted as a second output
+    // file — an IIFE at /v1/libs/aimeat-<name>.js has nowhere to put a sibling .css.
+    loader: { '.css': 'text' },
     write: false,
     logLevel: 'silent',
   });

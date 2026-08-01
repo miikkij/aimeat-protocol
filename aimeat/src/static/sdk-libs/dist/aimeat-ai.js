@@ -178,18 +178,18 @@
     const s = state();
     if (o.remember && s.remembered[o.remember]) return Promise.resolve(true);
     if (typeof document === "undefined" || !document.body) return Promise.resolve(true);
-    const t = STRINGS[lang()] || STRINGS.en;
+    const t2 = STRINGS[lang()] || STRINGS.en;
     ensureStyles();
     let remaining = o.remaining;
     if (!remaining) {
       const b = s.budget;
       if (b && typeof b.remaining_usd === "number" && typeof b.daily_budget_usd === "number") {
-        remaining = "$" + b.remaining_usd.toFixed(2) + " / $" + b.daily_budget_usd.toFixed(2) + " " + t.left;
+        remaining = "$" + b.remaining_usd.toFixed(2) + " / $" + b.daily_budget_usd.toFixed(2) + " " + t2.left;
       }
     }
     const dlg = document.createElement("dialog");
     dlg.className = "aim-spend";
-    dlg.innerHTML = '<div class="aim-spend-box" role="document"><h3>' + esc(t.title) + '</h3><p class="aim-spend-what">' + esc(o.what || t.cost) + "</p>" + (o.detail ? '<p class="aim-spend-detail">' + esc(o.detail) + "</p>" : "") + (o.estimate || remaining ? '<p class="aim-spend-meta">' + (o.estimate ? esc(t.cost) + " <b>" + esc(o.estimate) + "</b>" : esc(t.cost)) + (remaining ? "<br>" + esc(t.budget) + ": <b>" + esc(remaining) + "</b>" : "") + "</p>" : "") + (o.remember ? '<label class="aim-spend-remember"><input type="checkbox" class="aim-spend-rem"><span>' + esc(t.remember) + "</span></label>" : "") + '<div class="aim-spend-btns"><button type="button" class="aim-spend-cancel">' + esc(o.cancelLabel || t.cancel) + '</button><button type="button" class="aim-spend-ok" disabled>' + esc(o.okLabel || t.ok) + "</button></div></div>";
+    dlg.innerHTML = '<div class="aim-spend-box" role="document"><h3>' + esc(t2.title) + '</h3><p class="aim-spend-what">' + esc(o.what || t2.cost) + "</p>" + (o.detail ? '<p class="aim-spend-detail">' + esc(o.detail) + "</p>" : "") + (o.estimate || remaining ? '<p class="aim-spend-meta">' + (o.estimate ? esc(t2.cost) + " <b>" + esc(o.estimate) + "</b>" : esc(t2.cost)) + (remaining ? "<br>" + esc(t2.budget) + ": <b>" + esc(remaining) + "</b>" : "") + "</p>" : "") + (o.remember ? '<label class="aim-spend-remember"><input type="checkbox" class="aim-spend-rem"><span>' + esc(t2.remember) + "</span></label>" : "") + '<div class="aim-spend-btns"><button type="button" class="aim-spend-cancel">' + esc(o.cancelLabel || t2.cancel) + '</button><button type="button" class="aim-spend-ok" disabled>' + esc(o.okLabel || t2.ok) + "</button></div></div>";
     document.body.appendChild(dlg);
     return new Promise((resolve) => {
       let settled = false;
@@ -256,6 +256,405 @@
   };
   function attachSpend() {
     attach("spend", spend);
+  }
+
+  // src/static/sdk-libs/_core/config.js
+  function cfg() {
+    return window.__AIMEAT_SDK_CFG__ || { nodeId: "", baseUrl: "" };
+  }
+  function resolveNodeUrl() {
+    const meta = document.querySelector('meta[name="aimeat-node"]');
+    if (meta) return (meta.getAttribute("content") || "").replace(/\/$/, "");
+    if (location.protocol === "http:" || location.protocol === "https:") return location.origin;
+    return cfg().baseUrl;
+  }
+  var NODE_URL = resolveNodeUrl();
+  var APEX_URL = cfg().baseUrl;
+  var NODE_ID = cfg().nodeId;
+  var HEARTBEAT_MS = cfg().heartbeatMs || 3e4;
+
+  // public/components/ai-label-icons.js
+  var AI_PROVENANCE_SPEC_V1 = "aimeat.provenance/v1";
+  var EU_ICONS = {
+    "ai-basic": { ratio: 1 },
+    "ai-generated": { ratio: 1789.84 / 566.93 },
+    "ai-modified": { ratio: 1700.79 / 566.93 }
+  };
+  function reviewed(record) {
+    return record.humanInvolvement === "editorial-control" || record.humanInvolvement === "full-human";
+  }
+  function euIconFor(record) {
+    if (!record || typeof record !== "object" || Array.isArray(record) || record.spec !== AI_PROVENANCE_SPEC_V1) {
+      return { file: "ai-basic", alt: "aiLabel.iconAlt.unstated" };
+    }
+    switch (record.level) {
+      case "original":
+        return null;
+      case "assisted":
+        return { file: "ai-modified", alt: "aiLabel.iconAlt.aiModified" };
+      case "synthesized":
+      case "ai-generated":
+        return reviewed(record) ? { file: "ai-basic", alt: "aiLabel.iconAlt.aiBasic" } : { file: "ai-generated", alt: "aiLabel.iconAlt.aiGenerated" };
+      default:
+        return { file: "ai-basic", alt: "aiLabel.iconAlt.unstated" };
+    }
+  }
+
+  // public/css/components/ai-label.css
+  var ai_label_default = `/**
+ * @file public/css/components/ai-label.css
+ * @description Styling for the ONE visible AI label (TARGET-058 Phase 3, components/ai-label.js).
+ *   Every colour, radius and space is a theme.css token, so the badge flips with the theme and
+ *   carries no hardcoded brand hex. Nothing here is \`rgba(255,255,255,…)\`, which reads correctly
+ *   only on a dark background.
+ *
+ *   THE ICONS ARE LOCKUPS. \`aspect-ratio\` per icon, sized by HEIGHT with \`width: auto\`, because two
+ *   of the three are wide badges containing the word "AI" and a square box would squash them. The
+ *   ratios are the SVGs' own viewBoxes (1:1, 1789.84:566.93, 1700.79:566.93) and are duplicated in
+ *   components/ai-label.js \`EU_ICONS\`, where a test compares the two.
+ *
+ *   MINIMUM SIZE IS A COMPLIANCE PROPERTY, NOT TASTE. The Code says "clearly visible size" without a
+ *   number, so we pick one and enforce it: --ai-label-icon-h never drops below 18px, which keeps the
+ *   letters legible at 390px width. It does not shrink on small screens; the chip wraps instead.
+ *
+ *   NOTHING MAY SIT ON TOP OF IT. The Code requires placement "where no intervening overlay elements
+ *   exist". The label participates in normal flow inside the content it describes rather than
+ *   floating, so it cannot be covered by app chrome or a toast; \`isolation: isolate\` keeps a
+ *   descendant's z-index from escaping and a parent's stacking context from burying it.
+ * @structure
+ *   - .ai-label (+ --inline / --block / --interaction) — the wrapper
+ *   - .ai-label__icon (+ per-icon aspect ratios) — the official EU glyph, theme-variant switched
+ *   - .ai-label__text / __short / __long / __link
+ * @usage preloaded from spa.html; classes emitted by /components/ai-label.js
+ * @version-history
+ *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 3.
+ */
+
+.ai-label {
+  --ai-label-icon-h: 20px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  flex-wrap: wrap;
+  isolation: isolate;
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--text-dim);
+}
+
+/* Inline chip: beside a title, in a record header, on a message. */
+.ai-label--inline {
+  padding: var(--sp-1, 4px) var(--sp-2, 8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-dim);
+}
+
+/* Block banner: above a body of text, which is where Measure 1.2.2(f) puts it for published text
+   ("above or at the top of the text, near the headline"). */
+.ai-label--block,
+.ai-label--interaction {
+  --ai-label-icon-h: 24px;
+  align-items: flex-start;
+  padding: var(--sp-3, 12px);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-focus);
+  border-radius: var(--radius-sm);
+  background: var(--bg-dim);
+  margin-bottom: var(--sp-3, 12px);
+}
+
+/* The Art. 50(1) notice has no icon, so its text starts at the border. */
+.ai-label--interaction { align-items: center; }
+
+.ai-label__icon {
+  flex: 0 0 auto;
+  height: var(--ai-label-icon-h);
+  min-height: 18px;
+  width: auto;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+/* Sized by height with the SVG's own ratio — a square box distorts two of the three lockups. */
+.ai-label__icon--ai-basic {
+  aspect-ratio: 566.93 / 566.93;
+  background-image: url('/assets/eu-ai-icons/svg/ai-basic_black.svg');
+}
+.ai-label__icon--ai-generated {
+  aspect-ratio: 1789.84 / 566.93;
+  background-image: url('/assets/eu-ai-icons/svg/ai-generated_black.svg');
+}
+.ai-label__icon--ai-modified {
+  aspect-ratio: 1700.79 / 566.93;
+  background-image: url('/assets/eu-ai-icons/svg/ai-modified_black.svg');
+}
+
+/* Dark theme takes the white variants. The glyph is not localised and not restyled — our freedom is
+   in the chip around it, never in the mark itself. */
+[data-theme="dark"] .ai-label__icon--ai-basic {
+  background-image: url('/assets/eu-ai-icons/svg/ai-basic_white.svg');
+}
+[data-theme="dark"] .ai-label__icon--ai-generated {
+  background-image: url('/assets/eu-ai-icons/svg/ai-generated_white.svg');
+}
+[data-theme="dark"] .ai-label__icon--ai-modified {
+  background-image: url('/assets/eu-ai-icons/svg/ai-modified_white.svg');
+}
+
+.ai-label__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  /* Long compliance sentences must wrap, never widen the page: an overflowing label is the classic
+     way a badge turns into a horizontal scrollbar on a 390px viewport. */
+  overflow-wrap: anywhere;
+}
+
+.ai-label__short {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ai-label__long { color: var(--text-dim); }
+
+/* The interactive second layer the Code encourages. Underlined, not colour-only. */
+.ai-label__link {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ai-label__link:hover,
+.ai-label__link:focus-visible { color: var(--text); }
+
+/* An inline chip on one line reads better with the text side by side. */
+.ai-label--inline .ai-label__text { flex-direction: row; gap: var(--sp-2, 8px); align-items: baseline; }
+
+@media (max-width: 640px) {
+  /* Stack rather than shrink: the minimum icon size is a compliance property. */
+  .ai-label--inline .ai-label__text { flex-direction: column; gap: 2px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ai-label__link { transition: color 120ms ease; }
+}
+`;
+
+  // locales/en.json
+  var aiLabel = {
+    short: "AI-generated",
+    assisted: "AI-assisted",
+    original: "Written by a person",
+    unstated: "Origin unstated",
+    chat: "You are talking to an AI assistant.",
+    publicText: "This text was written by AI without human editorial review.",
+    assistedLong: "A person wrote this. AI helped edit or refine it.",
+    reviewedGeneric: "AI drafted this, and a person reviewed the substance.",
+    originalLong: "A person wrote this. No AI was involved.",
+    unstatedLong: "We do not know whether AI was involved in making this.",
+    reviewed: "AI-drafted, reviewed by {{name}}.",
+    detailsLink: "How this was made",
+    policyLong: "A model was involved in making this. This node labels that even where the law does not require it.",
+    interactionTitle: "You are talking to an AI assistant",
+    interactionBody: "It can be wrong, so check anything that matters. Your messages go to a language model on your own API key.",
+    draftTitle: "This draft was written by AI",
+    draftBody: "Read it before you send it. You are responsible for what goes out under your name.",
+    regionLabel: "AI transparency",
+    iconAlt: {
+      aiGenerated: "Content generated by AI",
+      aiModified: "Content partially modified by AI",
+      aiBasic: "AI was involved in making this content",
+      unstated: "AI involvement unstated"
+    }
+  };
+
+  // locales/fi.json
+  var aiLabel2 = {
+    short: "Tekoälyn tuottama",
+    assisted: "Tekoälyavusteinen",
+    original: "Ihmisen kirjoittama",
+    unstated: "Alkuperää ei ole kerrottu",
+    chat: "Keskustelet tekoälyavustajan kanssa.",
+    publicText: "Tämän tekstin on kirjoittanut tekoäly ilman ihmisen toimituksellista tarkistusta.",
+    assistedLong: "Tekstin on kirjoittanut ihminen. Tekoäly on ollut mukana sen muokkaamisessa.",
+    reviewedGeneric: "Tekoäly on luonnostellut tämän, ja ihminen on tarkistanut sisällön.",
+    originalLong: "Tämän on kirjoittanut ihminen. Tekoäly ei ole ollut mukana.",
+    unstatedLong: "Emme tiedä, onko tekoäly ollut mukana tämän tekemisessä.",
+    reviewed: "Tekoälyn luonnostelema, tarkistanut {{name}}.",
+    detailsLink: "Miten tämä on tehty",
+    policyLong: "Tämän tekemisessä on ollut mukana tekoälymalli. Tämä solmu merkitsee sen silloinkin, kun laki ei sitä vaadi.",
+    interactionTitle: "Keskustelet tekoälyavustajan kanssa",
+    interactionBody: "Se voi erehtyä, joten tarkista tärkeät asiat. Viestisi menevät kielimallille omalla API-avaimellasi.",
+    draftTitle: "Tämän luonnoksen on kirjoittanut tekoäly",
+    draftBody: "Lue se ennen lähettämistä. Vastaat itse siitä, mitä nimissäsi lähtee.",
+    regionLabel: "Tekoälyn läpinäkyvyystiedot",
+    iconAlt: {
+      aiGenerated: "Tekoälyn tuottamaa sisältöä",
+      aiModified: "Sisältöä on osittain muokattu tekoälyllä",
+      aiBasic: "Tekoäly on ollut mukana tämän sisällön tekemisessä",
+      unstated: "Tekoälyn osuutta ei ole kerrottu"
+    }
+  };
+
+  // src/static/sdk-libs/ai/strings.js
+  var STRINGS2 = { en: aiLabel, fi: aiLabel2 };
+  function pick(key, loc) {
+    const path = (key.startsWith("aiLabel.") ? key.slice("aiLabel.".length) : key).split(".");
+    for (const bundle of [STRINGS2[loc], STRINGS2.en]) {
+      const v = path.reduce((o, k) => o && typeof o === "object" ? o[k] : void 0, bundle);
+      if (typeof v === "string") return v;
+    }
+    return key;
+  }
+
+  // src/static/sdk-libs/ai/disclose.js
+  var STYLE_ID = "aimeat-ai-label-css";
+  var APP_TOKENS = `
+.ai-label{
+  --text: var(--color-base-content, #1A1A2E);
+  --text-dim: color-mix(in oklab, var(--color-base-content, #6B7280) 70%, transparent);
+  --bg-dim: var(--color-base-200, #F3F4F6);
+  --border: var(--color-base-300, #E5E7EB);
+  --border-focus: var(--color-primary, #E8564A);
+  --radius-sm: 10px; --radius-full: 9999px; --text-sm: 0.82rem;
+  --sp-1: 4px; --sp-2: 8px; --sp-3: 12px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) .ai-label{
+    --text: var(--color-base-content, #EDEEF2);
+    --bg-dim: var(--color-base-200, #22242B);
+    --border: var(--color-base-300, #33363F);
+    --border-focus: var(--color-primary, #FF6F62);
+  }
+}`;
+  function osDarkIcons(base) {
+    const url = (stem) => `${base}/assets/eu-ai-icons/svg/${stem}_white.svg`;
+    return `@media (prefers-color-scheme: dark){` + ["ai-basic", "ai-generated", "ai-modified"].map((s) => `:root:not([data-theme="light"]) .ai-label__icon--${s}{background-image:url('${url(s)}')}`).join("") + "}";
+  }
+  function locale() {
+    const stored = (() => {
+      try {
+        return localStorage.getItem("aimeat-lang");
+      } catch {
+        return null;
+      }
+    })();
+    const lang2 = stored || document.documentElement.lang || "en";
+    return lang2.slice(0, 2) === "fi" ? "fi" : "en";
+  }
+  function t(key) {
+    return pick(key, locale());
+  }
+  function localized(block, field, fallbackKey) {
+    const text = block && block[field];
+    if (text && typeof text === "object") {
+      const loc = locale();
+      if (typeof text[loc] === "string") return text[loc];
+      if (typeof text.en === "string") return text.en;
+    }
+    return t(fallbackKey);
+  }
+  function ensureStyles2() {
+    if (document.getElementById(STYLE_ID)) return;
+    const base = (APEX_URL || "").replace(/\/+$/, "");
+    const css = base ? ai_label_default.replace(/url\((['"]?)\/assets\//g, (m, q) => `url(${q}${base}/assets/`) : ai_label_default;
+    const st = document.createElement("style");
+    st.id = STYLE_ID;
+    st.textContent = APP_TOKENS + css + (base ? osDarkIcons(base) : "");
+    (document.head || document.documentElement).appendChild(st);
+  }
+  function el(tag, className, text) {
+    const n = document.createElement(tag);
+    if (className) n.className = className;
+    if (text != null) n.textContent = text;
+    return n;
+  }
+  function targetOf(target) {
+    if (!target) return null;
+    return typeof target === "string" ? document.querySelector(target) : target;
+  }
+  function buildLabel(record, recordUrl, opts = {}) {
+    const disclosure = record && record.disclosure;
+    if (!disclosure || !disclosure.required) return null;
+    const icon = euIconFor(record);
+    if (!icon) return null;
+    ensureStyles2();
+    const variant = opts.variant === "block" ? "block" : "inline";
+    const strength = disclosure.strength === "full" ? "full" : "light";
+    const alt = t(icon.alt);
+    const root = el("div", `ai-label ai-label--${variant} ai-label--${strength} ${opts.class || ""}`.trim());
+    root.setAttribute("role", "group");
+    root.setAttribute("aria-label", t("aiLabel.regionLabel"));
+    const glyph = el("span", `ai-label__icon ai-label__icon--${icon.file}`);
+    glyph.setAttribute("role", "img");
+    glyph.setAttribute("aria-label", alt);
+    glyph.setAttribute("title", alt);
+    root.appendChild(glyph);
+    const textWrap = el("span", "ai-label__text");
+    textWrap.appendChild(el("span", "ai-label__short", localized(disclosure, "short", "aiLabel.short")));
+    const long = localized(disclosure, "long", "aiLabel.publicText");
+    if (variant === "block" && strength === "full" && long) {
+      textWrap.appendChild(el("span", "ai-label__long", long));
+    }
+    root.appendChild(textWrap);
+    const url = recordUrl || record.attestation && record.attestation.recordUrl;
+    if (url) {
+      const a = el("a", "ai-label__link", t("aiLabel.detailsLink"));
+      a.href = url;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      root.appendChild(a);
+    }
+    return root;
+  }
+  function disclose(provenance, opts = {}) {
+    if (!provenance) return null;
+    const record = provenance.record || provenance;
+    const recordUrl = provenance.recordUrl || record.attestation && record.attestation.recordUrl;
+    const node = buildLabel(record, recordUrl, opts);
+    const mount = targetOf(opts.target);
+    if (mount) {
+      mount.textContent = "";
+      if (node) mount.appendChild(node);
+    }
+    return node;
+  }
+  function chatNotice(opts = {}) {
+    ensureStyles2();
+    const root = el("div", `ai-label ai-label--interaction ${opts.class || ""}`.trim());
+    root.setAttribute("role", "note");
+    const textWrap = el("span", "ai-label__text");
+    textWrap.appendChild(el("span", "ai-label__short", opts.title || t("aiLabel.interactionTitle")));
+    textWrap.appendChild(el("span", "ai-label__long", opts.body || t("aiLabel.interactionBody")));
+    root.appendChild(textWrap);
+    if (opts.recordUrl) {
+      const a = el("a", "ai-label__link", t("aiLabel.detailsLink"));
+      a.href = opts.recordUrl;
+      a.target = "_blank";
+      a.rel = "noopener noreferrer";
+      root.appendChild(a);
+    }
+    const mount = targetOf(opts.target);
+    if (mount) {
+      mount.textContent = "";
+      mount.appendChild(root);
+    }
+    return root;
+  }
+  function declare(item, provenance) {
+    if (!provenance || !item || typeof item !== "object") return item;
+    const record = provenance.record || provenance;
+    const recordUrl = provenance.recordUrl || record.attestation && record.attestation.recordUrl;
+    return Object.assign({}, item, {
+      aiProvenance: record,
+      ...recordUrl ? { aiProvenanceUrl: recordUrl } : {}
+    });
   }
 
   // src/static/sdk-libs/ai/index.js
@@ -353,7 +752,7 @@
           throw err;
         }
         if (r.data) noteBudget(r.data.budget);
-        return r.data;
+        return r.meta && r.meta.provenance ? { ...r.data, provenance: r.meta.provenance } : r.data;
       };
       if (opts.allowDuplicate) return call();
       const key = keyOf(["ai", opts.app_id, opts.model || opts.modelRole, opts.systemPrompt, opts.prompt]);
@@ -416,7 +815,38 @@
     invalidateCache() {
       _availCache = null;
       _modelsCache = null;
-    }
+    },
+    /**
+     * Show the user that a model made this. ONE call, no styling decisions.
+     *
+     *   const r = await AIMEAT.ai.complete({ app_id: 'my-app', prompt });
+     *   render(r.content);
+     *   AIMEAT.ai.disclose(r.provenance, { target: '#answer-label' });
+     *
+     * Renders the same badge the platform renders — same official EU icon, same stylesheet, same theme
+     * variables — so it follows your app's light/dark mode for free. It returns null and draws nothing
+     * when the content owes no label; the legal test already happened on the server, so pass the
+     * record and let this decide. `variant: 'block'` gives the banner form for a body of text; the
+     * default inline chip suits a title row or a card.
+     */
+    disclose,
+    /**
+     * The first-message notice for a chat surface: "you are talking to an AI assistant."
+     *
+     *   AIMEAT.ai.chatNotice({ target: '#chat-top' });
+     *
+     * Owed the moment a conversation opens, so it takes no record and is never suppressed.
+     */
+    chatNotice,
+    /**
+     * Keep the record with the content when you store or publish it.
+     *
+     *   await AIMEAT.data.set(key, AIMEAT.ai.declare({ text: r.content }, r.provenance));
+     *
+     * Returns a new object carrying `aiProvenance`, so anything that reads the record later — your own
+     * app, another app, an agent — can still say how it was made.
+     */
+    declare
   };
   attach("ai", ai);
   attachSpend();

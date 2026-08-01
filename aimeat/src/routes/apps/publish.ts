@@ -14,6 +14,11 @@
  *     catches the recurring phone-overflow bugs (missing viewport meta, grid 1fr blowout) at publish.
  *   v1.4.0 — 2026-07-22 — priceMorsels + licenseType carry forward on an update that omits them
  *     (an update must never silently turn a paid app free; price_morsels: 0 unprices explicitly).
+ *   v1.5.0 — 2026-08-01 — TARGET-058 Phase 5: the AI transparency check. An app that requests
+ *     `ai:use` and never tells the user a model made what they are reading gets `ai_hints` in the
+ *     response and a recorded gap on `manifest.aiPosture` — a WARNING, never a rejection (decision
+ *     D2: a publish that fails is a publish that gets worked around, and the app then ships with
+ *     less transparency rather than more). A declaration carries forward across updates and forks.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -30,6 +35,7 @@ import { randomBytes } from 'node:crypto';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
 import { lintAppHtmlForMobile } from '../../utils/app-mobile-lint.js';
+import { lintAppAiDisclosure } from '../../services/app-ai-posture.js';
 import { ensureAppSubdomain } from '../subdomains.js';
 import type { CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
@@ -71,6 +77,11 @@ export function registerPublishRoutes(
             const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
             const token = await generateUploadToken({
                 sub: ownerGhii,
+                // WHO is publishing, kept alongside WHERE it lands. An app always lands in the
+                // owner's bucket, so `sub` alone erased the agent — and the provenance stamp on the
+                // upload side has nothing to infer from once that is gone (TARGET-058 MINT-3).
+                // Server-resolved, never client-supplied.
+                actor: callerGaii,
                 utype: 'app',
                 // Only what the caller ACTUALLY sent. Defaulting the name to the filename here made
                 // "the caller omitted it" indistinguishable from "the caller asked for it" by the
@@ -207,8 +218,13 @@ export function registerPublishRoutes(
         let carriedName: string | undefined;
         let carriedVersion: string | undefined;
         let carriedTags: string[] | undefined;
+        // A generative app that is updated stays a generative app: what the previous version DECLARED
+        // survives a version whose author forgot the meta tag. What the node OBSERVES is re-measured
+        // from the bytes being published, never carried.
+        let carriedAiPosture: AppManifest['aiPosture'];
         if (isUpdate) {
             const existingApp = await storage.getApp(ownerGhii, filename);
+            carriedAiPosture = existingApp?.manifest?.aiPosture;
             parkedState = !!existingApp?.parked;
             forkableState = !!existingApp?.forkable;
             operatorHiddenState = !!existingApp?.operatorHidden;
@@ -281,6 +297,13 @@ export function registerPublishRoutes(
         if (effectiveProtection && Object.values(effectiveProtection).some(Boolean)) {
             manifest.protection = effectiveProtection;
         }
+        // TARGET-058: what this app says about the AI inside it, plus the publish check. HTML only —
+        // there is nothing to read in a binary. It WARNS and never blocks: a publish that fails is a
+        // publish that gets worked around, and the app then ships with less transparency, not more.
+        const aiLint = mimeType === 'text/html'
+            ? lintAppAiDisclosure(data.toString('utf8'), carriedAiPosture)
+            : null;
+        if (aiLint) manifest.aiPosture = aiLint.posture;
         // A re-publish changes the bytes → drop any cached obfuscated/locked base.
         invalidateProtectionCache(owner, filename);
 
@@ -407,6 +430,10 @@ export function registerPublishRoutes(
                 ? `App updated to version ${newVersion}. Previous version${existingVersion > 1 ? 's are' : ' is'} preserved.`
                 : 'App published. Others can download this file and open it locally.',
             ...(mobileHints.length ? { mobile_hints: mobileHints } : {}),
+            // Non-blocking, and worded for the model that built the app — that is who reads a publish
+            // response. `ai_posture` is what the node now believes; `ai_hints` is what to fix.
+            ...(aiLint ? { ai_posture: aiLint.posture } : {}),
+            ...(aiLint?.hints.length ? { ai_hints: aiLint.hints } : {}),
         }, [
             { description: 'View all versions', method: 'GET', url: `${downloadUrl}/versions` },
         ]));

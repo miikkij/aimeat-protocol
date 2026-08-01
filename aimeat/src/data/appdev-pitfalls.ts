@@ -12,6 +12,9 @@
  * @version-history
  *   v1.1.0 — 2026-07-19 — +flex-nav-wrap (mobile) +app-grant-node-role-via-owners (auth); updated
  *     auth-pill-overflow now that the compact pill is default + shells ship overflow-x:clip.
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5: three AI-transparency entries (unlabelled output,
+ *     provenance dropped on save, biometric inference being the owner's OWN duty). Research-first
+ *     surfaces these before a build, which is the only point at which they are cheap to act on.
  *   v1.0.0 — 2026-07-19 — initial: 26 curated entries distilled from docs/pitfalls.md
  *     (app-builder-relevant sections only) + recurring app-build lessons.
  */
@@ -70,6 +73,36 @@ export const APPDEV_PITFALLS: AppdevPitfallEntry[] = [
     source: 'curated',
     docRef: 'docs/pitfalls.md §12',
     updatedAt: '2026-07-19',
+  }),
+  E({
+    id: 'unlabelled-ai-output',
+    title: 'An app that generates content and never says so',
+    symptom: 'The app requests the `ai:use` scope, shows model-written text to a reader, and nothing on the page says a model wrote it. Publishing warns (`ai_hints`) and records a gap on the app; the catalogue card shows an "Unlabelled AI" marker to the owner.',
+    fix: 'Keep the `provenance` object AIMEAT.ai.complete() returns and render the label at first exposure: `AIMEAT.ai.disclose(r.provenance, { target: "#ai-label" })`. It draws the official EU label in the app\'s own theme and draws nothing when no label is owed. Declare `<meta name="aimeat-ai" content="generates=text; discloses=yes; public-interest=no">`, attach the record to anything stored with `AIMEAT.ai.declare(item, r.provenance)`, and open a chat with `AIMEAT.ai.chatNotice()`.',
+    appliesTo: ['app', 'publish'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-08-01',
+  }),
+  E({
+    id: 'ai-provenance-dropped-on-save',
+    title: 'The label is on screen but the stored item forgot where it came from',
+    symptom: 'The app renders the AI label correctly, then saves the generated item with AIMEAT.data.set() and the stored record carries no provenance. Anything reading the data later — another app, an agent, the owner in six months — reads it as content of unknown origin.',
+    fix: 'Wrap the value: `await AIMEAT.data.set(key, AIMEAT.ai.declare(item, r.provenance))`. declare() returns a copy carrying `aiProvenance`, so the record travels with the content instead of living only in the DOM that rendered it once.',
+    appliesTo: ['app'],
+    severity: 'warn',
+    source: 'curated',
+    updatedAt: '2026-08-01',
+  }),
+  E({
+    id: 'biometric-inference-needs-your-own-notice',
+    title: 'Emotion or attention inference is the app owner\'s own duty to declare',
+    symptom: 'The app reads a webcam, a microphone or interaction data to infer mood, emotion, attention or any other biometric category, and relies on the platform label to cover it. The platform label describes GENERATED content; it says nothing about inference performed on a person.',
+    fix: 'Tell the people exposed, in your own words, before the inference happens — `AIMEAT.ai.chatNotice({ target, title, body })` renders your wording. The duty sits with you as deployer, because only you know who is in front of the camera and why.',
+    appliesTo: ['app'],
+    severity: 'critical',
+    source: 'curated',
+    updatedAt: '2026-08-01',
   }),
   E({
     id: 'hardcoded-theme-colors',

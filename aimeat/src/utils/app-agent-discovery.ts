@@ -15,9 +15,14 @@
  *   The identifiers are stated literally because the app id is a FILENAME and carries its extension
  *   while the app's own subdomain does not: an agent reading `nuotta.apps.aimeat.io` guesses
  *   "nuotta", and every tool lookup for it misses.
- * @structure injectAgentDiscovery(html, spec) — pure string transform, returns a Buffer.
- * @usage const body = injectAgentDiscovery(injectAimeatBadge(app.data), { owner, filename, ... });
+ * @structure DISCOVERY_MARK — the idempotency marker; agentDiscoverySnippet(spec) — the markup.
+ *   Where it goes and whether the document can take it is decided once, in
+ *   services/app-serve-marks.ts.
+ * @usage import { agentDiscoverySnippet } from '../utils/app-agent-discovery.js';
  * @version-history
+ *   v2.0.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: injectAgentDiscovery() becomes
+ *     agentDiscoverySnippet(); the document detection and the last-</body> rule move to the single
+ *     serve-time-marks pass. Output is byte-identical (test/fixtures/serve-marks-golden.json).
  *   v1.1.0 — 2026-07-28 — Optional WebMCP bridge tag (`spec.webmcp`): the same block can now make the
  *     app's tools CALLABLE in the browser, not merely findable. Pointing at a document is what the
  *     v1.0.0 block did, and an in-browser agent that can read "there are five tools" still had no way
@@ -26,8 +31,6 @@
  *     owner, the app id with its extension, the tool manifest, the WebMCP endpoint and the
  *     agent-face markdown rendering.
  */
-import { injectBeforeClosingTag } from './html-inject.js';
-
 /** What the serving route knows about the app being sent. */
 export interface AppDiscoverySpec {
   /** Bare owner name — the `owner` argument of every app-tool call. */
@@ -50,25 +53,20 @@ export interface AppDiscoverySpec {
   webmcp?: boolean;
 }
 
-const MARK = 'id="aimeat-agent-discovery"';
+/** Present in a document that already carries the block — what makes a re-serve idempotent. */
+export const DISCOVERY_MARK = 'id="aimeat-agent-discovery"';
 
 function esc(s: string): string {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 /**
- * Append the discovery block before the LAST closing tag. Returns the input unchanged when the
- * payload is not an HTML document or already carries the block (idempotent — a served document can
- * be re-served through the same path).
+ * The discovery block.
  *
  * Nothing here executes: a `<link>` and a `<noscript>` need no CSP allowance beyond what a static
  * document already has, which is why this can ride on every app rather than being opt-in.
  */
-export function injectAgentDiscovery(data: Buffer | Uint8Array | string, spec: AppDiscoverySpec): Buffer {
-  const text = typeof data === 'string' ? data : Buffer.from(data).toString('utf-8');
-  if (!/<\/body\s*>/i.test(text) && !/<\/html\s*>/i.test(text)) return Buffer.from(text, 'utf-8');
-  if (text.includes(MARK)) return Buffer.from(text, 'utf-8');
-
+export function agentDiscoverySnippet(spec: AppDiscoverySpec): string {
   const base = spec.baseUrl.replace(/\/+$/, '');
   const appRef = `${spec.owner}/${spec.filename}`;
   const name = spec.appName || spec.filename;
@@ -102,10 +100,9 @@ export function injectAgentDiscovery(data: Buffer | Uint8Array | string, spec: A
   lines.push('A priced tool answers an unpaid POST with 402 and an x402 `accepts` block stating how to');
   lines.push('pay, so the calling convention can be learned from the service itself.');
 
-  const block =
-    `<link rel="mcp-server" href="/.well-known/mcp.json">`
+  return `<link rel="mcp-server" href="/.well-known/mcp.json">`
     + `<link rel="alternate" type="text/markdown" href="?format=md" title="Agent-facing description">`
-    + `<noscript ${MARK}><pre>${esc(lines.join('\n'))}</pre></noscript>`
+    + `<noscript ${DISCOVERY_MARK}><pre>${esc(lines.join('\n'))}</pre></noscript>`
     // A machine-readable twin of the same facts, for a reader that prefers structure to prose.
     + `<script type="application/json" id="aimeat-app-ref">`
     + esc(JSON.stringify({ owner: spec.owner, app_id: spec.filename, app: appRef, tools }))
@@ -117,6 +114,4 @@ export function injectAgentDiscovery(data: Buffer | Uint8Array | string, spec: A
       ? `<script src="/v1/libs/aimeat-webmcp.js?expose=app" data-owner="${esc(spec.owner)}"`
         + ` data-app="${esc(spec.filename)}" defer></script>`
       : '');
-
-  return Buffer.from(injectBeforeClosingTag(text, block), 'utf-8');
 }

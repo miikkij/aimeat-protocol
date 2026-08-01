@@ -35,9 +35,15 @@
  *     before minting the token. The check sat after the presigned early return, so asking for an
  *     upload URL let an anonymous agent write outside anonymous/* — the gate belongs on the write,
  *     not on the representation the caller happens to choose.
+ *   v1.9.0 -- 2026-08-01 -- TARGET-058 Phase 5 step 0b: every file response declares `charset=utf-8`
+ *     when, and only when, the stored bytes pass a UTF-8 decode test (sniffedContentType). A bare
+ *     `text/*` makes a browser fall back to the locale default and render UTF-8 as mojibake; these
+ *     are UPLOADED bytes though, so a genuinely cp1252 .txt/.csv keeps the type it has today rather
+ *     than being retyped into something its owner cannot read.
  */
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
+import { sniffedContentType } from '../utils/app-content-type.js';
 import type { Storage } from '../storage/interface.js';
 import { requireAuth, requireRole, requireExternalPrincipal, requireScope, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
@@ -120,13 +126,13 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 res.status(206);
                 res.setHeader('Content-Range', `bytes ${start}-${end}/${file.size}`);
                 res.setHeader('Content-Length', chunk.length);
-                res.setHeader('Content-Type', file.mimeType);
+                res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
                 res.end(chunk);
                 return;
             }
         }
 
-        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
         res.setHeader('Content-Length', file.size);
         res.setHeader('Cache-Control', 'private, max-age=300');
         res.end(file.data);
@@ -582,7 +588,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             // Lets the bytes be drawn into a canvas and read back, which is what any app doing
             // something WITH a public image (resize, re-encode, hand to a tool) has to do.
             res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
-            res.setHeader('Content-Type', file.mimeType);
+            res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
             res.setHeader('Content-Length', file.size);
             res.end(file.data);
             return;
@@ -634,7 +640,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
         }
 
         if (handleMode) { await sendHandle(accessorGaii); return; }
-        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
         res.setHeader('Content-Length', file.size);
         res.end(file.data);
     });
@@ -664,7 +670,7 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
             return;
         }
 
-        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
         res.setHeader('Content-Length', file.size);
         res.setHeader('X-AIMEAT-Visibility', file.visibility);
         res.setHeader('X-AIMEAT-Created', file.createdAt);
@@ -723,13 +729,13 @@ export function storageFilesRouter(config: AimeatConfig, storage: Storage): Rout
                 res.status(206);
                 res.setHeader('Content-Range', `bytes ${start}-${end}/${file.size}`);
                 res.setHeader('Content-Length', chunk.length);
-                res.setHeader('Content-Type', file.mimeType);
+                res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
                 res.end(chunk);
                 return;
             }
         }
 
-        res.setHeader('Content-Type', file.mimeType);
+        res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));
         res.setHeader('Content-Length', file.size);
         res.end(file.data);
     });

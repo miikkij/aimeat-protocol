@@ -21,12 +21,25 @@
  *   already declaring `utf-8` themselves, and 106 containing non-ASCII. The bytes we store are UTF-8
  *   by construction — they arrive as JavaScript strings through a JSON API — so declaring it is
  *   strictly correct, and it repairs the one app that declared no charset and does carry non-ASCII.
- * @structure appContentType(mimeType) — the mime type, with `charset=utf-8` added for text types
- *   that do not already carry a charset. Non-text types pass through untouched.
+ *   AND THE LIMIT THAT ARGUMENT DOES NOT REACH. Everything above is true because app HTML is UTF-8
+ *   BY CONSTRUCTION — it arrives as a JavaScript string through a JSON API, so there is no other
+ *   thing it could be. STORED FILES ARE NOT. A person can upload a genuinely cp1252 `.txt` or
+ *   `.csv`, and declaring `charset=utf-8` over it would corrupt a file that is served correctly
+ *   today — the exact failure this file exists to avoid, pointed the other way. So the stored-file
+ *   routes get sniffedContentType() instead: it reads the bytes, and declares UTF-8 only when the
+ *   bytes ARE valid UTF-8. Anything else keeps the type it has, and today's behaviour with it.
+ * @structure
+ *   - appContentType(mimeType) — for content the NODE generates: the mime type, with `charset=utf-8`
+ *     added for text types that do not already carry a charset. Non-text types pass through.
+ *   - sniffedContentType(mimeType, bytes) — for USER-UPLOADED bytes: the same, but only after the
+ *     bytes pass a UTF-8 decode test.
  * @usage
- *   import { appContentType } from '../utils/app-content-type.js';
- *   res.setHeader('Content-Type', appContentType(app.mimeType));
+ *   import { appContentType, sniffedContentType } from '../utils/app-content-type.js';
+ *   res.setHeader('Content-Type', appContentType(app.mimeType));            // node-generated
+ *   res.setHeader('Content-Type', sniffedContentType(file.mimeType, file.data));  // uploaded
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 5 step 0b: sniffedContentType() for the stored-file
+ *     routes, with the node-generated / user-uploaded distinction the Phase 4 audit drew.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 4 step 0a, after the corpus scan above.
  */
 
@@ -45,5 +58,40 @@ export function appContentType(mimeType: string | undefined | null): string {
   const type = (mimeType ?? '').trim() || 'application/octet-stream';
   if (/;\s*charset\s*=/i.test(type)) return type;
   if (!TEXTUAL.test(type)) return type;
+  return `${type}; charset=utf-8`;
+}
+
+/**
+ * `Content-Type` for bytes SOMEBODY UPLOADED, where the encoding is a fact to be established rather
+ * than a property of how the content got here.
+ *
+ * The test is a strict UTF-8 decode of the whole file, which is the method the Phase 4 corpus scan
+ * settled on after a glyph signature produced a false positive (it cannot tell `Ã¤` from a Finnish
+ * character class like `[ÅÄÖåäö]`; a decode test can). Two outcomes, and both are safe:
+ *
+ * - **The bytes decode as UTF-8** → declare it. The declaration states what the bytes are, and it
+ *   REPAIRS the file: without it a browser falls back to the locale default and shows mojibake.
+ * - **They do not** → say nothing, and the file keeps being served exactly as it is served today.
+ *   A genuinely cp1252 `.txt` is not retyped by us into something a reader cannot read.
+ *
+ * Pass the WHOLE file even when serving a byte range: a multi-byte character straddling a range
+ * boundary would fail a decode of the chunk while the file is perfectly good UTF-8, and the header
+ * describes the entity, not the slice.
+ */
+export function sniffedContentType(
+  mimeType: string | undefined | null,
+  bytes: Buffer | Uint8Array | undefined | null,
+): string {
+  const type = (mimeType ?? '').trim() || 'application/octet-stream';
+  if (/;\s*charset\s*=/i.test(type)) return type;
+  if (!TEXTUAL.test(type)) return type;
+  if (!bytes) return type;
+  try {
+    new TextDecoder('utf-8', { fatal: true }).decode(bytes);
+  } catch {
+    // The exception IS the answer: a decode failure is precisely the signal that these bytes are
+    // not UTF-8, and it is acted on rather than swallowed.
+    return type;   // leave the author's file exactly as it is served today
+  }
   return `${type}; charset=utf-8`;
 }

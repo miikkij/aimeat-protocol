@@ -12,6 +12,11 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-08-01 — TARGET-058 Phase 5, ADDITIVE (permission granted 2026-08-01): "Say that the AI made
+ *     it" — the disclose/declare/chatNotice calls with one worked snippet, the `<meta name="aimeat-ai">`
+ *     posture declaration, and the Art. 50(3) paragraph putting the biometric-inference duty on the
+ *     app owner as deployer. Plus one bullet in Important Rules and one line in the finish gate.
+ *     Existing text untouched.
  *   2026-07-31 — "Spending the user's money" section (AI calls + agent commissions): one click =
  *     one run on the SDK's own repeat guard, confirm before a batch via AIMEAT.spend.confirm,
  *     budget on screen, no automatic retry of a paid call, a cancel path for a running job — plus
@@ -245,6 +250,29 @@ export function buildAppPrompt(
   body += '```\n';
   body += 'Always handle isAvailable()===false and catch errors; never hardcode an API key in the app.\n\n';
 
+  // TRANSPARENCY. An app that generates content is, in EU AI Act terms, a system with a provider —
+  // its owner. There are two ways to handle that: every builder learns the law, or the SDK hands
+  // them the record, one call draws the label, and this prompt asks for both. Only the second
+  // happens in reality, which is why this section exists and why it names the exact calls.
+  body += '### Say that the AI made it (one call, and the app is compliant)\n';
+  body += 'When your app generates text, images, audio or video with a model, the person reading it is entitled to know. `AIMEAT.ai.complete()` hands you the evidence and one call draws the label, so this costs you two lines:\n';
+  body += '```javascript\n';
+  body += 'const r = await AIMEAT.ai.complete({ app_id: "my-app", prompt });\n';
+  body += 'render(r.content);                                        // the text, as before\n';
+  body += 'AIMEAT.ai.disclose(r.provenance, { target: "#ai-label" }); // the label, in YOUR theme\n';
+  body += '// Storing or publishing it? Keep the record with the content:\n';
+  body += 'await AIMEAT.data.set(key, AIMEAT.ai.declare({ text: r.content }, r.provenance));\n';
+  body += '// A chat surface says so in its first message:\n';
+  body += 'AIMEAT.ai.chatNotice({ target: "#chat-top" });\n';
+  body += '```\n';
+  body += '`disclose()` renders the official EU label using the platform stylesheet and your app\'s own theme tokens, in the reader\'s language, and renders nothing at all when no label is owed — the node decides that, so you pass the object and let it answer. `declare()` returns a copy of your item carrying the record, so whoever reads it later still knows how it was made.\n';
+  body += 'Declare the posture in your head section, beside your scopes, so the catalogue can show it:\n';
+  body += '```html\n';
+  body += '<meta name="aimeat-ai" content="generates=text,image; discloses=yes; public-interest=no">\n';
+  body += '```\n';
+  body += 'Set `public-interest=yes` when the app publishes on public-interest matters (news, health, elections, public administration) — those carry a stronger labelling duty and the node raises the label accordingly.\n';
+  body += '**If your app infers emotion, mood, attention or any biometric category from a person** (a webcam mood reader, a voice-stress meter, an attention tracker), you must inform the people exposed to it, and that duty is YOURS as the deployer — on your own account, in your own words, before the inference happens. The platform gives you the component (`AIMEAT.ai.chatNotice({ title, body })` takes your own wording); it cannot make the declaration for you, because only you know who is in front of the camera and why.\n\n';
+
   // Spending guard. Both money paths (the user's OpenRouter credit via aimeat-ai, an agent run via
   // aimeat-agents) are one click away, and the classic accident is five clicks on a button that
   // showed no feedback = five paid runs of the same job. The libs collapse repeats themselves; this
@@ -405,6 +433,7 @@ export function buildAppPrompt(
   body += '2. **Live channel connected, dialog open, count the repaints.** Put a `MutationObserver` on the open panel\'s content node and watch for 20 seconds while other work is happening on the account. Expected: **zero**. Anything above zero means a live event is repainting a surface the user is reading.\n';
   body += '3. **Read the network log after 60 idle seconds.** A repeating full listing is a bug even when nothing visibly breaks: it is a poll you did not intend. Gate it (see the live-updates section) so an idle app is idle.\n';
   body += '4. **If anything in the app costs money** (an AI call, an agent commission): open the network log, click that control FIVE times as fast as you can, and count the requests. Expected: **one**. Then RELOAD the page and commission the same job again — the node answers with the run you already have (`task.deduplicated`), and your UI must say so rather than claim a new one. Report both.\n';
+  body += '5. **If the app generates content with a model**: the AI label is VISIBLE at all three viewports in both themes, and a generated item you stored carries its provenance record. Open the stored record and look for `aiProvenance` — the label on screen and the record in storage are two separate things and both are owed.\n';
   body += 'Verify the FEATURE too, not just the render: perform the real interaction (commission the thing, save the thing, delete the thing) and confirm the result actually appears and persists. "It did not crash" is not a pass.\n\n';
 
   // Game form language — palette alone reads as a dashboard; the FORM LANGUAGE makes the game.
@@ -425,6 +454,7 @@ export function buildAppPrompt(
   body += '- Keep it as a single self-contained HTML file\n';
   body += '- Load only the libraries you actually use; load aimeat-auth before libs that need a session\n';
   body += '- Gate AI features on AIMEAT.ai.isAvailable() and handle the logged-out / no-key case\n';
+  body += '- Generating text, images, audio or video? Call AIMEAT.ai.disclose(r.provenance) so the user sees the label at first exposure, keep the provenance object and attach it with AIMEAT.ai.declare() to anything you store or publish, declare <meta name="aimeat-ai">, and open a chat with AIMEAT.ai.chatNotice()\n';
   body += '- Treat every paid control (AI call, agent commission) as spending: one click = one run, confirm before a batch, show the budget, never retry a failed paid call automatically\n';
   body += "- Theme with the platform tokens; respect BOTH user choices — light/dark mode (localStorage \"aimeat-theme\", OS-preference fallback) and palette (localStorage \"aimeat-palette\") — and never build your own theme/language/palette control (the login pill carries the cluster)\n";
   body += '- Include error handling and loading states for API calls\n\n';

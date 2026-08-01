@@ -5,8 +5,12 @@
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — AppManifest gains `cortex.agents` (Agent-Bundled Apps Slice 1):
  *     declarative crew-defs an app ships, validated at publish (crew-def-schemas.ts).
+ *   v1.2.0 — 2026-08-01 — AppManifest gains `aiPosture` (TARGET-058 Phase 5): the app's own AI
+ *     transparency statement plus the publish check's finding. On the manifest, so it needs no
+ *     storage migration and survives a fork.
  */
 import type { SemanticAnnotation, SemanticContext } from './common.js';
+import type { AppAiPosture } from '../../services/app-ai-posture.js';
 
 /**
  * The `cortex` section of an app manifest. `agents` carries the DECLARATIVE crew-defs
@@ -45,6 +49,19 @@ export interface AppManifest {
     version: number;            // source version that was forked
     node?: string;              // source node id (reserved for cross-node forks)
   };
+  /**
+   * What the app says about the AI inside it (TARGET-058): which modalities it generates, whether it
+   * shows the user a label, and whether it publishes on matters of public interest — plus the
+   * publish check's finding when the app requests `ai:use` and says nothing at all.
+   *
+   * On the MANIFEST deliberately: it is already a JSON blob on both storage providers, so this needs
+   * no migration, no second place to keep in sync, and it travels with every mechanism that already
+   * copies a manifest — an update, a FORK (a fork of a generative app is still a generative app), a
+   * backup, a purchase snapshot. Optional everywhere: an app that declares nothing is `undefined`,
+   * never a validation failure, because one bad manifest field silently delists every offering an
+   * app has. See services/app-ai-posture.ts.
+   */
+  aiPosture?: AppAiPosture;
   // Opt-in copy-protection applied to the app's inline (runnable) HTML at serve time.
   // All flags default OFF. HONEST LIMITS: client HTML a browser runs can always be
   // copied by anyone who can view it — these only raise the cost of casual theft

@@ -66,14 +66,12 @@ import type { Storage, AppRecord, SubdomainSiteRecord } from '../storage/interfa
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
-import { injectAimeatBadge } from '../utils/app-badge.js';
 import {
-  loadServedProvenance, setProvenanceHeaders, injectAiDisclosure, type ServedProvenance,
+  loadServedProvenance, setProvenanceHeaders, type ServedProvenance,
 } from '../services/ai-provenance-marks.js';
-import { injectAgentDiscovery } from '../utils/app-agent-discovery.js';
+import { applyServeMarks } from '../services/app-serve-marks.js';
 import { appCsp } from '../utils/app-csp.js';
 import { appContentType } from '../utils/app-content-type.js';
-import { injectAppHeadMeta } from '../utils/app-head-meta.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
 import { prefersMarkdown, sendMarkdown } from '../services/markdown-negotiation.js';
@@ -272,32 +270,34 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
     const relaxed = apexOrigin
       ? relaxAppCspMeta(app.data as Buffer | Uint8Array | string, apexOrigin)
       : (app.data as Buffer | Uint8Array | string);
-    // SERVE TIME ONLY. The disclosure marks are added to the bytes on their way out; `app.data`
-    // stays the author's upload, so the hash in the provenance record keeps meaning what it says.
-    let buf = injectAiDisclosure(injectAimeatBadge(relaxed), prov, visible);
-    // The body of a single-file app is empty until its JavaScript runs, so a fetching agent sees
-    // the meta tags and nothing else. This adds a static block naming the app id, the tools and
-    // where the schemas live — the facts an agent otherwise has to guess from the subdomain.
-    if (discover) {
-      buf = injectAgentDiscovery(buf, {
-        owner: app.ownerName, filename: app.filename,
-        appName: app.manifest?.name ?? null, description: app.manifest?.description ?? null,
-        baseUrl: discover.baseUrl, toolNames: discover.toolNames,
-        webmcp: wantsWebmcpBridge(relaxed),
-      });
-      // ...and the head metadata the app almost certainly has none of. Measured on a live app
-      // origin: lang, canonical, description, og:*, JSON-LD and h1 all absent. Authors write apps,
-      // not meta tags, and every published app gets an origin automatically — so this is derived
-      // here for all of them rather than asked for one at a time. Author-declared tags win.
-      if (discover.origin) {
-        buf = injectAppHeadMeta(buf, {
-          owner: app.ownerName, filename: app.filename,
-          appName: app.manifest?.name ?? null, description: app.manifest?.description ?? null,
-          origin: discover.origin, baseUrl: discover.baseUrl,
-          updatedAt: app.createdAt ?? null,
-        });
-      }
-    }
+    // SERVE TIME ONLY. Every mark is added to the bytes on their way out; `app.data` stays the
+    // author's upload, so the hash in the provenance record keeps meaning what it says. ONE pass:
+    // the attribution badge, the AI-disclosure marks, the agent-discovery block (the body of a
+    // single-file app is empty until its JavaScript runs, so a fetching agent would otherwise see
+    // the meta tags and nothing else) and the head metadata the app almost certainly has none of
+    // (measured on a live app origin: lang, canonical, description, og:*, JSON-LD all absent —
+    // authors write apps, not meta tags, and author-declared tags always win).
+    let buf = applyServeMarks(relaxed, {
+      badge: true,
+      provenance: prov,
+      visibleLabel: visible,
+      discovery: discover
+        ? {
+            owner: app.ownerName, filename: app.filename,
+            appName: app.manifest?.name ?? null, description: app.manifest?.description ?? null,
+            baseUrl: discover.baseUrl, toolNames: discover.toolNames,
+            webmcp: wantsWebmcpBridge(relaxed),
+          }
+        : undefined,
+      headMeta: discover?.origin
+        ? {
+            owner: app.ownerName, filename: app.filename,
+            appName: app.manifest?.name ?? null, description: app.manifest?.description ?? null,
+            origin: discover.origin, baseUrl: discover.baseUrl,
+            updatedAt: app.createdAt ?? null,
+          }
+        : undefined,
+    });
     // Opt-in copy-protection (obfuscate / domainLock / watermark) on the runnable body.
     if (protect && hasAnyProtection(app.manifest.protection)) {
       buf = applyAppProtection(buf, {
@@ -362,7 +362,7 @@ async function serveDraftPreview(
     const relaxed = apexOrigin
       ? relaxAppCspMeta(draft.data as Buffer | Uint8Array | string, apexOrigin)
       : (draft.data as Buffer | Uint8Array | string);
-    const buf = injectAimeatBadge(relaxed);
+    const buf = applyServeMarks(relaxed, { badge: true });
     res.setHeader('Content-Length', buf.length.toString());
     res.send(buf);
     return;
@@ -391,7 +391,7 @@ function servePortfolio(res: Response, html: string, portfolioConfig: Record<str
     + '<script src="/v1/libs/aimeat-auth.js"></script>'
     + '<script src="/v1/libs/portfolio-standalone.js"></script>';
   let buf: Buffer = Buffer.from(injectHeadSnippet(html, bridge), 'utf-8');
-  if (portfolioConfig.showBadge !== false) buf = injectAimeatBadge(buf);
+  if (portfolioConfig.showBadge !== false) buf = applyServeMarks(buf, { badge: true });
   res.setHeader('Content-Type', 'text/html; charset=utf-8');
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');

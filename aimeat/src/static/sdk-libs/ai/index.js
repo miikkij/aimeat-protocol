@@ -5,11 +5,17 @@
  *   the user's own OpenRouter key via the AIMEAT.auth session, so the key never leaves the server;
  *   short in-memory caches + typed error `.code`s. Componentized ESM source esbuild bundles to the
  *   IIFE served, unchanged, at /v1/libs/aimeat-ai.js. Ported verbatim from lib-ai.ts.
- * @structure imports authFetch (session) + attach (namespace) + the _core spend guard; _availCache /
- *   _modelsCache; the `ai` facade; attach('ai', …) + attachSpend().
+ * @structure imports authFetch (session) + attach (namespace) + the _core spend guard + ./disclose.js
+ *   (the transparency primitives); _availCache / _modelsCache; the `ai` facade; attach('ai', …) +
+ *   attachSpend().
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-ai.js"></script>
  *   if (await AIMEAT.ai.isAvailable()) { const r = await AIMEAT.ai.complete({ prompt, app_id }); }
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 5, ADDITIVE. complete() carries the node's provenance
+ *     record through as `provenance` (it rides in the envelope's `meta`, so `data` — the shape every
+ *     published app reads — is untouched and completeJson() inherits it by spreading). New:
+ *     disclose() renders the visible label, chatNotice() the Art. 50(1) notice, declare() attaches
+ *     the record to something the app stores. An app that only reads `content` is unaffected.
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-ai.ts (SDK-libs migration Phase 1).
  *   v1.1.0 — 2026-07-31 — Spend guard: identical in-flight completions collapse to one paid call
  *     (allowDuplicate/dedupeMs opt out), `confirm` asks the user first (SPEND_CANCELLED on a no),
@@ -19,6 +25,7 @@ import { makeSession } from '../_core/session.js';
 const { authFetch } = makeSession('aimeat-ai.js');
 import { attach } from '../_core/namespace.js';
 import { once, keyOf, confirmSpend, noteBudget, cancelledError, attachSpend } from '../_core/spend.js';
+import { disclose, chatNotice, declare } from './disclose.js';
 
 // 60s in-memory cache for isAvailable so apps can call it on every render
 // without hammering the server. Cleared on logout via storage event.
@@ -114,7 +121,11 @@ const ai = {
         throw err;
       }
       if (r.data) noteBudget(r.data.budget);
-      return r.data;
+      // ADDITIVE, and it cannot break a published app: the provenance record rides in the envelope's
+      // `meta`, not in `data`, so `content` / `model` / `usage` / `budget` are exactly what they were
+      // and an app that never heard of provenance keeps working. An app that wants the label hands
+      // this straight to AIMEAT.ai.disclose(). completeJson() spreads the result, so it inherits it.
+      return r.meta && r.meta.provenance ? { ...r.data, provenance: r.meta.provenance } : r.data;
     };
     if (opts.allowDuplicate) return call();
     const key = keyOf(['ai', opts.app_id, opts.model || opts.modelRole, opts.systemPrompt, opts.prompt]);
@@ -178,6 +189,40 @@ const ai = {
     _availCache = null;
     _modelsCache = null;
   },
+
+  /**
+   * Show the user that a model made this. ONE call, no styling decisions.
+   *
+   *   const r = await AIMEAT.ai.complete({ app_id: 'my-app', prompt });
+   *   render(r.content);
+   *   AIMEAT.ai.disclose(r.provenance, { target: '#answer-label' });
+   *
+   * Renders the same badge the platform renders — same official EU icon, same stylesheet, same theme
+   * variables — so it follows your app's light/dark mode for free. It returns null and draws nothing
+   * when the content owes no label; the legal test already happened on the server, so pass the
+   * record and let this decide. `variant: 'block'` gives the banner form for a body of text; the
+   * default inline chip suits a title row or a card.
+   */
+  disclose,
+
+  /**
+   * The first-message notice for a chat surface: "you are talking to an AI assistant."
+   *
+   *   AIMEAT.ai.chatNotice({ target: '#chat-top' });
+   *
+   * Owed the moment a conversation opens, so it takes no record and is never suppressed.
+   */
+  chatNotice,
+
+  /**
+   * Keep the record with the content when you store or publish it.
+   *
+   *   await AIMEAT.data.set(key, AIMEAT.ai.declare({ text: r.content }, r.provenance));
+   *
+   * Returns a new object carrying `aiProvenance`, so anything that reads the record later — your own
+   * app, another app, an agent — can still say how it was made.
+   */
+  declare,
 };
 
 attach('ai', ai);
