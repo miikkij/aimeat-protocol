@@ -12,6 +12,11 @@
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  *        app.use(subdomainAdminRouter(config, storage));
  * @version-history
+ *   v1.11.0 — 2026-08-01 — TARGET-058 Phase 4 step 0a: serveApp() and serveDraftPreview() set the
+ *     Content-Type through appContentType(), so an app on its own origin is served as
+ *     `text/html; charset=utf-8`. A bare `text/html` fell back to windows-1252 and mangled every
+ *     non-ASCII byte the document (or the node) put in it. All 110 published apps were scanned for
+ *     the double-encoding signature first — 0 found — because an HTTP charset overrides `<meta>`.
  *   v1.10.0 — 2026-07-30 — appCsp moved to utils/app-csp.ts (one policy, shared with the /v1/apps
  *     inline + draft routes) and its script-src gains 'wasm-unsafe-eval', so an app can compile
  *     WebAssembly. Wasm compilation only — no 'unsafe-eval', and COOP/COEP stay off.
@@ -67,6 +72,7 @@ import {
 } from '../services/ai-provenance-marks.js';
 import { injectAgentDiscovery } from '../utils/app-agent-discovery.js';
 import { appCsp } from '../utils/app-csp.js';
+import { appContentType } from '../utils/app-content-type.js';
 import { injectAppHeadMeta } from '../utils/app-head-meta.js';
 import { appToolNames } from '../services/app-tool-names.js';
 import { verifyDraftToken, verifyFrameToken, DraftTokenError } from '../services/draft-token.js';
@@ -248,7 +254,10 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
                   // one is a compliance mark rather than an owner-chosen protection, and it must not
                   // become conditional on a protection flag by accident.
                   visible?: { config: AimeatConfig; locale: Locale }): void {
-  res.setHeader('Content-Type', app.mimeType);
+  // charset=utf-8, via appContentType(): a bare `text/html` falls back to windows-1252 and turns
+  // every UTF-8 byte in the document into mojibake. See utils/app-content-type.ts for the corpus
+  // scan that had to happen before this could be declared.
+  res.setHeader('Content-Type', appContentType(app.mimeType));
   // TARGET-058: the AI-Disclosure + Link headers travel with the document on the app origin too.
   setProvenanceHeaders(res, prov);
   res.setHeader('Content-Security-Policy', csp);
@@ -345,7 +354,7 @@ async function serveDraftPreview(
     res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No draft to preview'));
     return;
   }
-  res.setHeader('Content-Type', draft.mimeType);
+  res.setHeader('Content-Type', appContentType(draft.mimeType));
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'no-store');       // a draft is never cached
   res.setHeader('X-Content-Type-Options', 'nosniff');

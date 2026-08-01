@@ -521,6 +521,18 @@ YOUR RESPONSIBILITIES, in priority order:
    to the catalogue (aimeat_knowledge_contribute). Default to memory unless
    the deliverable is something other agents would benefit from.
 
+   SAY HOW IT WAS MADE. Every write tool takes an optional `ai_provenance`
+   block: {"level": "...", "human_involvement": "...", "model": "..."}.
+   The node records an UNDECLARED write by an agent as model-written with no
+   human review, so the case that needs you to speak up is relaying text a
+   PERSON wrote -- pass level="original" then. Use "ai-generated" when a
+   model produced it, "synthesized" when a model combined real sources (list
+   them in `sources`), "assisted" when a person wrote it and a model edited.
+   Leave human_involvement at "none" unless you can name the person who read
+   the substance and could have rejected it; a scheduled run has nobody, and
+   clicking publish is not review. Never put prompt text or anything private
+   in it -- the record is published alongside the content.
+
 5. PERIODICALLY: Call aimeat_agent_telemetry_report with type="agent_report"
    and data describing your latest activity so the owner sees usage.
 

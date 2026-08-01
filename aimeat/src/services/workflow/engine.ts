@@ -416,7 +416,7 @@ export class WorkflowEngine {
           if (now < deadline) continue;
           const policy = action?.on_timeout ?? 'fail';
           if (policy === 'default' && action?.default_option) {
-            await applyHumanAnswer(this.storage, ownerGhii, r, step.id, {
+            await applyHumanAnswer(this.storage, this.config, ownerGhii, r, step.id, {
               picks: [action.default_option], pick: action.default_option, by: 'timeout-default',
             });
           } else if (policy === 'skip') {
@@ -759,7 +759,7 @@ export class WorkflowEngine {
       }
       const bad = validateHumanAnswer(rs.human.question, answer);
       if (bad) return { ok: false as const, code: 'BAD_ANSWER' as const, error: bad };
-      await applyHumanAnswer(this.storage, ownerGhii, run, stepId, {
+      await applyHumanAnswer(this.storage, this.config, ownerGhii, run, stepId, {
         picks: answer.picks, pick: answer.picks[0] ?? '', other: answer.other, by: answer.by,
       });
       await this.tick(ownerGhii, run);

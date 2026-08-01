@@ -13,6 +13,9 @@
  *   - scanOwnerDue(storage, config, ownerGaii) — pulse the owner's own due instances (manual trigger)
  *   - pulseInstanceServer(storage, config, ownerGaii, loc, cfg) — one instance, self-fulfilled
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4: a derived section carries the provenance record the
+ *     completion already minted. A living document derives itself on a cadence with nobody present,
+ *     which is exactly the case where the origin has to be recorded rather than remembered.
  *   v1.0.0 — 2026-06-21 — Phase 3: unattended self-fulfilled pulse + cadence/guards.
  */
 import { randomUUID } from 'node:crypto';
@@ -53,11 +56,18 @@ const srcKey = (l: Loc, id: string) => `${wsRoot(l)}.living-src.${l.docId}__${id
 const ledgerKey = (l: Loc) => `${wsRoot(l)}.living-ledger.${l.docId}__${Date.now()}-${Math.random().toString(36).slice(2, 6)}.latest`;
 const configKey = (l: Loc) => `${wsRoot(l)}.living.${l.docId}.latest`;
 
-async function upsert(storage: Storage, ownerGaii: string, key: string, value: unknown): Promise<void> {
+async function upsert(
+  storage: Storage, ownerGaii: string, key: string, value: unknown, aiProvenanceId?: string,
+): Promise<void> {
   const now = new Date().toISOString();
   const existing = await storage.getMemory(ownerGaii, key);
   await storage.setMemory({
     key, ownerGaii, value, visibility: 'private', tags: [],
+    // TARGET-058. Attached, never inherited from `existing`: a re-derivation is new bytes, so
+    // carrying the previous record forward would leave a statement standing about content it was
+    // never about. Passed only for the DERIVED section text — the ledger and status rows below are
+    // bookkeeping and make no claim about authorship.
+    ...(aiProvenanceId ? { aiProvenanceId } : {}),
     ttlHours: null, version: existing ? existing.version + 1 : 1,
     createdAt: existing?.createdAt ?? now, updatedAt: now,
   });
@@ -255,7 +265,11 @@ export async function pulseInstanceServer(
       costUsd += r.usage.costUsd || 0;
       const md = (r.content || '').trim();
       const der = { slot, markdown: md, derivedFrom: active.map(s => s.id), producedAt: new Date().toISOString(), producedBy: 'pulse', pending: gated };
-      await upsert(storage, ownerGaii, gated ? pendingKey(loc, slot) : slotKey(loc, slot), der);
+      // The completion above already minted an observed record (the node watched the model
+      // produce these bytes), so it is CARRIED rather than re-derived. `gated` parks the text for
+      // a human to approve — and approving is not yet reading the substance, so the record keeps
+      // humanInvolvement 'none' until somebody actually reviews it.
+      await upsert(storage, ownerGaii, gated ? pendingKey(loc, slot) : slotKey(loc, slot), der, r.provenance?.id);
       if (!gated) await appendHistory(storage, ownerGaii, loc, slot, { markdown: md, producedAt: der.producedAt, producedBy: 'pulse', derivedFrom: der.derivedFrom });
       await addLedger(storage, ownerGaii, loc, { event: gated ? 'pending' : 'slot-derived', slot, sources: active.length });
       rendered.push(`## ${sec.section}\n\n${md}`);

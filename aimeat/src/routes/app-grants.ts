@@ -91,6 +91,11 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'workflow:read': 'See your automations (workflows) and their runs',
   'workflow:write': 'Create, save, and run your automations (workflows)',
   'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
+  // TARGET-058. Recording what the node OBSERVED needs no permission — that happens whether anyone
+  // asks or not. Asserting how content was made is different: a declaration can say a person wrote
+  // or reviewed something, which is exactly the statement that decides whether a visible AI label is
+  // owed. So the assertion is the thing an owner grants, and staying silent is always free.
+  'provenance:write': 'State how content it creates was made (whether AI wrote it, and whether a person reviewed it)',
   // Spending is its own permission. Reading your memory and buying on your behalf are not the same
   // favour, and until this existed the narrowest grant there is was enough to draw on any contract
   // its owner held — the app presented the owner's own GHII, so the money layer could not tell them

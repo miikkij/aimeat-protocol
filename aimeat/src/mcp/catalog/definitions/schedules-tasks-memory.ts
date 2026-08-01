@@ -8,6 +8,7 @@
 
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
+import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
 export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     {
@@ -190,10 +191,11 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_task_complete',
-        description: 'Mark one of your ACTIVE tasks as done, with an optional completion message. Sets status to done, stamps completedAt, and appends a completed event. Only active tasks can be completed; if the work could not be done, use aimeat_task_fail instead.',
+        description: 'Mark one of your ACTIVE tasks as done, with an optional completion message. Sets status to done, stamps completedAt, and appends a completed event. Only active tasks can be completed; if the work could not be done, use aimeat_task_fail instead.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            ...aiProvenanceCatalogInput,
             task_id: { type: 'string', required: true, description: 'Task identifier.' },
             message: { type: 'string', description: 'Completion message.' },
         },
@@ -219,10 +221,11 @@ export const schedulesTasksMemoryTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_memory_write',
-        description: 'Write (create or update) a memory entry for the calling agent. The value can be any JSON: string, number, boolean, object, or array. Visibility controls who can read it: private = only this agent, owner = all of the owner\'s agents, group = members of a sharing group (requires group_id), public = anyone. Re-writing the same key bumps its version. Use tags to group entries for later filtering with aimeat_memory_list. TIP: workspace documents can embed a key LIVE (an ```aimeat-memory fenced block naming the key shows its current value on every open) — store table-like data as an array of objects with consistent field names and re-write the SAME key to update every document embedding it.',
+        description: 'Write (create or update) a memory entry for the calling agent. The value can be any JSON: string, number, boolean, object, or array. Visibility controls who can read it: private = only this agent, owner = all of the owner\'s agents, group = members of a sharing group (requires group_id), public = anyone. Re-writing the same key bumps its version. Use tags to group entries for later filtering with aimeat_memory_list. TIP: workspace documents can embed a key LIVE (an ```aimeat-memory fenced block naming the key shows its current value on every open) — store table-like data as an array of objects with consistent field names and re-write the SAME key to update every document embedding it.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            ...aiProvenanceCatalogInput,
             key: { type: 'string', required: true, description: 'Memory entry key (hierarchical, slash-separated, e.g. "project/acme/notes").' },
             value: { type: 'unknown', required: true, description: 'Value to store — any JSON type.' },
             visibility: { type: 'string', enum: ['private', 'owner', 'group', 'members', 'public'], description: 'Who can read it (members = any logged-in user of this node). Default: private.' },

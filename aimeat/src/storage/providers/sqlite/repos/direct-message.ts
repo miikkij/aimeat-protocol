@@ -39,6 +39,7 @@ function deserializeMessage(row: Record<string, unknown>): DirectMessageRecord {
   if (row.respondable != null) record.respondable = (row.respondable as number) === 1;
   if (row.replyToId) record.replyToId = row.replyToId as string;
   if (row.error) record.error = row.error as string;
+  if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
   if (row.deliveredAt) record.deliveredAt = row.deliveredAt as string;
   if (row.readAt) record.readAt = row.readAt as string;
   return record;
@@ -64,8 +65,8 @@ export function createDirectMessage(db: Database.Database, record: DirectMessage
     `INSERT INTO direct_messages
      (id, ownerGhii, conversationId, subject, senderGhii, recipientGhii, body, attachments, interactive,
       broadcastId, respondable, status,
-      direction, replyToId, origin, originNodeId, error, createdAt, deliveredAt, readAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      direction, replyToId, origin, originNodeId, error, aiProvenanceId, createdAt, deliveredAt, readAt)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.ownerGhii,
@@ -84,6 +85,7 @@ export function createDirectMessage(db: Database.Database, record: DirectMessage
     record.origin,
     record.originNodeId,
     record.error ?? null,
+    record.aiProvenanceId ?? null,
     record.createdAt,
     record.deliveredAt ?? null,
     record.readAt ?? null,

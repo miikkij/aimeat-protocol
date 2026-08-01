@@ -15,6 +15,15 @@
  *   - _access (request/list/decide) + _member_grant / _member_revoke / _members (creator-managed roles)
  * @usage import { registerWorkspaceTools } from './workspaces.js';
  * @version-history
+ *   v1.18.0 -- 2026-08-01 -- TARGET-058 Phase 4. aimeat_workspace_write accepts an `ai_provenance`
+ *     declaration and stamps EVERY item through provenanceForWrite() (a batch of twenty records is
+ *     twenty sets of bytes); aimeat_workspace_read returns the record on the batch-open branch; and
+ *     aimeat_workspace_publish carries the draft's record onto `.version.N` + `.latest`. Two real
+ *     losses closed: this tool wrote straight to storage, so agent-written workspace records carried
+ *     no provenance at all, and publishing then produced a `.latest` — the copy the read serves and
+ *     the label renders from — with none either. Two tools moved out by pure extraction to stay under
+ *     max-file-lines: aimeat_workspace_access joins workspace-members.ts (it is the request half of
+ *     the same membership concern) and aimeat_workspace_transfer gets workspace-transfer.ts.
  *   v1.15.0 -- 2026-07-11 -- TARGET-028: aimeat_workspace_member_grant/_revoke/_members (proactively add
  *     an existing GHII/GAII member to one or MANY workspaces as viewer|contributor, with revoke/downgrade
  *     and a members listing that shows role + grant source); _access decide gains an explicit `role`.
@@ -99,19 +108,20 @@ import { descriptionFor } from './catalog/shape.js';
 import { validateMemoryWrite } from '../services/schema-validator.js';
 import { checkDeleteGuard } from '../services/write-guards.js';
 import { authorizeRead } from '../services/access-guard.js';
-import { exportWorkspace } from '../services/workspace-export.js';
 import { buildOrganismOverview, buildWorkspaceOverview, entryTitle } from '../services/structure-overview.js';
-import { importWorkspace } from '../services/workspace-import.js';
-import { ZipSecurityError } from '../services/safe-zip.js';
 import { updateWorkspaceMeta, WorkspaceMetaError, normalizeObjectTypes, isMemoryBackedSpace, listOrganismWorkspaceEntries, backfillManifestEnvelope } from '../services/workspace-meta.js';
-import { recordSecurityIncident } from '../services/security-incident.js';
 import { emitChange, emitMemoryWritten } from '../services/event-bus.js';
 import { updateOrganismStructure } from '../services/structure-snapshot.js';
 import { normalizeDocValueImages } from '../services/doc-images.js';
 import { normalizeWriteItems, resolveWriteItem, MAX_BATCH_ITEMS, type ResolvedWriteItem } from '../services/workspace-write-items.js';
-import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, listWorkspaceMemberRoles, type WsRole } from '../services/workspace-roles.js';
+import { grantWorkspaceRole, revokeWorkspaceRole as revokeWsRoleSvc, type WsRole } from '../services/workspace-roles.js';
 import { listVersionRefs, maxVersionOf, pruneVersionsAfterPublish } from '../services/workspace-versions.js';
 import { registerWorkspaceMemberTools } from './workspace-members.js';
+import { registerWorkspaceTransferTool } from './workspace-transfer.js';
+import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
+import { memoryContentBytes } from '../routes/memory/shared.js';
 import { logger } from '../utils/logger.js';
 
 type ObjType = { name: string; namespace?: string; backing?: string; mode?: string; kind?: string; versioned?: boolean; create_only?: boolean; maxVersions?: number };
@@ -191,10 +201,18 @@ export function registerWorkspaceTools(
      *  on the immutable `.version.N` records (writerGaii) and the activity timeline, so collapsing the
      *  current-state owner onto the GHII costs no attribution. `owner` is overridable only for META that
      *  must stay under a specific identity. A legacy copy under a different identity is collapsed away. */
-    const writeRecord = async (key: string, value: unknown, prev: MemoryRecord | null, owner: string = ownerGhii): Promise<void> => {
+    const writeRecord = async (
+        key: string, value: unknown, prev: MemoryRecord | null, owner: string = ownerGhii,
+        aiProvenanceId?: string,
+    ): Promise<void> => {
         const now = new Date().toISOString();
         await storage.setMemory({
             key, ownerGaii: owner, value, visibility: prev?.visibility ?? 'private', tags: prev?.tags ?? [], ttlHours: null,
+            // TARGET-058. Attached, never inherited from `prev`: a new value is new content, so
+            // carrying the previous record's id forward would leave a statement standing about bytes
+            // it was never about. Passed only for CONTENT writes — the section index and the other
+            // meta writes below make no claim about authorship, so they carry no statement either.
+            ...(aiProvenanceId ? { aiProvenanceId } : {}),
             version: prev ? prev.version + 1 : 1, createdAt: prev?.createdAt ?? now, updatedAt: now,
         });
         if (prev && prev.ownerGaii !== owner) await collapseTo(key, owner);
@@ -342,6 +360,12 @@ export function registerWorkspaceTools(
                 const scoped = space ? [...spaces.values()].filter(s => s.ot.name === space || s.ot.namespace === space) : [...spaces.values()];
                 const found: unknown[] = [];
                 const missing: string[] = [];
+                // TARGET-058: the provenance for everything this call is about to return, in ONE
+                // query. Deliberately only on the batch-open branch — the index is titles, and an
+                // agent that needs to know how something was made is opening it anyway. Attaching a
+                // second, thinner shape of the same fact to every index row is how one document ends
+                // up with two spellings.
+                const provFor = await readProvenanceMany(storage, config, items.map(r => r.aiProvenanceId));
                 for (const id of new Set(ids.map(String))) {
                     let hit = false;
                     for (const s of scoped) {
@@ -352,6 +376,7 @@ export function registerWorkspaceTools(
                             space: s.ot.name, id, value: cur.value,
                             published: !!slot.latest, _version: cur.version, _createdAt: cur.createdAt, _updatedAt: cur.updatedAt,
                             ...(slot.draft ? { draft: slot.draft.value } : {}),
+                            ...provFor(cur.aiProvenanceId),
                         });
                         hit = true; break;
                     }
@@ -410,9 +435,10 @@ export function registerWorkspaceTools(
             id: z.string().optional().describe('Instance id. Required for a records space (or include id in value); auto-generated for a document.'),
             section: z.string().optional().describe('Document spaces only: section id/name to file the document under.'),
             items: z.any().optional().describe(`BATCH: an ARRAY of { value, space?, id?, section? } — up to ${MAX_BATCH_ITEMS} — written in ONE call. Each item inherits the top-level space/section unless it names its own. Use this for a migration: your client asks the human to approve every tool CALL, so twenty separate writes are twenty prompts and one missed prompt ends the job half-done. All-or-nothing: every item is checked first, and a single bad item writes nothing.`),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_workspace_write'),
-        async ({ organism_id, ws, space, value, id, section, items }): Promise<TextResult> => {
+        async ({ organism_id, ws, space, value, id, section, items, ai_provenance, ai_provenance_id }): Promise<TextResult> => {
             const deny = await denyReason(organism_id); if (deny) return fail(deny);
             if (!(await canWriteWs(organism_id, ws))) return fail('You are not approved to write to this workspace. Request access with aimeat_workspace_access(action:"request") and wait for the creator to approve.');
             const norm = normalizeWriteItems({ space, value, id, section, items });
@@ -439,8 +465,30 @@ export function registerWorkspaceTools(
                 planned.push({ key, v, item });
             }
             const written: Record<string, unknown>[] = [];
+            let lastProvenanceId: string | undefined;
             for (const { key, v, item } of planned) {
-                await writeRecord(key, v, await findByKey(key));   // content → authored by the calling agent
+                // TARGET-058. A workspace record is a memory record, but this tool writes straight to
+                // storage rather than through /v1/memory, so it inherited nothing: an agent's
+                // workspace write carried no provenance at all. It goes through the same one decision
+                // function every other write surface uses. Per ITEM, not per call — a batch of twenty
+                // records is twenty different sets of bytes, and one record covering all of them
+                // would be a statement about content it cannot identify.
+                const provenanceId = await provenanceForWrite(storage, {
+                    principal: agentGaii,
+                    content: memoryContentBytes(v),
+                    declaredId: ai_provenance_id,
+                    declared: toDeclaredProvenance(ai_provenance),
+                    pipeline: 'mcp.workspace_write',
+                    // A draft lands private; publishing is what makes it readable, and the publish
+                    // path re-derives the label from the record then.
+                    surface: { visibility: 'private', humanAudience: true },
+                    labelPolicy: config.aiLabelPublic,
+                    nodeId: config.nodeId,
+                    baseUrl: config.baseUrl,
+                    enabled: config.aiProvenance,
+                });
+                lastProvenanceId = provenanceId ?? lastProvenanceId;
+                await writeRecord(key, v, await findByKey(key), ownerGhii, provenanceId);   // content → authored by the calling agent
                 if (item.isDoc && item.section) {
                     const secKey = `${root}.meta.sections.${item.space}`;
                     const secRec = await findByKey(secKey);
@@ -451,7 +499,13 @@ export function registerWorkspaceTools(
                 written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null });
             }
             emitChange('organisms');
-            return ok(batch ? { count: written.length, items: written } : written[0]);
+            // The echo is the LAST item's record on a batch: every item was stamped, and repeating
+            // twenty near-identical documents in a tool result would cost the agent more context than
+            // the fact is worth. The per-record ids are on the records themselves.
+            const echo = await writeProvenanceEcho(storage, config, lastProvenanceId);
+            return ok(batch
+                ? { count: written.length, items: written, ...echo }
+                : { ...written[0], ...echo });
         });
 
     // ── aimeat_workspace_publish ──
@@ -497,6 +551,14 @@ export function registerWorkspaceTools(
             const publishOt = (await readManifest(organism_id, ws))?.objectTypes?.find(o => o.namespace === namespace);
             const versioned = publishOt?.versioned !== false;
             const n = maxN + 1;
+            // TARGET-058. Publishing MOVES the content, so the statement about how it was made moves
+            // with it. Without this the draft carried a record and `.latest` — the copy the workspace
+            // read serves and the visible label renders from — carried none, so publishing was where
+            // an agent-written record quietly became origin-unstated. Carried rather than re-minted:
+            // the record says how the content was MADE, and publishing does not change that. Same
+            // caveat as the REST path in routes/organisms/shared.ts — an image-URL rewrite above can
+            // leave the record's contentHash describing the draft bytes rather than the published ones.
+            const provenanceId = draft.aiProvenanceId ?? undefined;
             // Attribution: the immutable .version.N snapshot is authored by the PUBLISHER (writerGaii).
             // The .latest pointer (current state) is owned by a member's GHII — ONE owner per key, so it
             // never forks into per-agent duplicates that a read then has to disambiguate. Preserve the
@@ -504,11 +566,11 @@ export function registerWorkspaceTools(
             // record is owned by the caller's GHII. collapseTo removes any copy left under another identity.
             const latestOwner = existingLatest ? `${bareOwner(existingLatest.ownerGaii)}@${config.nodeId}` : ownerGhii;
             if (versioned) {
-                await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: writerGaii, value: draftValue, visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
+                await storage.setMemory({ key: `${base}.version.${n}`, ownerGaii: writerGaii, value: draftValue, ...(provenanceId ? { aiProvenanceId: provenanceId } : {}), visibility: draft.visibility, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now });
                 // Retention: prune history beyond the space's window (append-only spaces never pruned).
                 await pruneVersionsAfterPublish(storage, config, { refs: versionRefs, publishedN: n, ot: publishOt });
             }
-            await storage.setMemory({ key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue, visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
+            await storage.setMemory({ key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue, ...(provenanceId ? { aiProvenanceId: provenanceId } : {}), visibility: draft.visibility, tags, ttlHours: null, version: (existingLatest?.version ?? 0) + 1, createdAt: existingLatest?.createdAt ?? now, updatedAt: now });
             await collapseTo(`${base}.latest`, latestOwner);
             await storage.deleteMemory(draft.ownerGaii, `${base}.draft`);
             emitChange('organisms');
@@ -680,103 +742,14 @@ export function registerWorkspaceTools(
             return ok({ created: true, ws: wsId, types: man.objectTypes.map(o => o.name), schemas_locked: Object.keys(schemaMap) });
         });
 
-    // ── aimeat_workspace_request_access ──
-    mcp.tool('aimeat_workspace_access', descriptionFor('aimeat_workspace_access'),
-        {
-            organism_id: z.string(), ws: z.string(),
-            action: z.enum(['request', 'list', 'decide']).describe("'request' = ask the creator for access · 'list' = (creator/admin) see pending requests + members · 'decide' = (creator/admin) approve/deny one"),
-            message: z.string().optional().describe("action='request': a note to the creator"),
-            requester: z.string().optional().describe("action='decide': the requester's owner name"),
-            decision: z.string().optional().describe("action='decide': 'approve' (default) or 'deny'"),
-            role: z.enum(['viewer', 'contributor']).optional().describe("action='decide' approve: the role to grant — 'viewer' (read) or 'contributor' (read+write). Omit to keep the current default (contributor, unless decision='viewer')."),
-        },
-        annotationsFor('aimeat_workspace_access'),
-        async ({ organism_id, ws, action, message, requester, decision, role }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            const entry = await findWsEntry(organism_id, ws);
-            if (!entry) return fail('Workspace not found');
-            const isManager = async () => { const r = await roleOf(organism_id); return entry.createdBy === ownerName || r === 'creator' || r === 'admin'; };
+    // ── aimeat_workspace_access + the member-role tools (member_grant, member_revoke, members) ──
+    // Extracted to workspace-members.ts — access is the REQUEST half of the same membership
+    // concern the grant tools serve. Registered here to preserve tool order.
 
-            if (action === 'request') {
-                if (entry.createdBy === ownerName) return fail('You created this workspace.');
-                await writeRecord(`organism.${organism_id}.w.${ws}.access.request.${ownerName}`, { ws, requester: ownerName, requester_gaii: ownerGhii, message: message ?? '', status: 'pending', createdAt: new Date().toISOString() }, null, ownerGhii);
-                await ensureConsent(ownerGhii, `organism.${organism_id}.w.${ws}.**`, `organism.${organism_id}`, 'workspace-contribution');
-                emitChange('organisms');
-                return ok({ status: 'requested', ws, workspace_creator: entry.createdBy });
-            }
-            if (action === 'list') {
-                if (!(await isManager())) return fail('Only the workspace creator or an org admin can see access requests.');
-                const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
-                const roles = await listWorkspaceMemberRoles(storage, config, { creatorGhii, orgId: organism_id, ws });
-                const { items } = await storage.listAllMemory({ prefix: `organism.${organism_id}.w.${ws}.access.request.`, limit: 1000 });
-                const requests = items.map(r => {
-                    const v = r.value as { requester?: string; message?: string; createdAt?: string };
-                    const req = v.requester ?? bareOwner(r.ownerGaii);
-                    return { requester: req, message: v.message ?? '', created_at: v.createdAt, status: roles.has(req) ? 'approved' : 'pending', role: roles.get(req)?.role ?? null };
-                });
-                const members = [...roles.values()].map(m => ({ owner: m.owner, role: m.role, source: m.source ?? null, granted_by: m.grantedBy ?? null }));
-                return ok({ ws, requests, members });
-            }
-            if (action === 'decide') {
-                if (!requester) return fail("action='decide' needs a requester.");
-                if (!(await isManager())) return fail('Only the workspace creator or an org admin can decide access.');
-                // Grants are owned by the workspace CREATOR (so reads resolve via the content owner).
-                const creatorGhii = `${entry.createdBy}@${config.nodeId}`;
-                if (decision === 'deny') {
-                    await revokeWsRole(creatorGhii, organism_id, ws, requester);
-                    emitChange('organisms');
-                    return ok({ status: 'denied', ws, requester });
-                }
-                // Explicit `role` wins; else preserve the historical default (contributor unless decision='viewer').
-                const granted: WsRole = role ?? (decision === 'viewer' ? 'viewer' : 'contributor');
-                await setWsRole(creatorGhii, organism_id, ws, requester, granted, 'request', ownerName);
-                emitChange('organisms');
-                return ok({ status: 'approved', ws, requester, role: granted });
-            }
-            return fail("action must be 'request', 'list' or 'decide'.");
-        });
+    registerWorkspaceMemberTools(mcp, storage, config, { ownerName, ownerGhii, ok, fail, denyReason,
+        wsManager, setWsRole, revokeWsRole, findWsEntry, roleOf, writeRecord, ensureConsent, bareOwner });
 
-    // ── Workspace member-role tools (member_grant, member_revoke, members) ──
-    // Extracted to workspace-members.ts; registered here to preserve tool order.
-    registerWorkspaceMemberTools(mcp, storage, config, { ownerName, ok, fail, denyReason, wsManager, setWsRole, revokeWsRole });
-
-    // ── aimeat_workspace_export ──
-    mcp.tool('aimeat_workspace_transfer', descriptionFor('aimeat_workspace_transfer'),
-        {
-            organism_id: z.string(),
-            direction: z.enum(['export', 'import']).describe("'export' a workspace to a base64 ZIP, or 'import' a base64 ZIP as a NEW workspace"),
-            ws: z.string().optional().describe("direction='export': the workspace id to export"),
-            zip_base64: z.string().optional().describe("direction='import': the base64 ZIP from a prior export"),
-        },
-        annotationsFor('aimeat_workspace_transfer'),
-        async ({ organism_id, direction, ws, zip_base64 }): Promise<TextResult> => {
-            const deny = await denyReason(organism_id); if (deny) return fail(deny);
-            if (direction === 'export') {
-                if (!ws) return fail("direction='export' needs a ws.");
-                const entry = await findWsEntry(organism_id, ws);
-                if (!entry) return fail('Workspace not found');
-                const role = await roleOf(organism_id);
-                if (entry.createdBy !== ownerName && role !== 'creator' && role !== 'admin') return fail('Only the workspace creator or an org admin can export.');
-                const { buffer, filename } = await exportWorkspace(storage, config, { orgId: organism_id, ws, exporterGaii: ownerGhii, exportedAt: new Date().toISOString() });
-                if (buffer.length > 1_500_000) return fail(`Workspace too large for inline export (${buffer.length} bytes) — download it from the UI/REST instead.`);
-                return ok({ filename, size_bytes: buffer.length, zip_base64: buffer.toString('base64') });
-            }
-            if (direction === 'import') {
-                if (!zip_base64) return fail("direction='import' needs zip_base64.");
-                const buf = Buffer.from(zip_base64, 'base64');
-                if (!buf.length) return fail('zip_base64 is empty or invalid.');
-                try {
-                    const result = await importWorkspace(storage, config, { orgId: organism_id, importerGaii: ownerGhii, importerOwner: ownerName, zip: buf });
-                    emitChange('organisms');
-                    return ok(result);
-                } catch (e) {
-                    if (e instanceof ZipSecurityError) {
-                        const inc = await recordSecurityIncident(storage, config, { type: 'zip_import', code: e.code, actorGhii: ownerGhii, actorName: ownerName, detail: e.message, source: 'workspace_transfer_mcp', blob: buf });
-                        return fail(`Upload rejected by safety checks (${e.code}) and quarantined for review (incident ${inc.id}).`);
-                    }
-                    return fail((e as Error).message || 'Import failed');
-                }
-            }
-            return fail("direction must be 'export' or 'import'.");
-        });
+    // ── aimeat_workspace_transfer ── (workspace export/import as a base64 ZIP)
+    // Extracted to workspace-transfer.ts; registered here to preserve tool order.
+    registerWorkspaceTransferTool(mcp, storage, config, { ownerName, ownerGhii, ok, fail, denyReason, findWsEntry, roleOf });
 }

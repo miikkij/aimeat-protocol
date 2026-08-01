@@ -3195,6 +3195,15 @@ components:
           enum: [local, federation]
         originNodeId: { type: string }
         error: { type: string }
+        aiProvenanceId:
+          type: string
+          description: >-
+            The `aimeat.provenance/v1` record describing this message's BODY — how much of it a model
+            wrote, and whether a person read the substance before it was sent. Resolve it at
+            GET /v1/provenance/{id}. Both mailbox copies carry the same id: the statement is about
+            the bytes, not about whose row it is. ABSENT MEANS UNSTATED, never "a human wrote it" —
+            a message that arrived over federation from a peer that strips provenance is unstated,
+            because the id is node-local and does not cross the boundary.
         createdAt: { type: string, format: date-time }
         deliveredAt: { type: string, format: date-time }
         readAt: { type: string, format: date-time }
@@ -3618,6 +3627,17 @@ components:
                 multiSelect: { type: boolean }
                 allowOther: { type: boolean }
             answer_to_key: { type: string, description: 'human-input: memory key template the answer JSON is written to.' }
+            reviews_key:
+              type: string
+              description: >-
+                human-input: the memory key whose CONTENT this question puts in front of the person.
+                It is the only field in the workflow engine that can upgrade a provenance record's
+                humanInvolvement to `editorial-control`, because it is the only place where a named
+                person reads the substance and can reject it. On an answer the reviewed content is
+                re-stamped with that person recorded as the reviewer. A step that merely asks
+                "publish now?" must NOT set it — clicking publish is not review, and a false
+                editorial-control claim is worse than none. A watchdog timeout default
+                (by "timeout-default") never upgrades anything: nobody read it on that path.
             on_timeout: { type: string, enum: [fail, skip, default], description: 'human-input timeout policy (default fail).' }
             default_option: { type: string, description: 'human-input: required when on_timeout=default; must be one of question.options[].id.' }
     WorkflowTrigger:
@@ -5192,6 +5212,14 @@ paths:
         name outside this vocabulary fails the whole authorize with INVALID_SCOPE. Note: file
         deletion is covered by `storage:write` (there is no `storage:delete` scope) and
         `memory:delete` is NOT in the default set.
+
+        `provenance:write` is unusual and worth reading twice: it does NOT gate a route family. It
+        gates the act of ASSERTING how content was made — the optional `ai_provenance` block on the
+        write tools, and POST /v1/provenance. Recording what the node OBSERVED needs no permission
+        at all and happens whether anyone asks or not; what an owner grants here is the ability to
+        state that a person wrote or reviewed something, which is exactly the claim that decides
+        whether a visible AI label is owed. An app without it can still write; its writes are simply
+        recorded as the node saw them.
       tags:
         - App Grants
       responses:
@@ -13239,7 +13267,11 @@ paths:
         tools the morsel/micro-unit money price with a ready-made checkout line item. The page
         itself registers the same tools in-browser via /v1/libs/aimeat-webmcp.js (TARGET-034 phase C).
         Also carries `app_surface`: the app's public agent-facing description — declared scopes,
-        SKILL.md packs bound to the app, bundled crew-defs, and live EXCHANGE listings for its tools.
+        SKILL.md packs bound to the app, bundled crew-defs, live EXCHANGE listings for its tools, and
+        `ai_transparency` (whether the app's own bytes carry a provenance record and where it
+        resolves, whether the app declared a scope that lets it generate content, and the node's
+        one-sentence convention). Every member of that block is a fact the NODE holds rather than a
+        claim the app makes about itself.
         A published app with no public tool manifest answers 200 with an empty `tools` array (and a
         manifest for an app this node does not host still lists its tools, without `app_surface`).
         404 means neither exists, or the app is access-code gated, priced, or operator-hidden. A
@@ -15912,6 +15944,14 @@ paths:
       description: |
         Returns the app's HTML. Default (no `mode`) responds with `Content-Disposition: attachment`
         (programmatic download — never executed as a page). `mode=inline` returns runnable HTML.
+
+        **Encoding:** the response carries `Content-Type: text/html; charset=utf-8`. Until 2026-08-01
+        the charset parameter was absent, so browsers fell back to the locale default (windows-1252
+        in western Europe) and any non-ASCII byte in the document — the author's own, or a string the
+        node injects — rendered as mojibake. Published app bytes are UTF-8 by construction (they
+        arrive as JavaScript strings through a JSON API), so declaring it states a fact. An HTTP
+        charset overrides a document's own `<meta charset>`, so all 110 published apps were scanned
+        for double-encoded text before the header was added; none was found.
 
         **H-2 app origin:** when the app origin is provisioned (`AIMEAT_APP_ORIGIN_ENABLED`), an
         `mode=inline` request arriving on the **apex** origin is **301-redirected** to the isolated

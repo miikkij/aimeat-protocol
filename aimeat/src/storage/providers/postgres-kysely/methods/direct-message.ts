@@ -48,6 +48,7 @@ function toDirectMessageRecord(r: Selectable<DirectMessage>): DirectMessageRecor
   if (r.respondable != null) record.respondable = r.respondable;
   if (r.replyToId) record.replyToId = r.replyToId;
   if (r.error) record.error = r.error;
+  if (r.aiProvenanceId) record.aiProvenanceId = r.aiProvenanceId;
   if (r.deliveredAt) record.deliveredAt = iso(r.deliveredAt);
   if (r.readAt) record.readAt = iso(r.readAt);
   return record;
@@ -84,7 +85,8 @@ export const directMessageMethods = {
       subject: record.subject ?? null, senderGhii: record.senderGhii, recipientGhii: record.recipientGhii, body: record.body,
       attachments: jsonb(record.attachments ?? null), interactive: jsonb(record.interactive ?? null), broadcastId: record.broadcastId ?? null,
       respondable: record.respondable ?? null, status: record.status, direction: record.direction, replyToId: record.replyToId ?? null,
-      origin: record.origin, originNodeId: record.originNodeId, error: record.error ?? null, createdAt: new Date(record.createdAt),
+      origin: record.origin, originNodeId: record.originNodeId, error: record.error ?? null,
+      aiProvenanceId: record.aiProvenanceId ?? null, createdAt: new Date(record.createdAt),
       deliveredAt: record.deliveredAt ? new Date(record.deliveredAt) : null, readAt: record.readAt ? new Date(record.readAt) : null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();

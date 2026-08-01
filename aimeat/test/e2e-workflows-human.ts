@@ -9,6 +9,9 @@
  *   unit-covered (test/unit/workflow-human-input.test.ts — the 60s sweep isn't black-box-able). Run:
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=workflows-human
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4: the gate step declares `reviews_key`, and a new test
+ *     proves that answering it stamps the REVIEWED content with humanInvolvement
+ *     'editorial-control' naming the reviewer — the only upgrade path the engine has.
  *   v1.0.0 — 2026-07-16 — Initial human-input coverage (happy + decline + sandbox + validation).
  */
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -82,6 +85,10 @@ const HUMAN_STEP = {
       options: [{ id: 'approve', label: 'Approve' }, { id: 'reject', label: 'Reject' }],
     },
     answer_to_key: 'gate.decision',
+    // TARGET-058: the question puts plan.draft in front of the person, so answering it IS a step
+    // where the substance is read and can be rejected — the one thing that upgrades a provenance
+    // record's humanInvolvement to 'editorial-control'.
+    reviews_key: 'plan.draft',
   },
 };
 
@@ -208,6 +215,30 @@ async function run() {
     await sleep(700);
     const { body: r2 } = await json(`/v1/workflows/gated/runs/${approveRunId}`, { headers: auth });
     assert(r2.data.status === 'done', `run done, got ${r2.data.status}`);
+  });
+
+  // ── TARGET-058: the ONE step that may upgrade humanInvolvement, proven end to end ──
+  await test('a human-input step naming reviews_key stamps the reviewed content editorial-control', async () => {
+    const mem = await json('/v1/memory/plan.draft', { headers: auth });
+    assert(mem.status === 200, `plan.draft read ${mem.status}`);
+    const provId = mem.body.data?.ai_provenance_id;
+    assert(!!provId, 'the reviewed content carries no provenance record after a substantive review');
+
+    const rec = mem.body.meta?.provenance?.record;
+    assert(!!rec, `no record served with the item: ${JSON.stringify(mem.body.meta)}`);
+    assert(rec.humanInvolvement === 'editorial-control',
+      `humanInvolvement ${rec.humanInvolvement} — a step that reviews substance must upgrade it`);
+    // Who read it, and where. A claim of editorial control that cannot name the reviewer is worth
+    // nothing, and that is what the notes carry.
+    assert(String(rec.notes ?? '').includes(ownerName), `notes name no reviewer: ${rec.notes}`);
+    assert(String(rec.notes ?? '').includes('gate'), `notes name no step: ${rec.notes}`);
+    assert(String(rec.generator?.pipeline ?? '').includes('gated'), `pipeline ${rec.generator?.pipeline}`);
+    // The node asserted this; it did not stand and watch a model produce the bytes.
+    assert(rec.attestation?.stampedBy === 'node' && rec.attestation?.observed === false,
+      'an inference must never be recorded as an observation');
+    // And with a person in editorial control, no Article 50(4) label is owed.
+    assert(rec.disclosure?.required === false,
+      `a reviewed item owes no label, got required=${rec.disclosure?.required}`);
   });
 
   await test('answering an already-resolved step is a 409', async () => {

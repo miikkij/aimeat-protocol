@@ -27,6 +27,9 @@
  * @structure
  *   - contentHashOf(bytes)            — `sha256:<hex>`, node:crypto, no dependency
  *   - mintProvenance(storage, …)      — build + validate + persist, returns the stored row
+ *   - provenanceForWrite(storage, …)  — THE decision a write surface makes: attach / declare / Mint-3
+ *   - stampAutonomousOutput(…)        — the stamp for output the node produced on its own initiative;
+ *                                       the "only substantive review upgrades it" rule lives here
  *   - stampAgentWrite(storage, …)     — MINT-3: the default for a non-human principal that declared
  *                                       nothing. An owner (GHII) is never stamped.
  *   - publiclyResolvable(storage, ids)— THE visibility rule: provenance follows the content
@@ -36,6 +39,12 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 4. provenanceForWrite() folds the three cases a write
+ *     surface faces — attach an existing record, honour a caller's DECLARATION, or fall back to
+ *     Mint-3 — into one function, so the MCP write tools and the REST routes cannot drift into
+ *     three subtly different answers. A declaration is minted `stampedBy: 'principal'`, and the
+ *     principal on the record is always the RESOLVED identity: a caller cannot attribute its
+ *     writing to someone else.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3. `labelPolicy` (AIMEAT_AI_LABEL_PUBLIC) rides beside
  *     `nodeId` into the pre-rendered disclosure block, which now also carries `strength`.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. stampAgentWrite() (Mint-3) and publiclyResolvable();
@@ -285,6 +294,236 @@ export async function stampAgentWrite(
   });
   return row.id;
 }
+
+/**
+ * What a CALLER may state about content it is writing — the declaration an agent sends alongside a
+ * write, before the node turns it into a record.
+ *
+ * It is deliberately NOT the `aimeat.provenance/v1` document. It carries no `spec`, no
+ * `generatedAt`, no attestation, and it flattens `model` out of `generator`, because everything it
+ * omits is something the node knows better than the caller does. That is also why this type is
+ * spelled camelCase while the MCP parameter that carries it is snake_case: a declaration is an input
+ * DTO and follows the house convention (snake on the wire, mapped at the boundary), whereas the
+ * document it becomes is self-describing and keeps one spelling everywhere.
+ */
+export interface DeclaredProvenance {
+  /** REQUIRED when a caller declares anything at all. The rest is optional detail. */
+  level: AiProvenanceLevel;
+  method?: AiProvenanceMethod;
+  /**
+   * Absent means `none`, never "somebody probably looked". Only a step where a person reads the
+   * substance and can reject it upgrades this field, and a caller that does not mention review did
+   * not describe such a step.
+   */
+  humanInvolvement?: AiHumanInvolvement;
+  model?: string;
+  sources?: AiProvenanceSource[];
+  notes?: string;
+}
+
+/**
+ * THE decision every write surface makes about provenance, in one function: given who is writing,
+ * what they wrote, and whatever they said about it, what record (if any) should the item carry?
+ *
+ * Three cases, in this order, and the order matters:
+ *   1. `declaredId` — the caller is attaching a record that already exists. This is the publish path:
+ *      `/v1/ai/complete` hands back a private record and attaching it here is what makes it
+ *      resolvable. Resolved against the caller's OWN account, so nobody publishes someone else's
+ *      statement.
+ *   2. `declared` — the caller is stating how the content was made. Minted `stampedBy: 'principal'`,
+ *      because the generation happened in the caller's runtime and this node watched none of it; the
+ *      minter then forces `observed: false` for any principal stamp, so the distinction between what
+ *      we saw and what we were told cannot be blurred by anything a caller sends.
+ *   3. neither — MINT-3. A non-human principal that said nothing is stamped model-written; an owner
+ *      is left alone.
+ *
+ * IDENTITY IS NEVER THE CALLER'S TO STATE. `principal` here is the RESOLVED identity of whoever
+ * holds the token, and it overwrites anything a declaration tried to say about who generated the
+ * content. This is the one place an agent could otherwise attribute its writing to someone else.
+ */
+/** Thrown when a caller declares provenance without holding `provenance:write`. */
+export class ProvenanceScopeError extends Error {
+  readonly code = 'SCOPE_DENIED';
+  constructor(readonly heldScopes: string[]) {
+    super(
+      `Scope "${PROVENANCE_WRITE_SCOPE}" required to declare ai_provenance. Held: `
+      + `[${heldScopes.join(', ')}]. Omit the block to let the node record what it observed instead.`);
+    this.name = 'ProvenanceScopeError';
+  }
+}
+
+/** The scope that permits ASSERTING how content was made. Gates POST /v1/provenance and every
+ *  declaration arriving over MCP — one name, so the two doors cannot answer differently. */
+export const PROVENANCE_WRITE_SCOPE = 'provenance:write';
+
+/**
+ * Does this principal hold `provenance:write`?
+ *
+ * Mirrors requireScope() exactly, including the two rules that matter: a global `*` passes, a domain
+ * wildcard passes, and an OWNER bypasses scopes entirely while an agent or ecosystem app never does.
+ * The lookup only happens when a declaration is actually present, so the common path — the agent that
+ * says nothing and gets Mint-3 — costs no query.
+ *
+ * Why the gate exists at all: minting the node's own observation is not a privilege, but ASSERTING
+ * how content was made is. `POST /v1/provenance` has required this scope since Phase 1, and an MCP
+ * declaration performs the identical act; leaving it ungated here would make MCP a way around the
+ * REST gate — the same class of hole the memory schema-lock bypass was.
+ */
+async function mayDeclareProvenance(storage: Storage, principal: string): Promise<{ ok: true } | { ok: false; scopes: string[] }> {
+  // An owner writing through their own token is a person acting for themselves — the owner bypass.
+  if (!isGEAI(principal) && parseGAII(principal) === null) return { ok: true };
+  const scopes = isGEAI(principal)
+    ? (await storage.getEcosystemApp(principal))?.scopes ?? []
+    : (await storage.getAgent(principal))?.defaultScopes ?? [];
+  if (scopes.includes('*') || scopes.includes(PROVENANCE_WRITE_SCOPE)) return { ok: true };
+  const domain = PROVENANCE_WRITE_SCOPE.split(':')[0];
+  if (scopes.includes(`${domain}:*`)) return { ok: true };
+  return { ok: false, scopes };
+}
+
+export async function provenanceForWrite(
+  storage: Storage,
+  input: {
+    /** The resolved identity of the writer — GHII, GAII or GEAI. Never `req.auth!.sub`. */
+    principal: string;
+    /** The exact bytes written, hashed so a detection query can find them later. */
+    content: string | Uint8Array;
+    /** A record id the caller asked to attach. Checked against the caller's own account. */
+    declaredId?: string;
+    /** What the caller said about how the content was made. */
+    declared?: DeclaredProvenance;
+    /** The job, crew, app or route that orchestrated the write. */
+    pipeline?: string;
+    surface?: SurfaceContext;
+    labelPolicy?: DisclosureLabelPolicy;
+    nodeId: string;
+    baseUrl?: string;
+    /** `false` disables minting entirely (AIMEAT_AI_PROVENANCE=off). */
+    enabled?: boolean;
+  },
+): Promise<string | undefined> {
+  if (input.enabled === false) return undefined;
+
+  const attached = await resolveAttachableProvenanceId(
+    storage, ownerGhiiOf(input.principal), input.declaredId);
+  if (attached) return attached;
+
+  if (input.declared) {
+    // Refused, not silently downgraded to Mint-3: a caller that thinks it declared something and
+    // finds the opposite recorded has been lied to by its own tool call.
+    const may = await mayDeclareProvenance(storage, input.principal);
+    if (!may.ok) throw new ProvenanceScopeError(may.scopes);
+    const row = await mintProvenance(storage, {
+      stampedBy: 'principal',
+      ownerGhii: ownerGhiiOf(input.principal),
+      // The declaration's own idea of who generated this is discarded here, by construction: the
+      // input type has no principal field and this is the only value that reaches the record.
+      principal: input.principal,
+      level: input.declared.level,
+      humanInvolvement: input.declared.humanInvolvement ?? 'none',
+      method: input.declared.method,
+      content: input.content,
+      generator: {
+        ...(input.declared.model ? { model: input.declared.model } : {}),
+        ...(input.pipeline ? { pipeline: input.pipeline } : {}),
+      },
+      sources: input.declared.sources,
+      notes: input.declared.notes ?? DECLARED_BY_PRINCIPAL_NOTE,
+      surface: input.surface,
+      labelPolicy: input.labelPolicy,
+      nodeId: input.nodeId,
+      baseUrl: input.baseUrl,
+    });
+    return row.id;
+  }
+
+  return stampAgentWrite(storage, {
+    principal: input.principal,
+    content: input.content,
+    pipeline: input.pipeline,
+    surface: input.surface,
+    labelPolicy: input.labelPolicy,
+    nodeId: input.nodeId,
+    baseUrl: input.baseUrl,
+    enabled: input.enabled,
+  });
+}
+
+/**
+ * THE stamp for content this node produced ON ITS OWN INITIATIVE — a scheduled job, an automation,
+ * a playbook step, a tracked response that fired while nobody was looking.
+ *
+ * ONLY A STEP WHERE A PERSON READS THE SUBSTANCE AND CAN REJECT IT UPGRADES humanInvolvement.
+ * Clicking publish is not that step. A workflow human-input step that reviews substance MAY upgrade
+ * it. Nothing else may.
+ *
+ * Those are the words, and they are here rather than repeated at each call site because this is the
+ * sentence that drifts. Every autonomous path calls this and passes `reviewedBy` only when it can
+ * name the person and the step at which they read the SUBSTANCE — an approval queue, a "send" button
+ * on a pre-written draft, a scheduled fire, an owner who once configured the automation: none of
+ * those qualify, and none of them may pass it.
+ *
+ * `stampedBy: 'node'` with `observed: false`: the node is the one asserting this, and it composed
+ * the output — but it did not stand and watch a model generate the bytes, so recording an inference
+ * as an observation would be the one lie in the design. Where the node DID watch (a completion
+ * through ai-completion.ts), carry that record instead of calling this.
+ */
+export async function stampAutonomousOutput(
+  storage: Storage,
+  input: {
+    /** Whose account this belongs to and who it ran for — usually the owner's GHII. */
+    principal: string;
+    /** The exact bytes produced. */
+    content: string | Uint8Array;
+    /** What the output is, in provenance terms. Defaults to `ai-generated`. */
+    level?: AiProvenanceLevel;
+    method?: AiProvenanceMethod;
+    /** The job, crew, automation or route that produced it. */
+    pipeline: string;
+    /**
+     * The person who read the SUBSTANCE and could have rejected it, and where. Pass this ONLY for a
+     * step that meets that test; it is the single thing that upgrades humanInvolvement to
+     * `editorial-control`. Omitted means `none`, which is the correct answer for every path where
+     * the output goes out unread.
+     */
+    reviewedBy?: { who: string; step: string };
+    surface?: SurfaceContext;
+    labelPolicy?: DisclosureLabelPolicy;
+    nodeId: string;
+    baseUrl?: string;
+    /** `false` disables minting entirely (AIMEAT_AI_PROVENANCE=off). */
+    enabled?: boolean;
+  },
+): Promise<string | undefined> {
+  if (input.enabled === false) return undefined;
+  const reviewed = input.reviewedBy;
+  const row = await mintProvenance(storage, {
+    stampedBy: 'node',
+    observed: false,
+    ownerGhii: ownerGhiiOf(input.principal),
+    principal: input.principal,
+    level: input.level ?? 'ai-generated',
+    humanInvolvement: reviewed ? 'editorial-control' : 'none',
+    method: input.method,
+    content: input.content,
+    generator: { pipeline: input.pipeline },
+    notes: reviewed
+      ? `Produced by an automated step (${input.pipeline}) and reviewed by ${reviewed.who} at "${reviewed.step}", `
+        + 'a step where the substance is read and can be rejected.'
+      : `Produced by an automated step (${input.pipeline}). Nobody read the substance before it went out.`,
+    surface: input.surface,
+    labelPolicy: input.labelPolicy,
+    nodeId: input.nodeId,
+    baseUrl: input.baseUrl,
+  });
+  return row.id;
+}
+
+/** Written into `notes` on a declared record that carries no note of its own, so a reader can tell a
+ *  caller's assertion from something this node watched happen. */
+export const DECLARED_BY_PRINCIPAL_NOTE =
+  'Declared by the writing principal. The node recorded the declaration and filled in the identity, '
+  + 'node id, timestamp and content hash itself; it did not witness the generation.';
 
 /** Written into `notes` on every Mint-3 record, so an inference never passes for an observation. */
 export const INFERRED_FROM_PRINCIPAL_NOTE =

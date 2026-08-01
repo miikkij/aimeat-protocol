@@ -8,6 +8,7 @@
 
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
+import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
 export const agentMessagingTools: AimeatToolDefinition[] = [
     {
@@ -156,10 +157,11 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_dm_send',
-        description: 'Send a direct message across the AIMEAT federation FROM this agent TO any person (owner@node), agent (agent#owner@node) or app (eco:app#owner@node) — this is the federation-wide inbox ("Postilaatikko"), NOT the agent↔owner channel (that is aimeat_message_send). The recipient sees it is from you, the agent. A message to an agent/app is delivered to that identity\'s owner inbox. First contact lands in the recipient\'s requests until they accept. To attach files (up to 20): first upload each via aimeat_storage_upload (presigned — MCP cannot carry the bytes), then pass the returned { storage_key, mime, kind, size, name } in attachments. Requires the messages:send scope.',
+        description: 'Send a direct message across the AIMEAT federation FROM this agent TO any person (owner@node), agent (agent#owner@node) or app (eco:app#owner@node) — this is the federation-wide inbox ("Postilaatikko"), NOT the agent↔owner channel (that is aimeat_message_send). The recipient sees it is from you, the agent. A message to an agent/app is delivered to that identity\'s owner inbox. First contact lands in the recipient\'s requests until they accept. To attach files (up to 20): first upload each via aimeat_storage_upload (presigned — MCP cannot carry the bytes), then pass the returned { storage_key, mime, kind, size, name } in attachments. Requires the messages:send scope.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            ...aiProvenanceCatalogInput,
             to: { type: 'string', required: true, description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.' },
             body: { type: 'string', description: 'Message body (GFM markdown). Optional only if you attach ≥1 file.' },
             reply_to: { type: 'string', description: 'Id of a message you are replying to (keeps the same thread).' },
@@ -168,10 +170,11 @@ export const agentMessagingTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_dm_send_as_owner',
-        description: 'Send a federated direct message AS THE OWNER (a consented delegation), not as your own agent identity — this is how you reply to the owner\'s "Postilaatikko" conversations on their behalf so the reply comes FROM the owner, in the owner\'s existing thread. The recipient sees it as from the owner (the human), exactly as if they had sent it from the AIMEAT UI. Requires the messages:send-as-owner scope, which the owner grants explicitly; without it this tool is not available and you should hand the drafted reply back for the owner to send themselves. The sender is always your OWN owner (derived server-side) — you can never send as anyone else. Pass the owner\'s conversation_id (from the reply context) so it lands in the right thread. Attach files via aimeat_storage_upload first. Prefer this over aimeat_dm_send when the human asked you to reply for them.',
+        description: 'Send a federated direct message AS THE OWNER (a consented delegation), not as your own agent identity — this is how you reply to the owner\'s "Postilaatikko" conversations on their behalf so the reply comes FROM the owner, in the owner\'s existing thread. The recipient sees it as from the owner (the human), exactly as if they had sent it from the AIMEAT UI. Requires the messages:send-as-owner scope, which the owner grants explicitly; without it this tool is not available and you should hand the drafted reply back for the owner to send themselves. The sender is always your OWN owner (derived server-side) — you can never send as anyone else. Pass the owner\'s conversation_id (from the reply context) so it lands in the right thread. Attach files via aimeat_storage_upload first. Prefer this over aimeat_dm_send when the human asked you to reply for them.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            ...aiProvenanceCatalogInput,
             to: { type: 'string', required: true, description: 'Recipient: owner@node, agent#owner@node, or eco:app#owner@node.' },
             body: { type: 'string', description: 'Message body (GFM markdown). Optional only if you attach ≥1 file.' },
             reply_to: { type: 'string', description: 'Id of a message you are replying to (keeps the same thread).' },

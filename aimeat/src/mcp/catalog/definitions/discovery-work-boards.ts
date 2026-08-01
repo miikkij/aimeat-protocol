@@ -8,6 +8,7 @@
 
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
+import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
 export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     {
@@ -111,10 +112,11 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_board_post',
-        description: 'Publish a new top-level post (title + body, optional category) to a board you can see. Subscribers are notified. Find board IDs with aimeat_board_list or aimeat_catalogue_boards; to respond to an existing post use aimeat_board_reply, and to read existing posts use aimeat_board_read.',
+        description: 'Publish a new top-level post (title + body, optional category) to a board you can see. Subscribers are notified. Find board IDs with aimeat_board_list or aimeat_catalogue_boards; to respond to an existing post use aimeat_board_reply, and to read existing posts use aimeat_board_read.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            ...aiProvenanceCatalogInput,
             board_id: { type: 'string', required: true, description: 'Board identifier.' },
             title: { type: 'string', required: true, description: 'Post title.' },
             body: { type: 'string', required: true, description: 'Post body.' },

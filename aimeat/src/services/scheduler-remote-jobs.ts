@@ -59,6 +59,16 @@ export async function runAiJob(storage: Storage, config: AimeatConfig, job: Sche
     key: outputKey,
     ownerGaii: owner,
     value: result.content,
+    // TARGET-058. A scheduled AI job is the purest autonomous path there is: it fires on a clock,
+    // writes, and nobody is present. The completion above already minted an observed record (the
+    // node watched the model produce these bytes), so it is CARRIED here rather than re-derived —
+    // same bytes, same statement.
+    //
+    // THE RULE, in the words it must keep: only a step where a person reads the substance and can
+    // reject it upgrades humanInvolvement. Clicking publish is not that step. A workflow human-input
+    // step that reviews substance MAY upgrade it. Nothing else may. There is no such step anywhere
+    // on this path, which is why nothing here touches the record's `humanInvolvement: 'none'`.
+    ...(result.provenance ? { aiProvenanceId: result.provenance.id } : {}),
     visibility: cfg.outputVisibility || 'private',
     tags: ['scheduler', 'ai-output'],
     ttlHours: null,

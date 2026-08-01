@@ -339,9 +339,26 @@ export async function putOffering(storage: Storage, o: Offering): Promise<Offeri
   return o;
 }
 export async function getOffering(storage: Storage, id: string): Promise<Offering | null> {
+  return (await getOfferingWithMeta(storage, id))?.offering ?? null;
+}
+/**
+ * The offering PLUS the record metadata a caller sometimes needs — today just `aiProvenanceId`
+ * (TARGET-058: an offering descriptor is prose, and prose on this surface is very often model-written).
+ *
+ * It exists so the one caller that needs the provenance does not read the same row twice: an offering
+ * lives in a memory record, and `getOffering` deliberately hands back only the value. Same single
+ * query either way.
+ */
+export async function getOfferingWithMeta(
+  storage: Storage, id: string,
+): Promise<{ offering: Offering; aiProvenanceId?: string } | null> {
   const { items } = await storage.listAllMemory({ prefix: OFFERING_PREFIX + id, limit: 2 });
   const rec = items.find(r => r.key === OFFERING_PREFIX + id);
-  return rec ? (rec.value as Offering) : null;
+  if (!rec) return null;
+  return {
+    offering: rec.value as Offering,
+    ...(rec.aiProvenanceId ? { aiProvenanceId: rec.aiProvenanceId } : {}),
+  };
 }
 export async function listOfferings(storage: Storage): Promise<Offering[]> {
   const { items } = await storage.listAllMemory({ prefix: OFFERING_PREFIX, limit: 5000 });

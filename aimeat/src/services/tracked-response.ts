@@ -17,6 +17,10 @@
  *   - TRACKED_RESPONSE_SPEC — served inline spec for self-description
  * @usage import { createTrackedResponse, evaluateTrackedKey } from '../services/tracked-response.js';
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4: an AUTO-sent reply carries a provenance record —
+ *     `assisted` (a person wrote the template, the node filled a slot) with humanInvolvement
+ *     `none`, because configuring a trigger once is not reading this message. The `approve`
+ *     branch returns earlier and is untouched: there, a person is about to read it.
  *   v1.0.0 — 2026-06-21 — Initial implementation (first Memory Contract instance).
  */
 import { randomUUID } from 'node:crypto';
@@ -28,6 +32,7 @@ import { notify } from './notify.js';
 import { sendDirectMessage } from './message-send.js';
 import { trackKey, untrackKey } from './track-registry.js';
 import type { DeliveryCtx } from './message-delivery.js';
+import { stampAutonomousOutput } from './ai-provenance.js';
 
 // ── Types ───────────────────────────────────────────────────────────────────
 export type TrackedResponseState =
@@ -213,11 +218,31 @@ async function evaluateContract(ctx: DeliveryCtx, c: TrackedResponse): Promise<v
     // Auto: mark in-flight (persisted) before the send so a crash/retry won't double-send.
     c.state = 'sent';
     await persist(storage, c);
+    // TARGET-058. This is an automated reply DELIVERED to a person, and it goes out with nobody
+    // having read it — the owner wrote the template once and configured the trigger, which is not
+    // the same as reading this message. So `humanInvolvement` stays `none`; the `approve` branch
+    // above returns before here precisely because a person is about to read that one.
+    //
+    // `assisted` rather than `ai-generated`: a human wrote the template and the node filled a slot
+    // in it. Claiming a model wrote the whole thing would be as false as claiming a person did.
+    const aiProvenanceId = await stampAutonomousOutput(storage, {
+      principal: c.source.ownerGhii,
+      content: body,
+      level: 'assisted',
+      method: 'rewritten',
+      pipeline: `tracked-response:${c.id}`,
+      surface: { visibility: 'private', humanAudience: true },
+      labelPolicy: ctx.config.aiLabelPublic,
+      nodeId: ctx.config.nodeId,
+      baseUrl: ctx.config.baseUrl,
+      enabled: ctx.config.aiProvenance,
+    });
     const sent = await sendDirectMessage(ctx, {
       senderGhii: c.source.ownerGhii,
       recipientGhii: c.source.peerGhii,
       body,
       replyToId: c.source.messageId,
+      aiProvenanceId,
     });
     if (sent.ok) {
       c.delivery.sentMessageId = sent.message.id;

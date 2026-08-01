@@ -18,6 +18,9 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.5.0 -- 2026-08-01 -- TARGET-058 Phase 4: a note on why `provenance:write` is NOT in
+ *     TOOL_SCOPES. It gates a PARAMETER, not a tool, and hiding nine tools from an agent that merely
+ *     cannot assert authorship would be the wrong trade — the honest default needs no permission.
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.4.0 -- 2026-07-14 -- Commerce scopes (commerce:sell / commerce:buy) for the MCP commerce
  *     tools — deliberately stricter than the requireAuth-only REST commerce routes (documented
@@ -47,6 +50,14 @@ export const TOOL_SCOPES: Record<string, string> = {
     aimeat_memory_search: 'memory:read',
     aimeat_memory_read_public: 'memory:read',
     aimeat_memory_write: 'memory:write',
+
+    // NOTE on `provenance:write` (TARGET-058): it deliberately has NO entry in this map, because it
+    // does not gate a TOOL — it gates one optional PARAMETER (`ai_provenance`) on nine of them.
+    // Listing a tool here would hide the whole tool from an agent that merely cannot assert how its
+    // content was made, when the honest default (the node records what it observed) is available to
+    // everyone and needs no permission at all. The check lives at the one place that mints from a
+    // declaration, services/ai-provenance.ts:provenanceForWrite, and mirrors requireScope() exactly
+    // — so this parameter and POST /v1/provenance cannot answer differently.
 
     // AppDev pitfall KB (learned entries are memory records under packages/appdev-pitfalls/).
     // Delete gates on memory:write (not memory:delete) deliberately: it only removes the owner's

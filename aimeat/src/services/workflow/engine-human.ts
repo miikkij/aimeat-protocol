@@ -6,9 +6,15 @@
  *   Extracted from engine.ts to satisfy max-file-lines.
  * @usage import { validateHumanAnswer, applyHumanAnswer } from './engine-human.js';
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4: a human-input step that names `reviews_key` re-stamps
+ *     the reviewed content with humanInvolvement 'editorial-control'. This is the ONLY place in
+ *     the engine that may upgrade that field, and a watchdog timeout default never does — nobody
+ *     read anything on that path. Takes `config` for the node id / label posture.
  *   v1.0.0 — 2026-07-16 — Initial: validateHumanAnswer + applyHumanAnswer (human-input steps).
  */
 import type { Storage } from '../../storage/interface.js';
+import type { AimeatConfig } from '../../config.js';
+import { stampAutonomousOutput } from '../ai-provenance.js';
 import { template } from './engine-util.js';
 import type { WorkflowRun, WorkflowHumanQuestion } from '../../models/workflow-schemas.js';
 
@@ -38,7 +44,7 @@ export function validateHumanAnswer(q: WorkflowHumanQuestion, answer: { picks: s
  * step. Caller holds the run lock and ticks/persists afterwards.
  */
 export async function applyHumanAnswer(
-  storage: Storage, ownerGhii: string, run: WorkflowRun, stepId: string, ans: HumanAnswerValue,
+  storage: Storage, config: AimeatConfig, ownerGhii: string, run: WorkflowRun, stepId: string, ans: HumanAnswerValue,
 ): Promise<void> {
   const rs = run.steps[stepId];
   const step = run.defSnapshot.steps.find(s => s.id === stepId);
@@ -55,6 +61,44 @@ export async function applyHumanAnswer(
       createdAt: existing?.createdAt ?? now, updatedAt: now,
     });
     rs.writes = [...new Set([...rs.writes, key])];
+  }
+
+  // ── TARGET-058: the ONE place in the engine that may upgrade humanInvolvement ──
+  //
+  // ONLY A STEP WHERE A PERSON READS THE SUBSTANCE AND CAN REJECT IT UPGRADES humanInvolvement.
+  // Clicking publish is not that step. A workflow human-input step that reviews substance MAY
+  // upgrade it. Nothing else may.
+  //
+  // `reviews_key` is how a step says it is that kind of step: it names the content that was put in
+  // front of the person. A step that asks "publish now?" without naming what was read sets nothing
+  // here and the reviewed content keeps whatever record it already had.
+  //
+  // A TIMEOUT DEFAULT IS NOT REVIEW. When the watchdog synthesises an answer (`by: 'timeout-default'`)
+  // nobody read anything, and upgrading on that path would manufacture editorial control out of
+  // silence — which is the precise failure this whole design exists to prevent.
+  if (action?.reviews_key && ans.by && ans.by !== 'timeout-default') {
+    const reviewedKey = (run.keyPrefix ?? '') + template(action.reviews_key, run.vars);
+    const reviewed = await storage.getMemory(ownerGhii, reviewedKey);
+    if (reviewed) {
+      // Re-stamped rather than edited: a provenance record is an append-only statement about a set
+      // of bytes, so "a person has now reviewed this" is a NEW statement about the same bytes.
+      const provenanceId = await stampAutonomousOutput(storage, {
+        principal: ownerGhii,
+        content: typeof reviewed.value === 'string' ? reviewed.value : JSON.stringify(reviewed.value ?? null),
+        level: 'ai-generated',
+        pipeline: `workflow:${run.defSnapshot.id}/${stepId}`,
+        reviewedBy: { who: ans.by, step: stepId },
+        surface: { visibility: reviewed.visibility, humanAudience: true },
+        labelPolicy: config.aiLabelPublic,
+        nodeId: config.nodeId,
+        baseUrl: config.baseUrl,
+        enabled: config.aiProvenance,
+      });
+      if (provenanceId) {
+        await storage.setMemory({ ...reviewed, aiProvenanceId: provenanceId, updatedAt: now });
+        rs.writes = [...new Set([...rs.writes, reviewedKey])];
+      }
+    }
   }
   rs.state = 'green'; rs.endedAt = now;
 }

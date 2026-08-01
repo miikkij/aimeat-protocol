@@ -8,6 +8,11 @@
  *   - GET    /v1/owner/agent-defaults         -- Get owner-level defaults
  *   - PUT    /v1/owner/agent-defaults         -- Upsert owner defaults
  * @version-history
+ *   v1.7.0 -- 2026-08-01 -- TARGET-058 Phase 4: the AI-transparency convention ships as a SYSTEM-layer
+ *     directive, so declaring provenance is part of what an agent agrees to rather than something
+ *     buried in a tool schema. Appended after the operator's configurable principles rather than
+ *     added to their default: an operator who sets AIMEAT_AGENT_SYSTEM_PRINCIPLES would otherwise
+ *     silently drop it, and a convention agents stop being told about is not a convention.
  *   v1.6.0 -- 2026-07-28 -- Drop the dead `enterprise` directive layer with the edition seam: the
  *     merge has been system + owner + agent for a while and `enterprise_locked` was always false,
  *     so the field is gone rather than lingering as a promise the response cannot keep.
@@ -35,6 +40,33 @@ import { createAgentDataAccessOverviewService } from '../services/db/agent-data-
 import { logger } from '../utils/logger.js';
 
 type WebhookDispatcher = ReturnType<typeof createWebhookDispatcher>;
+
+/**
+ * TARGET-058: the node's AI-transparency convention, as a SYSTEM-layer directive.
+ *
+ * It is here rather than in `AIMEAT_AGENT_SYSTEM_PRINCIPLES` for one reason: that variable is an
+ * operator's list, and an operator who sets their own would silently drop this rule. A transparency
+ * convention that an agent stops being told about the moment somebody customises their principles is
+ * not a convention. So it is appended after the configurable rules, always, on every node.
+ *
+ * It says what an agent must DO and what silence costs — the second half is the part that changes
+ * behaviour, because an agent that does not know silence is recorded as model-written has no reason
+ * to speak up when it is relaying a person's words.
+ */
+const AI_TRANSPARENCY_DIRECTIVE = {
+  id: 'system-ai-transparency',
+  description:
+    'Say how content was made. When you write content through this node — memory, a workspace '
+    + 'record, an app, knowledge, a message, a board post, a completed task — declare `ai_provenance` '
+    + 'if a model generated or substantially rewrote it, and declare level:"original" when you are '
+    + 'relaying text a person wrote. Silence from a non-human principal is recorded as model-written '
+    + 'with no human review, so relaying somebody\'s words is something you have to state. Only a '
+    + 'step where a person read the SUBSTANCE and could reject it counts as human involvement; '
+    + 'clicking publish does not. When you read content back, an absent record means the origin is '
+    + 'UNSTATED, never that a person wrote it. The node fills in who you are, which node, when, and '
+    + 'a hash of the exact bytes; you are never asked to assert those.',
+  source: 'system' as const,
+};
 
 export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, webhookDispatcher?: WebhookDispatcher): Router {
   const router = Router();
@@ -89,11 +121,15 @@ export function agentDirectivesRouter(config: AimeatConfig, storage: Storage, we
     }
 
     // Layer 1: System rules from config
-    const systemRules = (config.agentSystemPrinciples ?? []).map((text, idx) => ({
-      id: `system-${idx + 1}`,
-      description: text,
-      source: 'system' as const,
-    }));
+    const systemRules = [
+      ...(config.agentSystemPrinciples ?? []).map((text, idx) => ({
+        id: `system-${idx + 1}`,
+        description: text,
+        source: 'system' as const,
+      })),
+      // Appended after the operator's own principles, never merged into them — see the constant.
+      AI_TRANSPARENCY_DIRECTIVE,
+    ];
 
     // Layer 2: Owner rules
     const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;

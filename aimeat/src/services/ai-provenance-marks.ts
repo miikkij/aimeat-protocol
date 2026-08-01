@@ -23,6 +23,8 @@
  * @structure
  *   - loadServedProvenance(storage, config, id, opts) — fetch + project, for a route that has
  *     ALREADY authorized the content read
+ *   - loadServedProvenanceMany(storage, config, ids, opts) — the same, batched, for a surface that
+ *     reads a PAGE of items; one query rather than one per item
  *   - envelopeMeta(p)                — the `meta.provenance` value; the single envelope carrier
  *   - setProvenanceHeaders(res, p)   — `AI-Disclosure` + `Link: rel="ai-provenance"`
  *   - injectAiDisclosure(bytes, p, visible?) — serve-time HTML marks (meta, attribute, JSON-LD),
@@ -34,6 +36,8 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 4 step 0b. loadServedProvenanceMany(): the batch loader,
+ *     so a surface that reads a page of items costs one query instead of one per item.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3. injectAiDisclosure() gained the VISIBLE label chip for
  *     runnable app documents, deliberately inside the existing injector rather than as a new pass:
  *     four serve-time HTML injectors already re-parse the same document, and adding a fifth is what
@@ -80,6 +84,32 @@ export async function loadServedProvenance(
   if (!provenanceId) return undefined;
   const row = await storage.getAiProvenance(provenanceId);
   return row ? servedProvenanceOf(config, row, opts) : undefined;
+}
+
+/**
+ * The BATCH form: the records attached to a page of items, in one query, keyed by id.
+ *
+ * Use this wherever a surface reads a list. The singular form in a loop is an N+1 that grows with
+ * the CONTENT rather than with the traffic — a workspace holding a thousand agent-written records
+ * costs a thousand lookups on every read of it — and the read tools an agent uses hit the same path.
+ * Same authorization contract as the singular form: the caller has already decided the items are
+ * readable, and provenance travels with the content it describes.
+ *
+ * Ids that do not resolve are simply absent from the map, so a caller looks up and spreads away.
+ */
+export async function loadServedProvenanceMany(
+  storage: Storage,
+  config: AimeatConfig,
+  provenanceIds: readonly (string | null | undefined)[],
+  opts?: { full?: boolean },
+): Promise<Map<string, ServedProvenance>> {
+  const ids = [...new Set(provenanceIds.filter((id): id is string => !!id))];
+  const out = new Map<string, ServedProvenance>();
+  if (ids.length === 0) return out;
+  for (const row of await storage.getAiProvenanceMany(ids)) {
+    out.set(row.id, servedProvenanceOf(config, row, opts));
+  }
+  return out;
 }
 
 /** The same projection for a caller that already holds the row — the mint path, typically. */

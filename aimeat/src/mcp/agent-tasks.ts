@@ -7,6 +7,11 @@
  *   import { registerAgentTaskTools } from './agent-tasks.js';
  *   registerAgentTaskTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.7.0 — 2026-08-01 — TARGET-058 Phase 4: aimeat_task_complete accepts an `ai_provenance`
+ *     declaration and stamps the completion message — the text the OWNER reads when they look at
+ *     what their agent did. The link rides in the event's `details` rather than a column of its
+ *     own, because `details` is already the per-event metadata home and one of thirteen event
+ *     types carrying a dedicated column would be the odd row out in every query on the table.
  *   v1.0.0 -- 2026-05-21 -- Initial creation for Agent Dashboard Phase 1
  *   v1.1.0 -- 2026-05-28 -- Remove legacy agent-side task start tool; owners start queued tasks
  *   v1.2.0 -- 2026-05-28 -- Add TODO proposal tool for public MCP parity with connector MCP
@@ -32,6 +37,9 @@ import { parseGAII, buildGAII } from '../utils/gaii.js';
 import { resolveTaskFileInputs, taskWithFileHandles } from '../services/task-files.js';
 import { emitDelivery } from '../services/event-bus.js';
 import { recordTaskStarted } from '../services/activity-recorder.js';
+import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
 
 export function registerAgentTaskTools(
     mcp: McpServer,
@@ -488,9 +496,10 @@ export function registerAgentTaskTools(
         {
             task_id: z.string().describe('The task ID to complete'),
             message: z.string().optional().describe('Completion message'),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_task_complete'),
-        async ({ task_id, message }) => {
+        async ({ task_id, message, ai_provenance, ai_provenance_id }) => {
             const task = await storage.getAgentTask(task_id);
             if (!task) return { content: [{ type: 'text' as const, text: 'Task not found' }], isError: true };
 
@@ -512,11 +521,33 @@ export function registerAgentTaskTools(
                 updatedAt: now,
             });
 
+            // TARGET-058. The completion message is what the OWNER reads when they look at what their
+            // agent did, so it is stamped like any other text an agent writes for a person.
+            //
+            // The link lives in the event's `details` rather than in a column of its own, unlike
+            // memory / apps / direct messages. That is deliberate: `details` is already the designed
+            // home for per-event metadata, and a column carried by exactly one of thirteen event
+            // types would be the odd row out in every query that touches the table. The RECORD is the
+            // same record everywhere; only where the pointer sits differs.
+            const aiProvenanceId = await provenanceForWrite(storage, {
+                principal: agentGaii,
+                content: completionMessage,
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.task_complete',
+                surface: { visibility: 'private', humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
+
             await storage.appendTaskEvent({
                 id: randomUUID(),
                 taskId: task_id,
                 type: 'completed',
                 message: completionMessage,
+                ...(aiProvenanceId ? { details: { aiProvenanceId } } : {}),
                 timestamp: now,
             });
 
@@ -530,6 +561,7 @@ export function registerAgentTaskTools(
                         task_id,
                         status: updated?.status ?? 'done',
                         completed_at: now,
+                        ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                     }, null, 2),
                 }],
             };

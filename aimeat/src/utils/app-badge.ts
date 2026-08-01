@@ -11,6 +11,11 @@
  * @structure injectAimeatBadge(html) — pure string transform, returns a Buffer.
  * @usage const body = injectAimeatBadge(app.data);
  * @version-history
+ *   v1.6.0 — 2026-08-01 — TARGET-058 Phase 4 step 0c: the em dash is REWORDED out of the badge
+ *     ("Publish your own app for free", "Publish your own app on aimeat.io") rather than escaped.
+ *     v1.5.0 encoded it, which renders the same glyph — the house style bans the character, not its
+ *     byte sequence. Note for whoever looks for it next: this string is a literal here, not a locale
+ *     key, which is where the Phase 3 audit expected to find it.
  *   v1.0.0 — 2026-06-24 — Initial: node-branded, idempotent, HTML-only badge injection.
  *   v1.1.0 — 2026-06-24 — Make the badge a permanent aimeat.io attribution mark: label + link
  *     hardcoded to aimeat.io (was node-derived); dropped the baseUrl param.
@@ -109,12 +114,12 @@ export function injectAimeatBadge(data: Buffer | Uint8Array | string): Buffer {
         '<div id="aimeat-app-badge">'
         + '<style>' + css + '</style>'
         + '<input type="checkbox" id="aimeat-app-badge-open">'
-        + '<label for="aimeat-app-badge-open" aria-label="' + entities(AIMEAT_LABEL + ' — publish your own app') + '">' + entities('⚡') + '</label>'
+        + '<label for="aimeat-app-badge-open" aria-label="' + entities('Publish your own app on ' + AIMEAT_LABEL) + '">' + entities('⚡') + '</label>'
         + '<a href="' + AIMEAT_HOME + '" target="_blank" rel="noopener noreferrer" '
-        + 'aria-label="' + entities(AIMEAT_LABEL + ' — publish your own app') + '">'
+        + 'aria-label="' + entities('Publish your own app on ' + AIMEAT_LABEL) + '">'
         + '<span>' + entities('⚡') + '</span>'
         + '<span>' + entities(AIMEAT_LABEL) + '</span>'
-        + '<span>' + entities('· Publish your own app — free') + '</span>'
+        + '<span>' + entities('· Publish your own app for free') + '</span>'
         + '</a>'
         + '</div>';
 

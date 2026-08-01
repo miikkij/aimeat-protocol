@@ -17,6 +17,11 @@
  *   v1.3.0 — 2026-07-16 — listOwnerScopeMemory aggregates GHII+agents in one listMemoryForOwners (was N+1)
  *   v1.4.0 — 2026-07-16 — aimeat_knowledge_get uses the values listMemory already returns (SELECT *) instead
  *     of a redundant getMemory per package entry (Phase 3)
+ *   v1.5.0 — 2026-08-01 — TARGET-058 Phase 4. aimeat_knowledge_contribute accepts `ai_provenance` +
+ *     `ai_provenance_id` and stamps the entry through provenanceForWrite(); the pre-existing `model`
+ *     parameter is folded in as a fallback declaration rather than asked for twice. aimeat_knowledge_get
+ *     returns each entry's record, batched. Knowledge is the material an agent later quotes back as
+ *     established fact, which is why per-entry origin has to survive the hop.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -26,6 +31,9 @@ import type { Storage, MemoryRecord } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
 
 /** An entry reference stored in a knowledge-package manifest's `entries` list. */
 interface KnowledgeEntryRef {
@@ -184,6 +192,11 @@ export function registerKnowledgeTools(
             // listMemory returns FULL records (SELECT *), so each entry already carries its value —
             // no getMemory per entry needed (was a redundant re-fetch of data already in hand).
             const entries = await storage.listMemory(agentGaii, { prefix: `packages/${package_id}/` });
+            // TARGET-058: how each entry was made, in ONE query for the whole package. A knowledge
+            // package is exactly the material an agent later quotes back to a person as if it were
+            // established fact, so per-entry origin is the difference between citing a source and
+            // laundering a model's output through a package name.
+            const provFor = await readProvenanceMany(storage, config, entries.map(e => e.aiProvenanceId));
             const entryDetails = entries
                 .filter(e => !e.key.endsWith('/manifest'))
                 .map(e => ({
@@ -191,6 +204,7 @@ export function registerKnowledgeTools(
                     visibility: e.visibility,
                     value: e.value ?? null,
                     tags: e.tags,
+                    ...provFor(e.aiProvenanceId),
                 }));
             return {
                 content: [{
@@ -214,9 +228,10 @@ export function registerKnowledgeTools(
             entry_key: z.string().describe('Entry key (short name, e.g. "summary" or "chapter-1")'),
             content: z.string().describe('Entry content as a string (plain text or JSON)'),
             model: z.string().max(64).optional().describe('Optional: the LLM model this knowledge came from (stored as a model: tag; indicative attribution)'),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_knowledge_contribute'),
-        async ({ package_id, entry_key, content, model }) => {
+        async ({ package_id, entry_key, content, model, ai_provenance, ai_provenance_id }) => {
             // The appdev-pitfalls package is schema-reserved — its entries need model/category/
             // severity structure, so raw contributions are redirected to the dedicated tool.
             if (package_id === 'appdev-pitfalls') {
@@ -255,11 +270,36 @@ export function registerKnowledgeTools(
                 ? [...baseTags.filter(t => !t.startsWith('model:')), `model:${normModel}`]
                 : baseTags;
 
+            // TARGET-058. Knowledge entries are the one write here that does NOT inherit anything —
+            // a workspace record rides on memory and picks up the memory path's stamp, but a
+            // knowledge entry written through this tool went to storage unmarked. It is also the
+            // content most likely to be model-written and most likely to be read back later as if it
+            // were established fact, which is exactly why the origin has to survive the hop.
+            const visibility = existing?.visibility ?? 'owner';
+            const aiProvenanceId = await provenanceForWrite(storage, {
+                principal: agentGaii,
+                content,
+                declaredId: ai_provenance_id,
+                // `model` has meant "which model this knowledge came from" on this tool since long
+                // before provenance existed, so an agent that names it has told us something real.
+                // Fold it into the declaration rather than making them say it twice — and only as a
+                // fallback, so an explicit ai_provenance.model still wins.
+                declared: toDeclaredProvenance(ai_provenance)
+                    ?? (model?.trim() ? { level: 'ai-generated', model: model.trim() } : undefined),
+                pipeline: 'mcp.knowledge_contribute',
+                surface: { visibility, humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
+
             await storage.setMemory({
                 key: fullEntryKey,
                 ownerGaii: agentGaii,
                 value,
-                visibility: existing?.visibility ?? 'owner',
+                ...(aiProvenanceId ? { aiProvenanceId } : {}),
+                visibility,
                 tags,
                 ttlHours: null,
                 version: (existing?.version ?? 0) + 1,
@@ -294,7 +334,10 @@ export function registerKnowledgeTools(
             return {
                 content: [{
                     type: 'text' as const,
-                    text: JSON.stringify({ package_id, entry_key: fullEntryKey, updated: true }, null, 2),
+                    text: JSON.stringify({
+                        package_id, entry_key: fullEntryKey, updated: true,
+                        ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
+                    }, null, 2),
                 }],
             };
         },

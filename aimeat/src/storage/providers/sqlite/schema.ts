@@ -277,6 +277,11 @@ export function initializeSchema(db: Database.Database): void {
   // The same attached half for apps: an app an agent published without declaring anything is
   // stamped by the node (Mint-3). Mirrors Postgres migration 0018.
   safeAddColumn('apps', 'aiProvenanceId', 'TEXT');
+  // A direct message is the one surface where AI-written text is DELIVERED to a named person rather
+  // than published for whoever comes along, so the recipient's copy has to be able to say how it was
+  // made. Both mailbox copies carry the same id — the statement is about the bytes, not about whose
+  // row it is. Mirrors Postgres migration 0019.
+  safeAddColumn('direct_messages', 'aiProvenanceId', 'TEXT');
   // The other direction: which provenance record a metered LLM call produced, so "what did this
   // money buy?" is one join rather than a guess.
   safeAddColumn('agent_usage_event', 'provenanceId', 'TEXT');

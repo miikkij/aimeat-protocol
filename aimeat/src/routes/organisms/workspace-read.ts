@@ -12,6 +12,9 @@
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 3: the workspace read attaches `_aiProvenance` /
  *     `_aiProvenanceUrl` to each record that has one (same underscore convention as `_version`),
  *     batched per read, so the record viewer can render the visible AI label at first paint.
+ *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 4 step 0b: that batch is now ONE query
+ *     (loadServedProvenanceMany) instead of one lookup per distinct id. The N+1 grew with the
+ *     workspace rather than with the traffic, so the busiest workspaces paid the most for it.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -30,7 +33,7 @@ import { buildOrganismOverview, buildWorkspaceOverview, listWorkspaces, collectW
 import { buildInstructionBlocks } from '../../services/hello-mcp.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../../services/structure-graph.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
-import { loadServedProvenance, type ServedProvenance } from '../../services/ai-provenance-marks.js';
+import { loadServedProvenanceMany } from '../../services/ai-provenance-marks.js';
 import { fresherRec } from './shared.js';
 import { logger } from '../../utils/logger.js';
 
@@ -130,15 +133,12 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     const readable: MemoryRecord[] = canReadWorkspace ? items : [];
     const byKey = new Map(readable.map(r => [r.key, r]));
 
-    // TARGET-058: the provenance records attached to anything in this workspace, fetched once for
-    // the whole read rather than once per record. Distinct ids only, so a workspace where one crew
-    // run stamped fifty records costs one lookup. Empty on a workspace nothing agent-written touches,
-    // which is the common case.
-    const provenanceIds = [...new Set(readable.map(r => r.aiProvenanceId).filter((id): id is string => !!id))];
-    const provenanceById = new Map<string, ServedProvenance>();
-    for (const p of await Promise.all(provenanceIds.map(id => loadServedProvenance(storage, config, id)))) {
-      if (p) provenanceById.set(p.id, p);
-    }
+    // TARGET-058: the provenance records attached to anything in this workspace, in ONE query for
+    // the whole read. It used to be one lookup per distinct id — an N+1 that grew with the workspace
+    // rather than with the traffic, so the busiest workspaces paid the most. Empty on a workspace
+    // nothing agent-written touched, which is the common case.
+    const provenanceById = await loadServedProvenanceMany(
+      storage, config, readable.map(r => r.aiProvenanceId));
 
     const manifestRec = byKey.get(`${nsRoot}meta.manifest`);
     const manifest = (manifestRec?.value as Record<string, unknown> | undefined) ?? null;

@@ -9,12 +9,30 @@
  *   import { memoryEntryOutput } from '../catalog/output-schemas.js';
  *   mcp.registerTool('aimeat_memory_read', { description, inputSchema, outputSchema: memoryEntryOutput, annotations }, handler)
  * @version-history
+ *   v1.1.0 -- 2026-08-01 -- TARGET-058 Phase 4: aiProvenanceOutput, declared here because an
+ *     outputSchema STRIPS what it does not name — a read tool attaching provenance without declaring
+ *     it would drop it silently, which is the exact loss this phase exists to prevent.
  *   v1.0.0 -- 2026-05-30 -- MCP audit Phase 4 (F4): output schemas for core read tools
  */
 import { z } from 'zod';
 
 /** A list-item record; loose by design so concise projections and varied fields still validate. */
 const looseRecord = z.record(z.string(), z.unknown());
+
+/**
+ * TARGET-058: how a returned item was made. Declared here rather than inline because an outputSchema
+ * STRIPS what it does not name — a tool that attaches provenance to a result and forgets to declare
+ * it here would return nothing, silently, which is the loss this whole phase exists to prevent.
+ *
+ * `record` is loose on purpose: it is the `aimeat.provenance/v1` document, and a reader must branch
+ * on its `spec` rather than on a shape pinned here. Re-declaring the record's fields in an MCP
+ * output schema would be a second definition of the document, free to drift from the first.
+ */
+export const aiProvenanceOutput = z.object({
+    id: z.string(),
+    record: looseRecord,
+    record_url: z.string(),
+}).optional();
 
 /** aimeat_wallet_balance */
 export const walletBalanceOutput = {
@@ -31,6 +49,7 @@ export const memoryEntryOutput = {
     tags: z.array(z.string()).optional(),
     version: z.number().optional(),
     updated_at: z.string().optional(),
+    ai_provenance: aiProvenanceOutput,
 };
 
 /** aimeat_memory_list — { items, count } plus the Phase 2 truncation markers and the

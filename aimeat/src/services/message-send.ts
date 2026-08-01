@@ -15,6 +15,11 @@
  *     OWNER human inbox (the owner reads + acts on their agent's DMs) — works on un-upgraded peers too.
  *   v1.2.0 — 2026-06-23 — Carry the optional `interactive` payload (federated AskUserQuestion) onto every
  *     stored copy + the dm.inbound push (as the role) so questions/answers survive send + delivery.
+ *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 4: `aiProvenanceId` rides onto every stored copy, so a
+ *     message an agent wrote can say so in the recipient's own inbox. A DM is the case Article 50
+ *     cares most about — AI-written text delivered to a named person rather than published — and it
+ *     was the one write surface with nowhere to record it. Cross-node is unchanged and therefore
+ *     unstated on the receiving side; see the field's doc comment.
  *   v1.3.0 — 2026-06-28 — Wake node-run system agents (Secretary/specialist) live: a DM to your OWN such
  *     agent fire-and-forget dispatches to system-agent-responder (real-time reply) instead of waiting for
  *     the tick. Dynamic import avoids the responder↔message-send cycle; the responder no-ops for non-system.
@@ -48,6 +53,21 @@ export interface SendMessageInput {
   respondable?: boolean;
   /** Auto-accept the first-contact gate (operator announcements → land in inbox, not requests). */
   skipContactGate?: boolean;
+  /**
+   * TARGET-058: the provenance record describing `body` — how much of it a model wrote and whether a
+   * person read the substance first. Both mailbox copies carry the same id, because the statement is
+   * about the bytes rather than about whose row it is.
+   *
+   * A direct message is the case Article 50 cares most about: AI-written text DELIVERED to a named
+   * person, rather than published for whoever comes along. Absent means unstated, never "a human
+   * wrote it".
+   *
+   * CROSS-NODE CAVEAT, stated rather than hidden: the id is node-local, so the sender's copy carries
+   * it and a peer receiving the message over federation stores nothing. Content arriving from a peer
+   * that strips provenance is therefore unstated — which is the correct reading — but carrying the
+   * record itself across the boundary is a federation-payload change this phase does not make.
+   */
+  aiProvenanceId?: string;
 }
 
 /**
@@ -87,7 +107,7 @@ export type SendMessageResult =
  */
 export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInput): Promise<SendMessageResult> {
   const { config, storage } = ctx;
-  const { senderGhii, recipientGhii, body, replyToId, attachments, subject, interactive, broadcastId, respondable } = input;
+  const { senderGhii, recipientGhii, body, replyToId, attachments, subject, interactive, broadcastId, respondable, aiProvenanceId } = input;
 
   // recipientGhii is what the thread is WITH (may be an agent/eco GAII). deliveryGhii is where the
   // message physically lands (the owner's human GHII for an agent/eco recipient; itself for a human).
@@ -113,7 +133,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
       await storage.createDirectMessage({
         id, ownerGhii: senderGhii, conversationId, subject, senderGhii, recipientGhii,
         body, attachments, interactive, broadcastId, respondable, status: 'undeliverable', direction: 'outbound',
-        replyToId, origin: 'local', originNodeId: config.nodeId,
+        replyToId, origin: 'local', originNodeId: config.nodeId, aiProvenanceId,
         error: 'blocked', createdAt: now,
       });
       return { ok: false, code: 'BLOCKED' };
@@ -126,7 +146,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     body, attachments, interactive, broadcastId, respondable,
     status: isLocal ? 'delivered' : 'queued',
     direction: 'outbound', replyToId,
-    origin: 'local', originNodeId: config.nodeId,
+    origin: 'local', originNodeId: config.nodeId, aiProvenanceId,
     createdAt: now, deliveredAt: isLocal ? now : undefined,
   };
   await storage.createDirectMessage(senderCopy);
@@ -164,7 +184,7 @@ export async function sendDirectMessage(ctx: DeliveryCtx, input: SendMessageInpu
     await storage.createDirectMessage({
       id, ownerGhii: inboundOwner, conversationId, subject, senderGhii, recipientGhii,
       body, attachments, interactive, broadcastId, respondable, status: 'delivered', direction: 'inbound',
-      replyToId, origin: 'local', originNodeId: config.nodeId,
+      replyToId, origin: 'local', originNodeId: config.nodeId, aiProvenanceId,
       createdAt: now, deliveredAt: now,
     });
 

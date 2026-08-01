@@ -7,6 +7,7 @@
  * @structure
  *   - createAiProvenance(row)                  -- append one record
  *   - getAiProvenance(id)                      -- resolve by node-local id (route authorizes)
+ *   - getAiProvenanceMany(ids)                 -- the batch form, so a page of items costs one query
  *   - findAiProvenanceByHash(hash, query)      -- the DETECTION lookup, filtered in SQL
  *   - publiclyLinkedProvenanceIds(ids)         -- THE visibility rule: which records describe
  *                                                 content that is publicly readable right now
@@ -27,6 +28,18 @@ export interface AiProvenanceRepository {
    * `resolveIdentity()` and return an IDENTICAL 404 for "absent" and "not yours".
    */
   getAiProvenance(id: string): Promise<AiProvenanceRecordRow | undefined>;
+
+  /**
+   * Resolve MANY ids in one query — the batch form of getAiProvenance(), for a surface that reads a
+   * page of items and needs the record attached to each.
+   *
+   * It exists because the alternative is an N+1 that grows with the content, not with the traffic: a
+   * workspace read, an MCP read tool and a listing all fetch a page of records and then one
+   * provenance lookup PER record. Applies no authorization either — same contract as the singular
+   * form: the caller has already decided the items are readable, and provenance travels with the
+   * content it describes. Missing ids are simply absent from the result; order is not guaranteed.
+   */
+  getAiProvenanceMany(ids: string[]): Promise<AiProvenanceRecordRow[]>;
 
   /**
    * The hash-keyed detection lookup: "did this node produce these exact bytes?". Filtering happens

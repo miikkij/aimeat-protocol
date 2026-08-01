@@ -11,10 +11,13 @@
  *   The hash lookup applies the predicate IN SQL rather than in the route. That is not a performance
  *   choice — it means a third party's non-public row never enters the process at all on the
  *   anonymous detection path, so there is nothing there to leak by a later mistake.
- * @structure aiProvenanceMethods — createAiProvenance · getAiProvenance · findAiProvenanceByHash ·
- *   publiclyLinkedProvenanceIds
+ * @structure aiProvenanceMethods — createAiProvenance · getAiProvenance · getAiProvenanceMany ·
+ *   findAiProvenanceByHash · publiclyLinkedProvenanceIds
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 4 step 0b. getAiProvenanceMany(): one query for a page of
+ *     items instead of one per item. The N+1 it replaces grew with the CONTENT rather than with the
+ *     traffic, and Phase 4's MCP read tools hit the same path.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. Visibility follows the content: the stored flag is
  *     gone and the public test is an EXISTS over the items that point at the record.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
@@ -49,6 +52,9 @@ const PUBLICLY_LINKED = `(
              AND a.parked = 0 AND a.operatorHidden = 0 AND a.accessCode IS NULL)
 )`;
 
+/** Bound-parameter budget for one `IN (...)` statement. Well under SQLite's 999-parameter default. */
+const ID_CHUNK = 500;
+
 export const aiProvenanceMethods = {
   async createAiProvenance(this: SqliteStorage, row: AiProvenanceRecordRow): Promise<void> {
     this.db.prepare(
@@ -64,6 +70,24 @@ export const aiProvenanceMethods = {
   async getAiProvenance(this: SqliteStorage, id: string): Promise<AiProvenanceRecordRow | undefined> {
     const row = this.db.prepare('SELECT * FROM ai_provenance WHERE id = ?').get(id) as Record<string, unknown> | undefined;
     return row ? deserialize(row) : undefined;
+  },
+
+  async getAiProvenanceMany(this: SqliteStorage, ids: string[]): Promise<AiProvenanceRecordRow[]> {
+    if (ids.length === 0) return [];
+    // Distinct ids only: a page where one crew run stamped fifty records carries fifty references to
+    // a handful of statements, and binding the duplicates would widen the IN list for nothing.
+    const unique = [...new Set(ids)];
+    const out: AiProvenanceRecordRow[] = [];
+    // Chunked because SQLite caps bound parameters per statement (999 on the older default) and the
+    // caller's page size is not ours to bound — a workspace can legitimately hold thousands.
+    for (let i = 0; i < unique.length; i += ID_CHUNK) {
+      const chunk = unique.slice(i, i + ID_CHUNK);
+      const rows = this.db.prepare(
+        `SELECT * FROM ai_provenance WHERE id IN (${chunk.map(() => '?').join(',')})`
+      ).all(...chunk) as Record<string, unknown>[];
+      for (const r of rows) out.push(deserialize(r));
+    }
+    return out;
   },
 
   async findAiProvenanceByHash(

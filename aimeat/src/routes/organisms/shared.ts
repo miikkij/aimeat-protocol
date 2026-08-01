@@ -197,9 +197,23 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const versioned = pubOt?.versioned !== false;
     const n = maxN + 1;
 
+    // TARGET-058. Publishing MOVES the content, so the statement about how it was made moves with
+    // it. Without this the draft carried a provenance record and `.latest` — the copy the workspace
+    // read serves and the visible label is rendered from — carried none, so publishing was where an
+    // agent-written record quietly became origin-unstated.
+    //
+    // Carried, not re-minted: the record says how the content was MADE, and publishing does not
+    // change that. One caveat worth stating rather than hiding — normalizeDocValueImages() above may
+    // have rewritten embedded image URLs, so on those documents the record's `contentHash` describes
+    // the draft bytes rather than the published ones. The authorship statement stays true; only the
+    // byte-level detection join is approximate, and re-minting here would have to invent a
+    // declaration nobody made.
+    const provenanceId = draft.aiProvenanceId ?? undefined;
+
     if (versioned) {
       await storage.setMemory({
         key: `${base}.version.${n}`, ownerGaii: publisher, value: draftValue,
+        ...(provenanceId ? { aiProvenanceId: provenanceId } : {}),
         visibility: vis, tags, ttlHours: null, version: 1, createdAt: now, updatedAt: now,
       });
       // Retention: prune history beyond the space's window (append-only spaces never pruned).
@@ -213,6 +227,7 @@ export function createOrganismHelpers(config: AimeatConfig, storage: Storage) {
     const latestOwner = existingLatest ? ownerGhiiOf(existingLatest.ownerGaii) : ownerGhii;
     await storage.setMemory({
       key: `${base}.latest`, ownerGaii: latestOwner, value: draftValue,
+      ...(provenanceId ? { aiProvenanceId: provenanceId } : {}),
       visibility: vis, tags, ttlHours: null,
       version: (existingLatest?.version ?? 0) + 1,
       createdAt: existingLatest?.createdAt ?? now, updatedAt: now,

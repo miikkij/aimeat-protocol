@@ -4,6 +4,12 @@
  *   and the app download (GET /v1/apps/:owner/:filename incl. draft preview + H-2 app-origin redirect +
  *   copy-protection). Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 4 step 0a: the published app and the draft preview are
+ *     served through appContentType(), so their `text/html` finally carries `charset=utf-8`. Without
+ *     it the browser fell back to windows-1252 and every UTF-8 byte in the document arrived as
+ *     mojibake — shipping since v1.3.0 in July, found when a Finnish compliance string rendered as
+ *     `TekoÃ¤lyn tuottama`. Preceded by a scan of all 110 published apps for the double-encoding
+ *     signature (0 found), because an HTTP charset overrides an app's own `<meta charset>`.
  *   v1.2.0 — 2026-07-30 — The inline + draft CSP now comes from utils/app-csp.ts (shared with the
  *     app origin) and permits WebAssembly compilation ('wasm-unsafe-eval'); wasm apps could not
  *     compile at all before, self-hosted bytes included. No 'unsafe-eval', no COOP/COEP.
@@ -22,6 +28,7 @@ import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { injectAimeatBadge } from '../../utils/app-badge.js';
 import { appCsp } from '../../utils/app-csp.js';
+import { appContentType } from '../../utils/app-content-type.js';
 import { detectLocale } from '../../i18n.js';
 import { collectAppLineage, resolveAppStatus } from '../../services/app-lineage.js';
 import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js';
@@ -322,7 +329,7 @@ export function registerReadRoutes(
                 res.status(404).json(error(config.nodeId, 'NOT_FOUND', `No draft exists for "${filename}"`));
                 return;
             }
-            res.setHeader('Content-Type', draft.mimeType);
+            res.setHeader('Content-Type', appContentType(draft.mimeType));
             const draftIsHtml = /html/i.test(draft.mimeType);
             const draftBody = draftIsHtml ? injectAimeatBadge(draft.data) : draft.data;
             res.setHeader('Content-Length', draftBody.length.toString());
@@ -428,7 +435,10 @@ export function registerReadRoutes(
             }
         }
 
-        res.setHeader('Content-Type', app.mimeType);
+        // charset=utf-8, via appContentType(): a bare `text/html` falls back to windows-1252 and
+        // turns every UTF-8 byte in the document into mojibake. See utils/app-content-type.ts for
+        // the corpus scan that had to happen before this could be declared.
+        res.setHeader('Content-Type', appContentType(app.mimeType));
 
         // Inline (runnable) HTML gets the viral "back to {node} · publish your own
         // app" badge appended; the raw download (attachment) is served byte-for-byte.

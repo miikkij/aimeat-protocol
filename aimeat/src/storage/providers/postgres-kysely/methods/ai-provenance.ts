@@ -11,10 +11,12 @@
  *   The hash lookup applies the predicate IN SQL rather than in the route. That is not a performance
  *   choice — it means a third party's non-public row never enters the process at all on the
  *   anonymous detection path, so there is nothing there to leak by a later mistake.
- * @structure aiProvenanceMethods — createAiProvenance · getAiProvenance · findAiProvenanceByHash ·
- *   publiclyLinkedProvenanceIds
+ * @structure aiProvenanceMethods — createAiProvenance · getAiProvenance · getAiProvenanceMany ·
+ *   findAiProvenanceByHash · publiclyLinkedProvenanceIds
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 4 step 0b. getAiProvenanceMany(): one query for a page of
+ *     items instead of one per item. No migration — it reads the primary key.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. Visibility follows the content: the stored flag is
  *     gone and the public test is an EXISTS over the items that point at the record.
  *     Schema: migrations/0018_ai_provenance_visibility.sql.
@@ -53,6 +55,9 @@ const publiclyLinked = (idColumn: string) => sql<boolean>`(
              AND a."parked" = false AND a."operatorHidden" = false AND a."accessCode" IS NULL)
 )`;
 
+/** Bind-parameter budget for one `IN (...)` statement. Well under the Postgres 65535 ceiling. */
+const ID_CHUNK = 1_000;
+
 export const aiProvenanceMethods = {
   async createAiProvenance(this: PostgresKyselyStorage, row: AiProvenanceRecordRow): Promise<void> {
     await this.db.insertInto('AiProvenance').values({
@@ -71,6 +76,23 @@ export const aiProvenanceMethods = {
   async getAiProvenance(this: PostgresKyselyStorage, id: string): Promise<AiProvenanceRecordRow | undefined> {
     const r = await this.db.selectFrom('AiProvenance').selectAll().where('id', '=', id).executeTakeFirst();
     return r ? toRecord(r) : undefined;
+  },
+
+  async getAiProvenanceMany(this: PostgresKyselyStorage, ids: string[]): Promise<AiProvenanceRecordRow[]> {
+    if (ids.length === 0) return [];
+    // Distinct ids only: a page where one crew run stamped fifty records carries fifty references to
+    // a handful of statements, and binding the duplicates would widen the IN list for nothing.
+    const unique = [...new Set(ids)];
+    const out: AiProvenanceRecordRow[] = [];
+    // Chunked because Postgres caps bind parameters per statement (65535) and the caller's page size
+    // is not ours to bound — a workspace can legitimately hold thousands.
+    for (let i = 0; i < unique.length; i += ID_CHUNK) {
+      const rows = await this.db.selectFrom('AiProvenance').selectAll()
+        .where('id', 'in', unique.slice(i, i + ID_CHUNK))
+        .execute();
+      for (const r of rows) out.push(toRecord(r));
+    }
+    return out;
   },
 
   async findAiProvenanceByHash(

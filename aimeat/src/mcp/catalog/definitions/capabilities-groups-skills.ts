@@ -10,6 +10,7 @@
 
 import type { AimeatToolDefinition } from './types.js';
 import { agentEverywhere } from './types.js';
+import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
 export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
     {
@@ -267,10 +268,11 @@ export const capabilitiesGroupsSkillsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_knowledge_contribute',
-        description: 'Add or update an entry in an existing knowledge package: pass the package id, a short entry key, and content (JSON is parsed if valid, otherwise stored as text). Bumps the entry version and registers it in the package manifest if new. The package must already exist (it is not created here). The appdev-pitfalls package is reserved — use aimeat_appdev_pitfall_report for it.',
+        description: 'Add or update an entry in an existing knowledge package: pass the package id, a short entry key, and content (JSON is parsed if valid, otherwise stored as text). Bumps the entry version and registers it in the package manifest if new. The package must already exist (it is not created here). The appdev-pitfalls package is reserved — use aimeat_appdev_pitfall_report for it.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            ...aiProvenanceCatalogInput,
             package_id: { type: 'string', required: true, description: 'Knowledge package identifier.' },
             entry_key: { type: 'string', required: true, description: 'Entry key.' },
             content: { type: 'string', required: true, description: 'Entry content.' },

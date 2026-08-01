@@ -633,6 +633,15 @@ export interface DirectMessageRecord {
   originNodeId: string;
   /** Last delivery error, if status is failed/undeliverable. */
   error?: string;
+  /**
+   * TARGET-058: the provenance record describing this message's body — how much of it a model wrote,
+   * and whether a person read the substance before it was sent.
+   *
+   * Both mailbox copies carry the SAME id: the statement is about the bytes, not about whose row it
+   * is. Absent means UNSTATED, which is never "a human wrote it" — a message that arrived from a
+   * peer node that strips provenance is unstated, not human-authored.
+   */
+  aiProvenanceId?: string;
   createdAt: string;
   deliveredAt?: string;
   readAt?: string;

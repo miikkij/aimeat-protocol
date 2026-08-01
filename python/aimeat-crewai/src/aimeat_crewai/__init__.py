@@ -91,8 +91,18 @@ from .usage_telemetry import (
     usage_run,
     build_llm_call_payload,
 )
+from .provenance import (
+    SPEC as PROVENANCE_SPEC,
+    Level,
+    Method,
+    HumanInvolvement,
+    declare,
+    source,
+    read_provenance,
+    is_model_written,
+)
 
-__version__ = "0.17.0"
+__version__ = "0.18.0"
 
 __all__ = [
     "__version__",
@@ -151,4 +161,14 @@ __all__ = [
     "install_usage_telemetry",
     "usage_run",
     "build_llm_call_payload",
+    # AI provenance — declare how content was made, read how it was made (0.18.0).
+    # Mirrors the node contract; the NODE SCHEMA WINS on any mismatch.
+    "PROVENANCE_SPEC",
+    "Level",
+    "Method",
+    "HumanInvolvement",
+    "declare",
+    "source",
+    "read_provenance",
+    "is_model_written",
 ]

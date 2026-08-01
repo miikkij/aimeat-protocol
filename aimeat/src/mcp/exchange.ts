@@ -16,6 +16,10 @@
  *   import { registerExchangeTools } from './exchange.js';
  *   registerExchangeTools(mcp, storage, config, () => agentGaii);
  * @version-history
+ *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 4: aimeat_exchange_offering_get returns the offering
+ *     descriptor's provenance record. A listing is prose — value proposition, SLA, data-quality
+ *     claims — and a buyer's agent deciding whether to accept a contract should be able to tell a
+ *     vendor's own words from a model's summary of them.
  *   v1.3.0 — 2026-07-27 — Contract-lifecycle reads target the CONTRACT explicitly (readContractForCall),
  *     so minting and the off-switch never act on a provider's grant.
  *   v1.2.0 — 2026-07-21 — need_post carries usage_intent; needs listings enriched with the requesting app's
@@ -32,6 +36,7 @@ import type { Storage } from '../storage/interface.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { readProvenance } from './ai-provenance-result.js';
 import { commerceFeePercent } from '../services/marketplace-fee.js';
 import { percentFee } from '../commerce/money.js';
 import {
@@ -41,7 +46,7 @@ import {
 import {
     type Offering, type Need, type Bid, type ActionCommercial, type NeedSpec,
     resolveActionPricing, resolveOfferingPricing, newNeedId, newBidId,
-    getOffering, listOfferings, matchOfferings, filterOfferings,
+    getOffering, getOfferingWithMeta, listOfferings, matchOfferings, filterOfferings,
     putNeed, getNeed, listNeeds, putBid, getBid,
     offeringStats, offeringConsumers, enrichNeeds,
 } from '../services/exchange-market.js';
@@ -143,9 +148,15 @@ export function registerExchangeTools(
         },
         annotationsFor('aimeat_exchange_offering_get'),
         async ({ offering_id }) => {
-            const o = await getOffering(storage, offering_id);
-            if (!o) return fail(`NOT_FOUND: no such offering "${offering_id}"`);
+            const found = await getOfferingWithMeta(storage, offering_id);
+            if (!found) return fail(`NOT_FOUND: no such offering "${offering_id}"`);
+            const o = found.offering;
             const stats = await offeringStats(storage, o);
+            // TARGET-058: how the offering DESCRIPTOR was written. An offering is prose — value
+            // proposition, SLA, data-quality claims — and prose on a marketplace is very often
+            // model-written. A buyer's agent deciding whether to accept a contract should be able to
+            // tell a vendor's own words from a model's summary of them. Absence means unstated.
+            const provenance = await readProvenance(storage, config, found.aiProvenanceId);
 
             if (o.kind === 'app-tool' && o.surface && o.surface.kind === 'app-tool') {
                 const s = o.surface;
@@ -164,6 +175,7 @@ export function registerExchangeTools(
                         body: '{ "input": { … } }',
                     },
                     stats,
+                    ...provenance,
                 });
             }
 
@@ -184,6 +196,7 @@ export function registerExchangeTools(
                     mcp: `aimeat_extension_invoke { "name": "${o.ext}", "action": "${o.action}", "input": { … } }`,
                 },
                 stats,
+                ...provenance,
             });
         },
     );

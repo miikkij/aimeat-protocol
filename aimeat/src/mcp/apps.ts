@@ -9,6 +9,10 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.7.0 — 2026-08-01 — TARGET-058 Phase 4: aimeat_app_publish and aimeat_app_draft_publish accept
+ *     an `ai_provenance` declaration and go through provenanceForWrite() instead of straight to
+ *     Mint-3, so an agent that DOES say how it built the app is believed about the how while the node
+ *     still fills in the who, the when and the content hash. Both results echo the stored record.
  *   2026-07-19 — publish/draft_publish next_steps nudge (face+bound-skills+template hint, best-effort) (AppDev KB Phase 6)
  *   v1.0.0 — 2026-05-02 — Initial creation: 5 tools for app publish, list, get, delete, versions
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -40,7 +44,9 @@ import { descriptionFor } from './catalog/shape.js';
 import { agentFaceKey } from '../services/agent-face.js';
 import { getOwnerScopePublicMemory } from '../services/owner-memory.js';
 import { listSkillsByBinding } from '../services/skills.js';
-import { stampAgentWrite } from '../services/ai-provenance.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
+import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { loadServedProvenance } from '../services/ai-provenance-marks.js';
 
 export function registerAppsTools(
@@ -90,9 +96,10 @@ export function registerAppsTools(
             version: z.string().optional().describe('Semver display version (e.g. "1.0.0"). Auto-generated if omitted.'),
             cortex_agents: z.array(z.record(z.string(), z.unknown())).optional().describe(
                 'Declarative crew-defs this app ships (Agent-Bundled Apps). Each entry is a crewaimeat crew_def JSON document (agent_name, agents[], tasks[], ...) validated at publish — DATA the owner\'s own fleet interprets, never code. Stored as manifest.cortex.agents. Omit on update to carry the existing list forward; send [] to clear.'),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_app_publish'),
-        async ({ filename, content_base64, name, description, category, tags, icon, version, cortex_agents }) => {
+        async ({ filename, content_base64, name, description, category, tags, icon, version, cortex_agents, ai_provenance, ai_provenance_id }) => {
             const agentGaii = getAgentGaii();
             const parsed = parseGAII(agentGaii);
             if (!parsed) {
@@ -206,12 +213,16 @@ export function registerAppsTools(
                 }
             }
 
-            // MINT-3 (TARGET-058): an agent publishing an app and declaring nothing is stamped by
-            // the node. This is THE case the rule exists for — an app published over MCP is written
+            // TARGET-058: an agent publishing an app and declaring nothing is stamped by the node
+            // (Mint-3). This is THE case the rule exists for — an app published over MCP is written
             // by a model far more often than not, and silence must not read as "a human wrote it".
-            const aiProvenanceId = await stampAgentWrite(storage, {
+            // Now through provenanceForWrite(), so an agent that DOES declare something is believed
+            // about the how while the node still fills in the who, the when and the hash.
+            const aiProvenanceId = await provenanceForWrite(storage, {
                 principal: agentGaii,
                 content: data,
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
                 pipeline: 'mcp.app_publish',
                 surface: { visibility: parkedState ? 'private' : 'public', humanAudience: true },
                 labelPolicy: config.aiLabelPublic,
@@ -252,6 +263,7 @@ export function registerAppsTools(
                             is_update: isUpdate,
                             download_url: downloadUrl,
                             inline_url: `${downloadUrl}?mode=inline`,
+                            ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                             next_steps: await buildNextSteps(parsed.owner, filename),
                         }, null, 2),
                     }],
@@ -343,9 +355,9 @@ export function registerAppsTools(
     mcp.tool(
         'aimeat_app_draft_publish',
         descriptionFor('aimeat_app_draft_publish'),
-        { filename: z.string().describe('App filename whose saved draft should be promoted to a new live version.') },
+        { filename: z.string().describe('App filename whose saved draft should be promoted to a new live version.'), ...aiProvenanceInputs },
         annotationsFor('aimeat_app_draft_publish'),
-        async ({ filename }) => {
+        async ({ filename, ai_provenance, ai_provenance_id }) => {
             const agentGaii = getAgentGaii();
             const parsed = parseGAII(agentGaii);
             if (!parsed) return { content: [{ type: 'text' as const, text: 'Failed to parse agent GAII' }], isError: true };
@@ -365,11 +377,12 @@ export function registerAppsTools(
                 forkableState = !!live?.forkable;
             }
             const manifest: AppManifest = { ...draft.manifest, version: draft.manifest.version || `1.0.${newVersion - 1}`, authorDisplay: parsed.owner };
-            // MINT-3 — same rule on the draft-publish path, or an agent could route around it by
-            // staging first.
-            const aiProvenanceId = await stampAgentWrite(storage, {
+            // Same rule on the draft-publish path, or an agent could route around it by staging first.
+            const aiProvenanceId = await provenanceForWrite(storage, {
                 principal: agentGaii,
                 content: draft.data,
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
                 pipeline: 'mcp.app_draft_publish',
                 surface: { visibility: parkedState ? 'private' : 'public', humanAudience: true },
                 labelPolicy: config.aiLabelPublic,
@@ -396,6 +409,7 @@ export function registerAppsTools(
                             filename, version_number: newVersion, is_update: isUpdate,
                             parked: parkedState, download_url: downloadUrl, inline_url: `${downloadUrl}?mode=inline`,
                             note: 'Draft published as the new live version; the draft slot is cleared.',
+                            ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                             next_steps: await buildNextSteps(parsed.owner, filename),
                         }, null, 2),
                     }],

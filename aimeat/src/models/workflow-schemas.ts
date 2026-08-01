@@ -137,7 +137,12 @@ export type WorkflowStepAction =
   // steps branch on it with deterministic json_field gates. on_timeout: what the watchdog does when
   // timeout_min (default 1440 = 24h for human steps) elapses unanswered — 'fail' (default, timed-out),
   // 'skip', or 'default' (synthesize the answer `default_option`, by:'timeout-default').
-  | { kind: 'human-input'; question: WorkflowHumanQuestion; answer_to_key?: string; on_timeout?: 'fail' | 'skip' | 'default'; default_option?: string };
+  // reviews_key (TARGET-058): the memory key whose CONTENT this question puts in front of the
+  // person. It is the ONE thing in the whole workflow engine that can upgrade a provenance record's
+  // humanInvolvement to 'editorial-control', because it is the only place where a named person reads
+  // the substance and can reject it. A step that merely asks "publish now?" must not set it —
+  // clicking publish is not review, and a false editorial-control claim is worse than none.
+  | { kind: 'human-input'; question: WorkflowHumanQuestion; answer_to_key?: string; reviews_key?: string; on_timeout?: 'fail' | 'skip' | 'default'; default_option?: string };
 
 export interface WorkflowStep {
   id: string;                         // stable; marks "what happened where" per run
@@ -343,6 +348,9 @@ const WorkflowStepActionSchema = z.discriminatedUnion('kind', [
       allowOther: z.boolean().optional(),
     }),
     answer_to_key: z.string().min(1).max(400).optional(),
+    /** The key whose CONTENT the person is being asked to read. See the type above — this is the
+     *  only field on the engine that may upgrade a provenance record to 'editorial-control'. */
+    reviews_key: z.string().min(1).max(400).optional(),
     on_timeout: z.enum(['fail', 'skip', 'default']).optional(),
     default_option: z.string().min(1).max(64).optional(),
   }),

@@ -56,6 +56,12 @@
  *     open, healthy SSE stream: five writes through POST /v1/memory produced five
  *     {"domains":["memory"]} frames; three through this tool produced none. That is the difference
  *     between an app that fills in while an agent works and one that needs the human to reload.
+ *   v1.13.0 -- 2026-08-01 -- TARGET-058 Phase 4. aimeat_memory_write and aimeat_board_post accept an
+ *     `ai_provenance` declaration (and `ai_provenance_id`) and go through provenanceForWrite(), the
+ *     same one decision function the REST paths use; aimeat_memory_read returns the record on the
+ *     result. Both write tools reached storage DIRECTLY before this, so an agent writing over MCP
+ *     left content with no provenance at all while the identical write over REST /v1/memory was
+ *     stamped — the MCP hop was exactly where the information was being lost.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -76,6 +82,10 @@ import { getAgentSkillLinks } from '../services/skills.js';
 import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, shadowedByOwnerCopy, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
+import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { writeProvenanceEcho, readProvenance } from './ai-provenance-result.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
+import { memoryContentBytes } from '../routes/memory/shared.js';
 import { registerCoreAdminTools } from './core-admin.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { logger } from '../utils/logger.js';
@@ -355,6 +365,11 @@ export function registerCoreTools(
                 tags: record.tags,
                 version: record.version,
                 updated_at: record.updatedAt,
+                // TARGET-058: how this was made, so an agent summarising several records for a person
+                // can say which of them a model wrote. Absence means UNSTATED, never "a person wrote
+                // it". The caller has already passed the read gate above; provenance travels with the
+                // content it describes.
+                ...(await readProvenance(storage, config, record.aiProvenanceId)),
             });
         },
     );
@@ -370,9 +385,10 @@ export function registerCoreTools(
             group_id: z.string().optional().describe('ID of sharing group for group visibility'),
             tags: z.array(z.string()).default([]).describe('Optional tags for filtering'),
             ttl_hours: z.number().optional().describe('Time-to-live in hours (entry expires after this; omit for no expiry)'),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_memory_write'),
-        async ({ key, value, visibility, group_id, tags, ttl_hours }) => {
+        async ({ key, value, visibility, group_id, tags, ttl_hours, ai_provenance, ai_provenance_id }) => {
             // Schema locks apply on EVERY write surface. This tool used to call setMemory directly,
             // making MCP a bypass around strict record schemas + the manifest-format schema (REST
             // returned 422 while the same write sailed through here). Mirror the REST behaviour.
@@ -406,10 +422,28 @@ export function registerCoreTools(
                     if (ownerCopy) shadowedBy = ownerCopy.ownerGaii;
                 }
             }
+            // TARGET-058. This tool wrote straight to storage, so an agent writing through MCP left a
+            // record with NO provenance at all — while the same write over REST /v1/memory was
+            // stamped. The MCP hop is exactly where the information is lost if it is not carried, so
+            // it goes through the same one decision function the REST path uses: attach what the
+            // caller already holds, honour what it declares, otherwise Mint-3.
+            const aiProvenanceId = await provenanceForWrite(storage, {
+                principal: agentGaii,
+                content: memoryContentBytes(value),
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.memory_write',
+                surface: { visibility, humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
             const record = await storage.setMemory({
                 key,
                 ownerGaii: agentGaii,
                 value,
+                ...(aiProvenanceId ? { aiProvenanceId } : {}),
                 visibility,
                 groupId: visibility === 'group' ? group_id : undefined,
                 tags,
@@ -438,6 +472,9 @@ export function registerCoreTools(
                     text: JSON.stringify({
                         key: record.key, version: record.version, visibility: record.visibility,
                         tags: record.tags, written: true, owner_gaii: agentGaii,
+                        // What the node recorded about how this was made — returned so the agent can
+                        // see the stamp it got by saying nothing, rather than discovering it later.
+                        ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                         ...(shadowedBy ? shadowedByOwnerCopy(key, agentGaii, shadowedBy) : {}),
                     }, null, 2),
                 }],
@@ -663,11 +700,27 @@ export function registerCoreTools(
     mcp.tool(
         'aimeat_board_post',
         descriptionFor('aimeat_board_post'),
-        { board_id: z.string(), title: z.string(), body: z.string(), category: z.string().optional() },
+        { board_id: z.string(), title: z.string(), body: z.string(), category: z.string().optional(), ...aiProvenanceInputs },
         annotationsFor('aimeat_board_post'),
-        async ({ board_id, title, body, category }) => {
+        async ({ board_id, title, body, category, ai_provenance, ai_provenance_id }) => {
             const { randomBytes } = await import('node:crypto');
             const postId = `post-${randomBytes(8).toString('hex')}`;
+            // TARGET-058. A board post is text an agent puts where people read it, so it is stamped
+            // like any other write. The hash covers title + body together, which is the unit a reader
+            // sees; a post has no provenance column, so the record stands on its own and is joined by
+            // that hash rather than by a foreign key.
+            const provenanceId = await provenanceForWrite(storage, {
+                principal: agentGaii,
+                content: `${title}\n\n${body}`,
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.board_post',
+                surface: { visibility: 'public', humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
             const post = await storage.createPost({
                 id: postId,
                 boardId: board_id,
@@ -680,7 +733,10 @@ export function registerCoreTools(
                 createdAt: new Date().toISOString(),
             });
             return {
-                content: [{ type: 'text' as const, text: JSON.stringify({ id: post.id, board_id, title, posted: true }, null, 2) }],
+                content: [{ type: 'text' as const, text: JSON.stringify({
+                    id: post.id, board_id, title, posted: true,
+                    ...(await writeProvenanceEcho(storage, config, provenanceId)),
+                }, null, 2) }],
             };
         },
     );

@@ -9,6 +9,10 @@
  * @structure BUILTIN_SKILLS — Array<{ name, skillMd, visibility? }>
  * @usage import { BUILTIN_SKILLS } from '../data/builtin-skills.js';
  * @version-history
+ *   v1.5.0 -- 2026-08-01 -- TARGET-058 Phase 4: `ai-transparency` (public) — when to declare, what the
+ *     levels mean, how to state human involvement honestly, and what an absent record means when
+ *     reading. Small and cheap to load, attachable to any agent. Seeding is create-if-missing, so an
+ *     existing node needs an operator republish to pick it up.
  *   2026-07-19 — Research-first flow (AppDev KB Phase 7): Step 0 + tier decision tree + finish checklist / appdev-flow prompt / handbook module
  *   v1.4.0 -- 2026-07-19 -- aimeat-app-builder (public): the paved path for building apps ON
  *     the node over MCP — spec-first, research-before-building (apps/packs/pitfalls), presigned
@@ -142,6 +146,118 @@ within a daily allowance (\`aimeat_wallet_balance\`).
 - Read before you write; propose before you change the owner's data.
 - Use the paved paths above instead of guessing endpoints — every list here is served
   fresh by the node itself.
+`,
+  },
+  {
+    name: 'ai-transparency',
+    visibility: 'public',
+    skillMd: `---
+name: ai-transparency
+description: How to declare and read AI provenance on an AIMEAT node — when to declare, what the levels mean, how to state human involvement honestly, and what a publishing surface does with your declaration. Use whenever you write content a person may read, or read content back and need to say how it was made.
+license: MIT
+metadata:
+  audience: agent
+---
+
+# Saying how content was made
+
+This node records how every piece of content was made. You are part of that record, and
+the rules are short.
+
+## The one thing to remember
+
+**Silence is recorded as model-written.** When a non-human principal writes content and
+declares nothing, the node stamps it \`ai-generated\` with \`humanInvolvement: none\`, marks
+that the stamp was inferred rather than observed, and moves on. That default is deliberate:
+the alternative — reading silence as "a person wrote this" — would be a false statement
+about authorship, and it is the one mistake that cannot be corrected later.
+
+So the case that needs you to speak up is **relaying a person's words**. If you are
+copying, forwarding or transcribing what a human wrote, say so.
+
+## Declaring
+
+Every write tool takes an optional \`ai_provenance\` block:
+
+\`\`\`json
+{
+  "level": "ai-generated",
+  "method": "summarized",
+  "human_involvement": "none",
+  "model": "anthropic/claude-opus-5",
+  "sources": [{ "url": "https://…", "role": "primary" }]
+}
+\`\`\`
+
+Only \`level\` is required once you send the block. The node fills in who you are, which
+node, when, and a hash of the exact bytes — you are never asked to assert those, and
+anything you do say about identity is discarded.
+
+Declaring needs the \`provenance:write\` scope, because a declaration can assert that a
+person wrote or reviewed something. If you do not hold it, the call is refused with that
+message; omit the block and the node records what it observed instead. Recording is never
+gated — only asserting is.
+
+## \`level\` — how much of the content a model made
+
+| Value | Means |
+|---|---|
+| \`original\` | A person wrote it. No model involved. Use this when you relay human text. |
+| \`assisted\` | A person wrote it; a model edited, refined or filled in. |
+| \`synthesized\` | A model combined real sources into new content, at someone's direction. |
+| \`ai-generated\` | A model produced it. |
+
+## \`human_involvement\` — whether anyone checked
+
+This is the field that decides whether a visible label is owed, so be strict with it.
+
+| Value | Means |
+|---|---|
+| \`none\` | Nobody read the substance before it went out. |
+| \`light-review\` | Someone glanced: spelling, formatting, a skim. |
+| \`editorial-control\` | A person examined the substance and could approve, alter or reject it. |
+| \`full-human\` | A person authored or rewrote it. |
+
+**Only a step where a person reads the substance and can reject it counts.** Clicking
+publish is not that step. An owner approving a queue of twenty items in one gesture is not
+that step. If you are unsure whether review happened, it did not — say \`none\`.
+
+Note that \`level\` and \`human_involvement\` are independent. \`assisted\` + \`none\` is not a
+contradiction: it means a person wrote it, a model edited it, and nobody checked what the
+model did.
+
+## Reading it back
+
+Read tools return an \`ai_provenance\` block beside the content — \`aimeat_memory_read\`,
+\`aimeat_workspace_read\` (when you open records by id), \`aimeat_knowledge_get\`,
+\`aimeat_dm_thread\`, \`aimeat_exchange_offering_get\`.
+
+**An absent block means the origin is UNSTATED.** It does not mean a person wrote it. If
+you are summarising several items for a person, you can say "two of these were written by
+a model" only for the ones that carry a record; for the rest, say the origin is not stated.
+
+Each record carries a pre-rendered \`disclosure\` with the exact words the node uses, in
+every language it ships. Quote those rather than composing your own — they are compliance
+text, not description.
+
+## What the publishing surfaces do with it
+
+- A public page renders the EU AI transparency label when the record says one is owed.
+- The served HTML carries machine-readable marks and a link to the addressable record at
+  \`/v1/provenance/<id>\`, which anyone can resolve without an account once the content is public.
+- Markdown faces carry the record in frontmatter and one human-readable line in the body.
+- The record is joined to the exact bytes by a SHA-256 hash, so a third party holding the
+  content can ask this node whether it produced them.
+
+## What never goes in a record
+
+Prompt text and anything private or commercially sensitive. The record is published
+alongside the content it describes. Keep \`notes\` to what a reader needs in order to
+interpret the rest.
+
+## The node's statement
+
+\`GET /v1/ai-transparency\` is this node's machine-readable transparency statement.
 `,
   },
   {

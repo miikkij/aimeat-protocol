@@ -824,7 +824,17 @@ DAEMON_DEFAULT_TOOL_FILTER: tuple[str, ...] = (
     "aimeat_task_complete",
     "aimeat_task_fail",
     "aimeat_task_create",  # for crew-to-crew delegation
-    # Deliverables
+    # Deliverables.
+    #
+    # AI PROVENANCE (TARGET-058): each of these write tools takes an optional
+    # `ai_provenance` block. A daemon crew publishes on a schedule with NO
+    # REVIEWER, so the node's default is the correct record for it —
+    # `ai-generated` / `humanInvolvement: "none"` — and the daemon does not
+    # override it. There is no step in this loop where a person reads the
+    # substance and could reject it: the owner queued a task, which is not the
+    # same as reading what came back. Use aimeat_crewai.provenance.declare()
+    # when the crew knows better, above all when it is RELAYING TEXT A PERSON
+    # WROTE (level="original") — that is the one thing silence gets wrong.
     "aimeat_memory_write",
     "aimeat_memory_read",
     "aimeat_memory_list",

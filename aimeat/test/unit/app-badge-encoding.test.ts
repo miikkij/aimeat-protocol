@@ -19,6 +19,8 @@
  *   - injectAiDisclosure's visible label is pure ASCII in both locales
  * @usage pnpm exec vitest run test/unit/app-badge-encoding.test.ts
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 4 step 0c: the em-dash assertion flips from "present as an
+ *     entity" to ABSENT. Escaping it still renders the banned character, so the badge was reworded.
  *   v1.0.0 — 2026-08-01 — Written after the mojibake was seen in a real browser.
  */
 import { describe, it, expect } from 'vitest';
@@ -45,10 +47,18 @@ describe('the attribution badge survives a document with no charset', () => {
     expect(nonAscii(html)).toEqual([]);
   });
 
-  it('still carries the glyphs — as entities, not as missing characters', () => {
+  it('still carries the glyphs it keeps — as entities, not as missing characters', () => {
     expect(html).toContain('&#9889;');  // ⚡
     expect(html).toContain('&#183;');   // ·
-    expect(html).toContain('&#8212;');  // —
+  });
+
+  // The em dash is gone from the WORDING, not merely escaped. Encoding it produced `&#8212;`, which
+  // a browser renders as exactly the character the house style bans — so the fix had to be a reword
+  // ("Publish your own app for free"). Asserted as an absence so re-introducing it fails here.
+  it('contains no em dash, encoded or otherwise', () => {
+    expect(html).not.toContain('&#8212;');
+    expect(html).not.toContain('&mdash;');
+    expect(html).not.toContain('—');
   });
 
   it('and still carries the badge itself', () => {

@@ -529,6 +529,8 @@ export interface DeviceAuth {
 }
 
 export interface DirectMessage {
+  /** TARGET-058: the provenance record describing this message's body. NULL = unstated. */
+  aiProvenanceId: string | null;
   attachments: Json | null;
   body: Generated<string>;
   broadcastId: string | null;

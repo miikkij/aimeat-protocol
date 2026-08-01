@@ -10,6 +10,11 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   v1.4.0 -- 2026-08-01 -- TARGET-058 Phase 4. aimeat_dm_send and aimeat_dm_send_as_owner accept an
+ *     `ai_provenance` declaration and stamp the body through provenanceForWrite(); aimeat_dm_thread
+ *     returns each message's record, batched. send_as_owner stamps the ACTING AGENT rather than the
+ *     owner it sends as: the recipient sees a person's name on the message, and letting Mint-3 read
+ *     the owner as the writer would manufacture exactly the false attribution this work prevents.
  *   v1.0.0 — 2026-06-22 — Initial: aimeat_dm_send (federated send + multi-attachment), gated messages:send.
  *   v1.1.0 — 2026-06-23 — aimeat_dm_ask (federated AskUserQuestion: structured option questions); inbox/thread
  *     now surface the `interactive` payload so the agent reads the human's machine-readable answers.
@@ -36,6 +41,9 @@ import { descriptionFor } from './catalog/shape.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
 import { fileRefFor } from '../services/file-refs.js';
 import type { DirectMessageAttachment } from '../storage/interface.js';
+import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
 
 /**
@@ -95,9 +103,10 @@ export function registerDmMessageTools(
             conversation_id: z.string().min(8).max(64).optional().describe('Continue a specific existing thread by its id (e.g. one returned by aimeat_dm_inbox). Omit for the default per-recipient thread.'),
             attachments: z.array(MessageAttachmentInputSchema).max(20).optional()
                 .describe('Up to 20 files to attach. Upload each file first via aimeat_storage_upload (presigned), then pass its { storage_key, mime, kind, size, name } here — MCP does not carry the bytes.'),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_dm_send'),
-        async ({ to, body, reply_to, subject, conversation_id, attachments }) => {
+        async ({ to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
             const senderGhii = getAgentGaii();
             const recipientGhii = to.trim();
 
@@ -109,9 +118,27 @@ export function registerDmMessageTools(
             }
 
             const mapped = attachments?.length ? mapMessageAttachments(attachments, senderGhii, config.nodeId) : undefined;
+            // TARGET-058. A message an agent sends is AI-written text delivered to a named person, so
+            // it is stamped like any other write: declared if the agent said something, Mint-3 if it
+            // said nothing. The record describes the BODY — attachments carry their own provenance
+            // wherever they are stored.
+            const aiProvenanceId = await provenanceForWrite(storage, {
+                principal: senderGhii,
+                content: body ?? '',
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.dm_send',
+                // A DM is never public, but it IS delivered to a person — which is what decides
+                // whether a label is owed, not whether the world can read it.
+                surface: { visibility: 'private', humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
             const result = await sendDirectMessage(ctx, {
                 senderGhii, recipientGhii, body: body ?? '', replyToId: reply_to, attachments: mapped,
-                conversationId: conversation_id, subject,
+                conversationId: conversation_id, subject, aiProvenanceId,
             });
 
             if (!result.ok) {
@@ -131,6 +158,7 @@ export function registerDmMessageTools(
                         status: result.message.status,
                         attachments: result.message.attachments?.length ?? 0,
                         created_at: result.message.createdAt,
+                        ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                     }, null, 2),
                 }],
             };
@@ -154,9 +182,10 @@ export function registerDmMessageTools(
             conversation_id: z.string().min(8).max(64).optional().describe('The owner\'s existing thread with the recipient (so the reply lands in that thread). Omit for the default per-pair thread.'),
             attachments: z.array(MessageAttachmentInputSchema).max(20).optional()
                 .describe('Up to 20 files to attach, each pre-uploaded via aimeat_storage_upload (presigned).'),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_dm_send_as_owner'),
-        async ({ to, body, reply_to, subject, conversation_id, attachments }) => {
+        async ({ to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
             const agentGaii = getAgentGaii();
             const parsed = parseGaiiLoose(agentGaii);
             // Server-derived: the acting agent's OWN owner GHII. Never trust a client id here.
@@ -171,9 +200,29 @@ export function registerDmMessageTools(
             }
 
             const mapped = attachments?.length ? mapMessageAttachments(attachments, ownerGhii, config.nodeId) : undefined;
+            // TARGET-058, and this is the sharpest case on the whole surface. The message is SENT as
+            // the owner, so the recipient sees a person's name on it — but an AGENT wrote the words.
+            // Stamping the owner as the principal would let Mint-3 conclude "a human wrote this" and
+            // produce exactly the false attribution the whole design exists to prevent, so the
+            // principal here is the ACTING AGENT (the same identity the audit line below records).
+            // Delegation is not review: holding `messages:send-as-owner` says the owner allowed the
+            // agent to speak for them, not that anyone read this text before it went out. An owner
+            // who did read it can say so by declaring human_involvement:"editorial-control".
+            const aiProvenanceId = await provenanceForWrite(storage, {
+                principal: agentGaii,
+                content: body ?? '',
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.dm_send_as_owner',
+                surface: { visibility: 'private', humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
             const result = await sendDirectMessage(ctx, {
                 senderGhii: ownerGhii, recipientGhii, body: body ?? '', replyToId: reply_to, attachments: mapped,
-                conversationId: conversation_id, subject,
+                conversationId: conversation_id, subject, aiProvenanceId,
             });
 
             if (!result.ok) {
@@ -198,6 +247,7 @@ export function registerDmMessageTools(
                         status: result.message.status,
                         attachments: result.message.attachments?.length ?? 0,
                         created_at: result.message.createdAt,
+                        ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                     }, null, 2),
                 }],
             };
@@ -301,6 +351,10 @@ export function registerDmMessageTools(
             const { messages, total } = await storage.listAgentDmThread(agentGaii, conversation_id, { page: page ?? 1, perPage: per_page ?? 50 });
             // Oldest-first so the agent reads the conversation in order.
             const ordered = [...messages].sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+            // TARGET-058: how each message in the thread was made, in one query. This is the case the
+            // read half of the phase was written for — an agent summarising a conversation for the
+            // person who owns the mailbox has to be able to say which turns a model wrote.
+            const provFor = await readProvenanceMany(storage, config, ordered.map(m => m.aiProvenanceId));
             return {
                 content: [{
                     type: 'text' as const,
@@ -315,6 +369,7 @@ export function registerDmMessageTools(
                             attachments: m.attachments?.map(a => attachmentView(a, mailboxOwnerGhii)) ?? [],
                             interactive: m.interactive ?? null,
                             created_at: m.createdAt,
+                            ...provFor(m.aiProvenanceId),
                         })),
                         total,
                     }, null, 2),
