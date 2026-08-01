@@ -7,9 +7,11 @@
  *
  *   HARD TO CALL WRONGLY, BY CONSTRUCTION. The caller supplies only what it OBSERVED; the service
  *   fills `spec`, `generatedAt`, `contentHash`, `attestation` and `disclosure` itself. In
- *   particular `attestation.observed` is DERIVED from `stampedBy` and is not a parameter: a caller
- *   declaring provenance for content produced somewhere else cannot claim this node witnessed it.
- *   That is the whole point of keeping the two apart.
+ *   particular `attestation.observed` can only ever be NARROWED: a `principal` stamp is false no
+ *   matter what the caller says, so nobody declaring provenance for content produced elsewhere can
+ *   dress the claim up as something this node witnessed. A NODE stamp may narrow itself to false —
+ *   that is Mint-3, where the node stamped the record because an agent held the pen rather than
+ *   because it watched a model produce the bytes.
  *
  *   MINTING IS MAXIMAL, UNCONDITIONALLY. At the chokepoint the node already knows the model, the
  *   provider, the principal, the node id, the timestamp and the content hash, so it never omits
@@ -25,12 +27,18 @@
  * @structure
  *   - contentHashOf(bytes)            — `sha256:<hex>`, node:crypto, no dependency
  *   - mintProvenance(storage, …)      — build + validate + persist, returns the stored row
+ *   - stampAgentWrite(storage, …)     — MINT-3: the default for a non-human principal that declared
+ *                                       nothing. An owner (GHII) is never stamped.
+ *   - publiclyResolvable(storage, ids)— THE visibility rule: provenance follows the content
  *   - buildDisclosure(...)            — the pre-rendered disclosure block, from disclosureFor() + i18n
  *   - projectForDetail(record, detail)— what a PUBLIC surface serves under AIMEAT_AI_PROVENANCE_DETAIL
  * @usage
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. stampAgentWrite() (Mint-3) and publiclyResolvable();
+ *     `visibility` is no longer a mint parameter — it is derived from the content the record
+ *     describes, so nothing a caller sends can publish a statement about unreadable content.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
  */
 import { createHash, randomUUID } from 'node:crypto';
@@ -42,6 +50,7 @@ import {
   type LocalizedText,
 } from '../models/ai-provenance-schemas.js';
 import { disclosureFor, type SurfaceContext } from './ai-disclosure.js';
+import { isGEAI, parseGAII, ownerGhiiOf } from '../utils/gaii.js';
 import { createT, LOCALES } from '../i18n.js';
 
 /** What a caller may state. Everything the node can work out itself is deliberately absent. */
@@ -71,8 +80,13 @@ export interface MintProvenanceInput {
   derivedFrom?: string[];
   notes?: string;
 
-  /** `public` ONLY when the content this describes is itself public. Defaults to `private`. */
-  visibility?: 'public' | 'private';
+  /**
+   * Did THIS node witness the generation? Defaults to true for a node stamp, and it can only ever
+   * be NARROWED: a `principal` stamp is always `observed: false`, whatever this says. Mint-3 sets it
+   * false — the node stamped the record because an agent held the pen, not because it watched a
+   * model produce the bytes, and an inference must never be recorded as an observation.
+   */
+  observed?: boolean;
   /** When the content was generated. Defaults to now; a declarer may state an earlier time. */
   generatedAt?: string;
   /** The surface it will be served on, so the disclosure block can be pre-rendered. */
@@ -164,8 +178,9 @@ export async function mintProvenance(
     },
     attestation: {
       stampedBy: input.stampedBy,
-      // DERIVED, never a parameter: only a node that saw the generation may say it did.
-      observed: input.stampedBy === 'node',
+      // Only a node that saw the generation may say it did: a `principal` stamp is false, always,
+      // and a node stamp may still narrow itself to false when it is inferring rather than watching.
+      observed: input.stampedBy === 'node' && (input.observed ?? true),
       ...(contentHash ? { contentHash } : {}),
       ...(input.baseUrl ? { recordUrl: `${input.baseUrl.replace(/\/+$/, '')}/v1/provenance/${id}` } : {}),
     },
@@ -187,13 +202,108 @@ export async function mintProvenance(
     ownerGhii: input.ownerGhii,
     principal: input.principal,
     contentHash: contentHash ?? null,
-    visibility: input.visibility ?? 'private',
     generatedAt,
     createdAt: new Date().toISOString(),
     record: parsed.data,
   };
   await storage.createAiProvenance(row);
   return row;
+}
+
+/**
+ * MINT-3 — the node's default statement about content a non-human principal wrote without saying
+ * anything about it.
+ *
+ * The rule (07-mcp-and-agent-plane.md §2.2): **silence from an agent must not read as "a human wrote
+ * it".** An agent or ecosystem app writing text and declaring nothing is stamped `ai-generated` /
+ * `humanInvolvement: none`, `stampedBy: 'node'`, `observed: false` — we did not witness the
+ * generation, we inferred it from who is holding the pen — and the inference is written into
+ * `notes` so a reader can tell an inference from an observation.
+ *
+ * An OWNER (GHII) principal is never stamped. A person writing through their own token is presumed
+ * human unless they declare otherwise, and stamping them would be a false statement about
+ * authorship. Returns `undefined` in that case, and whenever provenance is switched off.
+ *
+ * Returns the provenance id to attach to the item, or undefined for "attach nothing".
+ */
+export async function stampAgentWrite(
+  storage: Storage,
+  input: {
+    /** The resolved identity of the writer — GHII, GAII or GEAI. Never `req.auth!.sub`. */
+    principal: string;
+    /** The exact bytes written, hashed here so a detection query can find them later. */
+    content: string | Uint8Array;
+    /** The job, crew, app or route that orchestrated the write. */
+    pipeline?: string;
+    /** The surface it will be served on, so the disclosure block is pre-rendered correctly. */
+    surface?: SurfaceContext;
+    nodeId: string;
+    baseUrl?: string;
+    /** `false` disables minting entirely (AIMEAT_AI_PROVENANCE=off). */
+    enabled?: boolean;
+  },
+): Promise<string | undefined> {
+  if (input.enabled === false) return undefined;
+  if (!isNonHumanPrincipal(input.principal)) return undefined;
+
+  const row = await mintProvenance(storage, {
+    stampedBy: 'node',
+    ownerGhii: ownerGhiiOf(input.principal),
+    principal: input.principal,
+    level: 'ai-generated',
+    humanInvolvement: 'none',
+    // The node stamped it, but it did NOT watch a model produce these bytes — it inferred from who
+    // was holding the pen. Recording that inference as an observation would be the one lie in the
+    // whole design.
+    observed: false,
+    content: input.content,
+    generator: input.pipeline ? { pipeline: input.pipeline } : undefined,
+    notes: INFERRED_FROM_PRINCIPAL_NOTE,
+    surface: input.surface,
+    nodeId: input.nodeId,
+    baseUrl: input.baseUrl,
+  });
+  return row.id;
+}
+
+/** Written into `notes` on every Mint-3 record, so an inference never passes for an observation. */
+export const INFERRED_FROM_PRINCIPAL_NOTE =
+  'Inferred from the principal type: a non-human principal wrote this and declared no provenance. '
+  + 'The node did not witness the generation. Silence from an agent is recorded as model-written '
+  + 'rather than as human-written; an agent relaying text a person wrote can say so explicitly.';
+
+/** A GAII (`agent#owner@node`) or a GEAI (`eco:app#owner@node`) — anything that is not a person. */
+function isNonHumanPrincipal(principal: string): boolean {
+  return isGEAI(principal) || parseGAII(principal) !== null;
+}
+
+/**
+ * Resolve a caller-supplied provenance id to something safe to attach to their own item.
+ *
+ * A write path that took the id on trust would be a way to point a public item at SOMEONE ELSE'S
+ * private record and publish it — visibility follows the content, so attaching is exactly the act
+ * that makes a record resolvable. The ownership check is therefore not a nicety; it is the whole
+ * gate. Returns the id when it is the caller's own, `undefined` otherwise.
+ */
+export async function resolveAttachableProvenanceId(
+  storage: Storage, ownerGhii: string, provenanceId: string | undefined,
+): Promise<string | undefined> {
+  if (!provenanceId) return undefined;
+  const row = await storage.getAiProvenance(provenanceId);
+  return row && row.ownerGhii === ownerGhii ? row.id : undefined;
+}
+
+/**
+ * THE visibility rule, at the one place that serves records: which of these are resolvable by
+ * anyone right now? Visibility is not stored on the record — it follows the content, so this asks
+ * the storage layer whether any item pointing at the record is currently public.
+ *
+ * Callers must treat "not in the returned set" as **identically** to "no such record": the resolve
+ * endpoint answers one 404 for both, or it becomes an oracle for which ids exist on this node.
+ */
+export async function publiclyResolvable(storage: Storage, ids: string[]): Promise<Set<string>> {
+  if (ids.length === 0) return new Set();
+  return new Set(await storage.publiclyLinkedProvenanceIds(ids));
 }
 
 /**

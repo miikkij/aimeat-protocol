@@ -31,6 +31,9 @@
  *   import { AiProvenanceSchema, asKnownProvenance } from '../models/ai-provenance-schemas.js';
  *   const parsed = AiProvenanceSchema.safeParse(req.body.provenance);
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. `humanInvolvement` doc comment states what it measures
+ *     (review of the MODEL's contribution, not authorship), which is what makes `assisted` + `none`
+ *     readable rather than contradictory.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1. The vocabulary frozen in
  *     docs/internal/EUAct/22-frozen-vocabulary.md Part B. `level` is the SINGLE definition of the
  *     four synthesis levels: src/schemas/knowledge-package.ts and
@@ -62,6 +65,11 @@ export type AiProvenanceMethod = (typeof AI_PROVENANCE_METHODS)[number];
 
 /**
  * The field that decides whether a visible label is owed.
+ *
+ * IT DESCRIBES REVIEW OF THE MODEL'S CONTRIBUTION, NOT AUTHORSHIP. That is why `assisted` + `none`
+ * is not a contradiction: it means a human wrote it, a model edited it, and nobody checked what the
+ * model did. Read the two fields together — `level` says how much of the content a model touched,
+ * this field says whether a person then examined what the model produced.
  *
  * ONLY A STEP WHERE A PERSON READS THE SUBSTANCE AND CAN REJECT IT UPGRADES THIS FIELD.
  * Clicking publish is not that step. The 20 July 2026 Guidelines are explicit that superficial

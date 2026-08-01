@@ -19,6 +19,12 @@
  *   A DECLARATION IS NOT AN OBSERVATION. `POST /v1/provenance` writes `stampedBy: 'principal'` and
  *   `observed: false`, always. The service derives that from stampedBy rather than accepting it as a
  *   parameter, so no caller can claim this node witnessed a generation it did not.
+ *
+ *   AND A DECLARATION CANNOT PUBLISH ITSELF. There is no `visibility` parameter, because a
+ *   caller-settable one is a way to publish a statement about content nobody may read. A record
+ *   becomes anonymously resolvable exactly when something public points at it — attach it to a
+ *   public memory key (`attachToMemoryKey`) and it resolves; make that key private and it returns to
+ *   the identical 404. One visibility model, the platform's own, running in one direction.
  * @structure
  *   - GET  /v1/schemas/ai-provenance/v1.json — the published JSON Schema (raw, not enveloped)
  *   - GET  /v1/provenance/:id                — resolve; public record → anyone, else owner-only
@@ -28,6 +34,8 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. Visibility is derived from the linked content instead
+ *     of being stored on the record and settable by the declarer.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
  */
 import { Router } from 'express';
@@ -43,7 +51,7 @@ import {
   AI_PROVENANCE_LEVELS, AI_PROVENANCE_METHODS, AI_HUMAN_INVOLVEMENT, AI_UPSTREAM_MARKS,
   AiProvenanceSourceSchema, CONTENT_HASH_PATTERN, aiProvenanceJsonSchema, AI_PROVENANCE_SCHEMA_PATH,
 } from '../models/ai-provenance-schemas.js';
-import { mintProvenance, projectForDetail } from '../services/ai-provenance.js';
+import { mintProvenance, projectForDetail, publiclyResolvable } from '../services/ai-provenance.js';
 
 /**
  * What a principal may DECLARE about content it produced elsewhere. Note what is absent: `spec`,
@@ -68,8 +76,6 @@ const DeclareProvenanceSchema = z.object({
   sources: z.array(AiProvenanceSourceSchema).max(100).optional(),
   derivedFrom: z.array(z.string().trim().min(1).max(400)).max(100).optional(),
   notes: z.string().trim().max(1_000).optional(),
-  /** Mark the record public ONLY when the content it describes is itself public. */
-  visibility: z.enum(['public', 'private']).optional(),
   /**
    * Attach the record to one of the caller's OWN memory keys. The key is resolved inside the
    * caller's own namespace — there is no way to name someone else's — which is what makes "a
@@ -110,7 +116,6 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     const record = isOwner ? row.record : projectForDetail(row.record, config.aiProvenanceDetail);
     return {
       id: row.id,
-      visibility: row.visibility,
       content_hash: row.contentHash,
       generated_at: row.generatedAt,
       // The document keeps ONE spelling on every carrier it travels on — camelCase — while the
@@ -160,9 +165,14 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     const owner = callerOwner(req);
     const isOwner = !!row && !!owner && row.ownerGhii === owner;
 
-    // ONE 404 for both "no such record" and "not yours". Two different answers here would turn this
-    // endpoint into an oracle for which ids exist on this node.
-    if (!row || (row.visibility !== 'public' && !isOwner)) {
+    // VISIBILITY FOLLOWS THE CONTENT. Not a flag on the record — a live question about whether
+    // anything public points at it. Publishing the content makes this resolve; unpublishing takes
+    // it straight back to the 404 below, with nothing to remember to do.
+    const isPublic = !!row && !isOwner && (await publiclyResolvable(storage, [row.id])).has(row.id);
+
+    // ONE 404 for all of "no such record", "not yours" and "its content is not public". Different
+    // answers here would turn this endpoint into an oracle for which ids exist on this node.
+    if (!row || (!isPublic && !isOwner)) {
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such provenance record.'));
     }
     res.json(success(config.nodeId, serve(row, isOwner)));
@@ -220,7 +230,6 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
         sources: input.sources,
         derivedFrom: input.derivedFrom,
         notes: input.notes,
-        visibility: input.visibility ?? 'private',
         nodeId: config.nodeId,
         baseUrl: config.baseUrl,
       });

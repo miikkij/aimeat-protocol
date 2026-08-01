@@ -16,6 +16,10 @@
  *   - renderPageMarkdown(page, config) — frontmatter + body + the site-map section
  * @usage app.use(markdownMirrorsRouter(config));  // before the SPA catch-all
  * @version-history
+ *   v1.1.0 — 2026-08-01 — Every mirror points at the node's AI transparency statement. These pages
+ *     are hand-authored marketing copy and deliberately carry NO provenance record of their own:
+ *     stamping them `original` would be an attestation about authorship nobody made, and absent
+ *     reads as UNSTATED, which is the truth here (TARGET-058).
  *   v1.0.0 — 2026-07-28 — Initial (agent-readability phase 07)
  */
 import { Router } from 'express';
@@ -58,6 +62,7 @@ ${sub(page.markdown ?? page.description)}
 
 ${siteMap}
 - [Full manual](${b}/llms.txt) · [Glossary](${b}/v1/glossary.md) · [API contract](${b}/v1/spec)
+- [AI transparency](${b}/v1/ai-transparency.md) — how this node marks content a model wrote
 `;
 }
 

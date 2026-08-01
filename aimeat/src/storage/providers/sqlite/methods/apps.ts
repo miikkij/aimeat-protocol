@@ -38,15 +38,15 @@ export const appsMethods = {
 
   async createApp(this: SqliteStorage, record: AppRecord): Promise<AppRecord> {
     this.db.prepare(
-      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, parked, forkable, operatorHidden, operatorHiddenBy, operatorHiddenAt, operatorHideReason, createdAt)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO apps (ownerGaii, ownerName, filename, versionNumber, manifest, mimeType, size, data, accessCode, parked, forkable, operatorHidden, operatorHiddenBy, operatorHiddenAt, operatorHideReason, createdAt, aiProvenanceId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       record.ownerGaii, record.ownerName, record.filename, record.versionNumber,
       JSON.stringify(record.manifest), record.mimeType, record.size, record.data,
       record.accessCode ?? null, record.parked ? 1 : 0, record.forkable ? 1 : 0,
       record.operatorHidden ? 1 : 0, record.operatorHiddenBy ?? null,
       record.operatorHiddenAt ?? null, record.operatorHideReason ?? null,
-      record.createdAt,
+      record.createdAt, record.aiProvenanceId ?? null,
     );
     return record;
   },
@@ -568,6 +568,7 @@ export const appsMethods = {
       if (row.operatorHiddenAt) record.operatorHiddenAt = row.operatorHiddenAt as string;
       if (row.operatorHideReason) record.operatorHideReason = row.operatorHideReason as string;
     }
+    if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
     return record;
   },
 

@@ -17,7 +17,7 @@ import { checkMemoryQuota, chargeOverage } from '../../services/quota.js';
 import { validateMemoryWrite } from '../../services/schema-validator.js';
 import { emitResourceUpdated, emitResourceListChanged } from '../../mcp/index.js';
 import { enqueueMemoryReplication } from '../../services/memory-replication.js';
-import { parseGaiiLoose } from '../../utils/gaii.js';
+import { parseGaiiLoose, ownerGhiiOf } from '../../utils/gaii.js';
 import { cached, TTL } from '../../services/cache.js';
 import { logger } from '../../utils/logger.js';
 import { emitChange, emitMemoryWritten } from '../../services/event-bus.js';
@@ -28,14 +28,15 @@ import { runAutomationRecipesForWrite } from '../../services/ecosystem-automatio
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 import { isKeyArchived } from '../../services/archive.js';
-import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared.js';
+import { stampAgentWrite, resolveAttachableProvenanceId } from '../../services/ai-provenance.js';
+import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
   const { config, storage, memoryDb, stats, onDirectoryChange, peers, resolve, workspaceAccess } = ctx;
 
   // POST /v1/memory — write a memory entry (agent auth required)
   router.post('/v1/memory', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
-    const { key, value, visibility, tags, ttl_hours, group_id, workspace_ref, workspace_refs, agent: agentParam } = req.body ?? {};
+    const { key, value, visibility, tags, ttl_hours, group_id, workspace_ref, workspace_refs, agent: agentParam, ai_provenance_id } = req.body ?? {};
 
     // Phase 2.3 — Workspace access check for organism.* keys (key comes from body, not params)
     if (typeof key === 'string' && key.startsWith('organism.')) {
@@ -175,10 +176,31 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       return;
     }
 
+    // MINT-3 (TARGET-058). A non-human principal that says nothing about what it wrote is stamped
+    // by the node: silence from an agent must NOT read as "a human wrote it". An owner writing
+    // through their own token is presumed human and is never stamped. Attached, not inherited — a
+    // new value is new content, so an overwrite drops the previous record's id rather than carrying
+    // a statement forward onto bytes it was never about.
+    // An explicitly supplied record wins — that is the publish path: `/v1/ai/complete` hands back a
+    // private record in `meta.provenance` and attaching it here is what makes it resolvable. It is
+    // resolved against the caller's OWN account, so nobody can publish someone else's statement.
+    const aiProvenanceId =
+      await resolveAttachableProvenanceId(storage, ownerGhiiOf(gaii), ai_provenance_id)
+      ?? await stampAgentWrite(storage, {
+        principal: gaii,
+        content: memoryContentBytes(value),
+        pipeline: 'memory.write',
+        surface: { visibility: vis as MemoryRecord['visibility'], humanAudience: true },
+        nodeId: config.nodeId,
+        baseUrl: config.baseUrl,
+        enabled: config.aiProvenance,
+      });
+
     const record = await storage.setMemory({
       key,
       ownerGaii: gaii,
       value,
+      ...(aiProvenanceId ? { aiProvenanceId } : {}),
       visibility: vis as MemoryRecord['visibility'],
       tags: Array.isArray(tags) ? tags : [],
       ttlHours: ttl_hours ?? null,

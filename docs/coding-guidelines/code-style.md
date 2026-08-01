@@ -42,6 +42,36 @@ Never use `MEAT` as a standalone prefix. The project is fully renamed to `AIMEAT
 | Env vars | `AIMEAT_*` | ~~MEAT_*~~ |
 | Default IDs | `aimeat-local-001-dev` | ~~meat-local-001-dev~~ |
 
+### Naming Convention — Casing, and Where It Changes
+
+This describes what the codebase already does. It is written down here because it was consistent and
+undocumented, which is how a reviewer ends up arguing about a casing choice that was never in doubt.
+
+There are **two kinds of thing**, and they follow different rules:
+
+| Kind | Casing | Example |
+|---|---|---|
+| Internal TS types, Zod models, variables | `camelCase` | `createdAt`, `blockSize`, `periodSeconds` |
+| **Route DTOs on the wire** | `snake_case`, **mapped at the route boundary** | `created_at: p.createdAt` (`access-tokens.ts`), `usage.prompt_tokens` (`ai.ts`) |
+| **Self-describing documents that carry their own `spec`** | **ONE spelling, `camelCase`, on every carrier** | ODPS `provenance` (`legalBasis`, `odpsVersion`), AI provenance (`humanInvolvement`, `generatedAt`) |
+
+**Route DTOs** are snake_case on the wire and camelCase inside, and the mapping happens once, in the
+route handler. Do not let snake_case leak inward and do not let camelCase leak outward.
+
+**Self-describing documents are different, and the difference is deliberate.** A document that
+carries its own `spec` identifier — `"spec": "aimeat.provenance/v1"`, an ODPS descriptor — is not a
+DTO of one endpoint. It travels through many carriers: a memory record, YAML frontmatter, a C2PA
+assertion, an MCP tool result, a WebMCP listing, `/v1/provenance/:id`, and a published JSON Schema
+external validators read. Mapping it at each boundary would mean one mapping site per carrier, and
+one of them would drift. So it keeps **one spelling everywhere**, and the spelling is camelCase.
+
+Which means `meta.provenance.humanInvolvement` sitting next to `usage.prompt_tokens` in the same
+response is **not** an inconsistency: one is a document riding in an envelope, the other is a field
+of that endpoint's DTO.
+
+The one place the two meet: an **MCP parameter name** is snake_case like every sibling parameter
+(`organism_id`, `include_archived`, `ai_provenance`) while its **value** is the document, camelCase.
+
 ### Type Exports
 
 - Export interfaces and types from the file where they're defined.

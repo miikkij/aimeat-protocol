@@ -62,6 +62,9 @@ import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { injectAimeatBadge } from '../utils/app-badge.js';
+import {
+  loadServedProvenance, setProvenanceHeaders, injectAiDisclosure, type ServedProvenance,
+} from '../services/ai-provenance-marks.js';
 import { injectAgentDiscovery } from '../utils/app-agent-discovery.js';
 import { appCsp } from '../utils/app-csp.js';
 import { injectAppHeadMeta } from '../utils/app-head-meta.js';
@@ -238,8 +241,11 @@ async function appForOrigin(req: Request, config: AimeatConfig, storage: Storage
 
 function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, apexOrigin?: string,
                   protect?: { config: AimeatConfig; viewer: string },
-                  discover?: { baseUrl: string; toolNames: string[]; origin?: string }): void {
+                  discover?: { baseUrl: string; toolNames: string[]; origin?: string },
+                  prov?: ServedProvenance): void {
   res.setHeader('Content-Type', app.mimeType);
+  // TARGET-058: the AI-Disclosure + Link headers travel with the document on the app origin too.
+  setProvenanceHeaders(res, prov);
   res.setHeader('Content-Security-Policy', csp);
   res.setHeader('Cache-Control', 'no-cache, must-revalidate');
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -252,7 +258,9 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
     const relaxed = apexOrigin
       ? relaxAppCspMeta(app.data as Buffer | Uint8Array | string, apexOrigin)
       : (app.data as Buffer | Uint8Array | string);
-    let buf = injectAimeatBadge(relaxed);
+    // SERVE TIME ONLY. The disclosure marks are added to the bytes on their way out; `app.data`
+    // stays the author's upload, so the hash in the provenance record keeps meaning what it says.
+    let buf = injectAiDisclosure(injectAimeatBadge(relaxed), prov);
     // The body of a single-file app is empty until its JavaScript runs, so a fetching agent sees
     // the meta tags and nothing else. This adds a static block naming the app id, the tools and
     // where the schemas live — the facts an agent otherwise has to guess from the subdomain.
@@ -481,7 +489,8 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       toolNames: await appToolNames(storage, app.ownerGaii, app.filename),
       origin: appOriginFor(req, config),
     };
-    serveApp(res, storage, app, appCspForRequest, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discover);  // the SDK (aimeat-auth.js) does the silent SSO itself
+    serveApp(res, storage, app, appCspForRequest, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discover,
+      await loadServedProvenance(storage, config, app.aiProvenanceId));  // the SDK (aimeat-auth.js) does the silent SSO itself
   });
 
   registerAppOriginWebmcp(router, storage, { resolveApp: t => resolveAppTarget(storage, t), isRestricted: a => appIsRestricted(config, a as AppRecord) });
@@ -639,7 +648,8 @@ Sitemap: ${origin}/sitemap.xml
       return;
     }
     const discoverShared = { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };
-    serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discoverShared); // no subdomain available → serve on the shared host (no SSO)
+    serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discoverShared,
+      await loadServedProvenance(storage, config, app.aiProvenanceId)); // no subdomain available → serve on the shared host (no SSO)
   });
 
   return router;

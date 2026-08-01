@@ -94,6 +94,16 @@ export interface AppRecord {
   operatorHiddenBy?: string;   // operator owner name who hid it
   operatorHiddenAt?: string;   // ISO timestamp
   operatorHideReason?: string; // optional operator-supplied reason (shown to owner)
+  /**
+   * The ATTACHED half of AI provenance (TARGET-058): the id of an `AiProvenanceRecordRow` describing
+   * how this app's BYTES were produced. Absent means UNSTATED — never "a human wrote it".
+   *
+   * Per VERSION, not per app: each published version is its own content, so each carries its own
+   * statement. It is also the link that makes the record publicly resolvable — a provenance record
+   * is readable by anyone exactly while some public item points at it, and a parked, hidden or
+   * access-coded app is not one.
+   */
+  aiProvenanceId?: string;
 }
 
 /**

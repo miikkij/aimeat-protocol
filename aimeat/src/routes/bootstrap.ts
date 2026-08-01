@@ -651,6 +651,7 @@ export function bootstrapRouter(
           stats: { method: 'GET', url: '/v1/stats', description: 'System statistics — agent count, action count, usage metrics', tier: 0 },
           federation: { method: 'GET', url: '/v1/federation/directory', description: 'Federated peer directory for multi-node networks', tier: 1 },
           wellknown: { method: 'GET', url: '/.well-known/aimeat', description: 'Node discovery endpoint (RFC 5785)', tier: 0 },
+          ai_transparency: { method: 'GET', url: '/v1/ai-transparency', description: 'What this node marks as AI-generated, how, and in which posture. Content generated here carries an aimeat.provenance/v1 record on every surface; /v1/provenance/by-hash/{sha256} answers without an account. Markdown mirror at /v1/ai-transparency.md', tier: 0 },
           mcp: { method: 'POST', url: '/v1/mcp', description: 'MCP (Model Context Protocol) connector — OAuth 2.1, full built-in tool set; or /v2/mcp/{appdev|agent|service|admin} for a purpose-scoped surface', tier: 1 },
           apps: { method: 'GET', url: '/v1/apps', description: 'Browse downloadable apps directory', tier: 0 },
           libs: { method: 'GET', url: '/v1/libs', description: 'JavaScript helper libraries for app development', tier: 0 },
@@ -677,6 +678,7 @@ export function bootstrapRouter(
       { description: 'Browse the action catalogue', method: 'GET', url: '/v1/catalogue' },
       { description: 'Full OpenAPI specification', method: 'GET', url: '/v1/spec' },
       { description: 'Node discovery', method: 'GET', url: '/.well-known/aimeat' },
+      { description: 'How this node marks AI-generated content', method: 'GET', url: '/v1/ai-transparency' },
       { description: 'If your AI is struggling, fetch the help prompt and paste it to your AI chat', method: 'GET', url: '/v1/help/prompt' },
     ]));
   });

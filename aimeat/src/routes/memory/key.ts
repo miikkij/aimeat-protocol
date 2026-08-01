@@ -2,6 +2,8 @@
  * @file src/routes/memory/key.ts
  * @description Per-key memory routes: GET/DELETE/PUT /v1/memory/:key, CORS management, and the public GET /v1/memory/:gaii/:key read. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058: the reads carry `meta.provenance` + the AI-Disclosure / Link
+ *     headers, and the writes stamp a non-human principal that declared nothing (Mint-3).
  *   v1.1.0 — 2026-07-19 — public :gaii/:key read supports ?soft=1 (200 + exists:false, identical
  *     for missing and hidden records — no existence leak), matching the authed route
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
@@ -20,7 +22,10 @@ import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { ecoMayReadKey, ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
-import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone } from './shared.js';
+import { stampAgentWrite, resolveAttachableProvenanceId } from '../../services/ai-provenance.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
+import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
+import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
 import { logger } from '../../utils/logger.js';
 
 export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
@@ -82,6 +87,12 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     stats?.increment('memory_reads');
 
+    // TARGET-058: how this record's value was made, on the ONE envelope carrier plus the two
+    // response headers. The read is already authorized above, so the caller may see the whole
+    // record: provenance travels with content a caller is entitled to.
+    const prov = await loadServedProvenance(storage, config, record.aiProvenanceId, { full: true });
+    setProvenanceHeaders(res, prov);
+
     res.json(success(config.nodeId, {
       key: record.key,
       // Always present, both ways. The soft-miss branch above returns exists:false, and a HIT used
@@ -108,7 +119,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       { description: 'Update this memory entry', method: 'POST', url: '/v1/memory', example_body: { key: record.key, value: '...new value...' } },
       { description: 'Delete this memory entry', method: 'DELETE', url: `/v1/memory/${encodeURIComponent(key)}` },
       { description: 'List all memory keys', method: 'GET', url: '/v1/memory' },
-    ]));
+    ], envelopeMeta(prov)));
   });
 
   // DELETE /v1/memory/:key — delete a memory entry
@@ -187,7 +198,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
   router.put('/v1/memory/:key', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), workspaceAccess, validateBody(MemoryUpdateSchema, config.nodeId), async (req, res) => {
     const gaii = resolve(req);
     const key = decodeURIComponent(req.params.key as string);
-    const { value, visibility, tags, ttl_hours, version, group_id } = req.body ?? {};
+    const { value, visibility, tags, ttl_hours, version, group_id, ai_provenance_id } = req.body ?? {};
 
     // Anonymous namespace enforcement
     if (isAnonymousGaii(gaii) && !key.startsWith('anonymous.')) {
@@ -273,10 +284,31 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     const now = new Date().toISOString();
     const effectiveVis = visibility ?? existing.visibility;
+    // MINT-3 (TARGET-058): a non-human principal that declares nothing is stamped, an owner is not.
+    // Only when the VALUE changes — a visibility or tag edit is not new content, and re-minting there
+    // would produce a second statement about bytes that already have one.
+    const newValue = value !== undefined ? value : existing.value;
+    // An explicitly supplied record wins, resolved against the caller's OWN account. Publishing a
+    // private record is done by attaching it to something public, so an unchecked id here would let
+    // a caller publish someone else's statement.
+    const attached = await resolveAttachableProvenanceId(storage, ownerGhiiOf(effectiveGaii), ai_provenance_id);
+    const aiProvenanceId = attached
+      ?? (value !== undefined
+        ? await stampAgentWrite(storage, {
+          principal: effectiveGaii,
+          content: memoryContentBytes(newValue),
+          pipeline: 'memory.update',
+          surface: { visibility: effectiveVis, humanAudience: true },
+          nodeId: config.nodeId,
+          baseUrl: config.baseUrl,
+          enabled: config.aiProvenance,
+        })
+        : existing.aiProvenanceId);
     const newRecord = {
       key,
       ownerGaii: effectiveGaii,
-      value: value !== undefined ? value : existing.value,
+      value: newValue,
+      ...(aiProvenanceId ? { aiProvenanceId } : {}),
       visibility: effectiveVis,
       tags: tags ?? existing.tags,
       ttlHours: ttl_hours ?? existing.ttlHours,
@@ -451,6 +483,12 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     if (record.visibility === 'public') {
       stats?.increment('memory_reads');
 
+      // TARGET-058: an anonymous reader of public content gets the public projection of its
+      // provenance. This is the SAME record `/v1/provenance/:id` serves them, because the item is
+      // public — which is exactly what makes that record resolvable in the first place.
+      const prov = await loadServedProvenance(storage, config, record.aiProvenanceId);
+      setProvenanceHeaders(res, prov);
+
       // Shared guard: audits the public read when the consent layer is enabled.
       await authorizeRead(storage, config, {
         ownerGaii: record.ownerGaii,
@@ -470,13 +508,14 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
         owner_gaii: record.ownerGaii,
         created_at: record.createdAt,
         updated_at: record.updatedAt,
+        ai_provenance_id: record.aiProvenanceId ?? null,
         _ddc: {
           flagCount: record.flagCount ?? 0,
           version: record.version,
           freshness: record.updatedAt,
           visibility: record.visibility,
         },
-      }));
+      }, undefined, envelopeMeta(prov)));
       return;
     }
 

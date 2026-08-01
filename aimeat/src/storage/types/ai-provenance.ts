@@ -9,16 +9,25 @@
  *
  *   The canonical DOCUMENT is `record` (an `aimeat.provenance/v1`, camelCase, served verbatim). The
  *   columns beside it are AIMEAT's own authorization + lookup metadata, NOT part of the spec:
- *   `ownerGhii` decides who may resolve a private record, `visibility` decides whether an anonymous
- *   reader may, and `contentHash` is the join key a third party can use without us having given
- *   them an identifier. Only `contentHash` is duplicated out of the document, and it is projected
- *   from it on write so the two cannot disagree.
+ *   `ownerGhii` decides who may resolve a record privately, and `contentHash` is the join key a
+ *   third party can use without us having given them an identifier. Only `contentHash` is
+ *   duplicated out of the document, and it is projected from it on write so the two cannot disagree.
+ *
+ *   THERE IS NO `visibility` COLUMN, DELIBERATELY. Provenance visibility FOLLOWS THE CONTENT: a
+ *   record is resolvable by anyone exactly when some item that points at it is itself publicly
+ *   readable, and it stops being resolvable the moment that item stops being public. Storing a flag
+ *   would create a second visibility concept that has to be kept in sync with the first, and letting
+ *   a caller set one would be a way to publish a statement about content nobody may read. The link
+ *   direction is item → record (`MemoryRecord.aiProvenanceId`, `AppRecord.aiProvenanceId`), so the
+ *   question is answered by ONE query — see publiclyLinkedProvenanceIds() in the repository.
  * @structure
  *   - AiProvenanceRecordRow — one stored provenance record
  *   - AiProvenanceHashQuery — the filter for the public hash lookup
  * @usage
  *   import type { AiProvenanceRecordRow } from '../storage/interface.js';
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. `visibility` removed: it is derived from the linked
+ *     content, not stored and never caller-settable.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
  */
 import type { AiProvenance } from '../../models/ai-provenance-schemas.js';
@@ -32,12 +41,6 @@ export interface AiProvenanceRecordRow {
   principal: string;
   /** `sha256:<64 lower-case hex>` of the exact bytes, or null when the declarer supplied none. */
   contentHash: string | null;
-  /**
-   * `public` ONLY when the content this describes is itself public. It gates the anonymous read on
-   * both resolve endpoints; a private record answers an anonymous caller with the same 404 a
-   * non-existent one does, so the endpoint discloses no existence.
-   */
-  visibility: 'public' | 'private';
   /** Copied out of the document for ordering/index purposes. */
   generatedAt: string;
   /** When the ROW was written, which is not necessarily when the content was generated. */
@@ -48,7 +51,7 @@ export interface AiProvenanceRecordRow {
 
 /** Filter for the hash lookup. `ownerGhii` widens a public-only read to include the caller's own. */
 export interface AiProvenanceHashQuery {
-  /** Restrict to records the caller owns, in ADDITION to every public one. Omit for public-only. */
+  /** Restrict to records the caller owns, in ADDITION to every publicly linked one. Omit for public-only. */
   ownerGhii?: string;
   limit?: number;
 }

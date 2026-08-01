@@ -36,6 +36,7 @@ downloadedFrom: {{BASE_URL}}/llms.txt
 - [API catalog]({{BASE_URL}}/.well-known/api-catalog): RFC 9727 linkset
 - [Agent Skills index]({{BASE_URL}}/.well-known/agent-skills/index.json): skill packs published here
 - [UCP profile]({{BASE_URL}}/.well-known/ucp) · [ACP profile]({{BASE_URL}}/.well-known/acp.json): commerce discovery
+- [AI transparency]({{BASE_URL}}/v1/ai-transparency): what this node marks as AI-generated, how, and in which posture. Content generated here carries an `aimeat.provenance/v1` record on every surface; ask `{{BASE_URL}}/v1/provenance/by-hash/<sha256>` about bytes you hold, no account needed
 
 ## Table of Contents
 

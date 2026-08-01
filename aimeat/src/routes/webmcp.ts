@@ -43,6 +43,7 @@ import { respondMeteredRefusal } from './extensions/metered-response.js';
 import { mintInternalPass } from './extensions/internal-pass.js';
 import { recordCallDuration } from '../services/call-timing.js';
 import { buildAppAgentSurface } from '../services/app-agent-surface.js';
+import { loadServedProvenance, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 
 /** The WebMCP draft this bridge mirrors (W3C Web Machine Learning CG). */
 const WEBMCP_SPEC = 'https://github.com/webmachinelearning/webmcp';
@@ -127,9 +128,16 @@ export function webmcpRouter(config: AimeatConfig, storage: Storage): Router {
     }
     const b = config.baseUrl;
     const appRef = `${ownerName}/${filename}`;
+    // TARGET-058: how the app's bytes were made, on the agent plane. This listing is a WebMCP
+    // document rather than an AIMEAT envelope, so the record rides at the top level under the same
+    // `ai_provenance` name the MCP surface uses — snake_case parameter, camelCase document, exactly
+    // as frozen. Absent means UNSTATED, which is never "a human wrote it".
+    const prov = await loadServedProvenance(storage, config, app?.aiProvenanceId);
+    setProvenanceHeaders(res, prov);
     res.json({
       webmcp: { version: 'draft', spec: WEBMCP_SPEC },
       app: appRef,
+      ...(prov ? { ai_provenance: prov.record, ai_provenance_url: prov.recordUrl } : {}),
       // The in-page half: the app page registers these tools on document.modelContext via the
       // served bridge library, so in-browser agents (Chrome/Edge) get them natively.
       page: `${b}/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}`,

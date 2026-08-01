@@ -40,6 +40,8 @@ import { descriptionFor } from './catalog/shape.js';
 import { agentFaceKey } from '../services/agent-face.js';
 import { getOwnerScopePublicMemory } from '../services/owner-memory.js';
 import { listSkillsByBinding } from '../services/skills.js';
+import { stampAgentWrite } from '../services/ai-provenance.js';
+import { loadServedProvenance } from '../services/ai-provenance-marks.js';
 
 export function registerAppsTools(
     mcp: McpServer,
@@ -204,6 +206,19 @@ export function registerAppsTools(
                 }
             }
 
+            // MINT-3 (TARGET-058): an agent publishing an app and declaring nothing is stamped by
+            // the node. This is THE case the rule exists for — an app published over MCP is written
+            // by a model far more often than not, and silence must not read as "a human wrote it".
+            const aiProvenanceId = await stampAgentWrite(storage, {
+                principal: agentGaii,
+                content: data,
+                pipeline: 'mcp.app_publish',
+                surface: { visibility: parkedState ? 'private' : 'public', humanAudience: true },
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
+
             try {
                 await storage.createApp({
                     ownerGaii,
@@ -217,6 +232,7 @@ export function registerAppsTools(
                     parked: parkedState,
                     forkable: forkableState,
                     createdAt: new Date().toISOString(),
+                    ...(aiProvenanceId ? { aiProvenanceId } : {}),
                 });
 
                 const downloadUrl = `/v1/apps/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(filename)}`;
@@ -348,11 +364,24 @@ export function registerAppsTools(
                 forkableState = !!live?.forkable;
             }
             const manifest: AppManifest = { ...draft.manifest, version: draft.manifest.version || `1.0.${newVersion - 1}`, authorDisplay: parsed.owner };
+            // MINT-3 — same rule on the draft-publish path, or an agent could route around it by
+            // staging first.
+            const aiProvenanceId = await stampAgentWrite(storage, {
+                principal: agentGaii,
+                content: draft.data,
+                pipeline: 'mcp.app_draft_publish',
+                surface: { visibility: parkedState ? 'private' : 'public', humanAudience: true },
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
+
             try {
                 await storage.createApp({
                     ownerGaii, ownerName: parsed.owner, filename, versionNumber: newVersion,
                     manifest, mimeType: draft.mimeType, size: draft.size, data: draft.data,
                     parked: parkedState, forkable: forkableState, createdAt: new Date().toISOString(),
+                    ...(aiProvenanceId ? { aiProvenanceId } : {}),
                 });
                 await storage.deleteAppDraft(ownerGaii, filename);
                 emitResourceListChanged(agentGaii);
@@ -479,6 +508,10 @@ export function registerAppsTools(
 
             const downloads = await storage.getAppDownloads(app.ownerGaii, app.filename);
             const forks = await storage.countAppForks(app.ownerGaii, app.filename);
+            // TARGET-058: the same record the REST envelope, the markdown face and the WebMCP
+            // listing serve for this app. An agent reading an app through MCP must not be the one
+            // surface that silently drops how it was made. Absent = UNSTATED, never "human-written".
+            const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
 
             return {
                 content: [{
@@ -499,6 +532,8 @@ export function registerAppsTools(
                         download_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}`,
                         inline_url: `/v1/apps/${encodeURIComponent(app.ownerName)}/${encodeURIComponent(app.filename)}?mode=inline`,
                         created_at: app.createdAt,
+                        ai_provenance: prov?.record ?? null,
+                        ai_provenance_url: prov?.recordUrl ?? null,
                     }, null, 2),
                 }],
             };
@@ -657,6 +692,11 @@ export function registerAppsTools(
                     parked: false,
                     forkable: false,
                     createdAt: now,
+                    // A fork copies bytes; it does not generate them. Carry the SOURCE's statement
+                    // forward rather than minting a new one — a fresh Mint-3 here would claim the
+                    // forker's agent produced content it merely copied, and the hash is the same
+                    // bytes either way, so a detection query must lead to the original assertion.
+                    ...(source.aiProvenanceId ? { aiProvenanceId: source.aiProvenanceId } : {}),
                 });
                 await storage.recordAppFork({
                     id: `fork-${Date.now()}-${Math.random().toString(16).slice(2, 10)}`,

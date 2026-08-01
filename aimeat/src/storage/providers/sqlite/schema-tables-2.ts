@@ -207,6 +207,7 @@ export function applySchemaTables2(db: Database.Database): void {
       accessCode     TEXT,
       parked         INTEGER NOT NULL DEFAULT 0,
       forkable       INTEGER NOT NULL DEFAULT 0,
+      aiProvenanceId TEXT,
       operatorHidden INTEGER NOT NULL DEFAULT 0,
       operatorHiddenBy   TEXT,
       operatorHiddenAt   TEXT,

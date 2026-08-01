@@ -317,6 +317,131 @@ components:
           $ref: '#/components/schemas/ErrorDetail'
         hints:
           $ref: '#/components/schemas/Hints'
+        meta:
+          $ref: '#/components/schemas/EnvelopeMeta'
+
+    EnvelopeMeta:
+      type: object
+      description: |
+        Facts ABOUT the response rather than parts of it: pagination, and `provenance`.
+
+        `provenance` is the SINGLE carrier for AI provenance across every route that serves
+        generated content (EU AI Act Article 50 transparency). It lives in `meta` and never in
+        `data`, on every route without exception - `data` shapes are what published apps read, so
+        carrying it there would be a per-route breaking change, and splitting it across `data` on
+        some routes and `meta` on others is what makes an SDK need a special case per endpoint.
+      properties:
+        page:
+          type: integer
+        per_page:
+          type: integer
+        total:
+          type: integer
+        provenance:
+          type: object
+          description: The provenance of the content in `data`, when this node has a statement about it.
+          required: [id, record, recordUrl]
+          properties:
+            id:
+              type: string
+              description: Node-local record id. A convenience handle - the content hash is the real join key.
+            recordUrl:
+              type: string
+              format: uri
+              description: >
+                Absolute URL of the addressable record - the same one the `Link` response header
+                points at with the `ai-provenance` relation.
+            record:
+              $ref: '#/components/schemas/AiProvenanceRecord'
+
+    AiProvenanceRecord:
+      type: object
+      description: |
+        An `aimeat.provenance/v1` document: how much of a piece of content a model produced, and how
+        much a person did. Readers MUST branch on `spec` and MUST NOT assume fields; an unknown
+        `spec` reads as UNSTATED, never as an error and never as "a human wrote it". Canonical
+        schema, versioned and machine-readable, at `/v1/schemas/ai-provenance/v1.json`.
+
+        This is a self-describing document, not a route DTO, so it keeps ONE spelling - camelCase -
+        on every carrier it travels on, next to the snake_case DTO fields around it.
+      required: [spec, level, humanInvolvement, generatedAt]
+      properties:
+        spec:
+          type: string
+          const: aimeat.provenance/v1
+        level:
+          type: string
+          enum: [original, assisted, synthesized, ai-generated]
+        method:
+          type: string
+          enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent]
+        humanInvolvement:
+          type: string
+          enum: [none, light-review, editorial-control, full-human]
+          description: >
+            Review of the MODEL's contribution, not authorship. `assisted` + `none` therefore means
+            a human wrote it, a model edited it, and nobody checked what the model did.
+        generatedAt:
+          type: string
+          format: date-time
+        generator:
+          type: object
+          properties:
+            principal: { type: string }
+            model: { type: string }
+            provider: { type: string }
+            nodeId: { type: string }
+            pipeline: { type: string }
+            upstreamMarks:
+              type: string
+              enum: ['yes', 'no', unknown]
+        sources:
+          type: array
+          items:
+            type: object
+            required: [url]
+            properties:
+              url: { type: string, format: uri }
+              title: { type: string }
+              retrievedAt: { type: string, format: date-time }
+              role: { type: string }
+        derivedFrom:
+          type: array
+          items: { type: string }
+        attestation:
+          type: object
+          properties:
+            stampedBy:
+              type: string
+              enum: [node, principal]
+            observed:
+              type: boolean
+              description: >
+                True ONLY when this node witnessed the generation. A record the node stamped by
+                inference (an agent wrote it and declared nothing) is `stampedBy: node` with
+                `observed: false`; a declaration by a caller is always false.
+            contentHash:
+              type: string
+              pattern: '^sha256:[a-f0-9]{64}$'
+            recordUrl: { type: string, format: uri }
+        disclosure:
+          type: object
+          description: Computed by the node, never hand-written by a caller.
+          required: [required, reason, short]
+          properties:
+            required: { type: boolean }
+            reason:
+              type: string
+              enum: [art50_1_interaction, art50_2_synthetic_output, art50_4_deepfake, art50_4_public_interest, policy, none]
+            short:
+              type: object
+              additionalProperties: { type: string }
+            long:
+              type: object
+              additionalProperties: { type: string }
+        notes:
+          type: string
+          maxLength: 1000
 
     HeaderNavConfig:
       type: object
@@ -549,6 +674,18 @@ components:
             the owner's own agents instead of the owner's GHII. Ignored for
             agent sessions. The agent must belong to the calling owner.
           example: claude#alice@aimeat-fi-001-genesis
+        ai_provenance_id:
+          type: string
+          description: >
+            Attach an ALREADY-MINTED AI provenance record to this write - typically the one
+            `/v1/ai/complete` returned in `meta.provenance`. This is the publish path: the record is
+            minted private at generation and becomes anonymously resolvable exactly while the item
+            carrying it is public. It must belong to the caller's own account, or it is ignored.
+
+            When it is absent and the writer is an AGENT or ECOSYSTEM principal, the node stamps one
+            itself (`ai-generated`, `humanInvolvement: none`, `stampedBy: node`, `observed: false`,
+            with the inference stated in `notes`): silence from an agent must not read as "a human
+            wrote it". An OWNER principal is never stamped.
 
     MemoryEntry:
       type: object
@@ -569,6 +706,13 @@ components:
           type: string
           enum: [private, dmz, federation]
           description: DMZ zone derived from visibility (private→private, owner→dmz, public→federation)
+        ai_provenance_id:
+          type: string
+          nullable: true
+          description: >
+            The attached AI provenance record describing how this value was produced, resolvable at
+            `/v1/provenance/{id}`. The record itself rides in `meta.provenance`. Null means UNSTATED,
+            which is not the same as "a human wrote it".
         tags:
           type: array
           items:
@@ -8182,19 +8326,19 @@ paths:
                 notes:
                   type: string
                   maxLength: 1000
-                visibility:
-                  type: string
-                  enum: [public, private]
-                  default: private
-                  description: >
-                    Mark `public` ONLY when the content it describes is itself public - this is what
-                    exposes the record to the anonymous hash lookup.
                 attachToMemoryKey:
                   type: string
                   description: >
-                    Attach the record to one of the caller's OWN memory keys. Note that a later
-                    ordinary write to that key CLEARS the attachment: a new value is new content,
-                    and keeping the old id would assert something about bytes that no longer exist.
+                    Attach the record to one of the caller's OWN memory keys. This is also the ONLY
+                    way a declared record becomes anonymously resolvable: provenance visibility
+                    follows the content, so attaching it to a PUBLIC item publishes the statement and
+                    making that item private again takes it back to the identical 404. There is no
+                    `visibility` field, deliberately - a caller-settable one would be a way to
+                    publish a statement about content nobody may read.
+
+                    Note that a later ordinary write to that key CLEARS the attachment: a new value
+                    is new content, and keeping the old id would assert something about bytes that no
+                    longer exist.
       responses:
         '201':
           $ref: '#/components/responses/AimeatSuccess'
@@ -8212,11 +8356,17 @@ paths:
       operationId: aiProvenanceResolve
       summary: Resolve a provenance record by id
       description: >
-        A record marked `public` resolves for anyone, including anonymous callers. A private record
-        resolves only for its owner.
+        PROVENANCE VISIBILITY FOLLOWS THE CONTENT. A record resolves for anyone - anonymous callers
+        included - exactly while some item pointing at it is itself publicly readable: a public
+        memory record (which is how workspace records, agent faces and WebMCP manifests are stored
+        too) or a published, unparked, unhidden, code-free app. Publish the content and the record
+        resolves; make it private again and this returns to the identical 404, with nothing to
+        remember to do. There is no stored visibility flag on the record and no way for a caller to
+        set one. The owner can always resolve their own records.
 
-        Returns an IDENTICAL 404 for "no such record" and "that record is not yours" - two different
-        answers would turn this into an oracle for which ids exist on this node.
+        Returns an IDENTICAL 404 for "no such record", "that record is not yours" and "its content
+        is not public" - different answers would turn this into an oracle for which ids exist on
+        this node.
 
         `AIMEAT_AI_PROVENANCE_DETAIL=minimal` reduces what a NON-owner is served to the four required
         fields plus the disclosure block. It never reduces what is stored, and the owner always sees
@@ -8245,8 +8395,9 @@ paths:
         regulators, researchers and fact-checkers can ask about bytes they already hold WITHOUT us
         having handed them an identifier first - the join key is the content hash, not a database id.
 
-        An authenticated caller additionally sees their own private records; the widening happens in
-        SQL, so a third party's private row never enters the process.
+        "Public" is derived, not stored: a record is listed here exactly while some publicly
+        readable item points at it. An authenticated caller additionally sees their own records; the
+        widening happens in SQL, so a third party's non-public row never enters the process.
 
         An empty `records` list is a real answer: "this node has no statement about these bytes". It
         is NOT "a human wrote it" - absence reads as UNSTATED, always.
@@ -8267,6 +8418,47 @@ paths:
           $ref: '#/components/responses/AimeatError'
         '429':
           $ref: '#/components/responses/AimeatError'
+
+  /v1/ai-transparency:
+    get:
+      operationId: aiTransparencyStatement
+      summary: This node's machine-readable AI transparency statement
+      description: >
+        What this node marks as AI-generated, how, in which posture, and who operates it - the
+        agent-native equivalent of a transparency page, and the document a regulator, a researcher or
+        a buyer's compliance officer reads first. Linked from `llms.txt`, `/.well-known/api-catalog`
+        and the node bootstrap document.
+
+        It is DERIVED from configuration rather than hand-maintained, so it cannot drift away from
+        what the node actually does, and it answers honestly when the answer is no:
+        `code_of_practice.signatory` ships as `false`, and `marking.text_watermarking` states plainly
+        that this node does not watermark text - it does not sample the tokens, and that layer
+        belongs to whoever runs the model.
+
+        Response `data`: `{ node_id, operator, supervisory_authority, marking, detection, labelling,
+        code_of_practice, posture }`.
+      tags: [AI Transparency]
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/ai-transparency.md:
+    get:
+      operationId: aiTransparencyStatementMarkdown
+      summary: The AI transparency statement as markdown
+      description: >
+        The same facts as `/v1/ai-transparency`, rendered as markdown for an agent that reads prose.
+        Carries `Link: rel="canonical"` back to the JSON.
+      tags: [AI Transparency]
+      security: []
+      responses:
+        '200':
+          description: The statement as markdown
+          content:
+            text/markdown:
+              schema:
+                type: string
 
   /v1/ledger/usage:
     get:
@@ -13045,6 +13237,12 @@ paths:
         manifest for an app this node does not host still lists its tools, without `app_surface`).
         404 means neither exists, or the app is access-code gated, priced, or operator-hidden. A
         PRIVATE manifest reads exactly like an absent one.
+
+        When the node has a statement about how the app's bytes were made, the listing carries
+        `ai_provenance` (an `aimeat.provenance/v1` document) and `ai_provenance_url`. This is a
+        WebMCP document rather than an AIMEAT envelope, so the record rides at the top level under
+        the same `ai_provenance` name the MCP surface uses. Absence means UNSTATED, never "a human
+        wrote it".
       tags: [Commerce]
       parameters:
         - { name: owner, in: path, required: true, schema: { type: string } }
@@ -36608,7 +36806,11 @@ paths:
       operationId: getAppVersions
       tags: [Apps]
       summary: List all published versions of an app
-      description: Public. Returns every published version of the given app in the owner's canonical bucket.
+      description: >
+        Public. Returns every published version of the given app in the owner's canonical bucket.
+        Each version carries its own `ai_provenance_id` (each publish is its own content), and
+        `meta.provenance` carries the LIVE version's record. Null/absent means UNSTATED, never
+        "a human wrote it".
       parameters:
         - name: owner
           in: path

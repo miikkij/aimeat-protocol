@@ -23,6 +23,10 @@
  *     if (await serveAppAgentFace(res, config, storage, app)) return;
  *   }
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058: the face carries AI provenance on both layers — YAML
+ *     frontmatter with the whole record and the response headers on the served document, plus ONE
+ *     human-readable line in the BODY so an agent that summarises the page carries the statement
+ *     forward instead of dropping it with the metadata.
  *   v1.0.0 — 2026-07-14 — Initial: Agent Face convention serving (phase 1)
  *   v1.2.0 — 2026-07-28 — buildAppAgentFace() split out of serveAppAgentFace() so the per-origin
  *     llms.txt / AGENTS.md / sitemap.md builders can compose the same body instead of each pointing
@@ -37,6 +41,9 @@ import type { Storage, AppRecord } from '../storage/interface.js';
 import { sendMarkdown, htmlToMarkdown } from './markdown-negotiation.js';
 import { cached, TTL } from './cache.js';
 import { getOwnerScopePublicMemory } from './owner-memory.js';
+import {
+  loadServedProvenance, provenanceFrontmatter, provenanceMarkdownNote, setProvenanceHeaders,
+} from './ai-provenance-marks.js';
 
 /** The memory key an app's agent face lives under (PUBLIC record, app owner's GHII) —
  *  same identifier family as the WebMCP tool manifest `apps.{filename}.tools`. */
@@ -120,7 +127,15 @@ export async function buildAppAgentFace(
       if (face === null && !isHtml) return null;
       const footer = buildAgentAffordances(config, app.ownerName, app.filename);
       const body = face ?? htmlToMarkdown(appHtml(app)).trimEnd();
-      return { markdown: body + footer, fromFace: face !== null };
+      // TARGET-058: ONE human-readable provenance line, IN THE BODY. Frontmatter alone is not
+      // enough — an agent asked to summarise this page carries the body forward and routinely drops
+      // the metadata, so a statement that lives only in frontmatter stops existing the moment the
+      // page is retold. It goes in here rather than in serveAppAgentFace() so the per-origin
+      // llms.txt / AGENTS.md documents, which compose this same body, carry it too.
+      const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
+      const note = provenanceMarkdownNote(prov);
+      const noteBlock = note ? ['', '', note, ''].join('\n') : '';
+      return { markdown: body + noteBlock + footer, fromFace: face !== null };
     },
     ['domain:memory', 'domain:apps'],
   );
@@ -134,7 +149,16 @@ export async function serveAppAgentFace(
 ): Promise<boolean> {
   const built = await buildAppAgentFace(config, storage, app);
   if (built === null) return false;
-  sendMarkdown(res, built.markdown, built.fromFace ? undefined : appHtml(app));
+  // The machine-readable half of the same statement: YAML frontmatter carrying the whole record, and
+  // the AI-Disclosure / Link headers. Two layers on purpose — strip the frontmatter and the record
+  // is still addressable; take the record offline and the frontmatter still says what was claimed.
+  const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
+  setProvenanceHeaders(res, prov);
+  const frontmatter = provenanceFrontmatter(prov);
+  const doc = frontmatter.length
+    ? ['---', ...frontmatter, '---', '', built.markdown].join('\n')
+    : built.markdown;
+  sendMarkdown(res, doc, built.fromFace ? undefined : appHtml(app));
   return true;
 }
 

@@ -2,6 +2,8 @@
  * @file src/routes/memory/shared.ts
  * @description Shared context type + small pure helpers for the memory route group modules. Extracted from src/routes/memory.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-01 — memoryContentBytes(): the one definition of "which bytes a memory value's
+ *     provenance record is about", shared by every write path (TARGET-058).
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/memory.ts (max-file-lines)
  */
 
@@ -30,6 +32,18 @@ export interface MemoryRouteCtx {
 /** Anonymous agents (shared#anonymous@...) may only write to keys prefixed with "anonymous." */
 export function isAnonymousGaii(gaii: string): boolean {
   return gaii.includes('#anonymous@');
+}
+
+/**
+ * The exact bytes a provenance record is a statement ABOUT, for a memory value (TARGET-058).
+ *
+ * A string value is hashed as itself, not as its JSON encoding: the markdown of an agent face, the
+ * text of an article and the body of a document are served verbatim, so a third party holding those
+ * bytes must be able to look them up. Anything else is hashed as its canonical JSON, which is the
+ * only stable rendering of a structured value we have.
+ */
+export function memoryContentBytes(value: unknown): string {
+  return typeof value === 'string' ? value : JSON.stringify(value ?? null);
 }
 
 /** Map memory visibility to DMZ zone (Phase 0.6) */

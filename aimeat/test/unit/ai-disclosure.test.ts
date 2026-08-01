@@ -30,26 +30,77 @@ function rec(level: AiProvenanceLevel, humanInvolvement: AiHumanInvolvement): Ai
 /** A person reading a public page. The default surface everything else is measured against. */
 const publicPage: SurfaceContext = { visibility: 'public', humanAudience: true };
 
-/** True when this combination owes a full 50(4) label on an anonymously readable page. */
-function owesFullLabel(level: AiProvenanceLevel, human: AiHumanInvolvement): boolean {
-  const unreviewed = human === 'none' || human === 'light-review';
-  return unreviewed && (level === 'ai-generated' || level === 'synthesized');
+/**
+ * What this combination owes on an anonymously readable page.
+ *
+ * `assisted` is `light`, not `none`: a human wrote it and a model edited it, and if nobody checked
+ * what the model did then the EU icon set has a category for exactly that — *Partially AI-Modified*,
+ * defined for pre-existing human-made content partially modified with AI on matters of public
+ * interest. Decision D4 is to over-label, so we do not sit on the line of the letter here
+ * (22-frozen-vocabulary.md §C2b).
+ */
+function expectedStrength(
+  level: AiProvenanceLevel, human: AiHumanInvolvement, visibility: SurfaceContext['visibility'],
+): 'full' | 'light' | 'none' {
+  if (visibility !== 'public') return 'none';
+  if (human !== 'none' && human !== 'light-review') return 'none';
+  if (level === 'ai-generated' || level === 'synthesized') return 'full';
+  if (level === 'assisted') return 'light';
+  return 'none';
 }
 
 describe('the cross-product: level × humanInvolvement × visibility', () => {
   for (const level of AI_PROVENANCE_LEVELS) {
     for (const human of AI_HUMAN_INVOLVEMENT) {
       for (const visibility of VISIBILITIES) {
-        const expected = visibility === 'public' && owesFullLabel(level, human);
-        it(`${level} × ${human} × ${visibility} → ${expected ? 'full label' : 'no label'}`, () => {
+        const strength = expectedStrength(level, human, visibility);
+        const expected = strength !== 'none';
+        it(`${level} × ${human} × ${visibility} → ${expected ? `${strength} label` : 'no label'}`, () => {
           const d = disclosureFor(rec(level, human), { ...publicPage, visibility });
           expect(d.required).toBe(expected);
-          expect(d.strength).toBe(expected ? 'full' : 'none');
+          expect(d.strength).toBe(strength);
           expect(d.reason).toBe(expected ? 'art50_4_public_interest' : 'none');
         });
       }
     }
   }
+});
+
+describe('`assisted` on a public-interest surface owes a LIGHT label (C2b)', () => {
+  for (const human of ['none', 'light-review'] as AiHumanInvolvement[]) {
+    it(`assisted × ${human} on an anonymously readable page → light, art50_4_public_interest`, () => {
+      const d = disclosureFor(rec('assisted', human), publicPage);
+      expect(d).toEqual({ required: true, reason: 'art50_4_public_interest', strength: 'light' });
+    });
+  }
+
+  it('a human who examined the model\'s contribution lifts it, exactly as for generated text', () => {
+    expect(disclosureFor(rec('assisted', 'editorial-control'), publicPage).required).toBe(false);
+    expect(disclosureFor(rec('assisted', 'full-human'), publicPage).required).toBe(false);
+  });
+
+  it('a declared editor at publication lifts it too', () => {
+    const d = disclosureFor(rec('assisted', 'none'), { ...publicPage, editorialResponsibility: true });
+    expect(d.required).toBe(false);
+  });
+
+  it('the publisher declaring no public interest opts out, as it does for generated text', () => {
+    expect(disclosureFor(rec('assisted', 'none'), { ...publicPage, publicInterest: 'no' }).required).toBe(false);
+  });
+
+  it('a private surface owes nothing — nobody is being informed of anything', () => {
+    expect(disclosureFor(rec('assisted', 'none'), { ...publicPage, visibility: 'private' }).required).toBe(false);
+  });
+
+  it('never escalates past light, even on a non-creative surface', () => {
+    expect(disclosureFor(rec('assisted', 'none'), publicPage).strength).toBe('light');
+    expect(disclosureFor(rec('assisted', 'none'), { ...publicPage, creativeWork: true }).strength).toBe('light');
+  });
+
+  it('but an assisted DEEP FAKE is a full disclosure — a face-swap is not a light matter', () => {
+    const d = disclosureFor(rec('assisted', 'none'), { ...publicPage, mediaKind: 'image' });
+    expect(d).toEqual({ required: true, reason: 'art50_4_deepfake', strength: 'full' });
+  });
 });
 
 describe('editorial control is not force-labelled', () => {

@@ -139,6 +139,7 @@ import { calibratorRouter } from '../routes/calibrator.js';
 import { openrouterRouter } from '../routes/openrouter.js';
 import { aiRouter } from '../routes/ai.js';
 import { aiProvenanceRouter } from '../routes/ai-provenance.js';
+import { aiTransparencyRouter } from '../routes/ai-transparency.js';
 import { uploadRouter } from '../routes/upload.js';
 import { agentTasksRouter } from '../routes/agent-tasks.js';
 import { schedulesRouter } from '../routes/schedules.js';
@@ -448,6 +449,9 @@ export async function mountRoutes(
   // AI provenance (TARGET-058). The by-hash detection lookup is PUBLIC + unauthenticated by
   // design — it is the Code of Practice's detection access point, not an admin API.
   app.use(aiProvenanceRouter(config, storage));
+  // The node's own AI transparency statement — what it marks, how, in which posture, and who runs
+  // it. Linked from llms.txt, AGENTS.md and the bootstrap document so an agent finds it first.
+  app.use(aiTransparencyRouter(config));
   app.use(csmRouter(config, storage));       // Phase 0.2 — CSM management
   app.use(msmRouter(config, storage));        // MSM — Machine Service Manifest
   app.use(actionsRouter(config, storage));

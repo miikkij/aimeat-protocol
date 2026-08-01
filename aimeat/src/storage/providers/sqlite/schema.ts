@@ -10,6 +10,11 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   v1.6.0 — 2026-08-01 — AI provenance visibility follows the content (TARGET-058 Phase 2): the
+ *     `ai_provenance.visibility` column is gone, `apps.aiProvenanceId` joins `memory.aiProvenanceId`
+ *     as the second link carrier, and both link columns are indexed AFTER their safeAddColumn.
+ *     Mirrors Postgres 0018. An upgraded database keeps a now-unread `visibility` column with its
+ *     'private' default, which nothing writes and nothing reads.
  *   v1.5.0 — 2026-08-01 — AI provenance (TARGET-058): the addressable `ai_provenance` table (in
  *     schema-tables-3) plus the attached `memory.aiProvenanceId` column. Mirrors Postgres 0017.
  *   v1.0.0 — pre-2026-06 — Initial SQLite schema bootstrap + migrations
@@ -269,9 +274,17 @@ export function initializeSchema(db: Database.Database): void {
   // AI provenance, ATTACHED half (TARGET-058) — the ai_provenance row describing how this value was
   // produced. Mirrors Postgres migration 0017. NULL = unstated, never "human-written".
   safeAddColumn('memory', 'aiProvenanceId', 'TEXT');
+  // The same attached half for apps: an app an agent published without declaring anything is
+  // stamped by the node (Mint-3). Mirrors Postgres migration 0018.
+  safeAddColumn('apps', 'aiProvenanceId', 'TEXT');
   // The other direction: which provenance record a metered LLM call produced, so "what did this
   // money buy?" is one join rather than a guess.
   safeAddColumn('agent_usage_event', 'provenanceId', 'TEXT');
+  // Provenance VISIBILITY FOLLOWS THE CONTENT (TARGET-058 Phase 2): resolving a record asks whether
+  // any item pointing at it is public, so both link columns are indexed. AFTER the safeAddColumn
+  // calls above — an index on a column an upgraded database has not gained yet is a boot crash.
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_memory_ai_provenance ON memory(aiProvenanceId);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_apps_ai_provenance ON apps(aiProvenanceId);`);
 
   // Governance Phase C — budget limits on agent directives
   safeAddColumn('agent_directives', 'budgetLimits', 'TEXT');

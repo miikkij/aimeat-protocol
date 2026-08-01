@@ -18,9 +18,21 @@
  *   5. The attached half round-trips, and an ordinary later write CLEARS it — a new value is new
  *      content, so carrying the old id forward would assert something about bytes that no longer
  *      exist.
+ *   PHASE 2 adds the propagation half:
+ *   6. Provenance visibility FOLLOWS THE CONTENT, proven in BOTH directions logged out: publish the
+ *      item and its record resolves; make the item private again and the record returns the
+ *      byte-identical 404. There is no `visibility` parameter on a declaration, because a
+ *      caller-settable one would be a way to publish a statement about content nobody may read.
+ *   7. `meta.provenance` is the ONE envelope carrier, and `data` shapes are untouched — that is what
+ *      keeps every published app working.
+ *   8. MINT-3: an agent writing with no declaration is stamped; an owner is not.
+ *   9. The node's own transparency statement answers, mirrors to markdown, and is discoverable.
  * @structure stub AI provider · owner/agent setup · one describe-ish block per acceptance item
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2: derived visibility (both directions), meta.provenance
+ *     + the two headers, Mint-3, the attach-to-publish path and its cross-owner refusal, and
+ *     /v1/ai-transparency.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
  */
 import * as ed from '@noble/ed25519';
@@ -175,14 +187,26 @@ async function startStub(): Promise<void> {
 
     const PUBLIC_TEXT = 'Julkaistu teksti, jonka on kirjoittanut tekoäly.';
     const PUBLIC_HASH = sha256(PUBLIC_TEXT);
+    const PUBLIC_KEY = `article.published.${Date.now()}`;
     let publicId = '';
 
-    await test('Owner A declares provenance for public content', async () => {
+    await test('Owner A publishes the content itself, publicly', async () => {
+        // There is no `visibility` parameter on a declaration, deliberately: a caller-settable one
+        // would be a way to publish a statement about content nobody may read. The record becomes
+        // resolvable because the CONTENT is public, and for no other reason.
+        const r = await json('/v1/memory', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ key: PUBLIC_KEY, value: PUBLIC_TEXT, visibility: 'public' }),
+        });
+        assert(r.status === 200 || r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    });
+
+    await test('Owner A declares provenance for that public content', async () => {
         const r = await json('/v1/provenance', {
             method: 'POST', headers: auth(a.token),
             body: JSON.stringify({
                 level: 'ai-generated', humanInvolvement: 'none', method: 'fully-generated',
-                content: PUBLIC_TEXT, visibility: 'public',
+                content: PUBLIC_TEXT, attachToMemoryKey: PUBLIC_KEY,
                 generator: { model: 'some/other-model', provider: 'elsewhere' },
             }),
         });
@@ -219,16 +243,6 @@ async function startStub(): Promise<void> {
         const r = await json('/v1/provenance/by-hash/not-a-digest');
         assert(r.status === 400, `expected 400, got ${r.status}`);
         assert(r.body.error.code === 'INVALID_HASH', `code ${r.body.error?.code}`);
-    });
-
-    await test('The public detection lookup is rate-limited (unauthenticated flood → 429)', async () => {
-        const bare = PUBLIC_HASH.replace('sha256:', '');
-        let sawLimit = false;
-        for (let i = 0; i < 120 && !sawLimit; i++) {
-            const res = await fetch(`${BASE}/v1/provenance/by-hash/${bare}`);
-            if (res.status === 429) sawLimit = true;
-        }
-        assert(sawLimit, 'an unauthenticated detection endpoint that never rate-limits is a free amplifier');
     });
 
     // ── 3. No existence disclosure: one 404 for "absent" and for "not yours" ──
@@ -374,6 +388,214 @@ async function startStub(): Promise<void> {
             'additionalProperties:false would make every future field addition a breaking change');
         assert(JSON.stringify(doc.properties.level.enum) === JSON.stringify(['original', 'assisted', 'synthesized', 'ai-generated']),
             `level enum drifted: ${JSON.stringify(doc.properties.level.enum)}`);
+    });
+
+
+    // ── 7. PHASE 2: provenance visibility FOLLOWS THE CONTENT, both directions ──
+
+    await test('Making the content PRIVATE takes its record back to the identical 404', async () => {
+        const before = await json(`/v1/memory/${encodeURIComponent(PUBLIC_KEY)}`, { headers: auth(a.token) });
+        assert(before.status === 200, `read ${before.status}`);
+        const put = await json(`/v1/memory/${encodeURIComponent(PUBLIC_KEY)}`, {
+            method: 'PUT', headers: auth(a.token),
+            body: JSON.stringify({ visibility: 'private', version: before.body.data.version }),
+        });
+        assert(put.status === 200, `unpublish ${put.status}: ${JSON.stringify(put.body?.error)}`);
+
+        const anon = await json(`/v1/provenance/${publicId}`);
+        const missing = await json('/v1/provenance/00000000-0000-4000-8000-000000000000');
+        assert(anon.status === 404, `unpublished record still resolves anonymously: ${anon.status}`);
+        // Identical, not merely both-404: a different message would say "this one exists".
+        assert(anon.body.error.code === missing.body.error.code, 'codes differ');
+        assert(anon.body.error.message === missing.body.error.message, 'messages differ');
+
+    });
+
+    await test('Publishing it again makes the record resolvable again — nothing to remember to do', async () => {
+        const cur = await json(`/v1/memory/${encodeURIComponent(PUBLIC_KEY)}`, { headers: auth(a.token) });
+        const put = await json(`/v1/memory/${encodeURIComponent(PUBLIC_KEY)}`, {
+            method: 'PUT', headers: auth(a.token),
+            body: JSON.stringify({ visibility: 'public', version: cur.body.data.version }),
+        });
+        assert(put.status === 200, `republish ${put.status}`);
+        const anon = await json(`/v1/provenance/${publicId}`);
+        assert(anon.status === 200, `republished record does not resolve: ${anon.status}`);
+    });
+
+    await test('The owner can still resolve their own record while it is private', async () => {
+        const cur = await json(`/v1/memory/${encodeURIComponent(PUBLIC_KEY)}`, { headers: auth(a.token) });
+        await json(`/v1/memory/${encodeURIComponent(PUBLIC_KEY)}`, {
+            method: 'PUT', headers: auth(a.token),
+            body: JSON.stringify({ visibility: 'private', version: cur.body.data.version }),
+        });
+        const mine = await json(`/v1/provenance/${publicId}`, { headers: auth(a.token) });
+        assert(mine.status === 200, `owner locked out of their own record: ${mine.status}`);
+        // ...and put it back public for the surfaces below.
+        const again = await json(`/v1/memory/${encodeURIComponent(PUBLIC_KEY)}`, { headers: auth(a.token) });
+        await json(`/v1/memory/${encodeURIComponent(PUBLIC_KEY)}`, {
+            method: 'PUT', headers: auth(a.token),
+            body: JSON.stringify({ visibility: 'public', version: again.body.data.version }),
+        });
+    });
+
+    // ── 8. PHASE 2: meta.provenance is the ONE envelope carrier, plus the two headers ──
+
+    await test('The public memory read carries meta.provenance and the AI-Disclosure + Link headers', async () => {
+        const res = await fetch(`${BASE}/v1/memory/${encodeURIComponent(a.gaii)}/${encodeURIComponent(PUBLIC_KEY)}`);
+        assert(res.status === 200, `anon public read ${res.status}`);
+        const body = await res.json() as any;
+        assert(body.meta?.provenance?.record?.spec === 'aimeat.provenance/v1',
+            `meta.provenance missing: ${JSON.stringify(body.meta)}`);
+        assert(body.data.provenance === undefined,
+            'provenance must live in meta, never in data — a data-shape change breaks published apps');
+        const disclosure = res.headers.get('ai-disclosure') ?? '';
+        assert(disclosure.includes('mode=machine-generated'),
+            `AI-Disclosure header wrong or absent: "${disclosure}"`);
+        const link = res.headers.get('link') ?? '';
+        assert(link.includes('rel="ai-provenance"'), `Link rel="ai-provenance" absent: "${link}"`);
+        assert(link.includes(`/v1/provenance/${publicId}`), `Link points elsewhere: "${link}"`);
+    });
+
+    await test('POST /v1/ai/complete carries the record in meta.provenance, not in data', async () => {
+        const r = await json('/v1/ai/complete', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ prompt: 'One more, for the envelope.' }),
+        });
+        assert(r.status === 200, `complete ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.content === STUB_CONTENT, 'the data shape must not change');
+        assert(r.body.meta?.provenance?.record?.spec === 'aimeat.provenance/v1',
+            `meta.provenance missing: ${JSON.stringify(r.body.meta)}`);
+        assert(r.body.meta.provenance.record.attestation.contentHash === sha256(STUB_CONTENT),
+            'the record must be about the bytes that were returned');
+        assert(r.body.meta.provenance.recordUrl.endsWith(`/v1/provenance/${r.body.meta.provenance.id}`),
+            `recordUrl wrong: ${r.body.meta.provenance.recordUrl}`);
+    });
+
+    // ── 9. PHASE 2: Mint-3 — silence from an agent is not "a human wrote it" ──
+
+    const agentW = await connectAgent(a.token, a.name, `provwriter${Date.now()}`, ['memory:read', 'memory:write']);
+    const AGENT_KEY = 'apps.provtest.agentface';
+    const AGENT_TEXT = '# Prov test app\n\nAn agent wrote this face and said nothing about how.';
+    let agentProvId = '';
+
+    await test('An AGENT writing with no declaration is stamped by the node', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: auth(agentW.token),
+            body: JSON.stringify({ key: AGENT_KEY, value: AGENT_TEXT, visibility: 'public' }),
+        });
+        assert(w.status === 200 || w.status === 201, `agent write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+
+        const read = await json(`/v1/memory/${encodeURIComponent(AGENT_KEY)}`, { headers: auth(agentW.token) });
+        agentProvId = read.body.data.ai_provenance_id;
+        assert(!!agentProvId, 'an agent wrote text and the node recorded nothing about its origin');
+
+        const p = read.body.meta.provenance.record;
+        assert(p.level === 'ai-generated', `level ${p.level}`);
+        assert(p.humanInvolvement === 'none', `humanInvolvement ${p.humanInvolvement}`);
+        assert(p.attestation.stampedBy === 'node', `stampedBy ${p.attestation.stampedBy}`);
+        assert(p.attestation.observed === false,
+            'the node inferred this from the principal type; it did not witness the generation');
+        assert(/[Ii]nferred from the principal type/.test(p.notes ?? ''),
+            `the inference must be stated in notes, not silently: "${p.notes}"`);
+        assert(p.attestation.contentHash === sha256(AGENT_TEXT), 'hash must be of the exact bytes written');
+    });
+
+    await test('An OWNER writing is NOT stamped — a person is presumed human', async () => {
+        const key = `owner.wrote.this.${Date.now()}`;
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ key, value: 'I typed this myself.', visibility: 'public' }),
+        });
+        assert(w.status === 200 || w.status === 201, `owner write ${w.status}`);
+        const read = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(a.token) });
+        assert(!read.body.data.ai_provenance_id,
+            `an owner's own writing was stamped as model-written: ${read.body.data.ai_provenance_id}`);
+    });
+
+    await test('by-hash finds the agent-written PUBLIC content, logged out', async () => {
+        const r = await json(`/v1/provenance/by-hash/${sha256(AGENT_TEXT).replace('sha256:', '')}`);
+        assert(r.status === 200, `anon by-hash ${r.status}`);
+        assert(r.body.data.count >= 1, 'the detection access point cannot see content this node published');
+        assert(r.body.data.records.some((x: any) => x.id === agentProvId), 'wrong record returned');
+    });
+
+    // ── 10. PHASE 2: attaching an ALREADY-MINTED record is the publish path ──
+
+    await test('A completion record becomes resolvable when its content is published', async () => {
+        // The Mint-1 record from step 1 is private: a completion is the owner's own until they
+        // publish it. Attaching it to a public item is the act that publishes the STATEMENT too.
+        const before = await json(`/v1/provenance/${mintedId}`);
+        assert(before.status === 404, `the private completion record already resolved anonymously: ${before.status}`);
+
+        const key = `article.fromcompletion.${Date.now()}`;
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ key, value: STUB_CONTENT, visibility: 'public', ai_provenance_id: mintedId }),
+        });
+        assert(w.status === 200 || w.status === 201, `publish ${w.status}: ${JSON.stringify(w.body?.error)}`);
+
+        const after = await json(`/v1/provenance/${mintedId}`);
+        assert(after.status === 200, `the published completion record still 404s: ${after.status}`);
+        assert(after.body.data.provenance.attestation.observed === true,
+            'this one the node DID witness — an observation, not an inference');
+    });
+
+    await test('Owner B cannot attach owner A\'s record to B\'s own public item', async () => {
+        // Attaching is what publishes a record, so an unchecked id here would be a way to publish
+        // someone else's private statement.
+        const key = `hijack.${Date.now()}`;
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: auth(b.token),
+            body: JSON.stringify({ key, value: 'not mine', visibility: 'public', ai_provenance_id: mintedId }),
+        });
+        assert(w.status === 200 || w.status === 201, `write ${w.status}`);
+        const read = await json(`/v1/memory/${encodeURIComponent(key)}`, { headers: auth(b.token) });
+        assert(read.body.data.ai_provenance_id !== mintedId,
+            'owner B attached owner A\'s provenance record to B\'s own item');
+    });
+
+    // ── 11. PHASE 2: the node's own transparency statement ──
+
+    await test('GET /v1/ai-transparency answers, and is honest when the answer is no', async () => {
+        const r = await json('/v1/ai-transparency');
+        assert(r.status === 200, `transparency ${r.status}`);
+        const d = r.body.data;
+        assert(d.marking.spec === 'aimeat.provenance/v1', `spec ${d.marking.spec}`);
+        assert(d.code_of_practice.signatory === false, 'signatory must ship as false until it is true');
+        assert(d.marking.text_watermarking === 'not-performed-by-this-node',
+            'this node does not watermark text and must not imply that it does');
+        assert(d.detection.access.includes('unauthenticated'), 'the detection access point must say it is open');
+        assert(d.posture.provenance === 'on', `posture ${d.posture.provenance}`);
+    });
+
+    await test('...and has a markdown mirror', async () => {
+        const res = await fetch(`${BASE}/v1/ai-transparency.md`);
+        assert(res.status === 200, `md ${res.status}`);
+        assert((res.headers.get('content-type') ?? '').includes('text/markdown'), 'wrong content type');
+        const text = await res.text();
+        assert(text.includes('aimeat.provenance/v1'), 'the mirror does not name the spec');
+        assert(text.includes('never "a human wrote it"'), 'the mirror must state what absence means');
+    });
+
+    await test('...and is linked from llms.txt and the bootstrap document', async () => {
+        const llms = await fetch(`${BASE}/llms.txt`).then(r => r.text());
+        assert(llms.includes('/v1/ai-transparency'), 'llms.txt does not point at the transparency statement');
+        const boot = await fetch(`${BASE}/`, { headers: { Accept: 'application/json' } }).then(r => r.json());
+        assert(JSON.stringify(boot).includes('/v1/ai-transparency'),
+            'the bootstrap document does not point at it');
+    });
+
+
+    // LAST, deliberately: this exhausts a 60-per-minute IP bucket, and every anonymous by-hash
+    // assertion above needs that bucket. Ordering is the fix; widening the limit would not be.
+    await test('The public detection lookup is rate-limited (unauthenticated flood → 429)', async () => {
+        const bare = PUBLIC_HASH.replace('sha256:', '');
+        let sawLimit = false;
+        for (let i = 0; i < 120 && !sawLimit; i++) {
+            const res = await fetch(`${BASE}/v1/provenance/by-hash/${bare}`);
+            if (res.status === 429) sawLimit = true;
+        }
+        assert(sawLimit, 'an unauthenticated detection endpoint that never rate-limits is a free amplifier');
     });
 
     stub?.close();

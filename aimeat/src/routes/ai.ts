@@ -28,6 +28,9 @@
  *     GET /v1/ai/available so such apps can gate their UI without owner-only settings.
  *   v1.4.0 — 2026-07-05 — Add GET /v1/ai/usage/history (owner per-day series + rollups) and
  *     GET /v1/admin/ai-usage (operator cross-user aggregate) backing the AI-spend charts.
+ *   v1.5.0 — 2026-08-01 — TARGET-058: /v1/ai/complete carries the minted provenance record in
+ *     `meta.provenance` and in the AI-Disclosure / Link response headers. The `data` shape is
+ *     untouched, so nothing that reads `content` changes.
  */
 import { Router } from 'express';
 import type { Request, Response } from 'express';
@@ -42,6 +45,7 @@ import {
   DEFAULT_DAILY_BUDGET_USD,
 } from '../services/ai-completion.js';
 import { getAdminAiUsage } from '../services/ai-usage-admin.js';
+import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 
 export function aiRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -115,6 +119,15 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
           prompt: prompt as string, systemPrompt, model: modelOverride, modelRole,
           temperature, topP: top_p, maxTokens: max_tokens, appId: app_id, images: imageList,
         });
+        // TARGET-058: the provenance of the bytes we are about to hand back, on the ONE envelope
+        // carrier. `meta`, never `data` — the `data` shape is what every published app reads, and it
+        // is unchanged, so an app that ignores provenance keeps working and one that wants it finds
+        // it in the same place on every route that serves generated content.
+        //
+        // The caller is the owner (or an app spending the owner's budget), so they see the whole
+        // record rather than the public projection: it is their own generation.
+        const prov = r.provenance ? servedProvenanceOf(config, r.provenance, { full: true }) : undefined;
+        setProvenanceHeaders(res, prov);
         res.json(success(config.nodeId, {
           content: r.content,
           model: r.model,
@@ -130,7 +143,7 @@ export function aiRouter(config: AimeatConfig, storage: Storage): Router {
             spent_today_usd: r.budget.spentTodayUsd,
             remaining_usd: r.budget.remainingUsd,
           },
-        }));
+        }, undefined, envelopeMeta(prov)));
       } catch (e) {
         if (e instanceof AiCompletionError) {
           return res.status(e.status).json(error(config.nodeId, e.code, e.message));

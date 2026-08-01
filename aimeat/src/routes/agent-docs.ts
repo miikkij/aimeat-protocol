@@ -71,6 +71,7 @@ ${pages}
 ## Machine-readable discovery
 
 - [Node descriptor](${b}/.well-known/aimeat): node id, type, public key, capabilities, federation settings
+- [AI transparency statement](${b}/v1/ai-transparency): what this node marks as AI-generated, how, and in which posture ([markdown](${b}/v1/ai-transparency.md))
 - [MCP Server Card](${b}/.well-known/mcp.json): the MCP server at \`${b}/v1/mcp\`, its transport and auth
 - [API catalog](${b}/.well-known/api-catalog): RFC 9727 linkset over the contract, docs and descriptors
 - [Agent Skills index](${b}/.well-known/agent-skills/index.json): the skill packs published here

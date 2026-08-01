@@ -218,11 +218,11 @@ export interface AiProvenance {
   ownerGhii: string;
   principal: string;
   record: Json;
-  visibility: Generated<string>;
 }
 
 export interface App {
   accessCode: string | null;
+  aiProvenanceId: string | null;
   createdAt: Generated<Timestamp>;
   data: Buffer;
   filename: string;

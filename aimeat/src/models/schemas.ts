@@ -96,6 +96,13 @@ export const MemoryWriteSchema = z.object({
     // Owner-session only: target GAII to store this entry under one of the
     // owner's own agents (instead of the owner's GHII). Ignored for agents.
     agent: z.string().optional(),
+    /**
+     * Attach an ALREADY-MINTED AI provenance record to this write (TARGET-058) — typically the one
+     * `/v1/ai/complete` returned in `meta.provenance`. This is the publish path: the record is
+     * minted private at generation and becomes anonymously resolvable exactly while the item
+     * carrying it is public. It must belong to the caller's own account, or the write is refused.
+     */
+    ai_provenance_id: z.string().max(100).optional(),
 });
 
 export const MemoryUpdateSchema = z.object({
@@ -105,6 +112,8 @@ export const MemoryUpdateSchema = z.object({
     tags: z.array(z.string().max(64)).max(20).optional(),
     ttl_hours: z.number().positive().max(8760).nullable().optional(),
     version: z.number().int().nonnegative(),
+    /** See MemoryWriteSchema.ai_provenance_id. Must belong to the caller's own account. */
+    ai_provenance_id: z.string().max(100).optional(),
 });
 
 // ── Actions ─────────────────────────────────────────────────

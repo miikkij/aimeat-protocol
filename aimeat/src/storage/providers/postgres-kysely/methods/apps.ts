@@ -40,6 +40,7 @@ function toApp(r: Selectable<App>): AppRecord {
     operatorHiddenBy: r.operatorHiddenBy ?? undefined,
     operatorHiddenAt: isoOpt(r.operatorHiddenAt),
     operatorHideReason: r.operatorHideReason ?? undefined,
+    aiProvenanceId: r.aiProvenanceId ?? undefined,
     createdAt: iso(r.createdAt),
   };
 }
@@ -83,6 +84,7 @@ export const appMethods = {
       operatorHidden: record.operatorHidden ?? false, operatorHiddenBy: record.operatorHiddenBy ?? null,
       operatorHiddenAt: record.operatorHiddenAt ? new Date(record.operatorHiddenAt) : null,
       operatorHideReason: record.operatorHideReason ?? null, createdAt: new Date(record.createdAt),
+      aiProvenanceId: record.aiProvenanceId ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();
     return record;

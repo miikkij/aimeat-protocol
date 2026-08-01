@@ -28,6 +28,9 @@ import { prefersMarkdown } from '../../services/markdown-negotiation.js';
 import { serveAppAgentFace } from '../../services/agent-face.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
 import { logger } from '../../utils/logger.js';
+import {
+    loadServedProvenance, envelopeMeta, setProvenanceHeaders, injectAiDisclosure,
+} from '../../services/ai-provenance-marks.js';
 
 export function registerReadRoutes(
     router: Router,
@@ -52,6 +55,10 @@ export function registerReadRoutes(
         }
 
         const versions = await storage.listAppVersions(app.ownerGaii, filename);
+        // TARGET-058: per version, because each publish is its own content and carries its own
+        // statement; `meta.provenance` is the LIVE version's, on the one envelope carrier.
+        const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
+        setProvenanceHeaders(res, prov);
         res.json(success(config.nodeId, {
             owner,
             filename,
@@ -60,9 +67,10 @@ export function registerReadRoutes(
                 version: v.manifest.version,
                 size: v.size,
                 created_at: v.createdAt,
+                ai_provenance_id: v.aiProvenanceId ?? null,
             })),
             total: versions.length,
-        }));
+        }, undefined, envelopeMeta(prov)));
     });
 
     // GET /v1/apps/:owner/:filename/forks — the direct forks of this app, each with
@@ -426,7 +434,16 @@ export function registerReadRoutes(
         // Opt-in copy-protection (obfuscate / domainLock / watermark) is layered onto
         // the inline body only — a no-op unless the owner enabled a flag.
         const isHtml = /html/i.test(app.mimeType);
-        let body = (mode === 'inline' && isHtml) ? injectAimeatBadge(app.data) : app.data;
+        // TARGET-058, SERVE TIME ONLY. The AI-disclosure marks (the `ai-disclosure` attribute, the
+        // meta tag, the schema.org JSON-LD, the link to the record) are added to the bytes on their
+        // way OUT and are never written back — `app.data` is what the author uploaded and stays
+        // that way, which is what keeps the content hash in the provenance record meaningful. This
+        // codebase has published from a served copy before; that is why this lives here and not in
+        // the publish path. The raw (attachment) download stays byte-for-byte, so anyone verifying
+        // the hash downloads the source rather than the rendered page.
+        const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
+        setProvenanceHeaders(res, prov);
+        let body = (mode === 'inline' && isHtml) ? injectAiDisclosure(injectAimeatBadge(app.data), prov) : app.data;
         if (mode === 'inline' && isHtml && hasAnyProtection(app.manifest.protection)) {
             body = applyAppProtection(body, {
                 protection: app.manifest.protection!,

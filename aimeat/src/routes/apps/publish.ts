@@ -25,6 +25,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { recordPublicActivity } from '../../services/public-activity.js';
 import { generateUploadToken } from '../../services/upload-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
+import { stampAgentWrite } from '../../services/ai-provenance.js';
 import { randomBytes } from 'node:crypto';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
@@ -283,6 +284,25 @@ export function registerPublishRoutes(
         // A re-publish changes the bytes → drop any cached obfuscated/locked base.
         invalidateProtectionCache(owner, filename);
 
+        // MINT-3 (TARGET-058): an app published by an agent or an ecosystem app that declared
+        // nothing is stamped by the node — silence from a non-human principal must not read as "a
+        // human wrote it". The owner publishing through their own token is never stamped. The hash
+        // is of the BYTES AS STORED, so a detection query about the author's file finds this record
+        // and the serve-time marks (which are added on the way out) cannot change the answer.
+        //
+        // Per version, because each publish is different content. The record becomes anonymously
+        // resolvable exactly while this app is actually public — parking, hiding or access-coding it
+        // takes the record back to a 404 with nothing to remember to do.
+        const aiProvenanceId = await stampAgentWrite(storage, {
+            principal: callerGaii,
+            content: data,
+            pipeline: 'app.publish',
+            surface: { visibility: accessCode || parkedState ? 'private' : 'public', humanAudience: true },
+            nodeId: config.nodeId,
+            baseUrl: config.baseUrl,
+            enabled: config.aiProvenance,
+        });
+
         await storage.createApp({
             ownerGaii: ownerGhii,   // canonical owner key (NOT caller GAII)
             ownerName: owner,
@@ -300,6 +320,7 @@ export function registerPublishRoutes(
             operatorHiddenAt,
             operatorHideReason,
             createdAt: now,
+            ...(aiProvenanceId ? { aiProvenanceId } : {}),
         });
 
         // Provision the per-app subdomain mapping NOW (HTML apps) — previously it was only

@@ -28,6 +28,9 @@
  *   import { disclosureFor } from './ai-disclosure.js';
  *   const d = disclosureFor(record, { visibility: 'public', humanAudience: true });
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. `assisted` + `none`/`light-review` on a public-interest
+ *     surface now owes a LIGHT label instead of none (22-frozen-vocabulary.md §C2b, overriding the
+ *     literal reading of Art. 50(4) that Phase 1 implemented).
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1. Rules from docs/internal/EUAct/06-platform-design.md
  *     §4 and decision D4 (over-labelling) in 21-decisions-2026-08-01.md.
  */
@@ -91,8 +94,9 @@ const strengthFor = (ctx: SurfaceContext): DisclosureStrength => (ctx.creativeWo
  *    of review. The review exemption belongs to the text limb; it does not reach deep fakes.
  * 5. **A person held editorial control → no 50(4) text duty.** The record still exists and is still
  *    served on every machine plane.
- * 6. Otherwise the text limb: model-produced, nobody read the substance, published anonymously
- *    readable, on a matter of public interest → **Art. 50(4) 2nd subpara**.
+ * 6. Otherwise the text limb: model-touched, nobody read the substance, published anonymously
+ *    readable, on a matter of public interest → **Art. 50(4) 2nd subpara**. `assisted` lands here
+ *    too, at LIGHT strength — see the comment on that branch.
  */
 export function disclosureFor(input: MaybeAiProvenance, ctx: SurfaceContext): DisclosureDecision {
   // 1 — nobody to inform.
@@ -123,12 +127,21 @@ export function disclosureFor(input: MaybeAiProvenance, ctx: SurfaceContext): Di
   if (ctx.editorialResponsibility === true) return NOTHING_OWED;
 
   // 6 — Art. 50(4) 2nd subpara: text published to inform the public on matters of public interest.
-  // `assisted` is out: a human wrote it and a model helped, which is not "generated or manipulated"
-  // in the sense the text limb reaches.
-  if (p.level !== 'synthesized' && p.level !== 'ai-generated') return NOTHING_OWED;
   if (!publiclyReadable) return NOTHING_OWED;
   // Over-labelling default (D4): absent and `unknown` both mean YES. Only an explicit `no` opts out.
   if (ctx.publicInterest === 'no') return NOTHING_OWED;
+
+  // `assisted` is LIGHT, never full. Read literally, Art. 50(4) reaches content "generated or
+  // manipulated" by AI and an assisted text is a human's, so the letter says nothing is owed — and
+  // that is where Phase 1 landed. It is the wrong answer for this platform: decision D4 is to
+  // over-label rather than sit on the line, and the Commission built an icon for precisely this case
+  // (*Partially AI-Modified* — pre-existing human-made content partially modified with AI, on
+  // matters of public interest). Under-labelling is the violation; over-labelling costs an icon.
+  //
+  // What `assisted` + `none` actually means, since it reads like a contradiction: a human wrote it,
+  // a model edited it, and NOBODY CHECKED WHAT THE MODEL DID. `humanInvolvement` describes review of
+  // the model's contribution, not authorship.
+  if (p.level === 'assisted') return { required: true, reason: 'art50_4_public_interest', strength: 'light' };
 
   return { required: true, reason: 'art50_4_public_interest', strength: strengthFor(ctx) };
 }

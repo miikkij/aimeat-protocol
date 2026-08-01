@@ -518,7 +518,6 @@ export function applySchemaTables3(db: Database.Database): void {
       ownerGhii   TEXT NOT NULL,
       principal   TEXT NOT NULL,
       contentHash TEXT,
-      visibility  TEXT NOT NULL DEFAULT 'private',
       generatedAt TEXT NOT NULL,
       createdAt   TEXT NOT NULL,
       record      TEXT NOT NULL

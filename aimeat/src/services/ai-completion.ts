@@ -400,9 +400,10 @@ export async function completeForOwner(
   // substance, whatever happens downstream. A publisher who later reviews it declares that at
   // publication (an attributable act) — the node never infers editorial control on anyone's behalf.
   //
-  // Visibility defaults to private. A completion is the owner's own until they publish it; the
-  // publish path is what upgrades the record, and guessing 'public' here would expose an owner's
-  // private drafts to the anonymous hash lookup.
+  // The record is not resolvable by anyone yet, and nothing here decides that. Provenance
+  // visibility FOLLOWS THE CONTENT: this record becomes publicly resolvable exactly when the owner
+  // attaches it to something public, and goes back to a 404 when they unpublish. A completion is
+  // the owner's own until then.
   let provenance: AiProvenanceRecordRow | undefined;
   if (config.aiProvenance) {
     try {

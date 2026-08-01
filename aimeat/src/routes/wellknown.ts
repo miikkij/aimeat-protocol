@@ -19,6 +19,7 @@
  *     the ROOT per server.json (SEP-2127) instead of only inside serverInfo; the UCP profile
  *     declares capabilities as an object keyed by capability name, as the spec requires — the array
  *     it used to send read as "capabilities missing" (agent-readability phase 09)
+ *   v1.8.0 — 2026-08-01 — api-catalog links the AI transparency statement (/v1/ai-transparency)
  *   v1.6.0 — 2026-07-14 — api-catalog links the Agent Skills discovery index (/.well-known/agent-skills/index.json)
  *   v1.5.0 — 2026-07-14 — Web Bot Auth key directory at /.well-known/http-message-signatures-directory
  *     (node Ed25519 JWKS, signed response; draft-meunier-http-message-signatures-directory)
@@ -203,6 +204,11 @@ export function wellknownRouter(config: AimeatConfig, storage: Storage): Router 
             { href: `${b}/.well-known/aimeat`, type: 'application/json' },
             { href: `${b}/.well-known/ucp`, type: 'application/json' },
             { href: `${b}/.well-known/agent-skills/index.json`, type: 'application/json' },
+            // What this node marks as AI-generated, how, and in which posture (TARGET-058). A
+            // discovery document rather than a page: it is the first thing a regulator, a
+            // researcher or a buyer's compliance officer needs, and it must be findable without
+            // reading HTML.
+            { href: `${b}/v1/ai-transparency`, type: 'application/json' },
           ],
         },
         {
