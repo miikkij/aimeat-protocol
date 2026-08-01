@@ -299,6 +299,72 @@ const APP_HTML = [
         assert(anon.body.error.message === missing.body.error.message, 'the 404s differ');
     });
 
+    // ── The FIFTH carrier: the browser library published apps actually read through ──
+    //
+    // The four fetches above all prove the node SERVES the record. None of them proves an app can
+    // GET it, and that is a different question with its own answer: every read in aimeat-data.js
+    // ended in `res.data`, and the node puts provenance on `meta`. So the statement was served
+    // correctly and thrown away at the last hop, on the one path a published app uses. An app could
+    // render model-written content and have no way to say so, however carefully the writing agent
+    // had declared it. Exactly the loss the connector had (ai-provenance-carry.ts v1.1.0).
+
+    const noteKey = `prov.note.${Date.now()}`;
+    let noteProvId = '';
+
+    await test('An agent writing PUBLIC memory gets it stamped, and the envelope carries the record', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: auth(agent.token),
+            body: JSON.stringify({ key: noteKey, value: 'Kirjoitettu mallilla.', visibility: 'public' }),
+        });
+        assert(w.status === 200 || w.status === 201, `write ${w.status}: ${JSON.stringify(w.body?.error)}`);
+        const r = await json(`/v1/memory/${encodeURIComponent(agent.gaii)}/${encodeURIComponent(noteKey)}`);
+        assert(r.status === 200, `public read ${r.status}`);
+        noteProvId = r.body.meta?.provenance?.id;
+        assert(!!noteProvId, `the public read envelope carries no provenance: ${JSON.stringify(r.body.meta)}`);
+    });
+
+    await test('aimeat-data getPublicEntry() hands the record to the app; getPublic() still returns the bare value', async () => {
+        // Run the LIBRARY SOURCE against the live node with the three browser globals it touches
+        // (window / document.querySelector / location). check:sdk holds source and shipped bundle
+        // together, so exercising the source exercises what apps load.
+        const g = globalThis as unknown as Record<string, unknown>;
+        const saved = { window: g.window, document: g.document, location: g.location };
+        g.window = { __AIMEAT_SDK_CFG__: { nodeId: NODE_ID, baseUrl: BASE } };
+        g.document = { querySelector: () => null };
+        g.location = { protocol: 'file:', origin: BASE };
+        try {
+            const mod = await import(`../src/static/sdk-libs/data/index.js?t=${Date.now()}`);
+            void mod;
+            const api = (g.window as { AIMEAT?: { data?: any } }).AIMEAT?.data;
+            assert(!!api?.getPublicEntry, 'the library exposes no getPublicEntry — an app cannot reach the record');
+
+            const bare = await api.getPublic(agent.gaii, noteKey);
+            assert(bare === 'Kirjoitettu mallilla.',
+                `getPublic must keep returning the bare value (every published app depends on it), got ${JSON.stringify(bare)}`);
+
+            const entry = await api.getPublicEntry(agent.gaii, noteKey);
+            assert(entry?.value === 'Kirjoitettu mallilla.', 'getPublicEntry lost the value');
+            assert(entry?.provenance?.id === noteProvId,
+                `getPublicEntry dropped the provenance: ${JSON.stringify(entry?.provenance)}`);
+            assert(entry.provenance.record.level === 'ai-generated' && entry.provenance.record.humanInvolvement === 'none',
+                'the record an app receives must be the one the node served');
+            // `recordUrl`, camelCase: this is the ENVELOPE carrier (ServedProvenance), not the
+            // per-item `ai_provenance` DTO whose keys are snake_case. Two carriers, two
+            // conventions, and an app that guesses gets undefined — so the assertion pins it.
+            assert(typeof entry.provenance.recordUrl === 'string' && entry.provenance.recordUrl.includes('/v1/provenance/'),
+                `an app must be able to link out to the addressable record, got ${JSON.stringify(entry.provenance.recordUrl)}`);
+        } finally {
+            g.window = saved.window; g.document = saved.document; g.location = saved.location;
+        }
+    });
+
+    await test('...and the SHIPPED bundle carries it too, not just the source', async () => {
+        const res = await fetch(`${BASE}/v1/libs/aimeat-data.js`);
+        assert(res.ok, `served lib ${res.status}`);
+        const text = await res.text();
+        assert(text.includes('getPublicEntry'), 'the served bundle predates the source — run pnpm build:sdk');
+    });
+
     console.log(`\n  ${passed} passed, ${failed} failed`);
     process.exit(failed > 0 ? 1 : 0);
 })();

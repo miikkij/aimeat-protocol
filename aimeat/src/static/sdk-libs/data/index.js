@@ -7,8 +7,9 @@
  *   that actually CONSUMES the shared config: `NODE_URL` (direct public/micro fetches) and `NODE_ID`
  *   (the `creator@node` construction in get()'s fallback) come from _core/config — the exact values
  *   the legacy string form baked in via `${config.baseUrl}` / `${config.nodeId}`.
- * @structure imports NODE_URL/NODE_ID (config), authFetch (session), attach (namespace); data.set/
- *   get/getEntry/update/delete/list/search/getPublic; data.micro()/microSets(); attach('data', …).
+ * @structure imports NODE_URL/NODE_ID (config), authFetch (session), attach (namespace);
+ *   withProvenance()/publicEntryResponse(); data.set/get/getEntry/update/delete/list/search/
+ *   getPublic/getPublicEntry; data.micro()/microSets(); attach('data', …).
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-data.js"></script>
  *   await AIMEAT.data.set('key', { value }); await AIMEAT.data.get('key');
  * @version-history
@@ -19,6 +20,12 @@
  *     library entirely to read their own owner's fleet output. All options are additive.
  *   v1.2.0 — 2026-07-29 — delete() takes { ownerScope } like the reads. list({ ownerScope }) already
  *     returned agent-written keys, so an app could render a record and then 404 trying to remove it.
+ *   v1.3.0 — 2026-08-01 — TARGET-058: AI provenance survives the READ. getEntry() folds in the
+ *     envelope's `meta.provenance`, and getPublicEntry() is the public sibling that does the same —
+ *     getPublic() keeps returning the bare value, because every published app depends on that.
+ *     Until now every read path here ended in `res.data`, so an app could render model-written
+ *     content with no way to state its origin no matter how carefully the writing agent declared
+ *     it. Same loss the connector had (ai-provenance-carry.ts v1.1.0); the browser had it too.
  */
 import { NODE_URL, NODE_ID } from '../_core/config.js';
 import { makeSession } from '../_core/session.js';
@@ -37,6 +44,33 @@ import { attach } from '../_core/namespace.js';
  * @param {{agent?: string, ownerScope?: boolean}} [opts]
  * @returns {URLSearchParams}
  */
+/**
+ * Fold the envelope's `meta.provenance` onto the entry the caller gets back.
+ *
+ * The node puts it on `meta` rather than in `data` on purpose: provenance DESCRIBES the content
+ * instead of being part of it, and `data` shapes are what published apps read. That decision is
+ * right, and it is also exactly why every `return res.data` in a client library silently drops it.
+ * One helper, so a read path added later cannot lose it again.
+ *
+ * @param {{data: any, meta?: {provenance?: any}}} res
+ */
+function withProvenance(res) {
+  const prov = res.meta?.provenance;
+  return prov ? { ...res.data, provenance: prov } : res.data;
+}
+
+/** The public (unauthenticated) memory read, shared by getPublic + getPublicEntry. */
+async function publicEntryResponse(gaii, key) {
+  const url = NODE_URL + '/v1/memory/' + encodeURIComponent(gaii) + '/' + encodeURIComponent(key) + '?soft=1';
+  const r = await fetch(url);
+  const res = await r.json();
+  if (!res.ok) {
+    if (res.error?.code === 'NOT_FOUND') return null;
+    throw new Error(res.error?.message || 'Failed to read public memory');
+  }
+  return res;
+}
+
 function scopeParams(opts) {
   const p = new URLSearchParams();
   if (opts?.agent) p.set('agent', opts.agent);
@@ -97,6 +131,7 @@ const data = {
   },
 
   // Read full entry metadata. opts: { agent, ownerScope } as in get().
+  // `provenance` is folded in from the envelope's `meta` — see withProvenance().
   async getEntry(key, opts) {
     const res = await authFetch(withParams(
       '/v1/memory/' + encodeURIComponent(key), scopeParams(opts)));
@@ -104,7 +139,7 @@ const data = {
       if (res.error?.code === 'NOT_FOUND') return null;
       throw new Error(res.error?.message || 'Failed to get memory');
     }
-    return res.data;
+    return withProvenance(res);
   },
 
   // Update with optimistic locking
@@ -180,15 +215,32 @@ const data = {
 
   // Read another agent's public memory (no auth needed). ?soft=1: missing (or hidden)
   // keys resolve null via a clean 200 instead of logging a console 404.
+  //
+  // Returns the VALUE, deliberately unchanged: every published app reading this library expects
+  // the bare value here, so widening the return type would break them all. To see how the value
+  // was made, use getPublicEntry() below.
   async getPublic(gaii, key) {
-    const url = NODE_URL + '/v1/memory/' + encodeURIComponent(gaii) + '/' + encodeURIComponent(key) + '?soft=1';
-    const r = await fetch(url);
-    const res = await r.json();
-    if (!res.ok) {
-      if (res.error?.code === 'NOT_FOUND') return null;
-      throw new Error(res.error?.message || 'Failed to read public memory');
-    }
-    return res.data.value;
+    const res = await publicEntryResponse(gaii, key);
+    return res === null ? null : res.data.value;
+  },
+
+  /**
+   * The same public read, as a full entry: `{ key, value, visibility, version, …, provenance }`.
+   *
+   * WHY THIS EXISTS. The node serves an item's AI provenance on the envelope's `meta`, and
+   * getPublic() returns `res.data.value` — so the statement about how the content was made was
+   * being thrown away at the last hop, on the one read path published apps actually use. An app
+   * could render a model-written article and have no way to say so, however carefully the writing
+   * agent had declared it. This is the same READ-DIRECTION loss that had to be fixed in the
+   * connector (ai-provenance-carry.ts v1.1.0, "read_provenance() never returns anything"); the
+   * browser library had it too.
+   *
+   * `provenance` is `{ id, record, record_url }` or undefined when the node holds no record for
+   * the item. Undefined means UNSTATED, and never "a person wrote it".
+   */
+  async getPublicEntry(gaii, key) {
+    const res = await publicEntryResponse(gaii, key);
+    return res === null ? null : withProvenance(res);
   },
 
   // ── Micro-Memory (Tier 0.5, GET-based) ──
