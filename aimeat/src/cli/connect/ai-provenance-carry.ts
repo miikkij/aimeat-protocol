@@ -81,6 +81,10 @@ export { memoryContentBytes };
  * have to accept `ai_provenance_id` for the entry to move to a real carrier. They are listed rather
  * than left implicit so that `check:ai-disclosure` can count them and so that nobody has to read
  * fourteen handlers to find out which of them actually work.
+ *
+ * ONE OF THEM IS NOW HALF-OPEN: `publish-draft` accepts a declaration (the app publish doors were
+ * fixed after this list was written), so `aimeat_app_draft_publish` is no longer blocked by the node
+ * — only by this side not sending the body. See its entry.
  */
 export type ProvenanceCarrier =
   | {
@@ -98,6 +102,11 @@ export const CONNECTOR_PROVENANCE_CARRIERS: Record<string, ProvenanceCarrier> = 
       : undefined),
   },
 
+  // READY TO MOVE, and the only entry on this list that is. The route now ACCEPTS a declaration
+  // (routes/apps/drafts.ts) — what is still missing is on this side: the connector's proxy posts an
+  // empty body, so the block never leaves the client. Left `not-carried` because that is what the
+  // caller is honestly told today; promoting it means sending the body AND being able to prove the
+  // echo's `recorded: true`, which is its own slice rather than a line change here.
   aimeat_app_draft_publish: { kind: 'not-carried', route: 'POST /v1/apps/:owner/:filename/publish-draft' },
   aimeat_app_publish: { kind: 'not-carried', route: 'POST /v1/packages' },
   aimeat_board_post: { kind: 'not-carried', route: 'POST /v1/boards/:id/posts' },
