@@ -13,6 +13,7 @@
 #   8. SDK-libs dist ↔ their sources     — pnpm check:sdk
 #   9. MCP tool surface/handler parity    — pnpm check:mcp-tools
 #  10. Cortex pack integrity (embed + versions) — pnpm check:viewport
+#  11. AI disclosure gates (TARGET-058)  — pnpm check:ai-disclosure
 #
 # These are the "green before commit" checks. E2E/Playwright are intentionally NOT here
 # (too slow / need a DB) — run those before pushing a feature (see CLAUDE.md Rule 1).
@@ -62,5 +63,8 @@ pnpm -s check:viewport
 
 echo "[pre-commit] No silent exception handlers in the cleaned areas (check:silent-catch)…"
 pnpm -s check:silent-catch -- --strict
+
+echo "[pre-commit] AI disclosure gates: one LLM path, one publish path, labels intact (check:ai-disclosure)…"
+pnpm -s check:ai-disclosure
 
 echo "[pre-commit] ✓ all checks passed"

@@ -9,6 +9,12 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.8.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a: aimeat_app_publish and aimeat_app_draft_publish
+ *     go through services/app-publish.ts, the one function the three REST doors already call. They
+ *     were the fourth and fifth partial copies of the publish — no transparency lint, no quota, no
+ *     change log, no announcement, no public feed, no subdomain, and a carry-forward list missing
+ *     the description, tags, icon, pricing, the access code and the operator-hidden flag. Promoting
+ *     a draft over MCP was consequently a way out of an operator hide.
  *   v1.7.0 — 2026-08-01 — TARGET-058 Phase 4: aimeat_app_publish and aimeat_app_draft_publish accept
  *     an `ai_provenance` declaration and go through provenanceForWrite() instead of straight to
  *     Mint-3, so an agent that DOES say how it built the app is believed about the how while the node
@@ -44,7 +50,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { agentFaceKey } from '../services/agent-face.js';
 import { getOwnerScopePublicMemory } from '../services/owner-memory.js';
 import { listSkillsByBinding } from '../services/skills.js';
-import { provenanceForWrite } from '../services/ai-provenance.js';
+import { publishApp } from '../services/app-publish.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { loadServedProvenance } from '../services/ai-provenance-marks.js';
@@ -154,27 +160,10 @@ export function registerAppsTools(
             }
 
             const ownerGaii = `${parsed.owner}@${config.nodeId}`;
-            const existingVersion = await storage.getLatestVersionNumber(ownerGaii, filename);
-            const newVersion = existingVersion + 1;
-            const isUpdate = existingVersion > 0;
 
-            // Description required for a NEW app; carried forward on an update when omitted (so a
-            // re-publish never blanks it). Mirrors POST /v1/apps.
-            let effectiveDescription = typeof description === 'string' ? description.trim() : '';
-            if (!effectiveDescription) {
-                if (isUpdate) {
-                    const existingApp = await storage.getApp(ownerGaii, filename);
-                    effectiveDescription = existingApp?.manifest?.description ?? '';
-                } else {
-                    return {
-                        content: [{ type: 'text' as const, text: 'A description is required when publishing a new app. Add a short "description" (1-2 sentences about what it does).' }],
-                        isError: true,
-                    };
-                }
-            }
-
-            // Agent-Bundled Apps: validate declared crew-defs fail-loud — a malformed
-            // agents[] rejects the publish so it never reaches a fleet. Mirrors POST /v1/apps.
+            // Agent-Bundled Apps: validate declared crew-defs fail-loud — a malformed agents[]
+            // rejects the publish so it never reaches a fleet. This stays HERE because it is
+            // validation of an MCP parameter, not part of the publish itself.
             let cortexAgents: Record<string, unknown>[] | undefined;
             if (cortex_agents !== undefined) {
                 const check = validateCortexAgents(cortex_agents);
@@ -184,71 +173,32 @@ export function registerAppsTools(
                 cortexAgents = check.agents as unknown as Record<string, unknown>[];
             }
 
-            const manifest: AppManifest = {
-                name,
-                description: effectiveDescription,
-                version: version ?? `1.0.${newVersion - 1}`,
-                category: category ?? 'tool',
-                tags: tags ?? [],
-                authorDisplay: parsed.owner,
-                usesCortex: [],
-            };
-            if (icon) manifest.icon = icon;
-            if (cortexAgents !== undefined && cortexAgents.length > 0) manifest.cortex = { agents: cortexAgents };
-
-            // Carry the parked + forkable + copy-protection state forward across
-            // re-publishes (an update never silently re-exposes a parked app, flips fork
-            // permission, or drops the owner's copy-protection). Mirrors POST /v1/apps.
-            let parkedState = false;
-            let forkableState = false;
-            if (isUpdate) {
-                const existingApp = await storage.getApp(ownerGaii, filename);
-                parkedState = !!existingApp?.parked;
-                forkableState = !!existingApp?.forkable;
-                if (existingApp?.manifest?.protection) manifest.protection = existingApp.manifest.protection;
-                // cortex.agents carried forward when omitted (an update never silently drops
-                // the app's bundled agents); an explicit [] clears the section.
-                if (cortex_agents === undefined && existingApp?.manifest?.cortex?.agents?.length) {
-                    manifest.cortex = existingApp.manifest.cortex;
-                }
-            }
-
-            // TARGET-058: an agent publishing an app and declaring nothing is stamped by the node
-            // (Mint-3). This is THE case the rule exists for — an app published over MCP is written
-            // by a model far more often than not, and silence must not read as "a human wrote it".
-            // Now through provenanceForWrite(), so an agent that DOES declare something is believed
-            // about the how while the node still fills in the who, the when and the hash.
-            const aiProvenanceId = await provenanceForWrite(storage, {
-                principal: agentGaii,
-                content: data,
-                declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
-                pipeline: 'mcp.app_publish',
-                surface: { visibility: parkedState ? 'private' : 'public', humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
-            });
-
+            // From here it is services/app-publish.ts — the same function POST /v1/apps, the
+            // presigned upload and publish-draft call. This tool was a FOURTH partial copy of the
+            // publish: no transparency lint, no protection-cache invalidation, no quota, no
+            // change-log entry, no announcement, no public feed, no subdomain provisioning, and a
+            // carry-forward list that dropped the description, tags, icon, pricing, the access code
+            // and the operator-hidden flag — so an agent could escape an operator hide by
+            // re-publishing over MCP.
             try {
-                await storage.createApp({
-                    ownerGaii,
+                const out = await publishApp(storage, config, {
                     ownerName: parsed.owner,
+                    ownerGhii: ownerGaii,
+                    callerGaii: agentGaii,
                     filename,
-                    versionNumber: newVersion,
-                    manifest,
-                    mimeType: 'text/html',
-                    size: data.length,
                     data,
-                    parked: parkedState,
-                    forkable: forkableState,
-                    createdAt: new Date().toISOString(),
-                    ...(aiProvenanceId ? { aiProvenanceId } : {}),
+                    mimeType: 'text/html',
+                    requested: { name, description, category, tags, icon, version, cortexAgents },
+                    accessCode: { mode: 'carry' },
+                    source: 'inline',
+                    declaredProvenanceId: ai_provenance_id,
+                    declaredProvenance: toDeclaredProvenance(ai_provenance),
                 });
+                if ('refusal' in out) {
+                    return { content: [{ type: 'text' as const, text: out.refusal.message }], isError: true };
+                }
 
-                const downloadUrl = `/v1/apps/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(filename)}`;
-                logger.info(`App ${isUpdate ? 'updated' : 'published'} via MCP: ${filename} v${newVersion}`, { by: agentGaii });
+                logger.info(`App ${out.isUpdate ? 'updated' : 'published'} via MCP: ${filename} v${out.versionNumber}`, { by: agentGaii });
                 emitResourceListChanged(agentGaii);
 
                 return {
@@ -257,13 +207,16 @@ export function registerAppsTools(
                         text: JSON.stringify({
                             mode: 'inline',
                             filename,
-                            version_number: newVersion,
-                            name: manifest.name,
-                            size: data.length,
-                            is_update: isUpdate,
-                            download_url: downloadUrl,
-                            inline_url: `${downloadUrl}?mode=inline`,
-                            ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
+                            version_number: out.versionNumber,
+                            name: out.manifest.name,
+                            size: out.size,
+                            is_update: out.isUpdate,
+                            download_url: out.downloadUrl,
+                            inline_url: `${out.downloadUrl}?mode=inline`,
+                            ...(out.mobileHints.length ? { mobile_hints: out.mobileHints } : {}),
+                            ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
+                            ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
+                            ...(await writeProvenanceEcho(storage, config, out.aiProvenanceId)),
                             next_steps: await buildNextSteps(parsed.owner, filename),
                         }, null, 2),
                     }],
@@ -366,50 +319,50 @@ export function registerAppsTools(
             if (!draft) {
                 return { content: [{ type: 'text' as const, text: `No draft to publish for "${filename}". Save one with aimeat_app_draft_save first.` }], isError: true };
             }
-            const existingVersion = await storage.getLatestVersionNumber(ownerGaii, filename);
-            const isUpdate = existingVersion > 0;
-            const newVersion = existingVersion + 1;
-            // Carry the live parked/forkable/protection state forward, mirroring publish.
-            let parkedState = false, forkableState = false;
-            if (isUpdate) {
-                const live = await storage.getApp(ownerGaii, filename);
-                parkedState = !!live?.parked;
-                forkableState = !!live?.forkable;
-            }
-            const manifest: AppManifest = { ...draft.manifest, version: draft.manifest.version || `1.0.${newVersion - 1}`, authorDisplay: parsed.owner };
-            // Same rule on the draft-publish path, or an agent could route around it by staging first.
-            const aiProvenanceId = await provenanceForWrite(storage, {
-                principal: agentGaii,
-                content: draft.data,
-                declaredId: ai_provenance_id,
-                declared: toDeclaredProvenance(ai_provenance),
-                pipeline: 'mcp.app_draft_publish',
-                surface: { visibility: parkedState ? 'private' : 'public', humanAudience: true },
-                labelPolicy: config.aiLabelPublic,
-                nodeId: config.nodeId,
-                baseUrl: config.baseUrl,
-                enabled: config.aiProvenance,
-            });
-
             try {
-                await storage.createApp({
-                    ownerGaii, ownerName: parsed.owner, filename, versionNumber: newVersion,
-                    manifest, mimeType: draft.mimeType, size: draft.size, data: draft.data,
-                    parked: parkedState, forkable: forkableState, createdAt: new Date().toISOString(),
-                    ...(aiProvenanceId ? { aiProvenanceId } : {}),
+                // The same shared publish the REST publish-draft goes through. This tool was the
+                // FIFTH copy, and the thinnest: it carried neither the access code nor the
+                // operator-hidden flag, so staging a draft and promoting it over MCP was a way out
+                // of an operator hide.
+                const out = await publishApp(storage, config, {
+                    ownerName: parsed.owner,
+                    ownerGhii: ownerGaii,
+                    callerGaii: agentGaii,
+                    filename,
+                    data: draft.data,
+                    mimeType: draft.mimeType,
+                    requested: {
+                        name: draft.manifest.name,
+                        description: draft.manifest.description,
+                        version: draft.manifest.version || undefined,
+                        category: draft.manifest.category,
+                        tags: draft.manifest.tags,
+                        icon: draft.manifest.icon,
+                        usesCortex: draft.manifest.usesCortex,
+                        cortexAgents: draft.manifest.cortex?.agents,
+                        protection: draft.manifest.protection,
+                    },
+                    accessCode: { mode: 'carry' },
+                    source: 'draft',
+                    declaredProvenanceId: ai_provenance_id,
+                    declaredProvenance: toDeclaredProvenance(ai_provenance),
                 });
+                if ('refusal' in out) {
+                    return { content: [{ type: 'text' as const, text: out.refusal.message }], isError: true };
+                }
                 await storage.deleteAppDraft(ownerGaii, filename);
                 emitResourceListChanged(agentGaii);
-                logger.info(`App draft published via MCP: ${filename} v${newVersion}`, { by: agentGaii });
-                const downloadUrl = `/v1/apps/${encodeURIComponent(parsed.owner)}/${encodeURIComponent(filename)}`;
+                logger.info(`App draft published via MCP: ${filename} v${out.versionNumber}`, { by: agentGaii });
                 return {
                     content: [{
                         type: 'text' as const,
                         text: JSON.stringify({
-                            filename, version_number: newVersion, is_update: isUpdate,
-                            parked: parkedState, download_url: downloadUrl, inline_url: `${downloadUrl}?mode=inline`,
+                            filename, version_number: out.versionNumber, is_update: out.isUpdate,
+                            parked: out.parked, download_url: out.downloadUrl, inline_url: `${out.downloadUrl}?mode=inline`,
                             note: 'Draft published as the new live version; the draft slot is cleared.',
-                            ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
+                            ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
+                            ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
+                            ...(await writeProvenanceEcho(storage, config, out.aiProvenanceId)),
                             next_steps: await buildNextSteps(parsed.owner, filename),
                         }, null, 2),
                     }],

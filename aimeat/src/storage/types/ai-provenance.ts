@@ -21,16 +21,50 @@
  *   direction is item → record (`MemoryRecord.aiProvenanceId`, `AppRecord.aiProvenanceId`), so the
  *   question is answered by ONE query — see publiclyLinkedProvenanceIds() in the repository.
  * @structure
+ *   - PUBLICLY_LINKED_CONTAINERS — the containers the derived-visibility rule must cover
  *   - AiProvenanceRecordRow — one stored provenance record
  *   - AiProvenanceHashQuery — the filter for the public hash lookup
  * @usage
  *   import type { AiProvenanceRecordRow } from '../storage/interface.js';
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 8. PUBLICLY_LINKED_CONTAINERS: the maintenance obligation
+ *     the derived-visibility design created, written down where `pnpm check:ai-disclosure` enforces it.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. `visibility` removed: it is derived from the linked
  *     content, not stored and never caller-settable.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
  */
 import type { AiProvenance } from '../../models/ai-provenance-schemas.js';
+
+/**
+ * THE list of containers that can make content publicly readable, and therefore the list the
+ * derived-visibility rule has to cover.
+ *
+ * This is the maintenance obligation that "visibility follows the content" creates, written down
+ * where it can be enforced. A record is anonymously resolvable exactly when some item pointing at it
+ * is public — so a NEW publishing route whose table is not in this list leaves every provenance
+ * record it produces silently private. Nothing breaks; the label simply fails to resolve, which
+ * reads to a visitor as "no provenance", which is the one thing this programme exists to prevent.
+ *
+ * `pnpm check:ai-disclosure` asserts that BOTH storage providers' `PUBLICLY_LINKED` predicates cover
+ * exactly these containers, and that the two agree with each other. Adding a publishing route means
+ * adding an entry here and a clause in both predicates, in the same change.
+ */
+export const PUBLICLY_LINKED_CONTAINERS = [
+  {
+    /** Memory records — and so also workspace records, agent faces and WebMCP tool manifests. */
+    name: 'memory',
+    sqliteTable: 'memory',
+    postgresTable: '"Memory"',
+    publicWhen: "visibility = 'public'",
+  },
+  {
+    /** Published apps: served to anyone who asks, so not parked, not operator-hidden, no access code. */
+    name: 'apps',
+    sqliteTable: 'apps',
+    postgresTable: '"App"',
+    publicWhen: 'not parked, not operator-hidden, no access code',
+  },
+] as const;
 
 export interface AiProvenanceRecordRow {
   /** Node-local id. A convenience handle — the content hash is the real join key. */

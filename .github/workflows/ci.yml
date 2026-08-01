@@ -102,6 +102,11 @@ jobs:
         working-directory: aimeat
         run: pnpm check:viewport
 
+      # TARGET-058: one LLM path, one publish path, every label still where it has to be.
+      - name: AI disclosure gates (check:ai-disclosure)
+        working-directory: aimeat
+        run: pnpm check:ai-disclosure
+
       - name: Unit tests (vitest)
         working-directory: aimeat
         run: pnpm test
