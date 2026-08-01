@@ -57,6 +57,7 @@ function deserializeMemory(row: Record<string, unknown>): MemoryRecord {
   if (row.archivedAt) record.archivedAt = row.archivedAt as string;
   if (row.archivedBy) record.archivedBy = row.archivedBy as string;
   if (row.archivedRoot) record.archivedRoot = row.archivedRoot as string;
+  if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
   return record;
 }
 

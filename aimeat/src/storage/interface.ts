@@ -27,6 +27,7 @@ export * from './types/commerce.js';
 export * from './types/apps.js';
 export * from './types/organisms-federation.js';
 export * from './types/agents-messaging.js';
+export * from './types/ai-provenance.js';
 
 // ── Domain Repository Interfaces ────────────────────────────────────
 import type { OwnerRepository } from './repositories/owner.repository.js';
@@ -84,6 +85,7 @@ import type { FeedbackRepository } from './repositories/feedback.repository.js';
 import type { AgentTelemetryRepository, AgentWebhookRepository } from './repositories/agent-webhook.repository.js';
 import type { AgentOnboardingRepository } from './repositories/agent-onboarding.repository.js';
 import type { InvitationRepository } from './repositories/invitation.repository.js';
+import type { AiProvenanceRepository } from './repositories/ai-provenance.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -111,4 +113,5 @@ export interface Storage extends
   AgentTelemetryRepository, AgentWebhookRepository,
   AgentOnboardingRepository,
   InvitationRepository,
+  AiProvenanceRepository,
   StatsRepository { }

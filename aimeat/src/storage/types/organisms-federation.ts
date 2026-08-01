@@ -2,11 +2,14 @@
  * @file src/storage/types/organisms-federation.ts
  * @description Organism, federation/peering, notification, extension, scheduler, cortex, and knowledge record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-01 — KnowledgeSynthesisLevel now aliases AiProvenanceLevel rather than
+ *     re-spelling the four strings (TARGET-058: one definition of the vocabulary).
  *   v1.1.0 — 2026-07-25 — Extension action commercial gains `provenance` + `odps` (ODPS v4.0 adoption,
  *     TARGET-045 §4): the source of a projected EXCHANGE listing carries its own descriptor data.
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  */
 import type { Provenance, OdpsExtras } from '../../models/odps-schemas.js';
+import type { AiProvenanceLevel } from '../../models/ai-provenance-schemas.js';
 
 export interface PeeringRequestRecord {
   id: string;
@@ -528,7 +531,10 @@ export type KnowledgeContentType =
   | 'idea' | 'research' | 'plan' | 'dataset' | 'document'
   | 'tutorial' | 'collection' | 'article' | 'story' | 'fiction';
 
-export type KnowledgeSynthesisLevel = 'original' | 'assisted' | 'synthesized' | 'ai-generated';
+/** The four synthesis levels. Defined once, in the provenance record's frozen vocabulary — a
+ *  knowledge package's `synthesis.level` and an AI provenance record's `level` are the SAME
+ *  vocabulary, so they must not drift apart into two spellings (TARGET-058). */
+export type KnowledgeSynthesisLevel = AiProvenanceLevel;
 export type KnowledgeMaturity = 'draft' | 'review' | 'published';
 export type KnowledgeLinkRelation = 'related-to' | 'extends' | 'derived-from' | 'contradicts' | 'supersedes' | 'references';
 

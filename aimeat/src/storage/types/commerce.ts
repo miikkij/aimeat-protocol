@@ -51,6 +51,15 @@ export interface MemoryRecord {
    * (smart restore): a record independently archived earlier keeps its own root and stays archived.
    */
   archivedRoot?: string;
+  /**
+   * The ATTACHED half of AI provenance (TARGET-058): the id of an `AiProvenanceRecordRow` describing
+   * how this record's VALUE was produced. Absent means UNSTATED — never "a human wrote it".
+   *
+   * Write-through, deliberately NOT inherited on overwrite: a new value is new content, and carrying
+   * the old id forward would make the record assert something about bytes that no longer exist. A
+   * writer that still means it re-supplies the id.
+   */
+  aiProvenanceId?: string;
 }
 
 /**

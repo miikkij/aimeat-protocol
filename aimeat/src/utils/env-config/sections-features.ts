@@ -2,6 +2,7 @@
  * @file src/utils/env-config/sections-features.ts
  * @description Indexing, personal-node, site, consent, push, email, TOTP, matching, marketplace, EUDIW, social-login config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-01 — AI Transparency section: AIMEAT_AI_PROVENANCE + _DETAIL (TARGET-058)
  *   v1.1.0 — 2026-07-14 — AIMEAT_MCP_CARD_COMMERCE_TOOLS in the Commerce section (TARGET-034 phase D)
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)
  */
@@ -293,6 +294,23 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           description: 'Lockout duration after max failed attempts (seconds)',
           value: String(config.totpLockoutSeconds),
           defaultVal: '300',
+        },
+      ],
+    },
+    {
+      title: 'AI Transparency (EU AI Act Art. 50)',
+      entries: [
+        {
+          envVar: 'AIMEAT_AI_PROVENANCE',
+          description: 'Mint + serve a provenance record for content this node generates',
+          value: config.aiProvenance ? 'true' : 'false',
+          defaultVal: 'true',
+        },
+        {
+          envVar: 'AIMEAT_AI_PROVENANCE_DETAIL',
+          description: 'What PUBLIC surfaces serve (full | minimal) — never what is stored',
+          value: config.aiProvenanceDetail,
+          defaultVal: 'full',
         },
       ],
     },

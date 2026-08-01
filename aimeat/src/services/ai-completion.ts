@@ -31,6 +31,10 @@
  *     app_quotas throttles a single app below it when wanted. Removed DEFAULT_APP_DAILY_USD.
  *   v1.5.0 — 2026-07-05 — Add getUsageHistory(): reads back the retained per-day usage records
  *     (never surfaced before) as a series + 24h/7d/30d rollups for the AI-spend charts.
+ *   v1.7.0 — 2026-08-01 — Mint an AI provenance record for every completion (TARGET-058). This is
+ *     THE mint point for observed generation: the node saw the model produce these exact bytes, so it
+ *     stamps observed:true with the model, provider, principal, node id, timestamp and content hash.
+ *     The result gains an OPTIONAL `provenance` — every existing caller keeps working unchanged.
  *   v1.6.0 — 2026-07-10 — Enforce config.aiProviderAllowlist: on a public node, a decrypted AI key
  *     may only be sent to an allowlisted provider host, so a poisoned owner/app baseUrl can't
  *     exfiltrate it. Empty allowlist = any host (unchanged default).
@@ -39,6 +43,8 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { decrypt, getEncryptionKey } from './encryption.js';
 import { complete } from './openrouter.js';
+import { mintProvenance } from './ai-provenance.js';
+import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
 
 type ProviderType = 'openrouter' | 'lmstudio' | 'custom';
@@ -125,6 +131,15 @@ export interface CompleteForOwnerResult {
     spentTodayUsd: number;
     remainingUsd: number;
   };
+  /**
+   * The provenance record minted for THIS completion (TARGET-058). Optional so no existing caller
+   * breaks, and absent when AIMEAT_AI_PROVENANCE is off or minting failed — a failure to record
+   * must never fail a completion the owner has already paid for.
+   *
+   * `id` resolves at GET /v1/provenance/:id and `record.attestation.contentHash` is the SHA-256 of
+   * `content`, which is what the public hash lookup is keyed on.
+   */
+  provenance?: AiProvenanceRecordRow;
 }
 
 const emptyUsage = (): UsageRecord => ({
@@ -375,6 +390,49 @@ export async function completeForOwner(
 
   logger.info(`[ai] gaii=${gaii} app=${appKey} model=${result.model} tokens=${totalTok} cost=$${costUsd.toFixed(4)} day_total=$${updated.total_cost_usd.toFixed(4)}`);
 
+  // ── Mint the provenance record (TARGET-058) ──
+  // THE mint point for an observed generation. The node just watched a model produce these exact
+  // bytes, so it stamps what it saw: stampedBy 'node', observed true, model, provider, principal,
+  // node id, timestamp and the content hash. Minting is MAXIMAL — none of that is optional here,
+  // because a thin record is a record that cannot answer a question later.
+  //
+  // Level is `ai-generated` with `humanInvolvement: 'none'`: at this instant nobody has read the
+  // substance, whatever happens downstream. A publisher who later reviews it declares that at
+  // publication (an attributable act) — the node never infers editorial control on anyone's behalf.
+  //
+  // Visibility defaults to private. A completion is the owner's own until they publish it; the
+  // publish path is what upgrades the record, and guessing 'public' here would expose an owner's
+  // private drafts to the anonymous hash lookup.
+  let provenance: AiProvenanceRecordRow | undefined;
+  if (config.aiProvenance) {
+    try {
+      provenance = await mintProvenance(storage, {
+        stampedBy: 'node',
+        ownerGhii: gaii,
+        principal: gaii,
+        level: 'ai-generated',
+        humanInvolvement: 'none',
+        method: 'fully-generated',
+        content: result.content,
+        generator: {
+          model: result.model,
+          provider,
+          pipeline: opts.appId,
+          // What the model VENDOR does about marking is not something we can observe from here.
+          // `unknown` is the honest answer, and it is never silently upgraded to 'yes'.
+          upstreamMarks: 'unknown',
+        },
+        nodeId: config.nodeId,
+        baseUrl: config.baseUrl,
+      });
+    } catch (err) {
+      // A completion the owner has already paid for must not fail because bookkeeping did. Logged
+      // rather than swallowed: an operator who sees this knows generated content is going out
+      // unrecorded, which is exactly the thing they would want to fix.
+      logger.warn(`[ai] provenance mint failed for gaii=${gaii} model=${result.model}: ${(err as Error).message}`);
+    }
+  }
+
   return {
     content: result.content,
     model: result.model,
@@ -384,5 +442,6 @@ export async function completeForOwner(
       spentTodayUsd: updated.total_cost_usd,
       remainingUsd: Math.max(0, dailyBudget - updated.total_cost_usd),
     },
+    provenance,
   };
 }

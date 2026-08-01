@@ -471,7 +471,8 @@ export const ownerMethods = {
       record.version = existing.version + 1;
       this.db.prepare(
         `UPDATE memory SET value = ?, visibility = ?, workspaceRef = ?, tags = ?, ttlHours = ?, version = ?,
-         createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ?, trackable = ?, byteSize = ? WHERE ownerGaii = ? AND key = ?`
+         createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ?, trackable = ?, byteSize = ?,
+         aiProvenanceId = ? WHERE ownerGaii = ? AND key = ?`
       ).run(
         valueStr, record.visibility, record.workspaceRef ?? null,
         JSON.stringify(record.tags), record.ttlHours,
@@ -479,12 +480,15 @@ export const ownerMethods = {
         record.flagCount ?? 0,
         record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
         trackable ? 1 : 0, byteSize,
+        // Write-through, deliberately NOT inherited from `existing`: a new value is new content, and
+        // keeping the old provenance id would assert something about bytes that no longer exist.
+        record.aiProvenanceId ?? null,
         record.ownerGaii, record.key,
       );
     } else {
       this.db.prepare(
-        `INSERT INTO memory (ownerGaii, key, value, visibility, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO memory (ownerGaii, key, value, visibility, workspaceRef, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize, aiProvenanceId)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
       ).run(
         record.ownerGaii, record.key,
         valueStr, record.visibility, record.workspaceRef ?? null,
@@ -493,6 +497,7 @@ export const ownerMethods = {
         record.flagCount ?? 0,
         record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
         trackable ? 1 : 0, byteSize,
+        record.aiProvenanceId ?? null,
       );
     }
     return record;
@@ -518,7 +523,8 @@ export const ownerMethods = {
     const valueStr = JSON.stringify(record.value);
     const result = this.db.prepare(
       `UPDATE memory SET value = ?, visibility = ?, workspaceRef = ?, tags = ?, ttlHours = ?, version = ?,
-       updatedAt = ?, flagCount = ?, allowedOrigins = ?, byteSize = ? WHERE ownerGaii = ? AND key = ? AND version = ?`
+       updatedAt = ?, flagCount = ?, allowedOrigins = ?, byteSize = ?, aiProvenanceId = ?
+       WHERE ownerGaii = ? AND key = ? AND version = ?`
     ).run(
       valueStr, record.visibility, record.workspaceRef ?? null,
       JSON.stringify(record.tags), record.ttlHours,
@@ -526,6 +532,7 @@ export const ownerMethods = {
       record.flagCount ?? 0,
       record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
       Buffer.byteLength(valueStr, 'utf8'),
+      record.aiProvenanceId ?? null,
       record.ownerGaii, record.key, expectedVersion,
     );
     if (result.changes === 0) return null; // version conflict
@@ -744,6 +751,7 @@ export const ownerMethods = {
     if (row.archivedAt) record.archivedAt = row.archivedAt as string;
     if (row.archivedBy) record.archivedBy = row.archivedBy as string;
     if (row.archivedRoot) record.archivedRoot = row.archivedRoot as string;
+    if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
     return record;
   },
 

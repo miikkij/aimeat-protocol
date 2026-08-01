@@ -3,7 +3,8 @@
  * @description CLI config validator — checks environment, file configs, and DB for
  *   errors, warnings, and info. Usage: aimeat validate (or aimeat check).
  *   Exit 0 = pass (warnings/info only), Exit 1 = errors found.
- * @version-history v1.0.1 — 2026-06-20 — Validate App Origin Isolation (H-2):
+ * @version-history v1.1.0 — 2026-08-01 — Validate AIMEAT_AI_PROVENANCE + _DETAIL (TARGET-058);
+ *   v1.0.1 — 2026-06-20 — Validate App Origin Isolation (H-2):
  *   AIMEAT_APP_ORIGIN_ENABLED must be true/false; if true, AIMEAT_APP_HOST required.
  */
 
@@ -330,6 +331,24 @@ export function validateEnv(): ValidationResult[] {
   }
   if (portfolioOriginEnabled === 'true' && !env.AIMEAT_PORTFOLIO_HOST?.trim()) {
     results.push({ level: 'error', variable: 'AIMEAT_PORTFOLIO_HOST', message: 'The portfolio origin is enabled (AIMEAT_PORTFOLIO_ORIGIN_ENABLED=true) but AIMEAT_PORTFOLIO_HOST is empty. Set the portfolio origin host (e.g. portfolio.example.com); it requires DNS + a wildcard TLS cert.' });
+  }
+
+  // ── AI Transparency (EU AI Act Art. 50, TARGET-058) ──
+  const aiProvenance = env.AIMEAT_AI_PROVENANCE;
+  if (aiProvenance !== undefined && aiProvenance !== 'true' && aiProvenance !== 'false') {
+    results.push({ level: 'error', variable: 'AIMEAT_AI_PROVENANCE', message: `Invalid value "${aiProvenance}". Must be "true" or "false".` });
+  }
+  if (aiProvenance === 'false') {
+    // Not an error — a local dev node may legitimately want the noise off. But it is worth saying
+    // plainly what it costs, because switching it off does NOT switch off the obligation.
+    results.push({ level: 'warning', variable: 'AIMEAT_AI_PROVENANCE', message: 'AI provenance recording is OFF. Generated content will carry no record, so "who made this?" becomes unanswerable after the fact — and a node that generates and publishes still owes the Article 50 marking. Intended for local development only.' });
+  }
+  const provenanceDetail = env.AIMEAT_AI_PROVENANCE_DETAIL;
+  if (provenanceDetail !== undefined && !['full', 'minimal'].includes(provenanceDetail)) {
+    results.push({ level: 'error', variable: 'AIMEAT_AI_PROVENANCE_DETAIL', message: `Invalid value "${provenanceDetail}". Must be "full" or "minimal".` });
+  }
+  if (provenanceDetail === 'minimal') {
+    results.push({ level: 'info', variable: 'AIMEAT_AI_PROVENANCE_DETAIL', message: 'Public surfaces serve only the four required fields plus the disclosure block. The full record is still stored and still visible to its owner.' });
   }
 
   // ── Config File Validation (aimeat.ini / aimeat.json) ─────────

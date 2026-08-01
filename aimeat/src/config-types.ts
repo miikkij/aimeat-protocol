@@ -217,6 +217,17 @@ export interface AimeatConfig {
   /** Host allowlist an AI `baseUrl` may point at before a decrypted key is sent (openrouter.ai,
    *  api.openai.com, …). Empty = any host (local dev / self-hosted). Enforced in ai-completion. */
   aiProviderAllowlist: string[];
+  /** Mint + serve AI provenance records for generated content (EU AI Act Art. 50, TARGET-058).
+   *  ON by default and safe to leave on: the record costs one row and is what makes "who made this"
+   *  answerable later. Turning it off is a dev convenience, never a way to publish unmarked content —
+   *  a node that generates and publishes still owes the marking whether or not it kept a record. */
+  aiProvenance: boolean;
+  /** What a PUBLIC surface SERVES, never what gets stored: `full` (default) serves the whole record,
+   *  `minimal` serves only the four required fields plus the disclosure block. Exists because the
+   *  Code of Practice pushes both ways — richer metadata is encouraged (Measure 1.3) while
+   *  privacy-/business-sensitive detail is discouraged in it (Sub-measure 1.1.1) — so an operator can
+   *  publish less without recording less. The owner always sees the full record. */
+  aiProvenanceDetail: 'full' | 'minimal';
   /** Node auto-generates thumbnails for published apps that have none (needs a headless browser). */
   screenshotAutoCapture: boolean;
   /** Minutes between auto-screenshot scans (default 15). */

@@ -37,6 +37,7 @@ import { actionMethods } from './methods/actions.js';
 import { scheduleMethods } from './methods/schedules.js';
 import { agentTaskMethods } from './methods/agent-tasks.js';
 import { agentUsageMethods } from './methods/agent-usage.js';
+import { aiProvenanceMethods } from './methods/ai-provenance.js';
 import { capabilityMethods } from './methods/capabilities.js';
 import { knowledgeMethods } from './methods/knowledge.js';
 import { appMethods } from './methods/apps.js';
@@ -113,6 +114,7 @@ Object.assign(
   scheduleMethods,
   agentTaskMethods,
   agentUsageMethods,
+  aiProvenanceMethods,
   capabilityMethods,
   knowledgeMethods,
   appMethods,

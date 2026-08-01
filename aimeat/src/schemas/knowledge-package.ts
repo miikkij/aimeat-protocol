@@ -9,7 +9,10 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-08-01 — `synthesis.level` now references AI_PROVENANCE_LEVELS instead of
+ *     spelling the four strings a second time. Same vocabulary, one definition (TARGET-058).
  */
+import { AI_PROVENANCE_LEVELS } from '../models/ai-provenance-schemas.js';
 
 export const KNOWLEDGE_CONTENT_TYPES = [
   'idea', 'research', 'plan', 'dataset', 'document',
@@ -35,7 +38,7 @@ export const ManifestSchema = {
       type: 'object',
       required: ['level', 'description'],
       properties: {
-        level: { type: 'string', enum: ['original', 'assisted', 'synthesized', 'ai-generated'] },
+        level: { type: 'string', enum: [...AI_PROVENANCE_LEVELS] },
         description: { type: 'string', maxLength: 500 },
         model: { type: 'string' },
       },

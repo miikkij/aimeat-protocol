@@ -416,6 +416,13 @@ export interface AgentUsageEvent {
   organismId?: string;
   workspaceId?: string;
   capabilityId?: string;
+  /**
+   * The AI provenance record this spend PRODUCED (TARGET-058), when there is one. Optional, so no
+   * existing ingest path changes. It makes "what did this money buy?" answerable in one join, and
+   * it is the only link between the two ledgers — cost stays out of the provenance record (that is
+   * this table's job) and prompt text stays out of it too (that is this table's job as well).
+   */
+  provenanceId?: string;
   /** For capability calls (TARGET-018 double-entry): the GHII that INVOKED the capability
    *  (the consumer). The producer is agentGaii/ownerGhii above. Lets the producer see who
    *  called each capability and what the real compute cost, alongside the morsel escrow. */

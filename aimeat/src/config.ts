@@ -21,6 +21,7 @@
  *   v1.2.0 -- 2026-07-10 -- Security posture: resolve securityProfile (local|public) + the
  *     allowPrivateEgress / aiProviderAllowlist knobs from env, normalise AIMEAT_ALLOW_PRIVATE_EGRESS
  *     for url-validator, add securityPostureWarnings() startup self-check. See security-development-dna.md.
+ *   v1.4.0 -- 2026-08-01 -- AI provenance (TARGET-058): AIMEAT_AI_PROVENANCE + _DETAIL.
  *   v1.3.0 -- 2026-07-14 -- mcpCardCommerceTools: AIMEAT_MCP_CARD_COMMERCE_TOOLS inline|pointer
  *     for the MCP Server Card commerce_tools block (TARGET-034 phase D).
  */
@@ -229,6 +230,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   }
   const aiProviderAllowlist = (process.env.AIMEAT_AI_PROVIDER_ALLOWLIST ?? '')
     .split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  // AI provenance (TARGET-058): ON unless explicitly switched off, and _DETAIL governs what is
+  // SERVED publicly, never what is stored. Rationale in config-types.ts + .env.example.
+  const aiProvenance = process.env.AIMEAT_AI_PROVENANCE !== 'false';
+  const aiProvenanceDetail: 'full' | 'minimal' = process.env.AIMEAT_AI_PROVENANCE_DETAIL === 'minimal' ? 'minimal' : 'full';
 
   const config: AimeatConfig = {
     port,
@@ -259,6 +264,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     securityProfile,
     allowPrivateEgress,
     aiProviderAllowlist,
+    aiProvenance,
+    aiProvenanceDetail,
     screenshotAutoCapture: process.env.AIMEAT_SCREENSHOT_AUTO === 'true',
     screenshotIntervalMin: parseInt(process.env.AIMEAT_SCREENSHOT_INTERVAL_MIN ?? '15', 10),
     screenshotSettleMs: parseInt(process.env.AIMEAT_SCREENSHOT_SETTLE_MS ?? '6000', 10),

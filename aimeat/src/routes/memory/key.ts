@@ -95,6 +95,9 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
       version: record.version,
       created_at: record.createdAt,
       updated_at: record.updatedAt,
+      // The ATTACHED half of AI provenance (TARGET-058). null = UNSTATED, which is not the same as
+      // "a human wrote it" — resolve it at /v1/provenance/:id to find out what was actually claimed.
+      ai_provenance_id: record.aiProvenanceId ?? null,
       _ddc: {
         flagCount: record.flagCount ?? 0,
         version: record.version,

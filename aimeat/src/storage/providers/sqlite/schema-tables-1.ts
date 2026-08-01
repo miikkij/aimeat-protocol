@@ -71,6 +71,9 @@ export function applySchemaTables1(db: Database.Database): void {
       archivedAt     TEXT,
       archivedBy     TEXT,
       archivedRoot   TEXT,
+      -- ATTACHED AI provenance (TARGET-058): the ai_provenance row describing how this value was
+      -- produced. NULL = unstated, which is not the same as "a human wrote it".
+      aiProvenanceId TEXT,
       PRIMARY KEY (ownerGaii, key)
     );
 

@@ -58,6 +58,7 @@ function toEvent(r: Selectable<AgentUsageEventRow>): AgentUsageEvent {
     workspaceId: r.workspaceId ?? undefined,
     capabilityId: r.capabilityId ?? undefined,
     consumerGhii: r.consumerGhii ?? undefined,
+    provenanceId: r.provenanceId ?? undefined,
   };
 }
 
@@ -81,6 +82,7 @@ export const agentUsageMethods = {
       workspaceId: event.workspaceId ?? null,
       capabilityId: event.capabilityId ?? null,
       consumerGhii: event.consumerGhii ?? null,
+      provenanceId: event.provenanceId ?? null,
     }).execute();
   },
 

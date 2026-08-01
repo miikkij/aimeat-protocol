@@ -443,7 +443,8 @@ export function applySchemaTables3(db: Database.Database): void {
       organismId       TEXT,
       workspaceId      TEXT,
       capabilityId     TEXT,
-      consumerGhii     TEXT
+      consumerGhii     TEXT,
+      provenanceId     TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_agent_usage_event_owner ON agent_usage_event(ownerGhii, ts);
     CREATE INDEX IF NOT EXISTS idx_agent_usage_event_agent ON agent_usage_event(agentGaii, ts);
@@ -503,6 +504,29 @@ export function applySchemaTables3(db: Database.Database): void {
       readinessOverride TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_agent_onboarding_status ON agent_onboarding(status);
+
+    -- ── AI Provenance records (TARGET-058, EU AI Act Art. 50) ──
+    -- APPEND-ONLY: a record is an attributable statement about a specific set of bytes. Correcting
+    -- one means minting a new record about the new bytes, never editing the old statement — so
+    -- there is no UPDATE path anywhere in the repository.
+    -- The record column holds the canonical aimeat.provenance/v1 document as JSON and is the single
+    -- source of truth; the columns beside it are AIMEAT's authorization + lookup metadata, not spec.
+    -- contentHash is NOT unique: the same bytes can honestly be generated twice, and the second
+    -- statement does not invalidate the first.
+    CREATE TABLE IF NOT EXISTS ai_provenance (
+      id          TEXT PRIMARY KEY,
+      ownerGhii   TEXT NOT NULL,
+      principal   TEXT NOT NULL,
+      contentHash TEXT,
+      visibility  TEXT NOT NULL DEFAULT 'private',
+      generatedAt TEXT NOT NULL,
+      createdAt   TEXT NOT NULL,
+      record      TEXT NOT NULL
+    );
+    -- The detection lookup ("did this node produce these exact bytes?") is hash-keyed and public,
+    -- so it is the one query that must stay index-backed under anonymous traffic.
+    CREATE INDEX IF NOT EXISTS idx_ai_provenance_hash ON ai_provenance(contentHash);
+    CREATE INDEX IF NOT EXISTS idx_ai_provenance_owner ON ai_provenance(ownerGhii, generatedAt);
 
   `);
 }

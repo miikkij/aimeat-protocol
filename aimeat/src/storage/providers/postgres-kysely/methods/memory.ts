@@ -77,6 +77,9 @@ export const memoryMethods = {
         version: record.version, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
         flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null, trackable,
         byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
+        // Write-through, deliberately NOT inherited from `existing`: a new value is new content, and
+        // keeping the old provenance id would assert something about bytes that no longer exist.
+        aiProvenanceId: record.aiProvenanceId ?? null,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any).where('ownerGaii', '=', record.ownerGaii).where('key', '=', record.key).execute();
     } else {
@@ -89,6 +92,7 @@ export const memoryMethods = {
         flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null,
         trackable, byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
         groupId: record.groupId ?? null, workspaceRef: record.workspaceRef ?? null,
+        aiProvenanceId: record.aiProvenanceId ?? null,
       };
       await this.db.insertInto('Memory').values({ ownerGaii: record.ownerGaii, key: record.key, ...insertCols } as never)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -121,6 +125,7 @@ export const memoryMethods = {
         version: newVersion, createdAt: new Date(record.createdAt), updatedAt: new Date(record.updatedAt),
         flagCount: record.flagCount ?? 0, allowedOrigins: record.allowedOrigins ?? null, trackable,
         byteSize: byteSize(record.value), searchBlob: buildSearchBlob(record),
+        aiProvenanceId: record.aiProvenanceId ?? null,
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
       } as any).where('ownerGaii', '=', record.ownerGaii).where('key', '=', record.key).where('version', '=', expectedVersion).execute();
       record.version = newVersion;

@@ -48,6 +48,7 @@ import { federationOauthMethods } from './methods/federation-oauth.js';
 import { packagesMethods } from './methods/packages.js';
 import { capabilityAgentsMethods } from './methods/capability-agents.js';
 import { messagingMethods } from './methods/messaging.js';
+import { aiProvenanceMethods } from './methods/ai-provenance.js';
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- intentional class+interface merge: the interface below declares the methods Object.assign installs on the prototype.
 export class SqliteStorage {
@@ -91,4 +92,5 @@ Object.assign(
   packagesMethods,
   capabilityAgentsMethods,
   messagingMethods,
+  aiProvenanceMethods,
 );

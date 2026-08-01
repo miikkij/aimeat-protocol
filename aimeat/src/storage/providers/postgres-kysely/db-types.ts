@@ -201,12 +201,24 @@ export interface AgentUsageEvent {
   organismId: string | null;
   ownerGhii: string;
   priceRef: string | null;
+  provenanceId: string | null;
   promptTokens: Generated<number>;
   provider: string;
   runId: string | null;
   source: string;
   ts: string;
   workspaceId: string | null;
+}
+
+export interface AiProvenance {
+  contentHash: string | null;
+  createdAt: string;
+  generatedAt: string;
+  id: string;
+  ownerGhii: string;
+  principal: string;
+  record: Json;
+  visibility: Generated<string>;
 }
 
 export interface App {
@@ -902,6 +914,7 @@ export interface Match {
 }
 
 export interface Memory {
+  aiProvenanceId: string | null;
   allowedOrigins: string[] | null;
   archived: Generated<boolean>;
   archivedAt: Timestamp | null;
@@ -1562,6 +1575,7 @@ export interface DB {
   AgentTaskEvent: AgentTaskEvent;
   AgentUsageDaily: AgentUsageDaily;
   AgentUsageEvent: AgentUsageEvent;
+  AiProvenance: AiProvenance;
   App: App;
   AppDownload: AppDownload;
   AppDraft: AppDraft;

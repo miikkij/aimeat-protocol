@@ -4232,7 +4232,12 @@
     "appHostRequired": "Sovellusisäntä vaaditaan, kun sovellusalkuperän eristys on käytössä",
     "portfolioOrigin": "Tarjotaanko julkaistut portfoliot omilla osoitteillaan <käyttäjänimi>.portfolio.<domain>? Vaatii DNS:n + jokerimerkki-TLS-varmenteen (sama pystytys kuin sovellusalkuperällä). Oletuksena pois päältä.",
     "portfolioHost": "Portfolio-alkuperän isäntä (esim. portfolio.example.com)",
-    "portfolioHostRequired": "Portfolio-isäntä vaaditaan, kun portfolio-alkuperä on käytössä"
+    "portfolioHostRequired": "Portfolio-isäntä vaaditaan, kun portfolio-alkuperä on käytössä",
+    "aiProvenanceDetail": "Tekoälyn alkuperätiedot julkisilla pinnoilla",
+    "aiProvenanceDetailFull": "Koko tietue",
+    "aiProvenanceDetailFullDesc": "Näytä kaikki tallennettu: malli, palveluntarjoaja, lähteet, ajoketju",
+    "aiProvenanceDetailMinimal": "Suppea",
+    "aiProvenanceDetailMinimalDesc": "Näytä vain pakolliset kentät ja ilmoitusteksti; koko tietue säilyy tallessa"
   },
   "join": {
     "title": "Liity AIMEAT-federaatioon",
@@ -8338,5 +8343,25 @@
     "whereTitle": "Mihin se menee sinun työkalussasi",
     "loadingTools": "Luetaan asennusohjeita tältä nodelta…",
     "toolsFailed": "Asennusohjeita ei juuri nyt saatu luettua. Connect-sivulla on samat askeleet."
+  },
+  "aiLabel": {
+    "short": "Tekoälyn tuottama",
+    "assisted": "Tekoälyavusteinen",
+    "original": "Ihmisen kirjoittama",
+    "unstated": "Alkuperää ei ole kerrottu",
+    "chat": "Keskustelet tekoälyavustajan kanssa.",
+    "publicText": "Tämän tekstin on kirjoittanut tekoäly ilman ihmisen toimituksellista tarkistusta.",
+    "assistedLong": "Tekstin on kirjoittanut ihminen. Tekoäly on ollut mukana sen muokkaamisessa.",
+    "reviewedGeneric": "Tekoäly on luonnostellut tämän, ja ihminen on tarkistanut sisällön.",
+    "originalLong": "Tämän on kirjoittanut ihminen. Tekoäly ei ole ollut mukana.",
+    "unstatedLong": "Emme tiedä, onko tekoäly ollut mukana tämän tekemisessä.",
+    "reviewed": "Tekoälyn luonnostelema, tarkistanut {{name}}.",
+    "detailsLink": "Miten tämä on tehty",
+    "iconAlt": {
+      "aiGenerated": "Tekoälyn tuottamaa sisältöä",
+      "aiModified": "Sisältöä on osittain muokattu tekoälyllä",
+      "aiBasic": "Tekoäly on ollut mukana tämän sisällön tekemisessä",
+      "unstated": "Tekoälyn osuutta ei ole kerrottu"
+    }
   }
 }

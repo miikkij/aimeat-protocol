@@ -10,6 +10,8 @@
  *   block 1), or upgrades crash with "no such column" before the ALTER runs.
  * @usage initializeSchema(db) from sqlite/index.ts constructor.
  * @version-history
+ *   v1.5.0 — 2026-08-01 — AI provenance (TARGET-058): the addressable `ai_provenance` table (in
+ *     schema-tables-3) plus the attached `memory.aiProvenanceId` column. Mirrors Postgres 0017.
  *   v1.0.0 — pre-2026-06 — Initial SQLite schema bootstrap + migrations
  *   v1.0.1 — 2026-06-21 — Fix self-host upgrade crash: move idx_ghii_googleSub creation
  *     to after safeAddColumn('ghiis','googleSub') so upgraded DBs index a column that
@@ -263,6 +265,13 @@ export function initializeSchema(db: Database.Database): void {
   safeAddColumn('agents', 'agentLimitations', "TEXT DEFAULT '[]'");
   safeAddColumn('agents', 'languages', "TEXT DEFAULT '[]'");
   safeAddColumn('extensions', 'createdByAgent', 'TEXT');
+
+  // AI provenance, ATTACHED half (TARGET-058) — the ai_provenance row describing how this value was
+  // produced. Mirrors Postgres migration 0017. NULL = unstated, never "human-written".
+  safeAddColumn('memory', 'aiProvenanceId', 'TEXT');
+  // The other direction: which provenance record a metered LLM call produced, so "what did this
+  // money buy?" is one join rather than a guess.
+  safeAddColumn('agent_usage_event', 'provenanceId', 'TEXT');
 
   // Governance Phase C — budget limits on agent directives
   safeAddColumn('agent_directives', 'budgetLimits', 'TEXT');

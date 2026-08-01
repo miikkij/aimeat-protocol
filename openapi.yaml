@@ -70,6 +70,13 @@ tags:
     description: Phase 1.2 — First-run node setup wizard and initialization
   - name: Schema
     description: Phase 0.1 — Schema locking for memory key patterns
+  - name: AI Transparency
+    description: >
+      AI provenance records (EU AI Act Article 50). One canonical record per piece of generated
+      content - which model, which principal, when, the SHA-256 of the exact bytes, and how much a
+      person was involved - plus the PUBLIC hash-keyed detection lookup. External vocabularies
+      (IPTC digitalSourceType, the W3C ai-disclosure attribute, the IETF AI-Disclosure header, the
+      EU icons, C2PA) are DERIVED from the record and never stored.
   - name: CSM
     description: Phase 0.2 — Community Service Manifest registration
   - name: Consent
@@ -8066,6 +8073,199 @@ paths:
         '401':
           $ref: '#/components/responses/AimeatError'
         '403':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/schemas/ai-provenance/v1.json:
+    get:
+      operationId: aiProvenanceSchemaV1
+      summary: The published JSON Schema for `aimeat.provenance/v1`
+      description: >
+        The record's JSON Schema, served RAW (not in the AIMEAT envelope) because the consumers are
+        external validators that expect a schema document at the URL. Versioned on purpose: a `v2`
+        gets its own URL rather than mutating under a pinned consumer. Readers MUST branch on `spec`
+        and MUST NOT assume fields - the schema therefore does not set `additionalProperties: false`,
+        so a later version adding fields is not a breaking change for a v1 validator.
+        Public and unauthenticated.
+      tags: [AI Transparency]
+      security: []
+      responses:
+        '200':
+          description: A JSON Schema (2020-12) document.
+          content:
+            application/schema+json:
+              schema:
+                type: object
+
+  /v1/provenance:
+    post:
+      operationId: aiProvenanceDeclare
+      summary: Declare provenance for content produced elsewhere
+      description: >
+        Records an attributable statement by the calling principal about content this node did NOT
+        witness being generated. The stored record always carries `attestation.stampedBy: principal`
+        and `attestation.observed: false` - there is no request field that can claim otherwise, so a
+        declaration can never be dressed up as something this node saw.
+
+        A principal may only declare for content in its OWN namespace: `attachToMemoryKey` is
+        resolved inside the caller's namespace, so there is no request shape that names another
+        owner's record. Supply `content` (hashed server-side) or a pre-computed `contentHash` - a
+        record about no particular bytes cannot be looked up later.
+      tags: [AI Transparency]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [level, humanInvolvement]
+              properties:
+                level:
+                  type: string
+                  enum: [original, assisted, synthesized, ai-generated]
+                  description: What the content is. Independent of `humanInvolvement`, on purpose.
+                humanInvolvement:
+                  type: string
+                  enum: [none, light-review, editorial-control, full-human]
+                  description: >
+                    Only a step where a person reads the SUBSTANCE and can reject it justifies
+                    `editorial-control` or `full-human`. Clicking publish is not that step, and a
+                    superficial check (spelling, formatting, a skim) is `light-review`.
+                method:
+                  type: string
+                  enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent]
+                content:
+                  type: string
+                  description: The exact bytes, hashed server-side. Prefer this when you hold them.
+                contentHash:
+                  type: string
+                  pattern: '^sha256:[a-f0-9]{64}$'
+                  description: A pre-computed digest, for a declarer holding bytes we should not see.
+                generatedAt:
+                  type: string
+                  format: date-time
+                  description: When the content was generated. Defaults to now.
+                generator:
+                  type: object
+                  properties:
+                    model:
+                      type: string
+                    provider:
+                      type: string
+                    pipeline:
+                      type: string
+                    upstreamMarks:
+                      type: string
+                      enum: ['yes', 'no', unknown]
+                      description: Does the model vendor mark its own output? Never guessed.
+                sources:
+                  type: array
+                  items:
+                    type: object
+                    required: [url]
+                    properties:
+                      url:
+                        type: string
+                        format: uri
+                      title:
+                        type: string
+                      retrievedAt:
+                        type: string
+                        format: date-time
+                      role:
+                        type: string
+                derivedFrom:
+                  type: array
+                  items:
+                    type: string
+                notes:
+                  type: string
+                  maxLength: 1000
+                visibility:
+                  type: string
+                  enum: [public, private]
+                  default: private
+                  description: >
+                    Mark `public` ONLY when the content it describes is itself public - this is what
+                    exposes the record to the anonymous hash lookup.
+                attachToMemoryKey:
+                  type: string
+                  description: >
+                    Attach the record to one of the caller's OWN memory keys. Note that a later
+                    ordinary write to that key CLEARS the attachment: a new value is new content,
+                    and keeping the old id would assert something about bytes that no longer exist.
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '401':
+          $ref: '#/components/responses/AimeatError'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/provenance/{id}:
+    get:
+      operationId: aiProvenanceResolve
+      summary: Resolve a provenance record by id
+      description: >
+        A record marked `public` resolves for anyone, including anonymous callers. A private record
+        resolves only for its owner.
+
+        Returns an IDENTICAL 404 for "no such record" and "that record is not yours" - two different
+        answers would turn this into an oracle for which ids exist on this node.
+
+        `AIMEAT_AI_PROVENANCE_DETAIL=minimal` reduces what a NON-owner is served to the four required
+        fields plus the disclosure block. It never reduces what is stored, and the owner always sees
+        the whole record.
+      tags: [AI Transparency]
+      security: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/provenance/by-hash/{sha256}:
+    get:
+      operationId: aiProvenanceByHash
+      summary: Detection lookup - did this node produce these exact bytes?
+      description: >
+        PUBLIC and UNAUTHENTICATED for public content, and rate-limited. This is the Code of
+        Practice's expected "public access point that routes detection queries to their system", so
+        regulators, researchers and fact-checkers can ask about bytes they already hold WITHOUT us
+        having handed them an identifier first - the join key is the content hash, not a database id.
+
+        An authenticated caller additionally sees their own private records; the widening happens in
+        SQL, so a third party's private row never enters the process.
+
+        An empty `records` list is a real answer: "this node has no statement about these bytes". It
+        is NOT "a human wrote it" - absence reads as UNSTATED, always.
+      tags: [AI Transparency]
+      security: []
+      parameters:
+        - name: sha256
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^(sha256:)?[a-f0-9]{64}$'
+          description: The SHA-256 digest, with or without the `sha256:` prefix.
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '400':
+          $ref: '#/components/responses/AimeatError'
+        '429':
           $ref: '#/components/responses/AimeatError'
 
   /v1/ledger/usage:

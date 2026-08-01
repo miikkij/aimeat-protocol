@@ -251,6 +251,23 @@ export async function askAllAdvancedSettings(
   );
   if (relayHops !== '3') settings.AIMEAT_MAX_RELAY_HOPS = relayHops;
 
+  // ── AI transparency (EU AI Act Art. 50) ──
+  // Only the DETAIL knob is asked. Whether to RECORD provenance is not an operator choice worth a
+  // question: the safe answer is the same in every posture, so it stays on and lives in .env.example
+  // for the rare dev who wants it off.
+  const provenanceDetail = checkCancel(
+    await p.select({
+      message: t('init.aiProvenanceDetail'),
+      options: [
+        { value: 'full', label: t('init.aiProvenanceDetailFull'), hint: t('init.aiProvenanceDetailFullDesc') },
+        { value: 'minimal', label: t('init.aiProvenanceDetailMinimal'), hint: t('init.aiProvenanceDetailMinimalDesc') },
+      ],
+      initialValue: cfg.aiProvenanceDetail,
+    }),
+    t,
+  ) as string;
+  if (provenanceDetail !== 'full') settings.AIMEAT_AI_PROVENANCE_DETAIL = provenanceDetail;
+
   // ── Cross-Federation (Genesis Peering) ──
   p.note(t('init.crossFedNote'));
 

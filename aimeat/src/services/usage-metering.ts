@@ -12,6 +12,8 @@
  *   import { recordUsageEvent } from '../services/usage-metering.js';
  * @version-history
  *   v1.0.0 -- 2026-07-10 -- Initial creation for LEDGER TARGET-016 substrate
+ *   v1.2.0 -- 2026-08-01 -- Optional provenanceId on a usage event (TARGET-058): a spend can be
+ *     joined to the content it produced. Optional, so no existing ingest path changes.
  *   v1.1.0 -- 2026-07-11 -- After recording, re-evaluate the owner's budget (TARGET-017 alerts)
  */
 
@@ -44,6 +46,9 @@ export interface UsageEventInput {
   capabilityId?: string;
   /** The GHII that invoked a capability (consumer) — TARGET-018 double-entry. */
   consumerGhii?: string;
+  /** The AI provenance record this call produced (TARGET-058), so a spend can be joined to what it
+   *  made. Optional — every existing caller keeps working without it. */
+  provenanceId?: string;
   /** Override the record timestamp (defaults to now). */
   ts?: string;
 }
@@ -90,6 +95,7 @@ export async function recordUsageEvent(storage: Storage, input: UsageEventInput)
     workspaceId: input.workspaceId,
     capabilityId: input.capabilityId,
     consumerGhii: input.consumerGhii,
+    provenanceId: input.provenanceId,
   };
 
   // 1. Source of truth — must persist (billing audit, TARGET-019). Let failures propagate.
@@ -150,6 +156,7 @@ export function extractUsageFields(data: Record<string, unknown>): {
   workspaceId?: string;
   capabilityId?: string;
   consumerGhii?: string;
+  provenanceId?: string;
 } | null {
   const model = typeof data.model === 'string' ? data.model.trim() : '';
   if (!model) return null;
@@ -178,5 +185,9 @@ export function extractUsageFields(data: Record<string, unknown>): {
     workspaceId: str(data.workspace_id),
     capabilityId: str(data.capability_id),
     consumerGhii: str(data.consumer_ghii),
+    // An agent reporting its own call may say which provenance record it produced (TARGET-058).
+    // This is a CLAIM by the agent, stored on the agent's own row — it grants nothing: resolving
+    // that id still goes through the authorized /v1/provenance/:id, which checks ownership itself.
+    provenanceId: str(data.provenance_id),
   };
 }
