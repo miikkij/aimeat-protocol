@@ -31,6 +31,11 @@
  *   import { AiProvenanceSchema, asKnownProvenance } from '../models/ai-provenance-schemas.js';
  *   const parsed = AiProvenanceSchema.safeParse(req.body.provenance);
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3. `disclosure.strength` added as an OPTIONAL member —
+ *     additive within v1, which the versioning promise permits (a v2 is owed only for a removal or
+ *     a re-meaning). It closes a Phase 1 gap rather than changing anything: the block pre-rendered
+ *     two of the three members disclosureFor() returns, and the label component needs the third to
+ *     know whether to render the long statement or the short chip.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. `humanInvolvement` doc comment states what it measures
  *     (review of the MODEL's contribution, not authorship), which is what makes `assisted` + `none`
  *     readable rather than contradictory.
@@ -166,10 +171,23 @@ export const AiProvenanceAttestationSchema = z.object({
   recordUrl: z.string().trim().url().max(2_000).optional(),
 });
 
-/** Pre-rendered disclosure so every face shows the same words. Computed; never hand-written. */
+/** How loud the visible label is. `full` states the substance, `light` is present but not intrusive
+ *  (creative works, `assisted` content, and anything labelled by node policy rather than by law). */
+export const AI_DISCLOSURE_STRENGTHS = ['full', 'light', 'none'] as const;
+export type AiDisclosureStrength = (typeof AI_DISCLOSURE_STRENGTHS)[number];
+
+/**
+ * Pre-rendered disclosure so every face shows the same words. Computed; never hand-written.
+ *
+ * `strength` is OPTIONAL for one reason only: Phase 1 shipped this block carrying two of the three
+ * members of the decision disclosureFor() returns, and a record minted before Phase 3 has no value
+ * for it. A reader that finds it absent should render the label rather than guess a strength — the
+ * obligation is in `required`, and `strength` only says how loudly to say it.
+ */
 export const AiDisclosureBlockSchema = z.object({
   required: z.boolean(),
   reason: z.enum(AI_DISCLOSURE_REASONS),
+  strength: z.enum(AI_DISCLOSURE_STRENGTHS).optional(),
   short: LocalizedTextSchema,
   long: LocalizedTextSchema.optional(),
 });

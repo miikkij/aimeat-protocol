@@ -4,9 +4,12 @@
  *   published record lists (with inline field view, color tags, archive/reopen/delete, and comments).
  *   Pure render functions driven by a ctx bag assembled by the parent Workspace. Extracted from
  *   workspace.js to satisfy max-file-lines with no behaviour change.
- * @structure recordFields (internal), renderRecordSpace
+ * @structure recordAiLabel (internal), recordFields (internal), renderRecordSpace
  * @usage import { renderRecordSpace } from '/views/profile/organisms/workspace/record-space.js';
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: the AI-transparency label on every record that owes
+ *     one — the compact chip in the list row (first exposure), the block form with the
+ *     "How this was made" link in the expanded view. Fed by `_aiProvenance` from the workspace read.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -15,10 +18,26 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner } from '/views/profile/shared.js';
 import { EmptyState } from '/components/EmptyState.js';
+import { AiLabel } from '/components/ai-label.js';
 import { SchemaForm } from '/views/profile/organisms/schema-form.js';
 import { WorkspaceComments } from '/views/profile/organisms/workspace-comments.js';
 import { ColorPicker } from './color-picker.js';
 import { PRIMARY_FIELD, renderFieldVal } from './helpers.js';
+
+/**
+ * The AI-transparency label for one record (TARGET-058). Two placements, one component:
+ *   - the LIST row gets the compact chip, because "at first exposure" means before the reader has
+ *     opened anything;
+ *   - the EXPANDED view gets the block form with the "How this was made" link, which is the
+ *     interactive second layer the Code of Practice encourages.
+ * Whether anything renders at all is decided by `disclosure.required` inside the component, from the
+ * server's disclosureFor(). Nothing here tests the record's level — that logic belongs in one place
+ * and this is not it.
+ */
+function recordAiLabel(rec, variant) {
+  return html`<${AiLabel} record=${rec?._aiProvenance} variant=${variant}
+    recordUrl=${variant === 'block' ? rec?._aiProvenanceUrl : undefined} />`;
+}
 
 // Read-only field view for a record (skips the underscore-prefixed metadata the read attaches).
 function recordFields(ctx, ot, rec) {
@@ -60,6 +79,7 @@ export function renderRecordSpace(ctx, ot) {
             <${ColorPicker} value=${itemColor(ot.name, d.id)} onPick=${(c) => setItemColor(ot.name, d.id, c)} />
             <span class="badge badge-warn">${t('organisms.draft') || 'draft'}</span>
             <button class="pj-rec-title" onClick=${() => toggleExpand(ot, d.id)}>${String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id || '')}</button>
+            ${recordAiLabel(d, 'inline')}
             <button class="btn-ghost btn-sm" onClick=${() => startEdit(ot, d)} disabled=${busy}>${t('organisms.edit') || 'Edit'}</button>
             <button class="btn-primary btn-sm" onClick=${() => publish(ot, d.id)} disabled=${busy}>${t('organisms.publish') || 'Publish'}</button>
             <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, d.id, String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.id))}>🗑</button>
@@ -70,7 +90,7 @@ export function renderRecordSpace(ctx, ot) {
                     idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
                     onSave=${(v) => saveDraft(ot, { ...v, id: addingId })} onCancel=${cancelForm} />`
                 : html`<${Spinner} />`}</div>`
-            : (expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordFields(ctx, ot, d)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${d.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, d.id)]} onReload=${reloadComments} />` : null)}
+            : (expandedRec[ot.name + ':' + d.id] ? html`<div class="pj-rec-fields">${recordAiLabel(d, 'block')}${recordFields(ctx, ot, d)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${d.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, d.id)]} onReload=${reloadComments} />` : null)}
         </div>
       `)}
 
@@ -81,6 +101,7 @@ export function renderRecordSpace(ctx, ot) {
             <div class="pj-item">
               <${ColorPicker} value=${itemColor(ot.name, o.id)} onPick=${(c) => setItemColor(ot.name, o.id, c)} />
               <button class="pj-rec-title" onClick=${() => toggleExpand(ot, o.id)}>${String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.summary || o.id || '')}</button>
+              ${recordAiLabel(o, 'inline')}
               ${o.status ? html`<span class="badge badge-info">${(o.status)}</span>` : null}
               ${!showArchived && !draftsFor(ot.name).some(dr => dr.id === o.id) ? html`
                 <button class="btn-ghost btn-sm" title=${t('organisms.reopenEditHint') || 'Reopen for editing — creates an editable draft from the published version'} disabled=${busy} onClick=${() => reopen(ot, o.id)}>${t('organisms.edit') || 'Edit'}</button>` : null}
@@ -89,7 +110,7 @@ export function renderRecordSpace(ctx, ot) {
                 : html`<button class="pj-icon-btn" title=${t('organisms.archive') || 'Archive'} disabled=${busy} onClick=${() => setRecordArchived(ot, o.id, true)}>🗄️</button>`}
               <button class="pj-icon-btn" title=${t('organisms.delete') || 'Delete'} disabled=${busy} onClick=${() => removeObject(ot.namespace, o.id, String(o[PRIMARY_FIELD[ot.name] || 'title'] || o.id))}>🗑</button>
             </div>
-            ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordFields(ctx, ot, o)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${o.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, o.id)]} onReload=${reloadComments} />` : null}
+            ${expandedRec[ot.name + ':' + o.id] ? html`<div class="pj-rec-fields">${recordAiLabel(o, 'block')}${recordFields(ctx, ot, o)}</div><${WorkspaceComments} orgId=${orgId} ws=${wsId} space=${ot.name} instanceId=${o.id} showToast=${showToast} batched=${true} initialComments=${commentsByKey[cKey(wsId, ot.name, o.id)]} onReload=${reloadComments} />` : null}
           </div>
         `)
       }

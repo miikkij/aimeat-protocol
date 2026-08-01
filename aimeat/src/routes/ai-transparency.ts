@@ -20,6 +20,10 @@
  *   import { aiTransparencyRouter } from './routes/ai-transparency.js';
  *   app.use(aiTransparencyRouter(config));
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3. `ai_market_surveillance` is answered from
+ *     AIMEAT_AI_SUPERVISORY_NAME/_URL instead of being permanently null, and `posture.visible_label`
+ *     publishes AIMEAT_AI_LABEL_PUBLIC so a reader can tell a legally required label from one this
+ *     operator chose to show.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 2. Shape from docs/internal/EUAct/20-public-release-plan.md §B.
  */
 import { Router } from 'express';
@@ -43,10 +47,12 @@ export function buildAiTransparency(config: AimeatConfig): Record<string, unknow
       contact: op.email || null,
     },
     supervisory_authority: {
-      // The AI Act's market-surveillance authority is NOT the data-protection authority, and this
-      // node has no configuration for it yet, so it says so rather than naming the wrong regulator.
-      // Which one applies depends on where the operator is established.
-      ai_market_surveillance: null,
+      // Two DIFFERENT regulators, kept in two different config fields on purpose. Naming the
+      // data-protection authority here would be a false statement in a compliance artefact, so an
+      // operator who has not told us theirs gets `null` and the note, never a guess.
+      ai_market_surveillance: config.aiSupervisoryName
+        ? { name: config.aiSupervisoryName, url: config.aiSupervisoryUrl || null }
+        : null,
       data_protection: op.supervisoryName ? { name: op.supervisoryName, url: op.supervisoryUrl || null } : null,
       member_state: op.country || null,
       note: 'The AI Act market-surveillance authority is determined by where the operator is established and is not the data-protection authority named here.',
@@ -74,6 +80,11 @@ export function buildAiTransparency(config: AimeatConfig): Record<string, unknow
     posture: {
       provenance: config.aiProvenance ? 'on' : 'off',
       detail: config.aiProvenanceDetail,
+      // Presentation only, and worth publishing precisely because it can be STRICTER than the law:
+      // a reader who sees a label on this node should be able to find out whether it means "the law
+      // required this" or "the operator chose it". `disclosure.reason` on the record answers per
+      // item; this answers for the node.
+      visible_label: config.aiLabelPublic,
     },
   };
 }
@@ -84,6 +95,8 @@ function renderMarkdown(config: AimeatConfig, s: Record<string, unknown>): strin
   const marking = s.marking as Record<string, unknown>;
   const detection = s.detection as Record<string, string>;
   const posture = s.posture as Record<string, string>;
+  const authorities = s.supervisory_authority as Record<string, unknown>;
+  const ams = authorities.ai_market_surveillance as { name: string; url: string | null } | null;
   return [
     '---',
     `title: AI transparency statement`,
@@ -118,7 +131,18 @@ function renderMarkdown(config: AimeatConfig, s: Record<string, unknown>): strin
     '',
     `- Provenance recording: **${posture.provenance}**`,
     `- Detail served on public surfaces: **${posture.detail}**`,
+    `- Visible label on public surfaces: **${posture.visible_label}**`
+      + (posture.visible_label === 'strict'
+        ? ' (also labels content the law exempts, such as content a person reviewed)'
+        : ''),
     `- Code of Practice signatory: **no**`,
+    '',
+    '## Who supervises this',
+    '',
+    ams
+      ? `AI Act market surveillance: **${ams.name}**${ams.url ? ` (${ams.url})` : ''}.`
+      : 'The AI Act market-surveillance authority for this node is **not stated**. It follows from where '
+        + 'the operator is established, and it is a different regulator from the data-protection authority.',
     '',
     `Machine-readable: ${b}/v1/ai-transparency`,
     '',

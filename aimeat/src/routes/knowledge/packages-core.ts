@@ -6,6 +6,10 @@
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/knowledge.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — GET /:id public manifest lookup batches owners+agents (was O(owners+agents) scan)
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3: importing a package whose `synthesis.level` is not
+ *     `original` mints an addressable provenance record (`stampedBy: 'principal'` — the author
+ *     declares it, the node did not witness it) and attaches it to the manifest; GET /:id serves it
+ *     on `meta.provenance` + the AI-Disclosure headers.
  */
 import type { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
@@ -18,6 +22,9 @@ import { recordPublicActivity } from '../../services/public-activity.js';
 import { ManifestSchema } from '../../schemas/knowledge-package.js';
 import { createRequire } from 'node:module';
 import type { KnowledgeHelpers } from './helpers.js';
+import { mintProvenance } from '../../services/ai-provenance.js';
+import { loadServedProvenance, envelopeMeta, setProvenanceHeaders } from '../../services/ai-provenance-marks.js';
+import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
 
 const require = createRequire(import.meta.url);
@@ -133,6 +140,45 @@ export function registerPackagesCoreRoutes(
     // Store manifest (with normalized entry keys)
     manifest.created = now;
     manifest.updated = now;
+
+    // TARGET-058. A knowledge package's `synthesis.level` is the SAME vocabulary as the provenance
+    // record's `level` — the record borrowed it from here — so a package that declares anything
+    // other than `original` is already stating AI involvement, and it should carry an addressable
+    // record rather than a badge the viewer invents from a string.
+    //
+    // `stampedBy: 'principal'`: the AUTHOR declares this. The node did not watch a model produce the
+    // package, and mintProvenance forces `observed: false` for a principal stamp so the claim cannot
+    // dress itself up as something we witnessed. `humanInvolvement: 'none'` is the honest reading of
+    // silence — the manifest schema has no field for review, so nobody has told us a person read the
+    // substance, and under decision D4 the unlabelled reading is the one we do not take.
+    let aiProvenanceId: string | undefined;
+    if (config.aiProvenance && manifest.synthesis && manifest.synthesis.level !== 'original') {
+      try {
+        const row = await mintProvenance(storage, {
+          stampedBy: 'principal',
+          ownerGhii: ownerGhiiOf(ownerGaii),
+          principal: ownerGaii,
+          level: manifest.synthesis.level,
+          humanInvolvement: 'none',
+          content: JSON.stringify(manifest),
+          generator: manifest.synthesis.model ? { model: manifest.synthesis.model } : undefined,
+          notes: manifest.synthesis.description,
+          surface: {
+            visibility: manifest.sharing.catalog_listed ? 'public' : 'owner',
+            humanAudience: true,
+          },
+          labelPolicy: config.aiLabelPublic,
+          nodeId: config.nodeId,
+          baseUrl: config.baseUrl,
+        });
+        aiProvenanceId = row.id;
+      } catch (err) {
+        // An import the user is waiting on must not fail because the label bookkeeping did. Logged,
+        // never swallowed: an operator who sees this knows a package went out unmarked.
+        logger.warn('POST /v1/knowledge/import: provenance mint failed, package stored unmarked', { error: String(err) });
+      }
+    }
+
     await storage.setMemory({
       key: manifestKey,
       ownerGaii,
@@ -143,6 +189,7 @@ export function registerPackagesCoreRoutes(
       version: 1,
       createdAt: now,
       updatedAt: now,
+      ...(aiProvenanceId ? { aiProvenanceId } : {}),
     });
 
     // Store entries with their content
@@ -240,13 +287,18 @@ export function registerPackagesCoreRoutes(
       return;
     }
 
+    // TARGET-058: the package's provenance rides on `meta.provenance`, the ONE envelope carrier, and
+    // on the AI-Disclosure / Link headers. The read above is the authorization decision; provenance
+    // travels with the content it describes, so no second check is owed here.
+    const prov = await loadServedProvenance(storage, config, manifest.aiProvenanceId);
+    setProvenanceHeaders(res, prov);
     res.json(success(config.nodeId, {
       package_id: packageId,
       manifest: manifest.value,
       tags: manifest.tags,
       created_at: manifest.createdAt,
       updated_at: manifest.updatedAt,
-    }));
+    }, undefined, envelopeMeta(prov)));
   });
 
   /* ── POST /v1/knowledge/:id/link — Create a link from this package to another memory ── */

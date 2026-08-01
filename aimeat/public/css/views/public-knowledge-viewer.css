@@ -472,3 +472,10 @@
     grid-template-columns: 1fr;
   }
 }
+
+/* Campsite (Rule 8): spacing utilities replacing the four inline `style=` attributes this view
+   carried. Tokens, not hardcoded rems, so they follow the theme's scale. */
+.pkv-mt-sm { margin-top: var(--sp-2, 0.5rem); }
+.pkv-mb-sm { margin-bottom: var(--sp-2, 0.5rem); }
+.pkv-mb-md { margin-bottom: var(--sp-3, 0.75rem); }
+.pkv-mb-lg { margin-bottom: var(--sp-4, 1rem); }

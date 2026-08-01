@@ -36,6 +36,8 @@
  *   import { mintProvenance, contentHashOf } from './ai-provenance.js';
  *   const row = await mintProvenance(storage, { stampedBy: 'node', ... , content });
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3. `labelPolicy` (AIMEAT_AI_LABEL_PUBLIC) rides beside
+ *     `nodeId` into the pre-rendered disclosure block, which now also carries `strength`.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. stampAgentWrite() (Mint-3) and publiclyResolvable();
  *     `visibility` is no longer a mint parameter — it is derived from the content the record
  *     describes, so nothing a caller sends can publish a statement about unreadable content.
@@ -49,7 +51,7 @@ import {
   type AiStampedBy, type AiProvenanceGenerator, type AiProvenanceSource, type AiDisclosureBlock,
   type LocalizedText,
 } from '../models/ai-provenance-schemas.js';
-import { disclosureFor, type SurfaceContext } from './ai-disclosure.js';
+import { disclosureFor, type SurfaceContext, type DisclosureLabelPolicy } from './ai-disclosure.js';
 import { isGEAI, parseGAII, ownerGhiiOf } from '../utils/gaii.js';
 import { createT, LOCALES } from '../i18n.js';
 
@@ -91,6 +93,12 @@ export interface MintProvenanceInput {
   generatedAt?: string;
   /** The surface it will be served on, so the disclosure block can be pre-rendered. */
   surface?: SurfaceContext;
+  /**
+   * The node's visible-label posture, `config.aiLabelPublic`. Pass it wherever `nodeId` is passed:
+   * it belongs to the node, not the caller, and omitting it silently pre-renders the block as
+   * "the law, exactly" — correct but less than the operator asked for.
+   */
+  labelPolicy?: DisclosureLabelPolicy;
   /** This node's id, stamped into `generator.nodeId`. */
   nodeId: string;
   /** The node's public base URL, so `attestation.recordUrl` resolves for a third party. */
@@ -124,13 +132,21 @@ function localized(key: string, vars?: Record<string, string>): LocalizedText {
  * comes from the `aiLabel.*` i18n keys, never from a string literal in this file (a self-hoster
  * elsewhere needs their own language, and the Finnish string is a compliance string).
  */
-export function buildDisclosure(record: AiProvenance, ctx: SurfaceContext): AiDisclosureBlock {
-  const decision = disclosureFor(record, ctx);
+export function buildDisclosure(
+  record: AiProvenance, ctx: SurfaceContext, policy: DisclosureLabelPolicy = 'light',
+): AiDisclosureBlock {
+  const decision = disclosureFor(record, ctx, policy);
 
   let shortKey: string;
   let longKey: string;
   if (decision.reason === 'art50_1_interaction') {
     shortKey = 'aiLabel.short'; longKey = 'aiLabel.chat';
+  } else if (decision.reason === 'policy') {
+    // Labelled beyond the law. The words must not overstate: this content was either reviewed by a
+    // person or declared outside the public-interest limb, so it gets the neutral "a model was
+    // involved" wording rather than the "no human editorial review" statement.
+    shortKey = record.level === 'assisted' ? 'aiLabel.assisted' : 'aiLabel.short';
+    longKey = 'aiLabel.policyLong';
   } else if (record.level === 'original') {
     shortKey = 'aiLabel.original'; longKey = 'aiLabel.originalLong';
   } else if (record.level === 'assisted') {
@@ -144,6 +160,7 @@ export function buildDisclosure(record: AiProvenance, ctx: SurfaceContext): AiDi
   return {
     required: decision.required,
     reason: decision.reason,
+    strength: decision.strength,
     short: localized(shortKey),
     long: localized(longKey),
   };
@@ -190,7 +207,7 @@ export async function mintProvenance(
   if (input.derivedFrom?.length) draft.derivedFrom = input.derivedFrom;
   if (input.notes) draft.notes = input.notes;
 
-  draft.disclosure = buildDisclosure(draft, input.surface ?? DEFAULT_SURFACE);
+  draft.disclosure = buildDisclosure(draft, input.surface ?? DEFAULT_SURFACE, input.labelPolicy);
 
   const parsed = AiProvenanceSchema.safeParse(draft);
   if (!parsed.success) {
@@ -237,6 +254,8 @@ export async function stampAgentWrite(
     pipeline?: string;
     /** The surface it will be served on, so the disclosure block is pre-rendered correctly. */
     surface?: SurfaceContext;
+    /** The node's visible-label posture, `config.aiLabelPublic`. */
+    labelPolicy?: DisclosureLabelPolicy;
     nodeId: string;
     baseUrl?: string;
     /** `false` disables minting entirely (AIMEAT_AI_PROVENANCE=off). */
@@ -260,6 +279,7 @@ export async function stampAgentWrite(
     generator: input.pipeline ? { pipeline: input.pipeline } : undefined,
     notes: INFERRED_FROM_PRINCIPAL_NOTE,
     surface: input.surface,
+    labelPolicy: input.labelPolicy,
     nodeId: input.nodeId,
     baseUrl: input.baseUrl,
   });

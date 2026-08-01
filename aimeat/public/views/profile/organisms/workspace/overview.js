@@ -9,6 +9,10 @@
  *   renderOvDocInline, renderOvSection, renderObjectives, renderOverview
  * @usage import { renderOverview, renderOvSection } from '/views/profile/organisms/workspace/overview.js';
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: the AI-transparency chip on every record and document
+ *     row here, from the shared /components/ai-label.js. This landing view — not the per-space tab —
+ *     is where a reader first meets a record, so a label only on the tab would be one most people
+ *     never see.
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
  */
 import { h } from 'preact';
@@ -17,6 +21,7 @@ const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner } from '/views/profile/shared.js';
 import { EmptyState } from '/components/EmptyState.js';
+import { AiLabel } from '/components/ai-label.js';
 import * as orgService from '/js/services/organisms.js';
 import { relTime } from '/views/profile/organisms/helpers.js';
 import { DocumentView, DocumentEditor } from '/views/profile/organisms/document.js';
@@ -148,6 +153,7 @@ export function renderOvSection(ctx, ot) {
                 <button class="pj-ov-item" onClick=${() => openOvDoc(ctx, ot, d)}>
                   ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
                   <span class="pj-ov-item-title">${d.title || d.id}</span>
+                  <${AiLabel} record=${d._aiProvenance} variant="inline" />
                   <span class="pj-ov-preview">${firstLine(d.markdown)}</span>
                 </button>
                 ${ovDoc && ovDoc.type === ot.name && ovDoc.id === d.id ? renderOvDocInline(ctx, ot, d) : null}
@@ -155,6 +161,10 @@ export function renderOvSection(ctx, ot) {
               <button class="pj-ov-item" key=${d.id} onClick=${() => openOvRec(ctx, ot, d)}>
                 ${d._draft ? html`<span class="badge badge-warn pj-mini">${t('organisms.draft') || 'draft'}</span>` : null}
                 <span class="pj-ov-item-title">${String(d[PRIMARY_FIELD[ot.name] || 'title'] || d.summary || d.id || '')}</span>
+                ${/* TARGET-058: the SAME component the space tab uses. This overview is the landing
+                      view, so it is where "at first exposure" actually happens for a record — a label
+                      only on the space tab would be a label most readers never reach. */''}
+                <${AiLabel} record=${d._aiProvenance} variant="inline" />
                 ${d.status ? html`<span class="badge badge-info">${String(d.status)}</span>` : null}
               </button>`;
           })}

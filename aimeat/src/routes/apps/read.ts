@@ -22,6 +22,7 @@ import { verifyDraftToken, DraftTokenError } from '../../services/draft-token.js
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { injectAimeatBadge } from '../../utils/app-badge.js';
 import { appCsp } from '../../utils/app-csp.js';
+import { detectLocale } from '../../i18n.js';
 import { collectAppLineage, resolveAppStatus } from '../../services/app-lineage.js';
 import { applyAppProtection, hasAnyProtection } from '../../utils/app-protect.js';
 import { prefersMarkdown } from '../../services/markdown-negotiation.js';
@@ -443,7 +444,11 @@ export function registerReadRoutes(
         // the hash downloads the source rather than the rendered page.
         const prov = await loadServedProvenance(storage, config, app.aiProvenanceId);
         setProvenanceHeaders(res, prov);
-        let body = (mode === 'inline' && isHtml) ? injectAiDisclosure(injectAimeatBadge(app.data), prov) : app.data;
+        let body = (mode === 'inline' && isHtml)
+            // The visible label rides ONLY on the inline (runnable) form. A raw download stays
+            // byte-for-byte, which is what keeps the content hash in the record verifiable.
+            ? injectAiDisclosure(injectAimeatBadge(app.data), prov, { config, locale: detectLocale(req.headers['accept-language']) })
+            : app.data;
         if (mode === 'inline' && isHtml && hasAnyProtection(app.manifest.protection)) {
             body = applyAppProtection(body, {
                 protection: app.manifest.protection!,

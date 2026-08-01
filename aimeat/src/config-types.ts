@@ -228,6 +228,24 @@ export interface AimeatConfig {
    *  privacy-/business-sensitive detail is discouraged in it (Sub-measure 1.1.1) — so an operator can
    *  publish less without recording less. The owner always sees the full record. */
   aiProvenanceDetail: 'full' | 'minimal';
+  /** How eagerly a VISIBLE AI label is shown on a public surface. It governs presentation only —
+   *  the record, the HTTP headers and the machine planes are unaffected by it.
+   *  - `strict` (default) also labels what the law exempts: a person held editorial control, or the
+   *    publisher declared the subject matter is not of public interest. Decision D4 is to over-label
+   *    rather than sit on the line, so this is the default and the reason is recorded as `policy`.
+   *  - `light` labels exactly what Article 50 requires and nothing more.
+   *  - `off` shows no visible label at all. A local-development convenience; it is REFUSED on a node
+   *    whose resolved security profile is `public` (coerced back to `strict`, with a startup warning),
+   *    because hiding the label on a public node is the violation the whole feature exists to prevent. */
+  aiLabelPublic: 'strict' | 'light' | 'off';
+  /** The AI ACT MARKET-SURVEILLANCE authority for this node, named in /v1/ai-transparency.
+   *  Deliberately NOT `operator.supervisoryName`, which is the DATA-PROTECTION authority: conflating
+   *  the two would put a false statement into a compliance artefact. In Finland this is Traficom; a
+   *  node established elsewhere has a different one, which is why it is configuration and not a
+   *  constant. Empty = the statement says the authority is unstated rather than naming the wrong one. */
+  aiSupervisoryName: string;
+  /** Homepage of the AI market-surveillance authority above. */
+  aiSupervisoryUrl: string;
   /** Node auto-generates thumbnails for published apps that have none (needs a headless browser). */
   screenshotAutoCapture: boolean;
   /** Minutes between auto-screenshot scans (default 15). */

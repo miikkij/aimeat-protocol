@@ -21,6 +21,12 @@
  *   v1.2.0 -- 2026-07-10 -- Security posture: resolve securityProfile (local|public) + the
  *     allowPrivateEgress / aiProviderAllowlist knobs from env, normalise AIMEAT_ALLOW_PRIVATE_EGRESS
  *     for url-validator, add securityPostureWarnings() startup self-check. See security-development-dna.md.
+ *   v1.5.1 -- 2026-08-01 -- Pure extraction: missingOperatorConfig / operatorTypeLabel moved to
+ *     config-operator.ts (max-file-lines) and are re-exported here, so no importer changes.
+ *   v1.5.0 -- 2026-08-01 -- TARGET-058 Phase 3: AIMEAT_AI_LABEL_PUBLIC (strict|light|off, `off`
+ *     refused + coerced to `strict` on a public node, reported by securityPostureWarnings) and
+ *     AIMEAT_AI_SUPERVISORY_NAME/_URL (the AI market-surveillance authority, distinct from the
+ *     operator block's data-protection authority).
  *   v1.4.0 -- 2026-08-01 -- AI provenance (TARGET-058): AIMEAT_AI_PROVENANCE + _DETAIL.
  *   v1.3.0 -- 2026-07-14 -- mcpCardCommerceTools: AIMEAT_MCP_CARD_COMMERCE_TOOLS inline|pointer
  *     for the MCP Server Card commerce_tools block (TARGET-034 phase D).
@@ -48,7 +54,6 @@ import type {
   NodeType,
   FederationRole,
   OperatorType,
-  OperatorConfig,
   RateLimitsConfig,
   RateLimitTier,
   LoadConfigOptions,
@@ -146,6 +151,11 @@ export function securityPostureWarnings(config: AimeatConfig): string[] {
   if (!config.encryptionKey) w.push('AIMEAT_ENCRYPTION_KEY is unset — secrets (AI keys, TOTP) cannot be encrypted at rest.');
   if (config.corsAllowedOrigins.includes('*')) w.push('AIMEAT_CORS_ALLOWED_ORIGINS=* — with credentials this is a CSRF / data-exfil footgun.');
   if (config.statsAccess === 'public') w.push('AIMEAT_STATS_ACCESS=public — internal metrics are exposed to anyone.');
+  // Not "you chose something unsafe" but "your choice was not honoured" — the one entry here that
+  // reports a coercion rather than a risk, so an operator who set it never believes it took effect.
+  if (process.env.AIMEAT_AI_LABEL_PUBLIC?.trim().toLowerCase() === 'off') {
+    w.push('AIMEAT_AI_LABEL_PUBLIC=off was REFUSED and reset to `strict` — a publicly reachable node may not hide the visible AI label (EU AI Act Art. 50). Use `light` to label only what the law requires.');
+  }
   return w;
 }
 
@@ -234,6 +244,16 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   // SERVED publicly, never what is stored. Rationale in config-types.ts + .env.example.
   const aiProvenance = process.env.AIMEAT_AI_PROVENANCE !== 'false';
   const aiProvenanceDetail: 'full' | 'minimal' = process.env.AIMEAT_AI_PROVENANCE_DETAIL === 'minimal' ? 'minimal' : 'full';
+  // Visible-label posture. `off` is REFUSED on a public node rather than obeyed: this knob decides
+  // whether a person is told, and the one combination that must be unreachable by accident is
+  // "reachable from the internet, labels hidden". An unknown value falls back to the strict default
+  // rather than to the permissive one. securityPostureWarnings() reports the coercion at startup.
+  const requestedLabelPublic = process.env.AIMEAT_AI_LABEL_PUBLIC?.trim().toLowerCase();
+  const aiLabelPublic: 'strict' | 'light' | 'off' =
+    requestedLabelPublic === 'off' && securityProfile === 'public' ? 'strict'
+      : (['strict', 'light', 'off'].includes(requestedLabelPublic ?? '')
+        ? (requestedLabelPublic as 'strict' | 'light' | 'off')
+        : 'strict');
 
   const config: AimeatConfig = {
     port,
@@ -266,6 +286,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     aiProviderAllowlist,
     aiProvenance,
     aiProvenanceDetail,
+    aiLabelPublic,
+    aiSupervisoryName: process.env.AIMEAT_AI_SUPERVISORY_NAME ?? '',
+    aiSupervisoryUrl: process.env.AIMEAT_AI_SUPERVISORY_URL ?? '',
     screenshotAutoCapture: process.env.AIMEAT_SCREENSHOT_AUTO === 'true',
     screenshotIntervalMin: parseInt(process.env.AIMEAT_SCREENSHOT_INTERVAL_MIN ?? '15', 10),
     screenshotSettleMs: parseInt(process.env.AIMEAT_SCREENSHOT_SETTLE_MS ?? '6000', 10),
@@ -754,43 +777,6 @@ export async function applyConfigOverrides(
   return { applied, skipped };
 }
 
-/**
- * Required operator fields that MUST be set for the privacy page to be
- * served publicly. Returns the list of missing field names, or an empty
- * array if everything is in place.
- *
- * Used by the `/v1/privacy` route handler in `src/routes/portal.ts` to
- * return 503 instead of silently shipping a partly-filled-in policy.
- *
- * Required because every running AIMEAT node identifies the operator as
- * the GDPR data controller. AIMEAT is self-hostable open source; nodes
- * must not ship the upstream author's name and address as a default.
- */
-export function missingOperatorConfig(operator: OperatorConfig): string[] {
-  const required: Array<keyof OperatorConfig> = [
-    'name',
-    'address',
-    'country',
-    'email',
-    'hostingName',
-    'hostingLocation',
-    'supervisoryName',
-    'supervisoryUrl',
-    'effectiveDate',
-  ];
-  return required.filter(key => !operator[key] || operator[key].trim() === '');
-}
-
-/**
- * Human-readable label for the operator type, used in the privacy policy
- * Controller section ("Controller: X, a natural person").
- */
-export function operatorTypeLabel(type: OperatorType, locale: 'en' | 'fi' = 'en'): string {
-  const labels: Record<OperatorType, { en: string; fi: string }> = {
-    natural_person: { en: 'a natural person', fi: 'luonnollinen henkilö' },
-    company: { en: 'a company', fi: 'yritys' },
-    organisation: { en: 'an organisation', fi: 'organisaatio' },
-    association: { en: 'an association', fi: 'yhdistys' },
-  };
-  return labels[type][locale];
-}
+// Pure extraction (2026-08-01, max-file-lines): the operator-identity helpers moved to
+// config-operator.ts. Re-exported here so every existing `from './config.js'` importer is unaffected.
+export { missingOperatorConfig, operatorTypeLabel } from './config-operator.js';

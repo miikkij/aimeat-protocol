@@ -2,6 +2,8 @@
  * @file src/utils/env-config/sections-features.ts
  * @description Indexing, personal-node, site, consent, push, email, TOTP, matching, marketplace, EUDIW, social-login config sections. Extracted from src/utils/env-config.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-01 — AI Transparency section gains AIMEAT_AI_LABEL_PUBLIC and
+ *     AIMEAT_AI_SUPERVISORY_NAME/_URL (TARGET-058 Phase 3)
  *   v1.2.0 — 2026-08-01 — AI Transparency section: AIMEAT_AI_PROVENANCE + _DETAIL (TARGET-058)
  *   v1.1.0 — 2026-07-14 — AIMEAT_MCP_CARD_COMMERCE_TOOLS in the Commerce section (TARGET-034 phase D)
  *   v1.0.0 — 2026-07-13 — Extracted from env-config.ts (max-file-lines)
@@ -311,6 +313,24 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           description: 'What PUBLIC surfaces serve (full | minimal) — never what is stored',
           value: config.aiProvenanceDetail,
           defaultVal: 'full',
+        },
+        {
+          envVar: 'AIMEAT_AI_LABEL_PUBLIC',
+          description: 'Visible label posture (strict | light | off) — off is refused on a public node',
+          value: config.aiLabelPublic,
+          defaultVal: 'strict',
+        },
+        {
+          envVar: 'AIMEAT_AI_SUPERVISORY_NAME',
+          description: 'AI market-surveillance authority (NOT the data-protection authority)',
+          value: config.aiSupervisoryName,
+          defaultVal: '',
+        },
+        {
+          envVar: 'AIMEAT_AI_SUPERVISORY_URL',
+          description: 'Homepage of the AI market-surveillance authority',
+          value: config.aiSupervisoryUrl,
+          defaultVal: '',
         },
       ],
     },

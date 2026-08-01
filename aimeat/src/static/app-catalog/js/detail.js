@@ -8,6 +8,9 @@
  *   injected once via initDetail(deps) — so there is no import cycle back through the entry module.
  * @usage import { initDetail, openDetailView, mountLoginPill, ... } from './detail.js'; initDetail({...})
  * @version-history
+ *   v1.6.0 — 2026-08-01 — TARGET-058 Phase 3: the Art. 50(1) disclosure above the Edit-with-AI
+ *     panel. A person is in a two-way exchange with a model here, so they are told before the first
+ *     exchange rather than after it.
  *   v1.5.0 — 2026-07-25 — TARGET-048 edit-model clarity: the STATUS card becomes a WORKING COPY →
  *     PUBLISHED lifecycle band, saving persists (server draft slot) instead of only touching a
  *     transient blob, every save leaves a restorable checkpoint ("Working-copy history"), and the
@@ -473,7 +476,17 @@ function renderDetailView() {
   if (isUrlApp) {
     aiHtml += '<span class="dtl-sync none">' + t('detail.urlCantEdit') + '</span>';
   } else {
+    // Art. 50(1), EU AI Act: this panel is a two-way exchange with a language model, so the person
+    // is told BEFORE the first exchange rather than after it. It is not the Art. 50(4) content
+    // label (that one belongs on published output and is decided by the node's disclosureFor) and
+    // it carries no EU icon, because the official icon set is for labelling content, not for
+    // disclosing a conversation. It shows whether or not a key is configured: the statement is
+    // about what this panel IS.
     aiHtml +=
+      '<div class="dtl-ai-notice" role="note">' +
+        '<strong>' + escapeHtml(t('detail.aiInteractionTitle')) + '</strong> ' +
+        escapeHtml(t('detail.aiInteractionBody')) +
+      '</div>' +
       '<div class="dtl-ai-row">' +
         '<textarea id="detail-ai-input" placeholder="' + escapeHtml(t('detail.editAiPh')) + '"' + (detailAiAvailable ? '' : ' disabled') + '></textarea>' +
         dtlBtn(t('detail.run'), 'window._launcher.detailAiRun()', {variant:'primary', id:'detail-ai-run', disabled: !detailAiAvailable}) +

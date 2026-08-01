@@ -20,6 +20,10 @@
  *   v1.3.0 — 2026-07-16 — Mobile: collapse to a small round ⚡ button that expands the full pill
  *     on tap (CSS-only checkbox toggle + media query — still zero script, covered by the same
  *     style-src 'unsafe-inline' the inline styles already need). Desktop look unchanged.
+ *   v1.5.0 — 2026-08-01 — Fix the mojibake: the badge's ⚡, · and — are emitted as numeric HTML
+ *     entities. Apps are served as `text/html` with no charset and usually declare none themselves,
+ *     so the raw UTF-8 bytes were being decoded as windows-1252 and shown as "âš¡ ... â€" free".
+ *     Caught in a browser during TARGET-058 Phase 3.
  *   v1.4.0 — 2026-07-25 — Brand-as-token: the coral accents are var(--color-primary, #E8564A) so
  *     the badge follows the app's palette (theme system v2); the hex remains only as the fallback
  *     for pages that load no theme. This injector was why every served app measured 2-3 hardcoded
@@ -30,6 +34,21 @@ import { injectBeforeClosingTag } from './html-inject.js';
 /** Permanent attribution target — the project home, not the serving node. */
 const AIMEAT_HOME = 'https://aimeat.io/';
 const AIMEAT_LABEL = 'aimeat.io';
+
+/**
+ * Every non-ASCII character as a numeric HTML entity.
+ *
+ * MEASURED, NOT PARANOIA. A published app is served as `text/html` with NO charset parameter, and
+ * most single-file apps declare no `<meta charset>` either, so the browser falls back to
+ * windows-1252 and the badge rendered as "âš¡ aimeat.io Â· Publish your own app â€" free". Entities
+ * are decoded identically under every encoding, so the badge is correct whatever the host document
+ * did or did not declare. The alternative — forcing `charset=utf-8` on somebody else's document —
+ * would also fix the APP's own text and is worth doing, but it is a change to how every published
+ * app is decoded and belongs in its own decision.
+ */
+function entities(s: string): string {
+    return s.replace(/[^ -~]/g, (c) => `&#${c.codePointAt(0)};`);
+}
 
 /**
  * Append the badge before the LAST `</body>` (fallback last `</html>`, else end). The label + link are the fixed
@@ -84,16 +103,18 @@ export function injectAimeatBadge(data: Buffer | Uint8Array | string): Buffer {
         + '#aimeat-app-badge a>span:first-child{display:none!important}'
         + '}';
 
+    // Every user-visible string goes through entities(): the glyphs here are exactly the ones that
+    // were rendering as mojibake in a charset-less document.
     const badge =
         '<div id="aimeat-app-badge">'
         + '<style>' + css + '</style>'
         + '<input type="checkbox" id="aimeat-app-badge-open">'
-        + '<label for="aimeat-app-badge-open" aria-label="' + AIMEAT_LABEL + ' — publish your own app">⚡</label>'
+        + '<label for="aimeat-app-badge-open" aria-label="' + entities(AIMEAT_LABEL + ' — publish your own app') + '">' + entities('⚡') + '</label>'
         + '<a href="' + AIMEAT_HOME + '" target="_blank" rel="noopener noreferrer" '
-        + 'aria-label="' + AIMEAT_LABEL + ' — publish your own app">'
-        + '<span>⚡</span>'
-        + '<span>' + AIMEAT_LABEL + '</span>'
-        + '<span>· Publish your own app — free</span>'
+        + 'aria-label="' + entities(AIMEAT_LABEL + ' — publish your own app') + '">'
+        + '<span>' + entities('⚡') + '</span>'
+        + '<span>' + entities(AIMEAT_LABEL) + '</span>'
+        + '<span>' + entities('· Publish your own app — free') + '</span>'
         + '</a>'
         + '</div>';
 

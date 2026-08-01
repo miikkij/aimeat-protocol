@@ -6,7 +6,8 @@
  *       for ReplyWithAiPopover (build(mode) → copy/mcp prompt).
  *     - Conversation → Notebook: buildConversationNotebookProps → { title, promptText, runServerSummary,
  *       parkConversation } for ConversationToNotebookPopover. runServerSummary calls /v1/ai/complete on the
- *       owner's own OpenRouter key (vision-aware, up to 8 images); parkConversation files the whole thread.
+ *       owner's own OpenRouter key (vision-aware, up to 8 images) and returns { content, provenance };
+ *       parkConversation files the whole thread.
  * @structure
  *   - collectThreadImages(thread, urlMap) — [{messageId,id,name,url}] for every image attachment
  *   - buildConversationReplyProps({ activeConv, thread, peerName, peerDisplayName })
@@ -17,6 +18,8 @@
  *   setNbConv(buildConversationNotebookProps({ activeConv, thread, urlMap, peerName, title }));
  * @version-history
  *   v1.0.0 — 2026-07-19 — Initial: extracted the Reply-with-AI + Conversation→Notebook assembly from inbox-tab.js.
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: runServerSummary returns { content, provenance } so the
+ *     popover can state that a model wrote the draft and link the record.
  */
 import { api } from '/js/api.js';
 import { t } from '/js/i18n.js';
@@ -76,7 +79,11 @@ export function buildConversationNotebookProps({ activeConv, thread, urlMap, pee
       retries: 0,
     });
     if (resp?.ok === false) throw new Error(resp.error?.message || t('inbox.failed'));
-    return resp?.data?.content || '';
+    // TARGET-058: the summary comes back with its provenance on `meta.provenance` (the ONE envelope
+    // carrier). The popover shows the reader that a model wrote what they are about to keep, and
+    // links the record. Returned as an object rather than a bare string so the caller cannot drop it
+    // by accident.
+    return { content: resp?.data?.content || '', provenance: resp?.meta?.provenance || null };
   };
   const parkConversation = ({ summary }) => parkConversationToNotebook({
     conv: { conversationId: activeConv.conversationId, peerGhii: activeConv.peerGhii, subject: activeConv.subject },

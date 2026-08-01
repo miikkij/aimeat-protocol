@@ -1183,6 +1183,13 @@
     .dtl-meta-item .dtl-meta-val { font-size: .9rem; color: var(--text); word-break: break-word; }
     .dtl-desc { font-size: .9rem; color: var(--text); line-height: 1.5; margin: 0 0 14px; }
 
+    /* Art. 50(1) disclosure above the AI edit panel (TARGET-058). Theme tokens only, and it wraps
+       rather than widening the page — a compliance line that produced a horizontal scrollbar at
+       390px would be a bug in the thing meant to be readable. */
+    .dtl-ai-notice { font-size: .82rem; line-height: 1.4; margin-bottom: 10px; padding: 8px 10px;
+      border: 1px solid var(--border-subtle); border-left: 3px solid var(--accent, var(--border));
+      border-radius: 8px; color: var(--text-muted); overflow-wrap: anywhere; }
+    .dtl-ai-notice strong { color: var(--text); }
     .dtl-ai-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
     #detail-ai-input {
       flex: 1; min-width: 240px; min-height: 64px; resize: vertical;

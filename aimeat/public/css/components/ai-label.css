@@ -1,0 +1,143 @@
+/**
+ * @file public/css/components/ai-label.css
+ * @description Styling for the ONE visible AI label (TARGET-058 Phase 3, components/ai-label.js).
+ *   Every colour, radius and space is a theme.css token, so the badge flips with the theme and
+ *   carries no hardcoded brand hex. Nothing here is `rgba(255,255,255,…)`, which reads correctly
+ *   only on a dark background.
+ *
+ *   THE ICONS ARE LOCKUPS. `aspect-ratio` per icon, sized by HEIGHT with `width: auto`, because two
+ *   of the three are wide badges containing the word "AI" and a square box would squash them. The
+ *   ratios are the SVGs' own viewBoxes (1:1, 1789.84:566.93, 1700.79:566.93) and are duplicated in
+ *   components/ai-label.js `EU_ICONS`, where a test compares the two.
+ *
+ *   MINIMUM SIZE IS A COMPLIANCE PROPERTY, NOT TASTE. The Code says "clearly visible size" without a
+ *   number, so we pick one and enforce it: --ai-label-icon-h never drops below 18px, which keeps the
+ *   letters legible at 390px width. It does not shrink on small screens; the chip wraps instead.
+ *
+ *   NOTHING MAY SIT ON TOP OF IT. The Code requires placement "where no intervening overlay elements
+ *   exist". The label participates in normal flow inside the content it describes rather than
+ *   floating, so it cannot be covered by app chrome or a toast; `isolation: isolate` keeps a
+ *   descendant's z-index from escaping and a parent's stacking context from burying it.
+ * @structure
+ *   - .ai-label (+ --inline / --block / --interaction) — the wrapper
+ *   - .ai-label__icon (+ per-icon aspect ratios) — the official EU glyph, theme-variant switched
+ *   - .ai-label__text / __short / __long / __link
+ * @usage preloaded from spa.html; classes emitted by /components/ai-label.js
+ * @version-history
+ *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 3.
+ */
+
+.ai-label {
+  --ai-label-icon-h: 20px;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2, 8px);
+  flex-wrap: wrap;
+  isolation: isolate;
+  min-width: 0;
+  max-width: 100%;
+  font-size: var(--text-sm);
+  line-height: 1.35;
+  color: var(--text-dim);
+}
+
+/* Inline chip: beside a title, in a record header, on a message. */
+.ai-label--inline {
+  padding: var(--sp-1, 4px) var(--sp-2, 8px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-full);
+  background: var(--bg-dim);
+}
+
+/* Block banner: above a body of text, which is where Measure 1.2.2(f) puts it for published text
+   ("above or at the top of the text, near the headline"). */
+.ai-label--block,
+.ai-label--interaction {
+  --ai-label-icon-h: 24px;
+  align-items: flex-start;
+  padding: var(--sp-3, 12px);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-focus);
+  border-radius: var(--radius-sm);
+  background: var(--bg-dim);
+  margin-bottom: var(--sp-3, 12px);
+}
+
+/* The Art. 50(1) notice has no icon, so its text starts at the border. */
+.ai-label--interaction { align-items: center; }
+
+.ai-label__icon {
+  flex: 0 0 auto;
+  height: var(--ai-label-icon-h);
+  min-height: 18px;
+  width: auto;
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: contain;
+}
+
+/* Sized by height with the SVG's own ratio — a square box distorts two of the three lockups. */
+.ai-label__icon--ai-basic {
+  aspect-ratio: 566.93 / 566.93;
+  background-image: url('/assets/eu-ai-icons/svg/ai-basic_black.svg');
+}
+.ai-label__icon--ai-generated {
+  aspect-ratio: 1789.84 / 566.93;
+  background-image: url('/assets/eu-ai-icons/svg/ai-generated_black.svg');
+}
+.ai-label__icon--ai-modified {
+  aspect-ratio: 1700.79 / 566.93;
+  background-image: url('/assets/eu-ai-icons/svg/ai-modified_black.svg');
+}
+
+/* Dark theme takes the white variants. The glyph is not localised and not restyled — our freedom is
+   in the chip around it, never in the mark itself. */
+[data-theme="dark"] .ai-label__icon--ai-basic {
+  background-image: url('/assets/eu-ai-icons/svg/ai-basic_white.svg');
+}
+[data-theme="dark"] .ai-label__icon--ai-generated {
+  background-image: url('/assets/eu-ai-icons/svg/ai-generated_white.svg');
+}
+[data-theme="dark"] .ai-label__icon--ai-modified {
+  background-image: url('/assets/eu-ai-icons/svg/ai-modified_white.svg');
+}
+
+.ai-label__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  /* Long compliance sentences must wrap, never widen the page: an overflowing label is the classic
+     way a badge turns into a horizontal scrollbar on a 390px viewport. */
+  overflow-wrap: anywhere;
+}
+
+.ai-label__short {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ai-label__long { color: var(--text-dim); }
+
+/* The interactive second layer the Code encourages. Underlined, not colour-only. */
+.ai-label__link {
+  flex: 0 0 auto;
+  color: var(--text-dim);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.ai-label__link:hover,
+.ai-label__link:focus-visible { color: var(--text); }
+
+/* An inline chip on one line reads better with the text side by side. */
+.ai-label--inline .ai-label__text { flex-direction: row; gap: var(--sp-2, 8px); align-items: baseline; }
+
+@media (max-width: 640px) {
+  /* Stack rather than shrink: the minimum icon size is a compliance property. */
+  .ai-label--inline .ai-label__text { flex-direction: column; gap: 2px; }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ai-label__link { transition: color 120ms ease; }
+}

@@ -4237,7 +4237,15 @@
     "aiProvenanceDetailFull": "Koko tietue",
     "aiProvenanceDetailFullDesc": "Näytä kaikki tallennettu: malli, palveluntarjoaja, lähteet, ajoketju",
     "aiProvenanceDetailMinimal": "Suppea",
-    "aiProvenanceDetailMinimalDesc": "Näytä vain pakolliset kentät ja ilmoitusteksti; koko tietue säilyy tallessa"
+    "aiProvenanceDetailMinimalDesc": "Näytä vain pakolliset kentät ja ilmoitusteksti; koko tietue säilyy tallessa",
+    "aiLabelPublic": "Näkyvä tekoälymerkintä julkisilla pinnoilla",
+    "aiLabelPublicStrict": "Tiukka (suositus)",
+    "aiLabelPublicStrictDesc": "Merkitse myös se, minkä laki jättäisi merkitsemättä, kuten ihmisen tarkistama sisältö",
+    "aiLabelPublicLight": "Vain se, mitä laki vaatii",
+    "aiLabelPublicLightDesc": "Merkitse täsmälleen se, mitä 50 artikla vaatii, ei enempää",
+    "aiSupervisoryNote": "Tekoälyn markkinavalvontaviranomainen on eri viranomainen kuin aiemmin antamasi tietosuojaviranomainen. Suomessa se on Traficom. Jätä tyhjäksi, jos et ole varma, niin läpinäkyvyysseloste kertoo, ettei viranomaista ole ilmoitettu.",
+    "aiSupervisoryName": "Tekoälyn markkinavalvontaviranomainen (vapaaehtoinen)",
+    "aiSupervisoryUrl": "Sen verkkosivu"
   },
   "join": {
     "title": "Liity AIMEAT-federaatioon",
@@ -8357,6 +8365,12 @@
     "unstatedLong": "Emme tiedä, onko tekoäly ollut mukana tämän tekemisessä.",
     "reviewed": "Tekoälyn luonnostelema, tarkistanut {{name}}.",
     "detailsLink": "Miten tämä on tehty",
+    "policyLong": "Tämän tekemisessä on ollut mukana tekoälymalli. Tämä solmu merkitsee sen silloinkin, kun laki ei sitä vaadi.",
+    "interactionTitle": "Keskustelet tekoälyavustajan kanssa",
+    "interactionBody": "Se voi erehtyä, joten tarkista tärkeät asiat. Viestisi menevät kielimallille omalla API-avaimellasi.",
+    "draftTitle": "Tämän luonnoksen on kirjoittanut tekoäly",
+    "draftBody": "Lue se ennen lähettämistä. Vastaat itse siitä, mitä nimissäsi lähtee.",
+    "regionLabel": "Tekoälyn läpinäkyvyystiedot",
     "iconAlt": {
       "aiGenerated": "Tekoälyn tuottamaa sisältöä",
       "aiModified": "Sisältöä on osittain muokattu tekoälyllä",

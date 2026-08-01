@@ -30,6 +30,10 @@
  * @structure stub AI provider · owner/agent setup · one describe-ish block per acceptance item
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3: the `policy` disclosure reason (the private/public
+ *     pair that proves AIMEAT_AI_LABEL_PUBLIC=strict labels what Art. 50(4) exempts, and that it
+ *     never overwrites a legal reason), and the AI market-surveillance authority in
+ *     /v1/ai-transparency + its markdown mirror.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2: derived visibility (both directions), meta.provenance
  *     + the two headers, Mint-3, the attach-to-publish path and its cross-owner refusal, and
  *     /v1/ai-transparency.
@@ -554,6 +558,67 @@ async function startStub(): Promise<void> {
             'owner B attached owner A\'s provenance record to B\'s own item');
     });
 
+    // ── 10b. PHASE 3: AIMEAT_AI_LABEL_PUBLIC=strict labels what the law exempts ──
+    //
+    // This is the ONLY path on which the `policy` disclosure reason is reachable. Everything the
+    // node stamps itself is `humanInvolvement: 'none'`, which already owes a label under Art. 50(4);
+    // only a DECLARED record can say a person held editorial control, and only then does the
+    // question "would this node label it anyway?" have an answer to test.
+
+    await test('A declaration attached to PRIVATE content owes no label — nobody is being informed', async () => {
+        const key = `policy.private.${Date.now()}`;
+        await json('/v1/memory', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ key, value: 'Reviewed by a person, kept to myself.', visibility: 'private' }),
+        });
+        const r = await json('/v1/provenance', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({
+                level: 'ai-generated', humanInvolvement: 'editorial-control',
+                content: 'Reviewed by a person, kept to myself.', attachToMemoryKey: key,
+            }),
+        });
+        assert(r.status === 201, `declare ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const d = r.body.data.provenance.disclosure;
+        assert(d.required === false, `a private item must owe no visible label, got reason=${d.reason}`);
+    });
+
+    await test('The same declaration on PUBLIC content is labelled by node policy, not by law', async () => {
+        const key = `policy.public.${Date.now()}`;
+        const text = 'Tekoäly luonnosteli tämän, ja toimittaja luki sen läpi.';
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ key, value: text, visibility: 'public' }),
+        });
+        assert(w.status === 200 || w.status === 201, `publish ${w.status}`);
+        const r = await json('/v1/provenance', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({
+                level: 'ai-generated', humanInvolvement: 'editorial-control',
+                content: text, attachToMemoryKey: key,
+            }),
+        });
+        assert(r.status === 201, `declare ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const d = r.body.data.provenance.disclosure;
+        // Art. 50(4) exempts editorial control. AIMEAT_AI_LABEL_PUBLIC=strict labels it anyway, and
+        // records WHY, so a reader can tell a legal duty from an operator's choice.
+        assert(d.required === true, 'strict policy did not label content the law exempts');
+        assert(d.reason === 'policy', `expected reason=policy, got ${d.reason}`);
+        assert(d.strength === 'light', `a policy label must be LIGHT, got ${d.strength}`);
+        // ...and it must not claim nobody reviewed it, because somebody did.
+        assert(!JSON.stringify(d.long).includes('without human editorial review'),
+            'a policy label must not assert the "no human review" statement');
+    });
+
+    await test('A law-required label keeps its legal reason — policy never overwrites it', async () => {
+        const r = await json(`/v1/provenance/${publicId}`, { headers: auth(a.token) });
+        assert(r.status === 200, `resolve ${r.status}`);
+        const d = r.body.data.provenance.disclosure;
+        assert(d.required === true && d.reason === 'art50_4_public_interest',
+            `expected the legal reason to survive, got required=${d.required} reason=${d.reason}`);
+        assert(d.strength === 'full', `expected full strength, got ${d.strength}`);
+    });
+
     // ── 11. PHASE 2: the node's own transparency statement ──
 
     await test('GET /v1/ai-transparency answers, and is honest when the answer is no', async () => {
@@ -566,6 +631,22 @@ async function startStub(): Promise<void> {
             'this node does not watermark text and must not imply that it does');
         assert(d.detection.access.includes('unauthenticated'), 'the detection access point must say it is open');
         assert(d.posture.provenance === 'on', `posture ${d.posture.provenance}`);
+        // PHASE 3. The AI Act market-surveillance authority is a DIFFERENT regulator from the
+        // data-protection authority, and naming the wrong one in a compliance artefact is the
+        // failure this pair of fields exists to prevent.
+        // Read back from the environment rather than hardcoded: the test env files are gitignored, so
+        // a hardcoded name would pass on this machine and fail on a fresh checkout. This asserts the
+        // DERIVATION — the statement reports exactly what the operator configured, and `null` when
+        // they configured nothing, which is the honest answer rather than a guess.
+        const wantAms = process.env.AIMEAT_AI_SUPERVISORY_NAME?.trim() || null;
+        const gotAms = d.supervisory_authority.ai_market_surveillance;
+        assert((gotAms?.name ?? null) === wantAms,
+            `ai_market_surveillance should be ${wantAms}, got ${JSON.stringify(gotAms)}`);
+        if (gotAms) {
+            assert(gotAms.name !== d.supervisory_authority.data_protection?.name,
+                'the AI authority and the data-protection authority must not collapse into one field');
+        }
+        assert(d.posture.visible_label === 'strict', `visible_label ${d.posture.visible_label}`);
     });
 
     await test('...and has a markdown mirror', async () => {
@@ -575,6 +656,10 @@ async function startStub(): Promise<void> {
         const text = await res.text();
         assert(text.includes('aimeat.provenance/v1'), 'the mirror does not name the spec');
         assert(text.includes('never "a human wrote it"'), 'the mirror must state what absence means');
+        const ams = process.env.AIMEAT_AI_SUPERVISORY_NAME?.trim();
+        assert(text.includes(ams || 'not stated'),
+            'the mirror neither names the AI market-surveillance authority nor says it is unstated');
+        assert(text.includes('Visible label on public surfaces: **strict**'), 'the mirror omits the label posture');
     });
 
     await test('...and is linked from llms.txt and the bootstrap document', async () => {

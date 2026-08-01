@@ -3,7 +3,9 @@
  * @description CLI config validator — checks environment, file configs, and DB for
  *   errors, warnings, and info. Usage: aimeat validate (or aimeat check).
  *   Exit 0 = pass (warnings/info only), Exit 1 = errors found.
- * @version-history v1.1.0 — 2026-08-01 — Validate AIMEAT_AI_PROVENANCE + _DETAIL (TARGET-058);
+ * @version-history v1.2.0 — 2026-08-01 — Validate AIMEAT_AI_LABEL_PUBLIC + the AI
+ *   market-surveillance authority (TARGET-058 Phase 3);
+ *   v1.1.0 — 2026-08-01 — Validate AIMEAT_AI_PROVENANCE + _DETAIL (TARGET-058);
  *   v1.0.1 — 2026-06-20 — Validate App Origin Isolation (H-2):
  *   AIMEAT_APP_ORIGIN_ENABLED must be true/false; if true, AIMEAT_APP_HOST required.
  */
@@ -349,6 +351,21 @@ export function validateEnv(): ValidationResult[] {
   }
   if (provenanceDetail === 'minimal') {
     results.push({ level: 'info', variable: 'AIMEAT_AI_PROVENANCE_DETAIL', message: 'Public surfaces serve only the four required fields plus the disclosure block. The full record is still stored and still visible to its owner.' });
+  }
+  const labelPublic = env.AIMEAT_AI_LABEL_PUBLIC?.trim().toLowerCase();
+  if (labelPublic !== undefined && !['strict', 'light', 'off'].includes(labelPublic)) {
+    results.push({ level: 'error', variable: 'AIMEAT_AI_LABEL_PUBLIC', message: `Invalid value "${env.AIMEAT_AI_LABEL_PUBLIC}". Must be "strict", "light" or "off".` });
+  }
+  if (labelPublic === 'off') {
+    // An error, not a warning: the value is not honoured on a public node, and an operator who set
+    // it and saw only a warning would reasonably believe the labels were gone.
+    results.push({ level: 'error', variable: 'AIMEAT_AI_LABEL_PUBLIC', message: 'Visible AI labels are switched off. This is a local-development value only — a node whose security profile resolves to `public` REFUSES it and runs `strict` instead. Use "light" to label exactly what Article 50 requires.' });
+  }
+  if (labelPublic === 'light') {
+    results.push({ level: 'info', variable: 'AIMEAT_AI_LABEL_PUBLIC', message: 'Visible labels follow the letter of Article 50. `strict` (the default) also labels content the law exempts, which is the posture this platform recommends.' });
+  }
+  if (!env.AIMEAT_AI_SUPERVISORY_NAME?.trim()) {
+    results.push({ level: 'info', variable: 'AIMEAT_AI_SUPERVISORY_NAME', message: 'The AI market-surveillance authority is unstated, so /v1/ai-transparency says so. It is NOT the data-protection authority in AIMEAT_OPERATOR_SUPERVISORY_NAME — in Finland it is Traficom.' });
   }
 
   // ── Config File Validation (aimeat.ini / aimeat.json) ─────────

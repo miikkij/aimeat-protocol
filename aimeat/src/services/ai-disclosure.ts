@@ -13,8 +13,7 @@
  *   WHAT IT DOES NOT DO. It does not decide machine-readable marking. Art. 50(2) marking is
  *   satisfied by the provenance record existing and being served on the machine planes, which
  *   happens whether or not a visible label is owed — so `art50_2_synthetic_output` is a reason the
- *   vocabulary carries but this function never returns. `policy` is likewise reserved for a
- *   node-policy knob stricter than the law, which does not exist yet.
+ *   vocabulary carries but this function never returns.
  *
  *   ABSENCE CREATES NO OBLIGATION — AND NO DENIAL. Unstated provenance returns "not required": we
  *   cannot owe a disclosure about content we know nothing about. That is not the same as saying a
@@ -22,12 +21,18 @@
  *   "origin unstated" one. Obligation and rendering are deliberately separate questions.
  * @structure
  *   - SurfaceContext — what the surface knows about itself
+ *   - DisclosureLabelPolicy — the node's posture (AIMEAT_AI_LABEL_PUBLIC)
  *   - DisclosureDecision — { required, reason, strength }
- *   - disclosureFor(p, ctx) — the decision, in the order the rules apply
+ *   - disclosureFor(p, ctx, policy) — the decision, in the order the rules apply
  * @usage
  *   import { disclosureFor } from './ai-disclosure.js';
- *   const d = disclosureFor(record, { visibility: 'public', humanAudience: true });
+ *   const d = disclosureFor(record, { visibility: 'public', humanAudience: true }, config.aiLabelPublic);
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3. AIMEAT_AI_LABEL_PUBLIC arrives as a third parameter,
+ *     which is what finally makes the `policy` reason reachable: `strict` labels the three cases the
+ *     law exempts (editorial control on the record, editorial responsibility declared at publication,
+ *     publicInterest declared `no`), always at LIGHT strength and only on an anonymously readable
+ *     surface. `off` suppresses content labels and NOT the Art. 50(1) conversation disclosure.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. `assisted` + `none`/`light-review` on a public-interest
  *     surface now owes a LIGHT label instead of none (22-frozen-vocabulary.md §C2b, overriding the
  *     literal reading of Art. 50(4) that Phase 1 implemented).
@@ -37,6 +42,17 @@
 import { asKnownProvenance, type MaybeAiProvenance, type AiDisclosureReason } from '../models/ai-provenance-schemas.js';
 
 export type DisclosureStrength = 'full' | 'light' | 'none';
+
+/**
+ * The node's visible-label posture (`AIMEAT_AI_LABEL_PUBLIC`). It governs PRESENTATION only — the
+ * record is minted, the headers are set and the machine planes carry the mark whatever this says.
+ *
+ * `light` is the neutral value and therefore the default parameter: it means "the law, exactly".
+ * `strict` is the shipped default of the CONFIG, because decision D4 is to over-label rather than
+ * sit on the line. The two defaults differ on purpose — a caller that forgot to pass the policy
+ * gets the letter of the law, never more than the operator asked for.
+ */
+export type DisclosureLabelPolicy = 'strict' | 'light' | 'off';
 
 /** What the surface serving the content knows about itself. */
 export interface SurfaceContext {
@@ -81,6 +97,22 @@ const NOTHING_OWED: DisclosureDecision = { required: false, reason: 'none', stre
 const strengthFor = (ctx: SurfaceContext): DisclosureStrength => (ctx.creativeWork ? 'light' : 'full');
 
 /**
+ * A model touched this, the law lets it pass, and the node may still want it labelled.
+ *
+ * Always LIGHT: the operator is going beyond the law, so the label is present rather than loud —
+ * a full "no human editorial review" statement on content a person actually reviewed would be a
+ * false statement, which is a worse outcome than no label at all. `reason: 'policy'` keeps the
+ * distinction legible to anyone auditing why a label appeared.
+ *
+ * Only ever on an anonymously readable surface. A private item exempt under the law is not a
+ * compliance posture question; nobody is being informed of anything there.
+ */
+function exemptButForPolicy(policy: DisclosureLabelPolicy, publiclyReadable: boolean): DisclosureDecision {
+  if (policy !== 'strict' || !publiclyReadable) return NOTHING_OWED;
+  return { required: true, reason: 'policy', strength: 'light' };
+}
+
+/**
  * Decide the visible disclosure for one item on one surface.
  *
  * The rules apply in this order, and the order carries meaning:
@@ -97,13 +129,26 @@ const strengthFor = (ctx: SurfaceContext): DisclosureStrength => (ctx.creativeWo
  * 6. Otherwise the text limb: model-touched, nobody read the substance, published anonymously
  *    readable, on a matter of public interest → **Art. 50(4) 2nd subpara**. `assisted` lands here
  *    too, at LIGHT strength — see the comment on that branch.
+ * 7. Finally the NODE POLICY, which can only ever say "label something the law let you skip". It
+ *    never downgrades a legal reason and never reaches content no model touched.
+ *
+ * `policy` is the third parameter rather than a member of `SurfaceContext` because it describes the
+ * NODE, not the surface: every surface on one node shares it, and putting it in the context would
+ * invite a caller to vary it per surface, which is exactly how an operator's compliance posture
+ * would come to depend on which route a reader arrived through.
  */
-export function disclosureFor(input: MaybeAiProvenance, ctx: SurfaceContext): DisclosureDecision {
+export function disclosureFor(
+  input: MaybeAiProvenance, ctx: SurfaceContext, policy: DisclosureLabelPolicy = 'light',
+): DisclosureDecision {
   // 1 — nobody to inform.
   if (!ctx.humanAudience) return NOTHING_OWED;
 
-  // 2 — Art. 50(1). The exchange itself is the trigger.
+  // 2 — Art. 50(1). The exchange itself is the trigger, and it survives `off`: a person talking to
+  // a model must be told, and no operator setting may hide that. `off` reaches the CONTENT label
+  // (a development convenience on an unreachable node), never the conversation one.
   if (ctx.interactive) return { required: true, reason: 'art50_1_interaction', strength: 'full' };
+
+  if (policy === 'off') return NOTHING_OWED;
 
   const p = asKnownProvenance(input);
 
@@ -120,16 +165,22 @@ export function disclosureFor(input: MaybeAiProvenance, ctx: SurfaceContext): Di
     return { required: true, reason: 'art50_4_deepfake', strength: strengthFor(ctx) };
   }
 
+  // Rules 5 and 6 below are the three EXEMPTIONS the law grants. Each one hands off to the node
+  // policy instead of returning silence, so `strict` catches exactly what the law let go and
+  // nothing else: no model involved (rule 3, above) still means no label, on any policy.
+  //
   // 5 — a person examined the substance and can reject it. Publishing is not that step. Either the
   // record observed it, or the publisher declared it at publication (an attributable act — the node
   // never infers editorial control on anyone's behalf).
-  if (p.humanInvolvement === 'editorial-control' || p.humanInvolvement === 'full-human') return NOTHING_OWED;
-  if (ctx.editorialResponsibility === true) return NOTHING_OWED;
+  if (p.humanInvolvement === 'editorial-control' || p.humanInvolvement === 'full-human') {
+    return exemptButForPolicy(policy, publiclyReadable);
+  }
+  if (ctx.editorialResponsibility === true) return exemptButForPolicy(policy, publiclyReadable);
 
   // 6 — Art. 50(4) 2nd subpara: text published to inform the public on matters of public interest.
   if (!publiclyReadable) return NOTHING_OWED;
   // Over-labelling default (D4): absent and `unknown` both mean YES. Only an explicit `no` opts out.
-  if (ctx.publicInterest === 'no') return NOTHING_OWED;
+  if (ctx.publicInterest === 'no') return exemptButForPolicy(policy, publiclyReadable);
 
   // `assisted` is LIGHT, never full. Read literally, Art. 50(4) reaches content "generated or
   // manipulated" by AI and an assisted text is a human's, so the letter says nothing is owed — and

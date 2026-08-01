@@ -423,6 +423,7 @@ export async function completeForOwner(
           // `unknown` is the honest answer, and it is never silently upgraded to 'yes'.
           upstreamMarks: 'unknown',
         },
+        labelPolicy: config.aiLabelPublic,
         nodeId: config.nodeId,
         baseUrl: config.baseUrl,
       });

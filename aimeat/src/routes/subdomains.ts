@@ -76,6 +76,7 @@ import { appLlmsTxt, appAgentsMd, appSitemapMd, appRootMirrorMd } from '../servi
 import { resolvePublishedPortfolio } from './portfolio.js';
 import { logger } from '../utils/logger.js';
 import { registerAppOriginWebmcp } from './subdomain-webmcp.js';
+import { detectLocale, type Locale } from '../i18n.js';
 
 /** Subdomains that can never be mapped (infrastructure / future use). */
 export const RESERVED_SUBDOMAINS = new Set([
@@ -242,7 +243,11 @@ async function appForOrigin(req: Request, config: AimeatConfig, storage: Storage
 function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, apexOrigin?: string,
                   protect?: { config: AimeatConfig; viewer: string },
                   discover?: { baseUrl: string; toolNames: string[]; origin?: string },
-                  prov?: ServedProvenance): void {
+                  prov?: ServedProvenance,
+                  // TARGET-058: what the VISIBLE label needs. Separate from `protect` because this
+                  // one is a compliance mark rather than an owner-chosen protection, and it must not
+                  // become conditional on a protection flag by accident.
+                  visible?: { config: AimeatConfig; locale: Locale }): void {
   res.setHeader('Content-Type', app.mimeType);
   // TARGET-058: the AI-Disclosure + Link headers travel with the document on the app origin too.
   setProvenanceHeaders(res, prov);
@@ -260,7 +265,7 @@ function serveApp(res: Response, storage: Storage, app: AppRecord, csp: string, 
       : (app.data as Buffer | Uint8Array | string);
     // SERVE TIME ONLY. The disclosure marks are added to the bytes on their way out; `app.data`
     // stays the author's upload, so the hash in the provenance record keeps meaning what it says.
-    let buf = injectAiDisclosure(injectAimeatBadge(relaxed), prov);
+    let buf = injectAiDisclosure(injectAimeatBadge(relaxed), prov, visible);
     // The body of a single-file app is empty until its JavaScript runs, so a fetching agent sees
     // the meta tags and nothing else. This adds a static block naming the app id, the tools and
     // where the schemas live — the facts an agent otherwise has to guess from the subdomain.
@@ -490,7 +495,8 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       origin: appOriginFor(req, config),
     };
     serveApp(res, storage, app, appCspForRequest, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discover,
-      await loadServedProvenance(storage, config, app.aiProvenanceId));  // the SDK (aimeat-auth.js) does the silent SSO itself
+      await loadServedProvenance(storage, config, app.aiProvenanceId),  // the SDK (aimeat-auth.js) does the silent SSO itself
+      { config, locale: detectLocale(req.headers['accept-language']) });
   });
 
   registerAppOriginWebmcp(router, storage, { resolveApp: t => resolveAppTarget(storage, t), isRestricted: a => appIsRestricted(config, a as AppRecord) });
@@ -649,7 +655,8 @@ Sitemap: ${origin}/sitemap.xml
     }
     const discoverShared = { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, app.ownerGaii, app.filename) };
     serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discoverShared,
-      await loadServedProvenance(storage, config, app.aiProvenanceId)); // no subdomain available → serve on the shared host (no SSO)
+      await loadServedProvenance(storage, config, app.aiProvenanceId), // no subdomain available → serve on the shared host (no SSO)
+      { config, locale: detectLocale(req.headers['accept-language']) });
   });
 
   return router;

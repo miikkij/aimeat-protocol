@@ -34,6 +34,9 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3. A declaration that attaches to a memory key
+ *     pre-renders its disclosure block against THAT key's visibility instead of the private default,
+ *     so a record attached to a public key stops claiming no label is owed.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. Visibility is derived from the linked content instead
  *     of being stored on the record and settable by the declarer.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 1.
@@ -52,6 +55,7 @@ import {
   AiProvenanceSourceSchema, CONTENT_HASH_PATTERN, aiProvenanceJsonSchema, AI_PROVENANCE_SCHEMA_PATH,
 } from '../models/ai-provenance-schemas.js';
 import { mintProvenance, projectForDetail, publiclyResolvable } from '../services/ai-provenance.js';
+import type { SurfaceContext } from '../services/ai-disclosure.js';
 
 /**
  * What a principal may DECLARE about content it produced elsewhere. Note what is absent: `spec`,
@@ -207,6 +211,12 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
       // Attaching is confined to the caller's own namespace because the key is looked up IN that
       // namespace. There is no request shape that names another owner's record.
       let attachTo: string | undefined;
+      // The surface the disclosure block is pre-rendered against. When the caller is attaching the
+      // record to something, we KNOW where it is about to be served — so use that item's visibility
+      // instead of the private default. Without this a declared record always claimed "no label
+      // owed", including for a record attached to a public key, which made the pre-rendered block a
+      // statement about a surface the content was never on.
+      let surface: SurfaceContext = { visibility: 'private', humanAudience: true };
       if (input.attachToMemoryKey) {
         const existing = await storage.getMemory(principal, input.attachToMemoryKey);
         if (!existing) {
@@ -214,6 +224,7 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
             `No memory record "${input.attachToMemoryKey}" in your namespace.`));
         }
         attachTo = input.attachToMemoryKey;
+        surface = { visibility: existing.visibility, humanAudience: true };
       }
 
       const row = await mintProvenance(storage, {
@@ -230,6 +241,8 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
         sources: input.sources,
         derivedFrom: input.derivedFrom,
         notes: input.notes,
+        surface,
+        labelPolicy: config.aiLabelPublic,
         nodeId: config.nodeId,
         baseUrl: config.baseUrl,
       });

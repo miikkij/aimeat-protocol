@@ -2,6 +2,9 @@
  * @file src/cli/init-wizard/steps-advanced.ts
  * @description Economy + advanced-settings wizard steps (quotas, federation, consent, CORS, TOTP, matching, marketplace, realtime, extensions, app/portfolio origin) for `aimeat init`. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: ask the visible-label posture
+ *     (AIMEAT_AI_LABEL_PUBLIC, `off` deliberately not offered) and the AI market-surveillance
+ *     authority (AIMEAT_AI_SUPERVISORY_NAME/_URL), which is NOT the operator step's DPA.
  *   v1.0.0 — 2026-07-13 — Extracted from src/cli/init-wizard.ts (max-file-lines)
  */
 
@@ -9,7 +12,7 @@ import * as p from '@clack/prompts';
 import type { TFunction } from '../../i18n.js';
 import type { AimeatConfig } from '../../config.js';
 import type { UseCase } from './presets.js';
-import { checkCancel, validateBurnRate, validatePositiveNum } from './helpers.js';
+import { checkCancel, validateBurnRate, validatePositiveNum, validateUrl } from './helpers.js';
 
 export async function askEconomySettings(
   t: TFunction,
@@ -267,6 +270,48 @@ export async function askAllAdvancedSettings(
     t,
   ) as string;
   if (provenanceDetail !== 'full') settings.AIMEAT_AI_PROVENANCE_DETAIL = provenanceDetail;
+
+  // The visible-label posture. `off` is not offered here at all: it exists for local development
+  // and the wizard is how a node gets configured for other people to use.
+  const labelPublic = checkCancel(
+    await p.select({
+      message: t('init.aiLabelPublic'),
+      options: [
+        { value: 'strict', label: t('init.aiLabelPublicStrict'), hint: t('init.aiLabelPublicStrictDesc') },
+        { value: 'light', label: t('init.aiLabelPublicLight'), hint: t('init.aiLabelPublicLightDesc') },
+      ],
+      initialValue: cfg.aiLabelPublic === 'light' ? 'light' : 'strict',
+    }),
+    t,
+  ) as string;
+  if (labelPublic !== 'strict') settings.AIMEAT_AI_LABEL_PUBLIC = labelPublic;
+
+  // The AI market-surveillance authority. Optional, and asked separately from the operator step's
+  // data-protection authority on purpose — they are different regulators and the wizard should not
+  // let one be typed where the other belongs.
+  p.note(t('init.aiSupervisoryNote'));
+  const aiSupervisoryName = checkCancel(
+    await p.text({
+      message: t('init.aiSupervisoryName'),
+      placeholder: 'Liikenne- ja viestintävirasto Traficom',
+      defaultValue: cfg.aiSupervisoryName ?? '',
+    }),
+    t,
+  ) as string;
+  if (aiSupervisoryName.trim()) settings.AIMEAT_AI_SUPERVISORY_NAME = aiSupervisoryName.trim();
+
+  if (aiSupervisoryName.trim()) {
+    const aiSupervisoryUrl = checkCancel(
+      await p.text({
+        message: t('init.aiSupervisoryUrl'),
+        placeholder: 'https://www.traficom.fi',
+        defaultValue: cfg.aiSupervisoryUrl ?? '',
+        validate: val => (val?.trim() ? validateUrl(val, t) : undefined),
+      }),
+      t,
+    ) as string;
+    if (aiSupervisoryUrl.trim()) settings.AIMEAT_AI_SUPERVISORY_URL = aiSupervisoryUrl.trim();
+  }
 
   // ── Cross-Federation (Genesis Peering) ──
   p.note(t('init.crossFedNote'));

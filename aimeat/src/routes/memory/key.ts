@@ -299,6 +299,7 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
           content: memoryContentBytes(newValue),
           pipeline: 'memory.update',
           surface: { visibility: effectiveVis, humanAudience: true },
+          labelPolicy: config.aiLabelPublic,
           nodeId: config.nodeId,
           baseUrl: config.baseUrl,
           enabled: config.aiProvenance,

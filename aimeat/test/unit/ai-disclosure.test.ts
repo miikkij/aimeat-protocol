@@ -248,3 +248,63 @@ describe('unstated provenance creates no obligation, and no denial either', () =
     });
   }
 });
+
+// ── AIMEAT_AI_LABEL_PUBLIC (TARGET-058 Phase 3) ─────────────────────────────────────────────────
+
+describe('the node label policy: `strict` labels what the law exempts', () => {
+  it('editorial control is exempt under the law, and labelled anyway under `strict`', () => {
+    const r = rec('ai-generated', 'editorial-control');
+    expect(disclosureFor(r, publicPage, 'light')).toEqual({ required: false, reason: 'none', strength: 'none' });
+    expect(disclosureFor(r, publicPage, 'strict'))
+      .toEqual({ required: true, reason: 'policy', strength: 'light' });
+  });
+
+  it('a publisher-declared "not public interest" is overridden by `strict`', () => {
+    const ctx: SurfaceContext = { ...publicPage, publicInterest: 'no' };
+    expect(disclosureFor(rec('ai-generated', 'none'), ctx, 'light').required).toBe(false);
+    expect(disclosureFor(rec('ai-generated', 'none'), ctx, 'strict'))
+      .toEqual({ required: true, reason: 'policy', strength: 'light' });
+  });
+
+  it('a publisher-declared editorial responsibility is overridden by `strict`', () => {
+    const ctx: SurfaceContext = { ...publicPage, editorialResponsibility: true };
+    expect(disclosureFor(rec('synthesized', 'none'), ctx, 'light').required).toBe(false);
+    expect(disclosureFor(rec('synthesized', 'none'), ctx, 'strict').reason).toBe('policy');
+  });
+
+  it('`strict` never upgrades a label the law already owes — the legal reason survives', () => {
+    expect(disclosureFor(rec('ai-generated', 'none'), publicPage, 'strict'))
+      .toEqual({ required: true, reason: 'art50_4_public_interest', strength: 'full' });
+  });
+
+  it('`strict` invents nothing where a model was not involved', () => {
+    expect(disclosureFor(rec('original', 'full-human'), publicPage, 'strict').required).toBe(false);
+    expect(disclosureFor(undefined, publicPage, 'strict').required).toBe(false);
+  });
+
+  it('`strict` stops at the door of a non-public surface — nobody is being informed there', () => {
+    for (const visibility of VISIBILITIES.filter(v => v !== 'public')) {
+      expect(disclosureFor(rec('ai-generated', 'editorial-control'), { ...publicPage, visibility }, 'strict').required)
+        .toBe(false);
+    }
+  });
+
+  it('`strict` stops at the door of a machine audience — the record IS the disclosure there', () => {
+    expect(disclosureFor(rec('ai-generated', 'editorial-control'),
+      { ...publicPage, humanAudience: false }, 'strict').required).toBe(false);
+  });
+
+  it('`off` shows nothing visible, including what the law requires', () => {
+    expect(disclosureFor(rec('ai-generated', 'none'), publicPage, 'off'))
+      .toEqual({ required: false, reason: 'none', strength: 'none' });
+  });
+
+  it('`off` does not suppress the Art. 50(1) conversation disclosure', () => {
+    const d = disclosureFor(undefined, { ...publicPage, interactive: true }, 'off');
+    expect(d).toEqual({ required: true, reason: 'art50_1_interaction', strength: 'full' });
+  });
+
+  it('the default, when a caller passes no policy, is the law and nothing more', () => {
+    expect(disclosureFor(rec('ai-generated', 'editorial-control'), publicPage).required).toBe(false);
+  });
+});

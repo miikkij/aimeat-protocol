@@ -15,6 +15,9 @@
  * @structure owner + agent setup · agent publishes an app · four fetches · serve-time HTML
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-surfaces
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: the VISIBLE label on the inline serve (official EU
+ *     icon in both theme variants, lockup proportions, aria-label, Accept-Language), and the
+ *     stored-bundle assertion extended to prove the chip does not leak into the author's bytes either.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 2.
  */
 import * as ed from '@noble/ed25519';
@@ -209,6 +212,62 @@ const APP_HTML = [
         assert((res.headers.get('ai-disclosure') ?? '').includes('mode=machine-generated'), 'header absent on the inline serve');
     });
 
+    // ── TARGET-058 Phase 3: the VISIBLE label a person actually sees ──
+
+    await test('The inline HTML carries the visible label, not only the machine marks', async () => {
+        const res = await fetch(`${BASE}/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(filename)}?mode=inline`);
+        const html = await res.text();
+        assert(html.includes('id="aimeat-ai-label"'), 'the visible label chip is absent from the served app');
+        // The official EU icon, at the right stem for an unreviewed model-written app.
+        assert(html.includes('/assets/eu-ai-icons/svg/ai-generated_black.svg'),
+            'the light-theme EU icon is not referenced');
+        assert(html.includes('/assets/eu-ai-icons/svg/ai-generated_white.svg'),
+            'the dark-theme EU icon variant is not referenced — the mark would vanish in dark mode');
+        // The wide lockup must keep its own proportions; a square box distorts it.
+        assert(html.includes('aspect-ratio:1789.84 / 566.93'), 'the lockup aspect ratio is not preserved');
+        assert(/aria-label="[^"]+"/.test(html), 'the icon carries no aria-label');
+        assert(html.includes('AI-generated'), 'the plain-language text beside the icon is absent');
+        // It must not collide with the aimeat.io attribution badge, which is bottom-RIGHT.
+        assert(html.includes('left:12px!important'), 'the label is not placed clear of the attribution badge');
+        assert(html.includes('id="aimeat-app-badge"'), 'the attribution badge went missing');
+        // And it must still not have landed inside the app's own JavaScript.
+        assert(html.includes('const trap = "</" + "body>";'), 'the app script was corrupted by injection');
+    });
+
+    await test('The visible label reaches the TOP LAYER, so an app overlay cannot cover it', async () => {
+        // A browser measurement caught this: `position:fixed` at the maximum z-index loses to an app
+        // that appends its own fixed layer at the SAME z-index, because DOM order breaks the tie. The
+        // Code requires placement "where no intervening overlay elements exist", and a manual popover
+        // is the only mechanism that delivers it — it sits above every z-index and above a modal
+        // dialog's backdrop.
+        const res = await fetch(`${BASE}/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(filename)}?mode=inline`);
+        const html = await res.text();
+        assert(html.includes('showPopover'), 'the label never enters the top layer — an app overlay will bury it');
+        assert(html.includes(':popover-open'), 'the popover state has no box rules, so the UA default would centre and shrink it');
+        // The attribute must NOT be in the markup: an unshown popover is display:none, so hard-coding
+        // it would make the label VANISH wherever the script does not run.
+        assert(!/<div id="aimeat-ai-label"[^>]*\spopover[=\s>]/.test(html),
+            'a hard-coded popover attribute would hide the label whenever the script is blocked');
+        // The interactive second layer survives every viewport — an earlier version hid it below 520px.
+        assert(!/#aimeat-ai-label a\{[^}]*display:none/.test(html),
+            'the "How this was made" link is hidden at some viewport — the second layer must not disappear');
+        // ...and on a narrow viewport it moves off the bottom row, which the aimeat.io attribution
+        // badge expands across. Measured at 390px: the two chips were landing on top of each other.
+        assert(/@media \(max-width:640px\)\{#aimeat-ai-label[^}]*bottom:58px/.test(html),
+            'the label shares the bottom row with the attribution badge on a narrow viewport');
+    });
+
+    await test('The visible label follows Accept-Language — the Finnish reader gets Finnish', async () => {
+        const res = await fetch(`${BASE}/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(filename)}?mode=inline`,
+            { headers: { 'Accept-Language': 'fi-FI,fi;q=0.9' } });
+        const html = await res.text();
+        // Numeric entities, not raw UTF-8: a published app is served without a charset parameter and
+        // usually declares none of its own, so raw bytes would render as "TekoÃ¤lyn tuottama".
+        assert(html.includes('Teko&#228;lyn tuottama'), 'the Finnish label text is absent for a Finnish reader');
+        assert(html.includes('Miten t&#228;m&#228; on tehty'), 'the Finnish "how this was made" link text is absent');
+        assert(!/Tekoälyn/.test(html), 'the Finnish text is raw UTF-8 — it will mojibake in a charset-less app document');
+    });
+
     await test('...and the STORED bundle is byte-identical to what was uploaded', async () => {
         const res = await fetch(`${BASE}/v1/apps/${encodeURIComponent(o.name)}/${encodeURIComponent(filename)}`);
         assert(res.status === 200, `download ${res.status}`);
@@ -216,6 +275,7 @@ const APP_HTML = [
         assert(raw.equals(Buffer.from(APP_HTML, 'utf-8')),
             'the served marks reached the stored bundle — the content hash now describes bytes nobody uploaded');
         assert(!raw.toString('utf-8').includes('ai-disclosure'), 'a disclosure mark is in the stored bytes');
+        assert(!raw.toString('utf-8').includes('aimeat-ai-label'), 'the visible label reached the stored bytes');
     });
 
     await test('The record was minted about the STORED bytes, not the served ones', async () => {

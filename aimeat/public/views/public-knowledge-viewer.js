@@ -9,6 +9,9 @@
  *     the canonical LoadMore component (removes an inline style="text-align:center;
  *     margin-top:1.5rem;"; identical visual — same .load-more wrapper + .btn-outline).
  *   v1.3.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
+ *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 3: the AI-transparency label under the package headline,
+ *     fed by `meta.provenance` from GET /v1/knowledge/:id. Campsite (Rule 8): the four inline
+ *     `style=` attributes became token-backed .pkv-mt-sm / .pkv-mb-* classes.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -19,6 +22,7 @@ import { CopyButton } from '/components/CopyButton.js';
 import { LoadMore } from '/components/Pagination.js';
 import { Spinner } from '/components/Spinner.js';
 import { EmptyState } from '/components/EmptyState.js';
+import { AiLabel } from '/components/ai-label.js';
 
 const CONTENT_TYPES = [
   'idea', 'research', 'plan', 'dataset', 'document',
@@ -401,7 +405,7 @@ function PackageCard({ pkg, onSelect }) {
         </div>
       `}
       ${manifest.author && html`
-        <div class="pkv-card-meta" style="margin-top:0.5rem;">
+        <div class="pkv-card-meta pkv-mt-sm">
           <span>${manifest.author}</span>
         </div>
       `}
@@ -413,6 +417,10 @@ function PackageCard({ pkg, onSelect }) {
 
 function DetailView({ packageId, onBack }) {
   const [manifest, setManifest] = useState(null);
+  // TARGET-058: `meta.provenance` from GET /v1/knowledge/:id — the addressable record minted when
+  // the author declared a non-`original` synthesis level. Absent for a package imported before the
+  // record existed, which reads as UNSTATED and renders nothing.
+  const [provenance, setProvenance] = useState(null);
   const [reputation, setReputation] = useState(null);
   const [links, setLinks] = useState([]);
   const [entryData, setEntryData] = useState({});
@@ -435,6 +443,7 @@ function DetailView({ packageId, onBack }) {
         if (cancelled) return;
         if (pkgResult.status === 'fulfilled') {
           setManifest(pkgResult.value?.data?.manifest || pkgResult.value?.data || null);
+          setProvenance(pkgResult.value?.meta?.provenance || null);
         } else {
           setError(pkgResult.reason?.message || 'Failed to load package');
         }
@@ -501,6 +510,10 @@ function DetailView({ packageId, onBack }) {
       <h2 class="pkv-detail-title">${manifest.name}</h2>
       <div class="pkv-detail-version">v${manifest.version || '1.0.0'}</div>
 
+      ${/* Art. 50(4) placement for published text: at the top, near the headline, before the reader
+            has read anything. Whether it renders is decided by the server's disclosureFor(). */''}
+      <${AiLabel} variant="block" record=${provenance?.record} recordUrl=${provenance?.recordUrl} />
+
       <div class="pkv-detail-meta">
         <div class="pkv-meta-item">
           <span class="pkv-meta-label">${t('pkv.author')}</span>
@@ -529,20 +542,20 @@ function DetailView({ packageId, onBack }) {
       </div>
 
       ${manifest.synthesis && html`
-        <div class="pkv-meta-item" style="margin-bottom:0.75rem;">
+        <div class="pkv-meta-item pkv-mb-md">
           <span class="pkv-meta-label">${t('pkv.synthesis')}</span>
           <span class="pkv-meta-value">${manifest.synthesis.level}${manifest.synthesis.model ? ' (' + manifest.synthesis.model + ')' : ''}</span>
         </div>
       `}
 
       ${manifest.tags && manifest.tags.length > 0 && html`
-        <div class="pkv-card-tags" style="margin-bottom:1rem;">
+        <div class="pkv-card-tags pkv-mb-lg">
           ${manifest.tags.map(tag => html`<span class="pkv-tag">${tag}</span>`)}
         </div>
       `}
 
       ${manifest.sharing && html`
-        <div class="pkv-meta-item" style="margin-bottom:0.5rem;">
+        <div class="pkv-meta-item pkv-mb-sm">
           <span class="pkv-meta-label">${t('pkv.license')}</span>
           <span class="pkv-meta-value">${manifest.sharing.license || t('pkv.noLicense')}</span>
         </div>

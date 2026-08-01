@@ -1191,6 +1191,13 @@
     .dtl-meta-item .dtl-meta-val { font-size: .9rem; color: var(--text); word-break: break-word; }
     .dtl-desc { font-size: .9rem; color: var(--text); line-height: 1.5; margin: 0 0 14px; }
 
+    /* Art. 50(1) disclosure above the AI edit panel (TARGET-058). Theme tokens only, and it wraps
+       rather than widening the page — a compliance line that produced a horizontal scrollbar at
+       390px would be a bug in the thing meant to be readable. */
+    .dtl-ai-notice { font-size: .82rem; line-height: 1.4; margin-bottom: 10px; padding: 8px 10px;
+      border: 1px solid var(--border-subtle); border-left: 3px solid var(--accent, var(--border));
+      border-radius: 8px; color: var(--text-muted); overflow-wrap: anywhere; }
+    .dtl-ai-notice strong { color: var(--text); }
     .dtl-ai-row { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; }
     #detail-ai-input {
       flex: 1; min-width: 240px; min-height: 64px; resize: vertical;
@@ -3215,6 +3222,8 @@
       "detail.needServerVersions": "Set the AIMEAT server URL in Settings to see published versions.",
       "detail.editAi": "✨ Edit with AI",
       "detail.editAiHint": "Describe a change. The AI rewrites the app with your own OpenRouter key and proposes it — nothing changes until you save it to your working copy.",
+      "detail.aiInteractionTitle": "You are talking to an AI assistant.",
+      "detail.aiInteractionBody": "It can be wrong, so read what it gives you before you keep it. Your text goes to a language model on your own API key.",
       "detail.editAiPh": "e.g. add a dark mode toggle in the top-right corner",
       "detail.run": "✨ Generate change",
       "detail.running": "Generating…",
@@ -3821,6 +3830,8 @@
       "detail.needServerVersions": "Aseta AIMEAT-palvelimen osoite asetuksissa nähdäksesi julkaistut versiot.",
       "detail.editAi": "✨ Muokkaa tekoälyllä",
       "detail.editAiHint": "Kuvaile muutos. Tekoäly kirjoittaa sovelluksen uudelleen omalla OpenRouter-avaimellasi, tallentaa luonnoksen jota voit testata, ja sitten säilytät tai hylkäät sen.",
+      "detail.aiInteractionTitle": "Keskustelet tekoälyavustajan kanssa.",
+      "detail.aiInteractionBody": "Se voi erehtyä, joten lue mitä se antaa ennen kuin otat sen käyttöön. Tekstisi menee kielimallille omalla API-avaimellasi.",
       "detail.editAiPh": "esim. lisää tumman tilan vaihtokytkin oikeaan yläkulmaan",
       "detail.run": "✨ Luo muutos",
       "detail.running": "Luodaan…",
@@ -6513,7 +6524,7 @@
     if (isUrlApp) {
       aiHtml += '<span class="dtl-sync none">' + t("detail.urlCantEdit") + "</span>";
     } else {
-      aiHtml += '<div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status wc-proposal-head">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + dtlBtn(t("wc.save"), "window._launcher.detailAiKeep()", { variant: "primary" }) + (app.published ? dtlBtn(t("wc.try"), "window._launcher.detailTestDraftLive()") + dtlBtn(t("wc.publishAs").replace("{v}", String((app.publishedVersionNumber || 0) + 1)), "window._launcher.detailPublishTestedDraft()", { variant: "success" }) : dtlBtn(t("wc.tryLocal"), "window._launcher.detailAiTest()")) + dtlBtn(t("wc.discardProposal"), "window._launcher.detailAiDiscard()") + '</div><p class="wc-verbs-hint">' + t("wc.verbsHint") + "</p></div>";
+      aiHtml += '<div class="dtl-ai-notice" role="note"><strong>' + escapeHtml(t("detail.aiInteractionTitle")) + "</strong> " + escapeHtml(t("detail.aiInteractionBody")) + '</div><div class="dtl-ai-row"><textarea id="detail-ai-input" placeholder="' + escapeHtml(t("detail.editAiPh")) + '"' + (detailAiAvailable ? "" : " disabled") + "></textarea>" + dtlBtn(t("detail.run"), "window._launcher.detailAiRun()", { variant: "primary", id: "detail-ai-run", disabled: !detailAiAvailable }) + '</div><div class="dtl-ai-status" id="detail-ai-status">' + (detailAiAvailable ? "" : escapeHtml(detailAiUnavailableMsg())) + '</div><div class="dtl-ai-draft" id="detail-ai-draft"' + (detailDraftBlob ? "" : " hidden") + '><div class="dtl-ai-status wc-proposal-head">' + t("detail.draftReady") + '</div><div class="dtl-btn-row">' + dtlBtn(t("wc.save"), "window._launcher.detailAiKeep()", { variant: "primary" }) + (app.published ? dtlBtn(t("wc.try"), "window._launcher.detailTestDraftLive()") + dtlBtn(t("wc.publishAs").replace("{v}", String((app.publishedVersionNumber || 0) + 1)), "window._launcher.detailPublishTestedDraft()", { variant: "success" }) : dtlBtn(t("wc.tryLocal"), "window._launcher.detailAiTest()")) + dtlBtn(t("wc.discardProposal"), "window._launcher.detailAiDiscard()") + '</div><p class="wc-verbs-hint">' + t("wc.verbsHint") + "</p></div>";
     }
     aiHtml += "</div>";
     var historyHtml = "";

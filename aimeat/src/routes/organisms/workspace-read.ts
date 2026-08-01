@@ -9,6 +9,9 @@
  *     an org admin reads every workspace under the organism without a per-workspace grant.
  *   v1.2.0 — 2026-07-16 — Workspace read scans exclude `.version.N` rows in SQL (excludeVersionRows):
  *     the read never surfaces history, so loading every historic full-copy value was pure waste.
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 3: the workspace read attaches `_aiProvenance` /
+ *     `_aiProvenanceUrl` to each record that has one (same underscore convention as `_version`),
+ *     batched per read, so the record viewer can render the visible AI label at first paint.
  */
 import type { Router } from 'express';
 import type { AimeatConfig } from '../../config.js';
@@ -27,6 +30,7 @@ import { buildOrganismOverview, buildWorkspaceOverview, listWorkspaces, collectW
 import { buildInstructionBlocks } from '../../services/hello-mcp.js';
 import { collectOrganismGraph, collectWorkspaceGraph } from '../../services/structure-graph.js';
 import { updateOrganismStructure } from '../../services/structure-snapshot.js';
+import { loadServedProvenance, type ServedProvenance } from '../../services/ai-provenance-marks.js';
 import { fresherRec } from './shared.js';
 import { logger } from '../../utils/logger.js';
 
@@ -126,6 +130,16 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
     const readable: MemoryRecord[] = canReadWorkspace ? items : [];
     const byKey = new Map(readable.map(r => [r.key, r]));
 
+    // TARGET-058: the provenance records attached to anything in this workspace, fetched once for
+    // the whole read rather than once per record. Distinct ids only, so a workspace where one crew
+    // run stamped fifty records costs one lookup. Empty on a workspace nothing agent-written touches,
+    // which is the common case.
+    const provenanceIds = [...new Set(readable.map(r => r.aiProvenanceId).filter((id): id is string => !!id))];
+    const provenanceById = new Map<string, ServedProvenance>();
+    for (const p of await Promise.all(provenanceIds.map(id => loadServedProvenance(storage, config, id)))) {
+      if (p) provenanceById.set(p.id, p);
+    }
+
     const manifestRec = byKey.get(`${nsRoot}meta.manifest`);
     const manifest = (manifestRec?.value as Record<string, unknown> | undefined) ?? null;
     const readme = byKey.get(`${nsRoot}meta.readme`)?.value ?? null;
@@ -164,11 +178,22 @@ export function registerOrganismWorkspaceReadRoutes(router: Router, config: Aime
       // `_updatedAt`/`_version` — so a client can show "created / last saved / published" without an
       // extra read. Underscore-prefixed so they never collide with manifest-declared fields; the
       // write paths re-pick {id,title,markdown}/form fields, so these are never persisted back.
+      //
+      // `_aiProvenance` (TARGET-058) rides the same convention. It is the whole reason the record
+      // viewer can show a label at all: a workspace record is a memory record, so an agent-written
+      // one already carries a Mint-3 stamp, and without it here the viewer would have to make a
+      // second request per record to find out. It is the SERVED projection (AIMEAT_AI_PROVENANCE_
+      // DETAIL applies) and the caller has already passed the workspace read gate above, which is
+      // the authorization argument: provenance travels with the content it describes.
       const withMeta = (rec: MemoryRecord): unknown => {
         const v = rec.value;
-        return (v && typeof v === 'object' && !Array.isArray(v))
-          ? { ...(v as Record<string, unknown>), _createdAt: rec.createdAt, _updatedAt: rec.updatedAt, _version: rec.version }
-          : v;
+        if (!v || typeof v !== 'object' || Array.isArray(v)) return v;
+        const prov = rec.aiProvenanceId ? provenanceById.get(rec.aiProvenanceId) : undefined;
+        return {
+          ...(v as Record<string, unknown>),
+          _createdAt: rec.createdAt, _updatedAt: rec.updatedAt, _version: rec.version,
+          ...(prov ? { _aiProvenance: prov.record, _aiProvenanceUrl: prov.recordUrl } : {}),
+        };
       };
       const current: unknown[] = [];
       const draftList: unknown[] = [];

@@ -5,6 +5,9 @@
  *   `import { Modal, ConfirmDialog, Markdown } from '/components/index.js'`)
  *   over deep-importing the individual component files.
  * @version-history
+ *   v1.9.0 — 2026-08-01 — TARGET-058 Phase 3: export AiLabel + AiInteractionNotice + euIconFor —
+ *     the ONE visible AI-transparency label. No surface hand-rolls a badge; if it is awkward to
+ *     import somewhere, fix the component rather than forking it.
  *   v1.8.0 — 2026-06-02 — Component unification (#23): export Collapsible — the
  *     canonical expand/collapse (chevron) section consolidating the per-view
  *     .expand-btn + .pf-chevron / .scope-advanced-toggle / .pkv-entry-arrow toggles.
@@ -47,3 +50,5 @@ export { Collapsible } from './Collapsible.js';
 export { Markdown, sanitizeHref } from './Markdown.js';
 export { useViewCSS } from './useViewCSS.js';
 export { UsageChart, colorForIndex, APP_PALETTE } from './UsageChart.js';
+export { AiLabel, AiInteractionNotice } from './ai-label.js';
+export { euIconFor, EU_ICONS } from './ai-label-icons.js';

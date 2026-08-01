@@ -191,6 +191,7 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
         content: memoryContentBytes(value),
         pipeline: 'memory.write',
         surface: { visibility: vis as MemoryRecord['visibility'], humanAudience: true },
+        labelPolicy: config.aiLabelPublic,
         nodeId: config.nodeId,
         baseUrl: config.baseUrl,
         enabled: config.aiProvenance,

@@ -298,6 +298,7 @@ export function registerPublishRoutes(
             content: data,
             pipeline: 'app.publish',
             surface: { visibility: accessCode || parkedState ? 'private' : 'public', humanAudience: true },
+            labelPolicy: config.aiLabelPublic,
             nodeId: config.nodeId,
             baseUrl: config.baseUrl,
             enabled: config.aiProvenance,

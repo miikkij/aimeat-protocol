@@ -32,6 +32,8 @@
  *   v1.6.0 — 2026-07-19 — Composer gets an expand toggle (⤢/⤡): enlarges the editor to ~60% of the
  *     viewport so long/formatted drafts are fully visible. Rich mode resizes via Toast UI `setHeight`;
  *     the markdown fallback + simple textarea grow via the `.inbox-composer--tall` class / lifted cap.
+ *   v1.8.0 — 2026-08-01 — TARGET-058 Phase 3: the generated conversation summary carries a standing
+ *     "a model wrote this draft" notice with a link to its provenance record.
  *   v1.7.0 — 2026-07-19 — ConversationToNotebookPopover: capture a whole thread (with images) into the
  *     Notebook via three modes — server-side AI summary (owner's key), copy-prompt (own chat), or raw.
  */
@@ -43,6 +45,7 @@ import { t } from '/js/i18n.js';
 import { escHtml, copyToClipboard } from '/js/utils.js';
 import { Markdown } from '/components/Markdown.js';
 import { MessageLinkPreviews } from '/components/LinkPreview.js';
+import { AiInteractionNotice } from '/components/ai-label.js';
 import { minidenticon } from '/lib/minidenticons.min.js';
 import * as schedules from '/js/services/schedules.js';
 import { MODES } from '/js/services/messages-ai-prompts.js';
@@ -655,6 +658,11 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
   const [mode, setMode] = useState('ai');       // 'ai' | 'copy' | 'raw'
   const [copied, setCopied] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
+  // TARGET-058: `meta.provenance` for the summary the model just produced, so the reader is told a
+  // model wrote it before they keep it. It is NOT an Art. 50(4) content label — this text is private
+  // to its owner and owes none — which is why the standing AiInteractionNotice carries it and not
+  // AiLabel (whose whole job is to render only when a label is legally owed).
+  const [aiProvenance, setAiProvenance] = useState(null);
   const [pasted, setPasted] = useState('');
   const [running, setRunning] = useState(false);
   const [parking, setParking] = useState(false);
@@ -672,9 +680,12 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
   const genSummary = async () => {
     setRunning(true);
     try {
-      const s = await runServerSummary();
-      if (s && s.trim()) setAiSummary(s.trim());
-      else showToast?.(t('inbox.notebook.summaryEmpty'), true);
+      const r = await runServerSummary();
+      const text = (typeof r === 'string' ? r : r?.content) || '';
+      if (text.trim()) {
+        setAiSummary(text.trim());
+        setAiProvenance(typeof r === 'string' ? null : (r?.provenance || null));
+      } else showToast?.(t('inbox.notebook.summaryEmpty'), true);
     } catch (e) { showToast?.(e?.message || t('inbox.failed'), true); }
     finally { setRunning(false); }
   };
@@ -704,6 +715,8 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
               <button class="btn-primary btn-sm" disabled=${running} onClick=${genSummary}>${running ? '… ' + t('inbox.notebook.summarizing') : '✨ ' + t('inbox.notebook.genSummary')}</button>
             </div>`
           : html`
+            <${AiInteractionNotice} titleKey="aiLabel.draftTitle" bodyKey="aiLabel.draftBody"
+              recordUrl=${aiProvenance?.recordUrl} />
             <textarea class="inbox-ai-text" rows="12" value=${aiSummary} onInput=${(e) => setAiSummary(e.target.value)}></textarea>
             <div class="inbox-ai-actions">
               <button class="btn-ghost btn-sm" disabled=${running} onClick=${genSummary}>${running ? '…' : '↻ ' + t('inbox.notebook.regen')}</button>

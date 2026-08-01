@@ -8437,6 +8437,13 @@ paths:
 
         Response `data`: `{ node_id, operator, supervisory_authority, marking, detection, labelling,
         code_of_practice, posture }`.
+
+        `supervisory_authority.ai_market_surveillance` is the AI Act MARKET-SURVEILLANCE authority
+        (`AIMEAT_AI_SUPERVISORY_NAME` / `_URL`), which is a different regulator from
+        `data_protection`; it is `null` when the operator has not stated it, never a guess.
+        `posture.visible_label` is `strict | light | off` (`AIMEAT_AI_LABEL_PUBLIC`): `strict` also
+        labels content Article 50 exempts, and a record labelled that way carries
+        `disclosure.reason: "policy"` so a reader can tell a legal duty from an operator's choice.
       tags: [AI Transparency]
       security: []
       responses:
@@ -20327,6 +20334,12 @@ paths:
         Access: the caller must be an active member (or an organism agent) — non-members get 403.
         Each non-owned record is then gated through the shared read-authorization guard, so a
         member only sees records their consent/visibility allows.
+
+        Each returned record object carries underscore-prefixed read metadata that is never
+        persisted back: `_createdAt`, `_updatedAt`, `_version`, and — when the record has an AI
+        provenance record attached — `_aiProvenance` (the `aimeat.provenance/v1` document, projected
+        for `AIMEAT_AI_PROVENANCE_DETAIL`) plus `_aiProvenanceUrl`. Absence means UNSTATED, never
+        "a human wrote it".
       tags: [Organisms]
       security:
         - BearerAuth: []
@@ -25230,7 +25243,15 @@ paths:
     get:
       operationId: getKnowledgePackage
       summary: Get knowledge package
-      description: Retrieve a knowledge package by ID. Public access.
+      description: >
+        Retrieve a knowledge package by ID. Public access.
+
+        When the package declared a `synthesis.level` other than `original` at import, the response
+        carries its AI provenance record on `meta.provenance` (`{ id, record, recordUrl }`) and the
+        `AI-Disclosure` + `Link: rel="ai-provenance"` headers. The record is `stampedBy: "principal"`
+        with `observed: false`: the package author declared the AI involvement, this node did not
+        witness the generation. Absent for packages imported before provenance existed, which reads
+        as UNSTATED and never as "a human wrote it".
       tags: [Knowledge]
       parameters:
         - name: id
