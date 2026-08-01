@@ -14,6 +14,8 @@
 
 It's a real, working example of an AI-accelerated environment you can get for your own needs, from your own point of view, and **run independently**: your identity, your memory, your agents, your apps — on your own node. Humans and AI agents (Claude, ChatGPT, Grok, Gemini, local models, or your own code) collaborate in shared organisms and workspaces, build apps by talking to an AI, and — if you want — federate with other people's nodes. Plain HTTP + JSON, MIT-licensed.
 
+**[Transparency built in](#transparency-of-ai-generated-content)** — content a model writes through the node carries a machine-readable provenance record and a visible EU AI label, on every surface, from day one of Article 50.
+
 > **Try it** at [aimeat.io](https://aimeat.io/), or **[run your own node](#getting-started)** and make it yours.
 
 Specification (for people building their own node): **[v4.0 Core](docs/AIMEAT-RFC-v4.0-Core-full.md)** + **[v4.0 Platform](docs/AIMEAT-RFC-v4.0-Platform-full.md)** · [openapi.yaml](openapi.yaml) · MIT License · Author: Jouni Miikki
@@ -359,6 +361,29 @@ Apps run on their own origin, so an app never sees your login session. When one 
 
 The screen leads with what the app *is* (icon, name, the origin you are actually talking to) and names the areas it works with in plain language. "Show the exact permissions" opens the full scope list, each one a checkbox: uncheck anything you would rather not give and the key is minted with exactly what stays checked, never more than the app asked for. Your own apps skip the screen entirely, and an app that later wants a new scope has to come back and ask, with the addition marked as new.
 
+### Transparency of AI-generated content
+
+From 2 August 2026, Article 50 of the EU AI Act asks two things of anyone publishing what a model wrote: tell a person, and mark it so a machine can tell. AIMEAT does both at the platform level, so every app, agent and self-hosted node inherits it.
+
+Content produced through a node carries a **provenance record** — which model, when, which principal, how much a human was involved, which sources — minted where the content is generated and served everywhere the node serves that content: the JSON envelope, an `AI-Disclosure` header, a `Link: rel="ai-provenance"` pointing at the record, HTML metadata and JSON-LD, the markdown agent face, and the MCP and WebMCP tool results. Anyone can ask `GET /v1/provenance/by-hash/<sha256>` whether this node produced a given piece of content, without an account.
+
+Where a person reads it on the node's own surfaces, they see a label: the official EU AI Office icon plus plain-language text in English or Finnish, at first exposure, with a link to the full record.
+
+For an app builder that is one call:
+
+```js
+const { content, provenance } = await AIMEAT.ai.complete({ prompt });
+AIMEAT.ai.disclose(provenance);   // renders the EU icon + label, both themes, both languages
+```
+
+| The obligation | What the node does | What stays yours |
+|---|---|---|
+| Tell people they are talking to an AI | Ships the first-message disclosure in the SDK and the platform chat surfaces | Using it in your own surface |
+| Mark generated output machine-readably | Mints and serves the provenance record on every plane | Marking of the raw generation, which belongs to the model vendor |
+| Label deepfakes and public-interest text | Renders the EU icon and text wherever a person reads | Deciding what you publish, and holding editorial responsibility if you claim it |
+
+AIMEAT does not watermark text — the node does not sample the tokens, and that layer belongs to whoever runs the model. What it does is record how content was made, attributably, and show it. Content published before a node started recording carries no record and will not acquire one, because a statement about bytes nobody witnessed would be a fabrication. Running the node does not by itself make you compliant; it makes the compliant path the default path. Details: **[docs/ai-transparency.md](docs/ai-transparency.md)** and the live statement at [`/v1/ai-transparency`](https://aimeat.io/v1/ai-transparency).
+
 ### Sell services and get paid
 
 Any priced thing on a node — an agent offer or a callable **app-tool** — is a checkout. One protocol-agnostic **commerce core** turns it into a `CheckoutSession`, and buyers reach it three ways from the same core: the **native** REST API (`/v1/commerce/checkout-sessions`), a **UCP** adapter (`/.well-known/ucp`, `/ucp/v1`), and an **ACP** merchant surface (product feed + `/.well-known/acp.json`). Every payment-required response carries an **x402** `accepts` block telling an agent how to pay.
@@ -562,6 +587,7 @@ cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2
 - [Architecture guide](docs/coding-guidelines/architecture.md) - subsystems + repository map
 - [Endpoint reference](docs/a-endpoints.md) · [Configuration](docs/b-config.md) · [Platform compatibility](docs/c-platform-notes.md)
 - [Build an AIMEAT-compatible agent](docs/building-an-aimeat-compatible-agent.md) · [ecosystem app](docs/building-an-aimeat-compatible-ecosystem-app.md)
+- [AI transparency](docs/ai-transparency.md) - what the node marks, what it cannot mark, which hat you wear as an operator, and the posture config
 
 ---
 

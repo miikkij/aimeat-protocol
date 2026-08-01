@@ -3,7 +3,7 @@
 ## What Is Built On The Core
 
 **Status:** v4.0 (Two-Layer Re-baseline: Platform & Ecosystem)
-**Date:** 2026-07-12
+**Date:** 2026-07-12 · §3.6 (AI Provenance & Transparency) added 2026-08-01
 **Author:** Jouni Miikki (Overscale Solutions Oy)
 **License:** MIT
 **Companion (normative base):** *AIMEAT Protocol Specification v4.0 — Core* (`AIMEAT-RFC-v4.0-Core-full.md`)
@@ -43,7 +43,7 @@ Individual end-user applications built on this Platform (the MACHINE ROOM apps, 
 
 - 1 The App Platform (apps, app grants, origin isolation, subdomains, served SDK)
 - 2 The Agent Fleet Operational Plane
-- 3 Programmable Compute & the Metered AI Plane (extensions, cortex, AI proxy, scheduler, workflows)
+- 3 Programmable Compute & the Metered AI Plane (extensions, cortex, AI proxy, scheduler, workflows, AI provenance & transparency)
 - 4 Skills & Capabilities
 - 5 The Ecosystem (GEAI apps & event plane)
 - 6 Build Tools (node-served build-app prompt + OpenHands; Generator & Foundry removed)
@@ -182,6 +182,144 @@ Declared, DAG-validated agent pipelines with per-step input/output **signals** (
 
 Together §3.4–3.5 are the reflexes of the shared living surface: the clock and the pipeline that let it act without a human present.
 
+### 3.6 AI Provenance & Transparency  `[normative]`
+
+Transparency is part of what an AIMEAT node **is**, not a feature of one node. A second implementation
+that follows this section interoperates: its records validate against our schema, its labels carry the
+same vocabulary, and a third party can ask it the same detection question.
+
+Two of the reflexes above make this section load-bearing rather than decorative. §3.4 and §3.5 let the
+node publish **without a human present**, which is exactly the case Article 50(4)'s editorial-control
+carve-out does not cover.
+
+#### 3.6.1 The record
+
+One canonical document, `aimeat.provenance/v1`, served verbatim wherever it travels. A node MUST
+publish its JSON Schema at a versioned URL (`/v1/schemas/ai-provenance/v1.json`).
+
+| Field | | Meaning |
+|---|---|---|
+| `spec` | REQUIRED | `aimeat.provenance/v1`. Readers **MUST** branch on it. |
+| `level` | REQUIRED | `original` · `assisted` · `synthesized` · `ai-generated` |
+| `humanInvolvement` | REQUIRED | `none` · `light-review` · `editorial-control` · `full-human` |
+| `generatedAt` | REQUIRED | ISO 8601, UTC |
+| `method` | optional | `human` · `rewritten` · `summarized` · `translated` · `synthesized` · `fully-generated` · `multi-agent` |
+| `generator` | optional | `principal`, `model`, `provider`, `nodeId`, `pipeline`, `upstreamMarks` |
+| `sources`, `derivedFrom` | optional | provenance of the inputs |
+| `attestation` | optional | `stampedBy` (`node`\|`principal`), `observed`, `contentHash`, `recordUrl` |
+| `disclosure` | computed | never hand-written — the node decides and pre-renders it |
+| `notes` | optional | ≤ 1000 chars |
+
+Four required fields, so a caller can always produce a valid record and a validator can report
+completeness rather than reject.
+
+**`level` and `humanInvolvement` are two axes on purpose.** No external vocabulary — IPTC, the W3C
+`ai-disclosure` attribute, the IETF header — can express them separately; each folds them into one.
+That separation is what decides whether a label is owed under Art. 50(4), which is why these two are
+the **stored** form and every external vocabulary is **derived**, never stored.
+
+**Only a step where a person reads the substance and can reject it raises `humanInvolvement` above
+`none`.** Clicking publish is not that step. A node MUST NOT infer review from a publish action.
+
+**Casing.** The record keeps ONE spelling — camelCase — on every carrier, because it is a
+self-describing document with its own `spec`, not a route DTO. Route and tool DTOs *around* it follow
+the surface's own convention (snake_case on the wire). A node MUST NOT re-case the document per
+carrier.
+
+**Versioning.** `v2` MAY add fields freely. Removing or re-meaning a field requires a new version and
+a documented mapping. An **unknown `spec` reads as `unstated`** — never an error, and never "a human
+wrote it".
+
+#### 3.6.2 Two layers, and the planes
+
+A node MUST serve both an **attached** mark (travels with the document) and an **addressable** record
+(its own URL, joined by content hash). Either alone is insufficient: strip the served document and
+the record survives; take the record offline and the in-band mark survives.
+
+| Plane | Attached | Addressable |
+|---|---|---|
+| JSON envelope | `meta.provenance` — the single carrier, never `data` | `recordUrl` inside it |
+| HTTP | `AI-Disclosure:` (RFC 9651 structured field) | `Link: <…>; rel="ai-provenance"` |
+| HTML | `<meta name="ai-disclosure">`, `ai-disclosure` on the document element, schema.org JSON-LD with the IPTC `digitalSourceType` | `<link rel="ai-provenance">` |
+| Markdown | YAML frontmatter + ONE human-readable line **in the body** | the record URL on both |
+| MCP / WebMCP | `ai_provenance` on tool results; `ai_provenance` / `ai_provenance_id` on write tools | `record_url` in the block |
+
+The markdown body line is not redundancy: an agent asked to summarise a page carries the body forward
+and routinely drops the metadata, so a statement that exists only in frontmatter stops existing the
+moment the page is summarised.
+
+**HTML marks are applied at SERVE time, never at store time.** A published bundle stays the author's
+bytes; a served copy is those bytes plus the node's marks. Storing marked bytes would break the
+content hash the record depends on.
+
+#### 3.6.3 Detection
+
+```
+GET /v1/provenance/by-hash/{sha256}   # public, unauthenticated, rate-limited
+GET /v1/provenance/{id}
+```
+
+`by-hash` is the Code of Practice's detection access point. The join key is the **content hash**, so a
+third party can ask about bytes they hold without the node ever having given them an identifier.
+
+**Visibility is derived, never stored.** A record is resolvable by an anonymous caller exactly when
+some item that points at it is itself publicly readable, computed against live rows — so a record
+stops resolving the moment its subject stops being public. A node MUST NOT expose a caller-settable
+visibility flag on a record: that would be a way to publish a statement about content nobody may read.
+
+**Records are append-only.** A correction is a NEW record about the NEW bytes, never an edit to an
+existing statement. There is no update or delete path.
+
+**Two limits a conforming implementation MUST state rather than paper over.** An empty `by-hash`
+answer means *unstated*, never "a human wrote it". And `by-hash` can only succeed where the node
+served the reader the same bytes it hashed — for a document the node re-serialises on the way out, the
+reader cannot reconstruct the hashed bytes and MUST use the record id from the `Link` header instead.
+
+#### 3.6.4 Presentation
+
+A node SHOULD render a visible label wherever a **person** reads content the record says is owed one:
+the official EU AI Office icon plus plain-language text, at first exposure, with no intervening
+overlay, and a second layer linking to the record.
+
+Whether a label is owed is decided **once, on the server**, and pre-rendered into `disclosure`. A
+surface renders; it does not re-decide. A view that writes `if (looksAiGenerated)` has put the legal
+test in the wrong place.
+
+**Machine-to-machine traffic is out of scope for the 50(1) "you are talking to an AI" disclosure** —
+agent↔node MCP calls, tool invocation, federation sync and the scheduler are not a natural person in a
+two-way exchange. Provenance still travels there, for engineering reasons: the MCP hop is where the
+information is either preserved or lost forever.
+
+#### 3.6.5 Posture
+
+Strictness is configuration, not a fork — the same node runs quiet on localhost and strict on the
+public internet.
+
+| Variable | Values | Governs |
+|---|---|---|
+| `AIMEAT_AI_PROVENANCE` | `true` (default) · `false` | whether records are minted |
+| `AIMEAT_AI_PROVENANCE_DETAIL` | `full` (default) · `minimal` | what a **public** surface serves |
+| `AIMEAT_AI_LABEL_PUBLIC` | `strict` (default) · `light` · `off` | how eagerly a **visible** label is shown |
+
+**Minting is maximal and unconditional; only serving is configurable.** Never store less; sometimes
+serve less. Configuration that could reduce what is *recorded* would make a completeness score
+incomparable between nodes, and a thin record cannot answer a question later.
+
+`off` MUST be refused on a node whose resolved security profile is `public`.
+
+A node MUST publish its own posture, operator identity, supervisory authority and detection endpoints
+at `GET /v1/ai-transparency` (JSON, with a markdown mirror), and MUST report an unset supervisory
+authority as unstated rather than guessing.
+
+#### 3.6.6 What the platform does not claim
+
+The node does **not** watermark text: it does not sample the tokens, and that layer belongs to whoever
+runs the model. Under Art. 50(2) the marking duty for the raw generation sits with the model vendor
+for a hosted model, and moves to the operator who **plugs in a local model**.
+
+Running a conforming node does not make its operator compliant. It makes the compliant path the
+default path. Operator-facing detail: [docs/ai-transparency.md](ai-transparency.md).
+
 ---
 
 ## 4. Skills & Capabilities
@@ -310,6 +448,7 @@ Legend: **P** primary/live · **B** built · **PARTIAL** · **DEP** deprecated/r
 | Metered AI proxy (`/v1/ai/complete`) | **P** | Realizes Core §26 |
 | Scheduler | **P** | Node owns the clock |
 | Workflows | **B** | Engine + runs shipped |
+| AI provenance + transparency (§3.6) | **P** | `aimeat.provenance/v1` on six planes; public `by-hash` detection; EU-icon label; posture config. Records exist only for content generated after a node started recording — nothing is retro-stamped |
 | Skills registry | **P** | AI-accelerated capability install |
 | Capabilities (invoke/vouch) | **B** | Realizes Core §22.1 |
 | Librarian retrieval | **B** | FTS, app-grant-gated |
