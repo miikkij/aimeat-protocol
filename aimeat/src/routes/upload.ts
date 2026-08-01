@@ -59,21 +59,17 @@
 
 import { Router, type Request, type Response } from 'express';
 import type { AimeatConfig } from '../config.js';
-import type { Storage, AppManifest, ExtensionRecord, StorageFileRecord } from '../storage/interface.js';
+import type { Storage, ExtensionRecord, StorageFileRecord } from '../storage/interface.js';
 import { verifyUploadToken, UploadTokenError } from '../services/upload-token.js';
 import { parseExtensionZip, parseCortexZip } from '../services/upload-zip.js';
 import { safeUnzip, ZipSecurityError } from '../services/safe-zip.js';
 import { SkillValidationError, isAllowedSkillPath } from '../services/skill-md.js';
 import { publishSkill, type SkillScope } from '../services/skills.js';
 import { parseGAII } from '../utils/gaii.js';
-import { lintAppHtmlForMobile } from '../utils/app-mobile-lint.js';
-import { lintAppAiDisclosure } from '../services/app-ai-posture.js';
-import { stampAgentWrite } from '../services/ai-provenance.js';
-import { invalidateProtectionCache } from '../utils/app-protect.js';
+import { publishApp } from '../services/app-publish.js';
 import { logger } from '../utils/logger.js';
 import { emitResourceListChanged } from '../mcp/index.js';
 import { pubEmbedUrl, pubEmbedMarkdown } from '../services/doc-images.js';
-import { ensureAppSubdomain } from './subdomains.js';
 import { getEncryptionKey } from '../services/encryption.js';
 import { getExtSecretKeys, encryptSecretFields } from '../services/extension-secrets.js';
 import { reconcileAfterExtensionWrite } from '../services/exchange-projection.js';
@@ -184,129 +180,58 @@ async function handleAppUpload(
     const ownerGaii = parsed ? `${parsed.owner}@${parsed.node}` : sub;
     const filename = meta.filename as string;
 
-    const existingVersion = await storage.getLatestVersionNumber(ownerGaii, filename);
-    const newVersion = existingVersion + 1;
-    const isUpdate = existingVersion > 0;
-
-    // On an UPDATE, a presigned publish that omits metadata must NEVER blank what the live
-    // app already declares — MCP callers rarely resend every field, and the presigned meta
-    // cannot express some of them at all. Mirrors POST /v1/apps: the NAME, the version,
-    // description, per-locale descriptions, category, tags, icon, pricing, copy-protection,
-    // forkable and the operator-hidden state all carry forward when the meta leaves them out.
-    //
-    // The name and the version were missing from that list while every other field was in it,
-    // which is the worst possible place for an omission: they are the two a person actually reads.
-    // A run of routine re-publishes renamed five live apps to their own filenames in the public
-    // catalogue, and nothing in the response said so.
-    const existingApp = isUpdate ? await storage.getApp(ownerGaii, filename) : null;
-    const prev = existingApp?.manifest;
-
-    const metaDescription = typeof meta.description === 'string' ? meta.description.trim() : '';
-    const metaTags = Array.isArray(meta.tags)
-        ? (meta.tags as unknown[]).filter((t): t is string => typeof t === 'string')
-        : undefined;
-
-    const manifest: AppManifest = {
-        name: (meta.name as string) ?? prev?.name ?? filename.replace(/\.html?$/i, ''),
-        description: metaDescription || (prev?.description ?? ''),
-        version: (meta.version as string) ?? prev?.version ?? `1.0.${newVersion - 1}`,
-        category: (meta.category as string) ?? prev?.category ?? 'tool',
-        tags: metaTags ?? prev?.tags ?? [],
-        authorDisplay: ownerName,
-        usesCortex: [],
-    };
-    if (meta.icon) manifest.icon = meta.icon as string;
-    else if (prev?.icon) manifest.icon = prev.icon;
-    if (prev?.descriptions) manifest.descriptions = prev.descriptions;
-    if (typeof prev?.priceMorsels === 'number' && prev.priceMorsels > 0) manifest.priceMorsels = prev.priceMorsels;
-    if (prev?.licenseType) manifest.licenseType = prev.licenseType;
-    if (prev?.protection && Object.values(prev.protection).some(Boolean)) manifest.protection = prev.protection;
-
-    // The presigned meta cannot carry cortex refs or crew-defs, so usesCortex + cortex.agents
-    // are ALWAYS carried from the live app — a re-upload never silently strips them.
-    if (prev?.usesCortex?.length) manifest.usesCortex = prev.usesCortex;
-    if (prev?.cortex?.agents?.length) manifest.cortex = prev.cortex;
-
-    // TARGET-058 Phase 5: the AI transparency check, and the check that this path was missing it.
-    // Presigned upload is the DEFAULT door for anything over ~1 KB, so it is the door most
-    // agent-published apps come through — and it ran neither the disclosure lint nor the provenance
-    // stamp that POST /v1/apps has run since Phase 4. An app published the recommended way arrived
-    // with no record at all.
-    const aiLint = lintAppAiDisclosure(data.toString('utf8'), prev?.aiPosture);
-    manifest.aiPosture = aiLint.posture;
-
-    // A re-publish changes the bytes → drop any cached obfuscated/locked base.
-    invalidateProtectionCache(ownerName, filename);
-
-    // MINT-3: the hash is of the bytes AS STORED, so the serve-time marks cannot change the answer.
-    const aiProvenanceId = await stampAgentWrite(storage, {
-        // `actor`, not `sub`: an app always lands in the OWNER's bucket, so `sub` is the owner even
-        // when an agent is the one publishing. Stamping off `sub` here meant a MINT-3 stamp could
-        // never fire on this path at all.
-        principal: actor,
-        content: data,
-        pipeline: 'app.publish',
-        surface: { visibility: existingApp?.parked ? 'private' : 'public', humanAudience: true },
-        labelPolicy: config.aiLabelPublic,
-        nodeId: config.nodeId,
-        baseUrl: config.baseUrl,
-        enabled: config.aiProvenance,
-    });
-
-    await storage.createApp({
-        ownerGaii,
+    // Everything from here to the response is services/app-publish.ts, shared with POST /v1/apps and
+    // publish-draft. This door's own business is only the token meta → requested-manifest mapping:
+    // a presigned publish that omits a field must NEVER blank what the live app declares, and
+    // `undefined` is exactly how the shared path is told "not mentioned".
+    const out = await publishApp(storage, config, {
         ownerName,
+        ownerGhii: ownerGaii,
+        // `actor`, not `sub`: an app always lands in the OWNER's bucket, so `sub` is the owner even
+        // when an agent is the one publishing. Attributing off `sub` here meant a MINT-3 stamp could
+        // never fire on this path at all.
+        callerGaii: actor,
         filename,
-        versionNumber: newVersion,
-        manifest,
-        mimeType: 'text/html',
-        ...(aiProvenanceId ? { aiProvenanceId } : {}),
-        size: data.length,
         data,
-        parked: !!existingApp?.parked,
-        forkable: !!existingApp?.forkable,
-        operatorHidden: !!existingApp?.operatorHidden,
-        operatorHiddenBy: existingApp?.operatorHiddenBy,
-        operatorHiddenAt: existingApp?.operatorHiddenAt,
-        operatorHideReason: existingApp?.operatorHideReason,
-        createdAt: new Date().toISOString(),
+        mimeType: 'text/html',
+        requested: {
+            name: typeof meta.name === 'string' ? meta.name : undefined,
+            description: typeof meta.description === 'string' ? meta.description : undefined,
+            version: typeof meta.version === 'string' ? meta.version : undefined,
+            category: typeof meta.category === 'string' ? meta.category : undefined,
+            tags: Array.isArray(meta.tags)
+                ? (meta.tags as unknown[]).filter((t): t is string => typeof t === 'string')
+                : undefined,
+            icon: typeof meta.icon === 'string' ? meta.icon : undefined,
+            // The presigned meta cannot express cortex refs, crew-defs, pricing, per-locale
+            // descriptions or protection — so every one of them is left unmentioned and carried.
+        },
+        accessCode: { mode: 'carry' },
+        source: 'presigned',
     });
-
-    // Provision the per-app subdomain mapping NOW — mirrors POST /v1/apps; previously it was
-    // only auto-assigned on the first path-form open, so a brand-new app's vanity subdomain
-    // 404'd until someone hit the canonical URL. Best-effort: never fails the publish.
-    if (/\.html?$/i.test(filename)) {
-        try {
-            await ensureAppSubdomain(storage, config, ownerName, filename);
-        } catch (err) {
-            // Never fails the publish, but the app's vanity subdomain will 404 until someone opens
-            // the canonical path form — which reads as a broken app rather than a missing mapping.
-            logger.warn('Subdomain provisioning failed after publish; the vanity URL will 404 until the canonical path is opened',
-                { filename, owner: ownerName, error: (err as Error).message });
-        }
+    if ('refusal' in out) {
+        res.status(out.refusal.status).json({
+            success: false, error: out.refusal.code, message: out.refusal.message,
+        });
+        return;
     }
 
-    const downloadUrl = `/v1/apps/${encodeURIComponent(ownerName)}/${encodeURIComponent(filename)}`;
-    logger.info(`App ${isUpdate ? 'updated' : 'published'} via upload: ${filename} v${newVersion}`, { by: sub });
+    logger.info(`App ${out.isUpdate ? 'updated' : 'published'} via upload: ${filename} v${out.versionNumber}`, { by: sub });
     emitResourceListChanged(sub);
-
-    // Non-blocking mobile hints — same static lint as the inline publish path; surfaced so the
-    // builder catches phone-overflow bugs (missing viewport, grid 1fr blowout) before users do.
-    const mobileHints = lintAppHtmlForMobile(data.toString('utf8'));
 
     res.json({
         success: true,
         type: 'app',
         filename,
-        version_number: newVersion,
-        name: manifest.name,
-        size: data.length,
-        is_update: isUpdate,
-        download_url: downloadUrl,
-        inline_url: `${downloadUrl}?mode=inline`,
-        ...(mobileHints.length ? { mobile_hints: mobileHints } : {}),
-        ai_posture: aiLint.posture,
-        ...(aiLint.hints.length ? { ai_hints: aiLint.hints } : {}),
+        version_number: out.versionNumber,
+        name: out.manifest.name,
+        size: out.size,
+        is_update: out.isUpdate,
+        download_url: out.downloadUrl,
+        inline_url: `${out.downloadUrl}?mode=inline`,
+        ...(out.mobileHints.length ? { mobile_hints: out.mobileHints } : {}),
+        ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
+        ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
     });
 }
 

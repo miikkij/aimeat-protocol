@@ -23,6 +23,7 @@
  * @structure
  *   - AppAiPosture — the stored statement (lives on the manifest; no storage migration)
  *   - parseAiPosture(html) — read `<meta name="aimeat-ai">`, or null
+ *   - AppAiLintResult — the publish check's return shape, named so services/app-publish.ts can hold it
  *   - lintAppAiDisclosure(html, previous?) — THE publish check: { posture, hints }, carrying an
  *     earlier version's or a parent app's declaration forward
  *   - publicPosture(p) — the catalogue-safe projection (no gap: that is owner-only)
@@ -31,6 +32,8 @@
  *   const { posture, hints } = lintAppAiDisclosure(html, previous?.manifest.aiPosture);
  *   if (posture) manifest.aiPosture = posture;
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a: `AppAiLintResult` named, so the one shared
+ *     publish path can carry the check's result instead of each door restating its shape.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5.
  */
 import { parseAppScopes } from './protected-resource.js';
@@ -62,6 +65,16 @@ export interface AppAiPosture {
   usesAi: boolean;
   /** The publish check's finding, when there is one. OWNER-ONLY — publicPosture() strips it. */
   gap?: { code: string; message: string; at: string };
+}
+
+/**
+ * What the publish check returns: the posture to store, and the hints to hand back to whoever (or
+ * whatever) is publishing. Named so the shared publish path can carry it without re-spelling the
+ * shape — three doors spelling it three times is how they drifted in the first place.
+ */
+export interface AppAiLintResult {
+  posture: AppAiPosture;
+  hints: string[];
 }
 
 /** Only look at the head-ish part of a big file, as parseAppScopes does. */
@@ -135,10 +148,7 @@ function isYes(v: string | undefined): boolean {
  * while the observed half is always re-measured from the bytes actually being published: a statement
  * about code that is no longer there would be worse than none.
  */
-export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): {
-  posture: AppAiPosture;
-  hints: string[];
-} {
+export function lintAppAiDisclosure(html: string, previous?: AppAiPosture): AppAiLintResult {
   const declared = parseAiPosture(html)
     ?? (previous?.source === 'declared'
       ? { generates: previous.generates, discloses: previous.discloses, publicInterest: previous.publicInterest }

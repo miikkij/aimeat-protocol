@@ -13,6 +13,10 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-app-draft
  * @version-history
+ *   v1.1.0 — 2026-08-01 — Phase 6 (TARGET-058 Phase 8 step 0a): the three publish doors share one
+ *     function, so promoting a draft keeps what a draft manifest cannot express. Watched to FAIL on
+ *     the unfixed code — a promoted draft came back with priceMorsels undefined, i.e. a paid app
+ *     silently turned free — and to pass after.
  *   v1.0.0 — 2026-07-11 — initial: draft save/preview/publish/discard + token gates.
  */
 
@@ -225,6 +229,68 @@ await test('DELETE .../draft discards a saved draft (200), then 404', async () =
 await test('Saving a draft requires content (400)', async () => {
     const { status } = await json(`/v1/apps/${ownerAName}/${APP}/draft`, aAuthed({ method: 'PUT', body: JSON.stringify({}) }));
     assert(status === 400, `missing content → 400, got ${status}`);
+});
+
+// ── Phase 6: ONE publish path (TARGET-058 Phase 8 step 0a) ──
+// The three publish doors — POST /v1/apps, the presigned upload, and publish-draft — now share
+// services/app-publish.ts. These tests pin the two things that were different before they did:
+// a draft manifest cannot express pricing or per-locale descriptions, and this route used to
+// publish the draft manifest VERBATIM, so promoting a draft turned a paid app free and dropped
+// its translations. Nothing in the response said so.
+console.log('\nPhase 6: one publish path — promoting a draft keeps what a draft cannot express');
+
+const PAID = 'paid-draft-app.html';
+
+await test('A paid app with per-locale descriptions is published inline', async () => {
+    const { status, body } = await json('/v1/apps', aAuthed({
+        method: 'POST',
+        body: JSON.stringify({
+            filename: PAID,
+            content: b64('<!DOCTYPE html><html><body><h1>paid v1</h1></body></html>'),
+            description: 'A paid app used to prove the draft door keeps its price.',
+            descriptions: { en: 'Paid app', fi: 'Maksullinen sovellus' },
+            price_morsels: 5,
+            license_type: 'lifetime',
+            category: 'utility',
+        }),
+    }));
+    assert(status === 201, `publish status ${status}: ${JSON.stringify(body)}`);
+    assert(body.data?.manifest?.priceMorsels === 5, `priceMorsels=5, got ${body.data?.manifest?.priceMorsels}`);
+    assert(body.data?.manifest?.licenseType === 'lifetime', 'licenseType=lifetime');
+    assert(body.data?.manifest?.descriptions?.fi === 'Maksullinen sovellus', 'fi description stored');
+});
+
+await test('Promoting a draft keeps the price, the licence and the translations', async () => {
+    const save = await json(`/v1/apps/${ownerAName}/${PAID}/draft`, aAuthed({
+        method: 'PUT',
+        body: JSON.stringify({ content: b64('<!DOCTYPE html><html><body><h1>paid v2</h1></body></html>') }),
+    }));
+    assert(save.status === 200, `draft save status ${save.status}`);
+
+    const pub = await json(`/v1/apps/${ownerAName}/${PAID}/publish-draft`, aAuthed({ method: 'POST' }));
+    assert(pub.status === 201, `publish-draft status ${pub.status}: ${JSON.stringify(pub.body)}`);
+    const m = pub.body.data?.manifest ?? {};
+    assert(m.priceMorsels === 5, `a promoted draft must stay paid — priceMorsels=${m.priceMorsels}`);
+    assert(m.licenseType === 'lifetime', `licenceType survived — got ${m.licenseType}`);
+    assert(m.descriptions?.fi === 'Maksullinen sovellus', `per-locale descriptions survived — got ${JSON.stringify(m.descriptions)}`);
+});
+
+await test('The paywall agrees: reading the promoted version still costs 5 morsels', async () => {
+    // The live paywall is the strongest evidence available that the price survived the promotion:
+    // it is computed from the stored manifest on every read. (The 402 answers the owner too — a
+    // pre-existing quirk of the read route, unrelated to this path.)
+    const { status, body } = await json(`/v1/apps/${ownerAName}/${PAID}`);
+    assert(status === 402, `a priced app answers 402 — got ${status}: ${JSON.stringify(body)}`);
+    assert(String(body.error?.message ?? '').includes('5 morsels'),
+        `the paywall still names the price — got "${body.error?.message}"`);
+});
+
+await test('Promoting a draft records a public-activity event, like the other two doors', async () => {
+    const { status, body } = await json('/v1/public/activity-feed?category=apps&limit=50');
+    assert(status === 200, `feed status ${status}`);
+    const items: any[] = body.data?.items ?? body.data?.events ?? [];
+    assert(items.some(e => String(e.summary ?? '').includes(PAID) || String(e.link ?? '').includes(PAID)),
+        'the draft publish reached the public feed');
 });
 
 console.log(`\n${passed} passed, ${failed} failed\n`);

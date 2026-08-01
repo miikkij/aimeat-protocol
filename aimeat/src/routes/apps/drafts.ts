@@ -4,6 +4,11 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.0.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a: publish-draft is now services/app-publish.ts,
+ *     shared with POST /v1/apps and the presigned upload. Promoting a draft consequently stops
+ *     dropping `priceMorsels`, `licenseType` and the per-locale `descriptions` (a draft manifest
+ *     cannot express them and this route published it verbatim, so a promoted draft turned a paid
+ *     app free), and now provisions the app's subdomain and announces like the other two doors.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
  *   v1.1.0 — 2026-07-16 — Draft save carries the live app's cortex.agents (bundled crew-defs)
  *     into the draft manifest so a draft-publish never drops them (Agent-Bundled Apps).
@@ -21,17 +26,12 @@ import type { AimeatConfig } from '../../config.js';
 import type { Storage, AppManifest } from '../../storage/interface.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { emitChange } from '../../services/event-bus.js';
-import { recordPublicActivity } from '../../services/public-activity.js';
 import { generateDraftToken, generateFrameToken } from '../../services/draft-token.js';
 import { resolveIdentity } from '../../utils/gaii.js';
-import { randomBytes } from 'node:crypto';
 import { decodeStrictBase64 } from '../../utils/base64.js';
-import { sanitizeProtection, invalidateProtectionCache } from '../../utils/app-protect.js';
-import { lintAppAiDisclosure } from '../../services/app-ai-posture.js';
-import { stampAgentWrite } from '../../services/ai-provenance.js';
+import { sanitizeProtection } from '../../utils/app-protect.js';
+import { publishApp } from '../../services/app-publish.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
-import { logger } from '../../utils/logger.js';
 
 export function registerDraftRoutes(
     router: Router,
@@ -246,114 +246,55 @@ export function registerDraftRoutes(
             return;
         }
 
-        const existingVersion = await storage.getLatestVersionNumber(ownerGhii, filename);
-        const isUpdate = existingVersion > 0;
-        // New (first-version) draft counts against the per-owner app quota.
-        if (!isUpdate && config.maxAppsPerAgent > 0) {
-            const { total } = await storage.listApps({ ownerGaii: ownerGhii, limit: 1 });
-            if (total >= config.maxAppsPerAgent) {
-                res.status(429).json(error(config.nodeId, 'QUOTA_EXCEEDED', `You have reached the maximum of ${config.maxAppsPerAgent} published apps`));
-                return;
-            }
-        }
-        const newVersion = existingVersion + 1;
-
-        // Carry live state forward, mirroring the re-publish path so publishing a draft
-        // never silently re-exposes a parked app, drops protection, or escapes moderation.
-        let parkedState = false, forkableState = false, operatorHiddenState = false;
-        let operatorHiddenBy: string | undefined, operatorHiddenAt: string | undefined, operatorHideReason: string | undefined;
-        let accessCode: string | undefined;
-        let carriedAiPosture: AppManifest['aiPosture'];
-        if (isUpdate) {
-            const live = await storage.getApp(ownerGhii, filename);
-            parkedState = !!live?.parked;
-            forkableState = !!live?.forkable;
-            operatorHiddenState = !!live?.operatorHidden;
-            operatorHiddenBy = live?.operatorHiddenBy;
-            operatorHiddenAt = live?.operatorHiddenAt;
-            operatorHideReason = live?.operatorHideReason;
-            accessCode = live?.accessCode;
-            carriedAiPosture = live?.manifest?.aiPosture;
-        }
-
-        const now = new Date().toISOString();
-        const manifest: AppManifest = { ...draft.manifest, version: draft.manifest.version || `1.0.${newVersion - 1}`, authorDisplay: owner };
-        // TARGET-058 Phase 5: the same AI transparency check the direct publish runs. Two doors to the
-        // same act have to give the same answer, or a builder learns which door skips the check.
-        const aiLint = /html/i.test(draft.mimeType)
-            ? lintAppAiDisclosure(draft.data.toString('utf8'), carriedAiPosture)
-            : null;
-        if (aiLint) manifest.aiPosture = aiLint.posture;
-        invalidateProtectionCache(owner, filename);
-
-        // TARGET-058 MINT-3: stamp the bytes here too. POST /v1/apps stamps and this path did not, so
-        // an app that went through the staging flow — the flow the catalogue's own editor uses —
-        // arrived live with NO provenance at all while the identical bytes posted directly were
-        // stamped. The hash is of the bytes AS STORED, so a serve-time mark cannot change the answer.
-        const aiProvenanceId = await stampAgentWrite(storage, {
-            principal: callerGaii,
-            content: draft.data,
-            pipeline: 'app.publish',
-            surface: { visibility: accessCode || parkedState ? 'private' : 'public', humanAudience: true },
-            labelPolicy: config.aiLabelPublic,
-            nodeId: config.nodeId,
-            baseUrl: config.baseUrl,
-            enabled: config.aiProvenance,
-        });
-
-        await storage.createApp({
-            ownerGaii: ownerGhii,
+        // The draft manifest IS the caller's statement, so every field it can express is passed as
+        // stated. What it CANNOT express — pricing, licence, per-locale descriptions — is left
+        // unmentioned and carried from the live app. Publishing the draft manifest verbatim, which
+        // is what this route used to do, therefore turned a paid app free and dropped its
+        // translations every time somebody promoted a draft.
+        const out = await publishApp(storage, config, {
             ownerName: owner,
+            ownerGhii,
+            callerGaii,
             filename,
-            versionNumber: newVersion,
-            manifest,
-            mimeType: draft.mimeType,
-            size: draft.size,
             data: draft.data,
-            accessCode,
-            parked: parkedState,
-            forkable: forkableState,
-            operatorHidden: operatorHiddenState,
-            operatorHiddenBy,
-            operatorHiddenAt,
-            operatorHideReason,
-            createdAt: now,
-            ...(aiProvenanceId ? { aiProvenanceId } : {}),
+            mimeType: draft.mimeType,
+            requested: {
+                name: draft.manifest.name,
+                description: draft.manifest.description,
+                version: draft.manifest.version || undefined,
+                category: draft.manifest.category,
+                tags: draft.manifest.tags,
+                icon: draft.manifest.icon,
+                usesCortex: draft.manifest.usesCortex,
+                cortexAgents: draft.manifest.cortex?.agents,
+                protection: draft.manifest.protection,
+            },
+            accessCode: { mode: 'carry' },
+            source: 'draft',
         });
-        await storage.deleteAppDraft(ownerGhii, filename);
+        if ('refusal' in out) {
+            res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));
+            return;
+        }
 
-        const downloadUrl = `/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}`;
-        await storage.addSiteChangeLog({
-            id: `site-${Date.now()}-${randomBytes(4).toString('hex')}`,
-            action: isUpdate ? 'app_update' : 'app_publish',
-            summary: `${isUpdate ? 'Updated' : 'Published'} app "${filename}" v${newVersion} from draft (${(draft.size / 1024).toFixed(1)} KB)`,
-            changedBy: owner,
-            changedAt: now,
-        });
-        emitChange('apps');
-        void recordPublicActivity(storage, config, {
-            category: 'apps',
-            actor: callerGaii,
-            summary: `App ${manifest.name || filename} ${isUpdate ? 'updated' : 'published'} (v${newVersion})`,
-            detail: manifest.description || '',
-            link: `${downloadUrl}?mode=inline`,
-        }).catch(err => { logger.warn('POST /v1/apps/:owner/:filename/publish-draft: feed is best-effort', { error: String(err) }); });
+        await storage.deleteAppDraft(ownerGhii, filename);
 
         res.status(201).json(success(config.nodeId, {
             filename,
-            version_number: newVersion,
-            manifest,
-            size: draft.size,
-            parked: parkedState,
-            forkable: forkableState,
-            download_url: downloadUrl,
-            note: isUpdate
-                ? `Draft published as version ${newVersion}. It is now the live app; the draft slot is cleared.`
+            version_number: out.versionNumber,
+            manifest: out.manifest,
+            size: out.size,
+            parked: out.parked,
+            forkable: out.forkable,
+            download_url: out.downloadUrl,
+            note: out.isUpdate
+                ? `Draft published as version ${out.versionNumber}. It is now the live app; the draft slot is cleared.`
                 : 'Draft published as version 1. It is now live; the draft slot is cleared.',
-            ...(aiLint ? { ai_posture: aiLint.posture } : {}),
-            ...(aiLint?.hints.length ? { ai_hints: aiLint.hints } : {}),
+            ...(out.mobileHints.length ? { mobile_hints: out.mobileHints } : {}),
+            ...(out.aiLint ? { ai_posture: out.aiLint.posture } : {}),
+            ...(out.aiLint?.hints.length ? { ai_hints: out.aiLint.hints } : {}),
         }, [
-            { description: 'View all versions', method: 'GET', url: `${downloadUrl}/versions` },
+            { description: 'View all versions', method: 'GET', url: `${out.downloadUrl}/versions` },
         ]));
     });
 }
