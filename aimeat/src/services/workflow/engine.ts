@@ -63,7 +63,7 @@ import { evaluateSignal, extractProgress, globToRegExp, type SignalEvalCtx } fro
 import { buildEvalCtx } from './eval-context.js';
 import { getWorkflow, validateWorkflow, runKey, type ResolvedStep } from './store.js';
 import { readEventTriggers, readEcosystemEventTriggers, readActiveRuns, reconcileActiveRun } from './lifecycle.js';
-import { template } from './engine-util.js';
+import { template, runDateIn } from './engine-util.js';
 import { isAgentStep, anyAgentReachable, AGENT_OFFLINE_GRACE_MS } from './engine-reachability.js';
 import {
   dispatchStep, askHumanInput, maybeAlertAgentOffline, onStepFail, onRunFinished, clearRunOutputs, type StepDeps,
@@ -624,7 +624,9 @@ export class WorkflowEngine {
   // ── helpers ──────────────────────────────────────────────────────────────────────
 
   private resolveVars(def: WorkflowDef, overrides: Record<string, string> | undefined, runId: string): Record<string, string> {
-    const today = new Date().toISOString().slice(0, 10);
+    // The run date belongs to the zone the SCHEDULE is in, not the server's — see runDateIn(), which
+    // carries the why. Only a schedule trigger has a zone; manual/event runs stay on UTC as before.
+    const today = runDateIn(def.trigger.kind === 'schedule' ? def.trigger.timezone : undefined);
     const out: Record<string, string> = {};
     for (const v of def.vars) {
       const override = overrides?.[v.name];
