@@ -9,6 +9,7 @@
  *   getting HTML; API JSON and authenticated SPA app routes are never negotiated.
  * @structure
  *   - prefersMarkdown(req)      — Accept-header check (q-value aware via req.accepts)
+ *   - prefersHtmlPage(req)      — the browser-vs-machine check, for a JSON route with a human page
  *   - sendMarkdown(res, md, originalHtml?) — headers + body for a negotiated response
  *   - htmlToMarkdown(html)      — dependency-free converter for the simple static info pages
  *   - buildLandingMarkdown(config) — the markdown landing page for / and /v1/portal (the SPA
@@ -18,6 +19,9 @@
  *   import { prefersMarkdown, sendMarkdown, htmlToMarkdown } from '../services/markdown-negotiation.js';
  *   if (prefersMarkdown(req)) { sendMarkdown(res, htmlToMarkdown(html), html); return; }
  * @version-history
+ *   v1.1.0 — 2026-08-01 — prefersHtmlPage(): the same negotiation question asked the other way,
+ *     so /v1/ai-transparency can send a person who pasted the machine URL into a browser to the
+ *     page at /v1/transparency while every machine keeps getting JSON (TARGET-058 Phase 10b).
  *   v1.0.0 — 2026-07-14 — Initial: Markdown for Agents negotiation (agent readiness)
  */
 import type { Request, Response } from 'express';
@@ -31,6 +35,22 @@ import type { AimeatConfig } from '../config.js';
  */
 export function prefersMarkdown(req: Request): boolean {
   return req.accepts(['text/html', 'text/markdown']) === 'text/markdown';
+}
+
+/**
+ * True when the caller is a browser asking for a page rather than a client asking for data.
+ *
+ * The mirror image of prefersMarkdown(), and here for the same reason: negotiation predicates
+ * belong in one place or a second, subtly different one gets written at the next call site.
+ *
+ * JSON IS THE DEFAULT, DELIBERATELY. `application/json` is listed FIRST, so a caller sending
+ * `Accept: * / *` — curl, fetch(), most agents — gets JSON, and only a client that ranks
+ * text/html ABOVE json (which is exactly what a browser's Accept header does) is treated as a
+ * reader. A JSON endpoint linked from llms.txt, /.well-known/ and the bootstrap document must
+ * never start answering HTML to the machines that follow those links.
+ */
+export function prefersHtmlPage(req: Request): boolean {
+  return req.accepts(['application/json', 'text/html']) === 'text/html';
 }
 
 /** Cheap token estimate for the x-markdown-tokens / x-original-tokens headers (~4 chars/token). */

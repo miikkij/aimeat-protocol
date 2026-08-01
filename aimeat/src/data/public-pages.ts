@@ -13,6 +13,16 @@
  *   stay discoverable where they belong — the RFC 9727 API catalog, the Link headers on every GET,
  *   llms.txt and the bootstrap response.
  *
+ *   NONE OF THESE PAGES GO IN `openapi.yaml`, AND THAT IS A DECISION RATHER THAN AN OVERSIGHT.
+ *   Neither a page route registered here nor its `<path>.md` mirror belongs in the API contract:
+ *   `openapi.yaml` describes the API, and a human page is not one. Rule 3's campsite clause is
+ *   about API routes you pass, not about copy that happens to travel over HTTP. Documenting one
+ *   page and leaving the other nine IS the inconsistency — which is what happened once, when
+ *   TARGET-058 Phase 10 added `/v1/transparency` and its mirror to the contract and Phase 10b took
+ *   them back out. If you are reading this because you were about to document a page route: don't.
+ *   Pages are discovered through sitemap.xml, the `.md` mirrors, llms.txt and the
+ *   `<link rel="alternate">` in each page head — every one of them driven by this registry.
+ *
  * @structure
  *   - PublicPage            — one page: path, title, description, sitemap hints
  *   - PUBLIC_PAGES          — the registry, in the order the sitemap should list them
@@ -22,6 +32,8 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   v1.2.0 — 2026-08-01 — Record the standing decision that page routes and their mirrors stay out
+ *     of openapi.yaml (TARGET-058 Phase 10b). Nothing here changed; the rule did.
  *   v1.1.0 — 2026-08-01 — Add /v1/transparency (TARGET-058 Phase 10), the public human page about
  *     how this node marks AI-generated content. Its markdown body states the limits and points at
  *     the live statement for operator identity rather than restating it — this file runs on every

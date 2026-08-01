@@ -14,7 +14,8 @@
  *   module, so the statement cannot drift away from what the node actually does: turn provenance off
  *   and this says so, set the detail knob to `minimal` and this says so.
  * @structure
- *   - GET /v1/ai-transparency                  — the JSON statement (AIMEAT envelope)
+ *   - GET /v1/ai-transparency                  — the JSON statement (AIMEAT envelope); a browser
+ *                                                asking for HTML is redirected to /v1/transparency
  *   - GET /v1/ai-transparency.md               — the same facts as markdown, for an agent
  *   - GET /v1/admin/ai-transparency-report     — operator: the documentation duty, from data
  *   - GET /v1/ai-transparency/mine             — owner: what your agents published, and how labelled
@@ -23,6 +24,10 @@
  *   import { aiTransparencyRouter } from './routes/ai-transparency.js';
  *   app.use(aiTransparencyRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 10b. `/v1/ai-transparency` and `/v1/transparency` are one
+ *     word apart and answer different content types, so a person pasting the machine URL into a
+ *     browser landed on JSON. Content negotiation sends a browser to the page; JSON stays the
+ *     default for every caller that does not rank text/html first.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 8. The operator report (Code of Practice Section 2,
  *     Commitment 2 — documentation, answered from records rather than a spreadsheet), the per-owner
  *     view (most publishing here is done by accounts, so an account must see its own exposure), and
@@ -39,7 +44,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AiProvenanceRecordRow } from '../storage/interface.js';
 import { requireAuth, requireRole } from '../auth/middleware.js';
 import { success } from '../middleware/envelope.js';
-import { sendMarkdown } from '../services/markdown-negotiation.js';
+import { sendMarkdown, prefersHtmlPage } from '../services/markdown-negotiation.js';
 import { resolveIdentity, ownerGhiiOf } from '../utils/gaii.js';
 import { AI_PROVENANCE_SPEC_V1, AI_PROVENANCE_SCHEMA_PATH } from '../models/ai-provenance-schemas.js';
 import {
@@ -254,8 +259,17 @@ function buildLoggingPolicy(config: AimeatConfig): Record<string, unknown> {
 export function aiTransparencyRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
 
-  router.get('/v1/ai-transparency', (_req: Request, res: Response) => {
+  router.get('/v1/ai-transparency', (req: Request, res: Response) => {
     res.set('Access-Control-Allow-Origin', '*');
+    // A person who pastes the machine URL into a browser gets the page, not a wall of JSON. Only
+    // a client that ranks text/html ABOVE application/json is redirected, which is what a browser
+    // does and what curl, fetch() and every agent following the llms.txt / .well-known / bootstrap
+    // links do NOT — so the default answer on this route is still, and must stay, JSON.
+    res.vary('Accept');
+    if (prefersHtmlPage(req)) {
+      res.redirect(302, '/v1/transparency');
+      return;
+    }
     res.json(success(config.nodeId, buildAiTransparency(config), [
       { description: 'The same statement as markdown', method: 'GET', url: '/v1/ai-transparency.md' },
       { description: 'The provenance record schema', method: 'GET', url: AI_PROVENANCE_SCHEMA_PATH },

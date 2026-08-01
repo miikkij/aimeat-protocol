@@ -37,6 +37,7 @@ import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
+import { openAppSandboxed } from '/js/app-sandbox.js';
 
 const html = htm.bind(h);
 
@@ -50,6 +51,32 @@ const FLAG_SAMPLE = `POST /v1/flags
 
 const SDK_SAMPLE = `const { content, provenance } = await AIMEAT.ai.complete({ prompt });
 AIMEAT.ai.disclose(provenance);`;
+
+/**
+ * An app on THIS node whose published bytes the node checked and found a disclosure call in.
+ *
+ * WHY A REAL ITEM AND NOT AN EXAMPLE BADGE. The page explains the label, so it should show one —
+ * but a demo badge fed by a static record is a badge somebody eventually ships as real, and
+ * minting a record to illustrate would be a fabricated attestation, which is precisely the thing
+ * this page says the node does not do. Linking something genuinely labelled costs nothing and
+ * cannot become a lie.
+ *
+ * `disclosureCallFound` is the MEASURED half of the posture — the node found the call in the bytes
+ * it serves — so the claim rests on what the node observed rather than on what the app declared
+ * about itself. An app that only declares `discloses: yes` is not good enough to point at.
+ * Public-interest publishers rank first: that is the Article 50(4) case a reader came here about.
+ *
+ * Returns null on a node that has no such app, and the section then renders nothing. A fresh
+ * clone with an empty catalogue must not advertise an example it does not have.
+ */
+function pickLabelledApp(apps) {
+  const eligible = apps.filter((a) => {
+    const p = a.ai_posture;
+    return p && p.disclosureCallFound === true && p.discloses === true
+      && Array.isArray(p.generates) && p.generates.length > 0 && !a.parked;
+  });
+  return eligible.find((a) => a.ai_posture.publicInterest === true) ?? eligible[0] ?? null;
+}
 
 /** One label/value row of the node's own statement. Renders nothing when the node states nothing. */
 function Fact({ label, value, href }) {
@@ -99,6 +126,7 @@ function Facts({ stmt }) {
 export default function Transparency({ navigate }) {
   const [stmt, setStmt] = useState(null);
   const [failed, setFailed] = useState(false);
+  const [labelled, setLabelled] = useState(null);
 
   useEffect(() => {
     fetch('/v1/ai-transparency')
@@ -108,6 +136,15 @@ export default function Transparency({ navigate }) {
         setStmt(j.data);
       })
       .catch((err) => { swallowed('transparency: statement fetch', err); setFailed(true); });
+  }, []);
+
+  // Something on this node that actually carries a label, resolved rather than hardcoded — a
+  // pinned filename would rot on a rename and be a lie on anybody else's node.
+  useEffect(() => {
+    fetch('/v1/apps?limit=100')
+      .then((r) => r.json())
+      .then((j) => setLabelled(pickLabelledApp(j?.data?.apps || [])))
+      .catch((err) => { swallowed('transparency: labelled example lookup', err); });
   }, []);
 
   const byHash = stmt?.detection?.by_hash || '/v1/provenance/by-hash/{sha256}';
@@ -134,6 +171,19 @@ export default function Transparency({ navigate }) {
           <li>${tr('transparency.limit4', 'A missing record means nothing was stated. It never means a person wrote it.')}</li>
         </ul>
       </section>
+
+      ${labelled ? html`
+        <p class="tp-seeit">
+          ${tr('transparency.seeItLead', 'Somewhere to see one:')}
+          ${' '}
+          <a href="#" role="button" onClick=${(e) => { e.preventDefault();
+              openAppSandboxed(`/v1/apps/${encodeURIComponent(labelled.owner)}/${encodeURIComponent(labelled.filename)}?mode=inline`,
+                labelled.manifest?.name || labelled.filename); }}>
+            ${labelled.manifest?.name || labelled.filename}
+          </a>
+          ${' '}
+          ${tr('transparency.seeItTail', 'is an app on this node that generates text, and the node found the disclosure call in the source it serves.')}
+        </p>` : null}
 
       <section class="tp-section">
         <h2 class="tp-h2">${tr('transparency.opTitle', 'Who runs this node, and who supervises it')}</h2>

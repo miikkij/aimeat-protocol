@@ -18,15 +18,20 @@
  *   AND IT ASSERTS THE ROUTE ITSELF. A SPA page needs an entry in BOTH src/routes/portal.ts and
  *   public/spa.html or a hard refresh answers 404 while in-app navigation looks fine — the trap
  *   this codebase has fallen into before.
- * @structure route + mirror · the stated limits · the claims register · locale parity
+ * @structure route + mirror · the stated limits · the claims register · locale parity ·
+ *   Accept negotiation on the JSON route · the openapi and namespace decisions
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=transparency-page
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 10b. Three decisions turned from comments into checks:
+ *     page routes and their mirrors stay OUT of openapi.yaml, no key returns to the colliding
+ *     `aiTransparency.*` namespace, and `/v1/ai-transparency` answers JSON to machines while
+ *     redirecting a browser. Plus: the labelled example may not be pinned to a filename.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 10.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { findPublicPage } from '../src/data/public-pages.js';
+import { PUBLIC_PAGES, findPublicPage } from '../src/data/public-pages.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const here = dirname(fileURLToPath(import.meta.url));
@@ -68,6 +73,25 @@ function pageKeys(bundle: Record<string, string>): Record<string, string> {
  * the watermarking pattern is deliberately loose about the words between "all" and "watermarked":
  * the claim is wrong however it is phrased.
  */
+/**
+ * Registry pages this check does NOT hold to the "pages stay out of openapi.yaml" rule.
+ *
+ * Both predate the decision and both are LISTED rather than quietly skipped, because a silent
+ * skip is how an exemption becomes the rule. Neither was introduced by TARGET-058.
+ *
+ *  - `/v1/docs` is an HTML page in this registry AND a documented path in the contract — the same
+ *    inconsistency the decision exists to remove. Not swept up here: taking it out also removes
+ *    `getDocs` from the generated types, which is the owner's call, not a test's.
+ *  - `/v1/glossary.md` is documented in the contract, but the route the contract describes is the
+ *    GLOSSARY DATA document (`glossaryMd`, tags: [Catalogue]) served by routes/glossary.ts — which
+ *    is a real API document and belongs there. It happens to collide with the URL the mirror
+ *    router would serve for the `/v1/glossary` registry entry; glossary.ts mounts first and wins,
+ *    so the registry's markdown body for that page is shadowed and never served.
+ *
+ * Delete an entry the moment its cause is fixed.
+ */
+const EXEMPT_FROM_PAGE_RULE = new Set(['/v1/docs', '/v1/glossary']);
+
 const FORBIDDEN: Array<[string, RegExp]> = [
     ['"EU AI Act compliant"', /\bAI[- ]Act[- ]compliant\b/i],
     ['"EU AI Act compliant" (fi)', /tekoälyasetuksen\s+mukainen/i],
@@ -225,6 +249,101 @@ const FORBIDDEN: Array<[string, RegExp]> = [
             if (allowed.has(k) || v.length < 12) continue;
             assert(fi[k] !== v, `${k} is identical in both locales — it was not translated`);
         }
+    });
+
+    // ── Phase 10b: the machine URL and the human URL are one word apart ─────────────────────
+
+    async function accept(header: string | null) {
+        const res = await fetch(`${BASE}/v1/ai-transparency`, {
+            redirect: 'manual', headers: header === null ? {} : { Accept: header },
+        });
+        return { status: res.status, ct: res.headers.get('content-type') ?? '',
+                 location: res.headers.get('location') ?? '', vary: res.headers.get('vary') ?? '' };
+    }
+
+    await test('/v1/ai-transparency still answers JSON to every machine caller', async () => {
+        // `*\/*` is curl and most fetch() defaults; no Accept header at all is a bare socket
+        // client. Both must keep getting the statement — the route is linked from llms.txt,
+        // /.well-known/ and the bootstrap document.
+        for (const h of ['*/*', 'application/json', null]) {
+            const r = await accept(h);
+            assert(r.status === 200, `Accept: ${h ?? '(none)'} → ${r.status}, expected 200 JSON`);
+            assert(r.ct.includes('application/json'), `Accept: ${h ?? '(none)'} → ${r.ct}`);
+        }
+    });
+
+    await test('/v1/ai-transparency sends a browser to the page instead', async () => {
+        for (const h of ['text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
+                         'text/html,application/xhtml+xml,image/webp,*/*;q=0.8', 'text/html']) {
+            const r = await accept(h);
+            assert(r.status === 302, `a browser Accept got ${r.status}, expected a 302`);
+            assert(r.location === '/v1/transparency', `redirected to ${r.location}`);
+        }
+    });
+
+    await test('the negotiated route varies on Accept, so no cache serves the wrong one', async () => {
+        const r = await accept('*/*');
+        // Token-exact: compression already sets `Vary: Accept-Encoding`, and a substring test for
+        // "accept" matches THAT and passes on a route that does not vary on Accept at all.
+        const tokens = r.vary.split(',').map(s => s.trim().toLowerCase());
+        assert(tokens.includes('accept'),
+            `Vary is "${r.vary}" — without a bare Accept token a shared cache pins one answer for both callers`);
+    });
+
+    // ── Phase 10b: the openapi decision, enforced rather than commented ─────────────────────
+
+    await test('no public page route or .md mirror is documented in openapi.yaml', async () => {
+        // The contract describes the API. A human page is not one, and documenting one page out
+        // of ten is the inconsistency this check exists to stop coming back.
+        //
+        // Parsed line by line rather than matched as a substring: openapi.yaml is CRLF, so a
+        // literal `\n  /v1/x:\n` never matches and the assertion passes on any input — which is
+        // exactly what the first version of this test did.
+        const spec = readFileSync(join(here, '..', '..', 'openapi.yaml'), 'utf-8');
+        const documented = new Set(
+            spec.split(/\r?\n/)
+                .map(line => line.match(/^ {2}(\/\S*):\s*$/)?.[1])
+                .filter((p): p is string => !!p),
+        );
+        assert(documented.size > 100, `only ${documented.size} path keys parsed out of openapi.yaml — the parser is wrong, not the spec`);
+        for (const p of PUBLIC_PAGES) {
+            if (p.path === '/') continue;   // the API root legitimately answers the bootstrap document
+            if (EXEMPT_FROM_PAGE_RULE.has(p.path)) continue;
+            assert(!documented.has(p.path), `openapi.yaml documents the page route ${p.path}`);
+            assert(!documented.has(`${p.path}.md`), `openapi.yaml documents the page mirror ${p.path}.md`);
+        }
+    });
+
+    // ── Phase 10b: the namespace that was one character from the public page's ──────────────
+
+    await test('no i18n key sits in the old aiTransparency.* namespace', async () => {
+        // It was renamed to aiTransparencyMine.* because `aiTransparency.title` (the owner card)
+        // and `transparency.title` (this page) meant different things one character apart, and a
+        // key picked wrong renders as itself with nothing raising a hand.
+        for (const [label, bundle] of [['en', en], ['fi', fi]] as const) {
+            const stale = Object.keys(bundle).filter(k => /^aiTransparency\./.test(k));
+            assert(stale.length === 0, `locales/${label}.json still has ${stale.length} key(s) in the colliding namespace: ${stale.slice(0, 3).join(', ')}`);
+        }
+        assert(Object.keys(en).some(k => k.startsWith('aiTransparencyMine.')), 'the owner card lost its strings entirely');
+    });
+
+    // ── Phase 10b: the labelled example, and the two ways it could become a lie ─────────────
+
+    await test('the labelled example is resolved from the node, never pinned to a filename', async () => {
+        const view = readFileSync(join(here, '..', 'public', 'views', 'transparency.js'), 'utf-8');
+        assert(!/['"][\w-]+\.html['"]/.test(view),
+            'the view names a specific app file — it would rot on a rename and be false on any other node');
+        assert(view.includes('disclosureCallFound'),
+            'the example is picked on what the app DECLARES rather than on what the node measured in its bytes');
+    });
+
+    await test('the footer and landing strings exist in both locales', async () => {
+        for (const k of ['landing.footTransparency', 'landing.transLine', 'landing.transCta']) {
+            assert(k in en && k in fi, `${k} is missing from a locale`);
+        }
+        const landing = readFileSync(join(here, '..', 'public', 'views', 'landing.js'), 'utf-8');
+        const footer = landing.slice(landing.indexOf('<footer class="ld-footer"'));
+        assert(footer.includes('/v1/transparency'), 'the landing footer has no transparency link');
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

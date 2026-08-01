@@ -21,6 +21,11 @@
  *   import { AiTransparencyCard } from './ai-transparency-card.js';
  *   html`<${AiTransparencyCard} />`
  * @version-history
+ *   v1.1.0 — 2026-08-01 — i18n namespace renamed `aiTransparency.*` → `aiTransparencyMine.*`
+ *     (TARGET-058 Phase 10b). It sat one character away from `transparency.*`, the PUBLIC page's
+ *     namespace, with `title` and `loading` meaning different things in each — a pair an
+ *     autocomplete picks wrong and nothing catches, because a missing key renders as itself.
+ *     Strings and behaviour unchanged.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8.
  */
 import { h } from 'preact';
@@ -59,7 +64,7 @@ export function AiTransparencyCard() {
       setReport(prev => (JSON.stringify(prev) === JSON.stringify(mine?.data ?? null) ? prev : (mine?.data ?? null)));
       setPolicy(prev => (JSON.stringify(prev) === JSON.stringify(pol?.data ?? null) ? prev : (pol?.data ?? null)));
     } catch (err) {
-      setError(err?.message || t('aiTransparency.loadFailed'));
+      setError(err?.message || t('aiTransparencyMine.loadFailed'));
     } finally {
       if (!opts.quiet) setLoading(false);
     }
@@ -85,55 +90,55 @@ export function AiTransparencyCard() {
     <div class="pf-card pf-aitr">
       <button type="button" class="pf-aitr-head" onClick=${() => setCollapsed(c => !c)}
               aria-expanded=${!collapsed}>
-        <span class="section-title">${t('aiTransparency.title')}</span>
+        <span class="section-title">${t('aiTransparencyMine.title')}</span>
         <span class="pf-aitr-chevron">${collapsed ? '+' : '−'}</span>
       </button>
-      <p class="section-desc">${t('aiTransparency.desc')}</p>
+      <p class="section-desc">${t('aiTransparencyMine.desc')}</p>
 
       ${!collapsed && html`
         <div class="pf-aitr-body">
-          ${loading && html`<p class="pf-aitr-muted">${t('aiTransparency.loading')}</p>`}
+          ${loading && html`<p class="pf-aitr-muted">${t('aiTransparencyMine.loading')}</p>`}
           ${error && html`<p class="pf-aitr-error">${error}</p>`}
 
           ${report && html`
             <div class="pf-aitr-stats">
               <div class=${'pf-aitr-stat' + (unlabelled > 0 ? ' pf-aitr-stat-warn' : '')}>
                 <span class="pf-aitr-num">${unlabelled}</span>
-                <span class="pf-aitr-lbl">${t('aiTransparency.unlabelled')}</span>
+                <span class="pf-aitr-lbl">${t('aiTransparencyMine.unlabelled')}</span>
               </div>
               <div class="pf-aitr-stat">
                 <span class="pf-aitr-num">${report.labelled ?? 0}</span>
-                <span class="pf-aitr-lbl">${t('aiTransparency.labelled')}</span>
+                <span class="pf-aitr-lbl">${t('aiTransparencyMine.labelled')}</span>
               </div>
               <div class="pf-aitr-stat">
                 <span class="pf-aitr-num">${report.public_total ?? 0}</span>
-                <span class="pf-aitr-lbl">${t('aiTransparency.publicTotal')}</span>
+                <span class="pf-aitr-lbl">${t('aiTransparencyMine.publicTotal')}</span>
               </div>
               <div class="pf-aitr-stat">
                 <span class="pf-aitr-num">${report.total ?? 0}</span>
-                <span class="pf-aitr-lbl">${t('aiTransparency.total')}</span>
+                <span class="pf-aitr-lbl">${t('aiTransparencyMine.total')}</span>
               </div>
             </div>
 
-            <p class="pf-aitr-note">${t('aiTransparency.scopeNote')}</p>
+            <p class="pf-aitr-note">${t('aiTransparencyMine.scopeNote')}</p>
 
             ${unlabelled > 0 && html`
-              <p class="pf-aitr-warn-line">${t('aiTransparency.unlabelledHelp')}</p>
+              <p class="pf-aitr-warn-line">${t('aiTransparencyMine.unlabelledHelp')}</p>
               <ul class="pf-aitr-list">
                 ${(report.unlabelled_detail?.items ?? []).map(item => html`
                   <li key=${item.id} class="pf-aitr-row">
-                    <span class="pf-aitr-row-main">${item.pipeline || t('aiTransparency.unknownSource')}</span>
+                    <span class="pf-aitr-row-main">${item.pipeline || t('aiTransparencyMine.unknownSource')}</span>
                     <span class="pf-aitr-row-meta">${shortTime(item.generated_at)}</span>
                     ${item.record_url && html`
                       <a class="pf-aitr-row-link" href=${item.record_url} target="_blank" rel="noopener noreferrer">
-                        ${t('aiTransparency.openRecord')}
+                        ${t('aiTransparencyMine.openRecord')}
                       </a>`}
                   </li>`)}
               </ul>
               ${report.unlabelled_detail
                 && report.unlabelled_detail.shown < report.unlabelled_detail.total
                 && html`<p class="pf-aitr-muted">
-                  ${t('aiTransparency.showingOf', {
+                  ${t('aiTransparencyMine.showingOf', {
                     shown: String(report.unlabelled_detail.shown),
                     total: String(report.unlabelled_detail.total),
                   })}
@@ -141,7 +146,7 @@ export function AiTransparencyCard() {
             `}
 
             ${(report.apps_declaring_generation_with_gap ?? []).length > 0 && html`
-              <h4 class="pf-aitr-sub">${t('aiTransparency.appsWithGap')}</h4>
+              <h4 class="pf-aitr-sub">${t('aiTransparencyMine.appsWithGap')}</h4>
               <ul class="pf-aitr-list">
                 ${report.apps_declaring_generation_with_gap.map(a => html`
                   <li key=${a.owner + '/' + a.filename} class="pf-aitr-row">
@@ -152,14 +157,14 @@ export function AiTransparencyCard() {
           `}
 
           ${policy && html`
-            <h4 class="pf-aitr-sub">${t('aiTransparency.policyTitle')}</h4>
+            <h4 class="pf-aitr-sub">${t('aiTransparencyMine.policyTitle')}</h4>
             <p class="pf-aitr-note">${policy.why}</p>
             <ul class="pf-aitr-list">
               ${(policy.records ?? []).map(r => html`
                 <li key=${r.what} class="pf-aitr-policy">
                   <span class="pf-aitr-row-main">${r.what}</span>
-                  <span class="pf-aitr-row-meta">${t('aiTransparency.retention')}: ${r.retention}</span>
-                  <span class="pf-aitr-row-meta">${t('aiTransparency.neverContains')}: ${r.never_contains}</span>
+                  <span class="pf-aitr-row-meta">${t('aiTransparencyMine.retention')}: ${r.retention}</span>
+                  <span class="pf-aitr-row-meta">${t('aiTransparencyMine.neverContains')}: ${r.never_contains}</span>
                 </li>`)}
             </ul>
             <p class="pf-aitr-note">${policy.note}</p>`}

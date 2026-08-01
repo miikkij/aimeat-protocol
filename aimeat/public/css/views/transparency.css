@@ -29,6 +29,11 @@
    centred H1 it sat inset from the headings and looked like a caption. */
 .tp-hero .ld-hero-sub { max-width: 62ch; margin: 0; text-align: left; }
 
+/* "Somewhere to see one" — one sentence under the limits, pointing at something on this node that
+   actually carries a label. Quiet: it is evidence, not a call to action. */
+.tp-seeit { margin: var(--sp-4, 16px) 0 0; max-width: 62ch; line-height: 1.6; color: var(--text-dim); font-size: var(--text-sm); }
+.tp-seeit a { color: var(--accent); font-weight: 600; }
+
 .tp-section { margin: var(--sp-8, 32px) 0; }
 .tp-h2 { font-size: var(--text-xl); font-weight: 700; margin: 0 0 var(--sp-3, 12px); color: var(--text); }
 .tp-p { margin: 0 0 var(--sp-3, 12px); max-width: 62ch; line-height: 1.6; color: var(--text); }

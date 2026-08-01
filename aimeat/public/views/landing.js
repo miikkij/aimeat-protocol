@@ -787,6 +787,10 @@ export default function Landing({ navigate }) {
         <a href="/v1/pricing#own-node" onClick=${(e) => { e.preventDefault(); navigate('/v1/pricing'); }}>${tr('landing.footOwnNode', 'Run your own node')}</a>
         <a class="ld-gh" href="https://github.com/miikkij/aimeat-protocol" target="_blank" rel="noopener">${GhMark}GitHub</a>
         <a href="/v1/portal?view=dev">${tr('landing.footDev', 'For developers')}</a>
+        ${/* The transparency page in the footer as well as the one line above it. A page a
+              visitor cannot find is close to not having one, and the footer is where someone
+              looks for this kind of statement. Header nav stays out of it. */''}
+        <a href="/v1/transparency" onClick=${(e) => { e.preventDefault(); navigate('/v1/transparency'); }}>${tr('landing.footTransparency', 'AI transparency')}</a>
       </footer>
     </div>
   `;
