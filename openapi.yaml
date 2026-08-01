@@ -28522,7 +28522,10 @@ paths:
     post:
       operationId: testOpenRouterKey
       summary: Test OpenRouter API key validity
-      description: Sends a minimal test request to OpenRouter to verify the stored API key is valid. Owner-only.
+      description: >
+        Sends a minimal test completion to verify the stored API key works. Owner-only. This is a
+        real, billable completion: it runs on the shared completion path, counts towards the owner's
+        daily AI budget (app id `openrouter:test`) and is refused with 402 once that budget is spent.
       tags: [OpenRouter]
       security:
         - BearerAuth: []
@@ -28556,6 +28559,18 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AimeatEnvelope'
+        '402':
+          description: The owner's daily AI budget is spent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: The configured provider host is not in this node's allowlist
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
         '503':
           description: Encryption not configured
           content:
@@ -28568,9 +28583,15 @@ paths:
       operationId: openRouterComplete
       summary: Run AI completion via OpenRouter
       description: |
-        Sends a prompt to OpenRouter and returns the AI completion. Used by the generator
-        pipeline to automate steps without requiring the user to copy/paste to an AI chat.
-        Owner-only.
+        Sends a prompt to the caller's configured AI provider and returns the completion. Used by the
+        calibrator/generator pipelines to automate steps without requiring the user to copy/paste to
+        an AI chat. Owner-only, and scoped to a project the caller owns.
+
+        Runs on the shared completion path, so the owner's daily AI budget, the node's provider-host
+        allowlist and the 200k prompt bound all apply, the call lands in `GET /v1/ai/usage` under the
+        app id `openrouter:complete`, and the response carries the minted AI-provenance record in
+        `meta.provenance` plus the `AI-Disclosure` and `Link: rel="ai-provenance"` headers
+        (TARGET-058). The `data` shape is unchanged.
       tags: [OpenRouter]
       security:
         - BearerAuth: []
@@ -28584,16 +28605,26 @@ paths:
               properties:
                 projectId:
                   type: string
-                  description: Generator project ID for context and logging
+                  description: Generator/calibrator project ID; must name a project the caller owns
                 prompt:
                   type: string
-                  description: The user prompt to send to the AI model
+                  description: The user prompt to send to the AI model (max 200k characters)
                 systemPrompt:
                   type: string
                   description: Optional system prompt to prepend
                 model:
                   type: string
                   description: Override the default model for this request
+                modelRole:
+                  type: string
+                  enum: [reasoning, execution]
+                  description: Use the owner's configured reasoning/execution model
+                temperature:
+                  type: number
+                top_p:
+                  type: number
+                max_tokens:
+                  type: integer
       responses:
         '200':
           description: Completion result
@@ -28613,6 +28644,24 @@ paths:
                           model:
                             type: string
                             description: The model that produced the response
+                          usage:
+                            type: object
+                            description: Tokens and cost as reported by the provider
+                            properties:
+                              prompt_tokens:
+                                type: integer
+                              completion_tokens:
+                                type: integer
+                              total_tokens:
+                                type: integer
+                              cost_usd:
+                                type: number
+                      meta:
+                        type: object
+                        description: >
+                          Carries `provenance` — the `aimeat.provenance/v1` record for the returned
+                          bytes, with its id and resolvable URL. Absent when provenance is disabled
+                          on the node.
         '400':
           description: Invalid request body or no API key configured
           content:
@@ -28621,6 +28670,18 @@ paths:
                 $ref: '#/components/schemas/AimeatEnvelope'
         '401':
           description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '402':
+          description: The owner's daily AI budget (or this app's quota) is spent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AimeatEnvelope'
+        '403':
+          description: The configured provider host is not in this node's allowlist
           content:
             application/json:
               schema:

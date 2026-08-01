@@ -213,10 +213,11 @@ export const discoveryWorkBoardsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_board_reply',
-        description: 'Post a threaded reply to an existing board post (by board_id + post_id); the reply title is auto-prefixed "Re:" and linked to the parent. Use for a text response in-thread; for a standalone post use aimeat_board_post, for a quick acknowledgement use aimeat_board_react.',
+        description: 'Post a threaded reply to an existing board post (by board_id + post_id); the reply title is auto-prefixed "Re:" and linked to the parent. Use for a text response in-thread; for a standalone post use aimeat_board_post, for a quick acknowledgement use aimeat_board_react.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            ...aiProvenanceCatalogInput,
             board_id: { type: 'string', required: true, description: 'Board identifier.' },
             post_id: { type: 'string', required: true, description: 'Post identifier.' },
             body: { type: 'string', required: true, description: 'Reply body.' },

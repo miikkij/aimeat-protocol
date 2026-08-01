@@ -11,10 +11,13 @@
  *   Morsels are plain integers; money is 6-decimal micro-units. The two never mix.
  * @usage import { exchangeTools } from './definitions/exchange.js';
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: aimeat_exchange_work_deliver documents `ai_provenance`.
+ *     The delivered output is the thing the buyer paid for, so how it was made belongs in the terms.
  *   v1.0.0 — 2026-07-20 — Initial EXCHANGE MCP tool definitions (10 tools)
  */
 import type { AimeatToolDefinition, ToolVisibility } from './types.js';
 import { agentEverywhere } from './types.js';
+import { AI_PROVENANCE_TOOL_NOTE, aiProvenanceCatalogInput } from './ai-provenance-note.js';
 
 /** The "act on EXCHANGE" tools (invoke/work/proposals) are on BOTH MCP surfaces so ANY agent can act: the
  *  PUBLIC /v1/mcp (hosted clients like Claude chat — the server tool threads the session token so app-tool
@@ -161,10 +164,11 @@ export const exchangeTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_exchange_work_deliver',
-        description: 'As the PROVIDER of an agent-work task, deliver the result → settle ON DELIVERY: charge the consumer the per-task price, credit you, route the rake, decrement their budget. Only the work\'s own provider may. A budget/rate failure leaves the work open and unpaid (you are told why).',
+        description: 'As the PROVIDER of an agent-work task, deliver the result → settle ON DELIVERY: charge the consumer the per-task price, credit you, route the rake, decrement their budget. Only the work\'s own provider may. A budget/rate failure leaves the work open and unpaid (you are told why).' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentMcp,
         input: {
+            ...aiProvenanceCatalogInput,
             work_id: { type: 'string', required: true, description: 'The open work item to deliver (from aimeat_exchange_work_list role=provider).' },
             output: { type: 'object', required: false, description: 'The delivered result (matching the offering\'s task output_schema).' },
             note: { type: 'string', required: false, description: 'An optional delivery note.' },

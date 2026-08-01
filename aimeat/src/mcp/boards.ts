@@ -13,6 +13,10 @@
  *   v1.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.2.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
+ *   v1.3.0 -- 2026-08-01 -- TARGET-058 Phase 8b. aimeat_board_reply accepts an `ai_provenance`
+ *     declaration and stamps the reply through provenanceForWrite(). Phase 4 froze it in the
+ *     reviewed-without list as borderline; it is not borderline — a reply is text on a public board
+ *     that a person reads, and aimeat_board_post next to it was stamped from the start.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -23,6 +27,9 @@ import type { Storage } from '../storage/interface.js';
 import { parseGAII, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
 
 export function registerBoardsTools(
     mcp: McpServer,
@@ -242,13 +249,31 @@ export function registerBoardsTools(
             board_id: z.string(),
             post_id: z.string(),
             body: z.string(),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_board_reply'),
-        async ({ board_id, post_id, body }) => {
+        async ({ board_id, post_id, body, ai_provenance, ai_provenance_id }) => {
             const parent = await storage.getPost(board_id, post_id);
             if (!parent) return { content: [{ type: 'text' as const, text: 'Post not found' }], isError: true };
 
             const replyId = `reply-${randomBytes(8).toString('hex')}`;
+            // TARGET-058. Same act as aimeat_board_post — text an agent puts where people read it —
+            // so it is stamped the same way. The hash covers the BODY alone: the title is generated
+            // by this tool ("Re: …"), and hashing our own prefix would describe bytes the agent never
+            // wrote. A post has no provenance column, so the record stands on its own and is joined
+            // to the reply by that hash.
+            const provenanceId = await provenanceForWrite(storage, {
+                principal: agentGaii,
+                content: body,
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.board_reply',
+                surface: { visibility: 'public', humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
             const reply = await storage.createPost({
                 id: replyId,
                 boardId: board_id,
@@ -272,6 +297,7 @@ export function registerBoardsTools(
                         reply_to: reply.replyTo,
                         title: reply.title,
                         created_at: reply.createdAt,
+                        ...(await writeProvenanceEcho(storage, config, provenanceId)),
                     }, null, 2),
                 }],
             };

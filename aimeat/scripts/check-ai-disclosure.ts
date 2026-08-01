@@ -24,6 +24,12 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b. LLM_TRANSPORT_LEGACY_CALLERS is EMPTY: both known
+ *     second paths now go through the chokepoint. Assertion 1 detects a transport caller by reading
+ *     the import CLAUSE rather than scanning for the word `complete` — the old word-scan fired on
+ *     `src/routes/openrouter.ts` purely because the route path is spelled `/v1/openrouter/complete`,
+ *     which would have made a genuinely-clean file impossible to remove from the list. Assertion 2's
+ *     two lists moved five borderline tools from "reviewed without" to "required".
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8.
  */
 import { readFileSync, readdirSync, statSync } from 'node:fs';
@@ -96,18 +102,37 @@ const LLM_TRANSPORT = 'src/services/openrouter.ts';
 const LLM_CHOKEPOINT = 'src/services/ai-completion.ts';
 
 /**
- * Callers of the raw transport that are NOT the chokepoint. Frozen at the Phase 8 audit: each one is
- * a real second path that produces model output outside ai-completion.ts, so each is a known gap
- * rather than an approval. A NEW entry has to be added here deliberately, which is the point.
+ * Callers of the raw transport that are NOT the chokepoint.
+ *
+ * EMPTY, and that is the assertion. Phase 8 froze two real second paths here by name — the
+ * owner-facing `POST /v1/openrouter/complete` and `services/notebook-ai.ts` — because naming a gap
+ * is better than hiding it. Phase 8b closed both, and emptying this list is what lets Phase 9 write
+ * "content this node generates carries a record" in public without a footnote.
+ *
+ * A new entry is a decision to produce model output that nothing stamps and nothing bills. Adding
+ * one is deliberately awkward: it means editing this file, in front of this comment.
  */
-const LLM_TRANSPORT_LEGACY_CALLERS: Record<string, string> = {
-  'src/routes/openrouter.ts':
-    'POST /v1/openrouter/complete — the owner-facing raw completion route. Predates the chokepoint; '
-    + 'produces model output with no provenance and no metering. Reported to Jouni, Phase 8.',
-  'src/services/notebook-ai.ts':
-    'Notebook classify/plan. Predates the chokepoint; produces model output with no provenance. '
-    + 'Reported to Jouni, Phase 8.',
-};
+const LLM_TRANSPORT_LEGACY_CALLERS: Record<string, string> = {};
+
+/**
+ * Does this file import `complete` (or `completeOwner`-style aliases of it) FROM the raw transport?
+ *
+ * Reads the import CLAUSE rather than scanning the file for the word. The word is everywhere:
+ * `src/routes/openrouter.ts` contains the string `'/v1/openrouter/complete'` and legitimately imports
+ * `listModels` from the transport, which a word-scan reads as a completion caller forever. Testing
+ * the binding makes the check say what it means — "you imported the function that talks to a model" —
+ * and it still fires on `import { complete as run }`, because the LOCAL name is irrelevant.
+ */
+export function importsTransportComplete(src: string): boolean {
+  const importClause = /import\s+(type\s+)?\{([^}]*)\}\s+from\s+['"](?:\.{1,2}\/)+(?:services\/)?openrouter\.js['"]/g;
+  for (const m of src.matchAll(importClause)) {
+    if (m[1]) continue;                                   // `import type { … }` binds no runtime call
+    const bindings = m[2].split(',').map(s => s.trim().split(/\s+as\s+/)[0].trim());
+    if (bindings.includes('complete')) return true;
+  }
+  // A namespace import can reach anything on the module, so it counts as reaching `complete`.
+  return /import\s+\*\s+as\s+\w+\s+from\s+['"](?:\.{1,2}\/)+(?:services\/)?openrouter\.js['"]/.test(src);
+}
 
 function checkOneLlmTransport(): void {
   const providerCall = /fetch\s*\(\s*[`'"][^`'"]*\/(chat\/completions|completions|messages)\b/;
@@ -122,13 +147,11 @@ function checkOneLlmTransport(): void {
     }
   }
 
-  const importsTransport = /from\s+['"](?:\.{1,2}\/)+(?:services\/)?openrouter\.js['"]/;
   for (const file of walk(join(root, 'src'))) {
     const r = rel(file);
     if (r === LLM_TRANSPORT || r === LLM_CHOKEPOINT) continue;
     const src = stripComments(readFileSync(file, 'utf8'));
-    if (!importsTransport.test(src)) continue;
-    if (!/\bcomplete\b/.test(src)) continue;   // listModels()-only callers are not completions
+    if (!importsTransportComplete(src)) continue;
     if (r in LLM_TRANSPORT_LEGACY_CALLERS) {
       notes.push(`  known second LLM path: ${r} — ${LLM_TRANSPORT_LEGACY_CALLERS[r]}`);
       continue;
@@ -150,42 +173,53 @@ const AI_PROVENANCE_REQUIRED = [
   'aimeat_app_draft_publish',
   'aimeat_app_publish',
   'aimeat_board_post',
+  'aimeat_board_reply',
+  'aimeat_dm_ask',
   'aimeat_dm_send',
   'aimeat_dm_send_as_owner',
+  'aimeat_exchange_work_deliver',
   'aimeat_knowledge_contribute',
   'aimeat_memory_write',
+  'aimeat_message_send',
   'aimeat_task_complete',
+  'aimeat_workspace_comment',
   'aimeat_workspace_write',
 ];
 
 /**
- * Write tools that take free text and deliberately do NOT carry the parameter — reviewed in Phase 4
- * and frozen here. Several are borderline (a board reply and a delivered piece of work are content a
- * model very often wrote); they are listed rather than fixed because widening the MCP surface is a
- * decision, not a refactor. Raised for Jouni, Phase 8.
+ * Write tools that take free text and deliberately do NOT carry the parameter — reviewed in Phase 4,
+ * decided in Phase 8, and frozen here.
+ *
+ * The five that WERE borderline (board_reply, dm_ask, exchange_work_deliver, message_send,
+ * workspace_comment) moved into the required list in Phase 8b: each carries text a person reads, and
+ * the whole point of naming them here rather than quietly fixing them was to make that a decision.
+ *
+ * What remains is configuration, routing and machine plumbing — a group name, a schedule, an IAM
+ * definition, a revenue split. Nobody reads those as authored prose, and a label on one would say
+ * nothing to anyone. `app_draft_save` is the one deliberate content exception; the reason is on it.
  */
 const AI_PROVENANCE_REVIEWED_WITHOUT = [
-  'aimeat_app_draft_save',            // staging; the record is minted when the draft is PUBLISHED
+  // DECIDED, Phase 8b. A draft is inline-only staging that nobody but its author can see, and its
+  // content is stamped at PUBLISH by the one publish path. A record minted at save time would
+  // describe bytes that were never shown to anyone and that the next save replaces — and it would
+  // have to be re-minted at publish regardless, because the published bytes are the ones a reader
+  // gets. One act, one record, at the moment the content reaches a person.
+  'aimeat_app_draft_save',
   'aimeat_app_template_propose',
   'aimeat_appdev_pitfall_report',
   'aimeat_board_create',
-  'aimeat_board_reply',               // borderline — content, and often model-written
   'aimeat_capabilities_create',
   'aimeat_capabilities_update',
   'aimeat_commerce_beneficiary_split_set',
-  'aimeat_dm_ask',                    // borderline
   'aimeat_exchange_need_post',
-  'aimeat_exchange_work_deliver',     // borderline — this IS the delivered output
   'aimeat_feedback_send',
   'aimeat_flag_report',
   'aimeat_group_create',
   'aimeat_iam_define',
-  'aimeat_message_send',              // borderline
   'aimeat_organism_create',
   'aimeat_organism_update',
   'aimeat_schedule_create',
   'aimeat_task_create',
-  'aimeat_workspace_comment',         // borderline
 ];
 
 /** A parameter name that carries prose a person will read. */

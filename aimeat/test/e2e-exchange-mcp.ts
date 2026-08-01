@@ -20,6 +20,8 @@
  *     previously treated the happy path as "identical to the WebMCP invoke" and skipped it — but WebMCP reads
  *     the token off the live request while the MCP tool replays its session's token, and that one difference
  *     is what broke every metered app-tool call an hour into any MCP session.
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 8b: a declared `ai_provenance` on a delivery reaches the
+ *     work item and the CONSUMER's listing. The delivered output is the thing the buyer paid for.
  */
 import * as ed from '@noble/ed25519';
 import { createHash, randomBytes } from 'node:crypto';
@@ -139,6 +141,33 @@ await test('aimeat_exchange_work_deliver — provider delivers → settle on del
     assert(res.data.work.charged_units === 5, `charged 5, got ${res.data?.work?.charged_units}`);
     const after = await balance(consumer.token);
     assert(after === before - 5, `consumer debited 5 (before ${before}, after ${after})`);
+});
+
+await test('aimeat_exchange_work_deliver — a DECLARED provenance rides with the delivered answer (TARGET-058)', async () => {
+    // The buyer paid for this output, so how it was made is part of what they bought. The provider
+    // here is an OWNER principal, which Mint-3 leaves alone (a person is presumed human) — so this
+    // asserts the DECLARATION path: the provider says a model wrote it, and the record must reach the
+    // work item, not just the tool result.
+    const res = parse(await C()['aimeat_exchange_work']({ offering_id: awOfferingId, input: { text: 'another document' } }));
+    const id = res.data?.work?.work_id;
+    assert(!!id, `start ${JSON.stringify(res)}`);
+    const del = parse(await P()['aimeat_exchange_work_deliver']({
+        work_id: id, output: { summary: 'A model wrote this summary.' },
+        ai_provenance: { level: 'ai-generated', human_involvement: 'none', model: 'stub/test-model' },
+    }));
+    assert(del.data?.work?.state === 'delivered', `deliver: ${JSON.stringify(del)}`);
+    const echoed = del.data.ai_provenance;
+    assert(!!echoed?.id, `no record echoed on the delivery: ${JSON.stringify(del.data)}`);
+    assert(echoed.record.level === 'ai-generated', `level ${echoed.record.level}`);
+    assert(echoed.record.generator?.model === 'stub/test-model', `model ${echoed.record.generator?.model}`);
+    assert(del.data.work.ai_provenance_id === echoed.id,
+        `the work item lost the record: ${JSON.stringify(del.data.work.ai_provenance_id)}`);
+
+    // ...and the CONSUMER — the party who paid — sees it on their own listing.
+    const list = parse(await C()['aimeat_exchange_work_list']({}));
+    const mine = list.data?.work?.find((x: any) => x.work_id === id);
+    assert(mine?.ai_provenance_id === echoed.id,
+        `the buyer cannot see how the answer was made: ${JSON.stringify(mine)}`);
 });
 
 await test('aimeat_exchange_work_list — consumer sees the delivered task with its output', async () => {

@@ -6,13 +6,16 @@
  *   organism, which workspace, which RECORD TYPE (bug / feature / task / decision / … — chosen
  *   generically from what the workspace actually offers, not hard-coded), a drafted title + content,
  *   and the completion condition (which field reaching which value means "done") + the field whose
- *   value carries the result back in the reply. Server-side because the OpenRouter key is decrypted
- *   here; the model only ever picks ids/namespaces present in the context we build. No AI key →
- *   NotebookAiError (the feature is gated on AI, never a static guess).
+ *   value carries the result back in the reply. Server-side because the caller's own key and budget
+ *   are server-side; the model only ever picks ids/namespaces present in the context we build. No AI
+ *   key → NotebookAiError (the feature is gated on AI, never a static guess).
  * @structure buildRecordContext() · triageMessage()
  * @usage const r = await triageMessage(storage, config, { gaii, ownerName, viewerGaii, text });
  * @version-history
  *   v1.0.0 — 2026-06-21 — Initial: AI record-type triage for Tracked Responses.
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: the two completions here run through the chokepoint
+ *     (via notebook-ai.ts) and are attributed as `tracked:triage` / `tracked:fill`, so the owner can
+ *     see what this feature spends. Nothing here decrypts a key any more.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -136,7 +139,7 @@ export async function triageMessage(
   const text = opts.text.trim();
   if (!text) throw new NotebookAiError('INVALID_INPUT', 'text is required');
 
-  const owner = await resolveOwnerModel(storage, config, opts.gaii);   // throws NO_OPENROUTER_KEY when missing
+  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'tracked:triage');   // throws NO_OPENROUTER_KEY when missing
   const context = await buildRecordContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii });
   const prompt = TRIAGE_TEMPLATE
     .split('{{structure}}').join(JSON.stringify({ organisms: context }, null, 2))
@@ -213,7 +216,7 @@ export async function fillRecord(
   storage: Storage, config: AimeatConfig,
   opts: { gaii: string; organismId: string; wsId: string; namespace: string; recordId: string; message: string; title: string; content: string },
 ): Promise<FillResult> {
-  const owner = await resolveOwnerModel(storage, config, opts.gaii);
+  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'tracked:fill');
   const base = `organism.${opts.organismId}.w.${opts.wsId}.${opts.namespace}`;
   const probeKey = `${base}.${opts.recordId}.draft`;
   const schemaRec = await storage.findApplicableSchema(probeKey);

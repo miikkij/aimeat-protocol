@@ -30,6 +30,10 @@
  * @structure stub AI provider · owner/agent setup · one describe-ish block per acceptance item
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8b: the legacy raw completion route
+ *     (POST /v1/openrouter/complete) now runs through the same chokepoint, so it mints provenance
+ *     AND lands in the usage ledger. Both halves read back from outside; the route's `content` and
+ *     `model` shape is pinned in the same test, because it is somebody's integration.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3: the `policy` disclosure reason (the private/public
  *     pair that proves AIMEAT_AI_LABEL_PUBLIC=strict labels what Art. 50(4) exempts, and that it
  *     never overwrites a legal reason), and the AI market-surveillance authority in
@@ -473,6 +477,59 @@ async function startStub(): Promise<void> {
             'the record must be about the bytes that were returned');
         assert(r.body.meta.provenance.recordUrl.endsWith(`/v1/provenance/${r.body.meta.provenance.id}`),
             `recordUrl wrong: ${r.body.meta.provenance.recordUrl}`);
+    });
+
+    // ── 8b. PHASE 8b: the LEGACY raw completion route runs through the same chokepoint ──
+    //
+    // `POST /v1/openrouter/complete` predates ai-completion.ts and spoke to the provider directly, so
+    // it produced model output that nothing stamped AND nothing billed. Both halves are asserted from
+    // OUTSIDE — the record is read back through /v1/provenance/:id and the charge through
+    // /v1/ai/usage — because "the code calls the right function" is not evidence that either happened.
+    //
+    // The route's shape is somebody's integration (the calibrator's callModel reads `data.content`),
+    // so `content` and `model` are pinned here too: this phase changes what happens behind the route,
+    // not what the route looks like.
+
+    await test('The legacy raw completion route mints provenance AND is metered', async () => {
+        // The route gates on a project the caller owns, so give it one to find.
+        const projectId = `phase8b-${Date.now()}`;
+        const mk = await json('/v1/memory', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ key: `generator.${projectId}.project`, value: { name: 'phase 8b' }, visibility: 'private' }),
+        });
+        assert(mk.status === 200 || mk.status === 201, `project setup ${mk.status}: ${JSON.stringify(mk.body?.error)}`);
+
+        const before = await json('/v1/ai/usage', { headers: auth(a.token) });
+        assert(before.status === 200, `usage before ${before.status}`);
+        const callsBefore = before.body.data.total_calls ?? 0;
+
+        const r = await json('/v1/openrouter/complete', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ projectId, prompt: 'Summarise the council meeting, again.' }),
+        });
+        assert(r.status === 200, `complete ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        assert(r.body.data.content === STUB_CONTENT, `data.content changed shape: ${JSON.stringify(r.body.data.content)}`);
+        assert(r.body.data.model === STUB_MODEL, `data.model changed shape: ${JSON.stringify(r.body.data.model)}`);
+
+        // 1. Provenance — read the RECORD.
+        const provId = r.body.meta?.provenance?.id;
+        assert(!!provId, `the raw route returned no meta.provenance: ${JSON.stringify(r.body.meta)}`);
+        const rec = await json(`/v1/provenance/${provId}`, { headers: auth(a.token) });
+        assert(rec.status === 200, `resolve ${rec.status}: ${JSON.stringify(rec.body?.error)}`);
+        const p = rec.body.data.provenance;
+        assert(p.attestation.contentHash === sha256(STUB_CONTENT),
+            `the record describes other bytes: ${p.attestation.contentHash}`);
+        assert(p.attestation.observed === true, 'the node watched this generation; observed must be true');
+        assert(p.generator.model === STUB_MODEL, `model ${p.generator.model}`);
+
+        // 2. Metering — read the LEDGER. This half is a money bug independent of Article 50:
+        // completions through this route were billed to nobody's budget.
+        const after = await json('/v1/ai/usage', { headers: auth(a.token) });
+        assert(after.status === 200, `usage after ${after.status}`);
+        assert((after.body.data.total_calls ?? 0) === callsBefore + 1,
+            `the completion was billed to nobody: total_calls ${callsBefore} → ${after.body.data.total_calls}`);
+        assert(!!after.body.data.per_app?.['openrouter:complete'],
+            `no per-app bucket for the route: ${JSON.stringify(after.body.data.per_app)}`);
     });
 
     // ── 9. PHASE 2: Mint-3 — silence from an agent is not "a human wrote it" ──

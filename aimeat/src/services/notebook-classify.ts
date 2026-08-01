@@ -3,15 +3,18 @@
  * @description Notebook slice B — AI placement classifier. Given a free-text note and the user's
  *   organism/workspace structure, asks the user's own OpenRouter model to suggest WHERE the note
  *   belongs (organism → workspace → document-space) and to draft a clean document title + markdown
- *   body. Server-side because the OpenRouter key is decrypted here; the materialize step itself runs
- *   client-side over the generic memory/organism APIs (no-SSR). The model only ever picks from ids
+ *   body. Server-side because the caller's key and budget are server-side; the materialize step
+ *   itself runs client-side over the generic memory/organism APIs (no-SSR). The model only picks ids
  *   present in the context we build, and we re-resolve names from that context so the frontend can
  *   render override dropdowns without a second round-trip.
  * @structure
  *   - buildPlacementContext() — compact {organisms:[{id,name,workspaces:[{id,name,documentSpaces}]}]}
- *   - classifyNote() — load key → build context → prompt → OpenRouter → parse → validated suggestion
+ *   - classifyNote() — resolve model → build context → prompt → chokepoint → parse → suggestion
  * @usage const result = await classifyNote(storage, config, { gaii, ownerName, text });
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8b: classify and distribute run through the completion
+ *     chokepoint (via notebook-ai.ts), so both mint provenance and appear in the owner's AI ledger
+ *     as `notebook:classify` / `notebook:distribute`. They were billed to nobody before.
  *   v1.0.0 — 2026-06-19 — Initial: AI placement classifier over OpenRouter (slice B).
  *   v1.1.0 — 2026-06-21 — Key/model resolution + completion extracted to notebook-ai.ts (shared with
  *     the planner); ClassifyError now extends NotebookAiError.
@@ -145,8 +148,8 @@ export async function classifyNote(
   const text = opts.text.trim();
   if (!text) throw new ClassifyError('INVALID_INPUT', 'text is required');
 
-  // Owner's own OpenRouter key + model (shared resolution; throws NO_OPENROUTER_KEY when missing).
-  const owner = await resolveOwnerModel(storage, config, opts.gaii);
+  // Owner's own model (shared resolution; throws NO_OPENROUTER_KEY when no key is configured).
+  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'notebook:classify');
 
   const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii });
   const prompt = fillPrompt(await loadClassifyTemplate(storage), context, text);
@@ -221,7 +224,7 @@ export async function distributeNote(
   const text = opts.text.trim();
   if (!text) throw new ClassifyError('INVALID_INPUT', 'text is required');
 
-  const owner = await resolveOwnerModel(storage, config, opts.gaii);
+  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'notebook:distribute');
   const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii });
   const prompt = (await loadDistributeTemplate(storage))
     .split('{{structure}}').join(JSON.stringify({ organisms: context }, null, 2))

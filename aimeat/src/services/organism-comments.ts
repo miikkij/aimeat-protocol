@@ -11,6 +11,9 @@
  *   - canAccessWorkspaceComments(...) -- membership + workspace-read gate
  *   - addComment(...) / listComments(...) -- create + read a target's thread
  * @version-history
+ *   v1.1.0 -- 2026-08-01 -- TARGET-058 Phase 8b: addComment() takes an optional `aiProvenanceId` and
+ *     writes it onto the comment's memory row. A comment IS a memory record, so it already had the
+ *     column — the id had nowhere to be passed in, which is a different problem with the same effect.
  *   v1.0.0 -- 2026-06-09 -- Initial: extracted so the MCP comment tools reuse the route logic.
  */
 import { randomUUID } from 'node:crypto';
@@ -51,7 +54,11 @@ function normaliseAnchor(anchor: unknown): CommentAnchor | null {
 
 export async function addComment(
   storage: Storage, organismId: string, author: string,
-  input: { ws: string; space: string; instanceId: string; body: string; anchor?: unknown; parentId?: unknown },
+  input: {
+    ws: string; space: string; instanceId: string; body: string; anchor?: unknown; parentId?: unknown;
+    /** TARGET-058: the provenance record describing this comment's body. Absent means UNSTATED. */
+    aiProvenanceId?: string;
+  },
 ): Promise<WorkspaceComment> {
   const commentId = randomUUID();
   const now = new Date().toISOString();
@@ -63,6 +70,7 @@ export async function addComment(
   await storage.setMemory({
     key: `${commentPrefix(organismId, input.ws, input.space, input.instanceId)}${commentId}`,
     ownerGaii: author, value: comment, visibility: 'private', tags: ['comment'],
+    ...(input.aiProvenanceId ? { aiProvenanceId: input.aiProvenanceId } : {}),
     ttlHours: null, version: 1, createdAt: now, updatedAt: now,
   });
   return comment;

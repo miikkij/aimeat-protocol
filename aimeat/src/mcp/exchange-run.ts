@@ -19,6 +19,10 @@
  *   import { registerExchangeRunTools } from './exchange-run.js';
  *   registerExchangeRunTools(mcp, storage, config, () => agentGaii, () => sessionToken);
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 8b. aimeat_exchange_work_deliver accepts an
+ *     `ai_provenance` declaration and stamps the delivered output. This is the thing the buyer paid
+ *     for, so the record travels ON the work item (`ai_provenance_id`) rather than only by hash —
+ *     the consumer's own listing is where they will look.
  *   v1.2.0 — 2026-07-28 — Calls the metered chokepoint directly. The capture-only mock Express
  *     Response existed only because the gate insisted on writing HTTP; a decision is a value.
  *   v1.1.0 — 2026-07-27 — The app-tool invoke carries the internal pass. Without it the loopback met the
@@ -48,6 +52,9 @@ import { appToolsKey, appIdFromToolsKey, AppToolsDocSchema, applyLockedInput } f
 import { getInterfaceVersion } from '../services/app-tool-interfaces.js';
 import { sendDirectMessage } from '../services/message-send.js';
 import type { PeerInfo } from '../services/federation.js';
+import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
 import { logger } from '../utils/logger.js';
 
 
@@ -97,6 +104,9 @@ export function registerExchangeRunTools(
             work_id: w.workId, offering_id: w.offeringId, consumer: w.consumerGaii, provider: w.providerGhii,
             agent: w.agentGaii, task_type: w.taskType, ext: w.ext, action: w.action, input: w.input, output: w.output,
             note: w.note, state: w.state, unit: w.unit, currency: w.currency, charged_units: w.chargedUnits,
+            // TARGET-058: how the delivered answer was made. Absent until delivery, and absent is
+            // UNSTATED — never a claim that a person wrote it.
+            ...(w.aiProvenanceId ? { ai_provenance_id: w.aiProvenanceId } : {}),
             created_at: w.createdAt, delivered_at: w.deliveredAt,
         };
     }
@@ -219,9 +229,10 @@ export function registerExchangeRunTools(
             work_id: z.string().min(1).max(120),
             output: z.unknown().optional(),
             note: z.string().max(2000).optional(),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_exchange_work_deliver'),
-        async ({ work_id, output, note }) => {
+        async ({ work_id, output, note, ai_provenance, ai_provenance_id }) => {
             const w = await getWork(storage, work_id);
             if (!w || w.providerOwner !== owner) return fail('NOT_FOUND: no such work of yours to deliver');
             if (w.state !== 'open') return fail(`WORK_NOT_OPEN: work is ${w.state}`);
@@ -243,12 +254,33 @@ export function registerExchangeRunTools(
             // capability does — it is their own cut either way, and the pool size stays their config.
             const shared = takeDesignations(output ?? null);
             if (outcome.kind === 'settled') await outcome.accrue(shared.designations);
+            // TARGET-058, and this is the sharpest commercial case on the surface: THIS is the thing
+            // the buyer paid for. The hash covers the output as STORED (after the beneficiary
+            // designations are taken out of it) plus the delivery note, because that pair is exactly
+            // what the consumer receives and reads.
+            const aiProvenanceId = await provenanceForWrite(storage, {
+                // The RESOLVED caller, never a field off the work item: whoever holds this token is
+                // who delivered, and this is the one place an attribution could otherwise be planted.
+                principal: callerGaii,
+                content: `${JSON.stringify(shared.result ?? null)}\n\n${note ?? ''}`,
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.exchange_work_deliver',
+                // Delivered privately to one buyer, and a buyer is a person deciding what to do with
+                // an answer — which is what decides whether a label is owed.
+                surface: { visibility: 'private', humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
             w.state = 'delivered'; w.output = shared.result ?? null; w.chargedUnits = charged; w.deliveredAt = new Date().toISOString();
+            if (aiProvenanceId) w.aiProvenanceId = aiProvenanceId;
             if (note) w.note = note.slice(0, 2000);
             await putWork(storage, w);
             await notify(w.consumerOwner, 'EXCHANGE — your agent work was delivered',
                 `Your "${w.taskType}" task (work ${w.workId}) was delivered by ${owner} and charged to your contract.`);
-            return ok({ work: workView(w) });
+            return ok({ work: workView(w), ...(await writeProvenanceEcho(storage, config, aiProvenanceId)) });
         },
     );
 

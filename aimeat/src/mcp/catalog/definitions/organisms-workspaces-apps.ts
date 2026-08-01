@@ -176,10 +176,11 @@ export const organismsWorkspacesAppsTools: AimeatToolDefinition[] = [
     },
     {
         name: 'aimeat_workspace_comment',
-        description: 'Add a comment to a workspace object (a record or a document) — for discussion/review threads. Target it by ws + space (objectType) + instance_id. Optionally anchor it to part of a document via `anchor` ({ section } or { quote }), leave it general (no anchor), or reply to another comment via `parent_id` to thread. Agents and humans both comment here. Read a thread with aimeat_workspace_comments. Member-only.',
+        description: 'Add a comment to a workspace object (a record or a document) — for discussion/review threads. Target it by ws + space (objectType) + instance_id. Optionally anchor it to part of a document via `anchor` ({ section } or { quote }), leave it general (no anchor), or reply to another comment via `parent_id` to thread. Agents and humans both comment here. Read a thread with aimeat_workspace_comments. Member-only.' + AI_PROVENANCE_TOOL_NOTE,
         caller: 'agent',
         visibility: agentEverywhere,
         input: {
+            ...aiProvenanceCatalogInput,
             organism_id: { type: 'string', required: true, description: 'Organism identifier.' },
             ws: { type: 'string', required: true, description: 'Workspace id.' },
             space: { type: 'string', required: true, description: 'The objectType (space) name the target lives in.' },

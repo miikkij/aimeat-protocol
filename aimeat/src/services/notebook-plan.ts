@@ -3,18 +3,20 @@
  * @description Notebook stage 2 — AI enrichment PLANNER. Given a free-text note and the user's
  *   organism/workspace structure, asks the user's own OpenRouter model to reason about the note's
  *   intent and propose an ordered plan of enrichment steps that EXPAND the note before it is filed.
- *   Server-side because the OpenRouter key is decrypted here (shared resolution in notebook-ai.ts);
- *   the steps themselves are executed client-side (no-SSR) — see public/js/services/notebook-plan.js.
+ *   Server-side because the caller's key and budget are server-side (shared resolution in
+ *   notebook-ai.ts); the steps themselves run client-side (no-SSR) — see public/js/services/notebook-plan.js.
  *   Phase 1 supports two self-fulfilled step kinds: `llm_reason` and `librarian_assess`. The model
  *   only ever produces those; unknown kinds are dropped defensively (same spirit as classify's
  *   resolveTarget).
  * @structure
- *   - planNote() — load key → build context → prompt → OpenRouter → parse → validated plan
+ *   - planNote() — resolve model → build context → prompt → chokepoint → parse → validated plan
  * @usage const result = await planNote(storage, config, { gaii, ownerName, viewerGaii, text });
  * @version-history
  *   v1.0.0 — 2026-06-21 — Initial (Phase 1): reason + librarian-assess planning over OpenRouter.
  *   v1.1.0 — 2026-06-21 — Phase 2: `delegate` step kind + offer catalogue grounding (the client passes a
  *     compact catalogue of the owner's agent offers; delegate steps are validated against it).
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 8b: the completion runs through the chokepoint, so the
+ *     plan is minted and metered as `notebook:plan`.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -151,7 +153,7 @@ export async function planNote(
   const text = opts.text.trim();
   if (!text) throw new NotebookAiError('INVALID_INPUT', 'text is required');
 
-  const owner = await resolveOwnerModel(storage, config, opts.gaii);
+  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'notebook:plan');
   const context = await buildPlacementContext(storage, config, { ownerName: opts.ownerName, viewerGaii: opts.viewerGaii });
   const catalogue = normaliseCatalogue(opts.catalogue);
   const prompt = fillPrompt(await loadPlanTemplate(storage), context, catalogue, text);

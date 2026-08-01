@@ -24,6 +24,9 @@
  *     can act in the organism). Active-member callers only; matches the REST members route.
  *   v1.5.0 -- 2026-06-22 -- Add aimeat_organism_update (creator/admin): edit name/description/interests/
  *     join_policy/visibility and the free-form README (organism.{id}.meta.readme). Mirrors PUT /v1/organisms/:id.
+ *   v1.7.0 -- 2026-08-01 -- TARGET-058 Phase 8b. aimeat_workspace_comment accepts an `ai_provenance`
+ *     declaration and stamps the body through provenanceForWrite(); the id lands on the comment's own
+ *     memory row, so a reader resolves it from the comment rather than by hash.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -41,6 +44,9 @@ import { registerOrganismEmailInviteTools } from './organisms-email-invites.js';
 import { searchOrganismContent } from '../services/organism-search.js';
 import { archiveTarget, unarchiveTarget, type ArchiveLevel } from '../services/archive.js';
 import { canAccessWorkspaceComments, addComment, listComments } from '../services/organism-comments.js';
+import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
 import { setOrganismReadme } from '../services/organism-readme.js';
 import { canSeeMembers } from '../services/organism-privacy.js';
 import { emitChange } from '../services/event-bus.js';
@@ -504,9 +510,10 @@ export function registerOrganismsTools(
             body: z.string().describe('The comment text'),
             anchor: z.object({ section: z.string().optional(), quote: z.string().optional() }).optional().describe('Optional anchor to part of a document'),
             parent_id: z.string().optional().describe('Optional id of the comment this replies to'),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_workspace_comment'),
-        async ({ organism_id, ws, space, instance_id, body, anchor, parent_id }) => {
+        async ({ organism_id, ws, space, instance_id, body, anchor, parent_id, ai_provenance, ai_provenance_id }) => {
             if (typeof body !== 'string' || !body.trim()) return { content: [{ type: 'text' as const, text: 'A non-empty body is required' }], isError: true };
             const organism = await storage.getOrganism(organism_id);
             if (!organism) return { content: [{ type: 'text' as const, text: 'Organism not found' }], isError: true };
@@ -514,8 +521,24 @@ export function registerOrganismsTools(
             if (!(await canAccessWorkspaceComments(storage, config, organism, agentGaii, ownerName, agentGaii, ws))) {
                 return { content: [{ type: 'text' as const, text: 'You cannot comment in this workspace' }], isError: true };
             }
-            const comment = await addComment(storage, organism_id, agentGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id });
-            return { content: [{ type: 'text' as const, text: JSON.stringify({ comment }, null, 2) }] };
+            // TARGET-058. A comment is discussion a person reads and answers — the same act as a
+            // board reply, in a members-only room. The body is stored truncated to 10 000 chars, so
+            // the hash is taken over the SAME slice that is stored: a record about bytes nobody kept
+            // would never match a detection query.
+            const aiProvenanceId = await provenanceForWrite(storage, {
+                principal: agentGaii,
+                content: body.slice(0, 10_000),
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.workspace_comment',
+                surface: { visibility: 'private', humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
+            const comment = await addComment(storage, organism_id, agentGaii, { ws, space, instanceId: instance_id, body, anchor, parentId: parent_id, aiProvenanceId });
+            return { content: [{ type: 'text' as const, text: JSON.stringify({ comment, ...(await writeProvenanceEcho(storage, config, aiProvenanceId)) }, null, 2) }] };
         },
     );
 

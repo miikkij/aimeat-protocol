@@ -20,6 +20,10 @@
  * @structure owner + two agents (one with provenance:write, one without) · write · read · lie · gate · DM
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-agent-plane
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: the five tools Phase 4 froze in
+ *     AI_PROVENANCE_REVIEWED_WITHOUT now carry the parameter, asserted through the MCP surface —
+ *     board_reply, message_send, dm_ask, workspace_comment (exchange_work_deliver is proven in
+ *     e2e-exchange-mcp, where a contract and a work item already exist).
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 4.
  */
 import * as ed from '@noble/ed25519';
@@ -375,6 +379,153 @@ async function connectAgent(ownerToken: string, ownerName: string, agentName: st
             'the appended sentence is missing from the description an agent actually reads');
         assert(!!mw!.inputSchema?.properties?.ai_provenance, 'ai_provenance is not on the input schema');
         assert(!!mw!.inputSchema?.properties?.ai_provenance_id, 'ai_provenance_id is not on the input schema');
+    });
+
+    // ── 7. PHASE 8b: the write tools that were reviewed WITHOUT the parameter and should not have been ──
+    //
+    // Phase 4 froze six borderline tools in a named list rather than quietly widening the surface,
+    // which made it a decision instead of a diff. Five of them carry text a PERSON reads — a board
+    // reply, a message to the owner, a structured question, a workspace comment, a delivered piece of
+    // work — so they owe the parameter, and this section is what proves they now have it.
+    //
+    // `aimeat_app_draft_save` is deliberately NOT here: a draft is inline-only staging whose content
+    // is stamped when it is PUBLISHED, so a second record at save time would describe bytes nobody
+    // has been shown. That reason is recorded next to the tool in scripts/check-ai-disclosure.ts.
+
+    const writer = await connectAgent(o.token, o.name, `w8b${Date.now()}`,
+        ['memory:read', 'memory:write', 'social:write', 'messages:send', 'messages:read', 'exchange:write', 'exchange:read']);
+
+    const PHASE_8B_TOOLS = [
+        'aimeat_board_reply', 'aimeat_message_send', 'aimeat_dm_ask',
+        'aimeat_workspace_comment', 'aimeat_exchange_work_deliver',
+    ];
+
+    await test('All five now DECLARE ai_provenance in the schema an agent actually reads', async () => {
+        let sessionId = '';
+        let id = 1;
+        const rpc = async (method: string, params: Record<string, unknown>) => {
+            const res = await fetch(`${BASE}/v1/mcp`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json', Accept: 'application/json, text/event-stream',
+                    Authorization: `Bearer ${writer.token}`,
+                    ...(sessionId ? { 'mcp-session-id': sessionId, 'mcp-protocol-version': '2025-03-26' } : {}),
+                },
+                body: JSON.stringify({ jsonrpc: '2.0', id: id++, method, params }),
+            });
+            const sid = res.headers.get('mcp-session-id');
+            if (sid) sessionId = sid;
+            const ct = res.headers.get('content-type') ?? '';
+            if (ct.includes('text/event-stream')) return parseSSE(await res.text())[0] ?? {};
+            return await res.json() as any;
+        };
+        await rpc('initialize', { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 'E2E', version: '1' } });
+        const out = await rpc('tools/list', {});
+        const tools = (out?.result?.tools ?? []) as Array<{ name: string; description: string; inputSchema: any }>;
+        for (const name of PHASE_8B_TOOLS) {
+            const t = tools.find(x => x.name === name);
+            assert(!!t, `${name} is not offered to an agent holding its scope`);
+            assert(!!t!.inputSchema?.properties?.ai_provenance, `${name}: ai_provenance missing from the input schema`);
+            assert(!!t!.inputSchema?.properties?.ai_provenance_id, `${name}: ai_provenance_id missing from the input schema`);
+            assert(t!.description.includes('silence is recorded as model-written'),
+                `${name}: the convention is not in the description an agent reads`);
+        }
+    });
+
+    await test('aimeat_board_reply stamps the reply and echoes the record', async () => {
+        const board = await mcpCall(writer.token, 'aimeat_board_create', {
+            name: `Phase8b ${Date.now()}`, description: 'provenance on replies', visibility: 'public',
+        });
+        assert(!board.isError, `board_create failed: ${board.raw.slice(0, 300)}`);
+        const boardId = board.parsed?.id ?? board.parsed?.board_id ?? board.parsed?.board?.id;
+        assert(!!boardId, `no board id: ${board.raw.slice(0, 300)}`);
+
+        const post = await mcpCall(writer.token, 'aimeat_board_post', {
+            board_id: boardId, title: 'A question', body: 'Anyone here?',
+        });
+        assert(!post.isError, `board_post failed: ${post.raw.slice(0, 300)}`);
+
+        const reply = await mcpCall(writer.token, 'aimeat_board_reply', {
+            board_id: boardId, post_id: post.parsed.id, body: 'A reply an agent wrote and said nothing about.',
+        });
+        assert(!reply.isError, `board_reply failed: ${reply.raw.slice(0, 300)}`);
+        const prov = reply.parsed?.ai_provenance;
+        assert(!!prov?.id, `a board reply carried no record: ${reply.raw.slice(0, 400)}`);
+        assert(prov.record.level === 'ai-generated' && prov.record.humanInvolvement === 'none',
+            `level/involvement ${prov.record.level}/${prov.record.humanInvolvement}`);
+        assert(prov.record.generator?.pipeline === 'mcp.board_reply', `pipeline ${prov.record.generator?.pipeline}`);
+    });
+
+    await test('aimeat_message_send stamps the message to the owner', async () => {
+        const m = await mcpCall(writer.token, 'aimeat_message_send', {
+            content: 'An agent reporting to its owner, origin undeclared.',
+        });
+        assert(!m.isError, `message_send failed: ${m.raw.slice(0, 300)}`);
+        const prov = m.parsed?.ai_provenance;
+        assert(!!prov?.id, `a message to the owner carried no record: ${m.raw.slice(0, 400)}`);
+        assert(prov.record.generator?.pipeline === 'mcp.message_send', `pipeline ${prov.record.generator?.pipeline}`);
+    });
+
+    await test('aimeat_message_send HONOURS a declaration of human authorship', async () => {
+        // The case the whole parameter exists for: an agent relaying words a person wrote must be
+        // able to say so. This agent holds no provenance:write, so it must be refused rather than
+        // silently recorded as the opposite — the same gate every other write surface applies.
+        const m = await mcpCall(writer.token, 'aimeat_message_send', {
+            content: 'The owner dictated this sentence.',
+            ai_provenance: { level: 'original', human_involvement: 'full-human' },
+        });
+        assert(m.isError, 'declaring without provenance:write must be refused, not downgraded');
+        assert(m.raw.includes('provenance:write'), `the refusal must name the scope: ${m.raw.slice(0, 300)}`);
+    });
+
+    await test('aimeat_dm_ask stamps the question it puts in front of a person', async () => {
+        const ask = await mcpCall(writer.token, 'aimeat_dm_ask', {
+            to: o.gaii,
+            body: 'A model wrote this framing and these options.',
+            questions: [{ id: 'q1', header: 'Pick', prompt: 'Which one?', options: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] }],
+            subject: `Ask ${Date.now()}`,
+        });
+        assert(!ask.isError, `dm_ask failed: ${ask.raw.slice(0, 400)}`);
+        const prov = ask.parsed?.ai_provenance;
+        assert(!!prov?.id, `a structured question carried no record: ${ask.raw.slice(0, 400)}`);
+        assert(prov.record.generator?.pipeline === 'mcp.dm_ask', `pipeline ${prov.record.generator?.pipeline}`);
+    });
+
+    await test('aimeat_workspace_comment stamps the comment', async () => {
+        const org = await mcpCall(writer.token, 'aimeat_organism_create', { name: `Phase8b org ${Date.now()}` });
+        assert(!org.isError, `organism_create failed: ${org.raw.slice(0, 300)}`);
+        const organismId = org.parsed?.id ?? org.parsed?.organism?.id;
+        assert(!!organismId, `no organism id: ${org.raw.slice(0, 300)}`);
+
+        const ws = await mcpCall(writer.token, 'aimeat_workspace_create', {
+            organism_id: organismId, name: 'Notes',
+            manifest: {
+                manifestVersion: '1.0', name: 'Notes', kind: 'project', status: 'active',
+                objectTypes: [{
+                    name: 'note', schemaRef: 'schema:note@1', namespace: 'shared.notes',
+                    backing: 'memory', writeRole: 'member', cardinality: 'many', mode: 'document',
+                }],
+            },
+        });
+        assert(!ws.isError, `workspace_create failed: ${ws.raw.slice(0, 400)}`);
+        const wsId = ws.parsed?.ws;
+        assert(!!wsId, `no workspace id: ${ws.raw.slice(0, 400)}`);
+
+        const wrote = await mcpCall(writer.token, 'aimeat_workspace_write', {
+            organism_id: organismId, ws: wsId, space: 'note', value: { title: 'A note', markdown: 'Something to discuss.' },
+        });
+        assert(!wrote.isError, `workspace_write failed: ${wrote.raw.slice(0, 400)}`);
+        const instanceId = wrote.parsed?.id;
+        assert(!!instanceId, `no instance id: ${wrote.raw.slice(0, 400)}`);
+
+        const c = await mcpCall(writer.token, 'aimeat_workspace_comment', {
+            organism_id: organismId, ws: wsId, space: 'note', instance_id: instanceId,
+            body: 'A comment a model wrote for people to read.',
+        });
+        assert(!c.isError, `workspace_comment failed: ${c.raw.slice(0, 400)}`);
+        const prov = c.parsed?.ai_provenance;
+        assert(!!prov?.id, `a workspace comment carried no record: ${c.raw.slice(0, 400)}`);
+        assert(prov.record.generator?.pipeline === 'mcp.workspace_comment', `pipeline ${prov.record.generator?.pipeline}`);
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

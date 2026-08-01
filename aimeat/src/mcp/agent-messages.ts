@@ -16,6 +16,10 @@
  *   v1.4.0 -- 2026-06-06 -- Task-based threads: threadId now defaults to linked_task_id when no
  *     thread_id is given, so a task's whole conversation stays in one thread instead of a new random
  *     thread per message. Updated param descriptions to steer agents toward passing linked_task_id.
+ *   v1.5.0 -- 2026-08-01 -- TARGET-058 Phase 8b. aimeat_message_send accepts an `ai_provenance`
+ *     declaration and stamps the content through provenanceForWrite(). This is the agent→human
+ *     channel: every message on it is text a named person reads, which is what decides whether a
+ *     label is owed — not whether the world can read it.
  */
 
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -25,6 +29,9 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
+import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
+import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
 
 export function registerAgentMessageTools(
     mcp: McpServer,
@@ -78,14 +85,35 @@ export function registerAgentMessageTools(
                     description: z.string().max(10_000),
                 }).optional().describe('Propose a task for user approval'),
             }).optional().describe('Optional message metadata'),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_message_send'),
-        async ({ content, thread_id, linked_task_id, metadata }) => {
+        async ({ content, thread_id, linked_task_id, metadata, ai_provenance, ai_provenance_id }) => {
             const now = new Date().toISOString();
             // Thread = task: group a message under its linked task so the whole
             // task conversation stays in one thread (omit thread_id and just pass
             // linked_task_id). Random thread only for ad-hoc, task-less chat.
             const threadId = thread_id ?? linked_task_id ?? randomUUID();
+
+            // TARGET-058. The message is delivered to a named person — the owner — so it is stamped
+            // like every other write that ends in front of a reader. The record describes the message
+            // CONTENT; `metadata` is machine plumbing (token counts, a proposed task) and not prose
+            // anyone reads as authored text.
+            //
+            // An agent message carries no provenance column of its own, so the record stands alone
+            // and is joined to the message by the hash of these exact bytes.
+            const provenanceId = await provenanceForWrite(storage, {
+                principal: agentGaii,
+                content,
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.message_send',
+                surface: { visibility: 'private', humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
 
             const record = await storage.createMessage({
                 id: randomUUID(),
@@ -115,6 +143,7 @@ export function registerAgentMessageTools(
                         thread_id: record.threadId,
                         status: record.status,
                         created_at: record.createdAt,
+                        ...(await writeProvenanceEcho(storage, config, provenanceId)),
                     }, null, 2),
                 }],
             };

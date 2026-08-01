@@ -12,6 +12,8 @@
  *   const w = await putWork(storage, { workId: newWorkId(), offeringId, consumerGaii, ... });
  *   // on delivery the exchange route settles via settleMeteredCoordinate against the consumer.
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: AgentWork carries `aiProvenanceId`, set at delivery, so
+ *     the buyer can find out how the answer they paid for was made.
  *   v1.0.0 — 2026-07-21 — Initial agent-work records (start → deliver → settle on delivery); metered per task.
  */
 import { randomUUID } from 'node:crypto';
@@ -40,6 +42,13 @@ export interface AgentWork {
   unit: EntitlementUnit;
   currency: string | null;
   chargedUnits: number;  // amount settled on delivery, in `unit` (0 until delivered)
+  /**
+   * TARGET-058: the provenance record describing the DELIVERED OUTPUT — how much of the answer the
+   * buyer paid for a model wrote. Set at delivery, absent until then, and absent means UNSTATED
+   * rather than "a person wrote it". Stored on the work value itself, which is a plain JSON memory
+   * record, so no column and no migration.
+   */
+  aiProvenanceId?: string;
   createdAt: string;
   deliveredAt: string | null;
 }

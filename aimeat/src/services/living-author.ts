@@ -5,10 +5,12 @@
  *   own OpenRouter model (shared resolution in notebook-ai.ts) and grounded by a compact catalogue of
  *   the owner's agent offers so sections can be assigned to real agents. Returns a template in the
  *   exact shape the client editor (living.js) consumes; the user can edit everything by hand after.
- * @structure authorLivingTemplate() — resolve key → prompt(need + catalogue) → OpenRouter → validated template
+ * @structure authorLivingTemplate() — resolve model → prompt(need + catalogue) → chokepoint → template
  * @usage const result = await authorLivingTemplate(storage, config, { gaii, need, catalogue });
  * @version-history
  *   v1.0.0 — 2026-06-21 — Phase 1: author a living-document template from a description.
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: the completion runs through the chokepoint, minted and
+ *     metered as `living:author`.
  */
 import type { Storage } from '../storage/interface.js';
 import type { AimeatConfig } from '../config.js';
@@ -89,7 +91,7 @@ export async function authorLivingTemplate(
   const need = opts.need.trim();
   if (!need) throw new NotebookAiError('INVALID_INPUT', 'need is required');
 
-  const owner = await resolveOwnerModel(storage, config, opts.gaii);
+  const owner = await resolveOwnerModel(storage, config, opts.gaii, 'living:author');
   const catalogue = normaliseCatalogue(opts.catalogue);
   const prompt = (await loadTemplate(storage))
     .split('{{need}}').join(need)

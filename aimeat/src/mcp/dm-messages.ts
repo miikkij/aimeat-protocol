@@ -10,6 +10,8 @@
  * @structure registerDmMessageTools(mcp, storage, config, getAgentGaii, peers)
  * @usage import { registerDmMessageTools } from './dm-messages.js';
  * @version-history
+ *   v1.5.0 -- 2026-08-01 -- TARGET-058 Phase 8b. aimeat_dm_ask joins its siblings: the intro AND the
+ *     questions are hashed, because on this tool the questions are the content a person reads.
  *   v1.4.0 -- 2026-08-01 -- TARGET-058 Phase 4. aimeat_dm_send and aimeat_dm_send_as_owner accept an
  *     `ai_provenance` declaration and stamp the body through provenanceForWrite(); aimeat_dm_thread
  *     returns each message's record, batched. send_as_owner stamps the ACTING AGENT rather than the
@@ -266,17 +268,35 @@ export function registerDmMessageTools(
             subject: z.string().min(1).max(200).optional().describe('Open a NEW topic thread with this title (else the default thread or conversation_id).'),
             conversation_id: z.string().min(8).max(64).optional().describe('Continue a specific existing thread by its id.'),
             submit_label: z.string().min(1).max(80).optional().describe('Optional submit-button label (the inbox defaults to a localized "Send answers").'),
+            ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_dm_ask'),
-        async ({ to, questions, body, subject, conversation_id, submit_label }) => {
+        async ({ to, questions, body, subject, conversation_id, submit_label, ai_provenance, ai_provenance_id }) => {
             const senderGhii = getAgentGaii();
             const recipientGhii = to.trim();
             if (recipientGhii === senderGhii) {
                 return { isError: true, content: [{ type: 'text' as const, text: JSON.stringify({ error: 'Cannot send a message to yourself.' }) }] };
             }
+            // TARGET-058. A structured question is not a lesser kind of message: the framing and the
+            // options are what a person reads, and the options are what they are steered to choose
+            // between. So the hash covers the intro AND the questions — hashing the body alone would
+            // describe the one part that is often empty.
+            const aiProvenanceId = await provenanceForWrite(storage, {
+                principal: senderGhii,
+                content: `${body ?? ''}\n\n${JSON.stringify(questions)}`,
+                declaredId: ai_provenance_id,
+                declared: toDeclaredProvenance(ai_provenance),
+                pipeline: 'mcp.dm_ask',
+                surface: { visibility: 'private', humanAudience: true },
+                labelPolicy: config.aiLabelPublic,
+                nodeId: config.nodeId,
+                baseUrl: config.baseUrl,
+                enabled: config.aiProvenance,
+            });
             const result = await sendDirectMessage(ctx, {
                 senderGhii, recipientGhii, body: body ?? '', conversationId: conversation_id, subject,
                 interactive: { role: 'questions', v: 1, questions, submitLabel: submit_label },
+                aiProvenanceId,
             });
             if (!result.ok) {
                 const msg = result.code === 'RECIPIENT_NOT_FOUND'
@@ -295,6 +315,7 @@ export function registerDmMessageTools(
                         status: result.message.status,
                         note: 'The answer returns as a reply — read interactive.answers via aimeat_dm_thread(conversation_id).',
                         created_at: result.message.createdAt,
+                        ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),
                     }, null, 2),
                 }],
             };
