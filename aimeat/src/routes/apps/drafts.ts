@@ -4,6 +4,9 @@
  *   preview-token, DELETE .../draft, POST .../publish-draft. Edit + test the next version without
  *   touching the live one. Extracted from src/routes/apps.ts to satisfy max-file-lines.
  * @version-history
+ *   v2.1.0 — 2026-08-01 — TARGET-058: publish-draft accepts `ai_provenance` / `ai_provenance_id`.
+ *     aimeat_app_draft_publish has advertised both since Phase 4 and this route never read them, so
+ *     the declaration died at the last hop before the mint.
  *   v2.0.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a: publish-draft is now services/app-publish.ts,
  *     shared with POST /v1/apps and the presigned upload. Promoting a draft consequently stops
  *     dropping `priceMorsels`, `licenseType` and the per-locale `descriptions` (a draft manifest
@@ -31,6 +34,7 @@ import { resolveIdentity } from '../../utils/gaii.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
 import { sanitizeProtection } from '../../utils/app-protect.js';
 import { publishApp } from '../../services/app-publish.js';
+import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { appOriginUrl, type CanonicalOwner } from './helpers.js';
 
 export function registerDraftRoutes(
@@ -246,6 +250,18 @@ export function registerDraftRoutes(
             return;
         }
 
+        // The declaration belongs to the PUBLISH, not to the draft save: promoting a draft is the act
+        // that puts bytes in front of readers, and it is the moment the publisher is answering for how
+        // they were made. Accepted here so aimeat_app_draft_publish's advertised `ai_provenance` has
+        // somewhere to land — it reached this route and was dropped, like the other two doors.
+        const { ai_provenance, ai_provenance_id } = req.body ?? {};
+        const declared = parseDeclaredProvenanceInput(ai_provenance);
+        if (!declared.ok) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                'Invalid ai_provenance declaration.', 400, { violations: declared.violations }));
+            return;
+        }
+
         // The draft manifest IS the caller's statement, so every field it can express is passed as
         // stated. What it CANNOT express — pricing, licence, per-locale descriptions — is left
         // unmentioned and carried from the live app. Publishing the draft manifest verbatim, which
@@ -271,6 +287,8 @@ export function registerDraftRoutes(
             },
             accessCode: { mode: 'carry' },
             source: 'draft',
+            declaredProvenanceId: typeof ai_provenance_id === 'string' ? ai_provenance_id : undefined,
+            declaredProvenance: declared.declared,
         });
         if ('refusal' in out) {
             res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));

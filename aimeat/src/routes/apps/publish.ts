@@ -6,6 +6,11 @@
  *   own business: validating the payload, decoding the base64, the optional screenshot, and this
  *   route's response document.
  * @version-history
+ *   v2.1.0 — 2026-08-01 — TARGET-058: BOTH modes of this route carry a provenance declaration —
+ *     the inline body reads `ai_provenance` / `ai_provenance_id`, and the presigned handshake puts
+ *     them in the token via buildUploadMeta so the PUT can mint from them. Phase 4 wired the
+ *     declaration into the MCP inline branch only; the other three doors accepted the parameter and
+ *     discarded it, which is why no app on this node carried a declared record.
  *   v2.0.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a: the body of the publish is now
  *     services/app-publish.ts, shared with the presigned-upload and publish-draft doors. Provenance
  *     went missing at a forgotten door in Phase 4 AND in Phase 5, and Phase 5 found the doors had
@@ -32,7 +37,8 @@ import type { Storage, AppManifest } from '../../storage/interface.js';
 import { validateCortexAgents } from '../../models/crew-def-schemas.js';
 import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
-import { generateUploadToken } from '../../services/upload-token.js';
+import { generateUploadToken, buildUploadMeta } from '../../services/upload-token.js';
+import { parseDeclaredProvenanceInput } from '../../mcp/ai-provenance-input.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { publishApp } from '../../services/app-publish.js';
 import { decodeStrictBase64 } from '../../utils/base64.js';
@@ -59,7 +65,19 @@ export function registerPublishRoutes(
             screenshot, screenshot_mime_type,
             name, description, descriptions, version: semver, category, tags, icon,
             uses_cortex, cortex, price_morsels, license_type, protection,
+            ai_provenance, ai_provenance_id,
         } = req.body ?? {};
+
+        // Validated at the door, against the SAME block every other surface uses. A malformed
+        // declaration is a 400 rather than a silently dropped field: dropping it is what this route
+        // used to do by never reading the key at all, and the result was an app that published
+        // successfully with no record while its author believed they had declared one.
+        const declared = parseDeclaredProvenanceInput(ai_provenance);
+        if (!declared.ok) {
+            res.status(400).json(error(config.nodeId, 'INVALID_INPUT',
+                'Invalid ai_provenance declaration.', 400, { violations: declared.violations }));
+            return;
+        }
 
         if (!filename || typeof filename !== 'string') {
             res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'filename is required'));
@@ -85,12 +103,16 @@ export function registerPublishRoutes(
                 // Only what the caller ACTUALLY sent. Defaulting the name to the filename here made
                 // "the caller omitted it" indistinguishable from "the caller asked for it" by the
                 // time the upload completed, so every presigned update renamed the app to its own
-                // filename — NUOTTA became "nuotta.html" in the catalogue, in public.
-                meta: {
+                // filename — NUOTTA became "nuotta.html" in the catalogue, in public. buildUploadMeta
+                // keeps that property (it drops undefined) and adds the carry-over list's guarantee
+                // that a newly accepted option cannot be forgotten here — which is how the
+                // provenance declaration went missing on this door.
+                meta: buildUploadMeta('app', {
                     filename, description, category, tags, icon,
                     ...(typeof req.body.name === 'string' ? { name: req.body.name } : {}),
                     ...(typeof semver === 'string' ? { version: semver } : {}),
-                },
+                    ai_provenance, ai_provenance_id,
+                }),
                 maxBytes: MAX_APP_SIZE,
                 contentType: 'text/html',
             });
@@ -179,6 +201,8 @@ export function registerPublishRoutes(
             // one explicitly. The other two carry the live app's forward — they have no way to say.
             accessCode: { mode: 'explicit', value: accessCode },
             source: 'inline',
+            declaredProvenanceId: typeof ai_provenance_id === 'string' ? ai_provenance_id : undefined,
+            declaredProvenance: declared.declared,
         });
         if ('refusal' in out) {
             res.status(out.refusal.status).json(error(config.nodeId, out.refusal.code, out.refusal.message));

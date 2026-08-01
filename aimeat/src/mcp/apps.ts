@@ -9,6 +9,13 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.9.0 — 2026-08-01 — TARGET-058: aimeat_app_publish's UPLOAD mode mints its token through
+ *     buildUploadMeta and carries `ai_provenance` / `ai_provenance_id` + `actor`. Phase 4 gave this
+ *     tool the parameter and Phase 8 shared the publish, but the presigned branch still hand-wrote
+ *     `meta: { filename, name, description, category, tags, icon, version }` — so the door the tool
+ *     itself recommends for anything over 1 KB accepted a declaration, dropped it at mint, and
+ *     published with `aiProvenanceId: null`. The missing `actor` blocked MINT-3 on the same branch,
+ *     so neither the caller's statement nor the node's fallback stamp could reach a presigned app.
  *   v1.8.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a: aimeat_app_publish and aimeat_app_draft_publish
  *     go through services/app-publish.ts, the one function the three REST doors already call. They
  *     were the fourth and fifth partial copies of the publish — no transparency lint, no quota, no
@@ -42,7 +49,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage, AppManifest } from '../storage/interface.js';
 import { parseGAII } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
-import { generateUploadToken } from '../services/upload-token.js';
+import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { generateDraftToken } from '../services/draft-token.js';
 import { validateCortexAgents } from '../models/crew-def-schemas.js';
 import { annotationsFor } from './annotations.js';
@@ -125,8 +132,19 @@ export function registerAppsTools(
                 const MAX_APP_SIZE = config.appMaxSizeMb * 1024 * 1024;
                 const token = await generateUploadToken({
                     sub: `${parsed.owner}@${config.nodeId}`,
+                    // WHO asked, next to WHERE it lands. An app always lands in the owner's bucket,
+                    // so `sub` alone erased the publishing agent — and with it everything MINT-3 has
+                    // to reason from, on the door this tool recommends for anything over 1 KB. The
+                    // REST presigned mint has carried `actor` since Phase 5; this one had not.
+                    actor: agentGaii,
                     utype: 'app',
-                    meta: { filename, name, description, category, tags, icon, version },
+                    // buildUploadMeta, not a hand-written object: the hand-written one is what
+                    // dropped `ai_provenance` (and `cortex_agents` before it). The carry-over list
+                    // lives with the token, so a new option is covered by declaring it there once.
+                    meta: buildUploadMeta('app', {
+                        filename, name, description, category, tags, icon, version,
+                        ai_provenance, ai_provenance_id,
+                    }),
                     maxBytes: MAX_APP_SIZE,
                     contentType: 'text/html',
                 });

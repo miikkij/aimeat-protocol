@@ -354,6 +354,67 @@ components:
             record:
               $ref: '#/components/schemas/AiProvenanceRecord'
 
+    AiProvenanceDeclaration:
+      type: object
+      description: >
+        What a caller SAYS about how the content in this request was made — the input block, not the
+        stored record. It is the same shape the MCP write tools take as `ai_provenance`, so a
+        statement means one thing whichever surface it arrives on.
+
+
+        What is deliberately absent is identity. There is no principal, no node and no attestation
+        here: the node fills in who you are, which node, when, and the hash of the exact bytes, and
+        it never takes any of those from the caller. A declaration is believed about the HOW and
+        never about the WHO.
+
+
+        Omitting the block is not an error. For an AGENT or ECOSYSTEM principal the node then stamps
+        a record itself (`stampedBy: node`) — silence from a non-human writer must not read as "a
+        human wrote it" — while an OWNER principal is never stamped.
+      required: [level]
+      properties:
+        level:
+          type: string
+          enum: [original, assisted, synthesized, ai-generated]
+          description: >
+            How much of this a model made. `original` = a person wrote it, no model involved.
+            `assisted` = a person wrote it and a model edited or refined it. `synthesized` = a model
+            combined real sources into new content at someone's direction. `ai-generated` = a model
+            produced it.
+        method:
+          type: string
+          enum: [human, rewritten, summarized, translated, synthesized, fully-generated, multi-agent]
+          description: Optional detail under `level`.
+        human_involvement:
+          type: string
+          enum: [none, light-review, editorial-control, full-human]
+          description: >
+            Whether a person examined what the model produced. Only a step where someone reads the
+            SUBSTANCE and can reject it counts — a skim, a spell-check or clicking publish is
+            `light-review` at most. Omitted means `none`.
+        model:
+          type: string
+          description: The model that produced it, as the provider names it.
+          example: anthropic/claude-opus-5
+        sources:
+          type: array
+          maxItems: 100
+          description: For synthesized content, where the material came from.
+          items:
+            type: object
+            required: [url]
+            properties:
+              url: { type: string }
+              title: { type: string }
+              retrieved_at: { type: string, format: date-time }
+              role: { type: string, description: "How it was used, e.g. 'primary' or 'background'." }
+        notes:
+          type: string
+          maxLength: 1000
+          description: >
+            Anything a reader needs to interpret the above. Never prompt text or anything private —
+            the record is publishable alongside the content.
+
     AiProvenanceItemBlock:
       type: object
       description: >
@@ -15902,6 +15963,19 @@ paths:
                       type: array
                       maxItems: 5
                       items: { $ref: '#/components/schemas/CrewDef' }
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: >
+                    How the app bundle in this request was made. Honoured in BOTH modes: sent with
+                    `mode: presigned` it rides in the signed upload token, so the declaration made at
+                    the handshake is the one recorded when the bytes arrive. A malformed block is a
+                    400 rather than a silently dropped field.
+                ai_provenance_id:
+                  type: string
+                  description: >
+                    Attach an ALREADY-MINTED record instead of declaring a new one. Must belong to
+                    the caller's own account. Also carried through the presigned token.
       responses:
         '201':
           description: |
@@ -16859,6 +16933,24 @@ paths:
       parameters:
         - { in: path, name: owner, required: true, schema: { type: string } }
         - { in: path, name: filename, required: true, schema: { type: string } }
+      requestBody:
+        required: false
+        description: >
+          Optional. The declaration belongs to the PROMOTION rather than to the draft save: this is
+          the call that puts the bytes in front of readers, and so the moment the publisher answers
+          for how they were made.
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ai_provenance:
+                  allOf:
+                    - $ref: '#/components/schemas/AiProvenanceDeclaration'
+                  description: How the promoted bundle was made. A malformed block is a 400.
+                ai_provenance_id:
+                  type: string
+                  description: Attach an already-minted record of the caller's own instead.
       responses:
         '201':
           description: Draft published as a new live version
