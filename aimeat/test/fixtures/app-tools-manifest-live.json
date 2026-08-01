@@ -1,0 +1,319 @@
+{
+  "tools": [
+    {
+      "name": "getEdition",
+      "plans": [
+        {
+          "id": "monthly",
+          "model": "subscription",
+          "periodPrice": 39,
+          "periodSeconds": 2592000,
+          "windowSeconds": 86400,
+          "callsPerWindow": 5
+        },
+        {
+          "id": "pack50",
+          "model": "bundle",
+          "blockSize": 50,
+          "blockPrice": 80
+        }
+      ],
+      "price": {
+        "morsels": 2
+      },
+      "exchange": true,
+      "action_id": "ext:sanomat:getEdition",
+      "usageTerms": {
+        "note": "AI-synthesized Finnish newspaper; verify facts against cited sources before republishing. Every article carries an ai_provenance record; keep it attached when you repeat the text.",
+        "resale": false,
+        "attribution": true,
+        "derivatives": true
+      },
+      "description": "The daily (L)AIMEAT Sanomat edition: all articles (title, category, body, sources) plus the satirical editorial for a date/edition. Omit date for the newest edition. Carries an aimeat.provenance/v1 record on the edition AND on every article, so you can state how each piece was made. No human reviews the substance before publication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "ISO date YYYY-MM-DD; omit for newest"
+          },
+          "edition": {
+            "type": "string",
+            "description": "morning | day | evening; omit for newest of the day"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "edition": {
+            "type": "string"
+          },
+          "articles": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "body": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "sources": {
+                  "type": "array"
+                },
+                "category": {
+                  "type": "string"
+                },
+                "editorial": {
+                  "type": "boolean"
+                },
+                "ai_provenance": {
+                  "type": "object",
+                  "description": "aimeat.provenance/v1 record for this article"
+                }
+              }
+            }
+          },
+          "editorial": {
+            "type": "object"
+          },
+          "articleCount": {
+            "type": "integer"
+          },
+          "editionLabel": {
+            "type": "string"
+          },
+          "ai_provenance": {
+            "type": "object",
+            "description": "aimeat.provenance/v1 record for the whole edition"
+          },
+          "availableSlots": {
+            "type": "array"
+          }
+        }
+      }
+    },
+    {
+      "name": "listEditions",
+      "price": {
+        "morsels": 0
+      },
+      "action_id": "ext:sanomat:listEditions",
+      "description": "Available editions (date + edition + article count), newest first. Free discovery helper for navigating the archive. Carries ai_provenance.self for the listing and ai_provenance.content for what the editions are.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "limit": {
+            "type": "integer",
+            "description": "max editions, newest first (default 20)"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "count": {
+            "type": "integer"
+          },
+          "editions": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "date": {
+                  "type": "string"
+                },
+                "edition": {
+                  "type": "string"
+                },
+                "articleCount": {
+                  "type": "integer"
+                },
+                "editionLabel": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "ai_provenance": {
+            "type": "object",
+            "description": "self = the listing, content = the editions it points at"
+          }
+        }
+      }
+    },
+    {
+      "name": "getSpaceWeather",
+      "plans": [
+        {
+          "id": "monthly",
+          "model": "subscription",
+          "periodPrice": 15,
+          "periodSeconds": 2592000,
+          "windowSeconds": 86400,
+          "callsPerWindow": 24
+        }
+      ],
+      "price": {
+        "morsels": 1
+      },
+      "exchange": true,
+      "action_id": "ext:sanomat:getSpaceWeather",
+      "usageTerms": {
+        "note": "Live NOAA/NASA measurement data re-served as-is; no model produced these numbers.",
+        "resale": false,
+        "attribution": true,
+        "derivatives": true
+      },
+      "description": "Live space weather: current NOAA planetary K-index mapped to the NOAA G-scale (geomagnetic storm level), aurora likelihood, plus live NOAA/NASA imagery URLs. Measured data, not model output: ai_provenance states level=original and no label owed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {}
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "images": {
+            "type": "array"
+          },
+          "kpTime": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "kpIndex": {
+            "type": "number"
+          },
+          "auroraLikely": {
+            "type": "boolean"
+          },
+          "ai_provenance": {
+            "type": "object"
+          },
+          "geomagneticStorm": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    {
+      "name": "getMoon",
+      "plans": [
+        {
+          "id": "monthly",
+          "model": "subscription",
+          "periodPrice": 9,
+          "periodSeconds": 2592000,
+          "windowSeconds": 86400,
+          "callsPerWindow": 10
+        }
+      ],
+      "price": {
+        "morsels": 1
+      },
+      "exchange": true,
+      "action_id": "ext:sanomat:getMoon",
+      "usageTerms": {
+        "note": "Computed from a synodic-month model; arithmetic, not a model output.",
+        "resale": false,
+        "attribution": true,
+        "derivatives": true
+      },
+      "description": "Moon phase as seen from Finland (Northern-Hemisphere orientation) for a date: phase name (FI/EN), illumination percent, waxing/waning, age in days. Computed arithmetic: ai_provenance states level=original and no label owed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "ISO date YYYY-MM-DD; omit for today"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "phase": {
+            "type": "string"
+          },
+          "waxing": {
+            "type": "boolean"
+          },
+          "ageDays": {
+            "type": "number"
+          },
+          "phaseEn": {
+            "type": "string"
+          },
+          "ai_provenance": {
+            "type": "object"
+          },
+          "illuminationPercent": {
+            "type": "integer"
+          }
+        }
+      }
+    },
+    {
+      "name": "getNameday",
+      "plans": [
+        {
+          "id": "monthly",
+          "model": "subscription",
+          "periodPrice": 9,
+          "periodSeconds": 2592000,
+          "windowSeconds": 86400,
+          "callsPerWindow": 10
+        }
+      ],
+      "price": {
+        "morsels": 1
+      },
+      "exchange": true,
+      "action_id": "ext:sanomat:getNameday",
+      "usageTerms": {
+        "note": "Almanac lookup from node-shared public data; no model involved.",
+        "resale": false,
+        "attribution": true,
+        "derivatives": true
+      },
+      "description": "Finnish name day(s) for a date from the shared almanac. Almanac lookup: ai_provenance states level=original and no label owed.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string",
+            "description": "ISO date YYYY-MM-DD; omit for today"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "date": {
+            "type": "string"
+          },
+          "names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "ai_provenance": {
+            "type": "object"
+          }
+        }
+      }
+    }
+  ],
+  "version": 2,
+  "updatedAt": "2026-08-01T07:47:42.057Z"
+}

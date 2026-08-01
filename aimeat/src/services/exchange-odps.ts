@@ -37,6 +37,7 @@ import { stringify as yamlStringify } from 'yaml';
 import { formatMoneyMajor } from '../commerce/money.js';
 import type { Offering, OfferingStats } from './exchange-market.js';
 import type { OdpsExtras, OdpsSlaDimension, OdpsQualityDimension, Provenance } from '../models/odps-schemas.js';
+import { AiProvenanceSchema } from '../models/ai-provenance-schemas.js';
 
 /** The ODPS version this node speaks. Pinned per the TARGET-045 addendum (Q2: pin ODPS v4.x, v4.1 current). */
 export const ODPS_VERSION = '4.1';
@@ -93,6 +94,36 @@ export function mergeProvenance(base: Provenance | null | undefined, own: Proven
   if (!base && !own) return null;
   const merged = { ...(base ?? {}), ...(own ?? {}) } as Provenance;
   return Object.keys(merged).length ? merged : null;
+}
+
+/**
+ * The AI-provenance document a listing carries: what a buyer is told about whether the OUTPUT they
+ * are purchasing was written by a model (TARGET-058). Distinct from `mergeProvenance` above, which is
+ * the ODPS attestation about the DATA the capability draws on.
+ *
+ * NOT a field merge, unlike its two neighbours. This one is a self-describing document with its own
+ * `spec`, and half a v1 record laid over half a v2 record is a document that claims to be something
+ * it is not. So a tool's own statement REPLACES the app-level default wholesale, and the app-level
+ * default applies only to tools that state nothing.
+ *
+ * SOFT-FAILING, DELIBERATELY. The manifest is all-or-nothing — one field a validator rejects silently
+ * delists every offering the app has — so an unparseable block is dropped from the listing and the
+ * offering still lists. Returning `null` here costs a buyer one piece of metadata; throwing would
+ * cost the provider their entire shelf.
+ */
+export function inheritAiProvenance(
+  appLevel: unknown, toolLevel: unknown,
+): Record<string, unknown> | null {
+  const chosen = isNonEmptyObject(toolLevel) ? toolLevel : (isNonEmptyObject(appLevel) ? appLevel : null);
+  if (!chosen) return null;
+  const parsed = AiProvenanceSchema.safeParse(chosen);
+  // Not `logger.warn` — this module is pure (no clock, no storage, no I/O) so the same offering always
+  // yields the same document. The caller decides whether a dropped block is worth reporting.
+  return parsed.success ? (parsed.data as unknown as Record<string, unknown>) : null;
+}
+
+function isNonEmptyObject(v: unknown): v is Record<string, unknown> {
+  return !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 0;
 }
 
 /** ODPS `details.type` for an offering that did not declare one: what the surface actually is. */
@@ -337,6 +368,16 @@ function aimeatExtension(input: OdpsProjectionInput): Json {
     ...(callRecipe ? { call_recipe: callRecipe as unknown as Json } : {}),
     ...(o.usageTerms ? { usage_terms: o.usageTerms as unknown as Json } : {}),
     ...(o.provenance ? { provenance: o.provenance as unknown as Json } : {}),
+    // TARGET-058: how much of what this capability RETURNS a model wrote. `provenance` above is the
+    // ODPS attestation about the DATA behind it; this is about the answer the buyer receives, and it
+    // is what an agent shopping for a capability reads before it commits. Absent means UNSTATED —
+    // never "a person wrote it" — which is why the note travels with the block.
+    ...(o.aiProvenance ? {
+      ai_provenance: {
+        ...(o.aiProvenance as unknown as Json),
+        'x-note': 'Stated by the provider about this capability\'s OUTPUT. Absence of this block means unstated, not human-written.',
+      },
+    } : {}),
     economics: {
       unit: o.unit, base_price: o.basePrice, currency: o.currency, rake_percent: rakePercent,
       note: 'base_price is in the offering unit: 6-decimal micro-units for money, whole morsels otherwise.',

@@ -165,6 +165,17 @@ export interface Offering {
   capabilityBinding?: string | null;
   provenance: Provenance | null;
   /**
+   * How much of what this capability RETURNS a model wrote — an `aimeat.provenance/v1` document
+   * (TARGET-058), projected from the app-tool manifest's `aiProvenance` (tool's own, or the app-level
+   * default when the tool states none). `provenance` above is the ODPS attestation about the DATA;
+   * this one is about the OUTPUT a buyer receives.
+   *
+   * Loosely typed and always optional, because the manifest is all-or-nothing: an unparseable block
+   * is dropped by inheritAiProvenance() rather than failing the projection, and a future `spec`
+   * version must never be able to delist an app's whole shelf.
+   */
+  aiProvenance?: Record<string, unknown> | null;
+  /**
    * Morsels burned per call on top of whatever this offering is paid in — the provider's own pacing.
    * Projected from the source and captured into the contract at accept, so changing it later governs
    * new contracts while existing ones keep the terms they were signed at.

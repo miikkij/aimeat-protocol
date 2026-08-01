@@ -54,7 +54,7 @@ import {
 } from './exchange-market.js';
 import type { EntitlementUnit } from './metered-entitlements.js';
 import type { Provenance, OdpsExtras } from '../models/odps-schemas.js';
-import { ODPS_VERSION, mergeOdpsExtras, mergeProvenance } from './exchange-odps.js';
+import { ODPS_VERSION, mergeOdpsExtras, mergeProvenance, inheritAiProvenance } from './exchange-odps.js';
 import { logger } from '../utils/logger.js';
 
 /** One outcome line of a reconcile — the dry-run report is exactly this list. */
@@ -93,6 +93,12 @@ interface DesiredListing {
   /** Provider descriptor data carried from the source onto the listing + its ODPS document. */
   provenance: Provenance | null;
   odps: OdpsExtras | null;
+  /**
+   * What the provider states about how much of this capability's OUTPUT a model wrote (TARGET-058).
+   * Optional on the interface as well as on the manifest: a source that predates the field, and one
+   * whose block failed to parse, look identical here — absent — and both still list.
+   */
+  aiProvenance?: Record<string, unknown> | null;
   /** The provider's declared pacing burn, projected so a contract can capture it at accept. */
   tollMorsels: number | null;
   tags: string[];
@@ -165,8 +171,13 @@ export function ownerGhiiOf(principal: string): string {
  * them, so the market could not list what the shop could already sell. An unbound tool needs a named
  * agent of this owner: `aimeat_exchange_work` builds the assignee GAII from the surface, so a listing
  * with no real assignee would take an order nobody can deliver.
+ *
+ * Exported for the manifest-safety test. The manifest is ALL-OR-NOTHING — one field a validator
+ * rejects silently delists every offering an app has — so "does this manifest still yield the same
+ * listings?" is a question worth being able to ask directly, against a real manifest, rather than
+ * only through a full reconcile.
  */
-async function desiredFromAppTools(
+export async function desiredFromAppTools(
   storage: Storage, ownerGhii: string, ownerName: string, only: string | undefined,
   skips: ReconcileChange[], dryRun: boolean,
 ): Promise<DesiredListing[]> {
@@ -213,6 +224,7 @@ async function desiredFromAppTools(
           plans: (tool.plans ?? []) as OfferingPlan[], usageTerms: usageTermsOf(tool.usageTerms), tags: [] as string[],
           provenance: provenanceOf(mergeProvenance(parsed.data.provenance, tool.provenance) ?? undefined),
           odps: mergeOdpsExtras(parsed.data.odps, tool.odps),
+          aiProvenance: inheritAiProvenance(parsed.data.aiProvenance, tool.aiProvenance),
           tollMorsels: pacingTollOf(tool.tollMorsels, morsels, money.length > 0),
           taskSpec: { inputSchema: tool.inputSchema ?? {}, outputSchema: tool.outputSchema ?? {} },
         };
@@ -224,7 +236,8 @@ async function desiredFromAppTools(
             // an existing listing whose surface predates this field reads as `unchanged`, the update
             // is skipped, and it keeps a surface no scoped reconcile can match.
             sourceHash: contentHash([taskBase.title, taskBase.description, taskBase.taskSpec, taskBase.plans,
-              taskBase.usageTerms, taskBase.provenance, taskBase.odps, taskBase.tollMorsels, appId, p]),
+              taskBase.usageTerms, taskBase.provenance, taskBase.odps, taskBase.aiProvenance,
+              taskBase.tollMorsels, appId, p]),
           });
         }
         continue;
@@ -244,13 +257,20 @@ async function desiredFromAppTools(
         // App-level defaults (manifest root) are inherited by every tool; the tool overrides field by field.
         provenance: provenanceOf(mergeProvenance(parsed.data.provenance, tool.provenance) ?? undefined),
         odps: mergeOdpsExtras(parsed.data.odps, tool.odps),
+        // A tool's own AI-provenance statement replaces the app-level default wholesale rather than
+        // merging with it: it is a self-describing document, and half of one laid over half of
+        // another is a document that claims to be something it is not.
+        aiProvenance: inheritAiProvenance(parsed.data.aiProvenance, tool.aiProvenance),
         tollMorsels: pacingTollOf(tool.tollMorsels, morsels, money.length > 0),
       };
       for (const p of prices(morsels, money)) {
         out.push({
           ...base, ...p,
           key: listingKey('app-tool', coord.ext, coord.action, p.unit, p.currency),
-          sourceHash: contentHash([base.title, base.description, base.plans, base.usageTerms, base.provenance, base.odps, base.tollMorsels, ifaceVersion, p]),
+          // aiProvenance rides in the hash for the same reason appId does above: without it, an app
+          // that ADDS a statement about its output reads as `unchanged`, the update is skipped, and
+          // the buyer never sees the thing the provider just declared.
+          sourceHash: contentHash([base.title, base.description, base.plans, base.usageTerms, base.provenance, base.odps, base.aiProvenance, base.tollMorsels, ifaceVersion, p]),
         });
       }
     }
@@ -434,7 +454,8 @@ export async function reconcileOwnerOfferings(
         title: d.title, description: d.description,
         unit: d.unit, basePrice: d.basePrice, currency: d.currency, plans: d.plans,
         ...(d.taskSpec ? { taskSpec: d.taskSpec } : {}),
-        provenance: d.provenance, odps: d.odps, tollMorsels: d.tollMorsels, usageTerms: d.usageTerms, tags: d.tags,
+        provenance: d.provenance, odps: d.odps, aiProvenance: d.aiProvenance ?? null,
+        tollMorsels: d.tollMorsels, usageTerms: d.usageTerms, tags: d.tags,
         state: 'listed', auto: true, sourceHash: d.sourceHash, createdAt: now, updatedAt: now,
       };
       if (!dryRun) await putOffering(storage, offering);
@@ -461,6 +482,7 @@ export async function reconcileOwnerOfferings(
       // the provider already made — an emptied legal basis is worse than a stale one.
       ...(d.provenance ? { provenance: d.provenance } : {}),
       ...(d.odps ? { odps: d.odps } : {}),
+      ...(d.aiProvenance ? { aiProvenance: d.aiProvenance } : {}),
       // Pacing IS overwritten from the source even when cleared: unlike an attestation, a stale brake
       // the provider has since removed keeps charging consumers for a limit nobody asked for.
       tollMorsels: d.tollMorsels,
