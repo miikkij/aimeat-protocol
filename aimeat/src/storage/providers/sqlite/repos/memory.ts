@@ -1,19 +1,29 @@
 /**
  * @file repos/memory.ts
- * @description SQLite (better-sqlite3) memory repository helpers: get/set/list/search memory rows and
- *   the FTS5 full-text path. Includes the trackable-memory versioning: when a key marked `trackable`
- *   is overwritten, its previous value is archived to the `memory_history` table (append-only) before
- *   the update, and listMemoryHistory() reads it back newest-first. NOTE: SqliteStorage (../index.ts)
- *   carries its own inline copies of the core memory methods; this module is the parallel repo layer —
- *   keep the two in sync when changing memory behaviour.
- * @structure getMemory/setMemory/listMemory/listAllMemory/deleteMemory/searchMemory/searchTextMemory/listMemoryHistory
- * @usage import { setMemory, listMemoryHistory } from './repos/memory.js';
+ * @description The SQLite memory helpers that do NOT fit as prototype methods: the shared archive-filter
+ *   SQL fragment, the DB-side byte/row aggregates behind the quota + stats, and the FTS5 full-text
+ *   search path. Every export here is called from methods/owner.ts or methods/owner-memory-scope.ts.
+ *
+ *   THIS IS NOT A PARALLEL MEMORY IMPLEMENTATION, and the header used to say it was. Until
+ *   2026-08-01 the module also carried get/set/list/listAll/delete/search/history copies of the core
+ *   memory methods, with a note telling the reader to "keep the two in sync". Nothing imported them —
+ *   the live CRUD is methods/owner.ts — and predictably the two did NOT stay in sync: the copies here
+ *   never learned `workspaceRef` or `groupId`. A duplicate that nothing calls cannot be kept honest by
+ *   a comment, so the copies were deleted rather than repaired. If you need memory CRUD, it lives in
+ *   methods/owner.ts; do not reintroduce a second one here.
+ * @structure archivedSql · sumMemoryBytes / sumMemoryBytesForOwners / countMemory ·
+ *   searchTextMemory (+ its private FTS helpers) · archive/unarchive/countArchivedByKeyPrefix
+ * @usage import { searchTextMemory, archivedSql } from './repos/memory.js';
  * @version-history
+ *   v2.0.0 — 2026-08-01 — Removed nine dead exports (getMemory, setMemory, listMemory, listAllMemory,
+ *     deleteMemory, deleteAllMemory, listMemoryHistory, incrementMemoryFlagCount, searchMemory) and the
+ *     two private helpers only they used (annotationOf, appendHistory). No importer existed for any of
+ *     them. deserializeMemory + isMemoryExpired STAY — searchTextMemory calls both.
  *   v1.1.0 — 2026-06-22 — Trackable-memory versioning: archive prior versions to memory_history (Osa D1).
  */
 import type Database from 'better-sqlite3';
 import type { ArchiveFilter, MemoryRecord } from '../../../interface.js';
-import type { MemoryTextHit, MemoryTextSearchOpts, MemoryVersionRecord } from '../../../repositories/memory.repository.js';
+import type { MemoryTextHit, MemoryTextSearchOpts } from '../../../repositories/memory.repository.js';
 
 /** SQL fragment (with leading ` AND`) restricting the `memory.archived` column by filter. Default
  *  `exclude` → active rows only. Shared by every bulk read so archived content stays out of the
@@ -61,86 +71,10 @@ function deserializeMemory(row: Record<string, unknown>): MemoryRecord {
   return record;
 }
 
-/** Read an optional `_actor` / `_event` annotation off a record value (the convention the structure
- *  timeline uses to attribute a version) — best-effort, so archived history rows carry who/why. */
-function annotationOf(value: unknown, field: '_actor' | '_event'): string | null {
-  if (value && typeof value === 'object' && !Array.isArray(value)) {
-    const v = (value as Record<string, unknown>)[field];
-    if (typeof v === 'string' && v) return v;
-  }
-  return null;
-}
-
-/** Archive the PREVIOUS version of a trackable key before it is overwritten. Append-only; INSERT OR
- *  IGNORE guards against re-archiving the same (owner,key,version). */
-function appendHistory(db: Database.Database, prev: MemoryRecord): void {
-  db.prepare(
-    `INSERT OR IGNORE INTO memory_history (ownerGaii, key, version, value, actor, event, recordedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`
-  ).run(
-    prev.ownerGaii, prev.key, prev.version,
-    JSON.stringify(prev.value),
-    annotationOf(prev.value, '_actor'), annotationOf(prev.value, '_event'),
-    prev.updatedAt,
-  );
-}
-
 function isMemoryExpired(record: MemoryRecord): boolean {
   if (!record.ttlHours) return false;
   const createdMs = new Date(record.createdAt).getTime();
   return Date.now() > createdMs + record.ttlHours * 3_600_000;
-}
-
-export function getMemory(db: Database.Database, ownerGaii: string, key: string): MemoryRecord | null {
-  const row = db.prepare('SELECT * FROM memory WHERE ownerGaii = ? AND key = ?').get(ownerGaii, key) as Record<string, unknown> | undefined;
-  if (!row) return null;
-  const record = deserializeMemory(row);
-  if (isMemoryExpired(record)) {
-    db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(ownerGaii, key);
-    return null;
-  }
-  return record;
-}
-
-export function setMemory(db: Database.Database, record: MemoryRecord): MemoryRecord {
-  const existing = getMemory(db, record.ownerGaii, record.key);
-  // Trackable is a property of the key: inherit the existing setting if the writer didn't specify, so
-  // a generic rewrite never silently turns tracking off. Archiving is gated on the EXISTING (previous)
-  // record being trackable — that's the version we keep.
-  const trackable = record.trackable ?? existing?.trackable ?? false;
-  record.trackable = trackable || undefined;
-  const valueStr = JSON.stringify(record.value);
-  const byteSize = Buffer.byteLength(valueStr, 'utf8');   // cached for the O(1) total-size quota sum
-  if (existing) {
-    if (existing.trackable) appendHistory(db, existing);   // keep the previous version before overwrite
-    record.version = existing.version + 1;
-    db.prepare(
-      `UPDATE memory SET value = ?, visibility = ?, tags = ?, ttlHours = ?, version = ?,
-       createdAt = ?, updatedAt = ?, flagCount = ?, allowedOrigins = ?, trackable = ?, byteSize = ? WHERE ownerGaii = ? AND key = ?`
-    ).run(
-      valueStr, record.visibility,
-      JSON.stringify(record.tags), record.ttlHours,
-      record.version, record.createdAt, record.updatedAt,
-      record.flagCount ?? 0,
-      record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
-      trackable ? 1 : 0, byteSize,
-      record.ownerGaii, record.key,
-    );
-  } else {
-    db.prepare(
-      `INSERT INTO memory (ownerGaii, key, value, visibility, tags, ttlHours, version, createdAt, updatedAt, flagCount, allowedOrigins, trackable, byteSize)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
-    ).run(
-      record.ownerGaii, record.key,
-      valueStr, record.visibility,
-      JSON.stringify(record.tags), record.ttlHours,
-      record.version, record.createdAt, record.updatedAt,
-      record.flagCount ?? 0,
-      record.allowedOrigins ? JSON.stringify(record.allowedOrigins) : null,
-      trackable ? 1 : 0, byteSize,
-    );
-  }
-  return record;
 }
 
 /** Sum the byte size of one owner's memory values, computed entirely in SQLite (no rows/values
@@ -159,23 +93,6 @@ export function sumMemoryBytesForOwners(db: Database.Database, ownerGaiis: strin
   return row.s;
 }
 
-/** Archived prior versions of a trackable key, newest version first. Empty for non-trackable keys. */
-export function listMemoryHistory(db: Database.Database, ownerGaii: string, key: string, opts?: { limit?: number }): MemoryVersionRecord[] {
-  const limit = opts?.limit ?? 200;
-  const rows = db.prepare(
-    'SELECT * FROM memory_history WHERE ownerGaii = ? AND key = ? ORDER BY version DESC LIMIT ?'
-  ).all(ownerGaii, key, limit) as Record<string, unknown>[];
-  return rows.map(r => ({
-    ownerGaii: r.ownerGaii as string,
-    key: r.key as string,
-    version: r.version as number,
-    value: JSON.parse(r.value as string),
-    actor: (r.actor as string | null) ?? null,
-    event: (r.event as string | null) ?? null,
-    recordedAt: r.recordedAt as string,
-  }));
-}
-
 export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: { prefix?: string; visibility?: string; archived?: ArchiveFilter }): number {
   if (ownerGaiis.length === 0) return 0;
   const placeholders = ownerGaiis.map(() => '?').join(',');
@@ -188,137 +105,6 @@ export function countMemory(db: Database.Database, ownerGaiis: string[], opts?: 
   // value-loading list path prunes those lazily. Negligible for a "N Muistit" counter.
   const row = db.prepare(sql).get(...params) as { c: number };
   return row.c;
-}
-
-export function listMemory(db: Database.Database, ownerGaii: string, opts?: { prefix?: string; visibility?: string; tags?: string[]; maxFlags?: number; archived?: ArchiveFilter }): MemoryRecord[] {
-  let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
-  const params: unknown[] = [ownerGaii];
-
-  if (opts?.prefix) {
-    sql += ' AND key LIKE ?';
-    params.push(opts.prefix + '%');
-  }
-  if (opts?.visibility) {
-    sql += ' AND visibility = ?';
-    params.push(opts.visibility);
-  }
-  sql += archivedSql(opts?.archived);
-
-  const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
-  const results: MemoryRecord[] = [];
-  for (const row of rows) {
-    const record = deserializeMemory(row);
-    if (isMemoryExpired(record)) {
-      db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key);
-      continue;
-    }
-    if (opts?.tags?.length) {
-      const hasTags = opts.tags.every(t => record.tags.includes(t));
-      if (!hasTags) continue;
-    }
-    if (opts?.maxFlags !== undefined && (record.flagCount ?? 0) > opts.maxFlags) continue;
-    results.push(record);
-  }
-  return results;
-}
-
-export function listAllMemory(db: Database.Database, opts?: { prefix?: string; ownerPrefix?: string; visibility?: string; limit?: number; offset?: number; archived?: ArchiveFilter; excludeVersionRows?: boolean }): { items: MemoryRecord[]; total: number } {
-  let whereClauses = '';
-  const params: unknown[] = [];
-
-  if (opts?.ownerPrefix) {
-    whereClauses += ' AND ownerGaii LIKE ?';
-    params.push(opts.ownerPrefix + '%');
-  }
-  if (opts?.prefix) {
-    whereClauses += ' AND key LIKE ?';
-    params.push(opts.prefix + '%');
-  }
-  if (opts?.visibility) {
-    whereClauses += ' AND visibility = ?';
-    params.push(opts.visibility);
-  }
-  // Drop `.version.N` workspace history rows in SQL (hot read paths always discard them).
-  if (opts?.excludeVersionRows) {
-    whereClauses += " AND key NOT LIKE '%.version.%'";
-  }
-  whereClauses += archivedSql(opts?.archived);
-
-  const whereStr = whereClauses ? ' WHERE ' + whereClauses.slice(5) : '';
-
-  // Count total
-  const countRow = db.prepare('SELECT COUNT(*) as cnt FROM memory' + whereStr).get(...params) as { cnt: number };
-  const total = countRow.cnt;
-
-  // Fetch page
-  const limit = opts?.limit ?? 50;
-  const offset = opts?.offset ?? 0;
-  const rows = db.prepare('SELECT * FROM memory' + whereStr + ' ORDER BY updatedAt DESC LIMIT ? OFFSET ?').all(...params, limit, offset) as Record<string, unknown>[];
-
-  const items: MemoryRecord[] = [];
-  for (const row of rows) {
-    const record = deserializeMemory(row);
-    if (isMemoryExpired(record)) {
-      db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key);
-      continue;
-    }
-    items.push(record);
-  }
-  return { items, total };
-}
-
-export function deleteMemory(db: Database.Database, ownerGaii: string, key: string): boolean {
-  const result = db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(ownerGaii, key);
-  return result.changes > 0;
-}
-
-export function deleteAllMemory(db: Database.Database, ownerGaii: string): number {
-  const result = db.prepare('DELETE FROM memory WHERE ownerGaii = ?').run(ownerGaii);
-  return result.changes;
-}
-
-export function incrementMemoryFlagCount(db: Database.Database, ownerGaii: string, key: string): void {
-  db.prepare(
-    'UPDATE memory SET flagCount = COALESCE(flagCount, 0) + 1 WHERE ownerGaii = ? AND key = ?'
-  ).run(ownerGaii, key);
-}
-
-export function searchMemory(db: Database.Database, ownerGaii: string, query: string, opts?: { visibility?: string; maxFlags?: number; prefix?: string; archived?: ArchiveFilter; limit?: number }): MemoryRecord[] {
-  const q = query.toLowerCase();
-  let sql = 'SELECT * FROM memory WHERE ownerGaii = ?';
-  const params: unknown[] = [ownerGaii];
-
-  if (opts?.visibility) {
-    sql += ' AND visibility = ?';
-    params.push(opts.visibility);
-  }
-
-  if (opts?.prefix) {
-    sql += ' AND key LIKE ?';
-    params.push(opts.prefix + '%');
-  }
-  sql += archivedSql(opts?.archived);
-
-  const rows = db.prepare(sql).all(...params) as Record<string, unknown>[];
-  const results: MemoryRecord[] = [];
-  for (const row of rows) {
-    const record = deserializeMemory(row);
-    if (isMemoryExpired(record)) {
-      db.prepare('DELETE FROM memory WHERE ownerGaii = ? AND key = ?').run(record.ownerGaii, record.key);
-      continue;
-    }
-    if (opts?.maxFlags !== undefined && (record.flagCount ?? 0) > opts.maxFlags) continue;
-    const valStr = typeof record.value === 'string' ? record.value : JSON.stringify(record.value);
-    if (
-      record.key.toLowerCase().includes(q) ||
-      valStr.toLowerCase().includes(q) ||
-      record.tags.some(t => t.toLowerCase().includes(q))
-    ) {
-      results.push(record);
-      if (opts?.limit !== undefined && results.length >= opts.limit) break;   // additive result cap (post-filter)
-    }
-  }
-  return results;
 }
 
 /** One FTS branch: search a single `*_fts` table joined back to memory. Default `exclude` runs over
