@@ -203,13 +203,25 @@ export interface TrustedIssuerRecord {
 }
 
 // Phase 3.3 — Verification Nonces (EUDIW/FTN state tracking)
+//
+// Also the pending-authorization store for OUTBOUND connections (TARGET-057). It is reused rather
+// than duplicated because it already IS this primitive: a single-use value bound to a principal,
+// carried across a provider redirect, with expiry sweeping (cleanExpiredNonces) already wired.
+// A second table would have been a second sweeper and a second way to forget one.
 export interface VerificationNonceRecord {
   id: string;
   owner: string;
-  type: 'eudiw' | 'ftn' | 'google_login' | 'casdoor_login' | 'entra_login';
+  type: 'eudiw' | 'ftn' | 'google_login' | 'casdoor_login' | 'entra_login' | 'connect';
   state: string;
+  /** OIDC nonce for the login types; the PKCE code_verifier for `connect`. */
   nonce: string;
   redirectUri: string;
+  /**
+   * Flow-specific JSON the callback needs and the URL must not carry. For `connect` that is the
+   * provider, the instance and the mode: putting them in the redirect URL instead would let the
+   * caller of the callback choose which provider their code is redeemed against.
+   */
+  payload?: string | null;
   createdAt: string;
   expiresAt: string;
 }

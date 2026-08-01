@@ -576,8 +576,8 @@ export const communityMethods = {
 
   async createVerificationNonce(this: SqliteStorage, record: VerificationNonceRecord): Promise<VerificationNonceRecord> {
     this.db.prepare(
-      'INSERT INTO verification_nonces (id, owner, type, state, nonce, redirectUri, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'
-    ).run(record.id, record.owner, record.type, record.state, record.nonce, record.redirectUri ?? '', record.createdAt, record.expiresAt);
+      'INSERT INTO verification_nonces (id, owner, type, state, nonce, redirectUri, payload, createdAt, expiresAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)'
+    ).run(record.id, record.owner, record.type, record.state, record.nonce, record.redirectUri ?? '', record.payload ?? null, record.createdAt, record.expiresAt);
     return record;
   },
 
@@ -587,10 +587,11 @@ export const communityMethods = {
     return {
       id: row.id as string,
       owner: row.owner as string,
-      type: row.type as 'eudiw' | 'ftn' | 'google_login',
+      type: row.type as VerificationNonceRecord['type'],
       state: row.state as string,
       nonce: row.nonce as string,
       redirectUri: row.redirectUri as string,
+      payload: (row.payload as string | null) ?? null,
       createdAt: row.createdAt as string,
       expiresAt: row.expiresAt as string,
     };

@@ -97,6 +97,8 @@ export function initializeSchema(db: Database.Database): void {
 
   // Phase 2 CORS — GHII-level allowed origins
   safeAddColumn('ghiis', 'allowedOrigins', 'TEXT');
+  // TARGET-057: the pending-authorization payload for outbound connections. Mirrors Postgres 0023.
+  safeAddColumn('verification_nonces', 'payload', 'TEXT');
 
   // Phase 3 CORS — Agent-level allowed origins
   safeAddColumn('agents', 'allowedOrigins', 'TEXT');

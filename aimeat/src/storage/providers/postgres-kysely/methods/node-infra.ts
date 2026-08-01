@@ -37,7 +37,8 @@ function toTrustedIssuer(r: Selectable<TrustedIssuer>): TrustedIssuerRecord {
 function toVerificationNonce(r: Selectable<VerificationNonce>): VerificationNonceRecord {
   return {
     id: r.id, owner: r.owner, type: r.type as VerificationNonceRecord['type'], state: r.state, nonce: r.nonce,
-    redirectUri: r.redirectUri, createdAt: iso(r.createdAt), expiresAt: iso(r.expiresAt),
+    redirectUri: r.redirectUri, payload: r.payload ?? null,
+    createdAt: iso(r.createdAt), expiresAt: iso(r.expiresAt),
   };
 }
 function toRealtimeRoom(r: Selectable<RealtimeRoom>): RealtimeRoomRecord {
@@ -104,7 +105,8 @@ export const nodeInfraMethods = {
   async createVerificationNonce(this: PostgresKyselyStorage, record: VerificationNonceRecord): Promise<VerificationNonceRecord> {
     await this.db.insertInto('VerificationNonce').values({
       id: record.id, owner: record.owner, type: record.type, state: record.state, nonce: record.nonce,
-      redirectUri: record.redirectUri ?? '', createdAt: new Date(record.createdAt), expiresAt: new Date(record.expiresAt),
+      redirectUri: record.redirectUri ?? '', payload: record.payload ?? null,
+      createdAt: new Date(record.createdAt), expiresAt: new Date(record.expiresAt),
     }).execute();
     return record;
   },

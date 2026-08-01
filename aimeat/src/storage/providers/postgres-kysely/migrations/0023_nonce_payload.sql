@@ -1,0 +1,13 @@
+-- 0023_nonce_payload.sql
+-- Flow-specific state for a pending authorization (TARGET-057).
+--
+-- "VerificationNonce" already is the primitive an outbound connection needs: a single-use value
+-- bound to a principal, carried across a provider redirect, with expiry sweeping already wired. It
+-- is reused rather than duplicated -- a second table would have meant a second sweeper and a second
+-- way to forget one.
+--
+-- What it lacked is somewhere to keep what the CALLBACK needs to know: which provider, which
+-- instance, which connection mode. The alternative was to put those in the redirect URL, and that
+-- would let whoever calls the callback choose which provider their code is redeemed against.
+-- Nullable, so every existing login row stays valid unchanged.
+ALTER TABLE "VerificationNonce" ADD COLUMN IF NOT EXISTS "payload" TEXT;

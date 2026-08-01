@@ -1594,6 +1594,8 @@ export interface VerificationNonce {
   id: Generated<string>;
   nonce: string;
   owner: string;
+  /** TARGET-057: flow-specific JSON the callback needs and the URL must not carry. */
+  payload: string | null;
   redirectUri: Generated<string>;
   state: string;
   type: string;

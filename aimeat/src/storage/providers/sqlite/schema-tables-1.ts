@@ -621,6 +621,10 @@ export function applySchemaTables1(db: Database.Database): void {
       state          TEXT NOT NULL UNIQUE,
       nonce          TEXT NOT NULL,
       redirectUri    TEXT NOT NULL DEFAULT '',
+      -- TARGET-057: flow-specific JSON the callback needs and the URL must not carry (provider,
+      -- instance, mode). In the redirect URL instead, whoever calls the callback would get to
+      -- choose which provider their code is redeemed against.
+      payload        TEXT,
       createdAt      TEXT NOT NULL,
       expiresAt      TEXT NOT NULL
     );
