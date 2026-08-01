@@ -5,6 +5,7 @@
 [![Agent-Ready: Level 5](https://img.shields.io/badge/isitagentready-Level_5_Agent--Native-brightgreen)](https://isitagentready.com/)
 [![AgentGrade](https://agentgrade.com/api/badge?url=https%3A%2F%2Faimeat.io)](https://agentgrade.com/s/aimeat.io)
 [![Agent Ready](https://agent-ready.dev/api/badge/aimeat.io)](https://agent-ready.dev)
+[![EU AI Act Art. 50: transparency built in](https://img.shields.io/badge/EU_AI_Act_Art._50-transparency_built_in-003399)](https://aimeat.io/v1/ai-transparency)
 
 **AI Memory Exchange and Action Transfer**
 

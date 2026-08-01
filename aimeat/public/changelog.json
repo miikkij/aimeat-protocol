@@ -2,6 +2,19 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-01",
+      "version": "2.4.0",
+      "kind": "feature",
+      "title": {
+        "en": "EU AI Act Article 50: now you can tell when a machine wrote it",
+        "fi": "EU:n tekoälyasetuksen artikla 50: nyt näet, milloin kirjoittajana oli kone"
+      },
+      "body": {
+        "en": "The EU's transparency rules for AI-generated content came into force on 2 August. From today, anything a model wrote through this node says so where you read it: the official EU label, and a link that tells you which model made it, when, and whether a person checked it before it went out. Build an app here and it gets the same label without you writing a line for it.",
+        "fi": "EU:n avoimuussäännöt tekoälysisällölle tulivat voimaan 2. elokuuta. Tästä päivästä alkaen kaikki mitä malli on tällä nodella kirjoittanut kertoo sen siinä missä sen luet: virallinen EU-merkintä ja linkki, josta näkyy mikä malli sen teki, milloin, ja tarkistiko ihminen sen ennen julkaisua. Jos rakennat täällä apin, se saa saman merkinnän ilman että kirjoitat siihen riviäkään."
+      }
+    },
+    {
       "date": "2026-07-31",
       "kind": "feature",
       "title": {
