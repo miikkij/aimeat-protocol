@@ -3,6 +3,8 @@
  * @description MCP tool registrations for knowledge package browsing,
  *   retrieval, contribution, and link discovery.
  * @version-history
+ *   v1.3.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_knowledge_contribute carries
+ *     `ai_provenance` / `ai_provenance_id` and echoes what was recorded.
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
@@ -14,6 +16,8 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
+import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
 
 export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -34,9 +38,11 @@ export function registerKnowledgeTools(mcp: McpServer, registry: AgentRegistry):
     package_id: z.string().describe('Knowledge package identifier'),
     entry_key: z.string().describe('Entry key'),
     content: z.string().describe('Entry content'),
-  }, annotationsFor('aimeat_knowledge_contribute'), async ({ package_id, entry_key, content }) => {
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_knowledge_contribute'), async ({ package_id, entry_key, content, ai_provenance, ai_provenance_id }) => {
     const resp = await client.post(`/v1/knowledge/${encodeURIComponent(package_id)}/contribute`, { entry_key, content });
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_knowledge_contribute', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   mcp.tool('aimeat_knowledge_links', descriptionFor('aimeat_knowledge_links'), {

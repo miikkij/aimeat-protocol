@@ -24,6 +24,9 @@
  *     organism_create/export/import), so no-LLM CrewAI crews can read/write organism workspaces via
  *     `aimeat connect call`. Thin REST wrappers, server-side authz unchanged. Guarded by
  *     test/unit/connector-cli-parity.test.ts.
+ *   v1.8.0 -- 2026-08-01 -- TARGET-058 Phase 11: every definition is wrapped by
+ *     withProvenanceCarrying(), so a caller's `ai_provenance` block is recorded, or reported as not
+ *     recorded, instead of being dropped on the floor behind an ok:true.
  *   v1.7.0 -- 2026-07-13 -- Split tool definitions + shared helpers into sibling modules
  *     (tool-call-helpers.ts, tool-call-defs-{agent,core,organism,apps}.ts) to satisfy max-file-lines;
  *     CONNECT_CLI_TOOLS is now the concatenation of those groups (order preserved).
@@ -40,15 +43,22 @@ import { coreTools } from './tool-call-defs-core.js';
 import { organismTools } from './tool-call-defs-organism.js';
 import { appTools } from './tool-call-defs-apps.js';
 import { exchangeTools } from './tool-call-defs-exchange.js';
+import { withProvenanceCarrying } from './ai-provenance-carry.js';
 
 // The full tool catalog is assembled from sibling group modules, preserving declaration order.
+//
+// TARGET-058 Phase 11: every definition goes through withProvenanceCarrying(), which is where an
+// `ai_provenance` block sent to a shell-callable tool is validated, recorded (or reported as not
+// recorded), and echoed back. ONE wrapper rather than thirteen edited handlers — this dispatch table
+// serves both `aimeat connect call` and `POST /local/call/:tool`, and a per-handler version would
+// have left whichever one somebody forgot silently stripping the block, which is the bug being fixed.
 export const CONNECT_CLI_TOOLS: ConnectCliToolDefinition[] = [
     ...agentTools,
     ...coreTools,
     ...organismTools,
     ...appTools,
     ...exchangeTools,
-];
+].map(withProvenanceCarrying);
 
 function getTool(name: string): ConnectCliToolDefinition | undefined {
     return CONNECT_CLI_TOOLS.find(tool => tool.name === name);

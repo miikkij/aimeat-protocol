@@ -2,6 +2,9 @@
  * @file cli/connect/tool-call-defs-core.ts
  * @description Memory, discovery, work, wallet, board, storage, admin, capabilities, catalogue, consent, flag, group, instance, knowledge and skill connect-call tool definitions. Extracted from cli/connect/tool-call.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.1.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_memory_write forwards `ai_provenance_id` into
+ *     the write body. The inline `ai_provenance` declaration is handled once, for every tool in this
+ *     table, by withProvenanceCarrying() in tool-call.ts.
  *   v1.0.0 -- 2026-07-13 -- Extracted from tool-call.ts (max-file-lines)
  */
 import type { JsonObject, ConnectCliToolDefinition } from './tool-call-helpers.js';
@@ -22,6 +25,12 @@ export const coreTools: ConnectCliToolDefinition[] = [
             const tags = optionalArray(input, 'tags');
             if (tags) body.tags = tags;
             if (ttlHours !== undefined) body.ttl_hours = ttlHours;
+            // POST /v1/memory takes a pre-minted record id directly (it checks the record belongs to
+            // this owner). An inline `ai_provenance` DECLARATION cannot ride here — the route has no
+            // field for it — so withProvenanceCarrying() records that one after the write, against
+            // this key. TARGET-058 Phase 11.
+            const provenanceId = optionalString(input, 'ai_provenance_id');
+            if (provenanceId) body.ai_provenance_id = provenanceId;
             return client.post('/v1/memory', body);
         },
     },

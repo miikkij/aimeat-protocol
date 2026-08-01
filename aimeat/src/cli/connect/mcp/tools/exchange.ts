@@ -6,6 +6,8 @@
  *   provider lineage locally. Thin REST proxies over the /v1/exchange/* routes (src/routes/exchange.ts +
  *   exchange-market.ts) — server-side authz + authoritative pricing unchanged.
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 11: aimeat_exchange_work_deliver carries
+ *     `ai_provenance` / `ai_provenance_id` and echoes what was recorded.
  *   v1.1.0 — 2026-07-21 — Act-on-exchange parity (tunnelled fleet agents get the same generic tools as the
  *     server MCP): app_tool_invoke (call an app tool via contract) + work start/deliver/list + proposals +
  *     proposal_decide — thin REST proxies over the app-tool WebMCP invoke, /v1/exchange/work, and proposals routes.
@@ -17,6 +19,8 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
+import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
 
 export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client } = registry.resolve();
@@ -157,11 +161,15 @@ export function registerExchangeTools(mcp: McpServer, registry: AgentRegistry): 
     work_id: z.string().describe('The open work item to deliver.'),
     output: z.unknown().optional().describe('The delivered result.'),
     note: z.string().optional().describe('An optional delivery note.'),
-  }, annotationsFor('aimeat_exchange_work_deliver'), async ({ work_id, output, note }) => {
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_exchange_work_deliver'), async ({ work_id, output, note, ai_provenance, ai_provenance_id }) => {
     const body: Record<string, unknown> = {};
     if (output !== undefined) body.output = output;
     if (note) body.note = note;
-    return out(await client.post(`/v1/exchange/work/${encodeURIComponent(work_id)}/deliver`, body));
+    const resp = await client.post(`/v1/exchange/work/${encodeURIComponent(work_id)}/deliver`, body);
+    if (resp.ok === false) return out(resp);
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_exchange_work_deliver', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   mcp.tool('aimeat_exchange_work_list', descriptionFor('aimeat_exchange_work_list'), {

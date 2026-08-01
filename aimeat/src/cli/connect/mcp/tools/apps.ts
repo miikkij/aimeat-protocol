@@ -3,6 +3,8 @@
  * @description MCP tool registrations for app/package management -- publishing,
  *   listing, retrieving, archiving versions, version history, sanctioned forks, and drafts (staging).
  * @version-history
+ *   v1.3.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_app_publish / aimeat_app_draft_publish
+ *     carry `ai_provenance` / `ai_provenance_id` and echo what was recorded.
  *   v1.2.0 -- 2026-07-19 -- Connector reachability: add aimeat_app_fork + app draft save/publish/discard
  *     (thin proxies to /v1/apps/:owner/:filename/fork | /draft | /publish-draft).
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -14,6 +16,8 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
+import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
 
 export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client, owner } = registry.resolve();
@@ -24,9 +28,11 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
     name: z.string().describe('App name'),
     description: z.string().describe('App description'),
     content: z.string().describe('App content'),
-  }, annotationsFor('aimeat_app_publish'), async ({ name, description, content }) => {
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_app_publish'), async ({ name, description, content, ai_provenance, ai_provenance_id }) => {
     const resp = await client.post('/v1/packages', { name, description, content });
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_app_publish', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   mcp.tool('aimeat_app_list', descriptionFor('aimeat_app_list'), {
@@ -95,8 +101,12 @@ export function registerAppsTools(mcp: McpServer, registry: AgentRegistry): void
   // → POST /v1/apps/:owner/:filename/publish-draft — promote the draft to a new live version.
   mcp.tool('aimeat_app_draft_publish', descriptionFor('aimeat_app_draft_publish'), {
     filename: z.string().describe('App filename whose draft to publish.'),
-  }, annotationsFor('aimeat_app_draft_publish'), async ({ filename }) => {
-    return out(await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/publish-draft`));
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_app_draft_publish'), async ({ filename, ai_provenance, ai_provenance_id }) => {
+    const resp = await client.post(`/v1/apps/${encodeURIComponent(owner)}/${encodeURIComponent(filename)}/publish-draft`);
+    if (resp.ok === false) return out(resp);
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_app_draft_publish', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   // → DELETE /v1/apps/:owner/:filename/draft — discard the draft (live app untouched).

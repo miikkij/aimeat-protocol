@@ -16,6 +16,8 @@
  * @structure
  *   1. one LLM transport          — provider HTTP lives in ONE file; who may call it is a list
  *   2. MCP write tools            — every free-text write tool has DECIDED about `ai_provenance`
+ *   2b. connector surfaces        — the CATALOG is the contract: node MCP, connector MCP and the
+ *                                   shell-callable dispatch all carry what it promises
  *   3. one publish path           — storage.createApp() has one caller plus named distinct acts
  *   4. external vocabulary        — IPTC/IETF values live only in the adapter (comments ignored)
  *   5. locale parity              — every aiLabel.* key in both locales, no [TODO:fi]
@@ -24,6 +26,11 @@
  * @usage  pnpm check:ai-disclosure          (exit 1 on any violation)
  *         pnpm check:ai-disclosure --list   (print what each assertion currently protects)
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 11. Assertion 2b: the gate reads BOTH MCP surfaces and the
+ *     shell-callable dispatch, not just src/mcp/. It reported green for eight phases on a connector
+ *     surface it could not see — where a declared write returned ok:true and the block was stripped
+ *     as an unknown key. The catalog is now the contract every surface is checked against, so the
+ *     NEXT field somebody adds cannot land on one surface and be forgotten on the others.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b. LLM_TRANSPORT_LEGACY_CALLERS is EMPTY: both known
  *     second paths now go through the chokepoint. Assertion 1 detects a transport caller by reading
  *     the import CLAUSE rather than scanning for the word `complete` — the old word-scan fired on
@@ -268,6 +275,130 @@ function checkMcpWriteTools(): void {
   }
 }
 
+// ── 2b. THE CONNECTOR'S SURFACES CARRY WHAT THE CATALOG PROMISES ────────────────────────────────
+// Assertion 2 scanned `src/mcp/` and reported green on the half of the estate it could not see. The
+// OTHER half — `src/cli/connect/`, what `aimeat connect serve` exposes and what every crewaimeat crew
+// calls through — carried zero references to provenance, so a declared write returned ok:true and the
+// declaration was stripped as an unknown key. A gate that passes on the surface it does not read is
+// worse than the missing wiring, because it is the thing that was supposed to prevent it.
+//
+// THE CATALOG IS THE CONTRACT, and that is what makes this checkable rather than a taste question.
+// `src/mcp/catalog/definitions/` declares `ai_provenance` on a tool; three surfaces implement those
+// tools; every one of them must carry it. When somebody adds the fifteenth tool, or the NEXT field,
+// the two that were updated pass and the one that was forgotten fails here by name.
+
+const CONNECTOR_MCP_DIR = 'src/cli/connect/mcp/tools';
+const CONNECTOR_CARRIERS = 'src/cli/connect/ai-provenance-carry.ts';
+const CONNECTOR_SHELL_WRAPPER = 'src/cli/connect/tool-call.ts';
+
+/** Tool names the canonical catalog declares `ai_provenance` on. The contract all surfaces answer to. */
+function catalogProvenanceTools(): string[] {
+  const dir = join(root, 'src', 'mcp', 'catalog', 'definitions');
+  const out: string[] = [];
+  for (const file of walk(dir)) {
+    const src = stripComments(readFileSync(file, 'utf8'));
+    const starts = [...src.matchAll(/name:\s*'([a-z0-9_]+)'/g)];
+    starts.forEach((m, i) => {
+      const end = i + 1 < starts.length ? starts[i + 1].index! : src.length;
+      const block = src.slice(m.index!, end);
+      if (/\.{3}aiProvenanceCatalogInput\b/.test(block) || /\bai_provenance\s*:/.test(block)) out.push(m[1]);
+    });
+  }
+  return [...new Set(out)].sort();
+}
+
+/** Tool registrations in the CONNECTOR's MCP surface, with the source of each block. */
+function connectorMcpToolBlocks(): Array<{ name: string; file: string; block: string }> {
+  const out: Array<{ name: string; file: string; block: string }> = [];
+  for (const file of walk(join(root, CONNECTOR_MCP_DIR))) {
+    const src = stripComments(readFileSync(file, 'utf8'));
+    const starts = [...src.matchAll(/mcp\.tool\(\s*'([a-z0-9_]+)'/g)];
+    starts.forEach((m, i) => {
+      const end = i + 1 < starts.length ? starts[i + 1].index! : src.length;
+      out.push({ name: m[1], file: rel(file), block: src.slice(m.index!, end) });
+    });
+  }
+  return out;
+}
+
+function checkConnectorSurfaces(): void {
+  const promised = catalogProvenanceTools();
+  if (promised.length === 0) {
+    fail('connector-provenance', 'the catalog declares ai_provenance on no tool at all',
+      'this check reads src/mcp/catalog/definitions/ for `...aiProvenanceCatalogInput`. If the catalog '
+      + 'stopped declaring it, assertion 2 and this one are both checking nothing.');
+    return;
+  }
+
+  // (a) The node's own surface. Same list, derived rather than hand-maintained: a tool the catalog
+  //     promises the parameter on and src/mcp/ does not carry is the Phase 4 bug returning.
+  const nodeCarrying = new Set(mcpToolBlocks().filter(b => /aiProvenanceInputs?\b/.test(b.block)).map(b => b.name));
+
+  // (b) The connector's MCP surface — the one nothing was checking.
+  const connectorBlocks = connectorMcpToolBlocks();
+  const connectorNames = new Set(connectorBlocks.map(b => b.name));
+  const connectorCarrying = new Set(connectorBlocks.filter(b => /aiProvenanceInputs?\b/.test(b.block)).map(b => b.name));
+
+  // (c) The shell-callable surface. It carries provenance through ONE wrapper over the whole dispatch
+  //     table rather than per handler, so what is checked is that the wrapper is still applied and
+  //     that the tool has a carrier decision. A tool with no entry in the carrier map falls through
+  //     `withProvenanceCarrying` untouched — which is exactly the silent strip, one layer down.
+  const shellSrc = stripComments(read(CONNECTOR_SHELL_WRAPPER));
+  if (!/\.map\(withProvenanceCarrying\)/.test(shellSrc)) {
+    fail('connector-provenance', `${CONNECTOR_SHELL_WRAPPER} no longer wraps CONNECT_CLI_TOOLS with withProvenanceCarrying()`,
+      'restore `.map(withProvenanceCarrying)` on the assembled list. Without it every shell-callable '
+      + 'write tool — `aimeat connect call` AND the serve daemon\'s POST /local/call/:tool — goes back '
+      + 'to dropping a caller\'s ai_provenance block behind an ok:true.');
+  }
+  const carrierSrc = stripComments(read(CONNECTOR_CARRIERS));
+  const declaredCarriers = new Set(
+    [...carrierSrc.matchAll(/^\s{2}(aimeat_[a-z0-9_]+):/gm)].map(m => m[1]));
+
+  for (const name of promised) {
+    if (!nodeCarrying.has(name)) {
+      fail('connector-provenance', `the catalog promises ai_provenance on ${name} but src/mcp/ does not carry it`,
+        'spread `...aiProvenanceInputs` into the node MCP registration, or stop promising it in the '
+        + 'catalog. A schema that advertises a parameter the handler discards is the failure this '
+        + 'programme exists to catch.');
+    }
+    // A tool the connector does not expose at all is not this check's business — but one it DOES
+    // expose has to honour the same contract, because that is the schema a crew reads.
+    if (connectorNames.has(name) && !connectorCarrying.has(name)) {
+      fail('connector-provenance', `connector MCP tool ${name} drops the ai_provenance the catalog promises`,
+        `spread \`...aiProvenanceInputs\` into its shape in ${CONNECTOR_MCP_DIR}/ and hand the block to `
+        + 'provenanceEchoedResult(). A zod object STRIPS unknown keys, so without this a crew declares, '
+        + 'gets ok:true, and the node records the opposite.');
+    }
+    if (!declaredCarriers.has(name)) {
+      fail('connector-provenance', `${name} has no entry in CONNECTOR_PROVENANCE_CARRIERS`,
+        `add one in ${CONNECTOR_CARRIERS}: either a carrier that records the declaration, or `
+        + '`{ kind: \'not-carried\', route }` naming the node route that would have to accept it. '
+        + 'No entry means the shell path silently ignores the block — the same bug, one layer down.');
+    }
+  }
+
+  // The two MCP surfaces must not drift APART either: a tool carrying it on the node and not on the
+  // connector is the state Phase 11 found, and the reverse would be just as invisible.
+  const nodeOnly = [...nodeCarrying].filter(n => connectorNames.has(n) && !connectorCarrying.has(n));
+  const connectorOnly = [...connectorCarrying].filter(n => !nodeCarrying.has(n));
+  for (const n of nodeOnly) {
+    fail('connector-provenance', `${n} carries ai_provenance on the node surface but not on the connector surface`,
+      `add \`...aiProvenanceInputs\` in ${CONNECTOR_MCP_DIR}/. Crews call through the connector; the `
+      + 'node surface being right does not help them.');
+  }
+  for (const n of connectorOnly) {
+    fail('connector-provenance', `${n} carries ai_provenance on the connector surface but not on the node's own`,
+      'add it in src/mcp/ too, and to the catalog definition. Two surfaces answering differently about '
+      + 'the same tool is the drift this assertion exists to stop.');
+  }
+
+  const notCarried = [...carrierSrc.matchAll(/^\s{2}(aimeat_[a-z0-9_]+):\s*\{\s*kind:\s*'not-carried'/gm)].map(m => m[1]);
+  if (notCarried.length) {
+    notes.push(`  connector declarations NOT recorded (the node route accepts none): ${notCarried.length} tool(s) — `
+      + `${notCarried.join(', ')}. Each returns ai_provenance.recorded=false with the reason.`);
+  }
+}
+
 // ── 3. ONE PUBLISH PATH ─────────────────────────────────────────────────────────────────────────
 // Provenance went missing at a forgotten publish door in Phase 4, again in Phase 5, and Phase 8
 // found FIVE doors where the audit had counted three. One function, and a short list of acts that
@@ -461,6 +592,9 @@ function listProtected(): void {
   console.log(`     known second paths: ${Object.keys(LLM_TRANSPORT_LEGACY_CALLERS).join(', ') || 'none'}`);
   console.log(`  2. MCP write tools     — ${AI_PROVENANCE_REQUIRED.length} must carry ai_provenance, `
     + `${AI_PROVENANCE_REVIEWED_WITHOUT.length} reviewed without`);
+  const promised = catalogProvenanceTools();
+  console.log(`  2b. connector surfaces — ${promised.length} catalog tools; node MCP + ${CONNECTOR_MCP_DIR}/ + `
+    + `the ${CONNECTOR_SHELL_WRAPPER} wrapper must all carry them`);
   console.log(`  3. one publish path    — ${PUBLISH_PATH}; ${Object.keys(CREATE_APP_DISTINCT_ACTS).length} distinct acts named`);
   console.log(`  4. vocabulary          — ${EXTERNAL_VOCABULARY.length} value tokens confined to ${ADAPTERS}`);
   console.log('  5. locales             — every aiLabel.* key in en + fi, no [TODO:fi]');
@@ -475,6 +609,7 @@ if (process.argv.includes('--list')) {
 
 checkOneLlmTransport();
 checkMcpWriteTools();
+checkConnectorSurfaces();
 checkOnePublishPath();
 checkVocabularyContainment();
 checkLocaleParity();

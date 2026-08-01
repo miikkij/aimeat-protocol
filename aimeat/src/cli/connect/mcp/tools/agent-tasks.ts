@@ -5,6 +5,8 @@
  *   mode, each tool accepts an optional `agent_name` parameter; if omitted, the
  *   registry's primary agent is used.
  * @version-history
+ *   v2.4.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_task_complete carries `ai_provenance` /
+ *     `ai_provenance_id` and echoes what was recorded.
  *   v1.1.0 -- 2026-05-28 -- Add TODO proposal tool for Hello Integration
  *   v1.1.1 -- 2026-05-28 -- Remove owner-only task start tool from agent MCP surface
  *   v1.1.2 -- 2026-05-28 -- Send task complete/fail messages with the REST API field name
@@ -22,6 +24,8 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
+import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
 
 export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry): void {
 
@@ -154,13 +158,15 @@ export function registerAgentTasksTools(mcp: McpServer, registry: AgentRegistry)
     agent_name: agentNameSchema,
     task_id: z.string().describe('Task identifier'),
     message: z.string().optional().describe('Completion message'),
-  }, annotationsFor('aimeat_task_complete'), async ({ agent_name, task_id, message }) => {
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_task_complete'), async ({ agent_name, task_id, message, ai_provenance, ai_provenance_id }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     const body: Record<string, unknown> = {};
     if (message) body.message = message;
     const resp = await client.post(`/v1/agents/${enc}/tasks/${encodeURIComponent(task_id)}/complete`, body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_task_complete', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   mcp.tool('aimeat_task_fail', descriptionFor('aimeat_task_fail'), {

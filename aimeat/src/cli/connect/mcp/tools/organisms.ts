@@ -3,6 +3,8 @@
  * @description MCP tool registrations for organism (collective) management --
  *   listing, viewing, joining, leaving, and member listing.
  * @version-history
+ *   v1.6.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_workspace_comment carries
+ *     `ai_provenance` / `ai_provenance_id` and echoes what was recorded.
  *   v1.0.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
  *     from shared annotations.ts for Connectors Directory compliance.
  *   v1.1.0 -- 2026-05-30 -- MCP audit Phase 1: tool descriptions sourced from canonical catalog via descriptionFor().
@@ -21,6 +23,8 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
+import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
 
 export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry): void {
   const { client, owner } = registry.resolve();
@@ -230,12 +234,15 @@ export function registerOrganismsTools(mcp: McpServer, registry: AgentRegistry):
     body: z.string().describe('The comment text'),
     anchor: z.object({ section: z.string().optional(), quote: z.string().optional() }).optional().describe('Optional anchor to part of a document'),
     parent_id: z.string().optional().describe('Optional id of the comment this replies to'),
-  }, annotationsFor('aimeat_workspace_comment'), async ({ organism_id, ws, space, instance_id, body, anchor, parent_id }) => {
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_workspace_comment'), async ({ organism_id, ws, space, instance_id, body, anchor, parent_id, ai_provenance, ai_provenance_id }) => {
     const payload: Record<string, unknown> = { ws, space, instance_id, body };
     if (anchor != null) payload.anchor = anchor;
     if (parent_id != null) payload.parent_id = parent_id;
     const resp = await client.post(`/v1/organisms/${encodeURIComponent(organism_id)}/comments`, payload);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }], ...(resp.ok === false ? { isError: true } : {}) };
+    if (resp.ok === false) return { content: [{ type: 'text' as const, text: JSON.stringify(resp.error ?? resp, null, 2) }], isError: true };
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_workspace_comment', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   mcp.tool('aimeat_workspace_comments', descriptionFor('aimeat_workspace_comments'), {

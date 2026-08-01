@@ -21,6 +21,8 @@
  *   attestation in this shape, by construction rather than by validation — this is the one place an
  *   agent could otherwise attribute its writing to somebody else.
  * @structure
+ *   - AiProvenanceBlockSchema — the block itself, exported so the connector's shell surface validates
+ *                               against these enums rather than a second copy of them
  *   - aiProvenanceInput      — the optional zod fragment, spread into a write tool's input shape
  *   - aiProvenanceIdInput    — the sibling `ai_provenance_id` fragment (attach an existing record)
  *   - toDeclaredProvenance() — the snake→camel mapping into services/ai-provenance.ts's input type
@@ -35,6 +37,9 @@
  *         declared: toDeclaredProvenance(ai_provenance), declaredId: ai_provenance_id, ... });
  *     });
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 11. The block schema is exported. The connector's two
+ *     surfaces carried NO provenance at all and stripped a caller's block as an unknown key; they now
+ *     validate against this same object rather than a second, drifting copy of the enums.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 4.
  */
 import { z } from 'zod';
@@ -59,8 +64,13 @@ const sourceInput = z.object({
  * The declaration block. `level` is required once the block is present, because a block that says
  * nothing about level says nothing at all; everything else is optional detail the node records if
  * offered and works out for itself if not.
+ *
+ * EXPORTED because the connector's SHELL-callable surface (`aimeat connect call`,
+ * `POST /local/call/:tool`) has no zod layer of its own and must validate the same block against the
+ * same enums. Two spellings of "what a declaration may say" is how the two surfaces drifted apart in
+ * the first place (TARGET-058 Phase 11).
  */
-const aiProvenanceBlock = z.object({
+export const AiProvenanceBlockSchema = z.object({
   level: z.enum(AI_PROVENANCE_LEVELS).describe(
     "How much of this a model made. 'original' = a person wrote it, no model involved. "
     + "'assisted' = a person wrote it and a model edited or refined it. 'synthesized' = a model "
@@ -83,7 +93,7 @@ const aiProvenanceBlock = z.object({
 
 /** The optional `ai_provenance` parameter. Spread into a write tool's input shape. */
 export const aiProvenanceInput = {
-  ai_provenance: aiProvenanceBlock.optional().describe(
+  ai_provenance: AiProvenanceBlockSchema.optional().describe(
     'How this content was made. Declare it when a model generated or substantially rewrote what you '
     + 'are writing. The node fills in who you are, which node, when, and a hash of the exact bytes — '
     + 'those are never taken from the caller.'),
@@ -100,7 +110,7 @@ export const aiProvenanceIdInput = {
 export const aiProvenanceInputs = { ...aiProvenanceInput, ...aiProvenanceIdInput };
 
 /** The declared block as it arrives over MCP, before the boundary mapping below. */
-export type AiProvenanceToolInput = z.infer<typeof aiProvenanceBlock>;
+export type AiProvenanceToolInput = z.infer<typeof AiProvenanceBlockSchema>;
 
 /**
  * Map the wire block onto the internal shape. The only interesting line is `humanInvolvement`, which

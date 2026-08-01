@@ -3,6 +3,8 @@
  * @description MCP tool registrations for agent-to-agent messaging. Routes are
  *   scoped to the connected agent via /v1/agents/{name}/messages.
  * @version-history
+ *   v2.5.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_message_send carries `ai_provenance` /
+ *     `ai_provenance_id` and echoes what was recorded.
  *   v1.1.0 -- 2026-05-28 -- Align send payload with the actual agent message API
  *   v2.0.0 -- 2026-05-29 -- Registry-driven, agent_name parameter
  *   v2.1.0 -- 2026-05-29 -- Add tool annotations (title + read/destructive/idempotent/openWorld hints)
@@ -18,6 +20,8 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
+import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
 
 export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegistry): void {
 
@@ -36,7 +40,8 @@ export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegist
     thread_id: z.string().optional().describe('Thread ID to reply in (omit to start a new conversation)'),
     linked_task_id: z.string().optional().describe('Optional linked task identifier'),
     metadata: z.record(z.string(), z.unknown()).optional().describe('Optional metadata key-value pairs'),
-  }, annotationsFor('aimeat_message_send'), async ({ agent_name, content, thread_id, linked_task_id, metadata }) => {
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_message_send'), async ({ agent_name, content, thread_id, linked_task_id, metadata, ai_provenance, ai_provenance_id }) => {
     const { client, agent } = pickAgent(registry, agent_name);
     const enc = encodeURIComponent(agent);
     if (!content) {
@@ -47,7 +52,8 @@ export function registerAgentMessagesTools(mcp: McpServer, registry: AgentRegist
     if (linked_task_id) payload.linked_task_id = linked_task_id;
     if (metadata) payload.metadata = metadata;
     const resp = await client.post(`/v1/agents/${enc}/messages`, payload);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_message_send', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   mcp.tool('aimeat_message_history', descriptionFor('aimeat_message_history'), {

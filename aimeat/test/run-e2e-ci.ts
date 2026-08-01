@@ -111,6 +111,9 @@ const ALL_SUITES = [
     'test/e2e-ai-provenance.ts',
     'test/e2e-ai-provenance-surfaces.ts',
     'test/e2e-ai-provenance-agent-plane.ts',
+    // Spawns the real `aimeat connect serve --http` daemon: the CONNECTOR's two tool surfaces
+    // (MCP + shell-callable) are separate code from src/mcp/, and they carried no provenance at all.
+    'test/e2e-ai-provenance-connector.ts',
     'test/e2e-app-ai-posture.ts',
     'test/e2e-notifications.ts',
     'test/e2e-feedback.ts',

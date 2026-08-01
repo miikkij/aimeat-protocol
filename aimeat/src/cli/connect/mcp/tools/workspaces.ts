@@ -7,6 +7,9 @@
  *   Tool names/descriptions/annotations come from the shared catalog, so they stay in lockstep with
  *   the server and the v2 surface allowlists (appdev/agent/service).
  * @version-history
+ *   v1.6.0 -- 2026-08-01 -- TARGET-058 Phase 11: aimeat_workspace_write carries `ai_provenance`.
+ *     NOT recorded, and the echo says why: the tool writes a BATCH of records through
+ *     POST /v1/memory, and one declaration cannot honestly describe N separately-authored ones.
  *   v1.0.0 -- 2026-06-08 -- Initial: 5 workspace tools as REST wrappers for the connector.
  *   v1.1.0 -- 2026-06-10 -- Backing gate (the invisible-documents bug happened through THIS path):
  *     _create normalizes objectTypes (rejects backing 'storage'/'knowledge', infers mode:'document'
@@ -29,6 +32,8 @@ import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
+import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
 import { normalizeObjectTypes, WorkspaceMetaError, backfillManifestEnvelope } from '../../../../services/workspace-meta.js';
 import { normalizeWriteItems, resolveWriteItem, MAX_BATCH_ITEMS, type ResolvedWriteItem, type WriteObjectType } from '../../../../services/workspace-write-items.js';
 import { entryTitle } from '../../../../services/structure-overview.js';
@@ -155,9 +160,10 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
       id: z.string().optional().describe('Instance id. Required for records (or include id in value); auto-generated for documents.'),
       section: z.string().optional().describe('Document spaces only: section id/name to file the document under.'),
       items: z.any().optional().describe(`BATCH: an ARRAY of { value, space?, id?, section? } — up to ${MAX_BATCH_ITEMS} — written in ONE call, so a migration costs one approval prompt instead of one per document. All-or-nothing: a single bad item writes nothing.`),
+      ...aiProvenanceInputs,
     },
     annotationsFor('aimeat_workspace_write'),
-    async ({ organism_id, ws, space, value, id, section, items }) => {
+    async ({ organism_id, ws, space, value, id, section, items, ai_provenance, ai_provenance_id }) => {
       const norm = normalizeWriteItems({ space, value, id, section, items });
       if ('error' in norm) return text({ error: norm.error }, true);
       const batch = items !== undefined && items !== null;
@@ -185,7 +191,12 @@ export function registerWorkspaceTools(mcp: McpServer, registry: AgentRegistry):
         }
         written.push({ written: key, id: item.instanceId, space: item.space, mode: item.isDoc ? 'document' : 'records', section: item.section ?? null });
       }
-      return text(batch ? { count: written.length, items: written } : written[0]);
+      // Not carried, and the reason is the batch: one declaration cannot honestly describe N
+      // separately-authored records, and per-item declaration was never designed. The echo says so
+      // rather than letting the block disappear. See ai-provenance-carry.ts.
+      return provenanceEchoedResult(client,
+        { tool: 'aimeat_workspace_write', declared: ai_provenance, declaredId: ai_provenance_id },
+        { ok: true, data: batch ? { count: written.length, items: written } : written[0] });
     });
 
   mcp.tool('aimeat_workspace_publish', descriptionFor('aimeat_workspace_publish'),

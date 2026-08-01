@@ -20,12 +20,17 @@
  *   v1.6.0 -- 2026-05-30 -- F10 drift reconciliation: align connector core tool inputs with server MCP +
  *     REST (catalogue_search search/category; memory_write group_id+ttl_hours; memory_search visibility;
  *     board read/post/create/subscribe filters; work_deliver output; message_send content; storage_upload).
+ *   v1.7.0 -- 2026-08-01 -- TARGET-058 Phase 11: memory_write and board_post carry `ai_provenance` /
+ *     `ai_provenance_id`. The catalog had advertised both since Phase 4 while these shapes stripped
+ *     them as unknown keys, so a crew's declaration vanished behind an ok:true.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import type { AgentRegistry } from '../../agent-registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor, shapeResponse, jsonContent, responseFormatSchema } from '../../../../mcp/catalog/shape.js';
+import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
+import { carrierAttach, provenanceEchoedResult } from '../../ai-provenance-carry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 
 export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void {
@@ -49,15 +54,27 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     group_id: z.string().optional().describe('ID of sharing group (required for group visibility)'),
     tags: z.array(z.string()).optional().describe('Optional tags for filtering/shared areas'),
     ttl_hours: z.number().optional().describe('Time-to-live in hours'),
-  }, annotationsFor('aimeat_memory_write'), async ({ agent_name, key, value, visibility, group_id, tags, ttl_hours }) => {
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_memory_write'), async ({ agent_name, key, value, visibility, group_id, tags, ttl_hours, ai_provenance, ai_provenance_id }) => {
     const { client } = pickAgent(registry, agent_name);
     const body: Record<string, unknown> = { key, value };
     if (visibility) body.visibility = visibility;
     if (group_id) body.group_id = group_id;
     if (tags) body.tags = tags;
     if (ttl_hours !== undefined) body.ttl_hours = ttl_hours;
+    // An id the node already minted travels in the write body itself — POST /v1/memory takes
+    // `ai_provenance_id` and checks it belongs to this owner. An inline DECLARATION cannot: the
+    // route has no field for it, so it is recorded after the write, against this key, by
+    // carryDeclaration(). See ai-provenance-carry.ts for why that order and not the other one.
+    if (ai_provenance_id) body.ai_provenance_id = ai_provenance_id;
     const resp = await client.post('/v1/memory', body);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    if (!resp.ok) return { content: [{ type: 'text' as const, text: JSON.stringify(resp, null, 2) }] };
+    return provenanceEchoedResult(client, {
+      tool: 'aimeat_memory_write',
+      declared: ai_provenance,
+      declaredId: ai_provenance_id,
+      attach: carrierAttach('aimeat_memory_write', { key, value }),
+    }, resp);
   });
 
   mcp.tool('aimeat_memory_list', descriptionFor('aimeat_memory_list'), {
@@ -246,12 +263,14 @@ export function registerCoreTools(mcp: McpServer, registry: AgentRegistry): void
     title: z.string().describe('Post title'),
     body: z.string().describe('Post body'),
     category: z.string().optional().describe('Optional post category'),
-  }, annotationsFor('aimeat_board_post'), async ({ agent_name, board_id, title, body, category }) => {
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_board_post'), async ({ agent_name, board_id, title, body, category, ai_provenance, ai_provenance_id }) => {
     const { client } = pickAgent(registry, agent_name);
     const reqBody: Record<string, unknown> = { title, body };
     if (category) reqBody.category = category;
     const resp = await client.post(`/v1/boards/${encodeURIComponent(board_id)}/posts`, reqBody);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_board_post', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   // ── Storage ─────────────────────────────────────────────────────────

@@ -5,6 +5,8 @@
  *   the node REST API (POST /v1/messages, GET /v1/messages/agent-inbox|agent-thread). Distinct from the
  *   agent↔owner dashboard tools in agent-messages.ts. Mirrors the server MCP surface (src/mcp/dm-messages.ts).
  * @version-history
+ *   v1.3.0 -- 2026-08-01 -- TARGET-058 Phase 11: dm_send / dm_ask / dm_send_as_owner carry
+ *     `ai_provenance` / `ai_provenance_id` and echo what was recorded.
  *   v1.0.0 -- 2026-06-22 -- Initial: aimeat_dm_send / aimeat_dm_inbox / aimeat_dm_thread.
  *   v1.1.0 -- 2026-06-23 -- Add aimeat_dm_ask (structured federated AskUserQuestion) — connector parity.
  *   v1.2.0 -- 2026-07-19 -- Add aimeat_dm_send_as_owner — the shell path sends via POST /v1/messages as the
@@ -17,6 +19,8 @@ import type { AgentRegistry } from '../../agent-registry.js';
 import { agentNameSchema, pickAgent } from './_registry.js';
 import { annotationsFor } from '../../../../mcp/annotations.js';
 import { descriptionFor } from '../../../../mcp/catalog/shape.js';
+import { aiProvenanceInputs } from '../../../../mcp/ai-provenance-input.js';
+import { provenanceEchoedResult } from '../../ai-provenance-carry.js';
 
 export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry): void {
 
@@ -28,7 +32,8 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     subject: z.string().optional().describe('Open a NEW topic thread with this title.'),
     conversation_id: z.string().optional().describe('Continue a specific existing thread by id.'),
     attachments: z.array(z.record(z.string(), z.unknown())).optional().describe('Up to 20 { storage_key, mime, kind, size, name } descriptors (upload files first via aimeat_storage_upload).'),
-  }, annotationsFor('aimeat_dm_send'), async ({ agent_name, to, body, reply_to, subject, conversation_id, attachments }) => {
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_dm_send'), async ({ agent_name, to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
     const { client } = pickAgent(registry, agent_name);
     const payload: Record<string, unknown> = { to };
     if (body) payload.body = body;
@@ -37,7 +42,8 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     if (conversation_id) payload.conversation_id = conversation_id;
     if (attachments) payload.attachments = attachments;
     const resp = await client.post('/v1/messages', payload);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_dm_send', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   mcp.tool('aimeat_dm_ask', descriptionFor('aimeat_dm_ask'), {
@@ -48,7 +54,8 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     subject: z.string().optional().describe('Open a NEW topic thread with this title.'),
     conversation_id: z.string().optional().describe('Continue a specific existing thread by id.'),
     submit_label: z.string().optional().describe('Optional submit-button label.'),
-  }, annotationsFor('aimeat_dm_ask'), async ({ agent_name, to, questions, body, subject, conversation_id, submit_label }) => {
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_dm_ask'), async ({ agent_name, to, questions, body, subject, conversation_id, submit_label, ai_provenance, ai_provenance_id }) => {
     const { client } = pickAgent(registry, agent_name);
     const payload: Record<string, unknown> = {
       to,
@@ -58,7 +65,8 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     if (subject) payload.subject = subject;
     if (conversation_id) payload.conversation_id = conversation_id;
     const resp = await client.post('/v1/messages', payload);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_dm_ask', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   mcp.tool('aimeat_dm_send_as_owner', descriptionFor('aimeat_dm_send_as_owner'), {
@@ -69,7 +77,8 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     subject: z.string().optional().describe('Open a NEW topic thread with this title.'),
     conversation_id: z.string().optional().describe('Continue a specific existing thread by id.'),
     attachments: z.array(z.record(z.string(), z.unknown())).optional().describe('Up to 20 { storage_key, mime, kind, size, name } descriptors.'),
-  }, annotationsFor('aimeat_dm_send_as_owner'), async ({ agent_name, to, body, reply_to, subject, conversation_id, attachments }) => {
+    ...aiProvenanceInputs,
+  }, annotationsFor('aimeat_dm_send_as_owner'), async ({ agent_name, to, body, reply_to, subject, conversation_id, attachments, ai_provenance, ai_provenance_id }) => {
     const { client } = pickAgent(registry, agent_name);
     const payload: Record<string, unknown> = { to };
     if (body) payload.body = body;
@@ -78,7 +87,8 @@ export function registerDmMessagesTools(mcp: McpServer, registry: AgentRegistry)
     if (conversation_id) payload.conversation_id = conversation_id;
     if (attachments) payload.attachments = attachments;
     const resp = await client.post('/v1/messages', payload);
-    return { content: [{ type: 'text' as const, text: JSON.stringify(resp.data ?? resp, null, 2) }] };
+    return provenanceEchoedResult(client,
+      { tool: 'aimeat_dm_send_as_owner', declared: ai_provenance, declaredId: ai_provenance_id }, resp);
   });
 
   mcp.tool('aimeat_dm_inbox', descriptionFor('aimeat_dm_inbox'), {
