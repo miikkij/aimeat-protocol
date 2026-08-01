@@ -527,5 +527,89 @@ export function applySchemaTables3(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_ai_provenance_hash ON ai_provenance(contentHash);
     CREATE INDEX IF NOT EXISTS idx_ai_provenance_owner ON ai_provenance(ownerGhii, generatedAt);
 
+    -- ── Outbound connections (TARGET-057, aimeat-connect) ──
+    -- "principal" is WHOEVER CONNECTED THE ACCOUNT, which in a multi-user app is the app's USER and
+    -- not the app's owner. It is deliberately not called "owner": that word already means the
+    -- account layer in AIMEAT, and reusing it produced a model that could not carry a multi-user app.
+    -- "credential" is ALWAYS ciphertext (iv:tag:ct, AES-256-GCM via services/encryption.ts) — the
+    -- same path extension secrets take. No API response contains this column.
+    CREATE TABLE IF NOT EXISTS connections (
+      id               TEXT PRIMARY KEY,
+      principal        TEXT NOT NULL,
+      mode             TEXT NOT NULL DEFAULT 'personal',
+      provider         TEXT NOT NULL,
+      instance         TEXT,
+      accountLabel     TEXT NOT NULL,
+      externalId       TEXT NOT NULL,
+      credential       TEXT NOT NULL,
+      credentialShape  TEXT NOT NULL,
+      scopes           TEXT NOT NULL DEFAULT '[]',
+      -- NULL is a legitimate value, not a missing one: some providers issue tokens that never
+      -- expire. Code that reads NULL as "expired" parks a working Mastodon connection.
+      expiresAt        TEXT,
+      status           TEXT NOT NULL DEFAULT 'active',
+      lastOkAt         TEXT,
+      lastError        TEXT,
+      -- Single-flight refresh claim. Several providers invalidate the old refresh token when they
+      -- issue a new one, so two concurrent publishes on one connection would leave one working
+      -- token and one connection wrongly parked — a failure caused purely by our own concurrency.
+      refreshClaimedAt TEXT,
+      createdAt        TEXT NOT NULL,
+      updatedAt        TEXT NOT NULL
+    );
+    -- COALESCE, not the bare column: NULL never equals NULL in a unique index, so without it every
+    -- fixed-endpoint provider (YouTube, Bluesky) would accept the same account twice.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_connections_identity
+      ON connections(principal, provider, externalId, COALESCE(instance, ''));
+    CREATE INDEX IF NOT EXISTS idx_connections_principal ON connections(principal, status);
+
+    -- One named errand over one connection, with the parameters the app may not choose already
+    -- decided. An app calls a DELEGATION, never a connection: it cannot retarget the channel, the
+    -- visibility or the playlist because those are not its parameters.
+    CREATE TABLE IF NOT EXISTS connection_delegations (
+      id           TEXT PRIMARY KEY,
+      connectionId TEXT NOT NULL,
+      appId        TEXT NOT NULL,
+      action       TEXT NOT NULL,
+      fixed        TEXT NOT NULL DEFAULT '{}',
+      -- Keyed on the PUBLISHER's GHII, which is only possible because a shared publish requires an
+      -- identified user. Without it one publisher drains an allowance everyone shares.
+      perUserLimit TEXT,
+      moderation   TEXT NOT NULL DEFAULT 'hold',
+      enabled      INTEGER NOT NULL DEFAULT 1,
+      createdAt    TEXT NOT NULL,
+      updatedAt    TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_delegations_triple
+      ON connection_delegations(connectionId, appId, action);
+    CREATE INDEX IF NOT EXISTS idx_delegations_app ON connection_delegations(appId, action);
+
+    -- A publish, written BEFORE it is attempted. That order is the whole point: a retry racing a
+    -- slow success publishes the video twice, and this repository has produced that family of bug
+    -- three times already. The unique index is what arbitrates — an application-level check is
+    -- exactly the read-then-write race it would be meant to close.
+    -- Doubles as the attribution record (which of an app's users caused which post) and the quota
+    -- ledger.
+    CREATE TABLE IF NOT EXISTS publish_attempts (
+      id             TEXT PRIMARY KEY,
+      idempotencyKey TEXT NOT NULL,
+      -- WHO published. In shared mode this is the app's user, NOT the connection's principal.
+      publisher      TEXT NOT NULL,
+      connectionId   TEXT NOT NULL,
+      delegationId   TEXT,
+      storageKey     TEXT NOT NULL,
+      -- 'held' is moderation and 'queued' is a full shared quota: honest waiting states, not
+      -- failures, and neither is retried as one. 'rejected' is permanent.
+      status         TEXT NOT NULL,
+      externalRef    TEXT,
+      error          TEXT,
+      createdAt      TEXT NOT NULL,
+      updatedAt      TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_publish_idempotency ON publish_attempts(idempotencyKey);
+    CREATE INDEX IF NOT EXISTS idx_publish_publisher ON publish_attempts(publisher, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_publish_delegation ON publish_attempts(delegationId, createdAt);
+    CREATE INDEX IF NOT EXISTS idx_publish_connection ON publish_attempts(connectionId, createdAt);
+
   `);
 }

@@ -86,6 +86,7 @@ import type { AgentTelemetryRepository, AgentWebhookRepository } from './reposit
 import type { AgentOnboardingRepository } from './repositories/agent-onboarding.repository.js';
 import type { InvitationRepository } from './repositories/invitation.repository.js';
 import type { AiProvenanceRepository } from './repositories/ai-provenance.repository.js';
+import type { ConnectionRepository } from './repositories/connection.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -114,4 +115,5 @@ export interface Storage extends
   AgentOnboardingRepository,
   InvitationRepository,
   AiProvenanceRepository,
+  ConnectionRepository,
   StatsRepository { }

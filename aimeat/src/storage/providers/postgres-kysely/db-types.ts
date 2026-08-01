@@ -222,6 +222,56 @@ export interface AiProvenance {
   record: Json;
 }
 
+/** TARGET-057. `credential` is ciphertext; `principal` is whoever connected the account. */
+export interface Connection {
+  accountLabel: string;
+  createdAt: string;
+  credential: string;
+  credentialShape: string;
+  expiresAt: string | null;
+  externalId: string;
+  id: string;
+  instance: string | null;
+  lastError: string | null;
+  lastOkAt: string | null;
+  mode: Generated<string>;
+  principal: string;
+  provider: string;
+  refreshClaimedAt: string | null;
+  scopes: Generated<Json>;
+  status: Generated<string>;
+  updatedAt: string;
+}
+
+/** TARGET-057. One named errand over one connection, with the fixed parameters an app cannot alter. */
+export interface ConnectionDelegation {
+  action: string;
+  appId: string;
+  connectionId: string;
+  createdAt: string;
+  enabled: Generated<boolean>;
+  fixed: Generated<Json>;
+  id: string;
+  moderation: Generated<string>;
+  perUserLimit: Json | null;
+  updatedAt: string;
+}
+
+/** TARGET-057. Written BEFORE the publish is attempted — that order is what stops the double post. */
+export interface PublishAttempt {
+  connectionId: string;
+  createdAt: string;
+  delegationId: string | null;
+  error: string | null;
+  externalRef: string | null;
+  id: string;
+  idempotencyKey: string;
+  publisher: string;
+  status: string;
+  storageKey: string;
+  updatedAt: string;
+}
+
 export interface App {
   accessCode: string | null;
   aiProvenanceId: string | null;
@@ -1596,6 +1646,8 @@ export interface DB {
   CapabilityLog: CapabilityLog;
   CapabilityVouch: CapabilityVouch;
   ChatInstance: ChatInstance;
+  Connection: Connection;
+  ConnectionDelegation: ConnectionDelegation;
   Consent: Consent;
   ConsentAudit: ConsentAudit;
   ContactConsent: ContactConsent;
@@ -1650,6 +1702,7 @@ export interface DB {
   PersonalAccessToken: PersonalAccessToken;
   PersonalNode: PersonalNode;
   PersonalPushSubscription: PersonalPushSubscription;
+  PublishAttempt: PublishAttempt;
   Purchase: Purchase;
   PushSubscription: PushSubscription;
   RealtimeRoom: RealtimeRoom;
