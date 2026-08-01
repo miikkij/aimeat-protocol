@@ -359,6 +359,45 @@ shorthands to these (`--card`→`--bg-card`, `--surface`/`--bg-dim`→`--bg-surf
 `--muted`→`--text-dim`, `--error`→`--danger`, `--warning`→`--warn`), so those
 inherit dark mode too — but prefer the canonical names in new code.
 
+#### `--border` collides with daisyUI, and it will bite the next shared component
+
+`theme.css` defines `--border` as a **colour** (`#E5E7EB`). daisyUI 5 defines the same name as a
+border **width**, and uses it inside `calc()` on nearly every component
+(`padding-inline: calc(var(--size)/2 - var(--border))` on `.badge`, plus toggle geometry and input
+paddings). The two meanings are incompatible, and both are load-bearing where they live.
+
+Two failure directions, both already observed:
+
+| Direction | What happens |
+|---|---|
+| A colour leaks into a daisyUI context | The `calc()` becomes invalid at computed-value time. Paddings collapse to 0 and toggles render as slivers. This is what bridge v1.0.0-v1.2.0 did by mapping the colour at `:root`, and it broke every page that loaded the bridge |
+| A shared component lands in a daisyUI app | `border: 1px solid var(--border)` resolves to `1px solid 1px`, the declaration is dropped, and the component silently loses its edge |
+
+**The rule: any component that may render inside a vendored-styling app must declare its own
+`--border` in a rule scoped to the component's own class.** Never rely on the ambient value and
+never map it at `:root`.
+
+Two existing fixes are the pattern to copy:
+
+- `public/lib/aimeat-daisyui-bridge.css` scopes the colour to `[class^='aui-'], [class*=' aui-']`,
+  and restores the width via `--border-w` for daisyUI components nested inside an `aui-*` container.
+- `src/static/sdk-libs/ai/disclose.js` (`APP_TOKENS`) scopes the same mapping to `.ai-label`, reading
+  daisyUI's own palette tokens where they exist (`--color-base-300`) and falling back to the AIMEAT
+  literals where they do not. That is what lets the AI-disclosure chip follow an app's palette and
+  its light/dark mode without the app doing anything.
+
+The general form, for a component `.foo`:
+
+```css
+.foo {
+  --border: var(--color-base-300, #E5E7EB);   /* daisyUI palette first, theme.css literal as fallback */
+  --text:   var(--color-base-content, #1A1A2E);
+}
+```
+
+Same reasoning applies to any other token name shared with a vendored framework. `--border` is the
+one that has actually cost us time twice, which is why it is written down.
+
 ### Button Classes (Available in theme.css)
 
 Always use these classes — **never set button colors via inline styles**:
