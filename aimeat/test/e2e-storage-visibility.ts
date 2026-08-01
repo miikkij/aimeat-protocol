@@ -1,5 +1,15 @@
-// T-5: Storage Visibility E2E Tests
-// Run: cd aimeat && pnpm exec tsx test/e2e-storage-visibility.ts
+/**
+ * @file test/e2e-storage-visibility.ts
+ * @description T-5: end-to-end coverage of /v1/storage visibility — who may download whose file,
+ *   and what the transport says about it: private/owner/group/public reads, presigned URLs, byte
+ *   ranges, HEAD metadata, chunked uploads, and the audit trail for denied reads.
+ * @structure Phases 1-10, each a numbered `test()` against a live node on E2E_BASE.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=storage-visibility
+ * @version-history
+ *   v1.1.0 — 2026-08-01 — Content-type assertions compare the BASE type: sniffedContentType() now
+ *     appends `; charset=utf-8` to text served from bytes that pass a strict UTF-8 decode.
+ *   v1.0.0 — earlier — T-5 suite.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -194,7 +204,9 @@ await test('2. Download own file (agent-A)', async () => {
     assert(res.status === 200, `status ${res.status}`);
     const data = await res.text();
     assert(data === testContent, `data mismatch: got ${data.length} bytes`);
-    assert(res.headers.get('content-type') === 'text/plain', `ct: ${res.headers.get('content-type')}`);
+    // Base type only: sniffedContentType() appends `; charset=utf-8` when the stored bytes pass a
+    // strict UTF-8 decode, which this ASCII fixture does.
+    assert(res.headers.get('content-type')?.startsWith('text/plain'), `ct: ${res.headers.get('content-type')}`);
 });
 
 await test('3. Agent-B cannot access A\'s private file', async () => {
@@ -353,7 +365,7 @@ await test('17. HEAD returns metadata headers', async () => {
         headers: { Authorization: `Bearer ${agentAToken}` },
     });
     assert(res.status === 200, `status ${res.status}`);
-    assert(res.headers.get('content-type') === 'text/plain', `ct: ${res.headers.get('content-type')}`);
+    assert(res.headers.get('content-type')?.startsWith('text/plain'), `ct: ${res.headers.get('content-type')}`);
     assert(res.headers.get('content-length') === String(testContent.length), `cl: ${res.headers.get('content-length')}`);
     assert(res.headers.get('x-aimeat-visibility') === 'public', `vis: ${res.headers.get('x-aimeat-visibility')}`);
     assert(res.headers.get('x-aimeat-created') !== null, 'x-aimeat-created present');

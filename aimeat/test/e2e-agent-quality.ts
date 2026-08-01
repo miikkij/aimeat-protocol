@@ -1,5 +1,15 @@
-// E2E Tests for Agent Quality tab (task ratings + statistics rollups)
-// Run: cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-quality
+/**
+ * @file test/e2e-agent-quality.ts
+ * @description E2E coverage of the Agent Quality surface — task ratings and the statistics rollups
+ *   built from them: the source-grounding hard gate for factual work, self-rating and non-done
+ *   rejections, per-context review buckets, and the /quality/overview composite.
+ * @structure Setup, then Phases 1-4 + the overview phase, each a numbered `test()` against a live node.
+ * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=agent-quality
+ * @version-history
+ *   v1.1.0 — 2026-08-01 — Test 4b's oversized-metadata payload tracks the 200 000-byte cap (raised
+ *     from 4 KB on 2026-07-30); under it the rating landed and skewed test 9's factual average.
+ *   v1.0.0 — earlier — Agent Quality suite.
+ */
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
 const NODE_ID = process.env.E2E_NODE_ID ?? 'aimeat-local-001-dev';
@@ -189,7 +199,9 @@ await test('4. Same-owner agent rates factual WITH source_grounded -> 200, rater
 });
 
 await test('4b. Oversized metadata is rejected -> 400', async () => {
-    const big = { blob: 'x'.repeat(5000) };
+    // Over the 200 000-byte serialized cap in src/routes/agent-tasks/completion.ts. A rating that
+    // slips under the cap would LAND on secondDoneTask and skew the factual average test 9 asserts.
+    const big = { blob: 'x'.repeat(210_000) };
     const { status } = await json(`/v1/agents/${agentName}/tasks/${secondDoneTaskId}/rate`, {
         method: 'POST', headers: { Authorization: `Bearer ${parentToken}` },
         body: JSON.stringify({ stars: 3, context: 'factual', source_grounded: true, metadata: big }),
