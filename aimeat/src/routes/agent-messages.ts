@@ -8,6 +8,10 @@
  *   - GET    /v1/agents/:name/messages         -- List message history
  *   - PATCH  /v1/agents/:name/messages/:id     -- Update message status
  * @version-history
+ *   v1.4.0 -- 2026-08-01 -- TARGET-058 Phase 9 step 0. A message sent here is stamped, and all three
+ *     read paths (inbox, history, the mount composite) carry the record on the row via one shared
+ *     withProvenance(). Before this the agent→owner chat was the last human-facing surface where a
+ *     model could write prose into a person's reading and nothing on the row said so.
  *   v1.3.0 -- 2026-07-16 -- Add GET /:name/messages/overview composite (commands + enriched threads +
  *     page-1 messages) folding the Messages subtab mount (AgentMessagesOverviewService).
  *   v1.2.0 -- 2026-06-06 -- Task-based threads: threadId defaults to linked_task_id when no
@@ -28,6 +32,8 @@ import { emitChange } from '../services/event-bus.js';
 import { emitResourceUpdated } from '../mcp/index.js';
 import { AgentMessageCreateSchema, AgentMessageStatusSchema } from '../models/agent-message-schemas.js';
 import { createAgentMessagesOverviewService } from '../services/db/agent-messages-overview-db-service.js';
+import { loadServedProvenanceMany, provenanceItemBlock } from '../services/ai-provenance-marks.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
 import type { createWebhookDispatcher } from '../services/webhook-dispatcher.js';
 import { logger } from '../utils/logger.js';
 
@@ -43,6 +49,25 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
   function resolveAgentGaii(req: Express.Request, agentName: string): string {
     const owner = req.auth!.owner as string;
     return buildGAII(agentName, owner, config.nodeId);
+  }
+
+  /**
+   * TARGET-058: attach each message's provenance record to the rows about to be served.
+   *
+   * Every read path here goes through this one function rather than each shaping its own block, so
+   * the inbox, the history page and the mount composite cannot end up disagreeing about whether a
+   * message says how it was made. ONE query for the whole page (loadServedProvenanceMany); a page of
+   * human-written messages costs an empty map and adds no key.
+   *
+   * The caller has already passed canAccessAgent() — that is the authorization argument, and it is
+   * the same one every other surface uses: provenance travels with the content it describes.
+   */
+  async function withProvenance(messages: AgentMessageRecord[]): Promise<unknown[]> {
+    const byId = await loadServedProvenanceMany(storage, config, messages.map(m => m.aiProvenanceId));
+    return messages.map(m => ({
+      ...m,
+      ...provenanceItemBlock(m.aiProvenanceId ? byId.get(m.aiProvenanceId) : undefined),
+    }));
   }
 
   /** Check if current session can access an agent's messages */
@@ -130,6 +155,20 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
         } : undefined,
       } : undefined,
       createdAt: now,
+      // TARGET-058: the same stamp aimeat_message_send applies, on the REST door. The record
+      // describes `content`; `metadata` is machine plumbing and is deliberately outside the hash.
+      // An OWNER writing here is not stamped as model-written — provenanceForWrite decides that from
+      // the principal, which is why this call is unconditional and carries no direction test.
+      aiProvenanceId: await provenanceForWrite(storage, {
+        principal: senderGaii,
+        content: body.content,
+        pipeline: 'rest.agent_message_send',
+        surface: { visibility: 'private', humanAudience: true },
+        labelPolicy: config.aiLabelPublic,
+        nodeId: config.nodeId,
+        baseUrl: config.baseUrl,
+        enabled: config.aiProvenance,
+      }),
     };
 
     const created = await storage.createMessage(record);
@@ -170,7 +209,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     const agentGaii = resolveAgentGaii(req, agentName);
     const messages = await storage.listPendingMessages(agentGaii);
 
-    res.json(success(config.nodeId, { messages }));
+    res.json(success(config.nodeId, { messages: await withProvenance(messages) }));
   });
 
   /* ── GET /v1/agents/:name/messages/threads -- List conversation threads ── */
@@ -187,7 +226,13 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     }
     const agentGaii = resolveAgentGaii(req, agentName);
     const data = await messagesOverviewDb.overview(agentGaii, agentName);
-    res.json(success(config.nodeId, data));
+    // The composite mirrors GET /messages page 1, so it carries the same provenance block — a mount
+    // that showed no label while the interactive re-fetch showed one would be a label that appears
+    // when you click and vanishes when you reload.
+    res.json(success(config.nodeId, {
+      ...data,
+      messages: { ...data.messages, messages: await withProvenance(data.messages.messages as AgentMessageRecord[]) },
+    }));
   });
 
   router.get('/v1/agents/:name/messages/threads', requireAuth(), async (req, res) => {
@@ -239,7 +284,7 @@ export function agentMessagesRouter(config: AimeatConfig, storage: Storage, webh
     const result = await storage.listMessages(agentGaii, { direction, threadId, page, perPage });
 
     res.json(success(config.nodeId, {
-      messages: result.messages,
+      messages: await withProvenance(result.messages),
       total: result.total,
       page,
       per_page: perPage,

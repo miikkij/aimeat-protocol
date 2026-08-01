@@ -43,6 +43,7 @@ function deserializePost(row: Record<string, unknown>): BoardPostRecord {
   if (row.ttlExpiresAt) record.ttlExpiresAt = row.ttlExpiresAt as string;
   if (row.replyTo) record.replyTo = row.replyTo as string;
   if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
+  if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
   return record;
 }
 
@@ -98,8 +99,8 @@ export function deleteBoard(db: Database.Database, id: string): boolean {
 
 export function createPost(db: Database.Database, post: BoardPostRecord): BoardPostRecord {
   db.prepare(
-    `INSERT INTO board_posts (boardId, id, authorGaii, title, body, category, tags, ttlExpiresAt, reactions, replyTo, createdAt, semantic)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    `INSERT INTO board_posts (boardId, id, authorGaii, title, body, category, tags, ttlExpiresAt, reactions, replyTo, createdAt, semantic, aiProvenanceId)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     post.boardId, post.id, post.authorGaii,
     post.title, post.body, post.category ?? null,
@@ -107,6 +108,7 @@ export function createPost(db: Database.Database, post: BoardPostRecord): BoardP
     JSON.stringify(post.reactions), post.replyTo ?? null,
     post.createdAt,
     post.semantic ? JSON.stringify(post.semantic) : null,
+    post.aiProvenanceId ?? null,
   );
   return post;
 }

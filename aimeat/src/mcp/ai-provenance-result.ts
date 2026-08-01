@@ -26,37 +26,31 @@
  * @usage
  *   return jsonContent({ ...payload, ...(await readProvenance(storage, config, rec.aiProvenanceId)) });
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0. The block's SHAPE moved to
+ *     services/ai-provenance-marks.ts as provenanceItemBlock(), because Phase 9 gave the REST board
+ *     and agent-message reads the same per-item block and a second declaration of it is how the two
+ *     surfaces drift. The three loader helpers below stay here — they are the MCP calling convention.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 4.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import {
-  loadServedProvenance, loadServedProvenanceMany, type ServedProvenance,
+  loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock,
+  type AiProvenanceItemBlock,
 } from '../services/ai-provenance-marks.js';
 
 /** The `ai_provenance` value on a tool result: the id, the document, and where it resolves. */
-export interface AiProvenanceResultBlock {
-  ai_provenance: {
-    id: string;
-    /** The `aimeat.provenance/v1` document, in its own camelCase spelling — one spelling everywhere. */
-    record: ServedProvenance['record'];
-    record_url: string;
-  };
-}
+export type AiProvenanceResultBlock = AiProvenanceItemBlock;
 
 /**
  * The wire shape, or an empty object so a caller can spread it away unconditionally.
  *
- * snake_case keys around a camelCase document is not an inconsistency to apologise for: the keys are
- * a result DTO and follow the MCP surface's convention, while the document is self-describing and
- * keeps one spelling on every carrier it travels on.
+ * ONE SHAPE, DEFINED ONCE. An MCP tool result and a REST list item carry the identical block, so it
+ * lives in services/ai-provenance-marks.ts beside every other "what does this look like on a wire"
+ * decision and this is the MCP-facing name for it. Two near-identical spellings of a compliance
+ * artefact is exactly how the two surfaces end up disagreeing about a field name.
  */
-export function provenanceResultBlock(
-  prov: ServedProvenance | undefined,
-): AiProvenanceResultBlock | Record<string, never> {
-  if (!prov) return {};
-  return { ai_provenance: { id: prov.id, record: prov.record, record_url: prov.recordUrl } };
-}
+export const provenanceResultBlock = provenanceItemBlock;
 
 /**
  * What a WRITE tool returns about the record it just attached.

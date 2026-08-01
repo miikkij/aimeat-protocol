@@ -51,12 +51,15 @@ function deserialize(row: Record<string, unknown>): AiProvenanceRecordRow {
  *
  * A public memory record covers memory, workspace records, agent faces and WebMCP tool manifests
  * (all memory-backed). An app counts when it is actually served to anyone who asks: not parked, not
- * operator-hidden, and not behind an access code.
+ * operator-hidden, and not behind an access code. A board post counts when its BOARD is public —
+ * the visibility lives one table up, which is why this clause is the only one that joins.
  */
 const PUBLICLY_LINKED = `(
   EXISTS (SELECT 1 FROM memory m WHERE m.aiProvenanceId = p.id AND m.visibility = 'public')
   OR EXISTS (SELECT 1 FROM apps a WHERE a.aiProvenanceId = p.id
              AND a.parked = 0 AND a.operatorHidden = 0 AND a.accessCode IS NULL)
+  OR EXISTS (SELECT 1 FROM board_posts bp JOIN boards b ON b.id = bp.boardId
+             WHERE bp.aiProvenanceId = p.id AND b.visibility = 'public')
 )`;
 
 /** Bound-parameter budget for one `IN (...)` statement. Well under SQLite's 999-parameter default. */

@@ -3,6 +3,10 @@
  * @description Messages tab with command palette, "/" autocomplete, and chat area.
  *   Wraps the existing messages subtab and adds command discovery.
  * @version-history
+ *   v1.8.0 -- 2026-08-01 -- TARGET-058 Phase 9 step 0: the AI label renders inside the message bubble
+ *     from the row's own `ai_provenance`. This is the surface where a model writes prose straight
+ *     into a person's reading, and until the message carried a provenance column there was nothing
+ *     to render it from. AiLabel decides for itself whether a label is owed; this call site does not.
  *   v1.7.0 -- 2026-07-16 -- Mount folds commands + threads + messages into GET /v1/agents/:name/messages/overview
  *     (getMessagesOverview); the [activeThread] effect skips its first run so the composite is the only
  *     initial load; individual reads kept as fallback.
@@ -33,6 +37,7 @@ import { timeAgo } from '/js/utils.js';
 import { sendMessage, listMessages, listThreads, getMessagesOverview } from '/js/services/agent-messages.js';
 import { getAgentCommands } from '/js/services/agent-integration.js';
 import { Markdown } from '/components/Markdown.js';
+import { AiLabel } from '/components/ai-label.js';
 import { swallowed } from '/js/swallowed.js';
 
 const html = htm.bind(h);
@@ -287,6 +292,12 @@ export default function TabMessages({ agent, agentName, showToast }) {
             // literal — the input is a plain text field, not markdown.
             ? html`<${Markdown} text=${msg.content || ''} />`
             : msg.content}
+          ${/* TARGET-058: whether a label is owed was decided on the server and lives in
+                record.disclosure.required — AiLabel returns null when it is not. Inside the bubble,
+                because Art. 50(5) asks for the mark at first exposure to the content it describes,
+                not in a footer under the whole thread. */''}
+          <${AiLabel} record=${msg.ai_provenance?.record}
+                      recordUrl=${msg.ai_provenance?.record_url} variant="inline" />
         </div>
         <div class="pf-agd-msg-meta ${msg.direction === 'inbound' ? 'pf-agd-msg-meta-right' : ''}">
           ${msg.createdAt ? html`<span class="pf-agd-msg-time">${new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span> ${timeAgo(msg.createdAt)}` : ''}

@@ -30,7 +30,7 @@ import type { Storage } from '../storage/interface.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
-import { writeProvenanceEcho } from './ai-provenance-result.js';
+import { writeProvenanceEcho, readProvenanceMany } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 
 export function registerAgentMessageTools(
@@ -51,6 +51,7 @@ export function registerAgentMessageTools(
         annotationsFor('aimeat_message_inbox'),
         async () => {
             const messages = await storage.listPendingMessages(agentGaii);
+            const provFor = await readProvenanceMany(storage, config, messages.map(m => m.aiProvenanceId));
             return {
                 content: [{
                     type: 'text' as const,
@@ -61,6 +62,7 @@ export function registerAgentMessageTools(
                             from: m.senderGaii,
                             content: m.content,
                             created_at: m.createdAt,
+                            ...provFor(m.aiProvenanceId),
                         })),
                         count: messages.length,
                     }, null, 2),
@@ -100,8 +102,8 @@ export function registerAgentMessageTools(
             // CONTENT; `metadata` is machine plumbing (token counts, a proposed task) and not prose
             // anyone reads as authored text.
             //
-            // An agent message carries no provenance column of its own, so the record stands alone
-            // and is joined to the message by the hash of these exact bytes.
+            // Phase 9 gave the message a column for the id, so the owner's own client renders the
+            // label from the message rather than the record standing alone, joined only by hash.
             const provenanceId = await provenanceForWrite(storage, {
                 principal: agentGaii,
                 content,
@@ -131,6 +133,7 @@ export function registerAgentMessageTools(
                 } : undefined,
                 createdAt: now,
                 processedAt: now,
+                aiProvenanceId: provenanceId,
             });
 
             emitResourceUpdated(agentGaii, `aimeat://messages/${record.threadId}`);
@@ -170,6 +173,9 @@ export function registerAgentMessageTools(
             const ordered = [...result.messages].sort(
                 (a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
             );
+            // TARGET-058: a thread an agent re-reads carries how each turn was made, so an agent
+            // summarising the conversation for a person can say which turns a model wrote.
+            const provFor = await readProvenanceMany(storage, config, ordered.map(m => m.aiProvenanceId));
             return {
                 content: [{
                     type: 'text' as const,
@@ -182,6 +188,7 @@ export function registerAgentMessageTools(
                             content: m.content,
                             metadata: m.metadata,
                             created_at: m.createdAt,
+                            ...provFor(m.aiProvenanceId),
                         })),
                         total: result.total,
                     }, null, 2),

@@ -3531,6 +3531,7 @@
         "testConnection": "Test connection",
         "testSuccess": "Connection successful",
         "testFail": "Connection failed",
+        "testBudgetSpent": "The daily AI budget is spent — the key was not tested",
         "save": "Save settings",
         "delete": "Remove API key",
         "deleteConfirm": "Are you sure you want to remove your OpenRouter API key?",

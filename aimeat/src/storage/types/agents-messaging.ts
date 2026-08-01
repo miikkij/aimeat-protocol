@@ -2,120 +2,14 @@
  * @file src/storage/types/agents-messaging.ts
  * @description Capability, agent-task, directive, sharing, usage-ledger, and messaging record types. Extracted from src/storage/interface.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-01 — The Capability Layer moved to ./capabilities.ts (max-file-lines) and is
+ *     re-exported from here, so nothing that imported it has to change. Pure extraction — a
+ *     capability is not a message, and it was the block least tied to this file's name.
  *   v1.1.0 — 2026-07-16 — Add Node Feedback Channel types (FeedbackRecord/Message + enums).
  *   v1.0.0 — 2026-07-13 — Extracted from src/storage/interface.ts (max-file-lines)
  */
-// ── Capability Layer ────────────────────────────────────────────────
-
-export interface CapabilitySource {
-  // 'ecosystem' = invocation routed over the connect-tunnel to a bound GEAI; ref = 'eco:{app}:{capId}'.
-  type: 'extension' | 'action' | 'cortex' | 'app' | 'manual' | 'ecosystem';
-  ref: string;
-  version: string;
-}
-
-export interface CapabilityExport {
-  name: string;
-  description: string;
-  inputSchema: Record<string, unknown>;
-  outputSchema: Record<string, unknown>;
-  example: { input: Record<string, unknown>; output: Record<string, unknown> } | null;
-}
-
-export interface CapabilityDependency {
-  type: 'sdk' | 'capability';
-  id: string;
-  required: boolean;
-  minVersion: string | null;
-}
-
-export interface CapabilityTrust {
-  operatorReviewed: boolean;
-  reviewedAt: string | null;
-  vouchCount: number;
-  publisherTrustScore: number;
-  codeAudited: boolean;
-  auditNotes: string | null;
-}
-
-export interface CapabilityStats {
-  totalInvocations: number;
-  successCount: number;
-  errorCount: number;
-  lastInvokedAt: string | null;
-  avgResponseMs: number;
-  lastError: string | null;
-}
-
-export interface CapabilityOverride {
-  summary?: string;
-  visibility?: 'private' | 'owner' | 'public';
-  disabled?: boolean;
-  notes?: string;
-}
-
-export interface CapabilityRecord {
-  id: string;
-  name: string;
-  summary: string;
-  ownerGhii: string;
-  visibility: 'private' | 'owner' | 'public';
-  scope: 'local';
-  status: 'draft' | 'pending_review' | 'active' | 'deprecated' | 'rejected' | 'disabled';
-  rejectionReason: string | null;
-  deprecationMessage: string | null;
-  replacedBy: string | null;
-  source: CapabilitySource;
-  authRequired: 'none' | 'anonymous' | 'registered';
-  callable: boolean;
-  inputSchema: Record<string, unknown> | null;
-  outputSchema: Record<string, unknown> | null;
-  exports: CapabilityExport[] | null;
-  usage: string;
-  whenToUse: string;
-  whenNotToUse: string;
-  examples: Array<{ description: string; input: Record<string, unknown>; output: Record<string, unknown> }>;
-  dependencies: CapabilityDependency[];
-  schemaHash: string;
-  webhookUrl: string | null;
-  cost: { morsels: number; perUnit?: string } | null;
-  trustRequired: number | null;
-  trust: CapabilityTrust;
-  redactedFields: string[];
-  operatorOverride: CapabilityOverride | null;
-  stats: CapabilityStats;
-  tags: string[];
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface CapabilityLogEntry {
-  id: string;
-  capabilityId: string;
-  callerGhii: string;
-  input: Record<string, unknown>;
-  status: 'success' | 'error';
-  durationMs: number;
-  error: string | null;
-  timestamp: string;
-}
-
-export interface CapabilityFilter {
-  ownerGhii?: string;
-  visibility?: string;
-  /** When set to a GHII, restricts results to `visibility='public' OR ownerGhii=<this>` — public
-   *  capabilities plus the caller's OWN (any visibility). Stops a registered non-owner from seeing
-   *  other owners' private rows (webhookUrl/ownerGhii) via the discovery list. */
-  publicOrOwner?: string;
-  status?: string;
-  sourceType?: string;
-  callable?: boolean;
-  authRequired?: string;
-  tags?: string[];
-  search?: string;
-  page?: number;
-  perPage?: number;
-}
+// ── Capability Layer — extracted to ./capabilities.ts, re-exported here ──
+export * from './capabilities.js';
 
 // ── Agent Tasks (Phase 1) ──
 
@@ -524,6 +418,15 @@ export interface AgentMessageRecord {
       isOther: boolean;
     };
   };
+  /**
+   * TARGET-058: the provenance record describing this message's `content`.
+   *
+   * The outbound direction is the one that matters: an agent writes prose straight into the owner's
+   * chat, and the owner reads it as a message from their agent. Without this the reader has no way
+   * to tell an agent's own words from a model completion the agent forwarded. `metadata` is machine
+   * plumbing and is deliberately outside the hash. Absent means UNSTATED, never "a human wrote it".
+   */
+  aiProvenanceId?: string;
   createdAt: string;
   processedAt?: string;
 }

@@ -2,6 +2,9 @@
  * @file agent-message.ts
  * @description SQLite implementation for agent message CRUD, inbox, and thread listing
  * @version-history
+ *   v1.1.0 -- 2026-08-01 -- TARGET-058 Phase 9 step 0: `aiProvenanceId` written and read back, so an
+ *     agent message the owner reads can render the label from the message itself rather than only
+ *     being findable by content hash. Mirrors Postgres migration 0020.
  *   v1.0.0 -- 2026-05-22 -- Initial creation for Agent Dashboard Phase 3
  */
 
@@ -24,6 +27,7 @@ function deserializeMessage(row: Record<string, unknown>): AgentMessageRecord {
   if (row.linkedTaskId) record.linkedTaskId = row.linkedTaskId as string;
   if (row.metadata) record.metadata = JSON.parse(row.metadata as string);
   if (row.processedAt) record.processedAt = row.processedAt as string;
+  if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
   return record;
 }
 
@@ -33,8 +37,8 @@ export function createMessage(db: Database.Database, record: AgentMessageRecord)
   db.prepare(
     `INSERT INTO agent_messages
      (id, agentGaii, threadId, direction, senderGaii, content, status,
-      linkedTaskId, metadata, createdAt, processedAt)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      linkedTaskId, metadata, createdAt, processedAt, aiProvenanceId)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   ).run(
     record.id,
     record.agentGaii,
@@ -47,6 +51,7 @@ export function createMessage(db: Database.Database, record: AgentMessageRecord)
     record.metadata ? JSON.stringify(record.metadata) : null,
     record.createdAt,
     record.processedAt ?? null,
+    record.aiProvenanceId ?? null,
   );
   return record;
 }

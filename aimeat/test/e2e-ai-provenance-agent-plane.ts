@@ -20,6 +20,11 @@
  * @structure owner + two agents (one with provenance:write, one without) · write · read · lie · gate · DM
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=ai-provenance-agent-plane
  * @version-history
+ *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 9 step 0 (§8). The two surfaces that were stamped with
+ *     nowhere to keep the id now have one, and these tests read the record OFF THE ITEM rather than
+ *     off the write result — which is the difference between "the record exists" and "a label can be
+ *     rendered". The board case is asserted with no Authorization header, because the claim Phase 9
+ *     publishes is about what a stranger sees.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 8b: the five tools Phase 4 froze in
  *     AI_PROVENANCE_REVIEWED_WITHOUT now carry the parameter, asserted through the MCP surface —
  *     board_reply, message_send, dm_ask, workspace_comment (exchange_work_deliver is proven in
@@ -526,6 +531,94 @@ async function connectAgent(ownerToken: string, ownerName: string, agentName: st
         const prov = c.parsed?.ai_provenance;
         assert(!!prov?.id, `a workspace comment carried no record: ${c.raw.slice(0, 400)}`);
         assert(prov.record.generator?.pipeline === 'mcp.workspace_comment', `pipeline ${prov.record.generator?.pipeline}`);
+    });
+
+    // ── 8. PHASE 9 step 0: the two surfaces that were stamped with nowhere to keep the id ──
+    //
+    // Phases 4 and 8b stamped a board post/reply and an agent message, but neither table had an
+    // `aiProvenanceId` column, so the record stood alone joined only by content hash. That is enough
+    // to answer "did this node produce these bytes?" and NOT enough to render a label FROM the item,
+    // which is what Phase 9 claims in public. Every assertion below reads the record off the ITEM.
+    //
+    // The board case additionally proves the DERIVED-VISIBILITY extension: a post on a public board
+    // is served to a stranger, so its record must resolve for that same stranger — asserted with no
+    // Authorization header at all, because an anonymous read is the case the claim is about.
+
+    let phase9BoardId = '';
+    let phase9PostProvId = '';
+
+    await test('a board post carries its record on the item, for an ANONYMOUS reader', async () => {
+        const board = await mcpCall(writer.token, 'aimeat_board_create', {
+            name: `Phase9 ${Date.now()}`, description: 'label from the item', visibility: 'public',
+        });
+        assert(!board.isError, `board_create failed: ${board.raw.slice(0, 300)}`);
+        phase9BoardId = board.parsed?.id ?? board.parsed?.board_id ?? board.parsed?.board?.id;
+        assert(!!phase9BoardId, `no board id: ${board.raw.slice(0, 300)}`);
+
+        const post = await mcpCall(writer.token, 'aimeat_board_post', {
+            board_id: phase9BoardId, title: 'Phase 9', body: 'A model wrote this and nobody read it first.',
+        });
+        assert(!post.isError, `board_post failed: ${post.raw.slice(0, 300)}`);
+        phase9PostProvId = post.parsed?.ai_provenance?.id ?? '';
+        assert(!!phase9PostProvId, `board_post echoed no record: ${post.raw.slice(0, 400)}`);
+
+        // NO Authorization header — this is the whole point.
+        const list = await json(`/v1/boards/${encodeURIComponent(phase9BoardId)}/posts`);
+        assert(list.status === 200, `anonymous board read ${list.status}`);
+        const row = (list.body.data?.posts ?? []).find((p: any) => p.title === 'Phase 9');
+        assert(!!row, `the post is not in the anonymous listing: ${JSON.stringify(list.body.data).slice(0, 300)}`);
+        assert(row.ai_provenance?.id === phase9PostProvId,
+            `the post row carries no record (or the wrong one): ${JSON.stringify(row.ai_provenance)}`);
+        assert(row.ai_provenance.record.disclosure?.required === true,
+            'a model-written post on a public board owes a visible label and the record does not say so');
+        assert(typeof row.ai_provenance.record_url === 'string' && row.ai_provenance.record_url.includes('/v1/provenance/'),
+            `no resolvable record_url: ${row.ai_provenance.record_url}`);
+    });
+
+    await test('that record RESOLVES anonymously — derived visibility reaches through the board', async () => {
+        const r = await json(`/v1/provenance/${encodeURIComponent(phase9PostProvId)}`);
+        assert(r.status === 200,
+            `an anonymous resolve of a public board post's record returned ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        // The route DTO is snake_case around the camelCase document, and the document sits under
+        // `provenance` — same shape /v1/provenance/:id has served since Phase 1.
+        assert(r.body.data?.provenance?.spec === 'aimeat.provenance/v1',
+            `unexpected document: ${JSON.stringify(r.body.data).slice(0, 200)}`);
+        assert(r.body.data.provenance.disclosure?.required === true,
+            'the anonymously-resolved record does not say a label is owed');
+    });
+
+    await test('an agent message carries its record on the row the OWNER reads', async () => {
+        const sent = await mcpCall(writer.token, 'aimeat_message_send', {
+            content: 'Phase 9: a model wrote this straight into a person\'s chat.',
+        });
+        assert(!sent.isError, `message_send failed: ${sent.raw.slice(0, 300)}`);
+        const provId = sent.parsed?.ai_provenance?.id;
+        assert(!!provId, `message_send echoed no record: ${sent.raw.slice(0, 400)}`);
+
+        const agentName = writer.gaii.split('#')[0];
+        const hist = await json(`/v1/agents/${encodeURIComponent(agentName)}/messages?per_page=50`,
+            { headers: { Authorization: `Bearer ${o.token}` } });
+        assert(hist.status === 200, `owner message read ${hist.status}`);
+        const row = (hist.body.data?.messages ?? []).find((m: any) => m.id === sent.parsed.message_id);
+        assert(!!row, `the sent message is not in the owner's history: ${JSON.stringify(hist.body.data?.messages ?? []).slice(0, 300)}`);
+        assert(row.ai_provenance?.id === provId,
+            `the message row carries no record (or the wrong one): ${JSON.stringify(row.ai_provenance)}`);
+        assert(row.ai_provenance.record.generator?.pipeline === 'mcp.message_send',
+            `pipeline ${row.ai_provenance.record.generator?.pipeline}`);
+    });
+
+    await test('a SECOND owner reading the same agent name sees their own empty namespace, not these messages', async () => {
+        // Cross-owner, on a route that takes an agent NAME rather than a GAII. The gate is
+        // construction rather than a 403: resolveAgentGaii() builds the GAII from the CALLER's own
+        // owner, so `/v1/agents/<same name>/messages` can only ever address the caller's own agent.
+        // Asserted because a name-keyed route is exactly where a shared namespace would hide.
+        const other = await setupOwner('x');
+        const agentName = writer.gaii.split('#')[0];
+        const r = await json(`/v1/agents/${encodeURIComponent(agentName)}/messages?per_page=50`,
+            { headers: { Authorization: `Bearer ${other.token}` } });
+        assert(r.status === 200, `second owner read ${r.status}`);
+        assert((r.body.data?.messages ?? []).length === 0,
+            `a second owner saw ${r.body.data.messages.length} of another account's agent messages`);
     });
 
     console.log(`\n  ${passed} passed, ${failed} failed`);

@@ -42,17 +42,10 @@
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { decrypt, getEncryptionKey } from './encryption.js';
-import { complete } from './openrouter.js';
+import { complete, DEFAULT_BASE_URLS, type ProviderType } from './openrouter.js';
 import { mintProvenance } from './ai-provenance.js';
 import type { AiProvenanceRecordRow } from '../storage/interface.js';
 import { logger } from '../utils/logger.js';
-
-type ProviderType = 'openrouter' | 'lmstudio' | 'custom';
-const DEFAULT_BASE_URLS: Record<ProviderType, string> = {
-  openrouter: 'https://openrouter.ai/api/v1',
-  lmstudio: 'http://localhost:1234/v1',
-  custom: '',
-};
 
 /**
  * Rough cost estimate when the provider didn't report one (LM Studio, custom).

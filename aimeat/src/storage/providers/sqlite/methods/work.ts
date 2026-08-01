@@ -2,6 +2,11 @@
  * @file src/storage/providers/sqlite/methods/work.ts
  * @description Action, Work, Wallet, Board, OTK, Node-key, Dispute, Micro-memory methods. Extracted from sqlite/index.ts to satisfy max-file-lines; bodies verbatim, bound to SqliteStorage via prototype merge.
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0: board posts round-trip `aiProvenanceId`.
+ *     NOTE FOR WHOEVER TOUCHES BOARDS NEXT: ../repos/board.ts is a second, complete implementation
+ *     of this same board domain and NOTHING IMPORTS IT. The methods here are the live ones (they are
+ *     what index.ts merges onto the prototype). This was found the expensive way — by editing the
+ *     repo file, watching the test still fail, and only then discovering the twin.
  *   v1.0.0 — 2026-07-13 — Extracted from providers/sqlite/index.ts (max-file-lines)
  */
 import type {
@@ -335,8 +340,8 @@ export const workMethods = {
 
   async createPost(this: SqliteStorage, post: BoardPostRecord): Promise<BoardPostRecord> {
     this.db.prepare(
-      `INSERT INTO board_posts (boardId, id, authorGaii, title, body, category, tags, ttlExpiresAt, reactions, replyTo, createdAt, semantic)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+      `INSERT INTO board_posts (boardId, id, authorGaii, title, body, category, tags, ttlExpiresAt, reactions, replyTo, createdAt, semantic, aiProvenanceId)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       post.boardId, post.id, post.authorGaii,
       post.title, post.body, post.category ?? null,
@@ -344,6 +349,8 @@ export const workMethods = {
       JSON.stringify(post.reactions), post.replyTo ?? null,
       post.createdAt,
       post.semantic ? JSON.stringify(post.semantic) : null,
+      // TARGET-058 (Phase 9 step 0). NULL = unstated, which is never "a human wrote it".
+      post.aiProvenanceId ?? null,
     );
     return post;
   },
@@ -427,6 +434,7 @@ export const workMethods = {
     if (row.ttlExpiresAt) record.ttlExpiresAt = row.ttlExpiresAt as string;
     if (row.replyTo) record.replyTo = row.replyTo as string;
     if (row.semantic) record.semantic = JSON.parse(row.semantic as string);
+    if (row.aiProvenanceId) record.aiProvenanceId = row.aiProvenanceId as string;
     return record;
   },
 

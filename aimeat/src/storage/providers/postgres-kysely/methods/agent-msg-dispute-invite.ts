@@ -6,6 +6,8 @@
  *   (mongodb methods/messaging.ts, work.ts, sessions.ts); mappers fold nullable columns back into the
  *   record shapes and jsonb columns (metadata / ruling / audit data / invite workspaces) round-trip.
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0: `AgentMessage.aiProvenanceId` round-trips
+ *     (migration 0020), so the owner's client can render the label from the message itself.
  *   v1.0.0 — 2026-07-15 — Phase 5: agent-message + dispute + invitation domains on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -30,6 +32,7 @@ function toMessage(r: Selectable<AgentMessage>): AgentMessageRecord {
   if (r.linkedTaskId) rec.linkedTaskId = r.linkedTaskId;
   if (r.metadata) rec.metadata = r.metadata as unknown as AgentMessageRecord['metadata'];
   if (r.processedAt) rec.processedAt = isoOrUndef(r.processedAt);
+  if (r.aiProvenanceId) rec.aiProvenanceId = r.aiProvenanceId;
   return rec;
 }
 
@@ -65,6 +68,7 @@ export const agentMessageMethods = {
       senderGaii: record.senderGaii, content: record.content, status: record.status,
       linkedTaskId: record.linkedTaskId ?? null, metadata: jsonb(record.metadata ?? null),
       createdAt: new Date(record.createdAt), processedAt: record.processedAt ? new Date(record.processedAt) : null,
+      aiProvenanceId: record.aiProvenanceId ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();
     return record;

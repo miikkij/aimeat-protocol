@@ -260,8 +260,8 @@ export function registerBoardsTools(
             // TARGET-058. Same act as aimeat_board_post — text an agent puts where people read it —
             // so it is stamped the same way. The hash covers the BODY alone: the title is generated
             // by this tool ("Re: …"), and hashing our own prefix would describe bytes the agent never
-            // wrote. A post has no provenance column, so the record stands on its own and is joined
-            // to the reply by that hash.
+            // wrote. Phase 9 gave the reply a column for the id, so the label can be rendered from
+            // the reply rather than only found by that hash.
             const provenanceId = await provenanceForWrite(storage, {
                 principal: agentGaii,
                 content: body,
@@ -284,6 +284,7 @@ export function registerBoardsTools(
                 reactions: {},
                 replyTo: post_id,
                 createdAt: new Date().toISOString(),
+                aiProvenanceId: provenanceId,
             });
 
             emitResourceUpdated(agentGaii, `aimeat://boards/${encodeURIComponent(board_id)}`);

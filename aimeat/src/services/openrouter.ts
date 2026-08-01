@@ -52,7 +52,28 @@ export interface OpenRouterModel {
   pricing?: { prompt: string; completion: string };
 }
 
-const OPENROUTER_BASE = 'https://openrouter.ai/api/v1';
+/**
+ * The provider kinds this transport speaks to. `custom` means "an OpenAI-compatible endpoint the
+ * owner named themselves", which is why its default base URL is the empty string: there is no
+ * default to guess, and a caller must supply one.
+ */
+export type ProviderType = 'openrouter' | 'lmstudio' | 'custom';
+
+/**
+ * Where each provider lives when the owner has not overridden it.
+ *
+ * DECLARED ONCE, HERE. This lived in three places — the route, the completion chokepoint, and a
+ * private OPENROUTER_BASE in this file — which is three chances for them to disagree about what
+ * `custom` means, on the one path that decides where a decrypted API key gets sent. The transport is
+ * the right home because it is the module that actually makes the request.
+ */
+export const DEFAULT_BASE_URLS: Record<ProviderType, string> = {
+  openrouter: 'https://openrouter.ai/api/v1',
+  lmstudio: 'http://localhost:1234/v1',
+  custom: '',
+};
+
+const OPENROUTER_BASE = DEFAULT_BASE_URLS.openrouter;
 const TIMEOUT_MS = 1_800_000; // 30 minutes
 
 /**

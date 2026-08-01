@@ -53,12 +53,15 @@ function toRecord(r: Selectable<AiProvenanceRow>): AiProvenanceRecordRow {
  *
  * A public memory record covers memory, workspace records, agent faces and WebMCP tool manifests
  * (all memory-backed). An app counts when it is actually served to anyone who asks: not parked, not
- * operator-hidden, and not behind an access code.
+ * operator-hidden, and not behind an access code. A board post counts when its BOARD is public —
+ * the visibility lives one table up, which is why this clause is the only one that joins.
  */
 const publiclyLinked = (idColumn: string) => sql<boolean>`(
   EXISTS (SELECT 1 FROM "Memory" m WHERE m."aiProvenanceId" = ${sql.raw(idColumn)} AND m."visibility" = 'public')
   OR EXISTS (SELECT 1 FROM "App" a WHERE a."aiProvenanceId" = ${sql.raw(idColumn)}
              AND a."parked" = false AND a."operatorHidden" = false AND a."accessCode" IS NULL)
+  OR EXISTS (SELECT 1 FROM "BoardPost" bp JOIN "Board" b ON b."boardId" = bp."boardId"
+             WHERE bp."aiProvenanceId" = ${sql.raw(idColumn)} AND b."visibility" = 'public')
 )`;
 
 /** Bind-parameter budget for one `IN (...)` statement. Well under the Postgres 65535 ceiling. */

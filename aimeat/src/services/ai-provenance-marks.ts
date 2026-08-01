@@ -26,6 +26,8 @@
  *   - loadServedProvenanceMany(storage, config, ids, opts) — the same, batched, for a surface that
  *     reads a PAGE of items; one query rather than one per item
  *   - envelopeMeta(p)                — the `meta.provenance` value; the single envelope carrier
+ *   - provenanceItemBlock(p)         — the per-ITEM `ai_provenance` block, for a list of rows that
+ *     each carry their own statement (REST DTOs and MCP tool results share it verbatim)
  *   - setProvenanceHeaders(res, p)   — `AI-Disclosure` + `Link: rel="ai-provenance"`
  *   - aiDisclosureParts(p, visible?) — the serve-time HTML marks (meta, link, JSON-LD, plus the
  *     visible label chip for a runnable app document) and the `ai-disclosure` value for the document
@@ -38,6 +40,9 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 9 step 0. provenanceItemBlock(): the per-item wire shape,
+ *     lifted out of mcp/ai-provenance-result.ts when the REST board and agent-message reads needed
+ *     the identical block. One declaration, two surfaces.
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a. injectAiDisclosure() becomes
  *     aiDisclosureParts(): the document detection, the idempotency check and the last-</body> rule
  *     are now shared with the other three serve-time marks in services/app-serve-marks.ts, which is
@@ -146,6 +151,32 @@ export function recordUrlFor(config: AimeatConfig, id: string): string {
  */
 export function envelopeMeta(p: ServedProvenance | undefined): { provenance: ServedProvenance } | undefined {
   return p ? { provenance: p } : undefined;
+}
+
+/** The per-ITEM wire shape: the id, the document, and where the document resolves. */
+export interface AiProvenanceItemBlock {
+  ai_provenance: { id: string; record: AiProvenance; record_url: string };
+}
+
+/**
+ * The block that rides on ONE ITEM in a list, or `{}` so a caller can spread it away unconditionally.
+ *
+ * `meta.provenance` above is for a response that IS one piece of generated content. A list of board
+ * posts or agent messages is not that: each row carries its own statement, and folding them into one
+ * envelope key would say that one record described the whole page.
+ *
+ * snake_case keys around a camelCase document is not an inconsistency to apologise for: the keys are
+ * a DTO and follow the wire convention, while the document is self-describing and keeps one spelling
+ * on every carrier it travels on (22-frozen-vocabulary §B1).
+ *
+ * AUTHORIZATION IS THE CALLER'S READ, NOT A SECOND TEST — same contract as loadServedProvenance():
+ * whoever may read the item may know how it was made.
+ */
+export function provenanceItemBlock(
+  p: ServedProvenance | undefined,
+): AiProvenanceItemBlock | Record<string, never> {
+  if (!p) return {};
+  return { ai_provenance: { id: p.id, record: p.record, record_url: p.recordUrl } };
 }
 
 // ── HTTP headers ────────────────────────────────────────────────────────────────────────────────

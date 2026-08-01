@@ -83,7 +83,7 @@ import { getOwnerScopeMemory } from '../services/owner-memory.js';
 import { notInYourNamespace, shadowedByOwnerCopy, OWNER_SCOPE_LIST_NOTE } from './memory-namespace-hints.js';
 import { walletBalanceOutput, memoryEntryOutput, memoryListOutput, genericListOutput, agentsListOutput, agentProfileOutput } from './catalog/output-schemas.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
-import { writeProvenanceEcho, readProvenance } from './ai-provenance-result.js';
+import { writeProvenanceEcho, readProvenance, readProvenanceMany } from './ai-provenance-result.js';
 import { provenanceForWrite } from '../services/ai-provenance.js';
 import { memoryContentBytes } from '../routes/memory/shared.js';
 import { registerCoreAdminTools } from './core-admin.js';
@@ -684,6 +684,9 @@ export function registerCoreTools(
         annotationsFor('aimeat_board_read'),
         async ({ board_id, category, limit, response_format }) => {
             const posts = await storage.listPosts(board_id, { category, limit: limit ?? 20 });
+            // TARGET-058: an agent asked to summarise a board has to be able to say which posts a
+            // model wrote. One query for the page — see readProvenanceMany's N+1 note.
+            const provFor = await readProvenanceMany(storage, config, posts.map(p => p.aiProvenanceId));
             return jsonContent(shapeResponse('aimeat_board_read', response_format, posts.map(p => ({
                 id: p.id,
                 author_gaii: p.authorGaii,
@@ -692,6 +695,7 @@ export function registerCoreTools(
                 category: p.category,
                 reactions: p.reactions,
                 created_at: p.createdAt,
+                ...provFor(p.aiProvenanceId),
             }))));
         },
     );
@@ -707,8 +711,8 @@ export function registerCoreTools(
             const postId = `post-${randomBytes(8).toString('hex')}`;
             // TARGET-058. A board post is text an agent puts where people read it, so it is stamped
             // like any other write. The hash covers title + body together, which is the unit a reader
-            // sees; a post has no provenance column, so the record stands on its own and is joined by
-            // that hash rather than by a foreign key.
+            // sees. Phase 9 gave the post a column for the id as well, so a reader gets the label
+            // FROM the post instead of having to already suspect something and go looking by hash.
             const provenanceId = await provenanceForWrite(storage, {
                 principal: agentGaii,
                 content: `${title}\n\n${body}`,
@@ -731,6 +735,7 @@ export function registerCoreTools(
                 tags: [],
                 reactions: {},
                 createdAt: new Date().toISOString(),
+                aiProvenanceId: provenanceId,
             });
             return {
                 content: [{ type: 'text' as const, text: JSON.stringify({

@@ -282,6 +282,12 @@ export function initializeSchema(db: Database.Database): void {
   // made. Both mailbox copies carry the same id — the statement is about the bytes, not about whose
   // row it is. Mirrors Postgres migration 0019.
   safeAddColumn('direct_messages', 'aiProvenanceId', 'TEXT');
+  // A board post/reply and an agent message were stamped from Phase 4 onward with nowhere to keep
+  // the id, so the record was findable by content hash and a label could not be rendered FROM the
+  // item. Mirrors Postgres migration 0020. A public board's posts also join PUBLICLY_LINKED above;
+  // an agent message stays private, like a direct message.
+  safeAddColumn('board_posts', 'aiProvenanceId', 'TEXT');
+  safeAddColumn('agent_messages', 'aiProvenanceId', 'TEXT');
   // The other direction: which provenance record a metered LLM call produced, so "what did this
   // money buy?" is one join rather than a guess.
   safeAddColumn('agent_usage_event', 'provenanceId', 'TEXT');
@@ -290,6 +296,8 @@ export function initializeSchema(db: Database.Database): void {
   // calls above — an index on a column an upgraded database has not gained yet is a boot crash.
   db.exec(`CREATE INDEX IF NOT EXISTS idx_memory_ai_provenance ON memory(aiProvenanceId);`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_apps_ai_provenance ON apps(aiProvenanceId);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_board_posts_ai_provenance ON board_posts(aiProvenanceId);`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_boards_visibility ON boards(visibility);`);
 
   // Governance Phase C — budget limits on agent directives
   safeAddColumn('agent_directives', 'budgetLimits', 'TEXT');

@@ -106,6 +106,8 @@ export interface AgentDirective {
 
 export interface AgentMessage {
   agentGaii: string;
+  /** TARGET-058 (migration 0020): the provenance record describing `content`. NULL = unstated. */
+  aiProvenanceId: string | null;
   content: string;
   createdAt: Generated<Timestamp>;
   direction: string;
@@ -337,6 +339,8 @@ export interface Board {
 }
 
 export interface BoardPost {
+  /** TARGET-058 (migration 0020): the provenance record describing title + body. NULL = unstated. */
+  aiProvenanceId: string | null;
   authorGaii: string;
   boardId: string;
   body: string;

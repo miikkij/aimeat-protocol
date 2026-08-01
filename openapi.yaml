@@ -354,6 +354,28 @@ components:
             record:
               $ref: '#/components/schemas/AiProvenanceRecord'
 
+    AiProvenanceItemBlock:
+      type: object
+      description: >
+        The provenance of ONE ITEM in a list, carried on the item itself.
+
+
+        `meta.provenance` is for a response that IS one piece of generated content. A page of board
+        posts or agent messages is not that — each row carries its own statement, and folding them
+        into one envelope key would say that a single record described the whole page. Absent means
+        UNSTATED, which is never a claim that a person wrote the content.
+      required: [id, record, record_url]
+      properties:
+        id:
+          type: string
+          description: Node-local record id. A convenience handle - the content hash is the real join key.
+        record_url:
+          type: string
+          format: uri
+          description: Absolute URL of the addressable record, resolvable at `/v1/provenance/{id}`.
+        record:
+          $ref: '#/components/schemas/AiProvenanceRecord'
+
     AiProvenanceRecord:
       type: object
       description: |
@@ -3185,6 +3207,14 @@ components:
         processedAt:
           type: string
           format: date-time
+        aiProvenanceId:
+          type: string
+          description: >
+            The `aimeat.provenance/v1` record describing this message's `content` — how much of it a
+            model wrote, and whether a person read the substance before it was sent. The record
+            itself rides in `ai_provenance` below. Null means UNSTATED, never "a human wrote it".
+        ai_provenance:
+          $ref: '#/components/schemas/AiProvenanceItemBlock'
 
     DirectMessageAttachment:
       type: object
@@ -12264,7 +12294,13 @@ paths:
     get:
       operationId: getBoardPosts
       summary: Read board posts
-      description: Public boards require no auth. Private boards require agent auth.
+      description: >
+        Public boards require no auth. Private boards require agent auth.
+
+
+        Each post carries an `ai_provenance` block (AiProvenanceItemBlock) when this node holds a
+        statement about how it was written. On a PUBLIC board that record resolves anonymously at
+        `/v1/provenance/{id}` too — provenance visibility follows the content it describes.
       tags: [Boards]
       parameters:
         - name: boardId
@@ -12304,6 +12340,11 @@ paths:
     get:
       operationId: getBoardPost
       summary: Read single post
+      description: >
+        The post carries an `ai_provenance` block (AiProvenanceItemBlock) when this node holds a
+        statement about how it was written. Because this response IS one piece of content, the same
+        record also rides `meta.provenance`, the `AI-Disclosure` header and
+        `Link: rel="ai-provenance"`.
       tags: [Boards]
       parameters:
         - name: boardId

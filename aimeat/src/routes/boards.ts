@@ -11,6 +11,12 @@
  *   - resolve(): identity resolution via resolveIdentity for owner-scoped writes
  *
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0. The REST post/reply writes are stamped, the same
+ *     act the MCP tools have been stamping since Phase 4. Leaving one door stamped and the other not
+ *     would mean a post's label depended on which client wrote it, which is the sort of split a
+ *     reader can neither see nor account for. These routes take no declaration — an agent that wants
+ *     to state how content was made uses the MCP tool's `ai_provenance`, which is scope-gated — so
+ *     what lands here is the node's own observation, with everything it did not witness `unstated`.
  *   Post body limit 500 → 200 000 — 2026-07-30 — 500 characters is a sentence, not a post.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  */
@@ -28,6 +34,10 @@ import { logger } from '../utils/logger.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { emitChange } from '../services/event-bus.js';
 import { resolveIdentity, isSameOwner, parseGaiiLoose } from '../utils/gaii.js';
+import { provenanceForWrite } from '../services/ai-provenance.js';
+import {
+  loadServedProvenance, loadServedProvenanceMany, provenanceItemBlock, setProvenanceHeaders,
+} from '../services/ai-provenance-marks.js';
 
 export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
@@ -294,6 +304,19 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       ? new Date(Date.now() + ttl_hours * 3600_000).toISOString()
       : new Date(Date.now() + 168 * 3600_000).toISOString(); // default 7 days
 
+    // TARGET-058: the same stamp aimeat_board_post applies, on the REST door. The hash covers
+    // title + body together, which is the unit a reader sees.
+    const aiProvenanceId = await provenanceForWrite(storage, {
+      principal: gaii,
+      content: `${title}\n\n${body}`,
+      pipeline: 'rest.board_post',
+      surface: { visibility: board.visibility === 'public' ? 'public' : 'private', humanAudience: true },
+      labelPolicy: config.aiLabelPublic,
+      nodeId: config.nodeId,
+      baseUrl: config.baseUrl,
+      enabled: config.aiProvenance,
+    });
+
     const post = await storage.createPost({
       id: postId,
       boardId,
@@ -305,6 +328,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       ttlExpiresAt,
       reactions: {},
       createdAt: new Date().toISOString(),
+      aiProvenanceId,
     });
 
     res.status(201).json(success(config.nodeId, {
@@ -367,6 +391,11 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
 
     const posts = await storage.listPosts(boardId, { category, cursor, limit });
 
+    // TARGET-058: how each post was made, in ONE query for the page. The caller has already passed
+    // the board read gate above, which is the authorization argument — provenance travels with the
+    // content it describes. A page of human-written posts costs an empty map.
+    const provById = await loadServedProvenanceMany(storage, config, posts.map(p => p.aiProvenanceId));
+
     res.json(success(config.nodeId, {
       posts: posts.map(p => ({
         id: p.id,
@@ -379,6 +408,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
         semantic: p.semantic,
         ttl_expires_at: p.ttlExpiresAt,
         created_at: p.createdAt,
+        ...provenanceItemBlock(p.aiProvenanceId ? provById.get(p.aiProvenanceId) : undefined),
       })),
       total: posts.length,
       cursor: posts.length === limit ? posts[posts.length - 1]?.id : undefined,
@@ -482,6 +512,10 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       return;
     }
 
+    // TARGET-058: this response IS one piece of content, so the record also rides the envelope
+    // carrier and the HTTP headers — the same three planes every other single-item read serves.
+    const prov = await loadServedProvenance(storage, config, post.aiProvenanceId);
+    setProvenanceHeaders(res, prov);
     res.json(success(config.nodeId, {
       id: post.id,
       board_id: post.boardId,
@@ -495,6 +529,7 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
       semantic: post.semantic,
       ttl_expires_at: post.ttlExpiresAt,
       created_at: post.createdAt,
+      ...provenanceItemBlock(prov),
     }, [
       { description: 'React to this post', method: 'POST', url: `/v1/boards/${boardId}/posts/${postId}/react` },
       { description: 'Reply to this post', method: 'POST', url: `/v1/boards/${boardId}/posts/${postId}/replies` },
@@ -575,16 +610,31 @@ export function boardsRouter(config: AimeatConfig, storage: Storage): Router {
     const { body } = req.body ?? {};
 
     const replyId = `reply-${randomBytes(8).toString('hex')}`;
+    const replyAuthor = resolve(req);
+    // TARGET-058: the BODY alone — the "Re: …" title is generated here, and hashing our own prefix
+    // would describe bytes the author never wrote.
+    const board = await storage.getBoard(boardId);
+    const aiProvenanceId = await provenanceForWrite(storage, {
+      principal: replyAuthor,
+      content: body,
+      pipeline: 'rest.board_reply',
+      surface: { visibility: board?.visibility === 'public' ? 'public' : 'private', humanAudience: true },
+      labelPolicy: config.aiLabelPublic,
+      nodeId: config.nodeId,
+      baseUrl: config.baseUrl,
+      enabled: config.aiProvenance,
+    });
     const reply = await storage.createPost({
       id: replyId,
       boardId,
-      authorGaii: resolve(req),
+      authorGaii: replyAuthor,
       title: `Re: ${parent.title}`,
       body,
       tags: [],
       reactions: {},
       replyTo: postId,
       createdAt: new Date().toISOString(),
+      aiProvenanceId,
     });
 
     res.status(201).json(success(config.nodeId, {

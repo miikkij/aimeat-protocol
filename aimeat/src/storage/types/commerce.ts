@@ -150,6 +150,15 @@ export interface BoardPostRecord {
   replyTo?: string;
   createdAt: string;
   semantic?: SemanticAnnotation;  // Phase 0.7b
+  /**
+   * TARGET-058: the provenance record describing this post's text — how much of it a model wrote,
+   * and whether a person read the substance before it went up.
+   *
+   * A post on a PUBLIC board is content anyone can read without an account, which is why boards are
+   * in PUBLICLY_LINKED_CONTAINERS: the label has to resolve for the same anonymous visitor who can
+   * read the post. Absent means UNSTATED, which is never "a human wrote it".
+   */
+  aiProvenanceId?: string;
 }
 
 export interface DisputeRecord {

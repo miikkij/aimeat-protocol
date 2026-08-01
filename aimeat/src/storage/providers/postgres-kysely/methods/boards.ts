@@ -5,6 +5,9 @@
  *   and the boards API. Translated 1:1 from the Prisma implementation. The business key is `boardId`
  *   (record.id), `postId` for posts.
  * @version-history
+ *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0: `BoardPost.aiProvenanceId` round-trips
+ *     (migration 0020). A post on a public board also satisfies the derived-visibility predicate in
+ *     ./ai-provenance.ts, so an anonymous reader of that board can resolve the record behind it.
  *   v1.0.0 — 2026-07-15 — Phase 5: boards on Postgres+Kysely.
  */
 import type { Selectable } from 'kysely';
@@ -19,7 +22,7 @@ function toBoard(r: Selectable<Board>): BoardRecord {
   return { id: r.boardId, name: r.name, description: r.description ?? undefined, visibility: r.visibility as BoardRecord['visibility'], ownerGaii: r.ownerGaii, allowedGaiis: r.allowedGaiis ?? [], federate: r.federate ?? false, createdAt: iso(r.createdAt) };
 }
 function toPost(r: Selectable<BoardPost>): BoardPostRecord {
-  return { id: r.postId, boardId: r.boardId, authorGaii: r.authorGaii, title: r.title, body: r.body, category: r.category ?? undefined, tags: r.tags ?? [], ttlExpiresAt: r.ttlExpiresAt ? iso(r.ttlExpiresAt) : undefined, reactions: (r.reactions ?? {}) as BoardPostRecord['reactions'], replyTo: r.replyTo ?? undefined, createdAt: iso(r.createdAt) };
+  return { id: r.postId, boardId: r.boardId, authorGaii: r.authorGaii, title: r.title, body: r.body, category: r.category ?? undefined, tags: r.tags ?? [], ttlExpiresAt: r.ttlExpiresAt ? iso(r.ttlExpiresAt) : undefined, reactions: (r.reactions ?? {}) as BoardPostRecord['reactions'], replyTo: r.replyTo ?? undefined, createdAt: iso(r.createdAt), aiProvenanceId: r.aiProvenanceId ?? undefined };
 }
 function toSub(r: Selectable<BoardSubscription>): BoardSubscriptionRecord {
   return { id: r.id, boardId: r.boardId, gaii: r.gaii, callbackUrl: r.callbackUrl ?? undefined, filters: (r.filters ?? undefined) as BoardSubscriptionRecord['filters'], createdAt: iso(r.createdAt) };
@@ -60,7 +63,7 @@ export const boardMethods = {
     const [row] = await this.db.insertInto('BoardPost').values({
       postId: p.id, boardId: p.boardId, authorGaii: p.authorGaii, title: p.title, body: p.body, category: p.category ?? null,
       tags: p.tags ?? null, ttlExpiresAt: p.ttlExpiresAt ? new Date(p.ttlExpiresAt) : null, reactions: jsonb(p.reactions ?? {}),
-      replyTo: p.replyTo ?? null, createdAt: new Date(p.createdAt),
+      replyTo: p.replyTo ?? null, createdAt: new Date(p.createdAt), aiProvenanceId: p.aiProvenanceId ?? null,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).returningAll().execute();
     return toPost(row);

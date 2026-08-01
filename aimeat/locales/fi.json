@@ -3531,6 +3531,7 @@
         "testConnection": "Testaa yhteys",
         "testSuccess": "Yhteys onnistui",
         "testFail": "Yhteys epäonnistui",
+        "testBudgetSpent": "Päivän tekoälybudjetti on käytetty – avainta ei testattu",
         "save": "Tallenna asetukset",
         "delete": "Poista API-avain",
         "deleteConfirm": "Haluatko varmasti poistaa OpenRouter API-avaimesi?",

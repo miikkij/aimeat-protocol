@@ -9,6 +9,10 @@
  * @usage
  *   import { OpenRouterSettings } from './openrouter-settings.js';
  * @version-history
+ *   v2.1.0 — 2026-08-01 — TARGET-058 Phase 9 step 0. "Test" now distinguishes a spent daily budget
+ *     from a failed connection. Phase 8b routed the test through the completion chokepoint, which
+ *     correctly made it refusable at 402 — but the panel headlined every failure "Connection failed",
+ *     so a person verifying their setup was told to doubt a key that was working.
  *   v2.0.0 — 2026-07-18 — Split out of generator-settings.js (SettingsCollectionView removed with
  *     the deleted Generator feature); dropped the generator.js project-settings import. OpenRouterSettings unchanged.
  *   v1.5.0 — 2026-07-05 — Model dropdown now populates for custom OpenAI-compatible providers
@@ -155,7 +159,15 @@ export function OpenRouterSettings({ onSettingsChange, startOpen = false }) {
     try {
       const resp = await apiPost('/v1/openrouter/test');
       if (resp.ok === false) {
-        showMsg(t('profile.generator.openrouter.testFail') + (resp.error?.message ? ': ' + resp.error.message : ''), true);
+        // A connectivity test is a real, billable completion, so it is REFUSED once the day's budget
+        // is spent — and that refusal is not a connection failure. Headlining it "Connection failed"
+        // sends someone off to check a key that was never the problem, which is exactly the wrong
+        // conclusion to hand a person who is trying to verify their setup.
+        const budgetSpent = resp.error?.code === 'QUOTA_EXHAUSTED' || resp.error?.code === 'APP_QUOTA_EXHAUSTED';
+        const head = budgetSpent
+          ? t('profile.generator.openrouter.testBudgetSpent')
+          : t('profile.generator.openrouter.testFail');
+        showMsg(head + (resp.error?.message ? ': ' + resp.error.message : ''), true);
       } else {
         showMsg(t('profile.generator.openrouter.testSuccess'));
       }

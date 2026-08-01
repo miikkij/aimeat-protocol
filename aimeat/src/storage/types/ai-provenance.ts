@@ -27,6 +27,10 @@
  * @usage
  *   import type { AiProvenanceRecordRow } from '../storage/interface.js';
  * @version-history
+ *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 9 step 0. `board_posts` joins the list: a post on a public
+ *     board is served unauthenticated, so leaving it out meant the one surface an anonymous visitor
+ *     reads had a record that would not resolve for them. Agent messages got the same column in the
+ *     same change and deliberately did NOT join the list — they are private, like direct messages.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 8. PUBLICLY_LINKED_CONTAINERS: the maintenance obligation
  *     the derived-visibility design created, written down where `pnpm check:ai-disclosure` enforces it.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 2. `visibility` removed: it is derived from the linked
@@ -63,6 +67,17 @@ export const PUBLICLY_LINKED_CONTAINERS = [
     sqliteTable: 'apps',
     postgresTable: '"App"',
     publicWhen: 'not parked, not operator-hidden, no access code',
+  },
+  {
+    /**
+     * Board posts and replies on a PUBLIC board. `GET /v1/boards/:boardId/posts` takes no auth, so a
+     * post there is readable by a stranger and its provenance must resolve for that same stranger.
+     * The visibility lives on the BOARD, not on the post, so the predicate joins.
+     */
+    name: 'board_posts',
+    sqliteTable: 'board_posts',
+    postgresTable: '"BoardPost"',
+    publicWhen: "the post's board has visibility = 'public'",
   },
 ] as const;
 

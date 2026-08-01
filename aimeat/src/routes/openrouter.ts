@@ -53,7 +53,7 @@ import { success, error } from '../middleware/envelope.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { encrypt, decrypt, getEncryptionKey } from '../services/encryption.js';
 import { logger } from '../utils/logger.js';
-import { listModels } from '../services/openrouter.js';
+import { listModels, DEFAULT_BASE_URLS, type ProviderType } from '../services/openrouter.js';
 import { completeForOwner, AiCompletionError } from '../services/ai-completion.js';
 import { servedProvenanceOf, envelopeMeta, setProvenanceHeaders } from '../services/ai-provenance-marks.js';
 
@@ -91,14 +91,6 @@ function validateProviderUrl(url: string): string | null {
     return 'Invalid URL format';
   }
 }
-
-type ProviderType = 'openrouter' | 'lmstudio' | 'custom';
-
-const DEFAULT_BASE_URLS: Record<ProviderType, string> = {
-  openrouter: 'https://openrouter.ai/api/v1',
-  lmstudio: 'http://localhost:1234/v1',
-  custom: '',
-};
 
 // Per-user model cache: Map<cacheKey, { models, expiresAt }>
 const modelCache = new Map<string, { models: unknown[]; expiresAt: number }>();
