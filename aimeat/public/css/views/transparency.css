@@ -1,0 +1,88 @@
+/**
+ * @file public/css/views/transparency.css
+ * @description Styling for the public AI transparency page (views/transparency.js, TARGET-058
+ *   Phase 10). Every colour, space and radius is a theme.css token, so the page reads in both
+ *   themes and carries no hardcoded brand hex; nothing here is `rgba(255,255,255,…)`, which is
+ *   legible only on a dark background.
+ *
+ *   THE LIMITS BLOCK IS THE ONE PIECE OF EMPHASIS ON THE PAGE. It gets the accent rule and the
+ *   tinted surface, because "what this cannot do" is the section a reader skims past on every
+ *   other compliance page. The rest of the page is deliberately plain: a transparency page that
+ *   looks like a brochure invites the reader to discount it.
+ *
+ *   CODE BLOCKS SCROLL THEMSELVES. A hash URL and a JSON body are both longer than 390px, so
+ *   `overflow-x: auto` lives on the block. Without it the widest sample sets the page width and
+ *   the body scrolls sideways on a phone.
+ * @structure
+ *   - .tp                 — page wrapper (rides on .ld for width)
+ *   - .tp-limits          — the "what this does not do" callout
+ *   - .tp-section / .tp-h2 / .tp-p / .tp-note / .tp-muted
+ *   - .tp-facts / .tp-fact — the operator + supervisor definition list
+ *   - .tp-code / .tp-links
+ * @usage preloaded from spa.html; classes emitted by /views/transparency.js
+ * @version-history
+ *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 10.
+ */
+
+.tp-hero { padding-bottom: var(--sp-4, 16px); }
+/* The intro reads as body text, so it starts where every section below it starts. Centred under a
+   centred H1 it sat inset from the headings and looked like a caption. */
+.tp-hero .ld-hero-sub { max-width: 62ch; margin: 0; text-align: left; }
+
+.tp-section { margin: var(--sp-8, 32px) 0; }
+.tp-h2 { font-size: var(--text-xl); font-weight: 700; margin: 0 0 var(--sp-3, 12px); color: var(--text); }
+.tp-p { margin: 0 0 var(--sp-3, 12px); max-width: 62ch; line-height: 1.6; color: var(--text); }
+.tp-note { color: var(--text-dim); font-size: var(--text-sm); }
+.tp-muted { color: var(--text-dim); }
+
+/* The boundary, stated where it cannot be skimmed past. */
+.tp-limits {
+  margin: var(--sp-6, 24px) 0;
+  padding: var(--sp-5, 20px);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border-focus);
+  border-radius: var(--radius-sm);
+  background: var(--bg-dim);
+}
+.tp-limits-title { font-size: var(--text-lg); font-weight: 700; margin: 0 0 var(--sp-2, 8px); color: var(--text); }
+.tp-limits-lead { margin: 0 0 var(--sp-3, 12px); color: var(--text-dim); font-size: var(--text-sm); }
+.tp-limits-list { margin: 0; padding-left: 1.15rem; }
+.tp-limits-list li { margin: 0 0 var(--sp-3, 12px); line-height: 1.6; color: var(--text); max-width: 62ch; }
+.tp-limits-list li:last-child { margin-bottom: 0; }
+
+/* Operator + supervisory authority, straight off /v1/ai-transparency. Two columns on a wide
+   screen, stacked below it — a 130px label column next to a long authority name is unreadable
+   at 390px. */
+.tp-facts {
+  margin: 0 0 var(--sp-4, 16px);
+  padding: var(--sp-4, 16px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+}
+.tp-fact { display: grid; grid-template-columns: 200px 1fr; gap: var(--sp-3, 12px); padding: var(--sp-2, 8px) 0; }
+.tp-fact + .tp-fact { border-top: 1px solid var(--border-subtle); }
+.tp-fact-key { margin: 0; color: var(--text-dim); font-size: var(--text-sm); }
+.tp-fact-val { margin: 0; color: var(--text); line-height: 1.5; overflow-wrap: anywhere; }
+.tp-fact-val a { color: var(--accent); }
+@media (max-width: 640px) {
+  .tp-fact { grid-template-columns: 1fr; gap: var(--sp-1, 4px); }
+}
+
+.tp-code {
+  margin: 0 0 var(--sp-3, 12px);
+  padding: var(--sp-3, 12px);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-dim);
+  overflow-x: auto;
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  color: var(--text);
+}
+.tp-code code { white-space: pre; }
+
+.tp-links { margin: 0; padding-left: 1.15rem; }
+.tp-links li { margin: 0 0 var(--sp-2, 8px); }
+.tp-links a { color: var(--accent); }

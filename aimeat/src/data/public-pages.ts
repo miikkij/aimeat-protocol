@@ -22,6 +22,10 @@
  *   import { sitemapPages } from '../data/public-pages.js';
  *   for (const page of sitemapPages()) { ... }
  * @version-history
+ *   v1.1.0 — 2026-08-01 — Add /v1/transparency (TARGET-058 Phase 10), the public human page about
+ *     how this node marks AI-generated content. Its markdown body states the limits and points at
+ *     the live statement for operator identity rather than restating it — this file runs on every
+ *     node, and a hardcoded operator would be false on all but one of them.
  *   v1.0.0 — 2026-07-28 — Initial: one registry behind sitemap.xml; API endpoints dropped from the
  *     sitemap (docs/internal/agentscanner/02-vaihe-sitemap-xml.md)
  */
@@ -205,6 +209,48 @@ and guessing wrong is quiet rather than loud.
 The full set with forms, examples and cross-references is at
 [{{BASE_URL}}/v1/glossary.md]({{BASE_URL}}/v1/glossary.md), and as JSON at
 [{{BASE_URL}}/v1/glossary.json]({{BASE_URL}}/v1/glossary.json).
+`,
+  },
+  {
+    path: '/v1/transparency',
+    title: 'How this node marks AI-generated content',
+    description: 'What this AIMEAT node records when a model writes something, what a reader sees, what the marking cannot do, and how anyone can check a piece of content without an account.',
+    changefreq: 'monthly',
+    priority: '0.6',
+    // The operator's legal identity and supervisory authority are DELIBERATELY not restated here.
+    // They have exactly one source — the live statement — and this file ships to every node that
+    // runs the software, where a hardcoded operator name would be a false statement. The page
+    // itself reads them from /v1/ai-transparency at render time for the same reason.
+    markdown: `When a model writes something on this node, the node records how it was made — which model,
+when, on whose account, and how much a person was involved — and keeps that record at an address
+of its own. Where a person reads that content on this node's own pages, the record becomes a
+visible label: the official EU AI Office icon and a sentence in English or Finnish, with a link to
+the full record. Software gets the same facts from the HTTP headers, the page metadata, and the
+markdown and MCP surfaces.
+
+## What this does not do
+
+- This node does **not** watermark text. It does not see the words as a model produces them, and
+  that layer belongs to whoever runs the model.
+- A mark can be removed by copying. The record at its own address survives that, but nothing here
+  makes text tamper-proof.
+- Content made before this node started recording carries no record and will not acquire one.
+- A missing record means nothing was stated. It never means a person wrote it.
+
+## Checking a piece of content
+
+Anyone can check content this node served, byte for byte, with no account:
+\`GET {{BASE_URL}}/v1/provenance/by-hash/{sha256}\`. It works where the node served you the same
+bytes it hashed; where the node re-assembles a document on the way out, use the record id from the
+response's \`Link\` header instead.
+
+## Who runs and supervises this node
+
+Stated on the node's own live statement, [{{BASE_URL}}/v1/ai-transparency.md]({{BASE_URL}}/v1/ai-transparency.md),
+which is also where the Code of Practice signatory status is answered.
+
+Reporting content that should carry a label and does not: \`POST {{BASE_URL}}/v1/flags\` with
+\`reason: "undisclosed_ai"\`.
 `,
   },
   {

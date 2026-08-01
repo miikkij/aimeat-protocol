@@ -9,6 +9,8 @@
  *     Sanomat teaser (designed masthead card; real screenshot when one exists), mobile-first, two CTAs.
  *   v1.3.0 — 2026-06-20 — Live wall: .ld-gallery is now a fixed 3-up grid (2-up tablet, 1-up phone)
  *     + .ld-wall-search filter box, for the real published-apps wall.
+ *   v1.4.0 — 2026-08-01 — .ld-transline: the single AI-transparency line above the footer
+ *     (TARGET-058 Phase 10).
  */
 .ld { max-width: 980px; margin: 0 auto; padding: 2rem 1.25rem 3rem; color: var(--text); }
 
@@ -112,6 +114,10 @@
 .ld-app-opens { display: inline-flex; align-items: center; gap: .22rem; }
 .ld-eye { flex: 0 0 auto; }
 .ld-app-by { font-size: .7rem; color: var(--text-muted); }
+/* One line about AI transparency, above the footer. Quiet on purpose: the claim it makes is small
+   and checkable, and the page it links to is where the limits belong. */
+.ld-transline { margin: 2rem auto 0; max-width: 62ch; text-align: center; color: var(--text-dim); font-size: .88rem; line-height: 1.6; }
+.ld-transline a { color: var(--accent); font-weight: 600; white-space: nowrap; }
 .ld-footer { display: flex; gap: 1.25rem; flex-wrap: wrap; justify-content: center; margin-top: 2.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); font-size: .88rem; }
 .ld-footer a { color: var(--text-dim); text-decoration: none; }
 .ld-footer a:hover { color: var(--text); }

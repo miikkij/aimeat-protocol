@@ -21,6 +21,9 @@
  *     existed; each case now opens the real thing. Adds the sovereignty section (EU AI Act,
  *     NIS2, own server, revocable grants, MIT) which is often the actual reason to buy, and
  *     a free assessment as the low-commitment entry. Every app link is operator-configurable.
+ *   v2.1.0 — 2026-08-01 — An AI-transparency section for the buyer who has to answer Article 50
+ *     to their own compliance officer (TARGET-058 Phase 10): what they get, then what stays
+ *     theirs, then a link to /v1/transparency where the limits are stated.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -191,6 +194,17 @@ export default function Business({ navigate }) {
           <li>${tr('biz.sov3', 'Agents and apps work under named permissions you can take back with one click, and every action is attributed to whoever took it.')}</li>
           <li>${tr('biz.sov4', 'The code is MIT licensed and readable. A closed competitor can only promise the same thing.')}</li>
         </ul>
+      </section>
+
+      <!-- The paragraph a buyer forwards to their own compliance officer. It names what they get
+           AND what stays theirs, in that order, because a caveat found later is the thing that
+           discredits everything above it. -->
+      <section class="ld-sovereignty">
+        <h2 class="ld-casegroup-title">${tr('biz.transTitle', 'AI transparency your compliance officer can read')}</h2>
+        <p class="ld-case-text">${tr('biz.trans1', 'Article 50 of the EU AI Act has applied since 2 August 2026. What you get here is an EU-built, self-hostable platform where AI provenance is a primitive of the layer every app sits on: content a model produced carries a record of how it was made, a person reading it on the node’s own surfaces sees a label, and the operator’s legal identity and supervisory authority sit at a fixed machine-readable address your compliance officer can fetch without asking us. Content the node served can be checked by anyone, byte for byte, with no account.')}</p>
+        <p class="ld-case-text">${tr('biz.trans2', 'What stays yours: the obligations that come with what you publish. Running on AIMEAT does not discharge them, and we would rather say so here than have you discover it later. What the platform does is make marking, labelling and the record the default path instead of a project.')}</p>
+        <a class="ld-path-cta" href="/v1/transparency"
+          onClick=${(e) => { e.preventDefault(); navigate('/v1/transparency'); }}>${tr('biz.transCta', 'How this node marks AI content →')}</a>
       </section>
 
       <div class="ld-stats">

@@ -9,6 +9,9 @@
  * @structure default export Landing({ navigate }) + BuildHero/Gallery(live wall)/StatsPanel/BuildAppPrompt/BuildAgentPrompt/AskYourAI
  * @usage routed at /v1/portal (and '/' for browsers) by spa.html
  * @version-history
+ *   v5.1.0 — 2026-08-01 — One line above the footer about how this node marks AI-generated
+ *     content, linking /v1/transparency (TARGET-058 Phase 10). One line and no more: the page
+ *     that states the limits properly is the one it links to.
  *   v5.0.0 — 2026-07-30 — TARGET-056: order reversed. The generator led the page's value and
  *     sat below a wall of other people's work; it is first now, with the three steps above it
  *     and the live counters directly under it as its evidence. The ownership question moved
@@ -765,6 +768,17 @@ export default function Landing({ navigate }) {
 
       <!-- 8. Today's stats + ownership line — the sales close. -->
       <${StatsPanel} navigate=${navigate} />
+
+      <!-- 8b. One line about AI transparency, and one link. It is deliberately one line: the
+               landing page is not a compliance brochure, and the page it links to is where the
+               limits are stated properly. -->
+      <p class="ld-transline">
+        ${tr('landing.transLine', 'Content a model wrote here carries a record of how it was made, and a label where a person reads it.')}
+        ${' '}
+        <a href="/v1/transparency" onClick=${(e) => { e.preventDefault(); navigate('/v1/transparency'); }}>
+          ${tr('landing.transCta', 'How this node marks AI content →')}
+        </a>
+      </p>
 
       <!-- 7. Footer -->
       <footer class="ld-footer">

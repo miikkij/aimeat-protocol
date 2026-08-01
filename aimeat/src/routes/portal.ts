@@ -42,6 +42,9 @@
  *     (privacy/terms/connect) negotiate Accept: text/markdown — the portal serves the
  *     authored landing markdown, static pages an HTML→markdown conversion; Vary: Accept.
  *     Authenticated SPA app routes stay HTML-only by design.
+ *   v1.11.0 — 2026-08-01 — Add /v1/transparency, the public human page for TARGET-058: what this
+ *     node marks, what it cannot do, who operates and supervises it. Distinct from the JSON
+ *     statement at /v1/ai-transparency, which is mounted ahead of this router.
  */
 import { Router } from 'express';
 import { readFileSync, existsSync } from 'node:fs';
@@ -587,6 +590,10 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
     '/v1/how-it-works',
     '/v1/glossary',
     '/v1/business',
+    // The human sibling of the machine-readable statement at /v1/ai-transparency. A different
+    // path on purpose: that one is JSON and is mounted ahead of this router, so a page there
+    // would never be reached, and a compliance statement is not a surface to route by Accept.
+    '/v1/transparency',
     '/v1/start',
     '/v1/app-grant',   // H-2 app-grant consent page (SPA)
     '/v1/invite',      // Email-invitation accept page (SPA, token in ?token=)

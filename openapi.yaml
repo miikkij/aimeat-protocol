@@ -8570,6 +8570,49 @@ paths:
               schema:
                 type: string
 
+  /v1/transparency:
+    get:
+      operationId: transparencyPage
+      summary: The public transparency page (HTML)
+      description: >
+        The human sibling of `/v1/ai-transparency`: what this node marks when a model writes
+        something, what the marking cannot do, who operates and supervises the node, how anyone
+        can check a piece of content without an account, and how to report a missing label.
+        Serves the SPA shell; the operator identity, supervisory authority and Code of Practice
+        status are read from `/v1/ai-transparency` at render time rather than restated, so the
+        page cannot drift away from the machine-readable statement. Answers
+        `Accept: text/markdown` with the authored mirror.
+      tags: [AI Transparency]
+      security: []
+      responses:
+        '200':
+          description: The page
+          content:
+            text/html:
+              schema:
+                type: string
+            text/markdown:
+              schema:
+                type: string
+
+  /v1/transparency.md:
+    get:
+      operationId: transparencyPageMarkdown
+      summary: The public transparency page as markdown
+      description: >
+        The authored markdown mirror of `/v1/transparency`, carrying `Link: rel="canonical"` back
+        to the page. States the limits and points at `/v1/ai-transparency.md` for the operator
+        identity rather than repeating it.
+      tags: [AI Transparency]
+      security: []
+      responses:
+        '200':
+          description: The page as markdown
+          content:
+            text/markdown:
+              schema:
+                type: string
+
   /v1/admin/ai-transparency-report:
     get:
       operationId: aiTransparencyReport
