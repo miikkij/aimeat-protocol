@@ -234,6 +234,30 @@ async function run() {
     assert(r.data.steps.write.state === 'input-red', `write should be input-red, got ${r.data.steps.write.state}`);
   });
 
+  await test('signals-only returns the verdicts INLINE, which is what it is advertised as', async () => {
+    // The tool catalog calls this mode "an instant health check — returns each step's verdict
+    // inline", and the node's MCP surface did. This route returned `{ runId, mode }`, so a caller
+    // got a receipt and had to fetch the run separately to learn anything — which is precisely what
+    // every other test in this file has to do above and below. The connector is a thin proxy over
+    // this route, so a crew pre-flighting a pipeline saw the empty version and had to invent a
+    // two-call workaround (reported 2026-08-01).
+    const { status, body } = await json('/v1/workflows/news/run', {
+      method: 'POST', headers: auth, body: JSON.stringify({ mode: 'signals-only' }),
+    });
+    assert(status === 200, `status ${status}`);
+    const d = body.data;
+    assert(!!d.steps, `no step verdicts in the run response: ${JSON.stringify(d)}`);
+    assert(typeof d.status === 'string', 'the run status belongs in the same answer');
+    assert(d.steps.fetch?.state === 'green' || d.steps.fetch?.state === 'output-red',
+      `fetch verdict missing or nonsense: ${JSON.stringify(d.steps.fetch)}`);
+    // The resolved vars: where <run-date> became a concrete date. A pre-flight check cannot see
+    // this any other way, and a wrong date here is the difference between a run that publishes and
+    // one that greens every step against yesterday's output.
+    assert(!!d.vars && typeof d.vars.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.vars.date),
+      `the resolved vars must come back so a caller can see the run date: ${JSON.stringify(d.vars)}`);
+    assert(d.vars.run === d.runId, 'vars.run identifies the run the verdicts belong to');
+  });
+
   await test('signals-only after writing both keys → done (all green)', async () => {
     await writeMem('news.raw', 'raw headlines here');
     await writeMem('news.article', 'the finished article');
