@@ -667,13 +667,89 @@ async function startStub(): Promise<void> {
             'a policy label must not assert the "no human review" statement');
     });
 
-    await test('A law-required label keeps its legal reason — policy never overwrites it', async () => {
+    await test('A required label keeps its reason — policy never overwrites it', async () => {
         const r = await json(`/v1/provenance/${publicId}`, { headers: auth(a.token) });
         assert(r.status === 200, `resolve ${r.status}`);
         const d = r.body.data.provenance.disclosure;
-        assert(d.required === true && d.reason === 'art50_4_public_interest',
-            `expected the legal reason to survive, got required=${d.required} reason=${d.reason}`);
+        // PRECAUTIONARY, not the statutory limb. Nothing about a memory write states whether its
+        // content informs the public on a matter of public interest, and D4 labels anyway — but the
+        // RECORD must not borrow Article 50(4)'s text limb to justify that precaution. This
+        // assertion previously read `art50_4_public_interest`, which is the overclaim being fixed:
+        // it was recorded on everything, including a dice game (LUOTAIN finding, 2026-08-02).
+        assert(d.required === true && d.reason === 'art50_4_precautionary',
+            `an unstated surface must record the precautionary reason, got required=${d.required} reason=${d.reason}`);
         assert(d.strength === 'full', `expected full strength, got ${d.strength}`);
+        // The READER sees no difference. That is the whole point of the change.
+        assert(JSON.stringify(d.short).length > 2 && JSON.stringify(d.long).length > 2,
+            'the label wording must be unchanged and present');
+    });
+
+    // ── 10b. The label's SECOND LAYER: a person clicking "how this was made" ──
+    //
+    // The visible chip links to /v1/provenance/{id}. That route answered application/json to
+    // everyone, so the compliance label handed a member of the public a JSON envelope — while the
+    // correction procedure the Code of Practice asks for sat in `next_actions`, invisible to exactly
+    // the reader it exists for. Negotiated now, the same way /v1/ai-transparency already was.
+
+    await test('A browser gets a readable page; the record says what the chip said', async () => {
+        const res = await fetch(`${BASE}/v1/provenance/${publicId}`, { headers: { Accept: 'text/html' } });
+        assert(res.status === 200, `html resolve ${res.status}`);
+        assert((res.headers.get('content-type') ?? '').includes('text/html'),
+            `expected text/html, got ${res.headers.get('content-type')}`);
+        const html = await res.text();
+        assert(/<html[\s>]/i.test(html), 'not an HTML document');
+        // The record's OWN pre-rendered sentence, not a second copy written in the page.
+        assert(html.includes('AI-generated') || html.includes('Tekoälyn'), 'the disclosure sentence is missing');
+        // The fingerprint, so a reader can see the record is bound to specific bytes.
+        assert(html.includes('sha256:'), 'the content hash is missing from the page');
+        // The correction route, which used to exist only in next_actions.
+        assert(/ai-transparency/.test(html), 'the page must point at how this node marks AI content');
+        assert(/flags/.test(html), 'the page must tell a reader how to report a wrong label');
+    });
+
+    await test('...and Vary: Accept is set, so a cache cannot serve one format for the other', async () => {
+        const res = await fetch(`${BASE}/v1/provenance/${publicId}`, { headers: { Accept: 'text/html' } });
+        assert((res.headers.get('vary') ?? '').toLowerCase().includes('accept'),
+            `expected Vary: Accept, got ${res.headers.get('vary')}`);
+    });
+
+    await test('Everything that is not a browser still gets the identical JSON', async () => {
+        const plain = await json(`/v1/provenance/${publicId}`);
+        assert(plain.status === 200, `json ${plain.status}`);
+        assert(plain.body.ok === true && !!plain.body.data.provenance, 'the JSON contract must be untouched');
+        // curl's default Accept is */* — it must NOT be read as a browser.
+        const star = await fetch(`${BASE}/v1/provenance/${publicId}`, { headers: { Accept: '*/*' } });
+        assert((star.headers.get('content-type') ?? '').includes('json'),
+            `Accept: */* must stay JSON, got ${star.headers.get('content-type')}`);
+    });
+
+    await test('The 404 stays an oracle-proof 404 in HTML too', async () => {
+        // A record that EXISTS but points at nothing public: mint one and leave it unattached.
+        const c = await json('/v1/ai/complete', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({ prompt: 'An unattached completion.', app_id: 'e2e-prov-404' }),
+        });
+        assert(c.status === 200, `complete ${c.status}`);
+        const byHash = await json(`/v1/provenance/by-hash/${sha256(c.body.data.content).replace('sha256:', '')}`,
+            { headers: auth(a.token) });
+        const unattachedId = byHash.body.data.records[0].id as string;
+        const missing = '00000000-0000-4000-8000-000000000000';
+
+        // "no such record" and "exists but its content is not public" must be indistinguishable in
+        // BOTH formats, or a readable page reopens the oracle the JSON branch deliberately closed.
+        const htmlMissing = await fetch(`${BASE}/v1/provenance/${missing}`, { headers: { Accept: 'text/html' } });
+        const htmlPrivate = await fetch(`${BASE}/v1/provenance/${unattachedId}`, { headers: { Accept: 'text/html' } });
+        assert(htmlMissing.status === 404 && htmlPrivate.status === 404,
+            `expected 404/404, got ${htmlMissing.status}/${htmlPrivate.status}`);
+        const [a1, b1] = [await htmlMissing.text(), await htmlPrivate.text()];
+        assert(a1 === b1, 'the two HTML 404s differ — the endpoint became an oracle for which ids exist');
+        assert(!a1.includes(unattachedId) && !a1.includes(missing), 'the 404 page must not echo the id back');
+
+        // And the JSON branch is still identical to itself, as it always was.
+        const jsonMissing = await json(`/v1/provenance/${missing}`);
+        const jsonPrivate = await json(`/v1/provenance/${unattachedId}`);
+        assert(jsonMissing.status === 404 && jsonPrivate.status === 404, 'the JSON 404s regressed');
+        assert(jsonMissing.body.error.message === jsonPrivate.body.error.message, 'the JSON 404s differ');
     });
 
     // ── 11. PHASE 2: the node's own transparency statement ──

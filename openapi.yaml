@@ -522,7 +522,23 @@ components:
             required: { type: boolean }
             reason:
               type: string
-              enum: [art50_1_interaction, art50_2_synthetic_output, art50_4_deepfake, art50_4_public_interest, policy, none]
+              description: >
+                Why a visible disclosure is (or is not) owed. Three of these are easy to confuse:
+
+
+                `art50_4_public_interest` — the content IS stated to inform the public on a matter
+                of public interest, so Article 50(4)'s text limb applies.
+
+
+                `art50_4_precautionary` — nobody stated whether it is. The node labels anyway
+                (over-labelling is the safe direction), but the record does not borrow a statutory
+                basis to justify a precaution.
+
+
+                `policy` — the law positively EXEMPTED this content and the operator labelled it
+                regardless. Distinct from `precautionary`, where applicability was never established
+                rather than decided.
+              enum: [art50_1_interaction, art50_2_synthetic_output, art50_4_deepfake, art50_4_public_interest, art50_4_precautionary, policy, none]
             short:
               type: object
               additionalProperties: { type: string }
@@ -8708,6 +8724,13 @@ paths:
         `AIMEAT_AI_PROVENANCE_DETAIL=minimal` reduces what a NON-owner is served to the four required
         fields plus the disclosure block. It never reduces what is stored, and the owner always sees
         the whole record.
+
+        CONTENT NEGOTIATED. A visible AI label's "how this was made" link lands here, so a PERSON
+        arrives at this URL. A client that ranks `text/html` above `application/json` - a browser -
+        gets a readable page carrying the record's own disclosure sentence, its fields, the content
+        fingerprint and the correction route. Everything else, including curl, `fetch()` and agents,
+        gets the JSON below unchanged. The 404 is identical in both formats for the same three
+        cases; the HTML variant takes no argument about the record and so has nothing to differ on.
       tags: [AI Transparency]
       security: []
       parameters:

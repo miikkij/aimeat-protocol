@@ -59,7 +59,9 @@ describe('the cross-product: level × humanInvolvement × visibility', () => {
           const d = disclosureFor(rec(level, human), { ...publicPage, visibility });
           expect(d.required).toBe(expected);
           expect(d.strength).toBe(strength);
-          expect(d.reason).toBe(expected ? 'art50_4_public_interest' : 'none');
+          // PRECAUTIONARY: `publicPage` states nothing about public interest, and a record must not
+          // borrow Article 50(4)'s text limb to justify the D4 over-label default.
+          expect(d.reason).toBe(expected ? 'art50_4_precautionary' : 'none');
         });
       }
     }
@@ -68,9 +70,9 @@ describe('the cross-product: level × humanInvolvement × visibility', () => {
 
 describe('`assisted` on a public-interest surface owes a LIGHT label (C2b)', () => {
   for (const human of ['none', 'light-review'] as AiHumanInvolvement[]) {
-    it(`assisted × ${human} on an anonymously readable page → light, art50_4_public_interest`, () => {
+    it(`assisted × ${human} on an anonymously readable page → light, precautionary`, () => {
       const d = disclosureFor(rec('assisted', human), publicPage);
-      expect(d).toEqual({ required: true, reason: 'art50_4_public_interest', strength: 'light' });
+      expect(d).toEqual({ required: true, reason: 'art50_4_precautionary', strength: 'light' });
     });
   }
 
@@ -222,10 +224,46 @@ describe('over-labelling by default (D4)', () => {
   });
 });
 
+/**
+ * WHICH BASIS THE RECORD CLAIMS — the half nothing exercised until 2026-08-02.
+ *
+ * Every case above runs on `publicPage`, which says nothing about public interest, and every one of
+ * them used to record `art50_4_public_interest`. That is what shipped: the statutory limb asserted
+ * on a dice game, because no call site passed the field at all and the D4 default filled it in.
+ *
+ * The label is not what changes here. Whether it appears, how strong it is and what it says are
+ * identical in all three cases below; only the recorded basis moves. That is the entire fix.
+ */
+describe('the recorded reason distinguishes a stated basis from a precaution', () => {
+  const g = () => rec('ai-generated', 'none');
+
+  it('stated public-interest=yes → the statutory reason', () => {
+    expect(disclosureFor(g(), { ...publicPage, publicInterest: 'yes' }))
+      .toEqual({ required: true, reason: 'art50_4_public_interest', strength: 'full' });
+  });
+
+  it('stated nothing → the precautionary reason, same label', () => {
+    expect(disclosureFor(g(), publicPage))
+      .toEqual({ required: true, reason: 'art50_4_precautionary', strength: 'full' });
+  });
+
+  it("`unknown` is a statement of ignorance, not of yes — it reads as precautionary too", () => {
+    expect(disclosureFor(g(), { ...publicPage, publicInterest: 'unknown' }).reason)
+      .toBe('art50_4_precautionary');
+  });
+
+  it('stated NO is exempt under the law, and `policy` records that the operator labelled anyway', () => {
+    // The third value, kept distinct from `precautionary`: here applicability was DECIDED and the
+    // law let it go. Collapsing the two would say the law exempted content nobody ever assessed.
+    expect(disclosureFor(g(), { ...publicPage, publicInterest: 'no' }, 'strict').reason).toBe('policy');
+    expect(disclosureFor(g(), { ...publicPage, publicInterest: 'no' }, 'light').required).toBe(false);
+  });
+});
+
 describe('creative work: present, but not intrusive', () => {
   it('artistic / satirical / fictional surfaces get a light disclosure, not silence', () => {
     const d = disclosureFor(rec('ai-generated', 'none'), { ...publicPage, creativeWork: true });
-    expect(d).toEqual({ required: true, reason: 'art50_4_public_interest', strength: 'light' });
+    expect(d).toEqual({ required: true, reason: 'art50_4_precautionary', strength: 'light' });
   });
 
   it('a creative deepfake is still disclosed, lightly', () => {
@@ -274,7 +312,7 @@ describe('the node label policy: `strict` labels what the law exempts', () => {
 
   it('`strict` never upgrades a label the law already owes — the legal reason survives', () => {
     expect(disclosureFor(rec('ai-generated', 'none'), publicPage, 'strict'))
-      .toEqual({ required: true, reason: 'art50_4_public_interest', strength: 'full' });
+      .toEqual({ required: true, reason: 'art50_4_precautionary', strength: 'full' });
   });
 
   it('`strict` invents nothing where a model was not involved', () => {
