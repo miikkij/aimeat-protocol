@@ -100,12 +100,32 @@ async function main(): Promise<void> {
       const ids = (r.data.data.providers as any[]).map(p => p.id);
       assert(ids.includes('fake'), `fake provider absent: ${ids.join(',')}`);
     });
-    await test('YouTube is absent without client credentials, rather than half-working', async () => {
-      const r = await api('/v1/connections/providers', { method: 'GET', bearer: jwtA });
-      const ids = (r.data.data.providers as any[]).map(p => p.id);
-      // The e2e node configures no Google client, so an enabled YouTube would mean the gate is
-      // decorative and the first real user would meet the failure instead.
-      assert(!ids.includes('youtube'), 'youtube offered without credentials');
+    await test('a provider with no client credentials is not advertised, and says why', async () => {
+      // Built in-process with an EMPTY config rather than asserted against the running node's
+      // provider list. The earlier version of this test checked that YouTube was absent from
+      // discovery, which passed only on a machine with no Google credentials in .env and started
+      // failing the moment the developer added theirs — an assertion about the environment wearing
+      // the costume of an assertion about the gate. Same family as the OAuth-login e2e that
+      // 302s instead of 503ing when a local Google client happens to be configured.
+      const { buildOutboundProviders, listProviderMeta, findProvider } = await import('../src/services/connections/providers.js');
+      const bare = buildOutboundProviders({
+        connectionsEnabled: true, connectGoogleClientId: '', connectGoogleClientSecret: '',
+        connectRedirectUri: '', connectFakeBaseUrl: '',
+      } as any);
+      const advertised = listProviderMeta(bare).map(p => p.id);
+      assert(!advertised.includes('youtube'), 'youtube advertised with no client credentials');
+      const yt = findProvider(bare, 'youtube');
+      assert(yt?.enabled === false, 'youtube enabled with no client credentials');
+      // The reason travels with the refusal: "disabled" alone leaves an operator nothing to act on.
+      assert(/CLIENT_ID/.test(yt?.disabledReason ?? ''), `unhelpful reason: ${yt?.disabledReason}`);
+    });
+    await test('the whole capability off means nothing is advertised at all', async () => {
+      const { buildOutboundProviders, listProviderMeta } = await import('../src/services/connections/providers.js');
+      const off = buildOutboundProviders({
+        connectionsEnabled: false, connectGoogleClientId: 'id', connectGoogleClientSecret: 'secret',
+        connectRedirectUri: '', connectFakeBaseUrl: 'http://127.0.0.1:1',
+      } as any);
+      assert(listProviderMeta(off).length === 0, 'providers advertised while the capability is off');
     });
     await test('discovery never leaks a client secret', async () => {
       const r = await api('/v1/connections/providers', { method: 'GET', bearer: jwtA });
@@ -358,6 +378,87 @@ async function main(): Promise<void> {
       assert(!('error' in second), 'second registration failed');
       assert((first as any).clientId === (second as any).clientId,
         'the second user registered again instead of reusing the first registration');
+      storage.close();
+    });
+
+    console.log('\nPhase 10 — Supplied credentials (no authorization round)');
+    await test('every advertised provider can actually be connected somehow', async () => {
+      // The check that would have caught Bluesky being listed with no route: a provider offered in
+      // discovery must have EITHER an authorization round or a set of attach fields. Advertising
+      // one with neither is a Connect button that cannot work.
+      const r = await api('/v1/connections/providers', { method: 'GET', bearer: jwtA });
+      const bad = (r.data.data.providers as any[]).filter(p =>
+        p.credentialShape === 'oauth2' ? false : !Array.isArray(p.attachFields) || p.attachFields.length === 0);
+      assert(bad.length === 0, `advertised but unconnectable: ${bad.map(p => p.id).join(', ')}`);
+    });
+    await test('a supplied credential connects the account', async () => {
+      const before = provider.stats.sessionMints;
+      const r = await api('/v1/connections/attach', {
+        bearer: jwtA,
+        body: { provider: 'fake-static', fields: { identifier: 'someone', password: 'good-secret' } },
+      });
+      assert(r.status === 201, `attach: ${r.status} ${r.data?.error?.message}`);
+      assert(r.data.data.connection.accountLabel === '@someone', `label ${r.data.data.connection.accountLabel}`);
+      assert(provider.stats.sessionMints === before + 1, 'the provider minted no session');
+    });
+    await test('the supplied secret is never echoed back', async () => {
+      const list = await api('/v1/connections', { method: 'GET', bearer: jwtA });
+      assert(!JSON.stringify(list.data).includes('good-secret'), 'the secret appeared in a response');
+    });
+    await test('a wrong secret is refused with something the user can act on', async () => {
+      const r = await api('/v1/connections/attach', {
+        bearer: jwtA,
+        body: { provider: 'fake-static', fields: { identifier: 'someone', password: 'wrong' } },
+      });
+      assert(r.status === 400 && r.data.error.code === 'ATTACH_FAILED', `${r.status} ${r.data?.error?.code}`);
+      assert(!JSON.stringify(r.data).includes('wrong'), 'the rejected secret was echoed in the error');
+    });
+    await test('a missing field is named, not swallowed', async () => {
+      const r = await api('/v1/connections/attach', {
+        bearer: jwtA, body: { provider: 'fake-static', fields: { identifier: 'someone' } },
+      });
+      assert(r.status === 400 && r.data.error.code === 'MISSING_FIELD', `${r.status} ${r.data?.error?.code}`);
+    });
+    await test('an OAuth provider refuses to be attached, and vice versa', async () => {
+      // The two paths must not overlap: attaching an OAuth provider would skip its consent screen.
+      const wrongWay = await api('/v1/connections/attach', {
+        bearer: jwtA, body: { provider: 'fake', fields: { identifier: 'x', password: 'y' } },
+      });
+      assert(wrongWay.status === 400 && wrongWay.data.error.code === 'NEEDS_AUTHORIZATION',
+        `attach accepted an OAuth provider: ${wrongWay.status} ${wrongWay.data?.error?.code}`);
+      const otherWay = await api('/v1/connections/start', { bearer: jwtA, body: { provider: 'fake-static' } });
+      assert(otherWay.status === 400 && otherWay.data.error.code === 'NOT_AN_OAUTH_PROVIDER',
+        `start accepted a supplied-credential provider: ${otherWay.status}`);
+    });
+    await test('a dead session is re-minted from the stored secret, without asking again', async () => {
+      const { ensureFreshCredential } = await import('../src/services/connections/refresh.js');
+      const { sealCredential } = await import('../src/services/connections/credential.js');
+      const { buildOutboundProviders } = await import('../src/services/connections/providers.js');
+      const { SqliteStorage } = await import('../src/storage/providers/sqlite/index.js');
+      const key = Buffer.from('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'hex');
+      const cfg = { nodeId: 'test', baseUrl: BASE, connectionsEnabled: true, connectGoogleClientId: '', connectGoogleClientSecret: '', connectRedirectUri: '', connectFakeBaseUrl: provider.baseUrl } as any;
+      const storage = new SqliteStorage(':memory:');
+      const ctx = { config: cfg, storage: storage as any, providers: buildOutboundProviders(cfg), key };
+      const now = new Date().toISOString();
+      await storage.createConnection({
+        id: 'sess-1', principal: 'sess@test', mode: 'personal', provider: 'fake-static', instance: null,
+        accountLabel: '@someone', externalId: 'did:test:someone',
+        // A session whose refresh token is already dead, but whose secret still works. This is the
+        // case the ordering fix exists for: checking for a refresh token first would park it.
+        credential: sealCredential({
+          shape: 'session', accessToken: 'at-dead', refreshToken: 'rt-dead',
+          extra: { appPassword: 'good-secret', identifier: 'someone', pds: provider.baseUrl, did: 'did:test:someone' },
+        }, key),
+        credentialShape: 'session', scopes: [],
+        expiresAt: new Date(Date.now() + 1000).toISOString(),
+        status: 'active', lastOkAt: now, lastError: null, createdAt: now, updatedAt: now,
+      });
+      const before = provider.stats.sessionMints;
+      const r = await ensureFreshCredential(ctx, 'sess-1');
+      assert(r.ok, `re-mint failed: ${JSON.stringify(r)}`);
+      assert(provider.stats.sessionMints === before + 1, 'no new session was minted from the stored secret');
+      const healed = await storage.getConnection('sess-1');
+      assert(healed?.status === 'active', `status ${healed?.status}`);
       storage.close();
     });
 

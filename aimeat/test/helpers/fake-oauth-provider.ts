@@ -38,6 +38,9 @@ export interface FakeProvider {
     staleRefreshAttempts: number;
     revocations: number;
     identityLookups: number;
+    /** Secrets exchanged for a session, and pairs refused. */
+    sessionMints: number;
+    sessionRejections: number;
   };
   /** Seconds the next issued access token lasts. Set to 0 to force the refresh path. */
   accessTokenTtlSeconds: number;
@@ -71,7 +74,7 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
 
   const state: FakeProvider = {
     baseUrl: '',
-    stats: { tokenExchanges: 0, refreshes: 0, staleRefreshAttempts: 0, revocations: 0, identityLookups: 0 },
+    stats: { tokenExchanges: 0, refreshes: 0, staleRefreshAttempts: 0, revocations: 0, identityLookups: 0, sessionMints: 0, sessionRejections: 0 },
     accessTokenTtlSeconds: 3600,
     breakRefresh: false,
     refreshDelayMs: 0,
@@ -176,6 +179,42 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
         const g = grants.get(token);
         if (!g || g.revoked) return json(res, 401, { error: 'invalid_token' });
         return json(res, 200, { id: g.subject, label: `Test account ${g.subject}` });
+      }
+
+      // ── The session-shaped half: a credential the user SUPPLIES, no authorization round ──
+      // Mirrors AT Proto's shape closely enough to prove the path: a secret is exchanged for a
+      // session, the session refreshes with the refresh token as a BEARER, and the secret keeps
+      // working afterwards so a dead session can be re-minted.
+      if (url.pathname === '/session' && req.method === 'POST') {
+        const raw = await new Promise<string>((resolve) => {
+          let b = ''; req.on('data', (c) => { b += c; }); req.on('end', () => resolve(b));
+        });
+        let parsed: { identifier?: unknown; password?: unknown };
+        try { parsed = JSON.parse(raw) as typeof parsed; } catch { return json(res, 400, { error: 'bad_json' }); }
+        const identifier = typeof parsed.identifier === 'string' ? parsed.identifier : '';
+        const password = typeof parsed.password === 'string' ? parsed.password : '';
+        // One wrong secret, so a test can prove the refusal message rather than only the success.
+        if (!identifier || password !== 'good-secret') {
+          state.stats.sessionRejections++;
+          return json(res, 401, { error: 'invalid_credentials' });
+        }
+        state.stats.sessionMints++;
+        const g = issue(identifier);
+        return json(res, 200, {
+          accessJwt: g.accessToken, refreshJwt: g.refreshToken,
+          did: `did:test:${identifier}`, handle: identifier,
+        });
+      }
+
+      if (url.pathname === '/xrpc/com.atproto.server.refreshSession' && req.method === 'POST') {
+        const presented = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+        const g = byRefresh.get(presented);
+        if (!g || g.revoked || g.retired.has(presented) || state.breakRefresh) {
+          return json(res, 400, { error: 'ExpiredToken' });
+        }
+        state.stats.refreshes++;
+        const next = issue(g.subject, g);
+        return json(res, 200, { accessJwt: next.accessToken, refreshJwt: next.refreshToken });
       }
 
       // The Mastodon-shaped registration endpoint, so the lazy per-instance path can be driven

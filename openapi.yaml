@@ -33570,6 +33570,66 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: No such provider.
+  /v1/connections/attach:
+    post:
+      operationId: attachConnection
+      summary: Connect an account by supplying a credential
+      description: >
+        For a provider that has no authorization round. The fields to send are declared by the
+        provider itself (attachFields in discovery), so a client renders the form without knowing
+        about any particular provider. The two paths never overlap: attaching a provider that HAS a
+        consent screen is refused, because it would be a way to skip that screen. The supplied
+        secret is never echoed back, in a response or in an error.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, fields]
+              properties:
+                provider:
+                  type: string
+                  example: bluesky
+                mode:
+                  type: string
+                  enum: [personal, shared]
+                  default: personal
+                fields:
+                  type: object
+                  additionalProperties:
+                    type: string
+                  description: Keyed by the names the provider declared in attachFields.
+      responses:
+        '200':
+          description: An account already connected was repaired with a new credential.
+        '201':
+          description: Connected
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          connection:
+                            $ref: '#/components/schemas/PublicConnection'
+                          created:
+                            type: boolean
+        '400':
+          description: >
+            The credential was refused, a declared field was missing, or the provider uses an
+            authorization round instead (NEEDS_AUTHORIZATION).
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No such provider.
   /v1/connections/callback:
     get:
       operationId: connectionCallback

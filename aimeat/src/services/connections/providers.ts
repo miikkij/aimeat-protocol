@@ -28,7 +28,22 @@ import type { AimeatConfig } from '../../config.js';
 import type { CredentialShape } from '../../models/connection-schemas.js';
 
 /** Stable provider identifiers. Also the value stored in `Connection.provider`. */
-export type OutboundProviderId = 'mastodon' | 'youtube' | 'bluesky' | 'fake';
+export type OutboundProviderId = 'mastodon' | 'youtube' | 'bluesky' | 'fake' | 'fake-static';
+
+/**
+ * What a user must supply for a provider that has NO authorization round.
+ *
+ * Declared here rather than hardcoded in a form so the panel renders whatever a provider needs
+ * without knowing about that provider. A provider with `attachFields: null` uses the OAuth round
+ * instead, and the two paths never overlap.
+ */
+export interface AttachField {
+  name: string;
+  label: string;
+  /** Rendered as a password input, and never echoed back in any response. */
+  secret: boolean;
+  placeholder?: string;
+}
 
 /** OAuth2 endpoints. Derived from the instance origin for an instance-scoped provider. */
 export interface OAuthEndpoints {
@@ -74,6 +89,12 @@ export interface OutboundProvider {
    * it — publish-gate measures usage either way, so the number can be filled in with evidence.
    */
   sharedDailyLimit: number | null;
+  /**
+   * Non-null when this provider is connected by SUPPLYING a credential rather than by an
+   * authorization round. Null for an OAuth provider. Advertising a provider without one of the two
+   * is how a "Connect" button appears that cannot work.
+   */
+  attachFields: AttachField[] | null;
   /** Endpoints. `instance` is required exactly when `instanceScoped` is true. */
   endpoints(instance: string | null): OAuthEndpoints | null;
 }
@@ -85,6 +106,7 @@ export interface OutboundProviderMeta {
   instanceScoped: boolean;
   credentialShape: CredentialShape;
   capabilities: string[];
+  attachFields: AttachField[] | null;
 }
 
 /**
@@ -105,6 +127,7 @@ function mastodon(enabled: boolean): OutboundProvider {
     scopes: ['read:accounts', 'write:statuses', 'write:media'],
     pkce: true,
     capabilities: ['publish-post', 'publish-video'],
+    attachFields: null,
     // Instances rate-limit, but there is no single daily publish ceiling to state, and inventing
     // one would be a guess wearing a number.
     sharedDailyLimit: null,
@@ -146,6 +169,7 @@ function youtube(clientId: string, clientSecret: string, capabilityOn: boolean):
     scopes: ['https://www.googleapis.com/auth/youtube.upload'],
     pkce: true,
     capabilities: ['publish-video'],
+    attachFields: null,
     // VARMISTETTAVA in the spec and still unread: the quota is per Google PROJECT and an upload
     // costs a large slice of it, which is believed to leave a single-digit number of uploads per
     // day for EVERY publisher on the node combined. Phase 5 reads the real figure from the console
@@ -174,7 +198,10 @@ function bluesky(capabilityOn: boolean): OutboundProvider {
   return {
     id: 'bluesky',
     label: 'Bluesky',
-    credentialShape: 'static',
+    // What is STORED is a session, even though what the user supplies is a static app password.
+    // Both are kept: the session is what calls use, and the app password is what lets a dead
+    // session be re-minted without asking the user to go and find it again.
+    credentialShape: 'session',
     instanceScoped: false,
     enabled: capabilityOn,
     disabledReason: capabilityOn ? null : 'connections capability is off (AIMEAT_CONNECTIONS_ENABLED)',
@@ -184,8 +211,13 @@ function bluesky(capabilityOn: boolean): OutboundProvider {
     pkce: false,
     capabilities: ['publish-post', 'publish-video'],
     sharedDailyLimit: null,
+    // The one provider a user hands us a secret for, so it is the one that needs a form.
+    attachFields: [
+      { name: 'identifier', label: 'Handle', secret: false, placeholder: 'you.bsky.social' },
+      { name: 'password', label: 'App password', secret: true, placeholder: 'xxxx-xxxx-xxxx-xxxx' },
+    ],
     endpoints() {
-      // Not an OAuth2 flow. The session endpoints live in the provider recipe, not here.
+      // Not an OAuth2 flow. The session endpoints live in the attach recipe, not here.
       return null;
     },
   };
@@ -215,6 +247,7 @@ function fake(baseUrl: string, capabilityOn: boolean): OutboundProvider {
     pkce: true,
     capabilities: ['publish-video', 'publish-post'],
     sharedDailyLimit: null,
+    attachFields: null,
     endpoints() {
       if (!baseUrl) return null;
       return {
@@ -223,6 +256,35 @@ function fake(baseUrl: string, capabilityOn: boolean): OutboundProvider {
         revoke: `${baseUrl}/revoke`,
       };
     },
+  };
+}
+
+/**
+ * The session-shaped test provider. Exists for the same reason `fake` does, one axis over: the
+ * supplied-credential path (no authorization round, a session minted from a secret the user hands
+ * over, and a refresh that is not OAuth2) has to be provable without a real Bluesky account.
+ *
+ * Without it, "attach" would ship tested only against the one provider nobody on this node has.
+ */
+function fakeStatic(baseUrl: string, capabilityOn: boolean): OutboundProvider {
+  const enabled = capabilityOn && Boolean(baseUrl);
+  return {
+    id: 'fake-static',
+    label: 'Test provider (supplied credential)',
+    credentialShape: 'session',
+    instanceScoped: false,
+    enabled,
+    disabledReason: enabled ? null : 'no AIMEAT_CONNECT_FAKE_BASE_URL (this provider is test-only)',
+    client: null,
+    scopes: [],
+    pkce: false,
+    capabilities: ['publish-post'],
+    sharedDailyLimit: null,
+    attachFields: [
+      { name: 'identifier', label: 'Handle', secret: false, placeholder: 'someone' },
+      { name: 'password', label: 'Secret', secret: true },
+    ],
+    endpoints() { return null; },
   };
 }
 
@@ -239,7 +301,10 @@ export function buildOutboundProviders(config: AimeatConfig): OutboundProvider[]
     bluesky(on),
   ];
   // Appended only when configured, so a production node's list is exactly the three above.
-  if (config.connectFakeBaseUrl) list.push(fake(config.connectFakeBaseUrl, on));
+  if (config.connectFakeBaseUrl) {
+    list.push(fake(config.connectFakeBaseUrl, on));
+    list.push(fakeStatic(config.connectFakeBaseUrl, on));
+  }
   return list;
 }
 
@@ -258,5 +323,6 @@ export function listProviderMeta(providers: OutboundProvider[]): OutboundProvide
     instanceScoped: p.instanceScoped,
     credentialShape: p.credentialShape,
     capabilities: p.capabilities,
+    attachFields: p.attachFields,
   }));
 }

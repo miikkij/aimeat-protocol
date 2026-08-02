@@ -23,6 +23,7 @@ import { safeFetch } from '../../utils/url-validator.js';
 import { logger } from '../../utils/logger.js';
 import { sealCredential, openCredential } from './credential.js';
 import { findProvider } from './providers.js';
+import { mintSession } from './attach.js';
 import type { ConnectContext } from './oauth.js';
 import type { ConnectionCredential, ConnectionRecord } from '../../models/connection-schemas.js';
 
@@ -116,6 +117,16 @@ async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Prom
     await ctx.storage.setConnectionStatus(conn.id, 'needs_reauth', 'stored credential cannot be read');
     return { ok: false, code: 'UNREADABLE', reason: 'stored credential cannot be read; reconnect this account' };
   }
+  const provider = findProvider(ctx.providers, conn.provider);
+  if (!provider) {
+    return { ok: false, code: 'PROVIDER_GONE', reason: 'that provider is no longer configured on this node' };
+  }
+
+  // BEFORE the refresh-token guard below, and that order is load-bearing: a session-shaped
+  // credential whose refresh token is gone can still be re-minted from the stored secret, and
+  // checking for a refresh token first would park exactly the connection that has a second chance.
+  if (current.shape === 'session') return refreshSession(ctx, conn, current);
+
   if (!current.refreshToken) {
     // An expiring token with no way to renew it. Google does this when access_type=offline was
     // missing, and the connection is genuinely finished — say so instead of retrying forever.
@@ -123,9 +134,8 @@ async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Prom
     return { ok: false, code: 'NEEDS_REAUTH', reason: 'this account needs to be reconnected' };
   }
 
-  const provider = findProvider(ctx.providers, conn.provider);
-  const endpoints = provider?.endpoints(conn.instance);
-  if (!provider || !endpoints) {
+  const endpoints = provider.endpoints(conn.instance);
+  if (!endpoints) {
     return { ok: false, code: 'PROVIDER_GONE', reason: 'that provider is no longer configured on this node' };
   }
 
@@ -196,6 +206,74 @@ async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Prom
   await ctx.storage.updateConnectionCredential(conn.id, sealCredential(next, ctx.key), expiresAt);
   const updated = await ctx.storage.getConnection(conn.id);
   return { ok: true, credential: next, connection: updated ?? conn };
+}
+
+/**
+ * Renew a session-shaped credential, with a fallback the OAuth path does not have.
+ *
+ * AT Proto refreshes by presenting the refresh token as a BEARER, not as a form field, which is why
+ * this is a separate function rather than a parameter on the OAuth exchange. And when that is
+ * refused — rotated away, expired, revoked — the stored app password can mint a fresh session. A
+ * user who supplied a non-expiring secret should not be asked for it twice.
+ */
+async function refreshSession(
+  ctx: ConnectContext, conn: ConnectionRecord, current: ConnectionCredential,
+): Promise<FreshResult> {
+  const pds = current.extra?.pds ?? '';
+  if (current.refreshToken && pds) {
+    try {
+      const r = await safeFetch(`${pds}/xrpc/com.atproto.server.refreshSession`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${current.refreshToken}` },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (r.ok) {
+        const j = await r.json().catch((err: unknown) => {
+          logger.warn('connections: session refresh response was unparseable', {
+            connectionId: conn.id, provider: conn.provider, error: String(err),
+          });
+          return null;
+        }) as { accessJwt?: unknown; refreshJwt?: unknown } | null;
+        const accessToken = typeof j?.accessJwt === 'string' ? j.accessJwt : '';
+        if (accessToken) {
+          const next: ConnectionCredential = {
+            shape: 'session',
+            accessToken,
+            ...(typeof j?.refreshJwt === 'string' ? { refreshToken: j.refreshJwt } : current.refreshToken ? { refreshToken: current.refreshToken } : {}),
+            ...(current.extra ? { extra: current.extra } : {}),
+          };
+          await ctx.storage.updateConnectionCredential(conn.id, sealCredential(next, ctx.key), null);
+          const updated = await ctx.storage.getConnection(conn.id);
+          return { ok: true, credential: next, connection: updated ?? conn };
+        }
+      }
+    } catch (err) {
+      // Not fatal and not final: the mint below is the second chance, and reaching it is the point.
+      logger.warn('connections: session refresh failed; falling back to re-minting from the stored secret', {
+        connectionId: conn.id, provider: conn.provider, error: String(err),
+      });
+    }
+  }
+
+  const secret = current.extra?.appPassword;
+  const identifier = current.extra?.identifier;
+  if (!secret || !identifier) {
+    await ctx.storage.setConnectionStatus(conn.id, 'needs_reauth', 'the session expired and no stored secret can renew it');
+    return { ok: false, code: 'NEEDS_REAUTH', reason: 'this account needs to be connected again' };
+  }
+
+  const minted = await mintSession(conn.provider, { identifier, password: secret }, ctx.config.connectFakeBaseUrl);
+  if ('error' in minted) {
+    // The secret itself no longer works — revoked at the provider, or the account changed. That IS
+    // a reconnect, and the reason is the one the owner can act on.
+    await ctx.storage.setConnectionStatus(conn.id, 'needs_reauth', minted.error);
+    return { ok: false, code: 'NEEDS_REAUTH', reason: minted.error };
+  }
+  await ctx.storage.updateConnectionCredential(
+    conn.id, sealCredential(minted.credential, ctx.key), minted.expiresAt,
+  );
+  const updated = await ctx.storage.getConnection(conn.id);
+  return { ok: true, credential: minted.credential, connection: updated ?? conn };
 }
 
 /**

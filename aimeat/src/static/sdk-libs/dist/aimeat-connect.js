@@ -155,14 +155,31 @@
           attrs: { type: "text", placeholder: s.instancePlaceholder, "aria-label": s.instancePlaceholder }
         });
       }
+      const attachInputs = (p.attachFields || []).map((f) => el("input", {
+        cls: "aim-conn-input",
+        attrs: {
+          type: f.secret ? "password" : "text",
+          autocomplete: f.secret ? "new-password" : "off",
+          placeholder: f.placeholder || f.label,
+          "aria-label": f.label,
+          "data-field": f.name
+        }
+      }));
       const btn = el("button", {
         cls: "aim-conn-btn",
         text: `${s.add} ${p.label}`,
         attrs: { type: "button" },
-        on: { click: () => void beginConnect(p.id, instanceInput) }
+        on: {
+          click: () => {
+            if (!p.attachFields) return void beginConnect(p.id, instanceInput);
+            const fields = {};
+            for (const input of attachInputs) fields[input.getAttribute("data-field")] = input.value;
+            void beginAttach(p.id, fields, attachInputs);
+          }
+        }
       });
       return el("div", {}, [
-        el("div", { cls: "aim-conn-add" }, [instanceInput, btn]),
+        el("div", { cls: "aim-conn-add" }, [instanceInput, ...attachInputs, btn]),
         // Before the attempt, always. Each of these prevents a failure whose message does not
         // explain itself.
         note.needs ? el("p", { cls: "aim-conn-note", text: note.needs }) : null,
@@ -179,6 +196,19 @@
       } catch (err) {
         const msg = err && err.message || String(err);
         root.appendChild(el("p", { cls: "aim-conn-err", text: msg }));
+      } finally {
+        busy = false;
+        await render();
+      }
+    }
+    async function beginAttach(providerId, fields, inputs) {
+      if (busy) return;
+      busy = true;
+      try {
+        await connect2.attach(providerId, fields);
+        for (const i of inputs) i.value = "";
+      } catch (err) {
+        root.appendChild(el("p", { cls: "aim-conn-err", text: err && err.message || String(err) }));
       } finally {
         busy = false;
         await render();
@@ -270,6 +300,14 @@
     const connection = added ?? repaired;
     return { connected: Boolean(connection), connection };
   }
+  async function attachAccount(provider, fields) {
+    const res = await authFetch2("/v1/connections/attach", {
+      method: "POST",
+      body: JSON.stringify({ provider, mode: "personal", fields })
+    });
+    announce();
+    return { connected: true, connection: res?.data?.connection };
+  }
   async function revoke(connectionId) {
     const res = await authFetch2(`/v1/connections/${encodeURIComponent(connectionId)}`, { method: "DELETE" });
     announce();
@@ -286,6 +324,7 @@
     list,
     providers,
     start,
+    attach: attachAccount,
     revoke,
     on,
     off,

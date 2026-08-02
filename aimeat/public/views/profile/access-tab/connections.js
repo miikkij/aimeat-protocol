@@ -35,6 +35,9 @@ export function ConnectionsSection({ showToast }) {
   const [connections, setConnections] = useState([]);
   const [providers, setProviders] = useState([]);
   const [instances, setInstances] = useState({});
+  // Supplied credentials, per provider per field. Held only until the POST; nothing here is
+  // persisted client-side, and the server never sends any of it back.
+  const [fields, setFields] = useState({});
   const [busy, setBusy] = useState('');
   const [unavailable, setUnavailable] = useState(false);
   const { confirm, ConfirmUI } = useConfirm();
@@ -95,6 +98,32 @@ export function ConnectionsSection({ showToast }) {
     }
     setBusy('');
   }, [instances, load, showToast]);
+
+  /**
+   * The other way to connect: the user supplies a credential and there is no round trip to the
+   * provider's consent screen. Kept separate from connect() because the two must never overlap —
+   * attaching an OAuth provider would be a way to skip its consent screen, and the server refuses
+   * that in both directions.
+   */
+  const attach = useCallback(async (provider) => {
+    setBusy(provider.id);
+    try {
+      await apiPost('/v1/connections/attach', {
+        provider: provider.id,
+        mode: 'personal',
+        fields: fields[provider.id] || {},
+      });
+      // Cleared on success so a secret does not sit in a form field after it has been stored.
+      setFields(f => ({ ...f, [provider.id]: {} }));
+      await load();
+    } catch (err) {
+      swallowed('connections-attach', err);
+      // The server's reason is the useful half here: "that is your account password, not an app
+      // password" is actionable in a way that "could not connect" is not.
+      showToast(err?.message || t('profile.access.cxConnectFailed') || 'Could not connect that account');
+    }
+    setBusy('');
+  }, [fields, load, showToast]);
 
   // useConfirm is (message, onConfirm, opts) — positional, with a callback. Passing it an options
   // object and awaiting the result renders an EMPTY dialog and never runs the action: the owner is
@@ -165,7 +194,20 @@ export function ConnectionsSection({ showToast }) {
                 value=${instances[p.id] || ''}
                 onInput=${e => setInstances({ ...instances, [p.id]: e.target.value })} />
             `}
-            <button class="btn-outline" disabled=${busy === p.id} onClick=${() => connect(p)}>
+            ${(p.attachFields || []).map(f => html`
+              <input key=${f.name}
+                type=${f.secret ? 'password' : 'text'}
+                class="input-field input-sm"
+                autocomplete=${f.secret ? 'new-password' : 'off'}
+                placeholder=${f.placeholder || f.label}
+                aria-label=${f.label}
+                value=${(fields[p.id] || {})[f.name] || ''}
+                onInput=${e => setFields(prev => ({
+                  ...prev, [p.id]: { ...(prev[p.id] || {}), [f.name]: e.target.value },
+                }))} />
+            `)}
+            <button class="btn-outline" disabled=${busy === p.id}
+              onClick=${() => (p.attachFields ? attach(p) : connect(p))}>
               ${busy === p.id
                 ? (t('profile.access.cxConnecting') || 'Connecting…')
                 : `${t('profile.access.cxConnect') || 'Connect'} ${escHtml(p.label)}`}

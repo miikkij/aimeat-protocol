@@ -14,7 +14,7 @@
  *   act on rather than a red error, telling a Bluesky user where an app password comes from BEFORE
  *   they go looking, and warning an Instagram user about the Business-account requirement BEFORE
  *   the attempt rather than after it fails for a reason nobody can read.
- * @structure list() · providers() · start() · revoke() · on()/off() · panel()
+ * @structure list() · providers() · start() · attach() · revoke() · on()/off() · panel()
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-connect.js"></script>
  *   const accounts = await AIMEAT.connect.list();
  *   await AIMEAT.connect.start('mastodon', { instance: 'mastodon.social' });
@@ -114,6 +114,25 @@ async function start(provider, opts = {}) {
 }
 
 /**
+ * Connect an account by SUPPLYING a credential, for a provider with no authorization round.
+ *
+ * Separate from start() because the two must never overlap: attaching a provider that HAS a consent
+ * screen would be a way to skip it, and the node refuses that in both directions. A provider's
+ * `attachFields` (from providers()) is what tells them apart.
+ *
+ * @param {string} provider
+ * @param {Record<string,string>} fields
+ */
+async function attachAccount(provider, fields) {
+  const res = await authFetch('/v1/connections/attach', {
+    method: 'POST',
+    body: JSON.stringify({ provider, mode: 'personal', fields }),
+  });
+  announce();
+  return { connected: true, connection: res?.data?.connection };
+}
+
+/**
  * Disconnect an account. The node tells the provider first where it can, and removes the credential
  * either way — so this always ends with the account disconnected here.
  */
@@ -132,7 +151,7 @@ function on(fn) {
 function off(fn) { listeners.delete(fn); }
 
 const connect = {
-  list, providers, start, revoke, on, off,
+  list, providers, start, attach: attachAccount, revoke, on, off,
   /** Per-provider things a user must be told BEFORE they try. See notes.js. */
   notes: PROVIDER_NOTES,
   /** Mount the ready-made panel. See panel.js. */

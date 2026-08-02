@@ -164,14 +164,34 @@ export async function mountConnectPanel(connect, opts = {}) {
         attrs: { type: 'text', placeholder: s.instancePlaceholder, 'aria-label': s.instancePlaceholder },
       });
     }
+    // A provider with attachFields is connected by supplying a credential; one without has a
+    // consent screen. Rendering from the declaration means the panel needs to know nothing about
+    // any particular provider, and a provider with NEITHER cannot get a button at all.
+    const attachInputs = (p.attachFields || []).map((f) => el('input', {
+      cls: 'aim-conn-input',
+      attrs: {
+        type: f.secret ? 'password' : 'text',
+        autocomplete: f.secret ? 'new-password' : 'off',
+        placeholder: f.placeholder || f.label,
+        'aria-label': f.label,
+        'data-field': f.name,
+      },
+    }));
     const btn = el('button', {
       cls: 'aim-conn-btn',
       text: `${s.add} ${p.label}`,
       attrs: { type: 'button' },
-      on: { click: () => void beginConnect(p.id, instanceInput) },
+      on: {
+        click: () => {
+          if (!p.attachFields) return void beginConnect(p.id, instanceInput);
+          const fields = {};
+          for (const input of attachInputs) fields[input.getAttribute('data-field')] = input.value;
+          void beginAttach(p.id, fields, attachInputs);
+        },
+      },
     });
     return el('div', {}, [
-      el('div', { cls: 'aim-conn-add' }, [instanceInput, btn]),
+      el('div', { cls: 'aim-conn-add' }, [instanceInput, ...attachInputs, btn]),
       // Before the attempt, always. Each of these prevents a failure whose message does not
       // explain itself.
       note.needs ? el('p', { cls: 'aim-conn-note', text: note.needs }) : null,
@@ -189,6 +209,23 @@ export async function mountConnectPanel(connect, opts = {}) {
     } catch (err) {
       const msg = (err && err.message) || String(err);
       root.appendChild(el('p', { cls: 'aim-conn-err', text: msg }));
+    } finally {
+      busy = false;
+      await render();
+    }
+  }
+
+  async function beginAttach(providerId, fields, inputs) {
+    if (busy) return;
+    busy = true;
+    try {
+      await connect.attach(providerId, fields);
+      // Cleared on success, so a secret does not sit in a form field after it has been stored.
+      for (const i of inputs) i.value = '';
+    } catch (err) {
+      // The node's reason is the useful half: "that is your account password, not an app password"
+      // is actionable in a way that a generic failure is not.
+      root.appendChild(el('p', { cls: 'aim-conn-err', text: (err && err.message) || String(err) }));
     } finally {
       busy = false;
       await render();

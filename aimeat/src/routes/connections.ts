@@ -44,6 +44,7 @@ import {
 import { requireEncryptionKey } from '../services/connections/credential.js';
 import { startAuthorization, completeAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { revokeConnection } from '../services/connections/refresh.js';
+import { attachCredential } from '../services/connections/attach.js';
 import { quotaStatus } from '../services/connections/publish-gate.js';
 import type {
   ConnectionRecord, PublicConnection, ConnectionMode, ModerationMode,
@@ -131,6 +132,41 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       return;
     }
     res.json(success(config.nodeId, { authorize_url: result.authorizeUrl, state: result.state }));
+  });
+
+  // ── POST /v1/connections/attach ──
+  // The other half of connecting: a provider with no authorization round, where the user supplies a
+  // credential instead. It existed as a provider entry before it existed as a route, which meant
+  // Bluesky was advertised in discovery with no way to connect it — the same "the gate is
+  // decorative" failure the YouTube case is asserted against.
+  router.post('/v1/connections/attach', requireAuth(), requireScope('connections:write'), async (req: Request, res: Response) => {
+    if (!capabilityOn(res)) return;
+    const c = ctx(res);
+    if (!c) return;
+    const provider = str(req.body?.provider);
+    if (!provider) {
+      res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'provider is required'));
+      return;
+    }
+    const raw = (req.body?.fields && typeof req.body.fields === 'object' ? req.body.fields : {}) as Record<string, unknown>;
+    const fields: Record<string, string> = {};
+    for (const k of Object.keys(raw)) if (typeof raw[k] === 'string') fields[k] = raw[k];
+
+    const result = await attachCredential(c, {
+      principal: resolve(req),
+      provider,
+      mode: req.body?.mode === 'shared' ? 'shared' : 'personal',
+      fields,
+    });
+    if (!result.ok) {
+      res.status(result.code === 'UNKNOWN_PROVIDER' ? 404 : 400)
+        .json(error(config.nodeId, result.code, result.reason));
+      return;
+    }
+    // The supplied secret is not echoed anywhere in this response, and toPublic() has no field for
+    // it at any level.
+    res.status(result.created ? 201 : 200)
+      .json(success(config.nodeId, { connection: toPublic(result.connection), created: result.created }));
   });
 
   // ── GET /v1/connections/callback ──
