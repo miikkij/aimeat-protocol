@@ -41,11 +41,17 @@ export interface FakeProvider {
     /** Secrets exchanged for a session, and pairs refused. */
     sessionMints: number;
     sessionRejections: number;
+    /** Publishes accepted, content refusals, and the byte count the last publish carried. */
+    publishes: number;
+    contentRejections: number;
+    lastPublishBytes: number;
   };
   /** Seconds the next issued access token lasts. Set to 0 to force the refresh path. */
   accessTokenTtlSeconds: number;
   /** When true, every refresh answers 400 — the "grant is gone" case. */
   breakRefresh: boolean;
+  /** When true, a publish is refused as CONTENT — permanent, and must never be retried. */
+  rejectContent: boolean;
   /** Milliseconds a refresh takes, so a test can create a real overlap between two callers. */
   refreshDelayMs: number;
   close(): Promise<void>;
@@ -74,9 +80,10 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
 
   const state: FakeProvider = {
     baseUrl: '',
-    stats: { tokenExchanges: 0, refreshes: 0, staleRefreshAttempts: 0, revocations: 0, identityLookups: 0, sessionMints: 0, sessionRejections: 0 },
+    stats: { tokenExchanges: 0, refreshes: 0, staleRefreshAttempts: 0, revocations: 0, identityLookups: 0, sessionMints: 0, sessionRejections: 0, publishes: 0, contentRejections: 0, lastPublishBytes: 0 },
     accessTokenTtlSeconds: 3600,
     breakRefresh: false,
+    rejectContent: false,
     refreshDelayMs: 0,
     close: async () => { /* replaced below */ },
   };
@@ -163,6 +170,26 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
         res.writeHead(302, { Location: back.toString() });
         res.end();
         return;
+      }
+
+      // A publish target, so the route -- gate, credential, recipe, outcome -- can be driven end to
+      // end without touching anyone's real account.
+      if (url.pathname === '/publish' && req.method === 'POST') {
+        const token = (req.headers.authorization ?? '').replace(/^Bearer\s+/i, '');
+        const g = grants.get(token);
+        if (!g || g.revoked) return json(res, 401, { error: 'invalid_token' });
+        const raw = await new Promise<Buffer>((resolve) => {
+          const parts: Buffer[] = [];
+          req.on('data', (c: Buffer) => parts.push(c));
+          req.on('end', () => resolve(Buffer.concat(parts)));
+        });
+        if (state.rejectContent) {
+          state.stats.contentRejections++;
+          return json(res, 422, { error: 'content_rejected', detail: 'the test provider will not take this' });
+        }
+        state.stats.publishes++;
+        state.stats.lastPublishBytes = raw.length;
+        return json(res, 200, { url: `https://test.example/${g.subject}/${state.stats.publishes}` });
       }
 
       if (url.pathname === '/revoke' && req.method === 'POST') {

@@ -43,9 +43,10 @@ import {
 } from '../services/connections/providers.js';
 import { requireEncryptionKey } from '../services/connections/credential.js';
 import { startAuthorization, completeAuthorization, type ConnectContext } from '../services/connections/oauth.js';
-import { revokeConnection } from '../services/connections/refresh.js';
+import { revokeConnection, ensureFreshCredential } from '../services/connections/refresh.js';
 import { attachCredential } from '../services/connections/attach.js';
-import { quotaStatus } from '../services/connections/publish-gate.js';
+import { quotaStatus, openPublish, openOwnPublish } from '../services/connections/publish-gate.js';
+import { publishToProvider } from '../services/connections/publish.js';
 import type {
   ConnectionRecord, PublicConnection, ConnectionMode, ModerationMode,
 } from '../models/connection-schemas.js';
@@ -231,6 +232,107 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     // told_provider is reported honestly: the local credential is always gone, but whether the
     // provider was reachable to be told is a fact the owner may want to act on.
     res.json(success(config.nodeId, { revoked: true, told_provider: result.toldProvider }));
+  });
+
+  // ── POST /v1/connections/publish ──
+  // Gate, then credential, then recipe, then record the outcome. The gate has already written the
+  // attempt by the time anything leaves the node, which is what makes a retry safe.
+  router.post('/v1/connections/publish', requireAuth(), requireScope('connections:use'), async (req: Request, res: Response) => {
+    if (!capabilityOn(res)) return;
+    const c = ctx(res);
+    if (!c) return;
+    const principal = resolve(req);
+    const storageKey = str(req.body?.storage_key);
+    const caption = typeof req.body?.caption === 'string' ? req.body.caption : '';
+    const params = (req.body?.params && typeof req.body.params === 'object' ? req.body.params : {}) as Record<string, unknown>;
+    const connectionId = str(req.body?.connection_id);
+    const appId = str(req.body?.app_id);
+    const action = str(req.body?.action);
+
+    if (!connectionId && !(appId && action)) {
+      res.status(400).json(error(
+        config.nodeId, 'INVALID_INPUT',
+        'either connection_id (your own account) or app_id + action (a delegated channel) is required',
+      ));
+      return;
+    }
+
+    // Resolved BEFORE the gate opens an attempt: a missing file is the caller's mistake and should
+    // not leave a row in flight for something that was never going to be uploaded.
+    let file: { bytes: Buffer; mimeType: string; name: string } | null = null;
+    if (storageKey) {
+      const stored = await storage.getStorageFile(principal, storageKey);
+      if (!stored) {
+        res.status(404).json(error(config.nodeId, 'NO_SUCH_FILE', `you have no stored file named '${storageKey}'`));
+        return;
+      }
+      file = { bytes: stored.data, mimeType: stored.mimeType, name: storageKey.split('/').pop() ?? storageKey };
+    }
+
+    const providerOf = async (): Promise<number | null> => {
+      const conn = connectionId ? await storage.getConnection(connectionId) : undefined;
+      const p = conn ? findProvider(providers, conn.provider) : undefined;
+      return p?.sharedDailyLimit ?? null;
+    };
+
+    const gate = connectionId
+      ? await openOwnPublish(storage, { publisher: principal, connectionId, storageKey, caption, params }, { sharedDailyLimit: await providerOf() })
+      : await openPublish(storage, { publisher: principal, appId, action, storageKey, caption, params }, { sharedDailyLimit: null });
+
+    if (!gate.ok) {
+      res.status(gate.code === 'NOT_FOUND' ? 404 : 400).json(error(config.nodeId, gate.code, gate.reason));
+      return;
+    }
+    // A repeat of work already opened. The first attempt's outcome is the answer; starting a second
+    // publish here is the double-post this whole mechanism exists to prevent.
+    if (gate.replay) {
+      res.json(success(config.nodeId, { attempt: gate.attempt, replay: true }));
+      return;
+    }
+    // Waiting states are honest outcomes, not errors: `held` is moderation and `queued` is a spent
+    // allowance. Reporting either as a failure teaches a caller to retry, which makes both worse.
+    if (gate.attempt.status === 'held' || gate.attempt.status === 'queued') {
+      res.json(success(config.nodeId, { attempt: gate.attempt, replay: false }));
+      return;
+    }
+
+    const fresh = await ensureFreshCredential(c, gate.connection.id);
+    if (!fresh.ok) {
+      await storage.updatePublishAttempt(gate.attempt.id, { status: 'failed', error: fresh.reason });
+      res.status(400).json(error(config.nodeId, fresh.code, fresh.reason));
+      return;
+    }
+
+    const provider = findProvider(providers, fresh.connection.provider);
+    if (!provider) {
+      await storage.updatePublishAttempt(gate.attempt.id, { status: 'failed', error: 'provider no longer configured' });
+      res.status(400).json(error(config.nodeId, 'PROVIDER_GONE', 'that provider is no longer configured on this node'));
+      return;
+    }
+    const outcome = await publishToProvider({
+      provider,
+      connection: fresh.connection,
+      credential: fresh.credential,
+      caption,
+      params: gate.params,
+      file,
+    });
+
+    if (outcome.ok) {
+      await storage.updatePublishAttempt(gate.attempt.id, { status: 'done', externalRef: outcome.externalRef });
+      await storage.touchConnectionOk(gate.connection.id);
+      res.json(success(config.nodeId, {
+        attempt: await storage.getPublishAttempt(gate.attempt.id),
+        url: outcome.externalRef,
+      }));
+      return;
+    }
+    // `rejected` never retries; `failed` may. The distinction is the provider's, not ours.
+    await storage.updatePublishAttempt(gate.attempt.id, {
+      status: outcome.permanent ? 'rejected' : 'failed',
+      error: outcome.reason,
+    });
+    res.status(502).json(error(config.nodeId, outcome.permanent ? 'REJECTED' : 'PUBLISH_FAILED', outcome.reason));
   });
 
   // ── POST /v1/connections/:id/delegations ──

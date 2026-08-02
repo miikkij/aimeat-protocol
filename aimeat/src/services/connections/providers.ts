@@ -229,7 +229,11 @@ function bluesky(capabilityOn: boolean): OutboundProvider {
     client: null,
     scopes: [],
     pkce: false,
-    capabilities: ['publish-post', 'publish-video'],
+    // publish-post ONLY, and publish-video is deliberately absent. Video on Bluesky goes through a
+    // separate video service with its own job queue and limits, which is not built. Listing a
+    // capability the recipe cannot perform is the same "advertised but unconnectable" mistake the
+    // attach route was just fixed for, one field over.
+    capabilities: ['publish-post'],
     sharedDailyLimit: null,
     // The one provider a user hands us a secret for, so it is the one that needs a form.
     attachFields: [

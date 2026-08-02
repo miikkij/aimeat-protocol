@@ -477,6 +477,99 @@ async function main(): Promise<void> {
       storage.close();
     });
 
+    console.log('\nPhase 11 — Publishing');
+    // Against the test provider's publish endpoint, so the whole route -- gate, credential, recipe,
+    // outcome, attempt update -- is exercised without posting to anyone's real account.
+    let pubConn = '';
+    await test('a publish reaches the provider and records where it landed', async () => {
+      const fresh = await connect(jwtA, 'publisher');
+      pubConn = (fresh.connections as any[]).find(c => c.accountLabel === 'Test account publisher').id;
+      // A stored file, because a publish carries bytes.
+      const put = await api('/v1/storage', {
+        bearer: jwtA,
+        body: {
+          key: 'vid/test.mp4', visibility: 'private', mime_type: 'video/mp4',
+          data: Buffer.from('not really a video, but real bytes').toString('base64'),
+        },
+      });
+      assert(put.status === 200 || put.status === 201, `storage put: ${put.status} ${put.data?.error?.message}`);
+
+      const before = provider.stats.publishes;
+      const r = await api('/v1/connections/publish', {
+        bearer: jwtA,
+        body: { connection_id: pubConn, storage_key: 'vid/test.mp4', caption: 'hello from the e2e' },
+      });
+      assert(r.status === 200, `publish: ${r.status} ${r.data?.error?.message}`);
+      assert(provider.stats.publishes === before + 1, 'the provider recorded no publish');
+      assert(typeof r.data.data.url === 'string' && r.data.data.url.length > 0, 'no url came back');
+      assert(r.data.data.attempt.status === 'done', `attempt status ${r.data.data.attempt.status}`);
+      assert(r.data.data.attempt.externalRef === r.data.data.url, 'the attempt does not carry where it landed');
+      assert(provider.stats.lastPublishBytes > 0, 'the provider received no bytes');
+    });
+
+    await test('the same publish twice reaches the provider ONCE', async () => {
+      // The double-post this whole mechanism exists to prevent, through the real route.
+      const before = provider.stats.publishes;
+      const r = await api('/v1/connections/publish', {
+        bearer: jwtA,
+        body: { connection_id: pubConn, storage_key: 'vid/test.mp4', caption: 'hello from the e2e' },
+      });
+      assert(r.status === 200, `replay: ${r.status}`);
+      assert(r.data.data.replay === true, 'the repeat was not recognised as a replay');
+      assert(provider.stats.publishes === before, `the provider was asked to publish ${provider.stats.publishes - before} more time(s)`);
+    });
+
+    await test('a refused CONTENT is rejected permanently, not retried', async () => {
+      provider.rejectContent = true;
+      const r = await api('/v1/connections/publish', {
+        bearer: jwtA,
+        body: { connection_id: pubConn, storage_key: 'vid/test.mp4', caption: 'a different caption entirely' },
+      });
+      provider.rejectContent = false;
+      assert(r.status === 502 && r.data.error.code === 'REJECTED', `${r.status} ${r.data?.error?.code}`);
+      // 'rejected' is the status that must never be retried; 'failed' would be.
+      const attempts = await api(`/v1/connections`, { method: 'GET', bearer: jwtA });
+      assert(attempts.status === 200, 'listing broke after a rejection');
+    });
+
+    await test("publishing to someone else's connection is the same 404 as a missing one", async () => {
+      const r = await api('/v1/connections/publish', {
+        bearer: jwtB,
+        body: { connection_id: pubConn, storage_key: 'vid/test.mp4', caption: 'not mine' },
+      });
+      assert(r.status === 404, `status ${r.status}`);
+    });
+
+    await test('a missing file is refused BEFORE an attempt is opened', async () => {
+      const r = await api('/v1/connections/publish', {
+        bearer: jwtA,
+        body: { connection_id: pubConn, storage_key: 'vid/does-not-exist.mp4', caption: 'x' },
+      });
+      assert(r.status === 404 && r.data.error.code === 'NO_SUCH_FILE', `${r.status} ${r.data?.error?.code}`);
+    });
+
+    await test('a spent shared allowance QUEUES rather than publishing', async () => {
+      // Straight at the gate with a ceiling of zero: the route's own provider has no limit, and the
+      // behaviour under a full one is what matters.
+      const { openOwnPublish } = await import('../src/services/connections/publish-gate.js');
+      const { SqliteStorage } = await import('../src/storage/providers/sqlite/index.js');
+      const storage = new SqliteStorage(':memory:');
+      const now = new Date().toISOString();
+      await storage.createConnection({
+        id: 'q1', principal: 'q@test', mode: 'personal', provider: 'fake', instance: null,
+        accountLabel: 'Q', externalId: 'q', credential: 'x', credentialShape: 'oauth2', scopes: [],
+        expiresAt: null, status: 'active', lastOkAt: now, lastError: null, createdAt: now, updatedAt: now,
+      });
+      const first = await openOwnPublish(storage as any,
+        { publisher: 'q@test', connectionId: 'q1', storageKey: 'a.mp4', caption: 'one' }, { sharedDailyLimit: 1 });
+      assert(first.ok && first.attempt.status === 'in_flight', 'the first should proceed');
+      const second = await openOwnPublish(storage as any,
+        { publisher: 'q@test', connectionId: 'q1', storageKey: 'b.mp4', caption: 'two' }, { sharedDailyLimit: 1 });
+      assert(second.ok && second.attempt.status === 'queued',
+        `expected queued, got ${second.ok ? second.attempt.status : 'refused'}`);
+      storage.close();
+    });
+
     console.log(`\n${'─'.repeat(60)}\n  ${passed} passed, ${failed} failed\n`);
   } finally {
     await provider.close();
