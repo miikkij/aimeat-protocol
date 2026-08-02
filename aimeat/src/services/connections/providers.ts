@@ -179,12 +179,23 @@ function youtube(clientId: string, clientSecret: string, capabilityOn: boolean):
     pkce: true,
     capabilities: ['publish-video'],
     attachFields: null,
-    // VARMISTETTAVA in the spec and still unread: the quota is per Google PROJECT and an upload
-    // costs a large slice of it, which is believed to leave a single-digit number of uploads per
-    // day for EVERY publisher on the node combined. Phase 5 reads the real figure from the console
-    // and sets it here. Until then the counter runs and the ceiling does not, because a made-up
-    // limit that refuses a legitimate publish is worse than none.
-    sharedDailyLimit: null,
+    // SIX. Read from the project's own quota page on 2026-08-02, not guessed:
+    //
+    //   Queries per day .......... 10,000   <- the budget, and the one that binds
+    //   Video Uploads per day ....... 100   <- looks like the limit, and is not
+    //
+    // The allowance is spent in UNITS, and one videos.insert costs 1,600 of them, so the budget
+    // runs out after six uploads while the upload counter is still at 6 of 100. Anyone reading that
+    // page would take the 100 and be wrong by a factor of sixteen.
+    //
+    // It is per Google PROJECT, so this is six uploads a day for EVERY publisher on the node
+    // combined — which is exactly why a shared channel needs a per-publisher cap on top.
+    //
+    // The 1,600 is Google's documented per-call cost rather than something measured here. The
+    // measurement is one step away and belongs to the first real upload: the quota page shows
+    // Current usage, so a single publish either moves it by 1,600 or corrects this number. (It
+    // already reads 1 from the channels.list the node makes when an account is connected.)
+    sharedDailyLimit: 6,
     endpoints() {
       return {
         authorize: 'https://accounts.google.com/o/oauth2/v2/auth',

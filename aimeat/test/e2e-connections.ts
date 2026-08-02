@@ -355,10 +355,25 @@ async function main(): Promise<void> {
       const r = await api(`/v1/connections/delegations/${delId}/quota`, { method: 'GET', bearer: jwtA });
       assert(r.status === 200, `status ${r.status}`);
       assert(r.data.data.quota.windowHours === 24, 'window missing');
-      // null is the honest value until the provider's real ceiling has been read, and the counter
-      // runs regardless — so the number can later be filled in with evidence.
+      // null for the TEST provider specifically: it has no published allowance to state. A real
+      // provider's ceiling belongs in its descriptor once it has been READ rather than guessed —
+      // see the YouTube assertion below.
       assert(r.data.data.quota.limit === null, `limit should be unmeasured, got ${r.data.data.quota.limit}`);
       assert(r.data.data.per_user_limit?.count === 2, 'per-user limit not reported');
+    });
+
+    await test('YouTube\'s shared ceiling is the measured one, not the one the console shows', async () => {
+      // Six, from the project's own quota page: a 10,000-unit daily budget, 1,600 units per upload.
+      // That same page advertises "Video Uploads per day: 100", which is NOT the binding limit and
+      // is wrong by a factor of sixteen — so this asserts the number that actually holds, and would
+      // go red if someone later replaced it with the one that looks right.
+      const { buildOutboundProviders, findProvider } = await import('../src/services/connections/providers.js');
+      const list = buildOutboundProviders({
+        connectionsEnabled: true, connectGoogleClientId: 'id', connectGoogleClientSecret: 'secret',
+        connectRedirectUri: '', connectFakeBaseUrl: '',
+      } as any);
+      const yt = findProvider(list, 'youtube');
+      assert(yt?.sharedDailyLimit === 6, `expected 6, got ${yt?.sharedDailyLimit}`);
     });
 
     console.log('\nPhase 9 — Lazy per-instance registration');
