@@ -36,6 +36,8 @@ export interface FakeProvider {
     refreshes: number;
     /** Refresh attempts that presented an already-rotated token. Must stay 0 under single flight. */
     staleRefreshAttempts: number;
+    /** Renewals attempted by a client that did not obtain the grant. Must stay 0 in normal use. */
+    wrongClientRefreshAttempts: number;
     revocations: number;
     identityLookups: number;
     /** Secrets exchanged for a session, and pairs refused. */
@@ -77,10 +79,13 @@ const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms
 export async function startFakeProvider(port = 0): Promise<FakeProvider> {
   const grants = new Map<string, Grant>();          // accessToken  → grant
   const byRefresh = new Map<string, Grant>();       // refreshToken → grant
+  // refreshToken to the client_id that obtained it. A real provider binds a grant to the
+  // client that got it and will not renew it for a different application.
+  const grantClient = new Map<string, string>();
 
   const state: FakeProvider = {
     baseUrl: '',
-    stats: { tokenExchanges: 0, refreshes: 0, staleRefreshAttempts: 0, revocations: 0, identityLookups: 0, sessionMints: 0, sessionRejections: 0, publishes: 0, contentRejections: 0, lastPublishBytes: 0 },
+    stats: { tokenExchanges: 0, refreshes: 0, staleRefreshAttempts: 0, wrongClientRefreshAttempts: 0, revocations: 0, identityLookups: 0, sessionMints: 0, sessionRejections: 0, publishes: 0, contentRejections: 0, lastPublishBytes: 0 },
     accessTokenTtlSeconds: 3600,
     breakRefresh: false,
     rejectContent: false,
@@ -129,6 +134,9 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
           if (!form.get('code_verifier')) return json(res, 400, { error: 'missing_code_verifier' });
           state.stats.tokenExchanges++;
           const g = issue(code.slice('code-'.length));
+          // WHO asked. Without recording this the provider would happily renew one application's
+          // token for another, and a test asserting it does not could never fail.
+          grantClient.set(g.refreshToken, form.get('client_id') ?? '');
           return json(res, 200, {
             access_token: g.accessToken, refresh_token: g.refreshToken,
             expires_in: state.accessTokenTtlSeconds, scope: 'publish',
@@ -147,8 +155,17 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
             state.stats.staleRefreshAttempts++;
             return json(res, 400, { error: 'invalid_grant', error_description: 'refresh token already used' });
           }
+          const issuedTo = grantClient.get(presented);
+          const asking = form.get('client_id') ?? '';
+          if (issuedTo !== undefined && issuedTo !== asking) {
+            // Exactly what a provider answers when application B tries to renew application A's
+            // token: an invalid_grant that says nothing useful to whoever is holding it.
+            state.stats.wrongClientRefreshAttempts++;
+            return json(res, 400, { error: 'invalid_grant', error_description: 'client mismatch' });
+          }
           state.stats.refreshes++;
           const next = issue(g.subject, g);
+          grantClient.set(next.refreshToken, asking);
           return json(res, 200, {
             access_token: next.accessToken, refresh_token: next.refreshToken,
             expires_in: state.accessTokenTtlSeconds,

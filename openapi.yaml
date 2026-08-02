@@ -3110,6 +3110,24 @@ components:
               description: Percentage at which to warn owner
 
     # === Sharing Groups ===
+    PublicProviderClient:
+      type: object
+      description: >
+        A client registration a principal made themselves. The secret is deliberately absent: it is
+        write-only, like every other secret in this feature.
+      properties:
+        provider:
+          type: string
+        clientId:
+          type: string
+        registeredAt:
+          type: string
+          format: date-time
+        connectionCount:
+          type: integer
+          description: >
+            Connected accounts created with this app. They can only be renewed by it, so this is
+            also how many would stop renewing if it were removed.
     PublicConnection:
       type: object
       description: >
@@ -33763,6 +33781,134 @@ paths:
           description: >
             The provider refused. `REJECTED` is permanent and must not be retried; `PUBLISH_FAILED`
             is transport-shaped and may be.
+  /v1/connections/clients:
+    get:
+      operationId: listOwnProviderClients
+      summary: The apps you registered yourself
+      description: >
+        Your own client registrations, one per provider at most. The client SECRET is never
+        returned, by this or any other endpoint.
+
+
+        `connectionCount` is how many of your connected accounts were created with that app. It
+        matters because a token can only be renewed by the client that issued it, so the number is
+        also the number of accounts that would stop renewing if the app went away.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Your own registrations. Empty when you use the node's.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          clients:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/PublicProviderClient'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    put:
+      operationId: setOwnProviderClient
+      summary: Register your own app at a provider
+      description: >
+        Bring your own application instead of sharing the node's. Without this, every user of a node
+        reaches a provider through one registration and shares its rate limit, its reputation and,
+        where publishing is charged per call, its bill. Your own app spends your own allowance.
+
+
+        The secret is encrypted at rest and never returned. Registering replaces any previous
+        registration of yours for the same provider.
+
+
+        EXISTING CONNECTIONS ARE NOT MOVED ONTO THE NEW APP. Each one can only be renewed by the
+        client that issued its token, so they keep the app they were made with. Reconnect an account
+        to move it.
+
+
+        A provider the node holds no credentials for can still be used this way, which is the point:
+        an operator who never registered an app does not thereby remove the choice from you.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider, client_id, client_secret]
+              properties:
+                provider:
+                  type: string
+                  example: linkedin
+                client_id:
+                  type: string
+                client_secret:
+                  type: string
+                  description: Stored encrypted. Never returned by any endpoint.
+      responses:
+        '200':
+          description: Stored.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          client:
+                            $ref: '#/components/schemas/PublicProviderClient'
+        '400':
+          description: >
+            Missing id or secret, or a provider that is connected by supplying a credential rather
+            than by registering an app, which has no client to register.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No such provider.
+        '503':
+          description: This node has no encryption key and will not store a secret in the clear.
+  /v1/connections/clients/{provider}:
+    delete:
+      operationId: deleteOwnProviderClient
+      summary: Remove your own app registration
+      description: >
+        Refused while any of your connected accounts still depends on it. Those accounts can only be
+        renewed by this client, so removing it would leave them working until their tokens expire and
+        then failing with an error nobody could trace back to this moment.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: provider
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Removed.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: >
+            You have no registration for that provider. Someone else's registration is this same
+            404: the lookup is scoped to you rather than filtered afterwards.
+        '409':
+          description: >
+            Connected accounts were made with this app. The message says how many. Disconnect them
+            first.
   /v1/connections/callback:
     get:
       operationId: connectionCallback

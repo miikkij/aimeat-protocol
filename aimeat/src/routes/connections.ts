@@ -41,7 +41,7 @@ import { logger } from '../utils/logger.js';
 import {
   buildOutboundProviders, listProviderMeta, findProvider,
 } from '../services/connections/providers.js';
-import { requireEncryptionKey } from '../services/connections/credential.js';
+import { requireEncryptionKey, sealCredential } from '../services/connections/credential.js';
 import { startAuthorization, completeAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { revokeConnection, ensureFreshCredential } from '../services/connections/refresh.js';
 import { attachCredential } from '../services/connections/attach.js';
@@ -49,6 +49,7 @@ import { quotaStatus, openPublish, openOwnPublish } from '../services/connection
 import { publishToProvider } from '../services/connections/publish.js';
 import type {
   ConnectionRecord, PublicConnection, ConnectionMode, ModerationMode,
+  ProviderClientRecord, PublicProviderClient,
 } from '../models/connection-schemas.js';
 
 /** The ONLY shape a connection leaves this file in. */
@@ -97,6 +98,114 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     res.json(success(config.nodeId, { providers: listProviderMeta(providers) }, [
       { description: 'Start connecting an account', method: 'POST', url: '/v1/connections/start' },
     ]));
+  });
+
+  // ── The caller's OWN app credentials at a provider ───────────────────────────
+  //
+  // Registered BEFORE /v1/connections/:id so a literal path segment is never eaten by the id
+  // parameter. `clients` would otherwise be a perfectly valid connection id as far as the router is
+  // concerned, and the bug only appears once someone actually calls it.
+  //
+  // WHAT THIS IS FOR. Without it, every user of a node reaches a provider through one registration:
+  // the node's. To LinkedIn or X they are one application, sharing one rate limit, one reputation
+  // and, on X, one bill, because pay-per-use charges the app rather than the member. A principal
+  // who brings their own app spends their own allowance and carries their own name.
+
+  /** Never the secret, and never another principal's row. */
+  function toPublicClient(row: ProviderClientRecord, connectionCount: number): PublicProviderClient {
+    return {
+      provider: row.provider,
+      clientId: row.clientId,
+      registeredAt: row.registeredAt,
+      connectionCount,
+    };
+  }
+
+  router.get('/v1/connections/clients', requireAuth(), requireScope('connections:read'), async (req: Request, res: Response) => {
+    if (!capabilityOn(res)) return;
+    const principal = resolve(req);
+    const rows = await storage.listPrincipalProviderClients(principal);
+    const clients = await Promise.all(rows.map(async (r) =>
+      toPublicClient(r, await storage.countConnectionsByProviderClient(r.id))));
+    res.json(success(config.nodeId, { clients }));
+  });
+
+  router.put('/v1/connections/clients', requireAuth(), requireScope('connections:write'), async (req: Request, res: Response) => {
+    if (!capabilityOn(res)) return;
+    const principal = resolve(req);
+    const body = req.body as { provider?: unknown; client_id?: unknown; client_secret?: unknown };
+    const providerId = typeof body.provider === 'string' ? body.provider : '';
+    const clientId = typeof body.client_id === 'string' ? body.client_id.trim() : '';
+    const clientSecret = typeof body.client_secret === 'string' ? body.client_secret.trim() : '';
+
+    const provider = findProvider(providers, providerId);
+    if (!provider) {
+      return res.status(404).json(error(config.nodeId, 'UNKNOWN_PROVIDER', `no provider '${providerId}'`));
+    }
+    // An attach-only provider has no authorization round, so a client id means nothing to it. Taking
+    // one and storing it would be accepting a secret this node can never use.
+    if (provider.credentialShape !== 'oauth2') {
+      return res.status(400).json(error(config.nodeId, 'NOT_AN_OAUTH_PROVIDER',
+        `${provider.id} is connected by supplying a credential, not by registering an app`));
+    }
+    if (!clientId || !clientSecret) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_CLIENT',
+        'both client_id and client_secret are required'));
+    }
+
+    const key = requireEncryptionKey(config);
+    if (!key) {
+      return res.status(503).json(error(config.nodeId, 'NO_ENCRYPTION_KEY',
+        'this node cannot store secrets: no encryption key is configured'));
+    }
+
+    const stored = await storage.upsertPrincipalProviderClient({
+      id: randomUUID(),
+      provider: provider.id,
+      instance: null,
+      principal,
+      clientId,
+      // Sealed exactly like a user token. It is the caller's secret, not the node's, and a table
+      // that holds one in the clear teaches the next one to do the same.
+      clientSecret: sealCredential({ shape: 'oauth2', accessToken: clientSecret }, key),
+      registeredAt: new Date().toISOString(),
+    });
+
+    // EXISTING CONNECTIONS ARE NOT RETARGETED. Each one remembers the client that minted its token
+    // and can only be refreshed by that one. Silently repointing them here would break every
+    // connection made before this moment, on its next renewal, hours later.
+    const count = await storage.countConnectionsByProviderClient(stored.id);
+    logger.info('connections: a principal registered their own client', {
+      principal, provider: provider.id,
+    });
+    res.json(success(config.nodeId, { client: toPublicClient(stored, count) }, [
+      { description: 'Connect an account with it', method: 'POST', url: '/v1/connections/start' },
+    ]));
+  });
+
+  router.delete('/v1/connections/clients/:provider', requireAuth(), requireScope('connections:write'), async (req: Request, res: Response) => {
+    if (!capabilityOn(res)) return;
+    const principal = resolve(req);
+    const providerId = req.params.provider as string;
+
+    const existing = await storage.getPrincipalProviderClient(providerId, principal);
+    // Absent and not-yours are the same 404: the lookup is scoped to the principal, so a row that
+    // belongs to someone else is simply not found rather than found and then denied.
+    if (!existing) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'no client of yours for that provider'));
+    }
+
+    // REFUSED WHILE ANYTHING STILL DEPENDS ON IT. Those connections can only be refreshed by this
+    // client; deleting it would leave them working until their token expires and then failing with
+    // an error nobody could trace back to this moment. Saying so now beats a mystery next week.
+    const count = await storage.countConnectionsByProviderClient(existing.id);
+    if (count > 0) {
+      return res.status(409).json(error(config.nodeId, 'CLIENT_IN_USE',
+        `${count} connected account(s) were made with this app and can only be renewed by it. Disconnect them first.`));
+    }
+
+    await storage.deletePrincipalProviderClient(providerId, principal);
+    res.json(success(config.nodeId, { deleted: true }));
   });
 
   // ── GET /v1/connections ── the caller's own, never anyone else's.

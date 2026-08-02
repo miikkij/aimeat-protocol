@@ -144,6 +144,8 @@ export async function registerAtInstance(
   // Sealed through the same path as a user token. It is not personal data, but a table that holds
   // one secret in the clear teaches the next one to do the same.
   const stored = await storage.upsertProviderClient({
+    // The NODE's registration at this instance, shared by everyone who arrives from it.
+    principal: null,
     id: randomUUID(),
     provider,
     instance: origin,

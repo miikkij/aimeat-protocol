@@ -153,4 +153,32 @@ export interface ConnectionRepository {
 
   /** The registration for one (provider, instance), or undefined if this node has never registered. */
   getProviderClient(provider: string, instance: string): Promise<ProviderClientRecord | undefined>;
+
+  /**
+   * A principal's OWN client for a provider, if they brought one. Scoped to the principal by the
+   * query rather than by a check afterwards: a lookup that can return someone else's row and is
+   * then filtered is a lookup that leaks the day someone forgets the filter.
+   */
+  getPrincipalProviderClient(
+    provider: string, principal: string,
+  ): Promise<ProviderClientRecord | undefined>;
+
+  /**
+   * By id, for the refresh path: a connection remembers which client minted it and must renew with
+   * that one. Returns undefined if the row is gone, which the caller treats as needs_reauth rather
+   * than silently falling back to the node's client and producing an unreadable invalid_grant.
+   */
+  getProviderClientById(id: string): Promise<ProviderClientRecord | undefined>;
+
+  /** Store or replace a principal's own client. One per principal per provider. */
+  upsertPrincipalProviderClient(row: ProviderClientRecord): Promise<ProviderClientRecord>;
+
+  /** Every client this principal brought. Secrets included; the route projects them away. */
+  listPrincipalProviderClients(principal: string): Promise<ProviderClientRecord[]>;
+
+  /** Returns false when there was nothing to delete, so absent and not-yours answer alike. */
+  deletePrincipalProviderClient(provider: string, principal: string): Promise<boolean>;
+
+  /** How many of this principal's connections were minted by a given client. */
+  countConnectionsByProviderClient(providerClientId: string): Promise<number>;
 }

@@ -237,6 +237,8 @@ export interface Connection {
   mode: Generated<string>;
   principal: string;
   provider: string;
+  /** Which client minted this token. Null = the node's configured client. */
+  providerClientId: string | null;
   refreshClaimedAt: string | null;
   scopes: Generated<Json>;
   status: Generated<string>;
@@ -265,7 +267,9 @@ export interface ProviderClient {
   clientId: string;
   clientSecret: string;
   id: string;
-  instance: string;
+  instance: string | null;
+  /** Null = the node's own registration. Non-null = a principal brought their own app. */
+  principal: string | null;
   provider: string;
   registeredAt: string;
 }

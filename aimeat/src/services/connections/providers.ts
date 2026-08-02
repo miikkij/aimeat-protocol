@@ -63,8 +63,22 @@ export interface OutboundProvider {
    * per instance and acquired at runtime; `client` is null and `endpoints()` needs the instance.
    */
   instanceScoped: boolean;
-  /** Config-gated. False = absent from discovery and refused at start, with a reason. */
+  /**
+   * Config-gated: this node can serve the provider itself. False = the node holds no client.
+   *
+   * NOT the same as unavailable. A principal who brings their own app can still use a provider the
+   * node never registered, which is exactly what bringing one is for.
+   */
   enabled: boolean;
+  /**
+   * The capability master switch (AIMEAT_CONNECTIONS_ENABLED). False means the whole feature is off
+   * and NOTHING is offered, whoever brought what.
+   *
+   * This used to be encoded only in `disabledReason` as a string, which meant the difference
+   * between "off" and "no client" was a substring match away from being wrong. It is a field now
+   * because the two answers differ: one hides the provider, the other invites you to bring an app.
+   */
+  capabilityOn: boolean;
   /** Why it is disabled, in words an operator can act on. Null when enabled. */
   disabledReason: string | null;
   /** Fixed-endpoint client credentials from config. Null for an instance-scoped provider. */
@@ -112,6 +126,8 @@ export interface OutboundProvider {
 /** What discovery may show. Deliberately free of anything an app could not act on. */
 export interface OutboundProviderMeta {
   id: OutboundProviderId;
+  /** False when the node holds no client for it; a principal's own app still works. */
+  nodeConfigured?: boolean;
   label: string;
   instanceScoped: boolean;
   credentialShape: CredentialShape;
@@ -125,14 +141,17 @@ export interface OutboundProviderMeta {
  * `POST /api/v1/apps` with no human in the loop. There is nothing to put in .env because nobody
  * knows which instance the next user arrives from.
  */
-function mastodon(enabled: boolean): OutboundProvider {
+function mastodon(capabilityOn: boolean): OutboundProvider {
   return {
     id: 'mastodon',
     label: 'Mastodon',
     credentialShape: 'oauth2',
     instanceScoped: true,
-    enabled,
-    disabledReason: enabled ? null : 'connections capability is off (AIMEAT_CONNECTIONS_ENABLED)',
+    // Mastodon registers itself per instance, so it needs no node client: the capability switch is
+    // the only thing that can turn it off.
+    enabled: capabilityOn,
+    capabilityOn,
+    disabledReason: capabilityOn ? null : 'connections capability is off (AIMEAT_CONNECTIONS_ENABLED)',
     client: null,
     scopes: ['read:accounts', 'write:statuses', 'write:media'],
     pkce: true,
@@ -171,6 +190,7 @@ function youtube(clientId: string, clientSecret: string, capabilityOn: boolean):
     credentialShape: 'oauth2',
     instanceScoped: false,
     enabled,
+    capabilityOn,
     disabledReason: enabled
       ? null
       : !capabilityOn
@@ -249,6 +269,7 @@ function linkedin(clientId: string, clientSecret: string, capabilityOn: boolean)
     credentialShape: 'oauth2',
     instanceScoped: false,
     enabled,
+    capabilityOn,
     disabledReason: enabled
       ? null
       : !capabilityOn
@@ -313,6 +334,7 @@ function x(clientId: string, clientSecret: string, capabilityOn: boolean): Outbo
     credentialShape: 'oauth2',
     instanceScoped: false,
     enabled,
+    capabilityOn,
     disabledReason: enabled
       ? null
       : !capabilityOn
@@ -358,6 +380,7 @@ function bluesky(capabilityOn: boolean): OutboundProvider {
     credentialShape: 'session',
     instanceScoped: false,
     enabled: capabilityOn,
+    capabilityOn,
     disabledReason: capabilityOn ? null : 'connections capability is off (AIMEAT_CONNECTIONS_ENABLED)',
     // No client credentials at all: the user's app password IS the credential.
     client: null,
@@ -400,6 +423,7 @@ function fake(baseUrl: string, capabilityOn: boolean): OutboundProvider {
     credentialShape: 'oauth2',
     instanceScoped: false,
     enabled,
+    capabilityOn,
     disabledReason: enabled ? null : 'no AIMEAT_CONNECT_FAKE_BASE_URL (this provider is test-only)',
     client: baseUrl ? { id: 'fake-client', secret: 'fake-secret' } : null,
     scopes: ['publish'],
@@ -434,6 +458,7 @@ function fakeStatic(baseUrl: string, capabilityOn: boolean): OutboundProvider {
     credentialShape: 'session',
     instanceScoped: false,
     enabled,
+    capabilityOn,
     disabledReason: enabled ? null : 'no AIMEAT_CONNECT_FAKE_BASE_URL (this provider is test-only)',
     client: null,
     scopes: [],
@@ -506,12 +531,22 @@ export function findProvider(
 
 /** The public projection for discovery. Enabled providers only, and no credentials in it. */
 export function listProviderMeta(providers: OutboundProvider[]): OutboundProviderMeta[] {
-  return providers.filter((p) => p.enabled).map((p) => ({
-    id: p.id,
-    label: p.label,
-    instanceScoped: p.instanceScoped,
-    credentialShape: p.credentialShape,
-    capabilities: p.capabilities,
-    attachFields: p.attachFields,
-  }));
+  return providers
+    // The master switch first: off means nothing is offered, whoever brought what.
+    .filter((p) => p.capabilityOn)
+    // Then: a provider the NODE has no client for is still listed, as long as someone could bring
+    // their own. Hiding it was right when the node's registration was the only way in; now it would
+    // mean the operator's decision not to register an app silently removes a choice from every
+    // user. The `fake` test providers stay out: they are gated on config and have nothing to bring.
+    .filter((p) => p.enabled || (p.credentialShape === 'oauth2' && !p.id.startsWith('fake')))
+    .map((p) => ({
+      id: p.id,
+      label: p.label,
+      instanceScoped: p.instanceScoped,
+      credentialShape: p.credentialShape,
+      capabilities: p.capabilities,
+      attachFields: p.attachFields,
+      /** False means: this node has no client. Bring your own and it works anyway. */
+      nodeConfigured: p.enabled,
+    }));
 }

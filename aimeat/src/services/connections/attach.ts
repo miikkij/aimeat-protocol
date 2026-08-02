@@ -183,6 +183,8 @@ export async function attachCredential(
     status: 'active',
     lastOkAt: now,
     lastError: null,
+    // No OAuth client took part: the user supplied the credential themselves.
+    providerClientId: null,
     createdAt: now,
     updatedAt: now,
   };

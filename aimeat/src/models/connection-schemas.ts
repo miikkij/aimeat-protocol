@@ -97,6 +97,17 @@ export interface ConnectionRecord {
   lastError: string | null;
   createdAt: string;
   updatedAt: string;
+  /**
+   * WHICH client minted this token, when it was not the node's own.
+   *
+   * This exists because a refresh must be made by the SAME client that issued the token. A user who
+   * connects with their own app and is then refreshed with the node's app gets an invalid_grant they
+   * cannot read and a connection that dies on its first renewal, hours after it appeared to work.
+   *
+   * null means the node's configured client, which is both the default and every connection that
+   * existed before principals could bring their own.
+   */
+  providerClientId: string | null;
 }
 
 /**
@@ -206,11 +217,33 @@ export type PublishStatus =
 export interface ProviderClientRecord {
   id: string;
   provider: string;
-  /** Instance origin, normalised and validated: it comes from a user, so it is an SSRF vector. */
-  instance: string;
+  /**
+   * Instance origin, normalised and validated: it comes from a user, so it is an SSRF vector.
+   * Null on a row that belongs to a principal rather than to an instance.
+   */
+  instance: string | null;
+  /**
+   * WHOSE client this is. Null means the NODE's own registration, acquired by registering at an
+   * instance and shared by everyone arriving from there.
+   *
+   * Non-null means a principal supplied their own app. That is the answer to the cost of a shared
+   * registration: everyone on one node otherwise appears to the provider as one application and
+   * shares its rate limit, its reputation and, at X, its bill. A principal who brings their own
+   * spends their own.
+   */
+  principal: string | null;
   clientId: string;
   clientSecret: string;
   registeredAt: string;
+}
+
+/** A principal's own client as an app or panel may see it. NEVER carries the secret. */
+export interface PublicProviderClient {
+  provider: string;
+  clientId: string;
+  registeredAt: string;
+  /** How many of this principal's connections were minted by it, so deleting is an informed act. */
+  connectionCount: number;
 }
 
 /** Rows a caller may set when opening an attempt; the rest is the store's business. */

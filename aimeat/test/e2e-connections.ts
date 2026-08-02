@@ -112,8 +112,13 @@ async function main(): Promise<void> {
         connectionsEnabled: true, connectGoogleClientId: '', connectGoogleClientSecret: '',
         connectRedirectUri: '', connectFakeBaseUrl: '',
       } as any);
-      const advertised = listProviderMeta(bare).map(p => p.id);
-      assert(!advertised.includes('youtube'), 'youtube advertised with no client credentials');
+      // The contract CHANGED when principals could bring their own app: a provider the node has no
+      // client for is still advertised, marked as not node-configured, because hiding it would let
+      // an operator decision to skip registering an app silently remove a choice from every user.
+      // What must NOT change is that it stays unusable to anyone who has not brought one.
+      const meta = listProviderMeta(bare).find(p => p.id === 'youtube');
+      assert(meta !== undefined, 'youtube missing from discovery entirely');
+      assert(meta!.nodeConfigured === false, 'youtube claims the node has a client for it');
       const yt = findProvider(bare, 'youtube');
       assert(yt?.enabled === false, 'youtube enabled with no client credentials');
       // The reason travels with the refusal: "disabled" alone leaves an operator nothing to act on.
@@ -655,6 +660,174 @@ async function main(): Promise<void> {
       assert(second.ok && second.attempt.status === 'queued',
         `expected queued, got ${second.ok ? second.attempt.status : 'refused'}`);
       storage.close();
+    });
+
+    console.log('\nPhase 12 — A principal brings their own app');
+    // WHY THIS EXISTS. Without it every user of a node reaches a provider through ONE registration:
+    // the node's. To LinkedIn or X a thousand users are one application, sharing one rate limit,
+    // one reputation and — on X, where pay-per-use charges the app rather than the member — one
+    // bill. Someone who brings their own app spends their own.
+
+    await test('a principal can register their own client, and the secret never comes back', async () => {
+      const r = await api('/v1/connections/clients', {
+        method: 'PUT', bearer: jwtA,
+        body: { provider: 'fake', client_id: 'alice-own-app', client_secret: 'alice-own-secret' },
+      });
+      assert(r.status === 200, `put client: ${r.status} ${r.data?.error?.message}`);
+      assert(r.data.data.client.clientId === 'alice-own-app', 'wrong client echoed');
+      assert(!JSON.stringify(r.data).includes('alice-own-secret'), 'the secret came back in the response');
+      const list = await api('/v1/connections/clients', { method: 'GET', bearer: jwtA });
+      assert(list.status === 200 && (list.data.data.clients as any[]).length === 1, 'not listed back');
+      assert(!JSON.stringify(list.data).includes('alice-own-secret'), 'the secret is readable from the listing');
+    });
+
+    await test("the principal's OWN client is used, not the node's", async () => {
+      // Read off the authorize URL, which is where a wrong client would actually reach the provider.
+      const start = await api('/v1/connections/start', {
+        bearer: jwtA, body: { provider: 'fake', mode: 'personal', return_url: '/profile#access' },
+      });
+      assert(start.status === 200, `start: ${start.status} ${start.data?.error?.message}`);
+      const url = new URL(start.data.data.authorize_url as string);
+      assert(url.searchParams.get('client_id') === 'alice-own-app',
+        `authorize used client_id=${url.searchParams.get('client_id')} instead of the principal's own`);
+    });
+
+    await test('another principal neither sees it nor is switched onto it', async () => {
+      const list = await api('/v1/connections/clients', { method: 'GET', bearer: jwtB });
+      assert(list.status === 200 && (list.data.data.clients as any[]).length === 0, "B can see A's client");
+      const start = await api('/v1/connections/start', {
+        bearer: jwtB, body: { provider: 'fake', mode: 'personal', return_url: '/profile#access' },
+      });
+      assert(start.status === 200, `B start: ${start.status}`);
+      const url = new URL(start.data.data.authorize_url as string);
+      assert(url.searchParams.get('client_id') !== 'alice-own-app', "B was silently put on A's application");
+    });
+
+    await test('a connection made with an own app remembers which app made it', async () => {
+      const start = await api('/v1/connections/start', {
+        bearer: jwtA, body: { provider: 'fake', mode: 'personal', return_url: '/profile#access' },
+      });
+      const cb = await fetch(
+        `${BASE}/v1/connections/callback?state=${encodeURIComponent(start.data.data.state)}&code=code-ownapp`,
+        { redirect: 'manual' },
+      );
+      assert(cb.status === 302, `callback: ${cb.status}`);
+      const clients = await api('/v1/connections/clients', { method: 'GET', bearer: jwtA });
+      assert((clients.data.data.clients as any[])[0].connectionCount >= 1,
+        'the client reports no connections made with it');
+    });
+
+    await test('a refresh is made by the app that ISSUED the token, and fails when it is not', async () => {
+      // THE REASON THE FEATURE IS SAFE TO SHIP. A refresh token belongs to the client that minted
+      // it; renewing with a different one is an invalid_grant that names nothing, arriving hours
+      // later and looking exactly like a revoked account.
+      //
+      // Both directions are asserted. The positive alone would pass even if the provider never
+      // checked, so the same connection is then pointed at the NODE's client and must fail — which
+      // is what proves the binding is doing the work rather than the test being generous.
+      const { ensureFreshCredential } = await import('../src/services/connections/refresh.js');
+      const { sealCredential } = await import('../src/services/connections/credential.js');
+      const { buildOutboundProviders } = await import('../src/services/connections/providers.js');
+      const { SqliteStorage } = await import('../src/storage/providers/sqlite/index.js');
+
+      const key = Buffer.from('0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef', 'hex');
+      const cfg = {
+        nodeId: 'test', baseUrl: BASE, connectionsEnabled: true,
+        connectGoogleClientId: '', connectGoogleClientSecret: '', connectRedirectUri: '',
+        connectFakeBaseUrl: provider.baseUrl,
+      } as any;
+      const storage = new SqliteStorage(':memory:');
+      const ctx = { config: cfg, storage: storage as any, providers: buildOutboundProviders(cfg), key };
+
+      // A real grant from the test provider, obtained BY the principal's own client, so the provider
+      // has recorded who owns it.
+      const form = new URLSearchParams({
+        grant_type: 'authorization_code', code: 'code-byoa', code_verifier: 'v',
+        client_id: 'byoa-client', client_secret: 'byoa-secret', redirect_uri: `${BASE}/v1/connections/callback`,
+      });
+      const tok = await fetch(`${provider.baseUrl}/token`, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString(),
+      });
+      const grant = await tok.json() as { access_token: string; refresh_token: string };
+
+      const own = await storage.upsertPrincipalProviderClient({
+        id: 'pc-byoa', provider: 'fake', instance: null, principal: 'byoa@test',
+        clientId: 'byoa-client',
+        clientSecret: sealCredential({ shape: 'oauth2', accessToken: 'byoa-secret' }, key),
+        registeredAt: new Date().toISOString(),
+      });
+
+      const now = new Date().toISOString();
+      const base = {
+        principal: 'byoa@test', mode: 'personal' as const, provider: 'fake', instance: null,
+        accountLabel: 'BYOA', externalId: 'byoa',
+        credential: sealCredential(
+          { shape: 'oauth2' as const, accessToken: grant.access_token, refreshToken: grant.refresh_token }, key,
+        ),
+        credentialShape: 'oauth2' as const, scopes: [],
+        // Already expired, so ensureFreshCredential actually goes to the provider.
+        expiresAt: new Date(Date.now() - 60_000).toISOString(),
+        status: 'active' as const, lastOkAt: now, lastError: null, createdAt: now, updatedAt: now,
+      };
+      await storage.createConnection({ ...base, id: 'byoa-1', providerClientId: own.id });
+
+      const beforeWrong = provider.stats.wrongClientRefreshAttempts;
+      const good = await ensureFreshCredential(ctx, 'byoa-1');
+      assert(good.ok, `a refresh with the issuing app failed: ${good.ok ? '' : good.reason}`);
+      assert(provider.stats.wrongClientRefreshAttempts === beforeWrong,
+        'the renewal was attempted by the wrong application');
+
+      // Now the same shape of connection, on a fresh grant, but pointed at the NODE's client.
+      const form2 = new URLSearchParams({
+        grant_type: 'authorization_code', code: 'code-byoa2', code_verifier: 'v',
+        client_id: 'byoa-client', client_secret: 'byoa-secret', redirect_uri: `${BASE}/v1/connections/callback`,
+      });
+      const tok2 = await fetch(`${provider.baseUrl}/token`, {
+        method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form2.toString(),
+      });
+      const grant2 = await tok2.json() as { access_token: string; refresh_token: string };
+      await storage.createConnection({
+        ...base, id: 'byoa-2', providerClientId: null,
+        externalId: 'byoa2',
+        credential: sealCredential(
+          { shape: 'oauth2' as const, accessToken: grant2.access_token, refreshToken: grant2.refresh_token }, key,
+        ),
+      });
+
+      const bad = await ensureFreshCredential(ctx, 'byoa-2');
+      assert(!bad.ok, 'renewing another application\u2019s token succeeded, so the provider is not checking');
+      assert(provider.stats.wrongClientRefreshAttempts === beforeWrong + 1,
+        'the provider did not record a wrong-client renewal, so the positive case proves nothing');
+      storage.close();
+    });
+
+    await test('deleting a client that connections still depend on is REFUSED', async () => {
+      const r = await api('/v1/connections/clients/fake', { method: 'DELETE', bearer: jwtA });
+      assert(r.status === 409 && r.data.error.code === 'CLIENT_IN_USE',
+        `expected 409 CLIENT_IN_USE, got ${r.status} ${r.data?.error?.code}`);
+      // The count is in the message, so the person knows what to disconnect first.
+      assert(/\d+ connected account/.test(r.data.error.message as string), 'the refusal does not say how many');
+    });
+
+    await test("deleting another principal's client is the same 404 as a missing one", async () => {
+      const r = await api('/v1/connections/clients/fake', { method: 'DELETE', bearer: jwtB });
+      assert(r.status === 404, `status ${r.status}`);
+    });
+
+    await test('an attach-only provider refuses a client it could never use', async () => {
+      const r = await api('/v1/connections/clients', {
+        method: 'PUT', bearer: jwtB,
+        body: { provider: 'fake-static', client_id: 'x', client_secret: 'y' },
+      });
+      assert(r.status === 400 && r.data.error.code === 'NOT_AN_OAUTH_PROVIDER', `${r.status} ${r.data?.error?.code}`);
+    });
+
+    await test('a client for an unknown provider is a 404, not a stored row', async () => {
+      const r = await api('/v1/connections/clients', {
+        method: 'PUT', bearer: jwtB,
+        body: { provider: 'not-a-provider', client_id: 'x', client_secret: 'y' },
+      });
+      assert(r.status === 404 && r.data.error.code === 'UNKNOWN_PROVIDER', `${r.status} ${r.data?.error?.code}`);
     });
 
     console.log(`\n${'─'.repeat(60)}\n  ${passed} passed, ${failed} failed\n`);

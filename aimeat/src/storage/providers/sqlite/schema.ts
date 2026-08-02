@@ -402,6 +402,56 @@ export function initializeSchema(db: Database.Database): void {
   // back as 'message' (they all came from the gate).
   safeAddColumn('contact_consents', 'origin', "TEXT NOT NULL DEFAULT 'message'");
 
+  // ── Outbound connections: a principal may bring their OWN app (TARGET-057) ──
+  //
+  // Which client minted a token. A token can only be renewed by the client that issued it, so a
+  // connection made with a principal's own app has to remember whose app that was. Without it such
+  // a connection authorises perfectly and then dies on its first refresh with an invalid_grant that
+  // names nothing, hours later, looking exactly like a revoked account. NULL = the node's client.
+  safeAddColumn('connections', 'providerClientId', 'TEXT');
+
+  // provider_clients was created with `instance TEXT NOT NULL`, which was right when the only rows
+  // were per-instance registrations. A principal's own client for a fixed-endpoint provider has no
+  // instance, and SQLite cannot relax NOT NULL with ALTER. So: rebuild, once, guarded by reading the
+  // column's own notnull flag rather than by a version number that can be wrong.
+  const pcCols = db.prepare("PRAGMA table_info('provider_clients')").all() as
+    Array<{ name: string; notnull: number }>;
+  const instanceCol = pcCols.find(c => c.name === 'instance');
+  if (instanceCol && instanceCol.notnull === 1) {
+    db.exec(`
+      DROP INDEX IF EXISTS idx_provider_clients_key;
+      DROP INDEX IF EXISTS idx_provider_clients_principal;
+      CREATE TABLE provider_clients_new (
+        id           TEXT PRIMARY KEY,
+        provider     TEXT NOT NULL,
+        instance     TEXT,
+        principal    TEXT,
+        clientId     TEXT NOT NULL,
+        clientSecret TEXT NOT NULL,
+        registeredAt TEXT NOT NULL
+      );
+      INSERT INTO provider_clients_new (id, provider, instance, principal, clientId, clientSecret, registeredAt)
+        SELECT id, provider, instance, NULL, clientId, clientSecret, registeredAt FROM provider_clients;
+      DROP TABLE provider_clients;
+      ALTER TABLE provider_clients_new RENAME TO provider_clients;
+    `);
+  } else {
+    safeAddColumn('provider_clients', 'principal', 'TEXT');
+  }
+
+  // Indexes AFTER the columns exist, in both branches. A partial index on (provider, instance) so
+  // that principal rows -- which carry no instance -- do not collapse into one row per provider,
+  // and one client per principal per provider so a second replaces the first rather than leaving
+  // two rows and a coin toss over which one a refresh uses.
+  db.exec(`
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_provider_clients_key
+      ON provider_clients(provider, instance) WHERE instance IS NOT NULL AND principal IS NULL;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_provider_clients_principal
+      ON provider_clients(provider, principal) WHERE principal IS NOT NULL;
+    CREATE INDEX IF NOT EXISTS idx_connections_provider_client
+      ON connections(providerClientId) WHERE providerClientId IS NOT NULL;
+  `);
+
   // ── Memory full-text search (Tier-1 librarian retrieval) ──
   // FTS5 is built into better-sqlite3 — no dependency. A standalone virtual table mirrors the
   // searchable text of every memory row (key + JSON value + tags), keyed by memory.rowid. AFTER

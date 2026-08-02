@@ -24,7 +24,7 @@
 
 import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { safeFetch } from '../../utils/url-validator.js';
-import { sealCredential } from './credential.js';
+import { sealCredential, openCredential } from './credential.js';
 import { normalizeInstance, registerAtInstance, type InstanceClient } from './instance.js';
 import { findProvider, type OutboundProvider, tokenRequest } from './providers.js';
 import type { AimeatConfig } from '../../config.js';
@@ -70,20 +70,50 @@ export function callbackUrl(config: AimeatConfig): string {
  * Client credentials for this provider: from config for a fixed endpoint, from the node's
  * registration at the instance for a federated one (registering on first contact).
  */
+/**
+ * Which client should speak to the provider for THIS principal, and which stored row it came from.
+ *
+ * Three branches, in this order.
+ *
+ *   1. THE PRINCIPAL'S OWN APP, if they brought one. This is what stops a node's thousand users
+ *      from being one application to LinkedIn or X, sharing one rate limit, one reputation and, on
+ *      X, one bill. A principal who registers their own app spends their own allowance.
+ *   2. An instance-scoped provider registers the node at the instance and remembers it.
+ *   3. The node's configured client, which is the default and always was.
+ *
+ * `recordId` is not decoration: it is written onto the connection so a refresh can be made by the
+ * SAME client that issued the token. Renewing with a different client is an invalid_grant nobody
+ * can read, hours later, indistinguishable from a revoked account.
+ */
 async function resolveClient(
-  ctx: ConnectContext, provider: OutboundProvider, instance: string | null,
-): Promise<InstanceClient | { error: string }> {
+  ctx: ConnectContext, provider: OutboundProvider, instance: string | null, principal: string,
+): Promise<(InstanceClient & { recordId: string | null }) | { error: string }> {
+  const own = await ctx.storage.getPrincipalProviderClient(provider.id, principal);
+  if (own) {
+    const secret = openCredential(own.clientSecret, ctx.key);
+    if (!secret) {
+      // Refusing beats falling back to the node's client: the principal asked to use their own app,
+      // and quietly using someone else's is the wrong answer to an unreadable secret.
+      return { error: 'your own app credentials for this provider could not be read; re-enter them' };
+    }
+    return { clientId: own.clientId, clientSecret: secret.accessToken, recordId: own.id };
+  }
   if (!provider.instanceScoped) {
     if (!provider.client) return { error: provider.disabledReason ?? 'provider is not configured' };
-    return { clientId: provider.client.id, clientSecret: provider.client.secret };
+    return { clientId: provider.client.id, clientSecret: provider.client.secret, recordId: null };
   }
   if (!instance) return { error: 'this provider needs an instance address' };
-  return registerAtInstance(ctx.storage, ctx.key, provider.id, instance, {
+  const registered = await registerAtInstance(ctx.storage, ctx.key, provider.id, instance, {
     name: 'AIMEAT',
     redirectUri: callbackUrl(ctx.config),
     scopes: provider.scopes,
     website: ctx.config.baseUrl,
   });
+  if ('error' in registered) return registered;
+  // recordId stays null for an instance registration: the connection already carries its instance,
+  // and the refresh path finds the same row by (provider, instance). Only a principal's own client
+  // needs to be pinned by id, because nothing else on the row points at it.
+  return { ...registered, recordId: null };
 }
 
 /**
@@ -97,8 +127,17 @@ export async function startAuthorization(
   const provider = findProvider(ctx.providers, input.provider);
   if (!provider) return { ok: false, code: 'UNKNOWN_PROVIDER', reason: `no provider '${input.provider}'` };
   if (!provider.enabled) {
-    // The reason travels with the refusal: an operator staring at "disabled" has nothing to act on.
-    return { ok: false, code: 'PROVIDER_DISABLED', reason: provider.disabledReason ?? 'provider is disabled' };
+    // A provider disabled only because the NODE registered no app is still usable by a principal
+    // who brought their own. That is the point of bringing one: an operator's decision not to
+    // register at LinkedIn should not stand between a user and their own registration. The
+    // capability master switch is separate and still refuses everything when it is off.
+    const own = ctx.config.connectionsEnabled
+      ? await ctx.storage.getPrincipalProviderClient(provider.id, input.principal)
+      : undefined;
+    if (!own) {
+      // The reason travels with the refusal: an operator staring at "disabled" has nothing to act on.
+      return { ok: false, code: 'PROVIDER_DISABLED', reason: provider.disabledReason ?? 'provider is disabled' };
+    }
   }
   if (provider.credentialShape !== 'oauth2') {
     return { ok: false, code: 'NOT_AN_OAUTH_PROVIDER', reason: `${provider.id} does not use an authorization round` };
@@ -111,7 +150,7 @@ export async function startAuthorization(
     instance = norm.origin;
   }
 
-  const client = await resolveClient(ctx, provider, instance);
+  const client = await resolveClient(ctx, provider, instance, input.principal);
   if ('error' in client) return { ok: false, code: 'CLIENT_UNAVAILABLE', reason: client.error };
 
   const endpoints = provider.endpoints(instance);
@@ -299,7 +338,7 @@ export async function completeAuthorization(
   if (!provider?.enabled) {
     return { ok: false, code: 'PROVIDER_DISABLED', reason: 'that provider is no longer available' };
   }
-  const client = await resolveClient(ctx, provider, payload.instance);
+  const client = await resolveClient(ctx, provider, payload.instance, nonce.owner);
   if ('error' in client) return { ok: false, code: 'CLIENT_UNAVAILABLE', reason: client.error };
   const endpoints = provider.endpoints(payload.instance);
   if (!endpoints) return { ok: false, code: 'NO_ENDPOINTS', reason: 'provider has no token endpoint' };
@@ -370,6 +409,8 @@ export async function completeAuthorization(
     status: 'active',
     lastOkAt: now,
     lastError: null,
+    // Which client minted this token. Null = the node own client, which is the default.
+    providerClientId: client.recordId,
     createdAt: now,
     updatedAt: now,
   };

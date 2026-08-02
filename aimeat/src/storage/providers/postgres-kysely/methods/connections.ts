@@ -50,6 +50,7 @@ function toConnection(r: Selectable<ConnectionRow>): ConnectionRecord {
     status: r.status as ConnectionStatus,
     lastOkAt: r.lastOkAt ?? null,
     lastError: r.lastError ?? null,
+    providerClientId: r.providerClientId ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -90,7 +91,8 @@ function toProviderClient(r: Selectable<ProviderClientRow>): ProviderClientRecor
   return {
     id: r.id,
     provider: r.provider,
-    instance: r.instance,
+    instance: r.instance ?? null,
+    principal: r.principal ?? null,
     clientId: r.clientId,
     clientSecret: r.clientSecret,
     registeredAt: r.registeredAt,
@@ -116,6 +118,7 @@ export const connectionMethods = {
       status: row.status,
       lastOkAt: row.lastOkAt,
       lastError: row.lastError,
+      providerClientId: row.providerClientId,
       createdAt: row.createdAt,
       updatedAt: row.updatedAt,
     }).execute();
@@ -355,15 +358,98 @@ export const connectionMethods = {
       id: row.id,
       provider: row.provider,
       instance: row.instance,
+      principal: null,
       clientId: row.clientId,
       clientSecret: row.clientSecret,
       registeredAt: row.registeredAt,
-    }).onConflict((oc) => oc.columns(['provider', 'instance']).doNothing()).execute();
+    }).onConflict((oc) => oc
+      .columns(['provider', 'instance'])
+      // The index is partial, so the conflict target has to repeat its predicate; without this
+      // Postgres cannot match the index and raises a unique violation instead of doing nothing.
+      .where('instance', 'is not', null).where('principal', 'is', null)
+      .doNothing()).execute();
 
     const r = await this.db.selectFrom('ProviderClient').selectAll()
       .where('provider', '=', row.provider).where('instance', '=', row.instance)
+      .where('principal', 'is', null)
       .executeTakeFirst();
     return toProviderClient(r as Selectable<ProviderClientRow>);
+  },
+
+  /**
+   * A principal's own client. The principal is IN the query rather than checked afterwards: a
+   * lookup that can return someone else's row and is then filtered is a lookup that leaks the day
+   * somebody forgets the filter.
+   */
+  async getPrincipalProviderClient(
+    this: PostgresKyselyStorage, provider: string, principal: string,
+  ): Promise<ProviderClientRecord | undefined> {
+    const r = await this.db.selectFrom('ProviderClient').selectAll()
+      .where('provider', '=', provider).where('principal', '=', principal)
+      .executeTakeFirst();
+    return r ? toProviderClient(r) : undefined;
+  },
+
+  async getProviderClientById(
+    this: PostgresKyselyStorage, id: string,
+  ): Promise<ProviderClientRecord | undefined> {
+    const r = await this.db.selectFrom('ProviderClient').selectAll()
+      .where('id', '=', id).executeTakeFirst();
+    return r ? toProviderClient(r) : undefined;
+  },
+
+  async listPrincipalProviderClients(
+    this: PostgresKyselyStorage, principal: string,
+  ): Promise<ProviderClientRecord[]> {
+    const rows = await this.db.selectFrom('ProviderClient').selectAll()
+      .where('principal', '=', principal).orderBy('provider').execute();
+    return rows.map(toProviderClient);
+  },
+
+  /** Replaces rather than accumulates: one brought-along client per principal per provider. */
+  async upsertPrincipalProviderClient(
+    this: PostgresKyselyStorage, row: ProviderClientRecord,
+  ): Promise<ProviderClientRecord> {
+    await this.db.insertInto('ProviderClient').values({
+      id: row.id,
+      provider: row.provider,
+      instance: null,
+      principal: row.principal,
+      clientId: row.clientId,
+      clientSecret: row.clientSecret,
+      registeredAt: row.registeredAt,
+    }).onConflict((oc) => oc
+      .columns(['provider', 'principal'])
+      .where('principal', 'is not', null)
+      .doUpdateSet({
+        clientId: row.clientId,
+        clientSecret: row.clientSecret,
+        registeredAt: row.registeredAt,
+      })).execute();
+
+    const r = await this.db.selectFrom('ProviderClient').selectAll()
+      .where('provider', '=', row.provider).where('principal', '=', row.principal)
+      .executeTakeFirst();
+    return toProviderClient(r as Selectable<ProviderClientRow>);
+  },
+
+  async deletePrincipalProviderClient(
+    this: PostgresKyselyStorage, provider: string, principal: string,
+  ): Promise<boolean> {
+    const r = await this.db.deleteFrom('ProviderClient')
+      .where('provider', '=', provider).where('principal', '=', principal)
+      .executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0) > 0;
+  },
+
+  async countConnectionsByProviderClient(
+    this: PostgresKyselyStorage, providerClientId: string,
+  ): Promise<number> {
+    const r = await this.db.selectFrom('Connection')
+      .select(({ fn }) => fn.countAll<string>().as('n'))
+      .where('providerClientId', '=', providerClientId)
+      .executeTakeFirst();
+    return Number(r?.n ?? 0);
   },
 
   async getProviderClient(

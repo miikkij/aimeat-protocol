@@ -23,6 +23,7 @@ import { safeFetch } from '../../utils/url-validator.js';
 import { logger } from '../../utils/logger.js';
 import { sealCredential, openCredential } from './credential.js';
 import { findProvider, tokenRequest } from './providers.js';
+import type { OutboundProvider } from './providers.js';
 import { mintSession } from './attach.js';
 import type { ConnectContext } from './oauth.js';
 import type { ConnectionCredential, ConnectionRecord } from '../../models/connection-schemas.js';
@@ -111,6 +112,47 @@ export async function ensureFreshCredential(
 }
 
 /** The exchange itself. Only ever runs inside a held claim. */
+/**
+ * The client that must speak for THIS connection, which is the one that issued its token.
+ *
+ * A refresh token belongs to the client that minted it. Renewing with a different client is an
+ * invalid_grant that names nothing, arriving hours after everything appeared to work and looking
+ * exactly like a revoked account. So the order here is not a preference, it is a correctness rule:
+ *
+ *   * `providerClientId` set means a principal brought their own app. That row, or nothing. Falling
+ *     back to the node's client here would produce precisely the unreadable failure above, and it
+ *     would also mean quietly using a different application than the person consented to.
+ *   * An instance-scoped connection finds its registration by (provider, instance), which is where
+ *     it was minted.
+ *   * Otherwise the node's configured client, which is what minted every other connection.
+ */
+async function clientThatIssued(
+  ctx: ConnectContext,
+  provider: OutboundProvider,
+  conn: ConnectionRecord,
+): Promise<{ clientId: string; clientSecret: string } | { error: string }> {
+  if (conn.providerClientId) {
+    const own = await ctx.storage.getProviderClientById(conn.providerClientId);
+    if (!own) {
+      return { error: 'the app this connection was made with is gone; reconnect it' };
+    }
+    const secret = openCredential(own.clientSecret, ctx.key);
+    if (!secret) return { error: 'the app credentials this connection was made with cannot be read' };
+    return { clientId: own.clientId, clientSecret: secret.accessToken };
+  }
+  if (provider.instanceScoped) {
+    const pc = conn.instance
+      ? await ctx.storage.getProviderClient(provider.id, conn.instance)
+      : undefined;
+    if (!pc) return { error: 'no client registration for this instance' };
+    const secret = openCredential(pc.clientSecret, ctx.key);
+    if (!secret) return { error: 'the stored registration for this instance cannot be read' };
+    return { clientId: pc.clientId, clientSecret: secret.accessToken };
+  }
+  if (!provider.client) return { error: 'no client credentials for this provider' };
+  return { clientId: provider.client.id, clientSecret: provider.client.secret };
+}
+
 async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Promise<FreshResult> {
   const current = openCredential(conn.credential, ctx.key);
   if (!current) {
@@ -139,15 +181,8 @@ async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Prom
     return { ok: false, code: 'PROVIDER_GONE', reason: 'that provider is no longer configured on this node' };
   }
 
-  const client = provider.instanceScoped
-    ? await (async () => {
-      const pc = conn.instance ? await ctx.storage.getProviderClient(provider.id, conn.instance) : undefined;
-      if (!pc) return null;
-      const secret = openCredential(pc.clientSecret, ctx.key);
-      return secret ? { clientId: pc.clientId, clientSecret: secret.accessToken } : null;
-    })()
-    : provider.client ? { clientId: provider.client.id, clientSecret: provider.client.secret } : null;
-  if (!client) return { ok: false, code: 'CLIENT_UNAVAILABLE', reason: 'no client credentials for this provider' };
+  const client = await clientThatIssued(ctx, provider, conn);
+  if ('error' in client) return { ok: false, code: 'CLIENT_UNAVAILABLE', reason: client.error };
 
   // Same builder as the first exchange. A refresh that authenticated differently from the exchange
   // is a connection that links successfully and then cannot renew -- visible only hours later.

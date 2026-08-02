@@ -41,6 +41,7 @@ function toConnection(r: Row): ConnectionRecord {
     status: r.status as ConnectionStatus,
     lastOkAt: (r.lastOkAt as string | null) ?? null,
     lastError: (r.lastError as string | null) ?? null,
+    providerClientId: (r.providerClientId as string | null) ?? null,
     createdAt: r.createdAt as string,
     updatedAt: r.updatedAt as string,
   };
@@ -82,7 +83,8 @@ function toProviderClient(r: Row): ProviderClientRecord {
   return {
     id: r.id as string,
     provider: r.provider as string,
-    instance: r.instance as string,
+    instance: (r.instance as string | null) ?? null,
+    principal: (r.principal as string | null) ?? null,
     clientId: r.clientId as string,
     clientSecret: r.clientSecret as string,
     registeredAt: r.registeredAt as string,
@@ -109,12 +111,13 @@ export const connectionMethods = {
   async createConnection(this: SqliteStorage, row: ConnectionRecord): Promise<void> {
     this.db.prepare(`
       INSERT INTO connections (id, principal, mode, provider, instance, accountLabel, externalId,
-        credential, credentialShape, scopes, expiresAt, status, lastOkAt, lastError, createdAt, updatedAt)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        credential, credentialShape, scopes, expiresAt, status, lastOkAt, lastError,
+        providerClientId, createdAt, updatedAt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `).run(
       row.id, row.principal, row.mode, row.provider, row.instance, row.accountLabel, row.externalId,
       row.credential, row.credentialShape, JSON.stringify(row.scopes), row.expiresAt, row.status,
-      row.lastOkAt, row.lastError, row.createdAt, row.updatedAt,
+      row.lastOkAt, row.lastError, row.providerClientId, row.createdAt, row.updatedAt,
     );
   },
 
@@ -326,20 +329,88 @@ export const connectionMethods = {
     this: SqliteStorage, row: ProviderClientRecord,
   ): Promise<ProviderClientRecord> {
     this.db.prepare(`
-      INSERT INTO provider_clients (id, provider, instance, clientId, clientSecret, registeredAt)
-      VALUES (?, ?, ?, ?, ?, ?)
-      ON CONFLICT(provider, instance) DO NOTHING
+      INSERT INTO provider_clients (id, provider, instance, principal, clientId, clientSecret, registeredAt)
+      VALUES (?, ?, ?, NULL, ?, ?, ?)
+      -- The conflict target has to repeat the partial index's own WHERE clause; without it SQLite
+      -- cannot match the index and raises instead of doing nothing.
+      ON CONFLICT(provider, instance) WHERE instance IS NOT NULL AND principal IS NULL DO NOTHING
     `).run(row.id, row.provider, row.instance, row.clientId, row.clientSecret, row.registeredAt);
-    const r = this.db.prepare('SELECT * FROM provider_clients WHERE provider = ? AND instance = ?')
-      .get(row.provider, row.instance) as Row;
+    const r = this.db.prepare(
+      'SELECT * FROM provider_clients WHERE provider = ? AND instance = ? AND principal IS NULL',
+    ).get(row.provider, row.instance) as Row;
     return toProviderClient(r);
   },
 
   async getProviderClient(
     this: SqliteStorage, provider: string, instance: string,
   ): Promise<ProviderClientRecord | undefined> {
-    const r = this.db.prepare('SELECT * FROM provider_clients WHERE provider = ? AND instance = ?')
-      .get(provider, instance) as Row | undefined;
+    const r = this.db.prepare(
+      'SELECT * FROM provider_clients WHERE provider = ? AND instance = ? AND principal IS NULL',
+    ).get(provider, instance) as Row | undefined;
     return r ? toProviderClient(r) : undefined;
+  },
+
+  /**
+   * A principal's own client. The principal is IN the query rather than checked after: a lookup
+   * that can return someone else's row and is then filtered is a lookup that leaks the day somebody
+   * forgets the filter.
+   */
+  async getPrincipalProviderClient(
+    this: SqliteStorage, provider: string, principal: string,
+  ): Promise<ProviderClientRecord | undefined> {
+    const r = this.db.prepare(
+      'SELECT * FROM provider_clients WHERE provider = ? AND principal = ?',
+    ).get(provider, principal) as Row | undefined;
+    return r ? toProviderClient(r) : undefined;
+  },
+
+  async getProviderClientById(
+    this: SqliteStorage, id: string,
+  ): Promise<ProviderClientRecord | undefined> {
+    const r = this.db.prepare('SELECT * FROM provider_clients WHERE id = ?')
+      .get(id) as Row | undefined;
+    return r ? toProviderClient(r) : undefined;
+  },
+
+  async listPrincipalProviderClients(
+    this: SqliteStorage, principal: string,
+  ): Promise<ProviderClientRecord[]> {
+    const rows = this.db.prepare(
+      'SELECT * FROM provider_clients WHERE principal = ? ORDER BY provider',
+    ).all(principal) as Row[];
+    return rows.map(toProviderClient);
+  },
+
+  /** Replaces rather than accumulates: one brought-along client per principal per provider. */
+  async upsertPrincipalProviderClient(
+    this: SqliteStorage, row: ProviderClientRecord,
+  ): Promise<ProviderClientRecord> {
+    this.db.prepare(`
+      INSERT INTO provider_clients (id, provider, instance, principal, clientId, clientSecret, registeredAt)
+      VALUES (?, ?, NULL, ?, ?, ?, ?)
+      ON CONFLICT(provider, principal) WHERE principal IS NOT NULL
+        DO UPDATE SET clientId = excluded.clientId, clientSecret = excluded.clientSecret,
+                      registeredAt = excluded.registeredAt
+    `).run(row.id, row.provider, row.principal, row.clientId, row.clientSecret, row.registeredAt);
+    const r = this.db.prepare(
+      'SELECT * FROM provider_clients WHERE provider = ? AND principal = ?',
+    ).get(row.provider, row.principal) as Row;
+    return toProviderClient(r);
+  },
+
+  async deletePrincipalProviderClient(
+    this: SqliteStorage, provider: string, principal: string,
+  ): Promise<boolean> {
+    const r = this.db.prepare(
+      'DELETE FROM provider_clients WHERE provider = ? AND principal = ?',
+    ).run(provider, principal);
+    return r.changes > 0;
+  },
+
+  async countConnectionsByProviderClient(this: SqliteStorage, providerClientId: string): Promise<number> {
+    const r = this.db.prepare(
+      'SELECT COUNT(*) AS n FROM connections WHERE providerClientId = ?',
+    ).get(providerClientId) as { n: number };
+    return r.n;
   },
 };

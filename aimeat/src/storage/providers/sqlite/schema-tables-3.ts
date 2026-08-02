@@ -554,6 +554,10 @@ export function applySchemaTables3(db: Database.Database): void {
       -- issue a new one, so two concurrent publishes on one connection would leave one working
       -- token and one connection wrongly parked — a failure caused purely by our own concurrency.
       refreshClaimedAt TEXT,
+      -- WHICH client minted this token. NULL = the node's configured client. A token can only be
+      -- renewed by the client that issued it, so a connection made with a principal's own app has
+      -- to remember whose app that was; otherwise it authorises fine and dies on first refresh.
+      providerClientId TEXT,
       createdAt        TEXT NOT NULL,
       updatedAt        TEXT NOT NULL
     );
@@ -623,15 +627,23 @@ export function applySchemaTables3(db: Database.Database): void {
       provider     TEXT NOT NULL,
       -- Normalised and validated before it gets here: it originates from a USER-SUPPLIED address,
       -- which makes it an SSRF vector, and every request to it goes through safeFetch.
-      instance     TEXT NOT NULL,
+      instance     TEXT,
+      -- WHOSE client. NULL = the node's own registration, shared by everyone from that instance.
+      -- Non-null = a principal brought their own app, and spends their own allowance and bill.
+      principal    TEXT,
       clientId     TEXT NOT NULL,
       clientSecret TEXT NOT NULL,
       registeredAt TEXT NOT NULL
     );
     -- Two users arriving from the same instance at the same moment must converge on ONE
-    -- registration rather than each minting their own.
+    -- registration rather than each minting their own. Partial, so a principal's own rows (which
+    -- carry no instance) do not collapse into a single row per provider.
     CREATE UNIQUE INDEX IF NOT EXISTS idx_provider_clients_key
-      ON provider_clients(provider, instance);
+      ON provider_clients(provider, instance) WHERE instance IS NOT NULL AND principal IS NULL;
+    -- One brought-along client per principal per provider: a second replaces the first rather than
+    -- leaving two rows and a coin toss over which one a refresh uses.
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_provider_clients_principal
+      ON provider_clients(provider, principal) WHERE principal IS NOT NULL;
 
   `);
 }
