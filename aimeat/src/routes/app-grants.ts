@@ -91,6 +91,10 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'workflow:read': 'See your automations (workflows) and their runs',
   'workflow:write': 'Create, save, and run your automations (workflows)',
   'ai:use': 'Use AI on your behalf with your configured key (spends your AI budget)',
+  // TARGET-057. Deliberately NOT connections:write: an app that may publish to an account you
+  // already connected is a different favour from one that may attach new accounts to your name.
+  // Attaching is a human act at the provider's own consent screen and no app performs it.
+  'connections:use': 'Publish to accounts you have already connected (never see or change the accounts themselves)',
   // TARGET-058. Recording what the node OBSERVED needs no permission — that happens whether anyone
   // asks or not. Asserting how content was made is different: a declaration can say a person wrote
   // or reviewed something, which is exactly the statement that decides whether a visible AI label is

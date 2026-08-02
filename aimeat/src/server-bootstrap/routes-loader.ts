@@ -83,6 +83,7 @@ import { organismsRouter } from '../routes/organisms.js';
 import { notificationsRouter } from '../routes/notifications.js';
 import { adminSecurityRouter } from '../routes/admin-security.js';
 import { sharingGroupsRouter } from '../routes/sharing-groups.js';
+import { connectionsRouter } from '../routes/connections.js';
 import { specRouter } from '../routes/spec.js';
 import { disputesRouter } from '../routes/disputes.js';
 import { microMemoryRouter } from '../routes/micro-memory.js';
@@ -503,6 +504,7 @@ export async function mountRoutes(
   app.use(notificationsRouter(config, storage));
   app.use(adminSecurityRouter(config, storage));
   app.use(sharingGroupsRouter(config, storage));
+  app.use(connectionsRouter(config, storage));  // TARGET-057: outbound connections + delegations
   app.use(federationRouter(config, storage, peers, networkDirectory));
   app.use(disputesRouter(config, storage));
   app.use(flagsRouter(config, storage));

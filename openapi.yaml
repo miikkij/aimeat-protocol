@@ -3074,6 +3074,29 @@ components:
               description: Percentage at which to warn owner
 
     # === Sharing Groups ===
+    PublicConnection:
+      type: object
+      description: >
+        Everything an app may see about a connection. Deliberately without the provider's scope list
+        and without an expiry: an app cannot know what a provider's scope names mean, so capability
+        questions are asked and answered instead. The credential appears in no projection anywhere.
+      properties:
+        id:
+          type: string
+        provider:
+          type: string
+        mode:
+          type: string
+          enum: [personal, shared]
+        accountLabel:
+          type: string
+          description: Fetched from the provider at connect time, never supplied by a caller.
+        status:
+          type: string
+          enum: [active, needs_reauth, revoked]
+          description: >
+            needs_reauth is a user-visible state rather than an error; scheduled work parks on it
+            instead of retrying.
     SharingGroup:
       type: object
       required: [id, name, ownerGaii, members, createdAt, updatedAt]
@@ -33400,6 +33423,386 @@ paths:
   # Sharing Groups
   # ============================================================
 
+  /v1/connections/providers:
+    get:
+      operationId: listConnectionProviders
+      summary: External services an account can be connected at
+      description: >
+        Enabled outbound providers only. A provider is enabled when the node has what it needs to
+        talk to it; an unconfigured one is absent rather than half-working. capabilities are the
+        questions an app may ask about a connection at that provider - an app never reads the
+        provider's own scope vocabulary, because it cannot know what those names mean.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Enabled providers
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          providers:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                  example: mastodon
+                                label:
+                                  type: string
+                                instanceScoped:
+                                  type: boolean
+                                  description: True when client credentials are per instance and acquired at runtime.
+                                credentialShape:
+                                  type: string
+                                  enum: [oauth2, static, session]
+                                capabilities:
+                                  type: array
+                                  items:
+                                    type: string
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/connections:
+    get:
+      operationId: listConnections
+      summary: Accounts the caller has connected
+      description: >
+        The caller's own connections and no one else's. The credential is never part of any
+        response; what comes back is enough to name the account in a picker and to see that it
+        needs attention.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The caller's connections
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          connections:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/PublicConnection'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          description: Connections are not enabled on this node, or it has no encryption key.
+  /v1/connections/start:
+    post:
+      operationId: startConnection
+      summary: Begin connecting an account
+      description: >
+        Returns the URL to send the user's browser to. Consent happens at the PROVIDER, never here.
+        The state is single-use and bound to the calling principal; the PKCE verifier stays on the
+        node and never travels.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [provider]
+              properties:
+                provider:
+                  type: string
+                  example: mastodon
+                instance:
+                  type: string
+                  description: >
+                    Required for an instance-scoped provider. Comes from the user, so it is
+                    normalised and validated, and every request to it goes through safeFetch.
+                  example: mastodon.social
+                mode:
+                  type: string
+                  enum: [personal, shared]
+                  default: personal
+                  description: >
+                    personal is the caller's own account. shared is a channel the caller owns and
+                    intends to delegate to an app's users.
+                return_url:
+                  type: string
+                  description: Same-origin path to return to. An absolute URL is ignored.
+      responses:
+        '200':
+          description: Authorization started
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          authorize_url:
+                            type: string
+                          state:
+                            type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No such provider.
+  /v1/connections/callback:
+    get:
+      operationId: connectionCallback
+      summary: Provider redirect target
+      description: >
+        Unauthenticated by necessity - the provider redirects a browser here and that browser may
+        carry no session. Its gate is the single-use state, which is bound to the principal who
+        started the round and consumed BEFORE the code is exchanged, so a replayed callback finds
+        nothing rather than racing the original.
+      tags: [Connections]
+      parameters:
+        - in: query
+          name: state
+          schema:
+            type: string
+        - in: query
+          name: code
+          schema:
+            type: string
+        - in: query
+          name: error
+          schema:
+            type: string
+          description: Present when the user cancelled or the provider refused.
+      responses:
+        '302':
+          description: Connected; redirected back to where the flow started.
+        '400':
+          description: The authorization could not be completed, with the reason.
+  /v1/connections/{id}:
+    delete:
+      operationId: revokeConnection
+      summary: Disconnect an account
+      description: >
+        Tells the provider first where it offers a way to be told, then removes the credential
+        locally regardless. An owner who asked to disconnect must end up disconnected even when the
+        provider is unreachable; told_provider reports which happened.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Revoked
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          revoked:
+                            type: boolean
+                          told_provider:
+                            type: boolean
+                            description: Whether the provider was reachable to be told.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: >
+            No such connection. Identical for a connection that does not exist and one belonging to
+            someone else - the difference between those answers would enumerate other people's
+            accounts.
+  /v1/connections/{id}/delegations:
+    post:
+      operationId: createConnectionDelegation
+      summary: Let an app perform one named action over a shared channel
+      description: >
+        Grants an app ONE action with the parameters it may not choose already decided. The app
+        calls the delegation, never the connection, so it cannot retarget the channel, the
+        visibility or the playlist. Shared-mode connections only.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [app_id, action]
+              properties:
+                app_id:
+                  type: string
+                action:
+                  type: string
+                  example: publish-video
+                fixed:
+                  type: object
+                  additionalProperties: true
+                  description: Parameters the app may not override. Merged OVER whatever it sends.
+                per_user_limit:
+                  type: object
+                  nullable: true
+                  properties:
+                    count:
+                      type: integer
+                      minimum: 1
+                    window_hours:
+                      type: integer
+                      minimum: 1
+                      default: 24
+                  description: >
+                    Ceiling per PUBLISHER, which is only possible because a shared publish is never
+                    anonymous. Without it one publisher drains an allowance everyone shares.
+                moderation:
+                  type: string
+                  enum: [hold, auto]
+                  default: hold
+                enabled:
+                  type: boolean
+                  default: true
+      responses:
+        '201':
+          description: Delegation created or replaced
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No such connection.
+    get:
+      operationId: listConnectionDelegations
+      summary: What has been delegated over a channel
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Delegations over this connection
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No such connection.
+  /v1/connections/delegations/{did}:
+    patch:
+      operationId: setConnectionDelegationEnabled
+      summary: Stop or resume a delegation
+      description: >
+        The one-gesture stop. Disabling halts every publisher at once; at the moment of abuse there
+        is no time to work through them one at a time.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: did
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [enabled]
+              properties:
+                enabled:
+                  type: boolean
+      responses:
+        '200':
+          description: Updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No such delegation.
+  /v1/connections/delegations/{did}/quota:
+    get:
+      operationId: getConnectionDelegationQuota
+      summary: How much of a shared allowance is left
+      description: >
+        Readable BEFORE anything is refused. A ceiling a person only meets by hitting it is
+        indistinguishable from a broken feature. limit is null when the provider's shared ceiling
+        has not been measured - the counter still runs, so the number can later be filled in with
+        evidence rather than a guess.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - in: path
+          name: did
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Allowance
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          quota:
+                            type: object
+                            properties:
+                              limit:
+                                type: integer
+                                nullable: true
+                              usedInWindow:
+                                type: integer
+                              remaining:
+                                type: integer
+                                nullable: true
+                              windowHours:
+                                type: integer
+                          per_user_limit:
+                            type: object
+                            nullable: true
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No such delegation.
   /v1/groups:
     post:
       operationId: createSharingGroup
