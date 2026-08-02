@@ -34,6 +34,12 @@
  *   import { aiProvenanceRouter } from './routes/ai-provenance.js';
  *   app.use(aiProvenanceRouter(config, storage));
  * @version-history
+ *   v1.3.0 — 2026-08-02 — GET /v1/provenance/:id is content-negotiated. A visible AI label's
+ *     "how this was made" link lands here, so a PERSON arrives — and the route answered
+ *     application/json to everyone, leaving the correction procedure it offers stranded in
+ *     `next_actions`. A browser now gets services/ai-provenance-page.ts; everything else is
+ *     unchanged. The identical-404 rule is carried over: the HTML variant takes no argument
+ *     about the record, so it has nothing to differ on.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3. A declaration that attaches to a memory key
  *     pre-renders its disclosure block against THAT key's visibility instead of the private default,
  *     so a record attached to a public key stops claiming no label is owed.
@@ -55,6 +61,9 @@ import {
   AiProvenanceSourceSchema, CONTENT_HASH_PATTERN, aiProvenanceJsonSchema, AI_PROVENANCE_SCHEMA_PATH,
 } from '../models/ai-provenance-schemas.js';
 import { mintProvenance, projectForDetail, publiclyResolvable } from '../services/ai-provenance.js';
+import { prefersHtmlPage } from '../services/markdown-negotiation.js';
+import { provenancePage, provenanceNotFoundPage } from '../services/ai-provenance-page.js';
+import { detectLocale } from '../i18n.js';
 import type { SurfaceContext } from '../services/ai-disclosure.js';
 
 /**
@@ -174,10 +183,36 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     // it straight back to the 404 below, with nothing to remember to do.
     const isPublic = !!row && !isOwner && (await publiclyResolvable(storage, [row.id])).has(row.id);
 
+    // A person may be reading this: the visible label's "details" link lands here. Negotiated the
+    // same way /v1/ai-transparency does — only a client that ranks text/html ABOVE application/json
+    // gets the page, which is what a browser does and what curl, fetch() and agents do not.
+    const asPage = prefersHtmlPage(req);
+    res.vary('Accept');
+
     // ONE 404 for all of "no such record", "not yours" and "its content is not public". Different
-    // answers here would turn this endpoint into an oracle for which ids exist on this node.
+    // answers here would turn this endpoint into an oracle for which ids exist on this node — and
+    // the HTML branch has to be equally uninformative or it reopens what this closed. Same status,
+    // same single code path, no variant that says more.
     if (!row || (!isPublic && !isOwner)) {
+      if (asPage) {
+        return res.status(404).type('html').send(provenanceNotFoundPage({
+          baseUrl: config.baseUrl, locale: detectLocale(req.headers['accept-language']),
+        }));
+      }
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such provenance record.'));
+    }
+
+    // `serve(row, isOwner)` FIRST, then render: the page shows exactly what the JSON would have
+    // served this caller. Rendering from the raw row would widen the owner projection in the one
+    // format nobody diffs.
+    if (asPage) {
+      // `.provenance` off the SAME projection the JSON branch sends — not `row.record`. One
+      // expression decides what this caller may see, in both formats.
+      return res.type('html').send(provenancePage(serve(row, isOwner).provenance, {
+        baseUrl: config.baseUrl,
+        locale: detectLocale(req.headers['accept-language']),
+        recordUrl: `${config.baseUrl.replace(/\/+$/, '')}/v1/provenance/${row.id}`,
+      }));
     }
     // The correction procedure, offered where a person actually arrives: a visible label's "details"
     // link lands here, so this is the one page where somebody who thinks a label is wrong or missing

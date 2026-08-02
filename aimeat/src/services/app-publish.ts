@@ -37,6 +37,10 @@
  *   });
  *   if ('refusal' in out) return res.status(out.refusal.status).json(error(...));
  * @version-history
+ *   v1.1.0 — 2026-08-02 — The app's declared `public-interest` reaches the disclosure decision.
+ *     It was parsed into the posture and then never passed, so every publish fell to the
+ *     over-label default and recorded the statutory basis. Tri-state: `observed` (the author
+ *     said nothing) stays unstated rather than becoming a `no`.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 8 step 0a. Extracted from routes/apps/publish.ts,
  *     routes/upload.ts and routes/apps/drafts.ts, which each held a partial copy of it.
  */
@@ -234,7 +238,18 @@ export async function publishApp(
     declaredId: input.declaredProvenanceId,
     declared: input.declaredProvenance,
     pipeline: 'app.publish',
-    surface: { visibility: accessCode || parked ? 'private' : 'public', humanAudience: true },
+    surface: {
+      visibility: accessCode || parked ? 'private' : 'public',
+      humanAudience: true,
+      // THE APP'S OWN ANSWER, finally asked. `<meta name="aimeat-ai" content="… public-interest=yes">`
+      // was parsed into the posture and then never reached the disclosure decision, so no publish on
+      // this node had ever stated one — every record fell to the D4 default and claimed the statutory
+      // basis regardless. Tri-state on purpose: `observed` means the author said nothing, which is
+      // NOT the same as saying no, and mapping silence to 'no' would be the opposite overclaim.
+      ...(aiLint?.posture.source === 'declared'
+        ? { publicInterest: aiLint.posture.publicInterest ? 'yes' as const : 'no' as const }
+        : {}),
+    },
     labelPolicy: config.aiLabelPublic,
     nodeId: config.nodeId,
     baseUrl: config.baseUrl,

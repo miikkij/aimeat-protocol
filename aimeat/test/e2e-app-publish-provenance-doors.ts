@@ -226,6 +226,59 @@ async function main() {
         assert(r.status === 400, `expected 400 at mint, got ${r.status} ${JSON.stringify(r.body)}`);
     });
 
+    console.log('\nThe recorded REASON follows what the app stated, not the over-label default');
+
+    // The label is identical in both cases (D4: over-label rather than sit on the line). What must
+    // differ is the basis the RECORD claims. Before this, `art50_4_public_interest` was recorded on
+    // everything — a dice game included — because no call site ever passed publicInterest at all, so
+    // an author who declared public-interest=yes produced a record identical to one who said
+    // nothing. The declaration could not be read back (LUOTAIN finding, 2026-08-02).
+    const PI_META = '<meta name="aimeat-ai" content="generates=text; discloses=yes; public-interest=yes">';
+    const declaredHtml = (meta: string) => APP_HTML.replace('<title>', `${meta}\n<title>`);
+    // NOT the DECLARATION above: that one says `editorial-control`, which exits at rule 5 (a person
+    // held editorial control, so Article 50(4)'s text limb never applies) and lands on `policy`
+    // under this node's strict posture. The public-interest question is only reached when nobody
+    // reviewed the substance — which is the case these two tests are about.
+    const UNREVIEWED = { level: 'ai-generated', human_involvement: 'none', model: 'anthropic/claude-opus-5' };
+
+    await test('An app that STATES public-interest=yes records the statutory reason', async () => {
+        const f = 'reason-public-interest.html';
+        const r = await json('/v1/apps', {
+            method: 'POST', headers: auth(ownerToken),
+            body: JSON.stringify({
+                filename: f, mime_type: 'text/html',
+                content: Buffer.from(declaredHtml(PI_META), 'utf-8').toString('base64'),
+                name: 'States public interest', description: 'Declares it.', ai_provenance: UNREVIEWED,
+            }),
+        });
+        assert(r.status === 200 || r.status === 201, `publish ${r.status}: ${JSON.stringify(r.body?.error)}`);
+        const { prov } = await storedRecord(f);
+        const d = prov?.record?.disclosure;
+        assert(d?.reason === 'art50_4_public_interest',
+            `an app that stated public-interest=yes must get the statutory reason, got ${d?.reason}`);
+    });
+
+    await test('...and one that states NOTHING records the precautionary reason, with the same label', async () => {
+        const f = 'reason-unstated.html';
+        const r = await json('/v1/apps', {
+            method: 'POST', headers: auth(ownerToken),
+            body: JSON.stringify({
+                filename: f, mime_type: 'text/html',
+                content: Buffer.from(APP_HTML, 'utf-8').toString('base64'),
+                name: 'States nothing', description: 'No posture meta.', ai_provenance: UNREVIEWED,
+            }),
+        });
+        assert(r.status === 200 || r.status === 201, `publish ${r.status}`);
+        const { prov } = await storedRecord(f);
+        const d = prov?.record?.disclosure;
+        assert(d?.reason === 'art50_4_precautionary',
+            `an app that stated nothing must not claim the statutory basis, got ${d?.reason}`);
+        // THE READER SEES NO DIFFERENCE. Whether a label appears, how strong it is and what it says
+        // are all unchanged — only the recorded basis moved.
+        assert(d?.required === true, 'the label must still be required');
+        assert(!!d?.short && !!d?.long, 'the label wording must be unchanged and present');
+    });
+
     console.log('\nSaying nothing still behaves — the node stamp is not replaced by the declaration path');
 
     await test('an owner publishing presigned with NO declaration is not falsely stamped', async () => {

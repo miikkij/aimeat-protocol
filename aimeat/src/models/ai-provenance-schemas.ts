@@ -31,6 +31,10 @@
  *   import { AiProvenanceSchema, asKnownProvenance } from '../models/ai-provenance-schemas.js';
  *   const parsed = AiProvenanceSchema.safeParse(req.body.provenance);
  * @version-history
+ *   v1.3.0 — 2026-08-02 — AI_DISCLOSURE_REASONS gains `art50_4_precautionary`: labelled because
+ *     nobody established whether the limb applies, as distinct from `policy` (the law exempted
+ *     it and the operator labelled anyway). Additive within v1, which the versioning promise above
+ *     permits — a reader that does not know the value still branches correctly on `spec`.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3. `disclosure.strength` added as an OPTIONAL member —
  *     additive within v1, which the versioning promise permits (a v2 is owed only for a removal or
  *     a re-meaning). It closes a Phase 1 gap rather than changing anything: the block pre-rendered
@@ -106,7 +110,13 @@ export const AI_DISCLOSURE_REASONS = [
   'art50_1_interaction',        // a person is in a two-way exchange with a model
   'art50_2_synthetic_output',   // this node/app provides the generating system
   'art50_4_deepfake',
-  'art50_4_public_interest',
+  'art50_4_public_interest',    // the content IS stated to inform the public on matters of public interest
+  // Nobody said whether it is. Decision D4 labels anyway — over-labelling is the safe direction —
+  // but the RECORD must not borrow a statutory basis to justify a precaution. Distinct from
+  // `policy`, which means the law positively exempted this and the operator labelled regardless:
+  // there the applicability was decided, here it was never established. Collapsing the two would
+  // trade one overclaim for its mirror image.
+  'art50_4_precautionary',
   'policy',                     // stricter than the law, by node policy
   'none',
 ] as const;

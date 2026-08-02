@@ -28,6 +28,12 @@
  *   import { disclosureFor } from './ai-disclosure.js';
  *   const d = disclosureFor(record, { visibility: 'public', humanAudience: true }, config.aiLabelPublic);
  * @version-history
+ *   v1.3.0 — 2026-08-02 — The recorded REASON splits from the label. An absent or `unknown`
+ *     publicInterest still labels (D4 over-labels on purpose) but now records
+ *     `art50_4_precautionary` instead of asserting Article 50(4)'s text limb. It had been
+ *     asserted on everything — a dice game included — because no caller ever passed the field,
+ *     which also made a declared public-interest=yes unreadable: it produced a record identical
+ *     to saying nothing. The label a reader sees is byte-identical in both cases.
  *   v1.2.0 — 2026-08-01 — TARGET-058 Phase 3. AIMEAT_AI_LABEL_PUBLIC arrives as a third parameter,
  *     which is what finally makes the `policy` reason reachable: `strict` labels the three cases the
  *     law exempts (editorial control on the record, editorial responsibility declared at publication,
@@ -192,7 +198,20 @@ export function disclosureFor(
   // What `assisted` + `none` actually means, since it reads like a contradiction: a human wrote it,
   // a model edited it, and NOBODY CHECKED WHAT THE MODEL DID. `humanInvolvement` describes review of
   // the model's contribution, not authorship.
-  if (p.level === 'assisted') return { required: true, reason: 'art50_4_public_interest', strength: 'light' };
+  // WHICH BASIS THE RECORD CLAIMS, now that the label itself is decided.
+  //
+  // D4 above says an absent or `unknown` publicInterest labels anyway, and that stays. What changed
+  // is the REASON written down: 'art50_4_public_interest' asserts the content is text published to
+  // inform the public on a matter of public interest, and for an unstated surface nobody asserted
+  // that. Recorded on a dice game it was simply false, and it also made a declaration unreadable —
+  // an author who stated public-interest=yes produced a record identical to one who stated nothing.
+  //
+  // So: the statutory reason when it was actually stated, the precautionary one when it was not.
+  // The label a reader sees is byte-identical either way, which is the point.
+  const stated = ctx.publicInterest === 'yes';
+  const reason: AiDisclosureReason = stated ? 'art50_4_public_interest' : 'art50_4_precautionary';
 
-  return { required: true, reason: 'art50_4_public_interest', strength: strengthFor(ctx) };
+  if (p.level === 'assisted') return { required: true, reason, strength: 'light' };
+
+  return { required: true, reason, strength: strengthFor(ctx) };
 }
