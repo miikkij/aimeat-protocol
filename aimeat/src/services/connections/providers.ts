@@ -64,6 +64,16 @@ export interface OutboundProvider {
    * in AIMEAT's vocabulary and gets a yes or no.
    */
   capabilities: string[];
+  /**
+   * The provider's own daily ceiling on publishes, when it has one that is shared rather than
+   * per-user. YouTube's allowance is per Google PROJECT, so ten publishers on one shared channel
+   * close it before lunch unless somebody counts.
+   *
+   * null means "no known shared ceiling", which is the honest value until the real number has been
+   * READ from the provider's console rather than guessed. The counting mechanism does not wait for
+   * it — publish-gate measures usage either way, so the number can be filled in with evidence.
+   */
+  sharedDailyLimit: number | null;
   /** Endpoints. `instance` is required exactly when `instanceScoped` is true. */
   endpoints(instance: string | null): OAuthEndpoints | null;
 }
@@ -95,6 +105,9 @@ function mastodon(enabled: boolean): OutboundProvider {
     scopes: ['read:accounts', 'write:statuses', 'write:media'],
     pkce: true,
     capabilities: ['publish-post', 'publish-video'],
+    // Instances rate-limit, but there is no single daily publish ceiling to state, and inventing
+    // one would be a guess wearing a number.
+    sharedDailyLimit: null,
     endpoints(instance) {
       // The caller validates and normalises `instance` before this is reached; building a URL from
       // an unvalidated user-supplied host is exactly the SSRF this feature has to not have.
@@ -133,6 +146,12 @@ function youtube(clientId: string, clientSecret: string, capabilityOn: boolean):
     scopes: ['https://www.googleapis.com/auth/youtube.upload'],
     pkce: true,
     capabilities: ['publish-video'],
+    // VARMISTETTAVA in the spec and still unread: the quota is per Google PROJECT and an upload
+    // costs a large slice of it, which is believed to leave a single-digit number of uploads per
+    // day for EVERY publisher on the node combined. Phase 5 reads the real figure from the console
+    // and sets it here. Until then the counter runs and the ceiling does not, because a made-up
+    // limit that refuses a legitimate publish is worse than none.
+    sharedDailyLimit: null,
     endpoints() {
       return {
         authorize: 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -164,6 +183,7 @@ function bluesky(capabilityOn: boolean): OutboundProvider {
     scopes: [],
     pkce: false,
     capabilities: ['publish-post', 'publish-video'],
+    sharedDailyLimit: null,
     endpoints() {
       // Not an OAuth2 flow. The session endpoints live in the provider recipe, not here.
       return null;
