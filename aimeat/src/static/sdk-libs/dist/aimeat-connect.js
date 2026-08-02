@@ -268,6 +268,43 @@
     const res = await authFetch2("/v1/connections/providers");
     return res?.data?.providers ?? [];
   }
+  async function publish(input) {
+    if (!input?.connectionId) throw new Error("publish needs a connectionId");
+    const res = await authFetch2("/v1/connections/publish", {
+      method: "POST",
+      body: JSON.stringify({
+        connection_id: input.connectionId,
+        storage_key: input.storageKey,
+        caption: input.caption ?? "",
+        params: input.params ?? {}
+      })
+    });
+    const d = res?.data ?? {};
+    return {
+      url: d.url,
+      replay: Boolean(d.replay),
+      status: d.attempt?.status ?? "unknown",
+      attemptId: d.attempt?.id ?? "",
+      error: d.attempt?.error ?? void 0
+    };
+  }
+  async function clients() {
+    const res = await authFetch2("/v1/connections/clients");
+    return res?.data?.clients ?? [];
+  }
+  async function setClient(provider, clientId, clientSecret) {
+    const res = await authFetch2("/v1/connections/clients", {
+      method: "PUT",
+      body: JSON.stringify({ provider, client_id: clientId, client_secret: clientSecret })
+    });
+    announce();
+    return res?.data?.client;
+  }
+  async function removeClient(provider) {
+    await authFetch2(`/v1/connections/clients/${encodeURIComponent(provider)}`, { method: "DELETE" });
+    announce();
+    return { removed: true };
+  }
   async function start(provider, opts = {}) {
     const before = await list();
     const res = await authFetch2("/v1/connections/start", {
@@ -351,8 +388,12 @@
     start,
     attach: attachAccount,
     revoke,
+    publish,
     on,
     off,
+    clients,
+    setClient,
+    removeClient,
     /** Per-provider things a user must be told BEFORE they try. See notes.js. */
     notes: PROVIDER_NOTES,
     /** Mount the ready-made panel. See panel.js. */

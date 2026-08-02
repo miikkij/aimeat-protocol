@@ -18,6 +18,7 @@
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-connect.js"></script>
  *   const accounts = await AIMEAT.connect.list();
  *   await AIMEAT.connect.start('mastodon', { instance: 'mastodon.social' });
+ *   await AIMEAT.connect.publish({ connectionId: accounts[0].id, caption: 'hello' });
  * @version-history
  *   v1.0.0 — 2026-08-02 — Initial (TARGET-057 phase 3).
  */
@@ -56,10 +57,105 @@ async function list() {
   return (res?.data?.connections ?? []);
 }
 
-/** Providers this node can connect to. An unconfigured one is simply absent. */
+/**
+ * Providers this node can connect to.
+ *
+ * `nodeConfigured: false` means the NODE holds no application credentials for it. That is not the
+ * same as unavailable: a user who registers their own app with setClient() can connect it anyway.
+ * Show those rather than hiding them, or an operator's decision not to register an app silently
+ * removes a choice from every user.
+ */
 async function providers() {
   const res = await authFetch('/v1/connections/providers');
   return (res?.data?.providers ?? []);
+}
+
+/**
+ * Publish to an account the CALLER connected.
+ *
+ * The whole point of the capability, from an app's side: one call, one post, and the credential
+ * never comes near the page.
+ *
+ * IDEMPOTENT BY CONTENT. The node keys an attempt on publisher + connection + file + caption and
+ * records it BEFORE anything leaves. Calling twice with the same arguments returns the FIRST
+ * outcome with `replay: true` and posts nothing further, which is why a failed network call is safe
+ * to retry. On a provider that charges per post, that is a billing control and not only a nicety.
+ *
+ * TWO SUCCESSFUL ANSWERS ARE NOT PUBLICATIONS. `status: 'held'` is awaiting moderation and
+ * `status: 'queued'` is a spent provider allowance. Neither is an error, because reporting them as
+ * one teaches a caller to retry, and retrying makes both worse. Read `status`, not the absence of
+ * a throw.
+ *
+ * @param {{connectionId: string, storageKey?: string, caption?: string,
+ *          params?: Record<string, unknown>}} input
+ * @returns {Promise<{url?: string, replay: boolean, status: string, attemptId: string, error?: string}>}
+ */
+async function publish(input) {
+  if (!input?.connectionId) throw new Error('publish needs a connectionId');
+  const res = await authFetch('/v1/connections/publish', {
+    method: 'POST',
+    body: JSON.stringify({
+      connection_id: input.connectionId,
+      storage_key: input.storageKey,
+      caption: input.caption ?? '',
+      params: input.params ?? {},
+    }),
+  });
+  const d = res?.data ?? {};
+  return {
+    url: d.url,
+    replay: Boolean(d.replay),
+    status: d.attempt?.status ?? 'unknown',
+    attemptId: d.attempt?.id ?? '',
+    error: d.attempt?.error ?? undefined,
+  };
+}
+
+/**
+ * The apps the CALLER registered themselves, one per provider at most.
+ *
+ * WHY ANYONE WOULD. Without their own, every user of a node reaches a provider through one
+ * registration: the node's. To the provider they are one application, sharing its rate limit, its
+ * reputation and — where publishing is charged per call — its bill. Their own app spends their own.
+ *
+ * `connectionCount` is how many of their accounts were made with it. It is not decoration: a token
+ * can only be renewed by the client that issued it, so that is also how many would stop renewing if
+ * the app went away, which is why removeClient() refuses while it is above zero.
+ */
+async function clients() {
+  const res = await authFetch('/v1/connections/clients');
+  return (res?.data?.clients ?? []);
+}
+
+/**
+ * Register the caller's own app at a provider. Replaces any previous one of theirs.
+ *
+ * The secret is write-only: it is encrypted by the node and no endpoint ever returns it, including
+ * this one.
+ *
+ * EXISTING CONNECTIONS ARE NOT MOVED ONTO IT. Each keeps the app that minted its token, because
+ * that is the only client that can renew it. Reconnect an account to move it.
+ */
+async function setClient(provider, clientId, clientSecret) {
+  const res = await authFetch('/v1/connections/clients', {
+    method: 'PUT',
+    body: JSON.stringify({ provider, client_id: clientId, client_secret: clientSecret }),
+  });
+  announce();
+  return res?.data?.client;
+}
+
+/**
+ * Remove the caller's own app registration.
+ *
+ * Refused while any of their connected accounts still depends on it, with the count in the message.
+ * Those accounts could only be renewed by this client; removing it would leave them working until
+ * their tokens expire and then failing with an error nobody could trace back to this moment.
+ */
+async function removeClient(provider) {
+  await authFetch(`/v1/connections/clients/${encodeURIComponent(provider)}`, { method: 'DELETE' });
+  announce();
+  return { removed: true };
 }
 
 /**
@@ -187,7 +283,8 @@ function on(fn) {
 function off(fn) { listeners.delete(fn); }
 
 const connect = {
-  list, providers, start, attach: attachAccount, revoke, on, off,
+  list, providers, start, attach: attachAccount, revoke, publish, on, off,
+  clients, setClient, removeClient,
   /** Per-provider things a user must be told BEFORE they try. See notes.js. */
   notes: PROVIDER_NOTES,
   /** Mount the ready-made panel. See panel.js. */
