@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Account connected</title>
+  <!--
+    Where the provider's redirect lands after a connection is finished (TARGET-057).
+
+    It is a STATIC file rather than something the node renders, because the backend is protocol-only
+    and does not build pages. Its whole job is to end the pop-up: the opener is watching for this
+    window to close and re-reads the account list when it does, since a cross-origin child window
+    cannot be asked what happened to it.
+
+    The message is here for the case where window.close() is refused -- a window the script did not
+    open cannot close itself in most browsers, which happens when someone reaches this URL directly.
+    A blank page then reads as a failure, and this connection has in fact already succeeded.
+  -->
+  <style>
+    html { color-scheme: light dark; }
+    body {
+      margin: 0; min-height: 100vh; display: grid; place-items: center;
+      font: 1rem/1.5 system-ui, sans-serif; padding: 1.5rem; text-align: center;
+    }
+    p { max-width: 28rem; margin: 0; }
+  </style>
+</head>
+<body>
+  <p id="msg">Account connected. You can close this window.</p>
+  <script>
+    // Attempted, not assumed: a window opened by the page that is watching it will close, and one
+    // opened any other way will not, so the message above stays as the fallback.
+    try { window.close(); } catch (err) {
+      document.getElementById('msg').textContent =
+        'Account connected. You can close this window. (' + err.message + ')';
+    }
+  </script>
+</body>
+</html>

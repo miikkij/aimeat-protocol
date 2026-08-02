@@ -40,6 +40,7 @@ import { SharingGroupsSection } from './access-tab/sharing-groups.js';
 import { AgentDefaultsSection } from './access-tab/agent-defaults.js';
 import { ConnectedAppsSection } from './access-tab/connected-apps.js';
 import { AccessTokensSection } from './access-tab/access-tokens.js';
+import { ConnectionsSection } from './access-tab/connections.js';
 import { swallowed } from '/js/swallowed.js';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -252,6 +253,7 @@ export default function AccessTab({ session, showToast }) {
     ${overview !== undefined ? html`
       <${ConnectedAppsSection} showToast=${showToast} initial=${overview?.appGrants} />
       <${AccessTokensSection} session=${session} showToast=${showToast} initial=${overview?.accessTokens} />
+      <${ConnectionsSection} showToast=${showToast} />
       <${SharingGroupsSection} showToast=${showToast} initial=${overview?.groups} />
       <${AgentDefaultsSection} showToast=${showToast} initial=${overview?.agentDefaults} />
     ` : null}

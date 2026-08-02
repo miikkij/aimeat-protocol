@@ -147,6 +147,21 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
         return json(res, 400, { error: 'unsupported_grant_type' });
       }
 
+      // The consent page, as a real provider has one: it redirects back to the caller's callback
+      // with a code. A browser-driven test needs this to exist; an API-driven one calls the
+      // callback directly and never comes here.
+      if (url.pathname === '/authorize' && req.method === 'GET') {
+        const redirect = url.searchParams.get('redirect_uri') ?? '';
+        const st = url.searchParams.get('state') ?? '';
+        const subject = url.searchParams.get('login_hint') ?? 'browser';
+        const back = new URL(redirect);
+        back.searchParams.set('code', `code-${subject}`);
+        back.searchParams.set('state', st);
+        res.writeHead(302, { Location: back.toString() });
+        res.end();
+        return;
+      }
+
       if (url.pathname === '/revoke' && req.method === 'POST') {
         const form = await body(req);
         const token = form.get('token') ?? '';

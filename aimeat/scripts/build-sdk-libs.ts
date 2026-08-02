@@ -68,6 +68,7 @@ export const SDK_LIBS: SdkLib[] = [
   { name: 'iam', entry: 'iam/index.js' },
   { name: 'audio', entry: 'audio/index.js' },
   { name: 'tunnel', entry: 'tunnel/index.js' },
+  { name: 'connect', entry: 'connect/index.js' },
   { name: 'auth', entry: 'auth/index.js' },
 ];
 
