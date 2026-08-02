@@ -503,6 +503,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     connectGoogleClientId: process.env.AIMEAT_CONNECT_GOOGLE_CLIENT_ID ?? '',
     connectGoogleClientSecret: process.env.AIMEAT_CONNECT_GOOGLE_CLIENT_SECRET ?? '',
     connectRedirectUri: process.env.AIMEAT_CONNECT_REDIRECT_URI ?? '',
+    connectFakeBaseUrl: process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? '',
     crossFederationEnabled: process.env.AIMEAT_CROSS_FEDERATION_ENABLED !== 'false',
     maxGenesisPeers: parseInt(process.env.AIMEAT_MAX_GENESIS_PEERS ?? '10', 10),
     genesisSyncIntervalHours: parseInt(process.env.AIMEAT_GENESIS_SYNC_INTERVAL_HOURS ?? '6', 10),

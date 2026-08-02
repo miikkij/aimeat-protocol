@@ -517,6 +517,10 @@ export interface AimeatConfig {
   connectGoogleClientId: string;
   connectGoogleClientSecret: string;
   connectRedirectUri: string;        // empty = derive from baseUrl
+  // TEST ONLY, empty everywhere else. Base URL of a local stand-in provider, so the E2E can drive
+  // the REAL authorization round -- state, PKCE, exchange, identity, rotating refresh, revoke --
+  // against a server it controls. Mocking the service layer instead would test the mock.
+  connectFakeBaseUrl: string;
 
   // Cross-Federation (Phase 3.4)
   crossFederationEnabled: boolean;

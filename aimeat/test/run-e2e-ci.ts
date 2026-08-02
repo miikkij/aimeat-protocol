@@ -67,6 +67,9 @@ const ALL_SUITES = [
     'test/e2e-board-ttl.ts',
     'test/e2e-calibrator.ts',
     'test/e2e-concurrency.ts',
+    // Starts a REAL OAuth provider on a fixed loopback port (agreed with the server env above) that
+    // rotates its refresh token, so the concurrency assertions test the guard rather than a stub.
+    'test/e2e-connections.ts',
     'test/e2e-disputes.ts',
     // DISABLED: e2e-email.ts always fails locally/CI because there are no SMTP
     // credentials configured to actually send email. Re-enable once a test mail
@@ -363,6 +366,15 @@ async function startServer(): Promise<ChildProcess> {
         // for every e2e run so the tunnel suites work in CI too (the .env.test.*
         // files are gitignored, so they can't carry this for CI).
         AIMEAT_CONNECT_TUNNEL_ENABLED: process.env.AIMEAT_CONNECT_TUNNEL_ENABLED ?? 'true',
+        // Outbound connections (TARGET-057) are opt-in and off by default in prod; on for every
+        // e2e run, same reason as the tunnel flag above (the .env.test.* files are gitignored, so
+        // they cannot carry it for CI). The fake provider's port is FIXED because the server reads
+        // this at boot, before the test process has started the provider — they can only meet on a
+        // port agreed in advance.
+        AIMEAT_CONNECTIONS_ENABLED: process.env.AIMEAT_CONNECTIONS_ENABLED ?? 'true',
+        AIMEAT_CONNECT_FAKE_BASE_URL: process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? 'http://127.0.0.1:40388',
+        // The fake provider lives on loopback, which safeFetch refuses by default and must.
+        AIMEAT_ALLOW_PRIVATE_EGRESS: process.env.AIMEAT_ALLOW_PRIVATE_EGRESS ?? 'true',
         AIMEAT_ADMIN_PASSWORD: process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!',
         // A fixed 32-byte (hex) encryption key so features that encrypt at rest work in
         // e2e (extension secrets, TOTP, and the app copy-protection watermark + decode).

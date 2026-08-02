@@ -211,6 +211,18 @@ async function fetchAccountIdentity(
       const title = typeof item?.snippet?.title === 'string' ? item.snippet.title : id;
       return { externalId: id, accountLabel: title };
     }
+    if (provider.id === 'fake') {
+      // Test-only, and reached only when a base URL is configured. It goes through the same
+      // safeFetch + shape-checking path as the real ones so the tests exercise that code rather
+      // than a shortcut around it.
+      const base = provider.endpoints(null)?.token.replace(/\/token$/, '') ?? '';
+      const r = await safeFetch(`${base}/me`, { headers: auth, signal: AbortSignal.timeout(15_000) });
+      if (!r.ok) return { error: `test provider rejected the token (HTTP ${r.status})` };
+      const j = await r.json() as { id?: unknown; label?: unknown };
+      const id = typeof j.id === 'string' ? j.id : '';
+      if (!id) return { error: 'test provider returned no account id' };
+      return { externalId: id, accountLabel: typeof j.label === 'string' ? j.label : id };
+    }
     return { error: `no identity lookup for ${provider.id}` };
   } catch (err) {
     return { error: `could not reach the provider: ${(err as Error).message}` };

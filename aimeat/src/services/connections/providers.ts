@@ -28,7 +28,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { CredentialShape } from '../../models/connection-schemas.js';
 
 /** Stable provider identifiers. Also the value stored in `Connection.provider`. */
-export type OutboundProviderId = 'mastodon' | 'youtube' | 'bluesky';
+export type OutboundProviderId = 'mastodon' | 'youtube' | 'bluesky' | 'fake';
 
 /** OAuth2 endpoints. Derived from the instance origin for an instance-scoped provider. */
 export interface OAuthEndpoints {
@@ -192,17 +192,55 @@ function bluesky(capabilityOn: boolean): OutboundProvider {
 }
 
 /**
+ * A stand-in provider for the end-to-end tests. Present ONLY when a base URL is configured, which
+ * nothing but the E2E environment does, so it cannot appear on a real node.
+ *
+ * It exists because the alternative is mocking the connection service, and a mocked service proves
+ * the mock. Against a real HTTP server the tests drive the actual code path: state, PKCE, the token
+ * exchange, the identity lookup, a ROTATING refresh token and revocation. The rotation is the point
+ * — it is the provider behaviour that makes concurrent refresh destructive, and it cannot be
+ * demonstrated against a stub that always returns the same token.
+ */
+function fake(baseUrl: string, capabilityOn: boolean): OutboundProvider {
+  const enabled = capabilityOn && Boolean(baseUrl);
+  return {
+    id: 'fake',
+    label: 'Test provider',
+    credentialShape: 'oauth2',
+    instanceScoped: false,
+    enabled,
+    disabledReason: enabled ? null : 'no AIMEAT_CONNECT_FAKE_BASE_URL (this provider is test-only)',
+    client: baseUrl ? { id: 'fake-client', secret: 'fake-secret' } : null,
+    scopes: ['publish'],
+    pkce: true,
+    capabilities: ['publish-video', 'publish-post'],
+    sharedDailyLimit: null,
+    endpoints() {
+      if (!baseUrl) return null;
+      return {
+        authorize: `${baseUrl}/authorize`,
+        token: `${baseUrl}/token`,
+        revoke: `${baseUrl}/revoke`,
+      };
+    },
+  };
+}
+
+/**
  * The providers this node offers. Disabled ones are RETURNED rather than filtered, so a route can
  * answer "why can I not connect YouTube" with the reason instead of a bare absence — an operator
  * staring at an empty list has nothing to act on.
  */
 export function buildOutboundProviders(config: AimeatConfig): OutboundProvider[] {
   const on = config.connectionsEnabled;
-  return [
+  const list = [
     mastodon(on),
     youtube(config.connectGoogleClientId, config.connectGoogleClientSecret, on),
     bluesky(on),
   ];
+  // Appended only when configured, so a production node's list is exactly the three above.
+  if (config.connectFakeBaseUrl) list.push(fake(config.connectFakeBaseUrl, on));
+  return list;
 }
 
 /** Lookup by id. Returns disabled providers too; the caller decides what to do about that. */
