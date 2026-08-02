@@ -201,7 +201,14 @@ async function fetchAccountIdentity(
         'https://www.googleapis.com/youtube/v3/channels?part=snippet&mine=true',
         { headers: auth, signal: AbortSignal.timeout(15_000) },
       );
-      if (!r.ok) return { error: `Google rejected the token (HTTP ${r.status})` };
+      if (!r.ok) {
+        // 403 here means the token is valid but not scoped for the read, which is a DIFFERENT
+        // problem from a bad token and has a different fix. Naming it saves the next person the
+        // hour it cost to find that youtube.upload alone cannot list your own channel.
+        return { error: r.status === 403
+          ? 'Google accepted the sign-in but would not say which channel it is for. The connection was authorised before youtube.readonly was requested; disconnect and connect again.'
+          : `Google rejected the token (HTTP ${r.status})` };
+      }
       const j = await r.json() as { items?: { id?: unknown; snippet?: { title?: unknown } }[] };
       const item = Array.isArray(j.items) ? j.items[0] : undefined;
       const id = typeof item?.id === 'string' ? item.id : '';

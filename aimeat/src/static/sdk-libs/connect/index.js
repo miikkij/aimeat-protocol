@@ -93,11 +93,7 @@ async function start(provider, opts = {}) {
   const win = window.open(url, 'aimeat-connect', 'width=620,height=760,noopener=no');
   if (!win) throw new Error('the connect window was blocked; allow pop-ups for this site');
 
-  await new Promise((resolve) => {
-    const done = () => { clearInterval(timer); resolve(undefined); };
-    const timer = setInterval(() => { if (win.closed) done(); }, 400);
-    if (opts.signal) opts.signal.addEventListener('abort', done, { once: true });
-  });
+  await waitForRound(before.length, opts.signal);
 
   const after = await list();
   const known = new Set(before.map((c) => c.id));
@@ -111,6 +107,46 @@ async function start(provider, opts = {}) {
   announce();
   const connection = added ?? repaired;
   return { connected: Boolean(connection), connection };
+}
+
+/**
+ * Wait for the round to finish, WITHOUT touching the pop-up window.
+ *
+ * This node sets a Cross-Origin-Opener-Policy, which severs the opener relationship as soon as the
+ * pop-up navigates to the provider. `win.closed` is then unreadable — the first version of this
+ * polled it and logged ten "COOP would block the window.closed call" errors per connection while
+ * appearing to work, because the flow completed for other reasons.
+ *
+ * Two signals instead, and neither goes near the window:
+ *   - the done page announces on a same-origin BroadcastChannel, which COOP does not affect
+ *   - the connection list is polled, which is what ACTUALLY decides success and also covers the
+ *     user who closes the pop-up before it ever reaches the done page
+ *
+ * Resolves either way; gives up after the timeout rather than waiting forever on a cancelled round.
+ */
+async function waitForRound(countBefore, signal) {
+  const DEADLINE = Date.now() + 180_000;
+  let channel = null;
+  let announced = false;
+  let aborted = false;
+  try {
+    channel = new BroadcastChannel('aimeat-connect');
+    channel.onmessage = () => { announced = true; };
+  } catch (err) {
+    console.warn('[aimeat-connect] BroadcastChannel unavailable; falling back to polling', err);
+  }
+  if (signal) signal.addEventListener('abort', () => { aborted = true; }, { once: true });
+  try {
+    while (Date.now() < DEADLINE && !aborted) {
+      await new Promise((r) => setTimeout(r, 1200));
+      if (announced) return true;
+      const now = await list();
+      if (now.length > countBefore) return true;
+    }
+    return false;
+  } finally {
+    if (channel) channel.close();
+  }
 }
 
 /**

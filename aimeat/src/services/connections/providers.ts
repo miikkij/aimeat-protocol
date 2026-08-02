@@ -166,7 +166,16 @@ function youtube(clientId: string, clientSecret: string, capabilityOn: boolean):
         ? 'connections capability is off (AIMEAT_CONNECTIONS_ENABLED)'
         : 'no client credentials (AIMEAT_CONNECT_GOOGLE_CLIENT_ID / _SECRET)',
     client: configured ? { id: clientId, secret: clientSecret } : null,
-    scopes: ['https://www.googleapis.com/auth/youtube.upload'],
+    // BOTH, and the second one is not optional. `youtube.upload` grants the write and nothing else,
+    // so `channels.list?mine=true` — how the node learns WHICH channel this connection is for —
+    // comes back 403 with a valid token. Asking only for the write and then reading is a
+    // contradiction that shows up at the very last step of a user's first connection attempt.
+    // The channel identity is what the dedupe key and the account label are built from, so this is
+    // the narrowest pair that actually works rather than a convenience.
+    scopes: [
+      'https://www.googleapis.com/auth/youtube.upload',
+      'https://www.googleapis.com/auth/youtube.readonly',
+    ],
     pkce: true,
     capabilities: ['publish-video'],
     attachFields: null,

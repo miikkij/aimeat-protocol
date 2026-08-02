@@ -279,16 +279,7 @@
     if (!url) throw new Error("the node did not return an authorization URL");
     const win = window.open(url, "aimeat-connect", "width=620,height=760,noopener=no");
     if (!win) throw new Error("the connect window was blocked; allow pop-ups for this site");
-    await new Promise((resolve) => {
-      const done = () => {
-        clearInterval(timer);
-        resolve(void 0);
-      };
-      const timer = setInterval(() => {
-        if (win.closed) done();
-      }, 400);
-      if (opts.signal) opts.signal.addEventListener("abort", done, { once: true });
-    });
+    await waitForRound(before.length, opts.signal);
     const after = await list();
     const known = new Set(before.map((c) => c.id));
     const added = after.find((c) => !known.has(c.id));
@@ -299,6 +290,34 @@
     announce();
     const connection = added ?? repaired;
     return { connected: Boolean(connection), connection };
+  }
+  async function waitForRound(countBefore, signal) {
+    const DEADLINE = Date.now() + 18e4;
+    let channel = null;
+    let announced = false;
+    let aborted = false;
+    try {
+      channel = new BroadcastChannel("aimeat-connect");
+      channel.onmessage = () => {
+        announced = true;
+      };
+    } catch (err) {
+      console.warn("[aimeat-connect] BroadcastChannel unavailable; falling back to polling", err);
+    }
+    if (signal) signal.addEventListener("abort", () => {
+      aborted = true;
+    }, { once: true });
+    try {
+      while (Date.now() < DEADLINE && !aborted) {
+        await new Promise((r) => setTimeout(r, 1200));
+        if (announced) return true;
+        const now = await list();
+        if (now.length > countBefore) return true;
+      }
+      return false;
+    } finally {
+      if (channel) channel.close();
+    }
   }
   async function attachAccount(provider, fields) {
     const res = await authFetch2("/v1/connections/attach", {

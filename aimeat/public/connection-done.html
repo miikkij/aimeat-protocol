@@ -8,13 +8,17 @@
     Where the provider's redirect lands after a connection is finished (TARGET-057).
 
     It is a STATIC file rather than something the node renders, because the backend is protocol-only
-    and does not build pages. Its whole job is to end the pop-up: the opener is watching for this
-    window to close and re-reads the account list when it does, since a cross-origin child window
-    cannot be asked what happened to it.
+    and does not build pages.
 
-    The message is here for the case where window.close() is refused -- a window the script did not
-    open cannot close itself in most browsers, which happens when someone reaches this URL directly.
-    A blank page then reads as a failure, and this connection has in fact already succeeded.
+    IT ANNOUNCES OVER BroadcastChannel, not window.opener. This node sets a Cross-Origin-Opener-Policy,
+    which severs the opener relationship the moment the pop-up navigates to the provider — so
+    window.opener is null here and the page that opened this one cannot read window.closed either.
+    The first version relied on exactly that and produced ten "COOP would block the window.closed
+    call" errors per connection while appearing to work.
+
+    BroadcastChannel is same-origin and unaffected by COOP, so this reaches the opener directly. The
+    opener also polls the server as a fallback, because a user who closes the pop-up early never
+    reaches this page at all.
   -->
   <style>
     html { color-scheme: light dark; }
@@ -28,8 +32,18 @@
 <body>
   <p id="msg">Account connected. You can close this window.</p>
   <script>
-    // Attempted, not assumed: a window opened by the page that is watching it will close, and one
-    // opened any other way will not, so the message above stays as the fallback.
+    try {
+      const ch = new BroadcastChannel('aimeat-connect');
+      ch.postMessage({ type: 'connected' });
+      ch.close();
+    } catch (err) {
+      // Reported rather than swallowed: without this message the opener falls back to polling, which
+      // is slower but still correct, and an operator should be able to tell the two paths apart.
+      console.warn('[aimeat-connect] could not announce over BroadcastChannel', err);
+    }
+    // Attempted, not assumed. A window the script did not open cannot close itself in most
+    // browsers, which is what happens when someone reaches this URL directly — and a blank page
+    // would then read as a failure when the connection has in fact already succeeded.
     try { window.close(); } catch (err) {
       document.getElementById('msg').textContent =
         'Account connected. You can close this window. (' + err.message + ')';
