@@ -484,6 +484,48 @@ export function requireScope(...requiredScopes: string[]) {
   };
 }
 
+/**
+ * Like requireScope, but ANY of the listed scopes is enough.
+ *
+ * requireScope is an AND, which is the right default: a route that needs two permissions needs
+ * both. This is for the case where two DIFFERENT principals legitimately reach the same route by
+ * different routes of trust — an owner reading their own connections with `connections:read`, and a
+ * granted app reading the same list with `connections:use` because it may publish to one and
+ * therefore has to be able to name one.
+ *
+ * A named guard rather than an inline check in the route: the owner bypass and the domain wildcard
+ * are security logic, and security logic copied into a handler is security logic that drifts.
+ */
+export function requireAnyScope(...acceptableScopes: string[]) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    if (!req.auth) {
+      deny401(req, res, 'Authentication required');
+      return;
+    }
+    if (req.auth.roles.includes('owner') &&
+        !req.auth.roles.includes('agent') && !req.auth.roles.includes('ecosystem')) {
+      next();
+      return;
+    }
+    const held = req.auth.scopes;
+    if (held.includes('*')) {
+      next();
+      return;
+    }
+    const ok = acceptableScopes.some((required) => {
+      const [domain] = required.split(':');
+      return held.includes(required) || held.includes(`${domain}:*`);
+    });
+    if (ok) {
+      next();
+      return;
+    }
+    logger.warn(`[scope-denied] ${req.auth.sub} needs any of "${acceptableScopes.join('", "')}", has [${held.join(', ')}] on ${req.method} ${req.path}`);
+    res.status(403).json(errorEnvelope('SCOPE_DENIED',
+      `One of these scopes is required: ${acceptableScopes.join(', ')}. Agent scopes: [${held.join(', ')}]`));
+  };
+}
+
 function extractToken(req: Request): string | null {
   const authHeader = req.headers.authorization;
   if (typeof authHeader === 'string' && authHeader.startsWith('Bearer ')) {

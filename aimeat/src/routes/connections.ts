@@ -35,7 +35,7 @@ import { randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { success, error } from '../middleware/envelope.js';
-import { requireAuth, requireScope } from '../auth/middleware.js';
+import { requireAuth, requireScope, requireAnyScope } from '../auth/middleware.js';
 import { resolveIdentity } from '../utils/gaii.js';
 import { logger } from '../utils/logger.js';
 import {
@@ -209,7 +209,17 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
   });
 
   // ── GET /v1/connections ── the caller's own, never anyone else's.
-  router.get('/v1/connections', requireAuth(), requireScope('connections:read'), async (req: Request, res: Response) => {
+  //
+  // `connections:use` is accepted alongside `connections:read` because a granted app holds only the
+  // former, and an app that may publish to a connection has to be able to NAME one. Building a test
+  // app against this capability is what surfaced it: the publish verb existed with no way to reach
+  // a connection id, which is a permission that cannot be exercised.
+  //
+  // Safe because the projection is the gate, not the scope: toPublic() is the ONLY thing that ever
+  // leaves this route, and it carries provider, account label and status — decision K1's answer to
+  // "what may an app know" — while the credential and the provider's own scope vocabulary never
+  // appear in it.
+  router.get('/v1/connections', requireAuth(), requireAnyScope('connections:read', 'connections:use'), async (req: Request, res: Response) => {
     if (!capabilityOn(res)) return;
     const principal = resolve(req);
     const rows = await storage.listConnections({ principal });

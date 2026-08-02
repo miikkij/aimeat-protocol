@@ -830,6 +830,43 @@ async function main(): Promise<void> {
       assert(r.status === 404 && r.data.error.code === 'UNKNOWN_PROVIDER', `${r.status} ${r.data?.error?.code}`);
     });
 
+    console.log('\nPhase 13 — What a granted app may and may not do');
+
+    await test('an app holding only connections:use can NAME a connection but not create one', async () => {
+      // Building a test app against this capability is what surfaced the hole: `connections:use`
+      // let an app publish to a connection while `connections:read` (which it is deliberately never
+      // granted) was the only way to learn a connection id. A permission that cannot be exercised.
+      //
+      // Exercised against the guard itself with synthetic principals, because minting a real app
+      // grant here would test the device-auth flow rather than the rule under examination.
+      const { requireAnyScope, requireScope } = await import('../src/auth/middleware.js');
+
+      const run = (guard: any, auth: any): number | 'next' => {
+        let code: number | 'next' = 'next';
+        const res: any = { status: (c: number) => { code = c; return res; }, json: () => res };
+        guard({ auth, method: 'GET', path: '/v1/connections', headers: {} } as any, res, () => { code = 'next'; });
+        return code;
+      };
+
+      const app = { sub: 'app:x#alice@n', owner: 'alice', roles: ['app'], scopes: ['connections:use'] };
+      const reader = { sub: 'a#alice@n', owner: 'alice', roles: ['agent'], scopes: ['connections:read'] };
+      const stranger = { sub: 'b#alice@n', owner: 'alice', roles: ['agent'], scopes: ['memory:read'] };
+      const owner = { sub: 'alice', owner: 'alice', roles: ['owner'], scopes: [] };
+
+      const listing = requireAnyScope('connections:read', 'connections:use');
+      assert(run(listing, app) === 'next', 'an app with connections:use cannot list, so it cannot name a target');
+      assert(run(listing, reader) === 'next', 'connections:read no longer lists');
+      assert(run(listing, owner) === 'next', 'the owner was refused their own connections');
+      assert(run(listing, stranger) === 403, 'an unrelated scope was let through');
+
+      // The other half, and the one that matters more: reading is not writing. An app must NOT be
+      // able to attach an account or register an app in the owner's name — that is a human act at
+      // the provider's own consent screen.
+      const writing = requireScope('connections:write');
+      assert(run(writing, app) === 403, 'an app with connections:use was allowed to WRITE connections');
+      assert(run(writing, reader) === 403, 'a read scope was allowed to write');
+    });
+
     console.log(`\n${'─'.repeat(60)}\n  ${passed} passed, ${failed} failed\n`);
   } finally {
     await provider.close();
