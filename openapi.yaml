@@ -287,6 +287,8 @@ components:
       type: string
       enum: [dispute_opened, counter_dispute, message, re_delivery, accept_redelivery, withdraw_dispute, accept_fault, partial_offer, partial_accepted, partial_rejected, escalated, operator_ruled, timeout_resolved]
 
+
+
     # === Core Envelope ===
     AimeatEnvelope:
       type: object
@@ -3805,7 +3807,7 @@ components:
       type: object
       required: [kind, cron, display_name]
       properties:
-        kind: { type: string, enum: [ai, agent_task, extension, eco-capability] }
+        kind: { type: string, enum: [ai, agent_task, extension, eco-capability, connections-publish] }
         cron: { type: string, example: '0 7 * * *' }
         display_name: { type: string }
         timezone: { type: string, example: Europe/Helsinki }
@@ -3831,7 +3833,28 @@ components:
         instance_id: { type: string }
         app: { type: string, description: 'eco-capability: the connected ecosystem app (GEAI) short name (e.g. "zendesk").' }
         capability_id: { type: string, description: 'eco-capability: the capability to invoke each fire; must be declared in the app''s manifest.' }
-        input: { type: object, description: 'Kind-specific input payload (extension scheduler input, or the eco-capability invoke input).' }
+        input:
+          type: object
+          description: |
+            Kind-specific input payload (extension scheduler input, or the eco-capability invoke input).
+
+            For `connections-publish` it is the post itself:
+            `{ connection_id, caption?, storage_key?, params?, ref? }`. The connection must be one the
+            CALLER connected — a connection belongs to the person who attached it, and absent /
+            not-yours answer with the same 404. Requires the `connections:use` scope.
+
+            Everything checkable is checked at CREATE time (the connection is yours and active, a
+            named file exists), because discovering either when it fires is a post that never appears
+            with nobody awake to see why.
+
+            A one-shot ("publish on Tuesday at 09:00") is this kind plus
+            `constraints: [{ type: max_runs, enabled: true, params: { limit: 1 } }]` — the scheduler
+            auto-disables the job after the fire. There is deliberately no separate publish queue:
+            the durable row, the DST-correct `timezone`, the run log and `/occurrences` are all this
+            same machinery. The fire goes through the SAME idempotency gate an immediate
+            `POST /v1/connections/publish` does, so a schedule racing an impatient human produces one
+            post rather than two.
+            `ref` is opaque — stored and handed back, never parsed or authorized against.
 
     # === Agent Workflows ===
     LocalizedString:
@@ -21779,9 +21802,11 @@ paths:
           schema: { type: string, enum: [enrichment] }
           description: |
             `enrichment` folds the per-workspace getWorkspace+activity+participants fan-out into this one
-            response: each readable workspace gains `enrichment: { hasManifest, recs, docs,
+            response: each readable workspace gains `enrichment: { hasManifest, kind, summary, recs, docs,
             lastEvent:{type,instance,action,at}|null, participants:[{owner,node,isLocalNode,isCreator,isSelf,agentsCount}],
             pendingReviews, apps:[{owner,filename,label?}] }`. Workspaces with `access:none` carry no enrichment.
+            `kind` and `summary` come from the workspace manifest (null when it declares none) so a
+            multi-tenant app can find ITS OWN workspaces from this listing without opening each one.
       responses:
         '200':
           description: Workspaces with the caller's per-workspace access status (+ enrichment when requested)

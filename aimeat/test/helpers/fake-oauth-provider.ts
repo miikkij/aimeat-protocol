@@ -56,6 +56,11 @@ export interface FakeProvider {
   breakRefresh: boolean;
   /** Make the item look gone, so the permanent-refusal path can be exercised. */
   noMetrics: boolean;
+  /**
+   * Answer a Mastodon status read with 403 — the shape a connection whose token lacks `read:statuses`
+   * actually gets. Retrying it is pointless, and the node must say so.
+   */
+  mastodonForbidden: boolean;
   /** When true, a publish is refused as CONTENT — permanent, and must never be retried. */
   rejectContent: boolean;
   /** Milliseconds a refresh takes, so a test can create a real overlap between two callers. */
@@ -93,6 +98,7 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
     accessTokenTtlSeconds: 3600,
     breakRefresh: false,
     noMetrics: false,
+    mastodonForbidden: false,
     rejectContent: false,
     refreshDelayMs: 0,
     close: async () => { /* replaced below */ },
@@ -129,6 +135,14 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
 
       // How a published item is doing. Real providers put an author's counts behind the same
       // token that published it, so this does too.
+      // The Mastodon status read, at the shape mastodonMetrics() actually calls. Present so the
+      // "this token can never read that" case can be exercised against a real HTTP answer rather
+      // than described in a comment.
+      if (url.pathname.startsWith('/api/v1/statuses/') && req.method === 'GET') {
+        state.stats.metricReads++;
+        if (state.mastodonForbidden) return json(res, 403, { error: 'This action is outside the authorized scopes' });
+        return json(res, 200, { favourites_count: 7, replies_count: 2, reblogs_count: 3 });
+      }
       if (url.pathname.startsWith('/metrics/') && req.method === 'GET') {
         const token = (req.headers.authorization ?? '').replace('Bearer ', '');
         if (!grants.has(token)) return json(res, 401, { error: 'invalid_token' });

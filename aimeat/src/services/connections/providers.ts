@@ -21,6 +21,8 @@
  *   - findProvider(list, id) / listProviderMeta(list) — lookup + the safe public projection
  * @usage const providers = buildOutboundProviders(config);
  * @version-history
+ *   v1.1.0 — 2026-08-02 — Mastodon asks for read:statuses: without it the metric reader 403'd forever,
+ *     so the capability was advertised and could never work.
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1b. Mastodon, YouTube, Bluesky.
  */
 
@@ -153,7 +155,11 @@ function mastodon(capabilityOn: boolean): OutboundProvider {
     capabilityOn,
     disabledReason: capabilityOn ? null : 'connections capability is off (AIMEAT_CONNECTIONS_ENABLED)',
     client: null,
-    scopes: ['read:accounts', 'write:statuses', 'write:media'],
+    // read:statuses is what lets an author READ BACK how their own post did. Without it the metric
+    // reader gets a 403 forever — the capability was advertised and could never work, which is the
+    // "the gate is decorative" failure this registry is written against. Connections made before
+    // this was added keep working for publishing and must be reconnected to read numbers.
+    scopes: ['read:accounts', 'read:statuses', 'write:statuses', 'write:media'],
     pkce: true,
     tokenAuth: 'body',
     capabilities: ['publish-post', 'publish-video'],

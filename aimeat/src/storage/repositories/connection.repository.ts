@@ -24,6 +24,9 @@
  * @usage
  *   import type { ConnectionRepository } from './repositories/connection.repository.js';
  * @version-history
+ *   v1.1.0 — 2026-08-02 — countPublishAttempts accepts SEVERAL connection ids: a provider's daily
+ *     allowance belongs to the APP registration rather than to one account, so counting a single
+ *     connection answers a question nobody asked (YouTube's six uploads are per Google project).
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1.
  */
 import type {
@@ -42,7 +45,13 @@ export interface ConnectionQuery {
 /** Narrowing for the counters. `since` is an ISO timestamp; the window is half-open [since, now). */
 export interface PublishAttemptQuery {
   publisher?: string;
-  connectionId?: string;
+  /**
+   * One connection, or several. Several because a provider's daily allowance is usually per APP
+   * rather than per account: YouTube's 10 000 units belong to the Google project, so counting one
+   * connection's uploads answers a question nobody asked and lets three accounts on the same client
+   * accept eighteen videos when six will go through.
+   */
+  connectionId?: string | string[];
   delegationId?: string;
   status?: PublishStatus | PublishStatus[];
   since?: string;

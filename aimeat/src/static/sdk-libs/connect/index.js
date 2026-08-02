@@ -22,6 +22,11 @@
  *   const sent = await AIMEAT.connect.history({ limit: 50 });
  *   await AIMEAT.connect.measure(sent[0].id);   // costs a provider request, and money on X
  * @version-history
+ *   v1.1.0 — 2026-08-02 — Every reader RAISES the node's refusal instead of resolving with a hollow
+ *     object. authFetch answers with the envelope either way, so a refused publish came back as
+ *     `status: 'unknown'` and an app drew it as "Published" — a post that never went out, reported as
+ *     sent. Errors carry `code` and `permanent`, because "this will never work" and "try again" ask
+ *     an app to draw different things.
  *   v1.0.0 — 2026-08-02 — Initial (TARGET-057 phase 3).
  */
 import { makeSession } from '../_core/session.js';
@@ -30,6 +35,33 @@ import { mountConnectPanel } from './panel.js';
 import { PROVIDER_NOTES } from './notes.js';
 
 const { authFetch } = makeSession('aimeat-connect.js');
+
+/**
+ * The node's answer, or its refusal as a thrown Error.
+ *
+ * WHY THIS EXISTS. authFetch resolves with the parsed envelope whether or not the call succeeded, so
+ * a refusal arrives as a perfectly ordinary object with no `data` — and every reader that pulled a
+ * field out of it got `undefined` and carried on. On this surface that produced the worst possible
+ * outcome: a publish the provider REFUSED read back as `status: 'unknown'`, which an app then drew
+ * as "Published". A post that never went out, reported as sent.
+ *
+ * `permanent` is carried through because the difference matters to what an app draws. A 409
+ * NOT_MEASURABLE is the platform saying it will never tell an author this number — an app that
+ * offers a retry there is offering a button that can never work, and on a paid provider a retry loop
+ * is a standing bill.
+ */
+function must(res, fallback) {
+  if (res && res.ok === false) {
+    const code = res.error && res.error.code;
+    const err = /** @type {Error & { code?: string, permanent?: boolean, envelope?: unknown }} */ (
+      new Error((res.error && (res.error.message || res.error.code)) || fallback));
+    err.code = code;
+    err.permanent = code === 'NOT_MEASURABLE' || code === 'REJECTED';
+    err.envelope = res;
+    throw err;
+  }
+  return (res && res.data) || {};
+}
 
 /**
  * @typedef {Object} Connection
@@ -55,8 +87,7 @@ function announce() {
 
 /** The caller's own connections. Never anyone else's — the node scopes this, not the caller. */
 async function list() {
-  const res = await authFetch('/v1/connections');
-  return (res?.data?.connections ?? []);
+  return must(await authFetch('/v1/connections'), 'could not read your connections').connections ?? [];
 }
 
 /**
@@ -68,8 +99,7 @@ async function list() {
  * removes a choice from every user.
  */
 async function providers() {
-  const res = await authFetch('/v1/connections/providers');
-  return (res?.data?.providers ?? []);
+  return must(await authFetch('/v1/connections/providers'), 'could not read the providers').providers ?? [];
 }
 
 /**
@@ -103,7 +133,7 @@ async function publish(input) {
       params: input.params ?? {},
     }),
   });
-  const d = res?.data ?? {};
+  const d = must(res, 'the publish was refused');
   return {
     url: d.url,
     replay: Boolean(d.replay),
@@ -128,8 +158,7 @@ async function publish(input) {
  */
 async function history(opts = {}) {
   const q = opts.limit ? `?limit=${encodeURIComponent(opts.limit)}` : '';
-  const res = await authFetch(`/v1/connections/attempts${q}`);
-  return (res?.data?.attempts ?? []);
+  return must(await authFetch(`/v1/connections/attempts${q}`), 'could not read your history').attempts ?? [];
 }
 
 /**
@@ -143,10 +172,12 @@ async function history(opts = {}) {
  * answers 409 with the reason, which is a fact to display rather than an error to hide.
  */
 async function measure(attemptId) {
+  // A refusal THROWS, carrying `permanent`. Returning undefined here is what made an app unable to
+  // tell "nobody has asked yet" from "this platform will never say", and both drew as "not read".
   const res = await authFetch(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/metrics`, {
     method: 'POST',
   });
-  return res?.data?.sample;
+  return must(res, 'the numbers could not be read').sample;
 }
 
 /**
@@ -157,7 +188,7 @@ async function measure(attemptId) {
  */
 async function series(attemptId) {
   const res = await authFetch(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/metrics`);
-  return (res?.data?.samples ?? []);
+  return must(res, 'could not read the series').samples ?? [];
 }
 
 /**
@@ -172,8 +203,7 @@ async function series(attemptId) {
  * the app went away, which is why removeClient() refuses while it is above zero.
  */
 async function clients() {
-  const res = await authFetch('/v1/connections/clients');
-  return (res?.data?.clients ?? []);
+  return must(await authFetch('/v1/connections/clients'), 'could not read your apps').clients ?? [];
 }
 
 /**

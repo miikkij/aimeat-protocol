@@ -353,8 +353,13 @@ export interface ScheduledJobRecord {
    * 'eco-capability' invokes a connected ecosystem app's (GEAI) capability over
    * the connect-tunnel on each fire — its `input` is
    * `{ app: string; capability_id: string; input?: Record<string,unknown> }`.
+   * 'connections-publish' posts to one of the owner's OWN connected accounts —
+   * its `input` is `{ connection_id, caption?, storage_key?, params?, ref? }`.
+   * A one-shot ("post this on Tuesday at 09:00") is this kind plus a
+   * max_runs:1 constraint, which the scheduler already auto-disables after the
+   * fire; there is deliberately no second queue table beside this one.
    */
-  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability';
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'connections-publish';
   extensionName?: string;
   instanceId?: string;
   actionId?: string;
@@ -397,7 +402,8 @@ export interface ExecutionLogEntry {
   id: string;
   jobId: string;
   jobName: string;
-  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability';
+  /** Mirrors ScheduledJobRecord['type'] — a run log that cannot name a kind cannot explain it. */
+  type: 'extension' | 'core' | 'ai' | 'agent_task' | 'workflow' | 'eco-capability' | 'connections-publish';
   extensionName?: string;
   actionId?: string;
   trigger: 'cron' | 'manual' | 'activate';

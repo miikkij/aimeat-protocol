@@ -348,6 +348,14 @@ export class Scheduler {
         run = await this.executeWorkflowJob(job);
       } else if (job.type === 'eco-capability') {
         run = await this.executeEcoCapabilityJob(job);
+      } else if (job.type === 'connections-publish') {
+        run = await this.executeConnectionsPublishJob(job);
+      } else {
+        // A kind with no branch used to fall through here and be recorded as a SUCCESSFUL run that
+        // did nothing — a scheduled post that never leaves and a green run log saying it did. Caught
+        // by the LÄHETIN e2e when a new kind's dispatch was missed; failing loudly is the only way
+        // the next added kind cannot repeat it.
+        throw new Error(`scheduler has no executor for job type "${job.type}"`);
       }
     } catch (err) {
       result = 'error';
@@ -692,6 +700,19 @@ export class Scheduler {
    */
   private async executeEcoCapabilityJob(job: ScheduledJobRecord): Promise<JobRunResult> {
     return runEcoCapabilityJob(this.config, job);
+  }
+
+  /**
+   * `connections-publish` kind: post to one of the owner's own connected accounts.
+   *
+   * The clock, the one-shot (max_runs), the DST-correct IANA timezone and the run log all come from
+   * THIS scheduler — the kind adds only "what to publish". The publish itself takes the same
+   * idempotency-gated path a person pressing send takes, so a schedule racing an impatient human
+   * produces one post rather than two.
+   */
+  private async executeConnectionsPublishJob(job: ScheduledJobRecord): Promise<JobRunResult> {
+    const { runConnectionsPublishJob } = await import('./connections/scheduled-publish-job.js');
+    return runConnectionsPublishJob(this.storage, this.config, job);
   }
 
   private async executeCoreJob(job: ScheduledJobRecord): Promise<void> {

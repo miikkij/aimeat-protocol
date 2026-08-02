@@ -250,6 +250,20 @@
 
   // src/static/sdk-libs/connect/index.js
   var { authFetch: authFetch2 } = makeSession("aimeat-connect.js");
+  function must(res, fallback) {
+    if (res && res.ok === false) {
+      const code = res.error && res.error.code;
+      const err = (
+        /** @type {Error & { code?: string, permanent?: boolean, envelope?: unknown }} */
+        new Error(res.error && (res.error.message || res.error.code) || fallback)
+      );
+      err.code = code;
+      err.permanent = code === "NOT_MEASURABLE" || code === "REJECTED";
+      err.envelope = res;
+      throw err;
+    }
+    return res && res.data || {};
+  }
   var listeners = /* @__PURE__ */ new Set();
   function announce() {
     for (const fn of listeners) {
@@ -261,12 +275,10 @@
     }
   }
   async function list() {
-    const res = await authFetch2("/v1/connections");
-    return res?.data?.connections ?? [];
+    return must(await authFetch2("/v1/connections"), "could not read your connections").connections ?? [];
   }
   async function providers() {
-    const res = await authFetch2("/v1/connections/providers");
-    return res?.data?.providers ?? [];
+    return must(await authFetch2("/v1/connections/providers"), "could not read the providers").providers ?? [];
   }
   async function publish(input) {
     if (!input?.connectionId) throw new Error("publish needs a connectionId");
@@ -279,7 +291,7 @@
         params: input.params ?? {}
       })
     });
-    const d = res?.data ?? {};
+    const d = must(res, "the publish was refused");
     return {
       url: d.url,
       replay: Boolean(d.replay),
@@ -290,22 +302,20 @@
   }
   async function history(opts = {}) {
     const q = opts.limit ? `?limit=${encodeURIComponent(opts.limit)}` : "";
-    const res = await authFetch2(`/v1/connections/attempts${q}`);
-    return res?.data?.attempts ?? [];
+    return must(await authFetch2(`/v1/connections/attempts${q}`), "could not read your history").attempts ?? [];
   }
   async function measure(attemptId) {
     const res = await authFetch2(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/metrics`, {
       method: "POST"
     });
-    return res?.data?.sample;
+    return must(res, "the numbers could not be read").sample;
   }
   async function series(attemptId) {
     const res = await authFetch2(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/metrics`);
-    return res?.data?.samples ?? [];
+    return must(res, "could not read the series").samples ?? [];
   }
   async function clients() {
-    const res = await authFetch2("/v1/connections/clients");
-    return res?.data?.clients ?? [];
+    return must(await authFetch2("/v1/connections/clients"), "could not read your apps").clients ?? [];
   }
   async function setClient(provider, clientId, clientSecret) {
     const res = await authFetch2("/v1/connections/clients", {

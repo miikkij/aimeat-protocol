@@ -15,12 +15,20 @@
  *     - a repeated publish returns the first attempt's outcome instead of starting a second
  * @structure Phase 0 owners · 1 discovery + capability gate · 2 the round · 3 credential never
  *   leaves · 4 cross-owner 404s · 5 refresh + single flight · 6 revoke · 7 delegations + gates ·
- *   8 idempotency + quota · 9 instance registration
+ *   8 idempotency + quota · 9 instance registration · 14 history + reach · 15 spaces (workspace
+ *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.1.0 — 2026-08-02 — LÄHETIN. Phase 15: a space is an organism workspace — asserts the three
+ *     states an app cannot be trusted to draw (outsider refused, ungranted organism member sees an
+ *     EMPTY space, grantee sees the content), that one grant opens exactly one workspace, and that a
+ *     space grant never lends the grantor's connection. Phase 17: publishing later is a KIND on the
+ *     scheduler this node already had, not a second queue — the fire goes through the same
+ *     idempotency gate an immediate publish does.
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 2.
  */
 
+import { randomBytes, createHash } from 'node:crypto';
 import { startFakeProvider, type FakeProvider } from './helpers/fake-oauth-provider.js';
 
 const BASE = process.env.E2E_BASE ?? 'http://localhost:40251';
@@ -66,6 +74,50 @@ async function connect(bearer: string, subject: string, mode: 'personal' | 'shar
   assert(res.status === 302, `callback did not redirect: ${res.status} ${await res.text()}`);
   const list = await api('/v1/connections', { method: 'GET', bearer });
   return { state, connections: list.data.data.connections as any[] };
+}
+
+/**
+ * Publish a throwaway app for `owner` and drive the full app-grant flow to a token carrying `scopes`.
+ *
+ * An app token is role 'app', which is a DIFFERENT principal class from an owner session: it never
+ * satisfies a role gate and never receives the owner's scope bypass. Asserting an app's limits with
+ * an owner token proves nothing about the app.
+ */
+async function grantAppToken(ownerBearer: string, owner: string, scopes: string[]): Promise<string> {
+  const filename = `lahetin-gate-${Date.now()}-${Math.random().toString(36).slice(2, 7)}.html`;
+  const redirect = 'http://localhost:9933/callback';
+  const verifier = randomBytes(32).toString('base64url');
+  const challenge = createHash('sha256').update(verifier).digest('base64url');
+
+  const pub = await api('/v1/apps', {
+    bearer: ownerBearer,
+    body: {
+      filename,
+      content: Buffer.from('<!DOCTYPE html><html><body>gate</body></html>', 'utf8').toString('base64'),
+      name: 'Gate probe', description: 'app-grant gate probe', category: 'tool',
+    },
+  });
+  assert(pub.status === 201, `publish probe app: ${pub.status} ${pub.data?.error?.message}`);
+
+  const q = new URLSearchParams({
+    app: `${owner}/${filename}`, response_type: 'code', scope: scopes.join(' '),
+    redirect_uri: redirect, state: 'x', code_challenge: challenge, code_challenge_method: 'S256',
+  });
+  const auth = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+  assert(auth.status === 302, `authorize: ${auth.status}`);
+  const requestId = decodeURIComponent(/req=([^&]+)/.exec(auth.headers.get('location') ?? '')![1]);
+
+  const consent = await api('/v1/app-grants/authorize-consent', {
+    bearer: ownerBearer, body: { request_id: requestId },
+  });
+  assert(consent.status === 200 && consent.data?.ok, `consent: ${consent.status}`);
+  const code = new URL(consent.data.data.redirect_url as string).searchParams.get('code') ?? '';
+
+  const tok = await api('/v1/app-grants/token', {
+    body: { grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: redirect },
+  });
+  assert(tok.status === 200 && tok.data?.ok, `app token: ${tok.status}`);
+  return tok.data.data.access_token as string;
 }
 
 async function main(): Promise<void> {
@@ -625,9 +677,12 @@ async function main(): Promise<void> {
     });
 
     await test("publishing to someone else's connection is the same 404 as a missing one", async () => {
+      // NO storage_key, deliberately. This test used to send one, and B owns no such file — so the
+      // route answered 404 for the FILE before the ownership check was ever reached, and the test
+      // stayed green with that check deleted. It asserted the right number for the wrong reason.
       const r = await api('/v1/connections/publish', {
         bearer: jwtB,
-        body: { connection_id: pubConn, storage_key: 'vid/test.mp4', caption: 'not mine' },
+        body: { connection_id: pubConn, caption: 'not mine' },
       });
       assert(r.status === 404, `status ${r.status}`);
     });
@@ -938,6 +993,416 @@ async function main(): Promise<void> {
     await test("measuring someone else's item is the same 404 as a missing one", async () => {
       const r = await api(`/v1/connections/attempts/${histId}/metrics`, { method: 'POST', bearer: jwtB });
       assert(r.status === 404, `status ${r.status}`);
+    });
+
+    console.log('\nPhase 15 — Spaces: workspace membership IS the access');
+
+    // WHAT THIS PHASE IS FOR (LÄHETIN phase 0). A space is an organism workspace, and there is no
+    // second roster: no app member list, no aimeat-iam. The app is open and the DATA is fenced, which
+    // only holds if the NODE refuses — so every assertion here goes through the API with the wrong
+    // person's token rather than through a UI that could simply be drawing less.
+    //
+    // The sharp one is the middle case. A non-member being refused is obvious. An organism member who
+    // was never granted the workspace is the case an app gets wrong: they authenticate, they belong to
+    // the organism, the request succeeds, and they must still see NOTHING.
+    let spaceOrg = '', spaceWs = '', otherWs = '';
+    const postKey = (org: string, ws: string, id: string) => `organism.${org}.w.${ws}.lahetin.posts.${id}.draft`;
+    const readWs = (org: string, ws: string, bearer: string) =>
+      api(`/v1/organisms/${org}/workspace?ws=${encodeURIComponent(ws)}`, { method: 'GET', bearer });
+    /** The post ids a caller can actually see in a workspace read, drafts included. */
+    const visiblePostIds = (call: Call): string[] => {
+      const d = call.data?.data ?? {};
+      const rows = [...((d.objects?.post ?? []) as any[]), ...((d.drafts?.post ?? []) as any[])];
+      return rows.map(r => String(r?.id ?? ''));
+    };
+
+    // NO SCHEMA LOCK, deliberately. provisionWorkspace locks in `strict` mode, which forces
+    // additionalProperties:false — so a lock written today would reject every record the moment a
+    // later phase adds a field (a scheduled time, an attempt id), and a lock cannot be relaxed for
+    // spaces that already exist. That is the same "we would have to migrate the data" cost the space
+    // model exists to avoid; the shape is the app's to enforce, the fence is the node's.
+    const LAHETIN_MANIFEST = {
+      manifestVersion: '1.0',
+      name: 'LÄHETIN',
+      kind: 'lahetin-space',
+      status: 'active',
+      summary: 'Somejulkaisut, luonnokset ja ajastukset yhdelle tiimille.',
+      objectTypes: [
+        { name: 'post', namespace: 'lahetin.posts', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:lahetin-post@1', cardinality: 'many' },
+        { name: 'setting', namespace: 'lahetin.settings', mode: 'records', backing: 'memory', writeRole: 'member', schemaRef: 'schema:lahetin-setting@1', cardinality: 'one' },
+      ],
+    };
+
+    await test('a space is an organism workspace, provisioned by its creator', async () => {
+      // join_policy 'open' only so this suite can put B inside the organism without the email-invite
+      // machinery. The app provisions 'invite_only' — being in the organism is not the point, holding
+      // the workspace is, and the next test is what proves that.
+      const org = await api('/v1/organisms', {
+        bearer: jwtA,
+        body: { name: `LÄHETIN ${stamp}`, type: 'project', visibility: 'private', join_policy: 'open' },
+      });
+      assert(org.status === 201, `create organism: ${org.status} ${org.data?.error?.message}`);
+      spaceOrg = org.data.data.organism.id;
+
+      const ws = await api(`/v1/organisms/${spaceOrg}/workspaces`, {
+        bearer: jwtA, body: { name: 'Markkinointi', manifest: LAHETIN_MANIFEST },
+      });
+      assert(ws.status === 201, `create workspace: ${ws.status} ${ws.data?.error?.message}`);
+      spaceWs = ws.data.data.ws;
+      assert(spaceWs.startsWith('ws-'), `ws id: ${spaceWs}`);
+
+      const draft = await api('/v1/memory', {
+        bearer: jwtA,
+        body: {
+          key: postKey(spaceOrg, spaceWs, 'p1'),
+          value: { id: 'p1', title: 'Kevätkampanja', body: 'Luonnos', channels: ['mastodon'], status: 'draft' },
+          visibility: 'private',
+        },
+      });
+      assert(draft.status === 200 || draft.status === 201, `write draft: ${draft.status} ${draft.data?.error?.message}`);
+
+      const mine = await readWs(spaceOrg, spaceWs, jwtA);
+      assert(mine.status === 200, `creator read: ${mine.status}`);
+      assert(visiblePostIds(mine).includes('p1'), 'the creator cannot see their own draft');
+    });
+
+    await test('someone outside the organism is refused, not shown an empty space', async () => {
+      const r = await readWs(spaceOrg, spaceWs, jwtB);
+      assert(r.status === 403, `expected 403 for a non-member, got ${r.status}`);
+    });
+
+    await test('an organism member with no workspace grant sees the space and none of its content', async () => {
+      // The one an app gets wrong. B is now genuinely inside the organism, so the request succeeds —
+      // and the workspace is still not theirs. If this ever returns p1, the fence is decoration and
+      // every space on the node leaks to everyone who joined the organism.
+      const join = await api(`/v1/organisms/${spaceOrg}/join`, { bearer: jwtB, body: {} });
+      assert(join.status === 200 || join.status === 201, `join: ${join.status} ${join.data?.error?.message}`);
+
+      const r = await readWs(spaceOrg, spaceWs, jwtB);
+      assert(r.status === 200, `member read: ${r.status}`);
+      const seen = visiblePostIds(r);
+      assert(seen.length === 0, `an ungranted member read ${seen.length} post(s): ${seen.join(',')}`);
+      assert(r.data.data.manifest === null, 'an ungranted member was handed the manifest');
+    });
+
+    await test('discovery names the workspace and still says the content is not theirs', async () => {
+      // Being able to SEE that a space exists is what makes "ask for access" possible at all; being
+      // able to read it is the separate thing. access:'none' is the app's cue to offer the request.
+      const r = await api(`/v1/organisms/${spaceOrg}/workspaces`, { method: 'GET', bearer: jwtB });
+      assert(r.status === 200, `list workspaces: ${r.status}`);
+      const row = (r.data.data.workspaces as any[]).find(w => w.id === spaceWs);
+      assert(row !== undefined, 'the workspace is invisible to a member of its organism');
+      assert(row.access === 'none', `expected access 'none', got '${row.access}'`);
+    });
+
+    await test('the grant is what opens it, and it opens exactly one workspace', async () => {
+      const grant = await api(`/v1/organisms/${spaceOrg}/workspace-access/grant`, {
+        bearer: jwtA, body: { ws: spaceWs, grantee: userB, role: 'viewer' },
+      });
+      assert(grant.status === 200, `grant: ${grant.status} ${grant.data?.error?.message}`);
+
+      const r = await readWs(spaceOrg, spaceWs, jwtB);
+      assert(r.status === 200, `granted read: ${r.status}`);
+      assert(visiblePostIds(r).includes('p1'), 'a granted viewer still cannot see the draft');
+    });
+
+    await test('through the APP, a viewer may read and may not write; a contributor may do both', async () => {
+      // The two roles the workspace layer actually has — there is no third — asserted through the
+      // door the app actually comes in by: an app-grant token (role 'app'), not an owner session.
+      //
+      // THAT DISTINCTION IS NOT A TEST DETAIL. A HUMAN owner session bypasses this gate entirely
+      // (middleware/workspace-access.ts treats an owner-role session as the principal and skips the
+      // contributor check), so writing this against jwtB would assert nothing: it passes whatever the
+      // grant says. What is proven here is the gate LÄHETIN runs under. The owner-session gap is a
+      // separate, wider question about the platform and is reported rather than quietly changed.
+      const appToken = await grantAppToken(jwtB, userB, ['memory:read', 'memory:write', 'organism:read']);
+      const asApp = (id: string) => api('/v1/memory', {
+        bearer: appToken,
+        body: {
+          key: postKey(spaceOrg, spaceWs, id),
+          value: { id, title: 'B kirjoitti', body: 'x', channels: ['mastodon'], status: 'draft' },
+          visibility: 'private',
+        },
+      });
+
+      const asViewer = await asApp('b-viewer');
+      assert(asViewer.status === 403, `a viewer's app was allowed to write: ${asViewer.status}`);
+      // ...and reading still works, because viewer means read.
+      assert(visiblePostIds(await readWs(spaceOrg, spaceWs, jwtB)).includes('p1'),
+        'the viewer lost read access');
+
+      const promote = await api(`/v1/organisms/${spaceOrg}/workspace-access/grant`, {
+        bearer: jwtA, body: { ws: spaceWs, grantee: userB, role: 'contributor' },
+      });
+      assert(promote.status === 200, `promote: ${promote.status} ${promote.data?.error?.message}`);
+
+      const asContributor = await asApp('b-contributor');
+      assert(asContributor.status === 200 || asContributor.status === 201,
+        `a contributor's app could not write: ${asContributor.status} ${asContributor.data?.error?.message}`);
+
+      // ...and the creator sees it, because a space is shared content and not a pile of private
+      // notes that happen to sit next to each other.
+      const seen = visiblePostIds(await readWs(spaceOrg, spaceWs, jwtA));
+      assert(seen.includes('b-contributor'), "the creator cannot see a contributor's post");
+    });
+
+    await test('a second space in the same organism stays shut', async () => {
+      // The acceptance criterion in words: a person in two spaces sees two spaces, and a person in one
+      // sees one. Same organism, same member, one grant — so the fence is the WORKSPACE and not the
+      // organism, which is the whole reason a space is a workspace rather than a tag on a record.
+      const ws2 = await api(`/v1/organisms/${spaceOrg}/workspaces`, {
+        bearer: jwtA, body: { name: 'Rekrytointi', manifest: LAHETIN_MANIFEST },
+      });
+      assert(ws2.status === 201, `create second workspace: ${ws2.status}`);
+      otherWs = ws2.data.data.ws;
+
+      const draft = await api('/v1/memory', {
+        bearer: jwtA,
+        body: {
+          key: postKey(spaceOrg, otherWs, 'p2'),
+          value: { id: 'p2', title: 'Avoin paikka', body: 'Luonnos', channels: ['bluesky'], status: 'draft' },
+          visibility: 'private',
+        },
+      });
+      assert(draft.status === 200 || draft.status === 201, `write second draft: ${draft.status}`);
+
+      const r = await readWs(spaceOrg, otherWs, jwtB);
+      assert(r.status === 200, `second space read: ${r.status}`);
+      const seen = visiblePostIds(r);
+      assert(seen.length === 0, `a grant on one space leaked ${seen.length} post(s) from another: ${seen.join(',')}`);
+
+      // ...and the one they DO hold is unaffected by the refusal above.
+      const still = await readWs(spaceOrg, spaceWs, jwtB);
+      assert(visiblePostIds(still).includes('p1'), 'the granted space stopped working');
+    });
+
+    await test('a connection is its owner’s, and a space grant does not lend it', async () => {
+      // Decision 7, asserted rather than asserted-about. B holds a viewer grant on A's space; that says
+      // what may be published, never with whose account. Publishing to A's connection is still the same
+      // 404 a stranger gets, because the connection belongs to the person who attached it.
+      const r = await api('/v1/connections/publish', {
+        bearer: jwtB, body: { connection_id: connA, caption: 'borrowed account' },
+      });
+      assert(r.status === 404, `a space member published through someone else's connection: ${r.status}`);
+    });
+
+    console.log('\nPhase 17 — Publishing later, on the scheduler this node already had');
+
+    // WHAT THIS PHASE IS FOR. The browser is not open at 07:00, so somebody's clock has to tick — and
+    // this node already owns one. A scheduled publish is a `ScheduledJob` of kind
+    // `connections-publish`; the durable row, the DST-correct IANA timezone, the one-shot
+    // (`max_runs: 1` auto-disables after the fire), the run log and `/occurrences` all come from the
+    // machinery extensions and workflows already use. There is deliberately NO second queue table.
+    let schedId = '';
+    const inMinutes = (n: number) => {
+      const d = new Date(Date.now() + n * 60_000);
+      // A specific instant expressed as cron. With max_runs:1 it fires once and disables itself.
+      return `${d.getUTCMinutes()} ${d.getUTCHours()} ${d.getUTCDate()} ${d.getUTCMonth() + 1} *`;
+    };
+    const ONE_SHOT = [{ type: 'max_runs', enabled: true, params: { limit: 1 } }];
+
+    await test('a publish can be put on the node’s own scheduler, with the zone the author meant', async () => {
+      const r = await api('/v1/schedules', {
+        bearer: jwtA,
+        body: {
+          kind: 'connections-publish',
+          cron: inMinutes(120),
+          // The zone is the scheduler's own field and it is DST-correct via croner. Rebuilding it
+          // beside this one is how a schedule silently moves an hour twice a year.
+          timezone: 'Europe/Helsinki',
+          display_name: 'Kevätkampanja',
+          constraints: ONE_SHOT,
+          input: { connection_id: connA, caption: `scheduled-${stamp}`, ref: 'org/ws/p1' },
+        },
+      });
+      assert(r.status === 200 || r.status === 201, `schedule: ${r.status} ${r.data?.error?.message}`);
+      const s = r.data.data.schedule ?? r.data.data;
+      schedId = s.id;
+      assert(!!schedId, 'no schedule id came back');
+      assert(s.timezone === 'Europe/Helsinki', `the zone was not kept: ${s.timezone}`);
+      assert(s.type === 'connections-publish', `kind ${s.type}`);
+      // The caller's own reference rides in `input` and is never parsed by the node.
+      assert((s.input as { ref?: string }).ref === 'org/ws/p1', 'the caller’s reference did not survive');
+    });
+
+    await test('it appears in the ONE schedule list the owner already had', async () => {
+      // Not a separate queue view: the same aggregate that shows extension crons and agent tasks.
+      const r = await api('/v1/schedules', { method: 'GET', bearer: jwtA });
+      assert(r.status === 200, `list: ${r.status}`);
+      const found = JSON.stringify(r.data.data).includes(schedId);
+      assert(found, 'the scheduled publish is missing from /v1/schedules');
+    });
+
+    await test('scheduling to someone else’s account is the same 404 as a missing one', async () => {
+      // Decision 7 on the scheduling surface: a connection belongs to the person who attached it, and
+      // queueing work changes nothing about that.
+      const r = await api('/v1/schedules', {
+        bearer: jwtB,
+        body: {
+          kind: 'connections-publish', cron: inMinutes(120), timezone: 'UTC',
+          constraints: ONE_SHOT, input: { connection_id: connA, caption: 'not mine' },
+        },
+      });
+      assert(r.status === 404, `status ${r.status}`);
+    });
+
+    await test('a schedule with no connection, or a file that is not there, is refused NOW', async () => {
+      // Both checked while somebody is looking at the screen. Discovering either at 07:00 is a post
+      // that never appears, with nobody awake to see why.
+      const noConn = await api('/v1/schedules', {
+        bearer: jwtA,
+        body: { kind: 'connections-publish', cron: inMinutes(120), timezone: 'UTC', constraints: ONE_SHOT, input: {} },
+      });
+      assert(noConn.status === 400, `missing connection_id: ${noConn.status}`);
+
+      const noFile = await api('/v1/schedules', {
+        bearer: jwtA,
+        body: {
+          kind: 'connections-publish', cron: inMinutes(120), timezone: 'UTC', constraints: ONE_SHOT,
+          input: { connection_id: connA, storage_key: 'vid/not-there.mp4' },
+        },
+      });
+      assert(noFile.status === 404 && noFile.data.error.code === 'NO_SUCH_FILE',
+        `missing file: ${noFile.status} ${noFile.data?.error?.code}`);
+    });
+
+    await test('an unknown time zone is refused by the scheduler’s own validation', async () => {
+      const r = await api('/v1/schedules', {
+        bearer: jwtA,
+        body: {
+          kind: 'connections-publish', cron: inMinutes(120), timezone: 'Europe/Helsinky',
+          constraints: ONE_SHOT, input: { connection_id: connA, caption: 'typo' },
+        },
+      });
+      assert(r.status === 400, `expected 400 for a zone this node does not know, got ${r.status}`);
+    });
+
+    await test('when it fires it publishes exactly once, through the same gate', async () => {
+      const before = provider.stats.publishes;
+      const r = await api(`/v1/schedules/${schedId}/trigger`, { bearer: jwtA });
+      assert(r.status === 200, `trigger: ${r.status} ${r.data?.error?.message}`);
+      assert(provider.stats.publishes === before + 1,
+        `the fire published ${provider.stats.publishes - before} time(s), expected 1`);
+
+      // ...and it is in the history like any other publish, because it IS one.
+      const hist = await api('/v1/connections/attempts', { method: 'GET', bearer: jwtA });
+      const mine = (hist.data.data.attempts as any[]).filter(a => a.status === 'done');
+      assert(mine.length > 0, 'the scheduled publish left no attempt behind');
+    });
+
+    await test('firing it again does not publish a second time', async () => {
+      // The idempotency gate, not a lock of the scheduler's own: same publisher, connection, file and
+      // caption is the same key whichever door it comes through.
+      const before = provider.stats.publishes;
+      await api(`/v1/schedules/${schedId}/trigger`, { bearer: jwtA });
+      assert(provider.stats.publishes === before,
+        `a second fire published again (${provider.stats.publishes - before})`);
+    });
+
+    await test('the same content scheduled AND sent by hand is ONE post', async () => {
+      const caption = `both-ways-${stamp}`;
+      const s = await api('/v1/schedules', {
+        bearer: jwtA,
+        body: {
+          kind: 'connections-publish', cron: inMinutes(120), timezone: 'Europe/Helsinki',
+          constraints: ONE_SHOT, input: { connection_id: connA, caption },
+        },
+      });
+      assert(s.status === 200 || s.status === 201, `schedule: ${s.status}`);
+      const id = (s.data.data.schedule ?? s.data.data).id;
+
+      const before = provider.stats.publishes;
+      const now = await api('/v1/connections/publish', { bearer: jwtA, body: { connection_id: connA, caption } });
+      assert(now.status === 200, `publish now: ${now.status} ${now.data?.error?.message}`);
+      assert(provider.stats.publishes === before + 1, 'the immediate publish did not reach the provider');
+
+      await api(`/v1/schedules/${id}/trigger`, { bearer: jwtA });
+      assert(provider.stats.publishes === before + 1,
+        `the schedule posted it a second time (${provider.stats.publishes - before} total)`);
+    });
+
+    await test('a schedule EDITED to name someone else’s account still cannot publish to it', async () => {
+      // THE ONE THAT MATTERS. `PATCH /v1/schedules/:id` replaces `input` wholesale with no
+      // validation, so the create-time ownership check can be walked around by editing afterwards.
+      // What must hold is the layer underneath: the publish gate compares the connection's principal
+      // against the publisher and refuses. If this ever goes green by PUBLISHING, a scheduled post
+      // has become a way to post to somebody else's account.
+      const created = await api('/v1/schedules', {
+        bearer: jwtA,
+        body: {
+          kind: 'connections-publish', cron: inMinutes(180), timezone: 'UTC',
+          display_name: 'swap probe', constraints: ONE_SHOT,
+          input: { connection_id: connA, caption: `swap-${stamp}` },
+        },
+      });
+      assert(created.status === 200 || created.status === 201, `create: ${created.status}`);
+      const id = (created.data.data.schedule ?? created.data.data).id;
+
+      // B's own connection, made the same way A's was.
+      const bConn = (await connect(jwtB, `swapee${stamp}`)).connections[0];
+      assert(!!bConn?.id, 'could not set up a second principal’s connection');
+
+      // The EDIT itself is refused, with the same 404 a stranger's connection gets anywhere else.
+      const patched = await api(`/v1/schedules/${id}`, {
+        method: 'PATCH', bearer: jwtA,
+        body: { input: { connection_id: bConn.id, caption: `swap-${stamp}` } },
+      });
+      assert(patched.status === 404,
+        `editing a schedule onto another principal's connection was allowed: ${patched.status}`);
+
+      // And the wall underneath holds regardless: firing it publishes to nobody else.
+      const before = provider.stats.publishes;
+      await api(`/v1/schedules/${id}/trigger`, { bearer: jwtA });
+      assert(provider.stats.publishes <= before + 1,
+        `a swapped schedule published more than its own post (${provider.stats.publishes - before})`);
+
+      // B's history stays empty of it: nothing was attributed to them either.
+      const bHist = await api('/v1/connections/attempts', { method: 'GET', bearer: jwtB });
+      const leaked = (bHist.data.data.attempts as any[]).filter(a => a.connectionId === bConn.id);
+      assert(leaked.length === 0, `${leaked.length} attempt(s) landed on the other principal's connection`);
+    });
+
+    await test('an app without connections:use cannot schedule a publish', async () => {
+      // The kind is gated on the same scope the immediate publish needs. Without this a memory-only
+      // app could put a post on the owner's accounts by way of the scheduler.
+      const weak = await grantAppToken(jwtA, userA, ['memory:read']);
+      const r = await api('/v1/schedules', {
+        bearer: weak,
+        body: {
+          kind: 'connections-publish', cron: inMinutes(120), timezone: 'UTC',
+          constraints: ONE_SHOT, input: { connection_id: connA, caption: 'nope' },
+        },
+      });
+      assert(r.status === 403, `expected 403, got ${r.status}`);
+    });
+
+    console.log('\nPhase 16 — Reading the numbers back');
+
+    await test('a Mastodon read refused for a missing scope is PERMANENT, not a retry', async () => {
+      // Found by running the real thing: mastodon.social answered 403 because the connection was
+      // authorized without `read:statuses`. The node reported 502, which puts a retry button in front
+      // of a person that can never work — and on a schedule would be a standing pointless call.
+      // Driven against a real HTTP 403 rather than described, using the reader's own code path.
+      const { readMetrics } = await import('../src/services/connections/metrics.js');
+      const { buildOutboundProviders, findProvider } = await import('../src/services/connections/providers.js');
+      const mastodon = findProvider(buildOutboundProviders({ connectionsEnabled: true } as any), 'mastodon')!;
+
+      provider.mastodonForbidden = true;
+      const out = await readMetrics({
+        provider: mastodon,
+        connection: { instance: `http://127.0.0.1:${FAKE_PORT}` } as any,
+        credential: { shape: 'oauth2', accessToken: 'x' } as any,
+        externalRef: `http://127.0.0.1:${FAKE_PORT}/@who/123`,
+      });
+      provider.mastodonForbidden = false;
+      assert(!out.ok && out.permanent === true,
+        `a 403 came back as ${out.ok ? 'ok' : (out.permanent ? 'permanent' : 'retryable')}`);
+      assert(!out.ok && /read:statuses/.test(out.reason),
+        `the refusal does not name the missing scope: ${!out.ok ? out.reason : ''}`);
+
+      // ...and the scope is actually requested now, so a NEW connection can read its own numbers.
+      assert(mastodon.scopes.includes('read:statuses'),
+        `Mastodon still does not ask for read:statuses: ${mastodon.scopes.join(' ')}`);
     });
 
     await test('every provider that can publish either reports numbers or says why not', async () => {

@@ -13,6 +13,7 @@
  * @structure connectionMethods — connections · delegations · publish attempts
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-08-02 — attemptWhere accepts several connection ids for the per-app ceiling.
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1.
  */
 import type { ConnectionQuery, PublishAttemptQuery } from '../../../repositories/connection.repository.js';
@@ -112,7 +113,13 @@ function attemptWhere(query: PublishAttemptQuery): { sql: string; params: unknow
   const clauses: string[] = [];
   const params: unknown[] = [];
   if (query.publisher) { clauses.push('publisher = ?'); params.push(query.publisher); }
-  if (query.connectionId) { clauses.push('connectionId = ?'); params.push(query.connectionId); }
+  if (query.connectionId) {
+    const list = Array.isArray(query.connectionId) ? query.connectionId : [query.connectionId];
+    // An empty array must match NOTHING rather than degenerate into no clause at all: a quota check
+    // over "no connections" that quietly counted every attempt in the table would refuse everyone.
+    clauses.push(list.length ? `connectionId IN (${list.map(() => '?').join(',')})` : '1 = 0');
+    params.push(...list);
+  }
   if (query.delegationId) { clauses.push('delegationId = ?'); params.push(query.delegationId); }
   if (query.status) {
     const list = Array.isArray(query.status) ? query.status : [query.status];
@@ -460,5 +467,5 @@ export const connectionMethods = {
       'SELECT COUNT(*) AS n FROM connections WHERE providerClientId = ?',
     ).get(providerClientId) as { n: number };
     return r.n;
-  },
+  }
 };

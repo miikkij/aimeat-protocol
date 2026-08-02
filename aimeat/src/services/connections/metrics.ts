@@ -22,6 +22,8 @@
  *   linkedinMetrics · xMetrics
  * @usage import { readMetrics } from './metrics.js';
  * @version-history
+ *   v1.1.0 — 2026-08-02 — Mastodon's 403 is a PERMANENT refusal, not a retry: it is what a token
+ *     without `read:statuses` gets, and every connection made before that scope was requested has one.
  *   v1.0.0 — 2026-08-02 — TARGET-057. Reach for Mastodon, Bluesky, YouTube and X; LinkedIn refuses
  *     out loud because member-post analytics are partner-gated.
  */
@@ -102,6 +104,16 @@ const mastodonMetrics: MetricReader = async ({ connection, credential, externalR
       signal: AbortSignal.timeout(15_000),
     });
     if (r.status === 404) return { ok: false, permanent: true, reason: 'that post is gone from the instance' };
+    // 403 is PERMANENT for this connection, not a hiccup. Mastodon answers it when the token lacks
+    // `read:statuses` — which every connection made before that scope was requested does. Reporting
+    // it as retryable puts a button in front of the user that can never work, and on a schedule it
+    // would be a standing pointless call. Reconnecting is the only fix, so the message says that.
+    if (r.status === 403) {
+      return {
+        ok: false, permanent: true,
+        reason: 'Mastodon refused: this connection was authorized without the read:statuses scope. Reconnect the account to read its numbers.',
+      };
+    }
     if (!r.ok) return { ok: false, permanent: r.status === 401, reason: `Mastodon answered HTTP ${r.status}` };
     const j = await r.json() as Record<string, unknown>;
     return sample({

@@ -15,6 +15,8 @@
  * @structure connectionMethods — connections · delegations · publish attempts
  * @usage merged onto PostgresKyselyStorage.prototype in ../index.ts
  * @version-history
+ *   v1.1.0 — 2026-08-02 — The attempt counters accept several connection ids: a provider's daily
+ *     allowance belongs to the app registration rather than to one account.
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1. Schema: migrations/0021_connections.sql.
  */
 import type { Selectable } from 'kysely';
@@ -335,7 +337,13 @@ export const connectionMethods = {
   ): Promise<PublishAttempt[]> {
     let q = this.db.selectFrom('PublishAttempt').selectAll();
     if (query.publisher) q = q.where('publisher', '=', query.publisher);
-    if (query.connectionId) q = q.where('connectionId', '=', query.connectionId);
+    // One id or several: a provider's daily allowance usually belongs to the APP rather than to
+    // one account, so counting a single connection answers a question nobody asked.
+    if (query.connectionId) {
+      q = Array.isArray(query.connectionId)
+        ? q.where('connectionId', 'in', query.connectionId)
+        : q.where('connectionId', '=', query.connectionId);
+    }
     if (query.delegationId) q = q.where('delegationId', '=', query.delegationId);
     if (query.status) {
       q = Array.isArray(query.status)
@@ -350,7 +358,13 @@ export const connectionMethods = {
   async countPublishAttempts(this: PostgresKyselyStorage, query: PublishAttemptQuery): Promise<number> {
     let q = this.db.selectFrom('PublishAttempt').select(({ fn }) => [fn.countAll<string>().as('n')]);
     if (query.publisher) q = q.where('publisher', '=', query.publisher);
-    if (query.connectionId) q = q.where('connectionId', '=', query.connectionId);
+    // One id or several: a provider's daily allowance usually belongs to the APP rather than to
+    // one account, so counting a single connection answers a question nobody asked.
+    if (query.connectionId) {
+      q = Array.isArray(query.connectionId)
+        ? q.where('connectionId', 'in', query.connectionId)
+        : q.where('connectionId', '=', query.connectionId);
+    }
     if (query.delegationId) q = q.where('delegationId', '=', query.delegationId);
     if (query.status) {
       q = Array.isArray(query.status)
@@ -513,5 +527,5 @@ export const connectionMethods = {
       .where('provider', '=', provider).where('instance', '=', instance)
       .executeTakeFirst();
     return r ? toProviderClient(r) : undefined;
-  },
+  }
 };

@@ -26,6 +26,9 @@
  *   GET    /v1/connections/delegations/:did/quota -- allowance left, BEFORE anything is refused
  * @usage app.use(connectionsRouter(config, storage));
  * @version-history
+ *   v1.1.0 — 2026-08-02 — A publish to one's OWN connection runs through the shared runOwnPublish(),
+ *     so the scheduler (schedules kind 'connections-publish') takes the identical idempotency-gated
+ *     path rather than a second copy of it.
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1e.
  */
 
@@ -45,9 +48,10 @@ import { requireEncryptionKey, sealCredential } from '../services/connections/cr
 import { startAuthorization, completeAuthorization, type ConnectContext } from '../services/connections/oauth.js';
 import { revokeConnection, ensureFreshCredential } from '../services/connections/refresh.js';
 import { attachCredential } from '../services/connections/attach.js';
-import { quotaStatus, openPublish, openOwnPublish } from '../services/connections/publish-gate.js';
+import { quotaStatus, openPublish } from '../services/connections/publish-gate.js';
 import { publishToProvider } from '../services/connections/publish.js';
 import { readMetrics, toStoredSample } from '../services/connections/metrics.js';
+import { runOwnPublish } from '../services/connections/publish-run.js';
 import type {
   ConnectionRecord, PublicConnection, ConnectionMode, ModerationMode,
   ProviderClientRecord, PublicProviderClient,
@@ -485,8 +489,26 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       return;
     }
 
-    // Resolved BEFORE the gate opens an attempt: a missing file is the caller's mistake and should
-    // not leave a row in flight for something that was never going to be uploaded.
+    // A publish to one's OWN connection goes through runOwnPublish, which is the SAME path the
+    // scheduler takes. Two copies of "open the gate, refresh, call the recipe, record" is how one of
+    // them eventually skips the gate, and skipping the gate publishes the same video twice.
+    if (connectionId) {
+      const out = await runOwnPublish(c, { publisher: principal, connectionId, storageKey, caption, params });
+      if (!out.ok) {
+        // A failure AFTER an attempt was opened is a 502 (the provider's answer); one before it is
+        // the caller's own input.
+        const status = out.notFound ? 404 : out.attemptId ? 502 : 400;
+        res.status(status).json(error(config.nodeId, out.code, out.reason));
+        return;
+      }
+      // Waiting states are honest outcomes, not errors: `held` is moderation and `queued` is a spent
+      // allowance. Reporting either as a failure teaches a caller to retry, which makes both worse.
+      res.json(success(config.nodeId, { attempt: out.attempt, replay: out.replay, url: out.url }));
+      return;
+    }
+
+    // The delegated path: an app acting over someone else's shared channel. Different gate, because
+    // the interesting constraints (per-user cap, moderation, fixed parameters) live on a delegation.
     let file: { bytes: Buffer; mimeType: string; name: string } | null = null;
     if (storageKey) {
       const stored = await storage.getStorageFile(principal, storageKey);
@@ -497,28 +519,18 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
       file = { bytes: stored.data, mimeType: stored.mimeType, name: storageKey.split('/').pop() ?? storageKey };
     }
 
-    const providerOf = async (): Promise<number | null> => {
-      const conn = connectionId ? await storage.getConnection(connectionId) : undefined;
-      const p = conn ? findProvider(providers, conn.provider) : undefined;
-      return p?.sharedDailyLimit ?? null;
-    };
-
-    const gate = connectionId
-      ? await openOwnPublish(storage, { publisher: principal, connectionId, storageKey, caption, params }, { sharedDailyLimit: await providerOf() })
-      : await openPublish(storage, { publisher: principal, appId, action, storageKey, caption, params }, { sharedDailyLimit: null });
+    const gate = await openPublish(
+      storage, { publisher: principal, appId, action, storageKey, caption, params }, { sharedDailyLimit: null },
+    );
 
     if (!gate.ok) {
       res.status(gate.code === 'NOT_FOUND' ? 404 : 400).json(error(config.nodeId, gate.code, gate.reason));
       return;
     }
-    // A repeat of work already opened. The first attempt's outcome is the answer; starting a second
-    // publish here is the double-post this whole mechanism exists to prevent.
     if (gate.replay) {
       res.json(success(config.nodeId, { attempt: gate.attempt, replay: true }));
       return;
     }
-    // Waiting states are honest outcomes, not errors: `held` is moderation and `queued` is a spent
-    // allowance. Reporting either as a failure teaches a caller to retry, which makes both worse.
     if (gate.attempt.status === 'held' || gate.attempt.status === 'queued') {
       res.json(success(config.nodeId, { attempt: gate.attempt, replay: false }));
       return;

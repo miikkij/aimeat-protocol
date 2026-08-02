@@ -8,6 +8,10 @@
  *     - ai              : server-side OpenRouter completion over predefined memory keys
  *     - agent_task      : materialise a task into an agent's queue on each fire
  *     - eco-capability  : invoke a connected ecosystem app's capability over the connect-tunnel
+ *     - connections-publish : post to one of the owner's OWN connected accounts. A one-shot
+ *       ("publish on Tuesday at 09:00") is this kind plus a max_runs:1 constraint — the clock, the
+ *       DST-correct timezone, the run log and /occurrences all come from this same machinery, so
+ *       there is no separate publish queue.
  *   GET /v1/schedules also aggregates the owner's extension cron jobs and each
  *   agent's self-reported internal scheduler (agents.<name>.scheduler) for the
  *   master Profile › Scheduler view.
@@ -40,6 +44,12 @@
  *     (managed + owner-installed extension crons) into a [from,to] window via croner, so the Profile ›
  *     Scheduler calendar can show day/week/month cadence. Window clamped to ~2 months; per-schedule and
  *     total occurrence caps guard against sub-minute crons; returns { occurrences:[{scheduleId,at}], truncated }.
+ *   v1.5.0 — 2026-08-02 — Add the `connections-publish` kind (LÄHETIN): post to one of the owner's OWN
+ *     connected accounts on this scheduler's clock. Deliberately a KIND rather than a second queue —
+ *     the durable job row, the DST-correct IANA timezone, the one-shot (max_runs:1 auto-disable), the
+ *     execution log, /occurrences and the whole REST surface already exist here. Validated at CREATE
+ *     time (connection is yours and active, a named file exists), because discovering either at 07:00
+ *     is a post that never appears with nobody awake to see why. Needs `connections:use`.
  *   v1.4.0 — 2026-07-17 — /occurrences now splits schedules by cadence: continuous / high-frequency crons
  *     (≥ ~6 fires/day, from the median gap of the first fire-times) are summarized in a new `frequent`
  *     array ({scheduleId, cron, intervalMinutes, approxPerDay}) instead of enumerated, so per-minute /
@@ -60,8 +70,8 @@ import { emitChange } from '../services/event-bus.js';
 import { mergeConstraintDefaults, knownConstraintTypes } from '../services/schedule-constraints.js';
 import { logger } from '../utils/logger.js';
 
-type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability';
-const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability'];
+type ScheduleKind = 'extension' | 'ai' | 'agent_task' | 'eco-capability' | 'connections-publish';
+const VALID_KINDS: ScheduleKind[] = ['extension', 'ai', 'agent_task', 'eco-capability', 'connections-publish'];
 
 /** Validate a cron expression (or the @activate sentinel) using croner. */
 function isValidCron(cron: string, timezone?: string): boolean {
@@ -128,6 +138,41 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     return Array.isArray(val?.entries) ? val!.entries! : [];
   }
 
+  /**
+   * Everything about a connections-publish input that can be checked BEFORE it fires.
+   *
+   * Shared by create AND edit, and that is the point: PATCH replaces `input` wholesale, so a check
+   * that only ran at create time would be a check anyone could walk around by editing afterwards.
+   * The publish gate would still refuse a foreign connection — that is the wall — but a schedule
+   * that is going to fail should be refused where somebody can see it, not at 07:00.
+   */
+  async function checkConnectionsPublishInput(
+    owner: string, raw: unknown,
+  ): Promise<{ status: number; code: string; message: string } | null> {
+    const input = (raw ?? {}) as { connection_id?: unknown; storage_key?: unknown };
+    const connectionId = typeof input.connection_id === 'string' ? input.connection_id : '';
+    if (!connectionId) {
+      return { status: 400, code: 'INVALID_INPUT', message: 'input.connection_id is required' };
+    }
+    const conn = await storage.getConnection(connectionId);
+    // Absent and not-yours answer identically: a connection belongs to the person who attached it,
+    // and the difference between the two answers would enumerate other people's accounts.
+    if (!conn || conn.principal !== owner) {
+      return { status: 404, code: 'NOT_FOUND', message: 'no such connection of yours' };
+    }
+    if (conn.status !== 'active') {
+      return {
+        status: 400, code: 'CONNECTION_UNAVAILABLE',
+        message: 'that account needs to be reconnected before anything can be scheduled to it',
+      };
+    }
+    const storageKey = typeof input.storage_key === 'string' ? input.storage_key : '';
+    if (storageKey && !(await storage.getStorageFile(owner, storageKey))) {
+      return { status: 404, code: 'NO_SUCH_FILE', message: `you have no stored file named '${storageKey}'` };
+    }
+    return null;
+  }
+
   /** Build a ScheduledJobRecord from a create body. Returns {record} or {error}. */
   async function buildRecordFromBody(
     req: Request, body: Record<string, unknown>, forcedAgentName?: string,
@@ -141,7 +186,9 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     // but a scoped principal (an H-2 app grant, or a narrowly-scoped agent) must hold the scope for the
     // capability the schedule DRIVES — otherwise a memory:write-only app could cron the owner's AI
     // budget (kind:'ai') or materialise tasks into the owner's agent queues (kind:'agent_task').
-    const kindScope: Partial<Record<ScheduleKind, string>> = { ai: 'ai:use', agent_task: 'task:write' };
+    const kindScope: Partial<Record<ScheduleKind, string>> = {
+      ai: 'ai:use', agent_task: 'task:write', 'connections-publish': 'connections:use',
+    };
     const needScope = kindScope[kind];
     if (needScope && !isOwnerSession(req)) {
       const scopes = req.auth!.scopes ?? [];
@@ -151,6 +198,11 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
         return { status: 403, code: 'SCOPE_DENIED', message: `Creating a "${kind}" schedule requires the "${needScope}" scope.` };
       }
     }
+    if (kind === 'connections-publish') {
+      const bad = await checkConnectionsPublishInput(owner, body.input);
+      if (bad) return bad;
+    }
+
     const cron = typeof body.cron === 'string' ? body.cron : '';
     const timezone = typeof body.timezone === 'string' ? body.timezone : undefined;
     if (!cron || !isValidCron(cron, timezone)) {
@@ -288,6 +340,18 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
         app,
         capability_id: capabilityId,
         input: (body.input && typeof body.input === 'object') ? body.input as Record<string, unknown> : {},
+      };
+    } else if (kind === 'connections-publish') {
+      // Narrowed to the fields the executor reads. Copying the body wholesale would let a caller park
+      // arbitrary JSON on the owner's schedule row, and `ref` is deliberately the ONLY free-form field
+      // — stored and handed back, never parsed.
+      const raw = (body.input ?? {}) as Record<string, unknown>;
+      base.input = {
+        connection_id: raw.connection_id,
+        ...(typeof raw.caption === 'string' ? { caption: raw.caption } : {}),
+        ...(typeof raw.storage_key === 'string' ? { storage_key: raw.storage_key } : {}),
+        ...(raw.params && typeof raw.params === 'object' ? { params: raw.params } : {}),
+        ...(typeof raw.ref === 'string' ? { ref: raw.ref.slice(0, 200) } : {}),
       };
     }
 
@@ -517,7 +581,15 @@ export function schedulesRouter(config: AimeatConfig, storage: Storage, schedule
     if (typeof body.description === 'string') updates.description = body.description.slice(0, 2000);
     if (typeof body.purpose === 'string') updates.purpose = body.purpose.slice(0, 500);
     if (body.constraints !== undefined) updates.constraints = sanitizeConstraints(body.constraints);
-    if (body.input && typeof body.input === 'object') updates.input = body.input as Record<string, unknown>;
+    if (body.input && typeof body.input === 'object') {
+      // A connections-publish edit is re-checked against the SAME rule the create used. Without this
+      // the ownership check is create-only, and "edit the schedule afterwards" walks around it.
+      if (job.type === 'connections-publish') {
+        const bad = await checkConnectionsPublishInput(ownerGhii(req), body.input);
+        if (bad) { res.status(bad.status).json(error(config.nodeId, bad.code, bad.message)); return; }
+      }
+      updates.input = body.input as Record<string, unknown>;
+    }
 
     const updated = await storage.updateScheduledJob(id, updates);
     await scheduler.reschedule(id);
