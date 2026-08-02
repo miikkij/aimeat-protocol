@@ -147,8 +147,29 @@ const contentHash = z.string().trim().regex(CONTENT_HASH_PATTERN, 'contentHash m
 // ── Nested blocks ───────────────────────────────────────────────────────────────────────────────
 
 /** WHERE the material came from. The honest thing for synthesized content. */
+/**
+ * A source address, SCHEME-CHECKED — because `.url()` is not.
+ *
+ * Zod's `.url()` validates that a string PARSES as a URL, and `javascript:alert(1)`,
+ * `JaVaScRiPt:alert(1)` and `data:text/html,<script>…</script>` all parse. A source is a place a
+ * reader can go and look; the two web schemes are the whole of that, and anything else in this
+ * field is either a mistake or an attempt to put script where a reader will click it.
+ *
+ * Exported so the MCP declaration boundary uses the SAME rule (mcp/ai-provenance-input.ts). Without
+ * that, the door accepted the value and the mint threw — a clean refusal beats a 500 that says
+ * "refusing to mint an invalid record" to somebody publishing an app.
+ *
+ * This closes the door for NEW records only. Records minted before it exist, which is why the
+ * readable page allowlists the scheme AGAIN at render time (services/ai-provenance-page.ts
+ * safeHref): that is the half that reaches what is already stored.
+ */
+export const AiSourceUrlSchema = z.string().trim().url().max(2_000).refine(
+  (u) => URL.canParse(u) && ['http:', 'https:'].includes(new URL(u).protocol),
+  { message: 'url must be http or https' },
+);
+
 export const AiProvenanceSourceSchema = z.object({
-  url: z.string().trim().url().max(2_000),
+  url: AiSourceUrlSchema,
   title: shortText.optional(),
   retrievedAt: isoInstant.optional(),
   role: shortText.optional(),

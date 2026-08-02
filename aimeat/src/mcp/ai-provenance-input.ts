@@ -50,7 +50,7 @@
  */
 import { z } from 'zod';
 import {
-  AI_PROVENANCE_LEVELS, AI_PROVENANCE_METHODS, AI_HUMAN_INVOLVEMENT,
+  AI_PROVENANCE_LEVELS, AI_PROVENANCE_METHODS, AI_HUMAN_INVOLVEMENT, AiSourceUrlSchema,
 } from '../models/ai-provenance-schemas.js';
 import type { DeclaredProvenance } from '../services/ai-provenance.js';
 
@@ -60,7 +60,11 @@ import type { DeclaredProvenance } from '../services/ai-provenance.js';
 export { AI_PROVENANCE_TOOL_NOTE } from './catalog/definitions/ai-provenance-note.js';
 
 const sourceInput = z.object({
-  url: z.string().describe('Where the material came from.'),
+  // The SAME scheme rule the stored record enforces, applied at the door. This field used to be a
+  // bare `z.string()`: a declaration could carry `javascript:…`, the mint would then throw deep in
+  // the service, and an author publishing an app got an opaque failure for an input the tool had
+  // just accepted. One rule, stated once, refused where the caller can see it.
+  url: AiSourceUrlSchema.describe('Where the material came from. Must be an http or https address.'),
   title: z.string().optional(),
   retrieved_at: z.string().optional().describe('ISO 8601 timestamp of when you fetched it.'),
   role: z.string().optional().describe("How it was used, e.g. 'primary' or 'background'."),

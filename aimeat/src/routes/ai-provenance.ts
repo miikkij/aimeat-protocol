@@ -98,6 +98,27 @@ const DeclareProvenanceSchema = z.object({
   attachToMemoryKey: z.string().trim().min(1).max(500).optional(),
 });
 
+/**
+ * Send a provenance HTML page under the tightest policy the page can actually run under.
+ *
+ * DEPTH, NOT THE FIX. The fix for a hostile `sources[].url` is the scheme allowlist in
+ * ai-provenance-page.ts safeHref(); this is the layer that holds if something else on this page
+ * ever becomes an href and somebody forgets. `script-src` inherits `'none'` from `default-src`,
+ * which also neutralises a `javascript:` URI outright.
+ *
+ * The list is short because the page's needs are, and they were checked rather than guessed: it
+ * loads no images, no fonts, no scripts and no external stylesheet — one inline `<style>` is the
+ * whole of it. `frame-ancestors 'none'` because a compliance statement should not be reframable by
+ * the app it is a statement about.
+ */
+function sendProvenanceHtml(res: Response, html: string): void {
+  res.setHeader('Content-Security-Policy',
+    "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'");
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  res.type('html').send(html);
+}
+
 export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Router {
   const router = Router();
   const resolve = (req: Request) => resolveIdentity(req.auth!, config.nodeId);
@@ -195,9 +216,10 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     // same single code path, no variant that says more.
     if (!row || (!isPublic && !isOwner)) {
       if (asPage) {
-        return res.status(404).type('html').send(provenanceNotFoundPage({
+        sendProvenanceHtml(res.status(404), provenanceNotFoundPage({
           baseUrl: config.baseUrl, locale: detectLocale(req.headers['accept-language']),
         }));
+        return;
       }
       return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'No such provenance record.'));
     }
@@ -208,11 +230,12 @@ export function aiProvenanceRouter(config: AimeatConfig, storage: Storage): Rout
     if (asPage) {
       // `.provenance` off the SAME projection the JSON branch sends — not `row.record`. One
       // expression decides what this caller may see, in both formats.
-      return res.type('html').send(provenancePage(serve(row, isOwner).provenance, {
+      sendProvenanceHtml(res, provenancePage(serve(row, isOwner).provenance, {
         baseUrl: config.baseUrl,
         locale: detectLocale(req.headers['accept-language']),
         recordUrl: `${config.baseUrl.replace(/\/+$/, '')}/v1/provenance/${row.id}`,
       }));
+      return;
     }
     // The correction procedure, offered where a person actually arrives: a visible label's "details"
     // link lands here, so this is the one page where somebody who thinks a label is wrong or missing

@@ -707,6 +707,50 @@ async function startStub(): Promise<void> {
         assert(/flags/.test(html), 'the page must tell a reader how to report a wrong label');
     });
 
+    await test('...under a policy tight enough that a hostile href could not run anyway', async () => {
+        const res = await fetch(`${BASE}/v1/provenance/${publicId}`, { headers: { Accept: 'text/html' } });
+        const csp = res.headers.get('content-security-policy') ?? '';
+        // Depth, not the fix — the scheme allowlist in safeHref() is the fix. `default-src 'none'`
+        // gives script-src 'none', which also neutralises a javascript: URI outright.
+        assert(csp.includes("default-src 'none'"), `expected a locked-down CSP, got: ${csp}`);
+        assert(csp.includes("frame-ancestors 'none'"), 'a compliance statement must not be reframable');
+        assert(!/script-src\s+[^;]*'unsafe-inline'/.test(csp), 'the page has no scripts and must not allow any');
+        // The site-wide policy (server-bootstrap/static-files.ts) is an app.use with no path, so it
+        // already covered this route — the audit that found the hole believed it did not. It is far
+        // looser than this page needs, and the route-level header REPLACES it rather than adding to
+        // it. This assertion pins that: the HTML response must carry OUR policy, not the site one.
+        const j = await fetch(`${BASE}/v1/provenance/${publicId}`);
+        const siteCsp = j.headers.get('content-security-policy') ?? '';
+        assert(siteCsp.includes("default-src 'self'"), `expected the site-wide policy on JSON, got: ${siteCsp}`);
+        assert(csp !== siteCsp, 'the page is being served under the site-wide policy instead of its own');
+    });
+
+    await test('A source with a javascript: scheme is REFUSED at the door', async () => {
+        // Before: zod's .url() accepted it, the record was minted, and the readable page turned it
+        // into a working link on the apex — where the session cookie lives.
+        const r = await json('/v1/provenance', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({
+                level: 'synthesized', humanInvolvement: 'none', contentHash: `sha256:${'a'.repeat(64)}`,
+                sources: [{ url: 'javascript:alert(1)' }],
+            }),
+        });
+        assert(r.status === 400, `expected 400, got ${r.status}: ${JSON.stringify(r.body)}`);
+        const v = JSON.stringify(r.body.error ?? {});
+        assert(/http/i.test(v), `the refusal must say what is wrong, got: ${v}`);
+    });
+
+    await test('...and an ordinary https source still mints fine', async () => {
+        const r = await json('/v1/provenance', {
+            method: 'POST', headers: auth(a.token),
+            body: JSON.stringify({
+                level: 'synthesized', humanInvolvement: 'none', contentHash: `sha256:${'b'.repeat(64)}`,
+                sources: [{ url: 'https://example.com/story', title: 'A story' }],
+            }),
+        });
+        assert(r.status === 201, `expected 201, got ${r.status}: ${JSON.stringify(r.body?.error)}`);
+    });
+
     await test('...and Vary: Accept is set, so a cache cannot serve one format for the other', async () => {
         const res = await fetch(`${BASE}/v1/provenance/${publicId}`, { headers: { Accept: 'text/html' } });
         assert((res.headers.get('vary') ?? '').toLowerCase().includes('accept'),

@@ -411,7 +411,13 @@ components:
             type: object
             required: [url]
             properties:
-              url: { type: string }
+              url:
+                type: string
+                format: uri
+                pattern: '^https?://'
+                description: >-
+                  http or https ONLY, checked at the door. A declaration carrying any other scheme
+                  is refused with a validation error rather than minted.
               title: { type: string }
               retrieved_at: { type: string, format: date-time }
               role: { type: string, description: "How it was used, e.g. 'primary' or 'background'." }
@@ -491,7 +497,14 @@ components:
             type: object
             required: [url]
             properties:
-              url: { type: string, format: uri }
+              url:
+                type: string
+                format: uri
+                pattern: '^https?://'
+                description: >-
+                  http or https ONLY. Zod's URL validation accepts `javascript:` and `data:` because
+                  they parse, so the scheme is checked separately. A source is a place a reader can
+                  go and look.
               title: { type: string }
               retrievedAt: { type: string, format: date-time }
               role: { type: string }
