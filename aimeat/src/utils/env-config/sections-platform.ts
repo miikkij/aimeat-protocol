@@ -131,7 +131,7 @@ export function platformSections(config: AimeatConfig): ConfigSection[] {
           envVar: 'AIMEAT_EXT_MAX_API_CALLS',
           description: 'Max API calls per extension invocation',
           value: String(config.extensionMaxApiCalls),
-          defaultVal: '50',
+          defaultVal: '500',
         },
         {
           envVar: 'AIMEAT_EXT_MAX_CODE_SIZE_KB',
