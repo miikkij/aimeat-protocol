@@ -228,6 +228,9 @@
     youtube: {
       before: "Sign in with the Google account that owns the channel. A Google account with no YouTube channel will connect and then have nowhere to publish."
     },
+    x: {
+      before: "Posting to X costs the node operator a small amount per post, charged against prepaid credits at X. When those credits run out, publishing stops until they are topped up."
+    },
     linkedin: {
       before: "A LinkedIn connection stops working after about two months and asks to be reconnected. That is LinkedIn: renewing a token in the background is a partner-only feature, so this is the one provider you will have to come back to a few times a year."
     },

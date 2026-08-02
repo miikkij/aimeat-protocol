@@ -22,7 +22,7 @@
 import { safeFetch } from '../../utils/url-validator.js';
 import { logger } from '../../utils/logger.js';
 import { sealCredential, openCredential } from './credential.js';
-import { findProvider } from './providers.js';
+import { findProvider, tokenRequest } from './providers.js';
 import { mintSession } from './attach.js';
 import type { ConnectContext } from './oauth.js';
 import type { ConnectionCredential, ConnectionRecord } from '../../models/connection-schemas.js';
@@ -149,19 +149,19 @@ async function performRefresh(ctx: ConnectContext, conn: ConnectionRecord): Prom
     : provider.client ? { clientId: provider.client.id, clientSecret: provider.client.secret } : null;
   if (!client) return { ok: false, code: 'CLIENT_UNAVAILABLE', reason: 'no client credentials for this provider' };
 
-  const body = new URLSearchParams({
+  // Same builder as the first exchange. A refresh that authenticated differently from the exchange
+  // is a connection that links successfully and then cannot renew -- visible only hours later.
+  const req = tokenRequest(provider, client, {
     grant_type: 'refresh_token',
     refresh_token: current.refreshToken,
-    client_id: client.clientId,
-    client_secret: client.clientSecret,
   });
 
   let res: Response;
   try {
     res = await safeFetch(endpoints.token, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-      body: body.toString(),
+      headers: req.headers,
+      body: req.body,
       signal: AbortSignal.timeout(20_000),
     });
   } catch (err) {

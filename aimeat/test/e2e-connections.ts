@@ -454,6 +454,45 @@ async function main(): Promise<void> {
         'with no keys LinkedIn should be present but disabled, saying which keys are missing');
     });
 
+    await test('the client secret goes where each provider wants it, and only there', async () => {
+      // The trap this exists for: X requires HTTP Basic and answers a body-carried secret with a 401
+      // that names nothing. Both halves are checked, because sending the secret in BOTH places is
+      // the "fix" that appears to work and quietly leaks the secret into a form body.
+      const { tokenRequest } = await import('../src/services/connections/providers.js');
+      const client = { clientId: 'the-id', clientSecret: 'the-secret' };
+
+      const basic = tokenRequest({ tokenAuth: 'basic' } as any, client, { grant_type: 'refresh_token' });
+      assert(typeof basic.headers.Authorization === 'string', 'a basic provider got no Authorization header');
+      const decoded = Buffer.from(basic.headers.Authorization.replace('Basic ', ''), 'base64').toString();
+      assert(decoded === 'the-id:the-secret', `header decoded to ${decoded}`);
+      assert(!basic.body.includes('the-secret'), 'the secret was ALSO put in the body');
+      assert(basic.body.includes('client_id=the-id'), 'client_id must still be in the body');
+
+      const body = tokenRequest({ tokenAuth: 'body' } as any, client, { grant_type: 'refresh_token' });
+      assert(body.headers.Authorization === undefined, 'a body provider got an Authorization header');
+      assert(body.body.includes('client_secret=the-secret'), 'the secret is missing from the body');
+    });
+
+    await test('X is shaped for its own flow once its keys are present', async () => {
+      const { buildOutboundProviders, findProvider } = await import('../src/services/connections/providers.js');
+      const withKeys = buildOutboundProviders({
+        connectionsEnabled: true,
+        connectGoogleClientId: '', connectGoogleClientSecret: '',
+        connectLinkedinClientId: '', connectLinkedinClientSecret: '',
+        connectXClientId: 'id', connectXClientSecret: 'secret',
+        connectFakeBaseUrl: '', connectRedirectUri: 'https://example.test/cb',
+      } as any);
+      const px = findProvider(withKeys, 'x');
+      assert(px !== null && px.enabled, 'X is not offered even with credentials');
+      assert(px!.pkce === true, 'X requires PKCE');
+      assert(px!.tokenAuth === 'basic', 'X must authenticate at the token endpoint with Basic');
+      // Without offline.access X issues no refresh token and the connection dies in two hours,
+      // silently -- the same shape as Google's access_type=offline.
+      assert(px!.scopes.includes('offline.access'), 'X without offline.access cannot renew');
+      assert(px!.scopes.includes('users.read'), 'X needs users.read to know whose account this is');
+      assert(!px!.capabilities.includes('publish-video'), 'X claims video it cannot do');
+    });
+
     await test('a supplied credential connects the account', async () => {
       const before = provider.stats.sessionMints;
       const r = await api('/v1/connections/attach', {

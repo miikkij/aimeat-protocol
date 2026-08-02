@@ -26,7 +26,7 @@ import { randomUUID, randomBytes, createHash } from 'node:crypto';
 import { safeFetch } from '../../utils/url-validator.js';
 import { sealCredential } from './credential.js';
 import { normalizeInstance, registerAtInstance, type InstanceClient } from './instance.js';
-import { findProvider, type OutboundProvider } from './providers.js';
+import { findProvider, type OutboundProvider, tokenRequest } from './providers.js';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage } from '../../storage/interface.js';
 import type { ConnectionMode, ConnectionRecord } from '../../models/connection-schemas.js';
@@ -218,6 +218,21 @@ async function fetchAccountIdentity(
       const title = typeof item?.snippet?.title === 'string' ? item.snippet.title : id;
       return { externalId: id, accountLabel: title };
     }
+    if (provider.id === 'x') {
+      const r = await safeFetch('https://api.x.com/2/users/me', {
+        headers: auth, signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) {
+        return { error: r.status === 403
+          ? 'X accepted the sign-in but would not say which account it is for. Check that the app requests the users.read scope.'
+          : `X rejected the token (HTTP ${r.status})` };
+      }
+      const j = await r.json() as { data?: { id?: unknown; username?: unknown } };
+      const id = typeof j.data?.id === 'string' ? j.data.id : '';
+      if (!id) return { error: 'X returned no account id' };
+      const handle = typeof j.data?.username === 'string' ? j.data.username : '';
+      return { externalId: id, accountLabel: handle ? `@${handle}` : id };
+    }
     if (provider.id === 'linkedin') {
       // The OIDC userinfo endpoint, which is what the openid+profile scopes are for. `sub` is the
       // stable member id and the dedupe key; the name is what the owner reads in the panel.
@@ -289,21 +304,19 @@ export async function completeAuthorization(
   const endpoints = provider.endpoints(payload.instance);
   if (!endpoints) return { ok: false, code: 'NO_ENDPOINTS', reason: 'provider has no token endpoint' };
 
-  const body = new URLSearchParams({
+  const req = tokenRequest(provider, client, {
     grant_type: 'authorization_code',
     code: input.code,
     redirect_uri: callbackUrl(ctx.config),
-    client_id: client.clientId,
-    client_secret: client.clientSecret,
+    ...(provider.pkce ? { code_verifier: nonce.nonce } : {}),
   });
-  if (provider.pkce) body.set('code_verifier', nonce.nonce);
 
   let token: TokenResponse;
   try {
     const r = await safeFetch(endpoints.token, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Accept: 'application/json' },
-      body: body.toString(),
+      headers: req.headers,
+      body: req.body,
       signal: AbortSignal.timeout(20_000),
     });
     if (!r.ok) return { ok: false, code: 'EXCHANGE_FAILED', reason: `the provider refused the code (HTTP ${r.status})` };

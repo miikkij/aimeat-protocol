@@ -28,7 +28,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { CredentialShape } from '../../models/connection-schemas.js';
 
 /** Stable provider identifiers. Also the value stored in `Connection.provider`. */
-export type OutboundProviderId = 'mastodon' | 'youtube' | 'linkedin' | 'bluesky' | 'fake' | 'fake-static';
+export type OutboundProviderId = 'mastodon' | 'youtube' | 'linkedin' | 'x' | 'bluesky' | 'fake' | 'fake-static';
 
 /**
  * What a user must supply for a provider that has NO authorization round.
@@ -73,6 +73,16 @@ export interface OutboundProvider {
   scopes: string[];
   /** Whether to send a PKCE challenge. Always true where the provider supports it. */
   pkce: boolean;
+  /**
+   * WHERE THE CLIENT SECRET GOES at the token endpoint.
+   *
+   * 'body' is the common case and the default. 'basic' is HTTP Basic authentication, which X
+   * REQUIRES for a confidential client: sending its secret in the form body is a 401 with a message
+   * that does not name the cause. This is a field rather than a check on the provider id because
+   * two places mint tokens (the first exchange and every refresh), and a rule that lives in one of
+   * them is a connection that authorises and then cannot renew.
+   */
+  tokenAuth: 'body' | 'basic';
   /**
    * What an app may ASK about a connection at this provider (decision K1). An app never reads the
    * provider's own scope vocabulary — it cannot know what those names mean — so it asks a question
@@ -126,6 +136,7 @@ function mastodon(enabled: boolean): OutboundProvider {
     client: null,
     scopes: ['read:accounts', 'write:statuses', 'write:media'],
     pkce: true,
+    tokenAuth: 'body',
     capabilities: ['publish-post', 'publish-video'],
     attachFields: null,
     // Instances rate-limit, but there is no single daily publish ceiling to state, and inventing
@@ -177,6 +188,7 @@ function youtube(clientId: string, clientSecret: string, capabilityOn: boolean):
       'https://www.googleapis.com/auth/youtube.readonly',
     ],
     pkce: true,
+    tokenAuth: 'body',
     capabilities: ['publish-video'],
     attachFields: null,
     // SIX. Read from the project's own quota page on 2026-08-02, not guessed:
@@ -248,6 +260,7 @@ function linkedin(clientId: string, clientSecret: string, capabilityOn: boolean)
     // then reading is the mistake that cost an hour on YouTube.
     scopes: ['openid', 'profile', 'w_member_social'],
     pkce: false,
+    tokenAuth: 'body',
     // Text and images at the Consumer tier. NOT publish-video and NOT a native PDF carousel: the
     // Documents API sits behind the partner-gated Community Management product, and advertising a
     // capability the recipe cannot perform is the bug the attach route was already fixed for.
@@ -262,6 +275,66 @@ function linkedin(clientId: string, clientSecret: string, capabilityOn: boolean)
         token: 'https://www.linkedin.com/oauth/v2/accessToken',
         // LinkedIn offers a revocation endpoint; revoking locally alone would be forgetting.
         revoke: 'https://www.linkedin.com/oauth/v2/revoke',
+      };
+    },
+  };
+}
+
+/**
+ * X.
+ *
+ * WHY IT IS HERE NOW AND WAS NOT BEFORE. X had no usable free write access; the entry price was a
+ * monthly subscription, which put it out of scope for a node that anyone can run. That changed on
+ * 2026-02-06: the free tier closed to new developers and pay-per-use replaced it, with NO monthly
+ * minimum, prepaid credits, a spend cap the developer sets, and roughly $0.015 per post created.
+ * The blocker was the subscription floor, and the subscription floor is gone.
+ *
+ * THREE THINGS DIFFER FROM THE OTHER OAUTH PROVIDERS:
+ *
+ *   The secret goes in an Authorization header, not the body — see tokenAuth above.
+ *
+ *   PKCE is mandatory rather than optional.
+ *
+ *   offline.access is what makes the connection survive. Without that scope X issues no refresh
+ *   token and the connection dies in two hours. It is the same trap as Google's access_type=offline
+ *   and it is silent in exactly the same way: the authorization succeeds, nothing in the response
+ *   says anything is missing, and the failure arrives hours later.
+ *
+ * COSTS REAL MONEY PER POST, which nothing else in this registry does. The operator's spend cap
+ * lives at X rather than here, and that is the right place for it: a limit this node enforced could
+ * be bypassed by anything else using the same credentials.
+ */
+function x(clientId: string, clientSecret: string, capabilityOn: boolean): OutboundProvider {
+  const configured = Boolean(clientId && clientSecret);
+  const enabled = capabilityOn && configured;
+  return {
+    id: 'x',
+    label: 'X',
+    credentialShape: 'oauth2',
+    instanceScoped: false,
+    enabled,
+    disabledReason: enabled
+      ? null
+      : !capabilityOn
+        ? 'connections capability is off (AIMEAT_CONNECTIONS_ENABLED)'
+        : 'no client credentials (AIMEAT_CONNECT_X_CLIENT_ID / _SECRET)',
+    client: configured ? { id: clientId, secret: clientSecret } : null,
+    // users.read identifies the account, tweet.write publishes, offline.access keeps it alive.
+    // Dropping any one of the three breaks something that only shows up later.
+    scopes: ['tweet.read', 'tweet.write', 'users.read', 'offline.access'],
+    pkce: true,
+    tokenAuth: 'basic',
+    // Text only for now. Media goes through a separate chunked endpoint with its own processing
+    // wait, and claiming video before that exists is the failure the recipe guard now catches.
+    capabilities: ['publish-post'],
+    // Pay-per-use has no daily ceiling to model; the limit is a spend cap set at X.
+    sharedDailyLimit: null,
+    attachFields: null,
+    endpoints() {
+      return {
+        authorize: 'https://x.com/i/oauth2/authorize',
+        token: 'https://api.x.com/2/oauth2/token',
+        revoke: 'https://api.x.com/2/oauth2/revoke',
       };
     },
   };
@@ -290,6 +363,7 @@ function bluesky(capabilityOn: boolean): OutboundProvider {
     client: null,
     scopes: [],
     pkce: false,
+    tokenAuth: 'body',
     // publish-post ONLY, and publish-video is deliberately absent. Video on Bluesky goes through a
     // separate video service with its own job queue and limits, which is not built. Listing a
     // capability the recipe cannot perform is the same "advertised but unconnectable" mistake the
@@ -330,6 +404,7 @@ function fake(baseUrl: string, capabilityOn: boolean): OutboundProvider {
     client: baseUrl ? { id: 'fake-client', secret: 'fake-secret' } : null,
     scopes: ['publish'],
     pkce: true,
+    tokenAuth: 'body',
     capabilities: ['publish-video', 'publish-post'],
     sharedDailyLimit: null,
     attachFields: null,
@@ -363,6 +438,7 @@ function fakeStatic(baseUrl: string, capabilityOn: boolean): OutboundProvider {
     client: null,
     scopes: [],
     pkce: false,
+    tokenAuth: 'body',
     capabilities: ['publish-post'],
     sharedDailyLimit: null,
     attachFields: [
@@ -371,6 +447,32 @@ function fakeStatic(baseUrl: string, capabilityOn: boolean): OutboundProvider {
     ],
     endpoints() { return null; },
   };
+}
+
+/**
+ * Build the token-endpoint request the way THIS provider wants to be asked.
+ *
+ * Two providers, two conventions, one place. RFC 6749 allows either, and X is strict about wanting
+ * the header form: a confidential client that puts its secret in the body gets a 401 whose message
+ * does not mention the secret at all.
+ */
+export function tokenRequest(
+  provider: OutboundProvider,
+  client: { clientId: string; clientSecret: string },
+  fields: Record<string, string>,
+): { headers: Record<string, string>; body: string } {
+  const body = new URLSearchParams({ ...fields, client_id: client.clientId });
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/x-www-form-urlencoded',
+    Accept: 'application/json',
+  };
+  if (provider.tokenAuth === 'basic') {
+    const pair = Buffer.from(`${client.clientId}:${client.clientSecret}`).toString('base64');
+    headers.Authorization = `Basic ${pair}`;
+  } else {
+    body.set('client_secret', client.clientSecret);
+  }
+  return { headers, body: body.toString() };
 }
 
 /**
@@ -384,6 +486,7 @@ export function buildOutboundProviders(config: AimeatConfig): OutboundProvider[]
     mastodon(on),
     youtube(config.connectGoogleClientId, config.connectGoogleClientSecret, on),
     linkedin(config.connectLinkedinClientId, config.connectLinkedinClientSecret, on),
+    x(config.connectXClientId, config.connectXClientSecret, on),
     bluesky(on),
   ];
   // Appended only when configured, so a production node's list is exactly the three above.

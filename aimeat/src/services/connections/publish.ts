@@ -19,6 +19,7 @@
  * @usage import { publishToProvider } from './publish.js';
  * @version-history
  *   v1.0.0 — 2026-08-02 — TARGET-057 phase 7b. Mastodon video, Bluesky text, YouTube resumable.
+ *   v1.2.0 — 2026-08-02 — X text posts. Billing refusal is kept distinct from content refusal.
  *   v1.1.0 — 2026-08-02 — LinkedIn text + image. Escapes their little-text markup; a video is
  *     refused out loud rather than dropped.
  */
@@ -482,11 +483,78 @@ const linkedinPost: PublishRecipe = async (input) => {
   }
 };
 
+/**
+ * X: a text post.
+ *
+ * NO MEDIA YET, and it says so rather than dropping the file. X's media upload is a separate
+ * chunked endpoint with an asynchronous processing wait, which is the YouTube-shaped work rather
+ * than a parameter on this call. The provider advertises publish-post only, and the recipe guard
+ * fails the build if those two ever disagree.
+ *
+ * THIS ONE COSTS MONEY. Every successful call is a charge against the operator's prepaid credits,
+ * which makes the idempotency ledger in publish-gate.ts a billing control here and not only a
+ * correctness one: a duplicate publish anywhere else is an embarrassment, and here it is also a
+ * second charge.
+ */
+const xPost: PublishRecipe = async (input) => {
+  const { credential, connection, caption } = input;
+  const token = credential.accessToken;
+  if (!token) return { ok: false, permanent: true, reason: 'no access token on this connection' };
+  if (input.file) {
+    return {
+      ok: false,
+      permanent: true,
+      reason: 'X posts text through this connection; attaching media needs the chunked upload endpoint, which this recipe does not implement yet',
+    };
+  }
+  if (!caption.trim()) return { ok: false, permanent: true, reason: 'X will not accept an empty post' };
+
+  try {
+    const res = await safeFetch('https://api.x.com/2/tweets', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: caption }),
+      signal: AbortSignal.timeout(30_000),
+    });
+    if (res.status === 401) {
+      return { ok: false, permanent: true, reason: 'X no longer accepts this token; the connection needs reconnecting' };
+    }
+    if (res.status === 403) {
+      return { ok: false, permanent: true, reason: `X refused the post: ${await providerSaid(res)}` };
+    }
+    if (res.status === 402) {
+      // Distinct from a refusal on purpose: nothing about the CONTENT is wrong, and the fix is to
+      // top up rather than to rewrite. Not permanent, because the same post will work once funded.
+      return { ok: false, permanent: false, reason: 'X declined for billing: the prepaid credit balance is spent' };
+    }
+    if (res.status === 429) {
+      return { ok: false, permanent: false, reason: 'X is rate limiting this app; the same post can be tried later' };
+    }
+    if (!res.ok) {
+      return { ok: false, permanent: false, reason: `X post failed (HTTP ${res.status}): ${await providerSaid(res)}` };
+    }
+    const j = await res.json() as { data?: { id?: unknown } };
+    const id = typeof j.data?.id === 'string' ? j.data.id : '';
+    if (!id) {
+      logger.warn('connections: X published but returned no post id', { connectionId: connection.id });
+      return { ok: true, externalRef: '' };
+    }
+    // accountLabel is the @handle, which is what the permalink wants. `i` works for any account and
+    // is what X itself redirects to, so a missing label does not cost the link.
+    const handle = (connection.accountLabel || '').replace(/^@/, '') || 'i';
+    return { ok: true, externalRef: `https://x.com/${handle}/status/${id}` };
+  } catch (err) {
+    logger.warn('connections: the X post failed', { connectionId: connection.id, error: String(err) });
+    return { ok: false, permanent: false, reason: `could not reach X: ${(err as Error).message}` };
+  }
+};
+
 const RECIPES: Record<string, PublishRecipe> = {
   mastodon: mastodonPublish,
   bluesky: blueskyPost,
   youtube: youtubeUpload,
   linkedin: linkedinPost,
+  x: xPost,
   fake: fakePublish,
   'fake-static': fakePublish,
 };
