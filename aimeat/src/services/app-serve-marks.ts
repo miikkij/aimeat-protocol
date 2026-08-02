@@ -37,12 +37,17 @@
  *   const body = applyServeMarks(app.data, {
  *     badge: true, provenance: prov, visibleLabel: { config, locale }, discovery, headMeta });
  * @version-history
+ *   v1.1.0 — 2026-08-02 — The reserved-strip contract: whenever visible chrome is served (badge or
+ *     AI label), also declare `--aimeat-chrome-bottom` (utils/app-chrome-reserve.ts) so apps can
+ *     lift their own fixed bottom UI clear of the marks instead of being covered by them. Goldens
+ *     re-captured — this is the first INTENTIONAL output change since the consolidation.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 5 step 0a: the four serve-time injectors become one pass.
  */
 import type { AimeatConfig } from '../config.js';
 import type { Locale } from '../i18n.js';
 import { injectBeforeClosingTag } from '../utils/html-inject.js';
 import { BADGE_MARK, badgeSnippet } from '../utils/app-badge.js';
+import { RESERVE_MARK, reserveSnippet } from '../utils/app-chrome-reserve.js';
 import { DISCOVERY_MARK, agentDiscoverySnippet, type AppDiscoverySpec } from '../utils/app-agent-discovery.js';
 import { applyAppHeadMeta, type AppHeadSpec } from '../utils/app-head-meta.js';
 import {
@@ -85,6 +90,11 @@ export function applyServeMarks(data: Buffer | Uint8Array | string, spec: ServeM
     // injectors did in effect: none of them emits another's marker, so a chain of `.includes`
     // checks over progressively longer strings gave the same answers.
     const parts: string[] = [];
+    // The reserved-strip contract rides along whenever VISIBLE chrome does (the badge or the AI
+    // label): it declares `--aimeat-chrome-bottom` so the app can lift its own bottom UI clear of
+    // the marks. Declaration only — an app that ignores it renders exactly as before.
+    const visibleChrome = spec.badge || (spec.provenance && spec.visibleLabel);
+    if (visibleChrome && !text.includes(RESERVE_MARK)) parts.push(reserveSnippet());
     if (spec.badge && !text.includes(BADGE_MARK)) parts.push(badgeSnippet());
     if (spec.provenance && !text.includes(PROVENANCE_HTML_MARK)) {
       const { block, w3c } = aiDisclosureParts(spec.provenance, spec.visibleLabel);

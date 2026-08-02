@@ -12,6 +12,10 @@
  * @usage import { buildAppPrompt } from '../services/build-app-prompt.js';
  *   const { full, body } = buildAppPrompt(config, { lang: 'en', mode: 'new', idea: '...' });
  * @version-history
+ *   2026-08-02 — ADDITIVE: "The node's bottom chrome strip" section + finish-gate check 6. The node
+ *     now serves `--aimeat-chrome-bottom` (utils/app-chrome-reserve.ts) and apps lift fixed bottom
+ *     UI / pad scrollers by it, so nothing renders under the AI label or the attribution badge.
+ *     Existing text untouched.
  *   2026-08-01 — TARGET-058 Phase 5, ADDITIVE (permission granted 2026-08-01): "Say that the AI made
  *     it" — the disclose/declare/chatNotice calls with one worked snippet, the `<meta name="aimeat-ai">`
  *     posture declaration, and the Art. 50(3) paragraph putting the biometric-inference duty on the
@@ -401,6 +405,26 @@ export function buildAppPrompt(
   body += '- **Verify**: at 390px (portrait) AND ~844px (landscape), `document.documentElement.scrollWidth === clientWidth` (zero horizontal overflow) and body text stays ≥14px.\n';
   body += 'For a focused view (chat/editor/wizard) on ≤760px, go full-screen (`position:fixed; inset:0` gated on an is-active class) with a Back affordance, rather than sharing the screen with app chrome.\n\n';
 
+  // The reserved bottom strip. Two fixed node marks (the AI-disclosure label bottom-left, the
+  // aimeat.io attribution badge bottom-right) ride every served app and always win the paint, so an
+  // app's own fixed bottom bar ends up covered unless it lifts itself clear. The node publishes the
+  // strip height as --aimeat-chrome-bottom (utils/app-chrome-reserve.ts via app-serve-marks.ts);
+  // this section is the app-side half of that contract. (Oma talo stats bar under both marks at
+  // 390px, 2026-08-02.)
+  body += '### The node\'s bottom chrome strip — lift your bottom UI clear of it\n';
+  body += 'Every served app carries two permanent marks fixed to the bottom corners: the AI-disclosure label (bottom-left) and the aimeat.io attribution badge (bottom-right). They are node chrome, they always paint on top, and they stay — so design the bottom edge of the app as RESERVED. The node tells you exactly how much: at serve time it sets `--aimeat-chrome-bottom` on `:root` (a height in px; larger on narrow viewports where the marks stack). Read the variable rather than hardcoding numbers, and give it fallbacks that match the current geometry (56px wide, 96px at ≤640px) so a locally previewed file lays out correctly too:\n';
+  body += '```css\n';
+  body += '/* Fixed/sticky bottom bars sit ABOVE the strip */\n';
+  body += '.bottom-bar { bottom: var(--aimeat-chrome-bottom, 56px); }\n';
+  body += '/* Scroll containers pad past it so the last row is reachable */\n';
+  body += '.scroll-area { padding-bottom: calc(var(--aimeat-chrome-bottom, 56px) + 12px); }\n';
+  body += '@media (max-width: 640px) {\n';
+  body += '  .bottom-bar { bottom: var(--aimeat-chrome-bottom, 96px); }\n';
+  body += '  .scroll-area { padding-bottom: calc(var(--aimeat-chrome-bottom, 96px) + 12px); }\n';
+  body += '}\n';
+  body += '```\n';
+  body += 'The same applies to full-screen focused views: give their bottom input row the same `padding-bottom`. When the node\'s chrome geometry changes, the served variable overrides your fallback automatically — that is the point of reading it.\n\n';
+
   // Visual verification. The mobile checklist proved a machine-checkable rule beats good intentions
   // (scrollWidth === clientWidth). These are the same idea for appearance: an app can pass every
   // functional test and still ship an unreadable dark theme, because nobody ever opened it.
@@ -435,6 +459,7 @@ export function buildAppPrompt(
   body += '3. **Read the network log after 60 idle seconds.** A repeating full listing is a bug even when nothing visibly breaks: it is a poll you did not intend. Gate it (see the live-updates section) so an idle app is idle.\n';
   body += '4. **If anything in the app costs money** (an AI call, an agent commission): open the network log, click that control FIVE times as fast as you can, and count the requests. Expected: **one**. Then RELOAD the page and commission the same job again — the node answers with the run you already have (`task.deduplicated`), and your UI must say so rather than claim a new one. Report both.\n';
   body += '5. **If the app generates content with a model**: the AI label is VISIBLE at all three viewports in both themes, and a generated item you stored carries its provenance record. Open the stored record and look for `aiProvenance` — the label on screen and the record in storage are two separate things and both are owed.\n';
+  body += '6. **The bottom chrome strip is clear at all three viewports**: scroll every scrollable surface to its end and confirm the last row and every fixed bottom control sit fully above the node\'s bottom marks (the AI label and the aimeat.io badge). If anything of yours renders under them, apply the `--aimeat-chrome-bottom` rules from the bottom-chrome section.\n';
   body += 'Verify the FEATURE too, not just the render: perform the real interaction (commission the thing, save the thing, delete the thing) and confirm the result actually appears and persists. "It did not crash" is not a pass.\n\n';
 
   // Game form language — palette alone reads as a dashboard; the FORM LANGUAGE makes the game.
