@@ -7,13 +7,26 @@
  *
  *   Plain .mjs on purpose — it runs as a postinstall hook, where a production install
  *   (`pnpm install --prod`) has no tsx to run a TypeScript script with.
- * @structure main() → --check (verify only, non-zero exit when something is missing) | default
- *   (download what is missing or corrupt, atomically via a .part file)
+ *
+ *   TWO LAYOUTS, and getting this wrong broke `npm i aimeat` for every published version up to
+ *   2.6.0. A dev checkout serves from `public/`; a PUBLISHED install ships `dist/` only, so the
+ *   same tree arrives at `dist/public/`. Resolving the manifest at a hardcoded `public/lib/` meant
+ *   the hook crashed with MODULE_NOT_FOUND-adjacent "no manifest" on every real install — unnoticed
+ *   because this repo's own global `aimeat` is a symlink into the working tree and therefore never
+ *   exercises the tarball.
+ * @structure resolvePublicRoot() → dev vs published layout; main() → --check (verify only, non-zero
+ *   exit when something is missing) | --optional (never fail the caller) | default (download what is
+ *   missing or corrupt, atomically via a .part file)
  * @usage
- *   pnpm vendor:libs        # download what is missing (postinstall / dev / build run this)
+ *   pnpm vendor:libs        # download what is missing (dev start / build run this)
  *   pnpm check:vendored     # verify only — CI and "why does /lib/... 404" use this
+ *   node scripts/vendor-libs.mjs --optional   # postinstall: warn, never abort the install
  *   AIMEAT_SKIP_VENDOR=1 pnpm install   # opt out (offline or air-gapped machine)
  * @version-history
+ *   v1.1.0 — 2026-08-02 — Resolve the public tree in BOTH layouts (dev `public/`, published
+ *     `dist/public/`), and add `--optional` for the postinstall hook so a firewalled or offline
+ *     machine gets a warning instead of a failed `npm install`. Explicit runs and --check still
+ *     fail loudly.
  *   v1.0.0 — 2026-07-30 — initial: @ffmpeg/core 0.12.6 wasm (32 MB), sha256-pinned.
  */
 import { createHash } from 'node:crypto';
@@ -22,8 +35,34 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-const MANIFEST = join(ROOT, 'public', 'lib', 'vendored-assets.json');
 const checkOnly = process.argv.includes('--check');
+/** postinstall: a machine that cannot reach the network must still finish installing. */
+const optional = process.argv.includes('--optional');
+
+/**
+ * The served public tree, which is not in the same place in both layouts: a dev checkout has
+ * `public/`, a published install ships `dist/` only and so has `dist/public/`. Assets must land in
+ * the tree the node actually serves, or they are downloaded and then never found.
+ */
+function resolvePublicRoot() {
+  for (const candidate of [join(ROOT, 'public'), join(ROOT, 'dist', 'public')]) {
+    if (existsSync(join(candidate, 'lib', 'vendored-assets.json'))) return candidate;
+  }
+  return null;
+}
+
+const PUBLIC_ROOT = resolvePublicRoot();
+if (PUBLIC_ROOT === null) {
+  const where = 'public/lib/vendored-assets.json (dev) or dist/public/lib/vendored-assets.json (published)';
+  if (checkOnly) {
+    console.error(`vendor-libs: no manifest found at ${where}.`);
+    process.exit(1);
+  }
+  // Not a layout we recognise. Saying so beats aborting somebody's install over it.
+  console.warn(`vendor-libs: no manifest at ${where} — nothing to vendor.`);
+  process.exit(0);
+}
+const MANIFEST = join(PUBLIC_ROOT, 'lib', 'vendored-assets.json');
 
 /** sha256 of a file on disk, or null when it is not there. */
 function hashOf(file) {
@@ -66,7 +105,7 @@ if (process.env.AIMEAT_SKIP_VENDOR === '1' && !checkOnly) {
 }
 
 for (const asset of assets) {
-  const target = join(ROOT, 'public', asset.path);
+  const target = join(PUBLIC_ROOT, asset.path);
   const have = hashOf(target);
   if (have === asset.sha256) continue;
 
@@ -80,8 +119,17 @@ for (const asset of assets) {
     console.warn(`  ! public/${asset.path} does not match its pinned hash (${statSync(target).size} bytes on disk) — refetching`);
     rmSync(target);
   }
-  await download(asset, target);
-  fetched++;
+  try {
+    await download(asset, target);
+    fetched++;
+  } catch (err) {
+    // An explicit `pnpm vendor:libs` must still fail — the caller asked for these bytes. The
+    // postinstall hook must not: a firewalled or offline machine installing the package has not
+    // asked for anything, and failing there aborts the whole install over an optional asset.
+    if (!optional) throw err;
+    console.warn(`vendor-libs: could not fetch ${asset.path} — ${(err).message}`);
+    console.warn(`vendor-libs: /lib/${asset.path} will 404 until you run: pnpm vendor:libs`);
+  }
 }
 
 if (checkOnly) {

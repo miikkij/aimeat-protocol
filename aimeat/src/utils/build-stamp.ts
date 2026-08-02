@@ -12,9 +12,13 @@
  * @structure readBuildStamp(): BuildStamp | null; checkBuildFreshness(): BuildFreshness
  * @usage import { checkBuildFreshness } from '../utils/build-stamp.js';
  * @version-history
+ *   v1.1.0 — 2026-08-02 — Detect a published install by the absence of `src/` rather than by all
+ *     source dirs scanning to zero. `scripts/vendor-libs.mjs` ships as a postinstall hook, so a
+ *     tarball has a `scripts/` dir whose mtimes are extraction time — which made every published
+ *     install announce STALE BUILD. Found by installing the packed tarball into a clean directory.
  *   v1.0.0 — 2026-08-02 — Initial stale-dist detection for the serve daemon.
  */
-import { readFileSync, readdirSync, statSync, type Dirent } from 'node:fs';
+import { readFileSync, readdirSync, statSync, existsSync, type Dirent } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -155,6 +159,14 @@ export function checkBuildFreshness(): BuildFreshness {
   if (!stamp) return compareFreshness(null, 0);
 
   const pkgRoot = join(dirname(stampPath()), '..');
+
+  // `src/` is THE discriminator between a dev checkout and a published install, because it is the
+  // one source dir that never ships. Do not infer this from the union of source_dirs: `scripts/`
+  // partially ships (vendor-libs.mjs is a postinstall hook), so a tarball install has a `scripts/`
+  // whose mtimes are the EXTRACTION time — newer than built_at, which made every published install
+  // announce itself as a stale build. Measured on a clean `npm install` of 2.6.1 before this line.
+  if (!existsSync(join(pkgRoot, 'src'))) return compareFreshness(stamp, 0);
+
   const dirs = stamp.source_dirs ?? ['src', 'bin', 'scripts'];
   return compareFreshness(stamp, Math.max(0, ...dirs.map((d) => newestMtime(join(pkgRoot, d)))));
 }
