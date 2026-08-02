@@ -182,6 +182,60 @@ An app is also an **agent surface**: any function it exposes can be published as
 
 ## What You Can Do
 
+### Use the AI chat you like, with your node in it
+
+One command connects **Goose, Claude Code, Cursor, VS Code or Claude Desktop** to your node:
+
+```bash
+aimeat connect client goose --url https://aimeat.io --owner your-handle
+```
+
+It does three things. It authorizes an agent **of its own** for that program (you approve it from your
+profile -> Agents tab, as always). It writes the MCP settings in the shape that program expects,
+merging into whatever you already had. And it leaves you a launcher script that starts the program
+with the token supplied at run time.
+
+| Client | How it reaches the node | Config it writes |
+|---|---|---|
+| `goose` | `POST /v1/mcp` | `config.yaml` -> `extensions` |
+| `claude-code` | `POST /v1/mcp` | `claude mcp add-json`, user scope |
+| `cursor` | `POST /v1/mcp` | `~/.cursor/mcp.json` |
+| `vscode` | `POST /v1/mcp` | user `mcp.json` -> `servers` |
+| `claude-desktop` | local connector over stdio | `claude_desktop_config.json` |
+
+Options: `--agent <name>` names the agent, `--workdir <path>` decides where the program starts (an
+agent writes files where it is launched, so this keeps it out of your source repos), `--surface
+appdev` narrows the toolset to app building, `--home <path>` puts the credential somewhere else,
+`--name <server>` lets a second node live alongside the first.
+
+**Two guarantees, because this command edits files you own.** Your token is never written into a
+config file: each client is given a variable reference, a headers-helper command, or the local
+connector, and the token itself stays in the connector home. And every other MCP server you had
+configured is left exactly as it was -- the command merges, backs the file up first, and refuses to
+write at all if it cannot parse what is there.
+
+After it runs you are talking to your own memory, apps, organisms, workspaces, tasks and the
+marketplace from that window: "what do I have in my workspace", "build me an app that does X",
+"what did my agents do today".
+
+**Goose is the one to try if you want a chat that is not Claude, ChatGPT or Grok.** It is an open
+source terminal agent that takes its model from **OpenRouter**, so you pick the model and pay per
+token for exactly what you use -- a strong model for a hard build, a cheap one for everything else,
+switched in seconds:
+
+```bash
+# a model for this session only
+$env:GOOSE_MODEL = "z-ai/glm-5.2"; C:\Users\you\.aimeat-goose\launch-goose.ps1
+GOOSE_MODEL=z-ai/glm-5.2 ~/.aimeat-goose/launch-goose.sh
+
+# inside a running session
+/model deepseek/deepseek-v3.2     # switch model without restarting
+/mode auto                        # stop confirming every tool call
+```
+
+Set `OPENROUTER_API_KEY` in your environment before launching. The full toolset costs roughly 50k
+input tokens per turn; `--surface appdev` cuts that to about a third when you are only building apps.
+
 ### Connect AI agents
 
 <img src="assets/screenshots/profile-agents.png" alt="Agent connection prompt" width="600" />
@@ -452,6 +506,9 @@ npx aimeat seed     # seed example packages (in another terminal, server must be
 
 # Or just connect an agent to someone else's node
 npx aimeat connect --url https://your-node --owner your-handle
+
+# Or point your own AI chat at a node in one command (goose | claude-code | cursor | vscode | claude-desktop)
+npx aimeat connect client goose --url https://aimeat.io --owner your-handle
 ```
 
 **App thumbnails (optional).** `aimeat screenshot-worker` renders each published app and stores a

@@ -33666,6 +33666,103 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '404':
           description: No such provider.
+  /v1/connections/publish:
+    post:
+      operationId: publishToConnection
+      summary: Publish to a connected account
+      description: >
+        Two ways in. `connection_id` publishes to an account the CALLER connected, which needs no
+        delegation because the publisher and the account holder are the same person. `app_id` +
+        `action` publishes through a delegation an app owner granted over a shared channel.
+
+
+        The attempt is recorded BEFORE anything leaves the node, keyed by a hash of publisher,
+        connection, file and caption. A repeat of the same request returns the FIRST attempt's
+        outcome with `replay: true` and starts no second publish.
+
+
+        Two 200 responses are waiting states rather than successes: `held` is moderation and
+        `queued` is a spent provider allowance. Neither is an error, because reporting them as one
+        teaches a caller to retry, and retrying makes both worse.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                connection_id:
+                  type: string
+                  description: Publish to your own connected account. Mutually exclusive with app_id.
+                app_id:
+                  type: string
+                  description: With `action`, publish through a delegation over someone's shared channel.
+                action:
+                  type: string
+                  example: publish-video
+                storage_key:
+                  type: string
+                  description: A file you have in storage. Omit for a text-only post.
+                caption:
+                  type: string
+                params:
+                  type: object
+                  additionalProperties: true
+                  description: >
+                    Provider options (title, description, visibility, privacyStatus, alt). A
+                    delegation's fixed values are merged OVER these, so a delegated app cannot
+                    retarget what the channel owner decided.
+      responses:
+        '200':
+          description: >
+            Published, replayed, held for moderation, or queued behind a full allowance. Check
+            `attempt.status` and `replay` rather than the status code.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          url:
+                            type: string
+                            description: Where it landed at the provider. Absent when nothing was published.
+                          replay:
+                            type: boolean
+                          attempt:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              status:
+                                type: string
+                                enum: [in_flight, held, queued, done, failed, rejected]
+                              externalRef:
+                                type: string
+                                nullable: true
+                              error:
+                                type: string
+                                nullable: true
+        '400':
+          description: >
+            The gate refused: no delegation, the delegation is disabled, a per-publisher cap is
+            spent, or the account needs reconnecting.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: >
+            No such connection, or no such stored file. A connection belonging to someone else is
+            this same 404.
+        '502':
+          description: >
+            The provider refused. `REJECTED` is permanent and must not be retried; `PUBLISH_FAILED`
+            is transport-shaped and may be.
   /v1/connections/callback:
     get:
       operationId: connectionCallback
