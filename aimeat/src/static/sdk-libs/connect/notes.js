@@ -14,6 +14,8 @@
  * @usage import { PROVIDER_NOTES } from './notes.js';  PROVIDER_NOTES.bluesky.before
  * @version-history
  *   v1.0.0 — 2026-08-02 — Initial (TARGET-057 phase 3).
+ *   v1.1.0 — 2026-08-02 — LinkedIn: says up front that the connection expires, because a token
+ *     that silently dies in two months is the least readable failure in the set.
  */
 
 /**
@@ -31,6 +33,9 @@ export const PROVIDER_NOTES = {
   },
   youtube: {
     before: 'Sign in with the Google account that owns the channel. A Google account with no YouTube channel will connect and then have nowhere to publish.',
+  },
+  linkedin: {
+    before: 'A LinkedIn connection stops working after about two months and asks to be reconnected. That is LinkedIn: renewing a token in the background is a partner-only feature, so this is the one provider you will have to come back to a few times a year.',
   },
   bluesky: {
     needs: 'An app password. This is NOT your Bluesky password.',

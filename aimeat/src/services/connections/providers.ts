@@ -28,7 +28,7 @@ import type { AimeatConfig } from '../../config.js';
 import type { CredentialShape } from '../../models/connection-schemas.js';
 
 /** Stable provider identifiers. Also the value stored in `Connection.provider`. */
-export type OutboundProviderId = 'mastodon' | 'youtube' | 'bluesky' | 'fake' | 'fake-static';
+export type OutboundProviderId = 'mastodon' | 'youtube' | 'linkedin' | 'bluesky' | 'fake' | 'fake-static';
 
 /**
  * What a user must supply for a provider that has NO authorization round.
@@ -207,6 +207,67 @@ function youtube(clientId: string, clientSecret: string, capabilityOn: boolean):
 }
 
 /**
+ * LinkedIn.
+ *
+ * IT SHOULD HAVE BEEN IN THE FIRST SLICE. The provider map put it behind a product approval, which
+ * was wrong: "Sign In with LinkedIn (OpenID Connect)" and "Share on LinkedIn" are the Consumer
+ * tier, self-serve, no human review. That error kept the platform that matters most for business
+ * at the back of the queue for the whole build. The mistake was factual, the cost was real.
+ *
+ * TWO THINGS DIFFER FROM THE OTHER OAUTH PROVIDERS and both are handled rather than assumed:
+ *
+ *   NO PKCE. LinkedIn's authorization-code flow does not document a code_challenge, and sending one
+ *   to a server that does not expect it is a way to fail at the consent screen. `pkce: false`.
+ *
+ *   PROBABLY NO REFRESH TOKEN. Programmatic refresh is a gated feature on LinkedIn; a Consumer-tier
+ *   app typically gets a ~60-day access token and nothing to renew it with. That is not a failure
+ *   mode this code has to invent anything for — a session with no refresh token already resolves to
+ *   needs_reauth with a reason the owner can act on. It does mean a LinkedIn connection asks to be
+ *   reconnected a few times a year, and the panel note says so before anyone connects.
+ *
+ * VARMISTETTAVA against a real app: whether a refresh token arrives at all, and the daily call
+ * ceiling (reported as roughly 100/day/member, with no self-serve way to raise it).
+ */
+function linkedin(clientId: string, clientSecret: string, capabilityOn: boolean): OutboundProvider {
+  const configured = Boolean(clientId && clientSecret);
+  const enabled = capabilityOn && configured;
+  return {
+    id: 'linkedin',
+    label: 'LinkedIn',
+    credentialShape: 'oauth2',
+    instanceScoped: false,
+    enabled,
+    disabledReason: enabled
+      ? null
+      : !capabilityOn
+        ? 'connections capability is off (AIMEAT_CONNECTIONS_ENABLED)'
+        : 'no client credentials (AIMEAT_CONNECT_LINKEDIN_CLIENT_ID / _SECRET)',
+    client: configured ? { id: clientId, secret: clientSecret } : null,
+    // openid+profile identify WHICH member this connection is for, which is what the dedupe key and
+    // the account label are built from. w_member_social is the write. Asking for the write alone and
+    // then reading is the mistake that cost an hour on YouTube.
+    scopes: ['openid', 'profile', 'w_member_social'],
+    pkce: false,
+    // Text and images at the Consumer tier. NOT publish-video and NOT a native PDF carousel: the
+    // Documents API sits behind the partner-gated Community Management product, and advertising a
+    // capability the recipe cannot perform is the bug the attach route was already fixed for.
+    capabilities: ['publish-post'],
+    // Roughly 100 calls a day per member, but that is a per-MEMBER limit rather than a shared pool,
+    // so it is not the kind of ceiling sharedDailyLimit models.
+    sharedDailyLimit: null,
+    attachFields: null,
+    endpoints() {
+      return {
+        authorize: 'https://www.linkedin.com/oauth/v2/authorization',
+        token: 'https://www.linkedin.com/oauth/v2/accessToken',
+        // LinkedIn offers a revocation endpoint; revoking locally alone would be forgetting.
+        revoke: 'https://www.linkedin.com/oauth/v2/revoke',
+      };
+    },
+  };
+}
+
+/**
  * Bluesky. Present in the first slice specifically because it is NOT oauth2-shaped: an app password
  * exchanged for a session. A store that only ever saw Mastodon and YouTube would be built around
  * authorization codes, and the mistake would surface at the third provider rather than the first.
@@ -322,6 +383,7 @@ export function buildOutboundProviders(config: AimeatConfig): OutboundProvider[]
   const list = [
     mastodon(on),
     youtube(config.connectGoogleClientId, config.connectGoogleClientSecret, on),
+    linkedin(config.connectLinkedinClientId, config.connectLinkedinClientSecret, on),
     bluesky(on),
   ];
   // Appended only when configured, so a production node's list is exactly the three above.

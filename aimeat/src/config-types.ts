@@ -516,6 +516,9 @@ export interface AimeatConfig {
   // per instance and acquired at runtime (storage ProviderClient).
   connectGoogleClientId: string;
   connectGoogleClientSecret: string;
+  /** LinkedIn app client id. Consumer tier, self-serve: no product review to wait on. */
+  connectLinkedinClientId: string;
+  connectLinkedinClientSecret: string;
   connectRedirectUri: string;        // empty = derive from baseUrl
   // TEST ONLY, empty everywhere else. Base URL of a local stand-in provider, so the E2E can drive
   // the REAL authorization round -- state, PKCE, exchange, identity, rotating refresh, revoke --

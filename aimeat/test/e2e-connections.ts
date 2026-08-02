@@ -406,6 +406,54 @@ async function main(): Promise<void> {
         p.credentialShape === 'oauth2' ? false : !Array.isArray(p.attachFields) || p.attachFields.length === 0);
       assert(bad.length === 0, `advertised but unconnectable: ${bad.map(p => p.id).join(', ')}`);
     });
+    await test('every capability a provider advertises has a recipe behind it', async () => {
+      // The OTHER half of the Bluesky bug. A provider can be perfectly connectable and still list a
+      // capability nothing implements, which fails at publish time -- after the account is linked,
+      // the file is uploaded and the user believes it worked. Checked against the registry with
+      // every provider configured, so it does not depend on which keys this machine happens to have.
+      const { buildOutboundProviders } = await import('../src/services/connections/providers.js');
+      const { RECIPES_FOR_TEST } = await import('../src/services/connections/publish.js');
+      const all = buildOutboundProviders({
+        connectionsEnabled: true,
+        connectGoogleClientId: 'x', connectGoogleClientSecret: 'x',
+        connectLinkedinClientId: 'x', connectLinkedinClientSecret: 'x',
+        connectFakeBaseUrl: '', connectRedirectUri: 'https://example.test/cb',
+      } as any);
+      const missing = all.filter(p => p.capabilities.length > 0 && !RECIPES_FOR_TEST[p.id]);
+      assert(missing.length === 0, `advertises a capability with no recipe: ${missing.map(p => p.id).join(', ')}`);
+    });
+
+    await test('LinkedIn is offered once its keys are present, and is shaped for its own flow', async () => {
+      const { buildOutboundProviders, findProvider } = await import('../src/services/connections/providers.js');
+      const withKeys = buildOutboundProviders({
+        connectionsEnabled: true,
+        connectGoogleClientId: '', connectGoogleClientSecret: '',
+        connectLinkedinClientId: 'id', connectLinkedinClientSecret: 'secret',
+        connectFakeBaseUrl: '', connectRedirectUri: 'https://example.test/cb',
+      } as any);
+      const li = findProvider(withKeys, 'linkedin');
+      assert(li !== null && li.enabled, 'LinkedIn is not offered even with credentials');
+      assert(li!.credentialShape === 'oauth2', `shape ${li!.credentialShape}`);
+      assert(typeof li!.endpoints(null).authorize === 'string', 'no authorize endpoint');
+      // NOT a detail: LinkedIn does not document a code_challenge, and sending one fails at consent.
+      assert(li!.pkce === false, 'LinkedIn must not be asked for PKCE');
+      // The YouTube lesson: asking for the write scope alone and then reading identity is a 403.
+      assert(li!.scopes.includes('openid') && li!.scopes.includes('w_member_social'),
+        `scopes ${li!.scopes.join(' ')}`);
+      // It must NOT claim video, because the recipe refuses video on purpose.
+      assert(!li!.capabilities.includes('publish-video'), 'LinkedIn claims video it cannot do');
+
+      const without = buildOutboundProviders({
+        connectionsEnabled: true,
+        connectGoogleClientId: '', connectGoogleClientSecret: '',
+        connectLinkedinClientId: '', connectLinkedinClientSecret: '',
+        connectFakeBaseUrl: '', connectRedirectUri: 'https://example.test/cb',
+      } as any);
+      const off = findProvider(without, 'linkedin');
+      assert(off !== null && !off.enabled && (off.disabledReason ?? '').includes('LINKEDIN'),
+        'with no keys LinkedIn should be present but disabled, saying which keys are missing');
+    });
+
     await test('a supplied credential connects the account', async () => {
       const before = provider.stats.sessionMints;
       const r = await api('/v1/connections/attach', {

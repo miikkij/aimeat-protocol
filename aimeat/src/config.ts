@@ -502,6 +502,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     connectionsEnabled: process.env.AIMEAT_CONNECTIONS_ENABLED === 'true',
     connectGoogleClientId: process.env.AIMEAT_CONNECT_GOOGLE_CLIENT_ID ?? '',
     connectGoogleClientSecret: process.env.AIMEAT_CONNECT_GOOGLE_CLIENT_SECRET ?? '',
+    connectLinkedinClientId: process.env.AIMEAT_CONNECT_LINKEDIN_CLIENT_ID ?? '',
+    connectLinkedinClientSecret: process.env.AIMEAT_CONNECT_LINKEDIN_CLIENT_SECRET ?? '',
     connectRedirectUri: process.env.AIMEAT_CONNECT_REDIRECT_URI ?? '',
     connectFakeBaseUrl: process.env.AIMEAT_CONNECT_FAKE_BASE_URL ?? '',
     crossFederationEnabled: process.env.AIMEAT_CROSS_FEDERATION_ENABLED !== 'false',

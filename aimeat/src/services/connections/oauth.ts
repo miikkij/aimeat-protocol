@@ -218,6 +218,22 @@ async function fetchAccountIdentity(
       const title = typeof item?.snippet?.title === 'string' ? item.snippet.title : id;
       return { externalId: id, accountLabel: title };
     }
+    if (provider.id === 'linkedin') {
+      // The OIDC userinfo endpoint, which is what the openid+profile scopes are for. `sub` is the
+      // stable member id and the dedupe key; the name is what the owner reads in the panel.
+      const r = await safeFetch('https://api.linkedin.com/v2/userinfo', {
+        headers: auth, signal: AbortSignal.timeout(15_000),
+      });
+      if (!r.ok) {
+        return { error: r.status === 403
+          ? 'LinkedIn accepted the sign-in but would not say which member it is for. Check that the app has "Sign In with LinkedIn using OpenID Connect" enabled.'
+          : `LinkedIn rejected the token (HTTP ${r.status})` };
+      }
+      const j = await r.json() as { sub?: unknown; name?: unknown };
+      const sub = typeof j.sub === 'string' ? j.sub : '';
+      if (!sub) return { error: 'LinkedIn returned no member id' };
+      return { externalId: sub, accountLabel: typeof j.name === 'string' ? j.name : sub };
+    }
     if (provider.id === 'fake') {
       // Test-only, and reached only when a base URL is configured. It goes through the same
       // safeFetch + shape-checking path as the real ones so the tests exercise that code rather

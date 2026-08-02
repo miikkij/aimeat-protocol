@@ -228,6 +228,9 @@
     youtube: {
       before: "Sign in with the Google account that owns the channel. A Google account with no YouTube channel will connect and then have nowhere to publish."
     },
+    linkedin: {
+      before: "A LinkedIn connection stops working after about two months and asks to be reconnected. That is LinkedIn: renewing a token in the background is a partner-only feature, so this is the one provider you will have to come back to a few times a year."
+    },
     bluesky: {
       needs: "An app password. This is NOT your Bluesky password.",
       where: "Bluesky → Settings → Privacy and security → App passwords.",

@@ -15,10 +15,12 @@
  *   PERMANENT AND TEMPORARY ARE DIFFERENT ANSWERS. A provider refusing the CONTENT is final and
  *   must never be retried; a provider being unreachable is not. Collapsing the two is how a
  *   rejected video gets resubmitted forever, and how an outage looks like a rejection.
- * @structure PublishRecipe · publishToProvider · mastodonPublish · blueskyPost · youtubeUpload
+ * @structure PublishRecipe · publishToProvider · mastodonPublish · blueskyPost · youtubeUpload · linkedinPost
  * @usage import { publishToProvider } from './publish.js';
  * @version-history
  *   v1.0.0 — 2026-08-02 — TARGET-057 phase 7b. Mastodon video, Bluesky text, YouTube resumable.
+ *   v1.1.0 — 2026-08-02 — LinkedIn text + image. Escapes their little-text markup; a video is
+ *     refused out loud rather than dropped.
  */
 
 import { safeFetch } from '../../utils/url-validator.js';
@@ -341,13 +343,159 @@ const fakePublish: PublishRecipe = async (input) => {
   }
 };
 
+/**
+ * LinkedIn's REST surface is versioned by a HEADER rather than by the path, and an absent or stale
+ * value is a 426. It moves monthly and old versions retire after about a year, so this is a named
+ * constant with a date rather than a literal buried in a call.
+ */
+const LINKEDIN_VERSION = '202506';
+
+/**
+ * LinkedIn's `commentary` is not plain text.
+ *
+ * It is their "little text" format, in which a bare `(` or `@` or `~` is markup. Send an unescaped
+ * one and the call fails validation, or worse, posts something subtly different from what the
+ * author wrote. Every one of these has to carry a backslash. This is exactly the class of thing
+ * that looks fine in a smoke test with an ASCII sentence and then mangles the first real caption
+ * that contains a bracket.
+ */
+function linkedinText(text: string): string {
+  return text.replace(/([|{}@[\]()<>#*_~\\])/g, '\\$1');
+}
+
+/**
+ * LinkedIn: a text post, optionally with one image.
+ *
+ * WHAT IT REFUSES AND WHY IT SAYS SO. A video is a permanent refusal rather than a quiet
+ * text-only fallback: LinkedIn's video path is the separate Videos API with multipart
+ * initialisation, the provider advertises `publish-post` only, and silently dropping the file
+ * someone attached is the same failure as the Mastodon edit that lost its video. Better to refuse
+ * and be understood.
+ */
+const linkedinPost: PublishRecipe = async (input) => {
+  const { credential, connection, caption, params, file } = input;
+  const token = credential.accessToken;
+  if (!token) return { ok: false, permanent: true, reason: 'no access token on this connection' };
+
+  const author = `urn:li:person:${connection.externalId}`;
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${token}`,
+    'LinkedIn-Version': LINKEDIN_VERSION,
+    'X-Restli-Protocol-Version': '2.0.0',
+  };
+
+  let media: { id: string; altText: string } | null = null;
+
+  if (file) {
+    if (!file.mimeType.startsWith('image/')) {
+      return {
+        ok: false,
+        permanent: true,
+        reason: `LinkedIn accepts a post with an image here; ${file.mimeType} needs the Videos API, which this connection is not scoped for`,
+      };
+    }
+    // Two steps, and the second one goes to a URL LinkedIn hands back rather than to a fixed host.
+    try {
+      const init = await safeFetch('https://api.linkedin.com/rest/images?action=initializeUpload', {
+        method: 'POST',
+        headers: { ...headers, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ initializeUploadRequest: { owner: author } }),
+        signal: AbortSignal.timeout(30_000),
+      });
+      if (!init.ok) {
+        return {
+          ok: false,
+          permanent: init.status === 403 || init.status === 401,
+          reason: `LinkedIn would not start an image upload (HTTP ${init.status}): ${await providerSaid(init)}`,
+        };
+      }
+      const ij = await init.json() as { value?: { uploadUrl?: unknown; image?: unknown } };
+      const uploadUrl = typeof ij.value?.uploadUrl === 'string' ? ij.value.uploadUrl : '';
+      const imageUrn = typeof ij.value?.image === 'string' ? ij.value.image : '';
+      if (!uploadUrl || !imageUrn) {
+        return { ok: false, permanent: false, reason: 'LinkedIn started an image upload without saying where to put it' };
+      }
+
+      const put = await safeFetch(uploadUrl, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': file.mimeType },
+        body: new Uint8Array(file.bytes),
+        signal: AbortSignal.timeout(120_000),
+      });
+      if (!put.ok) {
+        return { ok: false, permanent: false, reason: `LinkedIn rejected the image bytes (HTTP ${put.status})` };
+      }
+      media = { id: imageUrn, altText: str(params, 'alt', caption).slice(0, 300) };
+    } catch (err) {
+      logger.warn('connections: the LinkedIn image upload failed', { connectionId: connection.id, error: String(err) });
+      return { ok: false, permanent: false, reason: `could not reach LinkedIn to upload the image: ${(err as Error).message}` };
+    }
+  }
+
+  // CONNECTIONS is the safe default for a member post; PUBLIC only when it was asked for, because
+  // widening someone's audience without being told to is not a default anyone should get by accident.
+  const visibility = str(params, 'visibility', 'PUBLIC').toUpperCase() === 'CONNECTIONS'
+    ? 'CONNECTIONS'
+    : 'PUBLIC';
+
+  const body: Record<string, unknown> = {
+    author,
+    commentary: linkedinText(caption),
+    visibility,
+    distribution: { feedDistribution: 'MAIN_FEED', targetEntities: [], thirdPartyDistributionChannels: [] },
+    lifecycleState: 'PUBLISHED',
+    isReshareDisabledByAuthor: false,
+  };
+  if (media) body.content = { media };
+
+  try {
+    const res = await safeFetch('https://api.linkedin.com/rest/posts', {
+      method: 'POST',
+      headers: { ...headers, 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+      signal: AbortSignal.timeout(60_000),
+    });
+    if (res.status === 401) {
+      return { ok: false, permanent: true, reason: 'LinkedIn no longer accepts this token; the connection needs reconnecting' };
+    }
+    if (res.status === 403) {
+      return { ok: false, permanent: true, reason: `LinkedIn refused the post: ${await providerSaid(res)}. Check that the app has the "Share on LinkedIn" product enabled.` };
+    }
+    if (res.status === 422 || res.status === 400) {
+      return { ok: false, permanent: true, reason: `LinkedIn refused the content: ${await providerSaid(res)}` };
+    }
+    if (!res.ok) {
+      return { ok: false, permanent: false, reason: `LinkedIn post failed (HTTP ${res.status}): ${await providerSaid(res)}` };
+    }
+    // The post's urn comes back in a HEADER, not the body -- the body on a 201 is empty.
+    const urn = res.headers.get('x-restli-id') ?? res.headers.get('x-linkedin-id') ?? '';
+    if (!urn) {
+      // It published. Losing the reference is a real loss, but calling a successful publish a
+      // failure would invite a retry and a duplicate post, which is worse.
+      logger.warn('connections: LinkedIn published but returned no post urn', { connectionId: connection.id });
+      return { ok: true, externalRef: '' };
+    }
+    return { ok: true, externalRef: `https://www.linkedin.com/feed/update/${urn}/` };
+  } catch (err) {
+    logger.warn('connections: the LinkedIn post failed', { connectionId: connection.id, error: String(err) });
+    return { ok: false, permanent: false, reason: `could not reach LinkedIn: ${(err as Error).message}` };
+  }
+};
+
 const RECIPES: Record<string, PublishRecipe> = {
   mastodon: mastodonPublish,
   bluesky: blueskyPost,
   youtube: youtubeUpload,
+  linkedin: linkedinPost,
   fake: fakePublish,
   'fake-static': fakePublish,
 };
+
+/**
+ * Exposed so a test can ask which providers actually have a recipe, rather than keeping its own
+ * list of them. A test that maintains its own copy of the thing it checks stops checking.
+ */
+export const RECIPES_FOR_TEST: Readonly<Record<string, PublishRecipe>> = RECIPES;
 
 /**
  * Run the recipe for a connection's provider.
