@@ -274,6 +274,18 @@ export interface ProviderClient {
   registeredAt: string;
 }
 
+/** TARGET-057. One reading of how a published item is doing. Append-only time series. */
+export interface PublishMetric {
+  attemptId: string;
+  comments: number | null;
+  fetchedAt: string;
+  id: string;
+  impressions: number | null;
+  likes: number | null;
+  raw: Json;
+  shares: number | null;
+}
+
 /** TARGET-057. Written BEFORE the publish is attempted — that order is what stops the double post. */
 export interface PublishAttempt {
   connectionId: string;
@@ -1723,6 +1735,7 @@ export interface DB {
   PersonalPushSubscription: PersonalPushSubscription;
   ProviderClient: ProviderClient;
   PublishAttempt: PublishAttempt;
+  PublishMetric: PublishMetric;
   Purchase: Purchase;
   PushSubscription: PushSubscription;
   RealtimeRoom: RealtimeRoom;

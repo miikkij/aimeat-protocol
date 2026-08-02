@@ -47,6 +47,7 @@ import { revokeConnection, ensureFreshCredential } from '../services/connections
 import { attachCredential } from '../services/connections/attach.js';
 import { quotaStatus, openPublish, openOwnPublish } from '../services/connections/publish-gate.js';
 import { publishToProvider } from '../services/connections/publish.js';
+import { readMetrics, toStoredSample } from '../services/connections/metrics.js';
 import type {
   ConnectionRecord, PublicConnection, ConnectionMode, ModerationMode,
   ProviderClientRecord, PublicProviderClient,
@@ -98,6 +99,114 @@ export function connectionsRouter(config: AimeatConfig, storage: Storage): Route
     res.json(success(config.nodeId, { providers: listProviderMeta(providers) }, [
       { description: 'Start connecting an account', method: 'POST', url: '/v1/connections/start' },
     ]));
+  });
+
+  // ── History and reach ────────────────────────────────────────────────────────
+  //
+  // Registered before /v1/connections/:id so a literal segment is never eaten by the id parameter.
+  //
+  // WHAT THIS IS FOR. The ledger that stops double posts already recorded everything ever published
+  // through this node, and nothing could read it. A person running accounts needs to see what went
+  // out, where it landed, and how it did — otherwise "publish" is a write-only hole.
+
+  /** The caller's own history. Scoped by the query, so there is nothing to filter afterwards. */
+  router.get('/v1/connections/attempts', requireAuth(), requireAnyScope('connections:read', 'connections:use'), async (req: Request, res: Response) => {
+    if (!capabilityOn(res)) return;
+    const principal = resolve(req);
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+
+    const attempts = (await storage.listPublishAttempts({ publisher: principal })).slice(0, limit);
+    // One lookup for every row on the page rather than one per row: an N+1 here is a history view
+    // that takes a second to open and gets blamed on the network.
+    const [metrics, connections] = await Promise.all([
+      storage.latestPublishMetrics(attempts.map(a => a.id)),
+      storage.listConnections({ principal }),
+    ]);
+    const byId = new Map(connections.map(c => [c.id, c]));
+
+    const items = attempts.map(a => {
+      const c = byId.get(a.connectionId);
+      return {
+        id: a.id,
+        connectionId: a.connectionId,
+        // A connection that has since been disconnected leaves its history behind. Saying
+        // "(disconnected)" beats a blank where an account name should be.
+        provider: c?.provider ?? 'unknown',
+        accountLabel: c?.accountLabel ?? '(disconnected)',
+        status: a.status,
+        externalRef: a.externalRef,
+        storageKey: a.storageKey,
+        error: a.error,
+        createdAt: a.createdAt,
+        latest: metrics.get(a.id) ?? null,
+      };
+    });
+    res.json(success(config.nodeId, { attempts: items }));
+  });
+
+  /** One item's whole series, oldest first, so a curve can be drawn rather than a single number. */
+  router.get('/v1/connections/attempts/:id/metrics', requireAuth(), requireAnyScope('connections:read', 'connections:use'), async (req: Request, res: Response) => {
+    if (!capabilityOn(res)) return;
+    const principal = resolve(req);
+    const attempt = await storage.getPublishAttempt(req.params.id as string);
+    // Absent and not-yours answer alike, as everywhere else in this file.
+    if (!attempt || attempt.publisher !== principal) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'no such published item of yours'));
+    }
+    res.json(success(config.nodeId, { samples: await storage.listPublishMetrics(attempt.id) }));
+  });
+
+  /**
+   * Ask the platform how an item is doing, now, and keep the answer.
+   *
+   * A POST because it has effects: it spends a request at the provider and, on X, actual money.
+   * Nothing in this node schedules it — a reading happens because a person asked for one. A timer
+   * that refreshes a dashboard would be a standing bill nobody agreed to.
+   */
+  router.post('/v1/connections/attempts/:id/metrics', requireAuth(), requireScope('connections:use'), async (req: Request, res: Response) => {
+    if (!capabilityOn(res)) return;
+    const principal = resolve(req);
+    const attempt = await storage.getPublishAttempt(req.params.id as string);
+    if (!attempt || attempt.publisher !== principal) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'no such published item of yours'));
+    }
+    if (attempt.status !== 'done' || !attempt.externalRef) {
+      return res.status(400).json(error(config.nodeId, 'NOT_PUBLISHED',
+        'that item was never published, so there is nothing to measure'));
+    }
+
+    const connection = await storage.getConnection(attempt.connectionId);
+    if (!connection || connection.principal !== principal) {
+      return res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'the account it went to is gone'));
+    }
+    const provider = findProvider(providers, connection.provider);
+    if (!provider) {
+      return res.status(400).json(error(config.nodeId, 'PROVIDER_GONE', 'that provider is no longer available'));
+    }
+
+    const key = requireEncryptionKey(config);
+    if (!key) {
+      return res.status(503).json(error(config.nodeId, 'NO_ENCRYPTION_KEY', 'this node cannot read stored credentials'));
+    }
+    const ctx: ConnectContext = { config, storage, providers, key };
+    const fresh = await ensureFreshCredential(ctx, connection.id);
+    if (!fresh.ok) {
+      return res.status(400).json(error(config.nodeId, fresh.code, fresh.reason));
+    }
+
+    const out = await readMetrics({
+      provider, connection, credential: fresh.credential, externalRef: attempt.externalRef,
+    });
+    if (!out.ok) {
+      // 409 rather than 502 when the platform simply will not tell an author this: nothing is
+      // broken and nothing is worth retrying, which a 5xx would invite.
+      return res.status(out.permanent ? 409 : 502).json(
+        error(config.nodeId, out.permanent ? 'NOT_MEASURABLE' : 'METRICS_UNAVAILABLE', out.reason));
+    }
+
+    const stored = toStoredSample(attempt.id, out.sample);
+    await storage.addPublishMetric(stored);
+    res.json(success(config.nodeId, { sample: stored }));
   });
 
   // ── The caller's OWN app credentials at a provider ───────────────────────────

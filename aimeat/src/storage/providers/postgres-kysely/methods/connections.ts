@@ -22,13 +22,14 @@ import type { ConnectionQuery, PublishAttemptQuery } from '../../../repositories
 import type {
   ConnectionRecord, ConnectionStatus, CredentialShape, ConnectionMode,
   DelegationRecord, ModerationMode, PublishAttempt, NewPublishAttempt, PublishStatus,
-  ProviderClientRecord,
+  ProviderClientRecord, PublishMetricSample,
 } from '../../../../models/connection-schemas.js';
 import type {
   Connection as ConnectionRow,
   ConnectionDelegation as DelegationRow,
   PublishAttempt as PublishAttemptRow,
   ProviderClient as ProviderClientRow,
+  PublishMetric as PublishMetricRow,
   Json,
 } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
@@ -84,6 +85,21 @@ function toAttempt(r: Selectable<PublishAttemptRow>): PublishAttempt {
     error: r.error ?? null,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
+  };
+}
+
+function toMetric(r: Selectable<PublishMetricRow>): PublishMetricSample {
+  return {
+    id: r.id,
+    attemptId: r.attemptId,
+    fetchedAt: r.fetchedAt,
+    // null stays null. A provider that does not report a number reported nothing, and turning that
+    // into 0 invents a measurement.
+    impressions: r.impressions ?? null,
+    likes: r.likes ?? null,
+    comments: r.comments ?? null,
+    shares: r.shares ?? null,
+    raw: (r.raw as Record<string, unknown> | null) ?? {},
   };
 }
 
@@ -381,6 +397,44 @@ export const connectionMethods = {
    * lookup that can return someone else's row and is then filtered is a lookup that leaks the day
    * somebody forgets the filter.
    */
+  async addPublishMetric(this: PostgresKyselyStorage, row: PublishMetricSample): Promise<void> {
+    await this.db.insertInto('PublishMetric').values({
+      id: row.id,
+      attemptId: row.attemptId,
+      fetchedAt: row.fetchedAt,
+      impressions: row.impressions,
+      likes: row.likes,
+      comments: row.comments,
+      shares: row.shares,
+      raw: jsonb(row.raw ?? {}) as unknown as Json,
+    }).execute();
+  },
+
+  /** One query for every attempt on the page. N+1 here is a history view that takes a second. */
+  async latestPublishMetrics(
+    this: PostgresKyselyStorage, attemptIds: string[],
+  ): Promise<Map<string, PublishMetricSample>> {
+    const out = new Map<string, PublishMetricSample>();
+    if (attemptIds.length === 0) return out;
+    const rows = await this.db.selectFrom('PublishMetric').selectAll()
+      .where('attemptId', 'in', attemptIds)
+      .orderBy('attemptId').orderBy('fetchedAt', 'desc')
+      .execute();
+    // Ordered newest-first per attempt, so the first row seen for an id IS the latest.
+    for (const r of rows) {
+      if (!out.has(r.attemptId)) out.set(r.attemptId, toMetric(r));
+    }
+    return out;
+  },
+
+  async listPublishMetrics(
+    this: PostgresKyselyStorage, attemptId: string,
+  ): Promise<PublishMetricSample[]> {
+    const rows = await this.db.selectFrom('PublishMetric').selectAll()
+      .where('attemptId', '=', attemptId).orderBy('fetchedAt', 'asc').execute();
+    return rows.map(toMetric);
+  },
+
   async getPrincipalProviderClient(
     this: PostgresKyselyStorage, provider: string, principal: string,
   ): Promise<ProviderClientRecord | undefined> {

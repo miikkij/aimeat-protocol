@@ -19,6 +19,8 @@
  *   const accounts = await AIMEAT.connect.list();
  *   await AIMEAT.connect.start('mastodon', { instance: 'mastodon.social' });
  *   await AIMEAT.connect.publish({ connectionId: accounts[0].id, caption: 'hello' });
+ *   const sent = await AIMEAT.connect.history({ limit: 50 });
+ *   await AIMEAT.connect.measure(sent[0].id);   // costs a provider request, and money on X
  * @version-history
  *   v1.0.0 — 2026-08-02 — Initial (TARGET-057 phase 3).
  */
@@ -109,6 +111,53 @@ async function publish(input) {
     attemptId: d.attempt?.id ?? '',
     error: d.attempt?.error ?? undefined,
   };
+}
+
+/**
+ * What this caller has published through the node, newest first.
+ *
+ * The same ledger that stops a double post is what makes a history possible at all: every attempt
+ * was written down before anything left, so this is a record of what was TRIED, not a list of
+ * successes. `status` distinguishes them, and an item that was held or queued belongs on the page
+ * as much as one that went out.
+ *
+ * `latest` is the most recent reading of how it is doing, or null when nobody has asked yet. Null
+ * means unmeasured, never zero.
+ *
+ * @param {{limit?: number}} [opts]
+ */
+async function history(opts = {}) {
+  const q = opts.limit ? `?limit=${encodeURIComponent(opts.limit)}` : '';
+  const res = await authFetch(`/v1/connections/attempts${q}`);
+  return (res?.data?.attempts ?? []);
+}
+
+/**
+ * Ask the platform how one published item is doing, right now, and keep the answer.
+ *
+ * THIS HAS EFFECTS AND ONE OF THEM IS MONEY. It spends a request at the provider, and on X it
+ * spends actual credit. Nothing in the node schedules it: a reading happens because a person asked
+ * for one. Do not put this on a timer, and do not call it on render.
+ *
+ * A platform that will not report a number to its author is not a failure to retry: the node
+ * answers 409 with the reason, which is a fact to display rather than an error to hide.
+ */
+async function measure(attemptId) {
+  const res = await authFetch(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/metrics`, {
+    method: 'POST',
+  });
+  return res?.data?.sample;
+}
+
+/**
+ * Every reading taken for one item, oldest first.
+ *
+ * A curve rather than a number: 40 likes means something different in an hour than in a month, and
+ * that difference is the part worth acting on.
+ */
+async function series(attemptId) {
+  const res = await authFetch(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/metrics`);
+  return (res?.data?.samples ?? []);
 }
 
 /**
@@ -285,6 +334,7 @@ function off(fn) { listeners.delete(fn); }
 const connect = {
   list, providers, start, attach: attachAccount, revoke, publish, on, off,
   clients, setClient, removeClient,
+  history, measure, series,
   /** Per-provider things a user must be told BEFORE they try. See notes.js. */
   notes: PROVIDER_NOTES,
   /** Mount the ready-made panel. See panel.js. */

@@ -867,6 +867,96 @@ async function main(): Promise<void> {
       assert(run(writing, reader) === 403, 'a read scope was allowed to write');
     });
 
+    console.log('\nPhase 14 — History, and how it did');
+
+    let histId = '';
+    await test('the ledger that stops double posts is finally readable', async () => {
+      // It recorded everything ever published through this node and nothing could read it, which
+      // made "publish" a write-only hole for whoever had to run the accounts.
+      const r = await api('/v1/connections/attempts', { method: 'GET', bearer: jwtA });
+      assert(r.status === 200, `history: ${r.status} ${r.data?.error?.message}`);
+      const items = r.data.data.attempts as any[];
+      assert(items.length > 0, 'nothing in the history although this suite published earlier');
+      const done = items.find(i => i.status === 'done' && i.externalRef);
+      assert(done !== undefined, 'no completed publish in the history');
+      histId = done.id;
+      // The account is joined in, because an id nobody recognises is not a history.
+      assert(typeof done.accountLabel === 'string' && done.accountLabel.length > 0, 'no account label');
+      assert(done.latest === null, 'a reading exists before anyone asked for one');
+    });
+
+    await test("another principal's history is their own", async () => {
+      const r = await api('/v1/connections/attempts', { method: 'GET', bearer: jwtB });
+      assert(r.status === 200, `B history: ${r.status}`);
+      const ids = (r.data.data.attempts as any[]).map(i => i.id);
+      assert(!ids.includes(histId), "B can see A's published items");
+    });
+
+    await test('reading the numbers stores a sample, and null stays null', async () => {
+      const before = provider.stats.metricReads;
+      const r = await api(`/v1/connections/attempts/${histId}/metrics`, { method: 'POST', bearer: jwtA });
+      assert(r.status === 200, `measure: ${r.status} ${r.data?.error?.message}`);
+      assert(provider.stats.metricReads === before + 1, 'the provider was not actually asked');
+      const s = r.data.data.sample;
+      assert(s.likes === 7 && s.comments === 2 && s.shares === 3, `got ${JSON.stringify(s)}`);
+      // THE DISCIPLINE OF THIS WHOLE FEATURE. The test provider reports no impression count, and
+      // that has to survive as null. A 0 here would be a measurement nobody made, and a dashboard
+      // that averages invented zeros lies confidently.
+      assert(s.impressions === null, `an unreported number became ${s.impressions}`);
+      assert(s.raw && typeof s.raw === 'object', 'the provider\u2019s own answer was not kept');
+    });
+
+    await test('the series accumulates rather than overwrites', async () => {
+      await api(`/v1/connections/attempts/${histId}/metrics`, { method: 'POST', bearer: jwtA });
+      const r = await api(`/v1/connections/attempts/${histId}/metrics`, { method: 'GET', bearer: jwtA });
+      assert(r.status === 200, `series: ${r.status}`);
+      const samples = r.data.data.samples as any[];
+      // Two readings, not one row that moved: "how did that post do" is a question about a curve,
+      // and a single overwritten value can never say whether 40 likes took an hour or a month.
+      assert(samples.length >= 2, `expected a growing series, got ${samples.length}`);
+      assert(samples[0].fetchedAt <= samples[samples.length - 1].fetchedAt, 'the series is not oldest-first');
+    });
+
+    await test('the history carries the newest reading, not the first', async () => {
+      const r = await api('/v1/connections/attempts', { method: 'GET', bearer: jwtA });
+      const item = (r.data.data.attempts as any[]).find(i => i.id === histId);
+      assert(item.latest !== null, 'the history shows no reading after two were taken');
+      const series = await api(`/v1/connections/attempts/${histId}/metrics`, { method: 'GET', bearer: jwtA });
+      const newest = (series.data.data.samples as any[]).slice(-1)[0];
+      assert(item.latest.id === newest.id, 'the history is showing a stale sample');
+    });
+
+    await test('an item the platform will not report on is a 409, not a 5xx', async () => {
+      // Nothing is broken and nothing is worth retrying. A 5xx would invite a retry loop, and on a
+      // provider that charges per read that loop is a standing bill.
+      provider.noMetrics = true;
+      const r = await api(`/v1/connections/attempts/${histId}/metrics`, { method: 'POST', bearer: jwtA });
+      provider.noMetrics = false;
+      assert(r.status === 409 && r.data.error.code === 'NOT_MEASURABLE', `${r.status} ${r.data?.error?.code}`);
+    });
+
+    await test("measuring someone else's item is the same 404 as a missing one", async () => {
+      const r = await api(`/v1/connections/attempts/${histId}/metrics`, { method: 'POST', bearer: jwtB });
+      assert(r.status === 404, `status ${r.status}`);
+    });
+
+    await test('every provider that can publish either reports numbers or says why not', async () => {
+      // The gap this closes: a channel with no reader would show a permanent blank in a dashboard
+      // next to channels that report, and read as the worst performer rather than as unmeasured.
+      const { buildOutboundProviders } = await import('../src/services/connections/providers.js');
+      const { METRIC_READERS_FOR_TEST } = await import('../src/services/connections/metrics.js');
+      const all = buildOutboundProviders({
+        connectionsEnabled: true,
+        connectGoogleClientId: 'x', connectGoogleClientSecret: 'x',
+        connectLinkedinClientId: 'x', connectLinkedinClientSecret: 'x',
+        connectXClientId: 'x', connectXClientSecret: 'x',
+        connectFakeBaseUrl: '', connectRedirectUri: 'https://example.test/cb',
+      } as any);
+      const publishers = all.filter(p => p.capabilities.length > 0 && p.id !== 'fake-static');
+      const missing = publishers.filter(p => !METRIC_READERS_FOR_TEST[p.id]);
+      assert(missing.length === 0, `can publish but has no metric reader: ${missing.map(p => p.id).join(', ')}`);
+    });
+
     console.log(`\n${'─'.repeat(60)}\n  ${passed} passed, ${failed} failed\n`);
   } finally {
     await provider.close();

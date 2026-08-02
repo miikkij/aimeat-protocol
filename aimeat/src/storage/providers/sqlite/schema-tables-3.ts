@@ -615,6 +615,24 @@ export function applySchemaTables3(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_publish_delegation ON publish_attempts(delegationId, createdAt);
     CREATE INDEX IF NOT EXISTS idx_publish_connection ON publish_attempts(connectionId, createdAt);
 
+    -- How a published item is actually doing (TARGET-057). A TIME SERIES rather than a column on
+    -- the attempt: "how did that post do" is a question about a curve, and a field holding only the
+    -- latest value can never say whether 40 likes took an hour or a month. Append-only; a series
+    -- that can be edited is not a record. NULL means the platform does not report that number to
+    -- the author -- which is a different answer from zero, and writing 0 would invent a measurement.
+    CREATE TABLE IF NOT EXISTS publish_metrics (
+      id          TEXT PRIMARY KEY,
+      attemptId   TEXT NOT NULL,
+      fetchedAt   TEXT NOT NULL,
+      impressions INTEGER,
+      likes       INTEGER,
+      comments    INTEGER,
+      shares      INTEGER,
+      raw         TEXT NOT NULL DEFAULT '{}'
+    );
+    CREATE INDEX IF NOT EXISTS idx_publish_metrics_attempt
+      ON publish_metrics(attemptId, fetchedAt DESC);
+
     -- Client credentials this node holds AT a provider instance (TARGET-057). NOT the user's token
     -- and not .env either. A fixed provider's client id/secret (Google, Bluesky) are one per node
     -- and live in config; an instance-scoped provider (Mastodon) issues them PER INSTANCE, there is

@@ -3128,6 +3128,74 @@ components:
           description: >
             Connected accounts created with this app. They can only be renewed by it, so this is
             also how many would stop renewing if it were removed.
+    PublishMetricSample:
+      type: object
+      description: >
+        One reading of how a published item is doing. Normalised so platforms can be compared at
+        all, with the provider's own answer kept in `raw` so a wrong mapping stays discoverable.
+
+
+        EVERY COUNT IS NULLABLE AND NULL IS NOT ZERO. A platform that does not report impressions to
+        an author has reported nothing; writing 0 would invent a measurement nobody made.
+      properties:
+        id:
+          type: string
+        attemptId:
+          type: string
+        fetchedAt:
+          type: string
+          format: date-time
+          description: When this node asked. Not when the platform computed it, which is rarely knowable.
+        impressions:
+          type: integer
+          nullable: true
+        likes:
+          type: integer
+          nullable: true
+        comments:
+          type: integer
+          nullable: true
+        shares:
+          type: integer
+          nullable: true
+          description: Reblogs, reposts, retweets, shares. Cousins rather than synonyms, named once.
+        raw:
+          type: object
+          additionalProperties: true
+    PublishHistoryItem:
+      type: object
+      description: One published item, with the account it went to and the newest reading of it.
+      properties:
+        id:
+          type: string
+        connectionId:
+          type: string
+        provider:
+          type: string
+        accountLabel:
+          type: string
+          description: >
+            `(disconnected)` when the account has since been removed. History outlives the
+            connection that made it.
+        status:
+          type: string
+          enum: [in_flight, held, queued, done, failed, rejected]
+        externalRef:
+          type: string
+          nullable: true
+        storageKey:
+          type: string
+        error:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        latest:
+          allOf:
+            - $ref: '#/components/schemas/PublishMetricSample'
+          nullable: true
+          description: Null means nobody has asked for a reading. It does not mean zero engagement.
     PublicConnection:
       type: object
       description: >
@@ -33909,6 +33977,138 @@ paths:
           description: >
             Connected accounts were made with this app. The message says how many. Disconnect them
             first.
+  /v1/connections/attempts:
+    get:
+      operationId: listPublishHistory
+      summary: What you have published through this node
+      description: >
+        The same ledger that prevents double posts, finally readable. Every attempt was recorded
+        before anything left, so this is a record of what was TRIED: `status` distinguishes a
+        publication from one that was held for moderation, queued behind a spent allowance, or
+        refused.
+
+
+        `latest` is the most recent reading of how the item is doing, or null when nobody has asked
+        for one. Null means unmeasured. It never means zero.
+
+
+        Accepts `connections:use` as well as `connections:read`, because an app that may publish has
+        to be able to see what it published.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            default: 50
+            maximum: 200
+      responses:
+        '200':
+          description: Your own history, newest first.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          attempts:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/PublishHistoryItem'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+  /v1/connections/attempts/{id}/metrics:
+    get:
+      operationId: listPublishMetrics
+      summary: Every reading taken for one published item
+      description: >
+        Oldest first, so a curve can be drawn. Forty likes means something different in an hour than
+        in a month, and that difference is the part worth acting on.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The series, oldest first. Empty when nobody has asked for a reading.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          samples:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/PublishMetricSample'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: >
+            No such published item of yours. Someone else's item is this same 404.
+    post:
+      operationId: readPublishMetrics
+      summary: Ask the platform how an item is doing, now
+      description: >
+        A POST because it has effects: it spends a request at the provider and, on X, real money.
+        Nothing on this node schedules it. A reading happens because somebody asked for one, and a
+        dashboard that refreshes on a timer would be a standing bill nobody agreed to.
+
+
+        The answer is appended to the item's series rather than replacing anything.
+      tags: [Connections]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: The reading that was taken and stored.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          sample:
+                            $ref: '#/components/schemas/PublishMetricSample'
+        '400':
+          description: That item was never published, or the account needs reconnecting.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          description: No such published item of yours.
+        '409':
+          description: >
+            NOT_MEASURABLE. The platform will not report this to an author, or the item is gone.
+            Deliberately not a 5xx: nothing is broken and retrying will never help, and on a provider
+            that charges per read a retry loop is a standing cost.
+        '502':
+          description: >
+            METRICS_UNAVAILABLE. Transport-shaped, or a spent credit balance. Worth trying again.
   /v1/connections/callback:
     get:
       operationId: connectionCallback

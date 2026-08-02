@@ -38,6 +38,8 @@ export interface FakeProvider {
     staleRefreshAttempts: number;
     /** Renewals attempted by a client that did not obtain the grant. Must stay 0 in normal use. */
     wrongClientRefreshAttempts: number;
+    /** Metric reads. Counted because on a real provider each one costs a request, or money. */
+    metricReads: number;
     revocations: number;
     identityLookups: number;
     /** Secrets exchanged for a session, and pairs refused. */
@@ -52,6 +54,8 @@ export interface FakeProvider {
   accessTokenTtlSeconds: number;
   /** When true, every refresh answers 400 — the "grant is gone" case. */
   breakRefresh: boolean;
+  /** Make the item look gone, so the permanent-refusal path can be exercised. */
+  noMetrics: boolean;
   /** When true, a publish is refused as CONTENT — permanent, and must never be retried. */
   rejectContent: boolean;
   /** Milliseconds a refresh takes, so a test can create a real overlap between two callers. */
@@ -85,9 +89,10 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
 
   const state: FakeProvider = {
     baseUrl: '',
-    stats: { tokenExchanges: 0, refreshes: 0, staleRefreshAttempts: 0, wrongClientRefreshAttempts: 0, revocations: 0, identityLookups: 0, sessionMints: 0, sessionRejections: 0, publishes: 0, contentRejections: 0, lastPublishBytes: 0 },
+    stats: { tokenExchanges: 0, refreshes: 0, staleRefreshAttempts: 0, wrongClientRefreshAttempts: 0, metricReads: 0, revocations: 0, identityLookups: 0, sessionMints: 0, sessionRejections: 0, publishes: 0, contentRejections: 0, lastPublishBytes: 0 },
     accessTokenTtlSeconds: 3600,
     breakRefresh: false,
+    noMetrics: false,
     rejectContent: false,
     refreshDelayMs: 0,
     close: async () => { /* replaced below */ },
@@ -121,6 +126,20 @@ export async function startFakeProvider(port = 0): Promise<FakeProvider> {
   const server: Server = createServer((req, res) => {
     void (async () => {
       const url = new URL(req.url ?? '/', 'http://localhost');
+
+      // How a published item is doing. Real providers put an author's counts behind the same
+      // token that published it, so this does too.
+      if (url.pathname.startsWith('/metrics/') && req.method === 'GET') {
+        const token = (req.headers.authorization ?? '').replace('Bearer ', '');
+        if (!grants.has(token)) return json(res, 401, { error: 'invalid_token' });
+        state.stats.metricReads++;
+        if (state.noMetrics) return json(res, 404, { error: 'not_found' });
+        return json(res, 200, {
+          // Deliberately WITHOUT an impression count: the normalisation has to keep "not reported"
+          // distinct from zero, and a test provider that reports everything cannot show that.
+          likes: 7, comments: 2, shares: 3,
+        });
+      }
 
       if (url.pathname === '/token' && req.method === 'POST') {
         const form = await body(req);

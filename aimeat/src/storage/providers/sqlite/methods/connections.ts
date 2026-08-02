@@ -19,7 +19,7 @@ import type { ConnectionQuery, PublishAttemptQuery } from '../../../repositories
 import type {
   ConnectionRecord, ConnectionStatus, CredentialShape, ConnectionMode,
   DelegationRecord, ModerationMode, PublishAttempt, NewPublishAttempt, PublishStatus,
-  ProviderClientRecord,
+  ProviderClientRecord, PublishMetricSample,
 } from '../../../../models/connection-schemas.js';
 import type { SqliteStorage } from '../index.js';
 
@@ -76,6 +76,22 @@ function toAttempt(r: Row): PublishAttempt {
     error: (r.error as string | null) ?? null,
     createdAt: r.createdAt as string,
     updatedAt: r.updatedAt as string,
+  };
+}
+
+function toMetric(r: Row): PublishMetricSample {
+  const num = (v: unknown): number | null => (typeof v === 'number' ? v : null);
+  return {
+    id: r.id as string,
+    attemptId: r.attemptId as string,
+    fetchedAt: r.fetchedAt as string,
+    // null stays null. A provider that does not report a number reported nothing, and turning that
+    // into 0 invents a measurement.
+    impressions: num(r.impressions),
+    likes: num(r.likes),
+    comments: num(r.comments),
+    shares: num(r.shares),
+    raw: JSON.parse((r.raw as string) || '{}') as Record<string, unknown>,
   };
 }
 
@@ -355,6 +371,38 @@ export const connectionMethods = {
    * that can return someone else's row and is then filtered is a lookup that leaks the day somebody
    * forgets the filter.
    */
+  async addPublishMetric(this: SqliteStorage, row: PublishMetricSample): Promise<void> {
+    this.db.prepare(`
+      INSERT INTO publish_metrics (id, attemptId, fetchedAt, impressions, likes, comments, shares, raw)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(row.id, row.attemptId, row.fetchedAt, row.impressions, row.likes, row.comments,
+      row.shares, JSON.stringify(row.raw ?? {}));
+  },
+
+  /** One query for every attempt on the page. N+1 here is a history view that takes a second. */
+  async latestPublishMetrics(
+    this: SqliteStorage, attemptIds: string[],
+  ): Promise<Map<string, PublishMetricSample>> {
+    const out = new Map<string, PublishMetricSample>();
+    if (attemptIds.length === 0) return out;
+    const holes = attemptIds.map(() => '?').join(',');
+    const rows = this.db.prepare(`
+      SELECT m.* FROM publish_metrics m
+      JOIN (SELECT attemptId, MAX(fetchedAt) AS t FROM publish_metrics
+            WHERE attemptId IN (${holes}) GROUP BY attemptId) latest
+        ON latest.attemptId = m.attemptId AND latest.t = m.fetchedAt
+    `).all(...attemptIds) as Row[];
+    for (const r of rows) out.set(r.attemptId as string, toMetric(r));
+    return out;
+  },
+
+  async listPublishMetrics(this: SqliteStorage, attemptId: string): Promise<PublishMetricSample[]> {
+    const rows = this.db.prepare(
+      'SELECT * FROM publish_metrics WHERE attemptId = ? ORDER BY fetchedAt ASC',
+    ).all(attemptId) as Row[];
+    return rows.map(toMetric);
+  },
+
   async getPrincipalProviderClient(
     this: SqliteStorage, provider: string, principal: string,
   ): Promise<ProviderClientRecord | undefined> {

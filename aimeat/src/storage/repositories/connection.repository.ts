@@ -28,7 +28,7 @@
  */
 import type {
   ConnectionRecord, ConnectionStatus, DelegationRecord,
-  PublishAttempt, NewPublishAttempt, PublishStatus, ProviderClientRecord,
+  PublishAttempt, NewPublishAttempt, PublishStatus, ProviderClientRecord, PublishMetricSample,
 } from '../../models/connection-schemas.js';
 
 /** Narrowing for a listing. All fields optional; omitted means "any". */
@@ -169,6 +169,15 @@ export interface ConnectionRepository {
    * than silently falling back to the node's client and producing an unreadable invalid_grant.
    */
   getProviderClientById(id: string): Promise<ProviderClientRecord | undefined>;
+
+  /** Append one reading. Append-only on purpose: a series that can be edited is not a record. */
+  addPublishMetric(row: PublishMetricSample): Promise<void>;
+
+  /** The newest sample for each of these attempts, in one query rather than N. */
+  latestPublishMetrics(attemptIds: string[]): Promise<Map<string, PublishMetricSample>>;
+
+  /** The whole series for one attempt, oldest first, so a curve can be drawn. */
+  listPublishMetrics(attemptId: string): Promise<PublishMetricSample[]>;
 
   /** Store or replace a principal's own client. One per principal per provider. */
   upsertPrincipalProviderClient(row: ProviderClientRecord): Promise<ProviderClientRecord>;

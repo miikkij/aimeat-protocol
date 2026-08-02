@@ -288,6 +288,21 @@
       error: d.attempt?.error ?? void 0
     };
   }
+  async function history(opts = {}) {
+    const q = opts.limit ? `?limit=${encodeURIComponent(opts.limit)}` : "";
+    const res = await authFetch2(`/v1/connections/attempts${q}`);
+    return res?.data?.attempts ?? [];
+  }
+  async function measure(attemptId) {
+    const res = await authFetch2(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/metrics`, {
+      method: "POST"
+    });
+    return res?.data?.sample;
+  }
+  async function series(attemptId) {
+    const res = await authFetch2(`/v1/connections/attempts/${encodeURIComponent(attemptId)}/metrics`);
+    return res?.data?.samples ?? [];
+  }
   async function clients() {
     const res = await authFetch2("/v1/connections/clients");
     return res?.data?.clients ?? [];
@@ -394,6 +409,9 @@
     clients,
     setClient,
     removeClient,
+    history,
+    measure,
+    series,
     /** Per-provider things a user must be told BEFORE they try. See notes.js. */
     notes: PROVIDER_NOTES,
     /** Mount the ready-made panel. See panel.js. */

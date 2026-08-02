@@ -115,6 +115,21 @@ export interface ConnectionRecord {
  * that it needs attention; not enough to reason about the provider's scope vocabulary, whose
  * meaning an app cannot know. Capability questions go through a `can(capability)` ask instead.
  */
+/** One published item as a history view shows it: the attempt, plus who it went to. */
+export interface PublishHistoryItem {
+  id: string;
+  connectionId: string;
+  provider: string;
+  accountLabel: string;
+  status: PublishStatus;
+  externalRef: string | null;
+  storageKey: string;
+  error: string | null;
+  createdAt: string;
+  /** The most recent sample, when one has been taken. Null means nobody has asked yet. */
+  latest: PublishMetricSample | null;
+}
+
 export interface PublicConnection {
   id: string;
   provider: string;
@@ -235,6 +250,36 @@ export interface ProviderClientRecord {
   clientId: string;
   clientSecret: string;
   registeredAt: string;
+}
+
+/**
+ * What a platform reports back about one published item, at one moment.
+ *
+ * A TIME SERIES AND NOT A FIELD ON THE ATTEMPT. "How did that post do" is a question about a curve:
+ * a number that only ever holds the latest value can say a post has 40 likes and can never say
+ * whether that happened in an hour or over a month, which is the part anyone deciding what to
+ * publish next actually needs.
+ *
+ * NORMALISED, WITH THE ORIGINAL KEPT. Every platform names these differently and measures slightly
+ * different things — a Mastodon "reblog", a Bluesky "repost", an X "retweet" and a LinkedIn "share"
+ * are cousins, not synonyms. The normalised fields make a comparison possible; `raw` keeps what the
+ * provider actually said, so a wrong mapping stays discoverable rather than becoming the only
+ * record. A field the provider does not report is null, never 0: absent and zero are different
+ * answers and collapsing them invents engagement that was never measured.
+ */
+export interface PublishMetricSample {
+  id: string;
+  attemptId: string;
+  /** When THIS node asked. Not when the platform computed it, which is rarely knowable. */
+  fetchedAt: string;
+  /** Views/impressions. Null where the platform does not report it to the author. */
+  impressions: number | null;
+  likes: number | null;
+  comments: number | null;
+  /** Reblogs, reposts, retweets, shares. Named once so a comparison is possible at all. */
+  shares: number | null;
+  /** Exactly what the provider returned, so a mapping mistake stays visible. */
+  raw: Record<string, unknown>;
 }
 
 /** A principal's own client as an app or panel may see it. NEVER carries the secret. */
