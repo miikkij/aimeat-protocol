@@ -51,6 +51,10 @@
  *     (task/record/dm/message) arrives, without consuming — a pure signal so the woken daemon drains
  *     each queue as usual. Lets a multi-source agent (records+tasks, dms+tasks, …) wake on EVERY source
  *     instead of only its single parked queue (the per-queue `/next` endpoints stay for older daemons).
+ *   v1.5.0 — 2026-08-02 — Build identity: startup announces which artifact is running and shouts when
+ *     dist/ is older than the source it was built from; `/local/status` carries the same under `build`.
+ *     Clients reach the node only through this daemon, so a stale dist silently drops newly-added
+ *     fields — three separate hunts (outbound writes, inbound reads, `provider`) each ended here.
  */
 import express, { type Request, type Response } from 'express';
 import type { Server } from 'node:http';
@@ -69,6 +73,7 @@ import { startPollerForAgent, legacyWakeAdapter } from './poller.js';
 import { launchTaskRunner, isRunner } from '../task-runner.js';
 import { CONNECT_CLI_TOOLS } from '../tool-call.js';
 import { logger } from '../../../utils/logger.js';
+import { checkBuildFreshness, announceBuild, buildIdentity } from '../../../utils/build-stamp.js';
 
 export const SERVE_DISCOVERY_SCHEMA_VERSION = 1;
 
@@ -329,6 +334,13 @@ function pidAlive(pid: number): boolean {
 
 export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
   const { registry, buildMcp } = opts;
+
+  // Say what artifact this is BEFORE anything else, because clients reach the node only through
+  // this daemon: when dist/ is behind the source, nothing errors — a field added in source is
+  // simply absent from every write, and the search starts at the node.
+  const freshness = checkBuildFreshness();
+  announceBuild(freshness, line => console.error(line));
+
   const discoveryFile = serveDiscoveryPath();
 
   // Stale-detect: a live daemon owns the discovery file; a dead pid is overwritten.
@@ -639,6 +651,7 @@ export async function runServeDaemon(opts: ServeDaemonOptions): Promise<void> {
       data: {
         pid: process.pid,
         started_at: startedAt,
+        build: buildIdentity(freshness),   // which artifact is answering — see utils/build-stamp.ts
         principals: registry.list().map(e => ({
           type: e.agent.startsWith('eco:') ? 'ecosystem' : 'agent',
           id: e.agent,
