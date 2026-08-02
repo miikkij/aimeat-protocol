@@ -326,10 +326,6 @@ export function ConnectionsSection({ showToast }) {
                 : `${t('profile.access.cxConnect') || 'Connect'} ${escHtml(p.label)}`}
             </button>
           </div>
-          ${(NOTES[p.id] || []).map(key => html`
-            <p class="text-meta-sm" key=${key}>${t('profile.access.' + key)}</p>
-          `)}
-
           ${!p.attachFields && html`
             <${OwnApp}
               provider=${p}
@@ -344,6 +340,10 @@ export function ConnectionsSection({ showToast }) {
               onSave=${() => saveOwnClient(p.id)}
               onRemove=${(count) => removeOwnClient(p.id, count)} />
           `}
+          ${(NOTES[p.id] || []).map(key => html`
+            <p class="text-meta-sm" key=${key}>${t('profile.access.' + key)}</p>
+          `)}
+
         </div>
       `)}
     </div>

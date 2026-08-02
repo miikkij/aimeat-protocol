@@ -3569,3 +3569,13 @@
   gap: var(--space-2);
   width: 100%;
 }
+
+/* One service per block, and the eye has to be able to tell where one ends.
+   MEASURED before this existed: the "use your own app" control sat 52-83px below the Connect button
+   it belongs to and 16px above the NEXT service's, so proximity said it belonged to the wrong one
+   in every single case. Grouping is not decoration; it was reading as a different feature. */
+.access-cx-add + .access-cx-add {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-4);
+  margin-top: var(--space-4);
+}
