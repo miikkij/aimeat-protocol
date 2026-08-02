@@ -64,6 +64,12 @@ const DECLARATION = {
     method: 'rewritten',
     human_involvement: 'editorial-control',
     model: 'anthropic/claude-opus-5',
+    // WHO SERVED IT, which is a different question from WHICH MODEL. The block had no way to say
+    // this at all until 2026-08-02: the record schema carried `generator.provider` but only the
+    // node's own generation path could fill it, so an agent declaring for work it did elsewhere
+    // left the question permanently unanswered. Found by reading a real article's record back and
+    // noticing that `openrouter/openrouter/free` names a routing pool rather than a writer.
+    provider: 'openrouter',
     notes: 'Declared at publish time by the door-coverage E2E.',
 };
 
@@ -94,6 +100,8 @@ function assertDeclarationSurvived(prov: any, door: string) {
         `${door}: humanInvolvement is "${rec.humanInvolvement}", not the declared "editorial-control"`);
     assert(rec.generator?.model === 'anthropic/claude-opus-5',
         `${door}: the declared model did not survive (${JSON.stringify(rec.generator)})`);
+    assert(rec.generator?.provider === 'openrouter',
+        `${door}: the declared provider did not survive (${JSON.stringify(rec.generator)})`);
     // The half that must NOT come from the caller — a declaration is believed about the how, never
     // about the who. `stampedBy: 'principal'` says the node recorded a claim rather than made one.
     assert(rec.attestation?.stampedBy === 'principal',
