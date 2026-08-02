@@ -3,6 +3,7 @@
   "entries": [
     {
       "date": "2026-08-02",
+      "version": "2.7.0",
       "kind": "feature",
       "title": {
         "en": "Use the AI chat you like, with your node in it",
