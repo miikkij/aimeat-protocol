@@ -54,6 +54,14 @@
  *   });
  *   return jsonContent(withProvenanceEcho(resp.data ?? resp, echo));
  * @version-history
+ *   v1.2.0 — 2026-08-02 — Carry `provider` (who SERVED the model). It was added to the node's own MCP
+ *     surface and to this file's shared schema, but not to toDeclareBody — so it parsed, typed and
+ *     validated here and was dropped on the last line before the POST. Same two-surface split as the
+ *     outbound-write and inbound-read rounds, and the third time a declared field went quiet: this is
+ *     the path EVERY fleet crew uses, since crews reach the node only through `aimeat connect serve`.
+ *     `model` and `provider` now merge into one `generator` rather than one replacing the other.
+ *     test/unit/provenance-carry-field-parity.test.ts derives its expectations from the schema, so the
+ *     next field forgotten here fails a test instead of vanishing in production.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 11b: the READ direction. Reported from the crewaimeat
  *     side as "read_provenance() never returns anything for memory reads" — the node serves the
  *     record on the envelope carrier and every `resp.data ?? resp` in the connector dropped it.
@@ -174,7 +182,7 @@ export function carrierAttach(
 export function parseDeclarationInput(raw: unknown): AiProvenanceToolInput | undefined {
   if (raw === undefined || raw === null) return undefined;
   if (typeof raw !== 'object' || Array.isArray(raw)) {
-    throw new ProvenanceCarryError('ai_provenance must be an object: { level, human_involvement?, method?, model?, sources?, notes? }');
+    throw new ProvenanceCarryError('ai_provenance must be an object: { level, human_involvement?, method?, model?, provider?, sources?, notes? }');
   }
   const parsed = AiProvenanceBlockSchema.safeParse(raw);
   if (!parsed.success) {
@@ -186,8 +194,15 @@ export function parseDeclarationInput(raw: unknown): AiProvenanceToolInput | und
   return parsed.data;
 }
 
-/** The declaration as `POST /v1/provenance` wants it: camelCase document fields, not the snake DTO. */
-function toDeclareBody(
+/**
+ * The declaration as `POST /v1/provenance` wants it: camelCase document fields, not the snake DTO.
+ *
+ * Exported for the parity test that derives its expectations from AiProvenanceBlockSchema, so a
+ * field added to the schema and forgotten here fails a test instead of vanishing at runtime. That
+ * has now happened three times (outbound writes, inbound reads, `provider`), and every time the
+ * symptom was a field silently absent rather than an error.
+ */
+export function toDeclareBody(
   declared: AiProvenanceToolInput,
   content: string,
   attachToMemoryKey?: string,
@@ -198,7 +213,18 @@ function toDeclareBody(
     // field satisfied without inventing a different default on this side.
     humanInvolvement: declared.human_involvement ?? 'none',
     ...(declared.method ? { method: declared.method } : {}),
-    ...(declared.model ? { generator: { model: declared.model } } : {}),
+    // `model` and `provider` are two answers to different questions — which model wrote it, and who
+    // ran it — and they share one `generator` object, so neither may overwrite the other. Emit it
+    // when EITHER is present: the node's generator schema has no required field, and a caller
+    // routing through an intermediary can legitimately name the router without naming the model.
+    ...(declared.model || declared.provider
+      ? {
+        generator: {
+          ...(declared.model ? { model: declared.model } : {}),
+          ...(declared.provider ? { provider: declared.provider } : {}),
+        },
+      }
+      : {}),
     ...(declared.sources?.length
       ? {
         sources: declared.sources.map((s) => ({

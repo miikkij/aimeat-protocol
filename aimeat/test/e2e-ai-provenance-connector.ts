@@ -263,6 +263,36 @@ await test('THE PROBE, echoed: the tool result states what was actually recorded
     `no resolvable record_url in the echo: ${JSON.stringify(echo)}`);
 });
 
+await test('model AND provider both survive the connector — "who ran it" is not lost', async () => {
+  // Reported from the crewaimeat side: the declared write returned recorded:true and stored `model`,
+  // while `generator` came back {principal, model, nodeId} with no provider. The field existed in the
+  // schema and was typed here; toDeclareBody dropped it on the last line before the POST, and a
+  // dropped optional field raises no error anywhere. Both questions — which model wrote it, and who
+  // served it — must reach the stored record, and neither may overwrite the other in `generator`.
+  const key = 'crew.model.and.provider';
+  const r = await mcpCall(mcp!, 'aimeat_memory_write', {
+    key,
+    value: { x: 3 },
+    ai_provenance: {
+      level: 'ai-generated',
+      human_involvement: 'none',
+      model: 'nvidia/nemotron-nano-12b-v2-vl',
+      provider: 'openrouter',
+    },
+  });
+  assert(!r.isError, `write failed: ${r.raw}`);
+
+  const { record } = await storedProvenanceFor(declarerToken, key);
+  const generator = record.generator ?? {};
+  assert(generator.model === 'nvidia/nemotron-nano-12b-v2-vl',
+    `the declared model did not reach the record: ${JSON.stringify(generator)}`);
+  assert(generator.provider === 'openrouter',
+    `the declared provider was DROPPED between the connector and the record: ${JSON.stringify(generator)}`);
+  // The node still owns identity: it fills these in and a caller cannot state them.
+  assert(generator.principal === declarerGaii, `wrong principal: ${JSON.stringify(generator)}`);
+  assert(generator.nodeId === NODE_ID, `wrong nodeId: ${JSON.stringify(generator)}`);
+});
+
 // ─── 3. A bogus declaration is refused, not defaulted ───
 console.log('\nPhase 3 — A declaration that cannot be honoured never looks like one that was');
 
