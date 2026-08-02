@@ -33,6 +33,9 @@ export async function runConnectCli(positionals: string[]): Promise<void> {
 
   if (connectAction === 'help') {
     console.log(CONNECT_HELP_TEXT);
+  } else if (connectAction === 'client') {
+    const { runConnectClient } = await import('./cli/connect/clients/index.js');
+    await runConnectClient(positionals[2], connectFlags);
   } else if (connectAction === 'serve') {
     const { runServe } = await import('./cli/connect/mcp/server.js');
     await runServe(connectFlags);

@@ -23,6 +23,10 @@ USAGE
   aimeat maintenance off         Disable maintenance mode
   aimeat maintenance             Show maintenance status
   aimeat connect [opts]          Connect an AI agent (device auth flow)
+  aimeat connect client <id>     Point a chat client at this node in one command
+                                 (goose | claude-code | cursor | vscode | claude-desktop):
+                                 authorizes a dedicated agent, writes that client's MCP
+                                 config, and leaves a launcher that supplies the token.
   aimeat connect add [opts]      Add another agent to the connector pool
   aimeat connect list            Show all connected agents
   aimeat connect remove <name>   Remove a connected agent
@@ -93,6 +97,18 @@ export const CONNECT_HELP_TEXT = `
 AIMEAT Agent Connector
 
 USAGE
+  aimeat connect client <goose|claude-code|cursor|vscode|claude-desktop> [options]
+      Point a chat client at this node in ONE command: authorize a dedicated agent
+      into its own connector home, write that client's MCP config (merging, never
+      replacing what is already there), and leave a launcher that supplies the
+      token at run time so it never lands in a config file.
+      Options: --url --owner --agent --workdir --home --surface --name --reuse
+      e.g. aimeat connect client goose --url https://aimeat.io --owner alice
+
+      Interactive clients reach the node over its HTTP MCP endpoint (/v1/mcp).
+      Claude Desktop is the exception: its config file cannot carry a remote URL,
+      so it is wired through the local connector over stdio.
+
   aimeat connect --url <node-url> --owner <owner> [--agent <name>]
       Authenticate an AI agent with OAuth device authorization.
 

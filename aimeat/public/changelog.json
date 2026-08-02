@@ -2,6 +2,18 @@
   "_format": "Node change log, newest entry FIRST. Served at /changelog.json, rendered by public/views/landing-changelog.js. Add an entry in the same change that ships the thing. Fields: date (YYYY-MM-DD), version (optional, the node version it shipped in), kind (feature|fix|security|notice), title and body. title/body are either a plain string (shown to everyone) or { en, fi } when the wording deserves both languages. Write what a person gets, not what the code does.",
   "entries": [
     {
+      "date": "2026-08-02",
+      "kind": "feature",
+      "title": {
+        "en": "Use the AI chat you like, with your node in it",
+        "fi": "Käytä sitä tekoälychattia josta pidät, ja pidä nodesi mukana siinä"
+      },
+      "body": {
+        "en": "One command now connects Goose, Claude Code, Cursor, VS Code or Claude Desktop to your node: aimeat connect client goose. It creates an agent of its own for that program, writes the settings the program expects, and hands you a shortcut that starts it. From then on you can talk to your own data, apps and organisms from that window, with whichever model you pay for. It never writes your key into a settings file, and it leaves every other tool you had connected exactly as it was.",
+        "fi": "Yksi komento kytkee Goosen, Claude Coden, Cursorin, VS Coden tai Claude Desktopin nodeesi: aimeat connect client goose. Se luo ohjelmalle oman agentin, kirjoittaa asetukset siihen muotoon jota ohjelma odottaa, ja antaa sinulle pikakuvakkeen jolla se käynnistyy. Sen jälkeen voit jutella omalle datallesi, apeillesi ja organismeillesi siitä ikkunasta, sillä mallilla josta itse maksat. Avaintasi ei kirjoiteta asetustiedostoon, eikä yksikään aiemmin kytkemäsi työkalu muutu matkalla."
+      }
+    },
+    {
       "date": "2026-08-01",
       "version": "2.4.0",
       "kind": "feature",
