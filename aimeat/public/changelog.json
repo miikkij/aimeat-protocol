@@ -6,6 +6,19 @@
       "version": "2.7.0",
       "kind": "feature",
       "title": {
+        "en": "Connect your own accounts, publish to them, and read how it went",
+        "fi": "Liitä omat tilisi, julkaise niihin ja lue miten meni"
+      },
+      "body": {
+        "en": "Mastodon, YouTube, Bluesky, LinkedIn and X can now be connected to your profile, under Access. Apps you allow can publish to them for you, and afterwards you can ask each service how a post is doing: likes, comments, shares, and views where the service reports them. Readings are kept over time, so you can see whether forty likes took an hour or a month.\n\nWhere a service tells an author nothing, it says so rather than showing a zero. Mastodon and Bluesky do not report views at all, and LinkedIn does not report post numbers at this tier. A zero would be a measurement nobody made.\n\nYou approve every connection at the service itself. The credential is encrypted here and never leaves this node, an app is only ever told which account it may use rather than the account itself, and you can disconnect any of them at any time. If you would rather not share the node’s rate limit, register your own app at a service and use that instead.",
+        "fi": "Mastodonin, YouTuben, Blueskyn, LinkedInin ja X:n voi nyt liittää profiiliisi kohdassa Access. Sallimasi sovellukset voivat julkaista niihin puolestasi, ja jälkeenpäin voit kysyä jokaiselta palvelulta miten julkaisu on pärjännyt: tykkäykset, kommentit, jaot ja näyttökerrat siellä missä palvelu ne kertoo. Luvut säilyvät ajan yli, joten näet kertyikö neljäkymmentä tykkäystä tunnissa vai kuukaudessa.\n\nSiellä missä palvelu ei kerro tekijälle mitään, se sanotaan sen sijaan että näytettäisiin nolla. Mastodon ja Bluesky eivät kerro näyttökertoja lainkaan, eikä LinkedIn kerro julkaisun lukuja tällä tasolla. Nolla olisi mittaus jota kukaan ei tehnyt.\n\nHyväksyt jokaisen liitoksen palvelussa itsessään. Tunnus on täällä salattuna eikä poistu tältä nodelta, sovellus saa tietää vain minkä tilin se saa käyttää eikä itse tiliä, ja voit katkaista minkä tahansa liitoksen koska tahansa. Jos et halua jakaa noden kutsurajaa, rekisteröi palveluun oma sovelluksesi ja käytä sitä."
+      }
+    },
+    {
+      "date": "2026-08-02",
+      "version": "2.7.0",
+      "kind": "feature",
+      "title": {
         "en": "Use the AI chat you like, with your node in it",
         "fi": "Käytä sitä tekoälychattia josta pidät, ja pidä nodesi mukana siinä"
       },
