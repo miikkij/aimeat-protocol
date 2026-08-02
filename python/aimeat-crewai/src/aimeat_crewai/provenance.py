@@ -126,6 +126,7 @@ def declare(
     method: str | None = None,
     human_involvement: str = HumanInvolvement.NONE,
     model: str | None = None,
+    provider: str | None = None,
     sources: Iterable[Mapping[str, Any]] | None = None,
     notes: str | None = None,
 ) -> dict[str, Any]:
@@ -138,6 +139,11 @@ def declare(
     Nothing about identity is accepted here — the node fills in who you are, which node, when, and a
     hash of the exact bytes, and discards anything a caller says about it. That is by construction:
     it is the one place an agent could otherwise attribute its writing to somebody else.
+
+    ``provider`` is who SERVED the model, and it is worth stating whenever you route through an
+    intermediary: "which model" and "who ran it" are different questions, and a router alias answers
+    neither. A crew recording ``openrouter/openrouter/free`` as its model has named a routing POOL,
+    not the writer — prefer the model the response actually reports, and name the router here.
 
     ``notes`` must never carry prompt text or anything private: the record is published alongside
     the content it describes.
@@ -155,6 +161,8 @@ def declare(
         block["method"] = method
     if model:
         block["model"] = model
+    if provider:
+        block["provider"] = provider
     src = [dict(s) for s in (sources or [])]
     if src:
         block["sources"] = src

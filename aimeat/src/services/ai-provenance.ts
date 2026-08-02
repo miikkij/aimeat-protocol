@@ -317,6 +317,12 @@ export interface DeclaredProvenance {
    */
   humanInvolvement?: AiHumanInvolvement;
   model?: string;
+  /**
+   * Who SERVED the model, when a declarer routes through an intermediary. Separate from `model`
+   * because they answer different questions, and a router alias answers neither on its own: an
+   * agent recording `openrouter/openrouter/free` has named a routing pool, not a writer.
+   */
+  provider?: string;
   sources?: AiProvenanceSource[];
   notes?: string;
 }
@@ -425,6 +431,11 @@ export async function provenanceForWrite(
       content: input.content,
       generator: {
         ...(input.declared.model ? { model: input.declared.model } : {}),
+        // The declarer's own answer to "who ran it". The record schema has always had the field;
+        // until now only the node's OWN generation path could fill it, so an agent declaring for
+        // content it produced elsewhere had no way to say — and every such record came back with the
+        // question unanswered no matter how carefully the agent knew it.
+        ...(input.declared.provider ? { provider: input.declared.provider } : {}),
         ...(input.pipeline ? { pipeline: input.pipeline } : {}),
       },
       sources: input.declared.sources,

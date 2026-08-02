@@ -90,6 +90,10 @@ export const AiProvenanceBlockSchema = z.object({
     + "'light-review' at most. Omitted means 'none'."),
   model: z.string().optional().describe(
     "The model that produced it, as the provider names it, e.g. 'anthropic/claude-opus-5'."),
+  provider: z.string().optional().describe(
+    "Who served the model, when that is not obvious from its name — e.g. 'openrouter' in front of "
+    + "someone else's model. Say it when you route through an intermediary, because 'which model' "
+    + 'and "who ran it" are different questions and a reader chasing an output needs both.'),
   sources: z.array(sourceInput).max(100).optional().describe(
     'For synthesized content: where the material came from.'),
   notes: z.string().max(1_000).optional().describe(
@@ -161,6 +165,7 @@ export function toDeclaredProvenance(
     method: input.method,
     humanInvolvement: input.human_involvement,
     model: input.model,
+    provider: input.provider,
     sources: input.sources?.map((s) => ({
       url: s.url,
       ...(s.title ? { title: s.title } : {}),
