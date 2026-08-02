@@ -102,7 +102,7 @@ from .provenance import (
     is_model_written,
 )
 
-__version__ = "0.18.0"
+__version__ = "0.19.0"
 
 __all__ = [
     "__version__",
@@ -162,7 +162,8 @@ __all__ = [
     "usage_run",
     "build_llm_call_payload",
     # AI provenance — declare how content was made, read how it was made (0.18.0).
-    # Mirrors the node contract; the NODE SCHEMA WINS on any mismatch.
+    # `declare(provider=...)` — who SERVED the model — is 0.19.0; pin >=0.19.0 to call it, because
+    # on 0.18.0 it raises TypeError. Mirrors the node contract; the NODE SCHEMA WINS on any mismatch.
     "PROVENANCE_SPEC",
     "Level",
     "Method",
