@@ -412,16 +412,12 @@ export function buildAppPrompt(
   // this section is the app-side half of that contract. (Oma talo stats bar under both marks at
   // 390px, 2026-08-02.)
   body += '### The node\'s bottom chrome strip — lift your bottom UI clear of it\n';
-  body += 'Every served app carries two permanent marks fixed to the bottom corners: the AI-disclosure label (bottom-left) and the aimeat.io attribution badge (bottom-right). They are node chrome, they always paint on top, and they stay — so design the bottom edge of the app as RESERVED. The node tells you exactly how much: at serve time it sets `--aimeat-chrome-bottom` on `:root` (a height in px; larger on narrow viewports where the marks stack). Read the variable rather than hardcoding numbers, and give it fallbacks that match the current geometry (56px wide, 96px at ≤640px) so a locally previewed file lays out correctly too:\n';
+  body += 'Every served app carries two permanent marks fixed to the bottom corners: the AI-disclosure label (bottom-left; on phones a compact icon pill that expands on tap) and the aimeat.io attribution badge (bottom-right). They are node chrome, they always paint on top, and they stay — so design the bottom edge of the app as RESERVED. The node tells you exactly how much: at serve time it sets `--aimeat-chrome-bottom` on `:root` (one strip height in px, every viewport). Read the variable rather than hardcoding numbers, and give it a fallback matching the current geometry (56px) so a locally previewed file lays out correctly too:\n';
   body += '```css\n';
   body += '/* Fixed/sticky bottom bars sit ABOVE the strip */\n';
   body += '.bottom-bar { bottom: var(--aimeat-chrome-bottom, 56px); }\n';
   body += '/* Scroll containers pad past it so the last row is reachable */\n';
   body += '.scroll-area { padding-bottom: calc(var(--aimeat-chrome-bottom, 56px) + 12px); }\n';
-  body += '@media (max-width: 640px) {\n';
-  body += '  .bottom-bar { bottom: var(--aimeat-chrome-bottom, 96px); }\n';
-  body += '  .scroll-area { padding-bottom: calc(var(--aimeat-chrome-bottom, 96px) + 12px); }\n';
-  body += '}\n';
   body += '```\n';
   body += 'The same applies to full-screen focused views: give their bottom input row the same `padding-bottom`. When the node\'s chrome geometry changes, the served variable overrides your fallback automatically — that is the point of reading it.\n\n';
 

@@ -8538,6 +8538,7 @@
     "draftTitle": "Tämän luonnoksen on kirjoittanut tekoäly",
     "draftBody": "Lue se ennen lähettämistä. Vastaat itse siitä, mitä nimissäsi lähtee.",
     "regionLabel": "Tekoälyn läpinäkyvyystiedot",
+    "expand": "Näytä tekoälymerkintä",
     "iconAlt": {
       "aiGenerated": "Tekoälyn tuottamaa sisältöä",
       "aiModified": "Sisältöä on osittain muokattu tekoälyllä",

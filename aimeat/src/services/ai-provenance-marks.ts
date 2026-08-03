@@ -40,6 +40,11 @@
  *   setProvenanceHeaders(res, prov);
  *   res.json(success(config.nodeId, data, hints, envelopeMeta(prov)));
  * @version-history
+ *   v1.5.0 — 2026-08-02 — Mobile presentation of the visible label: collapsed icon-only pill on the
+ *     same 34px row as the attribution badge (was: full-text chip on its own row at bottom:58px,
+ *     ~90px of every phone viewport), tap-to-expand to the full statement via a hidden-checkbox
+ *     toggle. The disclosure icon stays visible at all times; desktop is unchanged. Developer
+ *     decision 2026-08-02 (Oma talo dialog collision).
  *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 9 step 0. provenanceItemBlock(): the per-item wire shape,
  *     lifted out of mcp/ai-provenance-result.ts when the REST board and agent-message reads needed
  *     the identical block. One declaration, two surfaces.
@@ -286,6 +291,11 @@ export function markDocumentElement(text: string, value: string): string {
  * background-image is governed by `img-src`. The `aria-label` carries the statement, so the mark
  * never depends on the image loading.
  *
+ * On narrow viewports (<=640px) the chip is COLLAPSED by default: a compact icon-only pill on the
+ * same 34px row as the attribution badge's collapsed button, expanding to the full statement on tap
+ * (hidden-checkbox toggle, no extra script). One short row is the whole footprint the two marks cost
+ * a phone — the strip apps keep clear via `--aimeat-chrome-bottom` (utils/app-chrome-reserve.ts).
+ *
  * Returns '' when no visible label is owed — which is disclosureFor()'s decision, pre-rendered into
  * the record at mint time. Nothing here re-decides it.
  */
@@ -329,19 +339,43 @@ function visibleLabelMarkup(p: ServedProvenance, config: AimeatConfig, locale: L
     // 520px, which removed the second layer on the commonest viewport there is.
     + `#${VISIBLE_LABEL_ID} a{color:inherit!important;opacity:.8!important;font-weight:500!important;`
     + 'text-decoration:underline!important}'
+    // The mobile toggle plumbing, inert on wide viewports: a visually-hidden (never display:none —
+    // keyboard a11y) checkbox plus its tap-target label. Same CSS-only mechanism as the attribution
+    // badge next door — the only way to get tap-to-expand without another script.
+    + `#${VISIBLE_LABEL_ID} input{position:absolute!important;width:1px!important;height:1px!important;`
+    + 'margin:0!important;opacity:0!important;pointer-events:none!important}'
+    + `#${VISIBLE_LABEL_ID} label{display:none!important}`
+    + `#${VISIBLE_LABEL_ID} input:focus-visible~label{outline:2px solid var(--color-primary,#E8564A)!important;outline-offset:2px!important}`
     + '@media (prefers-color-scheme:dark){'
     + `#${VISIBLE_LABEL_ID}{background:#14151a!important;color:#fff!important;border-color:#3a3a44!important}`
     + `#${VISIBLE_LABEL_ID}:popover-open{background:#14151a!important;color:#fff!important;border-color:#3a3a44!important}`
     + `#${VISIBLE_LABEL_ID} i{background-image:url("${esc(dark)}")!important}`
     + '}'
-    // Narrow viewports: sit on the row ABOVE the aimeat.io attribution badge instead of beside it.
-    // Measured at 390px — when a reader taps that badge open it slides left across the bottom row and
-    // collides with this chip. This label is in the top layer so it wins the paint, which means the
-    // COLLISION shows up as the badge being covered rather than the label; either way the Code asks
-    // for "sufficient spacing from other overlay elements", and two chips fighting over one corner is
-    // not that.
-    + `@media (max-width:640px){#${VISIBLE_LABEL_ID},#${VISIBLE_LABEL_ID}:popover-open`
-    + '{bottom:58px!important;inset:auto auto 58px 12px!important}}';
+    // Narrow viewports: COLLAPSED by default — a compact pill carrying only the EU icon, on the SAME
+    // 34px row as the attribution badge's collapsed ⚡ button (bottom:12), so together the two marks
+    // occupy one short strip instead of two stacked rows eating the app's bottom. An earlier version
+    // parked the full-text chip on its own row at bottom:58px, which cost ~90px of every phone
+    // viewport and still collided with app dialogs (Oma talo, 2026-08-02). The icon is the official
+    // Art. 50 mark, so the disclosure stays visible at all times; tapping expands the FULL statement
+    // (icon + text + details link, larger type than the old always-on chip) on the row above, which
+    // is the interactive second layer the Code encourages. The label overlay toggles it closed from
+    // anywhere on the panel; the details link sits above the overlay so it stays clickable.
+    + `@media (max-width:640px){`
+    + `#${VISIBLE_LABEL_ID},#${VISIBLE_LABEL_ID}:popover-open`
+    + '{bottom:12px!important;inset:auto auto 12px 12px!important;height:34px!important;'
+    + 'padding:0 10px!important;border-radius:9999px!important;flex-wrap:nowrap!important;box-sizing:border-box!important}'
+    + `#${VISIBLE_LABEL_ID} label{display:block!important;position:absolute!important;inset:0!important;`
+    + 'cursor:pointer!important;border-radius:inherit!important;z-index:2!important}'
+    + `#${VISIBLE_LABEL_ID} i{height:15px!important}`
+    + `#${VISIBLE_LABEL_ID} b,#${VISIBLE_LABEL_ID} a{display:none!important}`
+    + `#${VISIBLE_LABEL_ID}:has(input:checked),#${VISIBLE_LABEL_ID}:has(input:checked):popover-open`
+    + '{bottom:58px!important;inset:auto auto 58px 12px!important;height:auto!important;'
+    + 'padding:10px 14px!important;border-radius:14px!important;flex-wrap:wrap!important;'
+    + 'font-size:13px!important;line-height:1.35!important}'
+    + `#${VISIBLE_LABEL_ID}:has(input:checked) i{height:20px!important}`
+    + `#${VISIBLE_LABEL_ID}:has(input:checked) b{display:inline!important}`
+    + `#${VISIBLE_LABEL_ID}:has(input:checked) a{display:inline!important;position:relative!important;z-index:3!important}`
+    + '}';
 
   // THE TOP LAYER, AND WHY IT NEEDS THREE LINES OF SCRIPT. The Code requires the mark to sit "where
   // no intervening overlay elements exist", and z-index cannot deliver that: an app appending its
@@ -382,6 +416,8 @@ function visibleLabelMarkup(p: ServedProvenance, config: AimeatConfig, locale: L
   // encoding is not ours to rely on.
   return `<div id="${VISIBLE_LABEL_ID}" role="group" aria-label="${escAscii(t('aiLabel.regionLabel'))}">`
     + `<style>${css}</style>`
+    + `<input type="checkbox" id="${VISIBLE_LABEL_ID}-open">`
+    + `<label for="${VISIBLE_LABEL_ID}-open" aria-label="${escAscii(t('aiLabel.expand'))}"></label>`
     + `<i role="img" aria-label="${escAscii(alt)}"></i>`
     + `<b>${escAscii(short)}</b>`
     + `<a href="${esc(p.recordUrl)}" target="_blank" rel="noopener noreferrer">${escAscii(t('aiLabel.detailsLink'))}</a>`

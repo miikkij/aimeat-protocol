@@ -12,7 +12,7 @@
  *   bottom space the node's chrome occupies, so the app lifts its own bottom UI clear.
  *
  *   THE CONTRACT. The node owns the geometry: this snippet sets `--aimeat-chrome-bottom` on `:root`
- *   (56px wide viewports, 96px at <=640px where the AI label sits on the row above the badge). An
+ *   (one 56px strip on every viewport — the marks share a single bottom row). An
  *   app offsets its fixed bottom elements by `var(--aimeat-chrome-bottom, <fallback>)` and pads its
  *   scroll container by the same. If the marks' geometry ever changes, ONLY the values here change
  *   and every app that follows the contract adapts on the next serve — that is the point of serving
@@ -26,6 +26,8 @@
  * @structure RESERVE_MARK — idempotency marker; reserveSnippet() — the markup.
  * @usage import { reserveSnippet } from '../utils/app-chrome-reserve.js';  // via applyServeMarks()
  * @version-history
+ *   v1.1.0 — 2026-08-02 — One row everywhere: 56px on all viewports (was 96px on <=640px), since the
+ *     AI label now collapses onto the same 34px row as the badge on narrow screens.
  *   v1.0.0 — 2026-08-02 — Initial: the reserved bottom strip contract (--aimeat-chrome-bottom).
  */
 
@@ -33,19 +35,15 @@
 export const RESERVE_MARK = 'id="aimeat-chrome-reserve"';
 
 /**
- * Footprint of the node's bottom chrome, measured from the marks' own CSS:
- * - wide: both marks anchor at bottom:12px; the taller (the AI label chip, one wrapped row worst
- *   case) tops out under 56px.
- * - <=640px: the AI label sits at bottom:58px above the collapsed badge, chip height ~32px → 90px;
- *   96px covers it with margin.
+ * Footprint of the node's bottom chrome, measured from the marks' own CSS: every viewport keeps the
+ * marks on ONE row anchored at bottom:12px — the full AI chip / badge pill on wide viewports (tops
+ * out under 56px with a wrapped row), the two collapsed 34px buttons on <=640px. The AI label's
+ * tap-EXPANDED panel transiently rises above this strip by design (user-invoked, self-dismissing),
+ * so it is not part of the reserved height.
  */
-const WIDE_PX = 56;
-const NARROW_PX = 96;
+const STRIP_PX = 56;
 
 /** The `:root` variable declaration an app reads to keep its bottom UI clear of the node's marks. */
 export function reserveSnippet(): string {
-    return `<style ${RESERVE_MARK}>`
-        + `:root{--aimeat-chrome-bottom:${WIDE_PX}px}`
-        + `@media (max-width:640px){:root{--aimeat-chrome-bottom:${NARROW_PX}px}}`
-        + '</style>';
+    return `<style ${RESERVE_MARK}>:root{--aimeat-chrome-bottom:${STRIP_PX}px}</style>`;
 }
