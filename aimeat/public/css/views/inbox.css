@@ -5,6 +5,10 @@
  *   ticks, and a sticky composer. All colors/spacing use theme.css variables (dark-mode safe).
  *   Classes are `inbox-` prefixed. NOTE: this file must be linked in spa.html (useViewCSS is a no-op).
  * @version-history
+ *   v1.9.0 -- 2026-08-03 -- Mobile thread header space fix: ≤760px flattens the id column
+ *     (display:contents) so subject / via / GHII become full-width rows under the avatar+name+buttons
+ *     row, subject clamped to 2 lines — a long subject no longer wraps word-per-line in a narrow
+ *     column and eats half the screen. Desktop header unchanged.
  *   v1.8.0 -- 2026-07-31 -- Read-aloud controls: the thread-head Listen/Pause/Continue pill
  *     (.inbox-speak-group/-btn/-ico/-stop) that speaks the open conversation. The per-message 🔊 reuses
  *     the existing .inbox-bubble-act pill.
@@ -114,6 +118,24 @@
   /* Collapse the "Reply with AI" and "Listen" buttons to just their icon so they never crowd the header. */
   .inbox-ai-btn .inbox-ai-btn-label { display: none; }
   .inbox-speak-btn .inbox-ai-btn-label { display: none; }
+
+  /* Thread header: on a phone the action buttons eat the row, so a long subject would wrap inside the
+     leftover ~100px id column and grow the header to half the screen. Flatten the id column into the
+     header row (display:contents), let the header wrap, and send the subject / via / GHII lines to
+     their own full-width rows under the avatar+name+buttons row — subject clamped to 2 lines. */
+  .inbox-thread-head { flex-wrap: wrap; row-gap: 2px; }
+  .inbox-thread-head .inbox-thread-id { display: contents; }
+  .inbox-thread-head .inbox-name { flex: 1 1 0; min-width: 0; }
+  .inbox-thread-head .inbox-thread-subject,
+  .inbox-thread-head .inbox-thread-via,
+  .inbox-thread-head .inbox-sub { order: 1; flex: 0 0 100%; min-width: 0; margin-top: 0; }
+  .inbox-thread-head .inbox-thread-subject {
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
 }
 
 /* ── Avatars ── */
