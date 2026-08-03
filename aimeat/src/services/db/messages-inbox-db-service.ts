@@ -7,9 +7,12 @@
  *   reused (not re-implemented). Single-master: it serves the inbox mount and nothing else — the
  *   individual list endpoints stay for interactive re-fetches (filter/live-update).
  *
- * @structure MessagesInboxService.overview(ownerGhii, ownerName) → { requests, conversations, important, tracked, agents, groups }
+ * @structure MessagesInboxService.overview(ownerGhii, ownerName) → { requests, conversations, important, tracked, agents, groups, peerNames }
  * @usage const inbox = await createMessagesInboxService(storage).overview(ghii, owner);
  * @version-history
+ *   v1.1.0 — 2026-08-03 — peerNames: resolve every on-screen peer's display name (conversation peers,
+ *     their owners, request contacts) in the same read scope, so the inbox mount stops fanning out one
+ *     GET /v1/ghii|/v1/agents per peer from the browser (~48 requests on a busy account).
  *   v1.0.0 — 2026-07-16 — Phase 4: fold the inbox mount's 6-request fan-out into one composite.
  */
 import type { Storage, DirectMessageRecord, AgentRecord } from '../../storage/interface.js';
@@ -31,6 +34,9 @@ export interface InboxOverview {
   tracked: unknown[];
   agents: AgentRecord[];
   groups: unknown[];
+  /** Display name per on-screen principal id (conversation peers, their owners, request contacts).
+   *  '' = looked up but not resolvable here (e.g. a federated peer) — the client keeps the handle. */
+  peerNames: Record<string, string>;
 }
 
 export class MessagesInboxService {
@@ -71,8 +77,39 @@ export class MessagesInboxService {
         return true;
       });
 
-      return { requests, conversations: convos.conversations, important, tracked, agents, groups };
+      const peerNames = await this.resolvePeerNames(convos.conversations, requests);
+
+      return { requests, conversations: convos.conversations, important, tracked, agents, groups, peerNames };
     });
+  }
+
+  /**
+   * Display names for every principal the inbox renders: each conversation's peer, the OWNER behind an
+   * agent/app peer ('agent#owner@node' → 'owner@node', the person-group header), and each pending
+   * request's contact. Mirrors the client's per-peer GET /v1/ghii/:ghii | /v1/agents/:gaii lookups —
+   * agents by GAII, humans by GHII — but as parallel PK reads in this read scope instead of ~48 HTTP
+   * round-trips. An id that doesn't resolve locally (federated peer) maps to '' so the client knows it
+   * was looked up and falls back to the handle without re-fetching.
+   */
+  private async resolvePeerNames(convos: OwnerConversation[], requests: InboxRequest[]): Promise<Record<string, string>> {
+    const ids = new Set<string>();
+    const ownerKeyOf = (id: string) => { const h = id.indexOf('#'); return h >= 0 ? id.slice(h + 1) : id; };
+    for (const c of convos) {
+      if (!c.peerGhii) continue;
+      ids.add(c.peerGhii);
+      ids.add(ownerKeyOf(c.peerGhii));
+    }
+    for (const r of requests) if (r.contactId) ids.add(r.contactId);
+
+    const peerNames: Record<string, string> = {};
+    const missed = (err: unknown) => { logger.warn('resolvePeerNames: continuing after a suppressed failure', { error: String(err) }); return null; };
+    await Promise.all([...ids].map(async (id) => {
+      const name = id.includes('#')
+        ? (await this.storage.getAgent(id).catch(missed))?.displayName
+        : (await this.storage.getGHII(id).catch(missed))?.displayName;
+      peerNames[id] = (name ?? '').trim();
+    }));
+    return peerNames;
   }
 
   /** Pending first-contact requests with their first-message preview — mirrors GET /v1/messages/requests

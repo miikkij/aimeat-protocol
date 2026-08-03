@@ -349,6 +349,20 @@ await test('20. GET /v1/messages/overview folds the inbox mount into one call, e
         `overview requests (${d.requests.length}) == /requests (${reqs.body.data.requests.length})`);
 });
 
+await test('20b. overview.peerNames maps every conversation peer to its display name', async () => {
+    const dn = `Bob Display ${stamp}`;
+    const upd = await json('/v1/ghii', { method: 'PUT', headers: { Authorization: `Bearer ${bob.token}` }, body: JSON.stringify({ display_name: dn }) });
+    assert(upd.status === 200, `set display name: ${upd.status} ${JSON.stringify(upd.body)}`);
+    const ov = await json('/v1/messages/overview', { headers: { Authorization: `Bearer ${alice.token}` } });
+    assert(ov.status === 200, `overview status ${ov.status}`);
+    const names = ov.body.data.peerNames;
+    assert(!!names && typeof names === 'object' && !Array.isArray(names), 'peerNames is an object map');
+    for (const c of ov.body.data.conversations) {
+        assert(c.peerGhii in names, `peerNames covers peer ${c.peerGhii}`);
+    }
+    assert(names[bob.ghii] === dn, `peerNames[bob] resolves the display name (got "${names[bob.ghii]}")`);
+});
+
 await test('21. /v1/messages/overview requires an owner session (agent/anon rejected)', async () => {
     const anon = await json('/v1/messages/overview');
     assert(anon.status === 401 || anon.status === 403, `anon overview should be 401/403, got ${anon.status}`);

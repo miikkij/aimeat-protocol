@@ -28,6 +28,7 @@
   "inbox.linkPreview.showAll": "Show link previews",
   "inbox.thread.showAll": "Show all messages",
   "inbox.thread.showRecent": "Show last 50",
+  "inbox.thread.showOlder": "Show full history ({count} messages)",
   "inbox.attachmentRemove": "Remove attachment",
   "inbox.contactAgentSuffix": "(your agent)",
   "inbox.messageThis": "Send a message",

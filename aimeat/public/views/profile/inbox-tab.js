@@ -14,6 +14,11 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.28.0 -- 2026-08-03 -- Messages-view speedup: peer names seed from the overview's peerNames map
+ *     (kills the ~48-request per-peer GET fan-out on mount); threads open on the newest 50 again
+ *     (reverses the v1.25.0 full-history default — ~3s / ~190 requests on a 400-message thread; the
+ *     thread-top pill / header toggle load the rest); a live 'messages' update fetches only the newest
+ *     page and merges by id (refreshThreadDelta + helpers.mergeThreadPage).
  *   v1.27.0 -- 2026-08-01 -- Voice messages: 🎤 in the composer records a clip that travels the normal
  *     attachment path, an audio bubble plays in place, and a voice attachment can be turned into text
  *     with the owner's own key (useVoiceMessages → POST /v1/messages/:id/attachments/:attId/transcribe).
@@ -139,7 +144,7 @@ import { apiGet } from '/js/api.js';
 import { getSession } from '/js/services/auth.js';
 import { TrackResponseModal } from './track-response-modal.js';
 import { peerLabel } from '/js/services/messages-ai-prompts.js';
-import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, parkMessage, openTrackedRecord } from './inbox-tab/helpers.js';
+import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAttachmentUrls, sendFailure, parkMessage, openTrackedRecord, buildContactOptions, normalizePollQuestions, mergeThreadPage } from './inbox-tab/helpers.js';
 import { Composer, PollBuilder, MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { buildConversationReplyProps, buildMessageReplyProps, buildConversationNotebookProps } from './inbox-tab/ai-actions.js';
 import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel } from './inbox-tab/panels.js';
@@ -224,6 +229,13 @@ export default function InboxTab({ showToast }) {
       agentsSvc.listAgents().then(a => setMyAgents(a || [])).catch(err => { swallowed('inbox-tab: isOperator', err); });
       apiGet('/v1/groups').then(gr => setMyGroups(gr?.data?.groups || [])).catch(err => { swallowed('inbox-tab: isOperator', err); });
       return;
+    }
+    // Seed the peer display-name cache from the composite BEFORE the lists render — the resolvePeerNames
+    // effect then finds every id present and fetches nothing (was ~48 profile GETs per mount). '' entries
+    // are kept: "looked up, not resolvable here" (federated peer) → handle fallback, no re-fetch.
+    if (d.peerNames && typeof d.peerNames === 'object') {
+      peerNamesRef.current = { ...d.peerNames, ...peerNamesRef.current };
+      setPeerNames({ ...peerNamesRef.current });
     }
     setRequests(d.requests || []);
     setConversations(d.conversations || []);
@@ -323,14 +335,12 @@ export default function InboxTab({ showToast }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [awaitingIds]);
 
-  // markRead=true ONLY when the user opens the conversation. Marking read POSTs a receipt which itself
-  // emits a 'messages' change → SSE → live refresh; doing it on every live refresh creates a
-  // self-sustaining request loop. So live refreshes reload the thread WITHOUT marking read.
-  // Per-conversation "show all vs newest 50" mode. Defaults to ALL (show the full history on open so
-  // nothing looks lost); the header toggle collapses to the newest 50. A ref (read at call time) keeps
-  // loadThread []-memoized; the state drives the button. Re-defaults to ALL whenever a thread opens.
-  const [threadAll, setThreadAll] = useState(true);
-  const threadAllRef = useRef(true); threadAllRef.current = threadAll;
+  // markRead=true ONLY on explicit open — the read receipt itself emits a 'messages' change → SSE →
+  // refresh, so marking read on every live refresh would self-sustain a request loop.
+  // "Show all vs newest 50": defaults to the NEWEST 50 (one page request) — a 400-message full-history
+  // open cost ~3s / ~190 requests. Full history = thread-top pill or header toggle; re-defaults on open.
+  const [threadAll, setThreadAll] = useState(false);
+  const threadAllRef = useRef(false); threadAllRef.current = threadAll;
   const loadThread = useCallback(async (conv, markRead = false) => {
     if (!conv) return;
     // threadAllRef: false = newest 50 (fast default); true = the FULL history (header "All messages" toggle).
@@ -344,7 +354,27 @@ export default function InboxTab({ showToast }) {
     // Agent-owned ("via <agent>") threads are read-only for the owner — don't post a read receipt as them.
     if (markRead && !conv.viaAgent) await messages.markConversationRead(conv.conversationId).catch(err => { swallowed('inbox-tab: msgs', err); });
   }, []);
-  const toggleThreadAll = () => setThreadAll(v => { const nv = !v; threadAllRef.current = nv; if (activeConv) loadThread(activeConv); return nv; });
+  // Side effects OUTSIDE the state updater — Preact may re-invoke an updater (loadThread inside it double-fetched).
+  const toggleThreadAll = () => {
+    const nv = !threadAllRef.current;
+    threadAllRef.current = nv; setThreadAll(nv);
+    if (activeConv) loadThread(activeConv);
+  };
+
+  // Live (SSE) refresh of the OPEN thread: fetch only the NEWEST page and merge (helpers.mergeThreadPage)
+  // instead of re-walking the whole history; the attachment-URL cache means only new attachments fetch.
+  const threadRef = useRef([]); threadRef.current = thread;
+  const refreshThreadDelta = useCallback(async (conv) => {
+    if (!conv) return;
+    const newest = (await messages.getConversation(conv.conversationId, conv.viaAgent, false).catch(err => { swallowed('inbox-tab: delta', err); return []; })).slice().reverse();
+    if (!newest.length) return;
+    if (activeConvRef.current?.conversationId !== conv.conversationId) return;   // user switched threads mid-fetch
+    const merged = mergeThreadPage(threadRef.current, newest);
+    setThread(merged);
+    const cache = await resolveThreadAttachmentUrls(merged, conv.conversationId, urlCacheRef.current, messages.attachmentUrl);
+    urlCacheRef.current = cache;
+    setUrlMap(cache.map);
+  }, []);
 
   // Voice messages: can this owner transcribe, how long may a recording run, and the call that does it.
   const { canTranscribe, voiceMaxSeconds, transcribeVoice } = useVoiceMessages(loadThread, activeConvRef);
@@ -398,35 +428,18 @@ export default function InboxTab({ showToast }) {
     try { window.history.replaceState({}, '', '/v1/profile?tab=messages'); } catch (err) { swallowed('inbox-tab: toParam', err); }
   }, []);
 
-  // Recipient suggestions for a new message: your own agents (GAIIs) + everyone you've a thread with.
-  const contactOptions = (() => {
-    const map = new Map();
-    for (const a of myAgents) {
-      if (a?.gaii) map.set(a.gaii, `${a.name || a.gaii} ${t('inbox.contactAgentSuffix')}`);
-    }
-    for (const c of conversations) {
-      if (c?.peerGhii && !map.has(c.peerGhii)) map.set(c.peerGhii, peerName(c.peerGhii));
-    }
-    return [...map.entries()].map(([id, label]) => ({ id, label }));
-  })();
+  const contactOptions = buildContactOptions(myAgents, conversations);
 
-  // A 'messages' live-update ALWAYS reloads the open thread so incoming messages render immediately —
-  // even while you're typing a reply (previously the whole reload was skipped when an editable was
-  // focused, so new messages stayed invisible until send/reopen: the "badge shows N new but the thread
-  // never updates" bug). The "don't yank scroll while I write" concern is handled where it belongs —
-  // useThreadAutoScroll suppresses the new-message jump while the composer is focused (near-bottom
-  // follow still applies), so the message list re-renders without stealing the caret or the scroll.
+  // A 'messages' live-update ALWAYS refreshes the open thread (delta merge) so incoming messages render
+  // immediately, even mid-typing — skipping it while an editable was focused left new messages invisible
+  // until send/reopen. Scroll/caret protection lives in useThreadAutoScroll, not here.
   const liveRef = useRef(null);
-  liveRef.current = () => { loadLists(); if (activeConv) loadThread(activeConv); };
-  // Selective live refresh. `e.detail.domains` is a Set<string> (or null = "everything changed",
-  // e.g. a reconnect catch-up). IMPORTANT: it is a Set, not an Array — an earlier `Array.isArray`
-  // check silently never matched, so the inbox re-fetched on EVERY change (memory/organism/task
-  // churn from dozens of agents → a request storm). We branch by domain:
-  //   • 'messages'        (a direct message changed)  → full refresh (conversations + flags +
-  //                                                      open thread + requests)
-  //   • 'agent-messages'  (agent activity)            → ONLY the tracked-responses list (1 request)
-  // Everything else (memory, organisms, agent-tasks, …) is ignored. A burst is coalesced into one
-  // refresh; if any 'messages' event lands in the window we do the full refresh.
+  liveRef.current = () => { loadLists(); if (activeConv) refreshThreadDelta(activeConv); };
+  // Selective live refresh. `e.detail.domains` is a Set<string> (or null = "everything changed", e.g. a
+  // reconnect catch-up) — a Set, NOT an Array (an earlier Array.isArray check never matched → refresh on
+  // every change → request storm). 'messages' → full refresh (lists + open-thread delta);
+  // 'agent-messages' → only the tracked-responses list. Everything else ignored; bursts coalesce, and
+  // any 'messages' event in the window wins the full refresh.
   const liveTimerRef = useRef(null);
   const pendingFullRef = useRef(false);
   useEffect(() => {
@@ -454,7 +467,7 @@ export default function InboxTab({ showToast }) {
 
   const openConversation = async (conv) => {
     setActiveConv(conv); setMode('thread');
-    setThreadAll(true); threadAllRef.current = true;   // each thread opens showing its FULL history
+    setThreadAll(false); threadAllRef.current = false;   // each thread opens on its newest 50 (full history = one click)
     setDraftPrefill(''); setReplyingTrId(null); setReplyQuote(null);   // don't leak a suggested reply / quote across threads
     await loadThread(conv, true);                 // mark read only on explicit open (avoids a refresh loop)
     loadLists();
@@ -513,14 +526,7 @@ export default function InboxTab({ showToast }) {
 
     let interactive;
     if (bcType === 'poll') {
-      const questions = bcQuestions
-        .map(q => ({ ...q, options: (q.options || []).filter(o => o.label.trim()) }))
-        .filter(q => q.prompt.trim() && q.options.length >= 1)
-        .map(q => ({
-          id: q.id, header: (q.header || q.prompt).slice(0, 80), prompt: q.prompt.trim(),
-          options: q.options.map(o => ({ id: o.id, label: o.label.trim() })),
-          multiSelect: !!q.multiSelect, allowOther: q.allowOther !== false, required: !!q.required,
-        }));
+      const questions = normalizePollQuestions(bcQuestions);
       if (!questions.length) { showToast?.(t('inbox.pollNeedQuestion'), true); return; }
       interactive = { role: 'questions', v: 1, questions };
     } else if (!body && files.length === 0) { return; }

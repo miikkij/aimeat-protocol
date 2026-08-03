@@ -28,6 +28,7 @@
   "inbox.linkPreview.showAll": "Näytä linkkien esikatselut",
   "inbox.thread.showAll": "Näytä kaikki viestit",
   "inbox.thread.showRecent": "Näytä viimeiset 50",
+  "inbox.thread.showOlder": "Näytä koko historia ({count} viestiä)",
   "inbox.attachmentRemove": "Poista liite",
   "inbox.contactAgentSuffix": "(agenttisi)",
   "inbox.messageThis": "Lähetä viesti",

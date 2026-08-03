@@ -31940,6 +31940,64 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /v1/messages/overview:
+    get:
+      operationId: getMessagesOverview
+      summary: The whole inbox mount in one call (requests + conversations + flags + tracked + agents + groups + peer display names)
+      description: >-
+        Composite behind the profile Messages view: pending first-contact requests, the owner's
+        conversation list (own + agents' external threads), important-message flags, tracked responses,
+        the owner's agent fleet, share groups, and `peerNames` — a display-name map for every principal
+        the list renders (conversation peers, the owner behind an agent peer, request contacts), so the
+        client does not fan out one profile GET per peer. An id mapped to '' was looked up but is not
+        resolvable on this node (e.g. a federated peer); the client falls back to the handle.
+      tags: [Direct Messages]
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Inbox overview
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          requests:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                contactId: { type: string }
+                                conversationId: { type: string }
+                                preview: { type: string }
+                                createdAt: { type: string, format: date-time }
+                          conversations:
+                            type: array
+                            items:
+                              $ref: '#/components/schemas/ConversationSummary'
+                          important:
+                            type: array
+                            items: { type: string }
+                          tracked:
+                            type: array
+                            items: { type: object }
+                          agents:
+                            type: array
+                            items: { type: object }
+                          groups:
+                            type: array
+                            items: { type: object }
+                          peerNames:
+                            type: object
+                            additionalProperties: { type: string }
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
   /v1/messages/conversations/{conversationId}:
     get:
       operationId: getConversation

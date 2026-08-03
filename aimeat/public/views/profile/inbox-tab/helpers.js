@@ -5,6 +5,9 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.5.0 — 2026-08-03 — buildContactOptions() + normalizePollQuestions() moved here from inbox-tab.js
+ *     (max-file-lines); mergeThreadPage(): upsert-by-id merge of a freshly fetched newest page into a
+ *     loaded thread, for the live delta refresh that replaced full-history reloads.
  *   v1.4.0 — 2026-08-01 — parkMessage() + openTrackedRecord() moved here from inbox-tab.js: two
  *     self-contained actions that needed nothing from the tab's state beyond a toast, pulled out to
  *     keep the tab under max-file-lines while voice messages were added to it.
@@ -66,6 +69,39 @@ export function sendFailure(err) {
  * recipient's duplicated local copy; outbound resolves the original. `resolveUrl` = messages.attachmentUrl.
  * Returns { convId, map } to store as the new cache.
  */
+/** Recipient suggestions for a new message: your own agents (GAIIs) + everyone you've a thread with. */
+export function buildContactOptions(myAgents, conversations) {
+  const map = new Map();
+  for (const a of myAgents) {
+    if (a?.gaii) map.set(a.gaii, `${a.name || a.gaii} ${t('inbox.contactAgentSuffix')}`);
+  }
+  for (const c of conversations) {
+    if (c?.peerGhii && !map.has(c.peerGhii)) map.set(c.peerGhii, peerName(c.peerGhii));
+  }
+  return [...map.entries()].map(([id, label]) => ({ id, label }));
+}
+
+/** Broadcast poll: keep only answerable questions (a prompt + ≥1 labelled option), normalized for send. */
+export function normalizePollQuestions(bcQuestions) {
+  return bcQuestions
+    .map(q => ({ ...q, options: (q.options || []).filter(o => o.label.trim()) }))
+    .filter(q => q.prompt.trim() && q.options.length >= 1)
+    .map(q => ({
+      id: q.id, header: (q.header || q.prompt).slice(0, 80), prompt: q.prompt.trim(),
+      options: q.options.map(o => ({ id: o.id, label: o.label.trim() })),
+      multiSelect: !!q.multiSelect, allowOther: q.allowOther !== false, required: !!q.required,
+    }));
+}
+
+/** Merge a freshly fetched NEWEST page (chronological) into an already-loaded thread: upsert by id —
+ *  a new message appends, a changed one (read tick) replaces — ordered by createdAt. Messages older
+ *  than the fetched page stay as loaded, so a live refresh never re-walks the whole history. */
+export function mergeThreadPage(prev, newest) {
+  const newestIds = new Set(newest.map(m => m.id));
+  return [...prev.filter(m => !newestIds.has(m.id)), ...newest]
+    .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
+}
+
 export async function resolveThreadAttachmentUrls(msgs, conversationId, prevCache, resolveUrl) {
   const prev = prevCache?.convId === conversationId ? (prevCache.map || {}) : {};
   const map = {};

@@ -6,6 +6,8 @@
  *   (broadcast/poll results). Each is a presentational component driven entirely by props from InboxTab;
  *   the stateful container keeps all hooks. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.7.0 — 2026-08-03 — ThreadPanel: "Show full history (N messages)" pill at the top of a thread
+ *     showing only its newest page (threads now open on the newest 50 — inbox-tab v1.28.0).
  *   v1.6.0 — 2026-08-01 — Voice messages threaded through: ThreadPanel passes onTranscribe /
  *     canTranscribe to each bubble and voiceMaxSeconds to the Composer. An agent-owned ("via
  *     <agent>") thread is read-only for the owner, so it gets no transcribe action.
@@ -169,6 +171,11 @@ export function ThreadPanel({
       </div>
       <div class="inbox-msgs" ref=${msgsRef}>
         ${thread.length === 0 ? html`<div class="inbox-empty-sm">${t('inbox.noThread')}</div>` : null}
+        ${(!threadAll && (activeConv.messageCount || 0) > thread.length) ? html`
+          <div class="inbox-thread-older">
+            <button class="btn-ghost btn-sm" onClick=${toggleThreadAll}>
+              ↩ ${t('inbox.thread.showOlder', { count: activeConv.messageCount })}</button>
+          </div>` : null}
         ${thread.map(m => {
           const dk = dayKey(m.createdAt);
           const showDay = dk !== lastDay; lastDay = dk;
