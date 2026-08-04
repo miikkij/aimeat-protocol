@@ -211,6 +211,35 @@ function mountScene(container) {
 }
 // r128 gotchas: no bundled OrbitControls — implement pointer-drag orbit yourself; dispose() removed meshes.`;
 
+export const COMP_THREE_WORLD_SCENE = `// three-world-scene — a modern three.js scene with orbit controls and a real sky (three-world pack).
+// Load the self-hosted bundle: <script src="/lib/three-world@1.min.js"></script>  (pack id: three-world — three r185 + THREE.Addons)
+function mountWorldScene(container) {
+  var w = container.clientWidth, h = container.clientHeight || 420;
+  var scene = new THREE.Scene();
+  var camera = new THREE.PerspectiveCamera(55, w / h, 0.1, 2000); camera.position.set(6, 4, 8);
+  var renderer = new THREE.WebGLRenderer({ antialias: true }); renderer.setSize(w, h);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;   // modern color pipeline (NOT r128 idioms)
+  container.appendChild(renderer.domElement);
+  var controls = new THREE.Addons.OrbitControls(camera, renderer.domElement); // bundled addon
+  controls.enableDamping = true; controls.target.set(0, 1, 0);
+  var sky = new THREE.Addons.Sky(); sky.scale.setScalar(1000); scene.add(sky);
+  var sun = new THREE.Vector3().setFromSphericalCoords(1, THREE.MathUtils.degToRad(90 - 25), THREE.MathUtils.degToRad(200));
+  sky.material.uniforms.sunPosition.value.copy(sun);
+  sky.material.uniforms.turbidity.value = 8;
+  scene.add(new THREE.HemisphereLight(0xbfd4e6, 0x6b5a45, 0.6));
+  var dir = new THREE.DirectionalLight(0xfff2dd, 1.6); dir.position.copy(sun).multiplyScalar(50); scene.add(dir);
+  var box = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 2), new THREE.MeshStandardMaterial({ color: 0xe8564a, roughness: 0.5 }));
+  box.position.y = 1; scene.add(box);
+  scene.add(new THREE.Mesh(new THREE.PlaneGeometry(60, 60).rotateX(-Math.PI / 2), new THREE.MeshStandardMaterial({ color: 0x5d8a4a, roughness: 1 })));
+  addEventListener('resize', function () { w = container.clientWidth; camera.aspect = w / h; camera.updateProjectionMatrix(); renderer.setSize(w, h); });
+  (function loop() { requestAnimationFrame(loop); controls.update(); renderer.render(scene, camera); })();
+  return { scene: scene, camera: camera, renderer: renderer, controls: controls };
+}
+// InstancedMesh for repeated objects (setMatrixAt + setColorAt); RGBELoader (THREE.Addons) for HDR/equirect skyboxes:
+//   new THREE.Addons.RGBELoader().load(url, function (tex) { tex.mapping = THREE.EquirectangularReflectionMapping; scene.background = tex; });
+// Dispose geometries/materials you remove; cap pixelRatio on mobile.`;
+
 export const COMP_P5_SKETCH = `// p5-sketch — an instance-mode p5.js sketch mounted into a container (p5 pack: /lib/p5@1.min.js).
 // INSTANCE MODE always (global mode pollutes window and collides with AIMEAT libs).
 function mountSketch(el, params) {

@@ -16,6 +16,7 @@ with per-lib AI docs + changelogs) — keep this table and the registry in sync.
 | `chartjs@4.js` | `chart.js` (UMD) | 4.5.1 | `chartjs` | `https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js` | MIT |
 | `mermaid/mermaid.min.js` | `mermaid` (UMD) | 11.15.0 | `mermaid` | `node_modules/mermaid/dist` (see mermaid/README.md) | MIT |
 | `three.min.js` | `three` (r128 UMD) | r128 | `three` | `https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js` | MIT |
+| `three-world@1.min.js` | `three` + addons OrbitControls, Sky, RGBELoader (esbuild IIFE — `window.THREE`, addons on `THREE.Addons`; never load together with `three.min.js`) | 0.185.1 (r185), bundle v1 | `three-world` | built by `aimeat/scripts/vendor-three-world.mjs` from `registry.npmjs.org/three/-/three-0.185.1.tgz` | MIT |
 | `p5@1.min.js` | `p5` | 1.11.13 | `p5` | `https://cdn.jsdelivr.net/npm/p5@1/lib/p5.min.js` | LGPL-2.1 (owner-approved 2026-07-16) |
 | `pixi@8.min.js` | `pixi.js` | 8.19.0 | `pixi` | `https://cdn.jsdelivr.net/npm/pixi.js@8/dist/pixi.min.js` | MIT |
 | `pixi-unsafe-eval@8.min.js` | `pixi.js` (unsafe-eval companion — REQUIRED after pixi under the app CSP) | 8.19.0 | `pixi` | `https://cdn.jsdelivr.net/npm/pixi.js@8/dist/packages/unsafe-eval.min.js` | MIT |
