@@ -25,6 +25,9 @@
  * @version-history
  *   v1.0.0 — 2026-07-31 — Initial. Key + proof prompt + organism-setup prompt + instruction
  *     blocks generated from an organism's real structure.
+ *   v1.1.0 — 2026-08-04 — Instruction block gates saving on the user's ask or approval and states
+ *     that in-conversation instructions override the block. A persistent "write results there"
+ *     read as a standing order to auto-save mid-conversation, over the user's protests.
  */
 import type { AimeatConfig } from '../config.js';
 
@@ -218,9 +221,14 @@ export function buildInstructionBlocks(
         }
         B.push('Kun sinulla on AIMEAT-työkalut käytössä:');
         B.push(`- Lue tilanne organismista ennen kuin oletat mitään: \`aimeat_organism_overview\` id:llä \`${input.orgId}\`.`);
-        B.push('- Kirjoita tulokset sinne, älä pelkästään tähän keskusteluun. Muut agenttini lukevat ne samasta paikasta.');
+        B.push('- Tallentaminen on minun päätökseni. Kirjoita organismiin kahdessa tilanteessa: kun pyydän');
+        B.push('  tallentamaan, tai kun ehdotat tietyn tuloksen tallentamista ja hyväksyn ehdotuksen.');
+        B.push('  Kesken keskustelun et tallenna mitään omin päin.');
+        B.push('- Kun tallennat, tallenna organismiin eikä vain tähän keskusteluun. Muut agenttini lukevat sen samasta paikasta.');
         B.push('- Käytä olemassa olevaa workspacea ja rakennetta. Kysy ennen kuin luot uusia.');
         B.push('- Älä keksi sisältöä puolestani. Jos jokin puuttuu, kysy.');
+        B.push('- Se mitä sanon keskustelussa voittaa tämän ohjeen. Jos pyydän tallentamaan vähemmän tai');
+        B.push('  en ollenkaan, noudata sitä koko keskustelun ajan.');
         B.push('');
         B.push('Kun työkaluja ei ole, sano se suoraan äläkä kuvaile mitä tekisit.');
     } else {
@@ -236,9 +244,14 @@ export function buildInstructionBlocks(
         }
         B.push('When you have AIMEAT tools available:');
         B.push(`- Read the current state before assuming anything: \`aimeat_organism_overview\` with id \`${input.orgId}\`.`);
-        B.push('- Write results there, not only into this conversation. My other agents read them from the same place.');
+        B.push('- Saving is my decision. Write into the organism in two situations: when I ask you to');
+        B.push('  save something, or when you propose saving a specific result and I approve.');
+        B.push('  Mid-conversation you save nothing on your own.');
+        B.push('- When you do save, save into the organism, not only into this conversation. My other agents read it from the same place.');
         B.push('- Use the workspaces and structure that already exist. Ask before creating new ones.');
         B.push('- Do not invent content on my behalf. If something is missing, ask.');
+        B.push('- What I say in the conversation wins over this block. If I ask you to save less or not');
+        B.push('  at all, honor that for the rest of the conversation.');
         B.push('');
         B.push('When the tools are not available, say so plainly and do not describe what you would do.');
     }
