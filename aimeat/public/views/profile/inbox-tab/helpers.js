@@ -5,6 +5,9 @@
  *   pixel defense), tracked-state labels, attachment classification, the interactive-answer summary +
  *   poll tally, and the lazy Toast UI editor loader. Extracted from inbox-tab.js to satisfy max-file-lines.
  * @version-history
+ *   v1.6.0 — 2026-08-04 — resolveThreadAttachmentUrls(): cache entries carry a mint timestamp and are
+ *     re-minted after ATTACHMENT_URL_REUSE_MS instead of reused forever — a presigned download URL
+ *     held past its 1 h token TTL failed every click with the browser's bare "Couldn't download".
  *   v1.5.0 — 2026-08-03 — buildContactOptions() + normalizePollQuestions() moved here from inbox-tab.js
  *     (max-file-lines); mergeThreadPage(): upsert-by-id merge of a freshly fetched newest page into a
  *     loaded thread, for the live delta refresh that replaced full-history reloads.
@@ -102,21 +105,35 @@ export function mergeThreadPage(prev, newest) {
     .sort((a, b) => String(a.createdAt || '').localeCompare(String(b.createdAt || '')));
 }
 
+/** Resolved attachment URLs are PRESIGNED — the token inside them expires after 1 h (server
+ *  OWN_HANDLE_TTL_SECONDS). Reusing a cached URL forever meant a download click in a long-open tab
+ *  hit a dead token (410 → the browser's bare "Couldn't download"). Entries older than this are
+ *  re-minted instead of reused; paired with ATTACHMENT_URL_REFRESH_MS in inbox-tab.js (15 min ticks)
+ *  the worst-case age of a link in the DOM stays ~55 min, always inside the token's lifetime. */
+export const ATTACHMENT_URL_REUSE_MS = 40 * 60 * 1000;
+
 export async function resolveThreadAttachmentUrls(msgs, conversationId, prevCache, resolveUrl) {
-  const prev = prevCache?.convId === conversationId ? (prevCache.map || {}) : {};
+  const sameConv = prevCache?.convId === conversationId;
+  const prev = sameConv ? (prevCache.map || {}) : {};
+  // mintedAt per entry — a pre-timestamp cache ({} fallback) reads as age-infinite and re-mints.
+  const prevTs = sameConv ? (prevCache.ts || {}) : {};
+  const now = Date.now();
   const map = {};
+  const ts = {};
   await Promise.all(msgs.flatMap(m => (m.attachments || [])
     .filter(a => !a.inline)
     .map(async a => {
       const uk = `${m.id}::${a.id}`;
-      if (prev[uk]) { map[uk] = prev[uk]; return; }
+      if (prev[uk] && now - (prevTs[uk] || 0) < ATTACHMENT_URL_REUSE_MS) {
+        map[uk] = prev[uk]; ts[uk] = prevTs[uk]; return;
+      }
       const key = (a.mode === 'duplicate' && a.localKey) ? a.localKey
         : (m.direction === 'outbound' && a.storageKey) ? a.storageKey : null;
       if (!key) return;
       const u = await resolveUrl(key).catch(err => { swallowed('helpers: key', err); return null; });
-      if (u) map[uk] = u;
+      if (u) { map[uk] = u; ts[uk] = now; }
     })));
-  return { convId: conversationId, map };
+  return { convId: conversationId, map, ts };
 }
 
 /* Lazy-load the vendored Toast UI Editor (MIT, /lib/toastui/) — the same editor the workspace

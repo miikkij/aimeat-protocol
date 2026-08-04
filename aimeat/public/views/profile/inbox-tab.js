@@ -14,6 +14,10 @@
  *   (./inbox-tab/use-thread-ux.js)
  * @usage Lazy-loaded profile tab; registered in profile.js TABS as id `messages`.
  * @version-history
+ *   v1.28.1 -- 2026-08-04 -- Fix "attachment download fails in a long-open tab": presigned attachment
+ *     URLs expire after 1 h but were cached forever, so a click hit a dead token (410 → the browser's
+ *     bare "Couldn't download"). useAttachmentUrlRefresh (use-thread-ux.js) re-mints entries older
+ *     than the reuse window (helpers.ATTACHMENT_URL_REUSE_MS) while a thread is open.
  *   v1.28.0 -- 2026-08-03 -- Messages-view speedup: peer names seed from the overview's peerNames map
  *     (kills the ~48-request per-peer GET fan-out on mount); threads open on the newest 50 again
  *     (reverses the v1.25.0 full-history default — ~3s / ~190 requests on a 400-message thread; the
@@ -148,7 +152,7 @@ import { peerName, ownerKeyOf, isAgentPeer, buildAnswerSummary, resolveThreadAtt
 import { Composer, PollBuilder, MarkdownViewer, ReplyWithAiPopover, ConversationToNotebookPopover } from './inbox-tab/components.js';
 import { buildConversationReplyProps, buildMessageReplyProps, buildConversationNotebookProps } from './inbox-tab/ai-actions.js';
 import { ListPanel, ThreadPanel, TrackedPanel, ResultsPanel } from './inbox-tab/panels.js';
-import { useThreadAutoScroll, useMobileComposerKeyboard, useLinkPreviewToggle } from './inbox-tab/use-thread-ux.js';
+import { useThreadAutoScroll, useMobileComposerKeyboard, useLinkPreviewToggle, useAttachmentUrlRefresh, useRecentBroadcasts } from './inbox-tab/use-thread-ux.js';
 import { useVoiceMessages } from './inbox-tab/use-voice.js';
 import { ContactPicker } from '/components/ContactPicker.js';
 import { swallowed } from '/js/swallowed.js';
@@ -182,7 +186,7 @@ export default function InboxTab({ showToast }) {
   const [myGroups, setMyGroups] = useState([]);           // the owner's Share Groups (audiences)
   const [resultsId, setResultsId] = useState(null);       // broadcast id whose results are shown
   const [results, setResults] = useState(null);           // fetched broadcast results
-  const [recentBroadcasts, setRecentBroadcasts] = useState([]); // localStorage-tracked sent broadcasts
+  const { recentBroadcasts, trackBroadcast } = useRecentBroadcasts(); // localStorage-tracked sent broadcasts
   const [sending, setSending] = useState(false);
   const [important, setImportant] = useState(new Set());  // message ids flagged important (Tier 1)
   const [trackedList, setTrackedList] = useState([]);     // active Tracked Responses (Tier 2)
@@ -376,6 +380,10 @@ export default function InboxTab({ showToast }) {
     setUrlMap(cache.map);
   }, []);
 
+  // While a thread is open, re-mint presigned attachment URLs before their 1 h token expires —
+  // otherwise a download click in a long-open tab hits a dead token ("Couldn't download").
+  useAttachmentUrlRefresh(activeConv, activeConvRef, threadRef, urlCacheRef, setUrlMap);
+
   // Voice messages: can this owner transcribe, how long may a recording run, and the call that does it.
   const { canTranscribe, voiceMaxSeconds, transcribeVoice } = useVoiceMessages(loadThread, activeConvRef);
 
@@ -399,14 +407,6 @@ export default function InboxTab({ showToast }) {
     return () => { cancelled = true; };
   }, [activePeer]);
 
-  // Recent broadcasts/polls the user sent — tracked in localStorage so results stay re-accessible.
-  const BC_STORE = 'aimeat.inbox.broadcasts';
-  useEffect(() => { try { setRecentBroadcasts(JSON.parse(localStorage.getItem(BC_STORE) || '[]')); } catch { /* none */ } }, []);   // eslint-disable-line aimeat/no-silent-catch -- none
-  const trackBroadcast = (entry) => setRecentBroadcasts(prev => {
-    const next = [entry, ...prev.filter(b => b.id !== entry.id)].slice(0, 30);
-    try { localStorage.setItem(BC_STORE, JSON.stringify(next)); } catch { /* quota */ }   // eslint-disable-line aimeat/no-silent-catch -- quota
-    return next;
-  });
   const openResults = async (id) => {
     setMode('results'); setResultsId(id); setResults(null); setActiveConv(null);
     setResults(await messages.getBroadcastResults(id).catch(err => { swallowed('inbox-tab', err); return null; }));

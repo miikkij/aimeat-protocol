@@ -2,11 +2,16 @@
  * @file public/views/profile/inbox-tab/use-thread-ux.js
  * @description Thread-pane UX hooks for the profile Inbox tab: useThreadAutoScroll (jump to the
  *   latest message on open / near-bottom follow / a single one-time jump when a NEW message arrives —
- *   never a sticky pin) and useMobileComposerKeyboard (≤760px: publishes the on-screen keyboard's
- *   height as --inbox-kb from visualViewport and scrolls the composer into view on focus).
+ *   never a sticky pin), useMobileComposerKeyboard (≤760px: publishes the on-screen keyboard's
+ *   height as --inbox-kb from visualViewport and scrolls the composer into view on focus) and
+ *   useAttachmentUrlRefresh (re-mints expiring presigned attachment URLs while a thread is open).
  *   Extracted from inbox-tab.js to satisfy max-file-lines.
  * @usage import { useThreadAutoScroll, useMobileComposerKeyboard } from './inbox-tab/use-thread-ux.js';
  * @version-history
+ *   v1.5.0 — 2026-08-04 — Add useAttachmentUrlRefresh: while a thread is open, a 15 min tick re-mints
+ *     presigned attachment URLs approaching their 1 h token expiry — a download click in a long-open
+ *     tab hit a dead token (410 → the browser's bare "Couldn't download"). useRecentBroadcasts moved
+ *     here from inbox-tab.js (max-file-lines).
  *   v1.4.0 — 2026-07-21 — useThreadAutoScroll: on OPEN, keep re-pinning to the bottom for ~2.5s while late
  *     content (images, link previews, long histories) grows the thread, instead of a single jump that left
  *     a big thread stuck partway up. Re-pins only on real height growth; aborts the moment the reader
@@ -24,8 +29,49 @@
  *     the messenger on Android Chrome; drop the composer scrollIntoView(center) that left a dead gap.
  */
 import { useEffect, useRef, useState } from 'preact/hooks';
+import { resolveThreadAttachmentUrls } from './helpers.js';
+import { attachmentUrl } from '/js/services/messages.js';
 
 const LINK_PREVIEWS_KEY = 'aimeat.inbox.linkPreviews';
+const BC_STORE = 'aimeat.inbox.broadcasts';
+
+/** Recent broadcasts/polls the user sent — tracked in localStorage so results stay re-accessible.
+ *  Moved here from inbox-tab.js (max-file-lines). */
+export function useRecentBroadcasts() {
+  const [recentBroadcasts, setRecentBroadcasts] = useState([]);
+  useEffect(() => { try { setRecentBroadcasts(JSON.parse(localStorage.getItem(BC_STORE) || '[]')); } catch { /* none */ } }, []);   // eslint-disable-line aimeat/no-silent-catch -- none
+  const trackBroadcast = (entry) => setRecentBroadcasts(prev => {
+    const next = [entry, ...prev.filter(b => b.id !== entry.id)].slice(0, 30);
+    try { localStorage.setItem(BC_STORE, JSON.stringify(next)); } catch { /* quota */ }   // eslint-disable-line aimeat/no-silent-catch -- quota
+    return next;
+  });
+  return { recentBroadcasts, trackBroadcast };
+}
+
+/** Presigned attachment URLs carry a 1 h token. While a thread stays open (no reload, no SSE
+ *  traffic), the links in the DOM would outlive their tokens and every download click would fail.
+ *  A 15 min tick re-runs the resolver: entries younger than the reuse window (helpers.
+ *  ATTACHMENT_URL_REUSE_MS) come back from cache (no network), entries approaching expiry get a
+ *  fresh token before it dies. */
+export function useAttachmentUrlRefresh(activeConv, activeConvRef, threadRef, urlCacheRef, setUrlMap) {
+  useEffect(() => {
+    if (!activeConv) return undefined;
+    const iv = setInterval(async () => {
+      const conv = activeConvRef.current;
+      if (!conv) return;
+      const prevMap = urlCacheRef.current.map || {};
+      const cache = await resolveThreadAttachmentUrls(threadRef.current, conv.conversationId, urlCacheRef.current, attachmentUrl);
+      if (activeConvRef.current?.conversationId !== conv.conversationId) return;   // user switched threads mid-fetch
+      urlCacheRef.current = cache;
+      // Only re-render when a URL actually changed — an all-fresh tick must not touch <img>/<audio> src.
+      const keys = Object.keys(cache.map);
+      if (keys.length !== Object.keys(prevMap).length || keys.some(k => cache.map[k] !== prevMap[k])) setUrlMap(cache.map);
+    }, 15 * 60 * 1000);
+    return () => clearInterval(iv);
+    // The refs are stable — the open conversation is the real trigger.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeConv]);
+}
 
 /** Persisted global toggle for the link-preview cards (default ON). Returns the flag + a toggler that
  *  writes the choice to localStorage. Per-card dismissal is owned separately by /components/LinkPreview.js. */
