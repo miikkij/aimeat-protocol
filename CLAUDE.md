@@ -139,7 +139,15 @@ This is a hard precondition of the build, not an optional preamble, and it comes
 
 `aimeat/public/changelog.json` is what the landing page shows visitors under "What's new on this node" — newest entry first, `{ date, kind: feature|fix|security|notice, title, body }`, where title/body is a string or `{ en, fi }`. **When a piece of work is finished, ask the developer whether to add an entry** and propose the wording; they decide. Never add one on your own, and never for internal refactors a visitor would not notice.
 
-Write what a person gets, not what the code does. `pnpm check:changelog` (in the pre-commit gate) rejects a malformed file or a list that is not newest-first — a broken file makes the section vanish silently.
+Write what a person gets, not what the code does. `pnpm check:changelog` (in the pre-commit gate) rejects a malformed file or a list that is not newest-first — a broken file makes the section vanish silently. **Scope: the changelog advertises PLATFORM-level work only** (node, SDKs, platform capabilities) — an individual application's features belong in that app's own description/gallery, so don't propose entries for them.
+
+### Rule 15: Checkpoint Acceptance Needs an Explicit Pass-Criterion
+
+Before accepting any checkpoint result (a screenshot, an import, a computed layout, a migration), **name the requirement you are checking against and a measurable pass-criterion derived from it** — then verify against that, not against overall impression. "Looks right" is not acceptance: alignment is proven with an asymmetric anchor element, size with a known reference dimension, behavior with the real interaction (Rules 1/1b give the test- and browser-specific forms of this).
+
+1. **Result doesn't match the criterion → keep iterating.** Shipping "almost right" moves verification onto the developer's phone and costs a full feedback round per slip.
+2. **Can't state a pass-criterion → the requirement is unclear.** Resolve it from the source material or ask the developer BEFORE the next iteration — iterating blind on a guessed target produces confident wrong "fixes" (careless acceptance once shrank a correctly-sized part because the reference dimension was never established).
+3. A verdict established under weak evidence stays suspect: re-verify it with a proper anchor before building on it.
 
 ---
 
