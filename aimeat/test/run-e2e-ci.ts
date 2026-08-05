@@ -151,6 +151,7 @@ const ALL_SUITES = [
     'test/e2e-contacts.ts',
     'test/e2e-agent-offers.ts',
     'test/e2e-commerce.ts',
+    'test/e2e-commerce-holds.ts',
     'test/e2e-money-audit.ts',
     'test/e2e-x402.ts',
     'test/e2e-x402-testnet.ts',

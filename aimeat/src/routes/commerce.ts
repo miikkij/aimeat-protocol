@@ -14,6 +14,8 @@
  *   - PUT/DELETE /v1/commerce/payout/x402              the seller's stablecoin address
  *   - PUT/DELETE /v1/commerce/payout/stripe            the seller's OWN Stripe secret
  * @version-history
+ *   v1.5.0 — 2026-08-06 — Hold rail (TINKI phase 1): POST/GET /v1/commerce/holds,
+ *     GET /:id, POST /:id/capture (seller, partial allowed), POST /:id/release
  *   v1.4.0 — 2026-07-28 — Stripe credentials are set here (PUT/DELETE /v1/commerce/payout/stripe)
  *     beside the x402 address, replacing the removed edition's own endpoint; the two rail writes
  *     share writePsp, which keeps the record's version instead of resetting it on every edit
@@ -36,6 +38,7 @@ import {
   createSession, getSession, updateSessionItems, cancelSession, completeSession, CommerceError,
   listSessions, listOrders,
 } from '../commerce/session-service.js';
+import { createHold, getHold, listHolds, captureHold, releaseHold } from '../commerce/hold-book.js';
 import type { CheckoutSessionRecord } from '../commerce/types.js';
 import { PaymentError } from '../commerce/payment-handlers.js';
 import { paymentChallenge, x402ExactAccepts } from '../commerce/x402.js';
@@ -335,6 +338,80 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
         ? await cancelSession(storage, session)
         : await updateSessionItems(storage, config, session, parsed.data.items!);
       res.json(success(config.nodeId, { session }));
+    } catch (err) { sendCommerceError(res, config, err); }
+  });
+
+  // ── Holds: the covered-bid / deferred-capture rail (TINKI phase 1) ──
+
+  const HoldCreateSchema = z.object({
+    seller: z.string().min(1).max(200),
+    amount: z.number().int().positive(),
+    currency: z.string().min(3).max(10),
+    purpose: z.string().min(1).max(40),
+    reference: z.string().min(1).max(200),
+    payment: z.object({
+      handler: z.string().min(1).max(100).optional(),
+      instrument: z.unknown().optional(),
+    }).optional(),
+  });
+
+  // POST /v1/commerce/holds — authorize money on the buyer's instrument toward one seller.
+  router.post('/v1/commerce/holds', requireAuth(), async (req, res) => {
+    const parsed = HoldCreateSchema.safeParse(req.body);
+    if (!parsed.success) { res.status(400).json(error(config.nodeId, 'INVALID_HOLD', parsed.error.message)); return; }
+    try {
+      const hold = await createHold(storage, config, {
+        buyerOwner: req.auth!.owner as string,
+        buyerIdentity: resolveIdentity(req.auth!, config.nodeId),
+        sellerOwner: parsed.data.seller.split('@')[0] as string,
+        amount: parsed.data.amount,
+        currency: parsed.data.currency,
+        purpose: parsed.data.purpose,
+        reference: parsed.data.reference,
+        handlerId: parsed.data.payment?.handler,
+        instrument: parsed.data.payment?.instrument,
+      });
+      res.status(201).json(success(config.nodeId, { hold }, [
+        { description: 'Capture (seller)', method: 'POST', url: `/v1/commerce/holds/${hold.id}/capture` },
+        { description: 'Release', method: 'POST', url: `/v1/commerce/holds/${hold.id}/release` },
+      ]));
+    } catch (err) { sendCommerceError(res, config, err); }
+  });
+
+  // GET /v1/commerce/holds — the caller's holds: side=buyer (default) or side=seller (inbound).
+  router.get('/v1/commerce/holds', requireAuth(), async (req, res) => {
+    const side = String(req.query.side ?? 'buyer') === 'seller' ? 'seller' as const : 'buyer' as const;
+    const limit = Math.min(200, Math.max(1, parseInt(String(req.query.limit ?? '50'), 10) || 50));
+    const holds = await listHolds(storage, config, req.auth!.owner as string, side, limit);
+    res.json(success(config.nodeId, { holds, total: holds.length }));
+  });
+
+  // GET /v1/commerce/holds/:id — buyer or seller reads (lazy expiry applies; others get 404).
+  router.get('/v1/commerce/holds/:id', requireAuth(), async (req, res) => {
+    try {
+      const hold = await getHold(storage, config, req.auth!.owner as string, req.params.id as string);
+      res.json(success(config.nodeId, { hold }));
+    } catch (err) { sendCommerceError(res, config, err); }
+  });
+
+  // POST /v1/commerce/holds/:id/capture — seller settles up to the held amount (partial allowed).
+  router.post('/v1/commerce/holds/:id/capture', requireAuth(), async (req, res) => {
+    const amount = req.body?.amount;
+    if (amount !== undefined && (typeof amount !== 'number' || !Number.isInteger(amount))) {
+      res.status(400).json(error(config.nodeId, 'INVALID_HOLD', 'amount must be an integer number of micro-units'));
+      return;
+    }
+    try {
+      const hold = await captureHold(storage, config, req.auth!.owner as string, req.params.id as string, amount);
+      res.json(success(config.nodeId, { hold }));
+    } catch (err) { sendCommerceError(res, config, err); }
+  });
+
+  // POST /v1/commerce/holds/:id/release — buyer or seller cancels an open hold.
+  router.post('/v1/commerce/holds/:id/release', requireAuth(), async (req, res) => {
+    try {
+      const hold = await releaseHold(storage, config, req.auth!.owner as string, req.params.id as string);
+      res.json(success(config.nodeId, { hold }));
     } catch (err) { sendCommerceError(res, config, err); }
   });
 

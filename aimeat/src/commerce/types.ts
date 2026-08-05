@@ -193,4 +193,31 @@ export interface PaymentHandler {
     trackingCode: string;
     seller?: { ghii: string; owner: string; psp?: unknown };
   }): Promise<void>;
+  /**
+   * OPTIONAL hold rail (the covered-bid / escrow-by-deferred-capture primitives). `authorize`
+   * places a hold on the buyer's instrument WITHOUT moving money; `capture` settles up to the
+   * held amount onto the seller; `release` cancels the hold. A handler without these three
+   * cannot back holds — the hold book answers HOLD_UNSUPPORTED for its currencies.
+   */
+  authorize?(ctx: PaymentContext, args: {
+    buyerGhii: string;
+    amount: number;
+    currency: string;
+    reference: string;
+    instrument?: unknown;
+    seller?: { ghii: string; owner: string; psp?: unknown };
+  }): Promise<{ trackingCode: string }>;
+  /** Settle part or all of a held amount onto the seller. Throws on failure. */
+  capture?(ctx: PaymentContext, args: {
+    amount: number;
+    currency: string;
+    trackingCode: string;
+    reference: string;
+    seller?: { ghii: string; owner: string; psp?: unknown };
+  }): Promise<void>;
+  /** Cancel a hold without settling. Throws on failure (callers doing sweeps may tolerate). */
+  release?(ctx: PaymentContext, args: {
+    trackingCode: string;
+    seller?: { ghii: string; owner: string; psp?: unknown };
+  }): Promise<void>;
 }

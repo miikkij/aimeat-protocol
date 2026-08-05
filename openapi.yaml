@@ -13542,6 +13542,132 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/commerce/holds:
+    post:
+      operationId: createCommerceHold
+      summary: Authorize a hold on the buyer's instrument toward one seller (no money moves)
+      description: >
+        The covered-bid / deferred-capture primitive (TINKI phase 1). Money is authorized on the
+        BUYER's payment instrument through a hold-capable payment handler (Stripe manual-capture
+        intent on the seller's own account, or test.money in E2E) but not settled. The seller may
+        later capture up to the held amount; either party may release. Holds expire lazily after
+        ~6 days, safely inside Stripe's uncaptured-intent window. Morsels cannot back holds.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [seller, amount, currency, purpose, reference]
+              properties:
+                seller: { type: string, description: Seller owner name on this node }
+                amount: { type: integer, minimum: 1, description: 6-decimal micro-units }
+                currency: { type: string, example: EUR }
+                purpose: { type: string, example: bid, description: Caller-defined ('bid', 'deposit', …) }
+                reference: { type: string, description: Caller's correlation reference (e.g. a listing id) }
+                payment:
+                  type: object
+                  properties:
+                    handler: { type: string, description: Payment handler id (defaults by currency) }
+                    instrument: { description: 'Payment instrument (e.g. a Stripe PaymentMethod id)' }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '402':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+        '422':
+          $ref: '#/components/responses/AimeatError'
+    get:
+      operationId: listCommerceHolds
+      summary: List the caller's holds (buyer side by default, seller side with side=seller)
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: side
+          in: query
+          schema: { type: string, enum: [buyer, seller], default: buyer }
+        - name: limit
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+
+  /v1/commerce/holds/{id}:
+    get:
+      operationId: getCommerceHold
+      summary: Read one hold (buyer or seller; lazy expiry applies)
+      description: Non-parties get 404 — a hold's existence is not leaked.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/commerce/holds/{id}/capture:
+    post:
+      operationId: captureCommerceHold
+      summary: Capture a hold (seller only, up to the held amount; partial = second price)
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount: { type: integer, minimum: 1, description: Micro-units; defaults to the full held amount }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          $ref: '#/components/responses/AimeatError'
+        '422':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/commerce/holds/{id}/release:
+    post:
+      operationId: releaseCommerceHold
+      summary: Release an open hold (buyer or seller)
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          $ref: '#/components/responses/AimeatError'
+
   /v1/commerce/payout:
     get:
       operationId: commercePayoutStatus

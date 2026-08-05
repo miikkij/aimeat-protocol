@@ -18,6 +18,9 @@
  * @structure STRIPE_HANDLER_ID · stripePaymentHandler · stripeApi (module-local)
  * @usage registerPaymentHandler(stripePaymentHandler());
  * @version-history
+ *   v1.1.0 — 2026-08-06 — Hold rail (TINKI phase 1): authorize = manual-capture PaymentIntent
+ *     (requires_capture), capture up to the held amount, release = cancel. The uncaptured intent
+ *     is the escrow — funds guaranteed, settled onto the seller only at capture.
  *   v1.0.0 — 2026-07-28 — Promoted into core from the removed ee/ module, stripped of the Connect
  *     platform path: every seller charges on their own credentials (single edition, no fork).
  */
@@ -139,6 +142,53 @@ export function stripePaymentHandler(): PaymentHandler {
         // failure on top of the fulfillment one that triggered it.
         logger.error(`[stripe] refund failed for ${trackingCode}: ${err instanceof Error ? err.message : String(err)}`);
       }
+    },
+
+    // ── Hold rail: authorize (manual capture) → capture | release ──
+    // The uncaptured PaymentIntent IS the escrow: money is guaranteed on the buyer's card but
+    // lands on the seller's account only at capture. Stripe expires uncaptured card intents
+    // after ~7 days — the hold book keeps its own expiry safely inside that.
+
+    async authorize(_ctx, { amount, currency, reference, instrument, seller }) {
+      if (typeof instrument !== 'string' || !instrument) {
+        throw new PaymentError(
+          'PAYMENT_INSTRUMENT_REQUIRED', 402,
+          'Provide payment.instrument: a Stripe PaymentMethod id (e.g. a test-mode pm_… token)',
+        );
+      }
+      const stripeAmount = microsToStripeMinor(amount);
+      if (stripeAmount < 1) {
+        throw new PaymentError('AMOUNT_TOO_SMALL', 422, 'Hold below one minor unit');
+      }
+      const intent = await stripeApi(sellerKey(seller), 'POST', 'payment_intents', {
+        amount: String(stripeAmount),
+        currency: currency.toLowerCase(),
+        payment_method: instrument,
+        confirm: 'true',
+        'capture_method': 'manual',
+        'automatic_payment_methods[enabled]': 'true',
+        'automatic_payment_methods[allow_redirects]': 'never',
+        description: `AIMEAT hold ${reference}`,
+      });
+      if (intent.status !== 'requires_capture') {
+        throw new PaymentError('HOLD_NOT_PLACED', 402, `Stripe payment intent status: ${String(intent.status)}`);
+      }
+      return { trackingCode: String(intent.id) };
+    },
+
+    async capture(_ctx, { amount, trackingCode, seller }) {
+      const captured = await stripeApi(sellerKey(seller), 'POST', `payment_intents/${trackingCode}/capture`, {
+        amount_to_capture: String(microsToStripeMinor(amount)),
+      });
+      if (captured.status !== 'succeeded') {
+        throw new PaymentError('CAPTURE_FAILED', 402, `Stripe capture status: ${String(captured.status)}`);
+      }
+    },
+
+    async release(_ctx, { trackingCode, seller }) {
+      await stripeApi(sellerKey(seller), 'POST', `payment_intents/${trackingCode}/cancel`, {
+        cancellation_reason: 'requested_by_customer',
+      });
     },
   };
 }
