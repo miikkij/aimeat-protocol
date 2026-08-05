@@ -4,6 +4,8 @@
  *   Tests extension listing, action invocation, and the extension details resource.
  * @version-history
  *   v1.0.0 — 2026-03-21 — Initial creation
+ *   v1.1.0 — 2026-08-05 — Test 9b: ctx.files reaches the sandbox over MCP (write + read back +
+ *     missing ref), guarding the makeExtensionFiles parity fix in mcp/extensions.ts
  */
 
 // Run: cd aimeat && pnpm exec tsx test/e2e-mcp-extensions.ts
@@ -134,6 +136,17 @@ actions:
           type: string
     output:
       type: object
+  - id: filewrite
+    method: POST
+    path: /filewrite
+    script: file_script
+    input:
+      type: object
+      properties:
+        b64:
+          type: string
+    output:
+      type: object
 limits:
   memory_mb: 16
   timeout_ms: 5000
@@ -142,6 +155,14 @@ limits:
 
 const testScripts = {
     echo_script: `export default async function(ctx, input) { return { echoed: input.message ?? 'hello', from: 'mcp-test' }; }`,
+    // ctx.files parity with the REST door: write a file, read it back, and probe a missing ref.
+    file_script: `export default async function(ctx, input) {
+        if (!ctx.files) return { available: false };
+        const w = await ctx.files.write('probe.txt', input.b64, { mime: 'text/plain', visibility: 'public' });
+        const r = await ctx.files.read(w.key);
+        const missing = await ctx.files.read('no-such-file.bin');
+        return { available: true, key: w.key, url: w.url, size: w.size, readBack: r ? r.base64 : null, missing };
+    }`,
 };
 
 console.log('\n=== AIMEAT MCP Extensions E2E Test ===\n');
@@ -365,6 +386,26 @@ await test('9. aimeat_extension_invoke returns error for unknown action', async 
     }, 106);
     assert(body.result?.isError === true, 'isError = true');
     assert(body.result.content[0].text.includes('not found'), `msg: ${body.result.content[0].text}`);
+});
+
+await test('9b. aimeat_extension_invoke gives the action ctx.files (write + read back, missing ref → null)', async () => {
+    const payload = Buffer.from('mcp-files-ok').toString('base64');
+    const { body } = await mcpRpc('tools/call', {
+        name: 'aimeat_extension_invoke',
+        arguments: {
+            extension_name: extName,
+            action_id: 'filewrite',
+            input: { b64: payload },
+        },
+    }, 109);
+    assert(body.result?.content?.[0]?.text !== undefined, 'has content');
+    assert(!body.result.isError, `not an error: ${body.result?.content?.[0]?.text}`);
+    const result = JSON.parse(body.result.content[0].text);
+    assert(result.available === true, 'ctx.files is present over MCP');
+    assert(result.key === `ext/${extName}/probe.txt`, `reserved ext/ prefix applied: ${result.key}`);
+    assert(result.size === 12, `size: ${result.size}`);
+    assert(result.readBack === payload, `read back what was written: ${result.readBack}`);
+    assert(result.missing === null, 'missing ref reads as null');
 });
 
 // ─── Phase 6: Extension resource ───

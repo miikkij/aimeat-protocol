@@ -19,6 +19,9 @@
  *   v1.5.0 — 2026-07-19 — aimeat_extension_install gains update:true (in-place upsert preserving
  *     lifecycle + ext: memory, owner-gated) and activate:true (skip separate activate call);
  *     closes pitfall ext/extension-install-no-upsert
+ *   v1.6.0 — 2026-08-05 — aimeat_extension_invoke ctx gains files (makeExtensionFiles, parity with
+ *     the REST door): file-storing actions (universe render/checkpoint) no longer answer
+ *     UNAVAILABLE over MCP
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -38,6 +41,7 @@ import { logger } from '../utils/logger.js';
 import { notify } from '../services/notify.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { enforceExtensionMemoryLimits } from '../services/quota.js';
+import { makeExtensionFiles } from '../services/extension-files.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -258,6 +262,17 @@ export function registerExtensionsTools(
                     resp.headers.forEach((v, k) => { headers[k] = v; });
                     return { status: resp.status, ok: resp.ok, text, headers };
                 },
+                // Same ctx.files the REST door builds (routes/extensions/actions.ts): reads are
+                // authorized as the caller, writes land in the caller's own storage under
+                // ext/{name}/. Without it, any action that stores a file (e.g. a rendered SVG)
+                // works over REST but answers UNAVAILABLE over MCP — which door you came through
+                // decided whether the capability existed.
+                files: makeExtensionFiles({
+                    config, storage,
+                    callerGaii: agentGaii,
+                    callerOwner: parseGAII(agentGaii)?.owner,
+                    extName: ext.name,
+                }),
                 wallet: {
                     consume: async (amount: number, reason: string) => {
                         // SECURITY: reject non-positive/non-finite amounts — a negative amount would mint morsels (CR-1).
