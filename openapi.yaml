@@ -13525,6 +13525,93 @@ paths:
             text/plain:
               schema: { type: string }
 
+  # ── Attestations (TINKI phase 1) ──────────────────────────────
+  /v1/attestations:
+    post:
+      operationId: createAttestation
+      summary: Create a co-signed attestation (the trade-deed primitive)
+      description: >
+        An append-only record 2-4 principals co-sign with their registered Ed25519 keys. The
+        payload is canonicalized (sorted keys) and sha256-hashed; each party signs
+        `aimeat-attest:{id}:{payloadHash}` client-side with the same key their auth uses. The
+        creator must be one of the parties. When every party has signed, the record completes and
+        nothing can be added or changed.
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [payload, parties]
+              properties:
+                payload: { description: The co-signed fact (≤ 64 KB canonical JSON) }
+                parties:
+                  type: array
+                  minItems: 2
+                  maxItems: 4
+                  items: { type: string, description: GHII or GAII on this node }
+                reference: { type: string }
+      responses:
+        '201':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+        '422':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/attestations/{id}:
+    get:
+      operationId: getAttestation
+      summary: Read an attestation publicly — the node re-verifies every signature
+      description: Returns the record plus `verified`, recomputed from the payload and registered keys on every read.
+      tags: [Commerce]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '404':
+          $ref: '#/components/responses/AimeatError'
+
+  /v1/attestations/{id}/sign:
+    post:
+      operationId: signAttestation
+      summary: Sign as the identity you are (completes when all parties have signed)
+      tags: [Commerce]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signature]
+              properties:
+                signature: { type: string, description: 'Base64 Ed25519 over aimeat-attest:{id}:{payloadHash}' }
+      responses:
+        '200':
+          $ref: '#/components/responses/AimeatSuccess'
+        '403':
+          $ref: '#/components/responses/AimeatError'
+        '409':
+          $ref: '#/components/responses/AimeatError'
+        '422':
+          $ref: '#/components/responses/AimeatError'
+
   # ── Commerce (TARGET-033) ─────────────────────────────────────
   /v1/commerce/orders:
     get:
