@@ -58,6 +58,36 @@
     /** The markdown composer (exposed so an app can preview what publish() will write). */
     compose,
     /**
+     * Copy text to the clipboard the way every "Copy prompt" button should: async clipboard API
+     * first, hidden-offscreen-textarea execCommand fallback — never a visible selection painted
+     * over the page. Resolves to true/false; never throws. This is THE shared implementation for
+     * the platform's copy-a-prompt-to-your-AI pattern — stop hand-rolling it per app.
+     */
+    async copyText(text) {
+      const value = String(text == null ? "" : text);
+      if (typeof navigator !== "undefined" && navigator.clipboard && navigator.clipboard.writeText) {
+        try {
+          await navigator.clipboard.writeText(value);
+          return true;
+        } catch {
+        }
+      }
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = value;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        return !!ok;
+      } catch {
+        return false;
+      }
+    },
+    /**
      * Publish this app's agent face: a markdown string, or { title, sections: [{ heading, body }] }.
      * opts.app names the app filename explicitly (e.g. 'my-app.html') and overrides inference —
      * pass it on per-app subdomain origins, where the filename is not derivable from the URL.

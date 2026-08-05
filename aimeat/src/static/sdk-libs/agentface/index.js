@@ -10,11 +10,15 @@
  *   verbatim from lib-agentface.ts — the bespoke auth-guard messages are preserved (they teach the
  *   app-owner-only serving rule), so getSession stays inline rather than using _core/session.
  * @structure imports attach (namespace); getSession/compose/inferFilename; the `agentface` object
- *   (key/compose/publish); attach('agentface', …) + window.AIMEATAgentFace.
+ *   (key/compose/copyText/publish); attach('agentface', …) + window.AIMEATAgentFace.
  * @usage <script src="/v1/libs/aimeat-auth.js"></script><script src="/v1/libs/aimeat-agentface.js"></script>
  *   await AIMEATAgentFace.publish('# My app\n\n…', { app: 'my-app.html' });
+ *   await AIMEAT.agentface.copyText(promptText);  // the shared "Copy prompt" implementation
  * @version-history
  *   v1.0.0 — 2026-07-19 — Migrated from src/routes/lib-agentface.ts (SDK-libs migration Phase 1).
+ *   v1.1.0 — 2026-08-05 — copyText(): the ONE shared clipboard implementation for the platform's
+ *     copy-a-prompt-to-your-AI pattern (async API + hidden-textarea fallback, no visible
+ *     selection) — every app was hand-rolling its own, several of them badly.
  */
 import { attach } from '../_core/namespace.js';
 
@@ -66,6 +70,36 @@ const agentface = {
 
   /** The markdown composer (exposed so an app can preview what publish() will write). */
   compose: compose,
+
+  /**
+   * Copy text to the clipboard the way every "Copy prompt" button should: async clipboard API
+   * first, hidden-offscreen-textarea execCommand fallback — never a visible selection painted
+   * over the page. Resolves to true/false; never throws. This is THE shared implementation for
+   * the platform's copy-a-prompt-to-your-AI pattern — stop hand-rolling it per app.
+   */
+  async copyText(text) {
+    const value = String(text == null ? '' : text);
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      try {
+        await navigator.clipboard.writeText(value);
+        return true;
+      } catch { /* fall through to the textarea fallback */ }
+    }
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = value;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.left = '-9999px';
+      document.body.appendChild(ta);
+      ta.select();
+      const ok = document.execCommand('copy');
+      document.body.removeChild(ta);
+      return !!ok;
+    } catch {
+      return false;
+    }
+  },
 
   /**
    * Publish this app's agent face: a markdown string, or { title, sections: [{ heading, body }] }.
