@@ -147,6 +147,7 @@ Before accepting any checkpoint result (a screenshot, an import, a computed layo
 
 1. **Result doesn't match the criterion → keep iterating.** Shipping "almost right" moves verification onto the developer's phone and costs a full feedback round per slip.
 2. **Can't state a pass-criterion → the requirement is unclear.** Resolve it from the source material or ask the developer BEFORE the next iteration — iterating blind on a guessed target produces confident wrong "fixes" (careless acceptance once shrank a correctly-sized part because the reference dimension was never established).
+2b. **The developer gave a source → OPEN IT before implementing.** A URL, file or spec in the request IS the requirement; fetch and read it first, and implement what it says — never substitute your own interpretation of its title or summary. (A linked grass tutorial was once "implemented" without opening the link; the result resembled the headline, not the technique, and the whole round was wasted.)
 3. A verdict established under weak evidence stays suspect: re-verify it with a proper anchor before building on it.
 
 ---
