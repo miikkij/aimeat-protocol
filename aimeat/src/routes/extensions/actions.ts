@@ -22,8 +22,12 @@ import { requireAuth } from '../../auth/middleware.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
-import { executeExtensionAction } from '../../services/extension-runtime.js';
+import { executeExtensionAction, EXT_HASH_REFERENCE_JS } from '../../services/extension-runtime.js';
 import type { ExtensionCtx } from '../../services/extension-runtime.js';
+
+/** The published hash, evaluated here so the served example is produced BY the served source. */
+const aimeatHashRef: (s: string) => string =
+  new Function(`${EXT_HASH_REFERENCE_JS}; return aimeatHash;`)() as (s: string) => string;
 import { makeExtensionFiles } from '../../services/extension-files.js';
 import { extensionCrossNotify } from '../../services/extension-notify.js';
 import { logger } from '../../utils/logger.js';
@@ -40,6 +44,23 @@ import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from '..
 import type { EmailService } from '../../services/email.js';
 
 export function registerExtensionActionRoutes(router: Router, config: AimeatConfig, storage: Storage, emailService?: EmailService): void {
+  // ── GET /v1/ext-hash — the node's published ctx.hash, as source ──
+  // An extension and a browser app (or an agent computing a commitment before it calls one) must
+  // agree on the same hash byte for byte. That agreement used to depend on copying the function
+  // out of a doc; a commitment hashed by a different function is silently wrong at reveal time,
+  // which is exactly where it is most expensive. So the node serves the reference itself.
+  router.get('/v1/ext-hash', (_req, res) => {
+    res.json(success(config.nodeId, {
+      name: 'aimeatHash',
+      algorithm: 'FNV-1a 64-bit (two 32-bit lanes, hex-concatenated) — 16 lowercase hex chars',
+      source: EXT_HASH_REFERENCE_JS,
+      note: 'This is byte-for-byte the ctx.hash an extension runs in the sandbox. Use it whenever a '
+        + 'value hashed outside the sandbox has to match one hashed inside it (sealed-bid commitments, '
+        + 'idempotency keys, content fingerprints).',
+      examples: [{ input: 'abc', output: aimeatHashRef('abc') }],
+    }));
+  });
+
   // ── POST /v1/ext/:extName/:instanceId/:actionId — Instance-scoped action execution ──
   router.post('/v1/ext/:extName/:instanceId/:actionId', requireAuth(), async (req, res) => {
     const extName = req.params.extName as string;
