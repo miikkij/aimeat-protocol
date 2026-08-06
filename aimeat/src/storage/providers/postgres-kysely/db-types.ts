@@ -398,6 +398,39 @@ export interface FinanceCounter {
   value: Generated<number>;
 }
 
+/** Outbound door: saved recipient with opt-out and bounce state (never a free address). */
+export interface OutboundContact {
+  bounceCount: Generated<number>;
+  createdAt: string;
+  email: string;
+  ghii: string | null;
+  id: string;
+  name: string;
+  notes: string | null;
+  optOutAt: string | null;
+  optOutToken: string;
+  optedOut: Generated<boolean>;
+  ownerGhii: string;
+  suppressedAt: string | null;
+  tags: Generated<Json>;
+  updatedAt: string;
+}
+
+/** Outbound door: append-only send log; the daily limit counts rows here. */
+export interface OutboundMessage {
+  channel: string;
+  contactId: string;
+  createdAt: string;
+  error: string | null;
+  id: string;
+  invoiceId: string | null;
+  kind: string;
+  ownerGhii: string;
+  status: string;
+  subject: string;
+  templateId: string | null;
+}
+
 export interface App {
   accessCode: string | null;
   aiProvenanceId: string | null;
@@ -1826,6 +1859,8 @@ export interface DB {
   OrganismMembership: OrganismMembership;
   OrganismReputation: OrganismReputation;
   Otk: Otk;
+  OutboundContact: OutboundContact;
+  OutboundMessage: OutboundMessage;
   Owner: Owner;
   OwnerAgentDefault: OwnerAgentDefault;
   Package: Package;

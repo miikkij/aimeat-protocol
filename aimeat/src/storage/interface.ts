@@ -88,6 +88,7 @@ import type { InvitationRepository } from './repositories/invitation.repository.
 import type { AiProvenanceRepository } from './repositories/ai-provenance.repository.js';
 import type { ConnectionRepository } from './repositories/connection.repository.js';
 import type { FinanceRepository } from './repositories/finance.repository.js';
+import type { OutboundRepository } from './repositories/outbound.repository.js';
 
 export interface Storage extends
   OwnerRepository, AgentRepository, MemoryRepository,
@@ -118,4 +119,5 @@ export interface Storage extends
   AiProvenanceRepository,
   ConnectionRepository,
   FinanceRepository,
+  OutboundRepository,
   StatsRepository { }

@@ -21,6 +21,9 @@
  *   v1.4.0 -- 2026-07-04 -- Add sendInvite() for email invitations to unregistered users.
  *   v1.5.0 -- 2026-07-07 -- Add sendKeyInvite()/sendKeyCredentials() for provisioned-code access keys
  *     and the first-login durable-credentials email (TARGET-011).
+ *   v1.6.0 -- 2026-08-06 -- Add sendWithAttachments() (invoice PDFs via the outbound door) with
+ *     reply-to + display-name support: the envelope sender stays the node's own address
+ *     (SPF/DKIM), the business's name and reply address ride on top.
  */
 
 import { createTransport, type Transporter } from 'nodemailer';
@@ -42,6 +45,12 @@ import {
 
 export type { MatchSuggestion } from './email-templates.js';
 
+export interface EmailAttachment {
+  filename: string;
+  content: Buffer;
+  contentType: string;
+}
+
 export interface EmailService {
   readonly enabled: boolean;
   sendVerificationCode(to: string, code: string, locale?: string): Promise<boolean>;
@@ -52,6 +61,8 @@ export interface EmailService {
   sendKeyInvite(to: string, args: import('./email-templates.js').KeyInviteEmailArgs, locale?: string): Promise<boolean>;
   sendKeyCredentials(to: string, args: import('./email-templates.js').KeyCredentialsEmailArgs, locale?: string): Promise<boolean>;
   sendRaw(to: string, subject: string, html: string, text: string): Promise<boolean>;
+  /** Attachment-carrying send (outbound door / invoice PDFs). Envelope from stays the node's; fromName + replyTo carry the business identity. */
+  sendWithAttachments(to: string, subject: string, html: string, text: string, attachments: EmailAttachment[], opts?: { replyTo?: string; fromName?: string }): Promise<boolean>;
 }
 
 /**
@@ -102,6 +113,7 @@ function createDisabledService(): EmailService {
     sendKeyInvite: () => warn('sendKeyInvite'),
     sendKeyCredentials: () => warn('sendKeyCredentials'),
     sendRaw: () => warn('sendRaw'),
+    sendWithAttachments: () => warn('sendWithAttachments'),
   };
 }
 
@@ -193,6 +205,29 @@ export function createEmailService(config: AimeatConfig): EmailService {
 
     async sendRaw(to: string, subject: string, rawHtml: string, rawText: string): Promise<boolean> {
       return send(to, subject, rawHtml, rawText, 'group_send');
+    },
+
+    async sendWithAttachments(to: string, subject: string, html: string, text: string, attachments: EmailAttachment[], opts?: { replyTo?: string; fromName?: string }): Promise<boolean> {
+      try {
+        // Display name is quoted-escaped; the address itself is always the node's configured from.
+        const fromHeader = opts?.fromName ? `"${opts.fromName.replaceAll('"', "'")}" <${from}>` : from;
+        await withRetry(
+          () => transporter.sendMail({
+            from: fromHeader, to, subject, html, text,
+            replyTo: opts?.replyTo,
+            attachments: attachments.map((a) => ({ filename: a.filename, content: a.content, contentType: a.contentType })),
+          }),
+          subject,
+          'outbound',
+        );
+        logger.info(`Email sent successfully: ${subject}`);   // never log addresses (privacy)
+        getStats()?.incrementTyped('email_sent', 'outbound');
+        return true;
+      } catch (err) {
+        logger.error(`Email send failed after retries: ${subject}`, { error: (err as Error).message });
+        getStats()?.incrementTyped('email_failed', 'outbound');
+        return false;
+      }
     },
   };
 }

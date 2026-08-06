@@ -49,6 +49,7 @@ import { commerceBeneficiariesRouter } from '../routes/commerce-beneficiaries.js
 import { commerceWebhooksRouter } from '../routes/commerce-webhooks.js';
 import { financeRouter } from '../routes/finance.js';
 import { financeLedgerRouter } from '../routes/finance-ledger.js';
+import { outboundRouter } from '../routes/outbound.js';
 
 // Routes
 import { bootstrapRouter } from '../routes/bootstrap.js';
@@ -414,6 +415,7 @@ export async function mountRoutes(
   app.use(commerceWebhooksRouter(config, storage));       // Stripe webhooks → accounting vouchers (per-seller secret)
   app.use(financeRouter(config, storage));                // Finance: invoices (Finvoice 3.0) — company-in-a-box phase 1
   app.use(financeLedgerRouter(config, storage));          // Finance: vouchers, VAT registry/report, fiscal years, exports
+  app.use(outboundRouter(config, storage));               // Outbound door: contact registry, policied send, public unsubscribe
 
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
   app.use(agentTasksRouter(config, storage, webhookDispatcher));

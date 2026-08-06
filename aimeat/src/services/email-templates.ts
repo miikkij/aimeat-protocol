@@ -11,6 +11,8 @@
  *   v1.2.0 — 2026-07-05 — Add keyInviteEmailHtml/keyInviteEmailSubject (provisioned-code access keys).
  *   v1.2.1 — 2026-07-05 — wrapHtml takes optional brand/footer; key-invite email shows the AIME♥AT
  *     wordmark + a "Sent from the AIMEAT machine room" footer (scoped to that template only).
+ *   v1.4.0 — 2026-08-06 — Add outboundEmailHtml: the outbound door's generic layout (caller supplies
+ *     pre-escaped body HTML + the plain-text twin; brand may name the sending business).
  *   v1.3.0 — 2026-07-07 — Add keyCredentialsEmailHtml/keyCredentialsEmailSubject: durable login
  *     (username + freshly issued password) emailed on a provisioned-code account's first sign-in (TARGET-011).
  */
@@ -492,4 +494,14 @@ export function matchSuggestionEmailHtml(matches: MatchSuggestion[], locale?: st
   ].join('\n');
 
   return { html, text };
+}
+
+/**
+ * Outbound-door generic email: caller supplies the ALREADY-ESCAPED body HTML and its
+ * plain-text twin (the door composes both, including the marketing unsubscribe footer).
+ * `brand` (trusted constant or validated business name) shows in place of the AIMEAT wordmark.
+ */
+export function outboundEmailHtml(heading: string, bodyHtml: string, textBody: string, locale?: string, opts?: { brand?: string }): { html: string; text: string } {
+  const html = wrapHtml(heading, bodyHtml, locale, opts?.brand ? { brand: esc(opts.brand) } : undefined);
+  return { html, text: textBody };
 }

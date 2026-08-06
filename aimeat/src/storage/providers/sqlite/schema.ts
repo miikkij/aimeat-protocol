@@ -37,6 +37,7 @@ import type Database from 'better-sqlite3';
 import { applySchemaTables1 } from './schema-tables-1.js';
 import { applySchemaTables2 } from './schema-tables-2.js';
 import { applySchemaTables3 } from './schema-tables-3.js';
+import { applySchemaTables4 } from './schema-tables-4.js';
 
 export function initializeSchema(db: Database.Database): void {
   // CREATE TABLE/INDEX DDL, applied in numeric order (same order as the original single
@@ -44,6 +45,7 @@ export function initializeSchema(db: Database.Database): void {
   applySchemaTables1(db);
   applySchemaTables2(db);
   applySchemaTables3(db);
+  applySchemaTables4(db);
 
   // ── Schema migrations for existing databases ──
   // ALTER TABLE ADD COLUMN is idempotent-safe: if the column exists, it throws

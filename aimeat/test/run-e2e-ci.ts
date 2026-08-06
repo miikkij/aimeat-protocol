@@ -154,6 +154,7 @@ const ALL_SUITES = [
     'test/e2e-commerce-holds.ts',
     'test/e2e-attestations.ts',
     'test/e2e-finance.ts',
+    'test/e2e-outbound.ts',
     'test/e2e-money-audit.ts',
     'test/e2e-x402.ts',
     'test/e2e-x402-testnet.ts',
@@ -379,6 +380,14 @@ async function startServer(): Promise<ChildProcess> {
         // The fake provider lives on loopback, which safeFetch refuses by default and must.
         AIMEAT_ALLOW_PRIVATE_EGRESS: process.env.AIMEAT_ALLOW_PRIVATE_EGRESS ?? 'true',
         AIMEAT_ADMIN_PASSWORD: process.env.AIMEAT_ADMIN_PASSWORD ?? 'TestAdminPw123!',
+        // Outbound door daily limit kept small so e2e-outbound can actually reach the 429
+        // without sending two hundred messages (default in prod code is 200).
+        AIMEAT_OUTBOUND_DAILY_LIMIT: process.env.AIMEAT_OUTBOUND_DAILY_LIMIT ?? '8',
+        // The server falls back to loading ./aimeat/.env for any key NOT already present in its
+        // env (src/index.ts) — on a dev machine that file holds REAL SMTP credentials, and an e2e
+        // send once reached the real SMTP server through exactly this hole. An empty string counts
+        // as present, so pinning '' here keeps the test server's email service disabled.
+        AIMEAT_SMTP_HOST: process.env.AIMEAT_SMTP_HOST ?? '',
         // A fixed 32-byte (hex) encryption key so features that encrypt at rest work in
         // e2e (extension secrets, TOTP, and the app copy-protection watermark + decode).
         AIMEAT_ENCRYPTION_KEY: process.env.AIMEAT_ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',

@@ -28,6 +28,7 @@ import {
   applyOverdue, requireOwnInvoice,
 } from '../services/finance/invoice-service.js';
 import { buildFinvoiceXml } from '../services/finance/finvoice.js';
+import { renderInvoicePdf } from '../services/finance/invoice-pdf.js';
 
 const PartySchema = z.object({
   name: z.string().min(2).max(140),
@@ -240,6 +241,19 @@ export function financeRouter(config: AimeatConfig, storage: Storage): Router {
       res.setHeader('Content-Type', 'application/xml; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="finvoice-${inv.invoiceNumber}.xml"`);
       res.send(xml);
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  // Human-readable A4 PDF, rendered deterministically from the immutable sent invoice.
+  router.get('/v1/finance/invoices/:id/pdf', requireAuth(), requireScope('finance:read'), async (req, res) => {
+    try {
+      const inv = await requireOwnInvoice(storage, resolve(req), req.params.id as string);
+      const pdf = await renderInvoicePdf(inv);
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="lasku-${inv.invoiceNumber}.pdf"`);
+      res.send(pdf);
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
     }

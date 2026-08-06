@@ -473,6 +473,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     pushMaxSubscriptionsPerNode: parseInt(process.env.AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE ?? '5', 10),
     pushMaxFailures: parseInt(process.env.AIMEAT_PUSH_MAX_FAILURES ?? '3', 10),
     emailRateLimitMin: parseInt(process.env.AIMEAT_EMAIL_RATE_LIMIT_MIN ?? '30', 10),
+    // Outbound door: max sent messages per owner per rolling 24 h. A safe public default —
+    // a legit micro-business rarely exceeds it, a spammer always would.
+    outboundDailyLimit: parseInt(process.env.AIMEAT_OUTBOUND_DAILY_LIMIT ?? '200', 10),
     eudiwEnabled: process.env.AIMEAT_EUDIW_ENABLED === 'true',
     eudiwClientId: process.env.AIMEAT_EUDIW_CLIENT_ID ?? 'aimeat-verifier-001',
     eudiwRedirectUri: process.env.AIMEAT_EUDIW_REDIRECT_URI ?? '',

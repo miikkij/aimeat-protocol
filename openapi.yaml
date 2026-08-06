@@ -167,6 +167,8 @@ tags:
     description: Access model — groups, levels, and effective-access resolution (authority ∩ consent)
   - name: Contacts
     description: Owner contact list — add, list, remove, and email resolution for sharing and messaging
+  - name: Outbound
+    description: The outbound messaging door — saved recipient registry, policied send (inbox-first, opt-out, bounce suppression, daily limit), append-only send log, public unsubscribe
   - name: Finance
     description: Company-in-a-box bookkeeping — sales invoices (Finvoice 3.0), append-only vouchers, VAT registry/report, fiscal years, accountant exports, and PSP webhooks that book vouchers
   - name: Notifications
@@ -42897,3 +42899,170 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/AimeatError' }
         '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/finance/invoices/{id}/pdf:
+    get:
+      operationId: getFinanceInvoicePdf
+      tags: [Finance]
+      summary: Download the invoice as an A4 PDF
+      description: Human-readable invoice document rendered deterministically from the immutable sent invoice (409 for a draft). The same PDF the outbound door attaches to invoice emails.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: PDF (application/pdf) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ── Outbound door (company-in-a-box phase 2) ────────────────────────────────
+  /v1/outbound/contacts:
+    get:
+      operationId: listOutboundContacts
+      tags: [Outbound]
+      summary: List saved outbound recipients
+      description: The owner's recipient registry. The per-contact unsubscribe token is never included — it is the recipient's capability, not the owner's.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: opted_out, in: query, schema: { type: boolean } }
+        - { name: suppressed, in: query, schema: { type: boolean } }
+        - { name: tag, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createOutboundContact
+      tags: [Outbound]
+      summary: Save an outbound recipient
+      description: 'Creates (or returns, deduped by lower-cased address) a saved recipient. If the email belongs to a registered user on this node, the contact carries their GHII and sends prefer the AIMEAT inbox channel. Requires scope outbound:send.'
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, email]
+              properties:
+                name: { type: string, maxLength: 140 }
+                email: { type: string, format: email }
+                tags: { type: array, items: { type: string }, maxItems: 20 }
+                notes: { type: string, nullable: true }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/outbound/contacts/{id}:
+    delete:
+      operationId: deleteOutboundContact
+      tags: [Outbound]
+      summary: Remove a saved recipient
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/outbound/contacts/{id}/opt-out:
+    post:
+      operationId: setOutboundContactOptOut
+      tags: [Outbound]
+      summary: Toggle a recipient's marketing opt-out (owner side)
+      description: The recipient's own path is the public unsubscribe link in every marketing email. Opt-out blocks marketing sends; transactional and invoice sends still deliver.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [opted_out]
+              properties:
+                opted_out: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/outbound/contacts/{id}/bounce:
+    post:
+      operationId: recordOutboundContactBounce
+      tags: [Outbound]
+      summary: Record a bounce (or clear the suppression)
+      description: 'The third bounce suppresses the address — every send to it is refused until the owner clears it with { clear: true }.'
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                clear: { type: boolean, description: 'true resets bounceCount and lifts the suppression' }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/outbound/send:
+    post:
+      operationId: sendOutboundMessage
+      tags: [Outbound]
+      summary: Send a message through the policied door
+      description: 'The one send path. Recipient is a SAVED contact id, never a free address. Policy chain: suppression (422 SUPPRESSED) → marketing opt-out (422 OPTED_OUT) → rolling 24 h daily limit (429 DAILY_LIMIT) → channel selection (AIMEAT inbox first when the recipient has an identity here, email fallback; marketing email carries the unsubscribe link). Compose directly (subject+body), from a template (memory record outbound.template.{template_id} with {{var}} substitution), or from an invoice (invoice_id attaches the PDF + Finvoice XML and updates the invoice''s deliveryStatus). Every outcome lands in the send log.'
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contact_id, kind]
+              properties:
+                contact_id: { type: string }
+                kind: { type: string, enum: [transactional, marketing, invoice] }
+                subject: { type: string, maxLength: 300 }
+                body: { type: string, maxLength: 20000 }
+                template_id: { type: string }
+                variables: { type: object, additionalProperties: { type: string } }
+                invoice_id: { type: string }
+                reply_to: { type: string, format: email }
+                from_name: { type: string, maxLength: 140 }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/AimeatError' }
+        '429': { $ref: '#/components/responses/AimeatError' }
+  /v1/outbound/log:
+    get:
+      operationId: listOutboundLog
+      tags: [Outbound]
+      summary: Read the append-only send log
+      description: Every attempt — sent, failed, suppressed, skipped — with channel, kind and error. The GDPR-answerable record of what left this node.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: contact_id, in: query, schema: { type: string } }
+        - { name: kind, in: query, schema: { type: string, enum: [transactional, marketing, invoice] } }
+        - { name: status, in: query, schema: { type: string, enum: [sent, failed, suppressed, skipped] } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/outbound/unsubscribe:
+    get:
+      operationId: outboundUnsubscribe
+      tags: [Outbound]
+      summary: Public token-based unsubscribe (no auth)
+      description: The link every marketing email carries. Sets the contact's opt-out and renders a confirmation page. Unknown tokens answer identically — the endpoint never confirms whether an address exists.
+      parameters: [{ name: token, in: query, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Confirmation page (text/html) }
+        '400': { description: Malformed link }
