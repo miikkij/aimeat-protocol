@@ -491,7 +491,7 @@ export default function AppsTab({ session, showToast, onStats }) {
               ${a.version_number > 1 ? html`<span class="badge badge-dim">${'#' + a.version_number}</span>` : ''}
               <span class="badge badge-info">${escHtml(a.mime_type || a.content_type || 'html')}</span>
               ${a.protected ? html`<span class="badge badge-warn">\u{1F512}</span>` : ''}
-              ${a.parked ? html`<span class="badge badge-dim">\u{1F17F}️ ${t('profile.apps.parkedBadge') || 'Parked'}</span>` : ''}
+              ${a.parked ? html`<span class="badge badge-dim">${t('profile.apps.parkedBadge') || 'Unlisted'}</span>` : ''}
               ${a.manifest?.cortex?.agents?.length ? html`<span class="badge badge-info" title=${t('profile.apps.agentBadgeHint') || 'This app ships its own agent — deploy it onto your fleet below'}>\u{1F916} ${t('profile.apps.agentBadge') || 'Ships an agent'}</span>` : ''}
               ${promoted[`${a.owner || session.owner}/${a.filename || a.name}`] ? html`<span class="badge badge-success" title=${t('profile.apps.promotedBadgeHint') || 'Promoted on your public profile — manage the pitch in the app catalog'}>\u{1F4E3} ${t('profile.apps.promotedBadge') || 'Promoted'}</span>` : ''}
               ${a.operator_hidden ? html`<span class="badge badge-danger">\u{1F6AB} ${t('profile.apps.operatorHiddenBadge') || 'Moderated by operator: hidden'}</span>` : ''}
@@ -516,7 +516,10 @@ export default function AppsTab({ session, showToast, onStats }) {
               recordRecent({ type: 'app', id: `${a.owner || session.owner}/${a.filename || a.name}`,
                 label: a.manifest?.name || String(a.filename || a.name).replace(/\.html?$/i, ''),
                 data: { owner: a.owner || session.owner, filename: a.filename || a.name } });
-              window.open(`/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}?mode=inline`, '_blank');
+              // Own protected app: append the code (a plain navigation carries no Bearer, so
+              // without it the owner would land on the unlock page for their own app).
+              const codeQ = a.access_code ? `&code=${encodeURIComponent(a.access_code)}` : '';
+              window.open(`/v1/apps/${encodeURIComponent(a.owner || session.owner)}/${encodeURIComponent(a.filename || a.name)}?mode=inline${codeQ}`, '_blank');
             }}>${t('profile.apps.launch') || 'Launch'}</button>
             <button class="btn-sm" onClick=${() => startEditMeta(a)}>${t('profile.apps.editDetails') || 'Edit Details'}</button>
             <button class="btn-sm" onClick=${() => startEditAgents(a)}>\u{1F916} ${a.manifest?.cortex?.agents?.length ? (t('profile.apps.agentEdit') || 'Edit Agents') : (t('profile.apps.agentAdd') || 'Add Agents')}</button>
@@ -587,7 +590,7 @@ export default function AppsTab({ session, showToast, onStats }) {
                     ${a.manifest?.version ? ' \u2022 v' + escHtml(a.manifest.version) : ''}
                     ${a.created_at ? ' \u2022 ' + timeAgo(a.created_at) : ''}
                     ${a.protected ? ' \u2022 \u{1F512} ' + t('profile.apps.protected') : ''}
-                    ${a.parked ? ' \u2022 \u{1F17F}\ufe0f ' + (t('profile.apps.parkedBadge') || 'Parked') : ''}
+                    ${a.parked ? ' \u2022 ' + (t('profile.apps.parkedBadge') || 'Unlisted') : ''}
                   </div>
                   <div class="mb-half"><a href="${NODE_URL + (a.download_url || '/v1/apps/' + encodeURIComponent(a.owner) + '/' + encodeURIComponent(a.filename))}" class="btn-sm pf-no-underline pf-inline-block">${t('profile.apps.download')}</a></div>
                 </div>

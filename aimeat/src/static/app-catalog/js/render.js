@@ -123,7 +123,21 @@ function launchInTab(app) {
 // View a published app: open it TOP-LEVEL in a new tab (clean full page, no toolbar/X). The
 // url is the apex ?mode=inline URL; the server serves it inline (session inherited) when the
 // app origin is OFF, or 301s it to the isolated app origin when ON.
+// The viewer's OWN protected app gets its access code appended (a plain navigation carries no
+// Bearer, so without the code the owner would land on the unlock page for their own app).
 function viewPublished(url, name) {
+  try {
+    var u = new URL(url, window.location.origin);
+    var parts = u.pathname.split('/'); // ['', 'v1', 'apps', owner, filename]
+    if (parts[1] === 'v1' && parts[2] === 'apps' && parts[3] && parts[4]) {
+      var key = decodeURIComponent(parts[3]) + '/' + decodeURIComponent(parts[4]);
+      var codeVal = ownAppAccessCodes[key];
+      if (codeVal && !u.searchParams.has('code')) {
+        url += (url.indexOf('?') >= 0 ? '&' : '?') + 'code=' + encodeURIComponent(codeVal);
+      }
+    }
+  // eslint-disable-next-line aimeat/no-silent-catch -- an unparseable url just opens as-is; the server still answers with the unlock page
+  } catch (err) { void err; }
   window.open(url, '_blank', 'noopener');
 }
 
@@ -176,6 +190,10 @@ export let serverStateByFilename = {};
 // filename -> current protection object, populated here as own cards render; the detail module
 // (copy-protection modal) reads it via the injected getOwnProtection() getter.
 export let ownAppProtection = {};
+// "owner/filename" -> the ACCESS CODE of the viewer's OWN protected app. The listing exposes the
+// code only to the app's owner; viewPublished appends it so the owner's own Open never lands on
+// the unlock page (UX-remake v3, P6). Other people's apps are never in this map.
+export let ownAppAccessCodes = {};
 export let serverAppManifests = {}; // moved out of server-io: SSOT for the owner-app manifest cache (detail reads via getServerManifests)
 
 /**
@@ -309,6 +327,7 @@ function buildLibraryEntries(localApps, serverApps) {
         accessCode: !!sa.protected
       };
       ownAppProtection[fn] = prot;
+      if (sa.access_code) ownAppAccessCodes[(sa.owner || '') + '/' + fn] = sa.access_code;
     }
   }
   return entries;

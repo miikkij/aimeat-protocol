@@ -109,6 +109,7 @@ const ALL_SUITES = [
     'test/e2e-memory-full.ts',
     'test/e2e-hello-mcp.ts',
     'test/e2e-device-token-grace.ts',
+    'test/e2e-app-access-code.ts',
     'test/e2e-owner-usage.ts',
     'test/e2e-owner-home.ts',
     'test/e2e-ai-usage-history.ts',

@@ -100,6 +100,11 @@ export function registerCatalogueAdminRoutes(
                 size: app.size,
                 mime_type: app.mimeType,
                 protected: !!app.accessCode,
+                // The code itself goes ONLY to the app's own owner (isOwn), so the owner's
+                // surfaces (catalog Open/Details, profile Launch) can append ?code= instead of
+                // dead-ending the owner on their own protected app. The owner already holds
+                // the same power via Edit Access Code; everyone else keeps the boolean only.
+                ...(isOwn && app.accessCode ? { access_code: app.accessCode } : {}),
                 parked: !!app.parked,
                 forkable: !!app.forkable,
                 has_draft: viewerGhii ? (app.ownerGaii === viewerGhii && viewerDraftFilenames.has(app.filename)) : false,

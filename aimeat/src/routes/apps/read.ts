@@ -16,6 +16,9 @@
  *   v1.1.0 — 2026-07-14 — Agent Face: the download route negotiates text/markdown (Accept or
  *     ?format=md) — serves the public apps.{filename}.agentface record (else converted HTML)
  *     with the agent-affordances footer, after the hidden/access-code/paid gates.
+ *   v1.4.0 — 2026-08-07 — Protected app + browser navigation: a human unlock page with a code
+ *     field (params preserved, bilingual) replaces the raw ACCESS_DENIED JSON that dead-ended
+ *     even the owner's own Open button (UX-remake v3, P6). API callers keep the JSON.
  *   v1.0.0 — 2026-07-13 — Extracted from src/routes/apps.ts (max-file-lines)
  */
 import type { Router } from 'express';
@@ -39,6 +42,46 @@ import { logger } from '../../utils/logger.js';
 import {
     loadServedProvenance, envelopeMeta, setProvenanceHeaders,
 } from '../../services/ai-provenance-marks.js';
+
+/**
+ * The unlock page a BROWSER gets for a protected app instead of raw JSON: a code field that
+ * resubmits the same URL as a plain GET, every non-code query param preserved as hidden inputs.
+ * No script, minimal inline style (the global CSP allows 'unsafe-inline' styles). Bilingual by
+ * Accept-Language; `wrongCode` distinguishes a bad code from a missing one.
+ */
+function accessCodeUnlockPage(req: { path: string; query: Record<string, unknown>; headers: Record<string, unknown> }, wrongCode: boolean): string {
+    const fi = String(req.headers['accept-language'] ?? '').toLowerCase().startsWith('fi');
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const hidden = Object.entries(req.query)
+        .filter(([k, v]) => k !== 'code' && typeof v === 'string')
+        .map(([k, v]) => `<input type="hidden" name="${esc(k)}" value="${esc(v as string)}">`)
+        .join('');
+    const t = fi
+        ? {
+            title: 'Tämä appi on suojattu koodilla',
+            lead: 'Appin omistaja on asettanut pääsykoodin. Syötä koodi avataksesi appin.',
+            wrong: 'Koodi ei täsmännyt. Tarkista se ja yritä uudelleen.',
+            label: 'Pääsykoodi', submit: 'Avaa appi',
+        }
+        : {
+            title: 'This app is protected by a code',
+            lead: 'The app\'s owner set an access code. Enter it to open the app.',
+            wrong: 'That code did not match. Check it and try again.',
+            label: 'Access code', submit: 'Open the app',
+        };
+    return `<!DOCTYPE html><html lang="${fi ? 'fi' : 'en'}"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(t.title)}</title>
+<style>body{font-family:system-ui,sans-serif;background:#FAFAF8;color:#1c1c1e;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:1rem}
+.card{background:#fff;border:1px solid #e3e3de;border-radius:12px;padding:2rem;max-width:420px;width:100%}
+h1{font-size:1.15rem;margin:0 0 .5rem}p{font-size:.9rem;line-height:1.55;color:#555;margin:0 0 1rem}
+.err{color:#c04b40}label{display:block;font-size:.8rem;color:#555;margin-bottom:.3rem}
+input[type=text]{width:100%;box-sizing:border-box;padding:.6rem .75rem;border:1px solid #ccc;border-radius:8px;font-size:1rem;margin-bottom:1rem}
+button{width:100%;padding:.7rem;border:0;border-radius:8px;background:#E8564A;color:#fff;font-size:.95rem;font-weight:600;cursor:pointer}</style></head>
+<body><div class="card"><h1>${esc(t.title)}</h1><p>${esc(t.lead)}</p>${wrongCode ? `<p class="err">${esc(t.wrong)}</p>` : ''}
+<form method="GET" action="${esc(req.path)}">${hidden}<label for="code">${esc(t.label)}</label>
+<input type="text" id="code" name="code" autocomplete="off" autofocus required>
+<button type="submit">${esc(t.submit)}</button></form></div></body></html>`;
+}
 
 export function registerReadRoutes(
     router: Router,
@@ -373,9 +416,29 @@ export function registerReadRoutes(
         }
 
         if (app.accessCode && app.accessCode !== code) {
-            res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
-                'This app is protected. Provide the access code via ?code= query parameter or X-Access-Code header.'));
-            return;
+            // The code gates OTHER people, never the app's own owner or an operator: an
+            // authenticated owner request (the catalog's Details/version/fork fetches carry a
+            // Bearer) used to 403 here silently, dead-ending the owner on their own app
+            // (UX-remake v3, P6, measured).
+            let codeExempt = false;
+            if (req.auth) {
+                if (req.auth.roles?.includes('operator')) codeExempt = true;
+                else {
+                    const { owner: viewerOwner } = await canonicalOwner(req);
+                    codeExempt = viewerOwner === app.ownerName;
+                }
+            }
+            if (!codeExempt) {
+                // A browser NAVIGATION gets a human page with a code field instead of raw JSON
+                // (the other half of the same measured dead end). API callers keep the JSON.
+                if ((req.headers.accept ?? '').includes('text/html')) {
+                    res.status(403).type('html').send(accessCodeUnlockPage(req, !!code));
+                    return;
+                }
+                res.status(403).json(error(config.nodeId, 'ACCESS_DENIED',
+                    'This app is protected. Provide the access code via ?code= query parameter or X-Access-Code header.'));
+                return;
+            }
         }
 
         // Paid app check: if marketplace enabled and app has a price, require valid license
