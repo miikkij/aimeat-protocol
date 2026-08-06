@@ -955,7 +955,8 @@
       "organisms": "Organismit",
       "packages": "Paketit",
       "inbox": "Viestit",
-      "appDev": "AppDev"
+      "appDev": "AppDev",
+      "pnl": "Tulos"
     },
     "appdev": {
       "title": "AppDev — tieto & kiihdytys",
@@ -3993,6 +3994,31 @@
         "metricTokens": "Tokenit",
         "metricSeconds": "Sekunnit",
         "footnote": "Hinta on arvio, kun palvelu ei ilmoita sitä (LM Studio, oma palvelin). Palveluntarjoajan oma näkymä on lasku, joka pätee."
+      }
+    },
+    "pnl": {
+      "title": "Tuloskooste (P&L)",
+      "desc": "Tulot ja kulut kirjatuista tositteista kausittain — ei ennusteita, vain kirjausten totuus. AI-kulut näkyvät omana dollaririvinään (LEDGER).",
+      "from": "Alkaen (kk)",
+      "to": "Asti (kk)",
+      "show": "Näytä",
+      "income": "Tulot",
+      "expenses": "Kulut",
+      "total": "Yhteensä",
+      "result": "Tulos ennen veroja",
+      "vatPayable": "ALV-velka kaudelta",
+      "transfers": "Sisäiset siirrot (ei tulosvaikutusta)",
+      "aiCost": "AI-kulut (LEDGER)",
+      "aiCostNote": "AI-kulut mitataan dollareissa eikä niitä sekoiteta euromääräiseen tulokseen.",
+      "count": "kpl",
+      "empty": "Ei kirjauksia kaudella.",
+      "source": {
+        "invoice": "Maksetut laskut",
+        "stripe": "Stripe-maksut",
+        "checkout": "Checkout-myynti",
+        "receipt": "Kuittitositteet",
+        "manual": "Manuaaliset kirjaukset",
+        "morsel": "Morsel-myynti"
       }
     }
   },

@@ -540,6 +540,22 @@ await test('33. the clients list names the granting owner; revoke closes the doo
   assert(!clients2.body.data.clients.includes(A.ghii), 'the verified clients list must drop A after revoke');
 });
 
+await test('34b. the P&L summary sums income, expenses and the result, transfers aside', async () => {
+  const month = new Date().toISOString().slice(0, 7);
+  const r = await json(`/v1/finance/pnl?from=${month}&to=${month}`, { headers: authed(A.token) });
+  assert(r.status === 200, `expected 200, got ${r.status} ${JSON.stringify(r.body)}`);
+  const rep = r.body.data.report;
+  assert(rep.totalIncomeMinor > 0, 'income should be positive (paid invoice + stripe + webhook charges)');
+  assert(rep.totalExpenseMinor > 0, 'expenses should be positive (receipt + refund vouchers)');
+  assert(rep.resultMinor === rep.totalIncomeMinor - rep.totalExpenseMinor, 'result must be income − expenses');
+  assert(rep.transferCount >= 1, 'the payout transfer should be counted');
+  assert(!rep.income.some((l: any) => l.source === 'morsel' && l.amountMinor === undefined), 'line shape sane');
+  assert(typeof rep.aiCostUsd === 'number', 'AI cost line present');
+  // The accountant grant covers the P&L too — and its absence refuses it.
+  const denied = await json(`/v1/finance/pnl?from=${month}&owner=${A.owner}`, { headers: authed(B.token) });
+  assert(denied.status === 403, `cross-owner P&L without a grant must be 403, got ${denied.status}`);
+});
+
 await test('34. only the owner role manages accountants (agent → 403)', async () => {
   const r = await json('/v1/finance/accountants', { method: 'POST', headers: authed(narrowAgentToken), body: JSON.stringify({ accountant: C.owner }) });
   assert(r.status === 403, `agent grant should be 403, got ${r.status}`);

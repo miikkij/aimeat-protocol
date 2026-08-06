@@ -22,6 +22,7 @@ import { FinanceError } from '../services/finance/errors.js';
 import { bookVoucher, reverseVoucher, attachEvidence } from '../services/finance/vouchers.js';
 import { vatCodesValidOn, ensureVatCodesSeeded } from '../services/finance/vat-codes.js';
 import { vatPeriodReport } from '../services/finance/vat-report.js';
+import { pnlReport } from '../services/finance/pnl.js';
 import { vouchersCsv, invoicesCsv, buildZip } from '../services/finance/export.js';
 import { buildFinvoiceXml } from '../services/finance/finvoice.js';
 import {
@@ -263,6 +264,23 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
         return;
       }
       const report = await vatPeriodReport(storage, await resolveFinanceOwner(config, storage, req), from, to);
+      res.json(success(config.nodeId, { report }));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  // ── P&L period summary (tuloslaskelma-kooste) ─────────────────────────────
+
+  router.get('/v1/finance/pnl', requireAuth(), requireScope('finance:read'), async (req, res) => {
+    try {
+      const from = typeof req.query.from === 'string' ? req.query.from : '';
+      const to = typeof req.query.to === 'string' ? req.query.to : from;
+      if (!MONTH_RE.test(from)) {
+        res.status(400).json(error(config.nodeId, 'INVALID_PERIOD', 'from (yyyy-mm) is required'));
+        return;
+      }
+      const report = await pnlReport(storage, await resolveFinanceOwner(config, storage, req), from, to);
       res.json(success(config.nodeId, { report }));
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;

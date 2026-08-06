@@ -43150,3 +43150,19 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/finance/pnl:
+    get:
+      operationId: getFinancePnl
+      tags: [Finance]
+      summary: P&L period summary (tuloskooste)
+      description: Income and expenses from booked vouchers grouped by source over a month range, the result before taxes, the period's VAT payable, internal transfers as an info line, and the owner's LEDGER AI spend as its own USD line (never mixed into the EUR result). Accepts ?owner= under an accountant grant.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, pattern: '^[0-9]{4}-[0-9]{2}$' } }
+        - { name: to, in: query, schema: { type: string, pattern: '^[0-9]{4}-[0-9]{2}$' } }
+        - { name: owner, in: query, schema: { type: string, description: Client owner name (accountant grant required) } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }

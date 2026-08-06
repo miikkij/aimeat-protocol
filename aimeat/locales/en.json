@@ -955,7 +955,8 @@
       "organisms": "Organisms",
       "packages": "Packages",
       "inbox": "Messages",
-      "appDev": "AppDev"
+      "appDev": "AppDev",
+      "pnl": "P&L"
     },
     "appdev": {
       "title": "AppDev — knowledge & acceleration",
@@ -3993,6 +3994,31 @@
         "metricTokens": "Tokens",
         "metricSeconds": "Seconds",
         "footnote": "Cost is estimated when the provider does not report one (LM Studio, custom). Your provider's own dashboard has the authoritative bill."
+      }
+    },
+    "pnl": {
+      "title": "Profit & loss",
+      "desc": "Income and expenses from booked vouchers by period — no forecasts, only the truth of the bookings. AI spend shows as its own USD line (LEDGER).",
+      "from": "From (month)",
+      "to": "To (month)",
+      "show": "Show",
+      "income": "Income",
+      "expenses": "Expenses",
+      "total": "Total",
+      "result": "Result before taxes",
+      "vatPayable": "VAT payable for the period",
+      "transfers": "Internal transfers (no P&L effect)",
+      "aiCost": "AI spend (LEDGER)",
+      "aiCostNote": "AI spend is metered in USD and never mixed into the EUR result.",
+      "count": "pcs",
+      "empty": "No bookings in the period.",
+      "source": {
+        "invoice": "Paid invoices",
+        "stripe": "Stripe payments",
+        "checkout": "Checkout sales",
+        "receipt": "Receipt vouchers",
+        "manual": "Manual bookings",
+        "morsel": "Morsel sales"
       }
     }
   },

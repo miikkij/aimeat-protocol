@@ -3586,3 +3586,22 @@
   padding-top: var(--space-4);
   margin-top: var(--space-4);
 }
+
+/* ── P&L tab (pf-pnl) — company-in-a-box phase 7 ─────────────────────────── */
+.pf-pnl-controls { display: flex; gap: var(--space-3); align-items: flex-end; flex-wrap: wrap; margin-bottom: var(--space-4); }
+.pf-pnl-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-dim); }
+.pf-pnl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4); }
+.pf-pnl-block { margin-bottom: var(--space-4); }
+.pf-pnl-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+.pf-pnl-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
+.pf-pnl-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-pnl-count { color: var(--text-dim); font-size: 0.85rem; white-space: nowrap; }
+.pf-pnl-total td { font-weight: 700; border-bottom: 0; border-top: 2px solid var(--text); }
+.pf-pnl-result { text-align: center; padding: var(--space-5); margin-bottom: var(--space-4); }
+.pf-pnl-result-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+.pf-pnl-result-value { font-size: 2rem; font-weight: 700; margin: 4px 0; }
+.pf-pnl-result.pos .pf-pnl-result-value { color: var(--success, #1e7d45); }
+.pf-pnl-result.neg .pf-pnl-result-value { color: var(--danger, #b3372c); }
+.pf-pnl-vat { color: var(--text-dim); font-size: 0.9rem; }
+.pf-pnl-note, .pf-pnl-empty { color: var(--text-dim); font-size: 0.85rem; margin: var(--space-2) 0 0; }
+.pf-pnl-error { color: var(--danger, #b3372c); }
