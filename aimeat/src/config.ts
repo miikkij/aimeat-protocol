@@ -473,9 +473,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     pushMaxSubscriptionsPerNode: parseInt(process.env.AIMEAT_PUSH_MAX_SUBSCRIPTIONS_PER_NODE ?? '5', 10),
     pushMaxFailures: parseInt(process.env.AIMEAT_PUSH_MAX_FAILURES ?? '3', 10),
     emailRateLimitMin: parseInt(process.env.AIMEAT_EMAIL_RATE_LIMIT_MIN ?? '30', 10),
-    // Outbound door: max sent messages per owner per rolling 24 h. A safe public default —
-    // a legit micro-business rarely exceeds it, a spammer always would.
     outboundDailyLimit: parseInt(process.env.AIMEAT_OUTBOUND_DAILY_LIMIT ?? '200', 10),
+    finvoiceOperator: process.env.AIMEAT_FINVOICE_OPERATOR ?? '',
+    finvoiceOperatorUrl: process.env.AIMEAT_FINVOICE_OPERATOR_URL ?? null,
+    finvoiceOperatorApiKey: process.env.AIMEAT_FINVOICE_OPERATOR_KEY ?? null,
     eudiwEnabled: process.env.AIMEAT_EUDIW_ENABLED === 'true',
     eudiwClientId: process.env.AIMEAT_EUDIW_CLIENT_ID ?? 'aimeat-verifier-001',
     eudiwRedirectUri: process.env.AIMEAT_EUDIW_REDIRECT_URI ?? '',
@@ -594,7 +595,6 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     extensionMaxCodeSizeKb: parseInt(process.env.AIMEAT_EXT_MAX_CODE_SIZE_KB ?? '256', 10),
     extensionMaxInstalled: parseInt(process.env.AIMEAT_EXT_MAX_INSTALLED ?? '20', 10),
     maxExtensionsPerOwner: parseInt(process.env.AIMEAT_MAX_EXTENSIONS_PER_OWNER || '10', 10),
-
 
     // Prompt Calibrator
     calibratorEnabled: process.env.AIMEAT_CALIBRATOR_ENABLED !== 'false',

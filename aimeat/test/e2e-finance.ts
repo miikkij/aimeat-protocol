@@ -426,5 +426,57 @@ await test('26. charge.refunded books an expense voucher', async () => {
   assert(vouchers.body.data.vouchers.some((v: any) => v.externalRef === 'evt_refund_1'), 'refund voucher missing');
 });
 
+console.log('\nPhase 5 — Finvoice operator (mock adapter)');
+
+await test('27. finvoice delivery submits to the operator and the status loop closes', async () => {
+  const draft = await json('/v1/finance/invoices', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify(draftBody({
+      buyer: { name: 'Verkkolaskuostaja Oy', businessId: '7654321-1', einvoiceAddress: '003712345678', einvoiceOperator: '003721291126' },
+    })),
+  });
+  assert(draft.status === 201, `draft failed: ${draft.status}`);
+  const sent = await json(`/v1/finance/invoices/${draft.body.data.invoice.id}/send`, {
+    method: 'POST', headers: authed(A.token), body: JSON.stringify({ delivery_method: 'finvoice' }),
+  });
+  assert(sent.status === 200, `finvoice send failed: ${sent.status} ${JSON.stringify(sent.body)}`);
+  const inv = sent.body.data.invoice;
+  assert(inv.operatorMessageId, 'operatorMessageId missing');
+  assert(inv.deliveryStatus === 'pending', `expected pending, got ${inv.deliveryStatus}`);
+  const refreshed = await json(`/v1/finance/invoices/${inv.id}/refresh-delivery`, { method: 'POST', headers: authed(A.token) });
+  assert(refreshed.status === 200 && refreshed.body.data.invoice.deliveryStatus === 'delivered',
+    `expected delivered after refresh, got ${refreshed.status} ${refreshed.body.data?.invoice?.deliveryStatus}`);
+});
+
+await test('28. the operator rejection flows back as deliveryStatus rejected', async () => {
+  const draft = await json('/v1/finance/invoices', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify(draftBody({
+      buyer: { name: 'Hylkääjä Oy', einvoiceAddress: 'REJECT-003799999999' },
+    })),
+  });
+  const sent = await json(`/v1/finance/invoices/${draft.body.data.invoice.id}/send`, {
+    method: 'POST', headers: authed(A.token), body: JSON.stringify({ delivery_method: 'finvoice' }),
+  });
+  assert(sent.status === 200, `send failed: ${sent.status}`);
+  const refreshed = await json(`/v1/finance/invoices/${sent.body.data.invoice.id}/refresh-delivery`, { method: 'POST', headers: authed(A.token) });
+  assert(refreshed.body.data.invoice.deliveryStatus === 'rejected', `expected rejected, got ${refreshed.body.data.invoice.deliveryStatus}`);
+});
+
+await test('29. finvoice delivery without an e-invoice address is refused (422)', async () => {
+  const draft = await json('/v1/finance/invoices', { method: 'POST', headers: authed(A.token), body: JSON.stringify(draftBody()) });
+  const sent = await json(`/v1/finance/invoices/${draft.body.data.invoice.id}/send`, {
+    method: 'POST', headers: authed(A.token), body: JSON.stringify({ delivery_method: 'finvoice' }),
+  });
+  assert(sent.status === 422 && sent.body.error?.code === 'MISSING_EINVOICE_ADDRESS',
+    `expected 422 MISSING_EINVOICE_ADDRESS, got ${sent.status} ${JSON.stringify(sent.body.error)}`);
+  // The transition stood (number claimed, document exists) — only the delivery leg failed,
+  // and the retry door works once the address is there.
+  const inv = await json(`/v1/finance/invoices/${draft.body.data.invoice.id}`, { headers: authed(A.token) });
+  assert(inv.body.data.invoice.status === 'sent', 'invoice should remain sent (retryable delivery)');
+  const retry = await json(`/v1/finance/invoices/${draft.body.data.invoice.id}/deliver-finvoice`, { method: 'POST', headers: authed(A.token) });
+  assert(retry.status === 422, 'retry without address should still be 422');
+});
+
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
 if (failed > 0) process.exit(1);

@@ -388,6 +388,9 @@ async function startServer(): Promise<ChildProcess> {
         // send once reached the real SMTP server through exactly this hole. An empty string counts
         // as present, so pinning '' here keeps the test server's email service disabled.
         AIMEAT_SMTP_HOST: process.env.AIMEAT_SMTP_HOST ?? '',
+        // Finvoice delivery uses the in-process mock operator in every e2e run so the
+        // submit/refresh loop is provable without an operator account.
+        AIMEAT_FINVOICE_OPERATOR: process.env.AIMEAT_FINVOICE_OPERATOR ?? 'mock',
         // A fixed 32-byte (hex) encryption key so features that encrypt at rest work in
         // e2e (extension secrets, TOTP, and the app copy-protection watermark + decode).
         AIMEAT_ENCRYPTION_KEY: process.env.AIMEAT_ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',

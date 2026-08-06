@@ -474,6 +474,10 @@ export interface AimeatConfig {
   emailRateLimitMin: number;
   /** Outbound door: max sent messages per owner per rolling 24 h (AIMEAT_OUTBOUND_DAILY_LIMIT, default 200). */
   outboundDailyLimit: number;
+  /** E-invoice operator adapter: '' = disabled (safe default), 'mock' = test double, 'rest' = generic gateway. */
+  finvoiceOperator: string;
+  finvoiceOperatorUrl: string | null;
+  finvoiceOperatorApiKey: string | null;
 
   // EUDIW / Identity Verification (Phase 3.3)
   eudiwEnabled: boolean;

@@ -29,6 +29,7 @@ import {
 } from '../services/finance/invoice-service.js';
 import { buildFinvoiceXml } from '../services/finance/finvoice.js';
 import { renderInvoicePdf } from '../services/finance/invoice-pdf.js';
+import { submitInvoice, refreshDeliveryStatus } from '../services/finance/finvoice-operator.js';
 
 const PartySchema = z.object({
   name: z.string().min(2).max(140),
@@ -184,7 +185,13 @@ export function financeRouter(config: AimeatConfig, storage: Storage): Router {
         res.status(400).json(error(config.nodeId, 'INVALID_SEND', parsed.error.message));
         return;
       }
-      const invoice = await send(storage, resolve(req), req.params.id as string, parsed.data.delivery_method, parsed.data.reference_style ?? 'fi');
+      let invoice = await send(storage, resolve(req), req.params.id as string, parsed.data.delivery_method, parsed.data.reference_style ?? 'fi');
+      // Finvoice delivery submits to the operator right away. The state transition above
+      // stands even when the submission fails (the number is claimed, the document exists);
+      // a failed submission is retryable via POST .../deliver-finvoice.
+      if (parsed.data.delivery_method === 'finvoice') {
+        invoice = await submitInvoice(config, storage, invoice);
+      }
       emitChange('finance', resolve(req));
       res.json(success(config.nodeId, { invoice }, [
         { description: 'Download the Finvoice 3.0 XML', method: 'GET', url: `/v1/finance/invoices/${invoice.id}/finvoice.xml` },
@@ -241,6 +248,32 @@ export function financeRouter(config: AimeatConfig, storage: Storage): Router {
       res.setHeader('Content-Type', 'application/xml; charset=utf-8');
       res.setHeader('Content-Disposition', `attachment; filename="finvoice-${inv.invoiceNumber}.xml"`);
       res.send(xml);
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  // (Re)submit a sent invoice to the e-invoice operator — the retry door for a failed submission.
+  router.post('/v1/finance/invoices/:id/deliver-finvoice', requireAuth(), requireScope('finance:write'), async (req, res) => {
+    try {
+      const inv = await requireOwnInvoice(storage, resolve(req), req.params.id as string);
+      const invoice = await submitInvoice(config, storage, inv);
+      emitChange('finance', resolve(req));
+      res.json(success(config.nodeId, { invoice }, [
+        { description: 'Poll the delivery status', method: 'POST', url: `/v1/finance/invoices/${invoice.id}/refresh-delivery` },
+      ]));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  // Poll the operator for the delivery outcome (the status feedback loop).
+  router.post('/v1/finance/invoices/:id/refresh-delivery', requireAuth(), requireScope('finance:read'), async (req, res) => {
+    try {
+      const inv = await requireOwnInvoice(storage, resolve(req), req.params.id as string);
+      const invoice = await refreshDeliveryStatus(config, storage, inv);
+      emitChange('finance', resolve(req));
+      res.json(success(config.nodeId, { invoice }));
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
     }

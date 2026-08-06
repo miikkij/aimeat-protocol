@@ -43066,3 +43066,33 @@ paths:
       responses:
         '200': { description: Confirmation page (text/html) }
         '400': { description: Malformed link }
+
+  /v1/finance/invoices/{id}/deliver-finvoice:
+    post:
+      operationId: deliverFinanceInvoiceFinvoice
+      tags: [Finance]
+      summary: (Re)submit a sent invoice to the e-invoice operator
+      description: 'Submits the Finvoice XML through the configured operator adapter (AIMEAT_FINVOICE_OPERATOR) and stamps operatorMessageId + deliveryStatus pending. Retryable — an earlier failed submission is replaced. 503 FINVOICE_OPERATOR_NOT_CONFIGURED when the node has no operator; 422 MISSING_EINVOICE_ADDRESS without a buyer verkkolaskuosoite.'
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/AimeatError' }
+        '503': { $ref: '#/components/responses/AimeatError' }
+  /v1/finance/invoices/{id}/refresh-delivery:
+    post:
+      operationId: refreshFinanceInvoiceDelivery
+      tags: [Finance]
+      summary: Poll the operator for the delivery outcome
+      description: The status feedback loop — updates deliveryStatus (pending/delivered/rejected) from the operator's answer.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/AimeatError' }
