@@ -800,6 +800,10 @@ function loadPublishedApps() {
         currentOwner = JSON.parse(stored).owner || null;
       }
     }
+    // The token is the authority the rest of this file uses. Without one there is no owner,
+    // whatever a leftover localStorage blob says — reading that stale blob kept "Your apps (1)"
+    // on screen after a logout (UX-remake v3, measured).
+    if (!getCortexOwnerToken()) currentOwner = null;
   } catch(e) {}
 
   // Load the owner's favourites alongside the app list so the ⭐ group + stars match the current

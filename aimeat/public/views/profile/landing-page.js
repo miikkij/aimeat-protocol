@@ -97,7 +97,7 @@ import { h } from "preact";
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import htm from "htm";
 const html = htm.bind(h);
-import { t } from "/js/i18n.js";
+import { t, tOr } from "/js/i18n.js";
 import { listApps } from "/js/services/apps.js";
 import { onLiveUpdate } from "/lib/live-updates.js";
 import { getMemory, createMemory } from "/js/services/memory.js";
@@ -108,7 +108,7 @@ import { swallowed } from '/js/swallowed.js';
 import {
   ProfileCard, WaitingForYou, NextSteps, UsageCard, AiSpendCard, AgentLedgerCard,
   CommerceCard, ContinueCard, AgentsCard, CortexSection, InboxNavButton,
-  SIDEBAR_GROUPS, SIDEBAR_ITEM_BY_ID, INFRA_TAB_IDS, DEFAULT_PINS,
+  SIDEBAR_GROUPS, SIDEBAR_ITEM_BY_ID, INFRA_TAB_IDS, DEFAULT_PINS, BASIC_TAB_IDS,
 } from "./landing-page.cards.js";
 
 /* ───── Tier heuristic ───── */
@@ -172,6 +172,21 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
   const fromPopRef = useRef(false);
   openViewRef.current = openView;
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Sidebar depth (K5): basic set by default, everything behind one remembered toggle. A user who
+  // has already opened a non-basic tab is clearly past the basics — start them expanded.
+  const [showAllTools, setShowAllTools] = useState(() => {
+    try {
+      const saved = localStorage.getItem('aimeat.sidebar.allTools');
+      if (saved === '1') return true;
+      if (saved === '0') return false;
+    // eslint-disable-next-line aimeat/no-silent-catch -- blocked storage just means "no remembered choice"
+    } catch { /* fall through to the heuristic */ }
+    try {
+      const saved = JSON.parse(sessionStorage.getItem('aimeat-profile-tab') || 'null');
+      return !!(saved && saved.tabId && !BASIC_TAB_IDS.has(saved.tabId));
+    // eslint-disable-next-line aimeat/no-silent-catch -- no remembered tab means start basic
+    } catch { return false; }
+  });
   // Extensions promo: onboarding-only (apps < 3) and dismissable for good.
   const [showPromo, setShowPromo] = useState(() => { try { return localStorage.getItem('aimeat.cortexPromoDismissed') !== '1'; } catch { return true; } });
   const dismissPromo = () => { setShowPromo(false); try { localStorage.setItem('aimeat.cortexPromoDismissed', '1'); } catch { /* noop */ } };   // eslint-disable-line aimeat/no-silent-catch -- noop
@@ -369,15 +384,28 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
             `}
             ${SIDEBAR_GROUPS.filter(g => !g.adminOnly || isOperator).map(g => {
               const collapsed = collapsedGroups.has(g.titleKey);
+              // Basic view: only the everyday items. The rest are one toggle away, never gone.
+              const items = showAllTools ? g.items : g.items.filter(it => BASIC_TAB_IDS.has(it.id));
+              if (items.length === 0) return null;
               return html`
                 <div class="pf-side-group" key=${g.titleKey}>
                   <button class="pf-side-group-title pf-side-group-toggle" onClick=${() => toggleGroup(g.titleKey)}>
                     <span class="pf-chevron ${collapsed ? '' : 'pf-chevron-open'}">▼</span> ${t(g.titleKey)}
                   </button>
-                  ${!collapsed && g.items.map(it => renderItem(it, false))}
+                  ${!collapsed && items.map(it => renderItem(it, false))}
                 </div>
               `;
             })}
+            <button class="pf-side-item pf-side-more" onClick=${() => setShowAllTools(v => {
+              const next = !v;
+              // eslint-disable-next-line aimeat/no-silent-catch -- a blocked store only costs the remembered choice
+              try { localStorage.setItem('aimeat.sidebar.allTools', next ? '1' : '0'); } catch { /* not persisted */ }
+              return next;
+            })}>
+              <span class="pf-side-label">${showAllTools
+                ? tOr('profile.landing.showBasicTools', 'Show fewer tools')
+                : tOr('profile.landing.showAllTools', 'Show all tools')}</span>
+            </button>
           `;
         })()}
       </aside>

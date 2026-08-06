@@ -499,14 +499,17 @@ export function buildAppPrompt(
     body += '## When the app is ready — tell me how to publish it\n';
     body += 'After you hand me the finished single HTML file, END your reply by telling me (in my language) to do exactly this:\n';
     body += '1. Open ' + nodeUrl + '/app-catalog.html\n';
-    body += '2. Click "+ Add" → open the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
-    body += '3. Click Publish.\n';
+    body += '2. Click "+" → "Add app" → the "Paste" tab → paste the HTML (or drop it as a file). The app name + description fill in automatically.\n';
+    body += '3. Click Save. A second dialog opens: fill in the description and click Publish. (Two dialogs, not one — Save takes the file, Publish puts it on the node.)\n';
     body += 'I will be asked to sign in first — it is fast: one click with Google, or a quick email + password, and a brand-new account is created right there in seconds.\n';
-    body += 'What I get: once published, the app is LIVE on my own AIMEAT node and PUBLIC — anyone can find it in the community catalogue and use it, and I get a link to share. From my catalogue I can launch it, publish updates (older versions are always kept), park it (hide it from the public), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n\n';
+    body += 'What I get: the app goes live on my own AIMEAT node at its own address, and I get a link to share. It starts UNLISTED (only I can find it) — from my catalogue I can list it publicly in the community catalogue, launch it, publish updates (older versions are always kept), or delete it. It keeps working with my AIMEAT login, saved data, files, AI and realtime features.\n\n';
   }
 
   // ── full: language line + header (new mode) + body ──
-  let full = 'Language: talk to me and write ALL user-facing text (UI labels, buttons, messages) in ' + pbLang + '. These build instructions are in English, but converse with me and build the app interface in ' + pbLang + '.\n\n';
+  // The language line follows the UI language, but the USER's own words win: someone who writes
+  // "in Finnish please" into their idea and then gets an English app has been overruled by a
+  // default they never saw (UX-remake v3, measured in the Fatalii run). Additive sentence only.
+  let full = 'Language: talk to me and write ALL user-facing text (UI labels, buttons, messages) in ' + pbLang + '. These build instructions are in English, but converse with me and build the app interface in ' + pbLang + '. If I ask for another language anywhere in my idea or in the conversation, that wins over this line.\n\n';
   if (!isImprove) {
     full += 'Help me build a single-file HTML app that runs on AIMEAT.\n';
     full += 'My initial idea: ' + idea + '\n\n';

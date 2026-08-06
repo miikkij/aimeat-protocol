@@ -29,7 +29,7 @@ export function loadPromoted() {
   var token = getCortexOwnerToken();
   var b = base();
   if (!token || !b) { promoted = {}; return Promise.resolve(); }
-  return fetch(b + '/v1/memory/' + encodeURIComponent(KEY), { headers: { 'Authorization': 'Bearer ' + token } })
+  return fetch(b + '/v1/memory/' + encodeURIComponent(KEY) + '?soft=1', { headers: { 'Authorization': 'Bearer ' + token } })
     .then(function (r) { return r.ok ? r.json() : null; })
     .then(function (j) {
       var items = (j && j.data && j.data.value && Array.isArray(j.data.value.items)) ? j.data.value.items : [];

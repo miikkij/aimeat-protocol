@@ -2374,6 +2374,8 @@
 }
 .pf-side-item:hover { background: var(--bg-hover, var(--bg-dim)); }
 .pf-side-item--active { background: var(--accent-faint, var(--bg-dim)); color: var(--accent); font-weight: 700; }
+/* The one toggle between the basic menu and every tool (K5). Reads as an action, not a tab. */
+.pf-side-more { margin-top: 0.5rem; color: var(--accent); font-weight: 600; }
 .pf-side-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pf-side-badge { margin-left: auto; font-size: 0.68rem; background: var(--bg-dim); color: var(--text-dim); padding: 0.05rem 0.45rem; border-radius: var(--radius-full, 999px); }
 

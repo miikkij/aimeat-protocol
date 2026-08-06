@@ -383,7 +383,11 @@ export const GhiiRegistrationSchema = z.object({
     bio: z.string().max(10_000).optional(),
     avatar: z.string().max(128).optional(),
     locale: z.string().max(10).optional(),
-    password: z.string().max(256).optional(),
+    // 8 is the floor for a NEW password (was: any length, with the sign-in modal advertising
+    // "min 4 chars" — a 4-character password on an account that owns data and can spend is not a
+    // defensible default). Existing accounts are unaffected: this gates registration only, and
+    // login still accepts whatever an account already has.
+    password: z.string().min(8).max(256).optional(),
     // Optional at the schema level; REQUIRED at runtime when the node runs with the email gate on
     // (AIMEAT_EMAIL_CONFIRMATION_REQUIRED). When present it is recorded + a verification code is sent.
     email: z.string().email().max(256).optional(),

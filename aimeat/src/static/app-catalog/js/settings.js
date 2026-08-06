@@ -132,7 +132,7 @@ function loadConfigFromServer() {
       if (!token) return;
       var gaii = auth.data.gaii || auth.data.sub || '';
       if (!gaii) return;
-      return fetch(url + '/v1/memory/app-launcher%2Fconfig', {
+      return fetch(url + '/v1/memory/app-launcher%2Fconfig?soft=1', {
         headers: { 'Authorization': 'Bearer ' + token }
       }).then(function (r) {
         if (!r.ok) return null;

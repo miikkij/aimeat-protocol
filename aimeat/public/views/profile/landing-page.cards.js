@@ -669,7 +669,24 @@ export const SIDEBAR_GROUPS = [
   ] },
 ];
 
+/**
+ * The BASIC menu: what a person needs before they have built anything on the node. 38 items in
+ * one flat list was a measured wall for a non-technical newcomer (UX-remake v3, K5), and the
+ * chat-first model says the profile's deeper surfaces are for technical users. Everything else
+ * is one "Show all tools" toggle away, and the toggle state is remembered — nothing is removed.
+ * Operator-only groups are never in the basic set (they are role-gated anyway).
+ */
+export const BASIC_TAB_IDS = new Set([
+  'organisms', 'memory', 'notebook',            // where the work and knowledge live
+  'agents', 'mcp',                              // the chat/agent connection
+  'notifications', 'contacts',                  // what happened, who with
+  'apps', 'portfolio',                          // what you made
+  'wallet', 'access',                           // account
+]);
+
 // Flat item lookup (pinned section renders items by id).
 export const SIDEBAR_ITEM_BY_ID = Object.fromEntries(SIDEBAR_GROUPS.flatMap(g => g.items.map(it => [it.id, it])));
 export const INFRA_TAB_IDS = new Set(['federation', 'nodes', 'nodeStats', 'security']);
-export const DEFAULT_PINS = ['organisms', 'agents', 'memory', 'scheduler'];
+// Defaults stay inside BASIC_TAB_IDS: a default pin to a tool the basic menu hides (scheduler,
+// until 2026-08-07) contradicted the two-level menu the moment it shipped.
+export const DEFAULT_PINS = ['organisms', 'agents', 'memory', 'mcp'];

@@ -5114,7 +5114,7 @@
       promoted = {};
       return Promise.resolve();
     }
-    return fetch(b + "/v1/memory/" + encodeURIComponent(KEY), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+    return fetch(b + "/v1/memory/" + encodeURIComponent(KEY) + "?soft=1", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
       return r.ok ? r.json() : null;
     }).then(function(j) {
       var items = j && j.data && j.data.value && Array.isArray(j.data.value.items) ? j.data.value.items : [];
@@ -8241,7 +8241,7 @@
       if (!token) return;
       var gaii = auth.data.gaii || auth.data.sub || "";
       if (!gaii) return;
-      return fetch(url + "/v1/memory/app-launcher%2Fconfig", {
+      return fetch(url + "/v1/memory/app-launcher%2Fconfig?soft=1", {
         headers: { "Authorization": "Bearer " + token }
       }).then(function(r) {
         if (!r.ok) return null;
@@ -8542,7 +8542,7 @@
       favSet = /* @__PURE__ */ new Set();
       return Promise.resolve();
     }
-    return fetch(b + "/v1/memory/" + encodeURIComponent(KEY2), { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
+    return fetch(b + "/v1/memory/" + encodeURIComponent(KEY2) + "?soft=1", { headers: { "Authorization": "Bearer " + token } }).then(function(r) {
       return r.ok ? r.json() : null;
     }).then(function(j) {
       var refs = j && j.data && j.data.value && Array.isArray(j.data.value.refs) ? j.data.value.refs : [];
@@ -9251,6 +9251,7 @@
           currentOwner = JSON.parse(stored).owner || null;
         }
       }
+      if (!getCortexOwnerToken()) currentOwner = null;
     } catch (e) {
     }
     Promise.all([getAllApps(), loadFavorites(), loadPromoted()]).then(function() {

@@ -114,7 +114,7 @@ export function showLoginModal(opts, renderBtn) {
       + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.usernameLabel || 'Username') + '</label>'
       + '<input id="aimeat-username" class="aimeat-inp" placeholder="' + escHtml(i.usernamePlaceholder || 'Username') + '"></div>'
       + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.passwordLabel || 'Password') + '</label>'
-      + '<input id="aimeat-password" type="password" class="aimeat-inp" placeholder="' + escHtml(i.passwordPlaceholder || 'Password (min 4 chars)') + '"></div>'
+      + '<input id="aimeat-password" type="password" class="aimeat-inp" placeholder="' + escHtml(i.passwordPlaceholder || 'Password (min 8 chars)') + '"></div>'
       + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i.displayNameLabel || 'Display Name') + ' <span style="font-weight:400;text-transform:none;letter-spacing:0">(' + escHtml(i.displayNameHint || 'optional, for new accounts') + ')</span></label>'
       + '<input id="aimeat-displayname" class="aimeat-inp" placeholder="' + escHtml(i.displayNamePlaceholder || 'Display Name') + '"></div>'
       + '<div style="display:flex;gap:10px;margin-top:20px">'
@@ -316,6 +316,10 @@ export function showLoginModal(opts, renderBtn) {
               display_name: pendingEmailLogin.displayName,
               password: pendingEmailLogin.password,
               email: email,
+              // The account's locale, so the verification code arrives in the language the
+              // person is reading right now. Without it every account was created locale-less
+              // and every system email fell back to English (UX-remake v3, measured).
+              locale: currentModalLang(),
             }),
           });
         } else {
@@ -467,8 +471,10 @@ export function showLoginModal(opts, renderBtn) {
         return;
       }
 
-      if (!password || password.length < 4) {
-        errEl.textContent = i.errPassShort || 'Password must be at least 4 characters';
+      // 8 is the server's registration floor (models/schemas.ts). Keep the two in step: a
+      // client that accepts 4 just moves the rejection to a server error the user cannot read.
+      if (!password || password.length < 8) {
+        errEl.textContent = i.errPassShort || 'Password must be at least 8 characters';
         errEl.style.display = 'block';
         return;
       }
