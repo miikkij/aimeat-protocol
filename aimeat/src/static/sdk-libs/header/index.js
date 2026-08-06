@@ -124,24 +124,36 @@ function main() {
     return obj;
   }
 
+  /**
+   * Where the node's own pages live. On an app origin (`<app>.apps.<apex>`) a relative "/v1/profile"
+   * resolves to the APP's subdomain, which is not where the portal, the profile or the help pages
+   * are served — and the session cookie is host-only on the apex, so such a link lands the user on
+   * a logged-out copy of a page that does not belong to the app. Every node link is therefore
+   * absolute to the apex, while an apex page keeps its plain relative links.
+   */
+  function nodeHref(path) {
+    var m = /^(https?:\/\/)[^.]+\.apps\.(.+)$/.exec(location.origin);
+    return m ? m[1] + m[2] + path : path;
+  }
+
   function buildMarkup(t) {
     function label(k) { return t[k] || NAV_FALLBACK[k] || k; }
     var nav = document.createElement('nav');
     nav.className = 'topnav';
     nav.innerHTML =
       '<div style="display:flex;align-items:center;gap:20px">' +
-        '<a href="/v1/portal" class="topnav-brand">AIME<span class="heart">♥</span><span class="brand-at">AT</span></a>' +
+        '<a href="' + nodeHref('/v1/portal') + '" class="topnav-brand">AIME<span class="heart">♥</span><span class="brand-at">AT</span></a>' +
         '<span class="brand-morsels" data-morsels style="display:none"></span>' +
       '</div>' +
       '<div class="topnav-right">' +
         '<button class="topnav-burger" aria-label="Menu" data-burger>☰</button>' +
         '<div class="topnav-menu" data-menu>' +
-          '<a href="/v1/classic">' + label('nav.try') + '</a>' +
-          '<a href="/v1/portal?view=dev">' + label('nav.devView') + '</a>' +
-          '<a href="/v1/help">' + label('nav.help') + '</a>' +
-          '<a href="/app-catalog.html" target="_blank" data-auth-only style="display:none">' + label('nav.apps') + '</a>' +
-          '<a href="/v1/profile" class="profile-link visible" data-auth-only style="display:none">' + label('nav.profile') + '</a>' +
-          '<a href="/v1/admin" data-operator-only style="display:none">' + label('nav.admin') + '</a>' +
+          '<a href="' + nodeHref('/v1/classic') + '">' + label('nav.try') + '</a>' +
+          '<a href="' + nodeHref('/v1/portal?view=dev') + '">' + label('nav.devView') + '</a>' +
+          '<a href="' + nodeHref('/v1/help') + '">' + label('nav.help') + '</a>' +
+          '<a href="' + nodeHref('/app-catalog.html') + '" target="_blank" data-auth-only style="display:none">' + label('nav.apps') + '</a>' +
+          '<a href="' + nodeHref('/v1/profile') + '" class="profile-link visible" data-auth-only style="display:none">' + label('nav.profile') + '</a>' +
+          '<a href="' + nodeHref('/v1/admin') + '" data-operator-only style="display:none">' + label('nav.admin') + '</a>' +
           '<div class="topnav-center">' +
             // Theme toggle now lives inside the login pill (mountLoginButton) — see init().
             '<button class="lang-btn" data-lang="en">EN</button>' +
