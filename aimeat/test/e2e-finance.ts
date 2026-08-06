@@ -478,5 +478,72 @@ await test('29. finvoice delivery without an e-invoice address is refused (422)'
   assert(retry.status === 422, 'retry without address should still be 422');
 });
 
+console.log('\nPhase 6 — accountant role (read-only cross-owner grant)');
+
+const C = await makeOwner('fintili');
+
+await test('30. without a grant every cross-owner read is 403', async () => {
+  const r = await json(`/v1/finance/invoices?owner=${A.owner}`, { headers: authed(C.token) });
+  assert(r.status === 403 && r.body.error?.code === 'ACCOUNTANT_ACCESS_DENIED', `expected 403 ACCOUNTANT_ACCESS_DENIED, got ${r.status} ${JSON.stringify(r.body.error)}`);
+  const v = await json(`/v1/finance/vouchers?owner=${A.owner}`, { headers: authed(C.token) });
+  assert(v.status === 403, `vouchers should be 403, got ${v.status}`);
+  const month = new Date().toISOString().slice(0, 7);
+  const rep = await json(`/v1/finance/vat-report?from=${month}&owner=${A.owner}`, { headers: authed(C.token) });
+  assert(rep.status === 403, `vat-report should be 403, got ${rep.status}`);
+});
+
+await test('31. the grant opens READ access to exactly the granting owner', async () => {
+  const grant = await json('/v1/finance/accountants', { method: 'POST', headers: authed(A.token), body: JSON.stringify({ accountant: C.owner }) });
+  assert(grant.status === 201, `grant failed: ${grant.status} ${JSON.stringify(grant.body)}`);
+  const invoices = await json(`/v1/finance/invoices?owner=${A.owner}`, { headers: authed(C.token) });
+  assert(invoices.status === 200 && invoices.body.data.total > 0, `accountant should see A's invoices, got ${invoices.status}`);
+  const vouchers = await json(`/v1/finance/vouchers?owner=${A.owner}`, { headers: authed(C.token) });
+  assert(vouchers.status === 200 && vouchers.body.data.total > 0, "accountant should see A's vouchers");
+  const csv = await fetch(`${BASE}/v1/finance/export/vouchers.csv?owner=${A.owner}`, { headers: authed(C.token) });
+  assert(csv.status === 200, `CSV export should open, got ${csv.status}`);
+  // ...but not some third owner's books:
+  const other = await json(`/v1/finance/invoices?owner=${B.owner}`, { headers: authed(C.token) });
+  assert(other.status === 403, `B's books must stay closed, got ${other.status}`);
+});
+
+await test('32. the grant never opens WRITE (mutations ignore ?owner)', async () => {
+  // A voucher booked by the accountant lands in the ACCOUNTANT'S own bucket, never the client's.
+  const before = await json(`/v1/finance/vouchers?owner=${A.owner}`, { headers: authed(C.token) });
+  const write = await json('/v1/finance/vouchers?owner=' + A.owner, {
+    method: 'POST', headers: authed(C.token),
+    body: JSON.stringify({ date: new Date().toISOString().slice(0, 10), description: 'accountant write attempt', direction: 'expense', source: 'manual', amount_minor: 100 }),
+  });
+  assert(write.status === 201, 'the write itself succeeds — into C:s own books');
+  const after = await json(`/v1/finance/vouchers?owner=${A.owner}`, { headers: authed(C.token) });
+  assert(after.body.data.total === before.body.data.total, "A's voucher count must not change");
+  const own = await json('/v1/finance/vouchers', { headers: authed(C.token) });
+  assert(own.body.data.vouchers.some((v: any) => v.description === 'accountant write attempt'), "the voucher went to C's own bucket");
+  // Direct mutation of A's invoice by id answers 404 (C's bucket has no such invoice).
+  const pay = await json(`/v1/finance/invoices/${invoiceId}/mark-paid`, { method: 'POST', headers: authed(C.token), body: JSON.stringify({}) });
+  assert(pay.status === 404, `mark-paid must be 404, got ${pay.status}`);
+  // Fiscal-year locking is the client owner's own act, not the accountant's.
+  const years = await json(`/v1/finance/fiscal-years?owner=${A.owner}`, { headers: authed(C.token) });
+  const lock = await json(`/v1/finance/fiscal-years/${years.body.data.fiscal_years[0].id}/lock`, {
+    method: 'POST', headers: authed(C.token), body: JSON.stringify({ locked: true }),
+  });
+  assert(lock.status === 404, `cross-owner lock must be 404, got ${lock.status}`);
+});
+
+await test('33. the clients list names the granting owner; revoke closes the door', async () => {
+  const clients = await json('/v1/finance/clients', { headers: authed(C.token) });
+  assert(clients.status === 200 && clients.body.data.clients.includes(A.ghii), `clients should include A, got ${JSON.stringify(clients.body.data)}`);
+  const revoke = await json(`/v1/finance/accountants/${C.owner}`, { method: 'DELETE', headers: authed(A.token) });
+  assert(revoke.status === 200, `revoke failed: ${revoke.status}`);
+  const r = await json(`/v1/finance/invoices?owner=${A.owner}`, { headers: authed(C.token) });
+  assert(r.status === 403, `after revoke reads must be 403 again, got ${r.status}`);
+  const clients2 = await json('/v1/finance/clients', { headers: authed(C.token) });
+  assert(!clients2.body.data.clients.includes(A.ghii), 'the verified clients list must drop A after revoke');
+});
+
+await test('34. only the owner role manages accountants (agent → 403)', async () => {
+  const r = await json('/v1/finance/accountants', { method: 'POST', headers: authed(narrowAgentToken), body: JSON.stringify({ accountant: C.owner }) });
+  assert(r.status === 403, `agent grant should be 403, got ${r.status}`);
+});
+
 console.log(`\n${passed} passed, ${failed} failed out of ${passed + failed}`);
 if (failed > 0) process.exit(1);

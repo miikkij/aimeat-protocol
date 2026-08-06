@@ -43096,3 +43096,57 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '409': { $ref: '#/components/responses/Conflict' }
         '503': { $ref: '#/components/responses/AimeatError' }
+
+  /v1/finance/accountants:
+    get:
+      operationId: listFinanceAccountants
+      tags: [Finance]
+      summary: List the owners granted the accountant role on your books
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: grantFinanceAccountant
+      tags: [Finance]
+      summary: Grant the accountant role (read-only books access) to a local owner
+      description: 'The accountant may then pass ?owner={yourname} on finance READ endpoints (invoices, vouchers, VAT reports, exports, fiscal-year listing) — mutations never accept the parameter. The authoritative grant lives under the granting owner; the accountant''s client list is a re-verified mirror. Owner sessions only (an agent needs finance:write — agent tokens inherit the owner role on this node, so the scope is the fence).'
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [accountant]
+              properties:
+                accountant: { type: string, description: Local owner name }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/finance/accountants/{name}:
+    delete:
+      operationId: revokeFinanceAccountant
+      tags: [Finance]
+      summary: Revoke the accountant role
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: name, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/finance/clients:
+    get:
+      operationId: listFinanceClients
+      tags: [Finance]
+      summary: The accountant's verified client list
+      description: Owners who have granted the caller the accountant role — the mirror re-verified against each client's authoritative list, so a revoked grant never appears. The backbone of the multi-client accountant view.
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }

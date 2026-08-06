@@ -24,6 +24,9 @@ import { vatCodesValidOn, ensureVatCodesSeeded } from '../services/finance/vat-c
 import { vatPeriodReport } from '../services/finance/vat-report.js';
 import { vouchersCsv, invoicesCsv, buildZip } from '../services/finance/export.js';
 import { buildFinvoiceXml } from '../services/finance/finvoice.js';
+import {
+  resolveFinanceOwner, grantAccountant, revokeAccountant, listAccountants, listClients,
+} from '../services/finance/accountant-access.js';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MONTH_RE = /^\d{4}-\d{2}$/;
@@ -95,7 +98,7 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
 
   router.get('/v1/finance/vouchers', requireAuth(), requireScope('finance:read'), async (req, res) => {
     try {
-      const owner = resolve(req);
+      const owner = await resolveFinanceOwner(config, storage, req);
       const page = Math.max(1, parseInt((req.query.page as string) ?? '1', 10) || 1);
       const perPage = Math.min(200, Math.max(1, parseInt((req.query.per_page as string) ?? '50', 10) || 50));
       const q = {
@@ -118,12 +121,17 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
   });
 
   router.get('/v1/finance/vouchers/:id', requireAuth(), requireScope('finance:read'), async (req, res) => {
-    const voucher = await storage.getVoucher(req.params.id as string);
-    if (!voucher || voucher.ownerGhii !== resolve(req)) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Voucher not found'));
-      return;
+    try {
+      const owner = await resolveFinanceOwner(config, storage, req);
+      const voucher = await storage.getVoucher(req.params.id as string);
+      if (!voucher || voucher.ownerGhii !== owner) {
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Voucher not found'));
+        return;
+      }
+      res.json(success(config.nodeId, { voucher }));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
     }
-    res.json(success(config.nodeId, { voucher }));
   });
 
   // Correction: books the opposite-direction counter-voucher; the original is never touched.
@@ -181,8 +189,12 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
   // ── Fiscal years ──────────────────────────────────────────────────────────
 
   router.get('/v1/finance/fiscal-years', requireAuth(), requireScope('finance:read'), async (req, res) => {
-    const years = await storage.listFiscalYears(resolve(req));
-    res.json(success(config.nodeId, { fiscal_years: years }));
+    try {
+      const years = await storage.listFiscalYears(await resolveFinanceOwner(config, storage, req));
+      res.json(success(config.nodeId, { fiscal_years: years }));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
   });
 
   router.post('/v1/finance/fiscal-years', requireAuth(), requireScope('finance:write'), async (req, res) => {
@@ -218,8 +230,9 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
     }
   });
 
-  // Lock/unlock the period. Owner-only: this is the accountant's close, done by the human.
-  router.post('/v1/finance/fiscal-years/:id/lock', requireAuth(), requireRole('owner'), async (req, res) => {
+  // Lock/unlock the period — the human's close. Same gate note as the accountant block:
+  // the scope is what fences an agent whose token inherited the owner role.
+  router.post('/v1/finance/fiscal-years/:id/lock', requireAuth(), requireRole('owner'), requireScope('finance:write'), async (req, res) => {
     try {
       const locked = req.body?.locked;
       if (typeof locked !== 'boolean') {
@@ -249,7 +262,7 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
         res.status(400).json(error(config.nodeId, 'INVALID_PERIOD', 'from (yyyy-mm) is required'));
         return;
       }
-      const report = await vatPeriodReport(storage, resolve(req), from, to);
+      const report = await vatPeriodReport(storage, await resolveFinanceOwner(config, storage, req), from, to);
       res.json(success(config.nodeId, { report }));
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
@@ -259,30 +272,38 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
   // ── Exports ───────────────────────────────────────────────────────────────
 
   router.get('/v1/finance/export/vouchers.csv', requireAuth(), requireScope('finance:read'), async (req, res) => {
-    const owner = resolve(req);
-    const from = typeof req.query.from === 'string' ? req.query.from : undefined;
-    const to = typeof req.query.to === 'string' ? req.query.to : undefined;
-    const vouchers = await storage.listVouchers({ ownerGhii: owner, from, to, limit: 10000 });
-    vouchers.sort((a, b) => a.voucherNumber - b.voucherNumber);
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="tositteet.csv"');
-    res.send(vouchersCsv(vouchers));
+    try {
+      const owner = await resolveFinanceOwner(config, storage, req);
+      const from = typeof req.query.from === 'string' ? req.query.from : undefined;
+      const to = typeof req.query.to === 'string' ? req.query.to : undefined;
+      const vouchers = await storage.listVouchers({ ownerGhii: owner, from, to, limit: 10000 });
+      vouchers.sort((a, b) => a.voucherNumber - b.voucherNumber);
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="tositteet.csv"');
+      res.send(vouchersCsv(vouchers));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
   });
 
   router.get('/v1/finance/export/invoices.csv', requireAuth(), requireScope('finance:read'), async (req, res) => {
-    const owner = resolve(req);
-    const from = typeof req.query.from === 'string' ? req.query.from : undefined;
-    const to = typeof req.query.to === 'string' ? req.query.to : undefined;
-    const invoices = await storage.listInvoices({ ownerGhii: owner, from, to, limit: 10000 });
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', 'attachment; filename="laskut.csv"');
-    res.send(invoicesCsv(invoices));
+    try {
+      const owner = await resolveFinanceOwner(config, storage, req);
+      const from = typeof req.query.from === 'string' ? req.query.from : undefined;
+      const to = typeof req.query.to === 'string' ? req.query.to : undefined;
+      const invoices = await storage.listInvoices({ ownerGhii: owner, from, to, limit: 10000 });
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', 'attachment; filename="laskut.csv"');
+      res.send(invoicesCsv(invoices));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
   });
 
   // Every sent/paid/credited invoice in the range as Finvoice XML, bundled in one ZIP.
   router.get('/v1/finance/export/finvoice.zip', requireAuth(), requireScope('finance:read'), async (req, res) => {
     try {
-      const owner = resolve(req);
+      const owner = await resolveFinanceOwner(config, storage, req);
       const from = typeof req.query.from === 'string' ? req.query.from : undefined;
       const to = typeof req.query.to === 'string' ? req.query.to : undefined;
       const invoices = await storage.listInvoices({
@@ -306,6 +327,41 @@ export function financeLedgerRouter(config: AimeatConfig, storage: Storage): Rou
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
     }
+  });
+
+  // ── Accountant role (read-only grant to another local owner) ──────────────
+  // Gate note: agent tokens inherit the owner role on this node (intra-owner scope
+  // collapse, routes/auth.ts), so requireRole('owner') alone does not fence agents —
+  // the scope is the fence: an owner session bypasses it, an agent needs finance:write.
+
+  router.get('/v1/finance/accountants', requireAuth(), requireRole('owner'), requireScope('finance:read'), async (req, res) => {
+    res.json(success(config.nodeId, { accountants: await listAccountants(storage, resolve(req)) }));
+  });
+
+  router.post('/v1/finance/accountants', requireAuth(), requireRole('owner'), requireScope('finance:write'), async (req, res) => {
+    try {
+      const name = typeof req.body?.accountant === 'string' ? req.body.accountant.trim() : '';
+      const accountants = await grantAccountant(config, storage, resolve(req), name);
+      emitChange('finance', resolve(req));
+      res.status(201).json(success(config.nodeId, { accountants }));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  router.delete('/v1/finance/accountants/:name', requireAuth(), requireRole('owner'), requireScope('finance:write'), async (req, res) => {
+    try {
+      const accountants = await revokeAccountant(config, storage, resolve(req), req.params.name as string);
+      emitChange('finance', resolve(req));
+      res.json(success(config.nodeId, { accountants }));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  // The accountant's verified client list (the multi-client view's backbone).
+  router.get('/v1/finance/clients', requireAuth(), requireScope('finance:read'), async (req, res) => {
+    res.json(success(config.nodeId, { clients: await listClients(storage, resolve(req)) }));
   });
 
   return router;

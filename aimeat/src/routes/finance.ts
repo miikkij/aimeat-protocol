@@ -30,6 +30,7 @@ import {
 import { buildFinvoiceXml } from '../services/finance/finvoice.js';
 import { renderInvoicePdf } from '../services/finance/invoice-pdf.js';
 import { submitInvoice, refreshDeliveryStatus } from '../services/finance/finvoice-operator.js';
+import { resolveFinanceOwner } from '../services/finance/accountant-access.js';
 
 const PartySchema = z.object({
   name: z.string().min(2).max(140),
@@ -116,7 +117,7 @@ export function financeRouter(config: AimeatConfig, storage: Storage): Router {
   // List invoices (lazy overdue applied per returned row).
   router.get('/v1/finance/invoices', requireAuth(), requireScope('finance:read'), async (req, res) => {
     try {
-      const owner = resolve(req);
+      const owner = await resolveFinanceOwner(config, storage, req);
       const page = Math.max(1, parseInt((req.query.page as string) ?? '1', 10) || 1);
       const perPage = Math.min(200, Math.max(1, parseInt((req.query.per_page as string) ?? '50', 10) || 50));
       const status = typeof req.query.status === 'string' && (STATUSES as readonly string[]).includes(req.query.status)
@@ -139,7 +140,7 @@ export function financeRouter(config: AimeatConfig, storage: Storage): Router {
 
   router.get('/v1/finance/invoices/:id', requireAuth(), requireScope('finance:read'), async (req, res) => {
     try {
-      const inv = await requireOwnInvoice(storage, resolve(req), req.params.id as string);
+      const inv = await requireOwnInvoice(storage, await resolveFinanceOwner(config, storage, req), req.params.id as string);
       res.json(success(config.nodeId, { invoice: await applyOverdue(storage, inv) }));
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
@@ -238,7 +239,7 @@ export function financeRouter(config: AimeatConfig, storage: Storage): Router {
   // Finvoice 3.0 XML, generated deterministically from the immutable sent invoice.
   router.get('/v1/finance/invoices/:id/finvoice.xml', requireAuth(), requireScope('finance:read'), async (req, res) => {
     try {
-      const inv = await requireOwnInvoice(storage, resolve(req), req.params.id as string);
+      const inv = await requireOwnInvoice(storage, await resolveFinanceOwner(config, storage, req), req.params.id as string);
       let originalNumber: string | null = null;
       if (inv.type === 'credit_note' && inv.creditsInvoiceId) {
         const original = await storage.getInvoice(inv.creditsInvoiceId);
@@ -282,7 +283,7 @@ export function financeRouter(config: AimeatConfig, storage: Storage): Router {
   // Human-readable A4 PDF, rendered deterministically from the immutable sent invoice.
   router.get('/v1/finance/invoices/:id/pdf', requireAuth(), requireScope('finance:read'), async (req, res) => {
     try {
-      const inv = await requireOwnInvoice(storage, resolve(req), req.params.id as string);
+      const inv = await requireOwnInvoice(storage, await resolveFinanceOwner(config, storage, req), req.params.id as string);
       const pdf = await renderInvoicePdf(inv);
       res.setHeader('Content-Type', 'application/pdf');
       res.setHeader('Content-Disposition', `attachment; filename="lasku-${inv.invoiceNumber}.pdf"`);
