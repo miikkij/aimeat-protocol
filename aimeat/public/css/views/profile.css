@@ -4,6 +4,8 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.19.0 — 2026-08-06 — .wallet-rail-help*: expandable per-rail setup help (details/summary +
+ *     numbered steps + external links) under the Card and Stablecoin payout rails in the wallet tab.
  *   v2.18.0 — 2026-07-28 — .ag-spend*: the spending limit on a connected app's card.
  *   v2.17.0 — 2026-07-25 — .ag-scope-toggle: the Connected Apps scope count is now the disclosure
  *     button for its badge list (button reset so it still renders as a plain .badge).
@@ -229,6 +231,11 @@
 .pf .wallet-psp{display:flex;flex-direction:column;gap:.5rem;margin-bottom:1.5rem}
 .pf .wallet-psp-row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
 .pf .wallet-psp-input{flex:1;min-width:240px}
+.pf .wallet-rail-help{font-size:.8rem}
+.pf .wallet-rail-help summary{cursor:pointer;color:var(--text-dim);font-weight:600;user-select:none}
+.pf .wallet-rail-help[open] summary{margin-bottom:.4rem}
+.pf .wallet-rail-help-steps{margin:0;padding-left:1.25rem;color:var(--text-dim);display:flex;flex-direction:column;gap:.3rem}
+.pf .wallet-rail-help-steps a{color:var(--accent,#E8564A)}
 /* Payout rails: the chips that say WHICH rail a sale settles on (fiat via provider vs USDC on-chain). */
 .pf .wallet-rail-row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center}
 .pf .wallet-rail-row code{font-size:.8em;word-break:break-all}

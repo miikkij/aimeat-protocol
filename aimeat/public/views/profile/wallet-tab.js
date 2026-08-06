@@ -3,6 +3,10 @@
  * @description Profile tab for morsel wallet: balance overview, lifetime stats,
  *   morsel request form, and transaction history with expandable details.
  * @version-history
+ *   v1.7.0 — 2026-08-06 — Expandable "how do I get this" help under the Card and Stablecoin rails:
+ *     step-by-step setup instructions with links (Stripe registration + API keys page; Base-compatible
+ *     wallet install), so a seller who has neither credential can get one without leaving the page.
+ *     The x402 help adds a testnet step only when the node settles on a test network.
  *   v1.6.0 — 2026-07-28 — One "Selling & payments" section replaces the separate PSP and x402 blocks:
  *     card, stablecoin and invoice rails render from a single GET /v1/commerce/payout, and the Stripe
  *     key is written through /v1/commerce/payout/stripe. The old block called the removed edition's
@@ -51,6 +55,42 @@ function txTypeLabel(tx) {
   if (type === 'spent') return t('profile.wallet.spent');
   // Fallback based on amount sign
   return tx.amount > 0 ? t('profile.wallet.earned') : t('profile.wallet.shared');
+}
+
+/* Expandable per-rail setup help: a <details> disclosure under a rail card with numbered steps and
+ * external links, for the seller who has neither a Stripe key nor a wallet address yet. Steps are
+ * plain i18n keys; a step may carry links rendered after its text. Collapsed by default so the
+ * section stays compact for sellers who are already configured. */
+function RailHelp({ titleKey, steps }) {
+  return html`
+    <details class="wallet-rail-help">
+      <summary>${t(titleKey)}</summary>
+      <ol class="wallet-rail-help-steps">
+        ${steps.map(s => html`<li key=${s.key}>
+          ${t(s.key)}
+          ${(s.links || []).map((l, i) => html`${i > 0 ? ' · ' : ' '}<a href=${l.href} target="_blank" rel="noopener noreferrer">${l.label}</a>`)}
+        </li>`)}
+      </ol>
+    </details>`;
+}
+
+const STRIPE_HELP_STEPS = [
+  { key: 'profile.wallet.cardHelpStep1', links: [{ href: 'https://dashboard.stripe.com/register', label: 'dashboard.stripe.com/register' }] },
+  { key: 'profile.wallet.cardHelpStep2', links: [{ href: 'https://dashboard.stripe.com/apikeys', label: 'dashboard.stripe.com/apikeys' }] },
+  { key: 'profile.wallet.cardHelpStep3' },
+  { key: 'profile.wallet.cardHelpStep4' },
+];
+
+function x402HelpSteps(testnet) {
+  return [
+    { key: 'profile.wallet.x402HelpStep1', links: [
+      { href: 'https://www.coinbase.com/wallet', label: 'Coinbase Wallet' },
+      { href: 'https://metamask.io/', label: 'MetaMask' },
+    ] },
+    { key: 'profile.wallet.x402HelpStep2' },
+    { key: 'profile.wallet.x402HelpStep3' },
+    ...(testnet ? [{ key: 'profile.wallet.x402HelpStep4' }] : []),
+  ];
 }
 
 /* "Selling & payments" — every rail that can pay this seller, from ONE read of /v1/commerce/payout.
@@ -118,6 +158,7 @@ function SellingSection() {
           ${t('profile.wallet.pspRemove')}</button>`}
       </div>
       <span class="text-meta">${t('profile.wallet.railCardNote')}</span>
+      <${RailHelp} titleKey="profile.wallet.cardHelpTitle" steps=${STRIPE_HELP_STEPS} />
     </div>
 
     ${x.enabled && html`
@@ -140,6 +181,7 @@ function SellingSection() {
             ${t('profile.wallet.x402Remove')}</button>`}
         </div>
         ${addr.trim() && !addrValid && html`<span class="text-meta">${t('profile.wallet.x402Invalid')}</span>`}
+        <${RailHelp} titleKey="profile.wallet.x402HelpTitle" steps=${x402HelpSteps(!!x.testnet)} />
       </div>`}
 
     <div class="card wallet-psp">
