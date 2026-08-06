@@ -2441,6 +2441,22 @@
 .pj-section { border: 1px solid var(--border); border-radius: 10px; padding: 0.6rem 0.75rem; background: var(--card); }
 /* Action buttons sit right after the title (not pushed to the far edge) so they
    stay visually tied to the panel they act on. */
+/* Fresh-join welcome banner (invite-accept redirect, UX-remake v3 P8): says whose team the
+   person just joined and points at the chat connection as the next step. */
+.pj-joined-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  background: var(--card);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.pj-joined-actions { display: flex; gap: 0.5rem; align-items: center; }
+
 .pj-section-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.4rem; }
 .pj-section-title { font-weight: 600; text-transform: capitalize; margin-right: 0.25rem; }
 /* Lift the add-actions off the panel background so they read as buttons. */

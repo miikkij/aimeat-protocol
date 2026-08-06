@@ -657,7 +657,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
       <div class="pj-ws">
         ${back}
         <div class="section-title">${(org.name || 'Organism')}</div>
-        <div class="section-desc">${t('organisms.noWorkspace') || 'This organism has no workspace yet. Set one up to track goals, plans, deliverables and decisions — versioned on publish.'}</div>
+        <div class="section-desc">${t('organisms.noWorkspace') || 'The workspace is created, but it is still empty. Give it a structure: the one-click project template covers goals, plans, deliverables and decisions, or describe below what this workspace is for and an AI designs the structure.'}</div>
         <button class="btn-primary" onClick=${setup} disabled=${busy || genBusy}>${busy ? '...' : (t('organisms.setupWorkspace') || 'Set up workspace (project template)')}</button>
         <${WorkspaceGenerator} orgId=${orgId} wsId=${wsId} showToast=${showToast}
           onApplied=${load} onOpenSettings=${() => setShowSettings(true)} showRegenerate=${false}

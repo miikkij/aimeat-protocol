@@ -6700,7 +6700,7 @@
   "organisms": {
     "title": "Organisms",
     "backToList": "All organisms",
-    "noWorkspace": "This organism has no workspace yet. Set one up to track goals, plans, deliverables and decisions, versioned on publish.",
+    "noWorkspace": "The workspace is created, but it is still empty. Give it a structure: the one-click project template covers goals, plans, deliverables and decisions, or describe below what this workspace is for and an AI designs the structure.",
     "setupWorkspace": "Set up workspace",
     "workspaceReady": "Workspace ready",
     "setupError": "Failed to set up workspace",
@@ -7175,6 +7175,22 @@
     "visPublic": "Public",
     "visListed": "Listed",
     "visPrivate": "Private",
+    "joinedBanner": {
+      "title": "You are now a member of {name}.",
+      "body": "Connect your own AI to this team and you can use everything here straight from the chat you already use.",
+      "connect": "Connect your AI",
+      "dismiss": "Browse first"
+    },
+    "policyHint": {
+      "open": "Anyone can join without asking.",
+      "approval_required": "Anyone can ask to join; you approve each request.",
+      "invite_only": "Only people you invite can join."
+    },
+    "visHint": {
+      "public": "Shows in the public directory and anyone can read its public content.",
+      "listed": "Shows in the directory, but content stays members-only.",
+      "private": "Does not show anywhere; only members know it exists."
+    },
     "types": {
       "community": "Community",
       "team": "Team",

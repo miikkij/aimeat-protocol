@@ -40,7 +40,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'preact/hooks'
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 const html = htm.bind(h);
-import { t } from '/js/i18n.js';
+import { t, tOr } from '/js/i18n.js';
 import { Spinner, KebabMenu } from './shared.js';
 import { SearchBar } from '/components/SearchBar.js';
 import { EmptyState } from '/components/EmptyState.js';
@@ -75,6 +75,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
   const [sortMode, setSortMode] = useState('custom');
   const [customOrder, setCustomOrder] = useState([]);
   const [openSettings, setOpenSettings] = useState(false); // open OrganismHome with the Settings panel showing
+  const [justJoinedOrg, setJustJoinedOrg] = useState(null); // org id from the invite-accept redirect (?joined=1)
   // Cross-organism content search (all my organisms at once) — indexed librarian FTS, grouped per
   // organism. Replaces the org lists while a query is active; a hit opens that organism + workspace
   // with the in-workspace search pre-filled to the same query.
@@ -221,6 +222,10 @@ export default function OrganismsTab({ session, showToast, onStats }) {
       const params = new URLSearchParams(window.location.search);
       const org = params.get('org');
       if (org) { setOpenId(org); setOpenWs(params.get('ws') || null); setOpenSpace(null); setOpenSettings(false); }
+      // ?joined=1 arrives from the invitation-accept redirect: the person just became a member
+      // of THIS organism. The welcome banner says whose team they joined and points at the chat
+      // connection, because that is their actual next step (UX-remake v3, P8).
+      if (org && params.get('joined') === '1') setJustJoinedOrg(org);
     } catch (err) { swallowed('organisms-tab: onOpen', err); }
   }, []);
 
@@ -449,6 +454,17 @@ export default function OrganismsTab({ session, showToast, onStats }) {
         onBackToList=${() => { setOpenWs(null); setOpenSpace(null); setOpenId(null); setOpenSettings(false); loadData(); }} />`;
     }
     return html`
+      ${justJoinedOrg === openId ? html`
+        <div class="pj-joined-banner">
+          <div>
+            <strong>${(tOr('organisms.joinedBanner.title', 'You are now a member of {name}.')).replace('{name}', org.name || '')}</strong>
+            <div class="text-meta-sm">${tOr('organisms.joinedBanner.body', 'Connect your own AI to this team and you can use everything here straight from the chat you already use.')}</div>
+          </div>
+          <div class="pj-joined-actions">
+            <a class="btn-primary btn-sm pf-no-underline" href="/v1/profile?tab=mcp">${tOr('organisms.joinedBanner.connect', 'Connect your AI')}</a>
+            <button class="btn-ghost btn-sm" onClick=${() => setJustJoinedOrg(null)}>${tOr('organisms.joinedBanner.dismiss', 'Browse first')}</button>
+          </div>
+        </div>` : null}
       <${OrganismHome} org=${org} ghii=${ghii} showToast=${showToast}
         initialSettings=${openSettings}
         onOpenWs=${(wsId, space) => { setOpenSpace(space || null); setOpenWs(wsId); }}
@@ -492,7 +508,20 @@ export default function OrganismsTab({ session, showToast, onStats }) {
             <input type="text" placeholder=${t('organisms.interestsPlaceholder') || 'Interests (comma separated)'} value=${formInterests} onInput=${(e) => setFormInterests(e.target.value)}
               class="input-field input-sm" />
             <div class="flex-row-wrap">
-              <select value=${formType} onChange=${(e) => setFormType(e.target.value)}
+              <select value=${formType} onChange=${(e) => {
+                // The type sets SAFE defaults (UX-remake v3, P12): a team's internal space must
+                // not be born open + public because nobody read three unexplained dropdowns.
+                // The user can still change both after picking the type.
+                const v = e.target.value;
+                setFormType(v);
+                if (v === 'team' || v === 'cooperative' || v === 'project') {
+                  setFormPolicy('invite_only');
+                  setFormVisibility('private');
+                } else {
+                  setFormPolicy('open');
+                  setFormVisibility('public');
+                }
+              }}
                 class="input-field input-sm">
                 <option value="community">${t('organisms.types.community') || 'Community'}</option>
                 <option value="team">${t('organisms.types.team') || 'Team'}</option>
@@ -512,6 +541,10 @@ export default function OrganismsTab({ session, showToast, onStats }) {
                 <option value="listed">${t('organisms.visListed') || 'Listed'}</option>
                 <option value="private">${t('organisms.visPrivate') || 'Private'}</option>
               </select>
+            </div>
+            <div class="text-meta-sm">
+              ${tOr('organisms.policyHint.' + formPolicy, '')}${' '}
+              ${tOr('organisms.visHint.' + formVisibility, '')}
             </div>
             <div class="form-actions">
               <button class="btn-primary btn-sm" onClick=${handleCreate} disabled=${creating}>

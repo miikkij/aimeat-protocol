@@ -68,7 +68,15 @@ export function renderRecordSpace(ctx, ot) {
       ${spaceDesc(ot) ? html`<div class="section-desc">${spaceDesc(ot)}</div>` : null}
 
       ${adding === ot.name && !addingId && (addingSchema
-        ? html`<div class="pj-rec-edit pj-rec-edit-new">${html`<${SchemaForm} key=${'sf-new'} schema=${addingSchema} busy=${busy} initial=${addingInitial}
+        ? html`<div class="pj-rec-edit pj-rec-edit-new" ref=${(el) => {
+            // Scroll the freshly opened form into view ONCE. On a phone the form used to open
+            // below the fold, so "+ Add draft" looked like a dead button (UX-remake v3, P12,
+            // measured). The dataset flag stops re-scrolling on every keystroke re-render.
+            if (el && !el.dataset.scrolledIntoView) {
+              el.dataset.scrolledIntoView = '1';
+              el.scrollIntoView({ block: 'center', behavior: 'smooth' });
+            }
+          }}>${html`<${SchemaForm} key=${'sf-new'} schema=${addingSchema} busy=${busy} initial=${addingInitial}
             idPrefix=${ot.name} namespace=${ot.namespace} wsT=${wsT}
             onSave=${(v) => saveDraft(ot, v)} onCancel=${cancelForm} />`}</div>`
         : html`<${Spinner} />`)}

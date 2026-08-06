@@ -238,7 +238,10 @@ await test('10f. Part C — a non-allowlisted return_url is dropped (no open red
     const uname = `evilu${Date.now()}${Math.floor(Math.random() * 1e4)}`;
     const acc = await json(`/v1/invitations/${t}/accept`, { method: 'POST', body: JSON.stringify({ username: uname, password: 'EvilPass1234' }) });
     assert(acc.status === 200, `accept ${acc.status}: ${JSON.stringify(acc.body.error)}`);
-    assert(acc.body.data.redirect === '/v1/profile#organisms', `non-allowlisted target must fall back to the default, got ${acc.body.data.redirect}`);
+    // The default landing is INSIDE the invited-to organism, flagged as a fresh join — not the
+    // generic profile an invited member measurably bounced off (UX-remake v3, P8).
+    assert(acc.body.data.redirect === `/v1/profile?tab=organisms&org=${encodeURIComponent(orgId)}&joined=1`,
+        `non-allowlisted target must fall back to the in-organism landing, got ${acc.body.data.redirect}`);
 });
 
 await test('10g. A direct-adds B as a plain member (code-key quota tests below mint as B)', async () => {

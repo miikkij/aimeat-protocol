@@ -99,7 +99,10 @@ export default function InviteAccept() {
       const res = await api('/v1/invitations/' + encodeURIComponent(token) + '/accept', {
         method: 'POST', body: JSON.stringify(body || {}),
       });
-      window.location.href = (res && res.data && res.data.redirect) || '/v1/profile#organisms';
+      // Fallback mirrors the server default: land INSIDE the organism, flagged as a fresh join.
+      const orgId = res && res.data && res.data.organism_id;
+      window.location.href = (res && res.data && res.data.redirect)
+        || (orgId ? `/v1/profile?tab=organisms&org=${encodeURIComponent(orgId)}&joined=1` : '/v1/profile#organisms');
     } catch (e) {
       if (e && e.code === 'EMAIL_MISMATCH') { setMismatch(true); setSubmitting(false); return; }
       setFormError(e.message || tr('invite.acceptFailed', 'Could not accept the invitation.'));

@@ -6700,7 +6700,7 @@
   "organisms": {
     "title": "Organismit",
     "backToList": "Kaikki organismit",
-    "noWorkspace": "Tällä organismilla ei ole vielä työtilaa. Luo sellainen seurataksesi tavoitteita, suunnitelmia, tuotoksia ja päätöksiä, versioituna julkaistaessa.",
+    "noWorkspace": "Työtila on luotu, mutta se on vielä tyhjä. Anna sille rakenne: yhden klikkauksen projektipohja kattaa tavoitteet, suunnitelmat, tuotokset ja päätökset, tai kuvaile alle mihin tämä työtila on, niin tekoäly suunnittelee rakenteen.",
     "setupWorkspace": "Luo työtila",
     "workspaceReady": "Työtila valmis",
     "setupError": "Työtilan luonti epäonnistui",
@@ -7175,6 +7175,22 @@
     "visPublic": "Julkinen",
     "visListed": "Listattu",
     "visPrivate": "Yksityinen",
+    "joinedBanner": {
+      "title": "Olet nyt jäsen: {name}.",
+      "body": "Kytke oma tekoälysi tähän tiimiin, niin käytät kaikkea täällä olevaa suoraan siitä chatista jota jo käytät.",
+      "connect": "Kytke tekoälysi",
+      "dismiss": "Selaan ensin"
+    },
+    "policyHint": {
+      "open": "Kuka tahansa voi liittyä kysymättä.",
+      "approval_required": "Kuka tahansa voi pyytää jäsenyyttä; sinä hyväksyt jokaisen.",
+      "invite_only": "Vain kutsumasi ihmiset voivat liittyä."
+    },
+    "visHint": {
+      "public": "Näkyy julkisessa hakemistossa ja julkinen sisältö on kaikkien luettavissa.",
+      "listed": "Näkyy hakemistossa, mutta sisältö pysyy vain jäsenillä.",
+      "private": "Ei näy missään; vain jäsenet tietävät sen olemassaolosta."
+    },
     "types": {
       "community": "Yhteisö",
       "team": "Tiimi",

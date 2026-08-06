@@ -178,6 +178,14 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
 
   const owner = session.owner;
 
+  // Has this account produced ANYTHING yet? Gates the inventory cards (quotas, spend, commerce)
+  // off a brand-new account's first screen (UX-remake v3, P5). Only KNOWN-positive counts flip it,
+  // so the cards never flash in before the stats land and then disappear.
+  const hasOwnContent = (apps.length > 0)
+    || (typeof stats?.agents === 'number' && stats.agents > 0)
+    || (typeof stats?.organisms === 'number' && stats.organisms > 0)
+    || (typeof stats?.memories === 'number' && stats.memories > 0);
+
   /* Fetch app list for app strip */
   const loadApps = useCallback(async () => {
     try {
@@ -388,12 +396,16 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
           <${NextSteps} switchTab=${(id) => open(id, 'main')}
             hasApps=${appsLoaded ? apps.length > 0 : undefined} />
           <div class="pf-home-grid">
-            <${UsageCard} switchTab=${(id) => open(id, 'main')} initialUsage=${homeUsage} />
-            <${AiSpendCard} />
-            <${AgentLedgerCard} />
-            <${CommerceCard} />
             <${ContinueCard} />
             <${AgentsCard} owner=${owner} initialAgents=${homeAgents} />
+            ${/* Inventory (quotas, spend, commerce) stays OFF the first screen until the account
+                  has produced something. A brand-new account measurably read the zero-rows as a
+                  half-finished tool (UX-remake v3, P5); an established one still gets them. */
+              hasOwnContent ? html`
+              <${UsageCard} switchTab=${(id) => open(id, 'main')} initialUsage=${homeUsage} />
+              <${AiSpendCard} />
+              <${AgentLedgerCard} />
+              <${CommerceCard} />` : null}
           </div>
           ${(showPromo && apps.length < 3) ? html`
             <${CortexSection} switchTab=${() => open('extensions', 'main')} onDismiss=${dismissPromo} />` : null}

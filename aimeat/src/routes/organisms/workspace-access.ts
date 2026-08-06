@@ -780,10 +780,9 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     const roles = ownerRecord?.roles ?? ['owner'];
     const session = await establishOwnerSession(storage, config, req, res, { owner: ownerName, roles });
 
-    // Land the accepter on the inviter's chosen return target (e.g. back in the Experience Center app,
-    // already signed in), else the default profile view. Re-validate the stored value against the
-    // allowlist at redirect time too — the security-critical open-redirect check (the app-origin bridge
-    // signs the app in cross-subdomain; the accept session cookie stays host-only on this node).
+    // Land the accepter on the inviter's chosen return target (e.g. back in the Experience Center
+    // app, already signed in), else inside the invited-to organism. Re-validate the stored value
+    // against the allowlist at redirect time — the security-critical open-redirect check.
     const returnTarget = inv.returnUrl ? resolveInvitationReturnTarget(inv.returnUrl, config) : null;
     res.set('Cache-Control', 'no-store');
     res.json(success(config.nodeId, {
@@ -793,7 +792,8 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       workspaces: grantedWs,
       token: session.token,
       expires_in: session.expiresIn,
-      redirect: returnTarget ?? '/v1/profile#organisms',
+      // ?joined=1 = fresh join; the generic profile is what an invited member measurably bounced off (UX-remake v3, P8).
+      redirect: returnTarget ?? `/v1/profile?tab=organisms&org=${encodeURIComponent(inv.organismId)}&joined=1`,
     }));
   });
 }

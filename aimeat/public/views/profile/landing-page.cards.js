@@ -113,7 +113,13 @@ export function AgentsCard({ owner, initialAgents }) {
   // The Home /v1/owner/home composite already resolves the owner's agent list (initialAgents) — seed from
   // it and skip the mount /v1/agents fetch (dropping that duplicate). The next-scheduled-job row still
   // needs the schedules call (not in the composite); live-update refreshes both.
-  const seedAgents = (list) => (Array.isArray(list) ? list : []).filter(a => !String(a.name || '').startsWith('session-'))
+  // Excluded from the HOME card (both still live in the Agents tab):
+  //   session-*  — per-session scratch identities, never user-facing.
+  //   app        — the built-in agent registration creates for in-app calls. Counting it made a
+  //                brand-new account read "1 agent active today" when the person had connected
+  //                nothing, which is a claim about work that never happened (UX-remake v3, P5).
+  const seedAgents = (list) => (Array.isArray(list) ? list : [])
+    .filter(a => !String(a.name || '').startsWith('session-') && String(a.name || '') !== 'app')
     .slice().sort((a, b) => String(b.last_seen || '').localeCompare(String(a.last_seen || '')));
   const [agents, setAgents] = useState(initialAgents ? seedAgents(initialAgents) : null);
   const [nextJob, setNextJob] = useState(null);
