@@ -153,6 +153,9 @@ await test('Setup: provider installs an extension whose actions declare NO comme
             { id: 'solo', method: 'POST', path: '/solo', script: 'work' },
             { id: 'dual', method: 'POST', path: '/dual', script: 'work' },
             { id: 'boom', method: 'POST', path: '/boom', script: 'boom' },
+            // Sold by nobody, priced by nothing — the free half of the surface. A hosted app must be
+            // able to call this WITHOUT a money permission (see the APP GRANT free-call test).
+            { id: 'freebie', method: 'POST', path: '/freebie', script: 'work' },
         ],
         config: { public_access: { default: true } },
         limits: { timeout_ms: 5000, max_api_calls: 1 },
@@ -478,6 +481,51 @@ await test('APP GRANT · an app the consumer connected cannot spend a contract i
         + `contract (meter ${before.budget.calls} → ${after.budget.calls}). A grant confers scopes, not a call-right.`);
     assert(after.budget.calls === before.budget.calls,
         `and the owner's meter must not move for it: ${before.budget.calls} → ${after.budget.calls}`);
+});
+
+await test('APP GRANT · without the money permission, a FREE action still answers', async () => {
+    // The permission is about SPENDING. It used to be demanded before the node knew whether the call
+    // cost anything, so an app holding only memory:read was refused with SCOPE_DENIED on a capability
+    // that charges nobody — which locked published apps out of their own free extensions.
+    const APP_FILE = `free-probe-${Date.now()}.html`;
+    const pub = await json('/v1/apps', {
+        method: 'POST', headers: auth(consumer.token),
+        body: JSON.stringify({
+            filename: APP_FILE, content: Buffer.from('<!DOCTYPE html><html><body>probe</body></html>').toString('base64'),
+            name: 'Free Probe', description: 'money audit probe', category: 'utility',
+        }),
+    });
+    assert(pub.status === 201 || pub.status === 200, `publish ${pub.status}: ${JSON.stringify(pub.body?.error)}`);
+
+    const verifier = randomBytes(32).toString('base64url');
+    const challenge = createHash('sha256').update(verifier).digest('base64url');
+    const REDIRECT = 'http://localhost:9/cb';
+    const q = new URLSearchParams({
+        app: `${consumer.name}/${APP_FILE}`, response_type: 'code', scope: 'memory:read',
+        redirect_uri: REDIRECT, code_challenge: challenge, code_challenge_method: 'S256',
+    });
+    const authz = await fetch(`${BASE}/v1/app-grants/authorize?${q}`, { redirect: 'manual' });
+    const rid = decodeURIComponent(/req=([^&]+)/.exec(authz.headers.get('location') ?? '')?.[1] ?? '');
+    const con = await json('/v1/app-grants/authorize-consent', {
+        method: 'POST', headers: auth(consumer.token), body: JSON.stringify({ request_id: rid }),
+    });
+    const code = new URL(con.body.data.redirect_url).searchParams.get('code') ?? '';
+    const tok = await json('/v1/app-grants/token', {
+        method: 'POST', body: JSON.stringify({ grant_type: 'authorization_code', code, code_verifier: verifier, redirect_uri: REDIRECT }),
+    });
+    const appToken = tok.body.data.access_token as string;
+    assert(!!appToken, `grant token issued: ${JSON.stringify(tok.body?.error)}`);
+
+    const cb = await balance(consumer.token);
+    const free = await json(`/v1/ext/${EXT}/freebie`, { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
+    assert(free.status === 200,
+        `a free action must serve an app that holds no spend permission: ${free.status} ${JSON.stringify(free.body?.error)}`);
+    assert(cb - await balance(consumer.token) === 0, 'and nothing may be charged for it');
+
+    // The other half stays true: the PRICED action is still refused for exactly this app.
+    const priced = await json(`/v1/ext/${EXT}/solo`, { method: 'POST', headers: auth(appToken), body: JSON.stringify({ q: 'hi' }) });
+    assert(priced.status !== 200,
+        `the same app must still be refused the priced capability: ${priced.status} ${JSON.stringify(priced.body?.data ?? priced.body?.error)}`);
 });
 
 await test('APP GRANT · with the permission, it spends — and the app is NAMED for it', async () => {

@@ -136,6 +136,36 @@ function grandfathered(grant: { createdAt?: string } | null): boolean {
 }
 
 /**
+ * May this session spend its owner's money — and is it under its ceiling? Returns the refusal, or
+ * null when spending is allowed. Exported because the permission has to be checked at EVERY place
+ * that actually charges, not only in the entitlement chokepoint: the uncontracted per-call channel
+ * in paywall.ts settles on its own and would otherwise be a way around the permission.
+ *
+ * Call it ONLY where a charge is about to happen. Asking it of a free call is what locked hosted
+ * apps out of their own free capabilities.
+ */
+export async function appSpendRefusal(
+  storage: Storage,
+  session?: { roles: string[]; scopes: string[]; appGrantId?: string | null } | null,
+): Promise<{ kind: 'scope_required'; scope: string } | { kind: 'app_cap_reached'; capMorsels: number; spentMorsels: number } | null> {
+  if (!session?.roles.includes('app')) return null;
+  const appGrant = session.appGrantId ? await storage.getAppGrant(session.appGrantId) : null;
+  if (!session.scopes.includes('*')
+      && !session.scopes.includes(SPEND_SCOPE)
+      && !session.scopes.includes('contract:*')
+      && !grandfathered(appGrant)) {
+    return { kind: 'scope_required', scope: SPEND_SCOPE };
+  }
+  // The permission answers WHETHER; the ceiling answers HOW MUCH. Read before the call rather than
+  // after, so an app is stopped at its limit instead of discovering it by exceeding it.
+  if (appGrant && appGrant.spendCapMorsels !== null && appGrant.spendCapMorsels !== undefined
+      && (appGrant.spentMorsels ?? 0) >= appGrant.spendCapMorsels) {
+    return { kind: 'app_cap_reached', capMorsels: appGrant.spendCapMorsels, spentMorsels: appGrant.spentMorsels ?? 0 };
+  }
+  return null;
+}
+
+/**
  * Decide, and settle, one metered call. The whole sequence, in the one place every door shares:
  *
  *   1. OWNER-FREE — calling your own capability costs nothing, and burns no toll. Checked FIRST,
@@ -170,29 +200,26 @@ export async function authoriseMeteredCall(args: {
   const callerOwner = ownerGhiiOf(caller).split('@')[0];
   if (providerOwner && callerOwner === providerOwner) return { kind: 'free_owner' };
 
-  // 1b. A hosted app spends its OWNER's money. Reading their memory and buying on their behalf are
-  //     different favours, and an app grant presents the owner's own GHII, so without this the
-  //     narrowest grant there is reached any contract they held. Checked after owner-free, because
-  //     an app calling its own owner's capability costs nobody anything.
-  const appGrant = session?.appGrantId ? await storage.getAppGrant(session.appGrantId) : null;
-  if (session?.roles.includes('app')
-      && !session.scopes.includes('*')
-      && !session.scopes.includes(SPEND_SCOPE)
-      && !session.scopes.includes('contract:*')
-      && !grandfathered(appGrant)) {
-    return { kind: 'scope_required', scope: SPEND_SCOPE };
-  }
-
-  // 1c. The permission answers WHETHER; the ceiling answers HOW MUCH. Read before the call rather
-  //     than after, so an app is stopped at its limit instead of discovering it by exceeding it.
-  if (appGrant && appGrant.spendCapMorsels !== null && appGrant.spendCapMorsels !== undefined
-      && (appGrant.spentMorsels ?? 0) >= appGrant.spendCapMorsels) {
-    return { kind: 'app_cap_reached', capMorsels: appGrant.spendCapMorsels, spentMorsels: appGrant.spentMorsels ?? 0 };
-  }
-
   // 2. Whatever authorises this call — a grant wins over a contract while it is active.
+  //
+  //    BEFORE the app-spend checks below, deliberately. Those checks are about SPENDING, and nothing
+  //    is spent when nothing authorises a charge: an app asked for permission to spend before we
+  //    knew whether this call costs anything, so a hosted app could not call its own free capability
+  //    without holding a money permission it had no use for. (That is how TINKI's own app was locked
+  //    out of its own extension — the door answered SCOPE_DENIED for a call that was free.)
+  //    `no_right` means no charge is authorised here; the caller's door decides what to offer, and
+  //    every path that actually charges re-checks the permission (see below and paywall.ts step 3.9).
   const ent = await readEntitlementForCall(storage, caller, product.ext, product.action);
   if (!ent) return { kind: 'no_right' };
+
+  // 2b. A hosted app spends its OWNER's money. Reading their memory and buying on their behalf are
+  //     different favours, and an app grant presents the owner's own GHII, so without this the
+  //     narrowest grant there is reached any contract they held. Checked after owner-free (an app
+  //     calling its own owner's capability costs nobody anything) and after the entitlement lookup
+  //     (a free call spends nothing).
+  const refusal = await appSpendRefusal(storage, session);
+  if (refusal) return refusal;
+  const appGrant = session?.appGrantId ? await storage.getAppGrant(session.appGrantId) : null;
 
   // 3. Pacing, first and always. The one brake that bounds RATE rather than total spend, which is the
   //    property a money budget does not have.

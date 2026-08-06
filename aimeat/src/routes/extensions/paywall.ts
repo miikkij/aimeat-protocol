@@ -37,6 +37,8 @@ import { pricedAppToolsFor, type PricedBinding } from './priced-binding.js';
 import { readEntitlementForCall, computeCharge, type MeteredEntitlement } from '../../services/metered-entitlements.js';
 import type { BeneficiaryAccrual } from '../../services/metered-settlement.js';
 import { consumeInternalPass } from './internal-pass.js';
+import { appSpendRefusal } from '../../services/metered-access.js';
+import { respondMeteredRefusal } from './metered-response.js';
 import { burnPacingToll, resolvePacingToll } from './pacing.js';
 import { ownerGhiiOf } from '../../utils/gaii.js';
 import { logger } from '../../utils/logger.js';
@@ -321,6 +323,16 @@ export async function enforcePaywall(args: {
         invoke: `/v1/apps/${ownerName}/${s.appId}/webmcp/tools/${s.tool}`,
       })),
     });
+    return { ok: false };
+  }
+
+  // 3.9 Everything below CHARGES. The entitlement chokepoint checks the hosted-app spend permission
+  //     when it settles a contract; this uncontracted channel settles on its own, so it has to ask
+  //     the same question or it is a way around the permission. Asked HERE and not earlier: a free
+  //     action is answered above and must not need a money permission at all.
+  const spendRefusal = await appSpendRefusal(storage, session);
+  if (spendRefusal) {
+    respondMeteredRefusal(config, res, spendRefusal, `${ext.name}/${action.id}`);
     return { ok: false };
   }
 
