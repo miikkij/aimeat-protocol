@@ -39,6 +39,7 @@ import { agentTaskMethods } from './methods/agent-tasks.js';
 import { agentUsageMethods } from './methods/agent-usage.js';
 import { aiProvenanceMethods } from './methods/ai-provenance.js';
 import { connectionMethods } from './methods/connections.js';
+import { financeMethods } from './methods/finance.js';
 import { capabilityMethods } from './methods/capabilities.js';
 import { knowledgeMethods } from './methods/knowledge.js';
 import { appMethods } from './methods/apps.js';
@@ -117,6 +118,7 @@ Object.assign(
   agentUsageMethods,
   aiProvenanceMethods,
   connectionMethods,
+  financeMethods,
   capabilityMethods,
   knowledgeMethods,
   appMethods,

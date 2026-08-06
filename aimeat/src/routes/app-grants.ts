@@ -118,6 +118,12 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'organism:read': 'Read the published content of workspaces you are a member of (e.g. gated curriculum an app renders for you)',
   'organism:invite': 'Invite people into organisms you belong to (send email invitations / access keys on your behalf)',
   'organism:write': 'Create organisms and workspaces on your behalf (an app that provisions its own structured data space)',
+  // Company-in-a-box. Reading the books and writing them are different favours: TILIT (the
+  // accountant app) reads; an invoicing surface writes. Neither implies the other, and neither
+  // implies outbound:send — sending a message to a customer is a third, separate favour.
+  'finance:read': 'Read your bookkeeping: invoices, vouchers, VAT reports and exports',
+  'finance:write': 'Create and send invoices and book accounting vouchers on your behalf',
+  'outbound:send': 'Send email/messages to your saved outbound contacts on your behalf (opt-outs and daily limits always apply)',
 };
 
 const CODE_TTL_MS = 60_000;        // authorization code: single-use, 60s

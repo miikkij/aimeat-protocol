@@ -415,6 +415,31 @@ export async function completeSession(
   await putRecord(storage, session.buyerGhii, sessionKey(session.id), completed);
   // The seller's orders-received copy, under THEIR GHII (readable without touching buyer data).
   await putRecord(storage, session.sellerGhii, orderKey(session.id), completed);
+
+  // Bookkeeping: a completed MONEY checkout books an income voucher (tosite) for the seller.
+  // Best-effort — a voucher failure must never fail the checkout (the money already moved);
+  // the books can be reconciled from the payable entries. Amounts here are 6-decimal micros,
+  // vouchers are cents. No VAT breakdown is known at checkout level: the voucher lands on the
+  // accountant's unclassified list (TILIT puutelista) for classification.
+  if (isMoneyCurrency(session.currency) && session.total > 0) {
+    try {
+      const { bookVoucher } = await import('../services/finance/vouchers.js');
+      await bookVoucher(storage, session.sellerGhii, {
+        date: new Date().toISOString().slice(0, 10),
+        description: `Checkout ${session.id}: ${session.items.map((i) => i.title).filter(Boolean).join(', ').slice(0, 200) || 'sale'}`,
+        direction: 'income', source: 'checkout',
+        amountMinor: Math.round(session.total / 10_000),
+        currency: session.currency,
+        counterparty: session.buyerOwner ?? null,
+        trackingCode: collected.trackingCode,
+        externalRef: `checkout:${session.id}`,
+      });
+      emitChange('finance', session.sellerGhii);
+    } catch (e) {
+      logger.error(`checkout voucher booking failed for session ${session.id}: ${(e as Error).message}`);
+    }
+  }
+
   emitChange('agent-tasks');
   return completed;
 }

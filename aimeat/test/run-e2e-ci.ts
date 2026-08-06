@@ -153,6 +153,7 @@ const ALL_SUITES = [
     'test/e2e-commerce.ts',
     'test/e2e-commerce-holds.ts',
     'test/e2e-attestations.ts',
+    'test/e2e-finance.ts',
     'test/e2e-money-audit.ts',
     'test/e2e-x402.ts',
     'test/e2e-x402-testnet.ts',

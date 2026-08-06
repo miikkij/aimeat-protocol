@@ -46,6 +46,9 @@ import { commerceRouter } from '../routes/commerce.js';
 import { commerceUcpRouter } from '../routes/commerce-ucp.js';
 import { commerceAcpRouter } from '../routes/commerce-acp.js';
 import { commerceBeneficiariesRouter } from '../routes/commerce-beneficiaries.js';
+import { commerceWebhooksRouter } from '../routes/commerce-webhooks.js';
+import { financeRouter } from '../routes/finance.js';
+import { financeLedgerRouter } from '../routes/finance-ledger.js';
 
 // Routes
 import { bootstrapRouter } from '../routes/bootstrap.js';
@@ -408,6 +411,9 @@ export async function mountRoutes(
   app.use(commerceUcpRouter(config, storage));
   app.use(commerceAcpRouter(config, storage));
   app.use(commerceBeneficiariesRouter(config, storage));  // the second rake: revenue shared with third parties
+  app.use(commerceWebhooksRouter(config, storage));       // Stripe webhooks → accounting vouchers (per-seller secret)
+  app.use(financeRouter(config, storage));                // Finance: invoices (Finvoice 3.0) — company-in-a-box phase 1
+  app.use(financeLedgerRouter(config, storage));          // Finance: vouchers, VAT registry/report, fiscal years, exports
 
   // Agent tasks, directives, capabilities, and integration BEFORE agentsRouter to avoid /v1/agents/:name param conflicts
   app.use(agentTasksRouter(config, storage, webhookDispatcher));

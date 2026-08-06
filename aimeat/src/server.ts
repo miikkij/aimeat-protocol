@@ -91,6 +91,11 @@ export async function createServer(config: AimeatConfig, configSources?: ConfigS
     },
   }));
 
+  // PSP webhooks need the RAW body: the Stripe signature is an HMAC over the exact bytes,
+  // and a parse-then-restringify loses them. express.raw marks the body consumed, so the
+  // JSON parser below skips these paths.
+  app.use('/v1/commerce/webhooks', express.raw({ type: '*/*', limit: '1mb' }));
+
   // Global body parsing middleware (skip for presigned upload — it reads raw body)
   app.use((req, res, next) => {
     if (req.path.startsWith('/v1/upload/')) return next();

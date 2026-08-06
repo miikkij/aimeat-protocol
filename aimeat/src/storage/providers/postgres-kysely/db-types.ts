@@ -301,6 +301,103 @@ export interface PublishAttempt {
   updatedAt: string;
 }
 
+/**
+ * Company-in-a-box finance domain. Money columns are BIGINT minor units (cents) and come
+ * back from pg as strings — mappers Number() them. "numberSeq" stays NULL for drafts so the
+ * gapless-sequence unique index only bites once the number is claimed at send.
+ */
+export interface FinanceInvoice {
+  buyer: Json;
+  createdAt: string;
+  creditsInvoiceId: string | null;
+  currency: Generated<string>;
+  deliveryMethod: string | null;
+  deliveryStatus: string | null;
+  dueDate: string | null;
+  externalRef: string | null;
+  finvoiceXmlKey: string | null;
+  fiscalYearId: string | null;
+  id: string;
+  invoiceDate: string | null;
+  invoiceNumber: string | null;
+  lines: Generated<Json>;
+  notes: string | null;
+  numberSeq: number | null;
+  operatorMessageId: string | null;
+  organismId: string | null;
+  ownerGhii: string;
+  paidAt: string | null;
+  paidTrackingCode: string | null;
+  paymentTermsDays: Generated<number>;
+  referenceNumber: string | null;
+  seller: Json;
+  sentAt: string | null;
+  status: Generated<string>;
+  totalGrossMinor: Generated<string | number>;
+  totalNetMinor: Generated<string | number>;
+  totalVatMinor: Generated<string | number>;
+  type: Generated<string>;
+  updatedAt: string;
+  vatBreakdown: Generated<Json>;
+}
+
+/** Append-only accounting voucher (tosite); corrections are new rows via reversesVoucherId. */
+export interface FinanceVoucher {
+  amountMinor: string | number;
+  attachments: Generated<Json>;
+  counterparty: string | null;
+  createdAt: string;
+  currency: Generated<string>;
+  date: string;
+  description: string;
+  direction: string;
+  externalRef: string | null;
+  fiscalYearId: string;
+  id: string;
+  invoiceId: string | null;
+  organismId: string | null;
+  ownerGhii: string;
+  reversesVoucherId: string | null;
+  source: string;
+  trackingCode: string | null;
+  updatedAt: string;
+  vatBreakdown: Generated<Json>;
+  voucherNumber: number;
+}
+
+/** Node-global VAT registry; rates are basis points with validity windows (never hardcoded). */
+export interface FinanceVatCode {
+  category: string;
+  countryCode: Generated<string>;
+  createdAt: string;
+  id: string;
+  label: Json;
+  rateBp: number;
+  updatedAt: string;
+  validFrom: string;
+  validTo: string | null;
+}
+
+export interface FinanceFiscalYear {
+  createdAt: string;
+  endDate: string;
+  id: string;
+  label: string;
+  locked: Generated<boolean>;
+  lockedAt: string | null;
+  organismId: string | null;
+  ownerGhii: string;
+  startDate: string;
+  updatedAt: string;
+}
+
+/** Atomic named counters behind gapless invoice/voucher numbering. */
+export interface FinanceCounter {
+  kind: string;
+  ownerGhii: string;
+  value: Generated<number>;
+}
+
 export interface App {
   accessCode: string | null;
   aiProvenanceId: string | null;
@@ -1699,6 +1796,11 @@ export interface DB {
   ExtensionInstance: ExtensionInstance;
   FederationPeer: FederationPeer;
   Feedback: Feedback;
+  FinanceCounter: FinanceCounter;
+  FinanceFiscalYear: FinanceFiscalYear;
+  FinanceInvoice: FinanceInvoice;
+  FinanceVatCode: FinanceVatCode;
+  FinanceVoucher: FinanceVoucher;
   Flag: Flag;
   GenesisPeer: GenesisPeer;
   Ghii: Ghii;

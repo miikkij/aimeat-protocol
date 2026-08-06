@@ -50,6 +50,7 @@ import { capabilityAgentsMethods } from './methods/capability-agents.js';
 import { messagingMethods } from './methods/messaging.js';
 import { aiProvenanceMethods } from './methods/ai-provenance.js';
 import { connectionMethods } from './methods/connections.js';
+import { financeMethods } from './methods/finance.js';
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- intentional class+interface merge: the interface below declares the methods Object.assign installs on the prototype.
 export class SqliteStorage {
@@ -95,4 +96,5 @@ Object.assign(
   messagingMethods,
   aiProvenanceMethods,
   connectionMethods,
+  financeMethods,
 );

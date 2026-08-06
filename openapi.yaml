@@ -167,6 +167,8 @@ tags:
     description: Access model — groups, levels, and effective-access resolution (authority ∩ consent)
   - name: Contacts
     description: Owner contact list — add, list, remove, and email resolution for sharing and messaging
+  - name: Finance
+    description: Company-in-a-box bookkeeping — sales invoices (Finvoice 3.0), append-only vouchers, VAT registry/report, fiscal years, accountant exports, and PSP webhooks that book vouchers
   - name: Notifications
     description: Web push subscriptions and personal-node notification delivery
   - name: Schedules
@@ -42459,3 +42461,439 @@ paths:
                           platform: { type: string }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ── Finance (company-in-a-box phase 1) ──────────────────────────────────────
+  /v1/finance/invoices:
+    get:
+      operationId: listFinanceInvoices
+      tags: [Finance]
+      summary: List the owner's sales invoices
+      description: Returns the caller-owner's invoices newest first. Lazy overdue transition is applied to returned rows. Data is `{ invoices, total }`; each invoice carries computed integer-cent totals, the per-code VAT breakdown, and lifecycle fields (numberSeq/invoiceNumber/referenceNumber assigned at send).
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: status, in: query, schema: { type: string, enum: [draft, sent, paid, overdue, credited, cancelled] } }
+        - { name: type, in: query, schema: { type: string, enum: [invoice, credit_note] } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createFinanceInvoiceDraft
+      tags: [Finance]
+      summary: Create an invoice draft
+      description: Creates a draft sales invoice. Line amounts and totals are COMPUTED server-side from quantityMilli (thousandths), unitPriceMinor (cents) and the VAT code valid on the date — client-supplied amounts are rejected. Requires scope `finance:write`.
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [seller, buyer, lines]
+              properties:
+                organism_id: { type: string, nullable: true }
+                seller:
+                  type: object
+                  required: [name]
+                  description: Party snapshot (name, businessId, vatId, address, iban/bic, einvoice address/operator)
+                  properties:
+                    name: { type: string }
+                    businessId: { type: string }
+                    vatId: { type: string }
+                    email: { type: string }
+                    streetAddress: { type: string }
+                    postalCode: { type: string }
+                    city: { type: string }
+                    country: { type: string }
+                    einvoiceAddress: { type: string }
+                    einvoiceOperator: { type: string }
+                    iban: { type: string }
+                    bic: { type: string }
+                buyer:
+                  type: object
+                  required: [name]
+                  description: Party snapshot; contactId links to the outbound contact registry
+                  properties:
+                    name: { type: string }
+                    businessId: { type: string }
+                    vatId: { type: string }
+                    contactId: { type: string }
+                    email: { type: string }
+                    streetAddress: { type: string }
+                    postalCode: { type: string }
+                    city: { type: string }
+                    country: { type: string }
+                    einvoiceAddress: { type: string }
+                    einvoiceOperator: { type: string }
+                lines:
+                  type: array
+                  items:
+                    type: object
+                    required: [description, quantityMilli, unit, unitPriceMinor, vatCodeId]
+                    properties:
+                      description: { type: string }
+                      quantityMilli: { type: integer, description: 'Quantity in thousandths: 1500 = 1.5' }
+                      unit: { type: string }
+                      unitPriceMinor: { type: integer, description: Net unit price in cents }
+                      vatCodeId: { type: string }
+                currency: { type: string, default: EUR }
+                payment_terms_days: { type: integer, default: 14 }
+                notes: { type: string, nullable: true }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /v1/finance/invoices/{id}:
+    get:
+      operationId: getFinanceInvoice
+      tags: [Finance]
+      summary: Read one invoice
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: updateFinanceInvoiceDraft
+      tags: [Finance]
+      summary: Edit a draft invoice
+      description: Only a draft can be edited (409 NOT_DRAFT otherwise) — a sent invoice is immutable and corrections go through a credit note.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      operationId: deleteFinanceInvoiceDraft
+      tags: [Finance]
+      summary: Delete a draft invoice
+      description: Draft-only (409 otherwise). A deleted draft never consumes an invoice number — the sequence stays gapless.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/finance/invoices/{id}/send:
+    post:
+      operationId: sendFinanceInvoice
+      tags: [Finance]
+      summary: Send an invoice (draft → sent)
+      description: 'Atomically claims the next gapless invoice number, derives the display number and payment reference (Finnish viite or RF per reference_style), stamps invoice/due dates, re-snapshots VAT rates on the invoice date, and resolves the fiscal year (409 FISCAL_YEAR_LOCKED when locked). delivery_method is finvoice (operator), email, or manual.'
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [delivery_method]
+              properties:
+                delivery_method: { type: string, enum: [finvoice, email, manual] }
+                reference_style: { type: string, enum: [fi, rf], default: fi }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/finance/invoices/{id}/mark-paid:
+    post:
+      operationId: markFinanceInvoicePaid
+      tags: [Finance]
+      summary: Mark an invoice paid
+      description: Transitions sent/overdue → paid and books the income voucher (source `invoice`) carrying the invoice's VAT breakdown. Idempotent — repeating returns the paid invoice without a second voucher.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                paid_at: { type: string, format: date-time }
+                tracking_code: { type: string }
+                external_ref: { type: string }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/finance/invoices/{id}/credit-note:
+    post:
+      operationId: createFinanceCreditNote
+      tags: [Finance]
+      summary: Create a credit-note draft for a sent invoice
+      description: Returns a new draft of type `credit_note` mirroring the original's lines. Sending it flips the original to `credited`.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/finance/invoices/{id}/finvoice.xml:
+    get:
+      operationId: getFinanceInvoiceFinvoiceXml
+      tags: [Finance]
+      summary: Download the Finvoice 3.0 XML
+      description: Generates the schema-valid Finvoice 3.0 document deterministically from the immutable sent invoice (409 for a draft).
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { description: Finvoice 3.0 XML (application/xml) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/finance/vouchers:
+    get:
+      operationId: listFinanceVouchers
+      tags: [Finance]
+      summary: List accounting vouchers
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: fiscal_year_id, in: query, schema: { type: string } }
+        - { name: source, in: query, schema: { type: string, enum: [stripe, checkout, invoice, receipt, manual, morsel] } }
+        - { name: direction, in: query, schema: { type: string, enum: [income, expense, transfer] } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 50, maximum: 200 } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createFinanceVoucher
+      tags: [Finance]
+      summary: Book a manual/receipt voucher
+      description: 'Books an append-only voucher (tosite): the fiscal year is resolved from the date (409 when locked) and the sequential number is claimed atomically. Corrections use the reverse endpoint, never edits.'
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [date, description, direction, source, amount_minor]
+              properties:
+                organism_id: { type: string, nullable: true }
+                date: { type: string, format: date }
+                description: { type: string }
+                direction: { type: string, enum: [income, expense] }
+                source: { type: string, enum: [receipt, manual] }
+                amount_minor: { type: integer, description: 'Gross amount in cents, always positive' }
+                currency: { type: string, default: EUR }
+                vat_breakdown:
+                  type: array
+                  items:
+                    type: object
+                    required: [vatCodeId, vatRateBp, netMinor, vatMinor]
+                    properties:
+                      vatCodeId: { type: string }
+                      vatRateBp: { type: integer }
+                      netMinor: { type: integer }
+                      vatMinor: { type: integer }
+                counterparty: { type: string, nullable: true }
+                invoice_id: { type: string, nullable: true }
+                attachments: { type: array, items: { type: string } }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/finance/vouchers/{id}:
+    get:
+      operationId: getFinanceVoucher
+      tags: [Finance]
+      summary: Read one voucher
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/finance/vouchers/{id}/reverse:
+    post:
+      operationId: reverseFinanceVoucher
+      tags: [Finance]
+      summary: Reverse a voucher (the correction mechanism)
+      description: Books a new opposite-direction voucher with reversesVoucherId pointing back. The original row is never touched.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason: { type: string, maxLength: 300 }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '422': { $ref: '#/components/responses/AimeatError' }
+  /v1/finance/vouchers/{id}/attachments:
+    post:
+      operationId: addFinanceVoucherAttachments
+      tags: [Finance]
+      summary: Attach evidence (storage keys) to a voucher
+      description: Appends receipt images/documents to the voucher's evidence list. Augments the record; the booking itself never changes.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [keys]
+              properties:
+                keys: { type: array, items: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/finance/vat-codes:
+    get:
+      operationId: listFinanceVatCodes
+      tags: [Finance]
+      summary: List VAT codes valid on a date
+      description: The node-global VAT registry (Finnish codes seeded, basis-point rates, validity windows). Default filters to codes valid on `date` (today); `all=true` returns the whole registry.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: date, in: query, schema: { type: string, format: date } }
+        - { name: all, in: query, schema: { type: boolean, default: false } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/finance/fiscal-years:
+    get:
+      operationId: listFinanceFiscalYears
+      tags: [Finance]
+      summary: List fiscal years
+      security: [{ BearerAuth: [] }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+    post:
+      operationId: createFinanceFiscalYear
+      tags: [Finance]
+      summary: Create a fiscal year
+      description: Calendar years are auto-created on first booking; this endpoint exists for non-calendar fiscal years. Overlaps are rejected (409).
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [label, start_date, end_date]
+              properties:
+                label: { type: string }
+                start_date: { type: string, format: date }
+                end_date: { type: string, format: date }
+                organism_id: { type: string, nullable: true }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/finance/fiscal-years/{id}/lock:
+    post:
+      operationId: lockFinanceFiscalYear
+      tags: [Finance]
+      summary: Lock or unlock a fiscal year (owner only)
+      description: A locked year rejects new vouchers and invoice sends dated inside it — the accountant's period close. Owner role required (agents/apps cannot close periods).
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [locked]
+              properties:
+                locked: { type: boolean }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/finance/vat-report:
+    get:
+      operationId: getFinanceVatReport
+      tags: [Finance]
+      summary: VAT period summary (ALV-kausikooste)
+      description: Sales and deductible purchase VAT grouped by code over a month range, plus the payable total — the basis for the OmaVero self-assessment. Nothing is filed anywhere; this is the truth of the bookings. Transfers are excluded.
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: from, in: query, required: true, schema: { type: string, pattern: '^[0-9]{4}-[0-9]{2}$' } }
+        - { name: to, in: query, schema: { type: string, pattern: '^[0-9]{4}-[0-9]{2}$' } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/finance/export/vouchers.csv:
+    get:
+      operationId: exportFinanceVouchersCsv
+      tags: [Finance]
+      summary: Voucher journal CSV (semicolon, comma decimals, BOM)
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: CSV (text/csv) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/finance/export/invoices.csv:
+    get:
+      operationId: exportFinanceInvoicesCsv
+      tags: [Finance]
+      summary: Invoice ledger CSV
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: CSV (text/csv) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/finance/export/finvoice.zip:
+    get:
+      operationId: exportFinanceFinvoiceZip
+      tags: [Finance]
+      summary: Finvoice XML bundle (ZIP) of sent invoices in a date range
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to, in: query, schema: { type: string, format: date } }
+      responses:
+        '200': { description: ZIP bundle (application/zip) }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/commerce/webhooks/stripe/{owner}:
+    post:
+      operationId: stripeWebhookForSeller
+      tags: [Finance]
+      summary: Per-seller Stripe webhook → accounting vouchers
+      description: 'Verifies the Stripe v1 signature against the seller''s endpoint secret (set via PUT /v1/commerce/payout/stripe webhook_secret — every seller runs their own Stripe account). Books payment_intent.succeeded as an income voucher, or marks the matching invoice paid when metadata.aimeat_reference matches; charge.refunded as an expense voucher; payout.paid as a transfer voucher. Idempotent by event id. Unknown owners and unconfigured endpoints answer 404 identically.'
+      parameters: [{ name: owner, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, description: Raw Stripe event (signature verified over the exact bytes) }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/AimeatError' }
+        '404': { $ref: '#/components/responses/NotFound' }

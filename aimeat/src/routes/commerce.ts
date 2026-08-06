@@ -97,7 +97,7 @@ const PSP_KEY = 'commerce.psp';
 /** An EVM account address — the only shape an x402 stablecoin settlement can pay out to. */
 const EVM_ADDRESS = /^0x[a-fA-F0-9]{40}$/;
 
-type PspRecord = { provider?: string; secretKey?: unknown; payTo?: string; address?: string; x402?: { address?: string; payTo?: string } };
+type PspRecord = { provider?: string; secretKey?: unknown; webhookSecret?: unknown; payTo?: string; address?: string; x402?: { address?: string; payTo?: string } };
 
 /** Read the seller's payment settings record (private, owner-scoped). */
 async function readPsp(storage: Storage, ownerGhii: string): Promise<PspRecord> {
@@ -200,19 +200,30 @@ export function commerceRouter(config: AimeatConfig, storage: Storage): Router {
     }));
   });
 
-  /** Store the seller's OWN Stripe secret. Merges: the x402 address in the same record survives. */
+  /** Store the seller's OWN Stripe secret. Merges: the x402 address in the same record survives.
+   *  Optional webhook_secret is the endpoint signing secret for /v1/commerce/webhooks/stripe/:owner
+   *  (per-seller, because every seller runs their own Stripe account — there is no node-level key). */
   router.put('/v1/commerce/payout/stripe', requireAuth(), requireRole('owner'), async (req, res) => {
-    const raw = (req.body ?? {}) as { secret_key?: unknown; provider?: unknown };
+    const raw = (req.body ?? {}) as { secret_key?: unknown; provider?: unknown; webhook_secret?: unknown };
     const secretKey = typeof raw.secret_key === 'string' ? raw.secret_key.trim() : '';
     if (secretKey.length < 8 || secretKey.length > 200) {
       return res.status(400).json(error(config.nodeId, 'INVALID_PSP',
         'secret_key must be your Stripe secret (8-200 characters). It is stored server-side and never returned by any endpoint.'));
     }
+    const webhookSecret = typeof raw.webhook_secret === 'string' ? raw.webhook_secret.trim() : '';
+    if (webhookSecret && (webhookSecret.length < 8 || webhookSecret.length > 200)) {
+      return res.status(400).json(error(config.nodeId, 'INVALID_PSP',
+        'webhook_secret must be the Stripe endpoint signing secret (8-200 characters).'));
+    }
     const provider = typeof raw.provider === 'string' && raw.provider.trim() ? raw.provider.trim().slice(0, 60) : 'stripe';
     const ownerGhii = resolveIdentity(req.auth!, config.nodeId);
-    await writePsp(storage, ownerGhii, { ...(await readPsp(storage, ownerGhii)), provider, secretKey });
+    await writePsp(storage, ownerGhii, {
+      ...(await readPsp(storage, ownerGhii)), provider, secretKey,
+      ...(webhookSecret ? { webhookSecret } : {}),
+    });
     return res.json(success(config.nodeId, {
       configured: true, provider, keyHint: maskSecret(secretKey),
+      webhook_configured: !!webhookSecret || undefined,
       note: 'Money sales now settle on this Stripe account. The secret is never returned by any endpoint.',
     }));
   });
