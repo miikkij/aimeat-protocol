@@ -91,7 +91,9 @@ export interface ExtensionCtx {
         warn(msg: string, data?: Record<string, unknown>): void;
         error(msg: string, data?: Record<string, unknown>): void;
     };
-    notify?(message: string, opts?: { title?: string; priority?: string; channel?: string }): Promise<boolean>;
+    /** Notify the caller's owner; with `to`, ANOTHER owner — delivered only when the target holds
+     *  an active `extension_notify` consent for `ext:{name}` (see services/extension-notify.ts). */
+    notify?(message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string }): Promise<boolean>;
     email?(to: string, subject: string, body: string): Promise<boolean>;
     // NOTE: the guest ctx also exposes two PURE helpers that need no host call and are therefore
     // implemented inside buildSandboxScript rather than here:

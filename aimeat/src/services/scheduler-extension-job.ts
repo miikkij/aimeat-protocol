@@ -13,6 +13,7 @@ import { executeExtensionAction, trackMemoryAccess } from './extension-runtime.j
 import type { ExtensionCtx } from './extension-runtime.js';
 import { getEncryptionKey } from './encryption.js';
 import { getExtSecretKeys, getInstanceSecretKeys, decryptSecretFields } from './extension-secrets.js';
+import { extensionCrossNotify } from './extension-notify.js';
 import type { EmailService } from './email.js';
 import { notify } from './notify.js';
 import { logger } from '../utils/logger.js';
@@ -184,6 +185,7 @@ export async function runExtensionJob(
       error: (msg, data) => logger.error(`[ext:${ext.name}:scheduler] ${msg}`, data),
     },
     notify: async (message, opts) => {
+      if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
       const key = `notifications.${ext.installedBy}`;
       const existing = await storage.getMemory(ext.installedBy, key);
       const list = Array.isArray(existing?.value) ? existing.value : [];

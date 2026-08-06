@@ -147,6 +147,19 @@ actions:
           type: string
     output:
       type: object
+  - id: notifytest
+    method: POST
+    path: /notifytest
+    script: notify_script
+    input:
+      type: object
+      properties:
+        message:
+          type: string
+        to:
+          type: string
+    output:
+      type: object
 limits:
   memory_mb: 16
   timeout_ms: 5000
@@ -162,6 +175,11 @@ const testScripts = {
         const r = await ctx.files.read(w.key);
         const missing = await ctx.files.read('no-such-file.bin');
         return { available: true, key: w.key, url: w.url, size: w.size, readBack: r ? r.base64 : null, missing };
+    }`,
+    // Cross-owner notify: delivered ONLY when the target consented (extension_notify + ext:{name}).
+    notify_script: `export default async function(ctx, input) {
+        const sent = await ctx.notify(input.message, { title: 'cross', to: input.to });
+        return { sent };
     }`,
 };
 
@@ -406,6 +424,56 @@ await test('9b. aimeat_extension_invoke gives the action ctx.files (write + read
     assert(result.size === 12, `size: ${result.size}`);
     assert(result.readBack === payload, `read back what was written: ${result.readBack}`);
     assert(result.missing === null, 'missing ref reads as null');
+});
+
+const targetName = `mcpexttarget${Date.now()}`;
+let targetToken = '';
+let targetPriv = '';
+
+await test('9c. Cross-owner notify is REFUSED without the target\'s consent', async () => {
+  // A second owner who has granted nothing.
+  const reg = await json('/v1/ghii', {
+    method: 'POST',
+    body: JSON.stringify({ username: targetName, display_name: 'Notify Target', password: 'NotifyT1234' }),
+  });
+  assert(reg.status === 201, `register target: ${reg.status}`);
+  targetPriv = reg.body.data.private_key;
+  const timestamp = new Date().toISOString();
+  const signature = await signMsg(targetPriv, targetName + NODE_ID + timestamp);
+  const tok = await json('/v1/auth/token', { method: 'POST', body: JSON.stringify({ owner: targetName, timestamp, signature }) });
+  assert(tok.body.ok === true, 'target token');
+  targetToken = tok.body.data.token;
+
+  const { body } = await mcpRpc('tools/call', {
+    name: 'aimeat_extension_invoke',
+    arguments: { extension_name: extName, action_id: 'notifytest', input: { message: 'hei', to: targetName } },
+  }, 110);
+  assert(!body.result.isError, `not an error: ${body.result?.content?.[0]?.text}`);
+  const result = JSON.parse(body.result.content[0].text);
+  assert(result.sent === false, `unconsented cross-notify must NOT deliver, sent=${result.sent}`);
+});
+
+await test('9d. Cross-owner notify DELIVERS once the target consents (extension_notify)', async () => {
+  const grant = await json('/v1/consent', {
+    method: 'POST', headers: { Authorization: `Bearer ${targetToken}` },
+    body: JSON.stringify({ data_pattern: `ext:${extName}`, recipient: '*', purpose: 'extension_notify' }),
+  });
+  assert(grant.status === 201 || grant.status === 200, `consent grant: ${grant.status} ${JSON.stringify(grant.body).slice(0, 200)}`);
+
+  const { body } = await mcpRpc('tools/call', {
+    name: 'aimeat_extension_invoke',
+    arguments: { extension_name: extName, action_id: 'notifytest', input: { message: 'kello soi', to: targetName } },
+  }, 111);
+  assert(!body.result.isError, `not an error: ${body.result?.content?.[0]?.text}`);
+  const result = JSON.parse(body.result.content[0].text);
+  assert(result.sent === true, `consented cross-notify should deliver, sent=${result.sent}`);
+
+  // The notification landed in the TARGET's private list, attributed to the extension.
+  const mem = await json(`/v1/memory/notifications.${targetName}`, { headers: { Authorization: `Bearer ${targetToken}` } });
+  assert(mem.status === 200, `target notifications read: ${mem.status}`);
+  const list = mem.body.data?.value ?? mem.body.data?.memory?.value ?? [];
+  assert(Array.isArray(list) && list.some((n: any) => n.message === 'kello soi' && n.source === extName),
+    `notification present for target: ${JSON.stringify(list).slice(0, 200)}`);
 });
 
 // ─── Phase 6: Extension resource ───

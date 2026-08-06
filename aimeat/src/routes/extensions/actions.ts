@@ -25,6 +25,7 @@ import { notify } from '../../services/notify.js';
 import { executeExtensionAction } from '../../services/extension-runtime.js';
 import type { ExtensionCtx } from '../../services/extension-runtime.js';
 import { makeExtensionFiles } from '../../services/extension-files.js';
+import { extensionCrossNotify } from '../../services/extension-notify.js';
 import { logger } from '../../utils/logger.js';
 import { getMember, accountOf } from '../../services/app-members.js';
 import { resolveIdentity, callerPrincipal } from '../../utils/gaii.js';
@@ -290,7 +291,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           warn: (msg, data) => logger.warn(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
           error: (msg, data) => logger.error(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
         },
-        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string }) => {
+        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string }) => {
+          if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
           const key = `notifications.${req.auth!.owner}`;
           const existing = await storage.getMemory(callerGaii, key);
           const list = Array.isArray(existing?.value) ? (existing.value as unknown[]) : [];
@@ -614,7 +616,8 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           warn: (msg, data) => logger.warn(`[ext:${ext.name}] ${msg}`, data),
           error: (msg, data) => logger.error(`[ext:${ext.name}] ${msg}`, data),
         },
-        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string }) => {
+        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string }) => {
+          if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
           const key = `notifications.${req.auth!.owner}`;
           const existing = await storage.getMemory(callerGaii, key);
           const list = Array.isArray(existing?.value) ? (existing.value as unknown[]) : [];

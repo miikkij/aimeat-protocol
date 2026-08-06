@@ -42,6 +42,7 @@ import { notify } from '../services/notify.js';
 import { generateUploadToken, buildUploadMeta } from '../services/upload-token.js';
 import { enforceExtensionMemoryLimits } from '../services/quota.js';
 import { makeExtensionFiles } from '../services/extension-files.js';
+import { extensionCrossNotify } from '../services/extension-notify.js';
 import { safeFetch } from '../utils/url-validator.js';
 import { annotationsFor } from './annotations.js';
 import { descriptionFor } from './catalog/shape.js';
@@ -334,7 +335,8 @@ export function registerExtensionsTools(
                     warn: (msg, data) => logger.warn(`[ext:${ext.name}${instance_id ? ':' + instance_id : ''}] ${msg}`, data),
                     error: (msg, data) => logger.error(`[ext:${ext.name}${instance_id ? ':' + instance_id : ''}] ${msg}`, data),
                 },
-                notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string }) => {
+                notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string }) => {
+                    if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
                     const parsed = parseGAII(agentGaii);
                     if (!parsed) return false;
                     const key = `notifications.${parsed.owner}`;
