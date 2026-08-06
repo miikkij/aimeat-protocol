@@ -387,6 +387,11 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
                 logger.warn('Failed to upsert ChatInstance for MCP session', { error: (err as Error).message });
                 chatInstanceId = undefined;
             }
+
+            // Onboarding funnel: the owner's FIRST MCP session is the activation signal the
+            // rescue email keys off. Fire-and-forget; must never delay or break the session.
+            const { recordFirstMcpCall } = await import('../services/onboarding-funnel.js');
+            void recordFirstMcpCall(storage, config, sessionOwner, platform);
         }
 
         // Create transport and MCP server for this session

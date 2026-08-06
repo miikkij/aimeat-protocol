@@ -49,6 +49,11 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
     jobs.push({ id: 'core:mailbox-cleanup', name: 'Mailbox Cleanup', coreHandler: 'mailbox-cleanup', cron: '*/10 * * * *' });
   }
 
+  if (config.emailEnabled) {
+    // Onboarding rescue: hourly pass over day-old accounts with no MCP session (UX-remake v3, P3).
+    jobs.push({ id: 'core:mcp-onboarding-rescue', name: 'MCP Onboarding Rescue', coreHandler: 'mcp-onboarding-rescue', cron: '15 * * * *' });
+  }
+
   jobs.push({ id: 'core:capability-aggregation', name: 'Capability Aggregation', coreHandler: 'capability-aggregation', cron: '*/5 * * * *' });
 
   if (config.eudiwEnabled || config.ftnEnabled) {

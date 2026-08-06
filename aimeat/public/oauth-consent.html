@@ -99,11 +99,23 @@
       return typeof o === 'string' ? o : o?.name || session?.username || '';
     };
 
+    // Restore an existing browser session from the httpOnly refresh cookie.
+    // POST /v1/auth/refresh is the session-restore endpoint (GET /v1/auth/session is the
+    // unrelated legacy challenge flow and always 400s here, which forced a re-login).
     async function checkSession() {
       try {
-        const r = await fetch('/v1/auth/session', { credentials: 'include' });
+        const r = await fetch('/v1/auth/refresh', {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'X-AIMEAT-Refresh': '1' },
+        });
         const d = await r.json();
-        if (d.ok && d.data?.jwt) return d.data;
+        const jwt = d.ok && d.data?.token;
+        if (!jwt) return null;
+        // Owner name lives in the JWT payload; decode it client-side.
+        const payload = JSON.parse(atob(jwt.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        if (!payload.owner) return null;
+        return { jwt, owner: payload.owner };
       } catch {}
       return null;
     }
@@ -159,6 +171,10 @@
         <p class="subtitle">${escHtml(t('subtitle'))}</p>
         <div class="platform-badge">
           ${escHtml(t('platformLabel'))} <span class="platform-name">${escHtml(clientName)}</span>
+        </div>
+        <div class="scope-list">
+          <strong>${escHtml(t('scopeLabel'))}</strong><br/>
+          ${escHtml(t('scopeFull'))}
         </div>
         <p style="margin-bottom:1rem;font-size:.9rem">${escHtml(t('loginRequired'))}</p>
         <form id="loginForm">

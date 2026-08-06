@@ -30,6 +30,9 @@
  * @version-history
  *   v1.0.0 — 2026-07-31 — Moved here from public/views/profile/ai-tool-setup.js so the SPA and the
  *     Experience Center read one table instead of two copies.
+ *   v1.1.0 — 2026-08-07 — claude.ai moved first and flagged `recommended` (UX-remake v3, K2):
+ *     the free tier's single custom-connector slot is enough to start, and array order doubles
+ *     as the default selection in the pickers.
  */
 import type { AimeatConfig } from '../config.js';
 
@@ -44,6 +47,8 @@ export interface AiToolParam {
 export interface AiTool {
     id: string;
     label: string;
+    /** The tool we point a first-timer at (K2: free tier's one connector slot is enough). */
+    recommended?: boolean;
     mcp: {
         docs: string;
         steps: string[];
@@ -86,6 +91,35 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
     });
 
     return [
+        // claude.ai first ON PURPOSE (UX-remake v3, K2): it is the recommended first path — the
+        // free tier's single custom-connector slot is enough to start, and the array order is
+        // also the default selection in every picker built on this table.
+        {
+            id: 'claude-web',
+            label: 'claude.ai',
+            recommended: true,
+            mcp: {
+                docs: 'https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp',
+                steps: [
+                    s(l, 'Open claude.ai and go to Settings, then Connectors. On Pro and Max the path is Customize > Connectors.',
+                        'Avaa claude.ai, mene kohtaan Settings ja sieltä Connectors. Pro- ja Max-tasoilla polku on Customize > Connectors.'),
+                    s(l, 'Click + and then Add custom connector.', 'Klikkaa + ja sitten Add custom connector.'),
+                    s(l, 'Fill the fields with the values below and click Add.',
+                        'Täytä kentät alla olevilla arvoilla ja klikkaa Add.'),
+                    s(l, 'Sign in to this node in the tab that opens, with your own account.',
+                        'Kirjaudu tähän nodeen avautuvassa välilehdessä omalla tililläsi.'),
+                    s(l, 'Start a NEW conversation.', 'Aloita UUSI keskustelu.'),
+                ],
+                params: [nameParam(), { label: 'Remote MCP server URL', value: mcpUrl }, oauthParam()],
+                plans: s(l, 'Free, Pro, Max, Team and Enterprise. On Team and Enterprise an owner adds it under Organization settings > Connectors > Add > Custom > Web, and until they do, you cannot.',
+                    'Free, Pro, Max, Team ja Enterprise. Team- ja Enterprise-tileillä omistaja lisää sen kohdassa Organization settings > Connectors > Add > Custom > Web, ja ennen sitä sinä et voi.'),
+            },
+            instructions: {
+                where: s(l, 'Settings > General > Instructions for Claude (shown under Profile in some versions). Applies to every new conversation on the account.',
+                    'Settings > General > Instructions for Claude (joissakin versioissa Profile-kohdan alla). Koskee jokaista uutta keskustelua tällä tilillä.'),
+                docs: 'https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features',
+            },
+        },
         {
             id: 'claude-desktop',
             label: 'Claude Desktop',
@@ -110,31 +144,6 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
             instructions: {
                 where: s(l, 'Settings > General > Instructions for Claude. Applies to every new conversation on the account.',
                     'Settings > General > Instructions for Claude. Koskee jokaista uutta keskustelua tällä tilillä.'),
-                docs: 'https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features',
-            },
-        },
-        {
-            id: 'claude-web',
-            label: 'claude.ai',
-            mcp: {
-                docs: 'https://support.claude.com/en/articles/11175166-get-started-with-custom-connectors-using-remote-mcp',
-                steps: [
-                    s(l, 'Open claude.ai and go to Settings, then Connectors. On Pro and Max the path is Customize > Connectors.',
-                        'Avaa claude.ai, mene kohtaan Settings ja sieltä Connectors. Pro- ja Max-tasoilla polku on Customize > Connectors.'),
-                    s(l, 'Click + and then Add custom connector.', 'Klikkaa + ja sitten Add custom connector.'),
-                    s(l, 'Fill the fields with the values below and click Add.',
-                        'Täytä kentät alla olevilla arvoilla ja klikkaa Add.'),
-                    s(l, 'Sign in to this node in the tab that opens, with your own account.',
-                        'Kirjaudu tähän nodeen avautuvassa välilehdessä omalla tililläsi.'),
-                    s(l, 'Start a NEW conversation.', 'Aloita UUSI keskustelu.'),
-                ],
-                params: [nameParam(), { label: 'Remote MCP server URL', value: mcpUrl }, oauthParam()],
-                plans: s(l, 'Free, Pro, Max, Team and Enterprise. On Team and Enterprise an owner adds it under Organization settings > Connectors > Add > Custom > Web, and until they do, you cannot.',
-                    'Free, Pro, Max, Team ja Enterprise. Team- ja Enterprise-tileillä omistaja lisää sen kohdassa Organization settings > Connectors > Add > Custom > Web, ja ennen sitä sinä et voi.'),
-            },
-            instructions: {
-                where: s(l, 'Settings > General > Instructions for Claude (shown under Profile in some versions). Applies to every new conversation on the account.',
-                    'Settings > General > Instructions for Claude (joissakin versioissa Profile-kohdan alla). Koskee jokaista uutta keskustelua tällä tilillä.'),
                 docs: 'https://support.claude.com/en/articles/10185728-understanding-claude-s-personalization-features',
             },
         },

@@ -193,6 +193,7 @@
 .dv-copy-btn { padding: .3rem .6rem; background: var(--accent); color: #fff; border: none; border-radius: .25rem; cursor: pointer; font-size: .75rem; white-space: nowrap; }
 .dv-copy-btn--alt { padding: .2rem .5rem; background: var(--purple-bg); color: var(--purple-fg); border: 1px solid var(--purple-border); border-radius: .25rem; cursor: pointer; font-size: .75rem; white-space: nowrap; }
 .dv-note { margin-top: .75rem; font-size: .8rem; color: var(--text-dim); font-style: italic; }
+.dv-inline-link { color: var(--accent); font-style: normal; font-weight: 600; }
 .dv-hint { font-size: .8rem; color: var(--text-dim); margin: 0; font-style: italic; }
 .dv-step-img { max-width: 100%; border-radius: .5rem; border: 1px solid var(--border); }
 .dv-step-media { margin: .5rem 0; }

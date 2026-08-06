@@ -13,6 +13,11 @@
  *     the handle: an `owner` containing '@' is resolved (case-insensitive, verified-email only) to the
  *     bare handle before anything downstream. Email only selects the target account — not an auth
  *     factor — so the RFC 8628 approval semantics are unchanged.
+ *   v1.3.0 — 2026-08-07 — device-token retrieval grace window: the first credential poll no longer
+ *     clears the credentials; it shortens the request expiry to 120 s so a client that mis-parsed
+ *     the flat OAuth-style response can re-poll instead of redoing the whole owner-approval round.
+ *     Net credential lifetime in storage goes DOWN (was: until the 30 min expiry when unpolled).
+ *     (UX-remake v3, P9 / measured in the Jussi run.)
  */
 import type { Router, Request } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -418,9 +423,24 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
           res.status(400).json({ error: 'expired_token', error_description: 'Credentials have already been retrieved.' });
           return;
         }
-        // Return credentials and immediately clear them
+        // Retrieval grace window: the response is flat OAuth-style JSON (unlike the AIMEAT
+        // envelope every other endpoint uses), and a client that parses it wrong loses the
+        // credentials forever — forcing a whole new authorize + owner approval round. So the
+        // first retrieval does NOT clear the credentials; it shortens the request's expiry to
+        // a short grace window instead. A re-poll with the same device_code inside the window
+        // returns the same credentials; after it, the expiry check above ends the flow and
+        // cleanupExpiredDeviceAuth wipes the record. Security note: this narrows credential
+        // lifetime (they previously sat in storage until the original 30 min expiry when
+        // unpolled) and only the device_code holder — who could have polled first anyway —
+        // can re-read within the window.
+        const RETRIEVAL_GRACE_MS = 120_000;
         const creds = request.agentCredentials;
-        await storage.updateDeviceAuth(device_code, { agentCredentials: undefined });
+        const remainingMs = new Date(request.expiresAt).getTime() - Date.now();
+        if (remainingMs > RETRIEVAL_GRACE_MS) {
+          await storage.updateDeviceAuth(device_code, {
+            expiresAt: new Date(Date.now() + RETRIEVAL_GRACE_MS).toISOString(),
+          });
+        }
 
         const baseUrl = config.baseUrl;
         const agentName = request.agentName;

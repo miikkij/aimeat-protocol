@@ -4049,6 +4049,12 @@
       "note": "Works with any AI that can browse (Grok, Claude, ChatGPT with browsing). The URL returns JSON instructions the AI understands.",
       "fallback": "For any other AI, pick your platform below and you get exact steps."
     },
+    "staySync": {
+      "title": "Keep your AI in sync",
+      "lead": "Connecting is half the job. Without a standing instruction the AI forgets this node between sessions and drifts quietly out of sync. Paste this line into your project's CLAUDE.md, AGENTS.md or the chat's custom instructions:",
+      "prefilledNote": "Signed in? Your profile's MCP page builds this block prefilled with your own organisms and workspaces.",
+      "prefilledLink": "Get your prefilled block →"
+    },
     "step1": {
       "label": "Select Your AI Platform"
     },
@@ -8539,6 +8545,7 @@
   },
   "setup": {
     "pickTool": "Which AI tool are you connecting? The steps differ enough that the general version is not usable.",
+    "recommendedBadge": "recommended to start",
     "paramsTitle": "What to put in each field",
     "copy": "Copy",
     "copied": "Copied",

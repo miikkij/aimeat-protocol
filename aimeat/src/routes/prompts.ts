@@ -20,7 +20,7 @@
 import { Router } from 'express';
 import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
-import { requireAuth } from '../auth/middleware.js';
+import { requireAuth, optionalAuth } from '../auth/middleware.js';
 import { success, error } from '../middleware/envelope.js';
 import { substituteVariables, resolvePromptContent } from '../services/prompt-variables.js';
 import { parseGaiiLoose } from '../utils/gaii.js';
@@ -322,9 +322,16 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   // and the key it names can never drift apart: that drift would be a silent failure in exactly
   // the way this whole feature exists to prevent. Public — onboarding guidance, not a secret.
   // ?lang=en|fi, ?format=txt. MUST be registered before /v1/prompts/:tier.
-  router.get('/v1/prompts/hello-mcp', (req, res) => {
+  router.get('/v1/prompts/hello-mcp', optionalAuth(), (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
     const prompt = buildHelloMcpPrompt(config, { lang });
+    // Onboarding funnel: a signed-in owner fetching this prompt = the hello page was opened.
+    // The route stays public; the marker only exists for authenticated owners.
+    if (req.auth && !req.auth.anonymous && req.auth.owner) {
+      void import('../services/onboarding-funnel.js')
+        .then(m => m.recordHelloPageOpened(storage, config, req.auth!.owner))
+        .catch(err => logger.warn('hello-mcp: funnel marker failed', { error: String(err) }));
+    }
     if (req.query.format === 'txt') {
       res.type('text/plain; charset=utf-8').send(prompt);
       return;

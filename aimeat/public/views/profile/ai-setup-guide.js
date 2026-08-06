@@ -72,7 +72,8 @@ function ToolPicker({ tools, value, onPick }) {
       ${tools.map(tool => html`
         <button key=${tool.id} type="button" role="tab" aria-selected=${tool.id === value}
           class=${'ast-tool' + (tool.id === value ? ' ast-tool--active' : '')}
-          onClick=${() => onPick(tool.id)}>${tool.label}</button>`)}
+          onClick=${() => onPick(tool.id)}>${tool.label}${tool.recommended
+            ? html` <span class="ast-tool-reco">${tr('setup.recommendedBadge', 'recommended')}</span>` : null}</button>`)}
     </div>`;
 }
 

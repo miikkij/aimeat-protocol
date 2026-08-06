@@ -70,6 +70,12 @@ export function registerCoreHandlers(
     const { compactWorkspaceVersions } = await import('./workspace-versions.js');
     await compactWorkspaceVersions(storage, config);
   });
+  // Onboarding funnel rescue: one email to a day-old account with a verified email and no MCP
+  // session yet (UX-remake v3, P3). The handler no-ops when the email service is disabled.
+  scheduler.registerCoreHandler('mcp-onboarding-rescue', async () => {
+    const { runMcpOnboardingRescueJob } = await import('./onboarding-funnel.js');
+    await runMcpOnboardingRescueJob(config, storage);
+  });
   // Operator storage-growth telemetry: hourly per-table row-count snapshot (admin DB tab).
   scheduler.registerCoreHandler('storage-stats-snapshot', () => runStorageStatsSnapshotJob(storage));
   // Seed one snapshot at startup so the tab is never empty on a fresh boot (non-blocking).

@@ -4049,6 +4049,12 @@
       "note": "Toimii millä tahansa selaavalla AI:lla (Grok, Claude, ChatGPT selauksella). Osoite palauttaa JSON-ohjeet joita AI ymmärtää.",
       "fallback": "Kaikilla muilla tekoälyillä valitse alta alustasi, niin saat tarkat askeleet."
     },
+    "staySync": {
+      "title": "Pidä tekoälysi synkassa",
+      "lead": "Kytkentä on puolet työstä. Ilman pysyvää ohjetta AI unohtaa tämän noden sessioiden välillä ja ajautuu hiljaa pois synkasta. Liitä tämä rivi projektisi CLAUDE.md:hen, AGENTS.md:hen tai chatin omiin ohjeisiin:",
+      "prefilledNote": "Kirjautunut? Profiilisi MCP-sivu rakentaa tämän blokin esitäytettynä omilla organismeillasi ja työtiloillasi.",
+      "prefilledLink": "Hae esitäytetty blokkisi →"
+    },
     "step1": {
       "label": "Valitse AI-alustasi"
     },
@@ -8465,7 +8471,7 @@
     "intro": "Kytke tekoälysi tähän nodeen ja todista että kytkös toimii. Sen jälkeen käytät koko systeemiä siitä chatista johon olet jo tottunut: muisti, organismit, tehtävät ja agentit, samasta ikkunasta, ilman uuden työkalun opettelua. Kolme askelta, joista kolmas on nappi.",
     "pre": {
       "title": "Ennen kuin aloitat",
-      "paid": "Tarkista mitä tasosi sallii. Claude antaa ilmaiselle tilille tasan yhden oman konnektorin, mikä riittää tähän, joskin ilmaisen tason käyttörajat loppuvat oikeassa työssä nopeasti. ChatGPT vaatii Plus-, Pro-, Business-, Enterprise- tai Education-tason, ja vain selaimessa. Grok vaatii maksullisen tason. Tämän menminen väärin on yleisin yksittäinen syy käyttöönoton epäonnistumiseen, ja se epäonnistuu tavalla joka näyttää meidän vialtamme eikä puuttuvalta ominaisuudelta.",
+      "paid": "Tarkista mitä tasosi sallii. Claude antaa ilmaiselle tilille tasan yhden oman konnektorin, mikä riittää tähän, joskin ilmaisen tason käyttörajat loppuvat oikeassa työssä nopeasti. ChatGPT vaatii Plus-, Pro-, Business-, Enterprise- tai Education-tason, ja vain selaimessa. Grok vaatii maksullisen tason. Tämän meneminen väärin on yleisin yksittäinen syy käyttöönoton epäonnistumiseen, ja se epäonnistuu tavalla joka näyttää meidän vialtamme eikä puuttuvalta ominaisuudelta.",
       "tools": "AI-työkalu joka tukee MCP:tä: Claude (sovellus tai web), Claude Code, ChatGPT developer modessa, Codex CLI, Cursor, VS Code + Copilot, Grok. Geminin kuluttajasovellus ja Microsoft Copilot eivät tue, ja niissä toimiva reitti on kopioi-liitä.",
       "time": "Noin viisi minuuttia ja kyky liittää yksi kehote chattiisi.",
       "public": "Node johon työkalu yltää. Osa työkaluista yhdistää omasta pilvestään eikä sinun koneeltasi, joten localhostilla ajettava node ei ole niiden saavutettavissa."
@@ -8539,6 +8545,7 @@
   },
   "setup": {
     "pickTool": "Mihin AI-työkaluun kytket? Askeleet eroavat sen verran että yleisversiosta ei ole hyötyä.",
+    "recommendedBadge": "suositus aloitukseen",
     "paramsTitle": "Mitä mihinkin kenttään laitetaan",
     "copy": "Kopioi",
     "copied": "Kopioitu",

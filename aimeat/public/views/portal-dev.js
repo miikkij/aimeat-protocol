@@ -18,6 +18,10 @@
  *     organisms, knowledge packages) instead of /v1/stats fields that do not exist, which had
  *     every card rendering 0 on a node with 114 agents. New <StatCard> renders a placeholder
  *     until the fetch resolves rather than a hard zero.
+ *   v1.6.0 — 2026-08-07 — "Keep your AI in sync" panel: the copyable standing-instruction line
+ *     (CLAUDE.md/AGENTS.md/custom instructions) + link to the prefilled per-organism block on
+ *     the profile MCP page. Closes the documented gate where the connection worked but the AI
+ *     silently drifted off the node between sessions (UX-remake v3, P9).
  */
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { useViewCSS } from '/components/useViewCSS.js';
@@ -35,6 +39,10 @@ const GH_MARK = html`<svg class="gh-mark" viewBox="0 0 16 16" width="16" height=
 // client that speaks it; the browse prompt is the fallback for clients that can only read a URL.
 const MCP_ADD_COMMAND = `claude mcp add aimeat --transport http ${NODE_URL}/v1/mcp`;
 const BROWSE_PROMPT = `Read this URL and follow the instructions to connect to this AIMEAT node: ${NODE_URL}/?format=json`;
+// The standing instruction that makes the connection survive between sessions. Kept in English
+// on purpose: it is written for the AI, and it ends by telling the AI where the richer
+// per-organism block lives (profile → MCP → step 5 serves it prefilled).
+const STAY_SYNC_LINE = `I work on the AIMEAT node at ${NODE_URL} over MCP (connector "aimeat"). At the start of a task, read my context from it; write durable results back through the AIMEAT tools instead of keeping them only in this chat. If the AIMEAT tools are not available in this conversation, tell me plainly.`;
 
 /* One live counter. `value` is undefined until the fetch resolves, and the card shows a
    quiet placeholder instead of 0 — a zero here reads as "nothing runs on this node". */
@@ -154,6 +162,21 @@ export default function PortalDevView({ locale }) {
           <div class="dv-prompt-text dv-prompt-text--single">${BROWSE_PROMPT}</div>
         </div>
         <p class="dv-note">${dt('quickStart.note', locale)}<br/>${dt('quickStart.fallback', locale)}</p>
+      </div>
+
+      <!-- Stay in sync: the connection alone does not survive between sessions. The one-line
+           standing instruction is the other half of the setup (the documented failure mode is
+           the AI silently drifting off the node); the profile MCP page builds the full block
+           prefilled with the user's own organisms. -->
+      <div class="dv-panel">
+        <h3 class="dv-panel-title">${dt('staySync.title', locale)}</h3>
+        <p class="dv-panel-lead">${dt('staySync.lead', locale)}</p>
+        <div class="dv-prompt-output dv-prompt-output--flush">
+          <${CopyBtn} text=${STAY_SYNC_LINE} locale=${locale} />
+          <div class="dv-prompt-text">${STAY_SYNC_LINE}</div>
+        </div>
+        <p class="dv-note">${dt('staySync.prefilledNote', locale)}${' '}
+          <a class="dv-inline-link" href="/v1/profile?tab=mcp">${dt('staySync.prefilledLink', locale)}</a></p>
       </div>
 
       <!-- Step 1: Platform -->

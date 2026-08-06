@@ -186,5 +186,31 @@ await test('The Finnish prompt names the same key', async () => {
     assert(body.data?.prompt?.includes(HELLO_KEY), 'fi prompt must name the same key');
 });
 
+// ── Phase 5: the funnel marker — a signed-in owner opening the page is recorded ──
+console.log('\nPhase 5: hello_page_opened funnel marker');
+
+const MARKER_KEY = 'onboarding.hello_page_opened';
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+
+await test('An AUTHENTICATED prompt fetch writes the hello_page_opened marker', async () => {
+    const r = await json('/v1/prompts/hello-mcp', auth(tokenA));
+    assert(r.status === 200, `authed prompt fetch ${r.status}`);
+    // The marker write is fire-and-forget — poll briefly.
+    let found = false;
+    for (let i = 0; i < 10 && !found; i++) {
+        const m = await json(`/v1/memory/${encodeURIComponent(MARKER_KEY)}?soft=1`, auth(tokenA));
+        if (m.status === 200 && m.body.data?.exists !== false && m.body.data?.value) found = true;
+        else await sleep(300);
+    }
+    assert(found, 'marker must exist for the signed-in owner after fetching the prompt');
+});
+
+await test('The anonymous fetches earlier left owner B unmarked', async () => {
+    // Phase 4 fetched the prompt without auth; that must not have marked anyone.
+    const m = await json(`/v1/memory/${encodeURIComponent(MARKER_KEY)}?soft=1`, auth(tokenB));
+    assert(m.status === 200 && m.body.data?.exists === false,
+        `owner B must have no marker from anonymous fetches; got ${JSON.stringify(m.body.data)}`);
+});
+
 console.log(`\n=== Hello MCP: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);
