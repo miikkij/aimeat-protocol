@@ -153,17 +153,26 @@ export function stripePaymentHandler(): PaymentHandler {
       if (typeof instrument !== 'string' || !instrument) {
         throw new PaymentError(
           'PAYMENT_INSTRUMENT_REQUIRED', 402,
-          'Provide payment.instrument: a Stripe PaymentMethod id (e.g. a test-mode pm_… token)',
+          'Provide payment.instrument: a Stripe PaymentMethod id (e.g. a test-mode pm_… token) or a shared payment token (spt_…)',
         );
       }
       const stripeAmount = microsToStripeMinor(amount);
       if (stripeAmount < 1) {
         throw new PaymentError('AMOUNT_TOO_SMALL', 422, 'Hold below one minor unit');
       }
+      // Two instrument shapes, one rail. A PaymentMethod id (pm_…) is the ordinary card token,
+      // tokenized against THIS seller's account. A shared payment token (spt_…) is Stripe's
+      // agentic-commerce grant: the buyer's agent grants the seller a scoped, expiring, amount-
+      // capped credential, and the seller confirms it as payment_method_data instead. SPTs are
+      // a preview feature limited to US/CA sellers, so this branch is untested from the EU —
+      // it is here so an agent that HAS one is not turned away by a parameter name.
+      const isSpt = instrument.startsWith('spt_');
       const intent = await stripeApi(sellerKey(seller), 'POST', 'payment_intents', {
         amount: String(stripeAmount),
         currency: currency.toLowerCase(),
-        payment_method: instrument,
+        ...(isSpt
+          ? { 'payment_method_data[shared_payment_granted_token]': instrument }
+          : { payment_method: instrument }),
         confirm: 'true',
         'capture_method': 'manual',
         'automatic_payment_methods[enabled]': 'true',
