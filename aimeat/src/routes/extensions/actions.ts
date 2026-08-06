@@ -29,7 +29,7 @@ import type { ExtensionCtx } from '../../services/extension-runtime.js';
 const aimeatHashRef: (s: string) => string =
   new Function(`${EXT_HASH_REFERENCE_JS}; return aimeatHash;`)() as (s: string) => string;
 import { makeExtensionFiles } from '../../services/extension-files.js';
-import { extensionCrossNotify } from '../../services/extension-notify.js';
+import { extensionCrossNotify, safeNotificationLink } from '../../services/extension-notify.js';
 import { logger } from '../../utils/logger.js';
 import { getMember, accountOf } from '../../services/app-members.js';
 import { resolveIdentity, callerPrincipal } from '../../utils/gaii.js';
@@ -312,7 +312,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           warn: (msg, data) => logger.warn(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
           error: (msg, data) => logger.error(`[ext:${ext.name}:${instanceId}] ${msg}`, data),
         },
-        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string }) => {
+        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string; link?: string }) => {
           if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
           const key = `notifications.${req.auth!.owner}`;
           const existing = await storage.getMemory(callerGaii, key);
@@ -323,7 +323,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           // Also surface it where the owner actually looks: the header bell + web push,
           // deep-linked to the Extensions tab.
           void notify(storage, `${req.auth!.owner}@${config.nodeId}`, {
-            type: 'extension', title: opts?.title || ext.name, body: message, link: '/v1/profile?tab=extensions',
+            type: 'extension', title: opts?.title || ext.name, body: message, link: safeNotificationLink(config, opts?.link, '/v1/profile?tab=extensions'),
           });
           return true;
         },
@@ -637,7 +637,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           warn: (msg, data) => logger.warn(`[ext:${ext.name}] ${msg}`, data),
           error: (msg, data) => logger.error(`[ext:${ext.name}] ${msg}`, data),
         },
-        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string }) => {
+        notify: async (message: string, opts?: { title?: string; priority?: string; channel?: string; to?: string; link?: string }) => {
           if (opts?.to) return extensionCrossNotify(storage, config, ext.name, opts.to, message, opts);
           const key = `notifications.${req.auth!.owner}`;
           const existing = await storage.getMemory(callerGaii, key);
@@ -648,7 +648,7 @@ export function registerExtensionActionRoutes(router: Router, config: AimeatConf
           // Also surface it where the owner actually looks: the header bell + web push,
           // deep-linked to the Extensions tab.
           void notify(storage, `${req.auth!.owner}@${config.nodeId}`, {
-            type: 'extension', title: opts?.title || ext.name, body: message, link: '/v1/profile?tab=extensions',
+            type: 'extension', title: opts?.title || ext.name, body: message, link: safeNotificationLink(config, opts?.link, '/v1/profile?tab=extensions'),
           });
           return true;
         },

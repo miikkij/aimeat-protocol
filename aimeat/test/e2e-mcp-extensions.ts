@@ -178,7 +178,7 @@ const testScripts = {
     }`,
     // Cross-owner notify: delivered ONLY when the target consented (extension_notify + ext:{name}).
     notify_script: `export default async function(ctx, input) {
-        const sent = await ctx.notify(input.message, { title: 'cross', to: input.to });
+        const sent = await ctx.notify(input.message, { title: 'cross', to: input.to, link: input.link });
         return { sent };
     }`,
 };
@@ -474,6 +474,33 @@ await test('9d. Cross-owner notify DELIVERS once the target consents (extension_
   const list = mem.body.data?.value ?? mem.body.data?.memory?.value ?? [];
   assert(Array.isArray(list) && list.some((n: any) => n.message === 'kello soi' && n.source === extName),
     `notification present for target: ${JSON.stringify(list).slice(0, 200)}`);
+});
+
+await test('9e. Notification link: a node-relative deep link is kept, a foreign host is refused', async () => {
+  // An extension names where its notification leads (so a push about a listing opens the listing,
+  // not a generic settings tab). The node delivers it in its own name, so the destination is
+  // fenced to this node and its app origins — otherwise it is a phishing primitive.
+  const send = async (link: string) => {
+    const { body } = await mcpRpc('tools/call', {
+      name: 'aimeat_extension_invoke',
+      arguments: { extension_name: extName, action_id: 'notifytest', input: { message: `link ${link}`, to: targetName, link } },
+    }, 112);
+    assert(!body.result.isError, `not an error: ${body.result?.content?.[0]?.text}`);
+    return JSON.parse(body.result.content[0].text);
+  };
+  assert((await send('/v1/portal?x=1')).sent === true, 'relative link should deliver');
+  assert((await send('https://evil.example.com/steal')).sent === true, 'a refused link still delivers the message');
+
+  const notifs = await json(`/v1/notifications?limit=50`, { headers: { Authorization: `Bearer ${targetToken}` } });
+  assert(notifs.status === 200, `notifications read: ${notifs.status}`);
+  const items = (notifs.body.data?.notifications ?? notifs.body.data?.items ?? []) as any[];
+  const relative = items.find((n) => String(n.body || '').includes('link /v1/portal?x=1'));
+  const foreign = items.find((n) => String(n.body || '').includes('evil.example.com'));
+  assert(relative, `the relative-link notification should exist: ${JSON.stringify(items).slice(0, 300)}`);
+  assert(relative.link === '/v1/portal?x=1', `relative link must be kept, got ${relative.link}`);
+  assert(foreign, 'the foreign-link notification should exist');
+  assert(foreign.link === '/v1/profile?tab=extensions',
+    `a foreign host must fall back to the default link, got ${foreign.link}`);
 });
 
 // ─── Phase 6: Extension resource ───
