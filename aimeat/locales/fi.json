@@ -3870,7 +3870,8 @@
       "showBasicTools": "Näytä vähemmän",
       "pinAdd": "Kiinnitä",
       "pinRemove": "Irrota",
-      "pinLimit": "Enintään 5 kiinnitettyä"
+      "pinLimit": "Enintään 5 kiinnitettyä",
+      "menuBusiness": "Yritys"
     },
     "mcpConnected": "MCP kytketty",
     "openrouter": {

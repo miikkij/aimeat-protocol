@@ -96,6 +96,7 @@
     "typecheck:frontend": "tsc --noEmit -p tsconfig.frontend.json",
     "typecheck:sdk": "tsc --noEmit -p tsconfig.sdk.json",
     "check:importmap": "tsx scripts/check-importmap.ts",
+    "check:profile-tabs": "tsx scripts/check-profile-tabs.ts",
     "check:no-max-tokens": "tsx scripts/check-no-max-tokens.ts",
     "check:openapi": "tsx scripts/check-openapi.ts",
     "check:silent-catch": "tsx scripts/check-silent-catch.ts",

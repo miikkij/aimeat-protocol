@@ -634,6 +634,10 @@ export const SIDEBAR_GROUPS = [
     { id: 'email', labelKey: 'profile.tabs.email' },
     { id: 'chatsessions', labelKey: 'profile.tabs.chatSessions' },
   ] },
+  { titleKey: 'profile.landing.menuBusiness', items: [     // the company and its money
+    { id: 'companies', labelKey: 'profile.tabs.companies' },
+    { id: 'pnl', labelKey: 'profile.tabs.pnl' },
+  ] },
   { titleKey: 'profile.landing.menuBuildShare', items: [
     { id: 'apps', labelKey: 'profile.tabs.apps' },
     { id: 'appdev', labelKey: 'profile.tabs.appDev' },
@@ -677,6 +681,7 @@ export const SIDEBAR_GROUPS = [
  * Operator-only groups are never in the basic set (they are role-gated anyway).
  */
 export const BASIC_TAB_IDS = new Set([
+  'companies',                                  // your company: address, legal identity, sender
   'organisms', 'memory', 'notebook',            // where the work and knowledge live
   'agents', 'mcp',                              // the chat/agent connection
   'notifications', 'contacts',                  // what happened, who with

@@ -6,6 +6,7 @@
 #   3. Frontend type check (checkJs)     — pnpm typecheck:frontend
 #   4. SDK-libs type check (checkJs)      — pnpm typecheck:sdk
 #   5. Importmap ↔ imports in sync       — pnpm check:importmap
+#   5b. Every profile tab has a menu door — pnpm check:profile-tabs
 #   6. No max_tokens caps on AI calls    — pnpm check:no-max-tokens
 #   7. openapi.yaml parse + $ref health  — pnpm check:openapi
 #   8. app-catalog.html ↔ its sources    — pnpm check:app-catalog
@@ -39,6 +40,9 @@ pnpm -s typecheck:sdk
 
 echo "[pre-commit] Importmap ↔ imports in sync (check:importmap)…"
 pnpm -s check:importmap
+
+echo "[pre-commit] Every profile tab reachable from the menu (check:profile-tabs)…"
+pnpm -s check:profile-tabs
 
 echo "[pre-commit] No max_tokens caps on AI calls (check:no-max-tokens)…"
 pnpm -s check:no-max-tokens

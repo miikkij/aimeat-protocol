@@ -3870,7 +3870,8 @@
       "showBasicTools": "Show fewer tools",
       "pinAdd": "Pin",
       "pinRemove": "Unpin",
-      "pinLimit": "Max 5 pinned items"
+      "pinLimit": "Max 5 pinned items",
+      "menuBusiness": "Business"
     },
     "mcpConnected": "MCP connected",
     "openrouter": {

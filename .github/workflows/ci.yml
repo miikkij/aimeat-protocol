@@ -66,6 +66,10 @@ jobs:
         working-directory: aimeat
         run: pnpm check:importmap
 
+      - name: Every profile tab reachable from the menu
+        working-directory: aimeat
+        run: pnpm check:profile-tabs
+
       - name: No max_tokens caps on AI calls
         working-directory: aimeat
         run: pnpm check:no-max-tokens
