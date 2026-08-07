@@ -60,6 +60,7 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 - **Empty panels read as "broken" to users** — prefer always-populated counters/empty-states over a blank region.
 - **`buildComponentPrompt()` is async** — every call site must `await` it.
 - **Platform UI API shapes:** `Tabs` uses `onChange` (not `onSelect`); `DataTable` has no `onRowClick`; `Input`/`Select` return `{el, getValue()}`.
+- **`var(--space-N)` has no definition on this theme — always write the fallback.** There is no `--space-1..8` (nor `--space-xs/sm/md/lg`) in `theme.css`'s `:root`; the file's own two uses carry fallbacks (`var(--space-4, 1rem)`). An undefined custom property makes the whole declaration invalid, so `gap: var(--space-3)` computes to `normal` and `margin: var(--space-3) 0` computes to `0px` — **silently**. Nothing errors, nothing warns, and the page still renders; it just has no spacing, which reads as "the section is one wall of fields" rather than as a bug. Scale to use: `--space-1, 0.25rem` … `--space-8, 2rem`. *(Shipped this way in the P&L and Companies profile tabs — 27 declarations, all collapsed to zero — and was only caught by measuring `getBoundingClientRect()` gaps between siblings rather than looking at a screenshot. `getComputedStyle(document.documentElement).getPropertyValue('--space-3')` returning `''` is the one-line check.)*
 
 ## 5. i18n & locales
 *Symptoms: a raw key rendered instead of text, a key present in one language only.*
