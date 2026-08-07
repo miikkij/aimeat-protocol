@@ -259,6 +259,15 @@
 .ld-invite .ld-loop { margin-top: .25rem; }
 .ld-invite .ld-askai { margin-top: 1rem; }
 
+/* The connect door's body: one paragraph of scope, then one action + the account caveat. */
+.ld-connect-note { font-size: .9rem; line-height: 1.6; color: var(--text-dim); margin: 0 0 1rem; }
+.ld-connect-cta { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+.ld-connect-hint { font-size: .82rem; color: var(--text-dim); }
+
+/* "Show the other N apps" — the wall's first page is short so the two doors above it stay
+   reachable on a phone; the rest expands in place rather than sending the visitor elsewhere. */
+.ld-wall-more { display: flex; justify-content: center; margin-top: 1.25rem; }
+
 /* ── Node change log — folded, one line until it is wanted ────────────────────────────
    Same door as .ld-invite (one collapsible on the page should not read as two components),
    but quieter: this is a status line, not the page's invitation. Shut it shows the freshest

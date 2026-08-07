@@ -9,13 +9,17 @@
  *   extend the memory system, not the schema), so the funnel is queryable without a new table
  *   and visible to the owner in their own Memory tab.
  * @structure
- *   - FIRST_MCP_CALL_KEY / HELLO_PAGE_OPENED_KEY / MCP_RESCUE_SENT_KEY: the marker keys
- *   - recordFirstMcpCall() / recordHelloPageOpened(): write-once markers (in-process de-dupe)
+ *   - FIRST_MCP_CALL_KEY / HELLO_PAGE_OPENED_KEY / ACTIVATED_KEY / MCP_RESCUE_SENT_KEY: marker keys
+ *   - recordFirstMcpCall() / recordHelloPageOpened() / recordActivation(): write-once markers
+ *   - readOnboardingFunnel(): the operator view's rows (activation, TTFV, rescue)
  *   - runMcpOnboardingRescueJob(): the scheduled rescue pass (core handler 'mcp-onboarding-rescue')
  * @usage
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   v1.1.0 — 2026-08-07 — Activation marker + readOnboardingFunnel(): the account's first durable
+ *     own output (app / workspace / agent write) as ONE event with a kind, so an activation rate
+ *     and TTFV are computable (05-mittaus.md).
  *   v1.0.0 — 2026-08-07 — Initial (UX-remake v3, block 1.6).
  */
 import type { AimeatConfig } from '../config.js';
@@ -30,6 +34,14 @@ export const FIRST_MCP_CALL_KEY = 'onboarding.first_mcp_call';
 export const HELLO_PAGE_OPENED_KEY = 'onboarding.hello_page_opened';
 /** Written once, when the rescue email for a silent account has been sent (or attempted). */
 export const MCP_RESCUE_SENT_KEY = 'onboarding.mcp_rescue_sent';
+/**
+ * The ACTIVATION marker (05-mittaus.md): the first time this account produced a durable thing of
+ * its own — a published app, a published workspace item, or an agent's first write. One event with
+ * a `kind` dimension rather than three, so one activation rate is comparable across the personas.
+ * Written once; the value records which of the three came first and when.
+ */
+export const ACTIVATED_KEY = 'onboarding.activated';
+export type ActivationKind = 'app' | 'workspace' | 'agent';
 
 /**
  * Accounts created before this feature existed are never rescued — a months-old account
@@ -100,6 +112,94 @@ export async function recordHelloPageOpened(
         seenHelloOwners.delete(owner);
         logger.warn('onboarding-funnel: hello_page_opened marker failed', { owner, error: String(err) });
     }
+}
+
+// Same in-process de-dupe for activation: after the first write this owner costs nothing.
+const seenActivatedOwners = new Set<string>();
+
+/**
+ * Record the account's ACTIVATION — its first durable own output. Fire-and-forget from whichever
+ * path produced the thing (app publish, workspace publish, agent write); the marker is write-once,
+ * so the first caller wins and later ones are a no-op. Never throws: an activation marker must
+ * never be able to fail the publish it is measuring.
+ */
+export async function recordActivation(
+    storage: Storage, config: AimeatConfig, owner: string, kind: ActivationKind,
+): Promise<void> {
+    if (!owner || seenActivatedOwners.has(owner)) return;
+    seenActivatedOwners.add(owner);
+    try {
+        await writeMarkerOnce(storage, ownerGhii(config, owner), ACTIVATED_KEY, {
+            at: new Date().toISOString(),
+            kind,
+        });
+    } catch (err) {
+        seenActivatedOwners.delete(owner);
+        logger.warn('onboarding-funnel: activation marker failed', { owner, kind, error: String(err) });
+    }
+}
+
+/** One account's funnel state, as the operator view reads it. */
+export interface FunnelRow {
+    owner: string;
+    ghii: string;
+    createdAt: string;
+    locale: string;
+    helloOpenedAt: string | null;
+    firstMcpCallAt: string | null;
+    mcpClient: string | null;
+    activatedAt: string | null;
+    activationKind: ActivationKind | null;
+    /** Signup → activation, in minutes. Null until activated. */
+    ttfvMinutes: number | null;
+    rescueSentAt: string | null;
+}
+
+/**
+ * The whole funnel as rows, newest account first — the operator surface (05-mittaus.md) and the
+ * only place these markers are read together. Test accounts (uxtest-*) are excluded here rather
+ * than at write time, so a re-run measures itself but never pollutes the operator's numbers.
+ */
+export async function readOnboardingFunnel(
+    storage: Storage, opts: { since?: string; limit?: number } = {},
+): Promise<FunnelRow[]> {
+    const limit = Math.min(Math.max(opts.limit ?? 200, 1), 1000);
+    const sinceMs = opts.since ? Date.parse(opts.since) : NaN;
+    const ghiis = (await storage.listGHIIs())
+        .filter(g => !g.username.startsWith('uxtest-'))
+        .filter(g => (Number.isFinite(sinceMs) ? Date.parse(g.createdAt) >= sinceMs : true))
+        .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
+        .slice(0, limit);
+
+    const rows: FunnelRow[] = [];
+    for (const g of ghiis) {
+        const [hello, mcp, activated, rescue] = await Promise.all([
+            storage.getMemory(g.ghii, HELLO_PAGE_OPENED_KEY),
+            storage.getMemory(g.ghii, FIRST_MCP_CALL_KEY),
+            storage.getMemory(g.ghii, ACTIVATED_KEY),
+            storage.getMemory(g.ghii, MCP_RESCUE_SENT_KEY),
+        ]);
+        const val = (r: unknown): Record<string, unknown> =>
+            (r && typeof (r as { value?: unknown }).value === 'object' ? (r as { value: Record<string, unknown> }).value : {});
+        const activatedAt = (val(activated).at as string) ?? null;
+        const created = Date.parse(g.createdAt);
+        const actMs = activatedAt ? Date.parse(activatedAt) : NaN;
+        rows.push({
+            owner: g.ownerName,
+            ghii: g.ghii,
+            createdAt: g.createdAt,
+            locale: g.locale === 'fi' ? 'fi' : 'en',
+            helloOpenedAt: (val(hello).at as string) ?? null,
+            firstMcpCallAt: (val(mcp).at as string) ?? null,
+            mcpClient: (val(mcp).client as string) ?? null,
+            activatedAt,
+            activationKind: (val(activated).kind as ActivationKind) ?? null,
+            ttfvMinutes: (Number.isFinite(created) && Number.isFinite(actMs))
+                ? Math.round((actMs - created) / 60000) : null,
+            rescueSentAt: (val(rescue).at as string) ?? null,
+        });
+    }
+    return rows;
 }
 
 function rescueEmailContent(config: AimeatConfig, locale: string): { subject: string; heading: string; paragraphs: string[]; checklist: string[]; closing: string } {

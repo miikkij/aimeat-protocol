@@ -186,6 +186,11 @@ export function registerOrganismGateRoutes(router: Router, config: AimeatConfig,
     emitChange('organisms');
     // Content growth changes the structure fingerprint (doc/record counts) → record a timeline snapshot.
     void updateOrganismStructure(storage, config, id, { event: 'content published', actor: publisher }).catch(err => { logger.warn('guardHit: best-effort', { error: String(err) }); });
+    // Activation (05-mittaus.md): published workspace content is the team persona's first durable
+    // output. Write-once, fire-and-forget — measuring a publish must never fail it.
+    void import('../../services/onboarding-funnel.js')
+      .then(m => m.recordActivation(storage, config, req.auth!.owner, 'workspace'))
+      .catch(err => { logger.warn('publish: activation marker is best-effort', { error: String(err) }); });
   });
 
   // POST /v1/organisms/:id/workspace/records/publish — BATCH publish (Phase 2, data-access redesign).

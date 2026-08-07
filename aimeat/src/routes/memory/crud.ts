@@ -275,6 +275,14 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // matching an enabled recipe's glob, materialise an agent task for each configured agent.
     runAutomationRecipesForWrite(storage, config, gaii, key)
       .catch(e => logger.error('ecosystem automation recipe trigger failed', { key, error: String(e) }));
+    // Activation (05-mittaus.md): the third way an account first produces something durable is
+    // its AGENT writing through the connection. Owner-session and onboarding-marker writes are
+    // excluded — the first is the person's own hand, the second is the funnel measuring itself.
+    if (req.auth!.roles.includes('agent') && !key.startsWith('onboarding.')) {
+      void import('../../services/onboarding-funnel.js')
+        .then(m => m.recordActivation(storage, config, req.auth!.owner, 'agent'))
+        .catch(e => logger.warn('memory write: activation marker is best-effort', { error: String(e) }));
+    }
   });
 
   // GET /v1/memory — list memory keys (agent auth required)

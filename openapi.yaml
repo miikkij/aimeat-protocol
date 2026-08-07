@@ -15593,6 +15593,80 @@ paths:
         '200':
           $ref: '#/components/responses/AimeatSuccess'
 
+  /v1/admin/onboarding-funnel:
+    get:
+      operationId: getOnboardingFunnel
+      summary: Onboarding activation funnel (operator)
+      description: >-
+        The activation funnel per account and rolled up by weekly signup cohort: hello-page opens,
+        first MCP session, activation (the account's first durable own output — app / workspace /
+        agent write), time-to-first-value, and rescue emails sent. Test accounts (uxtest-*) are
+        excluded. Markers are memory records in each owner's namespace, not a separate table.
+      tags: [Admin]
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: since
+          in: query
+          required: false
+          schema: { type: string, format: date-time }
+          description: Only accounts created at or after this instant.
+        - name: limit
+          in: query
+          required: false
+          schema: { type: integer, minimum: 1, maximum: 1000, default: 200 }
+      responses:
+        '200':
+          description: Cohort rollup + per-account rows
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          cohorts:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                week: { type: string, example: '2026-W32' }
+                                created: { type: integer }
+                                hello_page_opened: { type: integer }
+                                mcp_connected: { type: integer }
+                                activated: { type: integer }
+                                activation_rate_pct: { type: number }
+                                ttfv_median_minutes: { type: integer, nullable: true }
+                                activation_kinds:
+                                  type: object
+                                  properties:
+                                    app: { type: integer }
+                                    workspace: { type: integer }
+                                    agent: { type: integer }
+                                rescue_sent: { type: integer }
+                          rows:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                owner: { type: string }
+                                ghii: { type: string }
+                                createdAt: { type: string, format: date-time }
+                                locale: { type: string, enum: [en, fi] }
+                                helloOpenedAt: { type: string, format: date-time, nullable: true }
+                                firstMcpCallAt: { type: string, format: date-time, nullable: true }
+                                mcpClient: { type: string, nullable: true }
+                                activatedAt: { type: string, format: date-time, nullable: true }
+                                activationKind: { type: string, enum: [app, workspace, agent], nullable: true }
+                                ttfvMinutes: { type: integer, nullable: true }
+                                rescueSentAt: { type: string, format: date-time, nullable: true }
+                          total: { type: integer }
+        '403':
+          description: Operator role required
+
   /v1/admin/messages/stats:
     get:
       operationId: getMessageDeliveryStats

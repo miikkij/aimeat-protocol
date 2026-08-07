@@ -207,6 +207,69 @@ export function adminMonitoringRouter(
         }));
     });
 
+    // GET /v1/admin/onboarding-funnel — the activation funnel (05-mittaus.md), operator only.
+    // Rows = accounts newest first (uxtest-* excluded), each with the four markers, plus one
+    // weekly-cohort rollup: created, activated (count + rate), median TTFV, activation kinds,
+    // hello-page opens, MCP connections, rescues sent. Deliberately a TABLE and not a chart:
+    // the decision it supports is "did the change move activation", not a dashboard.
+    // ?since=<ISO> narrows the window, ?limit caps the row count (default 200, max 1000).
+    router.get('/v1/admin/onboarding-funnel', requireAuth(), requireRole('operator'), async (req, res) => {
+        const { readOnboardingFunnel } = await import('../services/onboarding-funnel.js');
+        const since = typeof req.query.since === 'string' ? req.query.since : undefined;
+        const limit = typeof req.query.limit === 'string' ? parseInt(req.query.limit, 10) : undefined;
+        const rows = await readOnboardingFunnel(storage, { since, limit });
+
+        // ISO week key (YYYY-Www) — the cohort grain 05-mittaus.md specifies.
+        const weekOf = (iso: string): string => {
+            const d = new Date(iso);
+            if (Number.isNaN(d.getTime())) return 'unknown';
+            const t = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
+            t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));           // ISO: Thursday decides the year
+            const yearStart = new Date(Date.UTC(t.getUTCFullYear(), 0, 1));
+            const week = Math.ceil(((t.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+            return `${t.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+        };
+        const median = (xs: number[]): number | null => {
+            if (xs.length === 0) return null;
+            const s = [...xs].sort((a, b) => a - b);
+            const mid = Math.floor(s.length / 2);
+            return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
+        };
+
+        const byWeek = new Map<string, typeof rows>();
+        for (const r of rows) {
+            const k = weekOf(r.createdAt);
+            const list = byWeek.get(k) ?? [];
+            list.push(r);
+            byWeek.set(k, list);
+        }
+        const cohorts = [...byWeek.entries()]
+            .sort((a, b) => b[0].localeCompare(a[0]))
+            .map(([week, list]) => {
+                const activated = list.filter(r => !!r.activatedAt);
+                const ttfvs = activated.map(r => r.ttfvMinutes).filter((n): n is number => typeof n === 'number');
+                return {
+                    week,
+                    created: list.length,
+                    hello_page_opened: list.filter(r => !!r.helloOpenedAt).length,
+                    mcp_connected: list.filter(r => !!r.firstMcpCallAt).length,
+                    activated: activated.length,
+                    // Rate as a percentage with one decimal — comparable to the external benchmarks
+                    // the remake was measured against (03-ulkoinen-vertailu.md).
+                    activation_rate_pct: list.length ? Math.round((activated.length / list.length) * 1000) / 10 : 0,
+                    ttfv_median_minutes: median(ttfvs),
+                    activation_kinds: {
+                        app: activated.filter(r => r.activationKind === 'app').length,
+                        workspace: activated.filter(r => r.activationKind === 'workspace').length,
+                        agent: activated.filter(r => r.activationKind === 'agent').length,
+                    },
+                    rescue_sent: list.filter(r => !!r.rescueSentAt).length,
+                };
+            });
+
+        res.json(success(config.nodeId, { cohorts, rows, total: rows.length }));
+    });
+
     // GET /v1/admin/messages/stats — direct-message delivery telemetry (operator only).
     // Operator visibility into whether sends land or pile up in errors. Carries NO message content
     // and NO participant identities — only routing/outcome metadata.
