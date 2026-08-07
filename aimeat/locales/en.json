@@ -4022,7 +4022,18 @@
         "receipt": "Receipt vouchers",
         "manual": "Manual bookings",
         "morsel": "Morsel sales"
-      }
+      },
+      "accountantTitle": "Who may read your books",
+      "accountantDesc": "Give your accountant read access to your invoices, vouchers and VAT summary. They see your books in the TILIT app; they can never write to them, and you can close the door at any time.",
+      "accountantNone": "No one has access to your books.",
+      "accountantName": "Accountant's username on this node",
+      "accountantPlaceholder": "e.g. tilitoimisto",
+      "accountantGrant": "Give access",
+      "accountantGranted": "{name} can now read your books.",
+      "accountantRevoke": "Close access",
+      "accountantRevoked": "{name} no longer has access.",
+      "accountantConfirmRevoke": "Close {name}'s access to your books?",
+      "accountantHint": "Read access only — grants never allow writing, and the accountant is told which client's books they are opening."
     },
     "companies": {
       "title": "Companies",

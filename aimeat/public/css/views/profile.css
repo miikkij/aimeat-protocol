@@ -3626,6 +3626,10 @@
 .pf-pnl-vat { color: var(--text-dim); font-size: 0.9rem; }
 .pf-pnl-note, .pf-pnl-empty { color: var(--text-dim); font-size: 0.85rem; margin: var(--space-2, 0.5rem) 0 0; }
 .pf-pnl-error { color: var(--danger, #b3372c); }
+.pf-acc-list { list-style: none; padding: 0; margin: var(--space-3, 0.75rem) 0; display: flex; flex-direction: column; gap: var(--space-2, 0.5rem); }
+.pf-acc-list li { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3, 0.75rem); padding: var(--space-2, 0.5rem) var(--space-3, 0.75rem); background: var(--bg-dim); border-radius: var(--radius-sm, 10px); flex-wrap: wrap; }
+.pf-acc-who { font-family: var(--font-mono, monospace); font-size: 0.9rem; word-break: break-all; }
+.pf-acc-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-dim); flex: 1; min-width: 200px; }
 
 /* ── Companies tab (pf-co) — the company registry + co addresses ─────────── */
 .pf-co-row { display: flex; gap: var(--space-3, 0.75rem); align-items: flex-end; flex-wrap: wrap; margin: var(--space-3, 0.75rem) 0; }

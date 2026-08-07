@@ -7,6 +7,7 @@
  *   No forecasts: only the truth of the bookings. Live: re-fetches on the
  *   aimeat-live-update event when the finance domain ticks.
  * @version-history
+ *   v1.1.0 — 2026-08-07 — AccountantAccess: grant and revoke read access to your books.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 7: initial P&L tab.
  */
 import { h } from 'preact';
@@ -15,7 +16,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Spinner } from './shared.js';
-import { apiGet } from '/js/api.js';
+import { apiGet, apiPost, apiDelete } from '/js/api.js';
 
 function euros(minor) {
   const sign = minor < 0 ? '\u2212' : '';
@@ -64,7 +65,89 @@ function LineTable({ titleKey, lines, totalMinor }) {
   `;
 }
 
-export function PnlTab() {
+/**
+ * Who may read your books. A grant is a read-only door into this owner's finance data for a
+ * named accountant on this node — it never opens writes, and the granting owner is the only
+ * one who can open or close it, which is why it lives here and not in the accountant's app.
+ */
+function AccountantAccess({ showToast }) {
+  const [accountants, setAccountants] = useState([]);
+  const [name, setName] = useState('');
+  const [loaded, setLoaded] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await apiGet('/v1/finance/accountants');
+      setAccountants(res?.data?.accountants ?? []);
+    } catch (e) { showToast?.(e?.message || String(e), 'error'); }
+    setLoaded(true);
+  }, [showToast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const grant = useCallback(async () => {
+    const who = name.trim();
+    if (!who) return;
+    setBusy(true);
+    try {
+      const res = await apiPost('/v1/finance/accountants', { accountant: who });
+      setAccountants(res?.data?.accountants ?? []);
+      setName('');
+      showToast?.(t('profile.pnl.accountantGranted').replace('{name}', who), 'success');
+    } catch (e) { showToast?.(e?.message || String(e), 'error'); }
+    setBusy(false);
+  }, [name, showToast]);
+
+  const revoke = useCallback(async (who) => {
+    if (!confirm(t('profile.pnl.accountantConfirmRevoke').replace('{name}', who))) return;
+    setBusy(true);
+    try {
+      const res = await apiDelete(`/v1/finance/accountants/${encodeURIComponent(who.split('@')[0])}`);
+      setAccountants(res?.data?.accountants ?? []);
+      showToast?.(t('profile.pnl.accountantRevoked').replace('{name}', who), 'success');
+    } catch (e) { showToast?.(e?.message || String(e), 'error'); }
+    setBusy(false);
+  }, [showToast]);
+
+  if (!loaded) return null;
+
+  return html`
+    <div class="card pf-pnl-block">
+      <h3 class="section-title">${t('profile.pnl.accountantTitle')}</h3>
+      <p class="section-desc">${t('profile.pnl.accountantDesc')}</p>
+
+      ${accountants.length === 0
+        ? html`<p class="pf-pnl-note">${t('profile.pnl.accountantNone')}</p>`
+        : html`
+          <ul class="pf-acc-list">
+            ${accountants.map((who) => html`
+              <li key=${who}>
+                <span class="pf-acc-who">${who}</span>
+                <button class="btn-ghost" disabled=${busy} onClick=${() => revoke(who)}>
+                  ${t('profile.pnl.accountantRevoke')}
+                </button>
+              </li>
+            `)}
+          </ul>
+        `}
+
+      <div class="pf-pnl-controls">
+        <label class="pf-acc-field">
+          <span>${t('profile.pnl.accountantName')}</span>
+          <input value=${name} placeholder=${t('profile.pnl.accountantPlaceholder')}
+                 onInput=${(e) => setName(e.target.value)} />
+        </label>
+        <button class="btn-primary" disabled=${busy || !name.trim()} onClick=${grant}>
+          ${t('profile.pnl.accountantGrant')}
+        </button>
+      </div>
+      <p class="pf-pnl-note">${t('profile.pnl.accountantHint')}</p>
+    </div>
+  `;
+}
+
+export function PnlTab({ showToast }) {
   const [from, setFrom] = useState(monthShift(monthNow(), -5));
   const [to, setTo] = useState(monthNow());
   const [report, setReport] = useState(null);
@@ -146,6 +229,8 @@ export function PnlTab() {
           <p class="pf-pnl-note">${t('profile.pnl.aiCostNote')}</p>
         </div>
       `}
+
+      <${AccountantAccess} showToast=${showToast} />
     </div>
   `;
 }

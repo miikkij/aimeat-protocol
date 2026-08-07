@@ -4022,7 +4022,18 @@
         "receipt": "Kuittitositteet",
         "manual": "Manuaaliset kirjaukset",
         "morsel": "Morsel-myynti"
-      }
+      },
+      "accountantTitle": "Kuka saa lukea kirjojasi",
+      "accountantDesc": "Anna kirjanpitäjällesi lukuoikeus laskuihisi, tositteisiisi ja ALV-koosteeseesi. Hän näkee kirjasi TILIT-apissa; kirjoittaa hän ei voi koskaan, ja voit sulkea oven milloin tahansa.",
+      "accountantNone": "Kenelläkään ei ole pääsyä kirjoihisi.",
+      "accountantName": "Kirjanpitäjän käyttäjätunnus tällä nodella",
+      "accountantPlaceholder": "esim. tilitoimisto",
+      "accountantGrant": "Anna pääsy",
+      "accountantGranted": "{name} voi nyt lukea kirjojasi.",
+      "accountantRevoke": "Sulje pääsy",
+      "accountantRevoked": "{name} ei enää pääse kirjoihisi.",
+      "accountantConfirmRevoke": "Suljetaanko {name}:n pääsy kirjoihisi?",
+      "accountantHint": "Vain lukuoikeus — grantti ei koskaan avaa kirjoitusta, ja kirjanpitäjälle kerrotaan kenen kirjoja hän avaa."
     },
     "companies": {
       "title": "Yritykset",
