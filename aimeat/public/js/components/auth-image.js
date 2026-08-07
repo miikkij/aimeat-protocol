@@ -13,6 +13,7 @@ import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { swallowed } from '/js/swallowed.js';
+import { authHeaders } from '/js/services/auth.js';
 const html = htm.bind(h);
 
 export default function AuthImage({ src, alt, ...props }) {
@@ -23,14 +24,7 @@ export default function AuthImage({ src, alt, ...props }) {
     if (!src) return;
 
     let cancelled = false;
-    const headers = /** @type {Record<string,string>} */ ({});
-
-    if (window.AIMEAT?.auth?.hasSession) {
-      const session = window.AIMEAT.auth.getSession();
-      if (session?.jwt) {
-        headers['Authorization'] = 'Bearer ' + session.jwt;
-      }
-    }
+    const headers = /** @type {Record<string,string>} */ ({ ...authHeaders() });
 
     fetch(src, { headers })
       .then(r => {

@@ -181,6 +181,7 @@
     return APP_DEFAULT_SCOPES;
   }
   var AUTH_PROVIDERS = window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.providers || [];
+  var EMAIL_REQUIRED = !!(window.__AIMEAT_AUTH_CFG__ && window.__AIMEAT_AUTH_CFG__.emailRequired);
   var PROVIDER_ICONS = {
     google: '<svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true"><path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62z"/><path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18z"/><path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33z"/><path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z"/></svg>',
     entra: '<svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#F25022"/><rect x="11" y="1" width="9" height="9" fill="#7FBA00"/><rect x="1" y="11" width="9" height="9" fill="#00A4EF"/><rect x="11" y="11" width="9" height="9" fill="#FFB900"/></svg>',
@@ -199,6 +200,21 @@
   function off(event, fn) {
     if (!listeners[event]) return;
     listeners[event] = listeners[event].filter((f) => f !== fn);
+  }
+
+  // src/static/sdk-libs/auth/pkce.js
+  function b64url(buf) {
+    var bytes = new Uint8Array(buf), s = "";
+    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
+    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  async function pkce() {
+    var verifier = b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
+    if (crypto.subtle && crypto.subtle.digest) {
+      var digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+      return { verifier, challenge: b64url(digest), method: "S256" };
+    }
+    return { verifier, challenge: verifier, method: "plain" };
   }
 
   // src/static/sdk-libs/auth/theme.js
@@ -355,9 +371,11 @@
   }
 
   // src/static/sdk-libs/auth/modal.js
+  var EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   function showLoginModal(opts, renderBtn) {
     var i = opts.i18n || {};
     var lang = currentModalLang();
+    var tab = "signin";
     const old = document.getElementById("aimeat-modal");
     if (old) old.remove();
     const modal = document.createElement("div");
@@ -370,7 +388,14 @@
         );
         return el ? el.value : "";
       };
-      return { u: g("aimeat-username"), p: g("aimeat-password"), d: g("aimeat-displayname") };
+      return {
+        u: g("aimeat-username"),
+        p: g("aimeat-password"),
+        ru: g("aimeat-reg-username"),
+        rp: g("aimeat-reg-password"),
+        rd: g("aimeat-reg-displayname"),
+        re: g("aimeat-reg-email")
+      };
     }
     function restoreInputs(vals) {
       var s = function(id, val) {
@@ -382,7 +407,10 @@
       };
       s("aimeat-username", vals.u);
       s("aimeat-password", vals.p);
-      s("aimeat-displayname", vals.d);
+      s("aimeat-reg-username", vals.ru);
+      s("aimeat-reg-password", vals.rp);
+      s("aimeat-reg-displayname", vals.rd);
+      s("aimeat-reg-email", vals.re);
     }
     function switchLang(next) {
       if (next === lang) return;
@@ -400,7 +428,7 @@
       });
     }
     function render(anim) {
-      modal.innerHTML = buildModalInner(i, lang, anim);
+      modal.innerHTML = buildModalInner(i, lang, anim, tab);
       wireModal();
     }
     document.body.appendChild(modal);
@@ -420,10 +448,11 @@
       render(false);
       restoreInputs(vals);
     });
-    function buildModalInner(i2, lang2, anim) {
-      return '<style>.aimeat-inp{width:100%;padding:11px 14px;border:1.5px solid #E5E7EB;border-radius:10px;font-family:DM Sans,system-ui,sans-serif;font-size:15px;color:#1A1A2E;background:#FAFAF8;box-sizing:border-box;transition:all .15s;outline:none}.aimeat-inp:focus{border-color:#E8564A;box-shadow:0 0 0 3px rgba(232,86,74,.1)}.aimeat-inp::placeholder{color:#9CA3AF}.aimeat-go{flex:1;padding:12px;background:linear-gradient(135deg,#E8564A,#D4493F);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:15px;font-family:DM Sans,system-ui,sans-serif;box-shadow:0 2px 8px rgba(232,86,74,.25);transition:transform .15s,box-shadow .15s}.aimeat-go:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(232,86,74,.35)}.aimeat-label{display:block;margin-bottom:5px;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#6B7280}.aimeat-cancel{padding:12px 20px;background:none;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:10px;cursor:pointer;font-size:15px;font-weight:500;font-family:DM Sans,system-ui,sans-serif;transition:background .15s}.aimeat-cancel:hover{background:#F3F4F6}.aimeat-fi{width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px}.aimeat-langsw{position:absolute;top:24px;right:28px;display:flex;gap:5px}.aimeat-lang{padding:4px 9px;border:1px solid #E5E7EB;background:#fff;color:#6B7280;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.4px;line-height:1;font-family:DM Sans,system-ui,sans-serif;transition:all .15s}.aimeat-lang:hover{border-color:#E8564A;color:#E8564A}.aimeat-lang.active{background:#E8564A;color:#fff;border-color:#E8564A;cursor:default}@keyframes aimeatModalIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}</style><div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px"><div style="background:#FFFFFF;border-radius:16px;max-width:420px;width:100%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05);' + (anim ? "animation:aimeatModalIn .3s ease" : "") + '"><div style="padding:28px 32px 0;position:relative"><div class="aimeat-langsw"><button type="button" class="aimeat-lang' + (lang2 === "en" ? " active" : "") + '" data-lang="en">EN</button><button type="button" class="aimeat-lang' + (lang2 === "fi" ? " active" : "") + '" data-lang="fi">FI</button></div><h2 style="margin:0;font-size:22px;font-weight:800;display:flex;align-items:center;gap:8px;color:#1A1A2E">AIME <span style="width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#E8564A,#D4493F);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:14px">♥</span> AT Sign In</h2><p style="margin:8px 0 0;font-size:14px;color:#6B7280;line-height:1.5">' + escHtml(i2.descNew || "New? Pick a username and password to create an account.") + " " + escHtml(i2.descReturning || "Already have an account? Enter your username and password.") + '</p></div><div id="aimeat-modal-body" style="padding:24px 32px"><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.usernameLabel || "Username") + '</label><input id="aimeat-username" class="aimeat-inp" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '"></div><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.passwordLabel || "Password") + '</label><input id="aimeat-password" type="password" class="aimeat-inp" placeholder="' + escHtml(i2.passwordPlaceholder || "Password (min 8 chars)") + '"></div><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.displayNameLabel || "Display Name") + ' <span style="font-weight:400;text-transform:none;letter-spacing:0">(' + escHtml(i2.displayNameHint || "optional, for new accounts") + ')</span></label><input id="aimeat-displayname" class="aimeat-inp" placeholder="' + escHtml(i2.displayNamePlaceholder || "Display Name") + '"></div><div style="display:flex;gap:10px;margin-top:20px"><button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i2.signInBtn || "Sign In / Register") + '</button><button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p>' + (AUTH_PROVIDERS.length ? '<div style="display:flex;align-items:center;gap:12px;margin:18px 0 14px;color:#9CA3AF;font-size:12px;font-weight:600;letter-spacing:.5px"><span style="flex:1;height:1px;background:#E5E7EB"></span>' + escHtml(i2.orLabel || "OR") + '<span style="flex:1;height:1px;background:#E5E7EB"></span></div>' + AUTH_PROVIDERS.map(function(p) {
+    function buildModalInner(i2, lang2, anim, tab2) {
+      var isReg = tab2 === "register";
+      return '<style>.aimeat-inp{width:100%;padding:11px 14px;border:1.5px solid #E5E7EB;border-radius:10px;font-family:DM Sans,system-ui,sans-serif;font-size:15px;color:#1A1A2E;background:#FAFAF8;box-sizing:border-box;transition:all .15s;outline:none}.aimeat-inp:focus{border-color:#E8564A;box-shadow:0 0 0 3px rgba(232,86,74,.1)}.aimeat-inp::placeholder{color:#9CA3AF}.aimeat-go{flex:1;padding:12px;background:linear-gradient(135deg,#E8564A,#D4493F);color:#fff;border:none;border-radius:10px;cursor:pointer;font-weight:700;font-size:15px;font-family:DM Sans,system-ui,sans-serif;box-shadow:0 2px 8px rgba(232,86,74,.25);transition:transform .15s,box-shadow .15s}.aimeat-go:hover{transform:translateY(-1px);box-shadow:0 4px 14px rgba(232,86,74,.35)}.aimeat-label{display:block;margin-bottom:5px;font-size:12px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:#6B7280}.aimeat-cancel{padding:12px 20px;background:none;color:#1A1A2E;border:1px solid #E5E7EB;border-radius:10px;cursor:pointer;font-size:15px;font-weight:500;font-family:DM Sans,system-ui,sans-serif;transition:background .15s}.aimeat-cancel:hover{background:#F3F4F6}.aimeat-fi{width:20px;height:20px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;margin-top:1px}.aimeat-langsw{position:absolute;top:24px;right:28px;display:flex;gap:5px}.aimeat-lang{padding:4px 9px;border:1px solid #E5E7EB;background:#fff;color:#6B7280;border-radius:7px;cursor:pointer;font-size:11px;font-weight:700;letter-spacing:.4px;line-height:1;font-family:DM Sans,system-ui,sans-serif;transition:all .15s}.aimeat-lang:hover{border-color:#E8564A;color:#E8564A}.aimeat-lang.active{background:#E8564A;color:#fff;border-color:#E8564A;cursor:default}.aimeat-tabs{display:flex;gap:0;margin:18px 0 0;border-bottom:1.5px solid #E5E7EB}.aimeat-tab{flex:1;padding:11px 8px;background:none;border:none;border-bottom:2.5px solid transparent;margin-bottom:-1.5px;cursor:pointer;font-family:DM Sans,system-ui,sans-serif;font-size:15px;font-weight:600;color:#6B7280;transition:color .15s,border-color .15s}.aimeat-tab:hover{color:#1A1A2E}.aimeat-tab.active{color:#E8564A;border-bottom-color:#E8564A;cursor:default}@keyframes aimeatModalIn{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}</style><div style="position:fixed;inset:0;background:rgba(26,26,46,.4);backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;z-index:99999;font-family:DM Sans,system-ui,sans-serif;padding:24px"><div style="background:#FFFFFF;border-radius:16px;max-width:420px;width:100%;margin:auto;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.15),0 0 0 1px rgba(0,0,0,.05);' + (anim ? "animation:aimeatModalIn .3s ease" : "") + '"><div style="padding:28px 32px 0;position:relative"><div class="aimeat-langsw"><button type="button" class="aimeat-lang' + (lang2 === "en" ? " active" : "") + '" data-lang="en">EN</button><button type="button" class="aimeat-lang' + (lang2 === "fi" ? " active" : "") + '" data-lang="fi">FI</button></div><h2 style="margin:0;font-size:22px;font-weight:800;display:flex;align-items:center;gap:8px;color:#1A1A2E">AIME <span style="width:28px;height:28px;border-radius:7px;background:linear-gradient(135deg,#E8564A,#D4493F);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:14px">♥</span> AT</h2><p style="margin:8px 0 0;font-size:14px;color:#6B7280;line-height:1.5">' + escHtml(isReg ? i2.descNew || "Pick a username and password to create an account." : i2.descReturning || "Enter the username or email you signed up with.") + '</p><div class="aimeat-tabs" role="tablist"><button type="button" role="tab" class="aimeat-tab' + (isReg ? "" : " active") + '" data-tab="signin" aria-selected="' + (isReg ? "false" : "true") + '">' + escHtml(i2.tabSignIn || "Sign in") + '</button><button type="button" role="tab" class="aimeat-tab' + (isReg ? " active" : "") + '" data-tab="register" aria-selected="' + (isReg ? "true" : "false") + '">' + escHtml(i2.tabRegister || "Create account") + '</button></div></div><div id="aimeat-modal-body" style="padding:24px 32px"><div id="aimeat-tab-signin" style="' + (isReg ? "display:none" : "") + '"><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.identifierLabel || "Username or email") + '</label><input id="aimeat-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.identifierPlaceholder || "Username or email") + '"></div><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.passwordLabel || "Password") + '</label><input id="aimeat-password" type="password" autocomplete="current-password" class="aimeat-inp" placeholder="' + escHtml(i2.passwordPlaceholder || "Password") + '"></div><div style="display:flex;gap:10px;margin-top:20px"><button id="aimeat-go-btn" class="aimeat-go">' + escHtml(i2.signInOnlyBtn || "Sign in") + '</button><button id="aimeat-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p><div style="margin-top:14px;display:flex;gap:16px"><a href="#" id="aimeat-forgot-pw" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i2.forgotPassword || "Forgot password?") + '</a><a href="#" id="aimeat-forgot-user" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i2.forgotUsername || "Forgot username?") + '</a></div></div><div id="aimeat-tab-register" style="' + (isReg ? "" : "display:none") + '"><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.usernameLabel || "Username") + '</label><input id="aimeat-reg-username" class="aimeat-inp" autocomplete="username" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '"><p style="margin:5px 0 0;font-size:12px;color:#9CA3AF">' + escHtml(i2.usernameHint || "This becomes your permanent identity on this node.") + "</p></div>" + (EMAIL_REQUIRED ? '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.emailLabel || "Email") + '</label><input id="aimeat-reg-email" type="email" autocomplete="email" class="aimeat-inp" placeholder="you@example.com"><p style="margin:5px 0 0;font-size:12px;color:#9CA3AF">' + escHtml(i2.registerEmailHint || "We send a 6-digit code here to confirm the address. You can sign in with it later.") + "</p></div>" : "") + '<div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.passwordLabel || "Password") + '</label><input id="aimeat-reg-password" type="password" autocomplete="new-password" class="aimeat-inp" placeholder="' + escHtml(i2.passwordPlaceholder || "Password (min 8 chars)") + '"></div><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.displayNameLabel || "Display Name") + ' <span style="font-weight:400;text-transform:none;letter-spacing:0">(' + escHtml(i2.displayNameOptional || "optional") + ')</span></label><input id="aimeat-reg-displayname" class="aimeat-inp" placeholder="' + escHtml(i2.displayNamePlaceholder || "Display Name") + '"></div><div style="display:flex;gap:10px;margin-top:20px"><button id="aimeat-reg-btn" class="aimeat-go">' + escHtml(i2.createAccountBtn || "Create account") + '</button><button id="aimeat-reg-cancel-btn" class="aimeat-cancel">' + escHtml(i2.cancelBtn || "Cancel") + '</button></div><p id="aimeat-reg-error" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div>' + (AUTH_PROVIDERS.length ? '<div style="display:flex;align-items:center;gap:12px;margin:18px 0 14px;color:#9CA3AF;font-size:12px;font-weight:600;letter-spacing:.5px"><span style="flex:1;height:1px;background:#E5E7EB"></span>' + escHtml(i2.orLabel || "OR") + '<span style="flex:1;height:1px;background:#E5E7EB"></span></div>' + AUTH_PROVIDERS.map(function(p) {
         return '<button type="button" class="aimeat-oauth-btn" data-provider="' + escHtml(p.id) + '" style="width:100%;display:flex;align-items:center;justify-content:center;gap:10px;padding:11px;margin-bottom:8px;background:#fff;color:#1A1A2E;border:1.5px solid #E5E7EB;border-radius:10px;cursor:pointer;font-weight:600;font-size:15px;font-family:DM Sans,system-ui,sans-serif;transition:background .15s,border-color .15s">' + (PROVIDER_ICONS[p.id] || "") + escHtml(i2[p.i18nKey] || p.label) + "</button>";
-      }).join("") : "") + '<div style="margin-top:14px;display:flex;gap:16px"><a href="#" id="aimeat-forgot-pw" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i2.forgotPassword || "Forgot password?") + '</a><a href="#" id="aimeat-forgot-user" style="font-size:13px;color:#6B7280;cursor:pointer;text-decoration:underline">' + escHtml(i2.forgotUsername || "Forgot username?") + '</a></div></div><div id="aimeat-forgot-pw-view" style="padding:24px 32px;display:none"><div id="aimeat-fpw-step1"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.resetPasswordTitle || "Reset Password") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.resetPasswordDesc || "Enter your username to receive a reset code by email.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.usernameLabel || "Username") + '</label><input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '"></div><div style="display:flex;gap:10px"><button id="aimeat-fpw-send" class="aimeat-go">' + escHtml(i2.sendResetCode || "Send Reset Code") + '</button><button id="aimeat-fpw-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p><p id="aimeat-fpw-err" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div><div id="aimeat-fpw-step2" style="display:none"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.enterNewPasswordTitle || "Enter New Password") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.resetCodeSent || "A reset code was sent to your email. Enter it below with your new password.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.codeLabel || "Reset Code") + '</label><input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6"></div><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.newPasswordLabel || "New Password") + '</label><input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i2.newPasswordPlaceholder || "New password (min 8 chars)") + '"></div><div style="display:flex;gap:10px"><button id="aimeat-fpw-reset" class="aimeat-go">' + escHtml(i2.resetPassword || "Reset Password") + '</button><button id="aimeat-fpw-back2" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg2" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p><p id="aimeat-fpw-err2" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div></div><div id="aimeat-forgot-user-view" style="padding:24px 32px;display:none"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.recoverUsernameTitle || "Recover Username") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.recoverUsernameDesc || "Enter the email address associated with your account.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.emailLabel || "Email") + '</label><input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com"></div><div style="display:flex;gap:10px"><button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i2.sendUsername || "Send My Username") + '</button><button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fu-msg" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p></div><div id="aimeat-email-view" style="padding:24px 32px;display:none"><div id="aimeat-em-step1"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.completeAccountTitle || "One last step") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.completeAccountDesc || "Add an email to finish setting up your account. We’ll send a verification code to confirm it.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.emailLabel || "Email") + '</label><input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com"></div><div style="display:flex;gap:10px"><button id="aimeat-em-send" class="aimeat-go">' + escHtml(i2.sendVerificationCode || "Send Verification Code") + '</button><button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-err" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div><div id="aimeat-em-step2" style="display:none"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.enterCodeTitle || "Enter Verification Code") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.enterCodeDesc || "We sent a 6-digit code to your email. Enter it below to finish and sign in.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.codeLabel || "Verification Code") + '</label><input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric"></div><div style="display:flex;gap:10px"><button id="aimeat-em-confirm" class="aimeat-go">' + escHtml(i2.confirmAndSignIn || "Confirm & Sign In") + '</button><button id="aimeat-em-back2" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-msg2" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p><p id="aimeat-em-err2" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div></div><div style="padding:20px 32px 28px;background:#F9FAFB;border-top:1px solid #E5E7EB"><h4 style="margin:0 0 12px;font-size:13px;font-weight:700;color:#1A1A2E;display:flex;align-items:center;gap:6px">✨ ' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">♥</div><span>' + escHtml(i2.whyGhii || "A free GHII (Global Human Intelligence Identifier), your personal AI identity") + '</span></div><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#EFF6FF;color:#3B82F6">🔒</div><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#F0FDF4;color:#22C55E">🤖</div><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">♥</div><span><strong>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you — a digital agency under your own roof.") + "</strong></span></div></div></div></div>";
+      }).join("") : "") + '</div><div id="aimeat-forgot-pw-view" style="padding:24px 32px;display:none"><div id="aimeat-fpw-step1"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.resetPasswordTitle || "Reset Password") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.resetPasswordDesc || "Enter your username to receive a reset code by email.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.usernameLabel || "Username") + '</label><input id="aimeat-fpw-username" class="aimeat-inp" placeholder="' + escHtml(i2.usernamePlaceholder || "Username") + '"></div><div style="display:flex;gap:10px"><button id="aimeat-fpw-send" class="aimeat-go">' + escHtml(i2.sendResetCode || "Send Reset Code") + '</button><button id="aimeat-fpw-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p><p id="aimeat-fpw-err" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div><div id="aimeat-fpw-step2" style="display:none"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.enterNewPasswordTitle || "Enter New Password") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.resetCodeSent || "A reset code was sent to your email. Enter it below with your new password.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.codeLabel || "Reset Code") + '</label><input id="aimeat-fpw-code" class="aimeat-inp" placeholder="123456" maxlength="6"></div><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.newPasswordLabel || "New Password") + '</label><input id="aimeat-fpw-newpass" type="password" class="aimeat-inp" placeholder="' + escHtml(i2.newPasswordPlaceholder || "New password (min 8 chars)") + '"></div><div style="display:flex;gap:10px"><button id="aimeat-fpw-reset" class="aimeat-go">' + escHtml(i2.resetPassword || "Reset Password") + '</button><button id="aimeat-fpw-back2" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fpw-msg2" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p><p id="aimeat-fpw-err2" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div></div><div id="aimeat-forgot-user-view" style="padding:24px 32px;display:none"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.recoverUsernameTitle || "Recover Username") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.recoverUsernameDesc || "Enter the email address associated with your account.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.emailLabel || "Email") + '</label><input id="aimeat-fu-email" class="aimeat-inp" type="email" placeholder="you@example.com"></div><div style="display:flex;gap:10px"><button id="aimeat-fu-send" class="aimeat-go">' + escHtml(i2.sendUsername || "Send My Username") + '</button><button id="aimeat-fu-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-fu-msg" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p></div><div id="aimeat-email-view" style="padding:24px 32px;display:none"><div id="aimeat-em-step1"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.completeAccountTitle || "One last step") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.completeAccountDesc || "Add an email to finish setting up your account. We’ll send a verification code to confirm it.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.emailLabel || "Email") + '</label><input id="aimeat-em-email" class="aimeat-inp" type="email" placeholder="you@example.com"></div><div style="display:flex;gap:10px"><button id="aimeat-em-send" class="aimeat-go">' + escHtml(i2.sendVerificationCode || "Send Verification Code") + '</button><button id="aimeat-em-back" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-err" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div><div id="aimeat-em-step2" style="display:none"><h3 style="margin:0 0 8px;font-size:17px;font-weight:700;color:#1A1A2E">' + escHtml(i2.enterCodeTitle || "Enter Verification Code") + '</h3><p style="font-size:13px;color:#6B7280;margin-bottom:14px">' + escHtml(i2.enterCodeDesc || "We sent a 6-digit code to your email. Enter it below to finish and sign in.") + '</p><div style="margin-bottom:14px"><label class="aimeat-label">' + escHtml(i2.codeLabel || "Verification Code") + '</label><input id="aimeat-em-code" class="aimeat-inp" placeholder="123456" maxlength="6" inputmode="numeric"></div><div style="display:flex;gap:10px"><button id="aimeat-em-confirm" class="aimeat-go">' + escHtml(i2.confirmAndSignIn || "Confirm & Sign In") + '</button><button id="aimeat-em-back2" class="aimeat-cancel">' + escHtml(i2.backToLogin || "Back to Login") + '</button></div><p id="aimeat-em-msg2" style="margin:8px 0 0;font-size:13px;color:#22C55E;display:none"></p><p id="aimeat-em-err2" style="margin:8px 0 0;font-size:13px;color:#ef4444;display:none"></p></div></div><div id="aimeat-why" style="padding:20px 32px 28px;background:#F9FAFB;border-top:1px solid #E5E7EB;' + (isReg ? "" : "display:none") + '"><h4 style="margin:0 0 12px;font-size:13px;font-weight:700;color:#1A1A2E;display:flex;align-items:center;gap:6px">' + escHtml(i2.whyTitle || "What do you get?") + '</h4><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">♥</div><span>' + escHtml(i2.whyGhii || "A free GHII (Global Human Intelligence Identifier), your personal AI identity") + '</span></div><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#EFF6FF;color:#3B82F6">🔒</div><span>' + escHtml(i2.whyPrivacy || "Your own private memory space, protected by your password") + '</span></div><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;margin-bottom:8px;line-height:1.45"><div class="aimeat-fi" style="background:#F0FDF4;color:#22C55E">🤖</div><span>' + escHtml(i2.whyAgents || "Connect AI agents that remember you and work on your behalf") + '</span></div><div style="display:flex;align-items:flex-start;gap:10px;font-size:13.5px;color:#6B7280;line-height:1.45"><div class="aimeat-fi" style="background:#FFF1F0;color:#E8564A">♥</div><span><strong>' + escHtml(i2.whyMorsels || "Your own AI-built apps and agents work for you — a digital agency under your own roof.") + "</strong></span></div></div></div></div>";
     }
     function wireModal() {
       modal.querySelectorAll(".aimeat-lang").forEach(function(b) {
@@ -431,7 +460,27 @@
           switchLang(b.getAttribute("data-lang"));
         });
       });
-      document.getElementById("aimeat-cancel-btn").addEventListener("click", () => modal.remove());
+      ["aimeat-cancel-btn", "aimeat-reg-cancel-btn"].forEach(function(id) {
+        var el = document.getElementById(id);
+        if (el) el.addEventListener("click", function() {
+          modal.remove();
+        });
+      });
+      modal.querySelectorAll(".aimeat-tab").forEach(function(b) {
+        b.addEventListener("click", function() {
+          var next = b.getAttribute("data-tab");
+          if (next === tab) return;
+          var vals = captureInputs();
+          tab = next;
+          render(false);
+          restoreInputs(vals);
+          var focusId = tab === "register" ? "aimeat-reg-username" : "aimeat-username";
+          setTimeout(function() {
+            var el = document.getElementById(focusId);
+            if (el) el.focus();
+          }, 30);
+        });
+      });
       modal.querySelectorAll(".aimeat-oauth-btn").forEach(function(btn) {
         btn.addEventListener("click", function() {
           var id = btn.getAttribute("data-provider");
@@ -446,7 +495,7 @@
         document.getElementById("aimeat-email-view").style.display = view === "email" ? "" : "none";
       }
       var pendingEmailLogin = null;
-      function openEmailCompletion(user, pass, hasEmail, mode, displayName) {
+      function openEmailCompletion(user, pass, hasEmail, mode, displayName, prefillEmail) {
         pendingEmailLogin = { username: user, password: pass, mode: mode || "attach", displayName: displayName || user };
         showView("email");
         document.getElementById("aimeat-em-step1").style.display = "";
@@ -455,7 +504,7 @@
           /** @type {any} */
           document.getElementById("aimeat-em-email")
         );
-        emailInput.value = "";
+        emailInput.value = prefillEmail || "";
         var titleEl = document.querySelector("#aimeat-em-step1 h3");
         var desc = document.querySelector("#aimeat-em-step1 p");
         if (pendingEmailLogin.mode === "register") {
@@ -468,6 +517,10 @@
           }
         }
         document.getElementById("aimeat-em-err").style.display = "none";
+        if (prefillEmail) {
+          sendEmailCode();
+          return;
+        }
         setTimeout(function() {
           emailInput.focus();
         }, 50);
@@ -487,7 +540,7 @@
           showView("login");
         });
       });
-      document.getElementById("aimeat-em-send").addEventListener("click", async function() {
+      async function sendEmailCode() {
         var email = (
           /** @type {any} */
           document.getElementById("aimeat-em-email").value.trim()
@@ -545,7 +598,8 @@
           btn.textContent = i.sendVerificationCode || "Send Verification Code";
           btn.disabled = false;
         }
-      });
+      }
+      document.getElementById("aimeat-em-send").addEventListener("click", sendEmailCode);
       document.getElementById("aimeat-em-confirm").addEventListener("click", async function() {
         var code = (
           /** @type {any} */
@@ -669,21 +723,37 @@
         msgEl.textContent = i.usernameSent || "If an account with that email exists, your username was sent.";
         msgEl.style.display = "block";
       });
-      ["aimeat-username", "aimeat-password", "aimeat-displayname"].forEach(function(id) {
-        var el = document.getElementById(id);
+      [
+        ["aimeat-username", "aimeat-go-btn"],
+        ["aimeat-password", "aimeat-go-btn"],
+        ["aimeat-reg-username", "aimeat-reg-btn"],
+        ["aimeat-reg-email", "aimeat-reg-btn"],
+        ["aimeat-reg-password", "aimeat-reg-btn"],
+        ["aimeat-reg-displayname", "aimeat-reg-btn"]
+      ].forEach(function(pair) {
+        var el = document.getElementById(pair[0]);
         if (!el) return;
         el.addEventListener("keydown", function(e) {
           if (e.key !== "Enter") return;
           e.preventDefault();
           var btn = (
             /** @type {any} */
-            document.getElementById("aimeat-go-btn")
+            document.getElementById(pair[1])
           );
           if (btn && !btn.disabled) btn.click();
         });
       });
+      function releaseBtn(id, label) {
+        var b = (
+          /** @type {any} */
+          document.getElementById(id)
+        );
+        if (!b) return;
+        b.textContent = label;
+        b.disabled = false;
+      }
       document.getElementById("aimeat-go-btn").addEventListener("click", async () => {
-        let username = (
+        const raw = (
           /** @type {any} */
           document.getElementById("aimeat-username").value.trim().toLowerCase()
         );
@@ -692,26 +762,76 @@
           document.getElementById("aimeat-password").value
         );
         const errEl = document.getElementById("aimeat-error");
-        let isGhii = false;
+        const signInLabel = i.signInOnlyBtn || "Sign in";
+        errEl.style.display = "none";
+        const isEmail = EMAIL_RE.test(raw);
         let isFederated = false;
-        let fullUsername = username;
-        if (username.includes("@")) {
-          const atIdx = username.indexOf("@");
-          const nodePart = username.substring(atIdx + 1);
-          if (nodePart && nodePart !== NODE_ID) {
-            isFederated = true;
-            isGhii = true;
-          } else {
-            username = username.substring(0, atIdx);
-            isGhii = true;
-          }
+        let localName = raw;
+        if (!isEmail && raw.includes("@")) {
+          const nodePart = raw.substring(raw.indexOf("@") + 1);
+          if (nodePart && nodePart !== NODE_ID) isFederated = true;
+          else localName = raw.substring(0, raw.indexOf("@"));
         }
+        if (!raw || !isEmail && localName.length < 3) {
+          errEl.textContent = i.errIdentifierRequired || i.errUserShort || "Enter your username or email.";
+          errEl.style.display = "block";
+          return;
+        }
+        if (!password) {
+          errEl.textContent = i.errPassRequired || "Enter your password.";
+          errEl.style.display = "block";
+          return;
+        }
+        const btn = (
+          /** @type {any} */
+          document.getElementById("aimeat-go-btn")
+        );
+        btn.textContent = isFederated ? i.connectingHome || "Connecting to home node..." : i.working || "Working...";
+        btn.disabled = true;
+        try {
+          const session = await auth.loginWithPassword(isEmail || isFederated ? raw : localName, password);
+          modal.remove();
+          renderBtn();
+          if (opts.onLogin) opts.onLogin(session);
+        } catch (e) {
+          if (e.code === "EMAIL_NOT_VERIFIED" && !isFederated) {
+            releaseBtn("aimeat-go-btn", signInLabel);
+            openEmailCompletion(localName, password, !!(e.details && e.details.has_email));
+            return;
+          }
+          errEl.textContent = e.message.includes("Invalid username or password") ? i.errWrongCredentials || "That username or email and password do not match an account here." : e.message;
+          errEl.style.display = "block";
+          releaseBtn("aimeat-go-btn", signInLabel);
+        }
+      });
+      document.getElementById("aimeat-reg-btn").addEventListener("click", async () => {
+        const username = (
+          /** @type {any} */
+          document.getElementById("aimeat-reg-username").value.trim().toLowerCase()
+        );
+        const password = (
+          /** @type {any} */
+          document.getElementById("aimeat-reg-password").value
+        );
+        const emailEl = (
+          /** @type {any} */
+          document.getElementById("aimeat-reg-email")
+        );
+        const email = emailEl ? emailEl.value.trim() : "";
         const displayName = (
           /** @type {any} */
-          document.getElementById("aimeat-displayname").value.trim() || username
+          document.getElementById("aimeat-reg-displayname").value.trim() || username
         );
+        const errEl = document.getElementById("aimeat-reg-error");
+        const createLabel = i.createAccountBtn || "Create account";
+        errEl.style.display = "none";
         if (!username || username.length < 3) {
           errEl.textContent = i.errUserShort || "Username must be at least 3 characters";
+          errEl.style.display = "block";
+          return;
+        }
+        if (emailEl && !EMAIL_RE.test(email)) {
+          errEl.textContent = i.errEmailInvalid || "Please enter a valid email address.";
           errEl.style.display = "block";
           return;
         }
@@ -722,70 +842,29 @@
         }
         const btn = (
           /** @type {any} */
-          document.getElementById("aimeat-go-btn")
+          document.getElementById("aimeat-reg-btn")
         );
         btn.textContent = i.working || "Working...";
         btn.disabled = true;
-        if (isGhii) {
-          try {
-            if (isFederated) {
-              btn.textContent = i.connectingHome || "Connecting to home node...";
-            }
-            const loginUser = isFederated ? fullUsername : username;
-            const session = await auth.loginWithPassword(loginUser, password);
-            modal.remove();
-            renderBtn();
-            if (opts.onLogin) opts.onLogin(session);
-          } catch (e2) {
-            if (e2.code === "EMAIL_NOT_VERIFIED" && !isFederated) {
-              btn.textContent = i.signInBtn || "Sign In / Register";
-              btn.disabled = false;
-              openEmailCompletion(username, password, !!(e2.details && e2.details.has_email));
-              return;
-            }
-            errEl.textContent = e2.message.includes("Invalid username or password") ? i.errWrongPass || "Wrong password for that username." : e2.message;
-            errEl.style.display = "block";
-            btn.textContent = i.signInBtn || "Sign In / Register";
-            btn.disabled = false;
-          }
+        if (emailEl) {
+          releaseBtn("aimeat-reg-btn", createLabel);
+          openEmailCompletion(username, password, false, "register", displayName, email);
           return;
         }
         try {
-          const session = await auth.register(username, displayName, { password });
+          const session = await auth.register(username, displayName, { password, locale: currentModalLang() });
           modal.remove();
           renderBtn();
           if (opts.onLogin) opts.onLogin(session);
         } catch (e) {
           if (e.code === "EMAIL_REQUIRED") {
-            btn.textContent = i.signInBtn || "Sign In / Register";
-            btn.disabled = false;
+            releaseBtn("aimeat-reg-btn", createLabel);
             openEmailCompletion(username, password, false, "register", displayName);
             return;
           }
-          if (e.message.includes("already registered") || e.message.includes("NAME_TAKEN")) {
-            try {
-              const session = await auth.loginWithPassword(username, password);
-              modal.remove();
-              renderBtn();
-              if (opts.onLogin) opts.onLogin(session);
-            } catch (e2) {
-              if (e2.code === "EMAIL_NOT_VERIFIED") {
-                btn.textContent = i.signInBtn || "Sign In / Register";
-                btn.disabled = false;
-                openEmailCompletion(username, password, !!(e2.details && e2.details.has_email));
-                return;
-              }
-              errEl.textContent = e2.message.includes("Invalid username or password") ? i.errWrongPass || "Wrong password for that username." : e2.message;
-              errEl.style.display = "block";
-              btn.textContent = i.signInBtn || "Sign In";
-              btn.disabled = false;
-            }
-          } else {
-            errEl.textContent = e.message;
-            errEl.style.display = "block";
-            btn.textContent = i.signInBtn || "Sign In / Register";
-            btn.disabled = false;
-          }
+          errEl.textContent = e.message.includes("already registered") || e.message.includes("NAME_TAKEN") ? i.errNameTaken || "That username is taken. If it is yours, sign in instead." : e.message;
+          errEl.style.display = "block";
+          releaseBtn("aimeat-reg-btn", createLabel);
         }
       });
     }
@@ -1153,14 +1232,11 @@
         }
         document.getElementById("aimeat-logout-btn").addEventListener("click", () => {
           auth2.logout();
-          render();
-          if (opts.onLogout) opts.onLogout();
         });
         var gearBtn = document.getElementById("aimeat-grant-gear");
         if (gearBtn) gearBtn.addEventListener("click", () => {
-          auth2.manageGrant().then((res) => {
+          auth2.manageGrant().then(() => {
             render();
-            if (res && res.revoked && opts.onLogout) opts.onLogout();
           }).catch(() => {
           });
         });
@@ -1228,7 +1304,10 @@
       });
     }
     auth2.on("login", render);
-    auth2.on("logout", render);
+    auth2.on("logout", () => {
+      render();
+      if (opts.onLogout) opts.onLogout();
+    });
     auth2.on("session-updated", render);
     if (isAppOrigin() && !auth2.getSession()) {
       restoreSessionFromAppOrigin(false).then((s) => {
@@ -1402,19 +1481,6 @@
       }, 8e3);
     });
   }
-  function _b64url(buf) {
-    var bytes = new Uint8Array(buf), s = "";
-    for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-    return btoa(s).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-  }
-  async function _pkce() {
-    var verifier = _b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
-    if (crypto.subtle && crypto.subtle.digest) {
-      var digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
-      return { verifier, challenge: _b64url(digest), method: "S256" };
-    }
-    return { verifier, challenge: verifier, method: "plain" };
-  }
   async function requestConsentPopup(app, scopeStr, manage) {
     var apexOrigin;
     try {
@@ -1422,8 +1488,8 @@
     } catch {
       return null;
     }
-    var p = await _pkce();
-    var state = _b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
+    var p = await pkce();
+    var state = b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
     var redirectUri = location.origin + "/";
     var scope = scopeStr || appDeclaredScopes();
     var url = apexOrigin + "/v1/app-grants/authorize?response_type=code&response_mode=web_message" + (manage ? "&manage=1" : "") + "&app=" + encodeURIComponent(app) + "&scope=" + encodeURIComponent(scope) + "&redirect_uri=" + encodeURIComponent(redirectUri) + "&code_challenge=" + encodeURIComponent(p.challenge) + "&code_challenge_method=" + encodeURIComponent(p.method) + "&state=" + encodeURIComponent(state);
@@ -1834,36 +1900,42 @@
       persistSession(currentSession);
       emit("session-updated", currentSession);
     },
-    /** Logout — clear stored credentials from localStorage and IndexedDB */
+    /**
+     * Logout — clear stored credentials from localStorage and IndexedDB.
+     * ORDER MATTERS: local state is dropped and 'logout' emitted SYNCHRONOUSLY, before the revoke.
+     * "Logged out" must not depend on a network round-trip — with the revoke awaited first, every
+     * subscriber reading getSession() meanwhile still saw the old session, which is how the header
+     * kept the bell and "Me" next to a "Sign In" button (2026-08-07). Revoke + apex logout are
+     * best-effort cleanup that runs after the UI already shows the truth.
+     */
     async logout() {
       if (refreshTimer) {
         clearTimeout(refreshTimer);
         refreshTimer = null;
       }
       ownerRefreshInFlight = null;
+      const jwt = currentSession?.jwt;
+      const onAppOrigin = isAppOrigin();
+      currentSession = null;
+      remove("session");
+      remove("owner_key");
+      emit("logout");
+      await deleteKey("agent_key");
+      await deleteKey("owner_key");
       try {
         await fetch(NODE_URL + "/v1/auth/revoke", {
           method: "POST",
           credentials: "include",
-          headers: {
-            "Content-Type": "application/json",
-            ...currentSession?.jwt ? { "Authorization": "Bearer " + currentSession.jwt } : {}
-          }
+          headers: { "Content-Type": "application/json", ...jwt ? { "Authorization": "Bearer " + jwt } : {} }
         });
       } catch {
       }
-      if (isAppOrigin()) {
+      if (onAppOrigin) {
         try {
           await apexLogout();
         } catch {
         }
       }
-      currentSession = null;
-      remove("session");
-      remove("owner_key");
-      await deleteKey("agent_key");
-      await deleteKey("owner_key");
-      emit("logout");
     },
     /**
      * Re-open the consent screen for the current app (H-2 in-app grant management).

@@ -9,6 +9,7 @@
  */
 import * as memoryService from '/js/services/memory.js';
 import { swallowed } from '/js/swallowed.js';
+import { authHeaders } from '/js/services/auth.js';
 
 export function fileIcon(type) {
   if (type?.startsWith('image')) return '\u{1F5BC}️';
@@ -56,11 +57,7 @@ export function categoryIcon(cat) {
 // Authenticated blob fetch — browser <img>/<video>/<a> can't attach the JWT, so private files
 // are fetched with the session token and shown from an object URL (the AuthImage pattern).
 export async function fetchFileBlob(url) {
-  const headers = /** @type {Record<string,string>} */ ({});
-  if (window.AIMEAT?.auth?.hasSession) {
-    const s = window.AIMEAT.auth.getSession();
-    if (s?.jwt) headers['Authorization'] = 'Bearer ' + s.jwt;
-  }
+  const headers = /** @type {Record<string,string>} */ ({ ...authHeaders() });
   const resp = await fetch(url, { headers });
   if (!resp.ok) throw new Error(String(resp.status));
   return resp.blob();

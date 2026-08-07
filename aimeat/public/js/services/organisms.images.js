@@ -8,6 +8,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from organisms.js (max-file-lines)
  */
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
+import { authHeaders } from '/js/services/auth.js';
 
 /** ── Document images (stored in /v1/storage, fetched with the session for display) ── */
 function blobToBase64(blob) {
@@ -55,8 +56,7 @@ export async function uploadFile(orgId, file) {
 
 /** Fetch a /v1/storage file with the session token and return an object URL (for <img>). */
 export async function fetchStorageObjectUrl(url) {
-  const jwt = window.AIMEAT?.auth?.getSession?.()?.jwt;
-  const resp = await fetch(url, { headers: jwt ? { Authorization: 'Bearer ' + jwt } : {} });
+  const resp = await fetch(url, { headers: authHeaders() });
   if (!resp.ok) throw new Error('image fetch failed: ' + resp.status);
   return URL.createObjectURL(await resp.blob());
 }

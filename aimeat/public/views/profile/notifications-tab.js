@@ -14,6 +14,7 @@ import { t } from '/js/i18n.js';
 import { Spinner, ToggleSwitch, GlassCard } from './shared.js';
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { getNodeId } from '/js/services/auth.js';
 
 export default function NotificationsTab({ session, showToast }) {
   const [loading, setLoading] = useState(true);
@@ -53,7 +54,7 @@ export default function NotificationsTab({ session, showToast }) {
     } catch (err) { swallowed('notifications-tab: NotificationsTab', err); }
     // Check email verification status
     try {
-      const ghii = session.ghii || `${session.owner}@${window.AIMEAT?.auth?.nodeId || ''}`;
+      const ghii = session.ghii || `${session.owner}@${getNodeId()}`;
       const ghiiRes = await apiGet(`/v1/ghii/${encodeURIComponent(ghii)}`);
       if (ghiiRes.data?.verification_level >= 1) {
         setEmailVerified(true);

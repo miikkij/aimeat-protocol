@@ -23,6 +23,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
+import { authHeaders } from '/js/services/auth.js';
 
 /** Weighted score: critical=3, major=2, minor=1. Returns 0-100 or null. */
 export function computeWeightedScore(dims) {
@@ -44,9 +45,7 @@ export async function callModel(projectId, prompt, modelId, { retries = 1, tempe
   for (let attempt = 0; attempt <= retries; attempt++) {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 1_800_000); // 30 min
-    const headers = { 'Content-Type': 'application/json' };
-    const session = window.AIMEAT?.auth?.getSession?.();
-    if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
+    const headers = { 'Content-Type': 'application/json', ...authHeaders() };
     try {
       const body = { projectId, prompt, model: modelId };
       if (temperature !== undefined) body.temperature = temperature;

@@ -144,7 +144,22 @@
         "whyGhii",
         "whyPrivacy",
         "whyAgents",
-        "whyMorsels"
+        "whyMorsels",
+        // Two-tab modal. Without these the FIRST paint falls back to English and the modal visibly
+        // re-renders once the node's full dictionary arrives.
+        "tabSignIn",
+        "tabRegister",
+        "identifierLabel",
+        "identifierPlaceholder",
+        "signInOnlyBtn",
+        "createAccountBtn",
+        "usernameHint",
+        "registerEmailHint",
+        "displayNameOptional",
+        "errIdentifierRequired",
+        "errPassRequired",
+        "errWrongCredentials",
+        "errNameTaken"
       ];
       var obj = {};
       for (var i = 0; i < keys.length; i++) {

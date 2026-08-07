@@ -198,8 +198,7 @@ export default function Admin({ navigate, locale }) {
         const code = dash.error?.code || '';
         if (code === 'FORBIDDEN' || code === 'AUTH_REQUIRED' || code === 'OPERATOR_REQUIRED' || code === 'ACCESS_DENIED') {
           // Try token refresh once — the stored JWT may be stale (missing operator role)
-          const auth = window.AIMEAT?.auth;
-          const s = auth?.getSession();
+          const s = getSession();
           if (s?.refresh && !retriedRef.current) {
             retriedRef.current = true;
             try {

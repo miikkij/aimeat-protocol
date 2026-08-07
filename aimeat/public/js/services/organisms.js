@@ -38,6 +38,7 @@ import { decodeEntities } from '/js/utils.js';
 import { wsRoot, isMemorySpace, isDocSpace } from './organisms.shared.js';
 import { mlbl } from './organisms.charts.js';
 import { swallowed } from '/js/swallowed.js';
+import { getSession, getStoredGhii } from '/js/services/auth.js';
 
 // ── Re-exports of pieces extracted to sibling modules (pure extraction, max-file-lines) ──
 export { wsRoot, isMemorySpace, isDocSpace, getObjectSchema } from './organisms.shared.js';
@@ -714,18 +715,13 @@ export async function getConfig(orgId) {
 }
 
 /** The current owner's GHII (`owner@node`). ALWAYS returns a string so callers can safely `.split('@')`.
- *  Prefers the synchronous `auth.storedGhii` accessor; falls back to a sync `getSession()` only when it
- *  returns a session object with a string `ghii` (on some builds `getSession()` is async / returns a
- *  Promise — never return that, or `.split` blows up at call sites). Empty string when unknown. */
+ *  Prefers the persisted GHII (readable before the session object exists) and falls back to the active
+ *  session's. Empty string when unknown. */
 export function currentGhii() {
-  const auth = (typeof window !== 'undefined' && window.AIMEAT && window.AIMEAT.auth) || null;
-  if (!auth) return '';
-  if (typeof auth.storedGhii === 'string' && auth.storedGhii) return auth.storedGhii;
-  try {
-    const s = typeof auth.getSession === 'function' ? auth.getSession() : null;
-    if (s && typeof s === 'object' && typeof s.ghii === 'string') return s.ghii;
-  } catch (err) { swallowed('organisms: auth', err); }
-  return '';
+  const stored = getStoredGhii();
+  if (typeof stored === 'string' && stored) return stored;
+  const s = getSession();
+  return (s && typeof s.ghii === 'string') ? s.ghii : '';
 }
 
 /** Section indexes for every document-space, keyed by objectType name. A section is

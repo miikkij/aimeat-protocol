@@ -42,6 +42,8 @@ import { t } from '/js/i18n.js';
 import { api } from '/js/api.js';
 import { escHtml } from '/js/utils.js';
 import { swallowed } from '/js/swallowed.js';
+import { showLoginModal, getStoredGhii } from '/js/services/auth.js';
+import { useSession } from '/js/use-session.js';
 
 const html = htm.bind(h);
 /** t() with a literal fallback; {vars} are interpolated into the fallback too (missing-key safety). */
@@ -81,19 +83,12 @@ export default function AppGrant() {
   const [ownApp, setOwnApp] = useState(false); // server-verified: origin-bound request for the signed-in owner's own app
 
   const requestId = new URLSearchParams(window.location.search).get('req') || '';
-  const [authed, setAuthed] = useState(() => !!window.AIMEAT?.auth?.hasSession);
-
-  // Become reactive to login: the consent popup may open with no one logged in (login_required), and
-  // the user signs in right here (auth.showLoginModal) — flip to the consent view on success.
-  useEffect(() => {
-    const onLogin = () => setAuthed(true);
-    window.AIMEAT?.auth?.on?.('login', onLogin);
-    return () => window.AIMEAT?.auth?.off?.('login', onLogin);
-  }, []);
+  // Reactive to login: the consent popup may open with no one logged in (login_required) and the
+  // user signs in right here — the session hook flips this to the consent view on success.
+  const authed = !!useSession();
 
   function doLogin() {
-    if (window.AIMEAT?.auth?.showLoginModal) window.AIMEAT.auth.showLoginModal({ onLogin: () => setAuthed(true) });
-    else window.location.href = '/v1/profile';
+    if (!showLoginModal({})) window.location.href = '/v1/profile';
   }
 
   useEffect(() => {
@@ -115,7 +110,7 @@ export default function AppGrant() {
         // The owner's OWN app (server-verified: the redirect origin is bound to exactly this app):
         // same auto-approve policy as the silent bridge — their own app never needs the trust prompt.
         // The server computes `own` independently at consent time, so this is UX, not the gate.
-        const myOwner = (window.AIMEAT?.auth?.storedGhii || '').split('@')[0];
+        const myOwner = (getStoredGhii() || '').split('@')[0];
         const own = !!(res.data.origin_bound && res.data.app_owner && myOwner && myOwner === res.data.app_owner);
         // Pre-check the UNION of already-granted and now-requested scopes: an app update that added
         // a scope must surface it CHECKED — presenting it unchecked made users keep the old grant

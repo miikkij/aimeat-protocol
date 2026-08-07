@@ -49,6 +49,8 @@ import { t, getLocale } from '/js/i18n.js';
 import { escHtml } from '/js/utils.js';
 import { listApps } from '/js/services/apps.js';
 import { NODE_URL, tr, stampCspNonce, getSession } from './portfolio/shared.js';
+import { onAuthChange } from '/js/services/auth.js';
+import { useSession } from '/js/use-session.js';
 import { PortfolioBuilder } from './portfolio/builder.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -83,7 +85,7 @@ function PortfolioViewer({ username, navigate }) {
     if (!data?.has_html) return undefined;
     const ownerGaiis = Array.isArray(data.owner_gaiis) ? data.owner_gaiis : [];
 
-    const onAuthChange = () => postAuthState(frameRef.current?.contentWindow);
+    const pushAuthStateToFrame = () => postAuthState(frameRef.current?.contentWindow);
 
     const onMessage = async (e) => {
       const win = frameRef.current?.contentWindow;
@@ -111,23 +113,13 @@ function PortfolioViewer({ username, navigate }) {
     };
 
     window.addEventListener('message', onMessage);
-    window.addEventListener('aimeat-auth-change', onAuthChange);
-    // aimeat-auth-change fires from the login pill's onLogout BEFORE the async
-    // auth.logout() has cleared the session, so getSession() still reads the old
-    // state at that moment. The auth lib's own 'login'/'logout' events fire only
-    // AFTER the state change — subscribe to those too so the frame flips reliably.
-    const authApi = window.AIMEAT?.auth;
-    if (authApi?.on) {
-      authApi.on('login', onAuthChange);
-      authApi.on('logout', onAuthChange);
-    }
+    // onAuthChange is the session service's subscription: it is driven by the auth lib's own
+    // post-change events, so the callback never reads a session that has already been signed out.
+    // (This view used to carry a hand-rolled version of exactly that fix; the service now owns it.)
+    const unsubscribeAuth = onAuthChange(pushAuthStateToFrame);
     return () => {
       window.removeEventListener('message', onMessage);
-      window.removeEventListener('aimeat-auth-change', onAuthChange);
-      if (authApi?.off) {
-        authApi.off('login', onAuthChange);
-        authApi.off('logout', onAuthChange);
-      }
+      unsubscribeAuth();
     };
   }, [data]);
 
@@ -263,15 +255,7 @@ function PortfolioViewer({ username, navigate }) {
 
 /* ── Main Export ── */
 export default function Portfolio({ navigate }) {
-  const [session, setSession] = useState(null);
-
-  useEffect(() => {
-    const s = getSession();
-    if (s) setSession(s);
-    const handler = () => setSession(getSession());
-    window.addEventListener('aimeat-auth-change', handler);
-    return () => window.removeEventListener('aimeat-auth-change', handler);
-  }, []);
+  const session = useSession();
 
   // Determine mode from URL
   const path = typeof window !== 'undefined' ? window.location.pathname : '';

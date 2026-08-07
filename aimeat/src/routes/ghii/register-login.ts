@@ -4,6 +4,9 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-07 — POST /v1/ghii/login accepts the account's VERIFIED email as the identifier
+ *     (resolved via resolveOwnerByVerifiedEmail; selection only, never an auth factor). Identifier
+ *     parsing moved to utils/login-identifier.ts so an email can never be read as a federated GHII.
  *   v1.1.0 — 2026-07-19 — POST /v1/ghii accepts an optional email and, when the node runs with the email
  *     gate on (AIMEAT_EMAIL_CONFIRMATION_REQUIRED), REQUIRES one (EMAIL_REQUIRED) — a supplied email is
  *     recorded + a verification code sent, and a duplicate is refused (EMAIL_TAKEN). OAuth accounts are
@@ -21,7 +24,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { validateOwnerName } from '../../utils/gaii.js';
 import { issueJWT } from '../../auth/jwt.js';
 import { establishOwnerSession } from '../../services/owner-session.js';
-import { createHash, randomBytes, randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { validateTotpCode, validateBackupCode } from '../../services/totp.js';
 import type { TotpConfig } from '../../services/totp.js';
 import { hashPassword, verifyPassword, isLegacyHash } from '../../services/password.js';
@@ -30,28 +33,9 @@ import { rateLimit } from '../../middleware/rate-limit.js';
 import { logger } from '../../utils/logger.js';
 import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { GhiiRegistrationSchema, GhiiLoginSchema, validateBody } from '../../models/schemas.js';
-
-/** Create a pending 'registration' email-verification (15-min code) + dispatch it when email is enabled.
- *  Shared by POST /v1/ghii and attach-email; /v1/ghii/verify-email finalises it (emailHash + level 1). */
-async function startRegistrationEmailVerification(
-    storage: Storage, emailService: EmailService | undefined,
-    ownerName: string, email: string, locale?: string,
-): Promise<{ verificationId: string; emailSent: boolean }> {
-    const clean = email.toLowerCase().trim();
-    const code = String(Math.floor(100000 + Math.random() * 900000));
-    const verificationId = randomBytes(16).toString('hex');
-    const now = new Date().toISOString();
-    await storage.createEmailVerification({
-        id: verificationId, ownerName,
-        emailHash: createHash('sha256').update(clean).digest('hex'),
-        code: createHash('sha256').update(code).digest('hex'),
-        purpose: 'registration', status: 'pending', attempts: 0,
-        expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(), createdAt: now, verifiedAt: null,
-    });
-    let emailSent = false;
-    if (emailService?.enabled) { await emailService.sendVerificationCode(clean, code, locale); emailSent = true; }
-    return { verificationId, emailSent };
-}
+import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
+import { parseLoginIdentifier } from '../../utils/login-identifier.js';
+import { startRegistrationEmailVerification } from '../../services/email-verification-start.js';
 
 export function registerRegisterLoginRoutes(
     router: Router,
@@ -318,16 +302,19 @@ export function registerRegisterLoginRoutes(
             return;
         }
 
-        // Accept full GHII (e.g. "alice@node-id") -- strip the @node-id for local lookup
-        let loginName = username.trim().toLowerCase();
-        let federatedNodeId: string | undefined;
-        if (loginName.includes('@')) {
-            const atIdx = loginName.indexOf('@');
-            const nodePart = loginName.substring(atIdx + 1);
-            loginName = loginName.substring(0, atIdx);
-            if (nodePart !== config.nodeId) {
-                federatedNodeId = nodePart;
+        // An email, a full GHII (local or federated), or a bare handle — see login-identifier.ts.
+        // An email only SELECTS the account by its verified address; the password stays the sole
+        // auth factor, and an address matching nothing answers exactly like a wrong password.
+        const identifier = parseLoginIdentifier(username, config.nodeId);
+        const federatedNodeId = identifier.federatedNodeId;
+        let loginName = identifier.localName;
+        if (identifier.kind === 'email') {
+            const resolved = await resolveOwnerByVerifiedEmail(storage, identifier.localName);
+            if (!resolved.ok) {
+                res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid username or password'));
+                return;
             }
+            loginName = resolved.ownerName;
         }
 
         // --- Federated login: route auth request to the home node ---
@@ -688,111 +675,5 @@ export function registerRegisterLoginRoutes(
             { description: 'Upload an app', method: 'POST', url: '/v1/apps' },
         ]));
         emitChange('ghii');
-    });
-
-    // POST /v1/ghii/login/attach-email — Complete a legacy/unverified account during sign-in (no auth).
-    // Chicken-and-egg fix: /v1/ghii/email/verify requires a session, but login is blocked at the
-    // EMAIL_NOT_VERIFIED gate for accounts with verificationLevel < 1 — so those users can never reach
-    // it. This endpoint re-verifies username+password (so nobody can attach an email to someone else's
-    // account), attaches/updates the email, and sends a verification code. The caller then confirms via
-    // the existing /v1/ghii/verify-email (which sets verificationLevel=1), and re-runs the password
-    // login to obtain a normal owner session.
-    router.post('/v1/ghii/login/attach-email', rateLimit({ max: config.loginRateLimitMax, windowMs: config.loginRateLimitWindowMs }), async (req, res) => {
-        const { username, password, email } = req.body ?? {};
-
-        if (!username || typeof username !== 'string') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required'));
-            return;
-        }
-        if (!password || typeof password !== 'string') {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password is required'));
-            return;
-        }
-        if (!email || typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
-            res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'A valid email is required'));
-            return;
-        }
-
-        // Accept full GHII — strip @node-id for local lookup (federated accounts are managed by their home node)
-        let loginName = username.trim().toLowerCase();
-        if (loginName.includes('@')) {
-            const atIdx = loginName.indexOf('@');
-            const nodePart = loginName.substring(atIdx + 1);
-            loginName = loginName.substring(0, atIdx);
-            if (nodePart !== config.nodeId) {
-                res.status(400).json(error(config.nodeId, 'FEDERATION_UNSUPPORTED',
-                    'Email setup must be completed on your home node.'));
-                return;
-            }
-        }
-
-        const ghii = `${loginName}@${config.nodeId}`;
-        const ghiiRecord = await storage.getGHII(ghii);
-        // Uniform failure for missing account / no password / wrong password — never reveal which.
-        if (!ghiiRecord || !ghiiRecord.passwordHash) {
-            res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid username or password'));
-            return;
-        }
-
-        // Per-account password lockout (mirror the login handler)
-        if (ghiiRecord.passwordLockedUntil) {
-            const lockExpires = new Date(ghiiRecord.passwordLockedUntil).getTime();
-            if (Date.now() < lockExpires) {
-                res.status(429).json(error(config.nodeId, 'PASSWORD_LOCKED',
-                    `Account temporarily locked due to too many failed login attempts. Try again after ${ghiiRecord.passwordLockedUntil}`));
-                return;
-            }
-            await storage.updateGHII(ghii, { passwordFailedAttempts: 0, passwordLockedUntil: undefined });
-        }
-
-        const valid = await verifyPassword(password, ghiiRecord.passwordHash);
-        if (!valid) {
-            const attempts = (ghiiRecord.passwordFailedAttempts ?? 0) + 1;
-            const update: Record<string, unknown> = { passwordFailedAttempts: attempts };
-            if (attempts >= config.passwordLockoutAttempts) {
-                update.passwordLockedUntil = new Date(Date.now() + config.passwordLockoutMinutes * 60_000).toISOString();
-            }
-            await storage.updateGHII(ghii, update);
-            res.status(401).json(error(config.nodeId, 'AUTH_REQUIRED', 'Invalid username or password'));
-            return;
-        }
-        if (ghiiRecord.passwordFailedAttempts) {
-            await storage.updateGHII(ghii, { passwordFailedAttempts: 0, passwordLockedUntil: undefined });
-        }
-
-        // This endpoint is only for accounts still short of email verification. Once verified there is
-        // nothing to complete — the user should just log in.
-        if (ghiiRecord.verificationLevel >= 1) {
-            res.status(409).json(error(config.nodeId, 'ALREADY_VERIFIED',
-                'This account is already verified. Please sign in.'));
-            return;
-        }
-
-        const normalizedEmail = email.toLowerCase().trim();
-        const emailHash = createHash('sha256').update(normalizedEmail).digest('hex');
-
-        // Reject if the email already belongs to a different account (email is a recovery handle).
-        const emailOwner = await storage.getGHIIByEmailHash(emailHash);
-        if (emailOwner && emailOwner.ghii !== ghii) {
-            res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN',
-                'That email is already associated with another account.'));
-            return;
-        }
-
-        // Attach the email now so notification/recovery work once the code is confirmed. emailHash +
-        // verificationLevel are finalised by /v1/ghii/verify-email on a correct code.
-        await storage.updateGHII(ghii, { notificationEmail: normalizedEmail, magicLinkEnabled: true });
-
-        const { verificationId: verId, emailSent } = await startRegistrationEmailVerification(
-            storage, emailService, loginName, normalizedEmail, ghiiRecord.locale);
-
-        res.json(success(config.nodeId, {
-            ok: true,
-            verification_id: verId,
-            email_sent: emailSent,
-            message: 'Verification code sent',
-        }, [
-            { description: 'Confirm the code to finish setup', method: 'POST', url: '/v1/ghii/verify-email' },
-        ]));
     });
 }

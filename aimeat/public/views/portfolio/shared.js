@@ -32,11 +32,7 @@ export function stampCspNonce(htmlStr) {
   return htmlStr.replace(/<script(?=[\s>])/gi, `<script nonce="${nonce}"`);
 }
 
-/* ── Auth helpers ── */
-export function getSession() {
-  const a = window.AIMEAT?.auth;
-  if (!a || typeof a.getSession !== 'function') return null;
-  const s = a.getSession();
-  if (!s || !s.jwt) return null;
-  return s;
-}
+/* ── Auth helpers ──
+ * This module used to carry its own copy of getSession(). Re-exported from the session service
+ * instead: one implementation of "who is signed in", so a fix there reaches every caller. */
+export { getSession } from '/js/services/auth.js';

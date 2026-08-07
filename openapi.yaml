@@ -39993,6 +39993,12 @@ paths:
         cookie). A fresh owner signing key is minted only when the owner has none or the
         client sets `request_owner_key`. When the operator requires email confirmation and
         the account is unverified, responds 403 `EMAIL_NOT_VERIFIED` with `email_required`.
+
+        `username` also accepts the account's VERIFIED email address, which selects the account
+        by that address (never an authentication factor -- the password still is). An email is
+        told apart from a GHII by its dot-bearing domain, which a node id never has, so
+        `alice@aimeat-fi-001` still routes as a federated login. An address matching no verified
+        account answers 401 exactly like a wrong password, so this cannot enumerate addresses.
       requestBody:
         required: true
         content:
@@ -40001,7 +40007,7 @@ paths:
               type: object
               required: [username, password]
               properties:
-                username: { type: string, description: Bare owner name or full GHII (remote node = federated login) }
+                username: { type: string, description: Bare owner name, full GHII (remote node = federated login), or the account's verified email address }
                 password: { type: string }
                 totp_code: { type: string }
                 backup_code: { type: string }

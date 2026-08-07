@@ -115,7 +115,12 @@ function main() {
       'backToLogin', 'resetCodeSent', 'enterNewPasswordTitle', 'codeLabel', 'newPasswordLabel',
       'newPasswordPlaceholder', 'errPassWeak', 'resetPassword', 'resetSuccess', 'recoverUsernameTitle',
       'recoverUsernameDesc', 'emailLabel', 'sendUsername', 'usernameSent', 'whyTitle', 'whyGhii',
-      'whyPrivacy', 'whyAgents', 'whyMorsels'];
+      'whyPrivacy', 'whyAgents', 'whyMorsels',
+      // Two-tab modal. Without these the FIRST paint falls back to English and the modal visibly
+      // re-renders once the node's full dictionary arrives.
+      'tabSignIn', 'tabRegister', 'identifierLabel', 'identifierPlaceholder', 'signInOnlyBtn',
+      'createAccountBtn', 'usernameHint', 'registerEmailHint', 'displayNameOptional',
+      'errIdentifierRequired', 'errPassRequired', 'errWrongCredentials', 'errNameTaken'];
     var obj = {};
     for (var i = 0; i < keys.length; i++) {
       var val = t['modal.' + keys[i]];

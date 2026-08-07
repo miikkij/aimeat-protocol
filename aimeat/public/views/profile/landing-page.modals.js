@@ -9,7 +9,7 @@ import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import htm from "htm";
 const html = htm.bind(h);
 import { t } from "/js/i18n.js";
-import { getProfile, updateProfile, changePassword } from "/js/services/auth.js";
+import { getProfile, updateProfile, changePassword, updateSessionMeta } from "/js/services/auth.js";
 import { getMyPresence, setMyPresence } from "/js/services/presence.js";
 import { onLiveUpdate } from "/lib/live-updates.js";
 import { Spinner } from "./shared.js";
@@ -58,11 +58,7 @@ export function EditProfileModal({ session, onClose, onSaved, onChangePassword }
       if (resp && resp.data) {
         if (session && typeof fields.display_name === 'string') {
           // Persist + re-render the golden login pill live (so it shows the new name now).
-          if (window.AIMEAT?.auth?.updateSessionMeta) {
-            window.AIMEAT.auth.updateSessionMeta({ displayName: fields.display_name });
-          } else {
-            session.displayName = fields.display_name;
-          }
+          updateSessionMeta({ displayName: fields.display_name });
         }
         onSaved?.();
       } else {

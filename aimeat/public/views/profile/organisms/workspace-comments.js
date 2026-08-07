@@ -20,6 +20,7 @@ import { t } from '/js/i18n.js';
 import { dt } from '/js/format.js';
 import * as orgService from '/js/services/organisms.js';
 import { swallowed } from '/js/swallowed.js';
+import { getSession } from '/js/services/auth.js';
 
 /**
  * Comment thread on one workspace object (record or document). Targeted by orgId+ws+space+instanceId.
@@ -37,7 +38,7 @@ export function WorkspaceComments({ orgId, ws, space, instanceId, showToast, bat
   const [anchorQuote, setAnchorQuote] = useState('');
   const [replyTo, setReplyTo] = useState(null);   // { id, body } of the comment being replied to
   const [busy, setBusy] = useState(false);
-  const me = (() => { try { return window.AIMEAT?.auth?.getSession?.() || {}; } catch (err) { swallowed('workspace-comments', err); return { }; } })();
+  const me = getSession() || {};
   const mine = (author) => author && (author === me.gaii || author === me.ghii);
 
   const load = useCallback(async () => {

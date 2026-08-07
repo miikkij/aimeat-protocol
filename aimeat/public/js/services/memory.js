@@ -14,6 +14,7 @@
 import { api, apiGet, apiPost, apiDelete } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
 import { t } from '/js/i18n.js';
+import { authHeaders } from '/js/services/auth.js';
 
 /** List all memory entries. Returns array. Optional agentGaii to view another agent's memory. */
 export async function listMemories(agentGaii, opts) {
@@ -105,11 +106,7 @@ export async function importMemory(entries, mode, agentGaii) {
  * @returns {Promise<Blob>} the ZIP blob (throws on a non-2xx response).
  */
 export async function bundleCollection(items) {
-  const headers = { 'Content-Type': 'application/json' };
-  if (window.AIMEAT?.auth?.hasSession) {
-    const s = window.AIMEAT.auth.getSession();
-    if (s?.jwt) headers['Authorization'] = 'Bearer ' + s.jwt;
-  }
+  const headers = { 'Content-Type': 'application/json', ...authHeaders() };
   const base = typeof window !== 'undefined' ? window.location.origin : '';
   const resp = await fetch(`${base}/v1/memory/bundle`, { method: 'POST', headers, body: JSON.stringify({ items }) });
   if (!resp.ok) {

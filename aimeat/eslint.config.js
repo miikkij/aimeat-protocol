@@ -98,6 +98,12 @@ export default tseslint.config(
     files: ['public/**/*.js'],
     rules: {
       'aimeat/no-silent-catch': 'error',
+      // Session state has ONE source in the frontend: public/js/services/auth.js (and the
+      // useSession() hook over it). Reaching into window.AIMEAT.auth directly opts out of the
+      // service's guarantee that a session it hands you has not already been signed out — which is
+      // how the header came to render the notification bell next to a "Sign In" button (2026-08-07).
+      // The service itself carries a file-level disable; see the rule's header for the full story.
+      'aimeat/no-direct-auth': 'error',
     },
   },
   {

@@ -32,6 +32,7 @@ import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { authHeaders } from '/js/services/auth.js';
 import { Markdown } from '/components/Markdown.js';
 import { JsonNode } from '/components/JsonView.js';
 
@@ -150,9 +151,7 @@ export function ImageView({ desc }) {
     if (!authed) { setSrc(url); setFailed(false); return undefined; }
     let cancelled = false;
     setSrc(null); setFailed(false);
-    const headers = /** @type {Record<string,string>} */ ({});
-    const session = window.AIMEAT?.auth?.getSession?.();
-    if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
+    const headers = /** @type {Record<string,string>} */ ({ ...authHeaders() });
     fetch(url, { headers })
       .then(r => { if (!r.ok) throw new Error(String(r.status)); return r.blob(); })
       .then(blob => {

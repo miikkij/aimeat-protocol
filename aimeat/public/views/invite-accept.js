@@ -34,6 +34,8 @@ import { t } from '/js/i18n.js';
 import { api } from '/js/api.js';
 import { escHtml } from '/js/utils.js';
 import { swallowed } from '/js/swallowed.js';
+import { showLoginModal, logout } from '/js/services/auth.js';
+import { useSession } from '/js/use-session.js';
 
 const html = htm.bind(h);
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -42,7 +44,11 @@ const fill = (s, vars) => Object.keys(vars).reduce((acc, k) => acc.split(`{${k}}
 export default function InviteAccept() {
   const token = new URLSearchParams(window.location.search).get('token') || '';
   const [state, setState] = useState({ status: 'loading', inv: null, viewer: null, error: '' });
-  const [authed, setAuthed] = useState(() => !!window.AIMEAT?.auth?.hasSession);
+  // Reactive to an in-place login/logout (the shared modal, or a sign-out on this page) so the view
+  // flips between accept-as-me and the register form, and the effect below re-fetches the server's
+  // per-session `viewer` verdict for the newly-active (or cleared) session.
+  const session = useSession();
+  const authed = !!session;
   const [form, setForm] = useState({ username: '', password: '', display_name: '' });
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
@@ -66,19 +72,8 @@ export default function InviteAccept() {
     window.location.href = (p.loginUrl || `/v1/ghii/login/${p.id}`) + '?redirect=' + back;
   }
 
-  // Become reactive to an in-place login/logout (username/password via the shared modal, or a
-  // logout on this page) so the view flips between accept-as-me and the register form, and so we
-  // re-fetch the server's per-session `viewer` verdict for the newly-active (or cleared) session.
-  useEffect(() => {
-    const onLogin = () => setAuthed(true);
-    const onLogout = () => { setAuthed(false); setMismatch(false); };
-    window.AIMEAT?.auth?.on?.('login', onLogin);
-    window.AIMEAT?.auth?.on?.('logout', onLogout);
-    return () => {
-      window.AIMEAT?.auth?.off?.('login', onLogin);
-      window.AIMEAT?.auth?.off?.('logout', onLogout);
-    };
-  }, []);
+  // A session change clears the stale EMAIL_MISMATCH verdict — it belonged to the previous account.
+  useEffect(() => { setMismatch(false); }, [session]);
 
   // Load the invitation details (public). Re-runs when the session changes so `viewer.email_matches`
   // (whether accepting as the current account is allowed) reflects who is actually signed in.
@@ -119,14 +114,13 @@ export default function InviteAccept() {
   }
 
   function signInInstead() {
-    if (window.AIMEAT?.auth?.showLoginModal) window.AIMEAT.auth.showLoginModal({ onLogin: () => setAuthed(true) });
+    showLoginModal({});
   }
 
   // Sign out and stay on the accept page, so the visitor can register the invited email or sign in as
-  // the account it belongs to. The 'logout' event handler above re-fetches the viewer verdict.
+  // the account it belongs to. The session hook flips `authed` and re-fetches the viewer verdict.
   function signOutAndRetry() {
-    try { window.AIMEAT?.auth?.logout?.(); } catch (err) { swallowed('invite-accept: signOutAndRetry', err); }
-    setAuthed(false); setMismatch(false);
+    logout().catch(err => { swallowed('invite-accept: signOutAndRetry', err); });
   }
 
   if (state.status === 'loading') {
@@ -167,7 +161,7 @@ export default function InviteAccept() {
   // invitation: explain, and offer to sign out / switch account rather than showing an accept button.
   const wrongAccount = authed && (mismatch || (viewer && viewer.email_matches === false));
   if (wrongAccount) {
-    const who = (viewer && viewer.owner) || (window.AIMEAT?.auth?.getSession?.()?.owner) || '';
+    const who = (viewer && viewer.owner) || session?.owner || '';
     return html`
       <div class="inv-wrap">
         <div class="inv-card">

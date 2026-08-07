@@ -11,7 +11,9 @@
  *
  * @version-history
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
+ *   v1.1.0 — 2026-08-07 — Reads the session through /js/services/auth.js (single session source)
  */
+import { getSession } from '/js/services/auth.js';
 
 /**
  * Make an authenticated API call.
@@ -26,20 +28,18 @@ export async function api(path, opts = {}) {
   const headers = { 'Content-Type': 'application/json', ...opts.headers };
 
   // Attach auth token — refresh if expired
-  if (window.AIMEAT?.auth?.hasSession) {
-    const session = window.AIMEAT.auth.getSession();
-    if (session?.jwt) {
-      // If session has refresh() and token looks expired, refresh first
-      if (typeof session.refresh === 'function') {
-        try {
-          const payload = parseJwtPayload(session.jwt);
-          if (payload?.exp && Date.now() / 1000 > payload.exp - 60) {
-            await session.refresh();
-          }
-        } catch (e) { console.warn('JWT parse/refresh failed, proceeding:', e.message); }
-      }
-      headers['Authorization'] = 'Bearer ' + session.jwt;
+  const session = getSession();
+  if (session?.jwt) {
+    // If session has refresh() and token looks expired, refresh first
+    if (typeof session.refresh === 'function') {
+      try {
+        const payload = parseJwtPayload(session.jwt);
+        if (payload?.exp && Date.now() / 1000 > payload.exp - 60) {
+          await session.refresh();
+        }
+      } catch (e) { console.warn('JWT parse/refresh failed, proceeding:', e.message); }
     }
+    headers['Authorization'] = 'Bearer ' + session.jwt;
   }
 
   // Per-call timeout override (ms) — default 30s; long-running calls (e.g. AI completion on a
@@ -57,11 +57,11 @@ export async function api(path, opts = {}) {
 
       // On 401, try refreshing token once and retry
       if (resp.status === 401 && attempt === 0) {
-        const session = window.AIMEAT?.auth?.getSession?.();
-        if (session?.refresh) {
+        const live = getSession();
+        if (live?.refresh) {
           try {
-            await session.refresh();
-            headers['Authorization'] = 'Bearer ' + session.jwt;
+            await live.refresh();
+            headers['Authorization'] = 'Bearer ' + live.jwt;
             continue;
           } catch (e) { console.warn('Token refresh failed:', e.message); }
         }

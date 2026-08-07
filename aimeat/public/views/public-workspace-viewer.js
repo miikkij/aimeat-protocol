@@ -32,6 +32,7 @@ import { t } from '/js/i18n.js';
 import { Markdown } from '/components/Markdown.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { swallowed } from '/js/swallowed.js';
+import { authHeaders } from '/js/services/auth.js';
 
 const html = htm.bind(h);
 
@@ -64,9 +65,7 @@ export default function PublicWorkspaceViewer() {
     try {
       // Attach the SPA session JWT when signed in (members + account-mode visitors pass the gate)
       // and the stored share token when this workspace was unlocked with a password.
-      const headers = /** @type {Record<string, string>} */ ({});
-      const session = window.AIMEAT?.auth?.getSession?.();
-      if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
+      const headers = /** @type {Record<string, string>} */ ({ ...authHeaders() });
       let st = null;
       try { st = sessionStorage.getItem(shareTokenKey(org, ws)); } catch { /* storage unavailable */ }   // eslint-disable-line aimeat/no-silent-catch -- storage unavailable
       if (st) headers['X-Share-Token'] = st;

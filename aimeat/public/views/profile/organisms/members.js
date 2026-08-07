@@ -28,6 +28,7 @@ import * as orgService from '/js/services/organisms.js';
 import { fmtDate, orgInitials, relTime } from '/views/profile/organisms/helpers.js';
 import { InvitePanel, PendingInvites } from '/views/profile/organisms/invite-panel.js';
 import { swallowed } from '/js/swallowed.js';
+import { getGhii } from '/js/services/auth.js';
 
 /** Inline per-member workspace-role editor: every manageable workspace with a
  *  none/viewer/contributor select. Changes apply immediately (grant replaces, none revokes). */
@@ -79,7 +80,7 @@ export function OrgMemberManager({ org, ghii, canManage, isCreator, showToast, c
   const orgId = org.id;
   // Membership is keyed by bare owner name; presence needs a full GHII. Local members
   // resolve via this node; an already-qualified (federated) ghii is passed through.
-  const myNode = (window.AIMEAT?.auth?.getSession?.()?.ghii || '').split('@')[1] || '';
+  const myNode = (getGhii() || '').split('@')[1] || '';
   const toGhii = (id) => (id && !id.includes('@')) ? (myNode ? `${id}@${myNode}` : '') : (id || '');
   const [requests, setRequests] = useState(null);
   const [members, setMembers] = useState(null);

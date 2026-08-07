@@ -202,7 +202,13 @@ export function libsRouter(config: AimeatConfig, _storage: Storage): Router {
   // auth-specific one carrying the node's enabled OIDC providers (server-computed — the generic
   // prelude only has nodeId/baseUrl), which auth/config.js reads as window.__AIMEAT_AUTH_CFG__.providers.
   router.get('/v1/libs/aimeat-auth.js', (_req, res) => {
-    const authCfg = `window.__AIMEAT_AUTH_CFG__=${JSON.stringify({ providers: listEnabledProviderMeta(config) })};
+    const authCfg = `window.__AIMEAT_AUTH_CFG__=${JSON.stringify({
+      providers: listEnabledProviderMeta(config),
+      // Whether this node's registration gate demands an email. The modal's Register tab shows the
+      // email field up front when it does, instead of asking for it only AFTER the create attempt
+      // fails with EMAIL_REQUIRED (which read as the form losing the person's work).
+      emailRequired: config.emailConfirmationRequired === true,
+    })};
 `;
     sendJavascriptLibrary(res, configPrelude(config) + authCfg + readSdkBundle('auth'));
   });

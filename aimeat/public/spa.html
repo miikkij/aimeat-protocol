@@ -153,6 +153,7 @@
       "/js/services/ecosystem.js": "/js/services/ecosystem.js",
       "/js/services/apps.js": "/js/services/apps.js",
       "/js/services/auth.js": "/js/services/auth.js",
+      "/js/use-session.js": "/js/use-session.js",
       "/js/services/boards.js": "/js/services/boards.js",
       "/js/services/catalogue.js": "/js/services/catalogue.js",
       "/js/services/consent.js": "/js/services/consent.js",
@@ -328,6 +329,7 @@
     import { initThemeSystem } from '/js/theme.js';
     import { siteLink } from '/js/site.js';
     import { NotificationBell, openNotificationLink } from '/components/NotificationBell.js';
+    import { useSession } from '/js/use-session.js';
     import { CommandPalette } from '/views/command-palette.js';
     import { openAppSandboxed, isAppHtmlUrl } from '/js/app-sandbox.js';
     // generateStars no longer needed for light theme
@@ -635,7 +637,10 @@
     }
 
     function Header({ navigate, locale }) {
-      const [session, setSession] = useState(null);
+      // The session comes from the ONE session source (/js/services/auth.js via useSession), not a
+      // private copy synced by a hand-fired window event. That private copy is what kept the
+      // notification bell and the "Me" menu rendered next to a "Sign In" button after a logout.
+      const session = useSession();
       const [morsels, setMorsels] = useState(null);
       const [menuOpen, setMenuOpen] = useState(false);
       const [meOpen, setMeOpen] = useState(false);
@@ -647,22 +652,6 @@
       // Header nav config: { order, hidden }. Defaults to all visible in declared order
       // until the public /v1/site/header-nav fetch resolves (no flash of empty nav).
       const [navConfig, setNavConfig] = useState({ order: PUBLIC_NAV_LINKS.map(l => l.id), hidden: [] });
-
-      // Check auth state
-      useEffect(() => {
-        const checkAuth = () => {
-          if (window.AIMEAT?.auth?.hasSession) {
-            const s = window.AIMEAT.auth.getSession();
-            setSession(s);
-          } else {
-            setSession(null);
-          }
-        };
-        checkAuth();
-        // Re-check when auth lib fires events
-        window.addEventListener('aimeat-auth-change', checkAuth);
-        return () => window.removeEventListener('aimeat-auth-change', checkAuth);
-      }, []);
 
       // Collapse to the hamburger by MEASUREMENT, not by a guessed pixel width.
       //

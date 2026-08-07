@@ -10,6 +10,7 @@
  *   v1.0.0 -- 2026-07-05 -- Initial creation (Skills feature Phase 2b)
  */
 import { apiGet, apiPost, apiDelete } from '/js/api.js';
+import { authHeaders } from '/js/services/auth.js';
 
 /** The library: everything the caller can load, grouped by scope { node, user }. */
 export async function getLibrary() {
@@ -83,15 +84,11 @@ export async function downloadSkillZip(name, { scope, owner, organism, ws } = {}
   if (organism) params.set('organism', organism);
   if (ws) params.set('ws', ws);
   const qs = params.toString();
-  // Binary response — api() always JSON-parses, so fetch directly with the session token.
-  let jwt = '';
-  try {
-    jwt = (window.AIMEAT?.auth?.getSession()?.jwt)
-      || JSON.parse(localStorage.getItem('aimeat_session') || '{}').jwt || '';
-  // eslint-disable-next-line aimeat/no-silent-catch -- anonymous
-  } catch { /* anonymous */ }
+  // Binary response — api() always JSON-parses, so fetch directly with the session token. The
+  // localStorage read this used to fall back to was the same store the session service reads,
+  // one hop earlier and without the lib's validity checks — dropped rather than kept in sync.
   const res = await fetch(`/v1/skills/${encodeURIComponent(name)}/zip${qs ? `?${qs}` : ''}`, {
-    headers: jwt ? { Authorization: `Bearer ${jwt}` } : {},
+    headers: authHeaders(),
   });
   if (!res.ok) throw new Error(`Download failed (HTTP ${res.status})`);
   const blob = await res.blob();

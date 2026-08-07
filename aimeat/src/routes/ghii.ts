@@ -31,6 +31,7 @@ import type { EmailService } from '../services/email.js';
 import { rateLimit } from '../middleware/rate-limit.js';
 import type { PeerInfo } from '../services/federation.js';
 import { registerRegisterLoginRoutes } from './ghii/register-login.js';
+import { registerAttachEmailRoute } from './ghii/attach-email.js';
 import { registerWebVerifyRoutes } from './ghii/web-verify.js';
 import { registerRecoveryRoutes } from './ghii/recovery.js';
 import { registerProfileRoutes } from './ghii/profile.js';
@@ -43,6 +44,7 @@ export function ghiiRouter(config: AimeatConfig, storage: Storage, emailService?
     const registrationLimit = rateLimit({ max: config.registrationRateLimitMax, windowMs: config.registrationRateLimitWindowMs });
 
     registerRegisterLoginRoutes(router, config, storage, emailService, peers, registrationLimit);
+    registerAttachEmailRoute(router, config, storage, emailService);
     registerWebVerifyRoutes(router, config, storage, emailService, onDirectoryChange, registrationLimit);
     registerRecoveryRoutes(router, config, storage, emailService);
     registerProfileRoutes(router, config, storage, onDirectoryChange);

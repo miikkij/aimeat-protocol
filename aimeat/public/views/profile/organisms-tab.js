@@ -52,6 +52,7 @@ import { IncomingInvitations } from '/views/profile/organisms/panels.js';
 import { OrganismHome } from '/views/profile/organisms/home.js';
 import { Workspace } from '/views/profile/organisms/workspace.js';
 import { swallowed } from '/js/swallowed.js';
+import { authHeaders } from '/js/services/auth.js';
 
 export default function OrganismsTab({ session, showToast, onStats }) {
   const { confirm, ConfirmUI } = useConfirm();
@@ -181,8 +182,7 @@ export default function OrganismsTab({ session, showToast, onStats }) {
     if (!file) return;
     setImportingOrg(true);
     try {
-      const jwt = window.AIMEAT?.auth?.getSession?.()?.jwt || '';
-      const res = await fetch('/v1/organisms/import', { method: 'POST', headers: { Authorization: 'Bearer ' + jwt, 'Content-Type': 'application/zip' }, body: file });
+      const res = await fetch('/v1/organisms/import', { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/zip' }, body: file });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error?.message || 'Import failed');
       showToast(t('organisms.orgImported') || 'Organism imported');

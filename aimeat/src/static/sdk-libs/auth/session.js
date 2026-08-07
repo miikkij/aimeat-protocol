@@ -13,10 +13,13 @@
  * @usage import { auth, api, isAppOrigin, restoreSessionFromAppOrigin } from './session.js';
  * @version-history
  *   v1.0.0 — 2026-07-19 — Merged from src/routes/libs/auth-lib-part1/2/3.ts (SDK-libs migration Phase 3).
+ *   v1.1.0 — 2026-08-07 — logout() clears local state and emits BEFORE the server revoke, so
+ *     "signed out" never depends on a network round-trip; PKCE helpers moved to ./pkce.js.
  */
 import { importEd25519Key, storeKey, loadKey, deleteKey, migrateKeysToIndexedDB, sign, save, load, remove, parseJwt, isExpired } from './crypto.js';
 import { NODE_URL, APEX_URL, NODE_ID, appDeclaredScopes } from './config.js';
 import { emit, on, off } from './events.js';
+import { b64url, pkce } from './pkce.js';
 import { mountPill } from './pill.js';
 import { showLoginModal } from './modal.js';
 
@@ -176,27 +179,12 @@ export function apexLogout() {
   });
 }
 
-// ── App-grant consent popup (H-2, PKCE code flow) ──
-function _b64url(buf) {
-  var bytes = new Uint8Array(buf), s = '';
-  for (var i = 0; i < bytes.length; i++) s += String.fromCharCode(bytes[i]);
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-async function _pkce() {
-  var verifier = _b64url(crypto.getRandomValues(new Uint8Array(32)).buffer);
-  if (crypto.subtle && crypto.subtle.digest) {
-    var digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier));
-    return { verifier: verifier, challenge: _b64url(digest), method: 'S256' };
-  }
-  // Non-secure context (http on a non-localhost host): crypto.subtle is unavailable. Fall back to
-  // PKCE "plain". Acceptable — such transport is already non-confidential; real app origins are https.
-  return { verifier: verifier, challenge: verifier, method: 'plain' };
-}
+// ── App-grant consent popup (H-2, PKCE code flow; b64url/pkce live in ./pkce.js) ──
 export async function requestConsentPopup(app, scopeStr, manage) {
   var apexOrigin;
   try { apexOrigin = new URL(APEX_URL).origin; } catch { return null; }
-  var p = await _pkce();
-  var state = _b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
+  var p = await pkce();
+  var state = b64url(crypto.getRandomValues(new Uint8Array(16)).buffer);
   var redirectUri = location.origin + '/'; // app origin; never navigated in web_message mode (origin binding only)
   var scope = scopeStr || appDeclaredScopes();
   // manage=1 → the consent page always shows the management screen (the gear).
@@ -658,30 +646,35 @@ export const auth = {
     emit('session-updated', currentSession);
   },
 
-  /** Logout — clear stored credentials from localStorage and IndexedDB */
+  /**
+   * Logout — clear stored credentials from localStorage and IndexedDB.
+   * ORDER MATTERS: local state is dropped and 'logout' emitted SYNCHRONOUSLY, before the revoke.
+   * "Logged out" must not depend on a network round-trip — with the revoke awaited first, every
+   * subscriber reading getSession() meanwhile still saw the old session, which is how the header
+   * kept the bell and "Me" next to a "Sign In" button (2026-08-07). Revoke + apex logout are
+   * best-effort cleanup that runs after the UI already shows the truth.
+   */
   async logout() {
     if (refreshTimer) { clearTimeout(refreshTimer); refreshTimer = null; }
     ownerRefreshInFlight = null;
-    // Revoke the session and clear the httpOnly refresh cookie server-side.
-    try {
-      await fetch(NODE_URL + '/v1/auth/revoke', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(currentSession?.jwt ? { 'Authorization': 'Bearer ' + currentSession.jwt } : {}),
-        },
-      });
-    } catch { /* best effort — still clear local state below */ }
-    // On an app origin, end the apex session too so EXIT sticks across the whole family.
-    if (isAppOrigin()) { try { await apexLogout(); } catch { /* best effort */ } }
+    const jwt = currentSession?.jwt;
+    const onAppOrigin = isAppOrigin();
     currentSession = null;
     remove('session');
     remove('owner_key');
+    emit('logout');
     // SECURITY: Delete CryptoKeys from IndexedDB
     await deleteKey('agent_key');
     await deleteKey('owner_key');
-    emit('logout');
+    // Revoke the session and clear the httpOnly refresh cookie server-side.
+    try {
+      await fetch(NODE_URL + '/v1/auth/revoke', {
+        method: 'POST', credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...(jwt ? { 'Authorization': 'Bearer ' + jwt } : {}) },
+      });
+    } catch { /* best effort — local state is already cleared */ }
+    // On an app origin, end the apex session too so EXIT sticks across the whole family.
+    if (onAppOrigin) { try { await apexLogout(); } catch { /* best effort */ } }
   },
 
   /**

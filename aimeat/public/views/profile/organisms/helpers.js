@@ -13,6 +13,7 @@
  */
 import { t, getLocale } from '/js/i18n.js';
 import { swallowed } from '/js/swallowed.js';
+import { authHeaders } from '/js/services/auth.js';
 
 /** Date-only, formatted in the APP locale (browser locale may differ — fi must show 10.6.2026, not 6/10/2026).
  * @param {string} s ISO date string
@@ -52,8 +53,7 @@ export function orgInitials(name) {
  * @returns {Promise<void>} */
 export async function exportOrganismZip(org, showToast) {
   try {
-    const jwt = window.AIMEAT?.auth?.getSession?.()?.jwt || '';
-    const res = await fetch(`/v1/organisms/${encodeURIComponent(org.id)}/export`, { headers: { Authorization: 'Bearer ' + jwt } });
+    const res = await fetch(`/v1/organisms/${encodeURIComponent(org.id)}/export`, { headers: authHeaders() });
     if (!res.ok) {
       // Surface the server's reason (e.g. an access denial) instead of a bare "Export failed".
       const detail = await res.json().then(j => j?.error?.message).catch(err => { swallowed('helpers: exportOrganismZip', err); return null; });

@@ -19,6 +19,7 @@
  *   v1.2.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
  */
 import { apiGet, apiPost, apiPatch, apiDelete } from '/js/api.js';
+import { authHeaders } from '/js/services/auth.js';
 
 // ── Packages ──
 export const listPackages = (params) => apiGet('/v1/packages' + buildQuery(params));
@@ -54,20 +55,16 @@ export const toggleFeatured = (id, featured) => apiPatch(`/v1/templates/${enc(id
 
 // ── ZIP Import/Export ──
 export async function exportPackageZip(groupId) {
-  const session = window.AIMEAT?.auth?.getSession?.();
-  const headers = /** @type {Record<string,string>} */ ({});
-  if (session?.jwt) headers['Authorization'] = `Bearer ${session.jwt}`;
+  const headers = /** @type {Record<string,string>} */ ({ ...authHeaders() });
   const res = await fetch(`/v1/packages/${enc(groupId)}/export`, { headers });
   if (!res.ok) throw new Error(`Export failed: ${res.status}`);
   return res.blob();
 }
 
 export async function importPackageZip(file) {
-  const session = window.AIMEAT?.auth?.getSession?.();
   const formData = new FormData();
   formData.append('file', file);
-  const headers = /** @type {Record<string,string>} */ ({});
-  if (session?.jwt) headers['Authorization'] = `Bearer ${session.jwt}`;
+  const headers = /** @type {Record<string,string>} */ ({ ...authHeaders() });
   const res = await fetch('/v1/packages/import', {
     method: 'POST',
     headers,

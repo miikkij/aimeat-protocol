@@ -10,6 +10,9 @@
  * @structure mountPill(auth, selector, opts) → render() + event wiring.
  * @usage import { mountPill } from './pill.js';  (auth.mountLoginButton delegates here)
  * @version-history
+ *   v1.2.0 — 2026-08-07 — The host's onLogout fires from the auth lib's 'logout' event (after the
+ *     session is gone) instead of synchronously after the un-awaited logout() — the race that left
+ *     hosts rendering a signed-in header next to a "Sign In" button.
  *   v1.1.0 — 2026-07-25 — The in-pill controls become the platform control cluster (segmented
  *     language switch + segmented ☀|☾ mode switch + palette swatch picker, styled by cluster.js),
  *     with outside-click/Escape closers for the cluster popovers.
@@ -98,17 +101,13 @@ export function mountPill(auth, selector, opts = {}) {
       } else {
         container.innerHTML = pillHtml;
       }
-      document.getElementById('aimeat-logout-btn').addEventListener('click', () => {
-        auth.logout();
-        render();
-        if (opts.onLogout) opts.onLogout();
-      });
+      // Just ask for the logout — the render + opts.onLogout notification hang off the auth lib's
+      // 'logout' event (wired once, below), which fires AFTER the session state is actually gone.
+      document.getElementById('aimeat-logout-btn').addEventListener('click', () => { auth.logout(); });
       var gearBtn = document.getElementById('aimeat-grant-gear');
       if (gearBtn) gearBtn.addEventListener('click', () => {
-        auth.manageGrant().then((res) => {
-          render(); // reflect revoke (→ Sign In) or a re-grant
-          if (res && res.revoked && opts.onLogout) opts.onLogout();
-        }).catch(() => {});
+        // A revoke routes through auth.logout() → the 'logout' event handles render + onLogout.
+        auth.manageGrant().then(() => { render(); }).catch(() => {});
       });
       // Compact trigger toggles the popover. The outside-click / Escape closers are registered ONCE
       // per mount (below, after render()) — not here — so re-renders don't stack them.
@@ -186,7 +185,13 @@ export function mountPill(auth, selector, opts = {}) {
   // Re-render when the session changes out-of-band (e.g. the H-2 silent SSO logs in async). Only
   // re-render (do NOT call opts.onLogin — the interactive modal path already does).
   auth.on('login', render);
-  auth.on('logout', render);
+  // Logout is the ONE place that also notifies the host: the event fires after the session is
+  // already cleared, so every subscriber that then reads getSession()/hasSession sees the truth.
+  // Calling opts.onLogout from the button handler instead raced the async logout() and left hosts
+  // (the SPA header's bell + "Me" menu) rendering a signed-in state next to a "Sign In" button.
+  // Routing it through the event also covers the paths the button never touches: a grant revoke
+  // via manageGrant(), and the stale-cache drop below.
+  auth.on('logout', () => { render(); if (opts.onLogout) opts.onLogout(); });
   auth.on('session-updated', render); // live display-name (etc.) edits
   // Seamless SSO: on an app origin with no session yet, attempt the silent bridge ourselves. Always
   // re-confirm via the bridge on load (the cached session is only a UI cache); drop a stale cache.

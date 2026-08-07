@@ -35,6 +35,7 @@ import * as memoryService from '/js/services/memory.js';
 import { fmtDate, relTime } from '/views/profile/organisms/helpers.js';
 import { OrgSearch } from '/views/profile/organisms/panels.js';
 import { swallowed } from '/js/swallowed.js';
+import { authHeaders } from '/js/services/auth.js';
 
 /* Workspace list — an organism contains many workspaces (each an independent manifest + data set,
  * namespaced under organism.{id}.w.{wsId}.*). Lists the registry (organism.{id}.meta.workspaces),
@@ -224,11 +225,10 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
   };
 
   // ── Export (download ZIP backup) + Import (upload a ZIP as a new workspace) ──
-  const jwt = () => { try { return window.AIMEAT?.auth?.getSession?.()?.jwt || ''; } catch (err) { swallowed('workspace-list', err); return ''; } };
   const fileRef = useRef(null);
   const doExport = async (w) => {
     try {
-      const res = await fetch(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/export?ws=${encodeURIComponent(w.id)}`, { headers: { Authorization: 'Bearer ' + jwt() } });
+      const res = await fetch(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/export?ws=${encodeURIComponent(w.id)}`, { headers: authHeaders() });
       if (!res.ok) throw new Error('Export failed');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -241,7 +241,7 @@ export function WorkspaceList({ org, showToast, onOpen, onCount }) {
     if (!file) return;
     setBusy(true);
     try {
-      const res = await fetch(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/import`, { method: 'POST', headers: { Authorization: 'Bearer ' + jwt(), 'Content-Type': 'application/zip' }, body: file });
+      const res = await fetch(`/v1/organisms/${encodeURIComponent(orgId)}/workspace/import`, { method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/zip' }, body: file });
       const body = await res.json();
       if (!res.ok) throw new Error(body?.error?.message || 'Import failed');
       showToast(t('organisms.imported') || 'Workspace imported');

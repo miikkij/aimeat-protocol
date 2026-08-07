@@ -3,7 +3,7 @@
  * @description Header notification bell — shows the unread count and a dropdown of the user's
  *   in-app notifications (GET /v1/notifications). Opening the dropdown marks them read. Refreshes on
  *   the SSE `aimeat-live-update` event and a 45s poll, so a workspace-access approval (or request)
- *   surfaces without the user having to guess. Self-contained: reads the JWT from window.AIMEAT.auth.
+ *   surfaces without the user having to guess. Reads the JWT from the session service.
  *   Exports openNotificationLink() — the ONE translation from a notification link/URL into SPA
  *   navigation, shared by the bell dropdown and the service-worker push-click handler (spa.html).
  * @structure
@@ -19,17 +19,18 @@
  *     (approve/deny/accept/decline/reject) that call the action endpoint with the owner's session.
  *   v1.3.0 — 2026-07-19 — "Clear all" in the dropdown head (DELETE /v1/notifications) — deletes every
  *     notification for the owner (not just mark-read), optimistic empty + reconcile.
+ *   v1.3.1 — 2026-08-07 — Reads the JWT via /js/services/auth.js (single session source).
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
 import htm from 'htm';
 import { onLiveUpdate } from '/lib/live-updates.js';
 import { swallowed } from '/js/swallowed.js';
+import { getJwt } from '/js/services/auth.js';
 const html = htm.bind(h);
 
-const jwt = () => { try { return window.AIMEAT?.auth?.getSession?.()?.jwt || ''; } catch (err) { swallowed('NotificationBell', err); return ''; } };
 async function api(path, opts = {}) {
-  const token = jwt();
+  const token = getJwt();
   if (!token) return null;
   try {
     const res = await fetch(path, { ...opts, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token, ...(opts.headers || {}) } });

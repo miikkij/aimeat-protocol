@@ -601,8 +601,11 @@ export default function Landing({ navigate }) {
   // to the Home dashboard. But a deliberate in-app navigation here (brand link, footer)
   // shows the landing — otherwise a logged-in user could never see this page at all.
   // The in-app flag is set by spa.html's handleNav (sessionStorage, per browser tab).
+  //
+  // The flag suppresses ONLY the arrival redirect. Signing in while standing on this page
+  // always moves on to Home: without that, the sign-in modal closed and the visitor was left
+  // looking at the same marketing page with no sign that anything had happened.
   useEffect(() => {
-    try { if (sessionStorage.getItem('aimeat.in-app') === '1') return undefined; } catch { /* fall through */ }   // eslint-disable-line aimeat/no-silent-catch -- fall through
     const check = () => {
       try {
         const raw = localStorage.getItem('aimeat_session');
@@ -611,7 +614,9 @@ export default function Landing({ navigate }) {
       } catch { /* stay on landing */ }
       return false;
     };
-    if (check()) return undefined;
+    let arrivedInApp = false;
+    try { arrivedInApp = sessionStorage.getItem('aimeat.in-app') === '1'; } catch { /* treat as direct arrival */ }   // eslint-disable-line aimeat/no-silent-catch -- treat as direct arrival
+    if (!arrivedInApp && check()) return undefined;
     const onAuth = () => check();
     window.addEventListener('aimeat-auth-change', onAuth);
     return () => window.removeEventListener('aimeat-auth-change', onAuth);

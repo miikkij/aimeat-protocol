@@ -11,6 +11,7 @@
  */
 import { apiGet } from '/js/api.js';
 import { swallowed } from '/js/swallowed.js';
+import { authHeaders } from '/js/services/auth.js';
 
 const enc = encodeURIComponent;
 
@@ -31,9 +32,7 @@ export async function fetchPreview(url) {
  *  Returns null on any failure. The CALLER owns the returned URL and must URL.revokeObjectURL it. */
 export async function fetchPreviewImageUrl(imageUrl) {
   try {
-    const headers = /** @type {Record<string, string>} */ ({});
-    const session = window.AIMEAT?.auth?.getSession?.();
-    if (session?.jwt) headers['Authorization'] = 'Bearer ' + session.jwt;
+    const headers = /** @type {Record<string, string>} */ ({ ...authHeaders() });
     const resp = await fetch(`/v1/unfurl/image?url=${enc(imageUrl)}`, { headers });
     if (!resp.ok) return null;
     const blob = await resp.blob();

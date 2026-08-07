@@ -14,6 +14,7 @@ import { escHtml } from '/js/utils.js';
 import { dt, useToast, Toast } from './shared.js';
 import { useConfirm } from '/components/Modal.js';
 import { getSecurityIncidents, resolveSecurityIncident, deleteSecurityIncident } from '/js/services/admin.js';
+import { authHeaders } from '/js/services/auth.js';
 
 const html = htm.bind(h);
 
@@ -42,8 +43,7 @@ export default function SecurityTab() {
   );
   const downloadQuarantine = async (id) => {
     try {
-      const jwt = window.AIMEAT?.auth?.getSession?.()?.jwt || '';
-      const res = await fetch(`/v1/admin/security/incidents/${encodeURIComponent(id)}/quarantine`, { headers: { Authorization: 'Bearer ' + jwt } });
+      const res = await fetch(`/v1/admin/security/incidents/${encodeURIComponent(id)}/quarantine`, { headers: authHeaders() });
       if (!res.ok) throw new Error('No quarantined payload');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
