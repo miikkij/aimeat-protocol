@@ -106,6 +106,7 @@
   <link rel="stylesheet" href="/css/views/portal-classic.css">
   <link rel="stylesheet" href="/css/views/portal-dev.css">
   <link rel="stylesheet" href="/css/views/profile.css">
+  <link rel="stylesheet" href="/css/views/home.css">
   <link rel="stylesheet" href="/css/views/notebook.css">
   <link rel="stylesheet" href="/css/views/living.css">
   <link rel="stylesheet" href="/css/views/offers.css">
@@ -240,6 +241,8 @@
       "/js/services/admin-agent-integration.js": "/js/services/admin-agent-integration.js",
       "/js/services/schedules.js": "/js/services/schedules.js",
       "/js/services/workflows.js": "/js/services/workflows.js",
+      "/views/home/index.js": "/views/home/index.js",
+      "/views/home/step-mat.js": "/views/home/step-mat.js",
       "/views/profile/shared.js": "/views/profile/shared.js",
       "/views/profile/openrouter-settings.js": "/views/profile/openrouter-settings.js",
       "/views/profile/organisms/helpers.js": "/views/profile/organisms/helpers.js",
@@ -402,6 +405,7 @@
       '/v1/business':    () => import('/views/business.js' + B),
       '/v1/transparency': () => import('/views/transparency.js' + B),
       '/v1/profile':     () => import('/views/profile.js' + B),
+      '/v1/home':        () => import('/views/home/index.js' + B),
       '/v1/app-grant':   () => import('/views/app-grant.js' + B),
       '/v1/invite':      () => import('/views/invite-accept.js' + B),
       '/v1/aimeat-os':   () => import('/views/aimeat-os.js' + B),

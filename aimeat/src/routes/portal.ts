@@ -577,6 +577,9 @@ export function portalRouter(config: AimeatConfig, storage: Storage): Router {
 
   const spaRoutes = [
     '/v1/profile',
+    // KOTI — the remake's home path. Registered here AND in spa.html's ROUTES: without both,
+    // the view works on a client-side click and 404s on a refresh.
+    '/v1/home',
     '/v1/aimeat-os',
     '/v1/app-store',
     '/v1/classic',
