@@ -29,6 +29,8 @@ import { StepMat, StepMatDone } from '/views/home/step-mat.js';
 import { StepAgent, AgentCard } from '/views/home/step-agent.js';
 import { StepBranchB } from '/views/home/step-branch-b.js';
 import { HomeFeed, Rooms } from '/views/home/feed.js';
+import { HomeHeader } from '/views/home/header.js';
+import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -52,41 +54,13 @@ function DimmedStep({ n, titleKey, fallback, note }) {
 }
 
 /**
- * The switch (08-kytkin.md). It is not on the landing page and not in the middle of the screen: it
- * sits at the bottom of the home, near the settings, and its words say where it goes rather than
- * what it is called. "Beta", "remake" and a version number all mean nothing to the person reading.
+ * The greeting. It no longer carries the name: the name is on the nameplate in the header a line
+ * above (views/home/header.js), and printing it twice inside sixty pixels reads as a bug.
  */
-function Switcher({ onSwitched }) {
-  const [busy, setBusy] = useState(false);
-  const go = useCallback(async () => {
-    setBusy(true);
-    try {
-      const r = await api('/v1/home/ui-track', { method: 'PUT', body: JSON.stringify({ ui: 'profile' }) });
-      onSwitched?.();
-      window.location.href = r?.data?.landing || '/v1/profile';
-    } catch (e) {
-      swallowed('home: switch', e);
-      setBusy(false);
-    }
-  }, [onSwitched]);
-
-  return html`
-    <div class="koti-switch">
-      <span>${tr('home.switch.here', 'You are using the new home view.')}</span>
-      <button type="button" class="btn-ghost" disabled=${busy} onClick=${go}>
-        ${tr('home.switch.toProfile', 'Go back to the old profile')}
-      </button>
-    </div>`;
-}
-
-function Welcome({ name }) {
+function Welcome() {
   return html`
     <header class="koti-welcome">
-      <h1 class="koti-h1">
-        ${name
-          ? tr('home.welcomeNamed', 'Welcome to your new home, {name}.').replace('{name}', name)
-          : tr('home.welcome', 'Welcome to your new home.')}
-      </h1>
+      <h1 class="koti-h1">${tr('home.welcome', 'Welcome to your new home.')}</h1>
       <p class="koti-welcome-sub">
         ${tr('home.welcomeSub', 'Before the place can do anything for you, there are a couple of things to do.')}
       </p>
@@ -100,6 +74,22 @@ export default function HomeView({ navigate }) {
   const [feed, setFeed] = useState([]);
   const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState('');
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [switching, setSwitching] = useState(false);
+
+  // The switch (08-kytkin.md) now lives inside the settings dialog rather than at the bottom of
+  // the page: it is a setting, and it was the only thing below the feed. Behaviour is unchanged —
+  // it records the choice on the ACCOUNT and then leaves.
+  const switchToProfile = useCallback(async () => {
+    setSwitching(true);
+    try {
+      const r = await api('/v1/home/ui-track', { method: 'PUT', body: JSON.stringify({ ui: 'profile' }) });
+      window.location.href = r?.data?.landing || '/v1/profile';
+    } catch (e) {
+      swallowed('home: switch', e);
+      setSwitching(false);
+    }
+  }, []);
 
   // One line of feedback, and only for things that went wrong: the steps themselves report by
   // changing, which is louder than a message that fades.
@@ -186,6 +176,7 @@ export default function HomeView({ navigate }) {
   if (state.initialized) {
     return html`
       <div class="koti">
+        <${HomeHeader} name=${name} onOpenSettings=${() => setSettingsOpen(true)} />
         <header class="koti-welcome">
           <h1 class="koti-h1">${tr('home.readyTitle', 'Your home is up and running.')}</h1>
           <p class="koti-welcome-sub">
@@ -196,7 +187,9 @@ export default function HomeView({ navigate }) {
         <${Rooms} rooms=${rooms} onEnter=${enterRoom} />
         <${StepMatDone} state=${state} />
         <${HomeFeed} items=${feed} />
-        <${Switcher} />
+        <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
+          session=${session} showToast=${showToast}
+          onSwitch=${switchToProfile} switching=${switching} />
       </div>`;
   }
 
@@ -208,7 +201,8 @@ export default function HomeView({ navigate }) {
 
   return html`
     <div class="koti">
-      <${Welcome} name=${name} />
+      <${HomeHeader} name=${name} onOpenSettings=${() => setSettingsOpen(true)} />
+      <${Welcome} />
 
       <ol class="koti-steps">
         <li>
@@ -239,7 +233,9 @@ export default function HomeView({ navigate }) {
           </li>`}
       </ol>
       <${HomeFeed} items=${feed} />
-      <${Switcher} />
+        <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
+          session=${session} showToast=${showToast}
+          onSwitch=${switchToProfile} switching=${switching} />
       ${toast && html`<div class="koti-toast" role="status">${toast}</div>`}
     </div>`;
 }

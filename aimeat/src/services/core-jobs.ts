@@ -76,6 +76,12 @@ export function registerCoreHandlers(
     const { runMcpOnboardingRescueJob } = await import('./onboarding-funnel.js');
     await runMcpOnboardingRescueJob(config, storage);
   });
+  // One friendly email to an account nobody has been seen on for a fortnight, with a prompt in it.
+  // No-ops unless AIMEAT_INACTIVITY_NUDGE is on — unsolicited mail is never a deploy side effect.
+  scheduler.registerCoreHandler('inactivity-nudge', async () => {
+    const { runInactivityNudgeJob } = await import('./inactivity-nudge.js');
+    await runInactivityNudgeJob(config, storage);
+  });
   // Operator storage-growth telemetry: hourly per-table row-count snapshot (admin DB tab).
   scheduler.registerCoreHandler('storage-stats-snapshot', () => runStorageStatsSnapshotJob(storage));
   // Seed one snapshot at startup so the tab is never empty on a fresh boot (non-blocking).

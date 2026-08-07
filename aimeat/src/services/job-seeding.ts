@@ -52,6 +52,10 @@ export async function seedCoreScheduledJobs(config: AimeatConfig, storage: Stora
   if (config.emailEnabled) {
     // Onboarding rescue: hourly pass over day-old accounts with no MCP session (UX-remake v3, P3).
     jobs.push({ id: 'core:mcp-onboarding-rescue', name: 'MCP Onboarding Rescue', coreHandler: 'mcp-onboarding-rescue', cron: '15 * * * *' });
+    // Once a day is the most this may ever run: the work is a fortnight-scale comparison, and a
+    // more frequent pass buys nothing while multiplying the chance of a mistake reaching an inbox.
+    // NOTE: seeding is create-if-absent — changing this cron does nothing to an existing DB.
+    jobs.push({ id: 'core:inactivity-nudge', name: 'Inactivity Nudge', coreHandler: 'inactivity-nudge', cron: '40 9 * * *' });
   }
 
   jobs.push({ id: 'core:capability-aggregation', name: 'Capability Aggregation', coreHandler: 'capability-aggregation', cron: '*/5 * * * *' });

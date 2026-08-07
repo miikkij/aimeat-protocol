@@ -79,12 +79,21 @@ export const ONBOARDING_KEYS = {
     startedByAgent: 'onboarding.started_by_agent',
     agentDoorStarted: 'onboarding.agent_door_started',
     agentDoorResult: 'onboarding.agent_door_result',
+    /**
+     * The friendly nudge to an account nobody has seen for a fortnight. Accumulating, not
+     * write-once: someone can go quiet more than once in a lifetime, and a write-once marker would
+     * mean the second silence is never noticed. `sentAt` carries the last send, which is what the
+     * cooldown is measured from.
+     */
+    inactivityNudge: 'onboarding.inactivity_nudge',
 } as const;
 
 /** Which onboarding path an account was created on. Cohorts are meaningless without it. */
 export type OnboardingTrack = 'legacy' | 'remake';
 export type OnboardingBranch = 'A' | 'B' | 'agent';
-export type OnboardingRoom = 'create' | 'organise' | 'monetise' | 'company';
+// A room id is FROZEN once anyone enters it: `onboarding.room_entered` is written with
+// writeMarkerOnce, which has no update path. Renaming one later is a data migration, not an edit.
+export type OnboardingRoom = 'create' | 'organise' | 'monetise' | 'company' | 'messages';
 /** K3: new accounts land on the remake; existing ones stay legacy until they switch themselves. */
 export const DEFAULT_TRACK: OnboardingTrack = 'remake';
 
@@ -98,8 +107,14 @@ const RESCUE_MAX_AGE_MS = 7 * 24 * 3600 * 1000;  // after a week, one more email
 
 const ownerGhii = (config: AimeatConfig, owner: string): string => `${owner}@${config.nodeId}`;
 
-/** Write a marker key once; returns false when it already existed. */
-async function writeMarkerOnce(
+/**
+ * Write a marker key once; returns false when it already existed.
+ *
+ * Exported so a sibling job (the inactivity nudge) uses THIS implementation rather than a
+ * second copy: the ttlHours:null matters — a marker with a TTL is swept by the memory cleanup
+ * job, and an idempotency marker that expires turns a one-off email into a recurring one.
+ */
+export async function writeMarkerOnce(
     storage: Storage, ownerGaii: string, key: string, value: Record<string, unknown>,
 ): Promise<boolean> {
     const existing = await storage.getMemory(ownerGaii, key);
@@ -613,6 +628,14 @@ export async function runMcpOnboardingRescueJob(
 
         if (await storage.getMemory(g.ghii, MCP_RESCUE_SENT_KEY)) continue;
         if (await storage.getMemory(g.ghii, FIRST_MCP_CALL_KEY)) continue;
+        // The footer of every email we send says "manage your notification settings in your
+        // profile". Until now nothing on the server read that setting, so the sentence was not
+        // true. Checked here, after eligibility and before the marker, so someone who turns
+        // notifications back on is still reachable.
+        const { mayEmailOwner } = await import('./inactivity-nudge.js');
+        // `true`: this pass has always run without consulting the switch, and turning it off
+        // for everyone who never opened the tab is not a side effect to ship quietly.
+        if (!await mayEmailOwner(storage, g.ghii, true)) continue;
 
         const locale = g.locale === 'fi' ? 'fi' : 'en';
         // A remake account gets the message that continues its actual step; a legacy one keeps the

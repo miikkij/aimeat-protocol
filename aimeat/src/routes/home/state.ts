@@ -18,6 +18,7 @@ import { success } from '../../middleware/envelope.js';
 import { readHomeState, HOME_STEPS } from '../../services/home-state.js';
 import { aiClientQuestionOptions, resolveAiClient, decideBranch } from '../../services/ai-tool-setup.js';
 import { openRooms } from '../../services/home-rooms.js';
+import { resolveIdentity } from '../../utils/gaii.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
 
 export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void {
@@ -45,7 +46,11 @@ export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void
 
         // Only the rooms that are really there. The view renders what it is given and never
         // decides for itself which doors exist (E11).
-        const rooms = state.initialized ? await openRooms(storage, config) : [];
+        // The mailbox room asks about THIS account, so the resolved GHII goes in — never
+        // req.auth!.sub, which is a bare owner name on an owner session (Rule 10).
+        const rooms = state.initialized
+            ? await openRooms(storage, config, resolveIdentity(req.auth!, config.nodeId))
+            : [];
 
         res.json(success(config.nodeId, {
             state,

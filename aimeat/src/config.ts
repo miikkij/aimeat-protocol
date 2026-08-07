@@ -208,6 +208,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const rlRegistrationInvites = Math.max(1, parseInt(process.env.AIMEAT_RL_REGISTRATION_INVITES ?? '5', 10));
   // The home's monetising room. OFF unless an operator has checked that walking in lands somewhere.
   const homeRoomMonetise = process.env.AIMEAT_HOME_ROOM_MONETISE === 'true';
+  const inactivityNudge = process.env.AIMEAT_INACTIVITY_NUDGE === 'true';
 
   // ── Security posture (localhost-flexible → public-strict) ──
   // The profile sets safe DEFAULTS; any explicit AIMEAT_* var overrides it. Full rationale + the
@@ -695,6 +696,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     rlAuthChallenge,
 
     homeRoomMonetise,
+    inactivityNudge,
     rateLimits: {
       global: { windowMs: 1_000, max: rlGlobal },
       auth: { windowMs: 1_000, max: rlAuth },

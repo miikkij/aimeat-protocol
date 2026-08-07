@@ -561,7 +561,7 @@ await test('Only rooms that EXIST on this node are offered', async () => {
     }
     // E11: no card without a room. A door into nothing breaks the empty-state rule at exactly the
     // moment the person has finally got excited.
-    assert(ids.every(id => ['create', 'organise', 'monetise', 'company'].includes(id)),
+    assert(ids.every(id => ['create', 'organise', 'monetise', 'company', 'messages'].includes(id)),
         `unknown room offered: ${JSON.stringify(ids)}`);
 });
 
@@ -589,6 +589,52 @@ await test('Entering a room is recorded ONCE — the first one, not the latest',
     // And it shows up in the feed, from that same marker.
     const items = await feedOf(tokenAgentOwner);
     assert(items.some(i => i.kind === 'room_entered'), 'entering a room appears in the feed');
+});
+
+// ── The mailbox room: the only one gated on the ACCOUNT rather than the node ────────────────────
+//
+// It is a CONTENTS room, not a DOING room: you go in to read what arrived. An empty one is not a
+// starting state, it is the whole content — which is the door E11 forbids. In practice a new
+// account is never empty (the operator welcomes it at registration), so these tests drive the
+// check in BOTH directions against real mailbox states rather than a contrived one.
+
+await test('The mailbox room is offered, last, once there is mail', async () => {
+    const { body } = await json('/v1/home/state', auth(tokenAgentOwner));
+    const rooms = body.data.rooms as Array<{ id: string; url: string }>;
+    const mailbox = rooms.find(r => r.id === 'messages');
+    assert(mailbox !== undefined,
+        `the operator's welcome is mail, so the door is open: ${JSON.stringify(rooms.map(r => r.id))}`);
+    assert(mailbox!.url === '/v1/profile?tab=messages',
+        `and it leads to the real mailbox, got ${mailbox!.url}`);
+    assert(rooms[rooms.length - 1].id === 'messages',
+        `offered last — it is not an ambition anyone arrives with: ${JSON.stringify(rooms.map(r => r.id))}`);
+});
+
+await test('E11: emptying the mailbox closes the door again', async () => {
+    // Live check, not a one-off computed at signup: clear the inbox and the card must go.
+    const inbox = await json('/v1/messages/inbox', auth(tokenAgentOwner));
+    assert(inbox.status === 200, `inbox ${inbox.status}`);
+    const messages = inbox.body.data.messages as Array<{ id: string }>;
+    assert(messages.length > 0, 'precondition: there is mail to clear');
+    for (const m of messages) {
+        const del = await json(`/v1/messages/${encodeURIComponent(m.id)}`, auth(tokenAgentOwner, { method: 'DELETE' }));
+        assert(del.status === 200 || del.status === 204, `delete ${m.id}: ${del.status}`);
+    }
+
+    const { body } = await json('/v1/home/state', auth(tokenAgentOwner));
+    const ids = (body.data.rooms as Array<{ id: string }>).map(r => r.id);
+    assert(!ids.includes('messages'), `no mail, no door: ${JSON.stringify(ids)}`);
+    // The other rooms are untouched — this gate is per-room, not a global off switch.
+    assert(ids.includes('create') && ids.includes('organise'), `the core rooms stay: ${JSON.stringify(ids)}`);
+});
+
+await test('FAILURE MODE: entering a room that is closed for you is refused', async () => {
+    // Same account, mailbox now empty — so the door it would walk through does not exist.
+    const { status, body } = await json('/v1/home/room', auth(tokenAgentOwner, {
+        method: 'POST', body: JSON.stringify({ room: 'messages' }),
+    }));
+    assert(status === 409, `expected 409 ROOM_CLOSED, got ${status}: ${JSON.stringify(body)}`);
+    assert(body.error.code === 'ROOM_CLOSED', `code: ${body.error?.code}`);
 });
 
 await test('FAILURE MODE: an unknown room is refused', async () => {

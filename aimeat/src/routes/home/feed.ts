@@ -17,6 +17,7 @@ import { success, error } from '../../middleware/envelope.js';
 import { readHomeFeed } from '../../services/home-feed.js';
 import { ONBOARDING_KEYS, recordOnboardingEvent, type OnboardingRoom } from '../../services/onboarding-funnel.js';
 import { ROOMS, openRooms } from '../../services/home-rooms.js';
+import { resolveIdentity } from '../../utils/gaii.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
 
 export function registerHomeFeedRoutes(router: Router, ctx: HomeRouteCtx): void {
@@ -58,7 +59,7 @@ export function registerHomeFeedRoutes(router: Router, ctx: HomeRouteCtx): void 
             }
             // A room whose destination is not on this node is not enterable. Recording an entry
             // into a place that does not exist would put a step in the funnel that cannot happen.
-            const open = await openRooms(storage, config);
+            const open = await openRooms(storage, config, resolveIdentity(req.auth!, config.nodeId));
             if (!open.some(r => r.id === room)) {
                 res.status(409).json(error(config.nodeId, 'ROOM_CLOSED',
                     'That room is not open on this node yet.'));

@@ -209,6 +209,12 @@ export interface AimeatConfig {
   coOriginEnabled: boolean;
   /** Home room 3 (monetising). Default OFF — see services/home-rooms.ts for why it is a flag. */
   homeRoomMonetise: boolean;
+  /**
+   * Send the fortnight-of-silence nudge email. Default OFF: it is UNSOLICITED mail to real
+   * people, so switching it on has to be a decision somebody made, not a deploy side effect.
+   * See services/inactivity-nudge.ts.
+   */
+  inactivityNudge: boolean;
   nodeId: string;
   nodeType: NodeType;
   dbUrl: string | null;

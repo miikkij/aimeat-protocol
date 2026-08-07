@@ -7719,7 +7719,7 @@ paths:
                                   connectedAt: { type: string, format: date-time, nullable: true }
                               helloMcp: { type: boolean }
                               initialized: { type: boolean }
-                              room: { type: string, enum: [create, organise, monetise, company], nullable: true }
+                              room: { type: string, enum: [create, organise, monetise, company, messages], nullable: true }
                           steps:
                             type: array
                             items: { type: string }
@@ -7736,7 +7736,7 @@ paths:
                             items:
                               type: object
                               properties:
-                                id: { type: string, enum: [create, organise, monetise, company] }
+                                id: { type: string, enum: [create, organise, monetise, company, messages] }
                                 url: { type: string }
                           client_options:
                             type: array
@@ -8078,9 +8078,9 @@ paths:
   /v1/home/room:
     post:
       operationId: postHomeRoom
-      summary: Record which of the four rooms was entered first
+      summary: Record which room was entered first
       description: >-
-        The four destinations that open once a home exists are ROOMS, not paths: all open at once,
+        The destinations that open once a home exists are ROOMS, not paths: all open at once,
         no door locks behind anyone. This records which was entered FIRST, write-once — the question
         it answers is what someone came here to do, and a value that followed them around would
         answer "where were they last" instead.
@@ -8100,14 +8100,14 @@ paths:
               type: object
               required: [room]
               properties:
-                room: { type: string, enum: [create, organise, monetise, company] }
+                room: { type: string, enum: [create, organise, monetise, company, messages] }
       responses:
         '200':
           description: >-
             Recorded (`recorded: false` when a room was already recorded — the first one stands),
             with the destination URL.
         '400':
-          description: Not one of the four rooms
+          description: Not one of the known rooms
         '403':
           description: Not the account holder's own session
         '409':
@@ -16325,6 +16325,7 @@ paths:
                                     organise: { type: integer }
                                     monetise: { type: integer }
                                     company: { type: integer }
+                                    messages: { type: integer }
                                 switched:
                                   type: integer
                                   description: >-
@@ -16374,7 +16375,7 @@ paths:
                                 branch: { type: string, enum: [A, B, agent], nullable: true }
                                 firstAgentConnectedAt: { type: string, format: date-time, nullable: true }
                                 homeInitializedAt: { type: string, format: date-time, nullable: true }
-                                room: { type: string, enum: [create, organise, monetise, company], nullable: true }
+                                room: { type: string, enum: [create, organise, monetise, company, messages], nullable: true }
                           total: { type: integer }
         '403':
           description: Operator role required

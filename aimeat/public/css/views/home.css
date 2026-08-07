@@ -10,6 +10,8 @@
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
  *   v1.0.1 — 2026-08-07 — Rooms block gets a bottom margin: measured 0px between it and the done
  *     mat card on the finished home, so the two bordered cards collided.
+ *   v1.1.0 — 2026-08-07 — The header (nameplate + settings) and the settings dialog. The dialog
+ *     overrides .modal's single-box scroll so the tab row cannot scroll out of reach.
  */
 
 .koti {
@@ -343,15 +345,62 @@ a.koti-feed-line:hover { text-decoration: underline; }
 .koti-door-signin:hover { color: var(--accent); }
 .koti-keyhole { flex: none; }
 
-/* ── The switch: at the bottom, quiet, and it says where it goes. ── */
-.koti-switch {
-  margin-top: 3rem; padding-top: 1.1rem;
+/* ── The header: a nameplate, and one way into the settings. ── */
+.koti-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding-bottom: 0.9rem; margin-bottom: 1.4rem;
+  border-bottom: 1px solid var(--border);
+}
+.koti-name {
+  font-weight: 650; font-size: 1.02rem; color: var(--text);
+  /* A long display name shortens rather than pushing the settings button off the row. */
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.koti-settings-btn {
+  flex: none;
+  display: inline-flex; align-items: center; gap: 0.4rem;
+  font-size: 0.88rem;
+}
+.koti-cog { flex: none; opacity: 0.8; }
+
+/* ── The settings dialog ──
+   The shared .modal scrolls as ONE box (max-height 85vh + overflow-y:auto), which for a tabbed
+   dialog scrolls the tab row out of sight — you lose the way back to the other tabs. Here the box
+   is a column: title and tabs hold still, the panel underneath is what moves. */
+.koti-settings-modal {
+  width: 44rem;
+  display: flex; flex-direction: column;
+  overflow: hidden;                 /* the panel owns the scrolling, not the box */
+}
+/* The shared .modal-body sits between the box and our panel. Without letting it shrink, the panel
+   inherits no height limit, grows to its content, and everything past the dialog edge is clipped by
+   the overflow:hidden above — measured at 1280x460: 1373px of Wallet inside a 439px dialog, with
+   nothing scrolling. Scoped to this dialog so no other modal changes. */
+.koti-settings-modal .modal-body { flex: 1 1 auto; min-height: 0; display: flex; }
+.koti-settings { display: flex; flex-direction: column; min-height: 0; flex: 1 1 auto; width: 100%; }
+.koti-settings-tabs {
+  flex: none;
+  margin-bottom: 1rem;
+  /* Four tabs must fit a 390px phone: let them wrap rather than overflow the dialog sideways. */
+  flex-wrap: wrap; max-width: 100%;
+}
+.koti-settings-panel {
+  min-height: 0; overflow-y: auto;
+  /* Room for a focus ring on the first control instead of clipping it at the edge. */
+  padding: 0.15rem;
+}
+.koti-settings-switch {
+  margin-top: 2rem; padding-top: 1.1rem;
   border-top: 1px solid var(--border);
   display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
   font-size: 0.88rem; color: var(--muted);
 }
 
 @media (max-width: 560px) {
+  /* The dialog goes edge to edge rather than keeping a 44rem box on a phone. */
+  .koti-settings-modal { width: 100%; }
+  .koti-settings-tabs { width: 100%; }
+  .koti-settings-tabs .seg-btn { flex: 1 1 auto; }
   .koti-door { padding: 1.25rem 1rem 0; }
   .koti-door-title { font-size: 1.65rem; }
   .koti-door-agent-head > * { width: 100%; }

@@ -26,6 +26,7 @@ import { validateOutboundUrl } from '../utils/url-validator.js';
 import type { PeerInfo } from '../services/federation.js';
 import { performKeyExchange } from '../services/federation-helpers.js';
 import { logger } from '../utils/logger.js';
+import { ROOMS } from '../services/home-rooms.js';
 
 const POLL_INTERVAL_MS = 10_000;
 const MAX_POLL_DURATION_MS = 30 * 60_000;
@@ -293,12 +294,12 @@ export function adminMonitoringRouter(
                     home_initialized_rate_pct: list.length
                         ? Math.round((list.filter(r => !!r.homeInitializedAt).length / list.length) * 1000) / 10 : 0,
                     room_entered: list.filter(r => !!r.room).length,
-                    rooms: {
-                        create: list.filter(r => r.room === 'create').length,
-                        organise: list.filter(r => r.room === 'organise').length,
-                        monetise: list.filter(r => r.room === 'monetise').length,
-                        company: list.filter(r => r.room === 'company').length,
-                    },
+                    // Derived from ROOMS, not hand-listed: this used to be four literal lines, and
+                    // a fifth room would have been counted by room_entered above while missing
+                    // here — the totals stop adding up and nothing says so.
+                    rooms: Object.fromEntries(
+                        ROOMS.map(def => [def.id, list.filter(r => r.room === def.id).length]),
+                    ) as Record<string, number>,
                     // Its own column on purpose: remake-created accounts leaving for the old path
                     // is the result, not a footnote.
                     switched: list.filter(r => r.switched > 0).length,
