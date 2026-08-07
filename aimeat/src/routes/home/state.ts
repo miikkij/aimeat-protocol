@@ -17,6 +17,7 @@ import { requireAuth, requireRole } from '../../auth/middleware.js';
 import { success } from '../../middleware/envelope.js';
 import { readHomeState, HOME_STEPS } from '../../services/home-state.js';
 import { aiClientQuestionOptions, resolveAiClient, decideBranch } from '../../services/ai-tool-setup.js';
+import { openRooms } from '../../services/home-rooms.js';
 import { requireOwnerSession, type HomeRouteCtx } from './welcome-mat.js';
 
 export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void {
@@ -42,8 +43,13 @@ export function registerHomeStateRoutes(router: Router, ctx: HomeRouteCtx): void
             : null;
         const question = state.branch ? null : decision?.branch === 'ask' ? decision.question : null;
 
+        // Only the rooms that are really there. The view renders what it is given and never
+        // decides for itself which doors exist (E11).
+        const rooms = state.initialized ? await openRooms(storage, config) : [];
+
         res.json(success(config.nodeId, {
             state,
+            rooms,
             /** The three steps in order, so the view can name the ones still ahead. */
             steps: HOME_STEPS,
             /** What still needs asking, if anything. */

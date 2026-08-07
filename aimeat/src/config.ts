@@ -206,6 +206,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   // HOUR, not a second, and its default is deliberately small — a person's inbox is the thing
   // being protected. Raised only where a test needs to make more calls than a human ever would.
   const rlRegistrationInvites = Math.max(1, parseInt(process.env.AIMEAT_RL_REGISTRATION_INVITES ?? '5', 10));
+  // The home's monetising room. OFF unless an operator has checked that walking in lands somewhere.
+  const homeRoomMonetise = process.env.AIMEAT_HOME_ROOM_MONETISE === 'true';
 
   // ── Security posture (localhost-flexible → public-strict) ──
   // The profile sets safe DEFAULTS; any explicit AIMEAT_* var overrides it. Full rationale + the
@@ -692,6 +694,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     rlCatalogue,
     rlAuthChallenge,
 
+    homeRoomMonetise,
     rateLimits: {
       global: { windowMs: 1_000, max: rlGlobal },
       auth: { windowMs: 1_000, max: rlAuth },

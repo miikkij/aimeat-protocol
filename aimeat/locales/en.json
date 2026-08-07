@@ -8872,6 +8872,46 @@
       "stillB": "That one cannot open a connection either. The list above is the checked one — the app has to be from it.",
       "ledePlan": "{app} made it, and {app} can open a connection to your home — but only on one of its paid plans, and you said you are not on one. So the next step needs either that plan or another app.",
       "yours": "The one you already use"
+    },
+    "feed": {
+      "title": "What has happened",
+      "accountCreated": "Your home exists.",
+      "welcomeMat": "You made your welcome mat. Look at it.",
+      "agentKnocking": "Your agent is knocking at the door.",
+      "agentConnected": "Your agent is home.",
+      "agentConnectedNamed": "{name} is home.",
+      "homeReady": "Your home is up and running.",
+      "justNow": "just now",
+      "minutesAgo": "{n} min ago",
+      "hoursAgo": "{n} h ago",
+      "daysAgo": "{n} d ago"
+    },
+    "rooms": {
+      "title": "What would you like to do?",
+      "create": {
+        "title": "I want to make things",
+        "what": "You build apps and tools with your own AI.",
+        "next": "Next: you copy one prompt, and your first app is live.",
+        "entered": "You started making things."
+      },
+      "organise": {
+        "title": "I want to organise",
+        "what": "You keep what you know, and what your team knows, in one place your AI can reach.",
+        "next": "Next: you name what you are organising, and a workspace opens around it.",
+        "entered": "You started organising."
+      },
+      "monetise": {
+        "title": "I want to earn from this",
+        "what": "You put what you have built where other people can pay for it.",
+        "next": "Next: you open TURBO and see how the money side works.",
+        "entered": "You started on the money side."
+      },
+      "company": {
+        "title": "I want an AI company",
+        "what": "A company of its own, with its own page and its own agents.",
+        "next": "Next: you name the company, and it gets its own address.",
+        "entered": "You started a company."
+      }
     }
   }
 }

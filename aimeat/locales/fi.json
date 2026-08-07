@@ -8872,6 +8872,46 @@
       "stillB": "Sekään ei osaa avata yhteyttä. Yllä oleva lista on se tarkistettu — sovelluksen pitää olla siitä.",
       "ledePlan": "{app} teki sen, ja {app} osaa avata yhteyden kotiisi — mutta vain maksullisilla tasoillaan, etkä sinun mukaasi ole niillä. Seuraava askel tarvitsee siis joko sen tason tai toisen sovelluksen.",
       "yours": "Se jota jo käytät"
+    },
+    "feed": {
+      "title": "Mitä on tapahtunut",
+      "accountCreated": "Kotisi on olemassa.",
+      "welcomeMat": "Teit tervetuloamaton. Katso se.",
+      "agentKnocking": "Agenttisi koputtaa ovelle.",
+      "agentConnected": "Agenttisi on kotona.",
+      "agentConnectedNamed": "{name} on kotona.",
+      "homeReady": "Kodin supervoimat ovat käytössä.",
+      "justNow": "juuri nyt",
+      "minutesAgo": "{n} min sitten",
+      "hoursAgo": "{n} h sitten",
+      "daysAgo": "{n} pv sitten"
+    },
+    "rooms": {
+      "title": "Mitä haluaisit tehdä?",
+      "create": {
+        "title": "Haluan luoda",
+        "what": "Rakennat appeja ja työkaluja omalla tekoälylläsi.",
+        "next": "Seuraavaksi: kopioit yhden kehotteen, ja ensimmäinen appisi on julki.",
+        "entered": "Aloitit luomisen."
+      },
+      "organise": {
+        "title": "Haluan organisoida",
+        "what": "Pidät sen mitä tiedät, ja sen mitä tiimisi tietää, yhdessä paikassa johon tekoälysi yltää.",
+        "next": "Seuraavaksi: nimeät mitä organisoit, ja työtila aukeaa sen ympärille.",
+        "entered": "Aloitit organisoinnin."
+      },
+      "monetise": {
+        "title": "Haluan monetisoida",
+        "what": "Viet rakentamasi sinne missä muut voivat maksaa siitä.",
+        "next": "Seuraavaksi: avaat TURBOn ja näet miten rahapuoli toimii.",
+        "entered": "Aloitit rahapuolen."
+      },
+      "company": {
+        "title": "Haluan tekoälyyrityksen",
+        "what": "Oma yritys, omalla sivullaan ja omilla agenteillaan.",
+        "next": "Seuraavaksi: nimeät yrityksen, ja se saa oman osoitteensa.",
+        "entered": "Aloitit yrityksen."
+      }
     }
   }
 }

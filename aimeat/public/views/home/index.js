@@ -21,12 +21,14 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { apiGet } from '/js/api.js';
+import { api, apiGet } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
 import { Spinner } from '/components/Spinner.js';
+import { swallowed } from '/js/swallowed.js';
 import { StepMat, StepMatDone } from '/views/home/step-mat.js';
 import { StepAgent, AgentCard } from '/views/home/step-agent.js';
 import { StepBranchB } from '/views/home/step-branch-b.js';
+import { HomeFeed, Rooms } from '/views/home/feed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -66,6 +68,8 @@ function Welcome({ name }) {
 export default function HomeView({ navigate }) {
   const session = useSession();
   const [state, setState] = useState(null);
+  const [rooms, setRooms] = useState([]);
+  const [feed, setFeed] = useState([]);
   const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState('');
 
@@ -80,10 +84,31 @@ export default function HomeView({ navigate }) {
     try {
       const r = await apiGet('/v1/home/state');
       setState(r.data.state);
+      // Only the rooms the node actually has — the server decides, this view renders (E11).
+      setRooms(r.data.rooms ?? []);
       setLoadError('');
+      // The feed is secondary to the steps: if it fails the page still works, but the failure is
+      // recorded rather than swallowed, because a feed that silently never loads looks identical
+      // to an account where nothing has happened.
+      try {
+        const f = await apiGet('/v1/home/feed');
+        if (f?.data?.items) setFeed(f.data.items);
+      } catch (e) {
+        swallowed('home: feed', e);
+      }
     } catch (e) {
       setLoadError(e.message || String(e));
     }
+  }, []);
+
+  // Going into a room records WHICH one was first, then follows the door.
+  const enterRoom = useCallback(async (room) => {
+    // The door opens either way: a funnel marker must never stand between a person and the thing
+    // they just chose. The failure is still recorded, so a room that stops being counted is
+    // visible rather than mysterious.
+    await api('/v1/home/room', { method: 'POST', body: JSON.stringify({ room: room.id }) })
+      .catch(e => swallowed('home: room marker', e));
+    window.location.href = room.url;
   }, []);
 
   useEffect(() => { if (session) load(); }, [session, load]);
@@ -140,7 +165,9 @@ export default function HomeView({ navigate }) {
           </p>
         </header>
         <${AgentCard} agent=${state.agent} />
+        <${Rooms} rooms=${rooms} onEnter=${enterRoom} />
         <${StepMatDone} state=${state} />
+        <${HomeFeed} items=${feed} />
       </div>`;
   }
 
@@ -182,6 +209,7 @@ export default function HomeView({ navigate }) {
                   note=${tr('home.step3Dim', 'Opens once you have an app that can connect.')} />`}
           </li>`}
       </ol>
+      <${HomeFeed} items=${feed} />
       ${toast && html`<div class="koti-toast" role="status">${toast}</div>`}
     </div>`;
 }

@@ -12,6 +12,8 @@
  *   - Handlers live in sibling modules under ./home/:
  *     - home/welcome-mat.ts — POST /v1/home/welcome-mat, POST /v1/home/ai-client
  *     - home/state.ts       — GET /v1/home/state
+ *     - home/first-agent.ts — POST /v1/home/first-agent
+ *     - home/feed.ts        — GET /v1/home/feed, POST /v1/home/room
  * @usage app.use(homeRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 2).
@@ -22,6 +24,7 @@ import type { Storage } from '../storage/interface.js';
 import { registerWelcomeMatRoutes, type HomeRouteCtx } from './home/welcome-mat.js';
 import { registerHomeStateRoutes } from './home/state.js';
 import { registerFirstAgentRoutes } from './home/first-agent.js';
+import { registerHomeFeedRoutes } from './home/feed.js';
 
 export function homeRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -30,6 +33,7 @@ export function homeRouter(config: AimeatConfig, storage: Storage): Router {
     registerHomeStateRoutes(router, ctx);
     registerWelcomeMatRoutes(router, ctx);
     registerFirstAgentRoutes(router, ctx);
+    registerHomeFeedRoutes(router, ctx);
 
     return router;
 }

@@ -508,5 +508,96 @@ await test('The branch-B screen offers exactly ONE way, from the checked list', 
     }
 });
 
+console.log('\nPhase 7: the feed, and the four rooms');
+
+const feedOf = async (token: string) => {
+    const { status, body } = await json('/v1/home/feed', auth(token));
+    assert(status === 200, `feed ${status}: ${JSON.stringify(body.error)}`);
+    return body.data.items as Array<{ kind: string; at: string; link: string | null }>;
+};
+
+await test('A BRAND-NEW account has a feed row before it has done anything', async () => {
+    // The phase's own acceptance criterion. An empty feed on a first visit reads as broken, and
+    // the account being created is a real event with a real timestamp — so it is shown, not invented.
+    const t = await registerOwner(`hmfd${stamp}`);
+    const items = await feedOf(t);
+    assert(items.length >= 1, `a new account must already have a row, got ${items.length}`);
+    assert(items[items.length - 1].kind === 'account_created',
+        `the oldest row is the account being created, got ${items[items.length - 1].kind}`);
+});
+
+await test('The feed grows from the SAME markers the funnel counts', async () => {
+    // One store, one write path: a feed with its own events would drift from the numbers, and then
+    // the screen and the operator would describe the same account differently.
+    const items = await feedOf(tokenAgentOwner);
+    const kinds = items.map(i => i.kind);
+    for (const expected of ['account_created', 'welcome_mat', 'agent_connected', 'home_initialized']) {
+        assert(kinds.includes(expected), `feed is missing ${expected}: ${JSON.stringify(kinds)}`);
+    }
+    // Newest first, so the thing that just happened is the thing you read first.
+    for (let i = 1; i < items.length; i++) {
+        assert(items[i - 1].at >= items[i].at, `feed must be newest-first: ${JSON.stringify(items.map(x => x.at))}`);
+    }
+    // A row is a link to the thing itself, not to a page about it.
+    const mat = items.find(i => i.kind === 'welcome_mat');
+    assert(mat?.link?.includes('/v1/portfolio/'), `the mat row links to the mat: ${mat?.link}`);
+});
+
+await test('FAILURE MODE: the feed is the account holder\'s own (K1)', async () => {
+    const { status } = await json('/v1/home/feed', auth(agentToken));
+    assert(status === 403, `an agent must not read its owner's history; got ${status}`);
+});
+
+await test('Only rooms that EXIST on this node are offered', async () => {
+    const { body } = await json('/v1/home/state', auth(tokenAgentOwner));
+    const rooms = body.data.rooms as Array<{ id: string; url: string }>;
+    assert(Array.isArray(rooms), 'an initialized home is offered rooms');
+    // The two core surfaces are on every node; the other two depend on what is deployed here.
+    const ids = rooms.map(r => r.id);
+    assert(ids.includes('create') && ids.includes('organise'),
+        `the two core rooms are always there: ${JSON.stringify(ids)}`);
+    for (const r of rooms) {
+        assert(typeof r.url === 'string' && r.url.startsWith('/'), `${r.id} must carry a destination`);
+    }
+    // E11: no card without a room. A door into nothing breaks the empty-state rule at exactly the
+    // moment the person has finally got excited.
+    assert(ids.every(id => ['create', 'organise', 'monetise', 'company'].includes(id)),
+        `unknown room offered: ${JSON.stringify(ids)}`);
+});
+
+await test('An un-initialized home is offered NO rooms', async () => {
+    const { body } = await json('/v1/home/state', auth(tokenFail));
+    assert(Array.isArray(body.data.rooms) && body.data.rooms.length === 0,
+        `rooms open only after the home does: ${JSON.stringify(body.data.rooms)}`);
+});
+
+await test('Entering a room is recorded ONCE — the first one, not the latest', async () => {
+    const first = await json('/v1/home/room', auth(tokenAgentOwner, {
+        method: 'POST', body: JSON.stringify({ room: 'create' }),
+    }));
+    assert(first.status === 200, `enter ${first.status}: ${JSON.stringify(first.body.error)}`);
+    assert(first.body.data.recorded === true, 'the first entry is recorded');
+
+    const second = await json('/v1/home/room', auth(tokenAgentOwner, {
+        method: 'POST', body: JSON.stringify({ room: 'organise' }),
+    }));
+    assert(second.status === 200, `second enter ${second.status}`);
+    assert(second.body.data.recorded === false, 'a later room must not overwrite the first');
+
+    const s = await homeState(tokenAgentOwner);
+    assert(s.room === 'create', `the FIRST room is the one kept, got ${s.room}`);
+    // And it shows up in the feed, from that same marker.
+    const items = await feedOf(tokenAgentOwner);
+    assert(items.some(i => i.kind === 'room_entered'), 'entering a room appears in the feed');
+});
+
+await test('FAILURE MODE: an unknown room is refused', async () => {
+    const { status, body } = await json('/v1/home/room', auth(tokenAgentOwner, {
+        method: 'POST', body: JSON.stringify({ room: 'teleport' }),
+    }));
+    assert(status === 400, `expected 400, got ${status}`);
+    assert(/create/.test(body.error.message), 'the refusal names the real rooms');
+});
+
 console.log(`\n=== Remake Home: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);
