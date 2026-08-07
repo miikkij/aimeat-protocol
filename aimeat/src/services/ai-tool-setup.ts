@@ -26,8 +26,16 @@
  *   - Grok connectors https://docs.x.ai/grok/connectors
  * @structure buildAiToolSetup(config, { lang }) -> AiTool[] (strings already localized, URLs
  *   already resolved against this node's base URL)
+ *   AI_CLIENT_ALIASES / resolveAiClient() / decideBranch() / aiClientQuestionOptions() — the
+ *   remake's branch decision, kept beside the list it reads rather than in the calling code.
  * @usage import { buildAiToolSetup } from '../services/ai-tool-setup.js';
  * @version-history
+ *   v1.2.0 — 2026-08-07 — REMAKE phase 1: the alias map (what a model may call its own app →
+ *     one of these eight ids) and the branch decision live here, next to the list, because an
+ *     earlier draft put them in a five-row table of their own and that table would have dropped
+ *     ChatGPT, Grok and Codex users into branch B for no reason. Each tool now states its
+ *     `capability` ('yes' | 'plan-dependent') so a paid-tier requirement is asked about rather
+ *     than assumed either way.
  *   v1.0.0 — 2026-07-31 — Moved here from public/views/profile/ai-tool-setup.js so the SPA and the
  *     Experience Center read one table instead of two copies.
  *   v1.1.0 — 2026-08-07 — claude.ai moved first and flagged `recommended` (UX-remake v3, K2):
@@ -44,6 +52,13 @@ export interface AiToolParam {
     note?: string;
 }
 
+/**
+ * Whether this app can open an MCP connection at all. Every tool in this table can — that is why
+ * it is in the table — so the only distinction is whether a paid tier is required.
+ * `plan-dependent` is a question to ask the person, never a reason to refuse them.
+ */
+export type McpCapability = 'yes' | 'plan-dependent';
+
 export interface AiTool {
     id: string;
     label: string;
@@ -55,6 +70,12 @@ export interface AiTool {
         /** A literal command line, when the tool is attached from a terminal instead of a form. */
         command?: string;
         params: AiToolParam[];
+        /**
+         * Whether the free tier can do this. Defaults to 'yes' when absent. Derived from `plans`
+         * below and stated separately so the branch decision reads a value rather than parsing
+         * a sentence written for a human.
+         */
+        capability?: McpCapability;
         /** Which plans can do this at all — the most common reason setup fails. */
         plans?: string;
         /** A caution that belongs to the tool, not to us. */
@@ -208,6 +229,7 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     { label: 'Description', value: s(l, 'My AIMEAT node: memory, organisms, tasks', 'Oma AIMEAT-node: muisti, organismit, tehtävät') },
                     { label: 'MCP server URL', value: mcpUrl },
                 ],
+                capability: 'plan-dependent',
                 plans: s(l, 'Plus, Pro, Business, Enterprise and Education. Not on the free tier, and not in the apps: browser only.',
                     'Plus, Pro, Business, Enterprise ja Education. Ei ilmaisella tasolla eikä sovelluksissa: vain selaimessa.'),
                 warn: s(l, 'OpenAI marks developer mode as being for people who understand the risk: it grants both read and write tools. Their own warning is worth reading before you switch it on.',
@@ -322,6 +344,7 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     { label: 'Name', value: 'AIMEAT' },
                     { label: 'MCP server URL', value: mcpUrl },
                 ],
+                capability: 'plan-dependent',
                 plans: s(l, 'Paid tiers only. The node also has to be reachable from the public internet, so a node on localhost will not work here.',
                     'Vain maksullisilla tasoilla. Noden pitää lisäksi olla saavutettavissa julkisesta internetistä, joten localhostilla ajettava node ei toimi tässä.'),
             },
@@ -330,5 +353,210 @@ export function buildAiToolSetup(config: AimeatConfig, opts: { lang?: string } =
                     'Avaa chat-kentän vieressä oleva tilavalikko, etsi Custom Instructions ja klikkaa Customize. Koskee kaikkia keskustelujasi.'),
             },
         },
+    ];
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The branch decision (aimeat_remake/04-mcp-kyvykkyys.md)
+//
+// MCP capability belongs to the CLIENT APP, not the model. The same model is capable in Claude
+// Desktop and incapable behind a web UI with no connectors, because the model does not open
+// connections — the app it runs in does. So the deciding field is `ai-client`, and the eight ids
+// above ARE the list of apps that can. Nothing here is a second table: this maps what a model may
+// call its own app onto one of those eight.
+// ─────────────────────────────────────────────────────────────────────────────
+
+/** All ids in this table, for callers that need the set without building the localized list. */
+export const AI_TOOL_IDS = [
+    'claude-web', 'claude-desktop', 'claude-code', 'chatgpt', 'codex', 'cursor', 'vscode', 'grok',
+] as const;
+export type AiToolId = typeof AI_TOOL_IDS[number];
+
+/** Which tools need a paid tier. Everything else in the table works on its free one. */
+const PLAN_DEPENDENT: ReadonlySet<string> = new Set<string>(['chatgpt', 'grok']);
+
+/**
+ * What a model may claim about the app it is running in → which of the eight it is.
+ *
+ * Keys are NORMALIZED (lowercased, every non-alphanumeric removed), so one entry covers a family
+ * of spellings: `claudeai` matches "claude.ai", "Claude AI" and "CLAUDE-AI" alike. Vendor names
+ * are here too ("anthropic", "openai", "xai") because a model asked which app it is in commonly
+ * answers with who made it.
+ *
+ * This map grows from the unknown names the funnel collects (onboarding.ai_model_detected), never
+ * from guesses — the same rule as the table above.
+ */
+export const AI_CLIENT_ALIASES: Readonly<Record<string, AiToolId>> = {
+    // claude.ai — the recommended first path, so bare "claude" resolves here.
+    claude: 'claude-web',
+    claudeai: 'claude-web',
+    claudeweb: 'claude-web',
+    claudecom: 'claude-web',
+    anthropic: 'claude-web',
+    anthropicclaude: 'claude-web',
+    claudeaiweb: 'claude-web',
+    // Claude Desktop
+    claudedesktop: 'claude-desktop',
+    claudedesktopapp: 'claude-desktop',
+    claudeapp: 'claude-desktop',
+    claudeformac: 'claude-desktop',
+    claudeforwindows: 'claude-desktop',
+    // Claude Code
+    claudecode: 'claude-code',
+    claudecodecli: 'claude-code',
+    claudecli: 'claude-code',
+    // ChatGPT
+    chatgpt: 'chatgpt',
+    chatgptweb: 'chatgpt',
+    chatgptplus: 'chatgpt',
+    chatgptpro: 'chatgpt',
+    openai: 'chatgpt',
+    openaichatgpt: 'chatgpt',
+    gpt: 'chatgpt',
+    gpt4: 'chatgpt',
+    gpt4o: 'chatgpt',
+    gpt5: 'chatgpt',
+    gpt51: 'chatgpt',
+    // Codex CLI
+    codex: 'codex',
+    codexcli: 'codex',
+    openaicodex: 'codex',
+    // Cursor
+    cursor: 'cursor',
+    cursorai: 'cursor',
+    cursoride: 'cursor',
+    cursoreditor: 'cursor',
+    // VS Code / Copilot
+    vscode: 'vscode',
+    visualstudiocode: 'vscode',
+    copilot: 'vscode',
+    githubcopilot: 'vscode',
+    vscodecopilot: 'vscode',
+    copilotchat: 'vscode',
+    // Grok
+    grok: 'grok',
+    grokcom: 'grok',
+    xai: 'grok',
+    xaigrok: 'grok',
+} as const;
+
+/** Lowercase, drop everything that is not a letter or digit. "Claude Web" and "claude.ai" collapse. */
+export function normalizeAiClientClaim(raw: string): string {
+    return raw.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** Aliases longest-first, so "claudecode" wins over "claude" in a containment match. */
+const ALIASES_BY_LENGTH: ReadonlyArray<readonly [string, AiToolId]> =
+    Object.entries(AI_CLIENT_ALIASES)
+        .sort((a, b) => b[0].length - a[0].length) as ReadonlyArray<readonly [string, AiToolId]>;
+
+export type AiClientResolution =
+    | { kind: 'known'; id: AiToolId; capability: McpCapability; matched: string }
+    /** Nothing matched, or nothing was claimed. NOT the same as "incapable" — see decideBranch. */
+    | { kind: 'unknown'; claim: string | null };
+
+/**
+ * Resolve a model's claim about its own app to one of the eight ids.
+ *
+ * Two passes: an exact match on the normalized claim, then the longest alias CONTAINED in it —
+ * models rarely answer with a bare app name ("Claude Sonnet 4.5 via claude.ai"), and refusing to
+ * read those would push perfectly capable people into the "unknown" path for a phrasing habit.
+ * Longest-first ordering is what keeps "…via claude code" from resolving as claude.ai.
+ */
+export function resolveAiClient(claim: string | null | undefined): AiClientResolution {
+    const raw = typeof claim === 'string' ? claim.trim() : '';
+    if (!raw) return { kind: 'unknown', claim: null };
+    const norm = normalizeAiClientClaim(raw);
+    if (!norm) return { kind: 'unknown', claim: raw };
+
+    const exact = AI_CLIENT_ALIASES[norm];
+    if (exact) return { kind: 'known', id: exact, capability: capabilityOf(exact), matched: norm };
+
+    for (const [alias, id] of ALIASES_BY_LENGTH) {
+        if (norm.includes(alias)) return { kind: 'known', id, capability: capabilityOf(id), matched: alias };
+    }
+    return { kind: 'unknown', claim: raw };
+}
+
+/** A tool's capability. Everything in the table can speak MCP; only the tier varies. */
+export function capabilityOf(id: string): McpCapability {
+    return PLAN_DEPENDENT.has(id) ? 'plan-dependent' : 'yes';
+}
+
+/** What the person still has to be asked, if anything. */
+export type BranchQuestion = 'which-client' | 'paid-plan';
+
+export type BranchDecision =
+    | { branch: 'A'; reason: 'known-capable' | 'plan-confirmed' | 'unknown-defaults-to-a'; toolId?: AiToolId }
+    /** The ONLY route to B: the person said they do not have the tier their app requires. */
+    | { branch: 'B'; reason: 'plan-missing'; toolId: AiToolId }
+    | { branch: 'ask'; question: BranchQuestion; toolId?: AiToolId };
+
+/**
+ * The branch, from what we know so far.
+ *
+ * The rule that shapes every line of this: **an app NAME can never send anyone to branch B.**
+ * A wrong A costs one attempt. A wrong B tells someone whose tools were fine that their tools are
+ * not good enough, and they have no way to argue. So:
+ *   - a known app that needs no paid tier      → A
+ *   - a known app that does                    → ask about the tier (not a refusal, a question)
+ *   - an app we have never heard of, or none   → ask which app; if they cannot say, A anyway
+ *
+ * @param resolution  what resolveAiClient made of the model's claim
+ * @param answers.hasPaidPlan  the person's answer to the tier question, once they have given one
+ * @param answers.clientAnswer the person's answer to "which app did you talk in", once given.
+ *   `other` and `dont-know` both mean: try A. If the connection then fails, B is where they land,
+ *   having lost one attempt rather than being turned away on a guess.
+ */
+export function decideBranch(
+    resolution: AiClientResolution,
+    answers: { hasPaidPlan?: boolean; clientAnswer?: string } = {},
+): BranchDecision {
+    if (resolution.kind === 'unknown') {
+        const ans = answers.clientAnswer?.trim();
+        if (ans && ans !== 'other' && ans !== 'dont-know') {
+            // They named an app. Read it through the same map — the answer is not privileged.
+            const again = resolveAiClient(ans);
+            if (again.kind === 'known') return decideBranch(again, { hasPaidPlan: answers.hasPaidPlan });
+        }
+        if (ans) return { branch: 'A', reason: 'unknown-defaults-to-a' };
+        return { branch: 'ask', question: 'which-client' };
+    }
+
+    if (resolution.capability === 'yes') {
+        return { branch: 'A', reason: 'known-capable', toolId: resolution.id };
+    }
+    // plan-dependent
+    if (answers.hasPaidPlan === true) return { branch: 'A', reason: 'plan-confirmed', toolId: resolution.id };
+    if (answers.hasPaidPlan === false) return { branch: 'B', reason: 'plan-missing', toolId: resolution.id };
+    return { branch: 'ask', question: 'paid-plan', toolId: resolution.id };
+}
+
+/** One option in the "which app did you talk in?" question. */
+export interface AiClientOption {
+    id: string;
+    label: string;
+    recommended?: boolean;
+    /** Present for real tools; absent for the two escape options. */
+    plans?: string;
+}
+
+/**
+ * The options for "Which app did you talk to the AI in?", built from the SAME table the branch
+ * reads — a hardcoded second list here would be the exact drift the alias map exists to avoid.
+ * The two trailing options are escapes, and both lead to branch A.
+ */
+export function aiClientQuestionOptions(config: AimeatConfig, opts: { lang?: string } = {}): AiClientOption[] {
+    const l = lang(opts.lang);
+    const tools = buildAiToolSetup(config, opts).map(tool => ({
+        id: tool.id,
+        label: tool.label,
+        ...(tool.recommended ? { recommended: true } : {}),
+        ...(tool.mcp.plans ? { plans: tool.mcp.plans } : {}),
+    }));
+    return [
+        ...tools,
+        { id: 'other', label: s(l, 'Something else', 'Jokin muu') },
+        { id: 'dont-know', label: s(l, 'I am not sure', 'En ole varma') },
     ];
 }

@@ -7559,6 +7559,12 @@ paths:
         including the ones to leave empty (`value: ""` means leave the field blank on purpose,
         not "unknown"). Each tool carries its vendor's own documentation URL.
 
+        Every tool here can speak MCP — that is why it is in the table — so `mcp.capability` says
+        only whether a paid tier is required: `yes` (the free tier is enough, the default when the
+        field is absent) or `plan-dependent` (ChatGPT, Grok). `plan-dependent` is a question to ask
+        the person, never grounds to refuse them: MCP capability belongs to the client app, not to
+        the model, so an app name alone can never establish that someone cannot connect.
+
         Served rather than shipped inside each client because the clients cannot share code: the
         portal SPA and the Experience Center are separate origins, and a copy in each would
         drift. Drifting setup instructions are worse than none, since the reader follows them,
