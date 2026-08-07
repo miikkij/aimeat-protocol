@@ -38,6 +38,10 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
         active: true,
         variables: seed.variables,
         usedIn: seed.usedIn,
+        // Factory translations travel with the first insert only. On every later boot the branch
+        // below runs instead, and it does not carry `locales` — so an operator's Finnish edit is
+        // never reverted by a deploy, exactly as their English edit is not.
+        locales: seed.locales,
         version: 1,
         updatedAt: now,
         updatedBy: 'system',

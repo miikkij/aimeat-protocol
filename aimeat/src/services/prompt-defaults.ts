@@ -36,6 +36,13 @@ export interface PromptSeedEntry {
   content: string;
   variables: string[];
   usedIn: string[];
+  /**
+   * Optional factory translations, keyed by language tag ('fi'). Seeded ONCE, on first insert —
+   * after that the operator owns them and the seeder never touches them again (same rule the
+   * content already follows). A prompt with no entry here simply serves `content` everywhere,
+   * which is what every prompt did before this field existed.
+   */
+  locales?: Record<string, string>;
 }
 
 // Seed groups are extracted into ./prompt-defaults/* to keep this file within max-file-lines.

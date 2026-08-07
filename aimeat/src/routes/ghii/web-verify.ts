@@ -18,6 +18,7 @@ import type { EmailService } from '../../services/email.js';
 import { generateKeyPair } from '../../auth/keypair.js';
 import { success, error } from '../../middleware/envelope.js';
 import { emitChange } from '../../services/event-bus.js';
+import { logger } from '../../utils/logger.js';
 import { validateOwnerName, buildGAII } from '../../utils/gaii.js';
 import { issueJWT } from '../../auth/jwt.js';
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
@@ -189,6 +190,19 @@ export function registerWebVerifyRoutes(
             await emailService.sendVerificationCode(email, code, typeof locale === 'string' ? locale : undefined);
             verificationId = verId;
         }
+
+        // Which onboarding path this account was created on (05-mittaus.md). This door is the SPA's
+        // web registration and was missing the marker, so every account made here read as `legacy`
+        // — the same gap that /v1/ghii and provisionOwner already closed.
+        void import('../../services/onboarding-funnel.js')
+            .then(m => m.recordTrack(storage, config, username))
+            .catch(err => logger.warn('ghii register-web: track marker failed', { error: String(err) }));
+
+        // The operator's welcome into the new mailbox. Fire-and-forget: a greeting must never be
+        // able to turn a signup into a 500.
+        void import('../../services/welcome-message.js')
+            .then(m => m.sendOperatorWelcome(storage, config, username))
+            .catch(err => logger.warn('ghii register-web: welcome message failed', { error: String(err) }));
 
         // Notify directory of new profile (Phase 1.4 — event-driven refresh)
         if (onDirectoryChange) onDirectoryChange();

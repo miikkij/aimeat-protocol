@@ -59,6 +59,11 @@ let B: Awaited<ReturnType<typeof setupOwner>>;   // saved by A; messages C
 let C: Awaited<ReturnType<typeof setupOwner>>;   // receives B's DM (gate row), blocks later
 
 await test('Setup owners A + B + C', async () => {
+    // The first owner on a fresh node becomes the OPERATOR, and the operator welcomes every new
+    // account by message — which gives them a contact row with everyone. A used to be that first
+    // owner, so "A's address book" started out holding B and C for reasons this suite is not
+    // about. A throwaway owner takes the role, leaving A, B and C as ordinary strangers.
+    await setupOwner('op');
     A = await setupOwner('a'); B = await setupOwner('b'); C = await setupOwner('c');
 });
 

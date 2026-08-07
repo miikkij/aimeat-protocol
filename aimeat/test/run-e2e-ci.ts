@@ -116,6 +116,7 @@ const ALL_SUITES = [
     'test/e2e-onboarding-funnel.ts',
     'test/e2e-remake-funnel.ts',
     'test/e2e-remake-home.ts',
+    'test/e2e-operator-welcome.ts',
     'test/e2e-registration-invites.ts',
     'test/e2e-login-by-email.ts',
     'test/e2e-owner-usage.ts',

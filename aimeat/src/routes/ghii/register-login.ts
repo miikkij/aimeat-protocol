@@ -242,6 +242,11 @@ export function registerRegisterLoginRoutes(
             .then(m => m.recordTrack(storage, config, username))
             .catch(err => logger.warn('ghii register: track marker failed', { error: String(err) }));
 
+        // The operator's welcome into the new mailbox. Same fire-and-forget contract as above.
+        void import('../../services/welcome-message.js')
+            .then(m => m.sendOperatorWelcome(storage, config, username))
+            .catch(err => logger.warn('ghii register: welcome message failed', { error: String(err) }));
+
         // Kick off email verification when an email was supplied (see helper).
         let verificationId: string | null = null;
         let emailSent = false;

@@ -6086,6 +6086,8 @@
     "promptsGroupGenerator": "Generator",
     "promptsEdit": "Edit Prompt",
     "promptsContent": "Content",
+    "promptsLocaleFi": "Finnish version",
+    "promptsLocaleFiHint": "Served to accounts whose language is Finnish. Leave empty to send everyone the English text above.",
     "promptsLocales": "Locale Overrides",
     "promptsAddLocale": "Add Locale",
     "promptsChangeNote": "Change Note (optional)",
@@ -8804,7 +8806,6 @@
   "inbox.voiceMessage": "Voice message",
   "home": {
     "welcome": "Welcome to your new home.",
-    "welcomeNamed": "Welcome to your new home, {name}.",
     "welcomeSub": "Before the place can do anything for you, there are a couple of things to do.",
     "signInTitle": "Step into your home",
     "signInDesc": "Sign in to see where you left off.",
@@ -8924,7 +8925,21 @@
         "what": "A company of its own, with its own page and its own agents.",
         "next": "Next: you name the company, and it gets its own address.",
         "entered": "You started a company."
+      },
+      "messages": {
+        "title": "I want to keep in touch",
+        "what": "Messages from people and from your own agents arrive in one place.",
+        "next": "Next: you read what is already waiting, and reply in the same place.",
+        "entered": "You went to read your messages."
       }
+    },
+    "settings": {
+      "open": "Settings",
+      "title": "Settings",
+      "tabGeneral": "General",
+      "tabOpenRouter": "OpenRouter",
+      "tabAccess": "Access",
+      "tabWallet": "Wallet"
     },
     "switch": {
       "here": "You are using the new home view.",

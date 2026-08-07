@@ -140,5 +140,11 @@ export async function provisionOwner(
     .then(m => m.recordTrack(storage, config, owner.name))
     .catch(err => logger.warn('provisionOwner: track marker failed', { error: String(err) }));
 
+  // The operator's welcome, so the mailbox is not empty on day one. Fire-and-forget for the same
+  // reason as the marker above: a greeting must never be able to turn a signup into a 500.
+  void import('./welcome-message.js')
+    .then(m => m.sendOperatorWelcome(storage, config, owner.name))
+    .catch(err => logger.warn('provisionOwner: welcome message failed', { error: String(err) }));
+
   return { owner, ghii: ghiiRecord };
 }

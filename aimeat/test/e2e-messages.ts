@@ -68,6 +68,11 @@ async function registerOwner(name: string): Promise<{ token: string; ghii: strin
 }
 
 const stamp = Date.now();
+// The first owner on a fresh node becomes the OPERATOR, and the operator greets every new account
+// with a welcome message that (by design) opens the contact both ways. Alice used to be that first
+// owner, which quietly made her and Bob acquaintances before test 1 ran and broke the first-contact
+// gate this suite exists to test. A throwaway operator keeps Alice, Bob and Mallory strangers.
+const opName = `dmop${stamp}`;
 const aliceName = `dmalice${stamp}`;
 const bobName = `dmbob${stamp}`;
 const malName = `dmmal${stamp}`;
@@ -82,6 +87,7 @@ console.log('\n=== AIMEAT Direct Messages (human↔human) E2E ===\n');
 
 console.log('Setup -- three owners');
 await test('Register Alice, Bob, Mallory', async () => {
+    await registerOwner(opName);        // absorbs the operator role; see the note above
     alice = await registerOwner(aliceName);
     bob = await registerOwner(bobName);
     mal = await registerOwner(malName);

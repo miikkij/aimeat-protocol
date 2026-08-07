@@ -6086,6 +6086,8 @@
     "promptsGroupGenerator": "Generaattori",
     "promptsEdit": "Muokkaa kehotetta",
     "promptsContent": "Sisältö",
+    "promptsLocaleFi": "Suomenkielinen versio",
+    "promptsLocaleFiHint": "Tarjoillaan tileille joiden kieli on suomi. Jätä tyhjäksi, niin kaikille menee yllä oleva englanninkielinen teksti.",
     "promptsLocales": "Kieliversiot",
     "promptsAddLocale": "Lisää kieliversio",
     "promptsChangeNote": "Muutoshuomautus (valinnainen)",
@@ -8804,7 +8806,6 @@
   "inbox.voiceMessage": "Ääniviesti",
   "home": {
     "welcome": "Tervetuloa uuteen kotiisi.",
-    "welcomeNamed": "Tervetuloa uuteen kotiisi, {name}.",
     "welcomeSub": "Jotta saat kodin supervoimat käyttöösi, tehdään pari asiaa ensiksi.",
     "signInTitle": "Astu kotiisi",
     "signInDesc": "Kirjaudu sisään, niin näet mihin jäit.",
@@ -8924,7 +8925,21 @@
         "what": "Oma yritys, omalla sivullaan ja omilla agenteillaan.",
         "next": "Seuraavaksi: nimeät yrityksen, ja se saa oman osoitteensa.",
         "entered": "Aloitit yrityksen."
+      },
+      "messages": {
+        "title": "Haluan pitää yhteyttä",
+        "what": "Viestit ihmisiltä ja omilta agenteiltasi tulevat yhteen paikkaan.",
+        "next": "Seuraavaksi: luet mitä siellä jo odottaa, ja vastaat samassa paikassa.",
+        "entered": "Menit lukemaan viestisi."
       }
+    },
+    "settings": {
+      "open": "Asetukset",
+      "title": "Asetukset",
+      "tabGeneral": "Yleiset",
+      "tabOpenRouter": "OpenRouter",
+      "tabAccess": "Pääsy",
+      "tabWallet": "Lompakko"
     },
     "switch": {
       "here": "Käytät uutta kotinäkymää.",

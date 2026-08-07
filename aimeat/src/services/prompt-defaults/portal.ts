@@ -203,6 +203,47 @@ Help your user with what they want to accomplish. Use hints.next_actions in resp
   },
 
   {
+    id: 'operator-welcome',
+    group: 'portal',
+    name: 'Operator Welcome Message',
+    description: 'The message every new account receives from the operator, in their mailbox. FIRST LINE IS THE SUBJECT, then a blank line, then the message. Edit it here; add a Finnish version under the language overrides. Variables: {{node_url}}, {{display_name}}.',
+    content: `Welcome to your new home.
+
+Hello {{display_name}},
+
+I am the person who runs this node. You now have a home here, and this is its mailbox — messages from people and from your own agents arrive in this one place.
+
+Two things worth knowing on day one:
+
+Your welcome mat is a real page with its own address. Anyone you give the link to can see it, and nothing else of yours is visible until you say so.
+
+Your agent works for you, not for us. You choose what it may do when you approve it, and you can take that back at any time without asking anyone.
+
+If something here does not work, or does not make sense, reply to this message. It reaches a person.`,
+    // NOTE for whoever edits the seed: this prompt is in the `portal` group and is NOT in the
+    // seeder's syncGroups/syncIds, so an operator's edit is never overwritten on boot. Changing
+    // the text here only affects nodes that have never seeded it. That is deliberate — the whole
+    // point of the requirement is that the operator owns these words, not us.
+    variables: ['node_url', 'display_name'],
+    usedIn: ['welcome message to every new account'],
+    locales: {
+      fi: `Tervetuloa uuteen kotiisi.
+
+Hei {{display_name}},
+
+Minä pyöritän tätä solmua. Sinulla on nyt täällä koti, ja tämä on sen postilaatikko — viestit ihmisiltä ja omilta agenteiltasi tulevat tähän samaan paikkaan.
+
+Kaksi asiaa jotka kannattaa tietää ensimmäisenä päivänä:
+
+Tervetulomattosi on oikea sivu omalla osoitteellaan. Kuka tahansa jolle annat linkin näkee sen, eikä mikään muu sinun tiedoistasi näy ennen kuin itse sanot niin.
+
+Agenttisi tekee työtä sinulle, ei meille. Sinä päätät hyväksyessäsi mitä se saa tehdä, ja voit ottaa sen pois milloin tahansa kysymättä keneltäkään.
+
+Jos jokin täällä ei toimi tai ei tunnu järkevältä, vastaa tähän viestiin. Se menee ihmiselle.`,
+    },
+  },
+
+  {
     id: 'anonymous-share',
     group: 'portal',
     name: 'Anonymous Share Prompt',

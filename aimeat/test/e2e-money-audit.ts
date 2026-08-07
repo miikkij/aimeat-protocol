@@ -848,7 +848,11 @@ await test('GRANT · being approved notifies the MEMBER, once per decision rathe
         const r = await json('/v1/notifications', { headers: auth(newcomer.token) });
         return (r.body.data.notifications as any[]) ?? [];
     };
-    assert((await bell()).length === 0, 'a fresh account starts with an empty bell');
+    // Not "the bell is empty": a new account legitimately starts with the operator's welcome
+    // message, which rings. What this test is about is grant approvals, so that is what must be
+    // absent to begin with — and every assertion below already filters on that type.
+    assert((await bell()).filter(n => n.type === 'app_member_approved').length === 0,
+        'a fresh account has no grant-approval notifications yet');
 
     const APP_REF = `${provider.name}/${APP}`;
     const g1 = await json('/v1/exchange/grants', {

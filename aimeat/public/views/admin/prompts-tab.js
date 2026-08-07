@@ -174,6 +174,22 @@ export default function PromptsTab({ data }) {
           />
         </div>
 
+        ${/* Finnish override. The store has carried a per-language field all along and the PATCH
+              route already validates it — there was simply no box to type in, so an operator could
+              not write the Finnish half of anything user-facing. Empty means "no override": the
+              English content above is served to everyone. */''}
+        <div class="adm-prompt-editor">
+          <label style="font-weight:600;font-size:.9rem">${t('dashboard.promptsLocaleFi')}</label>
+          <p class="adm-text-dim adm-text-base" style="margin:2px 0 4px">${t('dashboard.promptsLocaleFiHint')}</p>
+          <textarea class="adm-prompt-textarea"
+            value=${(editData.locales && editData.locales.fi) || ''}
+            onInput=${e => setEditData({
+              ...editData,
+              locales: { ...(editData.locales || {}), fi: e.target.value },
+            })}
+          />
+        </div>
+
         <!-- Variables reference -->
         ${editData.variables && editData.variables.length > 0 && html`
           <div class="adm-prompt-vars">
