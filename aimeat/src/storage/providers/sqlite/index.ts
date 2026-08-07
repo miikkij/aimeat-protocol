@@ -52,6 +52,7 @@ import { aiProvenanceMethods } from './methods/ai-provenance.js';
 import { connectionMethods } from './methods/connections.js';
 import { financeMethods } from './methods/finance.js';
 import { outboundMethods } from './methods/outbound.js';
+import { companyMethods } from './methods/companies.js';
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging -- intentional class+interface merge: the interface below declares the methods Object.assign installs on the prototype.
 export class SqliteStorage {
@@ -99,4 +100,5 @@ Object.assign(
   connectionMethods,
   financeMethods,
   outboundMethods,
+  companyMethods,
 );

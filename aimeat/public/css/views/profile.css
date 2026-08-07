@@ -3623,3 +3623,22 @@
 .pf-pnl-vat { color: var(--text-dim); font-size: 0.9rem; }
 .pf-pnl-note, .pf-pnl-empty { color: var(--text-dim); font-size: 0.85rem; margin: var(--space-2) 0 0; }
 .pf-pnl-error { color: var(--danger, #b3372c); }
+
+/* ── Companies tab (pf-co) — the company registry + co addresses ─────────── */
+.pf-co-row { display: flex; gap: var(--space-3); align-items: flex-end; flex-wrap: wrap; margin: var(--space-3) 0; }
+.pf-co-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-dim); flex: 1; min-width: 180px; }
+.pf-co-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); }
+.pf-co-preview { font-size: 0.9rem; color: var(--text-dim); margin: 0; }
+.pf-co-preview code { background: var(--bg-dim); padding: 2px 6px; border-radius: 4px; }
+.pf-co-badge { display: inline-block; margin-left: var(--space-2); padding: 1px 8px; border-radius: 99px; font-size: 0.75rem; border: 1px solid var(--border); }
+.pf-co-badge.free { border-color: var(--success, #1e7d45); color: var(--success, #1e7d45); }
+.pf-co-badge.taken { border-color: var(--danger, #b3372c); color: var(--danger, #b3372c); }
+.pf-co-card { margin-bottom: var(--space-3); }
+.pf-co-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); cursor: pointer; flex-wrap: wrap; }
+.pf-co-address { font-size: 0.88rem; margin-top: 2px; }
+.pf-co-address a { color: var(--accent, #E8564A); }
+.pf-co-serving { font-size: 0.82rem; color: var(--text-dim); }
+.pf-co-body { border-top: 1px solid var(--border); margin-top: var(--space-3); padding-top: var(--space-3); }
+.pf-co-body h4 { margin: var(--space-3) 0 2px; font-size: 0.95rem; }
+.pf-co-hint, .pf-co-muted { color: var(--text-dim); font-size: 0.85rem; }
+.pf-co-error { color: var(--danger, #b3372c); }

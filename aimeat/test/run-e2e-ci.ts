@@ -158,6 +158,7 @@ const ALL_SUITES = [
     'test/e2e-attestations.ts',
     'test/e2e-finance.ts',
     'test/e2e-outbound.ts',
+    'test/e2e-companies.ts',
     'test/e2e-money-audit.ts',
     'test/e2e-x402.ts',
     'test/e2e-x402-testnet.ts',
@@ -394,6 +395,11 @@ async function startServer(): Promise<ChildProcess> {
         // Finvoice delivery uses the in-process mock operator in every e2e run so the
         // submit/refresh loop is provable without an operator account.
         AIMEAT_FINVOICE_OPERATOR: process.env.AIMEAT_FINVOICE_OPERATOR ?? 'mock',
+        // The company origin is opt-in and off by default in prod; on for every e2e run so
+        // the co-family serving half is provable. The host is fixed because the server reads
+        // it at boot — the suite and the server can only meet on a name agreed in advance.
+        AIMEAT_CO_HOST: process.env.AIMEAT_CO_HOST ?? 'co.localhost',
+        AIMEAT_CO_ORIGIN_ENABLED: process.env.AIMEAT_CO_ORIGIN_ENABLED ?? 'true',
         // A fixed 32-byte (hex) encryption key so features that encrypt at rest work in
         // e2e (extension secrets, TOTP, and the app copy-protection watermark + decode).
         AIMEAT_ENCRYPTION_KEY: process.env.AIMEAT_ENCRYPTION_KEY ?? '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',

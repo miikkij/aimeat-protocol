@@ -175,5 +175,41 @@ export function applySchemaTables4(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_outbound_messages_owner ON outbound_messages(ownerGhii, createdAt);
     CREATE INDEX IF NOT EXISTS idx_outbound_messages_contact ON outbound_messages(contactId, createdAt);
 
+    -- ── Company registry (company-in-a-box) ───────────────────────────────────
+    -- A company is a first-class entity like an app; creating one reserves
+    -- {slug}.co.<apex>. The slug lives HERE rather than in subdomain_sites because that
+    -- table is one flat label namespace shared by the apps family — a company named
+    -- "tinki" must not collide with an app named "tinki", they are different hosts.
+    -- The unique index on lower(slug) is the arbitration for concurrent claims.
+    -- The legal-identity columns are the seller-party snapshot an invoice needs, so a
+    -- founder types them once and every later invoice prefills from them.
+    CREATE TABLE IF NOT EXISTS companies (
+      id               TEXT PRIMARY KEY,
+      slug             TEXT NOT NULL,
+      ownerGhii        TEXT NOT NULL,
+      name             TEXT NOT NULL,
+      description      TEXT,
+      organismId       TEXT,
+      frontPageKind    TEXT NOT NULL DEFAULT 'none',
+      frontPageTarget  TEXT NOT NULL DEFAULT '',
+      businessId       TEXT,
+      vatId            TEXT,
+      streetAddress    TEXT,
+      postalCode       TEXT,
+      city             TEXT,
+      country          TEXT,
+      email            TEXT,
+      phone            TEXT,
+      iban             TEXT,
+      bic              TEXT,
+      einvoiceAddress  TEXT,
+      einvoiceOperator TEXT,
+      status           TEXT NOT NULL DEFAULT 'active',
+      createdAt        TEXT NOT NULL,
+      updatedAt        TEXT NOT NULL
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_slug ON companies(lower(slug));
+    CREATE INDEX IF NOT EXISTS idx_companies_owner ON companies(ownerGhii, createdAt);
+
   `);
 }

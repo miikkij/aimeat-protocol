@@ -167,6 +167,8 @@ tags:
     description: Access model — groups, levels, and effective-access resolution (authority ∩ consent)
   - name: Contacts
     description: Owner contact list — add, list, remove, and email resolution for sharing and messaging
+  - name: Companies
+    description: The company registry — a company is a first-class entity like an app, and registering one claims {slug}.co.<apex> as its address
   - name: Outbound
     description: The outbound messaging door — saved recipient registry, policied send (inbox-first, opt-out, bounce suppression, daily limit), append-only send log, public unsubscribe
   - name: Finance
@@ -43240,3 +43242,127 @@ paths:
         '400': { $ref: '#/components/responses/BadRequest' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ── Companies (company-in-a-box: the co origin) ─────────────────────────────
+  /v1/companies:
+    get:
+      operationId: listCompanies
+      tags: [Companies]
+      summary: List the companies you have registered
+      description: Each record carries its derived `address` ({slug}.co.<apex>) and `co_origin_enabled`, so a client can tell "reserved but the node does not serve the family yet" from "live".
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: page, in: query, schema: { type: integer, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, default: 50, maximum: 100 } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      operationId: createCompany
+      tags: [Companies]
+      summary: Register a company (claims {slug}.co.<apex>)
+      description: 'A company is a first-class entity like an app, and registering one reserves its address. The slug defaults to a normalised form of the name; the unique index arbitrates concurrent claims (409 SLUG_TAKEN), reserved infrastructure labels answer 409 SLUG_RESERVED. The legal-identity fields are the seller-party snapshot invoices prefill from. Requires scope company:write.'
+      security: [{ BearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, minLength: 2, maxLength: 140 }
+                slug: { type: string, description: 'Address label; defaults to a normalised form of the name' }
+                description: { type: string, nullable: true }
+                organism_id: { type: string, nullable: true }
+                business_id: { type: string, nullable: true }
+                vat_id: { type: string, nullable: true }
+                street_address: { type: string, nullable: true }
+                postal_code: { type: string, nullable: true }
+                city: { type: string, nullable: true }
+                country: { type: string, nullable: true }
+                email: { type: string, format: email, nullable: true }
+                phone: { type: string, nullable: true }
+                iban: { type: string, nullable: true }
+                bic: { type: string, nullable: true }
+                einvoice_address: { type: string, nullable: true }
+                einvoice_operator: { type: string, nullable: true }
+      responses:
+        '201': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /v1/companies/available:
+    get:
+      operationId: checkCompanyAddressAvailable
+      tags: [Companies]
+      summary: Is a company address free?
+      description: 'Advisory only — the create call is what actually arbitrates, so a name reported free can still be taken a moment later. Pass slug, or name to see how it normalises. Reasons: SLUG_TAKEN, SLUG_RESERVED, INVALID_SLUG.'
+      security: [{ BearerAuth: [] }]
+      parameters:
+        - { name: slug, in: query, schema: { type: string } }
+        - { name: name, in: query, schema: { type: string, description: 'Trade name; the response reports the slug it normalises to' } }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /v1/companies/{id}:
+    get:
+      operationId: getCompany
+      tags: [Companies]
+      summary: Read one company
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: updateCompany
+      tags: [Companies]
+      summary: Update a company's name and legal identity
+      description: The slug is the published address and is never moved by a rename.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    delete:
+      operationId: deleteCompany
+      tags: [Companies]
+      summary: Delete a company (frees its address)
+      description: The address becomes claimable again — the registry is not an archive.
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /v1/companies/{id}/front-page:
+    put:
+      operationId: setCompanyFrontPage
+      tags: [Companies]
+      summary: Set what the company address serves
+      description: "kind 'app' serves one of YOUR published apps (\"owner/file.html\"; someone else's answers 403 FRONT_PAGE_NOT_YOURS) through the same isolated app-serving path; 'redirect' 301s to an absolute http(s) URL; 'none' keeps the address reserved and unserved, which answers 404 like any unmapped address."
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [kind]
+              properties:
+                kind: { type: string, enum: [app, redirect, none] }
+                target: { type: string, description: '"owner/file.html" for app, an absolute URL for redirect' }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }

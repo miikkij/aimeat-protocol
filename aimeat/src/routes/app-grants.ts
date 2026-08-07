@@ -124,6 +124,10 @@ export const APP_GRANTABLE_SCOPES: Record<string, string> = {
   'finance:read': 'Read your bookkeeping: invoices, vouchers, VAT reports and exports',
   'finance:write': 'Create and send invoices and book accounting vouchers on your behalf',
   'outbound:send': 'Send email/messages to your saved outbound contacts on your behalf (opt-outs and daily limits always apply)',
+  // A company is an addressable public identity, so claiming one and pointing its address
+  // somewhere are separate from reading the registry.
+  'company:read': 'See the companies you have registered and their addresses',
+  'company:write': 'Register companies in your name and set what their address serves',
 };
 
 const CODE_TTL_MS = 60_000;        // authorization code: single-use, 60s

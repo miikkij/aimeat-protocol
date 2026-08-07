@@ -7,11 +7,15 @@
  *              ("owner/filename.html") or an absolute redirect URL — never raw
  *              HTML, so content stays in one place (app versions).
  * @structure subdomainServeRouter — root catch (GET /) for subdomain requests;
- *            subdomainAdminRouter — operator CRUD (list/create/update/delete);
  *            RESERVED_SUBDOMAINS, SUBDOMAIN_RE — validation primitives.
+ *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
- *        app.use(subdomainAdminRouter(config, storage));
  * @version-history
+ *   v1.13.0 — 2026-08-07 — Company origin: `{slug}.co.<apex>` serves a registered company's front
+ *     page through the same app-serving path (same CSP + marks), resolved from the company registry
+ *     rather than the subdomain-site table — so a company and an app may carry the same word.
+ *   v1.12.0 — 2026-08-07 — subdomainAdminRouter extracted to subdomain-admin.ts (max-file-lines);
+ *     resolveAppTarget + appIsRestricted exported for it. Behaviour unchanged.
  *   v1.11.0 — 2026-08-01 — TARGET-058 Phase 4 step 0a: serveApp() and serveDraftPreview() set the
  *     Content-Type through appContentType(), so an app on its own origin is served as
  *     `text/html; charset=utf-8`. A bare `text/html` fell back to windows-1252 and mangled every
@@ -62,10 +66,8 @@ import { Router } from 'express';
 import type { Request, Response } from 'express';
 import type { AimeatConfig } from '../config.js';
 import { applyAppProtection, hasAnyProtection } from '../utils/app-protect.js';
-import type { Storage, AppRecord, SubdomainSiteRecord } from '../storage/interface.js';
-import { requireAuth, requireRole } from '../auth/middleware.js';
-import { success, error } from '../middleware/envelope.js';
-import { resolveIdentity } from '../utils/gaii.js';
+import type { Storage, AppRecord } from '../storage/interface.js';
+import { error } from '../middleware/envelope.js';
 import {
   loadServedProvenance, setProvenanceHeaders, type ServedProvenance,
 } from '../services/ai-provenance-marks.js';
@@ -87,6 +89,9 @@ export const RESERVED_SUBDOMAINS = new Set([
   'www', 'mail', 'api', 'admin', 'static', 'cdn',
   'portal', 'app', 'apps', 'docs', 'status', 'mcp',
   'portfolio',
+  // The company family's own parent label: an apex subdomain named "co" would shadow
+  // the whole {slug}.co.<apex> family.
+  'co',
 ]);
 
 /** Valid subdomain label: lowercase alphanumeric + hyphens, 2–63 chars, no edge hyphens. */
@@ -126,7 +131,7 @@ export async function ensureAppSubdomain(storage: Storage, config: AimeatConfig,
 }
 
 /** Resolve an "owner/filename" app target to its latest published record. */
-async function resolveAppTarget(storage: Storage, target: string): Promise<AppRecord | null> {
+export async function resolveAppTarget(storage: Storage, target: string): Promise<AppRecord | null> {
   const slash = target.indexOf('/');
   if (slash <= 0 || slash === target.length - 1) return null;
   const owner = target.slice(0, slash);
@@ -140,7 +145,7 @@ async function resolveAppTarget(storage: Storage, target: string): Promise<AppRe
 }
 
 /** True when the app must not be served openly at a subdomain root. */
-function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
+export function appIsRestricted(config: AimeatConfig, app: AppRecord): boolean {
   if (app.accessCode) return true;
   if (config.marketplaceEnabled && app.manifest.priceMorsels && app.manifest.priceMorsels > 0) return true;
   return false;
@@ -436,6 +441,42 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
       return;
     }
 
+    // Company origin: {slug}.co.<apex> — the label is the company slug, resolved from the
+    // company registry (NOT the subdomain-site table the apps family uses, so a company and
+    // an app may carry the same word). Uniform 404 for every failure mode, so the origin is
+    // not a company-enumeration oracle.
+    if (req.coOrigin) {
+      if (!config.coOriginEnabled) return next();
+      if (!sub) {
+        res.redirect(301, config.baseUrl + '/v1/profile?tab=companies'); // bare co.<apex>
+        return;
+      }
+      const companyNotFound = () =>
+        res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Unknown company address'));
+      if (RESERVED_SUBDOMAINS.has(sub) || !SUBDOMAIN_RE.test(sub)) return companyNotFound();
+      const company = await storage.getCompanyBySlug(sub);
+      if (!company || company.status !== 'active') return companyNotFound();
+
+      if (company.frontPage.kind === 'redirect' && company.frontPage.target) {
+        res.redirect(301, company.frontPage.target);
+        return;
+      }
+      // 'none' answers exactly like an unmapped address: reserving a name and publishing a
+      // page are two separate acts, and serving a placeholder would claim otherwise.
+      if (company.frontPage.kind !== 'app' || !company.frontPage.target) return companyNotFound();
+
+      const companyApp = await resolveAppTarget(storage, company.frontPage.target);
+      if (!companyApp || appIsRestricted(config, companyApp)) return companyNotFound();
+      // The front page is an app, so it is served through the app path unchanged: same CSP,
+      // same serve-time marks, same download accounting.
+      serveApp(res, storage, companyApp, csp, apexOrigin,
+        { config, viewer: req.auth?.sub ?? 'anon' },
+        { baseUrl: config.baseUrl, toolNames: await appToolNames(storage, companyApp.ownerGaii, companyApp.filename) },
+        await loadServedProvenance(storage, config, companyApp.aiProvenanceId),
+        { config, locale: detectLocale(req.headers['accept-language']) });
+      return;
+    }
+
     if (!sub) return next();
 
     if (sub === 'www') {
@@ -666,131 +707,6 @@ Sitemap: ${origin}/sitemap.xml
     serveApp(res, storage, app, csp, apexOrigin, { config, viewer: req.auth?.sub ?? 'anon' }, discoverShared,
       await loadServedProvenance(storage, config, app.aiProvenanceId), // no subdomain available → serve on the shared host (no SSO)
       { config, locale: detectLocale(req.headers['accept-language']) });
-  });
-
-  return router;
-}
-
-/** Operator-only management CRUD for subdomain mappings. */
-export function subdomainAdminRouter(config: AimeatConfig, storage: Storage): Router {
-  const router = Router();
-  const operatorOnly = [requireAuth(), requireRole('operator')] as const;
-
-  // Validates kind+target; sends the error response and returns false on failure.
-  async function validateTarget(res: Response, kind: string, target: string): Promise<boolean> {
-    if (kind === 'redirect') {
-      if (!/^https?:\/\/\S+$/.test(target)) {
-        res.status(400).json(error(config.nodeId, 'INVALID_TARGET', 'Redirect target must be an absolute http(s) URL'));
-        return false;
-      }
-      return true;
-    }
-    // kind === 'app'
-    const app = await resolveAppTarget(storage, target);
-    if (!app) {
-      res.status(404).json(error(config.nodeId, 'APP_NOT_FOUND', `No published app matches target "${target}" (expected "owner/filename")`));
-      return false;
-    }
-    if (appIsRestricted(config, app)) {
-      res.status(400).json(error(config.nodeId, 'APP_RESTRICTED', 'Access-code-protected or paid apps cannot be served at a subdomain root'));
-      return false;
-    }
-    return true;
-  }
-
-  // GET /v1/admin/subdomains — list all mappings
-  router.get('/v1/admin/subdomains', ...operatorOnly, async (_req, res) => {
-    const sites = await storage.listSubdomainSites();
-    res.json(success(config.nodeId, { sites, total: sites.length }));
-  });
-
-  // POST /v1/admin/subdomains — create a mapping
-  router.post('/v1/admin/subdomains', ...operatorOnly, async (req, res) => {
-    const body = req.body ?? {};
-    const subdomain = String(body.subdomain ?? '').trim().toLowerCase();
-    const kind = String(body.kind ?? 'app');
-    const target = String(body.target ?? '').trim();
-    const enabled = body.enabled === undefined ? true : Boolean(body.enabled);
-
-    if (!SUBDOMAIN_RE.test(subdomain)) {
-      res.status(400).json(error(config.nodeId, 'INVALID_SUBDOMAIN',
-        'Subdomain must be 2-63 chars of lowercase a-z, 0-9 and hyphens, not starting or ending with a hyphen'));
-      return;
-    }
-    if (RESERVED_SUBDOMAINS.has(subdomain)) {
-      res.status(400).json(error(config.nodeId, 'RESERVED_SUBDOMAIN', `"${subdomain}" is a reserved subdomain`));
-      return;
-    }
-    if (kind !== 'app' && kind !== 'redirect') {
-      res.status(400).json(error(config.nodeId, 'INVALID_KIND', 'kind must be "app" or "redirect"'));
-      return;
-    }
-    if (!target) {
-      res.status(400).json(error(config.nodeId, 'INVALID_TARGET', 'target is required'));
-      return;
-    }
-    if (!(await validateTarget(res, kind, target))) return;
-
-    if (await storage.getSubdomainSite(subdomain)) {
-      res.status(409).json(error(config.nodeId, 'ALREADY_EXISTS', `Subdomain "${subdomain}" is already mapped`));
-      return;
-    }
-
-    const now = new Date().toISOString();
-    const site: SubdomainSiteRecord = {
-      subdomain, kind, target, enabled,
-      createdBy: resolveIdentity(req.auth!, config.nodeId),
-      createdAt: now, updatedAt: now,
-    };
-    await storage.createSubdomainSite(site);
-    res.status(201).json(success(config.nodeId, { site }));
-  });
-
-  // PATCH /v1/admin/subdomains/:subdomain — update kind/target/enabled
-  router.patch('/v1/admin/subdomains/:subdomain', ...operatorOnly, async (req, res) => {
-    const subdomain = (req.params.subdomain as string).trim().toLowerCase();
-    const existing = await storage.getSubdomainSite(subdomain);
-    if (!existing) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Subdomain "${subdomain}" is not mapped`));
-      return;
-    }
-
-    const body = req.body ?? {};
-    const updates: Partial<Pick<SubdomainSiteRecord, 'kind' | 'target' | 'enabled'>> = {};
-    if (body.kind !== undefined) {
-      if (body.kind !== 'app' && body.kind !== 'redirect') {
-        res.status(400).json(error(config.nodeId, 'INVALID_KIND', 'kind must be "app" or "redirect"'));
-        return;
-      }
-      updates.kind = body.kind;
-    }
-    if (body.target !== undefined) updates.target = String(body.target).trim();
-    if (body.enabled !== undefined) updates.enabled = Boolean(body.enabled);
-
-    // Cross-validate the effective kind/target pair when either changes
-    if (updates.kind !== undefined || updates.target !== undefined) {
-      const kind = updates.kind ?? existing.kind;
-      const target = updates.target ?? existing.target;
-      if (!target) {
-        res.status(400).json(error(config.nodeId, 'INVALID_TARGET', 'target is required'));
-        return;
-      }
-      if (!(await validateTarget(res, kind, target))) return;
-    }
-
-    const site = await storage.updateSubdomainSite(subdomain, updates);
-    res.json(success(config.nodeId, { site }));
-  });
-
-  // DELETE /v1/admin/subdomains/:subdomain — remove a mapping
-  router.delete('/v1/admin/subdomains/:subdomain', ...operatorOnly, async (req, res) => {
-    const subdomain = (req.params.subdomain as string).trim().toLowerCase();
-    const deleted = await storage.deleteSubdomainSite(subdomain);
-    if (!deleted) {
-      res.status(404).json(error(config.nodeId, 'NOT_FOUND', `Subdomain "${subdomain}" is not mapped`));
-      return;
-    }
-    res.json(success(config.nodeId, { deleted: true, subdomain }));
   });
 
   return router;

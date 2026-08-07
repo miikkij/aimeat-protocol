@@ -64,6 +64,7 @@ export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   wallet: 'wallet:read',
   finance: 'finance:read',
   outbound: 'outbound:send',
+  companies: 'company:read',
 
   // Knowledge
   knowledge: 'knowledge:read',

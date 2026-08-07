@@ -18,6 +18,10 @@
  *   v1.2.0 — 2026-07-03 — Portfolio origin: `req.portfolioOrigin` flag +
  *     `<username>.portfolio.<apex>` parsing (x-portfolio-origin header / hostname
  *     fallback), checked before the apex like the app host.
+ *   v1.4.0 — 2026-08-07 — Company origin: `req.coOrigin` flag + `{slug}.co.<apex>` parsing
+ *     (x-co-origin header / hostname fallback). Same two-level shape as the app host, and
+ *     checked in the same pass — the co host is itself an apex subdomain and would otherwise
+ *     be misread as the single-label subdomain "co".
  */
 import type { Request, Response, NextFunction } from 'express';
 import type { AimeatConfig } from '../config.js';
@@ -39,6 +43,12 @@ declare global {
        * session-less host where published portfolios are served standalone.
        */
       portfolioOrigin?: boolean;
+      /**
+       * True when the request arrived on the dedicated company origin
+       * (`co.<apex>` or `{slug}.co.<apex>`) — a registered company's front page,
+       * served on the same isolated, session-less host model as an app.
+       */
+      coOrigin?: boolean;
     }
   }
 }
@@ -61,6 +71,7 @@ export function subdomainMiddleware(config: AimeatConfig) {
   } catch { /* no hostname fallback without a valid baseUrl */ }
   const appHost = (config.appHost || '').toLowerCase();
   const portfolioHost = (config.portfolioHost || '').toLowerCase();
+  const coHost = (config.coHost || '').toLowerCase();
 
   /**
    * The leftmost label of the request's Host under the app, portfolio or apex host — or null when
@@ -70,7 +81,7 @@ export function subdomainMiddleware(config: AimeatConfig) {
    */
   const labelFromHost = (req: Request): string | null => {
     const host = (req.hostname || '').toLowerCase();
-    for (const parent of [appHost, portfolioHost, apexHost]) {
+    for (const parent of [appHost, portfolioHost, coHost, apexHost]) {
       if (!parent || !host.endsWith('.' + parent)) continue;
       const label = host.slice(0, -(parent.length + 1));
       // Single-level subdomains only — nginx's server_name regex matches one label.
@@ -83,15 +94,18 @@ export function subdomainMiddleware(config: AimeatConfig) {
     req.subdomain = null;
     req.appOrigin = false;
     req.portfolioOrigin = false;
+    req.coOrigin = false;
 
     // Header path (production behind nginx). x-app-origin marks the app host
     // family, x-portfolio-origin the portfolio host family.
     const fromHeader = req.get('x-subdomain');
     const appHeader = req.get('x-app-origin');
     const portfolioHeader = req.get('x-portfolio-origin');
-    if (appHeader || portfolioHeader || fromHeader) {
+    const coHeader = req.get('x-co-origin');
+    if (appHeader || portfolioHeader || coHeader || fromHeader) {
       if (appHeader && appHeader.trim() !== '' && appHeader.trim() !== '0') req.appOrigin = true;
       if (portfolioHeader && portfolioHeader.trim() !== '' && portfolioHeader.trim() !== '0') req.portfolioOrigin = true;
+      if (coHeader && coHeader.trim() !== '' && coHeader.trim() !== '0') req.coOrigin = true;
       // The proxy marks the HOST FAMILY on every location, but only some of them add the label.
       // `/.well-known/*` is one that does not, and reading the label as absent there made an app
       // origin describe itself as the bare app host — the whole family answering as one resource.
@@ -125,6 +139,18 @@ export function subdomainMiddleware(config: AimeatConfig) {
         req.portfolioOrigin = true;
         const label = host.slice(0, -(portfolioHost.length + 1));
         if (label && !label.includes('.')) req.subdomain = label; // <username>.portfolio.<apex>
+        return next();
+      }
+    }
+    if (coHost) {
+      if (host === coHost) {
+        req.coOrigin = true; // bare co.<apex> — no company named, redirects to the apex
+        return next();
+      }
+      if (host.endsWith('.' + coHost)) {
+        req.coOrigin = true;
+        const label = host.slice(0, -(coHost.length + 1));
+        if (label && !label.includes('.')) req.subdomain = label; // {slug}.co.<apex>
         return next();
       }
     }

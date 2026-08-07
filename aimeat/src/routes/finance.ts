@@ -31,6 +31,7 @@ import { buildFinvoiceXml } from '../services/finance/finvoice.js';
 import { renderInvoicePdf } from '../services/finance/invoice-pdf.js';
 import { submitInvoice, refreshDeliveryStatus } from '../services/finance/finvoice-operator.js';
 import { resolveFinanceOwner } from '../services/finance/accountant-access.js';
+import { requireOwnCompany, CompanyError } from '../services/company/company-service.js';
 
 const PartySchema = z.object({
   name: z.string().min(2).max(140),
@@ -58,7 +59,13 @@ const LineSchema = z.object({
 
 const DraftSchema = z.object({
   organism_id: z.string().max(80).nullish(),
-  seller: PartySchema,
+  /**
+   * Bill AS this registered company: the seller party is filled from its record, so a
+   * founder types the legal identity once at company registration instead of onto every
+   * invoice. An explicit `seller` still wins — the company is a default, not a cage.
+   */
+  company_id: z.string().max(80).optional(),
+  seller: PartySchema.optional(),
   buyer: PartySchema,
   lines: z.array(LineSchema).min(1).max(200),
   currency: z.string().length(3).optional(),
@@ -82,7 +89,43 @@ function sendErr(res: Response, config: AimeatConfig, e: unknown): boolean {
     res.status(e.statusCode).json(error(config.nodeId, e.code, e.message));
     return true;
   }
+  // A company-id that is not yours must answer like the finance domain's own 404, not leak
+  // a different error shape from a neighbouring domain.
+  if (e instanceof CompanyError) {
+    res.status(e.statusCode).json(error(config.nodeId, e.code, e.message));
+    return true;
+  }
   return false;
+}
+
+/**
+ * The invoice's seller party: from the named company's registered legal identity, or from an
+ * explicit seller block. An explicit seller wins, so the company is a default rather than a cage.
+ */
+async function resolveSeller(
+  storage: Storage, ownerGhii: string,
+  companyId: string | undefined,
+  explicit: z.infer<typeof PartySchema> | undefined,
+): Promise<z.infer<typeof PartySchema>> {
+  if (explicit) return explicit;
+  if (!companyId) {
+    throw new FinanceError('INVALID_PARTY', 400, 'Either seller or company_id is required');
+  }
+  const company = await requireOwnCompany(storage, ownerGhii, companyId);
+  return {
+    name: company.name,
+    ...(company.businessId ? { businessId: company.businessId } : {}),
+    ...(company.vatId ? { vatId: company.vatId } : {}),
+    ...(company.email ? { email: company.email } : {}),
+    ...(company.streetAddress ? { streetAddress: company.streetAddress } : {}),
+    ...(company.postalCode ? { postalCode: company.postalCode } : {}),
+    ...(company.city ? { city: company.city } : {}),
+    ...(company.country ? { country: company.country } : {}),
+    ...(company.iban ? { iban: company.iban } : {}),
+    ...(company.bic ? { bic: company.bic } : {}),
+    ...(company.einvoiceAddress ? { einvoiceAddress: company.einvoiceAddress } : {}),
+    ...(company.einvoiceOperator ? { einvoiceOperator: company.einvoiceOperator } : {}),
+  };
 }
 
 const STATUSES = ['draft', 'sent', 'paid', 'overdue', 'credited', 'cancelled'] as const;
@@ -100,9 +143,10 @@ export function financeRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       const b = parsed.data;
+      const seller = await resolveSeller(storage, resolve(req), b.company_id, b.seller);
       const invoice = await createDraft(storage, resolve(req), {
-        organismId: b.organism_id ?? null,
-        seller: b.seller, buyer: b.buyer, lines: b.lines,
+        organismId: b.organism_id ?? (b.company_id ? (await requireOwnCompany(storage, resolve(req), b.company_id)).organismId : null),
+        seller, buyer: b.buyer, lines: b.lines,
         currency: b.currency, paymentTermsDays: b.payment_terms_days, notes: b.notes ?? null,
       });
       emitChange('finance', resolve(req));
@@ -156,9 +200,10 @@ export function financeRouter(config: AimeatConfig, storage: Storage): Router {
         return;
       }
       const b = parsed.data;
+      const seller = await resolveSeller(storage, resolve(req), b.company_id, b.seller);
       const invoice = await updateDraft(storage, resolve(req), req.params.id as string, {
         organismId: b.organism_id ?? null,
-        seller: b.seller, buyer: b.buyer, lines: b.lines,
+        seller, buyer: b.buyer, lines: b.lines,
         currency: b.currency, paymentTermsDays: b.payment_terms_days, notes: b.notes ?? null,
       });
       emitChange('finance', resolve(req));

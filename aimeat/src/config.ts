@@ -31,6 +31,7 @@
  *   v1.3.0 -- 2026-07-14 -- mcpCardCommerceTools: AIMEAT_MCP_CARD_COMMERCE_TOOLS inline|pointer
  *     for the MCP Server Card commerce_tools block (TARGET-034 phase D).
  */
+import { deriveAppHost, derivePortfolioHost, deriveCoHost } from './config-hosts.js';
 import { loadFileSource } from './services/config-loader.js';
 import { CONFIG_FIELDS, DOT_PATH_TO_ENV, MUTABLE_CONFIG_MAP, parseConfigValue, isImmutable } from './services/config-schema.js';
 import type { ConfigProvenance } from './services/config-provenance.js';
@@ -115,25 +116,6 @@ function isPrivateHost(baseUrl: string): boolean {
   if (/^169\.254\./.test(host)) return true;      // link-local (incl. cloud metadata)
   if (/^f[cd][0-9a-f]{2}:/.test(host)) return true; // IPv6 unique-local
   return false;
-}
-
-/**
- * Derive the app-origin host (`apps.<apexHost>`) from a baseUrl. Returns '' for
- * localhost / IP / host-less baseUrls where a public app subdomain makes no sense
- * (the operator can still set AIMEAT_APP_HOST explicitly, e.g. for local testing).
- */
-function deriveAppHost(baseUrl: string): string {
-  let host: string;
-  // eslint-disable-next-line aimeat/no-silent-catch -- the exception IS the answer here: the input is not of that shape
-  try { host = new URL(baseUrl).hostname.toLowerCase(); } catch { return ''; }
-  if (!host || host === 'localhost' || /^[\d.]+$/.test(host) || host.endsWith('.localhost')) return '';
-  return `apps.${host}`;
-}
-
-/** Same derivation for the standalone-portfolio origin (`portfolio.<apexHost>`). */
-function derivePortfolioHost(baseUrl: string): string {
-  const appHost = deriveAppHost(baseUrl);
-  return appHost ? appHost.replace(/^apps\./, 'portfolio.') : '';
 }
 
 /**
@@ -266,6 +248,9 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     // `portfolio.<apexHost>` from the baseUrl (empty for host-less baseUrls).
     portfolioHost: (process.env.AIMEAT_PORTFOLIO_HOST ?? derivePortfolioHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
     portfolioOriginEnabled: process.env.AIMEAT_PORTFOLIO_ORIGIN_ENABLED === 'true',
+    // Company origin: {slug}.co.<apex>, same shape as the app origin.
+    coHost: (process.env.AIMEAT_CO_HOST ?? deriveCoHost(process.env.AIMEAT_BASE_URL ?? `http://localhost:${port}`)).trim().toLowerCase(),
+    coOriginEnabled: process.env.AIMEAT_CO_ORIGIN_ENABLED === 'true',
     nodeId: process.env.AIMEAT_NODE_ID ?? 'aimeat-local-001-dev',
     nodeType,
     dbUrl: process.env.DATABASE_URL ?? null,

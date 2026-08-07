@@ -194,6 +194,17 @@ export interface AimeatConfig {
    * advertised and the serve route stays inert.
    */
   portfolioOriginEnabled: boolean;
+  /**
+   * Company origin host — `{slug}.co.<apex>` serves a registered company's front page,
+   * the same way `{app}.apps.<apex>` serves an app. Host form, e.g. `co.aimeat.io`;
+   * empty when unset (localhost/IP baseUrls, unless AIMEAT_CO_HOST is set explicitly).
+   */
+  coHost: string;
+  /**
+   * Feature flag for the company origin. OFF until DNS/TLS/nginx for `*.coHost` are
+   * provisioned; when off the serve route stays inert and the addresses are not advertised.
+   */
+  coOriginEnabled: boolean;
   nodeId: string;
   nodeType: NodeType;
   dbUrl: string | null;

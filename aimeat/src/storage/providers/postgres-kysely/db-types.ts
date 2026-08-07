@@ -398,6 +398,36 @@ export interface FinanceCounter {
   value: Generated<number>;
 }
 
+/**
+ * The company registry. "slug" reserves {slug}.co.<apex>; the unique index is on lower(slug),
+ * so the column holds the display casing while resolution is case-insensitive.
+ */
+export interface Company {
+  businessId: string | null;
+  bic: string | null;
+  city: string | null;
+  country: string | null;
+  createdAt: string;
+  description: string | null;
+  einvoiceAddress: string | null;
+  einvoiceOperator: string | null;
+  email: string | null;
+  frontPageKind: Generated<string>;
+  frontPageTarget: Generated<string>;
+  iban: string | null;
+  id: string;
+  name: string;
+  organismId: string | null;
+  ownerGhii: string;
+  phone: string | null;
+  postalCode: string | null;
+  slug: string;
+  status: Generated<string>;
+  streetAddress: string | null;
+  updatedAt: string;
+  vatId: string | null;
+}
+
 /** Outbound door: saved recipient with opt-out and bounce state (never a free address). */
 export interface OutboundContact {
   bounceCount: Generated<number>;
@@ -1807,6 +1837,7 @@ export interface DB {
   CapabilityLog: CapabilityLog;
   CapabilityVouch: CapabilityVouch;
   ChatInstance: ChatInstance;
+  Company: Company;
   Connection: Connection;
   ConnectionDelegation: ConnectionDelegation;
   Consent: Consent;

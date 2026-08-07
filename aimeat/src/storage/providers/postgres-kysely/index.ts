@@ -41,6 +41,7 @@ import { aiProvenanceMethods } from './methods/ai-provenance.js';
 import { connectionMethods } from './methods/connections.js';
 import { financeMethods } from './methods/finance.js';
 import { outboundMethods } from './methods/outbound.js';
+import { companyMethods } from './methods/companies.js';
 import { capabilityMethods } from './methods/capabilities.js';
 import { knowledgeMethods } from './methods/knowledge.js';
 import { appMethods } from './methods/apps.js';
@@ -121,6 +122,7 @@ Object.assign(
   connectionMethods,
   financeMethods,
   outboundMethods,
+  companyMethods,
   capabilityMethods,
   knowledgeMethods,
   appMethods,

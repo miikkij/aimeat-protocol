@@ -956,7 +956,8 @@
       "packages": "Packages",
       "inbox": "Messages",
       "appDev": "AppDev",
-      "pnl": "P&L"
+      "pnl": "P&L",
+      "companies": "Companies"
     },
     "appdev": {
       "title": "AppDev — knowledge & acceleration",
@@ -4022,6 +4023,57 @@
         "manual": "Manual bookings",
         "morsel": "Morsel sales"
       }
+    },
+    "companies": {
+      "title": "Companies",
+      "desc": "Register a company and it gets its own address — the same way a published app gets one. Its details then prefill every invoice you send.",
+      "newTitle": "Register a company",
+      "newDesc": "A name is enough to start. The address is reserved immediately; pick the front page later.",
+      "name": "Company name",
+      "namePlaceholder": "e.g. Acme Consulting Ltd",
+      "create": "Register",
+      "creating": "Registering...",
+      "addressPreview": "Address",
+      "free": "free",
+      "reason": {
+        "SLUG_TAKEN": "taken",
+        "SLUG_RESERVED": "reserved",
+        "INVALID_SLUG": "not a valid address"
+      },
+      "empty": "No companies yet.",
+      "frontTitle": "Front page",
+      "frontHint": "What the address serves: one of your published apps, a redirect, or nothing yet.",
+      "frontNone": "Nothing yet",
+      "frontApp": "One of my apps",
+      "frontRedirect": "Redirect",
+      "pickApp": "Pick an app...",
+      "setFront": "Set front page",
+      "servingApp": "Serving: {app}",
+      "servingRedirect": "Redirects to: {url}",
+      "servingNone": "Address reserved, no front page set",
+      "originOff": "addresses not enabled on this node",
+      "identityTitle": "Company details",
+      "identityHint": "These become the seller details on your invoices and in the Finvoice e-invoice.",
+      "field": {
+        "business_id": "Business ID",
+        "vat_id": "VAT ID",
+        "street_address": "Street address",
+        "postal_code": "Postal code",
+        "city": "City",
+        "country": "Country (2 letters)",
+        "email": "Email",
+        "phone": "Phone",
+        "iban": "IBAN",
+        "bic": "BIC",
+        "einvoice_address": "E-invoice address",
+        "einvoice_operator": "E-invoice operator"
+      },
+      "save": "Save",
+      "saved": "Details saved.",
+      "frontSaved": "Front page set.",
+      "delete": "Delete company",
+      "deleted": "Company deleted.",
+      "confirmDelete": "Delete \"{name}\"? The address becomes claimable by others."
     }
   },
   "dev": {
@@ -7072,14 +7124,14 @@
     "confirmTypeName": "Type the organism's name to confirm",
     "confirmDeleteName": "Delete \"{name}\"?",
     "visHint": {
-      "public": "Public: anyone can find and view this organism.",
-      "listed": "Listed: appears in discovery, but the content is members-only.",
-      "private": "Private: only members can see this organism and its content."
+      "public": "Shows in the public directory and anyone can read its public content.",
+      "listed": "Shows in the directory, but content stays members-only.",
+      "private": "Does not show anywhere; only members know it exists."
     },
     "policyHint": {
-      "open": "Open: anyone can join instantly.",
-      "approval_required": "Approval required: join requests need an admin's approval.",
-      "invite_only": "Invite only: joining is by invitation only."
+      "open": "Anyone can join without asking.",
+      "approval_required": "Anyone can ask to join; you approve each request.",
+      "invite_only": "Only people you invite can join."
     },
     "openBoardsTab": "Open in Boards",
     "noBoard": "This organism has no board.",
@@ -7182,16 +7234,6 @@
       "body": "Connect your own AI to this team and you can use everything here straight from the chat you already use.",
       "connect": "Connect your AI",
       "dismiss": "Browse first"
-    },
-    "policyHint": {
-      "open": "Anyone can join without asking.",
-      "approval_required": "Anyone can ask to join; you approve each request.",
-      "invite_only": "Only people you invite can join."
-    },
-    "visHint": {
-      "public": "Shows in the public directory and anyone can read its public content.",
-      "listed": "Shows in the directory, but content stays members-only.",
-      "private": "Does not show anywhere; only members know it exists."
     },
     "types": {
       "community": "Community",
