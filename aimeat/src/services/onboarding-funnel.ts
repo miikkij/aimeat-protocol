@@ -264,6 +264,63 @@ export async function recordOnboardingEvent(
     }
 }
 
+/** What we know about the person's AI, and how we came to know it. */
+export interface AiDetection {
+    model: string | null;
+    vendor: string | null;
+    client: string | null;
+    mcp: 'yes' | 'no' | 'unknown';
+    /** 'meta' = read off the pasted page; 'asked' = the person answered. */
+    source: 'meta' | 'asked';
+    /** An app name that matched nothing — the list the alias map grows from. */
+    unknownClient?: string | null;
+    resolvedClient?: string | null;
+}
+
+/**
+ * Record what the person's AI is. One record, not an append log — but NOT plain write-once,
+ * because the two sources are not equal evidence.
+ *
+ * A model's claim about its own app is unreliable by nature (04-mcp-kyvykkyys.md); the person's
+ * own answer is not. So an `asked` reading replaces a `meta` one, and nothing replaces an `asked`
+ * one. Under strict write-once the `source` field would be decoration: the page's guess would be
+ * frozen in the funnel even after the person corrected it, and every later read would be of the
+ * less reliable of the two answers we had.
+ */
+export async function recordAiModelDetected(
+    storage: Storage, config: AimeatConfig, owner: string, detection: AiDetection,
+): Promise<void> {
+    if (!owner) return;
+    const gaii = ownerGhii(config, owner);
+    try {
+        const existing = await storage.getMemory(gaii, ONBOARDING_KEYS.aiModelDetected);
+        const prev = (existing?.value ?? null) as { source?: string } | null;
+        if (prev && !(detection.source === 'asked' && prev.source !== 'asked')) return;
+        const now = new Date().toISOString();
+        await storage.setMemory({
+            key: ONBOARDING_KEYS.aiModelDetected,
+            ownerGaii: gaii,
+            value: {
+                model: detection.model, vendor: detection.vendor, client: detection.client,
+                mcp: detection.mcp, source: detection.source, at: now,
+                ...(detection.unknownClient ? { unknown_client: detection.unknownClient } : {}),
+                ...(detection.resolvedClient ? { resolved_client: detection.resolvedClient } : {}),
+                // What the page said, kept when the person's answer supersedes it — the gap
+                // between the two IS the measure of how much a model's self-report is worth.
+                ...(prev ? { superseded: prev } : {}),
+            },
+            visibility: 'private',
+            tags: ['onboarding-funnel'],
+            ttlHours: null,
+            version: existing ? existing.version + 1 : 1,
+            createdAt: existing?.createdAt ?? now,
+            updatedAt: now,
+        });
+    } catch (err) {
+        logger.warn('onboarding-funnel: ai_model_detected marker failed', { owner, error: String(err) });
+    }
+}
+
 /**
  * The welcome-mat paste — the one marker that is NOT write-once. `attempts` accumulates because
  * how many tries the mat took is the direct measure of the prompt's quality (03-welcome-mat.md),

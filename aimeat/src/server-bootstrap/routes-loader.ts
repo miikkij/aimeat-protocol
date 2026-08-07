@@ -100,6 +100,7 @@ import { portalRouter } from '../routes/portal.js';
 import { publicStatsRouter } from '../routes/public-stats.js';
 import { publicEventsRouter } from '../routes/public-events.js';
 import { portfolioRouter } from '../routes/portfolio.js';
+import { homeRouter } from '../routes/home.js';
 import { portalApiRouter } from '../routes/portal-api.js';
 import { csmRouter } from '../routes/csm.js';
 import { msmRouter } from '../routes/msm.js';
@@ -546,6 +547,10 @@ export async function mountRoutes(
   if (config.portfolioEnabled) {
     app.use(portfolioRouter(config, storage));
   }
+
+  // The KOTI (home) routes — the remake's onboarding path. Additive: mounted beside the profile
+  // routes, which are untouched, and a person moves between the two with a switch.
+  app.use(homeRouter(config, storage));
 
   app.use(portalRouter(config, storage));
   app.use(portalApiRouter(config, storage));

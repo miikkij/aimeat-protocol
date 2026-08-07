@@ -7581,6 +7581,281 @@ paths:
         '200':
           description: The tool table, plus this node's mcp_url
 
+  /v1/prompts/welcome-mat:
+    get:
+      operationId: getWelcomeMatPrompt
+      summary: Welcome mat prompt (paste-able) — step 1 of the home path
+      description: >-
+        The prompt a person copies into their own AI chat as the very first thing they do here.
+        The answer is one HTML page, which they paste back at POST /v1/home/welcome-mat; it becomes
+        their PORTFOLIO (the mat is the portfolio's first version, not a second page type) and its
+        `<head>` metadata says which AI wrote it and, crucially, in which app.
+
+        Served from the node rather than shipped in a client because this prompt IS the gate: how
+        many attempts a mat takes measures the prompt's quality, and when the funnel says it is too
+        hard it has to be fixable from the server — including for the copies people have already
+        carried into their chats.
+
+        `variant=short` asks only for a heading and a few paragraphs; it is what a person is offered
+        after a failed paste, so a weaker model still has a way through. The full response also
+        carries `fallback_prompt` (the short variant) so that offer costs no second round trip.
+        When called with an owner session the person's display name is folded in, so the page is
+        about someone. Public.
+      tags:
+        - Discovery
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi] }
+          description: Prompt language (default en)
+        - name: variant
+          in: query
+          schema: { type: string, enum: [full, short], default: full }
+          description: short asks only for a heading and a few paragraphs
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+          description: txt returns the prompt as text/plain instead of the JSON envelope
+      responses:
+        '200':
+          description: The prompt, plus the short fallback (JSON envelope, or text/plain with format=txt)
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string, example: welcome-mat }
+                          lang: { type: string, enum: [en, fi] }
+                          variant: { type: string, enum: [full, short] }
+                          prompt: { type: string }
+                          system_prompt: { type: string }
+                          fallback_prompt:
+                            type: string
+                            nullable: true
+                            description: The short variant, offered after a failed paste. Null when already short.
+
+  /v1/home/state:
+    get:
+      operationId: getHomeState
+      summary: Where this account stands on the home path
+      description: >-
+        One call the home view renders entirely from: which of the three steps is open, which are
+        named but not yet reachable, and whether the home exists at all.
+
+        `initialized` is DERIVED and never a stored flag — it requires all three of: a welcome mat,
+        a connected first agent, and the Hello MCP proof key written THROUGH that connection. A
+        stored boolean could be set by a bug; these three cannot be talked past. There is no skip
+        and no default mat: without a mat there is no home.
+
+        When the branch is still undecided the answer carries `question` and, for the
+        which-app question, `client_options` built from the same tool table the branch decision
+        reads — so the picker can never drift from the list.
+
+        Requires the ACCOUNT HOLDER's own session: an agent token inherits its owner's roles on this
+        node, so agent, ecosystem and app-grant principals are refused here.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi] }
+          description: Language of the client_options labels
+      responses:
+        '200':
+          description: The home state
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          state:
+                            type: object
+                            properties:
+                              owner: { type: string }
+                              ghii: { type: string }
+                              track: { type: string, enum: [remake, legacy] }
+                              switched: { type: integer }
+                              step:
+                                type: string
+                                enum: [welcome-mat, first-agent, hello-mcp]
+                                nullable: true
+                                description: The step the person is ON. Null once the home is initialized.
+                              mat:
+                                type: object
+                                properties:
+                                  done: { type: boolean }
+                                  attempts: { type: integer }
+                                  result: { type: string, enum: [ok, failed], nullable: true }
+                                  url: { type: string, nullable: true }
+                                  standaloneUrl: { type: string, nullable: true }
+                              ai:
+                                type: object
+                                nullable: true
+                                properties:
+                                  model: { type: string, nullable: true }
+                                  vendor: { type: string, nullable: true }
+                                  client: { type: string, nullable: true }
+                                  mcp: { type: string, enum: [yes, no, unknown], nullable: true }
+                                  source: { type: string, enum: [meta, asked], nullable: true }
+                              branch: { type: string, enum: [A, B, agent], nullable: true }
+                              agent:
+                                type: object
+                                nullable: true
+                                properties:
+                                  name: { type: string }
+                                  gaii: { type: string }
+                                  connectedAt: { type: string, format: date-time, nullable: true }
+                              helloMcp: { type: boolean }
+                              initialized: { type: boolean }
+                              room: { type: string, enum: [create, organise, monetise, company], nullable: true }
+                          steps:
+                            type: array
+                            items: { type: string }
+                          question:
+                            type: string
+                            enum: [which-client, paid-plan]
+                            nullable: true
+                          client_options:
+                            type: array
+                            nullable: true
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string }
+                                label: { type: string }
+                                recommended: { type: boolean }
+                                plans: { type: string }
+        '403':
+          description: Not the account holder's own session
+
+  /v1/home/welcome-mat:
+    post:
+      operationId: postWelcomeMat
+      summary: Paste the welcome mat — step 1, and there is no way past it
+      description: >-
+        Takes whatever the person copied out of their AI chat and reads a page out of it. The paste
+        arrives wrapped in whatever the model said around it, so five attempts run in order and the
+        first that hits wins: the AIMEAT marker comments, a fenced code block, a document sitting in
+        prose, a bare `<body>` fragment (wrapped into a document), and finally rejection.
+
+        An accepted page is stored as the person's PORTFOLIO and the portfolio is switched on, so
+        the mat is visible the moment it lands. The four `ai-*` meta fields are read, and the BRANCH
+        is decided from `ai-client` — MCP capability belongs to the client app, not to the model, and
+        the model's own `ai-can-mcp` claim is recorded but deliberately not obeyed.
+
+        A refused paste is a 400 whose `details.missing` NAMES what was looked for and not found,
+        with `details.attempts`. The text is never echoed back and never cleared: the box keeps it
+        client-side. There is no skip — no field, no value and no route grants a home without a mat.
+
+        Requires the ACCOUNT HOLDER's own session. The mat doubles as evidence that a human has an
+        AI and understands copy-paste; an agent pasting it would prove neither.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [paste]
+              properties:
+                paste:
+                  type: string
+                  description: Whatever was copied out of the AI chat, explanation and all.
+      responses:
+        '200':
+          description: The mat was read and stored
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          saved: { type: boolean }
+                          attempts: { type: integer }
+                          level:
+                            type: integer
+                            enum: [1, 2, 3, 4]
+                            description: Which of the five attempts read it. Grades the prompt, not the person.
+                          wrapped:
+                            type: boolean
+                            description: True when a bare body fragment had a document shell built around it.
+                          meta:
+                            type: object
+                            description: The ai-* fields as the page stated them (every one optional).
+                          branch: { type: string, enum: [A, B, ask] }
+                          question: { type: string, enum: [which-client, paid-plan], nullable: true }
+                          tool_id: { type: string, nullable: true }
+                          portfolio_url: { type: string }
+                          standalone_url: { type: string, nullable: true }
+        '400':
+          description: >-
+            No page in the paste. `error.details` carries `reason`
+            (`empty` | `no_html` | `empty_page`), `missing` (which of doctype / html-tag /
+            body-tag / content was absent) and `attempts`.
+        '403':
+          description: Not the account holder's own session
+        '413':
+          description: The paste is larger than the node's portfolio size cap
+
+  /v1/home/ai-client:
+    post:
+      operationId: postHomeAiClient
+      summary: Answer which app you talked in, or whether you have the paid tier
+      description: >-
+        The person's own answer to the two questions the branch decision can raise. Their answer is
+        run through the same alias map as the page's claim — it is not privileged — and is recorded
+        with `source: asked`, which supersedes the page's `meta` reading. A model's claim about its
+        own app is unreliable; the person's is not, so `asked` replaces `meta` and nothing replaces
+        `asked` (the superseded reading is kept alongside).
+
+        `client` accepts one of the ids from `/v1/ai-tools`, `other`, `dont-know`, or free text. An
+        unrecognised answer leads to branch A, never to B: a wrong A costs one attempt, whereas a
+        wrong B tells someone whose tools were fine that their tools are not good enough. The ONLY
+        route to branch B is `has_paid_plan: false` for an app that requires a paid tier.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                client:
+                  type: string
+                  description: An id from /v1/ai-tools, `other`, `dont-know`, or free text.
+                has_paid_plan:
+                  type: boolean
+                  description: Whether the person has the tier their app requires.
+      responses:
+        '200':
+          description: The branch after the answer, plus the refreshed home state
+        '400':
+          description: Neither answer was supplied
+        '403':
+          description: Not the account holder's own session
+
   /v1/prompts/hello-mcp:
     get:
       operationId: getHelloMcpPrompt
@@ -39200,10 +39475,15 @@ paths:
       tags: [Upload]
       summary: Upload the portfolio HTML file
       description: |
-        Uploads (upserts) the owner's portfolio HTML, stored as a public storage file under
-        the owner's first agent (`portfolio/index.html`). The request body is the raw HTML with
+        Uploads (upserts) the owner's portfolio HTML as a public storage file
+        (`portfolio/index.html`). The request body is the raw HTML with
         `Content-Type: text/html`; size is capped by the node's `portfolioMaxSizeKb` config
         (default 512 KB). Requires owner auth.
+
+        Stored under the owner's first agent when they have one, and under their GHII when they
+        do not. An agent is NOT required: the welcome mat is the portfolio's first version and is
+        made before any agent exists, so the old `400 NO_AGENT` refusal is gone. Reads try every
+        identity, so a portfolio made before an agent stays visible after one arrives.
       security:
         - BearerAuth: []
       requestBody:

@@ -4,7 +4,14 @@
  *   HTML upload (stored as a storage file), public showcase listing, and the public
  *   portfolio-data endpoint consumed by the SPA viewer.
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
+ *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.4.0 — 2026-08-07 — The portfolio no longer requires an agent (remake phase 2). The welcome
+ *     mat IS the portfolio and is made BEFORE the first agent, so the 400 NO_AGENT on upload/config
+ *     would have blocked the entire new path, and resolvePublishedPortfolio's `no_agent` refusal
+ *     would have made the first thing anyone builds here invisible. Writes go to the first agent
+ *     when there is one (old path unchanged) and to the owner's GHII when there is not; reads try
+ *     every identity, so a mat made before an agent stays visible after one arrives.
  *   v1.3.0 — 2026-07-16 — catalog builds file lists via listStorageFilesForOwners (one IN
  *     query for all agents, was listStorageFiles per agent twice).
  *   v1.2.0 — 2026-07-03 — data/:username returns owner_gaiis (bridge allowlist for the
@@ -24,7 +31,42 @@ import { emitChange } from '../services/event-bus.js';
 /** Result of resolving a username to their published portfolio. */
 export type PortfolioResolution =
   | { ok: true; html: string | null; ghii: GHIIRecord; agents: AgentRecord[]; portfolioConfig: Record<string, unknown> }
-  | { ok: false; reason: 'user_not_found' | 'no_agent' | 'not_enabled' };
+  | { ok: false; reason: 'user_not_found' | 'not_enabled' };
+
+/** Where this owner's portfolio file and config live. */
+export const PORTFOLIO_HTML_KEY = 'portfolio/index.html';
+export const PORTFOLIO_CONFIG_KEY = 'portfolio.config';
+
+/**
+ * Which identity a NEW portfolio write is stored under.
+ *
+ * Historically this was always the owner's first agent, which was safe while a portfolio could
+ * only ever be built by someone who already had one. The remake reverses that order: the welcome
+ * mat IS the portfolio and it is made BEFORE any agent exists (03-welcome-mat.md), so an
+ * agent-keyed write has no key to use.
+ *
+ * An owner with an agent keeps writing exactly where they always did — the old path is unchanged
+ * byte for byte. An owner with none writes under their own GHII, which is an identity they have
+ * from the moment the account exists.
+ */
+export async function portfolioWriteGaii(
+  storage: Storage, ownerName: string, nodeId: string,
+): Promise<string> {
+  const agents = await storage.getAgentsByOwner(ownerName);
+  return agents.length ? agents[0].gaii : `${ownerName}@${nodeId}`;
+}
+
+/**
+ * Every identity a portfolio might be stored under, newest convention first. Reads try each in
+ * turn: an account that made its mat before connecting an agent has it under the GHII, and must
+ * keep seeing it after the agent arrives.
+ */
+export async function portfolioReadGaiis(
+  storage: Storage, ownerName: string, nodeId: string,
+): Promise<string[]> {
+  const agents = await storage.getAgentsByOwner(ownerName);
+  return [...agents.map(a => a.gaii), `${ownerName}@${nodeId}`];
+}
 
 /**
  * Shared resolver: username → published portfolio HTML + owner identities.
@@ -32,20 +74,33 @@ export type PortfolioResolution =
  * reasons to granular 404 messages and tolerates html:null) and the
  * portfolio-origin serve route (<username>.portfolio.<apex>, which returns a
  * uniform 404 for every failure INCLUDING html:null).
+ *
+ * `no_agent` is gone as a reason: a welcome mat exists before its owner has an agent, and
+ * refusing to serve it would make the first thing anyone builds here invisible.
  */
-export async function resolvePublishedPortfolio(storage: Storage, username: string): Promise<PortfolioResolution> {
+export async function resolvePublishedPortfolio(
+  storage: Storage, username: string,
+): Promise<PortfolioResolution> {
   const ghii = await storage.getGHIIByOwner(username);
   if (!ghii) return { ok: false, reason: 'user_not_found' };
 
   const agents = await storage.getAgentsByOwner(username);
-  if (!agents.length) return { ok: false, reason: 'no_agent' };
+  const candidates = [...agents.map(a => a.gaii), ghii.ghii];
 
-  const configMem = await storage.getMemory(agents[0].gaii, 'portfolio.config');
-  const portfolioConfig = (configMem?.value ?? null) as Record<string, unknown> | null;
-  if (!portfolioConfig || !portfolioConfig.enabled) return { ok: false, reason: 'not_enabled' };
+  let portfolioConfig: Record<string, unknown> | null = null;
+  for (const gaii of candidates) {
+    const mem = await storage.getMemory(gaii, PORTFOLIO_CONFIG_KEY);
+    const val = (mem?.value ?? null) as Record<string, unknown> | null;
+    if (val?.enabled) { portfolioConfig = val; break; }
+  }
+  if (!portfolioConfig) return { ok: false, reason: 'not_enabled' };
 
-  const htmlFile = await storage.getStorageFile(agents[0].gaii, 'portfolio/index.html');
-  return { ok: true, html: htmlFile ? htmlFile.data.toString('utf-8') : null, ghii, agents, portfolioConfig };
+  let html: string | null = null;
+  for (const gaii of candidates) {
+    const file = await storage.getStorageFile(gaii, PORTFOLIO_HTML_KEY);
+    if (file) { html = file.data.toString('utf-8'); break; }
+  }
+  return { ok: true, html, ghii, agents, portfolioConfig };
 }
 
 /** Valid DNS label for a portfolio subdomain (same shape as SUBDOMAIN_RE; kept local
@@ -228,14 +283,15 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    */
   router.get('/v1/portfolio/config', requireAuth(), async (req, res) => {
     const ownerName = req.auth!.owner;
-    const agents = await storage.getAgentsByOwner(ownerName);
-    if (!agents.length) {
-      res.json(success(config.nodeId, { config: null }));
-      return;
+    // Read across every identity this owner's portfolio could live under: the mat is written
+    // under the GHII before any agent exists, and must stay visible once one does.
+    let value: unknown = null;
+    for (const gaii of await portfolioReadGaiis(storage, ownerName, config.nodeId)) {
+      const mem = await storage.getMemory(gaii, PORTFOLIO_CONFIG_KEY);
+      if (mem?.value) { value = mem.value; break; }
     }
-    const mem = await storage.getMemory(agents[0].gaii, 'portfolio.config');
     res.json(success(config.nodeId, {
-      config: mem?.value ?? null,
+      config: value,
       // Where the portfolio is (or would be) served standalone — null when the
       // portfolio origin is disabled or the username isn't a valid DNS label.
       standalone_url: portfolioStandaloneUrl(config, ownerName),
@@ -248,17 +304,13 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    */
   router.put('/v1/portfolio/config', requireAuth(), async (req, res) => {
     const ownerName = req.auth!.owner;
-    const agents = await storage.getAgentsByOwner(ownerName);
-    if (!agents.length) {
-      res.status(400).json(error(config.nodeId, 'NO_AGENT', 'No agent found for this owner'));
-      return;
-    }
+    const target = await portfolioWriteGaii(storage, ownerName, config.nodeId);
     const body = req.body ?? {};
     const now = new Date().toISOString();
-    const existing = await storage.getMemory(agents[0].gaii, 'portfolio.config');
+    const existing = await storage.getMemory(target, PORTFOLIO_CONFIG_KEY);
     await storage.setMemory({
-      key: 'portfolio.config',
-      ownerGaii: agents[0].gaii,
+      key: PORTFOLIO_CONFIG_KEY,
+      ownerGaii: target,
       value: body,
       visibility: 'owner',
       tags: body.tags || ['portfolio'],
@@ -277,11 +329,10 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
    */
   router.put('/v1/portfolio/upload', requireAuth(), async (req, res) => {
     const ownerName = req.auth!.owner;
-    const agents = await storage.getAgentsByOwner(ownerName);
-    if (!agents.length) {
-      res.status(400).json(error(config.nodeId, 'NO_AGENT', 'No agent found for this owner'));
-      return;
-    }
+    // The NO_AGENT refusal that used to stand here is gone (11-avoimet-kysymykset.md): under the
+    // remake the welcome mat IS the portfolio and it comes BEFORE the first agent, so the check
+    // would have blocked the whole path. An owner who has an agent still writes under it.
+    const target = await portfolioWriteGaii(storage, ownerName, config.nodeId);
 
     const contentType = req.headers['content-type'] ?? '';
     if (!contentType.includes('text/html')) {
@@ -302,10 +353,10 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     }
 
     // Delete existing portfolio file if any (upsert)
-    await storage.deleteStorageFile(agents[0].gaii, 'portfolio/index.html');
+    await storage.deleteStorageFile(target, PORTFOLIO_HTML_KEY);
     await storage.createStorageFile({
-      key: 'portfolio/index.html',
-      ownerGaii: agents[0].gaii,
+      key: PORTFOLIO_HTML_KEY,
+      ownerGaii: target,
       visibility: 'public',
       mimeType: 'text/html',
       size: fileData.length,
@@ -327,7 +378,6 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     if (!resolved.ok) {
       const messages: Record<string, string> = {
         user_not_found: `User "${username}" not found`,
-        no_agent: 'No agent found for this user',
         not_enabled: 'Portfolio not enabled for this user',
       };
       res.status(404).json(error(config.nodeId, 'NOT_FOUND', messages[resolved.reason]));
