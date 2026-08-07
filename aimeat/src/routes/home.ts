@@ -14,6 +14,7 @@
  *     - home/state.ts       — GET /v1/home/state
  *     - home/first-agent.ts — POST /v1/home/first-agent
  *     - home/feed.ts        — GET /v1/home/feed, POST /v1/home/room
+ *     - home/track.ts       — GET + PUT /v1/home/ui-track (the switch)
  * @usage app.use(homeRouter(config, storage));
  * @version-history
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 2).
@@ -25,6 +26,7 @@ import { registerWelcomeMatRoutes, type HomeRouteCtx } from './home/welcome-mat.
 import { registerHomeStateRoutes } from './home/state.js';
 import { registerFirstAgentRoutes } from './home/first-agent.js';
 import { registerHomeFeedRoutes } from './home/feed.js';
+import { registerHomeTrackRoutes } from './home/track.js';
 
 export function homeRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -34,6 +36,7 @@ export function homeRouter(config: AimeatConfig, storage: Storage): Router {
     registerWelcomeMatRoutes(router, ctx);
     registerFirstAgentRoutes(router, ctx);
     registerHomeFeedRoutes(router, ctx);
+    registerHomeTrackRoutes(router, ctx);
 
     return router;
 }

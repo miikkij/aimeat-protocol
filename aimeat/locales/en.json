@@ -8144,7 +8144,18 @@
     "logKindFeature": "New",
     "logKindFix": "Fixed",
     "logKindSecurity": "Security",
-    "logKindNotice": "Notice"
+    "logKindNotice": "Notice",
+    "homeWelcome": "Welcome to your digital AI home.",
+    "agentDoorTitle": "Let your AI do this",
+    "agentDoorSub": "Copy the prompt into your own AI chat. If it can, a link arrives in your email and your account is done.",
+    "agentDoorCopy": "Copy the prompt",
+    "agentDoorCopied": "Copied — paste it in your AI chat",
+    "agentDoorAfter": "It will ask you for your email address and nothing else. You choose your own username afterwards, from the link.",
+    "agentDoorMcp": "Be ready to set up a connector for it later — that is the step that lets it reach your home directly.",
+    "agentDoorCannot": "If it says it cannot, that is a fine answer. Register below instead.",
+    "registerHome": "Register your home",
+    "registerHomeSub": "If you do not have a way in yet.",
+    "signInHome": "Sign in to your home"
   },
   "pricing": {
     "title": "Pricing",
@@ -8912,6 +8923,10 @@
         "next": "Next: you name the company, and it gets its own address.",
         "entered": "You started a company."
       }
+    },
+    "switch": {
+      "here": "You are using the new home view.",
+      "toProfile": "Go back to the old profile"
     }
   }
 }

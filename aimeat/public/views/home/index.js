@@ -51,6 +51,34 @@ function DimmedStep({ n, titleKey, fallback, note }) {
     </div>`;
 }
 
+/**
+ * The switch (08-kytkin.md). It is not on the landing page and not in the middle of the screen: it
+ * sits at the bottom of the home, near the settings, and its words say where it goes rather than
+ * what it is called. "Beta", "remake" and a version number all mean nothing to the person reading.
+ */
+function Switcher({ onSwitched }) {
+  const [busy, setBusy] = useState(false);
+  const go = useCallback(async () => {
+    setBusy(true);
+    try {
+      const r = await api('/v1/home/ui-track', { method: 'PUT', body: JSON.stringify({ ui: 'profile' }) });
+      onSwitched?.();
+      window.location.href = r?.data?.landing || '/v1/profile';
+    } catch (e) {
+      swallowed('home: switch', e);
+      setBusy(false);
+    }
+  }, [onSwitched]);
+
+  return html`
+    <div class="koti-switch">
+      <span>${tr('home.switch.here', 'You are using the new home view.')}</span>
+      <button type="button" class="btn-ghost" disabled=${busy} onClick=${go}>
+        ${tr('home.switch.toProfile', 'Go back to the old profile')}
+      </button>
+    </div>`;
+}
+
 function Welcome({ name }) {
   return html`
     <header class="koti-welcome">
@@ -168,6 +196,7 @@ export default function HomeView({ navigate }) {
         <${Rooms} rooms=${rooms} onEnter=${enterRoom} />
         <${StepMatDone} state=${state} />
         <${HomeFeed} items=${feed} />
+        <${Switcher} />
       </div>`;
   }
 
@@ -210,6 +239,7 @@ export default function HomeView({ navigate }) {
           </li>`}
       </ol>
       <${HomeFeed} items=${feed} />
+      <${Switcher} />
       ${toast && html`<div class="koti-toast" role="status">${toast}</div>`}
     </div>`;
 }

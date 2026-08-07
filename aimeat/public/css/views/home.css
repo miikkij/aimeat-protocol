@@ -295,3 +295,56 @@ a.koti-feed-line:hover { text-decoration: underline; }
 .koti-room-what { font-size: 0.92rem; color: var(--text-dim); line-height: 1.5; }
 /* The third line is the one that makes the choice possible, so it reads as a promise, not a note. */
 .koti-room-next { font-size: 0.88rem; color: var(--accent); line-height: 1.5; margin-top: 0.2rem; }
+
+/* ── The front door on the landing page ── */
+.koti-door { max-width: 720px; margin: 0 auto 2.5rem; padding: 2rem 1.25rem 0; }
+.koti-door-title {
+  font-size: 2.1rem; font-weight: 800; letter-spacing: -0.5px;
+  line-height: 1.15; margin: 0 0 1.5rem; color: var(--text);
+}
+.koti-door-agent {
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 1.15rem 1.25rem;
+  margin-bottom: 1.25rem;
+}
+.koti-door-agent-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; flex-wrap: wrap; }
+.koti-door-agent-title { margin: 0 0 0.3rem; font-size: 1.1rem; font-weight: 700; }
+.koti-door-agent-sub { margin: 0; font-size: 0.95rem; color: var(--text-dim); line-height: 1.5; max-width: 34rem; }
+.koti-door-after { margin-top: 1rem; padding-top: 0.9rem; border-top: 1px solid var(--border); }
+.koti-door-after p { margin: 0 0 0.5rem; font-size: 0.9rem; color: var(--text-dim); line-height: 1.5; }
+.koti-door-after p:last-child { margin-bottom: 0; }
+
+.koti-door-entrances { display: flex; align-items: center; gap: 1.25rem; flex-wrap: wrap; }
+.koti-door-register {
+  display: flex; flex-direction: column; gap: 0.15rem;
+  padding: 0.8rem 1.1rem;
+  border: 1px solid var(--border); border-radius: var(--radius-sm);
+  background: var(--surface); color: var(--text); text-decoration: none;
+}
+.koti-door-register:hover { border-color: var(--accent); }
+.koti-door-register-title { font-weight: 700; font-size: 1rem; }
+.koti-door-register-sub { font-size: 0.85rem; color: var(--text-dim); }
+/* Coming back is stepping into somewhere of your own, so the door is a keyhole. */
+.koti-door-signin {
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  color: var(--text-dim); text-decoration: none; font-size: 0.98rem;
+}
+.koti-door-signin:hover { color: var(--accent); }
+.koti-keyhole { flex: none; }
+
+/* ── The switch: at the bottom, quiet, and it says where it goes. ── */
+.koti-switch {
+  margin-top: 3rem; padding-top: 1.1rem;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  font-size: 0.88rem; color: var(--muted);
+}
+
+@media (max-width: 560px) {
+  .koti-door { padding: 1.25rem 1rem 0; }
+  .koti-door-title { font-size: 1.65rem; }
+  .koti-door-agent-head > * { width: 100%; }
+  .koti-door-entrances > * { width: 100%; box-sizing: border-box; }
+}

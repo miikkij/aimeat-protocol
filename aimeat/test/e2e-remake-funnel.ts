@@ -234,7 +234,79 @@ await test('The remake columns exist and read zero before anyone walks the path'
     assert(remake.home_initialized_rate_pct === 0, 'nothing is initialized yet');
 });
 
-console.log('\nPhase 3: the gate');
+console.log('\nPhase 3: the switch changes the counter, never the cohort');
+
+await test('A new account lands on the home; a legacy one lands on the profile (K3)', async () => {
+    const remake = await json('/v1/home/ui-track', auth(tokenOp));
+    assert(remake.status === 200, `ui-track ${remake.status}: ${JSON.stringify(remake.body.error)}`);
+    assert(remake.body.data.ui === 'home', `a remake account lands on the home, got ${remake.body.data.ui}`);
+    assert(remake.body.data.defaulted === true, 'nothing has been chosen yet, so this is the default');
+
+    const legacy = await json('/v1/home/ui-track', auth(tokenLegacy));
+    assert(legacy.body.data.ui === 'profile',
+        `an account on the old path keeps landing there, got ${legacy.body.data.ui}`);
+});
+
+await test('ACCEPTANCE: switching does NOT change `track` — only `switched`', async () => {
+    // The whole reason these are two fields. `track` is the cohort an account was created into;
+    // rewriting it on a flip would move accounts between cohorts as people wander, and a cohort
+    // whose membership changes under you measures nothing.
+    const before = await readTrack(tokenOp);
+    assert(before?.track === 'remake' && before.switched === 0, `setup: ${JSON.stringify(before)}`);
+
+    const put = await json('/v1/home/ui-track', auth(tokenOp, {
+        method: 'PUT', body: JSON.stringify({ ui: 'profile' }),
+    }));
+    assert(put.status === 200, `switch ${put.status}: ${JSON.stringify(put.body.error)}`);
+    assert(put.body.data.landing === '/v1/profile', `it goes to the old side, got ${put.body.data.landing}`);
+
+    const after = await readTrack(tokenOp);
+    assert(after?.track === 'remake', `THE CRITERION: track must be untouched, got ${after?.track}`);
+    assert(after?.switched === 1, `switched must count the flip, got ${after?.switched}`);
+    assert(before.at === (after as { at?: string }).at ?? true, 'the cohort timestamp does not move either');
+});
+
+await test('Re-affirming the SAME side does not inflate the counter', async () => {
+    // Counting a no-op would inflate the one number that says whether people are leaving.
+    const before = await readTrack(tokenOp);
+    const again = await json('/v1/home/ui-track', auth(tokenOp, {
+        method: 'PUT', body: JSON.stringify({ ui: 'profile' }),
+    }));
+    assert(again.status === 200, `re-affirm ${again.status}`);
+    const after = await readTrack(tokenOp);
+    assert(after?.switched === before?.switched,
+        `choosing the current side again is not a switch: ${before?.switched} → ${after?.switched}`);
+});
+
+await test('Switching back counts a second flip, and STILL leaves the cohort alone', async () => {
+    const back = await json('/v1/home/ui-track', auth(tokenOp, {
+        method: 'PUT', body: JSON.stringify({ ui: 'home' }),
+    }));
+    assert(back.status === 200, `switch back ${back.status}`);
+    assert(back.body.data.landing === '/v1/home', `it goes home, got ${back.body.data.landing}`);
+    const after = await readTrack(tokenOp);
+    assert(after?.switched === 2, `two flips counted, got ${after?.switched}`);
+    assert(after?.track === 'remake', `still the cohort it was created in, got ${after?.track}`);
+});
+
+await test('The funnel counts this account in the switched column', async () => {
+    const { body } = await json('/v1/admin/onboarding-funnel?limit=1000', auth(tokenOp));
+    const row = (body.data?.rows ?? []).find((r: any) => r.owner === ownerOp);
+    assert(row?.switched === 2, `the row carries the count, got ${row?.switched}`);
+    assert(row?.track === 'remake', `and the cohort is unchanged, got ${row?.track}`);
+    const remakeCohort = (body.data?.cohorts ?? []).find((c: any) => c.track === 'remake');
+    assert(remakeCohort.switched >= 1,
+        `the cohort's switched column counts them: ${JSON.stringify(remakeCohort.switched)}`);
+});
+
+await test('FAILURE MODE: an invalid side is refused', async () => {
+    const { status } = await json('/v1/home/ui-track', auth(tokenOp, {
+        method: 'PUT', body: JSON.stringify({ ui: 'sideways' }),
+    }));
+    assert(status === 400, `expected 400, got ${status}`);
+});
+
+console.log('\nPhase 4: the gate');
 
 await test('FAILURE MODE: a plain owner cannot read the funnel (403)', async () => {
     assert(!rolesOf(tokenHuman).includes('operator'), 'setup: this account must not be an operator');

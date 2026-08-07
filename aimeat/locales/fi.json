@@ -8144,7 +8144,18 @@
     "logKindFeature": "Uutta",
     "logKindFix": "Korjattu",
     "logKindSecurity": "Tietoturva",
-    "logKindNotice": "Tiedote"
+    "logKindNotice": "Tiedote",
+    "homeWelcome": "Tervetuloa digitaaliseen tekoälykotiisi.",
+    "agentDoorTitle": "Anna tekoälysi hoitaa tämä",
+    "agentDoorSub": "Kopioi kehote omaan tekoälychattiisi. Jos se pystyy, sähköpostiisi tulee linkki ja tilisi on valmis.",
+    "agentDoorCopy": "Kopioi kehote",
+    "agentDoorCopied": "Kopioitu — liitä se tekoälychattiisi",
+    "agentDoorAfter": "Se kysyy sinulta vain sähköpostiosoitteesi. Käyttäjänimen valitset itse jälkeenpäin, linkistä.",
+    "agentDoorMcp": "Varaudu konfiguroimaan sille konnektori myöhemmin — se on se askel joka päästää sen kotiisi suoraan.",
+    "agentDoorCannot": "Jos se sanoo ettei pysty, se on ihan kelpo vastaus. Rekisteröidy silloin alta.",
+    "registerHome": "Rekisteröi kotisi",
+    "registerHomeSub": "Jos sinulla ei vielä ole pääsyä.",
+    "signInHome": "Kirjaudu kotiisi"
   },
   "pricing": {
     "title": "Hinnoittelu",
@@ -8912,6 +8923,10 @@
         "next": "Seuraavaksi: nimeät yrityksen, ja se saa oman osoitteensa.",
         "entered": "Aloitit yrityksen."
       }
+    },
+    "switch": {
+      "here": "Käytät uutta kotinäkymää.",
+      "toProfile": "Palaa vanhaan profiiliin"
     }
   }
 }

@@ -73,6 +73,7 @@ import NodeTotals from './landing-node-totals.js';
 import NodeChangeLog from './landing-changelog.js';
 import { BuildAgentPrompt, AskYourAI } from './landing-prompts.js';
 import { swallowed } from '/js/swallowed.js';
+import { WelcomeDoor } from '/views/home/welcome-door.js';
 
 // t() echoes the key when a translation is missing — fall back to readable English.
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -627,6 +628,13 @@ export default function Landing({ navigate }) {
 
   return html`
     <div class="ld">
+      <!-- 0. The front door (remake phase 8). What this place is, in one sentence, and the three
+              ways in — the agent door first, because "your AI can do the whole thing" is the
+              product's strongest claim and this demonstrates it instead of describing it.
+              The landing page belongs to both the old path and the new one, which makes this the
+              one deliberate, bounded exception to the new path keeping to its own files. -->
+      <${WelcomeDoor} onNavigate=${navigate} />
+
       <!-- Order reversed 2026-07-30 (TARGET-056). The strongest thing on this page is that a
            sentence becomes a published app, and it used to sit below the fold under a wall of
            other people's work. It leads now; the reason it matters (owner or tenant) comes
