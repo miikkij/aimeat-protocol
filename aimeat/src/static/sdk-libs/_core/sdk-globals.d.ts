@@ -21,8 +21,12 @@ interface Window {
   AIMEATAgentFace?: Record<string, any>;
   /** Serve-time config prelude prepended to each bundle (see _core/config.js + libs/sdk-serve.ts). */
   __AIMEAT_SDK_CFG__?: { nodeId: string; baseUrl: string; heartbeatMs?: number };
-  /** aimeat-auth's extra serve-time prelude: the OIDC providers enabled on the node (server-computed). */
-  __AIMEAT_AUTH_CFG__?: { providers: Array<{ id: string; label: string; i18nKey: string }> };
+  /** aimeat-auth's extra serve-time prelude (server-computed, see routes/libs.ts): the OIDC providers
+   *  enabled on the node, and whether the node's registration gate demands an email. */
+  __AIMEAT_AUTH_CFG__?: {
+    providers: Array<{ id: string; label: string; i18nKey: string }>;
+    emailRequired?: boolean;
+  };
   /** aimeat-header's idempotency guard (mounts the canonical nav at most once). */
   __AIMEAT_HEADER_MOUNTED__?: boolean;
   /** aimeat-auth version marker exposed globally. */
