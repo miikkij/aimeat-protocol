@@ -11,6 +11,7 @@
  * @structure zod schemas · sendErr mapper · companiesRouter
  * @usage app.use(companiesRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.1.0 — 2026-08-07 — GET/PUT/DELETE /v1/companies/:id/smtp: a company's own sending identity.
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
  */
 import { Router, type Request, type Response } from 'express';
@@ -26,6 +27,9 @@ import {
   requireOwnCompany, checkSlugAvailable, companyAddress, slugify,
 } from '../services/company/company-service.js';
 import type { CompanyRecord } from '../models/company-schemas.js';
+import {
+  setCompanySmtp, getCompanySmtpPublic, deleteCompanySmtp,
+} from '../services/company/company-smtp.js';
 
 const IdentitySchema = {
   description: z.string().max(500).nullish(),
@@ -53,6 +57,18 @@ const CreateSchema = z.object({
 const UpdateSchema = z.object({
   name: z.string().min(2).max(140).optional(),
   ...IdentitySchema,
+}).strict();
+
+const SmtpSchema = z.object({
+  host: z.string().min(1).max(253),
+  port: z.number().int().min(1).max(65535).optional(),
+  secure: z.boolean().optional(),
+  username: z.string().max(200).nullish(),
+  /** Plaintext on the way in only — stored encrypted, never returned by any read. */
+  password: z.string().max(400).nullish(),
+  from_address: z.string().email().max(200),
+  from_name: z.string().max(140).nullish(),
+  reply_to: z.string().email().max(200).nullish(),
 }).strict();
 
 const FrontPageSchema = z.object({
@@ -189,6 +205,47 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
   router.delete('/v1/companies/:id', requireAuth(), requireScope('company:write'), async (req, res) => {
     try {
       await deleteCompany(storage, resolve(req), req.params.id as string);
+      emitChange('companies', resolve(req));
+      res.json(success(config.nodeId, { removed: req.params.id }));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  // ── A company's own sending identity (outbound door) ──────────────────────
+
+  router.get('/v1/companies/:id/smtp', requireAuth(), requireScope('company:read'), async (req, res) => {
+    try {
+      const smtp = await getCompanySmtpPublic(storage, resolve(req), req.params.id as string);
+      res.json(success(config.nodeId, { smtp }));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  router.put('/v1/companies/:id/smtp', requireAuth(), requireScope('company:write'), async (req, res) => {
+    try {
+      const parsed = SmtpSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json(error(config.nodeId, 'INVALID_SMTP', parsed.error.message));
+        return;
+      }
+      const b = parsed.data;
+      const smtp = await setCompanySmtp(config, storage, resolve(req), req.params.id as string, {
+        host: b.host, port: b.port, secure: b.secure,
+        username: b.username ?? null, password: b.password ?? undefined,
+        fromAddress: b.from_address, fromName: b.from_name ?? null, replyTo: b.reply_to ?? null,
+      });
+      emitChange('companies', resolve(req));
+      res.json(success(config.nodeId, { smtp }));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  router.delete('/v1/companies/:id/smtp', requireAuth(), requireScope('company:write'), async (req, res) => {
+    try {
+      await deleteCompanySmtp(storage, resolve(req), req.params.id as string);
       emitChange('companies', resolve(req));
       res.json(success(config.nodeId, { removed: req.params.id }));
     } catch (e) {

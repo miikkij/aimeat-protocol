@@ -4073,7 +4073,27 @@
       "frontSaved": "Front page set.",
       "delete": "Delete company",
       "deleted": "Company deleted.",
-      "confirmDelete": "Delete \"{name}\"? The address becomes claimable by others."
+      "confirmDelete": "Delete \"{name}\"? The address becomes claimable by others.",
+      "smtpTitle": "Sending identity (SMTP)",
+      "smtpHint": "Messages this company sends leave from its own mail server, not the node's. Get the settings from your mail provider. Leave this empty and the node's shared sender is used instead.",
+      "smtpActive": "Sending through {host}",
+      "smtpInactive": "Using the node's shared sender",
+      "smtpSave": "Save settings",
+      "smtpSaved": "Sending identity saved.",
+      "smtpRemove": "Remove settings",
+      "smtpRemoved": "Sending identity removed.",
+      "smtpConfirmRemove": "Remove these settings? Messages from this company will go out through the node's shared sender again.",
+      "smtp": {
+        "host": "Server",
+        "port": "Port",
+        "username": "Username",
+        "password": "Password",
+        "passwordKept": "Stored — leave empty to keep",
+        "fromAddress": "Sender address",
+        "fromName": "Sender name",
+        "replyTo": "Reply-to",
+        "secure": "TLS on connect (port 465)"
+      }
     }
   },
   "dev": {

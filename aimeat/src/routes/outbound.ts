@@ -11,6 +11,8 @@
  * @structure zod schemas · sendErr mapper · outboundRouter
  * @usage app.use(outboundRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.1.0 — 2026-08-07 — The send accepts company_id: the message then leaves through that
+ *     company's own SMTP server when it has one.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 2.
  */
 import { Router, type Request, type Response } from 'express';
@@ -42,6 +44,8 @@ const SendSchema = z.object({
   invoice_id: z.string().max(80).optional(),
   reply_to: z.string().email().max(200).optional(),
   from_name: z.string().max(140).optional(),
+  /** Send as this company: its own SMTP identity is used when it has one. */
+  company_id: z.string().max(80).optional(),
 }).strict();
 
 /** optOutToken is the RECIPIENT's capability (the unsubscribe link) — never shown to the owner. */
@@ -163,6 +167,7 @@ export function outboundRouter(config: AimeatConfig, storage: Storage): Router {
         subject: b.subject, body: b.body,
         templateId: b.template_id, variables: b.variables,
         invoiceId: b.invoice_id, replyTo: b.reply_to, fromName: b.from_name,
+        companyId: b.company_id,
       });
       res.json(success(config.nodeId, {
         message: result.log, channel: result.channel, status: result.status,

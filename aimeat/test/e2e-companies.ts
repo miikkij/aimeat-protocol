@@ -7,6 +7,8 @@
  *   403, and the serving half: a company host serves its front-page app, a redirect front page
  *   301s, an unclaimed label 404s, and the invoice seller prefills from the company record.
  * @version-history
+ *   v1.1.0 — 2026-08-07 — Phase 5: the company's own SMTP identity (the password never leaves
+ *     the server, an update without one keeps it, and a send really uses the company's server).
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
  */
 
@@ -305,7 +307,97 @@ await test('14. an agent without company scopes gets 403', async () => {
   assert(write.status === 403, `write should be 403, got ${write.status}`);
 });
 
-await test('15. deleting the company frees the address and stops serving it', async () => {
+console.log("\nPhase 5 — the company's own sending identity");
+
+let smtpContactId = '';
+
+await test('15. a company stores its own SMTP settings and no read ever returns the password', async () => {
+  const put = await json(`/v1/companies/${companyId}/smtp`, {
+    method: 'PUT', headers: authed(A.token),
+    body: JSON.stringify({
+      host: '127.0.0.1', port: 1, secure: false,
+      username: 'laskutus@perustaja.fi', password: 'ei-koskaan-ulos',
+      from_address: 'laskutus@perustaja.fi', from_name: 'Perustaja Oy', reply_to: 'asiakaspalvelu@perustaja.fi',
+    }),
+  });
+  assert(put.status === 200, `smtp save failed: ${put.status} ${JSON.stringify(put.body)}`);
+  const saved = put.body.data.smtp;
+  assert(saved.passwordSet === true, 'the record must report that a password is set');
+  assert(!('passwordEnc' in saved) && !('password' in saved), 'the write response must not carry the password in any form');
+
+  const get = await json(`/v1/companies/${companyId}/smtp`, { headers: authed(A.token) });
+  assert(get.status === 200, `smtp read failed: ${get.status}`);
+  const read = get.body.data.smtp;
+  assert(read.host === '127.0.0.1' && read.fromAddress === 'laskutus@perustaja.fi', 'the settings must round-trip');
+  assert(read.passwordSet === true, 'the read must still report a password is set');
+  assert(!JSON.stringify(get.body).includes('ei-koskaan-ulos'), 'the password leaked into a read response');
+});
+
+await test('16. updating the settings without a password keeps the stored one', async () => {
+  const put = await json(`/v1/companies/${companyId}/smtp`, {
+    method: 'PUT', headers: authed(A.token),
+    body: JSON.stringify({ host: '127.0.0.1', port: 1, from_address: 'laskut@perustaja.fi' }),
+  });
+  assert(put.status === 200, `smtp update failed: ${put.status}`);
+  assert(put.body.data.smtp.fromAddress === 'laskut@perustaja.fi', 'the sender address must change');
+  assert(put.body.data.smtp.passwordSet === true, 'omitting the password must keep the stored one, not clear it');
+});
+
+await test("17. another owner can neither read nor write this company's SMTP settings", async () => {
+  const get = await json(`/v1/companies/${companyId}/smtp`, { headers: authed(B.token) });
+  assert(get.status === 404, `cross-owner smtp read should be 404, got ${get.status}`);
+  const put = await json(`/v1/companies/${companyId}/smtp`, {
+    method: 'PUT', headers: authed(B.token),
+    body: JSON.stringify({ host: 'evil.example', from_address: 'kaappaus@evil.example' }),
+  });
+  assert(put.status === 404, `cross-owner smtp write should be 404, got ${put.status}`);
+  const del = await json(`/v1/companies/${companyId}/smtp`, { method: 'DELETE', headers: authed(B.token) });
+  assert(del.status === 404, `cross-owner smtp delete should be 404, got ${del.status}`);
+});
+
+await test("18. a send as the company goes through the company's own server, not the node's", async () => {
+  const contact = await json('/v1/outbound/contacts', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({ name: 'Asiakas Oy', email: `asiakas${Date.now().toString(36).slice(-5)}@example.com` }),
+  });
+  assert(contact.status === 201, `contact create failed: ${contact.status}`);
+  smtpContactId = contact.body.data.contact.id as string;
+
+  // The node's own transport is disabled in the test environment. If the send still reaches an
+  // SMTP connection, the company's settings are what carried it — that is the whole assertion.
+  const sent = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      contact_id: smtpContactId, kind: 'transactional', company_id: companyId,
+      subject: 'Lasku 1001', body: 'Liitteenä lasku.',
+    }),
+  });
+  assert(sent.status === 200, `send failed: ${sent.status} ${JSON.stringify(sent.body)}`);
+  assert(sent.body.data.status === 'failed', `expected a delivery failure against 127.0.0.1:1, got ${sent.body.data.status}`);
+  const err = String(sent.body.data.message.error ?? '');
+  assert(err !== 'EMAIL_DISABLED', "the node's shared transport answered — the company sender was not used");
+  assert(/ECONNREFUSED|connect|127\.0\.0\.1/i.test(err), `expected a connection error from the company server, got: ${err}`);
+});
+
+await test('19. removing the settings puts the company back on the shared sender', async () => {
+  const del = await json(`/v1/companies/${companyId}/smtp`, { method: 'DELETE', headers: authed(A.token) });
+  assert(del.status === 200, `smtp delete failed: ${del.status}`);
+  const get = await json(`/v1/companies/${companyId}/smtp`, { headers: authed(A.token) });
+  assert(get.body.data.smtp === null, 'the settings must be gone after removal');
+
+  const sent = await json('/v1/outbound/send', {
+    method: 'POST', headers: authed(A.token),
+    body: JSON.stringify({
+      contact_id: smtpContactId, kind: 'transactional', company_id: companyId,
+      subject: 'Lasku 1002', body: 'Liitteenä lasku.',
+    }),
+  });
+  assert(sent.status === 200, `send failed: ${sent.status}`);
+  assert(sent.body.data.message.error === 'EMAIL_DISABLED',
+    `without company settings the node's own (disabled) transport must answer, got: ${sent.body.data.message.error}`);
+});
+
+await test('20. deleting the company frees the address and stops serving it', async () => {
   const del = await json(`/v1/companies/${companyId}`, { method: 'DELETE', headers: authed(A.token) });
   assert(del.status === 200, `delete failed: ${del.status}`);
   const served = await coFetch(slug);

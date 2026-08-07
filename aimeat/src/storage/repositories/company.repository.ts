@@ -7,9 +7,11 @@
  *   not both win.
  * @usage Storage interface composes this; providers implement in methods/companies.ts.
  * @version-history
+ *   v1.1.0 — 2026-08-07 — CompanySmtp: set/get/delete a company's own sending identity.
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
  */
 import type { CompanyRecord, CompanyQuery } from '../../models/company-schemas.js';
+import type { CompanySmtpRecord } from '../../models/company-smtp-schemas.js';
 
 export interface CompanyRepository {
   /** Throws (unique violation) when the slug is taken — that IS the arbitration. */
@@ -21,4 +23,10 @@ export interface CompanyRepository {
   countCompanies(query: CompanyQuery): Promise<number>;
   updateCompany(row: CompanyRecord): Promise<void>;
   deleteCompany(id: string): Promise<boolean>;
+
+  // ── A company's own sending identity (outbound door) ──────────────────────
+  /** Upsert: one sending identity per company. */
+  setCompanySmtp(row: CompanySmtpRecord): Promise<void>;
+  getCompanySmtp(companyId: string): Promise<CompanySmtpRecord | undefined>;
+  deleteCompanySmtp(companyId: string): Promise<boolean>;
 }

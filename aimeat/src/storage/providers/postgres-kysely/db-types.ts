@@ -428,6 +428,22 @@ export interface Company {
   vatId: string | null;
 }
 
+/** A company's own sending identity; passwordEnc is AES-256-GCM ciphertext, never plaintext. */
+export interface CompanySmtp {
+  companyId: string;
+  createdAt: string;
+  fromAddress: string;
+  fromName: string | null;
+  host: string;
+  ownerGhii: string;
+  passwordEnc: string | null;
+  port: Generated<number>;
+  replyTo: string | null;
+  secure: Generated<boolean>;
+  updatedAt: string;
+  username: string | null;
+}
+
 /** Outbound door: saved recipient with opt-out and bounce state (never a free address). */
 export interface OutboundContact {
   bounceCount: Generated<number>;
@@ -1838,6 +1854,7 @@ export interface DB {
   CapabilityVouch: CapabilityVouch;
   ChatInstance: ChatInstance;
   Company: Company;
+  CompanySmtp: CompanySmtp;
   Connection: Connection;
   ConnectionDelegation: ConnectionDelegation;
   Consent: Consent;

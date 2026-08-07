@@ -13,7 +13,8 @@ import type { CompanyRepository } from '../../../repositories/company.repository
 import type {
   CompanyRecord, CompanyQuery, CompanyStatus, CompanyFrontPageKind,
 } from '../../../../models/company-schemas.js';
-import type { Company as CompanyRow } from '../db-types.js';
+import type { CompanySmtpRecord } from '../../../../models/company-smtp-schemas.js';
+import type { Company as CompanyRow, CompanySmtp as CompanySmtpRow } from '../db-types.js';
 import type { PostgresKyselyStorage } from '../index.js';
 
 function toCompany(r: Selectable<CompanyRow>): CompanyRecord {
@@ -69,6 +70,15 @@ function values(row: CompanyRecord) {
   };
 }
 
+function toSmtp(r: Selectable<CompanySmtpRow>): CompanySmtpRecord {
+  return {
+    companyId: r.companyId, ownerGhii: r.ownerGhii, host: r.host, port: r.port, secure: r.secure,
+    username: r.username ?? null, passwordEnc: r.passwordEnc ?? null,
+    fromAddress: r.fromAddress, fromName: r.fromName ?? null, replyTo: r.replyTo ?? null,
+    createdAt: r.createdAt, updatedAt: r.updatedAt,
+  };
+}
+
 export const companyMethods: CompanyRepository & ThisType<PostgresKyselyStorage> = {
   async createCompany(this: PostgresKyselyStorage, row: CompanyRecord): Promise<void> {
     await this.db.insertInto('Company')
@@ -113,6 +123,29 @@ export const companyMethods: CompanyRepository & ThisType<PostgresKyselyStorage>
 
   async deleteCompany(this: PostgresKyselyStorage, id: string): Promise<boolean> {
     const r = await this.db.deleteFrom('Company').where('id', '=', id).executeTakeFirst();
+    return Number(r.numDeletedRows ?? 0) > 0;
+  },
+
+  async setCompanySmtp(this: PostgresKyselyStorage, row: CompanySmtpRecord): Promise<void> {
+    const fields = {
+      ownerGhii: row.ownerGhii, host: row.host, port: row.port, secure: row.secure,
+      username: row.username, passwordEnc: row.passwordEnc, fromAddress: row.fromAddress,
+      fromName: row.fromName, replyTo: row.replyTo, updatedAt: row.updatedAt,
+    };
+    await this.db.insertInto('CompanySmtp')
+      .values({ companyId: row.companyId, createdAt: row.createdAt, ...fields })
+      .onConflict((oc) => oc.column('companyId').doUpdateSet(fields))
+      .execute();
+  },
+
+  async getCompanySmtp(this: PostgresKyselyStorage, companyId: string): Promise<CompanySmtpRecord | undefined> {
+    const r = await this.db.selectFrom('CompanySmtp').selectAll()
+      .where('companyId', '=', companyId).executeTakeFirst();
+    return r ? toSmtp(r) : undefined;
+  },
+
+  async deleteCompanySmtp(this: PostgresKyselyStorage, companyId: string): Promise<boolean> {
+    const r = await this.db.deleteFrom('CompanySmtp').where('companyId', '=', companyId).executeTakeFirst();
     return Number(r.numDeletedRows ?? 0) > 0;
   },
 };

@@ -4073,7 +4073,27 @@
       "frontSaved": "Julkisivu asetettu.",
       "delete": "Poista yritys",
       "deleted": "Yritys poistettu.",
-      "confirmDelete": "Poistetaanko \"{name}\"? Osoite vapautuu muiden varattavaksi."
+      "confirmDelete": "Poistetaanko \"{name}\"? Osoite vapautuu muiden varattavaksi.",
+      "smtpTitle": "Lähettäjätiedot (SMTP)",
+      "smtpHint": "Tämän yrityksen viestit lähtevät sen omalta sähköpostipalvelimelta, eivät noden kautta. Asetukset saat sähköpostipalvelusi tarjoajalta. Jos jätät tyhjäksi, käytössä on noden yhteinen lähettäjä.",
+      "smtpActive": "Lähetys palvelimen {host} kautta",
+      "smtpInactive": "Käytössä noden yhteinen lähettäjä",
+      "smtpSave": "Tallenna asetukset",
+      "smtpSaved": "Lähettäjätiedot tallennettu.",
+      "smtpRemove": "Poista asetukset",
+      "smtpRemoved": "Lähettäjätiedot poistettu.",
+      "smtpConfirmRemove": "Poistetaanko asetukset? Yrityksen viestit lähtevät jatkossa taas noden yhteisen lähettäjän kautta.",
+      "smtp": {
+        "host": "Palvelin",
+        "port": "Portti",
+        "username": "Käyttäjätunnus",
+        "password": "Salasana",
+        "passwordKept": "Tallennettu — jätä tyhjäksi säilyttääksesi",
+        "fromAddress": "Lähettäjän osoite",
+        "fromName": "Lähettäjän nimi",
+        "replyTo": "Vastausosoite",
+        "secure": "TLS heti yhteydessä (portti 465)"
+      }
     }
   },
   "dev": {

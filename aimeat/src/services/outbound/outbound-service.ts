@@ -19,6 +19,8 @@
  * @structure OutboundError · ensureContact · recordBounce/optOut · sendOutbound
  * @usage const result = await sendOutbound(config, storage, ownerGhii, {...});
  * @version-history
+ *   v1.1.0 — 2026-08-07 — A company's own SMTP sender is resolved BEFORE the email-enabled
+ *     guard, so a company that brings its own server is not blocked by the node's being off.
  *   v1.0.0 — 2026-08-06 — Company-in-a-box phase 2.
  */
 import { randomUUID, randomBytes } from 'node:crypto';
@@ -33,6 +35,7 @@ import { emitChange } from '../../services/event-bus.js';
 import { renderInvoicePdf } from '../finance/invoice-pdf.js';
 import { buildFinvoiceXml } from '../finance/finvoice.js';
 import { requireOwnInvoice } from '../finance/invoice-service.js';
+import { resolveCompanySender, sendAsCompany } from '../company/company-smtp.js';
 
 export class OutboundError extends Error {
   constructor(public readonly code: string, public readonly statusCode: number, message: string) {
@@ -130,6 +133,12 @@ export interface SendInput {
   replyTo?: string;
   /** Display name on the email From header (envelope address stays the node's). */
   fromName?: string;
+  /**
+   * Send AS this registered company: when the company has its own SMTP identity the mail
+   * leaves through ITS server, from ITS domain. Without one, the node's shared sender is
+   * used — a fallback, not a failure.
+   */
+  companyId?: string;
 }
 
 export interface SendResult {
@@ -231,7 +240,12 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
   } else {
     channel = 'email';
     const emailSvc = getActiveEmailService();
-    if (!emailSvc?.enabled) {
+    // A company with its own SMTP does not need the node's shared transport configured:
+    // "the node cannot send" and "this company cannot send" are different facts.
+    const companySender = input.companyId
+      ? await resolveCompanySender(config, storage, ownerGhii, input.companyId)
+      : null;
+    if (!companySender && !emailSvc?.enabled) {
       status = 'failed';
       error = 'EMAIL_DISABLED';
     } else {
@@ -244,11 +258,21 @@ export async function sendOutbound(config: AimeatConfig, storage: Storage, owner
         ? `${body}\n\n--\nPeru tilaus / Unsubscribe: ${unsubscribeUrl}`
         : body;
       const { html, text } = outboundEmailHtml(subject, htmlBody, textBody, 'fi', input.fromName ? { brand: input.fromName } : undefined);
-      const ok = await emailSvc.sendWithAttachments(contact.email, subject, html, text, attachments, {
-        replyTo: input.replyTo, fromName: input.fromName,
-      });
-      status = ok ? 'sent' : 'failed';
-      if (!ok) error = 'SMTP_SEND_FAILED';
+      // A company's own sending identity wins over the node's shared sender.
+      if (companySender) {
+        const res = await sendAsCompany(companySender, contact.email, subject, html, text, attachments);
+        status = res.ok ? 'sent' : 'failed';
+        if (!res.ok) error = res.error;
+      } else if (emailSvc?.enabled) {
+        const ok = await emailSvc.sendWithAttachments(contact.email, subject, html, text, attachments, {
+          replyTo: input.replyTo, fromName: input.fromName,
+        });
+        status = ok ? 'sent' : 'failed';
+        if (!ok) error = 'SMTP_SEND_FAILED';
+      } else {
+        status = 'failed';
+        error = 'EMAIL_DISABLED';
+      }
     }
   }
 

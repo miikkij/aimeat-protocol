@@ -43342,6 +43342,65 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v1/companies/{id}/smtp:
+    get:
+      operationId: getCompanySmtp
+      tags: [Companies]
+      summary: Read the company's own sending identity
+      description: "The stored SMTP settings, or null when the company uses the node's shared sender. The password is NEVER returned in any form: the record carries only passwordSet (boolean)."
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: setCompanySmtp
+      tags: [Companies]
+      summary: Store the company's own sending identity
+      description: "Outbound messages sent with this company_id then leave through this server instead of the node's shared sender. The password is stored as AES-256-GCM ciphertext; a node without AIMEAT_ENCRYPTION_KEY REFUSES the write (503 NO_ENCRYPTION_KEY) rather than storing it in the clear. Omitting password on an update keeps the stored one."
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host, from_address]
+              properties:
+                host: { type: string, maxLength: 253 }
+                port: { type: integer, minimum: 1, maximum: 65535, default: 587 }
+                secure: { type: boolean, description: 'TLS on connect; defaults to true for port 465' }
+                username: { type: string, nullable: true }
+                password: { type: string, nullable: true, description: 'Write-only. Omit to keep the stored password.' }
+                from_address: { type: string, format: email }
+                from_name: { type: string, nullable: true }
+                reply_to: { type: string, format: email, nullable: true }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503':
+          description: This node cannot store an SMTP password (AIMEAT_ENCRYPTION_KEY is unset)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+    delete:
+      operationId: deleteCompanySmtp
+      tags: [Companies]
+      summary: Remove the company's sending identity
+      description: "The company falls back to the node's shared sender."
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/companies/{id}/front-page:
     put:
       operationId: setCompanyFrontPage

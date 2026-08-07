@@ -4,6 +4,9 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.20.0 — 2026-08-07 — .pf-co-*: the SMTP section, and every --space-N in the pf-pnl/pf-co
+ *     blocks now carries a fallback — the variables are not defined on this theme, so the two
+ *     tabs were laying out with zero gaps and margins.
  *   v2.19.0 — 2026-08-06 — .wallet-rail-help*: expandable per-rail setup help (details/summary +
  *     numbered steps + external links) under the Card and Stablecoin payout rails in the wallet tab.
  *   v2.18.0 — 2026-07-28 — .ag-spend*: the spending limit on a connected app's card.
@@ -3583,15 +3586,15 @@
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-2);
-  padding-left: var(--space-3);
+  gap: var(--space-2, 0.5rem);
+  padding-left: var(--space-3, 0.75rem);
   border-left: 2px solid var(--border);
-  margin: var(--space-2) 0 var(--space-3);
+  margin: var(--space-2, 0.5rem) 0 var(--space-3, 0.75rem);
 }
 .access-cx-own-form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-2, 0.5rem);
   width: 100%;
 }
 
@@ -3601,44 +3604,55 @@
    in every single case. Grouping is not decoration; it was reading as a different feature. */
 .access-cx-add + .access-cx-add {
   border-top: 1px solid var(--border);
-  padding-top: var(--space-4);
-  margin-top: var(--space-4);
+  padding-top: var(--space-4, 1rem);
+  margin-top: var(--space-4, 1rem);
 }
 
 /* ── P&L tab (pf-pnl) — company-in-a-box phase 7 ─────────────────────────── */
-.pf-pnl-controls { display: flex; gap: var(--space-3); align-items: flex-end; flex-wrap: wrap; margin-bottom: var(--space-4); }
+.pf-pnl-controls { display: flex; gap: var(--space-3, 0.75rem); align-items: flex-end; flex-wrap: wrap; margin-bottom: var(--space-4, 1rem); }
 .pf-pnl-controls label { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-dim); }
-.pf-pnl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4); }
-.pf-pnl-block { margin-bottom: var(--space-4); }
+.pf-pnl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: var(--space-4, 1rem); }
+.pf-pnl-block { margin-bottom: var(--space-4, 1rem); }
 .pf-pnl-table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
 .pf-pnl-table td { padding: 6px 8px; border-bottom: 1px solid var(--border); }
 .pf-pnl-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .pf-pnl-count { color: var(--text-dim); font-size: 0.85rem; white-space: nowrap; }
 .pf-pnl-total td { font-weight: 700; border-bottom: 0; border-top: 2px solid var(--text); }
-.pf-pnl-result { text-align: center; padding: var(--space-5); margin-bottom: var(--space-4); }
+.pf-pnl-result { text-align: center; padding: var(--space-5, 1.25rem); margin-bottom: var(--space-4, 1rem); }
 .pf-pnl-result-label { font-size: 0.85rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
 .pf-pnl-result-value { font-size: 2rem; font-weight: 700; margin: 4px 0; }
 .pf-pnl-result.pos .pf-pnl-result-value { color: var(--success, #1e7d45); }
 .pf-pnl-result.neg .pf-pnl-result-value { color: var(--danger, #b3372c); }
 .pf-pnl-vat { color: var(--text-dim); font-size: 0.9rem; }
-.pf-pnl-note, .pf-pnl-empty { color: var(--text-dim); font-size: 0.85rem; margin: var(--space-2) 0 0; }
+.pf-pnl-note, .pf-pnl-empty { color: var(--text-dim); font-size: 0.85rem; margin: var(--space-2, 0.5rem) 0 0; }
 .pf-pnl-error { color: var(--danger, #b3372c); }
 
 /* ── Companies tab (pf-co) — the company registry + co addresses ─────────── */
-.pf-co-row { display: flex; gap: var(--space-3); align-items: flex-end; flex-wrap: wrap; margin: var(--space-3) 0; }
+.pf-co-row { display: flex; gap: var(--space-3, 0.75rem); align-items: flex-end; flex-wrap: wrap; margin: var(--space-3, 0.75rem) 0; }
 .pf-co-field { display: flex; flex-direction: column; gap: 4px; font-size: 0.85rem; color: var(--text-dim); flex: 1; min-width: 180px; }
-.pf-co-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3); }
+.pf-co-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: var(--space-3, 0.75rem); }
 .pf-co-preview { font-size: 0.9rem; color: var(--text-dim); margin: 0; }
 .pf-co-preview code { background: var(--bg-dim); padding: 2px 6px; border-radius: 4px; }
-.pf-co-badge { display: inline-block; margin-left: var(--space-2); padding: 1px 8px; border-radius: 99px; font-size: 0.75rem; border: 1px solid var(--border); }
+/* The card body stacks three titled sections; without this the headings sit flush against the
+   button row above them and the sections read as one undivided wall of fields. */
+.pf-co-body > .pf-co-row { margin-top: var(--space-3, 0.75rem); }
+/* Deleting a company frees its public address, so it is fenced off from the save buttons above
+   rather than sitting one gap below them where a mis-aimed click lands. */
+.pf-co-danger-row { border-top: 1px solid var(--border); padding-top: var(--space-4, 1rem); margin-top: var(--space-5, 1.25rem) !important; }
+/* The checkbox has no input box of its own, so it is pinned to the bottom of its grid cell to
+   land on the same line as the text inputs beside it instead of floating mid-cell. */
+.pf-co-check { flex-direction: row; align-items: center; gap: var(--space-2, 0.5rem); align-self: end; padding-bottom: 6px; }
+.pf-co-check input { width: auto; }
+.pf-co-badge { display: inline-block; margin-left: var(--space-2, 0.5rem); padding: 1px 8px; border-radius: 99px; font-size: 0.75rem; border: 1px solid var(--border); }
 .pf-co-badge.free { border-color: var(--success, #1e7d45); color: var(--success, #1e7d45); }
 .pf-co-badge.taken { border-color: var(--danger, #b3372c); color: var(--danger, #b3372c); }
-.pf-co-card { margin-bottom: var(--space-3); }
-.pf-co-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); cursor: pointer; flex-wrap: wrap; }
+.pf-co-card { margin-bottom: var(--space-3, 0.75rem); }
+.pf-co-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3, 0.75rem); cursor: pointer; flex-wrap: wrap; }
 .pf-co-address { font-size: 0.88rem; margin-top: 2px; }
 .pf-co-address a { color: var(--accent, #E8564A); }
 .pf-co-serving { font-size: 0.82rem; color: var(--text-dim); }
-.pf-co-body { border-top: 1px solid var(--border); margin-top: var(--space-3); padding-top: var(--space-3); }
-.pf-co-body h4 { margin: var(--space-3) 0 2px; font-size: 0.95rem; }
+.pf-co-body { border-top: 1px solid var(--border); margin-top: var(--space-3, 0.75rem); padding-top: var(--space-3, 0.75rem); }
+.pf-co-body h4 { margin: var(--space-5, 1.25rem) 0 2px; font-size: 0.95rem; }
+.pf-co-body h4:first-child { margin-top: 0; }
 .pf-co-hint, .pf-co-muted { color: var(--text-dim); font-size: 0.85rem; }
 .pf-co-error { color: var(--danger, #b3372c); }

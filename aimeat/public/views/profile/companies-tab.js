@@ -6,6 +6,7 @@
  *   what the address serves: one of your own published apps, a redirect, or nothing yet.
  *   Live: re-fetches on the aimeat-live-update event when the companies domain ticks.
  * @version-history
+ *   v1.1.0 — 2026-08-07 — SmtpSection: the company's own sending identity (write-only password).
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
  */
 import { h } from 'preact';
@@ -90,6 +91,105 @@ function CreateForm({ onCreated, showToast }) {
           </span>`}
         </p>
       `}
+    </div>
+  `;
+}
+
+/**
+ * A company's own sending identity. The password is write-only by design: the server never
+ * returns it, so the field starts empty and an empty field on save means "keep the stored one".
+ * The badge tells the user whether one is stored, which is the only thing they need to know.
+ */
+function SmtpSection({ company, showToast }) {
+  const [smtp, setSmtp] = useState(null);
+  const [loaded, setLoaded] = useState(false);
+  const [form, setForm] = useState({ host: '', port: '587', secure: false, username: '', password: '', from_address: '', from_name: '', reply_to: '' });
+  const [busy, setBusy] = useState(false);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await apiGet(`/v1/companies/${company.id}/smtp`);
+      const row = res?.data?.smtp ?? null;
+      setSmtp(row);
+      if (row) {
+        setForm({
+          host: row.host ?? '', port: String(row.port ?? 587), secure: !!row.secure,
+          username: row.username ?? '', password: '',
+          from_address: row.fromAddress ?? '', from_name: row.fromName ?? '', reply_to: row.replyTo ?? '',
+        });
+      }
+    } catch (e) { showToast?.(e?.message || String(e), 'error'); }
+    setLoaded(true);
+  }, [company.id, showToast]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const save = useCallback(async () => {
+    setBusy(true);
+    try {
+      const body = {
+        host: form.host.trim(), port: parseInt(form.port, 10) || 587, secure: !!form.secure,
+        username: form.username.trim() || null,
+        from_address: form.from_address.trim(),
+        from_name: form.from_name.trim() || null,
+        reply_to: form.reply_to.trim() || null,
+      };
+      if (form.password) body.password = form.password;
+      const res = await apiPut(`/v1/companies/${company.id}/smtp`, body);
+      setSmtp(res?.data?.smtp ?? null);
+      setForm((prev) => ({ ...prev, password: '' }));
+      showToast?.(t('profile.companies.smtpSaved'), 'success');
+    } catch (e) { showToast?.(e?.message || String(e), 'error'); }
+    setBusy(false);
+  }, [company.id, form, showToast]);
+
+  const remove = useCallback(async () => {
+    if (!confirm(t('profile.companies.smtpConfirmRemove'))) return;
+    setBusy(true);
+    try {
+      await apiDelete(`/v1/companies/${company.id}/smtp`);
+      setSmtp(null);
+      setForm({ host: '', port: '587', secure: false, username: '', password: '', from_address: '', from_name: '', reply_to: '' });
+      showToast?.(t('profile.companies.smtpRemoved'), 'success');
+    } catch (e) { showToast?.(e?.message || String(e), 'error'); }
+    setBusy(false);
+  }, [company.id, showToast]);
+
+  const set = (k) => (e) => { const v = e.target.type === 'checkbox' ? e.target.checked : e.target.value; setForm((prev) => ({ ...prev, [k]: v })); };
+
+  if (!loaded) return html`<p class="pf-co-hint">${t('common.loading')}</p>`;
+
+  return html`
+    <h4>${t('profile.companies.smtpTitle')}</h4>
+    <p class="pf-co-hint">${t('profile.companies.smtpHint')}</p>
+    <p class="pf-co-hint">
+      ${smtp
+        ? html`<span class="pf-co-badge free">${t('profile.companies.smtpActive').replace('{host}', smtp.host)}</span>`
+        : html`<span class="pf-co-badge">${t('profile.companies.smtpInactive')}</span>`}
+    </p>
+    <div class="pf-co-grid">
+      <label class="pf-co-field"><span>${t('profile.companies.smtp.host')}</span>
+        <input value=${form.host} placeholder="smtp.example.com" onInput=${set('host')} /></label>
+      <label class="pf-co-field"><span>${t('profile.companies.smtp.port')}</span>
+        <input value=${form.port} inputmode="numeric" onInput=${set('port')} /></label>
+      <label class="pf-co-field"><span>${t('profile.companies.smtp.username')}</span>
+        <input value=${form.username} autocomplete="off" onInput=${set('username')} /></label>
+      <label class="pf-co-field"><span>${t('profile.companies.smtp.password')}</span>
+        <input type="password" value=${form.password} autocomplete="new-password"
+               placeholder=${smtp?.passwordSet ? t('profile.companies.smtp.passwordKept') : ''}
+               onInput=${set('password')} /></label>
+      <label class="pf-co-field"><span>${t('profile.companies.smtp.fromAddress')}</span>
+        <input value=${form.from_address} placeholder="laskutus@yritys.fi" onInput=${set('from_address')} /></label>
+      <label class="pf-co-field"><span>${t('profile.companies.smtp.fromName')}</span>
+        <input value=${form.from_name} onInput=${set('from_name')} /></label>
+      <label class="pf-co-field"><span>${t('profile.companies.smtp.replyTo')}</span>
+        <input value=${form.reply_to} onInput=${set('reply_to')} /></label>
+      <label class="pf-co-field pf-co-check"><span>${t('profile.companies.smtp.secure')}</span>
+        <input type="checkbox" checked=${form.secure} onChange=${set('secure')} /></label>
+    </div>
+    <div class="pf-co-row">
+      <button class="btn-primary" disabled=${busy} onClick=${save}>${t('profile.companies.smtpSave')}</button>
+      ${smtp && html`<button class="btn-outline" disabled=${busy} onClick=${remove}>${t('profile.companies.smtpRemove')}</button>`}
     </div>
   `;
 }
@@ -205,6 +305,11 @@ function CompanyCard({ company, apps, onChanged, showToast }) {
           </div>
           <div class="pf-co-row">
             <button class="btn-primary" disabled=${busy} onClick=${saveIdentity}>${t('profile.companies.save')}</button>
+          </div>
+
+          <${SmtpSection} company=${company} showToast=${showToast} />
+
+          <div class="pf-co-row pf-co-danger-row">
             <button class="btn-danger" disabled=${busy} onClick=${remove}>${t('profile.companies.delete')}</button>
           </div>
         </div>

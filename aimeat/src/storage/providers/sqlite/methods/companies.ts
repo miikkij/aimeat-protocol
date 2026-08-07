@@ -11,6 +11,7 @@ import type { CompanyRepository } from '../../../repositories/company.repository
 import type {
   CompanyRecord, CompanyQuery, CompanyStatus, CompanyFrontPageKind,
 } from '../../../../models/company-schemas.js';
+import type { CompanySmtpRecord } from '../../../../models/company-smtp-schemas.js';
 import type { SqliteStorage } from '../index.js';
 
 type Row = Record<string, unknown>;
@@ -111,6 +112,43 @@ export const companyMethods: CompanyRepository & ThisType<SqliteStorage> = {
 
   async deleteCompany(this: SqliteStorage, id: string): Promise<boolean> {
     const r = this.db.prepare('DELETE FROM companies WHERE id = ?').run(id);
+    return r.changes > 0;
+  },
+
+  async setCompanySmtp(this: SqliteStorage, row: CompanySmtpRecord): Promise<void> {
+    this.db.prepare(`
+      INSERT INTO company_smtp (companyId, ownerGhii, host, port, secure, username, passwordEnc,
+                                fromAddress, fromName, replyTo, createdAt, updatedAt)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+      ON CONFLICT(companyId) DO UPDATE SET
+        ownerGhii = excluded.ownerGhii, host = excluded.host, port = excluded.port,
+        secure = excluded.secure, username = excluded.username, passwordEnc = excluded.passwordEnc,
+        fromAddress = excluded.fromAddress, fromName = excluded.fromName,
+        replyTo = excluded.replyTo, updatedAt = excluded.updatedAt
+    `).run(
+      row.companyId, row.ownerGhii, row.host, row.port, row.secure ? 1 : 0,
+      row.username, row.passwordEnc, row.fromAddress, row.fromName, row.replyTo,
+      row.createdAt, row.updatedAt,
+    );
+  },
+
+  async getCompanySmtp(this: SqliteStorage, companyId: string): Promise<CompanySmtpRecord | undefined> {
+    const r = this.db.prepare('SELECT * FROM company_smtp WHERE companyId = ?').get(companyId) as Row | undefined;
+    if (!r) return undefined;
+    return {
+      companyId: r.companyId as string, ownerGhii: r.ownerGhii as string,
+      host: r.host as string, port: Number(r.port), secure: Number(r.secure) === 1,
+      username: (r.username as string | null) ?? null,
+      passwordEnc: (r.passwordEnc as string | null) ?? null,
+      fromAddress: r.fromAddress as string,
+      fromName: (r.fromName as string | null) ?? null,
+      replyTo: (r.replyTo as string | null) ?? null,
+      createdAt: r.createdAt as string, updatedAt: r.updatedAt as string,
+    };
+  },
+
+  async deleteCompanySmtp(this: SqliteStorage, companyId: string): Promise<boolean> {
+    const r = this.db.prepare('DELETE FROM company_smtp WHERE companyId = ?').run(companyId);
     return r.changes > 0;
   },
 };

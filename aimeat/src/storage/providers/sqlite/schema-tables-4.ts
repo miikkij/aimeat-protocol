@@ -211,5 +211,26 @@ export function applySchemaTables4(db: Database.Database): void {
     CREATE UNIQUE INDEX IF NOT EXISTS idx_companies_slug ON companies(lower(slug));
     CREATE INDEX IF NOT EXISTS idx_companies_owner ON companies(ownerGhii, createdAt);
 
+    -- A company's own sending identity for the outbound door: its own table because most
+    -- companies never set one, so "sends as itself" is a presence question rather than a
+    -- nullable-column one. passwordEnc is AES-256-GCM ciphertext (services/encryption.ts):
+    -- a password is never stored in the clear, and without an encryption key the node
+    -- refuses to store one at all.
+    CREATE TABLE IF NOT EXISTS company_smtp (
+      companyId   TEXT PRIMARY KEY,
+      ownerGhii   TEXT NOT NULL,
+      host        TEXT NOT NULL,
+      port        INTEGER NOT NULL DEFAULT 587,
+      secure      INTEGER NOT NULL DEFAULT 0,
+      username    TEXT,
+      passwordEnc TEXT,
+      fromAddress TEXT NOT NULL,
+      fromName    TEXT,
+      replyTo     TEXT,
+      createdAt   TEXT NOT NULL,
+      updatedAt   TEXT NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_company_smtp_owner ON company_smtp(ownerGhii);
+
   `);
 }
