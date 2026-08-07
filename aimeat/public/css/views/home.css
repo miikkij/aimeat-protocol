@@ -231,3 +231,29 @@
   .koti-actions > * { width: 100%; }
   .koti-prompt-head > * { width: 100%; }
 }
+
+/* ── Branch B: the screen that must not read as an insult ── */
+/* Warm border, not a danger one. The person did nothing wrong; their tool has a limit. */
+.koti-b { border-color: var(--warn); }
+.koti-b .koti-step-num { border-color: var(--warn); color: var(--warn); }
+
+.koti-b-way, .koti-b-again {
+  margin-top: 1.4rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+}
+.koti-b-way-title { font-size: 1.02rem; font-weight: 700; margin: 0 0 0.4rem; }
+.koti-b-way-body { color: var(--text-dim); font-size: 0.96rem; line-height: 1.55; margin: 0 0 1rem; }
+
+.koti-b-apps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.7rem; }
+.koti-b-app {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-dim);
+  padding: 0.75rem 0.9rem;
+}
+.koti-b-app-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+.koti-b-app-name { font-weight: 700; font-size: 0.98rem; }
+/* The plan line is the single most common reason a setup fails, so it is not a footnote. */
+.koti-b-app-plans { margin: 0.35rem 0 0; font-size: 0.88rem; color: var(--text-dim); line-height: 1.5; }
+.koti-b-app-docs { display: inline-block; margin-top: 0.4rem; font-size: 0.85rem; }

@@ -131,6 +131,8 @@ async function recordAiDetection(
     fields: { model: string | null; vendor: string | null; client: string | null },
     resolution: AiClientResolution,
     source: 'meta' | 'asked',
+    hasPaidPlan?: boolean,
+    supersedes = false,
 ): Promise<void> {
     await recordAiModelDetected(ctx.storage, ctx.config, owner, {
         model: fields.model,
@@ -142,6 +144,8 @@ async function recordAiDetection(
         // The unmatched name is the list from which the alias map grows.
         unknownClient: resolution.kind === 'unknown' ? resolution.claim : null,
         resolvedClient: resolution.kind === 'known' ? resolution.id : null,
+        hasPaidPlan: typeof hasPaidPlan === 'boolean' ? hasPaidPlan : null,
+        supersedes,
     });
 }
 
@@ -200,7 +204,9 @@ export function registerWelcomeMatRoutes(router: Router, ctx: HomeRouteCtx): voi
         // deliberately not obeyed: models are confident about capabilities they do not have.
         const resolution = resolveAiClient(parsed.meta.client);
         const decision = decideBranch(resolution);
-        await recordAiDetection(ctx, owner, parsed.meta, resolution, 'meta');
+        // A paste is a NEW mat, so it replaces whatever was known — including a stale paid-tier
+        // answer about the app they used last time.
+        await recordAiDetection(ctx, owner, parsed.meta, resolution, 'meta', undefined, true);
         await recordBranch(ctx, owner, decision);
 
         const state = await readHomeState(storage, config, owner);
@@ -253,7 +259,7 @@ export function registerWelcomeMatRoutes(router: Router, ctx: HomeRouteCtx): voi
             model: state.ai?.model ?? null,
             vendor: state.ai?.vendor ?? null,
             client: clientAnswer ?? state.ai?.client ?? null,
-        }, base, 'asked');
+        }, base, 'asked', hasPaidPlan);
         await recordBranch(ctx, owner, decision);
 
         res.json(success(config.nodeId, {

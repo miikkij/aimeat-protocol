@@ -8856,6 +8856,22 @@
       "dtId": "Tunniste",
       "dtSince": "Kytketty",
       "manage": "Hallitse mitä se saa tehdä"
+    },
+    "branchB": {
+      "title": "Tervetuloamattosi on valmis",
+      "lede": "Teit sen {app}-sovelluksella. Se osaa kirjoittaa, mutta se ei osaa vielä avata yhteyttä kotiisi, joten seuraava askel tarvitsee toisen sovelluksen.",
+      "why": "Yhteys tarkoittaa sitä, että tekoäly voi lukea ja kirjoittaa asioita kotiisi itse, eikä sinun tarvitse kopioida tekstiä edestakaisin. Se on tämän paikan perusta: kaikki mitä täällä tehdään tehdään tekoälyllä, joten ilman yhteyttä kotisi ei valmistu.",
+      "thatApp": "sovellus jota käytit",
+      "wayTitle": "Ota käyttöön tekoälysovellus joka osaa avata yhteyden",
+      "wayBody": "Osa tekoälysovelluksista osaa tämän suoraan. Ne ovat maksullisia, tyypillisesti noin 20 dollaria kuussa. Jos käytät tekoälyä joka päivä, tämä on se mitä tarvitset.",
+      "recommended": "Hyvä ensimmäiseksi",
+      "theirDocs": "Heidän omat ohjeensa",
+      "againTitle": "Tee sitten matto uudestaan sillä",
+      "againBody": "Sama kehote, uusi sovellus. Liitä sen vastaus tähän, niin jatketaan siitä. Ensimmäinen mattosi säilyy kunnes tämä korvaa sen.",
+      "submit": "Tässä on uusi",
+      "stillB": "Sekään ei osaa avata yhteyttä. Yllä oleva lista on se tarkistettu — sovelluksen pitää olla siitä.",
+      "ledePlan": "{app} teki sen, ja {app} osaa avata yhteyden kotiisi — mutta vain maksullisilla tasoillaan, etkä sinun mukaasi ole niillä. Seuraava askel tarvitsee siis joko sen tason tai toisen sovelluksen.",
+      "yours": "Se jota jo käytät"
     }
   }
 }

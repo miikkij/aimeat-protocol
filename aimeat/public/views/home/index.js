@@ -26,14 +26,15 @@ import { useSession } from '/js/use-session.js';
 import { Spinner } from '/components/Spinner.js';
 import { StepMat, StepMatDone } from '/views/home/step-mat.js';
 import { StepAgent, AgentCard } from '/views/home/step-agent.js';
+import { StepBranchB } from '/views/home/step-branch-b.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
-/** The three steps, named. Step 3 only ever belongs to branch B; on A there are two. */
+/** The steps, named. `better-app` exists only on branch B; on A there are two, not three. */
 const STEP_TITLES = {
   'welcome-mat': ['home.step1', 'Your welcome mat'],
+  'better-app': ['home.step2b', 'Get an app that can connect'],
   'first-agent': ['home.step2', 'Connect your first agent'],
-  'hello-mcp': ['home.step3', 'Connect your first agent'],
 };
 
 /** A step that is named so the person knows it is coming, and dimmed so they cannot start it. */
@@ -144,8 +145,10 @@ export default function HomeView({ navigate }) {
   }
 
   const step = state.step;
-  // Branch B renames step 2 and moves the agent to step 3; on A there are two steps, not three.
-  const isBranchB = state.branch === 'B';
+  // Branch B inserts a step: get an app that can connect, which pushes the agent to number 3.
+  // It is driven by needsBetterApp (live) rather than by branch (write-once, historical), so
+  // re-pasting a mat from a capable app collapses this step by itself.
+  const onBranchB = state.needsBetterApp || (state.branch === 'B' && !state.mat.done);
 
   return html`
     <div class="koti">
@@ -158,24 +161,20 @@ export default function HomeView({ navigate }) {
             : html`<${StepMatDone} state=${state} />`}
         </li>
         <li>
-          ${step === 'welcome-mat'
-            ? html`<${DimmedStep}
-                n="2"
-                titleKey=${isBranchB ? 'home.step2b' : 'home.step2'}
-                fallback=${isBranchB ? 'Get an app that can connect' : 'Connect your first agent'}
-                note=${tr('home.step2Dim', 'Opens once your welcome mat is up.')} />`
-            : step === 'first-agent'
+          ${step === 'better-app'
+            ? html`<${StepBranchB} state=${state} onChanged=${onMatDone} />`
+            : step === 'first-agent' && !onBranchB
               ? html`<${StepAgent} onChanged=${load} showToast=${showToast} />`
               : html`<${DimmedStep}
                   n="2"
-                  titleKey=${STEP_TITLES[step]?.[0] ?? 'home.step2'}
-                  fallback=${STEP_TITLES[step]?.[1] ?? 'Connect your first agent'}
-                  note=${tr('home.step2Soon', 'This is the next thing.')} />`}
+                  titleKey=${onBranchB ? 'home.step2b' : (STEP_TITLES[step]?.[0] ?? 'home.step2')}
+                  fallback=${onBranchB ? 'Get an app that can connect' : (STEP_TITLES[step]?.[1] ?? 'Connect your first agent')}
+                  note=${tr('home.step2Dim', 'Opens once your welcome mat is up.')} />`}
         </li>
-        ${isBranchB && html`
+        ${onBranchB && html`
           <li>
-            ${step === 'hello-mcp'
-              ? html`<${StepAgent} onChanged=${load} showToast=${showToast} stepNumber="3" />`
+            ${step === 'first-agent'
+              ? html`<${StepAgent} onChanged=${load} showToast=${showToast} />`
               : html`<${DimmedStep}
                   n="3"
                   titleKey="home.step3"

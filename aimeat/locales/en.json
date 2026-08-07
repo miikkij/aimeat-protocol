@@ -8856,6 +8856,22 @@
       "dtId": "Its identifier",
       "dtSince": "Connected",
       "manage": "Manage what it may do"
+    },
+    "branchB": {
+      "title": "Your welcome mat is done",
+      "lede": "You made it with {app}. It can write, but it cannot open a connection to your home yet, so the next step needs a different app.",
+      "why": "A connection means the AI can read and write things in your home itself, instead of you copying text back and forth. That is what this place is built on: everything here is done with an AI, so without a connection your home cannot be finished.",
+      "thatApp": "the app you used",
+      "wayTitle": "Take up an AI app that can open a connection",
+      "wayBody": "Some AI apps do this directly. They are paid, typically around 20 dollars a month. If you use an AI every day, this is the one you want.",
+      "recommended": "A good first one",
+      "theirDocs": "Their own instructions",
+      "againTitle": "Then make the mat again with it",
+      "againBody": "Same prompt, new app. Paste what it gives you here and we carry on from there. Your first mat stays until this one replaces it.",
+      "submit": "Here is the new one",
+      "stillB": "That one cannot open a connection either. The list above is the checked one — the app has to be from it.",
+      "ledePlan": "{app} made it, and {app} can open a connection to your home — but only on one of its paid plans, and you said you are not on one. So the next step needs either that plan or another app.",
+      "yours": "The one you already use"
     }
   }
 }

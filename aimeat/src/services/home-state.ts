@@ -30,15 +30,16 @@ import {
     ONBOARDING_KEYS, recordOnboardingEvent, type OnboardingTrack, type OnboardingBranch,
     type OnboardingRoom,
 } from './onboarding-funnel.js';
+import { resolveAiClient, decideBranch } from './ai-tool-setup.js';
 import { portfolioReadGaiis, PORTFOLIO_HTML_KEY, portfolioStandaloneUrl } from '../routes/portfolio.js';
 import { logger } from '../utils/logger.js';
 
 /**
- * The three steps, in the order the person meets them. Step 3 exists only on branch B, where it is
- * the same act as step 2 on branch A — "connect your first agent" — reached after the person has
- * remade the mat with an app that can. Named here so the UI never invents a fourth.
+ * The steps, in the order a person meets them. `better-app` exists only on branch B and is what
+ * pushes the agent connection to step 3 there; on branch A there are two steps, not three. Named
+ * here so no surface invents a fourth.
  */
-export const HOME_STEPS = ['welcome-mat', 'first-agent', 'hello-mcp'] as const;
+export const HOME_STEPS = ['welcome-mat', 'better-app', 'first-agent'] as const;
 export type HomeStep = typeof HOME_STEPS[number];
 
 export interface HomeState {
@@ -63,10 +64,20 @@ export interface HomeState {
         model: string | null;
         vendor: string | null;
         client: string | null;
+        /** The /v1/ai-tools id the claim resolved to, or null when nothing matched. */
+        resolvedClient: string | null;
         mcp: 'yes' | 'no' | 'unknown' | null;
         source: 'meta' | 'asked' | null;
     } | null;
+    /** How the account ARRIVED — the funnel's value, write-once, historical. */
     branch: OnboardingBranch | null;
+    /**
+     * Whether the person is STILL waiting on an app that can connect. Recomputed from what is
+     * currently known about their AI, never stored: `branch` is write-once and stays 'B' forever
+     * once they arrive that way, so reading it as "are they stuck?" would trap someone on the
+     * branch-B screen for good the moment they fixed the very thing it asked for.
+     */
+    needsBetterApp: boolean;
     agent: { name: string; gaii: string; connectedAt: string | null } | null;
     /** Whether an agent has written the proof key through its own MCP connection. */
     helloMcp: boolean;
@@ -132,13 +143,24 @@ export async function readHomeState(
     const branch = (typeof get(ONBOARDING_KEYS.branchTaken).branch === 'string'
         ? get(ONBOARDING_KEYS.branchTaken).branch as OnboardingBranch : null);
 
+    // Are they STILL waiting on an app that can connect? Re-decided from what is currently known
+    // about their AI, using the same function the paste used — so re-pasting with a capable app
+    // moves them on by itself, with no separate "I upgraded" claim to make and nothing to reset.
+    // Reading `branch === 'B'` instead would strand them: that marker is write-once.
+    const paidAnswer = typeof aiMark.has_paid_plan === 'boolean' ? aiMark.has_paid_plan as boolean : undefined;
+    const needsBetterApp = matHtmlExists
+        && decideBranch(resolveAiClient(str(aiMark, 'client')), { hasPaidPlan: paidAnswer }).branch === 'B';
+
     const state: HomeState = {
         owner,
         ghii,
         displayName: ghiiRecord?.displayName ?? null,
         track: track.track === 'remake' ? 'remake' : 'legacy',
         switched: typeof track.switched === 'number' ? track.switched : 0,
-        step: initialized ? null : !matHtmlExists ? 'welcome-mat' : branch === 'B' ? 'hello-mcp' : 'first-agent',
+        step: initialized ? null
+            : !matHtmlExists ? 'welcome-mat'
+                : needsBetterApp ? 'better-app'
+                    : 'first-agent',
         mat: {
             done: matHtmlExists,
             attempts: typeof matMark.attempts === 'number' ? matMark.attempts : 0,
@@ -152,10 +174,14 @@ export async function readHomeState(
                 vendor: str(aiMark, 'vendor'),
                 client: str(aiMark, 'client'),
                 mcp: aiMark.mcp === 'yes' || aiMark.mcp === 'no' || aiMark.mcp === 'unknown' ? aiMark.mcp : null,
+                // Which of the eight their claim resolved to, so a surface can point at THEIR app
+                // rather than re-deriving it from a label and getting a near-miss.
+                resolvedClient: str(aiMark, 'resolved_client'),
                 source: (aiMark.source === 'asked' ? 'asked' : aiMark.source === 'meta' ? 'meta' : null),
             }
             : null,
         branch,
+        needsBetterApp,
         agent,
         helloMcp,
         initialized,

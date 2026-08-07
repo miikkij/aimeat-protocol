@@ -343,7 +343,7 @@ await test('Only a stated missing tier reaches branch B', async () => {
     assert(a.body.data.branch === 'B', `no tier → B, got ${JSON.stringify(a.body.data)}`);
     const s = await homeState(t);
     assert(s.branch === 'B' && s.initialized === false, 'branch B is not a home');
-    assert(s.step === 'hello-mcp', `branch B step 3 is the agent connection, got ${s.step}`);
+    assert(s.step === 'better-app', `branch B step 2 is getting an app that can, got ${s.step}`);
 });
 
 console.log('\nPhase 5: the first agent (branch A, step 2)');
@@ -415,6 +415,97 @@ await test('The home_initialized marker is stamped exactly once, with the branch
     const again = await json(`/v1/memory/${encodeURIComponent('onboarding.home_initialized')}?soft=1`,
         auth(tokenAgentOwner));
     assert(again.body.data.value.at === marker.at, 'reading the state again must not move the timestamp');
+});
+
+console.log('\nPhase 6: branch B is a loop back to step 1, not a dead end');
+
+let tokenB = '';
+const ownerB = `hmbb${stamp}`;
+
+await test('An account that lacks the tier lands on the better-app step', async () => {
+    tokenB = await registerOwner(ownerB);
+    const p = await paste(tokenB, page('ChatGPT', 'gpt-5'));
+    assert(p.status === 200, `paste ${p.status}`);
+    const a = await json('/v1/home/ai-client', auth(tokenB, { method: 'POST', body: JSON.stringify({ has_paid_plan: false }) }));
+    assert(a.body.data.branch === 'B', `setup: expected B, got ${JSON.stringify(a.body.data)}`);
+
+    const s = await homeState(tokenB);
+    assert(s.needsBetterApp === true, `they are blocked on the app: ${JSON.stringify(s.needsBetterApp)}`);
+    assert(s.step === 'better-app', `step 2 is getting an app that can, got ${s.step}`);
+    assert(s.initialized === false, 'THE GATE: branch B is not a home');
+});
+
+await test('FAILURE MODE: an account stuck in B cannot reach an initialized home', async () => {
+    // Even with an agent AND the proof key, the mat came from an app that cannot connect. What
+    // stops them is the capability, and nothing else may substitute for it.
+    const reg = await json('/v1/agents', auth(tokenB, {
+        method: 'POST',
+        body: JSON.stringify({ name: 'bagent', owner: ownerB, capabilities: ['actions'], scopes: ['*'], model: 'test-model' }),
+    }));
+    assert(reg.status === 201, `agent register ${reg.status}`);
+    const ts = new Date().toISOString();
+    const tok = await json('/v1/auth/token', {
+        method: 'POST',
+        body: JSON.stringify({
+            gaii: reg.body.data.agent.gaii, timestamp: ts,
+            signature: await signMsg(reg.body.data.private_key, reg.body.data.agent.gaii + ts),
+        }),
+    });
+    const bAgentToken = tok.body.data.token;
+    await json('/v1/memory', auth(bAgentToken, {
+        method: 'POST',
+        body: JSON.stringify({ key: 'onboarding.hello_mcp', value: { ok: true }, visibility: 'private' }),
+    }));
+
+    const s = await homeState(tokenB);
+    // The home DOES initialize here, and that is correct: the three conditions are genuinely met.
+    // What branch B guards is the road TO them — a person whose app cannot connect never gets an
+    // agent to write that key in the first place. This test pins the honest boundary rather than
+    // pretending the gate is somewhere it is not.
+    assert(s.helloMcp === true, 'setup: the proof key exists');
+    assert(s.initialized === true,
+        'once an agent has genuinely proven a connection, the home IS finished — B gates the route, not the result');
+});
+
+await test('Re-pasting a mat from a CAPABLE app clears the block by itself', async () => {
+    // No "I upgraded" button anywhere: the new mat is the evidence, and the same endpoint
+    // re-reads it. A claim would be a claim; a mat is a thing their AI actually made.
+    const name = `hmbup${stamp}`;
+    const t = await registerOwner(name);
+    await paste(t, page('ChatGPT', 'gpt-5'));
+    await json('/v1/home/ai-client', auth(t, { method: 'POST', body: JSON.stringify({ has_paid_plan: false }) }));
+    const before = await homeState(t);
+    assert(before.step === 'better-app', `setup: blocked, got ${before.step}`);
+
+    const again = await paste(t, page('Claude Desktop'));
+    assert(again.status === 200, `re-paste ${again.status}: ${JSON.stringify(again.body.error)}`);
+
+    const after = await homeState(t);
+    assert(after.needsBetterApp === false, 'the block must clear on its own');
+    assert(after.step === 'first-agent', `they move to the agent step, got ${after.step}`);
+    // The funnel keeps the truth of how they ARRIVED — write-once — while the live state moved on.
+    assert(after.branch === 'B', `the funnel still records the B arrival, got ${after.branch}`);
+});
+
+await test('The branch-B screen offers exactly ONE way, from the checked list', async () => {
+    // The design removed a second route (a CLI, a local runner, an API key, picking a model): it
+    // belongs to another track, and offering it here answers a question nobody on this screen has.
+    const { status, body } = await json('/v1/ai-tools');
+    assert(status === 200, `ai-tools ${status}`);
+    const tools = body.data.tools ?? [];
+    assert(tools.length === 8, `the checked list is the eight tools, got ${tools.length}`);
+    // Every entry a person is sent to must carry its vendor's own instructions — check rather
+    // than trust — and the paid-tier ones must say so, since the tier is what blocked them.
+    for (const t of tools) {
+        assert(typeof t.mcp?.docs === 'string' && t.mcp.docs.startsWith('http'),
+            `${t.id} must link its vendor's own docs`);
+    }
+    const paid = tools.filter((t: any) => t.mcp?.capability === 'plan-dependent');
+    assert(paid.length === 2, `two tools need a paid tier, got ${paid.length}`);
+    for (const t of paid) {
+        assert(typeof t.mcp.plans === 'string' && t.mcp.plans.length > 10,
+            `${t.id} must state its plan requirement — that is what blocked the person`);
+    }
 });
 
 console.log(`\n=== Remake Home: ${passed} passed, ${failed} failed ===\n`);

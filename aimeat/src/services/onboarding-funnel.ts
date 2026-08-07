@@ -275,6 +275,17 @@ export interface AiDetection {
     /** An app name that matched nothing — the list the alias map grows from. */
     unknownClient?: string | null;
     resolvedClient?: string | null;
+    /**
+     * The person's answer to the paid-tier question, when their app needs one. Kept because the
+     * live "are they still blocked?" question has to be RECOMPUTED from what is known, and without
+     * this the recomputation would re-ask a question they already answered.
+     */
+    hasPaidPlan?: boolean | null;
+    /**
+     * A FRESH welcome mat, which replaces the record outright rather than deferring to whatever
+     * was there. See the ordering note on recordAiModelDetected.
+     */
+    supersedes?: boolean;
 }
 
 /**
@@ -295,7 +306,12 @@ export async function recordAiModelDetected(
     try {
         const existing = await storage.getMemory(gaii, ONBOARDING_KEYS.aiModelDetected);
         const prev = (existing?.value ?? null) as { source?: string } | null;
-        if (prev && !(detection.source === 'asked' && prev.source !== 'asked')) return;
+        // Ordering, weakest to strongest: a page's claim < the person's answer ABOUT that page <
+        // a NEW page. A fresh mat supersedes everything, because it is a new artifact made in a
+        // different app — this is the whole mechanism of branch B, where someone takes up an app
+        // that can connect and pastes a new mat. Without it, the stale "no, I have no paid tier"
+        // answer would outlive the app it was about and hold them on the branch-B screen forever.
+        if (prev && !detection.supersedes && !(detection.source === 'asked' && prev.source !== 'asked')) return;
         const now = new Date().toISOString();
         await storage.setMemory({
             key: ONBOARDING_KEYS.aiModelDetected,
@@ -305,6 +321,7 @@ export async function recordAiModelDetected(
                 mcp: detection.mcp, source: detection.source, at: now,
                 ...(detection.unknownClient ? { unknown_client: detection.unknownClient } : {}),
                 ...(detection.resolvedClient ? { resolved_client: detection.resolvedClient } : {}),
+                ...(typeof detection.hasPaidPlan === 'boolean' ? { has_paid_plan: detection.hasPaidPlan } : {}),
                 // What the page said, kept when the person's answer supersedes it — the gap
                 // between the two IS the measure of how much a model's self-report is worth.
                 ...(prev ? { superseded: prev } : {}),
