@@ -8159,7 +8159,13 @@
     "agentDoorCannot": "If it says it cannot, that is a fine answer. Register below instead.",
     "registerHome": "Register your home",
     "registerHomeSub": "If you do not have a way in yet.",
-    "signInHome": "Sign in to your home"
+    "signInHome": "Sign in to your home",
+    "homeBackTitle": "You are already home.",
+    "homeBackGo": "Go to your home",
+    "homeBackOnHome": "Everything you have made is there.",
+    "homeBackOnProfile": "Your profile, where you left it.",
+    "switchOnProfile": "You are using the old profile.",
+    "switchToHome": "Try the new home"
   },
   "pricing": {
     "title": "Pricing",

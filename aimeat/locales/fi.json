@@ -8159,7 +8159,13 @@
     "agentDoorCannot": "Jos se sanoo ettei pysty, se on ihan kelpo vastaus. Rekisteröidy silloin alta.",
     "registerHome": "Rekisteröi kotisi",
     "registerHomeSub": "Jos sinulla ei vielä ole pääsyä.",
-    "signInHome": "Kirjaudu kotiisi"
+    "signInHome": "Kirjaudu kotiisi",
+    "homeBackTitle": "Olet jo kotona.",
+    "homeBackGo": "Mene kotiisi",
+    "homeBackOnHome": "Kaikki mitä olet tehnyt on siellä.",
+    "homeBackOnProfile": "Profiilisi, siinä mihin sen jätit.",
+    "switchOnProfile": "Käytät vanhaa profiilia.",
+    "switchToHome": "Kokeile uutta kotia"
   },
   "pricing": {
     "title": "Hinnoittelu",

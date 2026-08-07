@@ -16,6 +16,8 @@
  *   v1.0.0 — 2026-07-19 — Extracted from src/routes/libs/auth-lib-part2/3.ts (SDK-libs migration Phase 3).
  *   v1.0.1 — 2026-07-25 — Fix: adopt the node's full locale dict when any key differs, so newer modal
  *     keys (email-step strings) missing from a host's opts.i18n no longer fall back to English.
+ *   v1.2.0 — 2026-08-08 — opts.tab opens straight on 'register', so a button that says "register"
+ *     no longer opens a sign-in form and leave the person to find the tab.
  *   v1.1.0 — 2026-08-07 — Split the single register-or-login form into Sign in / Create account tabs;
  *     the email field appears in Create account when the node's gate asks for it; Sign in accepts the
  *     account's verified email as the identifier. Measured problem: one form doing both jobs asked for
@@ -37,7 +39,10 @@ export function showLoginModal(opts, renderBtn) {
   // Which of the two tabs is showing. One modal, two separate jobs: signing in needs an identifier
   // and a password, creating an account needs a name to be known by and (on nodes with the email
   // gate) an address. Merging them into one form meant neither said what it wanted.
-  var tab = 'signin';
+  // A caller that already knows which job the person came to do can say so: a button reading
+  // "Register your home" opening a sign-in form is a small lie, and the person has to find the
+  // tab themselves. Anything other than 'register' keeps the previous behaviour.
+  var tab = opts.tab === 'register' ? 'register' : 'signin';
   // Remove existing modal
   const old = document.getElementById('aimeat-modal');
   if (old) old.remove();

@@ -345,6 +345,15 @@ a.koti-feed-line:hover { text-decoration: underline; }
 .koti-door-signin:hover { color: var(--accent); }
 .koti-keyhole { flex: none; }
 
+/* The switch, on the front door. It is the only place somebody sitting on the OLD profile can
+   find it: until now the control lived inside the new home, which you had to already be in. */
+.koti-door-switch {
+  margin-top: 1.1rem; padding-top: 1rem;
+  border-top: 1px solid var(--border);
+  display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap;
+  font-size: 0.88rem; color: var(--muted);
+}
+
 /* ── The header: a nameplate, and one way into the settings. ── */
 .koti-header {
   display: flex; align-items: center; justify-content: space-between; gap: 1rem;

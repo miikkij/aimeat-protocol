@@ -375,7 +375,7 @@
   function showLoginModal(opts, renderBtn) {
     var i = opts.i18n || {};
     var lang = currentModalLang();
-    var tab = "signin";
+    var tab = opts.tab === "register" ? "register" : "signin";
     const old = document.getElementById("aimeat-modal");
     if (old) old.remove();
     const modal = document.createElement("div");
