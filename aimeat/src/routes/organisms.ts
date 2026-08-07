@@ -102,6 +102,7 @@ import { registerOrganismCrudRoutes } from './organisms/crud.js';
 import { registerOrganismMembershipRoutes } from './organisms/membership.js';
 import { registerOrganismWorkspaceReadRoutes } from './organisms/workspace-read.js';
 import { registerOrganismWorkspaceAccessRoutes } from './organisms/workspace-access.js';
+import { inviteAcceptRouter } from './invite-accept.js';
 import { registerOrganismWorkspaceOpsRoutes } from './organisms/workspace-ops.js';
 import { registerOrganismGateRoutes } from './organisms/gates.js';
 import { registerOrganismIntakeRoutes } from './organisms/intake.js';
@@ -116,6 +117,9 @@ export function organismsRouter(config: AimeatConfig, storage: Storage): Router 
   registerOrganismMembershipRoutes(router, config, storage);
   registerOrganismWorkspaceReadRoutes(router, config, storage);
   registerOrganismWorkspaceAccessRoutes(router, config, storage, H);
+  // The PUBLIC invitation token flow. It serves organism AND node-level invitations, so it is a
+  // module of its own — mounted here because this is where the organism helper bag already lives.
+  router.use(inviteAcceptRouter(config, storage, { findWsEntry: H.findWsEntry }));
   registerOrganismWorkspaceOpsRoutes(router, config, storage, H);
   registerOrganismGateRoutes(router, config, storage, H);
   registerOrganismIntakeRoutes(router, config, storage, H);

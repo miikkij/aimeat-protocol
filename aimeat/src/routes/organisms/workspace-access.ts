@@ -27,20 +27,18 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AimeatConfig } from '../../config.js';
 import type { Storage, MemoryRecord } from '../../storage/interface.js';
 import { success, error } from '../../middleware/envelope.js';
-import { requireAuth, requireRole, requireRoleOrScope, optionalAuth } from '../../auth/middleware.js';
+import { requireAuth, requireRole, requireRoleOrScope } from '../../auth/middleware.js';
 import { rateLimit } from '../../middleware/rate-limit.js';
 import { resolveIdentity, parseGaiiLoose, isSameOwner, validateOwnerName } from '../../utils/gaii.js';
 import { authorizeRead } from '../../services/access-guard.js';
 import { emitChange } from '../../services/event-bus.js';
 import { notify } from '../../services/notify.js';
 import { hashPassword } from '../../services/password.js';
-import { validatePasswordStrength } from '../../utils/password-validation.js';
 import { provisionOwner, ProvisionEmailTakenError } from '../../services/owner-provisioning.js';
-import { establishOwnerSession } from '../../services/owner-session.js';
 import { getActiveEmailService } from '../../services/email.js';
 import { countWorkspaceInstances, latestWorkspaceEvent, aggregateParticipants } from '../../services/workspace-enrichment.js';
 import { isOrgManager } from '../../services/workspace-access.js';
-import { createEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, resolveInvitationReturnTarget, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
+import { createEmailInvitation, invitePublic, hashInviteToken, inviteEmailHash, normalizeOrgRole, normalizeWorkspaceGrants, applyInvitationWorkspaceGrants, InvitationError, INVITE_CODE_QUOTA_PER_MEMBER, INVITE_DEFAULT_EXPIRY_DAYS, INVITE_MAX_EXPIRY_DAYS } from '../../services/invitations.js';
 import type { InvitationRecord } from '../../storage/repositories/invitation.repository.js';
 import type { OrganismHelpers } from './shared.js';
 
@@ -528,6 +526,7 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
       organismId: id,
       orgRole,
       type: 'code',
+      meta: null,
       workspaces: wsGrants,
       email: cleanEmail,
       emailHash: inviteEmailHash(cleanEmail),
@@ -628,172 +627,4 @@ export function registerOrganismWorkspaceAccessRoutes(router: Router, config: Ai
     res.json(success(config.nodeId, { status: 'cancelled' }));
   });
 
-  /* GET /v1/invitations/:token — PUBLIC: invite details for the accept page (token carried in the URL).
-   * optionalAuth so a signed-in visitor gets a `viewer` verdict (does MY verified email match the
-   * invited address?) and the accept page can warn BEFORE the button instead of after a 403. */
-  router.get('/v1/invitations/:token', optionalAuth(), rateLimit({ max: 30, windowMs: 60_000 }), async (req, res) => {
-    const token = req.params.token as string;
-    const inv = await storage.getInvitationByHash(hashInviteToken(token));
-    if (!inv || inv.status === 'cancelled' || inv.type !== 'link') { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
-    if (inv.status === 'accepted') { res.status(410).json(error(config.nodeId, 'INVITE_USED', 'This invitation has already been accepted')); return; }
-    if (inv.status === 'expired' || new Date(inv.expiresAt) <= new Date()) {
-      if (inv.status === 'pending') await storage.updateInvitation(inv.id, { status: 'expired' });
-      res.status(410).json(error(config.nodeId, 'INVITE_EXPIRED', 'This invitation has expired'));
-      return;
-    }
-    const organism = await storage.getOrganism(inv.organismId);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-    const registered = !!(await storage.getGHIIByEmailHash(inv.emailHash));
-    const wsDisplay: Array<{ ws: string; name: string; role: string }> = [];
-    for (const g of inv.workspaces) {
-      const entry = await findWsEntry(inv.organismId, g.ws);
-      wsDisplay.push({ ws: g.ws, name: entry?.name || g.ws, role: g.role });
-    }
-    // Signed-in visitor: report whether accepting as THIS account is allowed (verified email matches),
-    // so the page shows the mismatch warning up front. Never leak the account's email — only a verdict.
-    let viewer: { owner: string; email_matches: boolean; has_verified_email: boolean } | undefined;
-    if (req.auth && req.auth.anonymous !== true) {
-      const owner = req.auth.owner as string;
-      const g = await storage.getGHII(`${owner}@${config.nodeId}`);
-      const hash = g?.emailVerifiedAt ? g.emailHash : undefined;
-      viewer = { owner, has_verified_email: !!hash, email_matches: !!hash && hash === inv.emailHash };
-    }
-    res.json(success(config.nodeId, {
-      invitation: {
-        email: inv.email,
-        org_role: inv.orgRole,
-        workspaces: wsDisplay,
-        message: inv.message,
-        invited_by: inv.invitedBy,
-        expires_at: inv.expiresAt,
-        registered,
-        organism: { id: organism.id, name: organism.name, description: organism.description, type: organism.type, visibility: organism.visibility },
-      },
-      viewer,
-    }));
-  });
-
-  /* POST /v1/invitations/:token/accept — PUBLIC: register (or use current session) + join org + workspaces */
-  router.post('/v1/invitations/:token/accept', optionalAuth(), rateLimit({ max: 10, windowMs: 10 * 60 * 1000 }), async (req, res) => {
-    const token = req.params.token as string;
-    const inv = await storage.getInvitationByHash(hashInviteToken(token));
-    if (!inv || inv.status === 'cancelled') { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
-    // Only magic-link invites are redeemable via a token. A 'code' invite provisions its account at
-    // mint time and its uuid tokenHash is never surfaced anywhere — defence in depth: refuse to run the
-    // grant-applying accept path against a code invite even if its token were somehow presented.
-    if (inv.type !== 'link') { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Invitation not found')); return; }
-    if (inv.status === 'accepted') { res.status(410).json(error(config.nodeId, 'INVITE_USED', 'This invitation has already been accepted')); return; }
-    if (inv.status === 'expired' || new Date(inv.expiresAt) <= new Date()) {
-      if (inv.status === 'pending') await storage.updateInvitation(inv.id, { status: 'expired' });
-      res.status(410).json(error(config.nodeId, 'INVITE_EXPIRED', 'This invitation has expired'));
-      return;
-    }
-    const organism = await storage.getOrganism(inv.organismId);
-    if (!organism) { res.status(404).json(error(config.nodeId, 'NOT_FOUND', 'Organism not found')); return; }
-
-    // Who is accepting: a real (non-anonymous) session, else create a fresh account from the register form.
-    const authed = req.auth && req.auth.anonymous !== true ? (req.auth.owner as string) : null;
-    let ownerName: string;
-    let createdAccount = false;
-    if (authed) {
-      ownerName = authed;
-      // RECIPIENT BINDING (invite-hijack guard): an invitation is a rights-bearing capability minted
-      // for one specific email (inv.emailHash). A signed-in session may absorb it ONLY when its OWN
-      // verified email matches that address — otherwise any logged-in visitor who opens the link would
-      // inherit the operator-curated org role + workspace grants. No match (or no verified email at
-      // all) → 403 and the invite is NOT consumed, so the right party can still use it. The legit
-      // "put this on my other account" case is served by the operator's direct-add / name-invite.
-      const acceptor = await storage.getGHII(`${ownerName}@${config.nodeId}`);
-      const acceptorHash = acceptor?.emailVerifiedAt ? acceptor.emailHash : undefined;
-      if (!acceptorHash || acceptorHash !== inv.emailHash) {
-        res.status(403).json(error(config.nodeId, 'EMAIL_MISMATCH',
-          'This invitation was sent to a different email address. Sign out and open the invitation link again, or ask the inviter to add your account directly.'));
-        return; // do NOT consume the invite
-      }
-    } else {
-      let { username } = req.body ?? {};
-      const { password, display_name, locale } = req.body ?? {};
-      if (!username || typeof username !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'username is required')); return; }
-      username = username.trim().toLowerCase();
-      if (username.includes('@')) username = username.split('@')[0];
-      const nameErr = validateOwnerName(username);
-      if (nameErr) { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', nameErr)); return; }
-      if (!password || typeof password !== 'string') { res.status(400).json(error(config.nodeId, 'INVALID_INPUT', 'password is required')); return; }
-      const pwErr = validatePasswordStrength(password);
-      if (pwErr) { res.status(400).json(error(config.nodeId, 'WEAK_PASSWORD', pwErr)); return; }
-      if (await storage.getOwner(username)) { res.status(409).json(error(config.nodeId, 'NAME_TAKEN', `Username "${username}" is already registered`)); return; }
-      const passwordHash = await hashPassword(password);
-      let owner;
-      try {
-        ({ owner } = await provisionOwner(storage, config, {
-          username,
-          displayName: (typeof display_name === 'string' && display_name.trim()) ? display_name.trim() : username,
-          passwordHash,
-          locale: typeof locale === 'string' ? locale : undefined,
-          verifiedEmail: inv.email, // the invite proves reachability → the new account's email is verified
-          enableMagicLink: true,
-        }));
-      } catch (e) {
-        // The invited email already backs an account — accept from THAT account, don't fork it.
-        if (!(e instanceof ProvisionEmailTakenError)) throw e;
-        res.status(409).json(error(config.nodeId, 'EMAIL_TAKEN',
-          'An account already exists for this email. Sign in with it, then open the invitation link again.'));
-        return; // do NOT consume the invite
-      }
-      ownerName = owner.name;
-      createdAccount = true;
-      emitChange('ghii');
-    }
-
-    // Join the organism: membership row + roster arrays kept in sync (mirrors the accept handler above).
-    const nowIso = new Date().toISOString();
-    const existingMembership = await storage.getMembership(inv.organismId, ownerName);
-    if (existingMembership) {
-      if (existingMembership.status !== 'active') {
-        await storage.updateMembership(existingMembership.id, { status: 'active', role: inv.orgRole, joinedAt: nowIso });
-      }
-    } else {
-      await storage.createMembership({
-        id: uuidv4(), organismId: inv.organismId, ghii: ownerName,
-        role: inv.orgRole, status: 'active', invitedBy: inv.invitedBy, joinedAt: nowIso,
-      });
-    }
-    const nextMembers = [...new Set([...organism.members, ownerName])];
-    const nextAdmins = inv.orgRole === 'admin' ? [...new Set([...organism.admins, ownerName])] : organism.admins;
-    await storage.updateOrganism(inv.organismId, { members: nextMembers, admins: nextAdmins, updatedAt: nowIso });
-
-    // Apply the workspace grants (resolve each workspace's creator = the consent owner — shared core).
-    const grantedWs = await applyInvitationWorkspaceGrants(storage, config, { orgId: inv.organismId, grants: inv.workspaces, grantee: ownerName, invitedBy: inv.invitedBy });
-
-    // Consume the invite (single-use) + tell the inviter.
-    await storage.updateInvitation(inv.id, { status: 'accepted', acceptedAt: nowIso, acceptedBy: ownerName });
-    await notify(storage, `${inv.invitedBy}@${config.nodeId}`, {
-      type: 'organism_invitation_accepted',
-      title: `${ownerName} accepted your invitation to "${organism.name}"`,
-      link: '/v1/profile#organisms',
-    });
-    emitChange('notifications');
-    emitChange('organisms');
-
-    // Log the accepting user straight in (fresh roles), so the SPA lands authenticated.
-    const ownerRecord = await storage.getOwner(ownerName);
-    const roles = ownerRecord?.roles ?? ['owner'];
-    const session = await establishOwnerSession(storage, config, req, res, { owner: ownerName, roles });
-
-    // Land the accepter on the inviter's chosen return target (e.g. back in the Experience Center
-    // app, already signed in), else inside the invited-to organism. Re-validate the stored value
-    // against the allowlist at redirect time — the security-critical open-redirect check.
-    const returnTarget = inv.returnUrl ? resolveInvitationReturnTarget(inv.returnUrl, config) : null;
-    res.set('Cache-Control', 'no-store');
-    res.json(success(config.nodeId, {
-      status: 'joined',
-      organism_id: inv.organismId,
-      created_account: createdAccount,
-      workspaces: grantedWs,
-      token: session.token,
-      expires_in: session.expiresIn,
-      // ?joined=1 = fresh join; the generic profile is what an invited member measurably bounced off (UX-remake v3, P8).
-      redirect: returnTarget ?? `/v1/profile?tab=organisms&org=${encodeURIComponent(inv.organismId)}&joined=1`,
-    }));
-  });
 }

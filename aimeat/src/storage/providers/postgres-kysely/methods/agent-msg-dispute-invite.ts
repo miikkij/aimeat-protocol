@@ -46,7 +46,7 @@ function toDispute(r: Selectable<Dispute>): DisputeRecord {
 
 function toInvitation(r: Selectable<Invitation>): InvitationRecord {
   return {
-    id: r.id, tokenHash: r.tokenHash, organismId: r.organismId,
+    id: r.id, tokenHash: r.tokenHash, organismId: r.organismId ?? null,
     orgRole: (r.orgRole ?? 'member') as InvitationRecord['orgRole'],
     type: (r.type ?? 'link') as InvitationRecord['type'],
     workspaces: (r.workspaces ?? []) as unknown as InvitationWorkspaceGrant[],
@@ -56,6 +56,7 @@ function toInvitation(r: Selectable<Invitation>): InvitationRecord {
     createdAt: iso(r.createdAt), expiresAt: iso(r.expiresAt),
     acceptedAt: isoOrNull(r.acceptedAt), acceptedBy: r.acceptedBy ?? null,
     returnUrl: r.returnUrl ?? null,
+    meta: (r.meta ?? null) as Record<string, unknown> | null,
   };
 }
 
@@ -203,6 +204,7 @@ export const invitationMethods = {
       message: rec.message ?? null, status: rec.status, createdAt: new Date(rec.createdAt),
       expiresAt: new Date(rec.expiresAt), acceptedAt: rec.acceptedAt ? new Date(rec.acceptedAt) : null,
       acceptedBy: rec.acceptedBy ?? null, returnUrl: rec.returnUrl ?? null,
+      meta: jsonb(rec.meta ?? null),
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } as any).execute();
   },
@@ -217,6 +219,12 @@ export const invitationMethods = {
   async listInvitationsByOrganism(this: PostgresKyselyStorage, organismId: string, opts?: { status?: InvitationRecord['status'] }): Promise<InvitationRecord[]> {
     let q = this.db.selectFrom('Invitation').selectAll().where('organismId', '=', organismId);
     if (opts?.status) q = q.where('status', '=', opts.status);
+    return (await q.orderBy('createdAt', 'desc').execute()).map(toInvitation);
+  },
+  async listInvitationsByEmailHash(this: PostgresKyselyStorage, emailHash: string, opts?: { status?: InvitationRecord['status']; type?: InvitationRecord['type'] }): Promise<InvitationRecord[]> {
+    let q = this.db.selectFrom('Invitation').selectAll().where('emailHash', '=', emailHash);
+    if (opts?.status) q = q.where('status', '=', opts.status);
+    if (opts?.type) q = q.where('type', '=', opts.type);
     return (await q.orderBy('createdAt', 'desc').execute()).map(toInvitation);
   },
   async countInvitationsByInviter(this: PostgresKyselyStorage, invitedBy: string, opts?: { organismId?: string; type?: InvitationRecord['type']; statuses?: InvitationRecord['status'][] }): Promise<number> {

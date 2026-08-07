@@ -18,6 +18,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import type { AimeatConfig } from '../config.js';
 import type { Storage, GHIIRecord, OwnerRecord } from '../storage/interface.js';
 import { generateKeyPair } from '../auth/keypair.js';
+import { logger } from '../utils/logger.js';
 
 /** SHA-256 hex of a normalized email — matches GHII.emailHash hashing everywhere else. */
 function emailHashOf(email: string): string {
@@ -129,6 +130,15 @@ export async function provisionOwner(
       timestamp: now,
     });
   }
+
+  // Which onboarding path this account was created on (05-mittaus.md). This is the SHARED
+  // account-creation core — invitation accept (including the agent door), OAuth sign-up and
+  // code-key provisioning all land here — so the marker belongs here rather than at each door.
+  // It was missing, and every account made through any of them read as `legacy`: created on the
+  // new path, invisible to its numbers, and quietly padding the old path's instead.
+  void import('./onboarding-funnel.js')
+    .then(m => m.recordTrack(storage, config, owner.name))
+    .catch(err => logger.warn('provisionOwner: track marker failed', { error: String(err) }));
 
   return { owner, ghii: ghiiRecord };
 }

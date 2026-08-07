@@ -28,6 +28,25 @@ export interface MatchSuggestion {
 
 const i18n: Record<string, Record<string, string>> = {
   en: {
+    regInviteSubject: 'Someone asked us to set up an AIMEAT account for this address',
+    regInviteHeading: 'An AI asked for an account here',
+    regInviteLead: 'An AI assistant asked AIMEAT to create an account for this email address. No account exists yet, and none will unless you press the button below.',
+    regInviteWhoHeading: 'Where the request came from',
+    regInviteClaimNote: 'The AI told us these about itself. We have no way to check them, so treat them as what it said rather than as fact:',
+    regInviteObservedNote: 'These we saw ourselves:',
+    regInviteFieldModel: 'Model',
+    regInviteFieldVendor: 'Made by',
+    regInviteFieldClient: 'App',
+    regInviteFieldIp: 'IP address',
+    regInviteFieldAgent: 'Browser / client',
+    regInviteFieldAt: 'Time',
+    regInviteUnstated: 'not stated',
+    regInviteButton: 'Continue and pick a username',
+    regInviteNoCode: 'There is no code to type. This link is the proof that the address is yours.',
+    regInviteFallback: 'If the button does not work, open this address:',
+    regInviteExpiry: 'The link works until',
+    regInviteIgnore: 'If you did not ask for this, do nothing. No account is created, and this address is not stored beyond the expiry above.',
+    regInviteReport: 'You can report misuse here:',
     verificationSubject: 'Your AIMEAT Verification Code',
     verificationHeading: 'Email Verification',
     verificationBody: 'Use the following code to verify your email address:',
@@ -81,6 +100,25 @@ const i18n: Record<string, Record<string, string>> = {
     footerUnsubscribe: 'Manage your notification settings in your AIMEAT profile.',
   },
   fi: {
+    regInviteSubject: 'Joku pyysi meitä luomaan AIMEAT-tilin tähän osoitteeseen',
+    regInviteHeading: 'Tekoäly pyysi tänne tiliä',
+    regInviteLead: 'Tekoälyavustaja pyysi AIMEATia luomaan tilin tähän sähköpostiosoitteeseen. Tiliä ei ole vielä olemassa, eikä sitä synny ellet paina alla olevaa nappia.',
+    regInviteWhoHeading: 'Mistä pyyntö tuli',
+    regInviteClaimNote: 'Nämä tekoäly kertoi itsestään. Emme voi tarkistaa niitä, joten ne ovat sen oma väite eivätkä tosiasia:',
+    regInviteObservedNote: 'Nämä näimme itse:',
+    regInviteFieldModel: 'Malli',
+    regInviteFieldVendor: 'Tekijä',
+    regInviteFieldClient: 'Sovellus',
+    regInviteFieldIp: 'IP-osoite',
+    regInviteFieldAgent: 'Selain tai asiakasohjelma',
+    regInviteFieldAt: 'Aika',
+    regInviteUnstated: 'ei kerrottu',
+    regInviteButton: 'Jatka ja valitse käyttäjänimi',
+    regInviteNoCode: 'Koodia ei tarvitse näppäillä. Tämä linkki on todiste siitä että osoite on sinun.',
+    regInviteFallback: 'Jos nappi ei toimi, avaa tämä osoite:',
+    regInviteExpiry: 'Linkki toimii',
+    regInviteIgnore: 'Jos et pyytänyt tätä, älä tee mitään. Tiliä ei synny, eikä tätä osoitetta säilytetä yllä mainitun voimassaolon jälkeen.',
+    regInviteReport: 'Voit ilmoittaa väärinkäytöstä täällä:',
     verificationSubject: 'AIMEAT-vahvistuskoodisi',
     verificationHeading: 'Sähköpostivahvistus',
     verificationBody: 'Käytä seuraavaa koodia sähköpostiosoitteesi vahvistamiseen:',
@@ -318,6 +356,90 @@ export function inviteEmailHtml(args: InviteEmailArgs, locale?: string): { html:
   ].join('\n');
 
   return { html, text };
+}
+
+export interface RegistrationInviteEmailArgs {
+  acceptUrl: string;
+  /** What the AI said about itself. Unverifiable, and labelled as such in the message. */
+  agent: { model?: string | null; vendor?: string | null; client?: string | null };
+  /** What the server saw. This is the part that makes the request traceable. */
+  observed: { ip: string; userAgent: string | null; at: string };
+  expiresLabel: string;
+  reportUrl: string;
+}
+
+/**
+ * The agent-door email (12-ai-rekisteroi.md).
+ *
+ * This message arrives unrequested, so its job is to be judgeable: it says an AI asked, shows what
+ * the AI claimed about itself SEPARATELY from what the server observed, and states plainly that
+ * doing nothing means no account is created. That separation is the whole design — an open
+ * endpoint that emails strangers becomes traceable rather than dangerous when every message writes
+ * a complete account of its own origin into the mailbox of the person it concerns.
+ *
+ * There is no code to type. The link IS the proof that the address belongs to whoever opened it.
+ */
+export function registrationInviteEmail(
+  args: RegistrationInviteEmailArgs, locale?: string,
+): { subject: string; html: string; text: string } {
+  const unstated = t(locale, 'regInviteUnstated');
+  const claimed: Array<[string, string]> = [
+    [t(locale, 'regInviteFieldModel'), args.agent.model || unstated],
+    [t(locale, 'regInviteFieldVendor'), args.agent.vendor || unstated],
+    [t(locale, 'regInviteFieldClient'), args.agent.client || unstated],
+  ];
+  const observed: Array<[string, string]> = [
+    [t(locale, 'regInviteFieldIp'), args.observed.ip],
+    [t(locale, 'regInviteFieldAgent'), args.observed.userAgent || unstated],
+    [t(locale, 'regInviteFieldAt'), args.observed.at],
+  ];
+  const rows = (pairs: Array<[string, string]>) => pairs
+    .map(([k, v]) => `<tr><td style="padding:4px 12px 4px 0;color:#777;font-size:13px;">${esc(k)}</td><td style="padding:4px 0;font-size:13px;"><code>${esc(v)}</code></td></tr>`)
+    .join('');
+
+  const html = wrapHtml(t(locale, 'regInviteHeading'), `
+    <p>${t(locale, 'regInviteLead')}</p>
+    <p style="text-align: center;">
+      <a href="${args.acceptUrl}" class="btn">${t(locale, 'regInviteButton')}</a>
+    </p>
+    <p style="font-size:13px;color:#999;">${t(locale, 'regInviteNoCode')}</p>
+    <p style="font-size:13px;color:#999;">${t(locale, 'regInviteExpiry')} ${esc(args.expiresLabel)}.</p>
+
+    <h3 style="font-size:15px;margin-top:24px;">${t(locale, 'regInviteWhoHeading')}</h3>
+    <p style="font-size:13px;color:#777;margin-bottom:4px;">${t(locale, 'regInviteClaimNote')}</p>
+    <table style="border-collapse:collapse;">${rows(claimed)}</table>
+    <p style="font-size:13px;color:#777;margin:12px 0 4px;">${t(locale, 'regInviteObservedNote')}</p>
+    <table style="border-collapse:collapse;">${rows(observed)}</table>
+
+    <p style="font-size: 13px; color: #999;">${t(locale, 'regInviteFallback')}</p>
+    <p class="url-fallback">${args.acceptUrl}</p>
+    <p style="color:#999;font-size:13px;">${t(locale, 'regInviteIgnore')}</p>
+    <p style="color:#999;font-size:13px;">${t(locale, 'regInviteReport')} <a href="${args.reportUrl}">${args.reportUrl}</a></p>
+  `, locale);
+
+  const text = [
+    t(locale, 'regInviteHeading'),
+    '',
+    t(locale, 'regInviteLead'),
+    '',
+    args.acceptUrl,
+    '',
+    t(locale, 'regInviteNoCode'),
+    `${t(locale, 'regInviteExpiry')} ${args.expiresLabel}.`,
+    '',
+    t(locale, 'regInviteWhoHeading'),
+    t(locale, 'regInviteClaimNote'),
+    ...claimed.map(([k, v]) => `  ${k}: ${v}`),
+    t(locale, 'regInviteObservedNote'),
+    ...observed.map(([k, v]) => `  ${k}: ${v}`),
+    '',
+    t(locale, 'regInviteIgnore'),
+    `${t(locale, 'regInviteReport')} ${args.reportUrl}`,
+    '',
+    `-- ${t(locale, 'footer')}`,
+  ].join('\n');
+
+  return { subject: t(locale, 'regInviteSubject'), html, text };
 }
 
 export interface KeyInviteEmailArgs {

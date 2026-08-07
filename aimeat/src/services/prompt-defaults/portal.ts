@@ -126,12 +126,24 @@ Step 1 — Identify Your Capabilities:
 - If you can only open/fetch GET URLs: You are Tier 0/0.5. You can browse public data. For writes, use micro-memory with access_code or ask your human for help.
 
 Step 2 — Connect to User:
-Ask your user: "Do you have a GHII account on this node? If yes, do you have a connectivity key to share with me?"
-- Has connectivity key: POST {{node_url}}/v1/agents/connect with { "connectivity_key": "<key from user>" }. You receive agent credentials (GAII + private key). Store the private key securely.
-- Has account, no key: Direct your user to generate a connectivity key from their profile page at {{node_url}}/v1/profile -> Agents section -> Generate Connectivity Key
-- No account: Direct your user to register a GHII identity at {{node_url}}/v1/portal
+Ask your user: "Do you already have an account on this node?"
 
-Step 3 — Authenticate:
+- YES, they have an account — become their agent by device authorization (RFC 8628):
+  1. POST {{node_url}}/v1/agents/device-authorize with { "agent_name": "<a short name for yourself>", "owner": "<their username>" }
+  2. Show them the user_code from the response. They approve it in their browser and choose what you may do.
+  3. Poll POST {{node_url}}/v1/agents/device-token every 5 seconds with { "device_code": "<device_code>", "grant_type": "urn:ietf:params:oauth:grant-type:device_code" } until it returns 200 with an access_token.
+  4. Prove the connection works: POST {{node_url}}/v1/memory with { "key": "onboarding.hello_mcp", "value": { "ok": true }, "visibility": "private" }. Until that key exists the connection is unverified and their home is not finished.
+
+- NO account yet — ask them for their EMAIL ADDRESS ONLY, then:
+  POST {{node_url}}/v1/registration-invites with { "email": "<the address they gave>", "agent": { "model": "<your model>", "vendor": "<who made you>", "client": "<the app you are running in>" } }
+  We email them a link. They press it, choose a username, and the account exists. There is no code for them to type, and you never choose the username — it is permanent, and they cannot see from a chat window whether one is free.
+  Tell them the message shows the IP address the call came from and which AI made it, so they can see it was you.
+  Then come back to the YES path and connect yourself as their agent.
+
+If you cannot make POST requests at all, say so plainly and immediately, and send them to {{node_url}}/v1/portal to register themselves. Do not describe what you would have done — they are waiting.
+
+Step 3 — Authenticate (only when you hold an agent KEYPAIR):
+Device authorization already handed you a token, so most agents skip this. It applies when you were registered via POST /v1/agents and hold a private key:
 1. GET {{node_url}}/v1/auth/challenge -> receive a challenge nonce
 2. Sign: Ed25519_sign(your_private_key, your_gaii + current_iso_timestamp)
 3. POST {{node_url}}/v1/auth/token with { "gaii": "your_gaii", "timestamp": "ISO string", "signature": "base64 signature" }

@@ -202,6 +202,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
   const rlFederation = Math.max(1, parseInt(process.env.AIMEAT_RL_FEDERATION ?? String(rlGlobal), 10));
   const rlCatalogue = Math.max(1, parseInt(process.env.AIMEAT_RL_CATALOGUE ?? String(rlGlobal), 10));
   const rlAuthChallenge = Math.max(1, parseInt(process.env.AIMEAT_RL_AUTH_CHALLENGE ?? String(rlGlobal), 10));
+  // The agent door: an OPEN endpoint that sends email to a stranger's address. Its window is an
+  // HOUR, not a second, and its default is deliberately small — a person's inbox is the thing
+  // being protected. Raised only where a test needs to make more calls than a human ever would.
+  const rlRegistrationInvites = Math.max(1, parseInt(process.env.AIMEAT_RL_REGISTRATION_INVITES ?? '5', 10));
 
   // ── Security posture (localhost-flexible → public-strict) ──
   // The profile sets safe DEFAULTS; any explicit AIMEAT_* var overrides it. Full rationale + the
@@ -702,6 +706,7 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
       federation: { windowMs: 1_000, max: rlFederation },
       catalogue: { windowMs: 1_000, max: rlCatalogue },
       authChallenge: { windowMs: 1_000, max: rlAuthChallenge },
+      registrationInvites: { windowMs: 3_600_000, max: rlRegistrationInvites },
       openrouter: { windowMs: 60_000, max: parseInt(process.env.AIMEAT_RL_OPENROUTER ?? '30', 10) },
       roleMultipliers: { operator: 10, owner: 2, agent: 1, anonymous: 0.5 },
     },

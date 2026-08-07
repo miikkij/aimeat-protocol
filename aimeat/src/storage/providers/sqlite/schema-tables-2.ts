@@ -116,7 +116,9 @@ export function applySchemaTables2(db: Database.Database): void {
     CREATE TABLE IF NOT EXISTS invitations (
       id               TEXT PRIMARY KEY,
       tokenHash        TEXT NOT NULL,
-      organismId       TEXT NOT NULL,
+      -- NULL for a NODE-level invitation (type 'registration'): the agent door invites someone
+      -- to the node itself, not to an organism.
+      organismId       TEXT,
       orgRole          TEXT NOT NULL DEFAULT 'member',
       type             TEXT NOT NULL DEFAULT 'link',
       workspaces       TEXT NOT NULL DEFAULT '[]',
@@ -130,7 +132,9 @@ export function applySchemaTables2(db: Database.Database): void {
       expiresAt        TEXT NOT NULL,
       acceptedAt       TEXT,
       acceptedBy       TEXT,
-      returnUrl        TEXT
+      returnUrl        TEXT,
+      -- Per-variant extras (registration: the AI's self-report + the server's observation).
+      meta             TEXT
     );
     CREATE INDEX IF NOT EXISTS idx_invitations_tokenHash ON invitations(tokenHash);
     CREATE INDEX IF NOT EXISTS idx_invitations_organismId ON invitations(organismId);

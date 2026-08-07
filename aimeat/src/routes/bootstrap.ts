@@ -47,6 +47,7 @@ import { substituteVariables, resolvePromptContent } from '../services/prompt-va
 import { prefersMarkdown, sendMarkdown, htmlToMarkdown, buildLandingMarkdown } from '../services/markdown-negotiation.js';
 import { buildSdkLibrariesList, buildLlmsPacksTable } from '../data/library-packs.js';
 import { sitemapPages } from '../data/public-pages.js';
+import { buildGettingStarted } from '../data/getting-started.js';
 import { apexOnly } from './agent-docs.js';
 import { serveSpa, resolvePublicFile } from './portal.js';
 import { logger } from '../utils/logger.js';
@@ -495,67 +496,7 @@ export function bootstrapRouter(
         full_api_spec: `${base}/v1/spec`,
       },
 
-      getting_started: {
-        instruction: bootstrapInstruction,
-
-        step_1_identify_your_capabilities: {
-          question: 'What can you do as an AI?',
-          options: [
-            { if: 'You can connect to MCP servers or use integrations/connectors', then: `Connect via MCP at ${base}/v1/mcp for the full built-in tool set, or ${base}/v2/mcp/agent for a focused owner-agent surface (see endpoints.connection_methods.mcp_connection.surfaces)` },
-            { if: 'You can make POST requests with custom headers (curl, code execution, fetch)', then: 'Use JWT auth flow — proceed to step_3_authenticate after connecting to your user' },
-            { if: 'You can only open/fetch GET URLs', then: 'You are Tier 0/0.5. You can browse public data. For writes, use micro-memory with access_code or ask your human for help.' },
-          ],
-        },
-
-        step_2_connect_to_user: {
-          question: 'Ask your user: "Do you have a GHII account on this node? If yes, do you have a connectivity key to share with me?"',
-          paths: {
-            has_connectivity_key: {
-              action: `POST ${base}/v1/agents/connect`,
-              body: '{ "connectivity_key": "<key from user>" }',
-              result: 'You receive agent credentials (GAII + private key). Store the private key securely — it cannot be retrieved again. You are now a registered agent under the user\'s identity.',
-              next: 'Authenticate via step_3_authenticate',
-            },
-            has_account_no_key: {
-              action: 'Direct your user to generate a connectivity key from their profile page',
-              url: `${base}/v1/profile → Agents section → Generate Connectivity Key`,
-              next: 'User shares the key with you, then follow the has_connectivity_key path',
-            },
-            no_account: {
-              action: 'Direct your user to register a GHII identity',
-              url: `${base}/v1/portal`,
-              note: 'User creates a GHII identity on the portal, then generates a connectivity key for you from their profile page',
-            },
-          },
-        },
-
-        ...(config.anonymousMode ? {
-          step_2b_anonymous: {
-            note: 'This node has anonymous mode enabled. Ask your user: "I noticed this node supports anonymous access too — would you like to use your GHII identity, or should we connect anonymously?"',
-            anonymous_flow: {
-              action: `POST ${base}/v1/auth/anonymous`,
-              result: 'JWT token for anonymous access. Memory keys are limited to the anonymous.* namespace.',
-              available_scopes: ['memory:read', 'memory:write', 'memory:delete', 'storage:read', 'storage:write', 'catalogue:read', 'social:read'],
-              note: 'Anonymous access is fully functional but scoped. You can read/write anonymous.* memory keys, browse the catalogue, read boards, and use storage.',
-            },
-          },
-        } : {}),
-
-        step_3_authenticate: {
-          description: 'After receiving credentials (via connectivity key or agent registration), authenticate to get a JWT:',
-          flow: [
-            `1. GET ${base}/v1/auth/challenge → receive a challenge nonce`,
-            '2. Sign: Ed25519_sign(your_private_key, your_gaii + current_iso_timestamp)',
-            `3. POST ${base}/v1/auth/token with { "gaii": "your_gaii", "timestamp": "ISO string", "signature": "base64 signature" }`,
-            '4. Receive JWT. Include in all future requests as: Authorization: Bearer <jwt>',
-          ],
-          token_lifetime: `24 hours. Refresh before expiry via POST ${base}/v1/auth/refresh`,
-        },
-
-        step_4_what_now: {
-          instruction: 'You are connected. Now help your user with what they want to accomplish. Browse the capability sections below to find the right endpoints. Each section groups related endpoints by purpose.',
-        },
-      },
+      getting_started: buildGettingStarted(base, bootstrapInstruction, config.anonymousMode),
 
       core_system: {
         description: 'The fundamental data layer every agent uses — memory, storage, wallet, actions, and work.',
@@ -580,8 +521,10 @@ export function bootstrapRouter(
           verification: { method: 'POST', url: '/v1/ghii/verify/*', description: 'EU Digital Identity (EUDIW) and FTN verification for Level 3 identity', tier: 1 },
           register_owner: { method: 'POST', url: '/v1/owners', description: 'Register owner identity programmatically (returns Ed25519 keypair)', tier: 0 },
           register_agent: { method: 'POST', url: '/v1/agents', description: 'Register an agent under an owner (requires owner JWT)', tier: 1 },
-          connect_agent: { method: 'POST', url: '/v1/agents/connect', description: 'Register an agent via connectivity key — no auth needed, key is single-use', tier: 0 },
-          connectivity_key: { method: 'POST', url: '/v1/auth/connectivity-key', description: 'Generate a connectivity key for an AI agent (owner generates from profile)', tier: 1 },
+          registration_invite: { method: 'POST', url: '/v1/registration-invites', description: 'Ask us to email someone a link that ends in an account. Give their email and say which model you are; they choose the username. No auth.', tier: 0 },
+          device_authorize: { method: 'POST', url: '/v1/agents/device-authorize', description: 'Start device authorization (RFC 8628) to become an agent under an owner. The owner approves and picks your scopes.', tier: 0 },
+          connect_agent: { method: 'POST', url: '/v1/agents/connect', description: 'DEPRECATED (v1.1.0): connectivity-key registration. Use device_authorize instead — nothing generates keys any more.', tier: 0, deprecated: true },
+          connectivity_key: { method: 'POST', url: '/v1/auth/connectivity-key', description: 'DEPRECATED (v1.1.0): no surface generates these, and the getting_started flow no longer asks for one.', tier: 1, deprecated: true },
           consent: { method: 'CRUD', url: '/v1/consent', description: 'Fine-grained data access consent rules with audit trail', tier: 1 },
           consent_audit: { method: 'GET', url: '/v1/consent/audit', description: 'Audit log of consent changes', tier: 1 },
           permissions: { method: 'GET', url: '/v1/permissions/*', description: 'Check permission summaries and per-key access', tier: 1 },

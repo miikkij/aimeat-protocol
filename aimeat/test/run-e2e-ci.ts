@@ -21,7 +21,8 @@
  *            ambiguous substring exits non-zero instead of silently picking the first match
  *            (--test=security ran e2e-zip-security and never ran e2e-security).
  *   v1.7.0 -- 2026-08-07 -- Add e2e-remake-funnel.ts (remake phase 0: onboarding.track separation)
- *            and e2e-remake-home.ts (remake phases 2-3: the welcome mat gate).
+ *            e2e-remake-home.ts (remake phases 2-3: the welcome mat gate) and
+ *            e2e-registration-invites.ts (remake phase 4b: the agent door).
  *   v1.6.0 -- 2026-07-30 -- A suite that never RAN no longer renders as a tick. One with a syntax
  *            error exits non-zero having reported nothing, so `failed` was 0 and the row printed
  *            "OK 0 0 0" -- which reads as "nothing to test here" rather than "this never compiled".
@@ -115,6 +116,7 @@ const ALL_SUITES = [
     'test/e2e-onboarding-funnel.ts',
     'test/e2e-remake-funnel.ts',
     'test/e2e-remake-home.ts',
+    'test/e2e-registration-invites.ts',
     'test/e2e-login-by-email.ts',
     'test/e2e-owner-usage.ts',
     'test/e2e-owner-home.ts',

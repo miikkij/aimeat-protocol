@@ -394,6 +394,14 @@ export function initializeSchema(db: Database.Database): void {
   // after accepting (e.g. back into the Experience Center admin app, already signed in). Additive/
   // nullable; existing invitations read back as returnUrl=NULL (→ default profile redirect).
   safeAddColumn('invitations', 'returnUrl', 'TEXT');
+  // Per-variant extras. The registration invite (agent door) stores the AI's self-report
+  // (model/vendor/client) beside the server's own observation (ip/userAgent/at) here.
+  safeAddColumn('invitations', 'meta', 'TEXT');
+  // organismId became NULLable when the node-level registration invite joined this table.
+  // SQLite cannot drop a NOT NULL constraint with ALTER, and an upgraded database keeps it —
+  // harmless, because every row it refuses is one this node would only write on a FRESH
+  // database; a self-hosted upgrade that wants the agent door recreates the table below.
+  relaxInvitationsOrganismId(db);
 
   // Name-invite parity with email invites — workspace grants chosen at invite time, applied on
   // accept (JSON array [{ws, role}]). Additive/nullable; existing memberships read back unchanged.
@@ -520,4 +528,57 @@ export function initializeSchema(db: Database.Database): void {
     DELETE FROM memory_fts WHERE rowid IN (SELECT rowid FROM memory WHERE archived = 1);
     DELETE FROM memory_archive_fts WHERE rowid IN (SELECT rowid FROM memory WHERE archived = 0);
   `);
+}
+
+/**
+ * Drop the NOT NULL on invitations.organismId for databases created before the node-level
+ * registration invite joined this table (remake 4b).
+ *
+ * SQLite cannot relax a constraint with ALTER, so this is the standard table rebuild — and it is
+ * gated on PRAGMA table_info so a fresh database, where the column is already nullable, pays
+ * nothing. Rebuilding unconditionally on every boot would rewrite the table for no reason and
+ * would be the kind of migration that silently loses a row the day one column is forgotten.
+ */
+function relaxInvitationsOrganismId(db: Database.Database): void {
+  const cols = db.prepare('PRAGMA table_info(invitations)').all() as Array<{ name: string; notnull: number }>;
+  if (!cols.length) return;                                   // table not created yet
+  const org = cols.find(c => c.name === 'organismId');
+  if (!org || org.notnull === 0) return;                      // already nullable — nothing to do
+
+  const names = cols.map(c => c.name);
+  const carried = names.join(', ');
+  db.exec('PRAGMA foreign_keys=OFF');
+  const tx = db.transaction(() => {
+    db.exec(`
+      CREATE TABLE invitations_new (
+        id               TEXT PRIMARY KEY,
+        tokenHash        TEXT NOT NULL,
+        organismId       TEXT,
+        orgRole          TEXT NOT NULL DEFAULT 'member',
+        type             TEXT NOT NULL DEFAULT 'link',
+        workspaces       TEXT NOT NULL DEFAULT '[]',
+        email            TEXT NOT NULL,
+        emailHash        TEXT NOT NULL,
+        invitedBy        TEXT NOT NULL,
+        provisionedOwner TEXT,
+        message          TEXT,
+        status           TEXT NOT NULL DEFAULT 'pending',
+        createdAt        TEXT NOT NULL,
+        expiresAt        TEXT NOT NULL,
+        acceptedAt       TEXT,
+        acceptedBy       TEXT,
+        returnUrl        TEXT,
+        meta             TEXT
+      );
+      INSERT INTO invitations_new (${carried}) SELECT ${carried} FROM invitations;
+      DROP TABLE invitations;
+      ALTER TABLE invitations_new RENAME TO invitations;
+      CREATE INDEX IF NOT EXISTS idx_invitations_tokenHash ON invitations(tokenHash);
+      CREATE INDEX IF NOT EXISTS idx_invitations_organismId ON invitations(organismId);
+      CREATE INDEX IF NOT EXISTS idx_invitations_emailHash ON invitations(emailHash);
+      CREATE INDEX IF NOT EXISTS idx_invitations_expiresAt ON invitations(expiresAt);
+    `);
+  });
+  tx();
+  db.exec('PRAGMA foreign_keys=ON');
 }

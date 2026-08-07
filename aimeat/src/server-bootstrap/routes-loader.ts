@@ -101,6 +101,7 @@ import { publicStatsRouter } from '../routes/public-stats.js';
 import { publicEventsRouter } from '../routes/public-events.js';
 import { portfolioRouter } from '../routes/portfolio.js';
 import { homeRouter } from '../routes/home.js';
+import { registrationInvitesRouter } from '../routes/registration-invites.js';
 import { portalApiRouter } from '../routes/portal-api.js';
 import { csmRouter } from '../routes/csm.js';
 import { msmRouter } from '../routes/msm.js';
@@ -551,6 +552,10 @@ export async function mountRoutes(
   // The KOTI (home) routes — the remake's onboarding path. Additive: mounted beside the profile
   // routes, which are untouched, and a person moves between the two with a switch.
   app.use(homeRouter(config, storage));
+  // The agent door: an AI asks us to email someone a link that ends in an account. Open by design
+  // (no auth — the caller has no identity yet), fenced by a per-IP limit here and a per-address
+  // limit in the service.
+  app.use(registrationInvitesRouter(config, storage));
 
   app.use(portalRouter(config, storage));
   app.use(portalApiRouter(config, storage));

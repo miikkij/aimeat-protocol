@@ -169,6 +169,15 @@ export async function readHomeState(
         void recordOnboardingEvent(storage, config, owner, ONBOARDING_KEYS.homeInitialized, {
             via: branch ?? 'A',
         }).catch(err => logger.warn('home-state: home_initialized marker failed', { owner, error: String(err) }));
+        // An account the agent door started reaching a finished home is the door's own result.
+        // Derived here rather than by a job: the outcome is a function of the same three conditions,
+        // and a scheduler that had to guess when a chain "ended" would report abandonment for
+        // people who simply took two days.
+        if (byKey.has(ONBOARDING_KEYS.agentDoorStarted)) {
+            void recordOnboardingEvent(storage, config, owner, ONBOARDING_KEYS.agentDoorResult, {
+                result: 'home_initialized',
+            }).catch(err => logger.warn('home-state: agent_door_result marker failed', { owner, error: String(err) }));
+        }
     }
 
     return state;

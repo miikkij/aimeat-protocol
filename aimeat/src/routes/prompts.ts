@@ -34,6 +34,7 @@ import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
 import { buildWelcomeMatPrompt } from '../services/welcome-mat-prompt.js';
 import { buildAgentConnectPrompt, buildAgentConnectSteps } from '../services/agent-connect-prompt.js';
+import { buildAgentOnboardPrompt } from '../services/agent-onboard-prompt.js';
 import { buildAiToolSetup } from '../services/ai-tool-setup.js';
 import { logger } from '../utils/logger.js';
 
@@ -357,6 +358,31 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
     }, [
       { description: 'Paste the answer here', method: 'POST', url: '/v1/home/welcome-mat' },
       { description: 'Where your home stands', method: 'GET', url: '/v1/home/state' },
+    ]));
+  });
+
+  // GET /v1/prompts/agent-onboard — the front-page agent door (12-ai-rekisteroi.md). A person
+  // copies this into their own AI chat; if that AI can POST, it gets them an account without their
+  // touching the interface. PUBLIC and unauthenticated on purpose — the whole point is that the
+  // person does not have an account yet. ?lang, ?format=txt. MUST be registered before /v1/prompts/:tier.
+  router.get('/v1/prompts/agent-onboard', (req, res) => {
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
+    const prompt = buildAgentOnboardPrompt(config, { lang });
+    if (req.query.format === 'txt') {
+      res.type('text/plain; charset=utf-8').send(prompt);
+      return;
+    }
+    res.json(success(config.nodeId, {
+      id: 'agent-onboard',
+      name: 'Let your AI do this',
+      description: 'Paste into your own AI chat. If it can make a POST request it asks you for your email, '
+        + 'and a link arrives that finishes the account. It never picks your username.',
+      lang,
+      prompt,
+      system_prompt: prompt,
+    }, [
+      { description: 'The call the AI makes', method: 'POST', url: '/v1/registration-invites' },
+      { description: 'Register yourself instead', method: 'GET', url: '/v1/portal' },
     ]));
   });
 

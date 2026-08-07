@@ -67,9 +67,11 @@ export async function seedSystemPrompts(storage: Storage): Promise<void> {
       // Admin edits are preserved in version history and can be restored.
       // syncIds extends this to individual code-owned prompts in other groups
       // (e.g. the portal template-editor prompt, which must track its tag/header
-      // guidance in source). bootstrap-anon and other portal prompts are NOT synced.
+      // guidance in source; and bootstrap-anon, which DESCRIBES API FLOWS — when a flow is
+      // removed, a node still serving the old description sends every agent that reads its
+      // front door to a dead end, and it stayed wrong for exactly that reason).
       const syncGroups = ['generator', 'builders', 'tiers'];
-      const syncIds = ['site-portal'];
+      const syncIds = ['site-portal', 'bootstrap-anon'];
       if ((syncGroups.includes(seed.group) || syncIds.includes(seed.id)) && existing.content !== seed.content) {
         metaUpdate.content = seed.content;
         metaUpdate.updatedAt = new Date().toISOString();

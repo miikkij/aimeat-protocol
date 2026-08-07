@@ -7816,6 +7816,112 @@ paths:
         '413':
           description: The paste is larger than the node's portfolio size cap
 
+  /v1/registration-invites:
+    post:
+      operationId: postRegistrationInvite
+      summary: The agent door — an AI asks us to email someone a link that ends in an account
+      description: >-
+        An AI makes ONE call with a person's email address. The node emails that address a link; the
+        person presses it, chooses a username, and the account exists. The AI never creates the
+        account and never chooses the username — a username is permanent, and a model in a chat
+        window cannot see whether one is free.
+
+        `agent.model` is REQUIRED. It is how the node learns which AIs can actually do this, and it
+        means the email can always say what asked for it. The three `agent.*` fields are the AI's
+        own claims and are stored and displayed as claims; the node separately records what it
+        OBSERVED (IP, user agent, time), and the email shows the two apart.
+
+        Open and unauthenticated by design: the caller has no identity yet. Three things fence it:
+
+        1. The response is IDENTICAL whether the address is new, already has an account, or already
+           has a live invitation — it always answers `sent`. Anything else would make this an
+           address-checking machine open to the internet.
+        2. One LIVE invitation per address at a time, so an inbox cannot be buried by repeating the
+           call. This holds even against a caller rotating IPs.
+        3. A per-IP limit (`AIMEAT_RL_REGISTRATION_INVITES`, default 5 per HOUR).
+
+        The chain does not end at the account. The person still makes a welcome mat and connects
+        their first agent, exactly as someone who registered themselves would.
+      tags:
+        - Identity
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, agent]
+              properties:
+                email:
+                  type: string
+                  format: email
+                  description: The address the person gave the AI. The only thing the AI should ask for.
+                agent:
+                  type: object
+                  required: [model]
+                  description: What the AI says about itself. Claims, not facts — recorded and shown as such.
+                  properties:
+                    model: { type: string }
+                    vendor: { type: string }
+                    client:
+                      type: string
+                      description: The app the AI is running in. Resolved against /v1/ai-tools when known.
+      responses:
+        '202':
+          description: >-
+            Accepted. Says `sent` whether or not a message actually went out — see the
+            non-enumeration property above.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          status: { type: string, enum: [sent] }
+                          tell_the_person:
+                            type: string
+                            description: What the AI should say next. It cannot see the mailbox.
+                          expires_in_hours: { type: integer }
+                          mcp_client_recognised:
+                            type: string
+                            nullable: true
+                            description: The /v1/ai-tools id the claimed client resolved to, or null.
+                          next: { type: string }
+        '400':
+          description: A malformed address, or `agent.model` missing
+        '429':
+          description: Too many calls from this IP
+
+  /v1/prompts/agent-onboard:
+    get:
+      operationId: getAgentOnboardPrompt
+      summary: The front-page agent-door prompt (paste-able)
+      description: >-
+        The payload behind the landing page's first button. A person copies it into their own AI
+        chat; if that AI can make a POST request, it asks them for their email and a link arrives
+        that finishes the account.
+
+        Public and unauthenticated — the whole point is that the reader has no account yet. The most
+        important line in it is the failure line: the AI is told to say plainly and immediately when
+        it cannot make the call, and to send the person to register themselves, because a model that
+        describes what it would have done leaves someone waiting for an email that never comes.
+      tags:
+        - Discovery
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi] }
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+      responses:
+        '200':
+          description: The prompt (JSON envelope, or text/plain with format=txt)
+
   /v1/prompts/agent-connect:
     get:
       operationId: getAgentConnectPrompt
@@ -27773,9 +27879,16 @@ paths:
       operationId: getEmailInvitation
       summary: Get email invitation details (public)
       description: >-
-        Public — resolve an email-invitation token for the accept page: returns the organism summary,
-        organism role, workspace grants (with names), the inviter, the invited email, and whether that
-        email already maps to a registered account. Returns 410 when the invitation is expired/used.
+        Public — resolve an invitation token for the accept page.
+
+        Serves BOTH invitation variants, distinguished by `invitation.kind`:
+        `organism` (the inviter's organism summary, org role, workspace grants with names) and
+        `node` (the agent door — `organism` is null, `workspaces` empty, and `requested_by` carries
+        what the AI claimed about itself alongside what the server observed, so the recipient of an
+        unrequested message can judge and trace it).
+
+        Either way it returns the invited email and whether that address already maps to a
+        registered account. Returns 410 when the invitation is expired/used.
         optionalAuth: when a session is present the response also carries a `viewer` object
         { owner, has_verified_email, email_matches } so the accept page can warn — before the button —
         that the signed-in account cannot accept (its verified email doesn't match the invited address).

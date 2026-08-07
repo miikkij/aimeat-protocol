@@ -635,9 +635,9 @@ export const extensionsNotifyMethods = {
     return {
       id: row.id as string,
       tokenHash: row.tokenHash as string,
-      organismId: row.organismId as string,
+      organismId: (row.organismId as string | null) ?? null,
       orgRole: (row.orgRole as 'member' | 'admin') ?? 'member',
-      type: (row.type as 'link' | 'code') ?? 'link',
+      type: (row.type as 'link' | 'code' | 'registration') ?? 'link',
       workspaces: row.workspaces ? JSON.parse(row.workspaces as string) : [],
       email: row.email as string,
       emailHash: row.emailHash as string,
@@ -650,18 +650,20 @@ export const extensionsNotifyMethods = {
       acceptedAt: (row.acceptedAt as string | null) ?? null,
       acceptedBy: (row.acceptedBy as string | null) ?? null,
       returnUrl: (row.returnUrl as string | null) ?? null,
+      meta: row.meta ? JSON.parse(row.meta as string) : null,
     };
   },
 
   async createInvitation(this: SqliteStorage, rec: import('../../../../storage/repositories/invitation.repository.js').InvitationRecord): Promise<void> {
     this.db.prepare(
       `INSERT INTO invitations
-         (id, tokenHash, organismId, orgRole, type, workspaces, email, emailHash, invitedBy, provisionedOwner, message, status, createdAt, expiresAt, acceptedAt, acceptedBy, returnUrl)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+         (id, tokenHash, organismId, orgRole, type, workspaces, email, emailHash, invitedBy, provisionedOwner, message, status, createdAt, expiresAt, acceptedAt, acceptedBy, returnUrl, meta)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     ).run(
       rec.id, rec.tokenHash, rec.organismId, rec.orgRole, rec.type ?? 'link', JSON.stringify(rec.workspaces ?? []),
       rec.email, rec.emailHash, rec.invitedBy, rec.provisionedOwner ?? null, rec.message ?? null, rec.status,
       rec.createdAt, rec.expiresAt, rec.acceptedAt ?? null, rec.acceptedBy ?? null, rec.returnUrl ?? null,
+      rec.meta ? JSON.stringify(rec.meta) : null,
     );
   },
 
@@ -679,6 +681,17 @@ export const extensionsNotifyMethods = {
     const rows = opts?.status
       ? this.db.prepare('SELECT * FROM invitations WHERE organismId = ? AND status = ? ORDER BY createdAt DESC').all(organismId, opts.status) as Record<string, unknown>[]
       : this.db.prepare('SELECT * FROM invitations WHERE organismId = ? ORDER BY createdAt DESC').all(organismId) as Record<string, unknown>[];
+    return rows.map((r) => this.mapInvitationRow(r));
+  },
+
+  async listInvitationsByEmailHash(this: SqliteStorage, emailHash: string, opts?: { status?: string; type?: string }): Promise<import('../../../../storage/repositories/invitation.repository.js').InvitationRecord[]> {
+    const where: string[] = ['emailHash = ?'];
+    const values: unknown[] = [emailHash];
+    if (opts?.status) { where.push('status = ?'); values.push(opts.status); }
+    if (opts?.type) { where.push('type = ?'); values.push(opts.type); }
+    const rows = this.db.prepare(
+      `SELECT * FROM invitations WHERE ${where.join(' AND ')} ORDER BY createdAt DESC`
+    ).all(...values) as Record<string, unknown>[];
     return rows.map((r) => this.mapInvitationRow(r));
   },
 

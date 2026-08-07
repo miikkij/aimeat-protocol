@@ -52,6 +52,8 @@ export interface RateLimitsConfig {
   federation: RateLimitTier;
   catalogue: RateLimitTier;
   authChallenge: RateLimitTier;
+  /** The agent door (POST /v1/registration-invites) — open, and it emails strangers. Hour window. */
+  registrationInvites: RateLimitTier;
   openrouter: RateLimitTier;
   roleMultipliers: RoleMultipliers;
 }

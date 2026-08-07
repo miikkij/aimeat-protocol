@@ -63,7 +63,7 @@ export async function issueFirstLoginKeyCredentials(
     const emailSvc = getActiveEmailService();
     const to = ghii.notificationEmail || inv.email;
     if (emailSvc?.enabled && to) {
-      const org = await storage.getOrganism(inv.organismId);
+      const org = inv.organismId ? await storage.getOrganism(inv.organismId) : null;
       emailSent = await emailSvc.sendKeyCredentials(to, {
         username: ghii.username,
         password,

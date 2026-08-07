@@ -1086,7 +1086,8 @@ export interface Invitation {
   id: Generated<string>;
   invitedBy: string;
   message: string | null;
-  organismId: string;
+  meta: Json | null;
+  organismId: string | null;
   orgRole: Generated<string>;
   provisionedOwner: string | null;
   returnUrl: string | null;
