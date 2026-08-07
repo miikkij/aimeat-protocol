@@ -14,6 +14,8 @@
  *   cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx \
  *     test/run-e2e-ci.ts --test=e2e-onboarding-funnel
  * @version-history
+ *   v1.1.0 — 2026-08-07 — Cohorts are now grouped by week × track (remake phase 0), so the cohort
+ *     assertion selects the `remake` group by name instead of reading cohorts[0].
  *   v1.0.0 — 2026-08-07 — Initial.
  */
 
@@ -206,9 +208,11 @@ await test('An operator reads cohorts + rows, and this account appears activated
     assert(!!mine, `${ownerApp} must appear in the funnel rows`);
     assert(mine.activationKind === 'app', `expected activationKind=app, got ${mine.activationKind}`);
     assert(typeof mine.ttfvMinutes === 'number', 'an activated row must carry a TTFV');
-    const week = cohorts[0];
+    // Cohorts are grouped by week × track (remake phase 0), so pick the group by its track rather
+    // than by position: both accounts here were created through /v1/owners, hence `remake`.
+    const week = cohorts.find((c: any) => c.track === 'remake');
     assert(week && week.created >= 2 && week.activated >= 2,
-        `this week's cohort must count both accounts: ${JSON.stringify(week)}`);
+        `this week's remake cohort must count both accounts: ${JSON.stringify(cohorts)}`);
     assert(week.activation_kinds.app >= 1 && week.activation_kinds.agent >= 1,
         `both activation kinds must be counted: ${JSON.stringify(week.activation_kinds)}`);
 });

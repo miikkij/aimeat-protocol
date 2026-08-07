@@ -236,20 +236,32 @@ export function adminMonitoringRouter(
             return s.length % 2 ? s[mid] : Math.round((s[mid - 1] + s[mid]) / 2);
         };
 
-        const byWeek = new Map<string, typeof rows>();
+        // Cohorts are grouped by week × TRACK (05-mittaus.md). One row group per path per week:
+        // mixing the old and the new path into one number means neither can be judged, which is
+        // the whole reason the track marker exists. Sorted newest week first, remake before legacy
+        // within a week so the path under evaluation reads first.
+        const byWeekTrack = new Map<string, typeof rows>();
         for (const r of rows) {
-            const k = weekOf(r.createdAt);
-            const list = byWeek.get(k) ?? [];
+            const k = `${weekOf(r.createdAt)} ${r.track}`;
+            const list = byWeekTrack.get(k) ?? [];
             list.push(r);
-            byWeek.set(k, list);
+            byWeekTrack.set(k, list);
         }
-        const cohorts = [...byWeek.entries()]
-            .sort((a, b) => b[0].localeCompare(a[0]))
-            .map(([week, list]) => {
+        const cohorts = [...byWeekTrack.entries()]
+            .sort((a, b) => {
+                const [wa, ta] = a[0].split(' ');
+                const [wb, tb] = b[0].split(' ');
+                // Within a week the remake reads above legacy: the remake is the thing being
+                // judged, and the legacy row is the comparison it is judged against.
+                return wb.localeCompare(wa) || (ta === tb ? 0 : ta === 'remake' ? -1 : 1);
+            })
+            .map(([key, list]) => {
+                const [week, track] = key.split(' ');
                 const activated = list.filter(r => !!r.activatedAt);
                 const ttfvs = activated.map(r => r.ttfvMinutes).filter((n): n is number => typeof n === 'number');
                 return {
                     week,
+                    track,
                     created: list.length,
                     hello_page_opened: list.filter(r => !!r.helloOpenedAt).length,
                     mcp_connected: list.filter(r => !!r.firstMcpCallAt).length,
@@ -264,6 +276,32 @@ export function adminMonitoringRouter(
                         agent: activated.filter(r => r.activationKind === 'agent').length,
                     },
                     rescue_sent: list.filter(r => !!r.rescueSentAt).length,
+                    // ── the remake funnel, left to right as a person walks it ──
+                    mat_ok: list.filter(r => r.matResult === 'ok').length,
+                    mat_failed: list.filter(r => r.matResult === 'failed').length,
+                    // Total attempts across the cohort: mat_attempts / mat_ok is how hard the
+                    // prompt is, and it is the number the prompt gets edited against.
+                    mat_attempts: list.reduce((n, r) => n + r.matAttempts, 0),
+                    branch: {
+                        A: list.filter(r => r.branch === 'A').length,
+                        B: list.filter(r => r.branch === 'B').length,
+                        agent: list.filter(r => r.branch === 'agent').length,
+                    },
+                    first_agent_connected: list.filter(r => !!r.firstAgentConnectedAt).length,
+                    home_initialized: list.filter(r => !!r.homeInitializedAt).length,
+                    // The one number the whole remake is judged by.
+                    home_initialized_rate_pct: list.length
+                        ? Math.round((list.filter(r => !!r.homeInitializedAt).length / list.length) * 1000) / 10 : 0,
+                    room_entered: list.filter(r => !!r.room).length,
+                    rooms: {
+                        create: list.filter(r => r.room === 'create').length,
+                        organise: list.filter(r => r.room === 'organise').length,
+                        monetise: list.filter(r => r.room === 'monetise').length,
+                        company: list.filter(r => r.room === 'company').length,
+                    },
+                    // Its own column on purpose: remake-created accounts leaving for the old path
+                    // is the result, not a footnote.
+                    switched: list.filter(r => r.switched > 0).length,
                 };
             });
 

@@ -15600,10 +15600,14 @@ paths:
       operationId: getOnboardingFunnel
       summary: Onboarding activation funnel (operator)
       description: >-
-        The activation funnel per account and rolled up by weekly signup cohort: hello-page opens,
+        The activation funnel per account and rolled up by signup cohort: hello-page opens,
         first MCP session, activation (the account's first durable own output — app / workspace /
-        agent write), time-to-first-value, and rescue emails sent. Test accounts (uxtest-*) are
-        excluded. Markers are memory records in each owner's namespace, not a separate table.
+        agent write), time-to-first-value, and rescue emails sent, plus the remake path's own
+        steps (welcome mat, branch, first agent, home initialized, room entered).
+        Cohorts are grouped by ISO week AND by `track` (`remake` | `legacy`) — one row group per
+        path per week, because a single mixed number lets neither path be judged. Test accounts
+        (uxtest-*) and the shared `anonymous` system identity are excluded. Markers are memory
+        records in each owner's namespace, not a separate table.
       tags: [Admin]
       security:
         - BearerAuth: []
@@ -15636,6 +15640,12 @@ paths:
                               type: object
                               properties:
                                 week: { type: string, example: '2026-W32' }
+                                track:
+                                  type: string
+                                  enum: [remake, legacy]
+                                  description: >-
+                                    Which onboarding path the accounts in this group were created
+                                    on. Accounts predating the marker count as `legacy`.
                                 created: { type: integer }
                                 hello_page_opened: { type: integer }
                                 mcp_connected: { type: integer }
@@ -15649,6 +15659,39 @@ paths:
                                     workspace: { type: integer }
                                     agent: { type: integer }
                                 rescue_sent: { type: integer }
+                                mat_ok: { type: integer, description: Welcome mats accepted. }
+                                mat_failed: { type: integer, description: Accounts whose latest paste was rejected. }
+                                mat_attempts:
+                                  type: integer
+                                  description: >-
+                                    Total paste attempts in this group. mat_attempts / mat_ok is
+                                    how hard the prompt is, and the number it gets edited against.
+                                branch:
+                                  type: object
+                                  description: A = MCP-capable client, B = needs a better one first, agent = the front-page agent door.
+                                  properties:
+                                    A: { type: integer }
+                                    B: { type: integer }
+                                    agent: { type: integer }
+                                first_agent_connected: { type: integer }
+                                home_initialized: { type: integer }
+                                home_initialized_rate_pct:
+                                  type: number
+                                  description: The one number the remake is judged by.
+                                room_entered: { type: integer }
+                                rooms:
+                                  type: object
+                                  properties:
+                                    create: { type: integer }
+                                    organise: { type: integer }
+                                    monetise: { type: integer }
+                                    company: { type: integer }
+                                switched:
+                                  type: integer
+                                  description: >-
+                                    Accounts that have flipped between the two paths at least once.
+                                    Its own column on purpose: remake-created accounts leaving for
+                                    the old path is a result, not a footnote.
                           rows:
                             type: array
                             items:
@@ -15665,6 +15708,34 @@ paths:
                                 activationKind: { type: string, enum: [app, workspace, agent], nullable: true }
                                 ttfvMinutes: { type: integer, nullable: true }
                                 rescueSentAt: { type: string, format: date-time, nullable: true }
+                                track: { type: string, enum: [remake, legacy] }
+                                switched:
+                                  type: integer
+                                  description: Times this account flipped paths. Never changes `track`.
+                                matResult: { type: string, enum: [ok, failed], nullable: true }
+                                matAttempts: { type: integer }
+                                aiModel:
+                                  type: string
+                                  nullable: true
+                                  description: The model's own claim about itself — unreliable by nature.
+                                aiClient:
+                                  type: string
+                                  nullable: true
+                                  description: >-
+                                    The deciding field: MCP is a property of the client app, not
+                                    of the model.
+                                aiMcp: { type: string, enum: [yes, no, unknown], nullable: true }
+                                aiSource:
+                                  type: string
+                                  enum: [meta, asked]
+                                  nullable: true
+                                  description: >-
+                                    `meta` = read off the pasted page; `asked` = the person
+                                    answered. `asked` is the trustworthy one.
+                                branch: { type: string, enum: [A, B, agent], nullable: true }
+                                firstAgentConnectedAt: { type: string, format: date-time, nullable: true }
+                                homeInitializedAt: { type: string, format: date-time, nullable: true }
+                                room: { type: string, enum: [create, organise, monetise, company], nullable: true }
                           total: { type: integer }
         '403':
           description: Operator role required

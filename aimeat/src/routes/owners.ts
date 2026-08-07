@@ -9,6 +9,8 @@
  *   - POST /v1/owners: validates name, runs pre_owner_registration hook, creates owner + keypair
  *
  * @version-history
+ *   v1.2.0 — 2026-08-07 — Writes onboarding.track at account creation (remake phase 0) so the
+ *     programmatic door produces the same cohort marker as POST /v1/ghii.
  *   v1.0.0 — 2026-07-13 — Header added; file pre-dates header standard
  *   v1.1.0 — 2026-07-16 — GDPR export hoists owner-invariant reads out of the per-agent loop
  *     (boards+posts+flags loaded once; per-agent getGHIIByOwner re-fetch dropped) — was O(agents×boards)
@@ -103,6 +105,13 @@ export function ownersRouter(config: AimeatConfig, storage: Storage): Router {
         timestamp: now,
       });
     }
+
+    // Which onboarding path this account was created on (05-mittaus.md). BOTH creation doors write
+    // it — an account created through this programmatic one and left untracked would be missing
+    // from every cohort rather than counted in the wrong one, which is the harder bug to notice.
+    void import('../services/onboarding-funnel.js')
+      .then(m => m.recordTrack(storage, config, owner.name))
+      .catch(err => logger.warn('owners register: track marker failed', { error: String(err) }));
 
     // Extension hook: post_owner_registration (fire-and-forget)
     fireHook(config, storage, 'post_owner_registration', { name: owner.name, roles: owner.roles });

@@ -4,6 +4,9 @@
  *   POST /v1/ghii/login (password + federated + TOTP), POST /v1/ghii/login/attach-email. Extracted
  *   from src/routes/ghii.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.3.0 — 2026-08-07 — POST /v1/ghii writes onboarding.track at account creation (remake phase 0):
+ *     new accounts are created on the remake path (K3), and the marker is what keeps the two paths'
+ *     funnel numbers apart.
  *   v1.2.0 — 2026-08-07 — POST /v1/ghii/login accepts the account's VERIFIED email as the identifier
  *     (resolved via resolveOwnerByVerifiedEmail; selection only, never an auth factor). Identifier
  *     parsing moved to utils/login-identifier.ts so an email can never be read as a federated GHII.
@@ -230,6 +233,14 @@ export function registerRegisterLoginRoutes(
                 timestamp: now,
             });
         }
+
+        // Which onboarding path this account was created on (05-mittaus.md). K3: new accounts get
+        // the remake. Written here rather than at first sign-in because a cohort is defined by when
+        // the account was CREATED — an account that never returns still belongs to its week.
+        // Fire-and-forget: a funnel marker must never be able to fail a registration.
+        void import('../../services/onboarding-funnel.js')
+            .then(m => m.recordTrack(storage, config, username))
+            .catch(err => logger.warn('ghii register: track marker failed', { error: String(err) }));
 
         // Kick off email verification when an email was supplied (see helper).
         let verificationId: string | null = null;

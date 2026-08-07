@@ -20,6 +20,7 @@
  *   v1.5.0 -- 2026-07-29 -- --test= resolution: exact suite name wins over substring, and an
  *            ambiguous substring exits non-zero instead of silently picking the first match
  *            (--test=security ran e2e-zip-security and never ran e2e-security).
+ *   v1.7.0 -- 2026-08-07 -- Add e2e-remake-funnel.ts (remake phase 0: onboarding.track separation).
  *   v1.6.0 -- 2026-07-30 -- A suite that never RAN no longer renders as a tick. One with a syntax
  *            error exits non-zero having reported nothing, so `failed` was 0 and the row printed
  *            "OK 0 0 0" -- which reads as "nothing to test here" rather than "this never compiled".
@@ -111,6 +112,7 @@ const ALL_SUITES = [
     'test/e2e-device-token-grace.ts',
     'test/e2e-app-access-code.ts',
     'test/e2e-onboarding-funnel.ts',
+    'test/e2e-remake-funnel.ts',
     'test/e2e-login-by-email.ts',
     'test/e2e-owner-usage.ts',
     'test/e2e-owner-home.ts',

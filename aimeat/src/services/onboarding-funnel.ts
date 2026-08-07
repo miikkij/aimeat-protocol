@@ -10,13 +10,24 @@
  *   and visible to the owner in their own Memory tab.
  * @structure
  *   - FIRST_MCP_CALL_KEY / HELLO_PAGE_OPENED_KEY / ACTIVATED_KEY / MCP_RESCUE_SENT_KEY: marker keys
+ *   - ONBOARDING_KEYS: every remake event key, in ONE place (05-mittaus.md) — nothing that writes
+ *     a funnel marker spells a key literal of its own
  *   - recordFirstMcpCall() / recordHelloPageOpened() / recordActivation(): write-once markers
- *   - readOnboardingFunnel(): the operator view's rows (activation, TTFV, rescue)
+ *   - recordTrack() / recordTrackSwitch(): which path the account was created on, and how many
+ *     times it flipped. The switch NEVER rewrites `track` — see the note on recordTrackSwitch.
+ *   - recordOnboardingEvent(): the generic write-once marker every remake phase writes through
+ *   - recordWelcomeMatPasted(): the ONE deliberately non-write-once marker (attempts accumulate)
+ *   - readOnboardingFunnel(): the operator view's rows (activation, TTFV, rescue, remake events)
  *   - runMcpOnboardingRescueJob(): the scheduled rescue pass (core handler 'mcp-onboarding-rescue')
  * @usage
  *   import { recordFirstMcpCall } from '../services/onboarding-funnel.js';
  *   void recordFirstMcpCall(storage, config, owner, platform);   // fire-and-forget at MCP init
  * @version-history
+ *   v1.2.0 — 2026-08-07 — REMAKE phase 0: onboarding.track (legacy|remake + switched) written at
+ *     account creation, the six remake event keys + the agent-door pair collected into
+ *     ONBOARDING_KEYS, generic write-once + attempts-accumulating writers, and readOnboardingFunnel
+ *     rewritten onto ONE listMemoryForOwners query (was 4 getMemory per account) now that it reads
+ *     eleven markers instead of four.
  *   v1.1.0 — 2026-08-07 — Activation marker + readOnboardingFunnel(): the account's first durable
  *     own output (app / workspace / agent write) as ONE event with a kind, so an activation rate
  *     and TTFV are computable (05-mittaus.md).
@@ -42,6 +53,40 @@ export const MCP_RESCUE_SENT_KEY = 'onboarding.mcp_rescue_sent';
  */
 export const ACTIVATED_KEY = 'onboarding.activated';
 export type ActivationKind = 'app' | 'workspace' | 'agent';
+
+/**
+ * EVERY remake funnel key, in one place (05-mittaus.md). Nothing outside this module spells one of
+ * these strings: a key typed twice is a marker that silently stops being counted the day one of
+ * the two is edited, and a funnel that undercounts reads as a product that does not work.
+ */
+export const ONBOARDING_KEYS = {
+    /** Which path the account was created on. Written ONCE at account creation. */
+    track: 'onboarding.track',
+    /** The welcome mat paste. The ONE non-write-once marker: attempts accumulate. */
+    welcomeMatPasted: 'onboarding.welcome_mat_pasted',
+    /** What the model claimed about itself, or what the person answered when asked. */
+    aiModelDetected: 'onboarding.ai_model_detected',
+    /** A = MCP-capable client, B = needs a better one first, agent = the front-page agent door. */
+    branchTaken: 'onboarding.branch_taken',
+    firstAgentConnected: 'onboarding.first_agent_connected',
+    homeInitialized: 'onboarding.home_initialized',
+    /** The FIRST of the four rooms entered. Later ones do not overwrite it. */
+    roomEntered: 'onboarding.room_entered',
+    /** Agent door (12-ai-rekisteroi.md): the POST landed and the mail went out. */
+    inviteSentByAgent: 'onboarding.invite_sent_by_agent',
+    inviteCompleted: 'onboarding.invite_completed',
+    /** Durable mark on the account: an agent started this, with which model. */
+    startedByAgent: 'onboarding.started_by_agent',
+    agentDoorStarted: 'onboarding.agent_door_started',
+    agentDoorResult: 'onboarding.agent_door_result',
+} as const;
+
+/** Which onboarding path an account was created on. Cohorts are meaningless without it. */
+export type OnboardingTrack = 'legacy' | 'remake';
+export type OnboardingBranch = 'A' | 'B' | 'agent';
+export type OnboardingRoom = 'create' | 'organise' | 'monetise' | 'company';
+/** K3: new accounts land on the remake; existing ones stay legacy until they switch themselves. */
+export const DEFAULT_TRACK: OnboardingTrack = 'remake';
 
 /**
  * Accounts created before this feature existed are never rescued — a months-old account
@@ -139,6 +184,116 @@ export async function recordActivation(
     }
 }
 
+/**
+ * Record which path this account was created on. Called from BOTH account-creation routes
+ * (POST /v1/ghii and POST /v1/owners) so no door leaves an account without a track — an untracked
+ * account is invisible to one half of the funnel and inflates neither, which is worse than either.
+ * Write-once: re-registration in dev/test mode must not relabel an existing cohort.
+ */
+export async function recordTrack(
+    storage: Storage, config: AimeatConfig, owner: string, track: OnboardingTrack = DEFAULT_TRACK,
+): Promise<void> {
+    if (!owner) return;
+    try {
+        await writeMarkerOnce(storage, ownerGhii(config, owner), ONBOARDING_KEYS.track, {
+            track, at: new Date().toISOString(), switched: 0,
+        });
+    } catch (err) {
+        logger.warn('onboarding-funnel: track marker failed', { owner, track, error: String(err) });
+    }
+}
+
+/**
+ * The switch between the new home and the old profile. Increments `switched` and leaves `track`
+ * exactly as it was: rewriting it would move the account between cohorts every time the person
+ * flipped, and a cohort whose membership changes under you measures nothing. The counter is
+ * itself a result — remake-created accounts switching away is the signal the remake failed.
+ */
+export async function recordTrackSwitch(
+    storage: Storage, config: AimeatConfig, owner: string,
+): Promise<number> {
+    if (!owner) return 0;
+    const gaii = ownerGhii(config, owner);
+    const existing = await storage.getMemory(gaii, ONBOARDING_KEYS.track);
+    const prev = (existing?.value ?? {}) as { track?: OnboardingTrack; at?: string; switched?: number };
+    const switched = (typeof prev.switched === 'number' ? prev.switched : 0) + 1;
+    const now = new Date().toISOString();
+    await storage.setMemory({
+        key: ONBOARDING_KEYS.track,
+        ownerGaii: gaii,
+        // An account that somehow has no track yet is legacy by construction: it was created before
+        // the marker existed. Guessing `remake` here would fabricate a cohort member.
+        value: { track: prev.track ?? 'legacy', at: prev.at ?? now, switched },
+        visibility: 'private',
+        tags: ['onboarding-funnel'],
+        ttlHours: null,
+        version: existing ? existing.version + 1 : 1,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+    });
+    return switched;
+}
+
+/** Read an account's track (and switch count). Absent marker = an account older than the feature. */
+export async function readTrack(
+    storage: Storage, config: AimeatConfig, owner: string,
+): Promise<{ track: OnboardingTrack; switched: number }> {
+    const rec = await storage.getMemory(ownerGhii(config, owner), ONBOARDING_KEYS.track);
+    const v = (rec?.value ?? {}) as { track?: OnboardingTrack; switched?: number };
+    return { track: v.track === 'remake' ? 'remake' : 'legacy', switched: typeof v.switched === 'number' ? v.switched : 0 };
+}
+
+/**
+ * The generic write-once remake marker. Every phase writes through this rather than reaching for
+ * storage directly, so all of them share the same never-throw contract: funnel bookkeeping must
+ * never be able to fail the thing it is measuring. Returns whether this call was the one that wrote.
+ */
+export async function recordOnboardingEvent(
+    storage: Storage, config: AimeatConfig, owner: string,
+    key: typeof ONBOARDING_KEYS[keyof typeof ONBOARDING_KEYS],
+    value: Record<string, unknown>,
+): Promise<boolean> {
+    if (!owner) return false;
+    try {
+        return await writeMarkerOnce(storage, ownerGhii(config, owner), key, {
+            at: new Date().toISOString(), ...value,
+        });
+    } catch (err) {
+        logger.warn('onboarding-funnel: marker failed', { owner, key, error: String(err) });
+        return false;
+    }
+}
+
+/**
+ * The welcome-mat paste — the one marker that is NOT write-once. `attempts` accumulates because
+ * how many tries the mat took is the direct measure of the prompt's quality (03-welcome-mat.md),
+ * and a write-once marker would report every account as a first-try success. `result` holds the
+ * LATEST outcome, so ok-after-three-failures reads as ok with attempts=4.
+ * There is no `skipped` value and no caller that could produce one: the mat cannot be skipped.
+ */
+export async function recordWelcomeMatPasted(
+    storage: Storage, config: AimeatConfig, owner: string, result: 'ok' | 'failed',
+): Promise<{ attempts: number }> {
+    const gaii = ownerGhii(config, owner);
+    const existing = await storage.getMemory(gaii, ONBOARDING_KEYS.welcomeMatPasted);
+    const prev = (existing?.value ?? {}) as { attempts?: number };
+    const attempts = (typeof prev.attempts === 'number' ? prev.attempts : 0) + 1;
+    const now = new Date().toISOString();
+    await storage.setMemory({
+        key: ONBOARDING_KEYS.welcomeMatPasted,
+        ownerGaii: gaii,
+        // The mat's CONTENT never enters telemetry (05-mittaus.md): the page is the person's own.
+        value: { result, attempts, at: now },
+        visibility: 'private',
+        tags: ['onboarding-funnel'],
+        ttlHours: null,
+        version: existing ? existing.version + 1 : 1,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+    });
+    return { attempts };
+}
+
 /** One account's funnel state, as the operator view reads it. */
 export interface FunnelRow {
     owner: string;
@@ -153,6 +308,25 @@ export interface FunnelRow {
     /** Signup → activation, in minutes. Null until activated. */
     ttfvMinutes: number | null;
     rescueSentAt: string | null;
+    // ── remake (05-mittaus.md) ──
+    /** Which path the account was created on. `legacy` also covers pre-feature accounts. */
+    track: OnboardingTrack;
+    /** How many times the person flipped between the two. Never changes `track`. */
+    switched: number;
+    matResult: 'ok' | 'failed' | null;
+    matAttempts: number;
+    /** The model's own claim about itself — unreliable by nature, kept for exactly that reason. */
+    aiModel: string | null;
+    /** The deciding field: MCP is a property of the CLIENT APP, not the model. */
+    aiClient: string | null;
+    aiMcp: 'yes' | 'no' | 'unknown' | null;
+    /** 'meta' = read off the page; 'asked' = the person answered. 'asked' is the trustworthy one. */
+    aiSource: 'meta' | 'asked' | null;
+    branch: OnboardingBranch | null;
+    firstAgentConnectedAt: string | null;
+    homeInitializedAt: string | null;
+    /** The FIRST room entered — which of the four the person wanted, not where they ended up. */
+    room: OnboardingRoom | null;
 }
 
 /**
@@ -167,36 +341,64 @@ export async function readOnboardingFunnel(
     const sinceMs = opts.since ? Date.parse(opts.since) : NaN;
     const ghiis = (await storage.listGHIIs())
         .filter(g => !g.username.startsWith('uxtest-'))
+        // The shared anonymous-mode identity is the node's own, not a person who signed up. It has
+        // no track marker, so once cohorts are split by track it renders as a phantom "1 legacy
+        // account created this week" — a number an operator would try to explain.
+        .filter(g => g.username !== 'anonymous')
         .filter(g => (Number.isFinite(sinceMs) ? Date.parse(g.createdAt) >= sinceMs : true))
         .sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)))
         .slice(0, limit);
 
+    // ONE query for every account's every onboarding.* marker. The per-account Promise.all this
+    // replaces cost 4 round trips each; the remake reads eleven, which at 200 accounts would have
+    // been 2200 lookups to render one operator table.
+    const all = await storage.listMemoryForOwners(ghiis.map(g => g.ghii), { prefix: 'onboarding.' });
+    const byGhii = new Map<string, Map<string, Record<string, unknown>>>();
+    for (const m of all) {
+        const forOwner = byGhii.get(m.ownerGaii) ?? new Map<string, Record<string, unknown>>();
+        forOwner.set(m.key, (m.value && typeof m.value === 'object' ? m.value : {}) as Record<string, unknown>);
+        byGhii.set(m.ownerGaii, forOwner);
+    }
+
     const rows: FunnelRow[] = [];
     for (const g of ghiis) {
-        const [hello, mcp, activated, rescue] = await Promise.all([
-            storage.getMemory(g.ghii, HELLO_PAGE_OPENED_KEY),
-            storage.getMemory(g.ghii, FIRST_MCP_CALL_KEY),
-            storage.getMemory(g.ghii, ACTIVATED_KEY),
-            storage.getMemory(g.ghii, MCP_RESCUE_SENT_KEY),
-        ]);
-        const val = (r: unknown): Record<string, unknown> =>
-            (r && typeof (r as { value?: unknown }).value === 'object' ? (r as { value: Record<string, unknown> }).value : {});
-        const activatedAt = (val(activated).at as string) ?? null;
+        const marks = byGhii.get(g.ghii) ?? new Map<string, Record<string, unknown>>();
+        const val = (key: string): Record<string, unknown> => marks.get(key) ?? {};
+        const str = (key: string, field: string): string | null => {
+            const v = val(key)[field];
+            return typeof v === 'string' ? v : null;
+        };
+        const activatedAt = str(ACTIVATED_KEY, 'at');
         const created = Date.parse(g.createdAt);
         const actMs = activatedAt ? Date.parse(activatedAt) : NaN;
+        const track = val(ONBOARDING_KEYS.track);
+        const mat = val(ONBOARDING_KEYS.welcomeMatPasted);
         rows.push({
             owner: g.ownerName,
             ghii: g.ghii,
             createdAt: g.createdAt,
             locale: g.locale === 'fi' ? 'fi' : 'en',
-            helloOpenedAt: (val(hello).at as string) ?? null,
-            firstMcpCallAt: (val(mcp).at as string) ?? null,
-            mcpClient: (val(mcp).client as string) ?? null,
+            helloOpenedAt: str(HELLO_PAGE_OPENED_KEY, 'at'),
+            firstMcpCallAt: str(FIRST_MCP_CALL_KEY, 'at'),
+            mcpClient: str(FIRST_MCP_CALL_KEY, 'client'),
             activatedAt,
-            activationKind: (val(activated).kind as ActivationKind) ?? null,
+            activationKind: (val(ACTIVATED_KEY).kind as ActivationKind) ?? null,
             ttfvMinutes: (Number.isFinite(created) && Number.isFinite(actMs))
                 ? Math.round((actMs - created) / 60000) : null,
-            rescueSentAt: (val(rescue).at as string) ?? null,
+            rescueSentAt: str(MCP_RESCUE_SENT_KEY, 'at'),
+            // An account with no track marker pre-dates the feature, so it is legacy by construction.
+            track: track.track === 'remake' ? 'remake' : 'legacy',
+            switched: typeof track.switched === 'number' ? track.switched : 0,
+            matResult: mat.result === 'ok' ? 'ok' : mat.result === 'failed' ? 'failed' : null,
+            matAttempts: typeof mat.attempts === 'number' ? mat.attempts : 0,
+            aiModel: str(ONBOARDING_KEYS.aiModelDetected, 'model'),
+            aiClient: str(ONBOARDING_KEYS.aiModelDetected, 'client'),
+            aiMcp: (val(ONBOARDING_KEYS.aiModelDetected).mcp as FunnelRow['aiMcp']) ?? null,
+            aiSource: (val(ONBOARDING_KEYS.aiModelDetected).source as FunnelRow['aiSource']) ?? null,
+            branch: (val(ONBOARDING_KEYS.branchTaken).branch as OnboardingBranch) ?? null,
+            firstAgentConnectedAt: str(ONBOARDING_KEYS.firstAgentConnected, 'at'),
+            homeInitializedAt: str(ONBOARDING_KEYS.homeInitialized, 'at'),
+            room: (val(ONBOARDING_KEYS.roomEntered).room as OnboardingRoom) ?? null,
         });
     }
     return rows;
