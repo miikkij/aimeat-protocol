@@ -7363,7 +7363,9 @@
       "totp": "TOTP-koodi (jos käytössä)",
       "submit": "Kirjaudu"
     },
-    "explain": "Hyväksyntä antaa tälle tekoälylle luvan lukea ja kirjoittaa asioita kotiisi puolestasi. Sinä valitset kuinka paljon se saa tehdä, ja voit muuttaa sitä tai poistaa agentin milloin tahansa."
+    "explain": "Hyväksyntä antaa tälle tekoälylle luvan lukea ja kirjoittaa asioita kotiisi puolestasi. Sinä valitset kuinka paljon se saa tehdä, ja voit muuttaa sitä tai poistaa agentin milloin tahansa.",
+    "stepTitle": "Agenttisi on ovella",
+    "stepDesc": "Se pyytää päästä sisään. Tarkista, että alla oleva koodi on sama jonka tekoälysi näytti, ja päästä se sisään."
   },
   "oauthConsent": {
     "title": "Hyväksy AI-yhteys",

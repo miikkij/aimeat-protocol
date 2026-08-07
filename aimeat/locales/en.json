@@ -7363,7 +7363,9 @@
       "totp": "TOTP code (if enabled)",
       "submit": "Sign in"
     },
-    "explain": "Approving lets this AI read and write things in your home on your behalf. You choose how much it may do, and you can change it or remove the agent at any time."
+    "explain": "Approving lets this AI read and write things in your home on your behalf. You choose how much it may do, and you can change it or remove the agent at any time.",
+    "stepTitle": "Your agent is at the door",
+    "stepDesc": "It is asking to come in. Check that the code below is the one your AI showed you, then let it in."
   },
   "oauthConsent": {
     "title": "Authorize AI Connection",

@@ -8,6 +8,8 @@
  *   the eye away from the open step is working against it.
  * @version-history
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
+ *   v1.0.1 — 2026-08-07 — Rooms block gets a bottom margin: measured 0px between it and the done
+ *     mat card on the finished home, so the two bordered cards collided.
  */
 
 .koti {
@@ -186,6 +188,11 @@
 
 .koti-step .agc-step { margin-top: 1.25rem; }
 .koti-step .agc-explain { margin: 0.5rem 0 0.8rem; line-height: 1.5; }
+/* The badge + countdown row is one line at tab width and two on a phone. Without this it broke
+   between "Expires in:" and the clock, which reads as a rendering fault rather than a wrap.
+   Scoped to the step variant so the profile tab keeps the row it has always had. */
+.koti-step .agc-step .agc-card > .flex-row:first-child { flex-wrap: wrap; row-gap: 0.35rem; }
+.koti-step .agc-step .agc-card > .flex-row:first-child .text-caption { white-space: nowrap; }
 
 /* ── The connected agent ── */
 .koti-agent-card {
@@ -278,7 +285,9 @@ a.koti-feed-line:hover { text-decoration: underline; }
 .koti-feed-when { font-size: 0.8rem; color: var(--muted); }
 
 /* ── The four rooms ── */
-.koti-rooms { margin-top: 2rem; }
+/* Space on BOTH sides: on the finished home the done mat card follows this block directly, and with
+   a top margin only the two bordered cards met at the same y and read as one collided box. */
+.koti-rooms { margin: 2rem 0; }
 .koti-rooms-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 0.9rem; }
 .koti-room {
   display: flex; flex-direction: column; gap: 0.35rem;

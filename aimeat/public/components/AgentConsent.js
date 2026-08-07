@@ -21,6 +21,8 @@
  * @version-history
  *   v1.0.0 — 2026-08-07 — Extracted from views/profile/agents-tab.js so the home and the profile
  *     render the same panel (remake phase 4, E7).
+ *   v1.1.0 — 2026-08-07 — The 'step' variant says "your home" instead of the settings tab's "your
+ *     account"; browser verification caught the framing leaking into the new path.
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -115,10 +117,20 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
 export function AgentConsent({ requests, onApprove, onDeny, busyCode = null, variant = 'inline' }) {
   const list = Array.isArray(requests) ? requests : [];
   if (!list.length) return null;
+  // The profile tab is a settings surface and says "your account"; the home says "your home" the
+  // whole way down. Same panel, same behaviour — only the two lines of framing differ, so the old
+  // path keeps its wording untouched.
+  const step = variant === 'step';
   return html`
-    <div class=${variant === 'step' ? 'agc agc-step' : 'agent-cta mb-1 agc'}>
-      <div class="section-title">${t('profile.agents.pendingRequests.title')}</div>
-      <p>${t('profile.agents.pendingRequests.desc')}</p>
+    <div class=${step ? 'agc agc-step' : 'agent-cta mb-1 agc'}>
+      <div class="section-title">
+        ${step ? tr('agentConsent.stepTitle', 'Your agent is at the door')
+               : t('profile.agents.pendingRequests.title')}
+      </div>
+      <p>
+        ${step ? tr('agentConsent.stepDesc', 'It is asking to come in. Check that the code below is the one your AI showed you, then let it in.')
+               : t('profile.agents.pendingRequests.desc')}
+      </p>
       ${list.map(req => html`
         <${ConsentCard} key=${req.user_code} req=${req} variant=${variant}
           busy=${busyCode === req.user_code}
