@@ -7362,7 +7362,8 @@
       "password": "Salasana",
       "totp": "TOTP-koodi (jos käytössä)",
       "submit": "Kirjaudu"
-    }
+    },
+    "explain": "Hyväksyntä antaa tälle tekoälylle luvan lukea ja kirjoittaa asioita kotiisi puolestasi. Sinä valitset kuinka paljon se saa tehdä, ja voit muuttaa sitä tai poistaa agentin milloin tahansa."
   },
   "oauthConsent": {
     "title": "Hyväksy AI-yhteys",
@@ -8831,6 +8832,30 @@
       "errKept": "Tekstisi on yhä laatikossa. Pyydä tekoälyltäsi koko HTML-tiedosto yhdessä koodilohkossa ja liitä uudestaan.",
       "attempts": "Yrityksiä tähän mennessä: {n}.",
       "tryShorter": "Näytä lyhyempi kehote"
+    },
+    "agent": {
+      "title": "Yhdistä kotiisi ensimmäinen agenttisi",
+      "lede": "Agentti tarkoittaa täällä yksinkertaisesti sitä tekoälyä jonka kanssa jo puhut, kun se saa oman tiensä kotiisi. Kytkennan jälkeen se lukee ja kirjoittaa asioita puolestasi suoraan, eikä sinun tarvitse kopioida tekstiä edestakaisin. Sinä päätät mitä se saa tehdä, ja voit ottaa sen pois milloin tahansa.",
+      "nameLabel": "Anna agentillesi nimi",
+      "nameHint": "Se nimi jolla tunnistat sen. Pieniä kirjaimia, numeroita ja väliviivoja.",
+      "namePlaceholder": "claude",
+      "nameSubmit": "Tämä on sen nimi",
+      "named": "Agenttisi nimi on",
+      "rename": "Vaihda se",
+      "modePrompt": "Anna sille kehote",
+      "modeSteps": "Tee askel askeleelta",
+      "promptLabel": "Kehote",
+      "copy": "Kopioi kehote",
+      "copied": "Kopioitu — liitä se tekoälychattiisi",
+      "doneManual": "Olen aloittanut",
+      "waitTitle": "Odotetaan että agenttisi koputtaa ovelle.",
+      "waitBody": "Seuraava siirto on tekoälychatissasi: sen pitää ajaa kehote ja näyttää sinulle koodi. Kun se tekee niin, pyyntö ilmestyy tähän ja sinä hyväksyt sen.",
+      "cardSub": "Kytketty ja kotona.",
+      "showDetails": "Tiedot",
+      "hideDetails": "Piilota tiedot",
+      "dtId": "Tunniste",
+      "dtSince": "Kytketty",
+      "manage": "Hallitse mitä se saa tehdä"
     }
   }
 }

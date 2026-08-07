@@ -346,5 +346,76 @@ await test('Only a stated missing tier reaches branch B', async () => {
     assert(s.step === 'hello-mcp', `branch B step 3 is the agent connection, got ${s.step}`);
 });
 
+console.log('\nPhase 5: the first agent (branch A, step 2)');
+
+await test('GET /v1/prompts/agent-connect carries the prompt AND the manual steps', async () => {
+    const { status, body } = await json('/v1/prompts/agent-connect?agent_name=claude', auth(tokenMat));
+    assert(status === 200, `prompt ${status}: ${JSON.stringify(body.error)}`);
+    const d = body.data;
+    assert(typeof d.prompt === 'string' && d.prompt.length > 200, 'a prompt must come back');
+    assert(d.prompt.includes('"agent_name": "claude"'), 'the chosen name must be in the prompt');
+    assert(d.prompt.includes(ownerMat), 'the prompt must name the account it is for');
+    // The proof key is the thing that finishes the home, so the prompt has to ask for it.
+    assert(d.prompt.includes('onboarding.hello_mcp'), 'the prompt must tell the AI to write the proof key');
+    // A silent failure leaves a person watching a spinner forever.
+    assert(/say so plainly|sano se minulle/i.test(d.prompt), 'the prompt must tell the AI to say so when it cannot');
+    assert(Array.isArray(d.steps) && d.steps.length >= 3, `the manual steps must exist: ${JSON.stringify(d.steps)}`);
+    assert(d.steps.join(' ').includes('onboarding.hello_mcp'),
+        'the manual steps must describe the same flow as the prompt, proof key included');
+});
+
+await test('The Finnish prompt is Finnish, not English with a header', async () => {
+    const { body } = await json('/v1/prompts/agent-connect?lang=fi&agent_name=claude', auth(tokenMat));
+    const p = body.data.prompt as string;
+    assert(/[äö]/.test(p), 'Finnish copy must actually be in Finnish');
+    assert(p.includes('laitevaltuutusta'), `expected the Finnish flow description, got: ${p.slice(0, 120)}`);
+});
+
+await test('FAILURE MODE: first-agent cannot be marked before an agent exists (409)', async () => {
+    // Otherwise the funnel would carry a step that never happened, and the funnel is the only
+    // thing that says whether any of this works.
+    const t = await registerOwner(`hmfa${stamp}`);
+    const { status, body } = await json('/v1/home/first-agent', auth(t, { method: 'POST', body: '{}' }));
+    assert(status === 409, `expected 409, got ${status}: ${JSON.stringify(body)}`);
+});
+
+await test('FAILURE MODE: an agent token cannot mark its own arrival', async () => {
+    const { status } = await json('/v1/home/first-agent', auth(agentToken, { method: 'POST', body: '{}' }));
+    assert(status === 403, `an agent must not write its owner's funnel; got ${status}`);
+});
+
+await test('Marking the first agent is write-once and records its name', async () => {
+    const first = await json('/v1/home/first-agent', auth(tokenAgentOwner, { method: 'POST', body: '{}' }));
+    assert(first.status === 200, `first call ${first.status}: ${JSON.stringify(first.body.error)}`);
+    const { body } = await json(`/v1/memory/${encodeURIComponent('onboarding.first_agent_connected')}?soft=1`,
+        auth(tokenAgentOwner));
+    const marker = body.data?.value;
+    assert(marker?.agentName === 'hmagent', `the marker names the agent: ${JSON.stringify(marker)}`);
+
+    const second = await json('/v1/home/first-agent', auth(tokenAgentOwner, { method: 'POST', body: '{}' }));
+    assert(second.status === 200, `second call ${second.status}`);
+    assert(second.body.data.recorded === false, 'a second call must not re-record');
+    const after = await json(`/v1/memory/${encodeURIComponent('onboarding.first_agent_connected')}?soft=1`,
+        auth(tokenAgentOwner));
+    assert(after.body.data.value.at === marker.at, 'the timestamp must not move');
+});
+
+await test('The home_initialized marker is stamped exactly once, with the branch it came through', async () => {
+    // This account already has mat + agent + proof key from phase 2.
+    const s = await homeState(tokenAgentOwner);
+    assert(s.initialized === true, 'setup: this home is initialized');
+    const { body } = await json(`/v1/memory/${encodeURIComponent('onboarding.home_initialized')}?soft=1`,
+        auth(tokenAgentOwner));
+    const marker = body.data?.value;
+    assert(!!marker?.at, `home_initialized must be stamped: ${JSON.stringify(body.data)}`);
+    assert(marker.via === 'A' || marker.via === 'B' || marker.via === 'agent',
+        `via must say which branch: ${JSON.stringify(marker)}`);
+
+    await homeState(tokenAgentOwner);          // read again — must not re-stamp
+    const again = await json(`/v1/memory/${encodeURIComponent('onboarding.home_initialized')}?soft=1`,
+        auth(tokenAgentOwner));
+    assert(again.body.data.value.at === marker.at, 'reading the state again must not move the timestamp');
+});
+
 console.log(`\n=== Remake Home: ${passed} passed, ${failed} failed ===\n`);
 if (failed > 0) process.exit(1);

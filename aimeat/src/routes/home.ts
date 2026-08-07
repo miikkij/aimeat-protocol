@@ -21,6 +21,7 @@ import type { AimeatConfig } from '../config.js';
 import type { Storage } from '../storage/interface.js';
 import { registerWelcomeMatRoutes, type HomeRouteCtx } from './home/welcome-mat.js';
 import { registerHomeStateRoutes } from './home/state.js';
+import { registerFirstAgentRoutes } from './home/first-agent.js';
 
 export function homeRouter(config: AimeatConfig, storage: Storage): Router {
     const router = Router();
@@ -28,6 +29,7 @@ export function homeRouter(config: AimeatConfig, storage: Storage): Router {
 
     registerHomeStateRoutes(router, ctx);
     registerWelcomeMatRoutes(router, ctx);
+    registerFirstAgentRoutes(router, ctx);
 
     return router;
 }

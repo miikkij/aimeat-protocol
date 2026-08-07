@@ -67,7 +67,6 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
 import { Spinner } from './shared.js';
 import { apiGet, apiPost, apiPatch } from '/js/api.js';
@@ -75,7 +74,7 @@ import { listAgents, updateAgentScopes, deleteAgent, getAgentGroups, saveAgentGr
 import { getNodeUrl } from '/js/services/auth.js';
 import { useConfirm } from '/components/Modal.js';
 import SharedBoard from './agents/shared-board.js';
-import { SCOPE_TEMPLATES, templateLabel } from './agents/scope-config.js';
+import { AgentConsent } from '/components/AgentConsent.js';
 import { buildAgentPrompt, buildTaskRunnerPrompt, buildMcpOnboardingPrompt, PLATFORMS, PLATFORM_KEYS, PLATFORM_LABELS } from './agents/connect-prompts.js';
 import { loadAgentOrder, saveAgentOrder, UNGROUPED_ID, loadCollapsedGroups, saveCollapsedGroups, loadSeen, saveSeen, markTabSeen, effectiveOrderedNames, popOutAgent } from './agents/tab-helpers.js';
 import { renderFilterBar, ActiveTasksPanel, renderAgentGroups } from './agents/groups-render.js';
@@ -94,8 +93,6 @@ export default function AgentsTab({ session, showToast, onStats }) {
   const [scopesModal, setScopesModal] = useState(null);
   const [expandedAgent, setExpandedAgent] = useState(null);
   const [pendingRequests, setPendingRequests] = useState([]);
-  const [approvingCode, setApprovingCode] = useState(null);
-  const [approvePreset, setApprovePreset] = useState('standard');
   const [connectExpanded, setConnectExpanded] = useState(false);
   const [pasteExpanded, setPasteExpanded] = useState(false);
   const [taskRunnerExpanded, setTaskRunnerExpanded] = useState(false);
@@ -390,8 +387,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
     }
   }
 
-  async function handleApprove(userCode) {
-    const scopes = SCOPE_TEMPLATES[approvePreset] || SCOPE_TEMPLATES.standard;
+  // Scopes come from the shared consent panel, which owns the preset choice — this stays the
+  // approve action so the tab keeps its own toast, list update and reload.
+  async function handleApprove(userCode, scopes) {
     try {
       const resp = await apiPost('/v1/agents/verify', {
         user_code: userCode,
@@ -402,8 +400,6 @@ export default function AgentsTab({ session, showToast, onStats }) {
       if (resp?.ok !== false) {
         showToast(t('profile.agents.pendingRequests.approved'));
         setPendingRequests(prev => prev.filter(r => r.user_code !== userCode));
-        setApprovingCode(null);
-        setApprovePreset('standard');
         loadData();
       } else {
         showToast(resp?.error?.message || t('profile.agents.pendingRequests.approveError'), true);
@@ -457,58 +453,10 @@ export default function AgentsTab({ session, showToast, onStats }) {
     </div>
     <div class="section-desc">${t('profile.agents.desc')}</div>
 
-    ${pendingRequests.length > 0 && html`
-      <div class="agent-cta mb-1">
-        <div class="section-title">${t('profile.agents.pendingRequests.title')}</div>
-        <p>${t('profile.agents.pendingRequests.desc')}</p>
-        ${pendingRequests.map(req => html`
-          <div class="card mt-1 p-1" key=${req.user_code}>
-            <div class="flex-row mb-half">
-              <span class="badge badge-info">${t('profile.agents.pendingRequests.waiting')}</span>
-              <span class="text-caption">${t('profile.agents.pendingRequests.expiresIn')}: ${Math.floor(req.expires_in / 60)}:${String(req.expires_in % 60).padStart(2, '0')}</span>
-            </div>
-            <div class="mb-half">
-              <div class="text-caption mb-half">${t('profile.agents.pendingRequests.agentName')}</div>
-              <div class="text-bold">${escHtml(req.agent_name)}${req.display_name ? ` (${escHtml(req.display_name)})` : ''}</div>
-            </div>
-            <div class="mb-half">
-              <div class="text-caption mb-half">${t('profile.agents.pendingRequests.code')}</div>
-              <div class="pf-device-code">${req.user_code}</div>
-            </div>
-            ${approvingCode === req.user_code ? html`
-              <div class="mb-half">
-                <div class="text-caption mb-half">${t('profile.agents.pendingRequests.scopeLevel')}</div>
-                <div class="flex-row pf-scope-presets">
-                  ${['readonly', 'standard', 'full'].map(p => html`
-                    <button class="${approvePreset === p ? 'btn-primary' : 'btn-outline'} pf-scope-preset-btn"
-                      onClick=${() => setApprovePreset(p)}>
-                      ${templateLabel(p)}
-                    </button>
-                  `)}
-                </div>
-              </div>
-              <div class="flex-row mt-1">
-                <button class="btn-success" onClick=${() => handleApprove(req.user_code)}>
-                  ${t('profile.agents.pendingRequests.confirmApprove')}
-                </button>
-                <button class="btn-outline" onClick=${() => setApprovingCode(null)}>
-                  ${t('profile.agents.pendingRequests.cancel')}
-                </button>
-              </div>
-            ` : html`
-              <div class="flex-row mt-1">
-                <button class="btn-success" onClick=${() => setApprovingCode(req.user_code)}>
-                  ${t('profile.agents.pendingRequests.approve')}
-                </button>
-                <button class="btn-danger-solid" onClick=${() => handleDeny(req.user_code)}>
-                  ${t('profile.agents.pendingRequests.deny')}
-                </button>
-              </div>
-            `}
-          </div>
-        `)}
-      </div>
-    `}
+    ${/* The approval panel is a SHARED component (components/AgentConsent.js): the remake's home
+          shows the same panel for the person's FIRST agent, and a copy here would drift from it.
+          Behaviour is unchanged — same requests, same scope presets, same verify calls. */''}
+    <${AgentConsent} requests=${pendingRequests} onApprove=${handleApprove} onDeny=${handleDeny} />
 
     ${connectExpanded && html`
       <div class="pf-agd-connect-content">

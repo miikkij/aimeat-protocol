@@ -1,6 +1,6 @@
 /**
  * @file home.css
- * @description Styles for KOTI, the home path (hm- prefix): the welcome, the numbered step list
+ * @description Styles for KOTI, the home path (koti- prefix): the welcome, the numbered step list
  *   with exactly one step open and the rest named-but-dimmed, the prompt block, the paste box and
  *   its error state. Theme tokens only — no hardcoded colours, no rgba(255,255,255,…).
  *
@@ -10,42 +10,42 @@
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 3).
  */
 
-.hm {
+.koti {
   max-width: 720px;
   margin: 0 auto;
   padding: 2rem 1.25rem 4rem;
   color: var(--text);
 }
 
-.hm-loading { display: flex; justify-content: center; padding: 4rem 0; }
+.koti-loading { display: flex; justify-content: center; padding: 4rem 0; }
 
 /* ── Welcome ── */
-.hm-welcome { margin-bottom: 2rem; }
-.hm-h1 {
+.koti-welcome { margin-bottom: 2rem; }
+.koti-h1 {
   font-size: 1.9rem;
   font-weight: 800;
   letter-spacing: -0.4px;
   margin: 0 0 0.6rem;
   line-height: 1.2;
 }
-.hm-welcome-sub { color: var(--text-dim); font-size: 1.05rem; margin: 0; }
+.koti-welcome-sub { color: var(--text-dim); font-size: 1.05rem; margin: 0; }
 
 /* ── The step list ── */
-.hm-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1rem; }
+.koti-steps { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1rem; }
 
-.hm-step {
+.koti-step {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   background: var(--card);
   padding: 1.25rem 1.35rem;
 }
 /* The open step is the only thing on the page with an accent edge. */
-.hm-step-open { border-color: var(--accent); }
-.hm-step-done { border-color: var(--success); }
-.hm-step-dim { opacity: 0.55; background: var(--surface); }
+.koti-step-open { border-color: var(--accent); }
+.koti-step-done { border-color: var(--success); }
+.koti-step-dim { opacity: 0.55; background: var(--surface); }
 
-.hm-step-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.6rem; }
-.hm-step-num {
+.koti-step-head { display: flex; align-items: center; gap: 0.7rem; margin-bottom: 0.6rem; }
+.koti-step-num {
   flex: none;
   width: 1.75rem; height: 1.75rem;
   display: inline-flex; align-items: center; justify-content: center;
@@ -55,32 +55,32 @@
   font-size: 0.85rem; font-weight: 700;
   color: var(--text-dim);
 }
-.hm-step-open .hm-step-num { border-color: var(--accent); color: var(--accent); }
-.hm-step-num-done { border-color: var(--success); color: var(--success); }
+.koti-step-open .koti-step-num { border-color: var(--accent); color: var(--accent); }
+.koti-step-num-done { border-color: var(--success); color: var(--success); }
 
-.hm-step-title { font-size: 1.15rem; font-weight: 700; margin: 0; }
-.hm-step-lede { color: var(--text-dim); font-size: 0.98rem; line-height: 1.55; margin: 0 0 1.1rem; }
-.hm-step-dim .hm-step-lede { margin-bottom: 0; }
+.koti-step-title { font-size: 1.15rem; font-weight: 700; margin: 0; }
+.koti-step-lede { color: var(--text-dim); font-size: 0.98rem; line-height: 1.55; margin: 0 0 1.1rem; }
+.koti-step-dim .koti-step-lede { margin-bottom: 0; }
 
 /* ── The prompt block ── */
-.hm-prompt {
+.koti-prompt {
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--bg-dim);
   margin-bottom: 1.25rem;
   overflow: hidden;
 }
-.hm-prompt-head {
+.koti-prompt-head {
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
   flex-wrap: wrap;
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid var(--border);
 }
-.hm-prompt-label {
+.koti-prompt-label {
   font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px;
   color: var(--muted); font-weight: 700;
 }
-.hm-prompt-body {
+.koti-prompt-body {
   margin: 0;
   padding: 0.85rem;
   /* The prompt is long on purpose; a scroll box keeps the paste box on screen. */
@@ -95,12 +95,12 @@
 }
 
 /* ── The paste box ── */
-.hm-paste-label {
+.koti-paste-label {
   display: block;
   font-size: 0.9rem; font-weight: 600;
   margin-bottom: 0.4rem;
 }
-.hm-paste {
+.koti-paste {
   width: 100%;
   box-sizing: border-box;
   padding: 0.75rem 0.85rem;
@@ -113,35 +113,121 @@
   line-height: 1.5;
   resize: vertical;
 }
-.hm-paste:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+.koti-paste:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
 
 /* ── The error, which never clears the box ── */
-.hm-error {
+.koti-error {
   margin-top: 1rem;
   border: 1px solid var(--danger);
   border-radius: var(--radius-sm);
   background: var(--bg-dim);
   padding: 0.85rem 1rem;
 }
-.hm-error-text { margin: 0 0 0.4rem; font-weight: 600; color: var(--text); }
-.hm-error-hint { margin: 0; font-size: 0.9rem; color: var(--text-dim); line-height: 1.5; }
-.hm-fallback-btn { margin-top: 0.6rem; }
+.koti-error-text { margin: 0 0 0.4rem; font-weight: 600; color: var(--text); }
+.koti-error-hint { margin: 0; font-size: 0.9rem; color: var(--text-dim); line-height: 1.5; }
+.koti-fallback-btn { margin-top: 0.6rem; }
 
-.hm-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-top: 1.25rem; }
+.koti-actions { display: flex; gap: 0.7rem; flex-wrap: wrap; margin-top: 1.25rem; }
 
 /* ── The finished mat ── */
-.hm-mat-links { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
-.hm-mat-url {
+.koti-mat-links { display: flex; align-items: center; gap: 0.9rem; flex-wrap: wrap; }
+.koti-mat-url {
   font-size: 0.85rem; color: var(--text-dim);
   word-break: break-all;
 }
 
+/* ── Step 2: naming, the two ways of doing it, and the wait ── */
+.koti-hint { font-size: 0.88rem; color: var(--text-dim); margin: 0 0 0.6rem; }
+.koti-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-card);
+  color: var(--text);
+  font-size: 1rem;
+  font-family: inherit;
+}
+.koti-input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: var(--accent); }
+
+.koti-named { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.koti-named-label { color: var(--text-dim); font-size: 0.92rem; }
+.koti-named-value { font-size: 1rem; }
+.koti-rename { font-size: 0.85rem; }
+
+.koti-modes { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; }
+.koti-mode-on { border-color: var(--accent); color: var(--accent); }
+
+.koti-manual { margin: 0 0 1rem; padding-left: 1.3rem; display: flex; flex-direction: column; gap: 0.6rem; }
+.koti-manual-step { font-size: 0.95rem; line-height: 1.55; color: var(--text-dim); }
+
+/* The waiting state. Its whole job is to say the ball is in the other window. */
+.koti-waiting {
+  display: flex; align-items: flex-start; gap: 0.8rem;
+  margin-top: 1.25rem;
+  padding: 0.9rem 1rem;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg-dim);
+}
+.koti-waiting-dot {
+  flex: none;
+  width: 0.6rem; height: 0.6rem;
+  margin-top: 0.4rem;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+  animation: koti-pulse 1.4s ease-in-out infinite;
+}
+@keyframes koti-pulse { 0%, 100% { opacity: 0.35; } 50% { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .koti-waiting-dot { animation: none; opacity: 1; } }
+.koti-waiting-title { margin: 0 0 0.25rem; font-weight: 600; }
+.koti-waiting-body { margin: 0; font-size: 0.92rem; color: var(--text-dim); line-height: 1.5; }
+
+.koti-step .agc-step { margin-top: 1.25rem; }
+.koti-step .agc-explain { margin: 0.5rem 0 0.8rem; line-height: 1.5; }
+
+/* ── The connected agent ── */
+.koti-agent-card {
+  border: 1px solid var(--success);
+  border-radius: var(--radius);
+  background: var(--card);
+  padding: 1.25rem 1.35rem;
+  margin-bottom: 1rem;
+}
+.koti-agent-head { display: flex; align-items: center; gap: 0.7rem; }
+.koti-agent-dot {
+  flex: none; width: 0.6rem; height: 0.6rem;
+  border-radius: var(--radius-full); background: var(--success);
+}
+.koti-agent-name { font-size: 1.15rem; font-weight: 700; }
+.koti-agent-sub { font-size: 0.9rem; color: var(--text-dim); }
+.koti-agent-toggle { margin-top: 0.7rem; font-size: 0.88rem; }
+.koti-agent-details { margin: 0.8rem 0 0; display: grid; grid-template-columns: auto 1fr; gap: 0.35rem 1rem; }
+.koti-agent-details dt { font-size: 0.85rem; color: var(--muted); }
+.koti-agent-details dd { margin: 0; font-size: 0.9rem; }
+.koti-agent-gaii { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; word-break: break-all; }
+.koti-agent-manage { display: inline-block; margin-top: 0.9rem; }
+
+/* One line of feedback, only for things that went wrong. */
+.koti-toast {
+  position: fixed; left: 50%; bottom: 1.25rem; transform: translateX(-50%);
+  max-width: min(90vw, 30rem);
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--danger);
+  border-radius: var(--radius-sm);
+  background: var(--card);
+  color: var(--text);
+  font-size: 0.92rem;
+  z-index: 50;
+}
+
 @media (max-width: 560px) {
-  .hm { padding: 1.25rem 1rem 3rem; }
-  .hm-h1 { font-size: 1.55rem; }
-  .hm-step { padding: 1rem 1rem; }
-  .hm-prompt-body { max-height: 10rem; font-size: 0.78rem; }
+  .koti { padding: 1.25rem 1rem 3rem; }
+  .koti-h1 { font-size: 1.55rem; }
+  .koti-step { padding: 1rem 1rem; }
+  .koti-prompt-body { max-height: 10rem; font-size: 0.78rem; }
   /* One full-width button per row: a half-width primary action on a phone reads as optional. */
-  .hm-actions > * { width: 100%; }
-  .hm-prompt-head > * { width: 100%; }
+  .koti-actions > * { width: 100%; }
+  .koti-prompt-head > * { width: 100%; }
 }

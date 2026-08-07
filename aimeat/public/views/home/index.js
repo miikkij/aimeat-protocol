@@ -25,6 +25,7 @@ import { apiGet } from '/js/api.js';
 import { useSession } from '/js/use-session.js';
 import { Spinner } from '/components/Spinner.js';
 import { StepMat, StepMatDone } from '/views/home/step-mat.js';
+import { StepAgent, AgentCard } from '/views/home/step-agent.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -38,24 +39,24 @@ const STEP_TITLES = {
 /** A step that is named so the person knows it is coming, and dimmed so they cannot start it. */
 function DimmedStep({ n, titleKey, fallback, note }) {
   return html`
-    <div class="hm-step hm-step-dim" aria-disabled="true">
-      <div class="hm-step-head">
-        <span class="hm-step-num">${n}</span>
-        <h2 class="hm-step-title">${tr(titleKey, fallback)}</h2>
+    <div class="koti-step koti-step-dim" aria-disabled="true">
+      <div class="koti-step-head">
+        <span class="koti-step-num">${n}</span>
+        <h2 class="koti-step-title">${tr(titleKey, fallback)}</h2>
       </div>
-      ${note && html`<p class="hm-step-lede">${note}</p>`}
+      ${note && html`<p class="koti-step-lede">${note}</p>`}
     </div>`;
 }
 
 function Welcome({ name }) {
   return html`
-    <header class="hm-welcome">
-      <h1 class="hm-h1">
+    <header class="koti-welcome">
+      <h1 class="koti-h1">
         ${name
           ? tr('home.welcomeNamed', 'Welcome to your new home, {name}.').replace('{name}', name)
           : tr('home.welcome', 'Welcome to your new home.')}
       </h1>
-      <p class="hm-welcome-sub">
+      <p class="koti-welcome-sub">
         ${tr('home.welcomeSub', 'Before the place can do anything for you, there are a couple of things to do.')}
       </p>
     </header>`;
@@ -65,6 +66,14 @@ export default function HomeView({ navigate }) {
   const session = useSession();
   const [state, setState] = useState(null);
   const [loadError, setLoadError] = useState('');
+  const [toast, setToast] = useState('');
+
+  // One line of feedback, and only for things that went wrong: the steps themselves report by
+  // changing, which is louder than a message that fades.
+  const showToast = useCallback((msg) => {
+    setToast(msg);
+    setTimeout(() => setToast(''), 6000);
+  }, []);
 
   const load = useCallback(async () => {
     try {
@@ -93,12 +102,12 @@ export default function HomeView({ navigate }) {
 
   if (!session) {
     return html`
-      <div class="hm">
-        <header class="hm-welcome">
-          <h1 class="hm-h1">${tr('home.signInTitle', 'Step into your home')}</h1>
-          <p class="hm-welcome-sub">${tr('home.signInDesc', 'Sign in to see where you left off.')}</p>
+      <div class="koti">
+        <header class="koti-welcome">
+          <h1 class="koti-h1">${tr('home.signInTitle', 'Step into your home')}</h1>
+          <p class="koti-welcome-sub">${tr('home.signInDesc', 'Sign in to see where you left off.')}</p>
         </header>
-        <div class="hm-actions">
+        <div class="koti-actions">
           <button type="button" class="btn-primary" onClick=${() => navigate('/v1/portal')}>
             ${tr('home.signIn', 'Sign in')}
           </button>
@@ -108,27 +117,28 @@ export default function HomeView({ navigate }) {
 
   if (loadError) {
     return html`
-      <div class="hm">
-        <div class="hm-error" role="alert"><p class="hm-error-text">${loadError}</p></div>
+      <div class="koti">
+        <div class="koti-error" role="alert"><p class="koti-error-text">${loadError}</p></div>
       </div>`;
   }
 
   if (!state) {
-    return html`<div class="hm hm-loading"><${Spinner} /></div>`;
+    return html`<div class="koti koti-loading"><${Spinner} /></div>`;
   }
 
   const name = state.displayName || state.owner;
 
-  // ── The initialised home is phase 4's surface; until then this view is the three steps. ──
+  // ── The home, once it exists: the first agent as a card, its details below it. ──
   if (state.initialized) {
     return html`
-      <div class="hm">
-        <header class="hm-welcome">
-          <h1 class="hm-h1">${tr('home.readyTitle', 'Your home is up and running.')}</h1>
-          <p class="hm-welcome-sub">
+      <div class="koti">
+        <header class="koti-welcome">
+          <h1 class="koti-h1">${tr('home.readyTitle', 'Your home is up and running.')}</h1>
+          <p class="koti-welcome-sub">
             ${tr('home.readySub', 'Your welcome mat is out and your first agent is home.')}
           </p>
         </header>
+        <${AgentCard} agent=${state.agent} />
         <${StepMatDone} state=${state} />
       </div>`;
   }
@@ -138,10 +148,10 @@ export default function HomeView({ navigate }) {
   const isBranchB = state.branch === 'B';
 
   return html`
-    <div class="hm">
+    <div class="koti">
       <${Welcome} name=${name} />
 
-      <ol class="hm-steps">
+      <ol class="koti-steps">
         <li>
           ${step === 'welcome-mat'
             ? html`<${StepMat} onDone=${onMatDone} />`
@@ -154,20 +164,25 @@ export default function HomeView({ navigate }) {
                 titleKey=${isBranchB ? 'home.step2b' : 'home.step2'}
                 fallback=${isBranchB ? 'Get an app that can connect' : 'Connect your first agent'}
                 note=${tr('home.step2Dim', 'Opens once your welcome mat is up.')} />`
-            : html`<${DimmedStep}
-                n="2"
-                titleKey=${STEP_TITLES[step]?.[0] ?? 'home.step2'}
-                fallback=${STEP_TITLES[step]?.[1] ?? 'Connect your first agent'}
-                note=${tr('home.step2Soon', 'This is the next thing, and it is being built right now.')} />`}
+            : step === 'first-agent'
+              ? html`<${StepAgent} onChanged=${load} showToast=${showToast} />`
+              : html`<${DimmedStep}
+                  n="2"
+                  titleKey=${STEP_TITLES[step]?.[0] ?? 'home.step2'}
+                  fallback=${STEP_TITLES[step]?.[1] ?? 'Connect your first agent'}
+                  note=${tr('home.step2Soon', 'This is the next thing.')} />`}
         </li>
         ${isBranchB && html`
           <li>
-            <${DimmedStep}
-              n="3"
-              titleKey="home.step3"
-              fallback="Connect your first agent"
-              note=${tr('home.step3Dim', 'Opens once you have an app that can connect.')} />
+            ${step === 'hello-mcp'
+              ? html`<${StepAgent} onChanged=${load} showToast=${showToast} stepNumber="3" />`
+              : html`<${DimmedStep}
+                  n="3"
+                  titleKey="home.step3"
+                  fallback="Connect your first agent"
+                  note=${tr('home.step3Dim', 'Opens once you have an app that can connect.')} />`}
           </li>`}
       </ol>
+      ${toast && html`<div class="koti-toast" role="status">${toast}</div>`}
     </div>`;
 }

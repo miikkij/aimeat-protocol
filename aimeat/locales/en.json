@@ -7362,7 +7362,8 @@
       "password": "Password",
       "totp": "TOTP code (if enabled)",
       "submit": "Sign in"
-    }
+    },
+    "explain": "Approving lets this AI read and write things in your home on your behalf. You choose how much it may do, and you can change it or remove the agent at any time."
   },
   "oauthConsent": {
     "title": "Authorize AI Connection",
@@ -8831,6 +8832,30 @@
       "errKept": "Your text is still in the box. Ask your AI for the whole HTML file in one code block, and paste again.",
       "attempts": "Attempts so far: {n}.",
       "tryShorter": "Show me a shorter prompt to try"
+    },
+    "agent": {
+      "title": "Connect your first agent",
+      "lede": "An agent here is simply the AI you already talk to, given a way into your home. Once it is connected it can read and write things for you directly, instead of you copying text back and forth. You decide what it may do, and you can take it back at any time.",
+      "nameLabel": "Give your agent a name",
+      "nameHint": "Whatever you will recognise it by. Lower-case letters, numbers and dashes.",
+      "namePlaceholder": "claude",
+      "nameSubmit": "That is its name",
+      "named": "Your agent is called",
+      "rename": "Change it",
+      "modePrompt": "Give it a prompt",
+      "modeSteps": "Do it step by step",
+      "promptLabel": "The prompt",
+      "copy": "Copy the prompt",
+      "copied": "Copied — paste it in your AI chat",
+      "doneManual": "I have started it",
+      "waitTitle": "Waiting for your agent to knock.",
+      "waitBody": "The next move is in your AI chat: it has to run the prompt and show you a code. When it does, its request appears here and you approve it.",
+      "cardSub": "Connected and at home.",
+      "showDetails": "Details",
+      "hideDetails": "Hide details",
+      "dtId": "Its identifier",
+      "dtSince": "Connected",
+      "manage": "Manage what it may do"
     }
   }
 }

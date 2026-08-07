@@ -33,6 +33,7 @@ import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
 import { buildWelcomeMatPrompt } from '../services/welcome-mat-prompt.js';
+import { buildAgentConnectPrompt, buildAgentConnectSteps } from '../services/agent-connect-prompt.js';
 import { buildAiToolSetup } from '../services/ai-tool-setup.js';
 import { logger } from '../utils/logger.js';
 
@@ -355,6 +356,37 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
         : null,
     }, [
       { description: 'Paste the answer here', method: 'POST', url: '/v1/home/welcome-mat' },
+      { description: 'Where your home stands', method: 'GET', url: '/v1/home/state' },
+    ]));
+  });
+
+  // GET /v1/prompts/agent-connect — step 2 of the home path: the prompt that turns the AI a person
+  // already talks to into an agent with its own way in. Node-served for the same reason as the
+  // welcome-mat prompt: a misleading prompt has to be fixable for the copies already pasted into
+  // people's chats. Returns the prompt AND the same flow as manual steps, generated together so
+  // the two can never describe different things. Owner session (it names the caller's own home).
+  // ?lang, ?agent_name, ?format=txt. MUST be registered before /v1/prompts/:tier.
+  router.get('/v1/prompts/agent-connect', requireAuth(), (req, res) => {
+    const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
+    const agentName = typeof req.query.agent_name === 'string' ? req.query.agent_name : '';
+    const opts = { lang, owner: req.auth!.owner, agentName };
+    const prompt = buildAgentConnectPrompt(config, opts);
+    if (req.query.format === 'txt') {
+      res.type('text/plain; charset=utf-8').send(prompt);
+      return;
+    }
+    res.json(success(config.nodeId, {
+      id: 'agent-connect',
+      name: 'Connect your first agent',
+      description: 'Paste into your own AI chat. It starts device authorization, shows you a code to approve, '
+        + 'and then writes the proof key through the connection — the write that makes the home finished.',
+      lang,
+      agent_name: agentName || null,
+      prompt,
+      system_prompt: prompt,
+      steps: buildAgentConnectSteps(config, opts),
+    }, [
+      { description: 'Approve the request when it appears', method: 'POST', url: '/v1/agents/verify' },
       { description: 'Where your home stands', method: 'GET', url: '/v1/home/state' },
     ]));
   });

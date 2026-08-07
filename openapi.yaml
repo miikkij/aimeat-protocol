@@ -7816,6 +7816,93 @@ paths:
         '413':
           description: The paste is larger than the node's portfolio size cap
 
+  /v1/prompts/agent-connect:
+    get:
+      operationId: getAgentConnectPrompt
+      summary: Connect-your-first-agent prompt, plus the same flow as manual steps
+      description: >-
+        Step 2 of the home path: the prompt a person pastes into the AI chat they already use, to
+        turn it into an agent with its own way into their home. It runs device authorization
+        (RFC 8628), shows the person a code to approve, and then writes `onboarding.hello_mcp`
+        THROUGH the connection — that write is what makes the home finished, so the prompt asks for
+        it explicitly.
+
+        `steps` is the same flow as instructions to follow by hand, generated beside the prompt so
+        the two can never describe different things — the failure where someone follows one, gets
+        stuck, and finds the other saying something else.
+
+        The prompt also instructs the AI to say plainly when it CANNOT make the calls, rather than
+        describing what it would have done: the person is watching a screen, and a silent failure
+        is the worst outcome available. Owner session (the prompt names the caller's own home).
+      tags:
+        - Discovery
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: lang
+          in: query
+          schema: { type: string, enum: [en, fi] }
+        - name: agent_name
+          in: query
+          schema: { type: string }
+          description: The name the person chose. Omitted, the prompt asks the AI to pick one.
+        - name: format
+          in: query
+          schema: { type: string, enum: [txt] }
+      responses:
+        '200':
+          description: The prompt and the manual steps
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          id: { type: string, example: agent-connect }
+                          lang: { type: string, enum: [en, fi] }
+                          agent_name: { type: string, nullable: true }
+                          prompt: { type: string }
+                          system_prompt: { type: string }
+                          steps:
+                            type: array
+                            items: { type: string }
+
+  /v1/home/first-agent:
+    post:
+      operationId: postHomeFirstAgent
+      summary: Record that this account's first agent is in
+      description: >-
+        The funnel marker for the first agent (05-mittaus.md), called by the home right after an
+        approval. It RECORDS rather than grants: the approval itself happens through
+        POST /v1/agents/verify, and nothing here can create or admit an agent. That separation is
+        deliberate — a measurement endpoint that could also let someone in would be a way past the
+        consent step it exists to count.
+
+        Refuses with 409 when the account has no agent, so the funnel cannot carry a step that
+        never happened. Write-once: a re-approval or a double click cannot move the timestamp.
+
+        The response carries the refreshed home state, which is also where `home_initialized` gets
+        stamped the first time all three conditions (mat, agent, proof key) hold at once.
+
+        Requires the ACCOUNT HOLDER's own session — an agent marking its own arrival would be
+        writing its owner's funnel.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: >-
+            Recorded (or already recorded — `recorded: false`), with the refreshed home state.
+        '403':
+          description: Not the account holder's own session
+        '409':
+          description: No agent has joined this account yet
+
   /v1/home/ai-client:
     post:
       operationId: postHomeAiClient

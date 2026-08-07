@@ -88,19 +88,19 @@ export function StepMat({ onDone }) {
   const hasPaste = paste.trim().length > 0;
 
   return html`
-    <div class="hm-step hm-step-open">
-      <div class="hm-step-head">
-        <span class="hm-step-num">1</span>
-        <h2 class="hm-step-title">${tr('home.mat.title', 'Your welcome mat')}</h2>
+    <div class="koti-step koti-step-open">
+      <div class="koti-step-head">
+        <span class="koti-step-num">1</span>
+        <h2 class="koti-step-title">${tr('home.mat.title', 'Your welcome mat')}</h2>
       </div>
 
-      <p class="hm-step-lede">
+      <p class="koti-step-lede">
         ${tr('home.mat.lede', 'Every home needs a welcome mat. You are going to make yours with your own AI: copy the prompt below into your AI chat, paste what it gives back into the box, and press the button.')}
       </p>
 
-      <div class="hm-prompt">
-        <div class="hm-prompt-head">
-          <span class="hm-prompt-label">
+      <div class="koti-prompt">
+        <div class="koti-prompt-head">
+          <span class="koti-prompt-label">
             ${usingFallback ? tr('home.mat.promptShort', 'The shorter prompt') : tr('home.mat.promptLabel', 'The prompt')}
           </span>
           <${CopyButton}
@@ -109,16 +109,16 @@ export function StepMat({ onDone }) {
             label=${tr('home.mat.copy', 'Copy the prompt')}
             copiedLabel=${tr('home.mat.copied', 'Copied — paste it in your AI chat')} />
         </div>
-        <pre class="hm-prompt-body">${shown || tr('home.mat.loading', 'Loading…')}</pre>
+        <pre class="koti-prompt-body">${shown || tr('home.mat.loading', 'Loading…')}</pre>
       </div>
 
-      <label class="hm-paste-label" for="hm-paste">
+      <label class="koti-paste-label" for="koti-paste">
         ${tr('home.mat.pasteLabel', 'Paste what your AI gave you here')}
       </label>
       <textarea
-        id="hm-paste"
+        id="koti-paste"
         ref=${boxRef}
-        class="hm-paste"
+        class="koti-paste"
         rows="8"
         spellcheck="false"
         placeholder=${tr('home.mat.pastePlaceholder', 'Everything it wrote is fine — explanation and all.')}
@@ -126,19 +126,19 @@ export function StepMat({ onDone }) {
         onInput=${(e) => setPaste(e.target.value)}></textarea>
 
       ${errText && html`
-        <div class="hm-error" role="alert">
-          <p class="hm-error-text">${errText}</p>
-          <p class="hm-error-hint">
+        <div class="koti-error" role="alert">
+          <p class="koti-error-text">${errText}</p>
+          <p class="koti-error-hint">
             ${tr('home.mat.errKept', 'Your text is still in the box. Ask your AI for the whole HTML file in one code block, and paste again.')}
             ${attempts > 1 ? ` ${tr('home.mat.attempts', 'Attempts so far: {n}.').replace('{n}', String(attempts))}` : ''}
           </p>
           ${fallbackPrompt && !usingFallback && html`
-            <button type="button" class="btn-ghost hm-fallback-btn" onClick=${() => setUsingFallback(true)}>
+            <button type="button" class="btn-ghost koti-fallback-btn" onClick=${() => setUsingFallback(true)}>
               ${tr('home.mat.tryShorter', 'Show me a shorter prompt to try')}
             </button>`}
         </div>`}
 
-      <div class="hm-actions">
+      <div class="koti-actions">
         <button
           type="button"
           class=${hasPaste ? 'btn-primary' : 'btn-outline'}
@@ -153,18 +153,18 @@ export function StepMat({ onDone }) {
 /** The collapsed step, once there is a mat. Shows the thing that was made, not a tick. */
 export function StepMatDone({ state }) {
   return html`
-    <div class="hm-step hm-step-done">
-      <div class="hm-step-head">
-        <span class="hm-step-num hm-step-num-done">✓</span>
-        <h2 class="hm-step-title">${tr('home.mat.titleDone', 'Your welcome mat is up')}</h2>
+    <div class="koti-step koti-step-done">
+      <div class="koti-step-head">
+        <span class="koti-step-num koti-step-num-done">✓</span>
+        <h2 class="koti-step-title">${tr('home.mat.titleDone', 'Your welcome mat is up')}</h2>
       </div>
-      <p class="hm-step-lede">
+      <p class="koti-step-lede">
         ${tr('home.mat.doneLede', 'This is the first thing you made here, and it is a real page with its own address.')}
       </p>
-      <div class="hm-mat-links">
+      <div class="koti-mat-links">
         <a class="btn-outline" href=${state.mat.url}>${tr('home.mat.view', 'Look at it')}</a>
         ${state.mat.standaloneUrl && html`
-          <a class="hm-mat-url" href=${state.mat.standaloneUrl} target="_blank" rel="noopener">
+          <a class="koti-mat-url" href=${state.mat.standaloneUrl} target="_blank" rel="noopener">
             ${state.mat.standaloneUrl}
           </a>`}
       </div>
