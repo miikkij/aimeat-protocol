@@ -7727,6 +7727,17 @@ paths:
                             type: string
                             enum: [which-client, paid-plan]
                             nullable: true
+                          rooms:
+                            type: array
+                            description: >-
+                              The rooms that are actually open on THIS node, each with its
+                              destination. Empty until the home is initialized (E11: a card is shown
+                              only for a room that exists).
+                            items:
+                              type: object
+                              properties:
+                                id: { type: string, enum: [create, organise, monetise, company] }
+                                url: { type: string }
                           client_options:
                             type: array
                             nullable: true
@@ -8008,6 +8019,160 @@ paths:
           description: Not the account holder's own session
         '409':
           description: No agent has joined this account yet
+
+  /v1/home/feed:
+    get:
+      operationId: getHomeFeed
+      summary: What has happened on this account
+      description: >-
+        The home's feed, newest first. It reads the SAME markers the operator funnel reads — no
+        second store and no second write path — so the screen and the numbers cannot tell two
+        different stories about one account: if the funnel counted it the person sees it, and if
+        they see it, it was counted.
+
+        The first row exists before the person has done anything: the account being created is a
+        real event with a real timestamp, and an empty feed on a first visit reads as broken.
+        One row is live rather than a marker (`agent_knocking`) — the only one that disappears
+        again, and the only one to act on.
+
+        `kind` is a stable key the client translates; the node never decides which language the
+        person reads. K1: the account holder's own, not public — so nothing here needs moderation,
+        visibility rules or a retraction.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The feed
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          items:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                kind:
+                                  type: string
+                                  enum: [account_created, welcome_mat, agent_knocking, agent_connected, home_initialized, room_entered]
+                                at: { type: string, format: date-time }
+                                link:
+                                  type: string
+                                  nullable: true
+                                  description: Where the row goes when clicked — the thing itself, not a page about it.
+                                data:
+                                  type: object
+                                  description: Values the translated line interpolates (an agent's name, which room).
+                          total: { type: integer }
+        '403':
+          description: Not the account holder's own session
+
+  /v1/home/room:
+    post:
+      operationId: postHomeRoom
+      summary: Record which of the four rooms was entered first
+      description: >-
+        The four destinations that open once a home exists are ROOMS, not paths: all open at once,
+        no door locks behind anyone. This records which was entered FIRST, write-once — the question
+        it answers is what someone came here to do, and a value that followed them around would
+        answer "where were they last" instead.
+
+        A room whose destination is not on this node is refused with 409. Recording an entry into a
+        place that does not exist would put a step in the funnel that cannot happen. Which rooms
+        ARE open comes back on GET /v1/home/state.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [room]
+              properties:
+                room: { type: string, enum: [create, organise, monetise, company] }
+      responses:
+        '200':
+          description: >-
+            Recorded (`recorded: false` when a room was already recorded — the first one stands),
+            with the destination URL.
+        '400':
+          description: Not one of the four rooms
+        '403':
+          description: Not the account holder's own session
+        '409':
+          description: That room is not open on this node
+
+  /v1/home/ui-track:
+    get:
+      operationId: getHomeUiTrack
+      summary: Which side this person lands on (the switch)
+      description: >-
+        The new home or the old profile. K2: the choice is per USER and stored on the account, so it
+        follows them to another device; a per-tab choice would mean landing on whichever side
+        happened to be the default every morning.
+
+        When nothing has been chosen, `defaulted` is true and the answer comes from the account's
+        cohort (K3): an account created on the remake lands on the home, one created before it lands
+        where it always did. Nobody's workflow changes under them.
+
+        `track` and `switched` are returned read-only, for transparency — no route here changes
+        `track`.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: The current side, and the cohort it belongs to
+        '403':
+          description: Not the account holder's own session
+    put:
+      operationId: putHomeUiTrack
+      summary: Switch sides
+      description: >-
+        Stores the choice and increments `switched`. It NEVER changes `track`.
+
+        Those answer different questions: `track` is which path the account was created on and
+        defines its cohort; `switched` is how many times the person has flipped. Rewriting `track`
+        on a flip would move accounts between cohorts as people wander, and a cohort whose
+        membership changes under you measures nothing. The counter is itself a result — accounts
+        created on the new path leaving for the old one is the signal that the new path failed.
+
+        Re-affirming the side you are already on is not counted: counting a no-op would inflate the
+        one number that says whether people are leaving.
+
+        The switch moves no data and resets nothing. Both sides read the same account.
+      tags:
+        - Portal
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ui]
+              properties:
+                ui: { type: string, enum: [home, profile] }
+      responses:
+        '200':
+          description: The new side, where it lands, the switch count, and the UNCHANGED track
+        '400':
+          description: ui must be "home" or "profile"
+        '403':
+          description: Not the account holder's own session
 
   /v1/home/ai-client:
     post:
