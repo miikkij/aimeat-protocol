@@ -9,6 +9,7 @@
  * @usage
  *   import { mcpRouter, emitResourceUpdated, emitResourceListChanged } from '../mcp/index.js';
  * @version-history
+ *   v1.x — 2026-08-08 — registerCompanyTools: the company registry on the MCP surface.
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.0.0 — 2026-03-20 — Extracted from src/routes/mcp.ts (pure refactor, no logic changes)
  *   v1.1.0 — 2026-03-21 — Added registerOrganismsTools registration (5 tools + 1 resource)
@@ -77,6 +78,7 @@ import { registerAgentCapabilityTools } from './agent-capabilities.js';
 import { registerAgentMessageTools } from './agent-messages.js';
 import { registerDmMessageTools } from './dm-messages.js';
 import { registerContactTools } from './contacts.js';
+import { registerCompanyTools } from './companies.js';
 import { registerAgentOnboardingTools } from './agent-onboarding.js';
 import { registerAgentTelemetryTools } from './agent-telemetry.js';
 import { registerAgentManagementTools } from './agent-management.js';
@@ -192,6 +194,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         registerAgentMessageTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerDmMessageTools(mcp, storage, config, () => agentGaii, peers);
         registerContactTools(mcp, storage, config, () => agentGaii);
+        registerCompanyTools(mcp, storage, config, () => agentGaii);
         registerAgentTelemetryTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentOnboardingTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerAgentManagementTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

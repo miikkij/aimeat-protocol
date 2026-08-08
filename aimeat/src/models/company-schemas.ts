@@ -17,6 +17,7 @@
  * @structure CompanyFrontPage · CompanyRecord · CompanyQuery · NewCompanyInput
  * @usage import type { CompanyRecord } from '../models/company-schemas.js';
  * @version-history
+ *   v1.1.0 — 2026-08-08 — Front page kind 'portfolio': a company's own HTML page.
  *   v1.0.0 — 2026-08-07 — Company-in-a-box: the company registry + co origin.
  */
 
@@ -24,16 +25,22 @@
  * What {slug}.co.<apex> serves.
  * - 'app'      → one of the owner's published apps ("owner/file.html"), served exactly like
  *                an app origin serves it (isolated, session-less, same CSP).
+ * - 'portfolio' → a standalone HTML page the owner published for THIS company, stored as a
+ *                public storage file and served on the co origin the same way a personal
+ *                portfolio is served on the portfolio origin.
  * - 'redirect' → an absolute URL (the company's own site elsewhere).
  * - 'none'     → the address is reserved but nothing is published yet; the host answers 404,
  *                the same as any unmapped subdomain. Reserving a name and publishing a page
  *                are two separate acts, and pretending otherwise would serve a lie.
  */
-export type CompanyFrontPageKind = 'app' | 'redirect' | 'none';
+export type CompanyFrontPageKind = 'app' | 'portfolio' | 'redirect' | 'none';
 
 export interface CompanyFrontPage {
   kind: CompanyFrontPageKind;
-  /** "owner/file.html" for kind 'app'; an absolute https URL for 'redirect'; '' for 'none'. */
+  /**
+   * "owner/file.html" for kind 'app'; an absolute https URL for 'redirect'; '' for both
+   * 'portfolio' (the page is addressed by the company id, not by a target string) and 'none'.
+   */
   target: string;
 }
 

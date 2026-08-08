@@ -11,6 +11,8 @@
  *            The operator CRUD lives in subdomain-admin.ts.
  * @usage app.use(subdomainServeRouter(config, storage)); // BEFORE bootstrapRouter
  * @version-history
+ *   v1.x — 2026-08-08 — The co origin serves a company's own page (front page 'portfolio')
+ *     through servePortfolio, the same path the portfolio origin uses.
  *   v1.13.0 — 2026-08-07 — Company origin: `{slug}.co.<apex>` serves a registered company's front
  *     page through the same app-serving path (same CSP + marks), resolved from the company registry
  *     rather than the subdomain-site table — so a company and an app may carry the same word.
@@ -68,6 +70,7 @@ import type { AimeatConfig } from '../config.js';
 import { applyAppProtection, hasAnyProtection } from '../utils/app-protect.js';
 import type { Storage, AppRecord } from '../storage/interface.js';
 import { error } from '../middleware/envelope.js';
+import { readCompanyPortfolioHtml } from '../services/company/company-portfolio.js';
 import {
   loadServedProvenance, setProvenanceHeaders, type ServedProvenance,
 } from '../services/ai-provenance-marks.js';
@@ -459,6 +462,14 @@ export function subdomainServeRouter(config: AimeatConfig, storage: Storage): Ro
 
       if (company.frontPage.kind === 'redirect' && company.frontPage.target) {
         res.redirect(301, company.frontPage.target);
+        return;
+      }
+      if (company.frontPage.kind === 'portfolio') {
+        // The company's own document, served exactly the way a personal portfolio is served on
+        // the portfolio origin: same bridge, same CSP, same isolated session-less host.
+        const html = await readCompanyPortfolioHtml(storage, company);
+        if (!html) return companyNotFound();
+        servePortfolio(res, html, {}, csp);
         return;
       }
       // 'none' answers exactly like an unmapped address: reserving a name and publishing a

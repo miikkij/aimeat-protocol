@@ -4105,7 +4105,23 @@
         "fromName": "Sender name",
         "replyTo": "Reply-to",
         "secure": "TLS on connect (port 465)"
-      }
+      },
+      "frontPortfolio": "Company page (your own HTML)",
+      "servingPortfolio": "Serving the company page",
+      "portfolioLive": "Published, {kb} KB",
+      "portfolioNone": "No page published yet",
+      "portfolioHint": "One self-contained HTML file, served at the company address. Publishing it also points the address at it.",
+      "portfolioHtml": "The HTML document",
+      "portfolioPickFile": "Choose a file…",
+      "portfolioPublish": "Publish the page",
+      "portfolioPublished": "The page is live at the company address.",
+      "portfolioRemove": "Remove the page",
+      "portfolioRemoved": "The page is removed; the address serves nothing.",
+      "portfolioConfirmRemove": "Remove the published page? The company address will serve nothing until you publish again.",
+      "promptSettings": "Let AI fill these in",
+      "promptPortfolio": "Let AI build the page",
+      "promptApp": "Let AI build the app",
+      "promptCopied": "Prompt copied — paste it into your AI chat"
     }
   },
   "dev": {

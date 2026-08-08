@@ -19,6 +19,8 @@
  *   requireOwnCompany · companyAddress
  * @usage const company = await createCompany(config, storage, ownerGhii, input);
  * @version-history
+ *   v1.1.0 — 2026-08-08 — setFrontPage learns kind 'portfolio' and refuses it (409
+ *     NO_PORTFOLIO) until a page exists, so the setting never outruns the document.
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
  */
 import { randomUUID } from 'node:crypto';
@@ -189,6 +191,15 @@ export async function setFrontPage(storage: Storage, ownerGhii: string, id: stri
       throw new CompanyError('INVALID_FRONT_PAGE', 400, 'A redirect front page must be http(s)');
     }
     front = { kind: 'redirect', target: url.toString() };
+  } else if (front.kind === 'portfolio') {
+    // Pointing the address at a page that was never published would serve a 404 while the
+    // settings claim a page is live — so the selector refuses until there is something to serve.
+    const file = await storage.getStorageFile(ownerGhii, `company/${company.id}/index.html`);
+    if (!file) {
+      throw new CompanyError('NO_PORTFOLIO', 409,
+        'Publish the page first — there is nothing at this address to serve yet');
+    }
+    front = { kind: 'portfolio', target: '' };
   } else {
     front = { kind: 'none', target: '' };
   }

@@ -44080,6 +44080,58 @@ paths:
         '200': { $ref: '#/components/responses/AimeatSuccess' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '404': { $ref: '#/components/responses/NotFound' }
+  /v1/companies/{id}/portfolio:
+    get:
+      operationId: getCompanyPortfolio
+      tags: [Companies]
+      summary: Whether the company has a page published
+      description: "Reports published/sizeBytes/updatedAt for the standalone HTML page served at the company address. It does not return the document itself — the page is public at the company address."
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      operationId: publishCompanyPortfolio
+      tags: [Companies]
+      summary: Publish the company's own HTML page
+      description: "Stores a complete HTML document as a PUBLIC storage file under the owner (key company/{id}/index.html) AND points the address at it by setting frontPage.kind to 'portfolio' — publishing a page and serving it are one act. Re-publishing replaces the previous page. Refused with 400 when the body is empty or is not a document, and 413 above the node's portfolio size limit (AIMEAT_PORTFOLIO_MAX_SIZE_KB, default 512)."
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [html]
+              properties:
+                html: { type: string, description: 'The complete HTML document, doctype through </html>.' }
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '413':
+          description: The page exceeds the node's portfolio size limit
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AimeatEnvelope' }
+    delete:
+      operationId: deleteCompanyPortfolio
+      tags: [Companies]
+      summary: Remove the company's page
+      description: "Deletes the document and, when the front page was 'portfolio', falls the front page back to 'none' — the address serves nothing rather than keeping a setting that points at a document which no longer exists."
+      security: [{ BearerAuth: [] }]
+      parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+      responses:
+        '200': { $ref: '#/components/responses/AimeatSuccess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
   /v1/companies/{id}/smtp:
     get:
       operationId: getCompanySmtp
@@ -44144,7 +44196,7 @@ paths:
       operationId: setCompanyFrontPage
       tags: [Companies]
       summary: Set what the company address serves
-      description: "kind 'app' serves one of YOUR published apps (\"owner/file.html\"; someone else's answers 403 FRONT_PAGE_NOT_YOURS) through the same isolated app-serving path; 'redirect' 301s to an absolute http(s) URL; 'none' keeps the address reserved and unserved, which answers 404 like any unmapped address."
+      description: "kind 'portfolio' serves the page published via PUT /v1/companies/{id}/portfolio (409 NO_PORTFOLIO when none exists); kind 'app' serves one of YOUR published apps (\"owner/file.html\"; someone else's answers 403 FRONT_PAGE_NOT_YOURS) through the same isolated app-serving path; 'redirect' 301s to an absolute http(s) URL; 'none' keeps the address reserved and unserved, which answers 404 like any unmapped address."
       security: [{ BearerAuth: [] }]
       parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
       requestBody:
@@ -44155,7 +44207,7 @@ paths:
               type: object
               required: [kind]
               properties:
-                kind: { type: string, enum: [app, redirect, none] }
+                kind: { type: string, enum: [app, portfolio, redirect, none] }
                 target: { type: string, description: '"owner/file.html" for app, an absolute URL for redirect' }
       responses:
         '200': { $ref: '#/components/responses/AimeatSuccess' }

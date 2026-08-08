@@ -21,6 +21,7 @@
  *     async ({ key }) => { ... }
  *   );
  * @version-history
+ *   v1.x — 2026-08-08 — Annotations for the five aimeat_company_* tools.
  *   2026-07-19 — AppDev pitfall KB (Phase 4): reserved-package guard + optional model tag on contribute; register pitfall tools
  *   v1.0.0 -- 2026-05-29 -- Initial annotation map covering all 94 registered tools
  *     across server MCP and connector MCP, for Connectors Directory submission.
@@ -252,6 +253,13 @@ export const TOOL_ANNOTATIONS: Record<string, ToolAnnotations> = {
     aimeat_dm_ask: { title: 'Ask a Structured Question (Federated)', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     aimeat_dm_inbox: { title: 'Read Federated DM Inbox', readOnlyHint: true },
     aimeat_dm_thread: { title: 'Read Federated DM Thread', readOnlyHint: true },
+
+    // ── Companies (the registry + the co address family) ──
+    aimeat_company_list: { title: 'List Companies', readOnlyHint: true },
+    aimeat_company_create: { title: 'Register Company', readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+    aimeat_company_update: { title: 'Update Company Details', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_company_front_page: { title: 'Set Company Front Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
+    aimeat_company_portfolio_publish: { title: 'Publish Company Page', readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: false },
 
     // ── Contacts (address book) ──
     aimeat_contact_list: { title: 'List Contacts', readOnlyHint: true },

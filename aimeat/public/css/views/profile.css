@@ -4,6 +4,7 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.21.0 — 2026-08-08 — .pf-co-portfolio/.pf-co-html/.pf-co-file: the company page editor.
  *   v2.20.0 — 2026-08-07 — .pf-co-*: the SMTP section, and every --space-N in the pf-pnl/pf-co
  *     blocks now carries a fallback — the variables are not defined on this theme, so the two
  *     tabs were laying out with zero gaps and margins.
@@ -3642,6 +3643,11 @@
 .pf-co-body > .pf-co-row { margin-top: var(--space-3, 0.75rem); }
 /* Deleting a company frees its public address, so it is fenced off from the save buttons above
    rather than sitting one gap below them where a mis-aimed click lands. */
+.pf-co-portfolio { margin-top: var(--space-3, 0.75rem); }
+.pf-co-html { font-family: var(--font-mono, monospace); font-size: 0.8rem; line-height: 1.45; width: 100%; resize: vertical; }
+/* A file input styled as a button: the native control is hidden, the label IS the button. */
+.pf-co-file { position: relative; overflow: hidden; display: inline-flex; align-items: center; cursor: pointer; }
+.pf-co-file input[type="file"] { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
 .pf-co-danger-row { border-top: 1px solid var(--border); padding-top: var(--space-4, 1rem); margin-top: var(--space-5, 1.25rem) !important; }
 /* The checkbox has no input box of its own, so it is pinned to the bottom of its grid cell to
    land on the same line as the text inputs beside it instead of floating mid-cell. */

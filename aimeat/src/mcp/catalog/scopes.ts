@@ -18,6 +18,7 @@
  *   import { scopeAllowsTool } from '../catalog/scopes.js';
  *   if (scopeAllowsTool(agentScopes, 'aimeat_memory_write')) mcp.tool(...)
  * @version-history
+ *   v1.x — 2026-08-08 — aimeat_company_* ride company:read / company:write.
  *   v1.5.0 -- 2026-08-01 -- TARGET-058 Phase 4: a note on why `provenance:write` is NOT in
  *     TOOL_SCOPES. It gates a PARAMETER, not a tool, and hiding nine tools from an agent that merely
  *     cannot assert authorship would be the wrong trade — the honest default needs no permission.
@@ -129,6 +130,15 @@ export const TOOL_SCOPES: Record<string, string> = {
     // Contacts (address book) — the owner's messaging graph, so the messaging scopes gate it:
     // reading the list / resolving an email rides messages:read; editing the book (save/remove)
     // rides messages:send (the same trust level as opening conversations on the owner's behalf).
+    // The company registry: reading the owner's companies rides company:read; registering one,
+    // filling in its legal identity, choosing its front page and publishing its page all write
+    // to a PUBLIC address, so they ride company:write.
+    aimeat_company_list: 'company:read',
+    aimeat_company_create: 'company:write',
+    aimeat_company_update: 'company:write',
+    aimeat_company_front_page: 'company:write',
+    aimeat_company_portfolio_publish: 'company:write',
+
     aimeat_contact_list: 'messages:read',
     aimeat_contact_resolve_email: 'messages:read',
     aimeat_contact_add: 'messages:send',

@@ -77,6 +77,8 @@ export const MCP_SURFACES: Record<SurfaceRole, string[]> = {
         'aimeat_workflow_save', 'aimeat_workflow_get', 'aimeat_workflow_run', 'aimeat_workflow_answer', 'aimeat_workflow_pending_inputs',
         'aimeat_message_inbox', 'aimeat_message_send', 'aimeat_message_history',
         'aimeat_dm_send', 'aimeat_dm_send_as_owner', 'aimeat_dm_ask', 'aimeat_dm_inbox', 'aimeat_dm_thread',
+        'aimeat_company_list', 'aimeat_company_create', 'aimeat_company_update',
+        'aimeat_company_front_page', 'aimeat_company_portfolio_publish',
         'aimeat_contact_list', 'aimeat_contact_add', 'aimeat_contact_remove', 'aimeat_contact_resolve_email',
         'aimeat_feedback_send', 'aimeat_feedback_inbox',
         'aimeat_knowledge_list', 'aimeat_knowledge_get', 'aimeat_knowledge_contribute', 'aimeat_knowledge_links',

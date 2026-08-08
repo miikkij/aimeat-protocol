@@ -11,6 +11,7 @@
  * @structure zod schemas · sendErr mapper · companiesRouter
  * @usage app.use(companiesRouter(config, storage)) in routes-loader
  * @version-history
+ *   v1.2.0 — 2026-08-08 — GET/PUT/DELETE /v1/companies/:id/portfolio: the company's own page.
  *   v1.1.0 — 2026-08-07 — GET/PUT/DELETE /v1/companies/:id/smtp: a company's own sending identity.
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
  */
@@ -30,6 +31,9 @@ import type { CompanyRecord } from '../models/company-schemas.js';
 import {
   setCompanySmtp, getCompanySmtpPublic, deleteCompanySmtp,
 } from '../services/company/company-smtp.js';
+import {
+  publishCompanyPortfolio, getCompanyPortfolio, deleteCompanyPortfolio,
+} from '../services/company/company-portfolio.js';
 
 const IdentitySchema = {
   description: z.string().max(500).nullish(),
@@ -71,8 +75,13 @@ const SmtpSchema = z.object({
   reply_to: z.string().email().max(200).nullish(),
 }).strict();
 
+const PortfolioSchema = z.object({
+  /** The whole document. A page is small enough to send inline; the cap is portfolioMaxSizeKb. */
+  html: z.string().min(1),
+}).strict();
+
 const FrontPageSchema = z.object({
-  kind: z.enum(['app', 'redirect', 'none']),
+  kind: z.enum(['app', 'portfolio', 'redirect', 'none']),
   target: z.string().max(500).optional(),
 }).strict();
 
@@ -248,6 +257,46 @@ export function companiesRouter(config: AimeatConfig, storage: Storage): Router 
       await deleteCompanySmtp(storage, resolve(req), req.params.id as string);
       emitChange('companies', resolve(req));
       res.json(success(config.nodeId, { removed: req.params.id }));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  // ── The company's own page (front page kind 'portfolio') ──────────────────
+
+  router.get('/v1/companies/:id/portfolio', requireAuth(), requireScope('company:read'), async (req, res) => {
+    try {
+      const status = await getCompanyPortfolio(storage, resolve(req), req.params.id as string);
+      res.json(success(config.nodeId, { portfolio: status }));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  router.put('/v1/companies/:id/portfolio', requireAuth(), requireScope('company:write'), async (req, res) => {
+    try {
+      const parsed = PortfolioSchema.safeParse(req.body);
+      if (!parsed.success) {
+        res.status(400).json(error(config.nodeId, 'INVALID_PORTFOLIO', parsed.error.message));
+        return;
+      }
+      const { company, status } = await publishCompanyPortfolio(
+        config, storage, resolve(req), req.params.id as string, parsed.data.html,
+      );
+      emitChange('companies', resolve(req));
+      res.json(success(config.nodeId, { company: withAddress(config, company), portfolio: status }, [
+        { description: 'Open the published page', method: 'GET', url: companyAddress(config, company) ?? '/' },
+      ]));
+    } catch (e) {
+      if (!sendErr(res, config, e)) throw e;
+    }
+  });
+
+  router.delete('/v1/companies/:id/portfolio', requireAuth(), requireScope('company:write'), async (req, res) => {
+    try {
+      const company = await deleteCompanyPortfolio(storage, resolve(req), req.params.id as string);
+      emitChange('companies', resolve(req));
+      res.json(success(config.nodeId, { company: withAddress(config, company) }));
     } catch (e) {
       if (!sendErr(res, config, e)) throw e;
     }

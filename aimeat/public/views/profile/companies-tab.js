@@ -6,6 +6,8 @@
  *   what the address serves: one of your own published apps, a redirect, or nothing yet.
  *   Live: re-fetches on the aimeat-live-update event when the companies domain ticks.
  * @version-history
+ *   v1.2.0 — 2026-08-08 — Front page extracted to companies-front-page.js (adds the
+ *     portfolio kind); the identity section gained its AI hand-off prompt.
  *   v1.1.0 — 2026-08-07 — SmtpSection: the company's own sending identity (write-only password).
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
  */
@@ -17,6 +19,9 @@ import { t } from '/js/i18n.js';
 import { Spinner } from './shared.js';
 import { apiGet, apiPost, apiPut, apiDelete } from '/js/api.js';
 import { listApps } from '/js/services/apps.js';
+import { CopyButton } from '/components/CopyButton.js';
+import { FrontPageSection } from './companies-front-page.js';
+import { buildSettingsPrompt } from './companies-prompts.js';
 
 /** Trade name → address label. Mirrors the server's slugify so the preview does not lie. */
 function slugify(name) {
@@ -201,9 +206,7 @@ function CompanyCard({ company, apps, onChanged, showToast }) {
     for (const [wire, rec] of IDENTITY_FIELDS) init[wire] = company[rec] ?? '';
     return init;
   });
-  const [front, setFront] = useState(company.frontPage);
   const savedFront = company.frontPage;
-  useEffect(() => { setFront(savedFront); }, [savedFront]);
   const [busy, setBusy] = useState(false);
 
   const saveIdentity = useCallback(async () => {
@@ -217,17 +220,6 @@ function CompanyCard({ company, apps, onChanged, showToast }) {
     } catch (e) { showToast?.(e?.message || String(e), 'error'); }
     setBusy(false);
   }, [company, identity, onChanged, showToast]);
-
-  const saveFront = useCallback(async (next) => {
-    setBusy(true);
-    try {
-      await apiPut(`/v1/companies/${company.id}/front-page`, { kind: next.kind, target: next.target });
-      setFront(next);
-      showToast?.(t('profile.companies.frontSaved'), 'success');
-      onChanged();
-    } catch (e) { showToast?.(e?.message || String(e), 'error'); }
-    setBusy(false);
-  }, [company, onChanged, showToast]);
 
   const remove = useCallback(async () => {
     // Deleting a company frees its public address, so the confirm is the point, not friction.
@@ -247,7 +239,9 @@ function CompanyCard({ company, apps, onChanged, showToast }) {
     ? t('profile.companies.servingApp').replace('{app}', savedFront.target)
     : savedFront.kind === 'redirect'
       ? t('profile.companies.servingRedirect').replace('{url}', savedFront.target)
-      : t('profile.companies.servingNone');
+      : savedFront.kind === 'portfolio'
+        ? t('profile.companies.servingPortfolio')
+        : t('profile.companies.servingNone');
 
   return html`
     <div class="card pf-co-card">
@@ -266,31 +260,19 @@ function CompanyCard({ company, apps, onChanged, showToast }) {
 
       ${open && html`
         <div class="pf-co-body">
-          <h4>${t('profile.companies.frontTitle')}</h4>
-          <p class="pf-co-hint">${t('profile.companies.frontHint')}</p>
-          <div class="pf-co-row">
-            <select value=${front.kind} onChange=${(e) => setFront({ kind: e.target.value, target: '' })}>
-              <option value="none">${t('profile.companies.frontNone')}</option>
-              <option value="app">${t('profile.companies.frontApp')}</option>
-              <option value="redirect">${t('profile.companies.frontRedirect')}</option>
-            </select>
-            ${front.kind === 'app' && html`
-              <select value=${front.target} onChange=${(e) => setFront({ kind: 'app', target: e.target.value })}>
-                <option value="">${t('profile.companies.pickApp')}</option>
-                ${apps.map((a) => html`<option key=${a.filename} value=${`${a.owner}/${a.filename}`}>${a.name || a.filename}</option>`)}
-              </select>
-            `}
-            ${front.kind === 'redirect' && html`
-              <input value=${front.target} placeholder="https://..."
-                     onInput=${(e) => setFront({ kind: 'redirect', target: e.target.value })} />
-            `}
-            <button class="btn-outline" disabled=${busy} onClick=${() => saveFront(front)}>
-              ${t('profile.companies.setFront')}
-            </button>
-          </div>
+          <${FrontPageSection} company=${company} apps=${apps} busy=${busy} setBusy=${setBusy}
+            onSaved=${onChanged} showToast=${showToast} />
 
           <h4>${t('profile.companies.identityTitle')}</h4>
           <p class="pf-co-hint">${t('profile.companies.identityHint')}</p>
+          ${/* The third AI hand-off: a chat with the AIMEAT connector asks for these values one
+               batch at a time and writes them itself, which beats typing twelve fields — and it
+               is told never to invent one, because these land on real invoices. */ ''}
+          <div class="pf-co-row">
+            <${CopyButton} text=${buildSettingsPrompt(company)} className="btn-outline"
+              label=${t('profile.companies.promptSettings')}
+              copiedLabel=${t('profile.companies.promptCopied')} />
+          </div>
           ${/* Functional update: several fields can change before one re-render (autofill, a
                password manager, an agent driving the form), and the spread-from-render form
                made each write clobber the previous — only the last field survived. */ ''}

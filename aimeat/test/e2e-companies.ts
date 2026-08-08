@@ -7,6 +7,8 @@
  *   403, and the serving half: a company host serves its front-page app, a redirect front page
  *   301s, an unclaimed label 404s, and the invoice seller prefills from the company record.
  * @version-history
+ *   v1.2.0 — 2026-08-08 — Phase 6: the company's own page (publish switches the front
+ *     page, re-publish replaces, removal falls back to none, cross-owner refused).
  *   v1.1.0 — 2026-08-07 — Phase 5: the company's own SMTP identity (the password never leaves
  *     the server, an update without one keeps it, and a send really uses the company's server).
  *   v1.0.0 — 2026-08-07 — Company registry + co origin.
@@ -397,7 +399,88 @@ await test('19. removing the settings puts the company back on the shared sender
     `without company settings the node's own (disabled) transport must answer, got: ${sent.body.data.message.error}`);
 });
 
-await test('20. deleting the company frees the address and stops serving it', async () => {
+console.log("\nPhase 6 — the company's own page");
+
+const PAGE_MARKER = 'PERUSTAJA OY ETUSIVU';
+const PAGE = `<!doctype html><html lang="fi"><head><meta charset="utf-8"><title>${PAGE_MARKER}</title></head><body><h1>${PAGE_MARKER}</h1></body></html>`;
+
+await test('20. pointing the address at a page that was never published is refused', async () => {
+  const r = await json(`/v1/companies/${companyId}/front-page`, {
+    method: 'PUT', headers: authed(A.token), body: JSON.stringify({ kind: 'portfolio' }),
+  });
+  assert(r.status === 409, `expected 409, got ${r.status} ${JSON.stringify(r.body)}`);
+  assert(r.body.error?.code === 'NO_PORTFOLIO', `expected NO_PORTFOLIO, got ${r.body.error?.code}`);
+});
+
+await test('21. publishing a page serves it at the company address in one act', async () => {
+  const before = await json(`/v1/companies/${companyId}/portfolio`, { headers: authed(A.token) });
+  assert(before.body.data.portfolio.published === false, 'nothing should be published yet');
+
+  const put = await json(`/v1/companies/${companyId}/portfolio`, {
+    method: 'PUT', headers: authed(A.token), body: JSON.stringify({ html: PAGE }),
+  });
+  assert(put.status === 200, `publish failed: ${put.status} ${JSON.stringify(put.body)}`);
+  // Publishing IS choosing the front page — a second call to set it would be a step that exists
+  // only because the data model has two fields.
+  assert(put.body.data.company.frontPage.kind === 'portfolio',
+    `the front page must switch to portfolio, got ${put.body.data.company.frontPage.kind}`);
+
+  const served = await coFetch(slug);
+  assert(served.status === 200, `the address must serve the page, got ${served.status}`);
+  assert(served.body.includes(PAGE_MARKER), 'the served document is not the page that was published');
+  assert((served.contentType ?? '').includes('text/html'), `expected text/html, got ${served.contentType}`);
+});
+
+await test('22. re-publishing replaces the page rather than appending one', async () => {
+  // replaceAll, not replace: the marker appears in both the title and the h1, and replacing
+  // only the first would leave the "old page is gone" assertion checking nothing.
+  const second = PAGE.replaceAll(PAGE_MARKER, 'TOINEN VERSIO');
+  const put = await json(`/v1/companies/${companyId}/portfolio`, {
+    method: 'PUT', headers: authed(A.token), body: JSON.stringify({ html: second }),
+  });
+  assert(put.status === 200, `re-publish failed: ${put.status}`);
+  const served = await coFetch(slug);
+  assert(served.body.includes('TOINEN VERSIO'), 'the new page is not served');
+  assert(!served.body.includes(PAGE_MARKER), 'the previous page is still being served');
+});
+
+await test('23. something that is not a document is refused, not served blank', async () => {
+  const r = await json(`/v1/companies/${companyId}/portfolio`, {
+    method: 'PUT', headers: authed(A.token), body: JSON.stringify({ html: 'just some words' }),
+  });
+  assert(r.status === 400, `expected 400, got ${r.status}`);
+  const empty = await json(`/v1/companies/${companyId}/portfolio`, {
+    method: 'PUT', headers: authed(A.token), body: JSON.stringify({ html: '   ' }),
+  });
+  assert(empty.status === 400, `an empty page should be 400, got ${empty.status}`);
+});
+
+await test("24. another owner can neither read, publish nor remove this company's page", async () => {
+  const get = await json(`/v1/companies/${companyId}/portfolio`, { headers: authed(B.token) });
+  assert(get.status === 404, `cross-owner read should be 404, got ${get.status}`);
+  const put = await json(`/v1/companies/${companyId}/portfolio`, {
+    method: 'PUT', headers: authed(B.token), body: JSON.stringify({ html: PAGE }),
+  });
+  assert(put.status === 404, `cross-owner publish should be 404, got ${put.status}`);
+  const del = await json(`/v1/companies/${companyId}/portfolio`, { method: 'DELETE', headers: authed(B.token) });
+  assert(del.status === 404, `cross-owner remove should be 404, got ${del.status}`);
+  // ...and the page it could not touch is still the owner's.
+  const served = await coFetch(slug);
+  assert(served.body.includes('TOINEN VERSIO'), "the owner's page must be untouched");
+});
+
+await test('25. removing the page leaves the address serving nothing, not a stale setting', async () => {
+  const del = await json(`/v1/companies/${companyId}/portfolio`, { method: 'DELETE', headers: authed(A.token) });
+  assert(del.status === 200, `remove failed: ${del.status}`);
+  assert(del.body.data.company.frontPage.kind === 'none',
+    `the front page must fall back to none, got ${del.body.data.company.frontPage.kind}`);
+  const served = await coFetch(slug);
+  assert(served.status === 404, `the address must answer 404 after removal, got ${served.status}`);
+  const status = await json(`/v1/companies/${companyId}/portfolio`, { headers: authed(A.token) });
+  assert(status.body.data.portfolio.published === false, 'the page must be gone');
+});
+
+await test('26. deleting the company frees the address and stops serving it', async () => {
   const del = await json(`/v1/companies/${companyId}`, { method: 'DELETE', headers: authed(A.token) });
   assert(del.status === 200, `delete failed: ${del.status}`);
   const served = await coFetch(slug);

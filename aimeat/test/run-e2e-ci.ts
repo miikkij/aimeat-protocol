@@ -207,6 +207,7 @@ const ALL_SUITES = [
     'test/e2e-mcp-catalogue.ts',
     'test/e2e-mcp-memory-extended.ts',
     'test/e2e-mcp-wallet-extended.ts',
+    'test/e2e-mcp-companies.ts',
     'test/e2e-mcp-consent.ts',
     'test/e2e-mcp-chat-instances.ts',
     'test/e2e-mcp-flags.ts',

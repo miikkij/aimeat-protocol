@@ -4105,7 +4105,23 @@
         "fromName": "Lähettäjän nimi",
         "replyTo": "Vastausosoite",
         "secure": "TLS heti yhteydessä (portti 465)"
-      }
+      },
+      "frontPortfolio": "Yrityksen sivu (oma HTML)",
+      "servingPortfolio": "Tarjoilee yrityksen sivua",
+      "portfolioLive": "Julkaistu, {kb} KB",
+      "portfolioNone": "Sivua ei ole vielä julkaistu",
+      "portfolioHint": "Yksi itsenäinen HTML-tiedosto, joka tarjoillaan yrityksen osoitteessa. Julkaisu myös osoittaa osoitteen siihen.",
+      "portfolioHtml": "HTML-dokumentti",
+      "portfolioPickFile": "Valitse tiedosto…",
+      "portfolioPublish": "Julkaise sivu",
+      "portfolioPublished": "Sivu on nyt yrityksen osoitteessa.",
+      "portfolioRemove": "Poista sivu",
+      "portfolioRemoved": "Sivu poistettu; osoite ei tarjoile mitään.",
+      "portfolioConfirmRemove": "Poistetaanko julkaistu sivu? Yrityksen osoite ei tarjoile mitään ennen kuin julkaiset uudelleen.",
+      "promptSettings": "Anna AI:n täyttää nämä",
+      "promptPortfolio": "Anna AI:n rakentaa sivu",
+      "promptApp": "Anna AI:n rakentaa appi",
+      "promptCopied": "Prompti kopioitu — liitä se AI-chattiisi"
     }
   },
   "dev": {

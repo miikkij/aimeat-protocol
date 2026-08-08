@@ -38,6 +38,7 @@ export type { ToolCallerType, ToolVisibility, ToolInputField, AimeatToolDefiniti
 
 import type { AimeatToolDefinition } from './definitions/types.js';
 import { agentMessagingTools } from './definitions/agent-messaging.js';
+import { companyTools } from './definitions/companies.js';
 import { schedulesTasksMemoryTools } from './definitions/schedules-tasks-memory.js';
 import { discoveryWorkBoardsTools } from './definitions/discovery-work-boards.js';
 import { capabilitiesGroupsSkillsTools } from './definitions/capabilities-groups-skills.js';
@@ -52,6 +53,7 @@ export const CLI_FALLBACK_TOOL_DEFINITIONS: AimeatToolDefinition[] = [
     ...capabilitiesGroupsSkillsTools,
     ...organismsWorkspacesAppsTools,
     ...commerceTools,
+    ...companyTools,
     ...exchangeTools,
 ];
 
