@@ -1448,7 +1448,7 @@
         "permRequest": "Request",
         "permSend": "Send",
       "permWrite-as-owner": "Write into my own memory (as me)",
-      "permWrite-reserved": "Also manage my AI keys, spend cap and public profile (full administration)",
+      "permWrite-reserved": "Also manage my AI settings, spend cap and public profile",
         "permSend-as-owner": "Reply as me (send DM as you)",
         "permAccept": "Accept",
         "permPublish": "Publish",

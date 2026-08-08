@@ -1448,7 +1448,7 @@
         "permRequest": "Pyyntö",
         "permSend": "Lähetys",
       "permWrite-as-owner": "Kirjoita minun muistiini (minuna)",
-      "permWrite-reserved": "Hallitse myös AI-avaimiani, kulukattoani ja julkista profiiliani (täysi hallinta)",
+      "permWrite-reserved": "Hallitse myös AI-asetuksiani, kulukattoani ja julkista profiiliani",
         "permSend-as-owner": "Vastaa minuna (lähetä viesti nimissäni)",
         "permAccept": "Hyväksyntä",
         "permPublish": "Julkaisu",
