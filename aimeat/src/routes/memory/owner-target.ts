@@ -31,6 +31,7 @@
 import type { Request } from 'express';
 import type { AimeatConfig } from '../../config.js';
 import { resolveIdentity } from '../../utils/gaii.js';
+import { appMayWriteKey } from '../../utils/reserved-keys.js';
 
 /** The scope an owner grants an agent to write into the owner's own namespace. */
 export const WRITE_AS_OWNER_SCOPE = 'memory:write-as-owner';
@@ -123,4 +124,44 @@ export function resolveWriteTarget(
         delegatedOwnerWrite: true,
         reservedAllowed: hasWriteReserved(req.auth!.scopes),
     };
+}
+
+/**
+ * The same decision for the MCP write tool, so the two surfaces cannot drift apart.
+ *
+ * Returns the namespace to write under, or a denial the tool renders as an error. The denials name
+ * the tick the owner has to make, because "SCOPE_DENIED" alone sends an agent looking for a
+ * platform limitation that does not exist.
+ */
+export function resolveMcpWriteTarget(args: {
+    agentGaii: string; ownerName: string | null; nodeId: string;
+    scopes: string[]; key: string; ownerScope: boolean;
+}): { gaii: string } | { deny: { error: string; message: string; how_to_fix: string; your_scopes?: string[] } } {
+    if (!args.ownerScope) return { gaii: args.agentGaii };
+
+    if (!hasWriteAsOwner(args.scopes)) {
+        return { deny: {
+            error: 'SCOPE_DENIED',
+            message: `Scope "${WRITE_AS_OWNER_SCOPE}" is required to write into the owner's namespace.`,
+            your_scopes: args.scopes,
+            how_to_fix: 'The owner grants it in Profile -> Agents -> this agent -> permissions -> Memory.',
+        } };
+    }
+    if (!args.ownerName) {
+        return { deny: {
+            error: 'NO_OWNER',
+            message: 'Cannot resolve your owner from this session.',
+            how_to_fix: 'Reconnect the agent so the session carries its owner.',
+        } };
+    }
+    // The same reserved-key guard the app-grant path has: this write lands where the server reads
+    // openrouter.* / ai-usage.* / profile.* and trusts what it finds.
+    if (!appMayWriteKey(['agent'], args.key, true, hasWriteReserved(args.scopes))) {
+        return { deny: {
+            error: 'RESERVED_KEY',
+            message: `"${args.key}" is one of the keys the server itself trusts (the AI-provider URL, the spend cap, the public profile). Writing it on the owner's behalf needs the separate "${WRITE_RESERVED_SCOPE}" grant, which is not part of full access.`,
+            how_to_fix: 'The owner ticks it in Profile -> Agents -> this agent -> permissions -> Memory.',
+        } };
+    }
+    return { gaii: `${args.ownerName}@${args.nodeId}` };
 }
