@@ -6,6 +6,11 @@
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.4.1 — 2026-08-08 — /v1/portfolio/members looks in every identity a portfolio can live
+ *     under, not just the owner's first agent. v1.4.0 moved agentless writes to the GHII but left
+ *     this listing keyed on the first agent, so an account without an agent had a portfolio that
+ *     was published and served yet appeared on no list — and an account that made its mat before
+ *     connecting an agent stayed invisible afterwards too.
  *   v1.4.0 — 2026-08-07 — The portfolio no longer requires an agent (remake phase 2). The welcome
  *     mat IS the portfolio and is made BEFORE the first agent, so the 400 NO_AGENT on upload/config
  *     would have blocked the entire new path, and resolvePublishedPortfolio's `no_agent` refusal
@@ -249,15 +254,22 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
       return;
     }
     const ghiis = await storage.listGHIIs();
-    // Batch: owner→agents in one IN query, then the portfolio.config key across every first-agent
-    // gaii in one IN query (was getAgentsByOwner + getMemory PER owner = O(2·owners)).
+    // Batch: owner→agents in one IN query, then the portfolio.config key across every identity a
+    // portfolio can live under in one IN query (was getAgentsByOwner + getMemory PER owner).
+    //
+    // The candidates mirror resolvePublishedPortfolio exactly: every agent gaii AND the owner's own
+    // GHII. Keying this listing on the first agent alone made an agentless member's portfolio
+    // published, served at /v1/portfolio/:username — and absent from the one page that exists to
+    // find them, because the mat is written under the GHII before any agent exists.
     const agentsByOwner = await storage.getAgentsByOwners(ghiis.map(g => g.username));
-    const firstByOwner = new Map<string, string>();
+    const candidatesByOwner = new Map<string, string[]>();
     for (const g of ghiis) {
-      const a = agentsByOwner[g.username];
-      if (a?.length) firstByOwner.set(g.username, a[0].gaii);
+      candidatesByOwner.set(g.username, [...(agentsByOwner[g.username] ?? []).map(a => a.gaii), g.ghii]);
     }
-    const cfgRows = await storage.listMemoryForOwners([...firstByOwner.values()], { prefix: 'portfolio.config' });
+    const cfgRows = await storage.listMemoryForOwners(
+      [...new Set([...candidatesByOwner.values()].flat())],
+      { prefix: 'portfolio.config' },
+    );
     const enabledGaiis = new Set(
       cfgRows
         .filter(m => m.key === 'portfolio.config' && (m.value as Record<string, unknown> | null)?.enabled)
@@ -265,8 +277,7 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     );
     const members: Array<Record<string, unknown>> = [];
     for (const g of ghiis) {
-      const gaii = firstByOwner.get(g.username);
-      if (gaii && enabledGaiis.has(gaii)) {
+      if ((candidatesByOwner.get(g.username) ?? []).some(gaii => enabledGaiis.has(gaii))) {
         // `ghii` is the member's full identifier (owner@node). The showcase renders each member
         // as an ID card, and the identifier is the part that makes it one — a name is a label,
         // an identifier is addressable: other people and their agents reach you by it.
