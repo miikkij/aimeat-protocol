@@ -22,6 +22,11 @@
  *   const sent = await AIMEAT.connect.history({ limit: 50 });
  *   await AIMEAT.connect.measure(sent[0].id);   // costs a provider request, and money on X
  * @version-history
+ *   v1.2.0 — 2026-08-08 — attach() and revoke() were the two WRITERS still exempt from that rule:
+ *     both returned a hardcoded success and announced a change on any answer, so a 403 for an app
+ *     holding only `connections:use` read back as `{connected: true}`. Found by an app doing exactly
+ *     that. publish() now reports an empty externalRef as no url, since '' is what LinkedIn returns
+ *     for a successful share and every truthiness check downstream drew it as a link to nothing.
  *   v1.1.0 — 2026-08-02 — Every reader RAISES the node's refusal instead of resolving with a hollow
  *     object. authFetch answers with the envelope either way, so a refused publish came back as
  *     `status: 'unknown'` and an app drew it as "Published" — a post that never went out, reported as
@@ -112,6 +117,12 @@ async function providers() {
  * records it BEFORE anything leaves. Calling twice with the same arguments returns the FIRST
  * outcome with `replay: true` and posts nothing further, which is why a failed network call is safe
  * to retry. On a provider that charges per post, that is a billing control and not only a nicety.
+ *
+ * A SEND THAT FAILED IS NOT A REPLAY. The guard prevents a double POST, so an attempt that reached
+ * nobody — refused by the provider, or abandoned when the node stopped — is reopened and sent for
+ * real. Do not build a "you already sent this" state out of `replay` alone without showing the
+ * original `status`: an app that did exactly that told a user their post had gone out when it never
+ * left the node.
  *
  * TWO SUCCESSFUL ANSWERS ARE NOT PUBLICATIONS. `status: 'held'` is awaiting moderation and
  * `status: 'queued'` is a spent provider allowance. Neither is an error, because reporting them as
@@ -339,8 +350,13 @@ async function attachAccount(provider, fields) {
     method: 'POST',
     body: JSON.stringify({ provider, mode: 'personal', fields }),
   });
+  // `must` FIRST, and this line is the whole fix. Without it the two statements below ran on any
+  // answer at all: a refused credential, an expired session, a 403 for an app holding only
+  // `connections:use` — every one of them returned `{connected: true}` and announced a change that
+  // had not happened. Found by an app calling this with the wrong scope and being told it worked.
+  const d = must(res, 'the account could not be attached');
   announce();
-  return { connected: true, connection: res?.data?.connection };
+  return { connected: true, connection: d.connection };
 }
 
 /**
@@ -349,8 +365,12 @@ async function attachAccount(provider, fields) {
  */
 async function revoke(connectionId) {
   const res = await authFetch(`/v1/connections/${encodeURIComponent(connectionId)}`, { method: 'DELETE' });
+  // Same fix as attach(): a refusal used to resolve as `{revoked: true}`, so a panel removed the row
+  // and the account stayed connected. "This always ends with the account disconnected here" was only
+  // true when the call succeeded.
+  const d = must(res, 'the account could not be disconnected');
   announce();
-  return { revoked: true, toldProvider: Boolean(res?.data?.told_provider) };
+  return { revoked: true, toldProvider: Boolean(d.told_provider) };
 }
 
 /** Subscribe to "the set of connections changed". Returns an unsubscribe function. */

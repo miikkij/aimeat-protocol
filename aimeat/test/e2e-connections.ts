@@ -19,6 +19,11 @@
  *   membership IS the access) · 16 reading numbers back · 17 publishing later
  * @usage cd aimeat && pnpm exec node --env-file=.env.test.sqlite --import tsx test/run-e2e-ci.ts --test=e2e-connections
  * @version-history
+ *   v1.2.0 — 2026-08-08 — Three guards for the silences a production user actually met: a send that
+ *     failed can be sent again (its own dead row used to answer "already sent" forever), the
+ *     double-post guard still holds for one that landed, a scheduled fire that published nothing is
+ *     reported rather than logged green, and `read-metrics` is advertised only where numbers can come
+ *     back.
  *   v1.1.0 — 2026-08-02 — LÄHETIN. Phase 15: a space is an organism workspace — asserts the three
  *     states an app cannot be trusted to draw (outsider refused, ungranted organism member sees an
  *     EMPTY space, grantee sees the content), that one grant opens exactly one workspace, and that a
@@ -676,6 +681,48 @@ async function main(): Promise<void> {
       assert(attempts.status === 200, 'listing broke after a rejection');
     });
 
+    await test('a send that failed can be sent again — it is not its own permanent blocker', async () => {
+      // FOUND IN PRODUCTION. The idempotency key is derived from the message, so a caption that
+      // failed once collided with its own dead row forever: every retry was answered "already sent"
+      // and pointed at an attempt that had reached nobody. LÄHETIN drew that as an orange
+      // "already sent — the original result:" followed by nothing, and there was no way out of it
+      // from the app. The guard exists to prevent a DOUBLE post, and a row that published nothing
+      // cannot become one.
+      const caption = 'a caption that fails once and must be sendable afterwards';
+
+      provider.rejectContent = true;
+      const first = await api('/v1/connections/publish', {
+        bearer: jwtA, body: { connection_id: pubConn, storage_key: 'vid/test.mp4', caption },
+      });
+      provider.rejectContent = false;
+      assert(first.status === 502, `the first send should have failed: ${first.status}`);
+
+      const before = provider.stats.publishes;
+      const again = await api('/v1/connections/publish', {
+        bearer: jwtA, body: { connection_id: pubConn, storage_key: 'vid/test.mp4', caption },
+      });
+      assert(again.status === 200, `the retry was refused: ${again.status} ${again.data?.error?.message}`);
+      assert(again.data.data.replay === false,
+        'the retry of a FAILED send was answered as a replay, which is the production bug');
+      assert(provider.stats.publishes === before + 1,
+        `the retry never reached the provider (${provider.stats.publishes - before} publishes)`);
+      assert(again.data.data.attempt.status === 'done', `retry status ${again.data.data.attempt.status}`);
+      assert(!again.data.data.attempt.error, 'the reopened attempt still carries the old error');
+    });
+
+    await test('and that reopening did not weaken the double-post guard', async () => {
+      // The other half: the SAME message, now that it has actually landed, must still be refused.
+      // Without this the previous test would pass just as happily against a gate that was deleted.
+      const caption = 'a caption that fails once and must be sendable afterwards';
+      const before = provider.stats.publishes;
+      const r = await api('/v1/connections/publish', {
+        bearer: jwtA, body: { connection_id: pubConn, storage_key: 'vid/test.mp4', caption },
+      });
+      assert(r.status === 200, `${r.status}`);
+      assert(r.data.data.replay === true, 'a message that DID land was published a second time');
+      assert(provider.stats.publishes === before, 'the provider was asked to publish a landed message again');
+    });
+
     await test("publishing to someone else's connection is the same 404 as a missing one", async () => {
       // NO storage_key, deliberately. This test used to send one, and B owns no such file — so the
       // route answered 404 for the FILE before the ownership check was ever reached, and the test
@@ -1290,13 +1337,27 @@ async function main(): Promise<void> {
       assert(mine.length > 0, 'the scheduled publish left no attempt behind');
     });
 
-    await test('firing it again does not publish a second time', async () => {
+    await test('firing it again does not publish a second time, AND says so', async () => {
       // The idempotency gate, not a lock of the scheduler's own: same publisher, connection, file and
       // caption is the same key whichever door it comes through.
       const before = provider.stats.publishes;
-      await api(`/v1/schedules/${schedId}/trigger`, { bearer: jwtA });
+      const r = await api(`/v1/schedules/${schedId}/trigger`, { bearer: jwtA });
       assert(provider.stats.publishes === before,
         `a second fire published again (${provider.stats.publishes - before})`);
+
+      // And it is not silent about it. For THIS schedule the one-shot's own budget is what refuses
+      // the second fire — the executor is never reached — so the honest answer is `limited` with the
+      // spent cap named, not a second green run.
+      assert(r.data.data.outcome === 'limited',
+        `a refused second fire reported "${r.data.data.outcome}"`);
+      assert(/max_runs/.test(r.data.data.reason ?? ''),
+        `the refusal does not name its cause: ${JSON.stringify(r.data.data.reason)}`);
+
+      // ...and the run log keeps it, so it is still answerable tomorrow.
+      const detail = await api(`/v1/schedules/${schedId}`, { method: 'GET', bearer: jwtA });
+      const runs = (detail.data.data.runs ?? []) as any[];
+      assert(runs.some(x => x.result === 'skipped' && /max_runs/.test(x.errorMessage ?? '')),
+        `no run in the log explains the no-op: ${JSON.stringify(runs.map(x => [x.result, x.errorMessage]))}`);
     });
 
     await test('the same content scheduled AND sent by hand is ONE post', async () => {
@@ -1316,9 +1377,15 @@ async function main(): Promise<void> {
       assert(now.status === 200, `publish now: ${now.status} ${now.data?.error?.message}`);
       assert(provider.stats.publishes === before + 1, 'the immediate publish did not reach the provider');
 
-      await api(`/v1/schedules/${id}/trigger`, { bearer: jwtA });
+      const fired = await api(`/v1/schedules/${id}/trigger`, { bearer: jwtA });
       assert(provider.stats.publishes === before + 1,
         `the schedule posted it a second time (${provider.stats.publishes - before} total)`);
+      // One post is the right answer; a silent one is not. Whoever scheduled this has to be able to
+      // find out that their 09:00 slot put nothing on the platform, and why.
+      assert(fired.data.data.outcome !== 'ran',
+        'the schedule reported a completed run for a post its own gate had already sent');
+      assert(/already published/i.test(fired.data.data.reason ?? ''),
+        `the reason does not name the cause: ${JSON.stringify(fired.data.data.reason)}`);
     });
 
     await test('a schedule EDITED to name someone else’s account still cannot publish to it', async () => {
@@ -1420,6 +1487,37 @@ async function main(): Promise<void> {
       const publishers = all.filter(p => p.capabilities.length > 0 && p.id !== 'fake-static');
       const missing = publishers.filter(p => !METRIC_READERS_FOR_TEST[p.id]);
       assert(missing.length === 0, `can publish but has no metric reader: ${missing.map(p => p.id).join(', ')}`);
+    });
+
+    await test('read-metrics is advertised only where numbers can actually come back', async () => {
+      // The bug this closes was RENDERED, not thrown. LÄHETIN put a "read the numbers" button on a
+      // LinkedIn post because it had no way to ask, and every press spent a request to be told the
+      // same permanent no — which a production user read as "this app does nothing". A capability an
+      // app can ASK about costs nothing; finding out by calling costs a request and, on X, money.
+      const { buildOutboundProviders } = await import('../src/services/connections/providers.js');
+      const { METRIC_READERS_FOR_TEST } = await import('../src/services/connections/metrics.js');
+      const all = buildOutboundProviders({
+        connectionsEnabled: true,
+        connectGoogleClientId: 'x', connectGoogleClientSecret: 'x',
+        connectLinkedinClientId: 'x', connectLinkedinClientSecret: 'x',
+        connectXClientId: 'x', connectXClientSecret: 'x',
+        connectFakeBaseUrl: '', connectRedirectUri: 'https://example.test/cb',
+      } as any);
+
+      const claiming = all.filter(p => p.capabilities.includes('read-metrics'));
+      assert(claiming.length > 0, 'no provider advertises read-metrics, so this test proves nothing');
+      const unbacked = claiming.filter(p => !METRIC_READERS_FOR_TEST[p.id]);
+      assert(unbacked.length === 0, `advertises read-metrics with no reader: ${unbacked.map(p => p.id).join(', ')}`);
+
+      // LinkedIn is pinned because its refusal is UNCONDITIONAL — the reader exists so the caller
+      // gets a reason rather than silence, and it can never return a number at the Consumer tier.
+      // The day analytics becomes reachable, both this line and metrics.ts have to change together.
+      const li = all.find(p => p.id === 'linkedin')!;
+      assert(!li.capabilities.includes('read-metrics'),
+        'LinkedIn advertises read-metrics, but its reader refuses every call at this tier');
+      const out = await METRIC_READERS_FOR_TEST.linkedin({} as any);
+      assert(!out.ok && out.permanent === true,
+        'the LinkedIn reader stopped refusing permanently — the capability list must be revisited');
     });
 
     console.log(`\n${'─'.repeat(60)}\n  ${passed} passed, ${failed} failed\n`);

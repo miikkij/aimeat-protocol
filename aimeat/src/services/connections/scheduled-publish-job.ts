@@ -17,9 +17,17 @@
  *   IT DOES NOT RETRY A FAILURE. The scheduler records the error and the run log carries it. A
  *   schedule nobody is watching that retries on a broken connection is how one expired token becomes
  *   a thousand refused calls at a provider overnight.
+ *
+ *   AND IT DOES NOT CALL A RUN SUCCESSFUL WHEN NOTHING WAS SENT. The gate can legitimately answer
+ *   "this exact message is already opened" or "it is held / queued"; none of those put a post on a
+ *   platform. Returning normally for them made the scheduler count the run, log it green and, for a
+ *   one-shot, disable the schedule and tell the owner it was finished. `skipped` is the word that
+ *   already means "nothing ran, here is why", and it keeps the reason where a person can read it.
  * @structure ScheduledPublishInput · runConnectionsPublishJob
  * @usage registered by the Scheduler for job.type === 'connections-publish'
  * @version-history
+ *   v1.1.0 — 2026-08-08 — A fire that published nothing (replay / held / queued) reports `skipped`
+ *     with the reason instead of a green success that closed the one-shot.
  *   v1.0.0 — 2026-08-02 — LÄHETIN: scheduled publishing as a kind on the EXISTING scheduler.
  */
 
@@ -83,11 +91,38 @@ export async function runConnectionsPublishJob(
     throw new Error(out.reason);
   }
 
-  // `held` (moderation) and `queued` (a spent provider allowance) are honest outcomes, not failures.
-  // The attempt carries that state; reporting either as an error would teach a retry that makes both
-  // worse. `replay` means the gate recognised this exact work and published nothing further.
   logger.info('connections: a scheduled publish fired', {
     job: job.id, attempt: out.attempt.id, status: out.attempt.status, replay: out.replay,
   });
+
+  // ── A RUN THAT PUBLISHED NOTHING IS NOT A SUCCESSFUL RUN ─────────────────────
+  //
+  // This was the quietest lie on the whole path, and a production user met it: the gate answers
+  // `replay` when this exact message has already been opened, runOwnPublish passes that back as
+  // ok:true, and returning normally here made the scheduler count the run, write a green log line,
+  // and — for the one-shot LÄHETIN creates — auto-disable the schedule and tell the owner it had
+  // finished. A post that never left, reported as sent, and the schedule deleted itself.
+  //
+  // `skipped` is the scheduler's existing word for "nothing ran, and here is why". It keeps the
+  // reason in the run log, leaves runCount and the one-shot budget untouched, and does not pretend.
+  // `held` and `queued` are the same shape of answer: waiting is not sending.
+  if (out.replay) {
+    const landed = out.attempt.status === 'done';
+    return {
+      reads: [], writes: [], skipped: true,
+      skipReason: landed
+        ? `nothing was sent: this exact message is already published to that account (${out.attempt.createdAt})`
+        : `nothing was sent: an identical message is already ${out.attempt.status} from ${out.attempt.createdAt}`,
+    };
+  }
+  if (out.attempt.status === 'held' || out.attempt.status === 'queued') {
+    return {
+      reads: [], writes: [], skipped: true,
+      skipReason: out.attempt.status === 'held'
+        ? 'nothing was sent yet: the post is waiting for moderation'
+        : "nothing was sent yet: the account's daily allowance at the provider is spent",
+    };
+  }
+
   return { reads: [], writes: [] };
 }

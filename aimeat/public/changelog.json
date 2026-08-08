@@ -4,6 +4,19 @@
     {
       "date": "2026-08-08",
       "version": "2.7.0",
+      "kind": "fix",
+      "title": {
+        "en": "Publishing now tells you what happened",
+        "fi": "Julkaisu kertoo nyt mitä tapahtui"
+      },
+      "body": {
+        "en": "A send that failed no longer locks that message out forever. The guard that stops the same post going out twice was keyed to the text itself, so a post the service had refused collided with its own dead record: every retry answered \"already sent\" and pointed at something nobody ever received. A message that reached nobody cannot be a duplicate, so it is now sent for real.\n\nAnd a schedule that published nothing says so, with the reason. Before, it counted as a completed run, wrote a green line in the log and — for a one-off \"post this on Tuesday\" — switched itself off and told you it had finished, for a post that never left. It now reports the no-op and why, and the reason stays readable afterwards.\n\nApps can also ask, before spending anything, which of your channels will ever report numbers back. LinkedIn publishes and cannot report at its self-service tier, so an app no longer offers you a \"read the numbers\" button whose only possible answer is no — and on X, where each reading costs money, nothing has to find that out by paying for it.",
+        "fi": "Epäonnistunut lähetys ei enää lukitse samaa viestiä ikuisesti. Vartija joka estää saman julkaisun lähtemisen kahdesti oli sidottu itse tekstiin, joten palvelun torjuma julkaisu törmäsi omaan kuolleeseen kirjaukseensa: jokainen uusi yritys vastasi \"jo lähetetty\" ja osoitti johonkin jota kukaan ei koskaan saanut. Viesti joka ei mennyt perille ei voi olla tuplajulkaisu, joten se lähtee nyt oikeasti.\n\nJa ajastus joka ei julkaissut mitään sanoo sen, syyn kanssa. Ennen se laskettiin onnistuneeksi ajoksi, kirjasi lokiin vihreän rivin ja — kertaluonteisessa \"julkaise tämä tiistaina\" -ajastuksessa — sammutti itsensä ja ilmoitti valmistuneensa, julkaisusta joka ei koskaan lähtenyt. Nyt se kertoo ettei mitään lähtenyt ja miksi, ja syy on luettavissa myös jälkeenpäin.\n\nSovellukset voivat lisäksi kysyä etukäteen, mitkä kanavistasi ylipäätään kertovat lukuja takaisin. LinkedIn julkaisee mutta ei kerro lukuja itsepalvelutasollaan, joten sovellus ei enää tarjoa sinulle \"lue luvut\" -nappia jonka ainoa mahdollinen vastaus on ei — eikä X:llä, jossa jokainen lukukerta maksaa, tarvitse maksaa sen selvittämisestä."
+      }
+    },
+    {
+      "date": "2026-08-08",
+      "version": "2.7.0",
       "kind": "notice",
       "title": {
         "en": "We signed the EU Code of Practice on AI transparency — Section 2, and not Section 1",

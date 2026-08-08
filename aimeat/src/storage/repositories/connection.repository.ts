@@ -24,6 +24,8 @@
  * @usage
  *   import type { ConnectionRepository } from './repositories/connection.repository.js';
  * @version-history
+ *   v1.2.0 — 2026-08-08 — reopenPublishAttempt: an attempt that published nothing must not lock its
+ *     own message out forever. The key is derived from the message, so one failure was permanent.
  *   v1.1.0 — 2026-08-02 — countPublishAttempts accepts SEVERAL connection ids: a provider's daily
  *     allowance belongs to the APP registration rather than to one account, so counting a single
  *     connection answers a question nobody asked (YouTube's six uploads are per Google project).
@@ -131,6 +133,23 @@ export interface ConnectionRepository {
    * The caller distinguishes the two outcomes by comparing `row.id` with the id it passed.
    */
   openPublishAttempt(row: NewPublishAttempt): Promise<PublishAttempt>;
+
+  /**
+   * Claim an attempt that ended without publishing anything, so the same message can be sent again.
+   *
+   * WITHOUT THIS, ONE FAILURE IS PERMANENT. The idempotency key is derived from the message, so a
+   * caption that failed once collides with its own dead row forever: every retry is answered
+   * "already sent" and points at an attempt that reached nobody. The guard exists to prevent a
+   * DOUBLE post, and a row that published nothing cannot become one.
+   *
+   * Atomic, and conditional on the row still being in a state this may claim — two people pressing
+   * send at the same moment still produce exactly one publish, because only one UPDATE matches.
+   * Returns the reopened row, or undefined when the row was not claimable (already reopened by
+   * somebody else, still in flight, or actually published).
+   */
+  reopenPublishAttempt(
+    id: string, status: PublishStatus, claimable: PublishStatus[], staleBefore?: string,
+  ): Promise<PublishAttempt | undefined>;
 
   getPublishAttempt(id: string): Promise<PublishAttempt | undefined>;
 

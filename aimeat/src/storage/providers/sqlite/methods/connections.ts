@@ -13,6 +13,8 @@
  * @structure connectionMethods — connections · delegations · publish attempts
  * @usage merged onto SqliteStorage.prototype in ../index.ts
  * @version-history
+ *   v1.2.0 — 2026-08-08 — reopenPublishAttempt: a conditional UPDATE, so two callers racing the same
+ *     retry of a dead attempt still produce exactly one publish.
  *   v1.1.0 — 2026-08-02 — attemptWhere accepts several connection ids for the per-app ceiling.
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1.
  */
@@ -303,6 +305,27 @@ export const connectionMethods = {
     const r = this.db.prepare('SELECT * FROM publish_attempts WHERE idempotencyKey = ?')
       .get(row.idempotencyKey) as Row;
     // Guaranteed present: either this insert placed it or the conflicting one did.
+    return toAttempt(r);
+  },
+
+  /**
+   * Claim a dead attempt so the same message can be tried again. The WHERE clause is the whole
+   * safety property: only a row still in a claimable state matches, so of two callers racing the
+   * same retry exactly one wins and the loser is answered `replay` as before.
+   */
+  async reopenPublishAttempt(
+    this: SqliteStorage,
+    id: string, status: PublishStatus, claimable: PublishStatus[], staleBefore?: string,
+  ): Promise<PublishAttempt | undefined> {
+    if (!claimable.length) return undefined;
+    const holes = claimable.map(() => '?').join(', ');
+    const params: unknown[] = [status, new Date().toISOString(), id, ...claimable];
+    let sql = `UPDATE publish_attempts SET status = ?, error = NULL, externalRef = NULL, updatedAt = ?
+               WHERE id = ? AND status IN (${holes})`;
+    if (staleBefore) { sql += ' AND updatedAt < ?'; params.push(staleBefore); }
+    const info = this.db.prepare(sql).run(...params);
+    if (!info.changes) return undefined;
+    const r = this.db.prepare('SELECT * FROM publish_attempts WHERE id = ?').get(id) as Row;
     return toAttempt(r);
   },
 

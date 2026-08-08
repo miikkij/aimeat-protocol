@@ -24,6 +24,7 @@ A running catalogue of traps we've actually hit, so we don't hit them twice. **O
 14. [Environment & tooling (Windows)](#14-environment--tooling-windows)
 15. [Mobile, viewport & on-screen keyboard](#15-mobile-viewport--on-screen-keyboard)
 16. [Realtime & multiplayer apps (AimeatRealtime)](#16-realtime--multiplayer-apps-aimeatrealtime)
+16b. [Outbound publishing & idempotency gates (connections)](#16b-outbound-publishing--idempotency-gates-connections)
 17. [Tests that cannot fail](#17-tests-that-cannot-fail)
 
 ---
@@ -182,6 +183,24 @@ Full protocol (agent-facing): the `band-jam` skill's `references/jam-protocol.md
 - **Rooms are garbage-collected after inactivity — reconnect must be able to RECREATE, not just re-dial.** On WS close, `getRoom(id)` may 404 (reaped). Robust recovery: try `getRoom`; if it's gone, `createRoom` again with the same name/tags; then reconnect with a **fresh** `AimeatRealtime` instance (the dead socket's object can hold stale state). Back off exponentially and reset the delay on a successful `joined`. *(Band Jam's `tryReconnect` is the reference.)*
 - **Sync a shared timeline off ONE anchor, not each client's own clock.** Broadcast a `t0` (unix ms of "step 0") + `bpm`; every client computes `step = floor((Date.now()-t0)/stepMs) % N` — so all browsers land on the same step. On join, send a `sync-request` and adopt the returned `t0`/`bpm` so late joiners come in phase. On a tempo change, **re-anchor** `t0 = Date.now() - currentStep*newStepMs` so the beat doesn't jump. Deriving timing from a local incrementing `setInterval` counter drifts — don't.
 - **Any authenticated principal can create/join a room and broadcast — including a GAII agent.** `/v1/realtime/rooms` (create/list/get) and the WS (`/v1/realtime/ws?room=&token=&nick=`) are `requireAuth()` only, no role gate. So an AI bandmate / co-editor / co-player is simply an agent that opens the WS with its own JWT and sends the same payloads a browser does — there is **no special server path** to build for "let an AI join." Design the app's realtime messages as a clean public protocol and the agent surface comes for free. *(This is exactly how the `band-jam` skill lets a real Claude agent join a jam.)*
+
+---
+
+## 16b. Outbound publishing & idempotency gates (connections)
+*Symptoms: "nothing went out and nobody told me"; a schedule that fired, reported success and deleted
+itself; "already sent" pointing at a post nobody ever received; a Read button that can never work.*
+
+Found in production in LÄHETIN, 2026-08-08. Every one of these is the SAME shape: the node knew, and
+nothing on the way to the person carried it.
+
+- **A content-derived idempotency key makes one failure permanent.** `sha256(publisher, connection, file, caption)` is what stops a double post — and with no expiry and no reopen, a caption that failed once collides with its own dead row forever: every retry is answered `replay: true` pointing at an attempt that reached nobody, and there is no way out from the app. Fix: `claimDeadAttempt()` in `publish-gate.ts` reopens a `failed` / `rejected` row, and an `in_flight` one older than an hour. **The guard prevents a double POST; a row that published nothing cannot become one.**
+- **`replay: true` is not "it is out there".** It means "nothing was published just now". Whether that is good news depends entirely on `attempt.status`. An app that built a "you already sent this" message from `replay` alone, and read only `url` for the rest, printed a sentence ending in a colon followed by nothing.
+- **An empty `externalRef` is not a link.** LinkedIn answers a *successful* share with no URN header, so `''` flows out; `'' ?? undefined` stays `''`, and every truthiness check downstream renders a link to nothing. Test for `||`, not `??`.
+- **A scheduler run that published nothing must not return success.** The gate can legitimately answer replay / `held` / `queued`; returning normally made the scheduler count the run, write a green `ExecutionLog` row and — for the one-shot `max_runs: 1` LÄHETIN creates — auto-disable the schedule and push "finished" to the owner, for a post that never left. Return `{ skipped: true, skipReason }`: it keeps the reason in the run log and leaves `runCount` and the budget untouched. **Note the consequence for a reader: a skip never touches `lastRunResult`, so it is visible only through `GET /v1/schedules/{id}` → `runs[]`.**
+- **A failed one-shot silently reschedules itself a YEAR out.** A failure does not advance `runCount` and does not auto-disable, but `nextRunAt` is rewritten to `cron.nextRun()` — and a `min hour dayOfMonth month *` cron has no year field. The row stays `enabled` with a date twelve months away, and "04.08. klo 21.00" reads exactly like this week. Any UI showing a schedule's own next-run time outside a month grid must print the year.
+- **Filtering a schedule list on `enabled` deletes your own history.** The scheduler disables a one-shot the moment it fires, so `j.enabled && j.nextRunAt` erases every schedule that did its job — the post falls back to looking like an untouched draft and the send exists nowhere on screen. `lastRunAt`, `lastRunResult`, `lastRunError` and `runCount` are in the same response.
+- **Advertise metric readability; do not discover it by calling.** LinkedIn publishes and cannot report analytics at the Consumer tier, so an app with no way to ask renders "read the numbers" whose only possible answer is a 409 — and on X each discovery costs money. Providers now carry `read-metrics` in `capabilities` exactly when a reader can succeed.
+- **An SDK writer that returns a hardcoded success is a lie by construction.** `connect.attach()` and `connect.revoke()` returned `{connected: true}` / `{revoked: true}` without consulting the envelope, so a 403 for an app holding only `connections:use` read back as success and announced a change that never happened. Every reader on that surface already went through `must()`; the two writers did not.
 
 ---
 

@@ -20,6 +20,9 @@
  * @structure PublishRunInput · PublishRunOutcome · runOwnPublish
  * @usage import { runOwnPublish } from './publish-run.js';
  * @version-history
+ *   v1.1.0 — 2026-08-08 — A replay reports no `url` for an empty externalRef. LinkedIn answers a
+ *     successful share without a URN header, so `''` reached callers and every truthiness check
+ *     downstream drew it as a link to nothing.
  *   v1.0.0 — 2026-08-02 — LÄHETIN phase 2: extracted from the publish route so the scheduler can
  *     take the identical path rather than a second copy of it.
  */
@@ -107,8 +110,14 @@ export async function runOwnPublish(
 
   // A repeat of work already opened. The first attempt's outcome IS the answer; starting a second
   // publish here is the double post this whole mechanism exists to prevent.
+  //
+  // The caller must read `attempt.status`, never the absence of an error: a replay says "nothing was
+  // published NOW", which is a different sentence from "it is out there". An empty externalRef is
+  // reported as no url at all — LinkedIn answers a successful share without a URN header, so `''`
+  // reaches here and `'' ?? undefined` stays `''`, which every truthiness check downstream reads as
+  // a link and renders as nothing.
   if (gate.replay) {
-    return { ok: true, replay: true, attempt: gate.attempt, url: gate.attempt.externalRef ?? undefined };
+    return { ok: true, replay: true, attempt: gate.attempt, url: gate.attempt.externalRef || undefined };
   }
   if (gate.attempt.status === 'held' || gate.attempt.status === 'queued') {
     return { ok: true, replay: false, attempt: gate.attempt };

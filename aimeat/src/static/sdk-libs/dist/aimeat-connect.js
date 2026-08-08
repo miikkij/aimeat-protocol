@@ -392,13 +392,15 @@
       method: "POST",
       body: JSON.stringify({ provider, mode: "personal", fields })
     });
+    const d = must(res, "the account could not be attached");
     announce();
-    return { connected: true, connection: res?.data?.connection };
+    return { connected: true, connection: d.connection };
   }
   async function revoke(connectionId) {
     const res = await authFetch2(`/v1/connections/${encodeURIComponent(connectionId)}`, { method: "DELETE" });
+    const d = must(res, "the account could not be disconnected");
     announce();
-    return { revoked: true, toldProvider: Boolean(res?.data?.told_provider) };
+    return { revoked: true, toldProvider: Boolean(d.told_provider) };
   }
   function on(fn) {
     listeners.add(fn);

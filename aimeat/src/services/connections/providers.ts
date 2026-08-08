@@ -21,6 +21,9 @@
  *   - findProvider(list, id) / listProviderMeta(list) — lookup + the safe public projection
  * @usage const providers = buildOutboundProviders(config);
  * @version-history
+ *   v1.2.0 — 2026-08-08 — `read-metrics` joins the capability vocabulary, so an app can tell before
+ *     spending a request (and, on X, money) whether a channel will ever report numbers to its
+ *     author. LinkedIn does not carry it, which is the whole point.
  *   v1.1.0 — 2026-08-02 — Mastodon asks for read:statuses: without it the metric reader 403'd forever,
  *     so the capability was advertised and could never work.
  *   v1.0.0 — 2026-08-02 — TARGET-057 Phase 1b. Mastodon, YouTube, Bluesky.
@@ -103,6 +106,12 @@ export interface OutboundProvider {
    * What an app may ASK about a connection at this provider (decision K1). An app never reads the
    * provider's own scope vocabulary — it cannot know what those names mean — so it asks a question
    * in AIMEAT's vocabulary and gets a yes or no.
+   *
+   * The vocabulary: `publish-post`, `publish-video`, `read-metrics`. `read-metrics` is here because
+   * an app that cannot ask it has to FIND OUT by calling — which costs a provider request and, on
+   * X, money, to be told what the registry already knew. It also renders a "read the numbers"
+   * button on LinkedIn, where the answer is a permanent refusal: a control that can never work.
+   * A provider carries it exactly when metrics.ts has a reader that can succeed for it.
    */
   capabilities: string[];
   /**
@@ -162,7 +171,7 @@ function mastodon(capabilityOn: boolean): OutboundProvider {
     scopes: ['read:accounts', 'read:statuses', 'write:statuses', 'write:media'],
     pkce: true,
     tokenAuth: 'body',
-    capabilities: ['publish-post', 'publish-video'],
+    capabilities: ['publish-post', 'publish-video', 'read-metrics'],
     attachFields: null,
     // Instances rate-limit, but there is no single daily publish ceiling to state, and inventing
     // one would be a guess wearing a number.
@@ -215,7 +224,7 @@ function youtube(clientId: string, clientSecret: string, capabilityOn: boolean):
     ],
     pkce: true,
     tokenAuth: 'body',
-    capabilities: ['publish-video'],
+    capabilities: ['publish-video', 'read-metrics'],
     attachFields: null,
     // SIX. Read from the project's own quota page on 2026-08-02, not guessed:
     //
@@ -291,6 +300,9 @@ function linkedin(clientId: string, clientSecret: string, capabilityOn: boolean)
     // Text and images at the Consumer tier. NOT publish-video and NOT a native PDF carousel: the
     // Documents API sits behind the partner-gated Community Management product, and advertising a
     // capability the recipe cannot perform is the bug the attach route was already fixed for.
+    // NO read-metrics, and its absence is load-bearing: analytics is behind the same partner gate,
+    // so an app that offered "read the numbers" here would render a button whose only possible
+    // answer is a refusal. A production user pressed it repeatedly and concluded the app was broken.
     capabilities: ['publish-post'],
     // Roughly 100 calls a day per member, but that is a per-MEMBER limit rather than a shared pool,
     // so it is not the kind of ceiling sharedDailyLimit models.
@@ -354,7 +366,9 @@ function x(clientId: string, clientSecret: string, capabilityOn: boolean): Outbo
     tokenAuth: 'basic',
     // Text only for now. Media goes through a separate chunked endpoint with its own processing
     // wait, and claiming video before that exists is the failure the recipe guard now catches.
-    capabilities: ['publish-post'],
+    // read-metrics is real here and it BILLS: public_metrics is charged per read, which is why
+    // nothing on this node reads it on a timer.
+    capabilities: ['publish-post', 'read-metrics'],
     // Pay-per-use has no daily ceiling to model; the limit is a spend cap set at X.
     sharedDailyLimit: null,
     attachFields: null,
@@ -397,7 +411,7 @@ function bluesky(capabilityOn: boolean): OutboundProvider {
     // separate video service with its own job queue and limits, which is not built. Listing a
     // capability the recipe cannot perform is the same "advertised but unconnectable" mistake the
     // attach route was just fixed for, one field over.
-    capabilities: ['publish-post'],
+    capabilities: ['publish-post', 'read-metrics'],
     sharedDailyLimit: null,
     // The one provider a user hands us a secret for, so it is the one that needs a form.
     attachFields: [
@@ -435,7 +449,7 @@ function fake(baseUrl: string, capabilityOn: boolean): OutboundProvider {
     scopes: ['publish'],
     pkce: true,
     tokenAuth: 'body',
-    capabilities: ['publish-video', 'publish-post'],
+    capabilities: ['publish-video', 'publish-post', 'read-metrics'],
     sharedDailyLimit: null,
     attachFields: null,
     endpoints() {

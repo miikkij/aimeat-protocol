@@ -3860,6 +3860,15 @@ components:
             same machinery. The fire goes through the SAME idempotency gate an immediate
             `POST /v1/connections/publish` does, so a schedule racing an impatient human produces one
             post rather than two.
+
+            A FIRE THAT PUBLISHED NOTHING IS RECORDED AS `skipped`, NOT AS A SUCCESSFUL RUN, and the
+            run log carries the reason. That covers the gate answering "this exact message is already
+            published" and the `held` / `queued` waiting states. Returning success for those made the
+            scheduler count the run, log it green and — for a one-shot — disable the schedule and tell
+            the owner it had finished, for a post that never left. Read the runs from
+            `GET /v1/schedules/{id}`; a skip deliberately leaves `runCount` and the one-shot budget
+            untouched, so it does not appear in `lastRunResult`.
+
             `ref` is opaque — stored and handed back, never parsed or authorized against.
 
     # === Agent Workflows ===
@@ -34698,8 +34707,39 @@ paths:
                                   enum: [oauth2, static, session]
                                 capabilities:
                                   type: array
+                                  description: >
+                                    The vocabulary an app may ask in: publish-post, publish-video,
+                                    read-metrics. read-metrics is present only where a reader can
+                                    actually return numbers - LinkedIn publishes and cannot report at
+                                    the Consumer tier, so it carries publish-post alone. An app that
+                                    cannot ask this has to find out by calling, which spends a request
+                                    at the provider and real money on X, and renders a "read the
+                                    numbers" control whose only possible answer is a refusal.
                                   items:
                                     type: string
+                                    example: read-metrics
+                                nodeConfigured:
+                                  type: boolean
+                                  description: >
+                                    False means this node holds no application credentials for the
+                                    provider. NOT the same as unavailable: a principal who registers
+                                    their own client (PUT /v1/connections/clients) connects it anyway.
+                                attachFields:
+                                  type: array
+                                  nullable: true
+                                  description: >
+                                    Non-null when the provider is connected by SUPPLYING a credential
+                                    rather than by an authorization round. Null for an OAuth provider.
+                                    A provider with neither is a Connect button that cannot work.
+                                  items:
+                                    type: object
+                                    properties:
+                                      name: { type: string }
+                                      label: { type: string }
+                                      secret:
+                                        type: boolean
+                                        description: Render as a password input; never echoed back.
+                                      placeholder: { type: string }
         '401':
           $ref: '#/components/responses/Unauthorized'
   /v1/connections:
@@ -34870,9 +34910,20 @@ paths:
         outcome with `replay: true` and starts no second publish.
 
 
+        A SEND THAT FAILED IS NOT A REPLAY. The guard prevents a double POST, so an attempt that
+        reached nobody - refused by the provider, or left in flight when the node stopped - is
+        reopened and sent for real. Only `done`, `held` and `queued` stand as replays. Read
+        `attempt.status`: `replay: true` alone means "nothing was published just now", and whether
+        that is good news depends entirely on what the first attempt became.
+
+
         Two 200 responses are waiting states rather than successes: `held` is moderation and
         `queued` is a spent provider allowance. Neither is an error, because reporting them as one
         teaches a caller to retry, and retrying makes both worse.
+
+
+        `url` is absent when there is no link to give, including the successful LinkedIn share that
+        answers without a URN header - it is never the empty string.
       tags: [Connections]
       security:
         - BearerAuth: []
