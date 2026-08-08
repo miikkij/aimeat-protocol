@@ -105,6 +105,7 @@ import { minidenticon } from "/lib/minidenticons.min.js";
 import { syncTabHistory } from "./landing-page.helpers.js";
 import { EditProfileModal, ChangePasswordModal } from "./landing-page.modals.js";
 import { swallowed } from '/js/swallowed.js';
+import { HomeUiSwitch } from '/components/HomeUiSwitch.js';
 import {
   ProfileCard, WaitingForYou, NextSteps, UsageCard, AiSpendCard, AgentLedgerCard,
   CommerceCard, ContinueCard, AgentsCard, CortexSection, InboxNavButton,
@@ -437,6 +438,10 @@ export default function LandingPage({ tier, stats, homeUsage, homeAgents, sessio
           </div>
           ${(showPromo && apps.length < 3) ? html`
             <${CortexSection} switchTab=${() => open('extensions', 'main')} onDismiss=${dismissPromo} />` : null}
+          ${/* The way to the new home. It has to be HERE: somebody on this side could not reach it
+                from anywhere, which made the choice invisible rather than optional. Same shared
+                control the new home mounts in its settings. */''}
+          <${HomeUiSwitch} className="pf-ui-switch" />
         `}
       </main>
     </div>

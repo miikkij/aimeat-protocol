@@ -8943,7 +8943,9 @@
     },
     "switch": {
       "here": "Käytät uutta kotinäkymää.",
-      "toProfile": "Palaa vanhaan profiiliin"
+      "toProfile": "Palaa vanhaan profiiliin",
+      "hereProfile": "Käytät vanhaa profiilia.",
+      "toHome": "Kokeile uutta kotia"
     }
   }
 }

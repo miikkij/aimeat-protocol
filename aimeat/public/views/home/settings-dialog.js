@@ -16,12 +16,14 @@
  *      HomeView re-renders on every `aimeat-live-update` and a component whose identity is
  *      recreated per render makes Preact unmount and remount the OPEN dialog — the documented
  *      strobe in components/Modal.js.
- * @structure HomeSettingsDialog({ open, onClose, session, showToast, onSwitch })
+ * @structure HomeSettingsDialog({ open, onClose, session, showToast })
  * @usage
  *   import { HomeSettingsDialog } from '/views/home/settings-dialog.js';
  *   html`<${HomeSettingsDialog} open=${open} onClose=${close} session=${session} ... />`
  * @version-history
  *   v1.0.0 — 2026-08-07 — Initial.
+ *   v1.1.0 — 2026-08-08 — The switch is the shared components/HomeUiSwitch.js, mounted here and on
+ *     the old profile's Home view, so the two sides cannot say different things.
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -29,6 +31,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { Modal } from '/components/Modal.js';
+import { HomeUiSwitch } from '/components/HomeUiSwitch.js';
 import { OpenRouterSettings } from '/views/profile/openrouter-settings.js';
 import { ConnectedAppsSection } from '/views/profile/access-tab/connected-apps.js';
 import { ConnectionsSection } from '/views/profile/access-tab/connections.js';
@@ -48,18 +51,7 @@ const TABS = [
   { id: 'wallet', key: 'home.settings.tabWallet', fallback: 'Wallet' },
 ];
 
-/** The switch back to the old profile, which belongs with the settings rather than in the page. */
-function SwitchRow({ onSwitch, busy }) {
-  return html`
-    <div class="koti-settings-switch">
-      <span>${tr('home.switch.here', 'You are using the new home view.')}</span>
-      <button type="button" class="btn-ghost" disabled=${busy} onClick=${onSwitch}>
-        ${tr('home.switch.toProfile', 'Go back to the old profile')}
-      </button>
-    </div>`;
-}
-
-export function HomeSettingsDialog({ open, onClose, session, showToast, onSwitch, switching }) {
+export function HomeSettingsDialog({ open, onClose, session, showToast }) {
   const [tab, setTab] = useState('general');
 
   return html`
@@ -80,7 +72,9 @@ export function HomeSettingsDialog({ open, onClose, session, showToast, onSwitch
         <div class="koti-settings-panel">
           ${tab === 'general' && html`
             <${NotificationsTab} session=${session} showToast=${showToast} />
-            <${SwitchRow} onSwitch=${onSwitch} busy=${switching} />`}
+            ${/* The SAME control the old profile mounts — one switch, two places, so the wording
+                  and the behaviour cannot drift apart. */''}
+            <${HomeUiSwitch} className="koti-settings-switch" />`}
 
           ${/* startOpen: inside a tab there is nothing to collapse into. */''}
           ${tab === 'openrouter' && html`

@@ -8943,7 +8943,9 @@
     },
     "switch": {
       "here": "You are using the new home view.",
-      "toProfile": "Go back to the old profile"
+      "toProfile": "Go back to the old profile",
+      "hereProfile": "You are using the old profile.",
+      "toHome": "Try the new home"
     }
   }
 }

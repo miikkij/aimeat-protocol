@@ -3660,3 +3660,10 @@
 .pf-co-body h4:first-child { margin-top: 0; }
 .pf-co-hint, .pf-co-muted { color: var(--text-dim); font-size: 0.85rem; }
 .pf-co-error { color: var(--danger, #b3372c); }
+
+/* The switch into the new home, at the foot of the profile's own Home view. Separated by a rule so
+   it reads as a footer preference rather than another card in the grid. */
+.pf .pf-ui-switch {
+  margin: 2rem 0 0.5rem; padding-top: 1.1rem;
+  border-top: 1px solid var(--border);
+}

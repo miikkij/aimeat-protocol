@@ -75,21 +75,7 @@ export default function HomeView({ navigate }) {
   const [loadError, setLoadError] = useState('');
   const [toast, setToast] = useState('');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [switching, setSwitching] = useState(false);
 
-  // The switch (08-kytkin.md) now lives inside the settings dialog rather than at the bottom of
-  // the page: it is a setting, and it was the only thing below the feed. Behaviour is unchanged —
-  // it records the choice on the ACCOUNT and then leaves.
-  const switchToProfile = useCallback(async () => {
-    setSwitching(true);
-    try {
-      const r = await api('/v1/home/ui-track', { method: 'PUT', body: JSON.stringify({ ui: 'profile' }) });
-      window.location.href = r?.data?.landing || '/v1/profile';
-    } catch (e) {
-      swallowed('home: switch', e);
-      setSwitching(false);
-    }
-  }, []);
 
   // One line of feedback, and only for things that went wrong: the steps themselves report by
   // changing, which is louder than a message that fades.
@@ -188,8 +174,7 @@ export default function HomeView({ navigate }) {
         <${StepMatDone} state=${state} />
         <${HomeFeed} items=${feed} />
         <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
-          session=${session} showToast=${showToast}
-          onSwitch=${switchToProfile} switching=${switching} />
+          session=${session} showToast=${showToast} />
       </div>`;
   }
 
@@ -234,8 +219,7 @@ export default function HomeView({ navigate }) {
       </ol>
       <${HomeFeed} items=${feed} />
         <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}
-          session=${session} showToast=${showToast}
-          onSwitch=${switchToProfile} switching=${switching} />
+          session=${session} showToast=${showToast} />
       ${toast && html`<div class="koti-toast" role="status">${toast}</div>`}
     </div>`;
 }
