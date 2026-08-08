@@ -89,6 +89,8 @@ import { memoryContentBytes } from '../routes/memory/shared.js';
 import { registerCoreAdminTools } from './core-admin.js';
 import { registerCoreStorageTools } from './core-storage.js';
 import { logger } from '../utils/logger.js';
+import { appMayWriteKey } from '../utils/reserved-keys.js';
+import { hasWriteAsOwner, hasWriteReserved, WRITE_AS_OWNER_SCOPE } from '../routes/memory/owner-target.js';
 
 // F3: bound aimeat_memory_list so a default (and especially owner_scope) call cannot return an
 // unbounded payload. jsonContent() is the universal char-budget backstop; these caps stop the
@@ -103,6 +105,8 @@ export function registerCoreTools(
     getAgentGaii: () => string,
     emitResourceUpdated: (agentGaii: string, uri: string) => void,
     emitResourceListChanged: (agentGaii: string) => void,
+    /** This session's granted scopes. Needed by the owner_scope write gate; empty = no delegation. */
+    sessionScopes: string[] = [],
 ): void {
     const agentGaii = getAgentGaii();
 
@@ -333,9 +337,14 @@ export function registerCoreTools(
     // ── Tool 3: aimeat_memory_read ──
     mcp.registerTool(
         'aimeat_memory_read',
-        { description: descriptionFor('aimeat_memory_read'), inputSchema: { key: z.string(), response_format: responseFormatSchema }, outputSchema: memoryEntryOutput, annotations: annotationsFor('aimeat_memory_read') },
-        async ({ key, response_format }) => {
-            const record = await storage.getMemory(agentGaii, key);
+        { description: descriptionFor('aimeat_memory_read'), inputSchema: { key: z.string(), owner_scope: z.boolean().optional().describe("Also look in the OWNER's namespace and your sibling agents', not only your own. The same opt-in GET /v1/memory/:key?owner_scope=true has always had — the record was readable by policy the whole time, only this tool's lookup was namespaced."), response_format: responseFormatSchema }, outputSchema: memoryEntryOutput, annotations: annotationsFor('aimeat_memory_read') },
+        async ({ key, owner_scope, response_format }) => {
+            // Own namespace first, so a caller that holds its own copy is unaffected by the opt-in.
+            const parsedRead = parseGAII(agentGaii);
+            let record = await storage.getMemory(agentGaii, key);
+            if (!record && owner_scope && parsedRead) {
+                record = await getOwnerScopeMemory(storage, config.nodeId, parsedRead.owner, key);
+            }
             if (!record) {
                 // Memory is keyed by the WRITER, so a key an APP saved lives under the owner's GHII
                 // and a sibling agent's key lives under its GAII. A bare "Memory not found" here has
@@ -385,10 +394,11 @@ export function registerCoreTools(
             group_id: z.string().optional().describe('ID of sharing group for group visibility'),
             tags: z.array(z.string()).default([]).describe('Optional tags for filtering'),
             ttl_hours: z.number().optional().describe('Time-to-live in hours (entry expires after this; omit for no expiry)'),
+            owner_scope: z.boolean().optional().describe("Write this under the OWNER instead of yourself, so the owner's own tools read it as theirs. Requires the memory:write-as-owner scope, which your owner grants per agent. Without this flag every write lands in your own namespace exactly as before. Does not change `visibility` — where a record lives and who may read it are separate."),
             ...aiProvenanceInputs,
         },
         annotationsFor('aimeat_memory_write'),
-        async ({ key, value, visibility, group_id, tags, ttl_hours, ai_provenance, ai_provenance_id }) => {
+        async ({ key, value, visibility, group_id, tags, ttl_hours, owner_scope, ai_provenance, ai_provenance_id }) => {
             // Schema locks apply on EVERY write surface. This tool used to call setMemory directly,
             // making MCP a bypass around strict record schemas + the manifest-format schema (REST
             // returned 422 while the same write sailed through here). Mirror the REST behaviour.
@@ -408,14 +418,49 @@ export function registerCoreTools(
                     isError: true,
                 };
             }
-            const existing = await storage.getMemory(agentGaii, key);
+            // Where this write lands. Default is unchanged: the agent's own namespace. The opt-in is
+            // the ONLY thing that redirects it, and it needs the owner's grant — a scope that
+            // silently moved every write would take an agent's records out from under its own reads.
+            let writeGaii = agentGaii;
+            const parsedWrite = parseGAII(agentGaii);
+            if (owner_scope) {
+                if (!hasWriteAsOwner(sessionScopes)) {
+                    return {
+                        content: [{ type: 'text' as const, text: JSON.stringify({
+                            error: 'SCOPE_DENIED',
+                            message: `Scope "${WRITE_AS_OWNER_SCOPE}" is required to write into the owner's namespace.`,
+                            your_scopes: sessionScopes,
+                            how_to_fix: 'The owner grants it in Profile -> Agents -> this agent -> permissions -> Memory.',
+                        }, null, 2) }],
+                        isError: true,
+                    };
+                }
+                if (!parsedWrite) {
+                    return { content: [{ type: 'text' as const, text: 'Cannot resolve your owner from this session.' }], isError: true };
+                }
+                // The same reserved-key guard the app-grant path has: this write now lands where the
+                // server reads openrouter.* / ai-usage.* / profile.* and trusts what it finds.
+                if (!appMayWriteKey(['agent'], key, true, hasWriteReserved(sessionScopes))) {
+                    return {
+                        content: [{ type: 'text' as const, text: JSON.stringify({
+                            error: 'RESERVED_KEY',
+                            message: `"${key}" is one of the keys the server itself trusts (the AI-provider URL, the spend cap, the public profile). Writing it on the owner's behalf needs the separate "memory:write-reserved" grant, which is not part of full access.`,
+                            how_to_fix: 'The owner ticks it in Profile -> Agents -> this agent -> permissions -> Memory.',
+                        }, null, 2) }],
+                        isError: true,
+                    };
+                }
+                writeGaii = `${parsedWrite.owner}@${config.nodeId}`;
+            }
+
+            const existing = await storage.getMemory(writeGaii, key);
             // Writing a key the OWNER already holds is not an update: this copy lands in the agent's
             // own namespace and owner-scope reads resolve GHII-first, so the owner's copy wins and
             // this one becomes invisible — including in listings. Silently succeeding here is how
             // "I saved it" turns into "the app never showed it". Warn, do not refuse: writing your
             // own copy is legitimate, it just is not a way to update someone else's record.
             let shadowedBy: string | null = null;
-            if (!existing) {
+            if (!existing && !owner_scope) {
                 const parsedW = parseGAII(agentGaii);
                 if (parsedW) {
                     const ownerCopy = await storage.getMemory(`${parsedW.owner}@${config.nodeId}`, key);
@@ -428,7 +473,7 @@ export function registerCoreTools(
             // it goes through the same one decision function the REST path uses: attach what the
             // caller already holds, honour what it declares, otherwise Mint-3.
             const aiProvenanceId = await provenanceForWrite(storage, {
-                principal: agentGaii,
+                principal: agentGaii,   // provenance names WHO WROTE it, not whose namespace it lands in
                 content: memoryContentBytes(value),
                 declaredId: ai_provenance_id,
                 declared: toDeclaredProvenance(ai_provenance),
@@ -441,7 +486,7 @@ export function registerCoreTools(
             });
             const record = await storage.setMemory({
                 key,
-                ownerGaii: agentGaii,
+                ownerGaii: writeGaii,
                 value,
                 ...(aiProvenanceId ? { aiProvenanceId } : {}),
                 visibility,

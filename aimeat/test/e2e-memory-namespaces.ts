@@ -68,7 +68,7 @@ const codeVerifier = randomBytes(32).toString('base64url');
 const codeChallenge = createHash('sha256').update(codeVerifier).digest('base64url');
 
 let ownerToken = '', ownerPriv = '';
-let agentGaii = '', agentToken = '';
+let agentGaii = '', agentToken = '', agentPriv = '';
 let appToken = '';
 const ownerGhii = () => `${owner}@${NODE_ID}`;
 
@@ -85,11 +85,14 @@ async function main() {
 
         const ag = await json('/v1/agents', {
             method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
-            body: JSON.stringify({ name: 'nsbot', owner, capabilities: ['memory'] }),
+            // Explicit scopes: an agent minted without them gets the '*' wildcard, which would
+            // satisfy every gate and make the write-as-owner refusal untestable.
+            body: JSON.stringify({ name: 'nsbot', owner, capabilities: ['memory'], scopes: ['memory:read', 'memory:write'] }),
         });
         assert(ag.status === 201, `register agent: ${ag.status} ${JSON.stringify(ag.body)}`);
         agentGaii = ag.body.data.agent.gaii;
-        agentToken = await getToken(agentGaii, ag.body.data.private_key, true);
+        agentPriv = ag.body.data.private_key;
+        agentToken = await getToken(agentGaii, agentPriv, true);
 
         const pub = await json('/v1/apps', {
             method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
@@ -265,6 +268,143 @@ async function main() {
         const rows = (l.body.data.items ?? []).filter((i: any) => i.key === AGENT_ONLY_KEY);
         assert(rows.length === 0, `owner-scope listing still returns it: ${JSON.stringify(rows)}`);
     });
+
+
+    // == 4. memory:write-as-owner -- an agent writing INTO the owner's namespace ==
+    //
+    // Two conditions, both required. Most of these tests are about the cases that must REFUSE,
+    // because the failures that matter are a silent redirect and a bypassed reserved-key guard.
+    console.log('\nPhase 4: memory:write-as-owner');
+
+    const AS_OWNER_KEY = 'nstest.asowner.note';
+    const AS_OWNER_PUBLIC_KEY = 'nstest.asowner.public';
+
+    await test('WITHOUT the scope: owner_scope is refused, and nothing is written anywhere', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: AS_OWNER_KEY, value: { by: 'agent' }, owner_scope: true }),
+        });
+        assert(w.status === 403, `expected 403 without the scope, got ${w.status} ${JSON.stringify(w.body)}`);
+        assert(w.body.error?.code === 'SCOPE_DENIED', `code: ${w.body.error?.code}`);
+        const r = await json(`/v1/memory/${encodeURIComponent(AS_OWNER_KEY)}?owner_scope=true`, {
+            headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        assert(r.status === 404, 'a refused write must not leave a record behind');
+    });
+
+    await test('WITHOUT the flag: an agent write still lands in the AGENT namespace', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: 'nstest.asowner.unmoved', value: { by: 'agent' } }),
+        });
+        assert(w.status === 201, `write: ${w.status}`);
+        assert(w.body.data.owner_gaii === agentGaii,
+            `ordinary writes must not move, got ${w.body.data.owner_gaii}`);
+    });
+
+    await test('the owner grants memory:write-as-owner', async () => {
+        const p = await json('/v1/agents/nsbot/scopes', {
+            method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ scopes: ['memory:read', 'memory:write', 'memory:write-as-owner'] }),
+        });
+        assert(p.status === 200, `grant: ${p.status} ${JSON.stringify(p.body)}`);
+        agentToken = await getToken(agentGaii, agentPriv, true);   // a live token keeps its old scopes
+    });
+
+    await test('WITH the scope AND the flag: the write lands under the OWNER GHII', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: AS_OWNER_KEY, value: { by: 'agent-as-owner' }, owner_scope: true }),
+        });
+        assert(w.status === 201, `write: ${w.status} ${JSON.stringify(w.body)}`);
+        assert(w.body.data.owner_gaii === ownerGhii(),
+            `expected the owner GHII, got ${w.body.data.owner_gaii}`);
+    });
+
+    await test('the OWNER reads it as their own record, no owner_scope needed', async () => {
+        const r = await json(`/v1/memory/${encodeURIComponent(AS_OWNER_KEY)}`, {
+            headers: { Authorization: `Bearer ${ownerToken}` },
+        });
+        assert(r.status === 200, `owner read: ${r.status}`);
+        assert(r.body.data.value.by === 'agent-as-owner', `value: ${JSON.stringify(r.body.data.value)}`);
+    });
+
+    await test('THE GUARD: a reserved server-trusted key is refused even with the scope', async () => {
+        for (const key of ['openrouter.settings', 'ai-usage.today', 'profile.card']) {
+            const w = await json('/v1/memory', {
+                method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+                body: JSON.stringify({ key, value: { evil: true }, owner_scope: true }),
+            });
+            assert(w.status === 403, `${key} must be refused, got ${w.status}`);
+            assert(w.body.error?.code === 'RESERVED_KEY', `${key} code: ${w.body.error?.code}`);
+        }
+    });
+
+    await test('visibility is untouched: a public record written as the owner stays public', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: AS_OWNER_PUBLIC_KEY, value: { hello: 'world' }, visibility: 'public', owner_scope: true }),
+        });
+        assert(w.status === 201, `write: ${w.status}`);
+        assert(w.body.data.owner_gaii === ownerGhii(), 'lands under the owner');
+        assert(w.body.data.visibility === 'public', `visibility must survive, got ${w.body.data.visibility}`);
+        const pub = await json(`/v1/memory/${encodeURIComponent(ownerGhii())}/${encodeURIComponent(AS_OWNER_PUBLIC_KEY)}`);
+        assert(pub.status === 200, `public read: ${pub.status} ${JSON.stringify(pub.body)}`);
+    });
+
+
+
+    await test('a WILDCARD agent still cannot write the reserved keys', async () => {
+        // The one deliberate break from the '*'-bundles-everything convention. "Full access" is one
+        // click; redirecting a decrypted AI key is not what someone is choosing when they click it.
+        const ag = await json('/v1/agents', {
+            method: 'POST', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ name: 'nswild', owner, capabilities: ['memory'], scopes: ['*'] }),
+        });
+        assert(ag.status === 201, `register wildcard agent: ${ag.status}`);
+        const wildToken = await getToken(ag.body.data.agent.gaii, ag.body.data.private_key, true);
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${wildToken}` },
+            body: JSON.stringify({ key: 'openrouter.settings', value: { baseUrl: 'https://evil.test' }, owner_scope: true }),
+        });
+        assert(w.status === 403, `'*' must not reach a reserved key, got ${w.status} ${JSON.stringify(w.body)}`);
+        assert(w.body.error?.code === 'RESERVED_KEY', `code: ${w.body.error?.code}`);
+        // ...but '*' DOES carry write-as-owner, so an ordinary key still works for it.
+        const ok = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${wildToken}` },
+            body: JSON.stringify({ key: 'nstest.wild.ordinary', value: { by: 'wild' }, owner_scope: true }),
+        });
+        assert(ok.status === 201 && ok.body.data.owner_gaii === ownerGhii(),
+            `'*' should still carry write-as-owner: ${ok.status} ${JSON.stringify(ok.body.data)}`);
+    });
+
+    await test('WITH memory:write-reserved the owner CAN hand over the AI keys', async () => {
+        const p = await json('/v1/agents/nsbot/scopes', {
+            method: 'PATCH', headers: { Authorization: `Bearer ${ownerToken}` },
+            body: JSON.stringify({ scopes: ['memory:read', 'memory:write', 'memory:write-as-owner', 'memory:write-reserved'] }),
+        });
+        assert(p.status === 200, `grant: ${p.status} ${JSON.stringify(p.body)}`);
+        agentToken = await getToken(agentGaii, agentPriv, true);
+
+        for (const key of ['openrouter.settings', 'ai-usage.today', 'profile.card']) {
+            const w = await json('/v1/memory', {
+                method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+                body: JSON.stringify({ key, value: { managed: 'by agent' }, owner_scope: true }),
+            });
+            assert(w.status === 201 || w.status === 200, `${key}: ${w.status} ${JSON.stringify(w.body)}`);
+            assert(w.body.data.owner_gaii === ownerGhii(), `${key} must land under the owner`);
+        }
+    });
+
+    await test('the reserved grant does NOT imply the redirect: without the flag it still stays put', async () => {
+        const w = await json('/v1/memory', {
+            method: 'POST', headers: { Authorization: `Bearer ${agentToken}` },
+            body: JSON.stringify({ key: 'nstest.reserved.unmoved', value: { by: 'agent' } }),
+        });
+        assert(w.status === 201, `write: ${w.status}`);
+        assert(w.body.data.owner_gaii === agentGaii, `got ${w.body.data.owner_gaii}`);
+    });
+
 
     console.log(`\n${passed} passed, ${failed} failed\n`);
     if (failed > 0) process.exit(1);

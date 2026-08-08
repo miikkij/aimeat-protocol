@@ -5,12 +5,21 @@
  *   ../agents-tab.js to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/agents-tab.js (max-file-lines)
+ *   v1.1.0 — 2026-08-08 — memory:write-as-owner, so an owner can let one agent write into their own
+ *     namespace. Deliberately absent from readonly/standard; '*' carries it, as it does for
+ *     messages:send-as-owner.
  */
 import { t } from '/js/i18n.js';
 
 // === Scope Management Constants ===
 export const SCOPE_DOMAINS = [
-  { key: 'memory',    permissions: ['read', 'write', 'delete'] },
+  // write-as-owner: write into the OWNER's namespace instead of the agent's own. Same shape as
+  // messages:send-as-owner below — an explicit, owner-granted delegation. The agent must ALSO
+  // ask for it per call, so granting it changes nothing on its own.
+  // write-reserved: ALSO the keys the server itself trusts (openrouter.* / ai-usage.* /
+  // profile.*). For an agent that administers the account. Not in '*' on purpose — see
+  // WRITE_RESERVED_SCOPE in src/routes/memory/owner-target.ts.
+  { key: 'memory',    permissions: ['read', 'write', 'delete', 'write-as-owner', 'write-reserved'] },
   { key: 'storage',   permissions: ['read', 'write'] },
   { key: 'work',      permissions: ['request', 'read', 'accept', 'publish'] },
   { key: 'social',    permissions: ['read', 'write'] },

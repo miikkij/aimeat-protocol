@@ -160,7 +160,7 @@ export function mcpRouter(config: AimeatConfig, storage: Storage, peers: Map<str
         patchable.tool = (...args: unknown[]) => gate(args[0] as string) ? originalTool(...args) : undefined;
         patchable.registerTool = (...args: unknown[]) => gate(args[0] as string) ? originalRegisterTool(...args) : undefined;
 
-        registerCoreTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
+        registerCoreTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged, scopes);
         registerBoardsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerOrganismsTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);
         registerWorkspaceTools(mcp, storage, config, () => agentGaii, emitResourceUpdated, emitResourceListChanged);

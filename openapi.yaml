@@ -794,6 +794,21 @@ components:
           type: integer
           nullable: true
           description: Time-to-live in hours (null = permanent)
+        owner_scope:
+          type: boolean
+          description: >
+            Write this record under the OWNER's namespace instead of the caller's own. Memory is
+            keyed by whoever wrote it, so without this an agent's write lands under its GAII and the
+            owner's own tools do not see it as theirs.
+
+            Requires the `memory:write-as-owner` scope, which the owner grants per agent. The flag is
+            required as well as the scope: granting the scope alone must never redirect writes an
+            agent was already making, or its own records move out from under its own reads.
+
+            Does NOT change `visibility` — where a record lives and who may read it are separate.
+
+            The server-trusted keys (`openrouter.*`, `ai-usage.*`, `profile.*`) stay refused unless
+            the agent also holds `memory:write-reserved`, which is deliberately not part of `*`.
         agent:
           type: string
           description: >
@@ -860,7 +875,11 @@ components:
           description: Number of quality flags raised against this entry
         owner_gaii:
           type: string
-          description: GAII of the entry owner (included in public reads via /v1/memory/{gaii}/{key})
+          description: >
+            GAII of the entry owner — the namespace the record actually lives in. Returned on public
+            reads via /v1/memory/{gaii}/{key} AND on every write response, because with `owner_scope`
+            a caller can now place a record somewhere other than its own namespace and needs to be
+            told which.
         also_under:
           type: array
           items:

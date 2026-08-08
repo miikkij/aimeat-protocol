@@ -27,12 +27,15 @@ import { emitEcosystemMemoryWrite } from '../../services/ecosystem-events.js';
 import { runAutomationRecipesForWrite } from '../../services/ecosystem-automation.js';
 import { ecoMayWriteKey } from '../../services/ecosystem-access.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
+import { resolveWriteTarget } from './owner-target.js';
 import { isKeyArchived } from '../../services/archive.js';
 import { stampAgentWrite, resolveAttachableProvenanceId } from '../../services/ai-provenance.js';
 import { type MemoryRouteCtx, isAnonymousGaii, visibilityToZone, memoryContentBytes } from './shared.js';
 
 export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
-  const { config, storage, memoryDb, stats, onDirectoryChange, peers, resolve, workspaceAccess } = ctx;
+  //  is no longer destructured here: identity for a write now comes from
+  // resolveWriteTarget, which also decides whether the owner namespace was asked for.
+  const { config, storage, memoryDb, stats, onDirectoryChange, peers, workspaceAccess } = ctx;
 
   // POST /v1/memory — write a memory entry (agent auth required)
   router.post('/v1/memory', requireAuth(), requireExternalPrincipal(), requireScope('memory:write'), validateBody(MemoryWriteSchema, config.nodeId), async (req, res) => {
@@ -59,21 +62,29 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
       }
     }
 
+    const vis = visibility ?? 'private';
+    // Opt-in per request: "write this under the OWNER, not me". Gated by memory:write-as-owner.
+    const ownerScopeWrite = (req.body ?? {}).owner_scope === true;
+
+    const now = new Date().toISOString();
+    // Owner sessions use GHII identity (owner@nodeId) for memory storage. An agent lands under its
+    // own GAII unless it asked for the owner namespace AND holds the scope (see owner-target.ts).
+    const target = resolveWriteTarget(req, config, ownerScopeWrite);
+    if ('deny' in target) {
+      res.status(403).json(error(config.nodeId, target.deny.code, target.deny.message));
+      return;
+    }
+    let gaii = target.gaii;
+
     // Reserved-key guard (DNA invariant #2): a role-'app' token (H-2 app grant) has sub = the owner's
     // GHII, so its memory:write lands in the owner's namespace — where the server reads openrouter.*
     // (the URL a decrypted AI key is sent to), ai-usage.* (the daily spend cap), and profile.* (public
     // directory + match inputs). A granted app must not poison those; the owner manages them via the
     // owner-only routes (/v1/openrouter/settings, /v1/ghii).
-    if (typeof key === 'string' && !appMayWriteKey(req.auth!.roles, key)) {
+    if (typeof key === 'string' && !appMayWriteKey(req.auth!.roles, key, target.delegatedOwnerWrite, target.reservedAllowed)) {
       res.status(403).json(error(config.nodeId, 'RESERVED_KEY', `The key "${key}" is managed by the account owner and cannot be written by an app.`));
       return;
     }
-
-    const vis = visibility ?? 'private';
-
-    const now = new Date().toISOString();
-    // Owner sessions use GHII identity (owner@nodeId) for memory storage
-    let gaii = resolve(req);
 
     // Owner sessions may store an entry under one of their own agents' GAII by
     // passing `agent` (the target GAII). Without this, an owner-created entry
@@ -248,6 +259,10 @@ export function registerCrudRoutes(router: Router, ctx: MemoryRouteCtx): void {
 
     res.status(existing ? 200 : 201).json(success(config.nodeId, {
       key: record.key,
+      // WHERE it landed. Memory is keyed by the writer, and with owner_scope a caller can now put a
+      // record somewhere other than its own namespace — so the response has to say which, or the one
+      // thing the caller needs to know is the one thing it cannot see.
+      owner_gaii: record.ownerGaii,
       visibility: record.visibility,
       zone: visibilityToZone(record.visibility),
       tags: record.tags,
