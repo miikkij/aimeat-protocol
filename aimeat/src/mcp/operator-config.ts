@@ -15,6 +15,11 @@
  *   import { registerOperatorConfigTools } from './operator-config.js';
  * @version-history
  *   v1.0.0 -- 2026-07-05 -- Initial: agent-configure with propose-then-confirm.
+ *   v1.1.0 -- 2026-08-08 -- The narrow-only guard no longer exempts a target that holds '*'. It did,
+ *     because an agent with everything could not gain anything -- true until memory:write-reserved
+ *     became the one scope '*' deliberately does not carry, at which point a '*' agent could propose
+ *     it for itself and confirm it in the next call (the confirm token binds to the caller, so the
+ *     "show the owner" step is instruction text). Coverage now comes from utils/scope-coverage.ts.
  */
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
@@ -26,6 +31,7 @@ import { descriptionFor } from './catalog/shape.js';
 import { mintConfirmToken, verifyConfirmToken, ConfirmTokenError } from '../services/operator-confirm.js';
 import { emitChange } from '../services/event-bus.js';
 import { logger } from '../utils/logger.js';
+import { uncoveredScopes } from '../utils/scope-coverage.js';
 
 const CONFIGURE_ACTION = 'agent_configure';
 
@@ -103,10 +109,22 @@ export function registerOperatorConfigTools(
 
             // Privilege guard: scope changes may only narrow. Applies at propose time too,
             // so a widening proposal is rejected before it can even be shown as approvable.
+            //
+            // This used to skip itself entirely when the target held '*' — `added.length > 0 &&
+            // !granted.has('*')` — on the reasoning that an agent with everything cannot gain
+            // anything. That held until exactly one scope stopped being covered by '*'. An agent
+            // could then propose ['*','memory:write-reserved'] for ITSELF and confirm it in the
+            // next call, because the confirm token binds to the caller: the "show this diff to the
+            // owner" step below is instruction text, not a gate. The end of that path is writing
+            // openrouter.settings into the owner's namespace.
+            //
+            // So: no escape hatch, and coverage is decided by utils/scope-coverage.ts rather than
+            // by testing for '*' here. Anything the target does not already effectively hold is an
+            // addition, whatever its current scopes look like.
             if (proposed.scopes) {
-                const granted = new Set((agent as { defaultScopes?: string[] }).defaultScopes ?? []);
-                const added = proposed.scopes.filter(s => !granted.has(s));
-                if (added.length > 0 && !granted.has('*')) {
+                const granted = (agent as { defaultScopes?: string[] }).defaultScopes ?? [];
+                const added = uncoveredScopes(granted, proposed.scopes);
+                if (added.length > 0) {
                     return err(`Scope additions are not allowed through this tool (requested new: ${added.join(', ')}). Adding scopes is an owner approval in the profile UI; this tool can only narrow.`);
                 }
             }

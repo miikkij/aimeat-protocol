@@ -33,21 +33,20 @@ import type { AimeatConfig } from '../../config.js';
 import { resolveIdentity } from '../../utils/gaii.js';
 import { appMayWriteKey } from '../../utils/reserved-keys.js';
 
-/** The scope an owner grants an agent to write into the owner's own namespace. */
-export const WRITE_AS_OWNER_SCOPE = 'memory:write-as-owner';
-
 /**
- * The stronger grant on top of it: also the RESERVED, server-trusted keys — `openrouter.*` (the URL
- * a decrypted AI key is sent to), `ai-usage.*` (the spend cap) and `profile.*` (the public
- * directory). For an agent that administers the account on the owner's behalf.
+ * The two scopes this module gates on. They are defined in utils/scope-coverage.ts — the one place
+ * that knows `memory:write-reserved` is **deliberately NOT satisfied by `*`**, unlike every other
+ * scope here. `*` is the one-click "Full access" template, and somebody choosing it is deciding
+ * "this agent may act for me", not "this agent may point my decrypted AI key at a URL of its
+ * choosing". The consequence of getting that wrong is credential exfiltration, so it costs one more
+ * explicit tick in the detailed editor.
  *
- * **Deliberately NOT satisfied by `*`, unlike every other scope here.** `*` is the one-click "Full
- * access" template, and somebody choosing it is deciding "this agent may act for me" — not "this
- * agent may point my decrypted AI key at a URL of its choosing". The consequence of getting that
- * wrong is credential exfiltration, so it costs one more explicit tick in the detailed editor.
- * The exact-string check below is that decision; do not "fix" it into the wildcard family.
+ * Do not "fix" it into the wildcard family, and do not hand-roll a `*` test in a new surface that
+ * grants or approves scopes — ask utils/scope-coverage.ts. Two surfaces hand-rolled it and both
+ * became a way for an agent to grant itself this scope with no owner involved.
  */
-export const WRITE_RESERVED_SCOPE = 'memory:write-reserved';
+export { WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../../utils/scope-coverage.js';
+import { WRITE_AS_OWNER_SCOPE, WRITE_RESERVED_SCOPE } from '../../utils/scope-coverage.js';
 
 export interface WriteTarget {
     /** The namespace the record will be written under. */

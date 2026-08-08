@@ -18,6 +18,11 @@
  *     the flat OAuth-style response can re-poll instead of redoing the whole owner-approval round.
  *     Net credential lifetime in storage goes DOWN (was: until the 30 min expiry when unpolled).
  *     (UX-remake v3, P9 / measured in the Jussi run.)
+ *   v1.4.0 — 2026-08-08 — The auto-approve escalation filter no longer exempts a '*' approver, and
+ *     no longer reads `memory:*` as covering memory:write-reserved. Both shortcuts were right until
+ *     that scope existed; after it, a wildcard agent could auto-approve a sibling holding the grant
+ *     that reaches openrouter.settings and then collect the sibling's JWT from the unauthenticated
+ *     device-token poll — no owner step anywhere. Coverage now comes from utils/scope-coverage.ts.
  */
 import type { Router, Request } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -36,6 +41,7 @@ import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { detectPlatform } from '../../services/platform-detector.js';
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { DEVICE_AUTH_EXPIRY_MS, VALID_MODES } from './constants.js';
+import { uncoveredScopes } from '../../utils/scope-coverage.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
 function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
@@ -312,9 +318,15 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
         res.status(400).json(error(config.nodeId, 'INVALID_SCOPES', `Scopes exceed node maximum: ${invalid.join(', ')}`));
         return;
       }
-      const escalating = principal.kind === 'agent' && !principal.scopes.includes('*')
-        ? requestedScopes.filter(s =>
-            !principal.scopes.includes(s) && !principal.scopes.includes(`${s.split(':')[0]}:*`))
+      // An AGENT approver may pass on only what it already holds. The filter used to exempt a '*'
+      // approver outright, and to read `memory:*` as covering everything under it — both correct
+      // until memory:write-reserved became the one scope no wildcard carries. Either shortcut let a
+      // sibling be auto-approved with the grant that reaches openrouter.settings, with no owner
+      // step: the requester then collects the sibling's JWT from the unauthenticated
+      // /v1/agents/device-token poll. Coverage is decided in utils/scope-coverage.ts, so this
+      // surface and the guard cannot disagree again. An OWNER approver may still grant anything.
+      const escalating = principal.kind === 'agent'
+        ? uncoveredScopes(principal.scopes, requestedScopes)
         : [];
       if (escalating.length > 0) {
         // No escalation via a sibling: fall through to the manual consent flow where the
