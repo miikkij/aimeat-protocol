@@ -11,6 +11,9 @@
  *     + .ld-wall-search filter box, for the real published-apps wall.
  *   v1.4.0 — 2026-08-01 — .ld-transline: the single AI-transparency line above the footer
  *     (TARGET-058 Phase 10).
+ *   v1.5.0 — 2026-08-08 — .ld-askai-copy became a container rule on .ld-askai-box. .ld-gen-copy renamed
+ *       .ld-gen-action: it was never a copy class — step 3's "Register and add your app" anchor
+ *       wears it too.
  */
 .ld { max-width: 980px; margin: 0 auto; padding: 2rem 1.25rem 3rem; color: var(--text); }
 
@@ -49,7 +52,9 @@
 .ld-askai-sub { color: var(--text-dim); font-size: .92rem; margin: 0 auto 1rem; max-width: 620px; }
 .ld-askai-box { border: 1px solid var(--border); border-radius: 12px; background: var(--card); padding: 1rem 1.1rem; text-align: left; }
 .ld-askai-prompt { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--font-mono, monospace); font-size: .8rem; line-height: 1.5; color: var(--text); max-height: 260px; overflow-y: auto; }
-.ld-askai-copy { margin-top: .9rem; }
+/* The prompt box's copy button is the shared <CopyButton> (.btn-primary); the gap above it
+   belongs to this box, not to a bespoke button class. */
+.ld-askai-box .btn-primary { margin-top: .9rem; }
 /* "Show the full prompt" sits between the preview and the copy button. */
 .ld-askai-more { margin-top: .6rem; display: block; font-size: .82rem; }
 .ld-ticker { display: flex; align-items: center; gap: .5rem; justify-content: center; margin: 1rem auto; max-width: 760px; padding: .45rem .9rem; border: 1px solid var(--border); border-radius: 999px; background: var(--card); font-size: .85rem; color: var(--text-dim); white-space: nowrap; overflow: hidden; }
@@ -374,7 +379,9 @@
 /* What the prompt contains, instead of how many characters it is: a count reads as
    complexity, the contents read as the reason it is long. */
 .ld-gen-contains { font-size: .8rem; color: var(--text-muted); margin: 0 0 12px; }
-.ld-gen-copy { width: 100%; justify-content: center; }
+/* Full-width step action. Not a copy class despite its old name (.ld-gen-copy): step 3's
+   "Register and add your app" anchor wears it too. */
+.ld-gen-action { width: 100%; justify-content: center; }
 /* Step 3's action is an anchor, not a button — it leaves the page — so it needs the
    button box model spelled out that <button> gets for free. */
 .ld-gen-add { display: block; box-sizing: border-box; text-align: center; text-decoration: none; }

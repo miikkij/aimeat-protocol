@@ -18,10 +18,9 @@
  *   v1.1.0 — 2026-03-17 — Refactor: replace all inline style="" attributes with CSS classes
  *   v1.2.0 — 2026-06-02 — Component unification (#2): both install modals use the
  *     canonical <Modal> component (className="ext-modal-narrow" preserves width).
- *   v1.3.0 — 2026-06-02 — Component unification (#1): the five tier-2 clipboard
- *     buttons (copy prompt / script tag / API surface / instance ID / endpoint) now
- *     use the canonical <CopyButton> with onCopied toasts. The two "Create with AI"
- *     hero CTAs keep their labeled buttons + copyToClipboard (not copy buttons).
+ *   v1.3.0 — 2026-06-02 — Component unification (#1): the five tier-2 clipboard buttons (copy
+ *     prompt / script tag / API surface / instance ID / endpoint) use the canonical <CopyButton>
+ *     with onCopied toasts. The two "Create with AI" hero CTAs keep their own labeled buttons.
  *   v1.4.0 — 2026-06-02 — Component unification (#11): all six extension/instance
  *     status dots use the canonical <StatusDot> instead of bespoke .ext-status-dot
  *     (which had hardcoded #4ade80/#9ca3af — now tokenized via the component).
@@ -29,6 +28,7 @@
  *   v1.5.0 — 2026-07-13 — Split for max-file-lines: MOVED the two AI prompt builders into
  *     ./extensions-tab.prompts.js and the COMP_ICONS/COMP_TAG_CLASSES/BUNDLED lookup tables into
  *     ./extensions-tab.constants.js (relative siblings). Behavior verbatim.
+ *   v1.6.0 — 2026-08-08 — Copy labels from the shared common.* keys; endpoint button drops .ext-btn-copy-spaced (now a container rule).
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -376,7 +376,7 @@ export default function ExtensionsTab({ session, showToast }) {
         const content = p._content || p.content || '';
         return html`
           <div class="ext-detail-section">
-            <div class="ext-detail-section-title">${'\u{1F4AC}'} Prompt: ${p.name} <${CopyButton} text=${content} label=${t('profile.extensions.detail.copyPrompt')} className="btn-primary btn-sm" onCopied=${() => showToast(t('profile.extensions.detail.copied'))} /></div>
+            <div class="ext-detail-section-title">${'\u{1F4AC}'} Prompt: ${p.name} <${CopyButton} text=${content} label=${t('common.copyPrompt')} className="btn-primary btn-sm" onCopied=${() => showToast(t('common.copied'))} /></div>
             <div class="ext-detail-code">${content.substring(0, 500)}${content.length > 500 ? '...' : ''}</div>
           </div>`;
       })}
@@ -388,10 +388,10 @@ export default function ExtensionsTab({ session, showToast }) {
           <div class="ext-detail-section">
             <div class="ext-detail-section-title">${'\u{1F4E6}'} Library: ${lib.filename}</div>
             <div class="ext-lib-meta">${t('profile.extensions.detail.exports')}: ${(lib.exports || []).join(', ')}</div>
-            <div class="ext-lib-label">${t('profile.extensions.detail.scriptTag')} <${CopyButton} text=${scriptTag} label=${t('profile.extensions.detail.copyUrl')} className="btn-primary btn-sm" onCopied=${() => showToast(t('profile.extensions.detail.copied'))} /></div>
+            <div class="ext-lib-label">${t('profile.extensions.detail.scriptTag')} <${CopyButton} text=${scriptTag} label=${t('common.copyUrl')} className="btn-primary btn-sm" onCopied=${() => showToast(t('common.copied'))} /></div>
             <div class="ext-detail-code">${scriptTag}</div>
             ${lib.api_surface ? html`<div>
-              <div class="ext-lib-label-spaced">${t('profile.extensions.detail.apiSurface')} <${CopyButton} text=${lib.api_surface} label=${t('profile.extensions.detail.copyApi')} className="btn-primary btn-sm" onCopied=${() => showToast(t('profile.extensions.detail.copied'))} /></div>
+              <div class="ext-lib-label-spaced">${t('profile.extensions.detail.apiSurface')} <${CopyButton} text=${lib.api_surface} label=${t('profile.extensions.detail.copyApi')} className="btn-primary btn-sm" onCopied=${() => showToast(t('common.copied'))} /></div>
               <div class="ext-detail-code">${lib.api_surface}</div>
             </div>` : null}
           </div>`;
@@ -581,7 +581,7 @@ export default function ExtensionsTab({ session, showToast }) {
           <div class="ext-endpoint-box">
             POST ${NODE_URL}/v1/ext/${ext.name}/{actionId}
           </div>
-          <${CopyButton} text=${NODE_URL + '/v1/ext/' + ext.name + '/'} label=${t('profile.v8ext.copyEndpoint')} className="btn-primary btn-sm ext-btn-copy-spaced" onCopied=${() => showToast(t('profile.v8ext.copied'))} />
+          <${CopyButton} text=${NODE_URL + '/v1/ext/' + ext.name + '/'} label=${t('profile.v8ext.copyEndpoint')} className="btn-primary btn-sm" onCopied=${() => showToast(t('common.copied'))} />
         </div>`}
 
       <div class="ext-actions-bar">

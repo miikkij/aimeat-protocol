@@ -11,12 +11,17 @@
  * @usage import { ReadmePanel } from '/views/profile/organisms/readme-panel.js';
  * @version-history
  *   v1.0.0 — 2026-06-22 — Initial: README display + editor + prompt-driven AI fill (Osa A).
+ *   v1.1.0 — 2026-08-08 — The editor's "Generate with AI" is a shared <CopyButton> driving the paste-back hint via
+ *       onCopied. The empty-state button opens the editor AND copies, so it stays a plain button —
+ *       but copies through the shared copyToClipboard helper, not its own clipboard call.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { copyToClipboard } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { Markdown } from '/components/Markdown.js';
 
 /** Build a ready copy-paste prompt for an AI chat to write the README, seeded with the structure. */
@@ -49,11 +54,15 @@ export function ReadmePanel({ markdown, canEdit, onSave, aiPromptSeed, kind, nam
     finally { setBusy(false); }
   };
 
-  const copyPrompt = async () => {
-    const prompt = buildAiPrompt(kind, name, aiPromptSeed);
-    try { await navigator.clipboard.writeText(prompt); setCopied(true); setTimeout(() => setCopied(false), 2500); }
-    // eslint-disable-next-line aimeat/no-silent-catch -- clipboard may be blocked; the user can still type the README
-    catch { /* clipboard may be blocked; the user can still type the README */ }
+  // `copied` outlives the button's own 2s confirmation: it also reveals the paste-back hint
+  // under the editor, which is why the state stays here and CopyButton drives it via onCopied.
+  const markCopied = () => { setCopied(true); setTimeout(() => setCopied(false), 2500); };
+
+  // The empty-state affordance opens the editor AND copies, so it stays a plain button — but it
+  // copies through the same shared helper <CopyButton> uses, not its own clipboard call.
+  const openEditorAndCopy = async () => {
+    await copyToClipboard(buildAiPrompt(kind, name, aiPromptSeed));
+    markCopied();
   };
 
   if (editing) {
@@ -63,7 +72,8 @@ export function ReadmePanel({ markdown, canEdit, onSave, aiPromptSeed, kind, nam
           <strong>${t('readme.editTitle') || 'Edit README'}</strong>
           <div class="pj-readme-actions">
             <button class="btn-ghost" onClick=${() => setPreview(p => !p)}>${preview ? (t('readme.write') || 'Write') : (t('readme.preview') || 'Preview')}</button>
-            ${aiPromptSeed !== undefined ? html`<button class="btn-ghost" onClick=${copyPrompt}>${copied ? (t('readme.copied') || 'Copied!') : (t('readme.generateAi') || 'Generate with AI')}</button>` : null}
+            ${aiPromptSeed !== undefined ? html`<${CopyButton} text=${buildAiPrompt(kind, name, aiPromptSeed)} className="btn-ghost"
+              label=${t('readme.generateAi') || 'Generate with AI'} onCopied=${markCopied} />` : null}
             <button class="btn-outline" disabled=${busy} onClick=${() => { setDraft(markdown || ''); setEditing(false); }}>${t('common.cancel') || 'Cancel'}</button>
             <button class="btn-primary" disabled=${busy} onClick=${save}>${busy ? (t('common.saving') || 'Saving…') : (t('common.save') || 'Save')}</button>
           </div>
@@ -82,7 +92,7 @@ export function ReadmePanel({ markdown, canEdit, onSave, aiPromptSeed, kind, nam
         <div class="section-desc">${t('readme.emptyHint') || 'No description yet. Add a README so people (and agents) know what this is about.'}</div>
         <div class="pj-readme-actions">
           <button class="btn-outline" onClick=${() => { setDraft(''); setEditing(true); }}>${t('readme.write') || 'Write'}</button>
-          ${aiPromptSeed !== undefined ? html`<button class="btn-ghost" onClick=${() => { setDraft(''); setEditing(true); setTimeout(copyPrompt, 0); }}>${t('readme.generateAi') || 'Generate with AI'}</button>` : null}
+          ${aiPromptSeed !== undefined ? html`<button class="btn-ghost" onClick=${() => { setDraft(''); setEditing(true); setTimeout(openEditorAndCopy, 0); }}>${t('readme.generateAi') || 'Generate with AI'}</button>` : null}
         </div>
       </div>`;
   }

@@ -5,6 +5,9 @@
  *   to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from portfolio.js (max-file-lines)
+ *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -540,7 +543,7 @@ export function PortfolioBuilder({ session, navigate }) {
             <div class="portfolio-prompt-meta">${tr('portfolio.builder.charCount', '{n} characters').replace('{n}', generatedPrompt.length.toLocaleString())}</div>
             <div class="portfolio-prompt-actions">
               <${CopyButton} text=${generatedPrompt} className="btn-primary"
-                label=${t('portfolio.builder.copyPrompt')} copiedLabel=${t('portfolio.builder.promptCopied')} />
+                label=${t('portfolio.builder.copyPrompt')} copiedLabel=${t('common.copied')} />
               <button class="btn-ghost" onClick=${handleDownloadPrompt}>
                 ${t('portfolio.builder.downloadPrompt')}
               </button>

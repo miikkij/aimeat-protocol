@@ -19,6 +19,9 @@
  *   v1.1.0 — 2026-03-19 — Add launch button to My Apps list
  *   v1.0.0 — 2026-03-17 — Refactor: replace inline styles with CSS utility classes (card-h3, text-caption, etc.)
  *   v1.1.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
+ *   v1.8.0 — 2026-08-08 — The agent-authoring prompt copy is a shared <CopyButton>; its text is computed at render by
+ *       agentAuthoringPromptFor(). The hand-rolled handler and its "copy failed" toast are gone —
+ *       the shared helper falls back to execCommand instead of failing.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef, useCallback } from 'preact/hooks';
@@ -27,6 +30,7 @@ const html = htm.bind(h);
 import { t, getLocale } from '/js/i18n.js';
 import { escHtml, handleImgError, timeAgo } from '/js/utils.js';
 import { Spinner } from './shared.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { useConfirm } from '/components/Modal.js';
 import { listApps, uploadApp, deleteApp, patchApp, deployAppAgent, undeployAppAgent, appAgentStatus } from '/js/services/apps.js';
 import { getMemory } from '/js/services/memory.js';
@@ -371,16 +375,13 @@ export default function AppsTab({ session, showToast, onStats }) {
     setAgentsJson(JSON.stringify(app.manifest?.cortex?.agents ?? [], null, 2));
   }
 
-  async function handleCopyAgentPrompt(app) {
+  // The prompt embeds whatever is in the editor right now, falling back to the app's saved crew
+  // defs while the textarea holds invalid JSON. Computed at render because <CopyButton> takes the
+  // text as a prop, and agentsJson is state — every keystroke re-renders it.
+  function agentAuthoringPromptFor(app) {
     let current;
-    try { current = JSON.parse(agentsJson); } catch { current = app.manifest?.cortex?.agents ?? []; }   // eslint-disable-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
-    try {
-      await navigator.clipboard.writeText(buildAgentAuthoringPrompt(app, current));
-      showToast(t('profile.apps.agentPromptCopied') || 'Prompt copied — paste it to your AI chat, then paste the JSON result back here');
-    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
-    } catch {
-      showToast(t('profile.apps.agentPromptCopyFailed') || 'Copy failed — clipboard unavailable', true);
-    }
+    try { current = JSON.parse(agentsJson); } catch { current = app.manifest?.cortex?.agents ?? []; }   // eslint-disable-line aimeat/no-silent-catch -- invalid JSON in the editor is expected mid-typing
+    return buildAgentAuthoringPrompt(app, current);
   }
 
   async function handleSaveAgents(filename) {
@@ -549,7 +550,9 @@ export default function AppsTab({ session, showToast, onStats }) {
               <textarea class="prompt-box mb-half" rows="14" spellcheck="false" value=${agentsJson} onInput=${e => setAgentsJson(e.target.value)}></textarea>
               <div class="flex-row-wrap">
                 <button class="btn-primary btn-sm" onClick=${() => handleSaveAgents(a.filename)}>${t('profile.apps.save') || 'Save'}</button>
-                <button class="btn-info btn-sm" onClick=${() => handleCopyAgentPrompt(a)}>\u{1F4CB} ${t('profile.apps.agentCopyPrompt') || 'Copy AI prompt'}</button>
+                <${CopyButton} text=${agentAuthoringPromptFor(a)} className="btn-info btn-sm"
+                  label=${'\u{1F4CB} ' + (t('profile.apps.agentCopyPrompt') || 'Copy AI prompt')}
+                  onCopied=${() => showToast(t('profile.apps.agentPromptCopied') || 'Prompt copied — paste it to your AI chat, then paste the JSON result back here')} />
                 <button class="btn-outline btn-sm" onClick=${() => setEditingAgents(null)}>${t('profile.cancel') || 'Cancel'}</button>
               </div>
               <div class="text-meta-sm mt-xs">${t('profile.apps.agentClearHint') || 'Save an empty array [] to remove all bundled agents.'}</div>

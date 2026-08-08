@@ -15,6 +15,9 @@
  *   v2.0.0 — 2026-07-31 — Table fetched from GET /v1/ai-tools instead of an in-SPA copy, so
  *     the Experience Center reads the same one.
  *   v1.0.0 — 2026-07-31 — Initial.
+ *   v2.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -91,7 +94,7 @@ function Params({ params }) {
             <div class="ast-param-value">
               ${v
                 ? html`<code class="ast-code">${v}</code><${CopyButton} text=${v} className="btn-ghost btn-sm"
-                    label=${tr('setup.copy', 'Copy')} copiedLabel=${tr('setup.copied', 'Copied')} />`
+                    label=${tr('common.copy', 'Copy')} copiedLabel=${tr('common.copied', 'Copied')} />`
                 : html`<span class="ast-param-empty">${tr('setup.leaveEmpty', 'leave empty')}</span>`}
             </div>
             ${prm.note ? html`<div class="ast-param-note">${prm.note}</div>` : null}
@@ -133,7 +136,7 @@ export function McpSetupGuide() {
         <div class="ast-cmd">
           <pre class="ast-cmd-text">${cmd}</pre>
           <${CopyButton} text=${cmd} className="btn-primary btn-sm"
-            label=${tr('setup.copyCmd', 'Copy the command')} copiedLabel=${tr('setup.copied', 'Copied')} />
+            label=${tr('setup.copyCmd', 'Copy the command')} copiedLabel=${tr('common.copied', 'Copied')} />
         </div>` : null}
 
       <${Params} params=${tool.mcp.params} />

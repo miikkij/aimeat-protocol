@@ -14,6 +14,9 @@
  *     red section-title.
  *   v1.3.0 -- 2026-06-10 -- AgentDangerZone at the tab bottom: typed-agent-name gate +
  *     the shared confirm — replaces the Delete button that sat on every tab's footer.
+ *   v1.5.0 -- 2026-08-08 -- Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 
 import { h } from 'preact';
@@ -176,7 +179,7 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
 
   function handleCopy() {
     copyToClipboard(preview).then(() => {
-      showToast(t('profile.agents.detail.agent_config.copy'));
+      showToast(t('common.copy'));
     });
   }
 
@@ -264,7 +267,7 @@ export default function TabAgentConfig({ agent, agentName, showToast, onDeleteCl
             <div class="pf-agd-config-actions">
               ${!editing && html`
                 <button class="btn-outline btn-sm" onClick=${handleEdit}>${t('profile.agents.detail.agent_config.edit')}</button>
-                <button class="btn-outline btn-sm" onClick=${handleCopy}>${t('profile.agents.detail.agent_config.copy')}</button>
+                <button class="btn-outline btn-sm" onClick=${handleCopy}>${t('common.copy')}</button>
                 <button class="btn-outline btn-sm" onClick=${handleDownload}>${t('profile.agents.detail.agent_config.download')}</button>
               `}
             </div>

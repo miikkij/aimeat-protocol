@@ -12,6 +12,9 @@
  *   v2.0.0 — 2026-03-29 — V2 redesign: batch-based 4-step flow, score bars, template sections
  *   v2.1.0 — 2026-07-16 — Detail-view mount folds its 4-request waterfall into one GET /v1/calibrator/:id/detail
  *     (getProjectDetail); individual loaders kept as fallback + interactive re-fetch.
+ *   v2.2.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 
 import { h } from 'preact';
@@ -424,14 +427,14 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
               <div class="fnd-cal-editor-label">${t('profile.calibrator.prompt')} (v${selectedVersion || 0})</div>
               <textarea value=${prompt} onInput=${e => setPrompt(e.target.value)} disabled=${isReadOnly} />
               <div class="fnd-cal-editor-actions">
-                <${CopyButton} text=${prompt} label=${t('profile.calibrator.copy')} className="btn-sm" onCopied=${() => showToast?.('Prompt copied')} />
+                <${CopyButton} text=${prompt} label=${t('common.copy')} className="btn-sm" onCopied=${() => showToast?.('Prompt copied')} />
               </div>
             </div>
             <div class="fnd-cal-editor-panel">
               <div class="fnd-cal-editor-label">${t('profile.calibrator.targetOutput')}</div>
               <textarea value=${targetOutput} onInput=${e => setTargetOutput(e.target.value)} disabled=${isReadOnly} />
               <div class="fnd-cal-editor-actions">
-                <${CopyButton} text=${targetOutput} label=${t('profile.calibrator.copy')} className="btn-sm" onCopied=${() => showToast?.('Target copied')} />
+                <${CopyButton} text=${targetOutput} label=${t('common.copy')} className="btn-sm" onCopied=${() => showToast?.('Target copied')} />
               </div>
             </div>
           </div>
@@ -476,7 +479,7 @@ function ProjectDetailView({ projectId, onBack, showToast }) {
                     <button class="btn-ghost btn-sm" onClick=${() => handleResetTemplate(tc.field)}>
                       ${t('profile.calibrator.resetTemplate')}
                     </button>
-                    <${CopyButton} text=${templates[tc.field]} label=${t('profile.calibrator.copy')} className="btn-sm" onCopied=${() => showToast?.('Template copied')} />
+                    <${CopyButton} text=${templates[tc.field]} label=${t('common.copy')} className="btn-sm" onCopied=${() => showToast?.('Template copied')} />
                   </div>
                 </div>
               </details>

@@ -12,6 +12,9 @@
  *   v1.4.0 — 2026-08-01 — TARGET-058 Phase 3: the AI-transparency label under the package headline,
  *     fed by `meta.provenance` from GET /v1/knowledge/:id. Campsite (Rule 8): the four inline
  *     `style=` attributes became token-backed .pkv-mt-sm / .pkv-mb-* classes.
+ *   v1.5.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -648,7 +651,7 @@ function DetailView({ packageId, onBack }) {
 
       <div class="pkv-actions">
         <${CopyButton} text=${buildFullMarkdown(manifest, publicEntries, entryData)} className="btn-primary"
-          label=${t('pkv.copyMarkdown')} copiedLabel=${t('pkv.copied')} />
+          label=${t('pkv.copyMarkdown')} copiedLabel=${t('common.copied')} />
         <button class="btn-outline" onClick=${handleExport}>${t('pkv.exportJson')}</button>
       </div>
     </div>

@@ -10,11 +10,15 @@
  * @version-history
  *   v1.0.0 — 2026-08-07 — Extracted from landing.js (max-file-lines) when the chat-first
  *     connect door landed on the page (UX-remake v3, P1/P11). Render output unchanged.
+ *   v1.1.0 — 2026-08-08 — Both copy buttons are now the shared <CopyButton> instead of two
+ *     hand-rolled navigator.clipboard handlers, so they get its insecure-context fallback and
+ *     one copied-state. Labels come from common.copyPrompt / common.copied; the four
+ *     landing.*Copy* keys they used to hold are gone. Prompt text unchanged.
  */
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 
 const html = htm.bind(h);
@@ -132,16 +136,7 @@ function buildLandingAgentPrompt(nodeUrl) {
 }
 
 function BuildAgentPrompt() {
-  const [copied, setCopied] = useState(false);
   const prompt = buildLandingAgentPrompt(window.location.origin);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    // eslint-disable-next-line aimeat/no-silent-catch -- prompt is visible to select manually
-    } catch { /* prompt is visible to select manually */ }
-  };
   return html`
     <section class="ld-askai">
       <h2 class="ld-askai-title">${tr('landing.agentBuildTitle', 'Build an agent in 10 minutes. Copy this prompt')}</h2>
@@ -149,7 +144,8 @@ function BuildAgentPrompt() {
       <div class="ld-askai-box">
         <pre class="ld-askai-prompt">${prompt}</pre>
         <${ManagedEnvNote} compact=${true} />
-        <button class="btn-primary ld-askai-copy" onClick=${copy}>${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}</button>
+        <${CopyButton} text=${prompt} className="btn-primary"
+          label=${tr('common.copyPrompt', 'Copy prompt')} copiedLabel=${tr('common.copied', '✓ Copied')} />
       </div>
     </section>`;
 }
@@ -158,15 +154,6 @@ function BuildAgentPrompt() {
 // it sells better than the landing copy, and it feeds structured facts to the AIs that will field
 // "what is AIMEAT" questions later (AI-SEO). Copy button + the prompt.
 function AskYourAI() {
-  const [copied, setCopied] = useState(false);
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(ASK_AI_PROMPT);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    // eslint-disable-next-line aimeat/no-silent-catch -- clipboard blocked — the prompt is visible to select manually
-    } catch { /* clipboard blocked — the prompt is visible to select manually */ }
-  };
   return html`
     <section class="ld-askai">
       <h2 class="ld-askai-title">${tr('landing.askAiTitle', 'Let your own AI tell you what AIMEAT is, for you')}</h2>
@@ -174,7 +161,8 @@ function AskYourAI() {
       <div class="ld-askai-box">
         <pre class="ld-askai-prompt">${ASK_AI_PROMPT}</pre>
         <${ManagedEnvNote} compact=${true} />
-        <button class="btn-primary ld-askai-copy" onClick=${copy}>${copied ? tr('landing.askAiCopied', 'Copied ✓') : tr('landing.askAiCopy', 'Copy prompt')}</button>
+        <${CopyButton} text=${ASK_AI_PROMPT} className="btn-primary"
+          label=${tr('common.copyPrompt', 'Copy prompt')} copiedLabel=${tr('common.copied', '✓ Copied')} />
       </div>
     </section>`;
 }

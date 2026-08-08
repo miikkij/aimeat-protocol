@@ -41,13 +41,17 @@
  *     "a model wrote this draft" notice with a link to its provenance record.
  *   v1.7.0 — 2026-07-19 — ConversationToNotebookPopover: capture a whole thread (with images) into the
  *     Notebook via three modes — server-side AI summary (owner's key), copy-prompt (own chat), or raw.
+ *   v1.12.0 — 2026-08-08 — All three copy affordances are shared <CopyButton>s: the two AI-popover buttons (which each
+ *       hand-rolled a navigator.clipboard + execCommand ladder) and the message bubble's icon-only
+ *       ⧉, which uses the new ariaLabel/copiedTitle props so an icon keeps its screen-reader name.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
-import { escHtml, copyToClipboard } from '/js/utils.js';
+import { escHtml } from '/js/utils.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { Markdown } from '/components/Markdown.js';
 import { MessageLinkPreviews } from '/components/LinkPreview.js';
 import { AiInteractionNotice } from '/components/ai-label.js';
@@ -275,17 +279,6 @@ export function PollBuilder({ questions, setQuestions }) {
 }
 
 export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onPark, onReplyAi, onQuote, quoted, quotedName, onJumpTo, domId, tracked, onOpenMarkdown, answeredWith, onAnswer, submitting, showLinkPreviews, onTranscribe, canTranscribe }) {
-  // Copy the message text to the clipboard (the raw markdown the sender wrote — that's what pastes
-  // usefully into an AI chat or a document; the rendered body's presigned image URLs are transient).
-  const [copied, setCopied] = useState(false);
-  const copyTimer = useRef(null);
-  useEffect(() => () => { if (copyTimer.current) clearTimeout(copyTimer.current); }, []);
-  const copyBody = async () => {
-    await copyToClipboard(String(msg.body || ''));
-    setCopied(true);
-    if (copyTimer.current) clearTimeout(copyTimer.current);
-    copyTimer.current = setTimeout(() => setCopied(false), 1600);
-  };
   const nonInline = (msg.attachments || []).filter(a => !a.inline);
   const expiredIds = new Set((msg.attachments || []).filter(a => a.expired).map(a => a.id));
   // urlMap is keyed by `${messageId}::${attachmentId}` because per-message attachment ids (at0, at1…)
@@ -305,9 +298,12 @@ export function MessageBubble({ msg, mine, urlMap, starred, onStar, onTrack, onP
           ${onQuote ? html`<button class="inbox-bubble-act" title=${t('inbox.quoteReply')}
             onClick=${() => onQuote(msg)}>↩</button>` : null}
           <${BubbleSpeakButton} msgId=${msg.id} body=${msg.body} />
-          <button class=${`inbox-bubble-act${copied ? ' inbox-bubble-act--on' : ''}`}
-            title=${copied ? t('inbox.copied') : t('inbox.copyMessage')}
-            aria-label=${t('inbox.copyMessage')} onClick=${copyBody}>${copied ? '✓' : '⧉'}</button>
+          <!-- Copies the raw markdown the sender wrote — that is what pastes usefully into an AI
+               chat or a document; the rendered body's presigned image URLs are transient. -->
+          <${CopyButton} text=${String(msg.body || '')} className="inbox-bubble-act"
+            label="⧉" copiedLabel="✓"
+            title=${t('inbox.copyMessage')} copiedTitle=${t('common.copied')}
+            ariaLabel=${t('inbox.copyMessage')} />
           <button class=${`inbox-bubble-act${starred ? ' inbox-bubble-act--on' : ''}`} title=${t('inbox.markImportant')}
             onClick=${() => onStar?.(msg)}>${starred ? '⭐' : '☆'}</button>
           <button class=${`inbox-bubble-act${tracked ? ' inbox-bubble-act--on' : ''}`}
@@ -663,17 +659,7 @@ export function SchedulePanel({ agentName, onClose, showToast }) {
  *    `build(mode)` returns the prompt for the picked mode; the InboxTab supplies it per source. ── */
 export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
   const [mode, setMode] = useState(MODES.COPY);
-  const [copied, setCopied] = useState(false);
   const text = build(mode);
-  const copy = async () => {
-    try {
-      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(text);
-      else { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
-      setCopied(true); setTimeout(() => setCopied(false), 1800);
-      showToast?.(t('inbox.ai.copied'));
-    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
-    } catch { showToast?.(t('inbox.failed'), true); }
-  };
   return html`
     <div class="inbox-ai-overlay" onClick=${onClose}>
       <div class="inbox-ai-modal" onClick=${(e) => e.stopPropagation()}>
@@ -683,7 +669,7 @@ export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
         </div>
         <div class="inbox-ai-modes">
           <button class=${`inbox-ai-mode${mode === MODES.COPY ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode(MODES.COPY)}>
-            📋 ${t('inbox.ai.modeCopy')}
+            📋 ${t('common.copyPrompt')}
           </button>
           <button class=${`inbox-ai-mode${mode === MODES.MCP ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode(MODES.MCP)}>
             🔌 ${t('inbox.ai.modeMcp')}
@@ -692,7 +678,9 @@ export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
         <div class="inbox-ai-hint">${mode === MODES.COPY ? t('inbox.ai.hintCopy') : t('inbox.ai.hintMcp')}</div>
         <textarea class="inbox-ai-text" readOnly rows="14" value=${text}></textarea>
         <div class="inbox-ai-actions">
-          <button class="btn-primary btn-sm" onClick=${copy}>${copied ? '✓ ' + t('inbox.ai.copied') : '📋 ' + t('inbox.ai.copy')}</button>
+          <${CopyButton} text=${text} className="btn-primary btn-sm"
+            label=${'📋 ' + t('common.copy')} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
+            onCopied=${() => showToast?.(t('inbox.ai.copied'))} />
         </div>
       </div>
     </div>`;
@@ -706,7 +694,6 @@ export function ReplyWithAiPopover({ title, build, onClose, showToast }) {
  *    The parent (InboxTab) owns the async work (AI call + park + toasts) via the passed callbacks. ── */
 export function ConversationToNotebookPopover({ title, promptText, runServerSummary, parkConversation, onClose, showToast }) {
   const [mode, setMode] = useState('ai');       // 'ai' | 'copy' | 'raw'
-  const [copied, setCopied] = useState(false);
   const [aiSummary, setAiSummary] = useState('');
   // TARGET-058: `meta.provenance` for the summary the model just produced, so the reader is told a
   // model wrote it before they keep it. It is NOT an Art. 50(4) content label — this text is private
@@ -716,16 +703,6 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
   const [pasted, setPasted] = useState('');
   const [running, setRunning] = useState(false);
   const [parking, setParking] = useState(false);
-
-  const copy = async () => {
-    try {
-      if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(promptText);
-      else { const ta = document.createElement('textarea'); ta.value = promptText; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); }
-      setCopied(true); setTimeout(() => setCopied(false), 1800);
-      showToast?.(t('inbox.ai.copied'));
-    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
-    } catch { showToast?.(t('inbox.failed'), true); }
-  };
 
   const genSummary = async () => {
     setRunning(true);
@@ -755,7 +732,7 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
         </div>
         <div class="inbox-ai-modes">
           <button class=${`inbox-ai-mode${mode === 'ai' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('ai')}>✨ ${t('inbox.notebook.modeAi')}</button>
-          <button class=${`inbox-ai-mode${mode === 'copy' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('copy')}>📋 ${t('inbox.notebook.modeCopy')}</button>
+          <button class=${`inbox-ai-mode${mode === 'copy' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('copy')}>📋 ${t('common.copyPrompt')}</button>
           <button class=${`inbox-ai-mode${mode === 'raw' ? ' inbox-ai-mode--on' : ''}`} onClick=${() => setMode('raw')}>📥 ${t('inbox.notebook.modeRaw')}</button>
         </div>
         ${mode === 'ai' ? html`
@@ -776,7 +753,9 @@ export function ConversationToNotebookPopover({ title, promptText, runServerSumm
           <div class="inbox-ai-hint">${t('inbox.notebook.hintCopy')}</div>
           <textarea class="inbox-ai-text" readOnly rows="8" value=${promptText}></textarea>
           <div class="inbox-ai-actions">
-            <button class="btn-primary btn-sm" onClick=${copy}>${copied ? '✓ ' + t('inbox.ai.copied') : '📋 ' + t('inbox.ai.copy')}</button>
+            <${CopyButton} text=${promptText} className="btn-primary btn-sm"
+              label=${'📋 ' + t('common.copy')} copiedLabel=${'✓ ' + t('inbox.ai.copied')}
+              onCopied=${() => showToast?.(t('inbox.ai.copied'))} />
           </div>
           <div class="inbox-ai-hint">${t('inbox.notebook.pasteHint')}</div>
           <textarea class="inbox-ai-text" rows="8" placeholder=${t('inbox.notebook.pastePh')} value=${pasted} onInput=${(e) => setPasted(e.target.value)}></textarea>

@@ -5,6 +5,9 @@
  *   satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from portal-dev.js (max-file-lines)
+ *   v1.1.0 — 2026-08-08 — CopyBtn is now a pure label-free wrapper over <CopyButton>: shared btn-primary btn-sm
+ *       btn-copy-inline styling and the default common.copy / common.copied labels, replacing the
+ *       .dv-copy-btn class and the dev.copy / dev.copied keys. The unused `locale` prop is gone.
  */
 import { h } from 'preact';
 import htm from 'htm';
@@ -49,8 +52,10 @@ export const GOAL_LIST = [
 /* ══════════════════════════════════════════════
    COPY BUTTON
    ══════════════════════════════════════════════ */
-// Thin wrapper over the canonical CopyButton — keeps the dev-portal locale labels
-// (dt) + the .dv-copy-btn styling; the copy/feedback logic lives in the component.
-export function CopyBtn({ text, locale }) {
-  return html`<${CopyButton} text=${text} label=${dt('copy', locale)} copiedLabel=${dt('copied', locale)} className="dv-copy-btn" />`;
+// Thin wrapper over the canonical CopyButton. It used to carry the dev-portal's own copy labels
+// and its own .dv-copy-btn styling; both are now the shared ones — btn-primary, and the default
+// common.copy / common.copied. btn-copy-inline keeps it from stretching the .dv-code-row it
+// sometimes sits in; inside a .dv-prompt-output the container positions it in the corner.
+export function CopyBtn({ text }) {
+  return html`<${CopyButton} text=${text} className="btn-primary btn-sm btn-copy-inline" />`;
 }

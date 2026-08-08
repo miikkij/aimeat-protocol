@@ -1,4 +1,18 @@
 <!DOCTYPE html>
+<!--
+  @file oauth-consent.html
+  @description The OAuth device-authorization consent page: the owner reviews a client's
+    requested scopes, picks or creates the agent that will hold them, approves, and is either
+    redirected back or shown an auth code to paste. Standalone — it is NOT part of the SPA, so
+    it carries its own styles and its own slice of the locale file.
+  @version-history
+    v1.1.0 — 2026-08-08 — The auth-code copy button uses the shared copyToClipboard helper
+        (gaining the insecure-context fallback the raw navigator.clipboard call never had) and
+        the shared `.copied` class instead of an inline style.background. Its labels read
+        common.copy / common.copied from the locale, so the page-local oauthConsent.copyBtn /
+        copiedBtn keys are gone.
+    v1.0.0 — prior — Consent page; header added when the copy control was unified.
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -54,6 +68,10 @@
       font-weight:600; cursor:pointer; }
     .btn-sm-accent { background:var(--accent); color:#000; }
     .btn-sm-muted { background:transparent; border:1px solid var(--border); color:var(--muted); }
+    /* Same two class names the SPA's shared copy control uses (.btn-copy-inline / .copied), so
+       the auth-code copy button behaves and confirms identically on this standalone page. */
+    .btn-copy-inline { flex:none; white-space:nowrap; }
+    .btn-sm.copied { background:var(--success); }
   </style>
 </head>
 <body>
@@ -62,6 +80,8 @@
   </div>
 
   <script type="module">
+    import { copyToClipboard } from '/js/utils.js';
+
     // XSS-safe HTML escape
     const escHtml = (s) => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
@@ -76,12 +96,17 @@
     // i18n
     const lang = (navigator.language || 'en').startsWith('fi') ? 'fi' : 'en';
     let T = {};
+    // The copy button's labels are the node-wide shared pair (common.copy / common.copied), not
+    // page-local strings — this page only ever sliced `oauthConsent`, so it needs `common` too.
+    let C = {};
     try {
       const resp = await fetch(`/locales/${lang}.json`);
       const all = await resp.json();
       T = all.oauthConsent || {};
+      C = all.common || {};
     } catch {}
     const t = (key) => T[key] || key;
+    const tc = (key) => C[key] || key;
 
     const app = document.getElementById('app');
 
@@ -365,17 +390,20 @@
                 <p style="margin-bottom:.5rem;font-size:.9rem">${escHtml(t('authCodeLabel'))}</p>
                 <div style="display:flex;align-items:center;gap:.5rem;background:var(--bg);border:1px solid var(--border);border-radius:.5rem;padding:.6rem .75rem;margin-bottom:1rem;font-family:monospace;font-size:.8rem;word-break:break-all">
                   <span style="flex:1" id="codeValue">${code}</span>
-                  <button id="copyBtn" class="btn-sm btn-sm-accent" style="white-space:nowrap">${escHtml(t('copyBtn'))}</button>
+                  <button id="copyBtn" class="btn-sm btn-sm-accent btn-copy-inline">${escHtml(tc('copy'))}</button>
                 </div>
                 <p style="color:var(--muted);font-size:.82rem">${escHtml(t('authCodeHint'))}</p>
               `;
-              document.getElementById('copyBtn').addEventListener('click', () => {
-                navigator.clipboard.writeText(d.code).then(() => {
-                  const btn = document.getElementById('copyBtn');
-                  btn.textContent = t('copiedBtn');
-                  btn.style.background = 'var(--success)';
-                  setTimeout(() => { btn.textContent = t('copyBtn'); btn.style.background = ''; }, 2000);
-                });
+              // This page is outside the SPA (no Preact), so it cannot mount <CopyButton>; it uses
+              // the same shared copyToClipboard helper the component does — which is what gives it
+              // the insecure-context fallback the raw navigator.clipboard call never had — and the
+              // same `copied` class the component stamps, so the confirmation looks the same.
+              document.getElementById('copyBtn').addEventListener('click', async () => {
+                await copyToClipboard(d.code);
+                const btn = document.getElementById('copyBtn');
+                btn.textContent = tc('copied');
+                btn.classList.add('copied');
+                setTimeout(() => { btn.textContent = tc('copy'); btn.classList.remove('copied'); }, 2000);
               });
             }
           } else {

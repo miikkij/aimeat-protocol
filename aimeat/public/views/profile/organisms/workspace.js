@@ -41,6 +41,7 @@
  *     helpers moved into sibling modules under ./workspace/ (color-picker, helpers, generator,
  *     doc-space, record-space, overview, panels, model), imported back and threaded a ctx bag.
  *     No behaviour change — all hooks/effects/callbacks stay in this component.
+ *   v1.10.0 — 2026-08-08 — Drops copyShareLink from the two ctx spreads — the share panel copies with <CopyButton>.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -674,7 +675,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
   };
   const {
     allTypes, isDocSpace, draftsFor, objectsFor, mergedDocs, mergedRecords, docTypes,
-    patchShare, isDocPublic, anythingPublic, copyShareLink, instanceTitle, spaceDesc, groups,
+    patchShare, isDocPublic, anythingPublic, instanceTitle, spaceDesc, groups,
     activeTab, activeSpace, activeGroup, pickTab, openGroup, scrollToSpace, REL_DESC, agentMenuItems,
   } = buildWorkspaceModel({
     ws, share, setShare, setShareBusy, orgId, wsId, showToast, tab, showSettings, approvals, wsT,
@@ -697,7 +698,7 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     savePage, publish, popOut, reloadComments, cKey, commentsByKey, startAdd, saveDraft, cancelForm,
     draftsFor, objectsFor, toggleExpand, startEdit, reopen, isDocSpace, pickTab, openGroup, scrollToSpace,
     guardWsDirty, saveSettings, wsDirty, resetSettingsForm, removeSpaceHandler, addSpaceHandler, delWorkspace,
-    patchShare, isDocPublic, anythingPublic, copyShareLink, docTypes, toggleGate, resolve, instanceTitle,
+    patchShare, isDocPublic, anythingPublic, docTypes, toggleGate, resolve, instanceTitle,
   };
 
   return html`

@@ -9,6 +9,9 @@
  * @usage import { WorkspaceGenerator } from '/views/profile/organisms/workspace/generator.js';
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
+ *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useCallback } from 'preact/hooks';
@@ -96,7 +99,7 @@ export function WorkspaceGenerator({ orgId, wsId, showToast, onApplied, onOpenSe
             ${genBusy ? html`<span class="spinner"></span> ${t('organisms.generating') || 'Generating…'}` : (t('organisms.generate') || 'Generate with AI')}
           </button>
         ` : null}
-        <button class="btn-outline btn-sm" onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('organisms.copyPrompt') || 'Copy prompt'}</button>
+        <button class="btn-outline btn-sm" onClick=${copyPrompt} disabled=${!genDesc.trim()}>${t('common.copyPrompt') || 'Copy prompt'}</button>
       </div>
 
       <div class="section-desc">${t('organisms.pasteHelp') || 'No key? Copy the prompt above into any AI chat, then paste the JSON it returns here:'}</div>

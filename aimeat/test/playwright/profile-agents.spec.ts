@@ -288,7 +288,9 @@ test.describe('Agents — Copy Prompt', () => {
 
     await gotoAgentsTab(page);
 
-    const copyBtn = page.locator('.copy-prompt-btn');
+    // By accessible name, not by class: the copy control is the shared <CopyButton> wearing
+    // .btn-primary, and coupling this assertion to a bespoke class is what made it stale.
+    const copyBtn = page.getByRole('button', { name: /copy prompt/i }).first();
     await expect(copyBtn).toBeVisible({ timeout: 10_000 });
 
     // Prompt box should contain the owner name

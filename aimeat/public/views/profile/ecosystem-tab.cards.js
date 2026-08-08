@@ -7,6 +7,8 @@
  *   to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from ecosystem-tab.js (max-file-lines)
+ *   v1.1.0 — 2026-08-08 — Copy control unified: the bespoke .copy-prompt-btn is the shared .btn-primary, whose
+ *       .copied state now lives in theme.css. Copy labels come from the shared common.* keys.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -125,7 +127,7 @@ export function EcoAskInClaude({ app }) {
               <div class="pf-eco-mcp-sample-label">${t('profile.ecosystem.mcpSampleLabel')}</div>
               <div class="pf-eco-mcp-sample-row">
                 <code class="pf-eco-mcp-sample-prompt">${samplePrompt}</code>
-                <${CopyButton} className="copy-prompt-btn" text=${samplePrompt} />
+                <${CopyButton} className="btn-primary" text=${samplePrompt} />
               </div>
               <p class="pf-eco-dim pf-eco-mcp-sample-note">${t('profile.ecosystem.mcpAccessNote')}</p>`
             : html`<p class="pf-eco-dim pf-eco-mcp-no-organism">${t('profile.ecosystem.mcpNoOrganism')}</p>`}

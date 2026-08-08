@@ -8,6 +8,9 @@
  * @version-history
  *   v1.1.0 — 2026-06-02 — Admin design unification: inline danger styles → adm-btn-danger
  *     (2 delete buttons), raw textarea → adm-textarea adm-input-full, error div → <ErrorBox>.
+ *   v1.2.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -154,7 +157,7 @@ export default function CsmTab({ data, reload }) {
             <pre style="background:var(--bg-deep,#0f172a);padding:16px;border-radius:8px;overflow:auto;font-size:.8rem;max-height:500px;white-space:pre-wrap;line-height:1.5;border:1px solid var(--glass-border,#334155)">${prompt}</pre>
             <span style="position:absolute;top:8px;right:8px">
               <${CopyButton} text=${prompt} className="adm-btn"
-                label=${t('dashboard.copy')} copiedLabel=${t('dashboard.copied')} />
+                label=${t('common.copy')} copiedLabel=${t('common.copied')} />
             </span>
           </div>
 

@@ -5,7 +5,7 @@
  *   mega-prompt for building apps, agent workflows, or connecting an agent runtime.
  *
  * @structure
- *   - buildAppBuilderPrompt / buildAgentPrompt / buildConnectPrompt: compose the copy-paste prompts
+ *   - buildAppBuilderPrompt / buildAgentBuilderPrompt / buildConnectPrompt: compose the copy-paste prompts
  *   - WelcomeBoard: reads/posts the shared welcome board via /v1/memory + /v1/portal/try-memory
  *   - CardGroup / CopyPromptBtn: expandable card + copy-button wrapper primitives
  *   - PortalClassicView (default): assembles hero, board, card groups, and morsels footer
@@ -15,6 +15,12 @@
  *   v1.1.0 — 2026-07-31 — ManagedEnvNote above each of the three copy buttons (app-builder full,
  *     agent and connect compact): what a company-managed AI tool's untrusted-source notice means
  *     and the three routes round it. The prompt builders themselves are unchanged.
+ *   v1.2.0 — 2026-08-08 — Renamed the local buildAgentPrompt → buildAgentBuilderPrompt: the name
+ *     collided with the exported buildAgentPrompt in agents/connect-prompts.js, which builds a
+ *     different text (the device-auth CONNECT prompt). The new name matches its two siblings
+ *     (buildAppBuilderPrompt / buildConnectPrompt). Prompt text unchanged. Copy control unified:
+ *     CopyPromptBtn now passes btn-primary instead of the bespoke .cl-copy-prompt-btn, and the
+ *     "copied" tick comes from the shared t('common.copied') rather than a literal ✔.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -128,7 +134,7 @@ After giving the user the HTML file, always add:
 "If the app doesn't work, press F12 \u2192 Console tab, copy any red errors and paste them here. I'll fix it."`;
 }
 
-function buildAgentPrompt() {
+function buildAgentBuilderPrompt() {
   const n = NODE_URL;
   return `I'd like to build an AI agent workflow using AIMEAT, an open protocol for AI memory, coordination and task management.
 
@@ -328,10 +334,11 @@ function WelcomeBoard() {
 /* ══════════════════════════════════════════════
    COPY BUTTON COMPONENT
    ══════════════════════════════════════════════ */
-// Thin wrapper over the canonical CopyButton \u2014 keeps the classic-portal labels +
-// the .cl-copy-prompt-btn styling; the copy/feedback logic lives in the component.
+// Thin wrapper over the canonical CopyButton \u2014 it exists only to carry the classic-portal
+// labels. The look is the shared .btn-primary and the confirmation is the shared
+// t('common.copied'); the copy/feedback logic lives in the component.
 function CopyPromptBtn({ text, label, copiedLabel, className }) {
-  return html`<${CopyButton} text=${text} label=${label} copiedLabel=${copiedLabel || '\u2714'} className=${className || 'cl-copy-prompt-btn'} />`;
+  return html`<${CopyButton} text=${text} label=${label} copiedLabel=${copiedLabel} className=${className || 'btn-primary'} />`;
 }
 
 /* ══════════════════════════════════════════════
@@ -372,7 +379,7 @@ export default function PortalClassicView({ navigate }) {
   }, []);
 
   const appPrompt = buildAppBuilderPrompt();
-  const agentPrompt = buildAgentPrompt();
+  const agentPrompt = buildAgentBuilderPrompt();
   const connectPrompt = buildConnectPrompt();
 
   return html`
@@ -410,8 +417,7 @@ export default function PortalClassicView({ navigate }) {
           <div class="cl-prompt-actions">
             <${CopyPromptBtn}
               text=${appPrompt}
-              label=${ct('groups.copyPrompt')}
-              copiedLabel=${ct('groups.copied') + ' \u2714'}
+              label=${globalT('common.copyPrompt')}
             />
           </div>
           <div class="cl-prompt-lang-note">${ct('cards.apps.promptLangNote')}</div>
@@ -432,8 +438,10 @@ export default function PortalClassicView({ navigate }) {
         <div class="cl-return-section">
           <div class="cl-return-title">${ct('cards.apps.returnTitle')}</div>
           <div class="cl-return-motivation">${ct('cards.apps.returnMotivation')}</div>
+          <!-- Not a copy control: it navigates. It only ever wore .cl-copy-prompt-btn to borrow
+               that button's look, which is .btn-primary. -->
           <button
-            class="cl-copy-prompt-btn"
+            class="btn-primary"
             type="button"
             onClick=${() => navigate('/v1/profile?tab=apps')}
           >${ct('cards.apps.returnBtnAnon')}</button>
@@ -458,8 +466,7 @@ export default function PortalClassicView({ navigate }) {
           <div class="cl-prompt-actions">
             <${CopyPromptBtn}
               text=${agentPrompt}
-              label=${ct('groups.copyPrompt')}
-              copiedLabel=${ct('groups.copied') + ' \u2714'}
+              label=${globalT('common.copyPrompt')}
             />
           </div>
           <div class="cl-prompt-lang-note">${ct('cards.apps.promptLangNote')}</div>
@@ -480,8 +487,7 @@ export default function PortalClassicView({ navigate }) {
             <div class="cl-prompt-actions">
               <${CopyPromptBtn}
                 text=${connectPrompt}
-                label=${ct('groups.copyPrompt')}
-                copiedLabel=${ct('groups.copied') + ' \u2714'}
+                label=${globalT('common.copyPrompt')}
               />
             </div>
           </div>

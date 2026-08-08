@@ -22,6 +22,7 @@
  *     (CLAUDE.md/AGENTS.md/custom instructions) + link to the prefilled per-organism block on
  *     the profile MCP page. Closes the documented gate where the connection worked but the AI
  *     silently drifted off the node between sessions (UX-remake v3, P9).
+ *   v1.7.0 — 2026-08-08 — CopyBtn no longer takes a `locale` prop (it has no labels of its own any more).
  */
 import { useState, useEffect, useCallback } from 'preact/hooks';
 import { useViewCSS } from '/components/useViewCSS.js';
@@ -140,13 +141,13 @@ export default function PortalDevView({ locale }) {
         <p class="dv-panel-lead">${dt('quickStart.mcpDesc', locale)}</p>
         <div class="dv-code-row">
           <code class="dv-code">${MCP_ADD_COMMAND}</code>
-          <${CopyBtn} text=${MCP_ADD_COMMAND} locale=${locale} />
+          <${CopyBtn} text=${MCP_ADD_COMMAND} />
         </div>
         <p class="dv-hint">${dt('quickStart.mcpNote', locale)}</p>
 
         <p class="dv-panel-lead dv-mt">${dt('quickStart.desc', locale)}</p>
         <div class="dv-prompt-output dv-prompt-output--flush">
-          <${CopyBtn} text=${BROWSE_PROMPT} locale=${locale} />
+          <${CopyBtn} text=${BROWSE_PROMPT} />
           <div class="dv-prompt-text dv-prompt-text--single">${BROWSE_PROMPT}</div>
         </div>
         <p class="dv-note">${dt('quickStart.note', locale)}<br/>${dt('quickStart.fallback', locale)}</p>
@@ -160,7 +161,7 @@ export default function PortalDevView({ locale }) {
         <h3 class="dv-panel-title">${dt('staySync.title', locale)}</h3>
         <p class="dv-panel-lead">${dt('staySync.lead', locale)}</p>
         <div class="dv-prompt-output dv-prompt-output--flush">
-          <${CopyBtn} text=${STAY_SYNC_LINE} locale=${locale} />
+          <${CopyBtn} text=${STAY_SYNC_LINE} />
           <div class="dv-prompt-text">${STAY_SYNC_LINE}</div>
         </div>
         <p class="dv-note">${dt('staySync.prefilledNote', locale)}${' '}

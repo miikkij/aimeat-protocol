@@ -7,6 +7,8 @@
  *   an "ID card" face (renderIdCard): full GAII with its expansion, issued date, last seen,
  *   task/message tallies, trust + morsels — teaching display-name-vs-GAII at a glance.
  * @version-history
+ *   v3.1.0 -- 2026-08-08 -- The GAII copy button uses the shared classes and default labels; .pf-agd-idcard-copy and
+ *       the profile.agents.idcard.copyGaii/copied keys are gone.
  *   v3.0.0 -- 2026-07-12 -- ID-card treatment: each board mini-card reveals a full agent
  *     identity plate on hover/focus (labelled GAII + Global AI Instance Identifier, issued
  *     date, last seen, tasks done/active/failed, messages, trust, morsels, issuer node,
@@ -206,11 +208,7 @@ function renderIdCard(agent) {
             <strong>${t('profile.agents.idcard.gaiiLabel')}</strong> · ${t('profile.agents.idcard.gaiiFull')}
           </span>
           <span onClick=${(e) => e.stopPropagation()}>
-            <${CopyButton}
-              text=${gaii}
-              className="pf-agd-idcard-copy"
-              label=${t('profile.agents.idcard.copyGaii')}
-              copiedLabel=${'✅ ' + t('profile.agents.idcard.copied')} />
+            <${CopyButton} text=${gaii} className="btn-ghost btn-sm btn-copy-inline" />
           </span>
         </div>
         <code class="pf-agd-idcard-gaii-value">${gaii}</code>

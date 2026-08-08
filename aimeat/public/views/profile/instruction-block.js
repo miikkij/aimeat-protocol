@@ -14,6 +14,9 @@
  * @usage import { InstructionBlock } from '/views/profile/instruction-block.js';
  * @version-history
  *   v1.0.0 — 2026-07-31 — Initial.
+ *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -78,7 +81,7 @@ export function InstructionBlock({ orgId }) {
       <div class="ib-actions">
         <${CopyButton} text=${text} className="btn-primary"
           label=${tr('instrBlock.copy', 'Copy the block')}
-          copiedLabel=${tr('instrBlock.copied', 'Copied')} />
+          copiedLabel=${tr('common.copied', 'Copied')} />
         <span class="ib-meta">${tr('instrBlock.from', 'Generated from')} ${data.organism_name || data.organism_id}${
           Array.isArray(data.workspaces) && data.workspaces.length
             ? `, ${data.workspaces.length} ${tr('instrBlock.workspaces', 'workspaces')}` : ''}</span>

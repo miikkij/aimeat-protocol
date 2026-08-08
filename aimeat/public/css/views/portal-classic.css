@@ -5,6 +5,9 @@
  * @version-history
  *   v1.1.0 — 2026-06-02 — Phase 5: tokenize for dark mode (replace bare light-only
  *     surface/border/text literals with theme tokens that flip between light/dark)
+ *   v1.2.0 — 2026-08-08 — .cl-copy-prompt-btn deleted — the copy button is the shared .btn-primary now, and the one
+ *       non-copy control that borrowed the class (the "return to apps" navigate button) says
+ *       .btn-primary directly.
  */
 /* portal-classic view — scoped under .cl */
 /* ── Hero Section ── */
@@ -338,23 +341,6 @@
   gap: 1rem;
   margin-top: 0.75rem;
   flex-wrap: wrap;
-}
-.cl-copy-prompt-btn {
-  padding: 0.6rem 1.4rem;
-  background: linear-gradient(135deg, var(--accent, #E8564A), var(--accent-deep, #D44A3F));
-  color: #fff;
-  border: none;
-  border-radius: 10px;
-  font-size: 0.88rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 4px 15px rgba(232, 86, 74, 0.15);
-  font-family: var(--font, system-ui, sans-serif);
-}
-.cl-copy-prompt-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 25px rgba(232, 86, 74, 0.25);
 }
 .cl-prompt-lang-note {
   font-size: 0.8rem;

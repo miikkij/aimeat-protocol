@@ -4,6 +4,11 @@
  *   wallet, memory, agents, extensions, packages, knowledge, generator, and
  *   edit panels. Consumes theme.css tokens so it flips with dark/light mode.
  * @version-history
+ *   v2.22.0 — 2026-08-08 — Copy-button cleanup: deleted five dead rules (.agent-copy-btn, .ext-copy-btn, .tx-copy-btn,
+ *       .wallet-balance-copy, .pf-gen-debug-copy-file — no markup used any of them) and the
+ *       .copy-prompt-btn / .pn-copy-btn button styles, whose call sites are now shared .btn-*
+ *       classes. .ext-btn-copy-spaced became a container rule on .ext-endpoint-box. Kept
+ *       .access-copy-val — it wraps the VALUE, not the button.
  *   v2.21.0 — 2026-08-08 — .pf-co-portfolio/.pf-co-html/.pf-co-file: the company page editor.
  *   v2.20.0 — 2026-08-07 — .pf-co-*: the SMTP section, and every --space-N in the pf-pnl/pf-co
  *     blocks now carries a fallback — the variables are not defined on this theme, so the two
@@ -224,7 +229,6 @@
 .pf .agent-detail-row:last-child{border-bottom:none}
 .pf .agent-detail-label{color:var(--text-dim,#6B7280);font-size:.8rem;font-weight:600;flex-shrink:0;min-width:90px}
 .pf .agent-detail-value{color:var(--text,#1A1A2E);font-size:.85rem;text-align:right;word-break:break-word}
-.pf .agent-copy-btn{padding:2px 8px;font-size:.7rem;flex-shrink:0}
 .pf .agent-pubkey{font-family:monospace;font-size:.78rem;background:rgba(0,0,0,.04);padding:2px 6px;border-radius:4px;color:var(--accent,#E8564A)}
 .pf .wallet-overview{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:.75rem;margin-bottom:1.5rem}
 .pf .wallet-card{background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:var(--radius,12px);padding:1rem;text-align:center}
@@ -261,8 +265,6 @@
 .pf .tx-detail{padding:.4rem .8rem .8rem;font-size:.8rem;color:var(--text-dim,#6B7280);border-top:1px solid rgba(232,86,74,.05);display:grid;grid-template-columns:auto 1fr;gap:.25rem .75rem;align-items:baseline}
 .pf .tx-detail-label{font-weight:600;color:var(--text,#1A1A2E);font-size:.75rem;text-transform:uppercase}
 .pf .tx-detail-value{font-family:monospace;word-break:break-all}
-.pf .tx-copy-btn{font-size:.7rem;padding:2px 8px;background:rgba(232,86,74,.15);border:1px solid rgba(232,86,74,.3);border-radius:4px;color:var(--text,#1A1A2E);cursor:pointer;margin-top:.4rem}
-.pf .tx-copy-btn:hover{background:rgba(232,86,74,.25)}
 .pf .wallet-request{background:var(--bg-card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:var(--radius,12px);padding:1.25rem;margin-top:1rem}
 .pf .wallet-request .wr-title{font-weight:600;margin-bottom:.25rem}
 .pf .wallet-request .wr-desc{font-size:.8rem;color:var(--text-dim,#6B7280);margin-bottom:.75rem}
@@ -278,8 +280,6 @@
 /* .wl-stat/.wl-val/.wl-label removed — wallet lifetime tiles use canonical
    .stat-card / .stat-card-value.mono(.success/.danger) / .stat-card-label.
    Unified 2026-06-02 (#6). (.pf .wallet-lifetime grid wrapper kept.) */
-.pf .wallet-balance-copy{display:inline-block;margin-left:.5rem;font-size:.7rem;padding:2px 8px;background:rgba(232,86,74,.15);border:1px solid rgba(232,86,74,.3);border-radius:4px;color:var(--text,#1A1A2E);cursor:pointer;vertical-align:middle}
-.pf .wallet-balance-copy:hover{background:rgba(232,86,74,.25)}
 .pf .mem-item{display:flex;justify-content:space-between;align-items:center;padding:.5rem 0;border-bottom:1px solid var(--border-subtle,var(--border));font-size:.85rem;cursor:pointer;gap:.5rem}
 .pf .mem-item:hover{background:var(--bg-surface,var(--bg-dim))}
 /* Keys in the NEUTRAL text color — monospace already separates them; a list of all-red
@@ -405,8 +405,6 @@
 .pf .agent-cta h3{color:var(--accent,#E8564A);margin-bottom:.5rem;font-size:1.05rem}
 .pf .agent-cta p{font-size:.9rem;color:var(--text-dim,#6B7280);margin-bottom:.75rem}
 .pf .agent-prompt-box{position:relative;background:var(--bg-surface);border:1.5px solid var(--border,#E5E7EB);border-radius:10px;padding:1rem;font-family:monospace;font-size:.8rem;color:var(--text-dim);white-space:pre-wrap;word-break:break-all;line-height:1.5;margin-bottom:1rem;max-height:300px;overflow-y:auto}
-.pf .copy-prompt-btn{background:var(--accent-dark,#D4493F);color:#fff;border:none;border-radius:6px;padding:6px 14px;cursor:pointer;font-size:.8rem;font-weight:600;transition:all .2s}
-.pf .copy-prompt-btn:hover{background:var(--accent,#E8564A)}
 .pf .expand-btn{background:none;border:1px solid var(--border);color:var(--accent);border-radius:8px;padding:8px 16px;cursor:pointer;font-size:.85rem;font-weight:600;transition:all .2s;display:inline-flex;align-items:center;gap:6px}
 .pf .expand-btn:hover{border-color:var(--accent);color:var(--accent)}
 .pf .platform-instructions{display:none;margin-top:1rem}
@@ -606,8 +604,6 @@
 .pf .ext-detail-section{background:var(--surface,#F9FAFB);border:1px solid var(--border,#E5E7EB);border-radius:10px;padding:1rem;margin-bottom:1rem}
 .pf .ext-detail-section-title{font-weight:700;font-size:.95rem;margin-bottom:.75rem;display:flex;align-items:center;gap:8px;color:var(--accent,#E8564A)}
 .pf .ext-detail-code{font-family:monospace;font-size:.8rem;background:var(--bg-dim,#F3F4F6);padding:10px;border-radius:6px;overflow-x:auto;white-space:pre-wrap;word-break:break-all;margin-top:.5rem}
-.pf .ext-copy-btn{font-size:.7rem;padding:3px 10px;border-radius:5px;border:1px solid var(--border,#E5E7EB);background:transparent;color:var(--text-dim,#6B7280);cursor:pointer;margin-left:auto}
-.pf .ext-copy-btn:hover{background:var(--bg-dim,#F3F4F6)}
 /* Extensions hero */
 .pf .ext-hero{margin-bottom:1.5rem}
 .pf .ext-hero-desc{font-size:.95rem;color:var(--muted);line-height:1.7;margin-bottom:1.25rem;max-width:600px}
@@ -1641,7 +1637,9 @@
 .pf .ext-lib-entry-code      { width: 100%; font-family: monospace; font-size: 13px; }
 .pf .ext-modal-footer        { display: flex; justify-content: flex-end; gap: 1rem; margin-top: 1.5rem; }
 .pf .ext-bundled-btn         { font-size: .85rem; padding: .5rem 1rem; }
-.pf .ext-btn-copy-spaced     { margin-top: .5rem; }
+/* The endpoint box's copy button (a shared CopyButton) sits directly under it — the gap is the
+   box's business, not a class on the button. */
+.pf .ext-endpoint-box + .btn-primary { margin-top: .5rem; }
 .pf .btn-danger-outline      { border-color: rgba(239, 68, 68, .3); color: #f87171; }
 .pf .ext-comp-tag-schema     { color: #60a5fa; }
 .pf .ext-comp-tag-prompt     { color: #a78bfa; }
@@ -1685,7 +1683,6 @@
 /* ── Nodes tab ── */
 .pf .radio-row       { display: flex; gap: 1rem; }
 .pf .radio-label     { display: flex; align-items: center; gap: .4rem; cursor: pointer; }
-.pf .pn-copy-btn     { padding: 2px 8px; background: var(--card2); border: 1px solid var(--border); border-radius: 4px; color: var(--love4); cursor: pointer; font-size: .7rem; }
 .pf .pn-setup-arrow  { transition: transform .2s; display: inline-block; }
 .pf .pn-setup-arrow.open { transform: rotate(180deg); }
 .pf .pn-setup-link   { color: var(--love1); font-size: .8rem; }
@@ -2334,7 +2331,6 @@
 .pf-gen-debug-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .pf-gen-debug-content { overflow: auto; }
 .pf-gen-debug-content-header { display: flex; align-items: center; gap: var(--sp-2); margin-bottom: var(--sp-1); padding-bottom: var(--sp-1); border-bottom: 1px solid var(--border); }
-.pf-gen-debug-copy-file { margin-left: auto; }
 .pf-gen-debug-path { font-family: var(--mono); font-size: 0.8rem; color: var(--text-dim); }
 .pf-gen-debug-pre { background: var(--bg-dim); border: 1px solid var(--border); border-radius: 0; padding: var(--sp-2); font-family: var(--mono); font-size: 0.78rem; white-space: pre-wrap; word-break: break-word; overflow: auto; max-height: 500px; line-height: 1.4; }
 .pf-gen-debug-hint { color: var(--text-dim); font-style: italic; padding: var(--sp-4); text-align: center; }

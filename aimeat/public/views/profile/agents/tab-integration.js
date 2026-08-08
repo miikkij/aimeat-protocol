@@ -37,6 +37,9 @@
  *     strengths/gaps, last validated, roles badge, platform version, bundle update, copy install cmd
  *   v1.3.0 -- 2026-05-24 -- Audit fix: always show delivery log section, add warn icon for step pills
  *   v1.2.0 -- 2026-05-24 -- Add delivery status indicator dot, show polling fallback interval
+ *   v1.10.0 -- 2026-08-08 -- Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 
 import { h } from 'preact';
@@ -290,7 +293,7 @@ function renderOnboardingView(onboarding, agentName, handleRerun, rerunning, cur
             copiedLabel=${'✓ ' + t('profile.agents.detail.integration.installCommandCopied')} />
           <${CopyButton} text=${curlText} className="btn-outline btn-sm"
             label=${t('profile.agents.skillBundle.copyCurl')}
-            copiedLabel=${'✓ ' + t('profile.agents.copied')} />
+            />
           <a class="btn-outline btn-sm" href=${getSkillBundleUrl(agentName)} download>
             ${t('profile.agents.skillBundle.downloadZip')}
           </a>
@@ -438,7 +441,7 @@ function renderProductionView(agent, onboarding, webhook, bundleVersion, display
             copiedLabel=${'✓ ' + t('profile.agents.detail.integration.promptCopied')} />
           <${CopyButton} text=${curlText} className="btn-outline btn-sm"
             label=${t('profile.agents.skillBundle.reinstall')}
-            copiedLabel=${'✓ ' + t('profile.agents.copied')} />
+            />
           <button class="btn-outline btn-sm" onClick=${handleUpdateBundle} disabled=${updatingBundle}>
             ${updatingBundle ? '...' : t('profile.agents.detail.integration.update')}
           </button>

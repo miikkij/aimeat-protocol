@@ -17,6 +17,8 @@
  *   v1.1.0 — 2026-07-31 — ManagedEnvNote above the playbook's copyable prompt: what a
  *     company-managed AI tool's untrusted-source notice means, and the three routes round
  *     it. The playbook text itself is unchanged.
+ *   v1.2.0 — 2026-08-08 — The inline code copy button uses the shared .btn-copy-inline modifier instead of
+ *       .st-pb-copy, and copied-labels come from common.copied.
  */
 import { h } from 'preact';
 import { useState, useEffect, useMemo } from 'preact/hooks';
@@ -69,7 +71,7 @@ function Verdict({ tier, score, shareText, onContinue, onBack }) {
       </div>
       <div class="st-verdict-actions">
         <${CopyButton} text=${shareText} className="btn-outline"
-          label=${tr('start.copyVerdict', 'Copy the verdict')} copiedLabel=${tr('start.copied', 'Copied')} />
+          label=${tr('start.copyVerdict', 'Copy the verdict')} copiedLabel=${tr('common.copied', 'Copied')} />
         <button type="button" class="btn-primary" onClick=${onContinue}>${tr('start.buildCta', 'Build my playbook →')}</button>
       </div>
       <p class="st-verdict-note">${tr('start.buildIntro', 'Verdict delivered. Three more choices: they become your playbook.')}</p>
@@ -87,14 +89,14 @@ function PlaybookItem({ item }) {
       ${item.code && html`
         <div class="st-pb-code">
           <pre>${item.code}</pre>
-          <${CopyButton} text=${item.code} className="btn-ghost st-pb-copy" />
+          <${CopyButton} text=${item.code} className="btn-ghost btn-copy-inline" />
         </div>`}
       ${item.prompt && html`
         <div class="st-pb-prompt">
           <blockquote>${trr(item.prompt)}</blockquote>
           <${ManagedEnvNote} />
           <${CopyButton} text=${trr(item.prompt)} className="btn-primary"
-            label=${tr('start.copyPrompt', 'Copy the prompt')} copiedLabel=${tr('start.copied', 'Copied')} />
+            label=${tr('start.copyPrompt', 'Copy the prompt')} copiedLabel=${tr('common.copied', 'Copied')} />
         </div>`}
       ${item.link && html`<a class="st-pb-link" href=${item.link.href}>${trr(item.link.label)}</a>`}
     </li>
@@ -129,7 +131,7 @@ function Playbook({ answers, tier, onBack, onRestart }) {
       `)}
       <div class="st-pb-actions st-no-print">
         <${CopyButton} text=${md} className="btn-outline"
-          label=${tr('start.pb.copyAll', 'Copy playbook')} copiedLabel=${tr('start.copied', 'Copied')} />
+          label=${tr('start.pb.copyAll', 'Copy playbook')} copiedLabel=${tr('common.copied', 'Copied')} />
         <button type="button" class="btn-outline" onClick=${() => window.print()}>${tr('start.pb.print', 'Print / save as PDF')}</button>
         <button type="button" class="st-back" onClick=${onBack}>${tr('start.back', '← Change previous answer')}</button>
         <button type="button" class="st-back" onClick=${onRestart}>${tr('start.restart', 'Start over')}</button>

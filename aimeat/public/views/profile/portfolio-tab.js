@@ -9,6 +9,9 @@
  *     nothing is published; published state shows URL + last updated + Visit/Edit/Unpublish.
  *   v1.1.0 — 2026-03-17 — Replace inline styles with CSS classes
  *   v1.0.0 — 2026-03-16 — Initial portfolio tab
+ *   v2.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -74,7 +77,7 @@ export default function PortfolioTab({ session, navigate, showToast }) {
           <span class="access-copy-val">
             <a href=${url} target="_blank">${url}</a>
             <${CopyButton} text=${url} className="btn-ghost btn-sm" label="📋"
-              onCopied=${() => showToast?.(t('profile.access.copied') || 'Copied')} />
+              onCopied=${() => showToast?.(t('common.copied') || 'Copied')} />
           </span>
         </div>
         ${cfg.publishedAt && html`

@@ -7,9 +7,15 @@
  *     handed out the connectivity-key flow removed in v1.1.0 of the node (POST /v1/owners for an
  *     owner_key, X-AIMEAT-Owner-Key, Ed25519 challenge-response), which returns 400 on any
  *     current node. Added an apiMcpHint pointing MCP-capable clients at the one-line path.
+ *   v1.2.0 — 2026-08-08 — The three hand-rolled MCP copy buttons became shared <CopyButton>s (btn-primary / btn-outline
+ *       + btn-copy-inline), which removes the .dv-copy-btn / --alt classes, the two useCallback
+ *       clipboard handlers and the single `copied` flag that all three buttons confusingly shared —
+ *       copying the command used to light up the URL buttons too.
  */
 import { useState, useCallback } from 'preact/hooks';
-import { sanitizeHtml, copyToClipboard } from '/js/utils.js';
+import { sanitizeHtml } from '/js/utils.js';
+import { t as globalT } from '/js/i18n.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { html, NODE_URL, dt, GOAL_LIST, CopyBtn } from './portal-dev.shared.js';
 import { swallowed } from '/js/swallowed.js';
 
@@ -18,21 +24,9 @@ import { swallowed } from '/js/swallowed.js';
    ══════════════════════════════════════════════ */
 function McpPanel({ locale, isLoggedIn, session }) {
   const [setupTab, setSetupTab] = useState('code'); // 'code' | 'cowork' | 'chat'
-  const [copied, setCopied] = useState(false);
 
   const mcpUrl = `${NODE_URL}/v1/mcp`;
-
-  const copyUrl = useCallback(async () => {
-    await copyToClipboard(mcpUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [mcpUrl]);
-
-  const copyCommand = useCallback(async () => {
-    await copyToClipboard(`claude mcp add aimeat --transport http ${mcpUrl}`);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  }, [mcpUrl]);
+  const mcpAddCommand = `claude mcp add aimeat --transport http ${mcpUrl}`;
 
   return html`
     <div class="dv-panel">
@@ -83,11 +77,9 @@ function McpPanel({ locale, isLoggedIn, session }) {
               <div class="dv-field">
                 <div class="dv-field-label">${dt('panel.mcpCodeRunThis', locale)}</div>
                 <div class="dv-code-row">
-                  <code class="dv-code">claude mcp add aimeat --transport http ${mcpUrl}</code>
-                  <button type="button" onClick=${copyCommand}
-                    class="dv-copy-btn">
-                    ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyCommand', locale)}
-                  </button>
+                  <code class="dv-code">${mcpAddCommand}</code>
+                  <${CopyButton} text=${mcpAddCommand} className="btn-primary btn-sm btn-copy-inline"
+                    label=${dt('panel.mcpCopyCommand', locale)} />
                 </div>
               </div>
               <p class="dv-hint">
@@ -110,10 +102,8 @@ function McpPanel({ locale, isLoggedIn, session }) {
                   <li>${dt('panel.mcpDesktopStep2', locale)}
                     <div class="dv-step-row">
                       <code class="dv-code--inline">${mcpUrl}</code>
-                      <button type="button" onClick=${copyUrl}
-                        class="dv-copy-btn--alt">
-                        ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyUrl', locale)}
-                      </button>
+                      <${CopyButton} text=${mcpUrl} className="btn-outline btn-sm btn-copy-inline"
+                        label=${globalT('common.copyUrl')} />
                     </div>
                   </li>
                   <li>${dt('panel.mcpDesktopStep3', locale)}
@@ -142,10 +132,8 @@ function McpPanel({ locale, isLoggedIn, session }) {
                   <li>${dt('panel.mcpChatStep3', locale)}
                     <div class="dv-step-row">
                       <code class="dv-code--inline-sm">${mcpUrl}</code>
-                      <button type="button" onClick=${copyUrl}
-                        class="dv-copy-btn--alt">
-                        ${copied ? dt('panel.mcpCopied', locale) : dt('panel.mcpCopyUrl', locale)}
-                      </button>
+                      <${CopyButton} text=${mcpUrl} className="btn-outline btn-sm btn-copy-inline"
+                        label=${globalT('common.copyUrl')} />
                     </div>
                   </li>
                   <li>${dt('panel.mcpChatStep4', locale)}</li>
@@ -224,7 +212,7 @@ function ApiPanel({ locale }) {
       <h3>${dt('panel.apiBadge', locale)}</h3>
       <p>${dt('panel.apiDesc', locale)}</p>
       <div class="dv-prompt-output">
-        <${CopyBtn} text=${prompt} locale=${locale} />
+        <${CopyBtn} text=${prompt} />
         <div class="dv-prompt-text">${prompt}</div>
       </div>
       <p class="dv-hint">${dt('panel.apiMcpHint', locale)}</p>
@@ -240,7 +228,7 @@ function BrowsePanel({ locale, onSwitchToPromptPackage }) {
       <h3>${dt('panel.browseBadge', locale)}</h3>
       <p>${dt('panel.browseDesc', locale)}</p>
       <div class="dv-prompt-output">
-        <${CopyBtn} text=${prompt} locale=${locale} />
+        <${CopyBtn} text=${prompt} />
         <div class="dv-prompt-text">${prompt}</div>
       </div>
       <h3 class="dv-mt">${dt('panel.browseUpgradeTitle', locale)}</h3>
@@ -299,7 +287,7 @@ function PromptPackagePanel({ locale, platform, variant, isLoggedIn }) {
       </div>
       ${(selectedGoal || loading) && html`
         <div class="dv-prompt-output">
-          <${CopyBtn} text=${promptText} locale=${locale} />
+          <${CopyBtn} text=${promptText} />
           <div class="dv-prompt-text">${loading ? dt('panel.loading', locale) : promptText}</div>
         </div>
       `}

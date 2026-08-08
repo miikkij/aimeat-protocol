@@ -11,6 +11,9 @@
  * @usage registered in views/profile.js TABS + landing-page.cards.js SIDEBAR_GROUPS (id 'appdev').
  * @version-history
  *   v1.0.0 — 2026-07-19 — initial (AppDev KB UI phase).
+ *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -58,7 +61,7 @@ function StartPrompts({ locale, showToast }) {
           <button class="btn-ghost" onClick=${() => setOpen(open === id ? null : id)}>
             ${open === id ? t('profile.appdev.hidePrompt') : t('profile.appdev.showPrompt')}
           </button>
-          ${text != null && html`<${CopyButton} text=${text} className="copy-prompt-btn" label=${t('profile.appdev.copyPrompt')} onCopied=${() => showToast(t('profile.appdev.copied'))} />`}
+          ${text != null && html`<${CopyButton} text=${text} className="btn-primary" label=${t('common.copyPrompt')} onCopied=${() => showToast(t('profile.appdev.copied'))} />`}
         </div>
       </div>
       ${open === id && html`<pre class="pf-adk-prompt-body">${text ?? t('profile.loading')}</pre>`}

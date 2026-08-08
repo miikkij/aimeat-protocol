@@ -44,7 +44,7 @@ Shows morsel balance overview, transaction history with expandable details, life
 ### TC-03: Copy balance
 
 **Steps:**
-1. Click the copy balance button (`.wallet-balance-copy`)
+1. Click the copy balance button (the shared `<CopyButton>` labelled by `profile.wallet.copyBalance`; find it by its accessible name, not by a class)
 
 **Expected:**
 - Clipboard contains text like "Balance: X | Available: Y | Escrow: Z"
@@ -146,7 +146,7 @@ Shows morsel balance overview, transaction history with expandable details, life
 
 **Steps:**
 1. Expand a transaction
-2. Click "Copy Transaction" button (`.tx-copy-btn`)
+2. Click the transaction's copy button (the shared `<CopyButton>` labelled `common.copy`; find it by its accessible name)
 
 **Expected:**
 - Button text changes to "Copied" briefly

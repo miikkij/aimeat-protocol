@@ -16,6 +16,8 @@
  *   v2.0.0 — 2026-07-28 — Split into "For me" / "For my AI". Human tab is new; the prompt is
  *     rendered through <Markdown> instead of shown as source. Learn/feedback links come from
  *     siteLinks so they only appear on nodes that have them.
+ *   v2.1.0 — 2026-08-08 — The copy button is the shared .btn-primary with the shared common.copyPrompt label; the
+ *       bespoke .hlp-copy-btn and the help.copyBtn/help.copied keys are gone.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -80,7 +82,7 @@ function AgentHelp({ prompt, loading, error }) {
       ${loading && html`<div class="hlp-loading"><${Spinner} /></div>`}
       ${error && html`<p class="hlp-error">${t('help.loadError')}</p>`}
       ${!loading && !error && html`
-        <${CopyButton} text=${prompt} label=${t('help.copyBtn')} copiedLabel=${t('help.copied')} className="hlp-copy-btn" />
+        <${CopyButton} text=${prompt} label=${t('common.copyPrompt')} className="btn-primary" />
         <div class="hlp-prompt-rendered"><${Markdown} text=${prompt} /></div>
       `}
 

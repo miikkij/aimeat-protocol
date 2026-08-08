@@ -16,6 +16,9 @@
  *   v1.0.0 — 2026-03-29 — Initial V2 implementation
  *   v1.0.1 — 2026-06-19 — lint fixes (misleading-char-class/unused-expression/empty-block)
  *   v1.0.2 — 2026-07-13 — Split for max-file-lines: helpers + Step 4 render moved to sibling modules
+ *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -512,7 +515,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
               ` : ''}
               <div class="fnd-cal-run-actions">
                 ${m.step1_generation?.output ? html`
-                  <${CopyButton} text=${m.step1_generation.output} label=${t('profile.calibrator.copy')} className="btn-sm" onCopied=${() => showToast?.('Output copied')} />
+                  <${CopyButton} text=${m.step1_generation.output} label=${t('common.copy')} className="btn-sm" onCopied=${() => showToast?.('Output copied')} />
                 ` : ''}
                 <${PasteBack} label=${t('profile.calibrator.pasteOutput')} onSave=${text => handlePasteStep1(i, text)} />
               </div>
@@ -579,7 +582,7 @@ Now return the full modified instruction prompt with the fixes incorporated. Rem
                 ${a?.rawResponse ? html`<${CollapsiblePre} label=${t('profile.calibrator.viewRawResponse')} text=${a.rawResponse} />` : ''}
                 <div class="fnd-cal-run-actions">
                   ${a?.analysis ? html`
-                    <${CopyButton} text=${typeof a.analysis === 'string' ? a.analysis : JSON.stringify(a.analysis, null, 2)} label=${t('profile.calibrator.copy')} className="btn-sm" onCopied=${() => showToast?.('Analysis copied')} />
+                    <${CopyButton} text=${typeof a.analysis === 'string' ? a.analysis : JSON.stringify(a.analysis, null, 2)} label=${t('common.copy')} className="btn-sm" onCopied=${() => showToast?.('Analysis copied')} />
                   ` : ''}
                   <${PasteBack} label=${t('profile.calibrator.pasteAnalysis')} onSave=${text => handlePasteStep2(modelIndex, text)} />
                 </div>

@@ -38,6 +38,8 @@
  *     thread. Adds `.inbox-back` + `.inbox-body--panel` rules; desktop two-pane unchanged.
  *   v1.1.0 -- 2026-06-16 -- Full messenger redesign (avatars, bubbles, ticks, date dividers, sticky composer).
  *   v1.0.0 -- 2026-06-16 -- Initial creation for user-to-user messaging (layer 5).
+ *   v1.11.0 -- 2026-08-08 -- The message bubble's copy action is a shared <CopyButton>, so .inbox-bubble-act.copied
+ *       joins --on: the component stamps `copied` itself.
  */
 
 .inbox { display: flex; flex-direction: column; gap: 14px; }
@@ -570,7 +572,10 @@
   color: var(--text-dim);
 }
 .inbox-bubble-act:hover { background: var(--card-bg-alt); color: var(--accent); }
-.inbox-bubble-act--on { color: var(--accent); }
+/* `copied` is <CopyButton>'s confirmed state (it stamps the class itself); the bubble's copy
+   action is a CopyButton, so it lights up the same way --on does for the other toggles. */
+.inbox-bubble-act--on,
+.inbox-bubble-act.copied { color: var(--accent); }
 
 .inbox-track-banner {
   display: flex; align-items: center; gap: 10px;

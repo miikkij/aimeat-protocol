@@ -91,6 +91,7 @@
  *   v2.28.0 -- 2026-06-10 -- Detail-tab stat cards: content-sized + centered as a group
  *     (labels like "Onnistumisprosentti" no longer overflow); header-row gains bottom
  *     margin so the connect button isn't flush against the description text.
+ *   v2.29.0 -- 2026-08-08 -- .pf-agd-idcard-copy deleted — the GAII copy button is btn-ghost btn-sm btn-copy-inline.
  */
 
 /* Header row: title left, connect button right. The bottom margin keeps the
@@ -1521,22 +1522,6 @@
   color: var(--text, #1A1A2E);
   word-break: break-all;
   line-height: 1.35;
-}
-.pf .pf-agd-idcard-copy {
-  flex-shrink: 0;
-  background: none;
-  border: 1px solid var(--border, #E5E7EB);
-  border-radius: 5px;
-  color: var(--text-dim, #6B7280);
-  font-size: 0.6rem;
-  padding: 1px 6px;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: border-color 0.15s, color 0.15s;
-}
-.pf .pf-agd-idcard-copy:hover {
-  border-color: var(--accent, #E8564A);
-  color: var(--accent, #E8564A);
 }
 
 /* Stat plate — 2-column grid of tombstone facts */

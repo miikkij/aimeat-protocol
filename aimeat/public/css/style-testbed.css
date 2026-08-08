@@ -9,6 +9,8 @@
  *   clone overrides without imposing their page-container geometry.
  * @version-history
  *   v1.0.0 — 2026-06-02 — Initial testbed layout
+ *   v1.1.0 — 2026-08-08 — .stb-copy-btn / .stb-copied deleted — the output bar's copy button is .btn-primary and
+ *       confirms with the shared .copied state.
  */
 
 .stb {
@@ -122,11 +124,6 @@
 .stb-output-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
 .stb-output-title { font-size: 0.85rem; font-weight: 700; }
 .stb-output-count { color: var(--text-dim); font-weight: 500; font-size: 0.78rem; }
-.stb-copy-btn {
-  padding: 6px 14px; border: none; border-radius: var(--radius-sm);
-  background: var(--accent); color: var(--on-inverted, #fff); cursor: pointer; font-size: 0.8rem; font-weight: 600;
-}
-.stb-copy-btn.stb-copied { background: var(--success-fg, #16a34a); }
 .stb-output {
   width: 100%; box-sizing: border-box; resize: vertical;
   font-family: var(--font-mono, monospace); font-size: 0.78rem; line-height: 1.4;

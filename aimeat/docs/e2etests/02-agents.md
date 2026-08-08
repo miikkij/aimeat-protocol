@@ -54,7 +54,7 @@ Lists registered AI agents with expandable cards showing details, GAII/key copy,
 ### TC-04: Copy agent creation prompt
 
 **Steps:**
-1. Find "Copy Prompt" button (`.copy-prompt-btn`)
+1. Find the "Copy prompt" button (the shared `<CopyButton>`; find it by its accessible name, not by a class)
 2. Click it
 
 **Expected:**
@@ -132,7 +132,7 @@ Lists registered AI agents with expandable cards showing details, GAII/key copy,
 
 **Steps:**
 1. Expand an agent card
-2. Click the GAII copy button (`.agent-copy-btn`)
+2. Click the GAII copy button (the shared `<CopyButton>` next to the GAII value; find it by its accessible name)
 
 **Expected:**
 - Clipboard contains the full agent GAII string

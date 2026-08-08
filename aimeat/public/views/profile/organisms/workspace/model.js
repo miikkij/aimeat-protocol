@@ -10,6 +10,9 @@
  * @usage import { buildWorkspaceModel } from '/views/profile/organisms/workspace/model.js';
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
+ *   v1.1.0 — 2026-08-08 — copyShareLink removed — the share panel uses a shared <CopyButton>. Its "Copy failed" branch
+ *       is not a loss: it only fired when navigator.clipboard rejected, exactly the case the shared
+ *       helper handles by falling back to execCommand and succeeding.
  */
 import { h } from 'preact';
 import htm from 'htm';
@@ -90,12 +93,6 @@ export function buildWorkspaceModel(ctx) {
   };
   const anythingPublic = () => !!share && (!!share.public
     || Object.values(share.spaces || {}).some(Boolean) || Object.values(share.docs || {}).some(Boolean));
-  const copyShareLink = async (url) => {
-    try { await navigator.clipboard.writeText(window.location.origin + url); showToast(t('organisms.linkCopied') || 'Link copied'); }
-    // eslint-disable-next-line aimeat/no-silent-catch -- a browser API refusing here IS the answer
-    catch { showToast(t('organisms.copyFailed') || 'Copy failed'); }
-  };
-
   // Resolve an activity-feed event's instance id to a human title (document title / record primary
   // field), so the feed reads "published · Techstack-matriisi" instead of "published · doc-76qchtb".
   // Falls back to the id when the item isn't in the loaded set (deleted, or not readable).
@@ -181,7 +178,7 @@ export function buildWorkspaceModel(ctx) {
 
   return {
     allTypes, types, isDocSpace, draftsFor, objectsFor, mergedDocs, mergedRecords, docTypes,
-    patchShare, isDocPublic, anythingPublic, copyShareLink, instanceTitle, spaceDesc, groups,
+    patchShare, isDocPublic, anythingPublic, instanceTitle, spaceDesc, groups,
     activeTab, activeSpace, activeGroup, pickTab, openGroup, scrollToSpace, REL_DESC, agentMenuItems,
   };
 }

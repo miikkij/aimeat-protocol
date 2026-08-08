@@ -45,7 +45,7 @@
  *   v3.4.0 -- 2026-05-31 -- Drag-to-reorder agent bars (per-browser localStorage order, ungrouped/unfiltered list only) + pop-out button opening an agent in its own window (/v1/profile?solo=)
  *   v3.5.0 -- 2026-06-02 -- Component unification: replace 4 bespoke copy-prompt buttons
  *     (connect command, MCP onboarding, manual agent prompt, task-runner prompt) with the
- *     canonical <CopyButton> (className="copy-prompt-btn" preserves appearance); removed the
+ *     canonical <CopyButton> (className="btn-primary" preserves appearance); removed the
  *     now-dead copiedAction state + markCopied helper.
  *   v3.8.0 -- 2026-06-10 -- "Group by: Tag" becomes the default once any agent carries tags
  *     (never overrides a user-picked grouping); unseen-change tracking drops memory churn and
@@ -61,6 +61,8 @@
  *     active tasks already fetched in loadData, so no extra requests); clicking a
  *     row deep-links into that agent's Tasks tab and auto-opens the task
  *     (expandedAgent + deepLink → AgentCard preSelectedTab/openTaskId).
+ *   v3.9.0 -- 2026-08-08 -- Copy control unified: the bespoke .copy-prompt-btn is the shared .btn-primary, whose
+ *       .copied state now lives in theme.css. Copy labels come from the shared common.* keys.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -468,9 +470,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
         <div class="agent-prompt-box"><code>npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}</code></div>
         <${CopyButton}
           text=${`npx aimeat connect --url ${getNodeUrl()} --owner ${session.owner}`}
-          className="copy-prompt-btn"
+          className="btn-primary"
           label=${t('profile.agents.copyCommand')}
-          copiedLabel=${'\u2705 ' + t('profile.agents.copied')} />
+          />
 
         <p class="mt-1 mb-half text-bold">${t('profile.agents.cliServe')}</p>
         <div class="agent-prompt-box"><code>npx aimeat connect serve</code></div>
@@ -482,9 +484,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
         <div class="agent-prompt-box">${buildMcpOnboardingPrompt()}</div>
         <${CopyButton}
           text=${buildMcpOnboardingPrompt()}
-          className="copy-prompt-btn"
+          className="btn-primary"
           label=${t('profile.agents.copyAgentInstruction')}
-          copiedLabel=${'\u2705 ' + t('profile.agents.copied')} />
+          />
 
         <div class="pf-agent-divider mt-1">
           <button class="expand-btn" onClick=${() => setPlatExpand(!platExpand)}>
@@ -515,9 +517,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
               <div class="agent-prompt-box">${buildAgentPrompt(session)}</div>
               <${CopyButton}
                 text=${buildAgentPrompt(session)}
-                className="copy-prompt-btn"
-                label=${t('profile.agents.copyPrompt')}
-                copiedLabel=${'\u2705 ' + t('profile.agents.copied')} />
+                className="btn-primary"
+                label=${t('common.copyPrompt')}
+                />
             </div>
           `}
         </div>
@@ -548,9 +550,9 @@ export default function AgentsTab({ session, showToast, onStats }) {
               <div class="agent-prompt-box">${buildTaskRunnerPrompt(session, taskRunnerName)}</div>
               <${CopyButton}
                 text=${buildTaskRunnerPrompt(session, taskRunnerName)}
-                className="copy-prompt-btn"
+                className="btn-primary"
                 label=${t('profile.agents.taskRunner.copyButton')}
-                copiedLabel=${'\u2705 ' + t('profile.agents.copied')} />
+                />
             </div>
           `}
         </div>

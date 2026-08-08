@@ -10,6 +10,9 @@
  *   v1.0.0 — 2026-06-19 — Extracted from organisms-tab.js during the module split.
  *   v1.1.0 — 2026-06-22 — OrgSearch: instant (debounced) indexed search, results grouped by workspace,
  *     and clicking a hit deep-links to the exact record/document (via the workspace openDoc handoff).
+ *   v1.2.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -151,7 +154,7 @@ export function BoardPreview({ boardId, showToast }) {
   };
   const copyId = async () => {
     const ok = await copyToClipboard(boardId);
-    showToast(ok ? (t('organisms.copied') || 'Copied') : (t('organisms.copyFailed') || 'Could not copy'));
+    showToast(ok ? (t('common.copied') || 'Copied') : (t('organisms.copyFailed') || 'Could not copy'));
   };
 
   const ts = (p) => p.created_at || p.createdAt || p.at || '';

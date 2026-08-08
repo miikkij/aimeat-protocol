@@ -16,6 +16,9 @@
  *     select (member_visibility: signed-in default / members / admins / public) with an honest
  *     hint (hides the LIST, not content authorship); isMember now prefers `your_membership` from
  *     GET /:id since members[] can be roster-redacted for this caller.
+ *   v1.3.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect, useMemo, useRef } from 'preact/hooks';
@@ -175,7 +178,7 @@ export function OrganismHome({ org, ghii, showToast, initialSettings, onOpenWs, 
     ? `${org.boardId.slice(0, 12)}…${org.boardId.slice(-6)}` : (org.boardId || '');
   const copyBoardId = async () => {
     const ok = await copyToClipboard(org.boardId);
-    showToast(ok ? (t('organisms.copied') || 'Copied') : (t('organisms.copyFailed') || 'Could not copy'));
+    showToast(ok ? (t('common.copied') || 'Copied') : (t('organisms.copyFailed') || 'Could not copy'));
   };
 
   // What a delete actually removes (counted from the accessible workspaces when settings opens).

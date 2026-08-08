@@ -10,6 +10,8 @@
  *   v1.3.0 — 2026-06-02 — Component unification (#11): node status dot uses
  *     canonical <StatusDot> (online/offline/degraded/detached) instead of the
  *     bespoke 10px .pn-status-dot (now 8px, with title tooltip added).
+ *   v1.4.0 — 2026-08-08 — The tunnel-URL copy button is btn-ghost btn-sm btn-copy-inline with the shared default
+ *       labels; .pn-copy-btn and the profile.nodes.copyUrl/copied keys are gone.
  */
 import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
@@ -132,7 +134,8 @@ function NodesList({ session, showToast, onStats }) {
                     <span class="pn-detail-label">${t('profile.nodes.tunnelUrl')}</span>
                     <span class="pn-detail-value flex-row">
                       <code class="text-meta-sm">${tunnelUrl}</code>
-                      <${CopyButton} text=${tunnelUrl} label=${t('profile.nodes.copyUrl')} className="pn-copy-btn" onCopied=${() => showToast(t('profile.nodes.copied'))} />
+                      <${CopyButton} text=${tunnelUrl} className="btn-ghost btn-sm btn-copy-inline"
+                        onCopied=${() => showToast(t('common.copied'))} />
                     </span>
                   </div>
                   <div class="pn-padding-half">

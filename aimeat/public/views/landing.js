@@ -58,6 +58,11 @@
  *     build-agent and ask-your-AI compact): what a company-managed AI tool's untrusted-source
  *     notice means and the three routes round it. A security team met that notice cold and did
  *     not continue. No prompt text changed anywhere.
+ *   v3.7.0 — 2026-08-08 — BuildAppPrompt's copy button is the shared <CopyButton> (with the new
+ *     `disabled` prop, which the async-loaded prompt needs) instead of a hand-rolled
+ *     navigator.clipboard handler; labels come from common.copyPrompt / common.copied. The
+ *     misnamed .ld-gen-copy — which also dressed step 3's "Register and add your app" anchor,
+ *     not a copy control at all — is now .ld-gen-action. No prompt text changed.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -68,6 +73,7 @@ import { escHtml } from '/js/utils.js';
 import { openAppSandboxed } from '/js/app-sandbox.js';
 import { siteLink, hasSite } from '/js/site.js';
 import { Collapsible } from '/components/Collapsible.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { ManagedEnvNote } from '/components/ManagedEnvNote.js';
 import NodeTotals from './landing-node-totals.js';
 import NodeChangeLog from './landing-changelog.js';
@@ -322,7 +328,6 @@ function packMatchesIdea(pack, ideaText) {
 }
 
 function BuildAppPrompt() {
-  const [copied, setCopied] = useState(false);
   const [templates, setTemplates] = useState([]);
   const [tplContent, setTplContent] = useState('');
   const [canonical, setCanonical] = useState('');
@@ -409,16 +414,6 @@ function BuildAppPrompt() {
     return out;
   })();
 
-  const copy = async () => {
-    if (!prompt) return;
-    try {
-      await navigator.clipboard.writeText(prompt);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    // eslint-disable-next-line aimeat/no-silent-catch -- prompt is visible to select manually
-    } catch { /* prompt is visible to select manually */ }
-  };
-
   // What the prompt CONTAINS, rather than how many characters it is. A character count reads as
   // complexity; the contents read as value, and they are the reason the prompt is long.
   const contains = [];
@@ -482,15 +477,14 @@ function BuildAppPrompt() {
         <div class="ld-gen-preview">${prompt || tr('landing.buildLoading', 'Loading the build prompt from this node…')}</div>
         ${prompt ? html`<p class="ld-gen-contains">${tr('landing.promptContains', 'Includes')}: ${contains.join(' · ')}.</p>` : ''}
         <${ManagedEnvNote} />
-        <button class="btn-primary ld-gen-copy" onClick=${copy} disabled=${!prompt}>
-          ${copied ? tr('landing.buildCopied', 'Copied ✓') : tr('landing.buildCopy', 'Copy prompt')}
-        </button>
+        <${CopyButton} text=${prompt} className="btn-primary ld-gen-action" disabled=${!prompt}
+          label=${tr('common.copyPrompt', 'Copy prompt')} copiedLabel=${tr('common.copied', '✓ Copied')} />
       </div>
 
       <div class="ld-gen-step">
         <div class="ld-gen-head"><span class="ld-gen-num">3</span><span>${tr('landing.genStep3', 'Add & publish your app')}</span></div>
         <p class="ld-gen-hint">${tr('landing.genStep3Hint', 'Got the code or HTML file back from the AI? Create an account, it takes a minute, then paste the code or upload the file. The app goes live at its own address and you get a link to share.')}</p>
-        <a class="btn-outline ld-gen-copy ld-gen-add" href="/app-catalog.html?add=1">
+        <a class="btn-outline ld-gen-action ld-gen-add" href="/app-catalog.html?add=1">
           ${tr('landing.genStep3Btn', 'Register and add your app')}
         </a>
         <p class="ld-gen-hint ld-gen-mcp">${tr('landing.genStep3Mcp', 'If the AI you pasted the prompt into is connected to this node over MCP, it can publish the app for you, with no file to move by hand.')}</p>

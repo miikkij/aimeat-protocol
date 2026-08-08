@@ -8,7 +8,13 @@
  * @version-history
  *   v1.0.0 — 2026-06-02 — Initial testbed behavior
  *   v1.0.1 — 2026-06-19 — JSDoc type annotations for frontend type-checking
+ *   v1.1.0 — 2026-08-08 — Loaded as a module (style-testbed.html) so the copy button can use the
+ *     shared copyToClipboard helper instead of its own navigator.clipboard + execCommand ladder,
+ *     and the shared `copied` class instead of the bespoke .stb-copied. Deferred module execution
+ *     is safe here: init() already handles a readyState that is no longer 'loading'.
  */
+import { copyToClipboard } from '/js/utils.js';
+
 (function () {
   'use strict';
 
@@ -129,24 +135,16 @@
   }
 
   // ── Copy ──
-  function copyOut() {
+  async function copyOut() {
     const out = document.getElementById('stb-output');
     const btn = document.getElementById('stb-copy');
     if (!out) return;
-    const done = () => {
-      if (!btn) return;
-      btn.classList.add('stb-copied');
-      const prev = btn.textContent;
-      btn.textContent = '✓ Copied';
-      setTimeout(() => { btn.classList.remove('stb-copied'); btn.textContent = prev; }, 1500);
-    };
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(/** @type {HTMLInputElement} */ (out).value).then(done, () => { /** @type {HTMLInputElement} */ (out).select(); document.execCommand('copy'); done(); });
-    } else {
-      /** @type {HTMLInputElement} */ (out).select();
-      document.execCommand('copy');
-      done();
-    }
+    await copyToClipboard(/** @type {HTMLInputElement} */ (out).value);
+    if (!btn) return;
+    btn.classList.add('copied');
+    const prev = btn.textContent;
+    btn.textContent = '✓ Copied';
+    setTimeout(() => { btn.classList.remove('copied'); btn.textContent = prev; }, 1500);
   }
 
   // ── Wire up ──

@@ -6,6 +6,9 @@
  *   memory-tab.js as a ctx-consuming plain render function (all state/handlers passed in via ctx).
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
+ *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import htm from 'htm';
@@ -131,8 +134,8 @@ export function renderFilesList(ctx) {
                   <button class="btn-outline btn-sm" title=${t('profile.files.preview') || 'Preview'} onClick=${() => setPreviewFile(f)}>${'\u{1F441}️'} ${t('profile.files.preview') || 'Preview'}</button>
                   <${CopyButton}
                     text=${fileUrl(f)}
-                    label=${`\u{1F517} ${t('profile.files.copyUrl') || 'Copy URL'}`}
-                    title=${t('profile.files.copyUrl') || 'Copy URL'}
+                    label=${`\u{1F517} ${t('common.copyUrl') || 'Copy URL'}`}
+                    title=${t('common.copyUrl') || 'Copy URL'}
                     className="btn-outline btn-sm"
                     onCopied=${() => showToast(t('profile.files.urlCopied') || 'URL copied to clipboard')} />
                   <button class="btn-outline btn-sm" onClick=${() => handleDownloadFile(f)}>${t('profile.files.download')}</button>

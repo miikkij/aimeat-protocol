@@ -26,6 +26,9 @@
  *     (AccessTabService); parent seeds consent+public-key, the four child sections seed from their
  *     `initial` slice and skip their own mount fetch (live-update still self-refreshes). Falls back to
  *     the individual endpoints if the composite is unavailable. (Phase 4 slice 2 — frontend half.)
+ *   v1.7.0 -- 2026-08-08 -- Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
@@ -142,7 +145,7 @@ export default function AccessTab({ session, showToast }) {
   const copyRow = (label, value) => html`
     <div class="mem-item"><span class="mem-key">${label}</span>
       <span class="access-copy-val">${escHtml(value || '-')}
-        ${value && html`<${CopyButton} text=${value} className="btn-ghost btn-sm" label="📋" onCopied=${() => showToast(t('profile.access.copied') || 'Copied')} />`}
+        ${value && html`<${CopyButton} text=${value} className="btn-ghost btn-sm" label="📋" onCopied=${() => showToast(t('common.copied') || 'Copied')} />`}
       </span>
     </div>`;
 
@@ -171,7 +174,7 @@ export default function AccessTab({ session, showToast }) {
         ? html`<div class="access-mono">…</div>`
         : pubKey
           ? html`<div class="flex-between"><div class="access-mono">${escHtml(pubKey)}</div>
-              <${CopyButton} text=${pubKey} className="btn-ghost btn-sm" label="📋" onCopied=${() => showToast(t('profile.access.copied') || 'Copied')} /></div>`
+              <${CopyButton} text=${pubKey} className="btn-ghost btn-sm" label="📋" onCopied=${() => showToast(t('common.copied') || 'Copied')} /></div>`
           : html`<div class="text-meta-sm">${t('profile.access.noKeypair') || 'No keypair is stored for this account. Keys are generated at registration; older accounts may not have one.'}</div>`}
     </div>
 
@@ -199,7 +202,7 @@ export default function AccessTab({ session, showToast }) {
     <div class="card">
       <div class="flex-between">
         <div class="access-mcp-url">${escHtml(NODE_URL + '/v1/mcp')}</div>
-        <${CopyButton} text=${NODE_URL + '/v1/mcp'} className="btn-ghost btn-sm" label="📋" onCopied=${() => showToast(t('profile.access.copied') || 'Copied')} />
+        <${CopyButton} text=${NODE_URL + '/v1/mcp'} className="btn-ghost btn-sm" label="📋" onCopied=${() => showToast(t('common.copied') || 'Copied')} />
       </div>
       <div class="access-mcp-desc">${t('profile.access.mcpDesc')}</div>
     </div>

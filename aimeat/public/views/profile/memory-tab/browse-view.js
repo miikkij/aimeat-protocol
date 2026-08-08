@@ -6,6 +6,9 @@
  *   take the shared ctx so all state/handlers still live in the MemoryTab component.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from public/views/profile/memory-tab.js (max-file-lines)
+ *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import htm from 'htm';
@@ -207,7 +210,7 @@ export function renderBrowsePanel(ctx) {
                         <button class="btn-outline btn-sm"
                           disabled=${copyingKeys.has(entry.key)}
                           onClick=${(e) => { e.stopPropagation(); handleCopyEntry(ctx, entry.owner_gaii, entry.key); }}>
-                          ${copyingKeys.has(entry.key) ? '...' : t('profile.memory.discoverCopy')}
+                          ${copyingKeys.has(entry.key) ? '...' : t('common.copy')}
                         </button>
                       </div>
                       ${isExpanded && html`

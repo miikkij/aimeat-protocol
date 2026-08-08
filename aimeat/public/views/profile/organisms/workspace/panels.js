@@ -10,11 +10,14 @@
  * @usage import { renderSettingsPanel } from '/views/profile/organisms/workspace/panels.js';
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from workspace.js (max-file-lines)
+ *   v1.1.0 — 2026-08-08 — The public-viewer share link is a shared <CopyButton> (common.copyLink + onCopied toast)
+ *       instead of the ctx.copyShareLink handler.
  */
 import { h } from 'preact';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { EmptyState } from '/components/EmptyState.js';
 import { Mermaid } from '/components/Mermaid.js';
 import * as orgService from '/js/services/organisms.js';
@@ -152,7 +155,7 @@ export function renderSettingsPanel(ctx) {
 }
 
 export function renderShareTab(ctx) {
-  const { share, docTypes, shareBusy, patchShare, objectsFor, wsT, isDocPublic, sharePw, setSharePw, showToast, anythingPublic, copyShareLink, orgId, wsId } = ctx;
+  const { share, docTypes, shareBusy, patchShare, objectsFor, wsT, isDocPublic, sharePw, setSharePw, showToast, anythingPublic, orgId, wsId } = ctx;
   return html`
     <div class="pj-section">
       <div class="section-desc">${t('organisms.sharePublicDesc') || 'Make published document-space pages readable by anyone with the link — no login required. Drafts are never shared. Anything you make public is also announced on the public activity feed on the front page.'}</div>
@@ -243,7 +246,9 @@ export function renderShareTab(ctx) {
         ${anythingPublic() ? html`
           <div class="pj-share-actions">
             <a class="btn-outline btn-sm" href=${orgService.publicViewerUrl(orgId, wsId)} target="_blank" rel="noopener">${'🔗 '}${t('organisms.openPublicViewer') || 'Open public viewer'}</a>
-            <button class="btn-ghost btn-sm" onClick=${() => copyShareLink(orgService.publicViewerUrl(orgId, wsId))}>${t('organisms.copyLink') || 'Copy link'}</button>
+            <${CopyButton} text=${window.location.origin + orgService.publicViewerUrl(orgId, wsId)} className="btn-ghost btn-sm"
+              label=${t('common.copyLink') || 'Copy link'}
+              onCopied=${() => showToast(t('organisms.linkCopied') || 'Link copied')} />
           </div>` : null}
       `}
     </div>`;

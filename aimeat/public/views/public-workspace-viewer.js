@@ -24,11 +24,14 @@
  *   v1.1.2 — 2026-07-07 — Fix: in isolated single-page mode (a per-doc "open ↗" deep-link) the TOC
  *     now switches the rendered page instead of only moving the highlight — the visible page follows
  *     `selected`, TOC clicks scroll back to top, and "Copy AI link" tracks the current page.
+ *   v1.3.0 — 2026-08-08 — The AI-link copy is a shared <CopyButton>; the local copied state and clipboard handler are
+ *       gone, and pwv.copied with them.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
+import { CopyButton } from '/components/CopyButton.js';
 import { Markdown } from '/components/Markdown.js';
 import { useViewCSS } from '/components/useViewCSS.js';
 import { swallowed } from '/js/swallowed.js';
@@ -184,16 +187,6 @@ export default function PublicWorkspaceViewer() {
   const aiLink = isSingle && current
     ? `${window.location.origin}/v1/organisms/${encodeURIComponent(org)}/workspace/public/document?ws=${encodeURIComponent(ws)}&type=${encodeURIComponent(current.type)}&id=${encodeURIComponent(current.id)}&format=md`
     : `${window.location.origin}/v1/organisms/${encodeURIComponent(org)}/workspace/public/documents?ws=${encodeURIComponent(ws)}&format=md`;
-  const [copied, setCopied] = useState(false);
-  const copyAiLink = useCallback(async () => {
-    try {
-      await navigator.clipboard.writeText(aiLink);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1800);
-    // eslint-disable-next-line aimeat/no-silent-catch -- clipboard unavailable — ignore
-    } catch { /* clipboard unavailable — ignore */ }
-  }, [aiLink]);
-
   if (docs === undefined) {
     return html`<div class="pwv-container"><div class="pwv-state">${t('pwv.loading') || 'Loading…'}</div></div>`;
   }
@@ -269,9 +262,8 @@ export default function PublicWorkspaceViewer() {
         <div class="pwv-bar">
           <span class="pwv-badge">${t('pwv.publicBadge') || 'Public document'}</span>
           <div class="pwv-bar-actions">
-            <button class="btn-outline btn-sm pwv-action" onClick=${copyAiLink}>
-              ${copied ? (t('pwv.copied') || 'Copied!') : (t('pwv.copyAiLink') || 'Copy AI link (Markdown)')}
-            </button>
+            <${CopyButton} text=${aiLink} className="btn-outline btn-sm pwv-action"
+              label=${t('pwv.copyAiLink') || 'Copy AI link (Markdown)'} />
             <button class="btn-outline btn-sm pwv-action" onClick=${() => window.print()}>
               ${t('pwv.print') || 'Print / Save as PDF'}
             </button>

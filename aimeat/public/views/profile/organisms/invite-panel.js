@@ -11,6 +11,8 @@
  * @usage import { InvitePanel, PendingInvites } from '/views/profile/organisms/invite-panel.js';
  * @version-history
  *   v1.0.0 — 2026-07-16 — Initial: unified direct-add/invite/email form + editable pending rows.
+ *   v1.1.0 — 2026-08-08 — The accept-link copy is a shared <CopyButton> with an onCopied toast, replacing the
+ *       copyAcceptUrl handler; label is the shared common.copyLink.
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -20,6 +22,7 @@ import { t } from '/js/i18n.js';
 import * as orgService from '/js/services/organisms.js';
 import { fmtDate } from '/views/profile/organisms/helpers.js';
 import { ContactPicker } from '/components/ContactPicker.js';
+import { CopyButton } from '/components/CopyButton.js';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -104,10 +107,6 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
     finally { setBusy(false); }
   };
 
-  const copyAcceptUrl = async (url) => {
-    try { await navigator.clipboard.writeText(url); showToast(t('organisms.linkCopied') || 'Link copied'); } catch { /* clipboard blocked */ }   // eslint-disable-line aimeat/no-silent-catch -- clipboard blocked
-  };
-
   const submitLabel = isEmail
     ? (t('organisms.sendInvite') || 'Send invitation')
     : requireAccept ? (t('organisms.sendInvite') || 'Send invitation') : (t('organisms.addMember') || 'Add member');
@@ -164,7 +163,9 @@ export function InvitePanel({ orgId, wsOptions, showToast, onChanged, onClose })
         <div class="pj-eminvite-url">
           <div class="section-desc">${emResult.email_sent ? (t('organisms.inviteEmailSentHint') || 'Email sent. You can also share this link:') : (t('organisms.inviteLinkHint') || 'Share this link with the invitee:')}</div>
           ${emResult.accept_url}
-          <div><button class="btn-outline btn-sm" onClick=${() => copyAcceptUrl(emResult.accept_url)}>${t('organisms.copyLink') || 'Copy link'}</button></div>
+          <div><${CopyButton} text=${emResult.accept_url} className="btn-outline btn-sm"
+            label=${t('common.copyLink') || 'Copy link'}
+            onCopied=${() => showToast(t('organisms.linkCopied') || 'Link copied')} /></div>
         </div>` : null}
     </div>`;
 }

@@ -10,6 +10,10 @@
    @usage Loaded first in spa.html <head>; the theme is toggled by /js/theme.js
      which flips the data-theme attribute on <html>.
    @version-history
+     v1.26.0 — 2026-08-08 — Copy control, one style: `.copied` joins `.btn-primary.success` (the green <CopyButton>
+         stamps for ~2s), `.btn-outline.copied`/`.btn-ghost.copied` give the quiet buttons the same
+         confirmation, and `.btn-copy-inline` is the ONE copy modifier — the field/row case where a
+         copy button must not stretch or wrap. Replaces 18 per-view copy-button classes.
      v1.24.0 — 2026-07-21 — App-shell scroll model: html/body no longer scroll (height:100%;
        overflow:hidden); #app is a full-viewport (100dvh) flex column with the topnav as a fixed-height
        row and .page-content as the sole overflow-y:auto scroll region. Removes the ~nav-height phantom
@@ -778,7 +782,12 @@ a { color: inherit; text-decoration: none; }
   transform: translateY(0);
 }
 
-.btn-primary.success {
+/* `copied` is the confirmed state of <CopyButton> (components/CopyButton.js), which stamps the
+   class on the button for ~2s after a successful copy. It shares .success's green so the one
+   copy control looks the same everywhere — .hlp-copy-btn.copied, .dv-copy-btn.copied and
+   .stb-copy-btn.stb-copied each used to reimplement this in their own view stylesheet. */
+.btn-primary.success,
+.btn-primary.copied {
   background: linear-gradient(135deg, #10B981, #059669);
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
   animation: none;
@@ -876,6 +885,22 @@ a { color: inherit; text-decoration: none; }
   border-color: var(--text-muted);
   color: var(--text);
   background: var(--control-bg);
+}
+
+/* The quiet buttons confirm a copy by turning green rather than by swapping background —
+   they sit on cards and in field rows where a filled green pill would shout. */
+.btn-outline.copied,
+.btn-ghost.copied {
+  border-color: var(--success-fg);
+  color: var(--success-fg);
+}
+
+/* The one copy modifier. A copy button that sits inline in a field or row next to the value it
+   copies (a <code> line, a GAII, a tunnel URL) must not stretch the row or wrap its label.
+   Everything else a copy button needs is already in .btn-primary / .btn-outline / .btn-ghost. */
+.btn-copy-inline {
+  flex: none;
+  white-space: nowrap;
 }
 
 /* ── Cards ── */

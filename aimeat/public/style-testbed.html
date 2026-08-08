@@ -11,6 +11,9 @@
     Reachable at /style-testbed.html on the dev server. Not part of the app
     nav and not a service — purely an internal decision aid.
   @version-history
+    v1.2.0 — 2026-08-08 — Copy-button clones resolved: the output-bar button is .btn-primary, the .cl-copy-prompt-btn
+        and .dv-copy-btn specimens are retired (both are shared CopyButtons now) and their decision
+        entries say so. Script loads as a module so it can use the shared clipboard helper.
     v1.0.0 — 2026-06-02 — Initial testbed (buttons, inputs, stat cards)
     v1.1.0 — 2026-06-02 — Add "Add / merge into canonical" decision option; per-clone
       "maps to" annotations (each variant's canonical equivalent); relabel canonical
@@ -147,27 +150,25 @@
         </div>
 
         <!-- Classic portal -->
-        <div class="stb-variant" data-clone=".cl-save-btn / .cl-register-btn / .cl-copy-prompt-btn" data-sites="~4">
-          <div class="stb-variant-head"><span class="stb-vname">Classic · <code>.cl-*-btn</code></span><span class="stb-tag">~4 sites</span></div>
+        <div class="stb-variant" data-clone=".cl-save-btn / .cl-register-btn" data-sites="~3">
+          <div class="stb-variant-head"><span class="stb-vname">Classic · <code>.cl-*-btn</code></span><span class="stb-tag">~3 sites</span></div>
           <div class="stb-specimens">
             <button class="cl-save-btn" type="button">Save</button>
             <button class="cl-save-btn cl-register-btn" type="button">Register</button>
-            <button class="cl-copy-prompt-btn" type="button">Copy prompt</button>
           </div>
           <p class="stb-diff">heavier 700/.92rem · 10px radius · has a .loading spinner state · register hardcodes #22c55e/#16a34a</p>
-          <p class="stb-map stb-map-warn">maps to: Save→<code>btn-primary</code> · Register→<code>btn-success</code> · Copy→<code>btn-primary</code>. ⚠ the <code>.loading</code> spinner state has NO canonical equivalent → pick "Add / merge into canonical" to keep it.</p>
+          <p class="stb-map stb-map-warn">maps to: Save→<code>btn-primary</code> · Register→<code>btn-success</code>. ⚠ the <code>.loading</code> spinner state has NO canonical equivalent → pick "Add / merge into canonical" to keep it. <em>(<code>.cl-copy-prompt-btn</code> was resolved 2026-08-08 — it is <code>btn-primary</code> on a shared <code>CopyButton</code> now.)</em></p>
           <div class="stb-decide-wrap"></div>
         </div>
 
         <!-- Dev portal -->
-        <div class="stb-variant" data-clone=".dv-copy-btn / .dv-upload-btn" data-sites="2">
-          <div class="stb-variant-head"><span class="stb-vname">Dev portal · <code>.dv-*-btn</code></span><span class="stb-tag">2 sites</span></div>
+        <div class="stb-variant" data-clone=".dv-upload-btn" data-sites="1">
+          <div class="stb-variant-head"><span class="stb-vname">Dev portal · <code>.dv-*-btn</code></span><span class="stb-tag">1 site</span></div>
           <div class="stb-specimens stb-specimens-relative">
             <button class="dv-upload-btn" type="button">Upload</button>
-            <span class="stb-mini-note">(<code>.dv-copy-btn</code> is absolute-positioned; uses the --love gradient palette deliberately)</span>
           </div>
-          <p class="stb-diff">uses the separate --love1/2/3 brand palette · .copied state hardcodes #22c55e (won't theme-flip)</p>
-          <p class="stb-map">maps to: Upload→<code>btn-primary</code> · Copy→<code>btn-ghost</code>/<code>CopyButton</code>. The --love palette is a deliberate dev-portal identity — "Leave separate" is reasonable here.</p>
+          <p class="stb-diff">uses the separate --love1/2/3 brand palette</p>
+          <p class="stb-map">maps to: Upload→<code>btn-primary</code>. The --love palette is a deliberate dev-portal identity — "Leave separate" is reasonable here. <em>(<code>.dv-copy-btn</code>/<code>--alt</code> were resolved 2026-08-08 — both are shared <code>CopyButton</code>s now; the absolute positioning moved to the <code>.dv-prompt-output</code> container that owns it.)</em></p>
           <div class="stb-decide-wrap"></div>
         </div>
 
@@ -397,11 +398,11 @@
   <footer class="stb-output-bar">
     <div class="stb-output-head">
       <span class="stb-output-title">Your decisions <span class="stb-output-count" id="stb-count"></span></span>
-      <button class="stb-copy-btn" id="stb-copy" type="button">Copy to clipboard</button>
+      <button class="btn-primary" id="stb-copy" type="button">Copy to clipboard</button>
     </div>
     <textarea class="stb-output" id="stb-output" readonly rows="10"></textarea>
   </footer>
 
-  <script src="/js/style-testbed.js"></script>
+  <script type="module" src="/js/style-testbed.js"></script>
 </body>
 </html>

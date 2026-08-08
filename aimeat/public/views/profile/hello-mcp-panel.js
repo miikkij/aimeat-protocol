@@ -16,6 +16,9 @@
  * @usage import { HelloMcpPanel } from '/views/profile/hello-mcp-panel.js';
  * @version-history
  *   v1.0.0 — 2026-07-31 — Initial.
+ *   v1.1.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback } from 'preact/hooks';
@@ -70,7 +73,7 @@ function Proof({ prompt, state, checking, onCheck }) {
       <div class="hm-actions">
         <${CopyButton} text=${prompt} className="btn-primary"
           label=${tr('helloMcp.proof.copy', 'Copy the prompt')}
-          copiedLabel=${tr('helloMcp.proof.copied', 'Copied')} />
+          copiedLabel=${tr('common.copied', 'Copied')} />
         <button class="btn-outline" onClick=${onCheck} disabled=${checking}>
           ${checking ? tr('helloMcp.proof.checking', 'Checking…') : tr('helloMcp.proof.check', 'I ran it, check now')}
         </button>
@@ -154,7 +157,7 @@ function AfterPass() {
         <div class="hm-actions">
           <${CopyButton} text=${prompt} className="btn-primary"
             label=${tr('helloMcp.org.copy', 'Copy the prompt')}
-            copiedLabel=${tr('helloMcp.proof.copied', 'Copied')} />
+            copiedLabel=${tr('common.copied', 'Copied')} />
           <button class="btn-ghost" onClick=${() => loadOrgs(true)} disabled=${busy}>
             ${busy ? tr('helloMcp.org.refreshing', 'Looking…') : tr('helloMcp.org.refresh', 'It is created, show it')}
           </button>

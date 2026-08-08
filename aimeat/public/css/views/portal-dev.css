@@ -6,12 +6,25 @@
  * @version-history
  *   v1.1.0 — 2026-06-02 — Phase 4: tokenize card/panel/border/text/bg-layer/code
  *     surfaces (#FFFFFF/#E5E7EB/#F3F4F6/#6B7280) for dark mode.
- *   v1.2.0 — 2026-06-02 — Component unification (#6 stat cards): remove .dv-stat*/
- *     .dv-num/.dv-label; dev-portal stats use canonical .stat-card family.
+ *   v1.2.0 — 2026-06-02 — Component unification (#6 stat cards): remove .dv-stat* /
+ *     .dv-num / .dv-label; dev-portal stats use canonical .stat-card family.
  *   v1.3.0 — 2026-06-02 — Component unification (#11): remove .dv-dot (had a
  *     hardcoded #22c55e); node-badge dot uses canonical <StatusDot>.
  *   v1.4.0 — 2026-07-28 — Community list leads with Open (apps run on the node) and keeps
  *     Download as the quieter second action: .dv-app-actions / -open / -download.
+ *   v1.5.0 — 2026-08-08 — The copy button is the shared .btn-primary; .dv-copy-btn / .dv-copy-btn--alt are gone,
+ *       along with the two conflicting .dv-copy-btn definitions that fought over it. The corner
+ *       positioning moved onto .dv-prompt-output, the container that actually owns it.
+ *   v1.6.0 — 2026-08-08 — Close the header comment. The v1.2.0 entry above wrote ".dv-stat*/" —
+ *       that "*/" TERMINATED this comment at line 9, so from 2026-06-02 the rest of the header
+ *       was parsed as CSS. The parser consumed it as one long selector up to the next "{",
+ *       which swallowed the whole `:root { --love1..5 }` block below: browser-verified, the
+ *       sheet's first parsed rule was .dv-bg-layer and --love2 resolved to theme.css's #FF6B6B
+ *       instead of the #D44A3F declared here. Now restored (139 rules, :root first). NOTE the
+ *       block is UNSCOPED and this sheet is linked globally in spa.html, so it wins over
+ *       theme.css app-wide — --love2/3/4/5 change everywhere, including two profile.css text
+ *       colours (.dw-code-accent, .access-mcp-url via --love3). --love* are theme-invariant
+ *       (theme.css:128), so light and dark resolve identically; verified both.
  */
 /* ── Dev Portal root vars ── */
 :root {
@@ -103,9 +116,10 @@
 /* Prompt output */
 .dv-prompt-output { position: relative; }
 .dv-prompt-text { background: var(--code-bg); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; font-family: monospace; font-size: .8rem; white-space: pre-wrap; word-break: break-word; max-height: 500px; overflow-y: auto; line-height: 1.5; color: var(--text, #1A1A2E); }
-.dv-copy-btn { position: absolute; top: .5rem; right: .5rem; background: linear-gradient(135deg, var(--love1), var(--love2)); color: #fff; border: none; border-radius: 6px; padding: .4rem .8rem; cursor: pointer; font-weight: 600; font-size: .8rem; z-index: 1; transition: all .2s; font-family: inherit; }
-.dv-copy-btn:hover { background: linear-gradient(135deg, var(--love3), var(--love1)); box-shadow: 0 2px 12px rgba(232,86,74,.2); }
-.dv-copy-btn.copied { background: #22c55e; }
+/* The prompt box's copy button overlays the top-right corner of the scrollable text. The
+   POSITION belongs to this container (which is position:relative) — the button itself is a
+   plain shared .btn-primary, and its green confirmed state comes from theme.css. */
+.dv-prompt-output > .btn-primary { position: absolute; top: .5rem; right: .5rem; z-index: 1; }
 
 /* Goals */
 .dv-goals { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: .5rem; margin-bottom: 1rem; }
@@ -144,11 +158,9 @@
 /* Share URL */
 .dv-share-url { display: flex; align-items: center; gap: .5rem; background: var(--bg-surface); border: 1px solid var(--success); border-radius: 8px; padding: .6rem 1rem; margin-top: .75rem; font-family: monospace; font-size: .85rem; }
 .dv-share-url input { flex: 1; background: none; border: none; color: var(--text, #1A1A2E); font-family: monospace; font-size: .85rem; outline: none; }
-.dv-share-url .dv-copy-btn { position: static; background: #22c55e; color: #fff; padding: .3rem .6rem; font-size: .8rem; }
-/* .dv-copy-btn is absolutely positioned for the prompt boxes (which are position:relative).
-   In a plain flex row it has no positioned ancestor and escapes to the page corner, so the
-   row pins it back into the flow. */
-.dv-code-row .dv-copy-btn { position: static; }
+/* The share-url row's copy button confirms success by existing next to a live URL, so it is
+   styled as the success action rather than the accent one. */
+.dv-share-url .btn-primary { background: #22c55e; box-shadow: none; }
 
 /* App list */
 .dv-app-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: .75rem; margin-top: 1rem; }
@@ -190,8 +202,6 @@
 .dv-code { font-size: .78rem; background: var(--code-bg); padding: .4rem .6rem; border-radius: .25rem; user-select: all; flex: 1; word-break: break-all; }
 .dv-code--inline { font-size: .78rem; background: var(--code-bg); padding: .25rem .5rem; border-radius: .25rem; user-select: all; }
 .dv-code--inline-sm { font-size: .8rem; background: var(--code-bg); padding: .25rem .5rem; border-radius: .25rem; user-select: all; }
-.dv-copy-btn { padding: .3rem .6rem; background: var(--accent); color: #fff; border: none; border-radius: .25rem; cursor: pointer; font-size: .75rem; white-space: nowrap; }
-.dv-copy-btn--alt { padding: .2rem .5rem; background: var(--purple-bg); color: var(--purple-fg); border: 1px solid var(--purple-border); border-radius: .25rem; cursor: pointer; font-size: .75rem; white-space: nowrap; }
 .dv-note { margin-top: .75rem; font-size: .8rem; color: var(--text-dim); font-style: italic; }
 .dv-inline-link { color: var(--accent); font-style: normal; font-weight: 600; }
 .dv-hint { font-size: .8rem; color: var(--text-dim); margin: 0; font-style: italic; }

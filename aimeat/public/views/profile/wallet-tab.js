@@ -31,6 +31,9 @@
  *     purchases/sales `.tx-list`s (were bare blocks straight under their section headers). Campsite Rule 8:
  *     the tx-item / tx-item-wrap dividers + hover swapped hardcoded rgba(232,86,74,…) for --border /
  *     --accent-subtle tokens (theme-aware).
+ *   v1.8.0 — 2026-08-08 — Copy labels now resolve from the shared common.copy / common.copied / common.copyPrompt /
+ *       common.copyLink / common.copyUrl keys; the per-view copy label keys this file used were
+ *       removed from both locales. Same words on screen.
  */
 import { h } from 'preact';
 import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
@@ -368,7 +371,7 @@ export default function WalletTab({ session, showToast, onStats }) {
       <${CopyButton}
         text=${`Balance: ${w.balance ?? 0} | Available: ${(w.balance ?? 0) - escrow} | Escrow: ${escrow}`}
         label=${t('profile.wallet.copyBalance')}
-        copiedLabel=${t('profile.wallet.copied')}
+        copiedLabel=${t('common.copied')}
         className="btn-outline btn-sm" />
     </div>
 
@@ -474,8 +477,8 @@ export default function WalletTab({ session, showToast, onStats }) {
                       <span onClick=${(e) => e.stopPropagation()}>
                         <${CopyButton}
                           text=${txCopyText}
-                          label=${t('profile.wallet.copyTx')}
-                          copiedLabel=${t('profile.wallet.copied')}
+                          label=${t('common.copy')}
+                          copiedLabel=${t('common.copied')}
                           className="btn-outline btn-sm" />
                       </span>
                     </div>
