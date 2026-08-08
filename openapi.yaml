@@ -6267,6 +6267,14 @@ paths:
                           status:
                             type: string
                             enum: [pending, approved, denied, expired]
+                          existing_agent:
+                            type: boolean
+                            description: >
+                              True when an agent of this name already exists for the owner — the
+                              request is a RETURN (expired token, reinstall), not a first approval.
+                              The consent screen preselects "keep its current access" and approves
+                              with no `scopes` field, which leaves the grant untouched. A boolean
+                              only: this endpoint is unauthenticated, so it never discloses scopes.
                           expires_in:
                             type: integer
         '404':
@@ -39556,6 +39564,22 @@ paths:
                                 display_name: { type: string }
                                 description: { type: string }
                                 status: { type: string }
+                                existing_agent:
+                                  type: boolean
+                                  description: >
+                                    True when an agent of this name already exists — the request is
+                                    a RETURN (expired token, reinstall), not a first approval. The
+                                    consent card then preselects "keep its current access" and
+                                    approves with no `scopes` field, leaving the grant untouched.
+                                current_scopes:
+                                  type: array
+                                  nullable: true
+                                  items: { type: string }
+                                  description: >
+                                    What the existing agent holds today, so the card can show it.
+                                    Null when the agent does not exist yet. Owner-authenticated
+                                    listing only — the unauthenticated consent-page endpoint
+                                    (/v1/agents/verify/info/{userCode}) never returns scopes.
                                 created_at: { type: string }
                                 expires_in: { type: integer }
         '401':

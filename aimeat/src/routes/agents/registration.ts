@@ -3,6 +3,12 @@
  * @description Agent registration routes (connectivity-key connect, owner-authed create, pending list, consent HTML page). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from agents.ts (max-file-lines)
+ *   v1.1.0 — 2026-08-08 — The pending device-auth listing carries `existing_agent` +
+ *     `current_scopes`, so the consent card can tell an agent coming BACK from a first approval.
+ *     It preselected "Standard" either way, which narrowed a full-access agent every time its
+ *     token expired — on a click that meant "yes, this is my agent". Owner-authenticated, so the
+ *     scopes are the owner's own to see; the unauthenticated consent-page endpoint gets only the
+ *     boolean. Covered by test/e2e-agent-reapproval.ts.
  */
 import type { Router } from 'express';
 import { readFileSync, existsSync } from 'node:fs';
@@ -296,13 +302,21 @@ export function registerRegistrationRoutes(
   // GET /v1/agents/device-authorize/pending — list pending device auth requests for the logged-in owner
   router.get('/v1/agents/device-authorize/pending', requireAuth(), requireRole('owner'), async (req, res) => {
     const pending = await storage.listPendingDeviceAuthByOwner(req.auth!.owner);
+    // Which of these are agents coming BACK. The consent card preselected "Standard" regardless, so
+    // re-approving a full-access agent after its token expired narrowed it on a click that meant
+    // "yes, this is mine". The owner is entitled to see their own agent's scopes (the Agents tab
+    // shows them), so this authenticated listing carries them and the card can offer to keep them.
+    const existing = await Promise.all(pending.map(r =>
+      storage.getAgent(buildGAII(r.agentName, req.auth!.owner, config.nodeId))));
     res.json(success(config.nodeId, {
-      requests: pending.map(r => ({
+      requests: pending.map((r, i) => ({
         user_code: r.userCode,
         agent_name: r.agentName,
         display_name: r.displayName,
         description: r.description,
         status: r.status,
+        existing_agent: !!existing[i],
+        current_scopes: existing[i]?.defaultScopes ?? null,
         created_at: r.createdAt,
         expires_in: Math.max(0, Math.ceil((new Date(r.expiresAt).getTime() - Date.now()) / 1000)),
       })),

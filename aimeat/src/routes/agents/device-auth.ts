@@ -31,6 +31,11 @@
  *     verbatim, narrowing included, except that a scope no wildcard carries survives either way
  *     (the consent card's templates cannot express it, so re-approval is not where it was meant to
  *     be dropped).
+ *   v1.6.0 — 2026-08-08 — /verify/info reports `existing_agent`, so the consent screen can tell a
+ *     RETURN from a first approval and preselect "keep its current access" instead of Standard. A
+ *     boolean only — that endpoint is unauthenticated and rate-limited against user-code
+ *     enumeration, so it says THAT the agent exists and never what it may do. Covered by
+ *     test/e2e-agent-reapproval.ts.
  */
 import type { Router, Request } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -535,6 +540,14 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
 
     const remainingMs = new Date(request.expiresAt).getTime() - Date.now();
 
+    // Whether this is a RETURN, not a first approval. The consent screen used to preselect
+    // "Standard" either way, so bringing a full-access agent back after its token expired — the
+    // ordinary way an agent comes back — silently narrowed it, on a click that meant "yes, this is
+    // my agent". A boolean only: this endpoint is unauthenticated and rate-limited against user-code
+    // enumeration, so it says THAT the agent exists, never what it may do.
+    const existing = await storage.getAgent(
+      buildGAII(request.agentName, request.ownerName, config.nodeId));
+
     res.json(success(config.nodeId, {
       user_code: request.userCode,
       agent_name: request.agentName,
@@ -542,6 +555,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
       description: request.description,
       owner: request.ownerName,
       status: request.status,
+      existing_agent: !!existing,
       expires_in: Math.ceil(remainingMs / 1000),
     }));
   });

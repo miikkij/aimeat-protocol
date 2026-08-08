@@ -23,6 +23,11 @@
  *     render the same panel (remake phase 4, E7).
  *   v1.1.0 — 2026-08-07 — The 'step' variant says "your home" instead of the settings tab's "your
  *     account"; browser verification caught the framing leaking into the new path.
+ *   v1.2.0 — 2026-08-08 — An agent coming BACK defaults to "keep its current access" and approves
+ *     with no scopes field, which is how the server reads "nothing was chosen". The card
+ *     preselected "Standard" for every request, so bringing a full-access agent back after its
+ *     token expired — the ordinary way an agent returns — narrowed it to eight scopes on a click
+ *     that meant "yes, this is my agent". A first approval is unchanged.
  */
 import { h } from 'preact';
 import { useState } from 'preact/hooks';
@@ -47,7 +52,14 @@ function countdown(seconds) {
  */
 function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
   const [expanded, setExpanded] = useState(false);
-  const [preset, setPreset] = useState('standard');
+  // An agent coming BACK keeps what it has unless the owner says otherwise. Defaulting to
+  // 'standard' here narrowed a full-access agent every time its token expired, on a click that
+  // meant "yes, this is my agent" — the owner never chose 'standard', it was simply preselected.
+  // 'keep' approves with NO scopes field, which is exactly how the server reads "nothing was
+  // chosen" (approveDeviceAuth, scopesRequested=false).
+  const returning = !!req.existing_agent;
+  const [preset, setPreset] = useState(returning ? 'keep' : 'standard');
+  const choices = returning ? ['keep', 'readonly', 'standard', 'full'] : ['readonly', 'standard', 'full'];
 
   return html`
     <div class="card mt-1 p-1 agc-card" key=${req.user_code}>
@@ -79,17 +91,24 @@ function ConsentCard({ req, onApprove, onDeny, busy, variant }) {
         <div class="mb-half">
           <div class="text-caption mb-half">${t('profile.agents.pendingRequests.scopeLevel')}</div>
           <div class="flex-row pf-scope-presets">
-            ${['readonly', 'standard', 'full'].map(p => html`
+            ${choices.map(p => html`
               <button type="button" key=${p}
                 class="${preset === p ? 'btn-primary' : 'btn-outline'} pf-scope-preset-btn"
                 onClick=${() => setPreset(p)}>
-                ${templateLabel(p)}
+                ${p === 'keep' ? t('profile.agents.pendingRequests.keepCurrent') : templateLabel(p)}
               </button>`)}
           </div>
+          ${returning && html`
+            <p class="text-caption agc-returning">
+              ${t('profile.agents.pendingRequests.returningAgent')}
+              ${Array.isArray(req.current_scopes) && req.current_scopes.length > 0
+                ? ` (${req.current_scopes.join(', ')})` : ''}
+            </p>`}
         </div>
         <div class="flex-row mt-1">
           <button type="button" class="btn-success" disabled=${busy}
-            onClick=${() => onApprove(req.user_code, SCOPE_TEMPLATES[preset] || SCOPE_TEMPLATES.standard)}>
+            onClick=${() => onApprove(req.user_code,
+              preset === 'keep' ? undefined : (SCOPE_TEMPLATES[preset] || SCOPE_TEMPLATES.standard))}>
             ${t('profile.agents.pendingRequests.confirmApprove')}
           </button>
           <button type="button" class="btn-outline" onClick=${() => setExpanded(false)}>

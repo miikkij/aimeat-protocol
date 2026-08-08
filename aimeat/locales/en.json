@@ -1587,7 +1587,9 @@
         "cancel": "Cancel",
         "approved": "Agent approved successfully!",
         "denied": "Request denied",
-        "approveError": "Failed to approve agent"
+        "approveError": "Failed to approve agent",
+        "keepCurrent": "Keep its current access",
+        "returningAgent": "This agent is already set up. Approving without changing anything leaves its permissions exactly as they are."
       },
       "mode": {
         "autonomous": "Autonomous",

@@ -1587,7 +1587,9 @@
         "cancel": "Peruuta",
         "approved": "Agentti hyväksytty!",
         "denied": "Pyyntö hylätty",
-        "approveError": "Agentin hyväksyminen epäonnistui"
+        "approveError": "Agentin hyväksyminen epäonnistui",
+        "keepCurrent": "Pidä nykyiset oikeudet",
+        "returningAgent": "Tämä agentti on jo käytössä. Hyväksyminen ilman muutoksia jättää sen oikeudet täsmälleen ennalleen."
       },
       "mode": {
         "autonomous": "Autonominen",

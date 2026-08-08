@@ -109,6 +109,8 @@
         displayName: 'Display Name',
         description: 'Description',
         scopeLabel: 'Permission Level',
+        scopeKeep: 'Keep its current access',
+        scopeKeepDesc: 'This agent is already set up. Leave its permissions exactly as they are.',
         scopeReadonly: 'Read Only',
         scopeReadonlyDesc: 'Can read memory, wallet balance, and catalogue',
         scopeStandard: 'Standard',
@@ -149,6 +151,8 @@
         displayName: 'Näyttönimi',
         description: 'Kuvaus',
         scopeLabel: 'Käyttöoikeustaso',
+        scopeKeep: 'Pidä nykyiset oikeudet',
+        scopeKeepDesc: 'Tämä agentti on jo käytössä. Jätä sen oikeudet täsmälleen ennalleen.',
         scopeReadonly: 'Vain luku',
         scopeReadonlyDesc: 'Voi lukea muistia, lompakkosaldoa ja luetteloa',
         scopeStandard: 'Normaali',
@@ -293,6 +297,9 @@
     }
 
     function getSelectedScopes() {
+      // null = "nothing chosen", which is how the server reads an approval with no `scopes` field:
+      // an existing agent keeps exactly what it holds.
+      if (selectedPreset === 'keep') return null;
       if (selectedPreset === 'custom') return [...customScopes];
       return SCOPE_PRESETS[selectedPreset] || SCOPE_PRESETS.standard;
     }
@@ -300,12 +307,17 @@
     function renderConsent() {
       const info = requestInfo;
 
+      // An agent coming BACK keeps what it has unless the owner picks otherwise. 'Standard' used
+      // to be preselected either way, so re-approving a full-access agent after its token expired
+      // narrowed it on a click that meant "yes, this is my agent".
       const scopeOptions = [
+        ...(info.existing_agent ? [{ key: 'keep', name: t('scopeKeep'), desc: t('scopeKeepDesc') }] : []),
         { key: 'readonly', name: t('scopeReadonly'), desc: t('scopeReadonlyDesc') },
         { key: 'standard', name: t('scopeStandard'), desc: t('scopeStandardDesc') },
         { key: 'full', name: t('scopeFull'), desc: t('scopeFullDesc') },
         { key: 'custom', name: t('scopeCustom'), desc: t('scopeCustomDesc') },
       ];
+      if (info.existing_agent && selectedPreset === 'standard') selectedPreset = 'keep';
 
       const scopeRadiosHtml = scopeOptions.map(o => `
         <label class="scope-radio ${selectedPreset === o.key ? 'selected' : ''}" data-preset="${escHtml(o.key)}">
@@ -404,7 +416,7 @@
         errEl.textContent = '';
 
         const scopes = getSelectedScopes();
-        if (scopes.length === 0) {
+        if (scopes && scopes.length === 0) {
           errEl.textContent = 'Select at least one scope';
           btn.disabled = false;
           btn.textContent = t('approveBtn');
@@ -416,7 +428,10 @@
           const r = await fetch('/v1/agents/verify', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ user_code: code, action: 'approve', scopes, owner_token: jwt }),
+            // `scopes` omitted entirely when keeping the current access — the server treats a
+            // missing field as "nothing was chosen" and leaves an existing agent untouched.
+            body: JSON.stringify({ user_code: code, action: 'approve', owner_token: jwt,
+              ...(scopes ? { scopes } : {}) }),
           });
           const d = await r.json();
           if (d.ok) {
