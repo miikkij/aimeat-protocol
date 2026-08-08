@@ -1426,6 +1426,7 @@
         "saveError": "Failed to update scopes",
         "notAvailable": "Not available on this node",
         "alwaysOn": "Always enabled (Tier 0)",
+        "notInFullAccess": "tick separately, not part of full access",
         "readOnlyView": "Your current permissions",
         "domainMemory": "Memory",
         "domainStorage": "Storage (files)",

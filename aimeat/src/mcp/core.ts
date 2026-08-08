@@ -62,6 +62,12 @@
  *     result. Both write tools reached storage DIRECTLY before this, so an agent writing over MCP
  *     left content with no provenance at all while the identical write over REST /v1/memory was
  *     stamped — the MCP hop was exactly where the information was being lost.
+ *   v1.14.0 -- 2026-08-08 -- owner_scope on aimeat_memory_read and aimeat_memory_write, behind
+ *     memory:write-as-owner, decided by the same routes/memory/owner-target.ts the REST path uses.
+ *     The write result reports the namespace the record LANDED in rather than the caller: verified
+ *     against production, a delegated write succeeded into the owner's GHII while answering with the
+ *     agent's — for a call whose whole subject is which namespace was written, the one field that
+ *     mattered was the one that was wrong.
  */
 
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/sdk/server/mcp.js';
@@ -494,7 +500,12 @@ export function registerCoreTools(
                     type: 'text' as const,
                     text: JSON.stringify({
                         key: record.key, version: record.version, visibility: record.visibility,
-                        tags: record.tags, written: true, owner_gaii: agentGaii,
+                        // The namespace it ACTUALLY landed in, not the caller. With owner_scope
+                        // those differ, and that difference is the entire subject of the call —
+                        // reporting the caller here told a successful delegated write it had gone
+                        // to the agent's own namespace, which is the one thing it had not done.
+                        tags: record.tags, written: true, owner_gaii: record.ownerGaii,
+                        ...(writeGaii !== agentGaii ? { wrote_as_owner: true } : {}),
                         // What the node recorded about how this was made — returned so the agent can
                         // see the stamp it got by saying nothing, rather than discovering it later.
                         ...(await writeProvenanceEcho(storage, config, aiProvenanceId)),

@@ -1426,6 +1426,7 @@
         "saveError": "Oikeuksien päivitys epäonnistui",
         "notAvailable": "Ei saatavilla tässä nodessa",
         "alwaysOn": "Aina käytössä (Taso 0)",
+        "notInFullAccess": "rastita erikseen, ei sisälly täyteen pääsyyn",
         "readOnlyView": "Nykyiset oikeutesi",
         "domainMemory": "Muisti",
         "domainStorage": "Tallennustila (tiedostot)",
