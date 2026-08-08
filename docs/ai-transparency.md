@@ -158,6 +158,8 @@ Every knob has a safe public default. All are documented in `.env.example`.
 | `AIMEAT_AI_PROVENANCE` | `true` (default) · `false` | Whether records are minted at all. `false` is a local-dev convenience, **not** a compliance option — a node that generates and publishes owes the marking whether or not it kept a record. |
 | `AIMEAT_AI_PROVENANCE_DETAIL` | `full` (default) · `minimal` | What a **public** surface *serves*. It never reduces what is stored, and the owner always sees the whole record. `minimal` serves the four required fields plus the disclosure block — for when a pipeline name or a source list would reveal something commercial. |
 | `AIMEAT_AI_LABEL_PUBLIC` | `strict` (default) · `light` · `off` | How eagerly a **visible** label is shown. Presentation only: the record, the headers and the machine planes are unaffected. |
+| `AIMEAT_AI_COP_SECTIONS` | empty (default) · `2` · `1,2` | Which sections of the Code of Practice **your organisation** signed. Empty means the statement reports you as not a signatory. Set it only once the AI Office has confirmed your signature: it is a public compliance claim, not a feature flag. |
+| `AIMEAT_AI_COP_SIGNED_ON` | ISO date | When it was signed. A signature without a date is the part a reader cannot check, so `aimeat validate` warns when sections are set without one. |
 
 **Minting is maximal, unconditionally.** At the point of generation the node already knows the model,
 the provider, the principal, the node id, the timestamp and the content hash, so it always records
@@ -228,9 +230,29 @@ Discipline for this repository, our marketing and our listings — and worth ado
 | "Your app is compliant because it runs on AIMEAT" | "Your app inherits the marking and labelling primitives; the deployer duties for what you publish remain yours." |
 
 One trap the Commission states explicitly: **using the EU icons says nothing about being a signatory**
-of the Code of Practice, and must never be presented as if it did. `aimeat.io` is **not** a signatory;
-`/v1/ai-transparency` reports `code_of_practice.signatory: false`, and it ships as false precisely so
-the answer means something if it ever becomes true.
+of the Code of Practice, and must never be presented as if it did.
+
+`aimeat.io` **is** a signatory, as of 1 August 2026 (confirmed by the AI Office on 5 August 2026), and
+of **Section 2 only** — labelling deep fakes and AI-generated and manipulated published text, the
+deployer commitment. **Section 1 is deliberately not signed**: the node does not run the generative
+models, so imperceptible marking of model output is not a layer it is in a position to provide, and
+`marking.text_watermarking` says so on the same document.
+
+Two things follow, and both are load-bearing:
+
+- **Say "Section 2", never "the Code of Practice".** A bare "we signed the Code" lets a reader infer
+  the watermarking commitment we explicitly declined. `/v1/ai-transparency` publishes `sections`,
+  `signed_on` and `not_signed` with the reason, in that spirit — copy it in marketing and listings.
+- **This is configuration, not a property of the software.** The signature belongs to *Overscale
+  Solutions Oy*, not to the code, and this repository is MIT-licensed. So the value lives in
+  `AIMEAT_AI_COP_SECTIONS` / `AIMEAT_AI_COP_SIGNED_ON`, empty by default: a node someone else runs
+  reports `signatory: false` until its own operator signs and sets it. A `true` written into a source
+  file would publish our compliance claim from their node.
+
+```bash
+AIMEAT_AI_COP_SECTIONS="2"          # empty (the default) = not a signatory
+AIMEAT_AI_COP_SIGNED_ON="2026-08-01"
+```
 
 ---
 

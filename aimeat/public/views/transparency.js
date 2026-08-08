@@ -29,6 +29,9 @@
  *   - Facts({ stmt })            — operator + supervisory authority, straight off the statement
  * @usage routed at /v1/transparency by spa.html + src/routes/portal.ts
  * @version-history
+ *   v1.1.0 — 2026-08-08 — The signatory answer became yes for this node, so the yes branch now says
+ *     WHEN it was signed and which section was NOT — the boundary-before-the-boast rule applies to
+ *     the one claim on this page a reader is most likely to over-read.
  *   v1.0.0 — 2026-08-01 — TARGET-058 Phase 10. Copy specified in
  *     docs/internal/EUAct/20-public-release-plan.md §D, corrected by §5 of 32-audit-phase-9.md.
  */
@@ -150,6 +153,11 @@ export default function Transparency({ navigate }) {
   const byHash = stmt?.detection?.by_hash || '/v1/provenance/by-hash/{sha256}';
   const signatory = stmt?.code_of_practice?.signatory === true;
   const sections = (stmt?.code_of_practice?.sections || []).join(', ');
+  const signedOn = stmt?.code_of_practice?.signed_on || '';
+  // The sections NOT signed, shown in the same breath as the ones that are. Saying only "we signed"
+  // invites a reader to assume the whole Code, and Section 1 is exactly the part this node cannot
+  // honour — same discipline as the limits section above.
+  const notSigned = (stmt?.code_of_practice?.not_signed || []).map((n) => n.section).join(', ');
 
   return html`
     <div class="ld tp">
@@ -225,7 +233,10 @@ export default function Transparency({ navigate }) {
             ? t('transparency.copYes', { sections: sections || '—' })
             : tr('transparency.copNo',
               'The operator of this node has not signed the EU Code of Practice on Transparency of AI-generated Content. The live statement says the same, and it ships saying so precisely so that the answer would mean something if it ever changed.')}
+          ${signatory && signedOn ? ` ${t('transparency.copSignedOn', { date: signedOn })}` : ''}
         </p>
+        ${signatory && notSigned ? html`
+          <p class="tp-p">${t('transparency.copNotSigned', { sections: notSigned })}</p>` : null}
         <p class="tp-p">${tr('transparency.copIcons',
           'The icons on the labels come from the EU AI Office. Using them says nothing about being a signatory of the Code, and we do not present it as if it did.')}</p>
       </section>

@@ -281,6 +281,10 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
     aiLabelPublic,
     aiSupervisoryName: process.env.AIMEAT_AI_SUPERVISORY_NAME ?? '',
     aiSupervisoryUrl: process.env.AIMEAT_AI_SUPERVISORY_URL ?? '',
+    // Code of Practice: from the env, never a constant — the signature is the OPERATOR's, and a
+    // `true` in this file would have every node running this code claim one it never gave.
+    aiCopSections: (process.env.AIMEAT_AI_COP_SECTIONS ?? '').split(',').map(s => s.trim()).filter(Boolean),
+    aiCopSignedOn: (process.env.AIMEAT_AI_COP_SIGNED_ON ?? '').trim(),
     screenshotAutoCapture: process.env.AIMEAT_SCREENSHOT_AUTO === 'true',
     screenshotIntervalMin: parseInt(process.env.AIMEAT_SCREENSHOT_INTERVAL_MIN ?? '15', 10),
     screenshotSettleMs: parseInt(process.env.AIMEAT_SCREENSHOT_SETTLE_MS ?? '6000', 10),

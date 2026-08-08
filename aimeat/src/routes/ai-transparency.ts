@@ -5,10 +5,12 @@
  *   page, and the document a regulator, a researcher or a buyer's compliance officer reads first.
  *
  *   IT ANSWERS HONESTLY WHEN THE ANSWER IS "NO". `code_of_practice.signatory` ships as **false** and
- *   flips only if the operator actually signs; `text_watermarking` says plainly that this node does
- *   not do it, because the node does not sample the tokens and that layer belongs to whoever runs
- *   the model. A field that is honest when the answer is no is what makes it worth anything when the
- *   answer is yes — a transparency claim is the one claim a reader will check.
+ *   flips only where the operator configured the sections they actually signed; `text_watermarking`
+ *   says plainly that this node does not do it, because the node does not sample the tokens and that
+ *   layer belongs to whoever runs the model. A field that is honest when the answer is no is what
+ *   makes it worth anything when the answer is yes — a transparency claim is the one claim a reader
+ *   will check. Where the answer IS yes, the sections NOT signed are published beside it with the
+ *   reason, because a bare `signatory: true` is the shape a reader would reasonably over-read.
  *
  *   IT IS DERIVED, NEVER HAND-MAINTAINED. Every value comes from config or from the provenance
  *   module, so the statement cannot drift away from what the node actually does: turn provenance off
@@ -24,6 +26,10 @@
  *   import { aiTransparencyRouter } from './routes/ai-transparency.js';
  *   app.use(aiTransparencyRouter(config, storage));
  * @version-history
+ *   v1.4.0 — 2026-08-08 — The AI Office confirmed Overscale Solutions Oy's signature of Section 2
+ *     (deployer; Section 1 deliberately not signed), so `code_of_practice` needed a way to say yes.
+ *     It reads AIMEAT_AI_COP_SECTIONS / _SIGNED_ON rather than a constant: the signature is the
+ *     operator's, and a `true` in this file would be a false claim on every other node.
  *   v1.3.0 — 2026-08-01 — TARGET-058 Phase 10b. `/v1/ai-transparency` and `/v1/transparency` are one
  *     word apart and answer different content types, so a person pasting the machine URL into a
  *     browser landed on JSON. Content negotiation sends a browser to the page; JSON stays the
@@ -50,6 +56,51 @@ import { AI_PROVENANCE_SPEC_V1, AI_PROVENANCE_SCHEMA_PATH } from '../models/ai-p
 import {
   buildAiTransparencyReport, listUnlabelledPublic, DEFAULT_TREND_DAYS,
 } from '../services/ai-transparency-report.js';
+
+/** Official section titles, quoted verbatim from the Code of Practice signature form. A section
+ *  whose title is not held here is published by number alone — a paraphrased title in a compliance
+ *  artefact is a small invention, and this file exists to not make those. */
+const COP_SECTION_TITLES: Record<string, string> = {
+  '2': 'Labelling deep fakes and AI-generated and manipulated published text',
+};
+
+/** Why this node cannot sign Section 1, in the operator's own words to the AI Office. It is the
+ *  same fact `marking.text_watermarking` states, said where a reader is looking for the scope of
+ *  the signature rather than for the marking layers. */
+const COP_SECTION_1_DECLINED =
+  'This node does not run the generative models itself, so imperceptible watermarking of model '
+  + 'output is not a layer it is in a position to provide, and the operator would rather state that '
+  + 'than commit to it.';
+
+/**
+ * The Code of Practice block — signatory status, and the SCOPE of the signature.
+ *
+ * `signatory` is true only where the operator configured the sections they actually signed
+ * (AIMEAT_AI_COP_SECTIONS), never from a constant: see the config-types.ts note on why a signature
+ * written into MIT source would be a false claim on everybody else's node.
+ *
+ * A signed section is only half an answer. Section 1 and Section 2 are separate commitments and a
+ * deployer can honestly hold one without the other, so the section NOT signed is published beside
+ * the one that is, with the reason. Reporting `signatory: true` alone would let a reader infer the
+ * whole Code, which is the over-reading a transparency artefact is supposed to prevent.
+ */
+function buildCodeOfPractice(config: AimeatConfig): Record<string, unknown> {
+  const sections = config.aiCopSections;
+  if (!sections.length) return { signatory: false, sections: [] };
+  const has = (n: string) => sections.includes(n);
+  return {
+    signatory: true,
+    sections,
+    section_titles: Object.fromEntries(
+      sections.filter(s => COP_SECTION_TITLES[s]).map(s => [s, COP_SECTION_TITLES[s]]),
+    ),
+    signed_on: config.aiCopSignedOn || null,
+    // Which duty-holder the signature was given as, derived from the sections rather than stated
+    // twice: Section 1 is the provider's commitment, Section 2 the deployer's.
+    role: has('1') ? (has('2') ? 'provider-and-deployer' : 'provider') : 'deployer',
+    not_signed: has('1') ? [] : [{ section: '1', reason: COP_SECTION_1_DECLINED }],
+  };
+}
 
 /** The node's own statement about how it marks AI-generated content. */
 export function buildAiTransparency(config: AimeatConfig): Record<string, unknown> {
@@ -105,7 +156,7 @@ export function buildAiTransparency(config: AimeatConfig): Record<string, unknow
       appeal: `POST ${b}/v1/flags/{flagId}/appeal`,
       note: 'A visible AI label links to its own record; that record id is what to report.',
     },
-    code_of_practice: { signatory: false, sections: [] },
+    code_of_practice: buildCodeOfPractice(config),
     posture: {
       provenance: config.aiProvenance ? 'on' : 'off',
       detail: config.aiProvenanceDetail,
@@ -127,6 +178,20 @@ function renderMarkdown(config: AimeatConfig, s: Record<string, unknown>): strin
   const authorities = s.supervisory_authority as Record<string, unknown>;
   const ams = authorities.ai_market_surveillance as { name: string; url: string | null } | null;
   const correction = s.correction as Record<string, string>;
+  const cop = s.code_of_practice as {
+    signatory: boolean; sections: string[]; section_titles?: Record<string, string>;
+    signed_on?: string | null; role?: string; not_signed?: { section: string; reason: string }[];
+  };
+  // Named sections, not a bare "yes". The number alone tells a reader nothing about what was
+  // promised, and this is the surface an agent quotes back to somebody.
+  const copLines = cop.signatory
+    ? [
+      `- Code of Practice signatory: **yes**, as ${cop.role || 'deployer'}`
+        + (cop.signed_on ? ` (signed ${cop.signed_on})` : ''),
+      ...cop.sections.map(n => `  - Section ${n}${cop.section_titles?.[n] ? ` — ${cop.section_titles[n]}` : ''}`),
+      ...(cop.not_signed || []).map(ns => `  - Section ${ns.section} — **not signed**. ${ns.reason}`),
+    ]
+    : ['- Code of Practice signatory: **no**'];
   return [
     '---',
     `title: AI transparency statement`,
@@ -165,7 +230,7 @@ function renderMarkdown(config: AimeatConfig, s: Record<string, unknown>): strin
       + (posture.visible_label === 'strict'
         ? ' (also labels content the law exempts, such as content a person reviewed)'
         : ''),
-    `- Code of Practice signatory: **no**`,
+    ...copLines,
     '',
     '## If a label is missing or wrong',
     '',

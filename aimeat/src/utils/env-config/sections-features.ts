@@ -332,6 +332,18 @@ export function featureSections(config: AimeatConfig): ConfigSection[] {
           value: config.aiSupervisoryUrl,
           defaultVal: '',
         },
+        {
+          envVar: 'AIMEAT_AI_COP_SECTIONS',
+          description: 'Code of Practice sections THIS operator signed (empty = not a signatory)',
+          value: config.aiCopSections.join(','),
+          defaultVal: '',
+        },
+        {
+          envVar: 'AIMEAT_AI_COP_SIGNED_ON',
+          description: 'ISO date the Code of Practice was signed',
+          value: config.aiCopSignedOn,
+          defaultVal: '',
+        },
       ],
     },
     {

@@ -4541,7 +4541,16 @@
     "aiLabelPublicLightDesc": "Label exactly what Article 50 requires and nothing more",
     "aiSupervisoryNote": "The AI market-surveillance authority is a different regulator from the data protection authority you gave earlier. In Finland it is Traficom. Leave it empty if you are unsure, and the transparency statement will say it is unstated.",
     "aiSupervisoryName": "AI market-surveillance authority (optional)",
-    "aiSupervisoryUrl": "Its website"
+    "aiSupervisoryUrl": "Its website",
+    "aiCopNote": "The EU Code of Practice on Transparency of AI-generated Content is voluntary and is signed by your organisation, not by this software. Answer yes only if the AI Office has confirmed your signature — the node publishes it as a compliance claim at /v1/ai-transparency. Using the EU label icons says nothing about being a signatory.",
+    "aiCopSigned": "Has your organisation signed the EU Code of Practice on Transparency of AI-generated Content?",
+    "aiCopSections": "Which sections did you sign?",
+    "aiCopSection2": "Section 2 — deployer",
+    "aiCopSection2Desc": "Labelling deep fakes and AI-generated and manipulated published text",
+    "aiCopSection1": "Section 1 — provider",
+    "aiCopSection1Desc": "Machine-readable marking of model output; sign it only if you run the models yourself",
+    "aiCopSignedOn": "Date the signature was confirmed (YYYY-MM-DD)",
+    "aiCopSignedOnInvalid": "Use the form YYYY-MM-DD, for example 2026-08-01"
   },
   "join": {
     "title": "Join AIMEAT Federation",
@@ -8770,6 +8779,8 @@
   "transparency.copTitle": "The Code of Practice",
   "transparency.copNo": "The operator of this node has not signed the EU Code of Practice on Transparency of AI-generated Content. The live statement says the same, and it ships saying so precisely so that the answer would mean something if it ever changed.",
   "transparency.copYes": "The operator of this node has signed the EU Code of Practice on Transparency of AI-generated Content, sections: {sections}.",
+  "transparency.copSignedOn": "Signed {date}.",
+  "transparency.copNotSigned": "Section {sections} is not signed. This node does not run the generative models itself, so imperceptible watermarking of their output is not a layer it can provide, and the operator would rather say that than commit to it.",
   "transparency.copIcons": "The icons on the labels come from the EU AI Office. Using them says nothing about being a signatory of the Code, and we do not present it as if it did.",
   "transparency.devTitle": "For developers",
   "transparency.devLead1": "An app built on this node inherits all of it. One call returns the text and the record; one more renders the label, in both themes and both languages.",

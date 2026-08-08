@@ -3,7 +3,10 @@
  * @description CLI config validator — checks environment, file configs, and DB for
  *   errors, warnings, and info. Usage: aimeat validate (or aimeat check).
  *   Exit 0 = pass (warnings/info only), Exit 1 = errors found.
- * @version-history v1.2.0 — 2026-08-01 — Validate AIMEAT_AI_LABEL_PUBLIC + the AI
+ * @version-history v1.3.0 — 2026-08-08 — Validate the Code of Practice signature
+ *   (AIMEAT_AI_COP_SECTIONS / _SIGNED_ON): unknown sections, a missing or malformed
+ *   date, and Section 1 signed by a node that does not run the models;
+ *   v1.2.0 — 2026-08-01 — Validate AIMEAT_AI_LABEL_PUBLIC + the AI
  *   market-surveillance authority (TARGET-058 Phase 3);
  *   v1.1.0 — 2026-08-01 — Validate AIMEAT_AI_PROVENANCE + _DETAIL (TARGET-058);
  *   v1.0.1 — 2026-06-20 — Validate App Origin Isolation (H-2):
@@ -366,6 +369,26 @@ export function validateEnv(): ValidationResult[] {
   }
   if (!env.AIMEAT_AI_SUPERVISORY_NAME?.trim()) {
     results.push({ level: 'info', variable: 'AIMEAT_AI_SUPERVISORY_NAME', message: 'The AI market-surveillance authority is unstated, so /v1/ai-transparency says so. It is NOT the data-protection authority in AIMEAT_OPERATOR_SUPERVISORY_NAME — in Finland it is Traficom.' });
+  }
+  // The Code of Practice signature. Validated harder than the rest of this section because it is the
+  // only value here that asserts something about the operator to a regulator: a typo turns
+  // /v1/ai-transparency into a false compliance claim, and nothing downstream would catch it.
+  const copSections = (env.AIMEAT_AI_COP_SECTIONS ?? '').split(',').map(s => s.trim()).filter(Boolean);
+  const unknownCopSections = copSections.filter(s => !['1', '2'].includes(s));
+  if (unknownCopSections.length) {
+    results.push({ level: 'error', variable: 'AIMEAT_AI_COP_SECTIONS', message: `Unknown section(s) ${unknownCopSections.join(', ')}. The Code of Practice on Transparency of AI-generated Content has Section 1 (provider: machine-readable marking of model output) and Section 2 (deployer: labelling deep fakes and AI-generated or manipulated published text). Give the numbers you signed, e.g. "2".` });
+  }
+  if (copSections.length) {
+    const signedOn = (env.AIMEAT_AI_COP_SIGNED_ON ?? '').trim();
+    if (!signedOn) {
+      results.push({ level: 'warning', variable: 'AIMEAT_AI_COP_SIGNED_ON', message: 'This node claims to have signed the Code of Practice but states no date. A signature without a date is the part of the claim a reader cannot check — set the ISO date the AI Office confirmed it, e.g. 2026-08-01.' });
+    } else if (!/^\d{4}-\d{2}-\d{2}$/.test(signedOn)) {
+      results.push({ level: 'error', variable: 'AIMEAT_AI_COP_SIGNED_ON', message: `Invalid date "${signedOn}". Use ISO YYYY-MM-DD, e.g. 2026-08-01.` });
+    }
+    if (copSections.includes('1')) {
+      results.push({ level: 'warning', variable: 'AIMEAT_AI_COP_SECTIONS', message: 'Section 1 is the PROVIDER commitment: imperceptible marking of a generative model\'s own output. An AIMEAT node does not sample the model\'s tokens and /v1/ai-transparency states that it does not watermark text, so signing Section 1 as a node operator claims a layer this software does not provide. Sign it only if you run the models yourself.' });
+    }
+    results.push({ level: 'info', variable: 'AIMEAT_AI_COP_SECTIONS', message: `/v1/ai-transparency reports this node as a Code of Practice signatory for section(s) ${copSections.join(', ')}. Set it only after the AI Office confirmed your signature — it is a public compliance claim.` });
   }
 
   // ── Config File Validation (aimeat.ini / aimeat.json) ─────────

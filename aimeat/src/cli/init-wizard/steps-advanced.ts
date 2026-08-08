@@ -2,6 +2,9 @@
  * @file src/cli/init-wizard/steps-advanced.ts
  * @description Economy + advanced-settings wizard steps (quotas, federation, consent, CORS, TOTP, matching, marketplace, realtime, extensions, app/portfolio origin) for `aimeat init`. Extracted from src/cli/init-wizard.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-08 — Ask whether THIS operator signed the EU Code of Practice and which
+ *     sections (AIMEAT_AI_COP_SECTIONS / _SIGNED_ON). Defaults to no: it is a public compliance
+ *     claim, so it has to be typed by the person who made it.
  *   v1.1.0 — 2026-08-01 — TARGET-058 Phase 3: ask the visible-label posture
  *     (AIMEAT_AI_LABEL_PUBLIC, `off` deliberately not offered) and the AI market-surveillance
  *     authority (AIMEAT_AI_SUPERVISORY_NAME/_URL), which is NOT the operator step's DPA.
@@ -311,6 +314,44 @@ export async function askAllAdvancedSettings(
       t,
     ) as string;
     if (aiSupervisoryUrl.trim()) settings.AIMEAT_AI_SUPERVISORY_URL = aiSupervisoryUrl.trim();
+  }
+
+  // The Code of Practice signature. Asked, rather than defaulted to yes for convenience, because
+  // this is the one answer in the wizard that asserts something to a regulator on the operator's
+  // behalf — and the default has to be "no" for a node that has not signed.
+  p.note(t('init.aiCopNote'));
+  const copSigned = checkCancel(
+    await p.confirm({
+      message: t('init.aiCopSigned'),
+      initialValue: cfg.aiCopSections.length > 0,
+    }),
+    t,
+  );
+  if (copSigned) {
+    const copSections = checkCancel(
+      await p.multiselect({
+        message: t('init.aiCopSections'),
+        options: [
+          { value: '2', label: t('init.aiCopSection2'), hint: t('init.aiCopSection2Desc') },
+          { value: '1', label: t('init.aiCopSection1'), hint: t('init.aiCopSection1Desc') },
+        ],
+        initialValues: cfg.aiCopSections.length ? cfg.aiCopSections : ['2'],
+        required: true,
+      }),
+      t,
+    ) as string[];
+    settings.AIMEAT_AI_COP_SECTIONS = copSections.join(',');
+
+    const copSignedOn = checkCancel(
+      await p.text({
+        message: t('init.aiCopSignedOn'),
+        placeholder: '2026-08-01',
+        defaultValue: cfg.aiCopSignedOn ?? '',
+        validate: val => (/^\d{4}-\d{2}-\d{2}$/.test(val?.trim() ?? '') ? undefined : t('init.aiCopSignedOnInvalid')),
+      }),
+      t,
+    ) as string;
+    settings.AIMEAT_AI_COP_SIGNED_ON = copSignedOn.trim();
   }
 
   // ── Cross-Federation (Genesis Peering) ──

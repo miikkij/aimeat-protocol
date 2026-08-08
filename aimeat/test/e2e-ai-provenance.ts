@@ -803,7 +803,28 @@ async function startStub(): Promise<void> {
         assert(r.status === 200, `transparency ${r.status}`);
         const d = r.body.data;
         assert(d.marking.spec === 'aimeat.provenance/v1', `spec ${d.marking.spec}`);
-        assert(d.code_of_practice.signatory === false, 'signatory must ship as false until it is true');
+        // The Code of Practice signature is the OPERATOR's, so it is read from the environment like
+        // the authority below rather than pinned to one answer: pinning `false` would fail on the
+        // node that has signed, and pinning `true` would be a false claim everywhere else. What is
+        // asserted is the DERIVATION and the internal consistency — a `true` that names no section,
+        // or a `false` that carries sections, is the shape a reader would be misled by.
+        const wantCopSections = (process.env.AIMEAT_AI_COP_SECTIONS ?? '')
+            .split(',').map(s => s.trim()).filter(Boolean);
+        const cop = d.code_of_practice;
+        assert(cop.signatory === (wantCopSections.length > 0),
+            `signatory should follow AIMEAT_AI_COP_SECTIONS, got ${cop.signatory}`);
+        assert(JSON.stringify(cop.sections) === JSON.stringify(wantCopSections),
+            `sections ${JSON.stringify(cop.sections)} != configured ${JSON.stringify(wantCopSections)}`);
+        if (cop.signatory) {
+            // Section 1 is the provider commitment. A node that says it does not watermark text and
+            // simultaneously claims Section 1 is the contradiction this endpoint exists to prevent.
+            assert(!cop.sections.includes('1') || d.marking.text_watermarking !== 'not-performed-by-this-node',
+                'the statement claims Code of Practice Section 1 while stating it does not watermark text');
+            assert(Array.isArray(cop.not_signed), 'a signatory must state which sections it did NOT sign');
+            assert(cop.sections.includes('1') || cop.not_signed.some((n: { section: string; reason: string }) =>
+                n.section === '1' && typeof n.reason === 'string' && n.reason.length > 20),
+            'Section 1 is unsigned but the statement gives no reason a reader can read');
+        }
         assert(d.marking.text_watermarking === 'not-performed-by-this-node',
             'this node does not watermark text and must not imply that it does');
         assert(d.detection.access.includes('unauthenticated'), 'the detection access point must say it is open');
@@ -837,6 +858,16 @@ async function startStub(): Promise<void> {
         assert(text.includes(ams || 'not stated'),
             'the mirror neither names the AI market-surveillance authority nor says it is unstated');
         assert(text.includes('Visible label on public surfaces: **strict**'), 'the mirror omits the label posture');
+        // The markdown is a SEPARATE rendering of the same statement, and it used to carry the
+        // signatory answer as a literal "no" — the exact way two surfaces drift apart.
+        const mdCop = (process.env.AIMEAT_AI_COP_SECTIONS ?? '').split(',').map(s => s.trim()).filter(Boolean);
+        assert(text.includes(mdCop.length
+            ? 'Code of Practice signatory: **yes**'
+            : 'Code of Practice signatory: **no**'),
+        'the mirror\'s signatory line disagrees with AIMEAT_AI_COP_SECTIONS');
+        for (const s of mdCop) {
+            assert(text.includes(`Section ${s}`), `the mirror does not name signed Section ${s}`);
+        }
     });
 
     await test('...and is linked from llms.txt and the bootstrap document', async () => {

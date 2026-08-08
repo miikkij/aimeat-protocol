@@ -4541,7 +4541,16 @@
     "aiLabelPublicLightDesc": "Merkitse täsmälleen se, mitä 50 artikla vaatii, ei enempää",
     "aiSupervisoryNote": "Tekoälyn markkinavalvontaviranomainen on eri viranomainen kuin aiemmin antamasi tietosuojaviranomainen. Suomessa se on Traficom. Jätä tyhjäksi, jos et ole varma, niin läpinäkyvyysseloste kertoo, ettei viranomaista ole ilmoitettu.",
     "aiSupervisoryName": "Tekoälyn markkinavalvontaviranomainen (vapaaehtoinen)",
-    "aiSupervisoryUrl": "Sen verkkosivu"
+    "aiSupervisoryUrl": "Sen verkkosivu",
+    "aiCopNote": "EU:n käytännesäännöt tekoälysisällön läpinäkyvyydestä ovat vapaaehtoiset, ja ne allekirjoittaa organisaatiosi, ei tämä ohjelmisto. Vastaa kyllä vain, jos AI Office on vahvistanut allekirjoituksesi — node julkaisee sen osoitteessa /v1/ai-transparency vaatimustenmukaisuusväitteenä. EU:n merkintäkuvakkeiden käyttö ei kerro allekirjoittajuudesta mitään.",
+    "aiCopSigned": "Onko organisaatiosi allekirjoittanut EU:n käytännesäännöt tekoälysisällön läpinäkyvyydestä?",
+    "aiCopSections": "Mitkä osiot allekirjoititte?",
+    "aiCopSection2": "Osio 2 — käyttöönottaja",
+    "aiCopSection2Desc": "Syvähuijausten sekä tekoälyn tuottaman ja muokatun julkaistun tekstin merkitseminen",
+    "aiCopSection1": "Osio 1 — tarjoaja",
+    "aiCopSection1Desc": "Mallin tuotoksen konelukuinen merkintä; allekirjoita vain, jos ajat mallit itse",
+    "aiCopSignedOn": "Päivä, jona allekirjoitus vahvistettiin (VVVV-KK-PP)",
+    "aiCopSignedOnInvalid": "Käytä muotoa VVVV-KK-PP, esimerkiksi 2026-08-01"
   },
   "join": {
     "title": "Liity AIMEAT-federaatioon",
@@ -8770,6 +8779,8 @@
   "transparency.copTitle": "Käytännesäännöt",
   "transparency.copNo": "Tämän noden ylläpitäjä ei ole allekirjoittanut EU:n käytännesääntöjä tekoälysisällön läpinäkyvyydestä. Elävä ilmoitus kertoo saman, ja se kertoo sen juuri siksi, että vastauksella olisi merkitystä jos se joskus muuttuu.",
   "transparency.copYes": "Tämän noden ylläpitäjä on allekirjoittanut EU:n käytännesäännöt tekoälysisällön läpinäkyvyydestä, osiot: {sections}.",
+  "transparency.copSignedOn": "Allekirjoitettu {date}.",
+  "transparency.copNotSigned": "Osiota {sections} ei ole allekirjoitettu. Tämä node ei aja generatiivisia malleja itse, joten niiden tuotoksen huomaamaton vesileimaus ei ole kerros, jonka se pystyisi tarjoamaan. Ylläpitäjä sanoo sen mieluummin suoraan kuin sitoutuu siihen.",
   "transparency.copIcons": "Merkinnöissä käytetyt kuvakkeet ovat EU:n tekoälytoimistolta. Niiden käyttö ei kerro allekirjoittamisesta mitään, emmekä esitä sitä niin.",
   "transparency.devTitle": "Kehittäjälle",
   "transparency.devLead1": "Tälle nodelle rakennettu appi perii kaiken tämän. Yksi kutsu palauttaa tekstin ja alkuperätiedon, toinen piirtää merkinnän molemmissa teemoissa ja molemmilla kielillä.",

@@ -9565,6 +9565,15 @@ paths:
         Response `data`: `{ node_id, operator, supervisory_authority, marking, detection, labelling,
         code_of_practice, posture }`.
 
+        `code_of_practice` reports the EU Code of Practice on Transparency of AI-generated Content
+        signature of THIS node's operator, from `AIMEAT_AI_COP_SECTIONS` / `_SIGNED_ON` - the
+        signature belongs to the operator, not to the software, so it is never a constant. Empty
+        config gives `{ signatory: false, sections: [] }`. Where sections are set it adds
+        `section_titles`, `signed_on`, a `role` derived from the sections (Section 1 is the provider
+        commitment, Section 2 the deployer commitment) and `not_signed`, which names the sections
+        NOT signed with the reason - a bare `signatory: true` would let a reader infer the whole
+        Code, including commitments the operator explicitly declined.
+
         `supervisory_authority.ai_market_surveillance` is the AI Act MARKET-SURVEILLANCE authority
         (`AIMEAT_AI_SUPERVISORY_NAME` / `_URL`), which is a different regulator from
         `data_protection`; it is `null` when the operator has not stated it, never a guess.

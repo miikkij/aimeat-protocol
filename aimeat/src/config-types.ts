@@ -267,6 +267,18 @@ export interface AimeatConfig {
   aiSupervisoryName: string;
   /** Homepage of the AI market-surveillance authority above. */
   aiSupervisoryUrl: string;
+  /** Which SECTIONS of the EU Code of Practice on Transparency of AI-generated Content this node's
+   *  operator has actually signed (`['2']`). Empty is the shipped default and means "not a
+   *  signatory", which is what /v1/ai-transparency then reports.
+   *
+   *  CONFIGURATION AND NOT A CONSTANT, for one reason that decides it: the signature belongs to the
+   *  OPERATOR, not to the software. This is MIT code that other people run, so a `true` written into
+   *  a source file would have every node in the world publishing somebody else's compliance claim —
+   *  in the one artefact a regulator reads first. */
+  aiCopSections: string[];
+  /** ISO date (`2026-08-01`) the operator signed the Code of Practice, published beside the sections.
+   *  A signature without a date is the shape a reader cannot check; empty unless sections are set. */
+  aiCopSignedOn: string;
   /** Node auto-generates thumbnails for published apps that have none (needs a headless browser). */
   screenshotAutoCapture: boolean;
   /** Minutes between auto-screenshot scans (default 15). */
