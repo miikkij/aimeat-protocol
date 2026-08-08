@@ -7,6 +7,9 @@
  *   an "ID card" face (renderIdCard): full GAII with its expansion, issued date, last seen,
  *   task/message tallies, trust + morsels — teaching display-name-vs-GAII at a glance.
  * @version-history
+ *   v3.2.0 -- 2026-08-09 -- Buckets and sort order come from the server verdict. The local
+ *     BUCKET_OF map had no `system` key, so `|| 'quiet'` filed every internal agent under quiet
+ *     on the one surface meant to be read at a glance; there is now an `internal` pill.
  *   v3.1.0 -- 2026-08-08 -- The GAII copy button uses the shared classes and default labels; .pf-agd-idcard-copy and
  *       the profile.agents.idcard.copyGaii/copied keys are gone.
  *   v3.0.0 -- 2026-07-12 -- ID-card treatment: each board mini-card reveals a full agent
@@ -26,18 +29,19 @@ import { useMemo, useState } from 'preact/hooks';
 import htm from 'htm';
 import { t } from '/js/i18n.js';
 import { CopyButton } from '/components/CopyButton.js';
-import { detectAgentState, getStateColor } from './state-detector.js';
+import { agentState, agentBucket, agentRank, getStateColor } from './state-detector.js';
 
 const html = htm.bind(h);
 
-// Detailed states collapse into four glanceable buckets for the legend/filter.
-const BUCKET_OF = { production: 'online', idle: 'quiet', new: 'onboarding', onboarding: 'onboarding', problem: 'issue' };
-const BUCKET_RANK = { issue: 0, onboarding: 1, online: 2, quiet: 3 };
+// The buckets and their order come from the server (services/agent-health.ts) with the agent. The
+// local BUCKET_OF map had no `system` key, so `BUCKET_OF[state] || 'quiet'` filed every internal
+// agent under "quiet" — on the one surface that exists to be read at a glance.
 const BUCKETS = [
   { id: 'online', color: 'var(--success)', key: 'profile.agents.board.online' },
   { id: 'quiet', color: 'var(--text-muted)', key: 'profile.agents.board.quiet' },
   { id: 'onboarding', color: 'var(--warning)', key: 'profile.agents.board.onboarding' },
   { id: 'issue', color: 'var(--danger)', key: 'profile.agents.board.issue' },
+  { id: 'internal', color: 'var(--text-muted)', key: 'profile.agents.board.internal' },
 ];
 
 export default function SharedBoard({ agents, onboardings, onAgentClick }) {
@@ -45,18 +49,20 @@ export default function SharedBoard({ agents, onboardings, onAgentClick }) {
 
   // Hooks must run unconditionally before any early return (Rules of Hooks).
   const agentStates = useMemo(() => {
-    const rows = (agents || []).map(agent => {
-      const state = detectAgentState(agent, onboardings?.[agent.name]);
-      return { agent, state, bucket: BUCKET_OF[state] || 'quiet', onboarding: onboardings?.[agent.name] };
-    });
+    const rows = (agents || []).map(agent => ({
+      agent,
+      state: agentState(agent),
+      bucket: agentBucket(agent),
+      onboarding: onboardings?.[agent.name],
+    }));
     // Problems first, onboarding second, then the rest — an issue must not drown.
-    rows.sort((a, b) => (BUCKET_RANK[a.bucket] ?? 9) - (BUCKET_RANK[b.bucket] ?? 9));
+    rows.sort((a, b) => agentRank(a.agent) - agentRank(b.agent));
     return rows;
   }, [agents, onboardings]);
 
   const counts = useMemo(() => {
-    const c = { online: 0, quiet: 0, onboarding: 0, issue: 0 };
-    for (const r of agentStates) c[r.bucket]++;
+    const c = { online: 0, quiet: 0, onboarding: 0, issue: 0, internal: 0 };
+    for (const r of agentStates) c[r.bucket] = (c[r.bucket] ?? 0) + 1;
     return c;
   }, [agentStates]);
 

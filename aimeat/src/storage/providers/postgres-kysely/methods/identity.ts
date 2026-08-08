@@ -139,14 +139,20 @@ export const identityMethods = {
     const r = await this.db.selectFrom('Agent').selectAll().where('name', '=', name).executeTakeFirst();
     return r ? toAgentRecord(r) : null;
   },
+  // ORDER BY is load-bearing, not tidiness: callers take agents[0] as "the" agent (the home card),
+  // and an unordered Postgres scan returns heap order, which changes whenever a row is UPDATEd —
+  // and a throttled lastSeen touch IS an update. The home therefore showed a different agent after
+  // each heartbeat, with nobody having done anything. createdAt then gaii, matching sqlite.
   async getAgentsByOwner(this: PostgresKyselyStorage, owner: string): Promise<AgentRecord[]> {
-    return (await this.db.selectFrom('Agent').selectAll().where('owner', '=', owner).execute()).map(toAgentRecord);
+    return (await this.db.selectFrom('Agent').selectAll().where('owner', '=', owner)
+      .orderBy('createdAt', 'asc').orderBy('gaii', 'asc').execute()).map(toAgentRecord);
   },
   async getAgentsByOwners(this: PostgresKyselyStorage, owners: string[]): Promise<Record<string, AgentRecord[]>> {
     const out: Record<string, AgentRecord[]> = {};
     if (owners.length === 0) return out;
     for (const o of owners) out[o] = [];
-    const rows = (await this.db.selectFrom('Agent').selectAll().where('owner', 'in', owners).execute()).map(toAgentRecord);
+    const rows = (await this.db.selectFrom('Agent').selectAll().where('owner', 'in', owners)
+      .orderBy('createdAt', 'asc').orderBy('gaii', 'asc').execute()).map(toAgentRecord);
     for (const a of rows) (out[a.owner] ??= []).push(a);
     return out;
   },

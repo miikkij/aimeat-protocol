@@ -2046,7 +2046,8 @@
           "urlUpdated": "Webhook URL updated",
           "urlUpdateFailed": "Failed to update webhook URL",
           "save": "Save",
-          "cancel": "Cancel"
+          "cancel": "Cancel",
+          "onboardingFailed": "Onboarding did not complete."
         },
         "integration": {
           "checklistTitle": "Hello Integration",
@@ -2272,7 +2273,8 @@
         "onboarding": "onboarding",
         "issue": "issue",
         "newShort": "new",
-        "issueShort": "issue"
+        "issueShort": "issue",
+        "internal": "Internal"
       },
       "idcard": {
         "eyebrow": "AI Identity",
@@ -8935,7 +8937,15 @@
       "hideDetails": "Hide details",
       "dtId": "Its identifier",
       "dtSince": "Connected",
-      "manage": "Manage what it may do"
+      "manage": "Manage what it may do",
+      "stateProduction": "Connected and at home.",
+      "stateIdle": "Here, but quiet just now.",
+      "stateOnboarding": "Settling in.",
+      "stateNew": "Just arrived — it has not started yet.",
+      "stateProblem": "Something is wrong with it.",
+      "stateSystem": "Part of the house.",
+      "othersProblem": "{count} more, {problems} needing attention.",
+      "othersOk": "{count} more, all fine."
     },
     "branchB": {
       "title": "Your welcome mat is done",

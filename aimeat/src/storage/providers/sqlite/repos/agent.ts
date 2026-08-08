@@ -84,8 +84,13 @@ export function getAgent(db: Database.Database, gaii: string): AgentRecord | nul
   return row ? deserializeAgent(row) : null;
 }
 
+/**
+ * Ordered to match methods/owner.ts. This copy has no importers today, and that is exactly why it
+ * is fixed rather than left: an unordered third implementation is a disagreement waiting for
+ * whoever wires it up next.
+ */
 export function getAgentsByOwner(db: Database.Database, owner: string): AgentRecord[] {
-  const rows = db.prepare('SELECT * FROM agents WHERE owner = ?').all(owner) as Record<string, unknown>[];
+  const rows = db.prepare('SELECT * FROM agents WHERE owner = ? ORDER BY createdAt ASC, gaii ASC').all(owner) as Record<string, unknown>[];
   return rows.map(r => deserializeAgent(r));
 }
 

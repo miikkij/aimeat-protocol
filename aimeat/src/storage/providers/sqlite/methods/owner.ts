@@ -241,8 +241,10 @@ export const ownerMethods = {
     return row ? this.deserializeAgent(row) : null;
   },
 
+  // Ordered on purpose — see the note on the Postgres implementation. The two providers must agree
+  // about which agent is agents[0], because a caller treats it as "the" agent.
   async getAgentsByOwner(this: SqliteStorage, owner: string): Promise<AgentRecord[]> {
-    const rows = this.db.prepare('SELECT * FROM agents WHERE owner = ?').all(owner) as Record<string, unknown>[];
+    const rows = this.db.prepare('SELECT * FROM agents WHERE owner = ? ORDER BY createdAt ASC, gaii ASC').all(owner) as Record<string, unknown>[];
     return rows.map(r => this.deserializeAgent(r));
   },
 
@@ -251,7 +253,7 @@ export const ownerMethods = {
     if (owners.length === 0) return out;
     for (const o of owners) out[o] = [];
     const p = owners.map(() => '?').join(',');
-    const rows = this.db.prepare(`SELECT * FROM agents WHERE owner IN (${p})`).all(...owners) as Record<string, unknown>[];
+    const rows = this.db.prepare(`SELECT * FROM agents WHERE owner IN (${p}) ORDER BY createdAt ASC, gaii ASC`).all(...owners) as Record<string, unknown>[];
     for (const r of rows) { const a = this.deserializeAgent(r); (out[a.owner] ??= []).push(a); }
     return out;
   },

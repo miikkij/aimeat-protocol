@@ -768,6 +768,68 @@ components:
         last_seen:
           type: string
           format: date-time
+        health:
+          $ref: '#/components/schemas/AgentHealth'
+
+    AgentHealth:
+      type: object
+      description: >
+        The account-level answer to "is this agent OK", computed on the server so every surface
+        shows the same one. Clients render this; they do not derive it. Purpose-specific windows
+        (workflow reachability, presence dots, trust decay) are different questions and stay
+        separate.
+      properties:
+        state:
+          type: string
+          enum: [system, new, onboarding, problem, idle, production]
+          description: >
+            First match wins, in this order. `system` = owner-tagged node machinery. `new` = no
+            onboarding record, or pending. `onboarding` = in progress. `problem` = onboarding is
+            behind it and something is wrong (see `reasons`). `production` = seen within 10 minutes,
+            or reached by a healthy webhook. `idle` = alive but quiet.
+        bucket:
+          type: string
+          enum: [issue, onboarding, online, quiet, internal]
+          description: The glanceable grouping used by the fleet board.
+        rank:
+          type: integer
+          description: Sort key for a fleet list; lower is more urgent (issue = 0).
+        reasons:
+          type: array
+          description: Empty unless state is `problem`. Ordered most-actionable first.
+          items:
+            type: string
+            enum: [onboarding-failed, never-seen, stale-24h, webhook-down]
+        last_seen:
+          type: string
+          nullable: true
+          format: date-time
+        seconds_since_seen:
+          type: integer
+          nullable: true
+          description: Null when the agent has never been seen.
+        delivery:
+          type: object
+          properties:
+            channel:
+              type: string
+              enum: [webhook, webhook-failing, polling, none]
+            webhook_configured: { type: boolean }
+            webhook_enabled: { type: boolean }
+            fail_count: { type: integer }
+            last_success_at: { type: string, nullable: true, format: date-time }
+            last_failure_at: { type: string, nullable: true, format: date-time }
+        onboarding:
+          type: object
+          nullable: true
+          properties:
+            status:
+              type: string
+              enum: [pending, in_progress, completed, failed]
+            readiness_level:
+              type: string
+              nullable: true
+              enum: [basic, standard, full, expert]
 
     # === Memory ===
     MemoryWrite:

@@ -4,6 +4,7 @@
  *   during onboarding or production status (connection, platform, readiness,
  *   identity, delivery log) after completion.
  * @version-history
+ *   v1.9.0 -- 2026-08-09 -- Reads the server's agent state instead of computing one.
  *   v1.8.0 -- 2026-07-17 -- Card scheme generalized: pf-agd-prod-grid renamed to the
  *     shared pf-agd-card-grid; production sections carry pf-agd-card / --full.
  *   v1.9.0 -- 2026-07-16 -- Mount folds webhook + delivery-log + onboarding-checklist into GET
@@ -49,7 +50,7 @@ import { onLiveUpdate } from '/lib/live-updates.js';
 import { t, tOr } from '/js/i18n.js';
 import { timeAgo } from '/js/utils.js';
 import { CopyButton } from '/components/CopyButton.js';
-import { detectAgentState } from './state-detector.js';
+import { agentState } from './state-detector.js';
 import { swallowed } from '/js/swallowed.js';
 import {
   getOnboarding, startOnboarding, getIntegrationOverview,
@@ -61,7 +62,7 @@ import {
 const html = htm.bind(h);
 
 export default function TabIntegration({ agent, onboarding, showToast, agentName }) {
-  const state = detectAgentState(agent, onboarding);
+  const state = agentState(agent);
   const [webhook, setWebhook] = useState(null);
   const [bundleVersion, setBundleVersion] = useState(null);
   const [deliveries, setDeliveries] = useState([]);

@@ -20,6 +20,13 @@
  *   import { readHomeState } from '../services/home-state.js';
  *   const state = await readHomeState(storage, config, req.auth!.owner);
  * @version-history
+ *   v1.1.0 — 2026-08-09 — The agent card carries the SAME health verdict the Agents tab shows
+ *     (services/agent-health.ts), plus how many agents there are and how many are in trouble.
+ *     It carried none: the card was derived from agents.length, so the home said "connected and
+ *     at home" about an agent the Agents tab was calling a problem. It also showed agents[0] of
+ *     an unordered list; the shown agent is now the WORST one, and the list is ordered by both
+ *     providers. `initialized` requires a LIVE agent — an account whose every agent was dead
+ *     still read "your home is ready".
  *   v1.0.0 — 2026-08-07 — Initial (remake phases 2–3).
  */
 import type { AimeatConfig } from '../config.js';
@@ -33,6 +40,8 @@ import {
 import { resolveAiClient, decideBranch } from './ai-tool-setup.js';
 import { portfolioReadGaiis, PORTFOLIO_HTML_KEY, portfolioStandaloneUrl } from '../routes/portfolio.js';
 import { logger } from '../utils/logger.js';
+import { computeAgentHealthMany, isLiveState, type AgentHealth } from './agent-health.js';
+import type { AgentOnboardingRecord } from '../storage/types/agents-messaging.js';
 
 /**
  * The steps, in the order a person meets them. `better-app` exists only on branch B and is what
@@ -78,7 +87,23 @@ export interface HomeState {
      * branch-B screen for good the moment they fixed the very thing it asked for.
      */
     needsBetterApp: boolean;
-    agent: { name: string; gaii: string; connectedAt: string | null } | null;
+    /**
+     * The agent the card shows, plus how many there are and how many are in trouble.
+     *
+     * `health` is the SAME verdict the Agents tab renders (services/agent-health.ts). The card used
+     * to carry no status at all — it was derived from `agents.length`, so the home said "connected
+     * and at home" about an agent the Agents tab was calling a problem, one click away.
+     */
+    agent: {
+        name: string;
+        gaii: string;
+        connectedAt: string | null;
+        health: AgentHealth;
+        /** How many agents the owner has, so one card cannot imply there is only one. */
+        total: number;
+        /** How many are in the `issue` bucket. A number the card can say out loud. */
+        problems: number;
+    } | null;
     /** Whether an agent has written the proof key through its own MCP connection. */
     helloMcp: boolean;
     /** mat ∧ agent ∧ helloMcp. Derived every time; never trusted from storage. */
@@ -130,15 +155,48 @@ export async function readHomeState(
     // The proof key is written by the AGENT under its own GAII, so this must read owner-scope.
     const helloMcp = !!(await getOwnerScopeMemory(storage, config.nodeId, owner, HELLO_MCP_KEY));
 
-    const agent = agents.length
+    // Which agent the card shows. The list is ordered by both providers now (createdAt, gaii), so
+    // agents[0] is the FIRST agent rather than whatever the storage engine happened to return —
+    // on Postgres that used to change after every heartbeat.
+    //
+    // The one shown is the worst one, not the first: a card that reports the oldest agent as
+    // healthy while another is broken is the same lie in a different place. `problems` carries the
+    // count so the card never implies the fleet is one agent.
+    const nowMs = Date.now();
+    const onboardings = await Promise.all(agents.map(a =>
+        storage.getOnboarding(a.gaii).catch(err => {
+            // A missing onboarding record and a failed read both mean "cannot judge onboarding",
+            // and the verdict degrades to 'new' either way — but a read that FAILED is worth
+            // knowing about, so it is logged rather than swallowed.
+            logger.warn('home-state: continuing after a suppressed onboarding read', {
+                gaii: a.gaii, error: String(err),
+            });
+            return null;
+        })));
+    const onboardingByGaii: Record<string, AgentOnboardingRecord | null> = {};
+    agents.forEach((a, i) => { onboardingByGaii[a.gaii] = onboardings[i] ?? null; });
+    const healthByGaii = computeAgentHealthMany(agents, onboardingByGaii, nowMs);
+
+    const worst = agents.length
+        ? agents.reduce((best, a) =>
+            healthByGaii[a.gaii].rank < healthByGaii[best.gaii].rank ? a : best, agents[0])
+        : null;
+
+    const agent = worst
         ? {
-            name: agents[0].name,
-            gaii: agents[0].gaii,
-            connectedAt: str(firstAgent, 'at') ?? agents[0].createdAt ?? null,
+            name: worst.name,
+            gaii: worst.gaii,
+            connectedAt: str(firstAgent, 'at') ?? worst.createdAt ?? null,
+            health: healthByGaii[worst.gaii],
+            total: agents.length,
+            problems: agents.filter(a => healthByGaii[a.gaii].bucket === 'issue').length,
         }
         : null;
 
-    const initialized = matHtmlExists && !!agent && helloMcp;
+    // An agent EXISTING was enough before, so an account whose every agent was dead still read
+    // "your home is ready". A home is not ready on the strength of a record.
+    const hasLiveAgent = agents.some(a => isLiveState(healthByGaii[a.gaii].state));
+    const initialized = matHtmlExists && hasLiveAgent && helloMcp;
 
     const branch = (typeof get(ONBOARDING_KEYS.branchTaken).branch === 'string'
         ? get(ONBOARDING_KEYS.branchTaken).branch as OnboardingBranch : null);

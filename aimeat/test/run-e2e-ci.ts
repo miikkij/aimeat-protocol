@@ -113,6 +113,7 @@ const ALL_SUITES = [
     'test/e2e-hello-mcp.ts',
     'test/e2e-device-token-grace.ts',
     'test/e2e-agent-reapproval.ts',
+    'test/e2e-agent-health.ts',
     'test/e2e-app-access-code.ts',
     'test/e2e-onboarding-funnel.ts',
     'test/e2e-remake-funnel.ts',

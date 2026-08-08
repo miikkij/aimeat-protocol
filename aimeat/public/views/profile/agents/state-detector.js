@@ -1,9 +1,26 @@
 /**
  * @file state-detector.js
- * @description Determines agent state from onboarding record and agent data.
- *   States: 'new' | 'onboarding' | 'problem' | 'idle' | 'production'
- *   Also provides default tab selection and state color mapping.
+ * @description Presentation for an agent's state — the default tab and the colour. It does NOT
+ *   decide the state any more: the server does, in src/services/agent-health.ts, and every agent in
+ *   /v1/agents carries a `health` object.
+ *
+ *   It used to decide it here, and could not do so correctly. Two of its three "problem" conditions
+ *   read fields the response has never contained — `webhookFailCount` was not projected at all, and
+ *   `previousReadinessLevel` is not a field on any record in the system — so a broken push channel
+ *   showed as healthy and "problem" silently meant only "not seen in 24 h". Its readiness ladder
+ *   named a level the node never produces (`advanced`) and omitted the one it does (`expert`),
+ *   which inverted the comparison at the top. None of that was visible from this file.
+ *
+ *   States: 'system' | 'new' | 'onboarding' | 'problem' | 'idle' | 'production' — unchanged, which
+ *   is why every locale key and colour below still applies.
+ * @structure agentState(agent) · getDefaultTab(state) · getStateColor(state)
+ * @usage
+ *   import { agentState, getDefaultTab } from './state-detector.js';
+ *   const state = agentState(agent);
  * @version-history
+ *   v2.0.0 -- 2026-08-09 -- Renders the server's verdict instead of computing its own (V1). Removed
+ *     detectAgentState(), READINESS_RANKS, readinessRank() and isStale(); the three dead conditions
+ *     went with them.
  *   v1.3.0 -- 2026-05-24 -- Remove unused getStateLabel() export (audit fix #7)
  *   v1.2.1 -- 2026-05-24 -- Document idle state in design spec, align with audit findings
  *   v1.2.0 -- 2026-05-24 -- Add idle state for inactive production agents
@@ -12,25 +29,24 @@
  */
 
 /**
- * Detect agent state from onboarding record and agent data.
- * Checked in priority order: new > onboarding > problem > idle > production.
+ * The agent's state as the server computed it.
+ *
+ * `health` is always present on /v1/agents. The fallback exists for the one case where it is not —
+ * an object assembled locally before a refresh — and says 'new' rather than guessing 'production',
+ * because claiming an agent is fine is the failure that matters.
  */
-export function detectAgentState(agent, onboarding) {
-  // System agents (Secretary, company Secretary, specialists) are auto-provisioned and never run the
-  // device-auth "Hello Integration" onboarding — so they must never show the 0/11 "onboarding not
-  // started" state. Any `system:*` tag marks an internal agent.
-  if ((agent.tags || []).some((tag) => typeof tag === 'string' && tag.startsWith('system:'))) return 'system';
-  if (!onboarding || onboarding.status === 'pending' || onboarding.status === 'not_started') return 'new';
-  if (onboarding.status === 'in_progress') return 'onboarding';
+export function agentState(agent) {
+  return agent?.health?.state ?? 'new';
+}
 
-  const webhookDown = (agent.webhookFailCount ?? 0) >= 5;
-  const noTelemetry = !agent.last_seen || isStale(agent.last_seen, 24 * 60);
-  const readinessDrop = onboarding.previousReadinessLevel && onboarding.readinessLevel
-    && readinessRank(onboarding.readinessLevel) < readinessRank(onboarding.previousReadinessLevel);
-  if (webhookDown || noTelemetry || readinessDrop) return 'problem';
+/** The fleet-board bucket ('issue' | 'onboarding' | 'online' | 'quiet' | 'internal'). */
+export function agentBucket(agent) {
+  return agent?.health?.bucket ?? 'onboarding';
+}
 
-  if (!agent.last_seen || isStale(agent.last_seen, 60)) return 'idle';
-  return 'production';
+/** Sort key: lower is more urgent. An issue must never drown in a long list. */
+export function agentRank(agent) {
+  return agent?.health?.rank ?? 1;
 }
 
 export function getDefaultTab(state) {
@@ -55,14 +71,4 @@ export function getStateColor(state) {
     case 'production': return 'var(--success)';
     default: return 'var(--text-muted)';
   }
-}
-
-const READINESS_RANKS = { none: 0, basic: 1, standard: 2, advanced: 3, full: 4 };
-function readinessRank(level) {
-  return READINESS_RANKS[level] ?? 0;
-}
-
-function isStale(isoDate, thresholdMinutes) {
-  const diff = Date.now() - new Date(isoDate).getTime();
-  return diff > thresholdMinutes * 60 * 1000;
 }

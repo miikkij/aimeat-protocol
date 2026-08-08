@@ -3,6 +3,11 @@
  * @description Agent card component with collapsed/expanded states,
  *   Two-Zone Header (identity + state-dependent status), and tab bar.
  * @version-history
+ *   v1.21.0 -- 2026-08-09 -- Renders the server's health verdict instead of deriving one. Removed
+ *     the dead reads: agent.webhookFailCount (never in the response), agent.mcpEnabled (not a
+ *     field on any record) and onboarding.previousReadinessLevel (likewise), plus the second
+ *     READINESS_RANKS copy. The problem panel finally names what is wrong -- its sentence was
+ *     empty in every real case -- and Test webhook is offered only when one is configured.
  *   2026-07-19 — AppDev tab (KB UI): learned-pitfall + template management surface, start-prompt copy, model badge
  *   v1.20.0 -- 2026-07-17 -- Style unification: collapsed-bar summary separators use a
  *     middle dot (·) instead of a pipe, matching the rest of the profile meta rows.
@@ -68,7 +73,7 @@ import htm from 'htm';
 import { t, tOr } from '/js/i18n.js';
 import { apiGet, apiPatch } from '/js/api.js';
 import { timeAgo } from '/js/utils.js';
-import { detectAgentState, getDefaultTab } from './state-detector.js';
+import { agentState, getDefaultTab } from './state-detector.js';
 import { testWebhook, updateWebhook } from '/js/services/agent-integration.js';
 import TabReadme from './tab-readme.js';
 import TabIntegration from './tab-integration.js';
@@ -143,7 +148,7 @@ function totalChanges(changes) {
 }
 
 export default function AgentCard({ agent, onboarding, expanded, onToggle, session, showToast, allAgents, changes, onTabSeen, onScopesClick, onDeleteClick, onFederateToggle, onPopOut, soloMode = false, preSelectedTab = null, openTaskId = null, openTaskNonce = 0 }) {
-  const state = detectAgentState(agent, onboarding);
+  const state = agentState(agent);
   const [activeTab, setActiveTab] = useState(null);
   // README markdown: undefined = not loaded, '' = none published, string = show tab.
   const [readme, setReadme] = useState(undefined);
@@ -390,22 +395,21 @@ function renderChangeBadge(changes) {
   return html`<span class="pf-agd-change-badge pf-agd-change-badge--dot ${failed ? 'pf-agd-change-badge--failed' : ''}" title=${title}></span>`;
 }
 
+/**
+ * How this agent is reached, from the server's verdict.
+ *
+ * Was computed here from `agent.webhookUrl` (not in the response), `agent.mcpEnabled` (not a field
+ * on any record) and a fail threshold of 5 that disagreed with the server's 10. So the warning icon
+ * could never appear, and the MCP labels could never be chosen. The MCP branch is gone rather than
+ * rewired: there is nothing to rewire it to.
+ */
 function renderDeliveryIndicator(agent) {
-  const hasWebhook = agent.webhookUrl || agent.webhook_url;
-  const hasMcp = agent.mcpEnabled || agent.mcp_enabled;
-  const failCount = agent.webhookFailCount ?? 0;
-  const icon = hasWebhook ? (failCount >= 5 ? '⚠' : '✓') : '';
-
-  let label;
-  if (hasMcp && hasWebhook) {
-    label = t('profile.agents.detail.deliveryMcpWh');
-  } else if (hasWebhook) {
-    label = t('profile.agents.detail.deliveryWh');
-  } else if (hasMcp) {
-    label = t('profile.agents.detail.deliveryMcp');
-  } else {
-    label = t('profile.agents.detail.deliveryPolling');
-  }
+  const delivery = agent?.health?.delivery;
+  if (!delivery) return null;
+  const label = delivery.webhook_configured
+    ? t('profile.agents.detail.deliveryWh')
+    : t('profile.agents.detail.deliveryPolling');
+  const icon = delivery.webhook_configured ? (delivery.channel === 'webhook-failing' ? '⚠' : '✓') : '';
 
   return html`<span class="pf-agd-delivery-indicator">${label}${icon ? ` ${icon}` : ''} · </span>`;
 }
@@ -423,8 +427,6 @@ function renderModelBadge(agent) {
   if (!agent?.model) return null;
   return html`<span class="pf-agd-badge pf-agd-badge--model" title=${t('profile.agents.modelBadgeTitle')}>${agent.model}</span>`;
 }
-
-const READINESS_RANKS = { none: 0, basic: 1, standard: 2, advanced: 3, full: 4 };
 
 function renderReadinessBadge(state, onboarding) {
   if (state === 'system') {
@@ -444,8 +446,10 @@ function renderReadinessBadge(state, onboarding) {
     const score = onboarding?.readinessScore;
     if (!score && score !== 0) return html`<span class="pf-agd-badge pf-agd-badge--readiness-none">--</span>`;
     const label = t(`agentOnboarding.readiness.${level}`);
-    const degraded = onboarding?.previousReadinessLevel && (READINESS_RANKS[level] ?? 0) < (READINESS_RANKS[onboarding.previousReadinessLevel] ?? 0);
-    return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level} ${degraded ? 'pf-agd-badge--degraded' : ''}">${degraded ? '↓ ' : ''}${label} (${score})</span>`;
+    // No "degraded ↓" marker: it was driven by onboarding.previousReadinessLevel, which is not a
+    // field on the record, has no column in either backend and is written nowhere — so the arrow
+    // could never appear. Reintroducing it needs a stored previous level first, not a rank table.
+    return html`<span class="pf-agd-badge pf-agd-badge--readiness-${level}">${label} (${score})</span>`;
   }
   // idle and production both show level + score
   const level = onboarding?.readinessLevel || 'none';
@@ -529,13 +533,11 @@ function renderZone2(state, agent, onboarding, setActiveTab, showToast) {
     case 'idle':
     case 'production':
     default: {
-      const hasWebhook = agent.webhookUrl || agent.webhook_url;
-      const hasMcp = agent.mcpEnabled || agent.mcp_enabled;
-      let deliveryLabel;
-      if (hasMcp && hasWebhook) deliveryLabel = t('profile.agents.detail.deliveryMcpWh');
-      else if (hasWebhook) deliveryLabel = t('profile.agents.detail.deliveryWh');
-      else if (hasMcp) deliveryLabel = t('profile.agents.detail.deliveryMcp');
-      else deliveryLabel = t('profile.agents.detail.deliveryPolling');
+      // Same source as the header indicator — see renderDeliveryIndicator for why the MCP branch
+      // is gone rather than rewired.
+      const deliveryLabel = agent?.health?.delivery?.webhook_configured
+        ? t('profile.agents.detail.deliveryWh')
+        : t('profile.agents.detail.deliveryPolling');
       const stats = agent.taskStats;
       return html`
         <div class="pf-agd-zone2 pf-agd-zone2--production">
@@ -663,19 +665,29 @@ function ProblemZone2({ agent, setActiveTab, showToast }) {
     setActiveTab('integration');
   }
 
-  const failCount = agent.webhookFailCount ?? 0;
+  // What is actually wrong, named by the server. This panel's sentence used to be empty in every
+  // real case: it tested a fail count the response did not carry, and `!agent.last_seen`, which is
+  // false for the ordinary problem — an agent that HAS been seen, 25 hours ago.
+  const delivery = agent?.health?.delivery;
+  const reasons = agent?.health?.reasons ?? [];
+  const reasonText = {
+    'webhook-down': () => t('profile.agents.detail.zone2.webhookFailed', { count: delivery?.fail_count ?? 0 }),
+    'never-seen': () => t('profile.agents.detail.zone2.noTelemetry'),
+    'stale-24h': () => t('profile.agents.detail.zone2.noTelemetry'),
+    'onboarding-failed': () => t('profile.agents.detail.zone2.onboardingFailed'),
+  };
 
   return html`
     <div class="pf-agd-zone2 pf-agd-zone2--problem">
       <div class="pf-agd-zone2-title">${t('profile.agents.detail.zone2.problemTitle')}</div>
       <div class="pf-agd-zone2-desc">
-        ${failCount >= 5 ? t('profile.agents.detail.zone2.webhookFailed', { count: failCount }) : ''}
-        ${!agent.last_seen ? t('profile.agents.detail.zone2.noTelemetry') : ''}
+        ${reasons.map(r => html`<div>${(reasonText[r] ?? (() => r))()}</div>`)}
       </div>
       <div class="pf-agd-zone2-actions">
+        ${delivery?.webhook_configured && html`
         <button class="btn-outline btn-sm" onClick=${handleTestWebhook} disabled=${testing}>
           ${t('profile.agents.detail.zone2.testWebhook')}
-        </button>
+        </button>`}
         <button class="btn-outline btn-sm" onClick=${(e) => { e.stopPropagation(); setEditingUrl(!editingUrl); }}>
           ${t('profile.agents.detail.zone2.updateUrl')}
         </button>

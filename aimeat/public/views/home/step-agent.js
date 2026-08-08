@@ -16,6 +16,10 @@
  *   connected agent, shown on an initialised home with its details in a details/summary section.
  * @usage import { StepAgent } from './step-agent.js';
  * @version-history
+ *   v1.1.0 — 2026-08-09 — The card says what the agent is actually doing, and the dot takes its
+ *     colour from that. It printed "Connected and at home." unconditionally next to a dot that
+ *     was green in CSS — about an agent the Agents tab could be calling a problem. It also says
+ *     how many other agents there are, so one card cannot imply the fleet is one.
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 4).
  */
 import { h } from 'preact';
@@ -216,17 +220,44 @@ export function StepAgent({ onChanged, showToast }) {
     </div>`;
 }
 
+/**
+ * How the home describes an agent's state. The same six states the Agents tab uses, in words that
+ * fit a home rather than a dashboard.
+ *
+ * This card used to print "Connected and at home." unconditionally, next to a dot that was green in
+ * CSS — about an agent the Agents tab was calling a problem, one click away. It now renders the
+ * verdict the server computed (services/agent-health.ts), which is the same one that tab renders.
+ */
+const STATE_TEXT = {
+  production: ['home.agent.stateProduction', 'Connected and at home.'],
+  idle: ['home.agent.stateIdle', 'Here, but quiet just now.'],
+  onboarding: ['home.agent.stateOnboarding', 'Settling in.'],
+  new: ['home.agent.stateNew', 'Just arrived — it has not started yet.'],
+  problem: ['home.agent.stateProblem', 'Something is wrong with it.'],
+  system: ['home.agent.stateSystem', 'Part of the house.'],
+};
+
 /** The connected agent on an initialised home: a card, with its details below it. */
 export function AgentCard({ agent }) {
   const [open, setOpen] = useState(false);
   if (!agent) return null;
+  const state = agent.health?.state ?? 'production';
+  const [subKey, subFallback] = STATE_TEXT[state] ?? STATE_TEXT.production;
+  const others = (agent.total ?? 1) - 1;
   return html`
     <div class="koti-agent-card">
       <div class="koti-agent-head">
-        <span class="koti-agent-dot" aria-hidden="true"></span>
+        <span class="koti-agent-dot koti-agent-dot--${state}" aria-hidden="true"></span>
         <div>
           <div class="koti-agent-name">${agent.name}</div>
-          <div class="koti-agent-sub">${tr('home.agent.cardSub', 'Connected and at home.')}</div>
+          <div class="koti-agent-sub">${tr(subKey, subFallback)}</div>
+          ${others > 0 && html`
+            <div class="koti-agent-sub">
+              ${agent.problems > 0
+                ? tr('home.agent.othersProblem', `${others} more, ${agent.problems} needing attention.`)
+                    .replace('{count}', String(others)).replace('{problems}', String(agent.problems))
+                : tr('home.agent.othersOk', `${others} more, all fine.`).replace('{count}', String(others))}
+            </div>`}
         </div>
       </div>
       <button type="button" class="btn-ghost koti-agent-toggle" aria-expanded=${open}

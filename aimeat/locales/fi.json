@@ -2046,7 +2046,8 @@
           "urlUpdated": "Webhook-URL päivitetty",
           "urlUpdateFailed": "Webhook-URL:n päivitys epäonnistui",
           "save": "Tallenna",
-          "cancel": "Peruuta"
+          "cancel": "Peruuta",
+          "onboardingFailed": "Käyttöönotto ei mennyt läpi."
         },
         "integration": {
           "checklistTitle": "Hello-integraatio",
@@ -2272,7 +2273,8 @@
         "onboarding": "käyttöönotossa",
         "issue": "ongelma",
         "newShort": "uusi",
-        "issueShort": "ongelma"
+        "issueShort": "ongelma",
+        "internal": "Sisäinen"
       },
       "idcard": {
         "eyebrow": "Tekoälyidentiteetti",
@@ -4987,7 +4989,7 @@
     "customMessagePlaceholder": "esim. Päivitetään versioon v1.3",
     "disableMaintenance": "Poista ylläpitotila",
     "enableMaintenance": "Ota ylläpitotila käyttöön",
-    "maintenanceExplain": "Kun ylläpitotila on päällä, kaikki ei-välttämättömät päätepiseet palauttavat 503. Operaattorit, terveystarkistukset ja ylläpitoreitit pysyvät käytettävissä.",
+    "maintenanceExplain": "Kun ylläpitotila on päällä, kaikki ei-välttämättömät päätepisteet palauttavat 503. Operaattorit, terveystarkistukset ja ylläpitoreitit pysyvät käytettävissä.",
     "since": "Alkaen",
     "by": "Tekijä",
     "backupExplain": "Varmuuskopio vie kaikki omistajat, agentit, toiminnot, taulut, muistit ja transaktiot JSON-muodossa.",
@@ -5284,7 +5286,7 @@
     "csmManagement": "CSM-hallinta",
     "msmManagement": "MSM-hallinta",
     "portal": "Portaali",
-    "portalDesc": "Hallitse solmusi julkista portaalia: aloitussivua, jonka vierailijat näkevät. Mukauta HTML-mallipohjaa, aseta dynaamista sisältöä muistiavaimilla ja KV-pareilla, esikatsele muutoksia reaaliajassa ja luo tekoälyystävällinen kehotekooste portaalistasi chat-integraatioita varten.",
+    "portalDesc": "Hallitse solmusi julkista portaalia: aloitussivua, jonka vierailijat näkevät. Mukauta HTML-mallipohjaa, aseta dynaamista sisältöä muistiavaimilla ja KV-pareilla, esikatsele muutoksia reaaliajassa ja luo tekoäly-ystävällinen kehotekooste portaalistasi chat-integraatioita varten.",
     "portalTemplate": "Mallipohjan muokkaus",
     "portalNavTitle": "Ylävalikon linkit",
     "portalNavExplain": "Valitse, mitkä julkiset linkit näkyvät sivuston ylävalikossa ja missä järjestyksessä. Kirjautumista vaativat linkit (Sovellukset, Profiili, Ylläpito) noudattavat aina kirjautumis- ja roolisääntöjään, eivätkä ne näy tässä.",
@@ -6018,7 +6020,7 @@
     "cfg_consent_max_per_user": "Maks. per käyttäjä",
     "cfg_totp_enabled": "TOTP käytössä",
     "cfg_totp_period": "Koodijakso (sekuntia)",
-    "cfg_totp_window": "Validointiikkuna",
+    "cfg_totp_window": "Validointi-ikkuna",
     "cfg_totp_max_failed_attempts": "Maks. epäonnistuneet yritykset",
     "cfg_totp_lockout_seconds": "Lukitusaika (sekuntia)",
     "cfg_totp_encryption_key_configured": "Salausavain asetettu",
@@ -6728,7 +6730,7 @@
       "viewOriginal": "Näytä alkuperäinen"
     },
     "organisms": {
-      "title": "Tietoorganismit",
+      "title": "Tieto-organismit",
       "empty": "Et ole jäsenenä yhdessäkään tiedonjako-organismissa.",
       "contribute": "Osallistu",
       "packages": "{count} pakettia",
@@ -7954,7 +7956,7 @@
       "evidence": "Tiedosto"
     },
     "tabs": {
-      "agentIntegration": "Agenttiintegraatio"
+      "agentIntegration": "Agentti-integraatio"
     },
     "agentIntegration": {
       "platformRegistry": "Alustarekisteri",
@@ -8935,7 +8937,15 @@
       "hideDetails": "Piilota tiedot",
       "dtId": "Tunniste",
       "dtSince": "Kytketty",
-      "manage": "Hallitse mitä se saa tehdä"
+      "manage": "Hallitse mitä se saa tehdä",
+      "stateProduction": "Yhdistetty ja kotona.",
+      "stateIdle": "Täällä, mutta hiljaa juuri nyt.",
+      "stateOnboarding": "Asettuu taloksi.",
+      "stateNew": "Juuri saapunut — ei ole vielä aloittanut.",
+      "stateProblem": "Siinä on jotain vialla.",
+      "stateSystem": "Osa taloa.",
+      "othersProblem": "{count} muuta, {problems} kaipaa huomiota.",
+      "othersOk": "{count} muuta, kaikki kunnossa."
     },
     "branchB": {
       "title": "Tervetuloamattosi on valmis",
@@ -8987,7 +8997,7 @@
         "entered": "Aloitit rahapuolen."
       },
       "company": {
-        "title": "Haluan tekoälyyrityksen",
+        "title": "Haluan tekoäly-yrityksen",
         "what": "Oma yritys, omalla sivullaan ja omilla agenteillaan.",
         "next": "Seuraavaksi: nimeät yrityksen, ja se saa oman osoitteensa.",
         "entered": "Aloitit yrityksen."

@@ -631,8 +631,10 @@ export function Workspace({ org, wsId, showToast, onBack, onBackToList, initialS
     );
   }, [ws, orgId, wsId, confirm, showToast, load]);
 
-  // Copy a ready prompt that teaches an AI/agent how to access + use THIS workspace (the MCP gap
-  // bridge). 'human' = paste into a chat; 'agent' = imperative, assumes tool access.
+  // Copy a ready prompt that teaches an AI/agent how to access + use THIS workspace, with its real
+  // ids and structure inlined. 'human' = paste into a chat; 'agent' = imperative, assumes tool
+  // access. (It teaches aimeat_workspace_*; the "MCP gap" this comment used to name closed in
+  // v1.1.0 and the prompt was updated on 2026-08-09.)
   const copyAccessPrompt = useCallback(async (variant) => {
     try {
       const text = await orgService.buildAccessPrompt(orgId, org.name, wsId, ws, variant);

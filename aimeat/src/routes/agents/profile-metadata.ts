@@ -2,6 +2,11 @@
  * @file src/routes/agents/profile-metadata.ts
  * @description Agent read + owner-managed metadata routes (public profile, list, tags, engagements, mode, concurrency, schedule constraints, heartbeat). Extracted from agents.ts to satisfy max-file-lines.
  * @version-history
+ *   v1.2.0 — 2026-08-09 — Each agent carries `health`, the account-level verdict from
+ *     services/agent-health.ts. The frontend derived it from fields this response never sent
+ *     (webhookFailCount was not projected at all), so two of its three problem conditions could
+ *     not fire. The onboarding read moved out of the ?include=stats guard, since the verdict is
+ *     not an optional extra of one query parameter.
  *   2026-07-19 — model/modelDetectedBy: indicative primary-LLM attribution on agents (AppDev KB Phase 3)
  *   v1.1.0 — 2026-07-16 — Engagements enrichment reads all orgs' workspace registries in ONE cross-owner
  *     key-IN query (getMemoryByKeysAnyOwner) instead of a listAllMemory scan per engagement org (Phase 3).
@@ -20,6 +25,8 @@ import { markAgentSeen } from '../../services/telemetry-buffer.js';
 import { listByAgent as listEngagementsByAgent } from '../../services/workspace-engagements.js';
 import { VALID_MODES } from './constants.js';
 import { logger } from '../../utils/logger.js';
+import { computeAgentHealthMany } from '../../services/agent-health.js';
+import type { AgentOnboardingRecord } from '../../storage/types/agents-messaging.js';
 
 export function registerProfileMetadataRoutes(router: Router, config: AimeatConfig, storage: Storage): void {
   // GET /v1/agents/:gaii — public agent profile (no auth)
@@ -98,20 +105,33 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
 
     let taskCounts: Record<string, { queued: number; active: number; done: number; failed: number; doneToday: number; lastTaskUpdateAt: string | null; lastFailedAt: string | null }> = {};
     let msgCounts: Record<string, { total: number; lastMessageAt: string | null }> = {};
-    const onboardingByGaii: Record<string, unknown> = {};
+    const onboardingByGaii: Record<string, AgentOnboardingRecord | null> = {};
     const activeByGaii: Record<string, Array<{ id: string; title: string; status: string; updatedAt: string; createdAt: string; agentGaii: string }>> = {};
+
+    // Onboarding is half of the health verdict, so it is fetched whether or not stats were asked
+    // for — the verdict is not an optional extra of one query parameter. In practice this costs
+    // nothing new: the Agents tab always passes include=stats, which fetched exactly this already.
+    if (agents.length > 0) {
+      const obs = await Promise.all(agents.map(a => storage.getOnboarding(a.gaii).catch(err => {
+        logger.warn('GET /v1/agents: continuing after a suppressed failure', { error: String(err) });
+        return null;
+      })));
+      agents.forEach((a, i) => { onboardingByGaii[a.gaii] = obs[i] ?? null; });
+    }
+    // One clock for the whole page: two cards in one response must not straddle a threshold and
+    // then disagree about what time it is.
+    const health = computeAgentHealthMany(agents, onboardingByGaii, Date.now());
+
     if (wantStats && agents.length > 0) {
       const ownerGhii = `${req.auth!.owner}@${config.nodeId}`;
       const gaiis = agents.map(a => a.gaii);
-      const [tc, mc, active, obs] = await Promise.all([
+      const [tc, mc, active] = await Promise.all([
         storage.countTasksByOwner(ownerGhii),
         storage.countMessagesByAgents(gaiis),
         storage.listAgentTasksByOwner(ownerGhii, { status: 'active', perPage: 200 }),
-        Promise.all(agents.map(a => storage.getOnboarding(a.gaii).catch(err => { logger.warn('GET /v1/agents: continuing after a suppressed failure', { error: String(err) }); return null; }))),
       ]);
       taskCounts = tc;
       msgCounts = mc;
-      agents.forEach((a, i) => { onboardingByGaii[a.gaii] = obs[i]; });
       for (const tsk of active.tasks) {
         (activeByGaii[tsk.agentGaii] ??= []).push({ id: tsk.id, title: tsk.title, status: tsk.status, updatedAt: tsk.updatedAt, createdAt: tsk.createdAt, agentGaii: tsk.agentGaii });
       }
@@ -133,6 +153,10 @@ export function registerProfileMetadataRoutes(router: Router, config: AimeatConf
         morsel_balance: a.morselBalance,
         created_at: a.createdAt,
         last_seen: a.lastSeen,
+        // The account-level verdict, computed once on the server (services/agent-health.ts). The
+        // frontend used to derive this itself from fields this response does not carry, so two of
+        // its three problem conditions could never fire and a broken webhook read as healthy.
+        health: health[a.gaii],
         public_key: a.publicKey,
         federate: a.federate ?? false,
         tags: a.tags ?? [],

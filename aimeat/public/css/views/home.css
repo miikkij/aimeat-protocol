@@ -205,10 +205,15 @@
   margin-bottom: 1rem;
 }
 .koti-agent-head { display: flex; align-items: center; gap: 0.7rem; }
+/* The dot carries the state. It was green in CSS regardless of what the agent was actually doing. */
 .koti-agent-dot {
   flex: none; width: 0.6rem; height: 0.6rem;
   border-radius: var(--radius-full); background: var(--success);
 }
+.koti-agent-dot--problem { background: var(--danger); }
+.koti-agent-dot--idle { background: var(--text-muted); }
+.koti-agent-dot--new,
+.koti-agent-dot--onboarding { background: var(--warning); }
 .koti-agent-name { font-size: 1.15rem; font-weight: 700; }
 .koti-agent-sub { font-size: 0.9rem; color: var(--text-dim); }
 .koti-agent-toggle { margin-top: 0.7rem; font-size: 0.88rem; }

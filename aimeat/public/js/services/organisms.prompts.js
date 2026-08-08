@@ -6,13 +6,26 @@
  * @usage import { buildAccessPrompt, buildContractAgentPrompt } from './organisms.prompts.js';
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from organisms.js (max-file-lines)
+ *   v1.1.0 — 2026-08-09 — The access prompt teaches the workspace tools instead of raw memory keys,
+ *     and no longer claims there are none. aimeat_workspace_* has existed since v1.1.0; the prompt
+ *     handed out aimeat_memory_read/write against organism.{id}.w.{ws}.… and a raw POST to publish,
+ *     so every reader learned to hand-assemble a key layout the tools own and to skip the
+ *     draft/publish handling that comes with them. The contract-agent variant below was already
+ *     correct — this makes the two halves of one file agree.
  */
 import { isMemorySpace, isDocSpace, getObjectSchema } from './organisms.shared.js';
 import { swallowed } from '/js/swallowed.js';
 
 // ── Access prompt: a copy-paste prompt teaching an AI/agent how to use THIS workspace ──
-// Bridges the MCP gap (no workspace-aware tools yet) by injecting the real structure + the exact
-// conventions. Two variants: 'human' (paste into a chat) and 'agent' (imperative, assumes tools).
+// Injects the real structure + ids so the reader does not have to discover them. Two variants:
+// 'human' (paste into a chat) and 'agent' (imperative, assumes tools).
+//
+// It teaches the WORKSPACE tools (aimeat_workspace_*), which have existed since v1.1.0
+// (src/mcp/catalog/surfaces.ts). It used to claim there were none and hand out raw
+// aimeat_memory_read/write calls against organism.{id}.w.{ws}.… keys — teaching every reader to
+// hand-assemble a key layout the tools own, and to bypass the draft/publish handling that comes
+// with them. The contract-agent prompt further down this same file was already correct; this is
+// the two halves agreeing.
 
 /** Format one objectType's full schema for the prompt's STRUCTURE block. */
 function describeType(ot, schema) {
@@ -47,19 +60,26 @@ export async function buildAccessPrompt(orgId, orgName, wsId, ws, variant = 'hum
   const structure = described.join('\n') || '(no spaces declared yet)';
 
   const access = [
-    `- Read the manifest:   aimeat_memory_read key="organism.${orgId}.w.${wsId}.meta.manifest"`,
-    `- List everything:     aimeat_memory_list prefix="organism.${orgId}.w.${wsId}." limit=500`,
-    `    (keys end in .draft = working copy, .latest = published, .version.N = history)`,
-    `- Document sections:   aimeat_memory_read key="organism.${orgId}.w.${wsId}.meta.sections.{type}"`,
-    `- Write/refresh a draft: aimeat_memory_write key="organism.${orgId}.w.${wsId}.{namespace}.{id}.draft" value={...}`,
+    `- Overview of this workspace: aimeat_workspace_overview { organism_id:"${orgId}", ws:"${wsId}" }`,
+    `    (the manifest's spaces, sections and what is in them, as readable markdown)`,
+    `- Index of everything:  aimeat_workspace_read { organism_id:"${orgId}", ws:"${wsId}" }`,
+    `    → ids + titles, no bodies. Open the ones you need with the same call plus ids:["a","b"]`,
+    `      (optionally space:"<space name>" to narrow the lookup).`,
+    `- Write/refresh a draft: aimeat_workspace_write { organism_id:"${orgId}", ws:"${wsId}",`,
+    `      space:"<space NAME>", id:"<instance id>", value:{...} }`,
+    `    (records: the record itself; documents: { title, markdown } — id is auto-generated, and`,
+    `     section:"<section>" files it. Writing always lands in the DRAFT.)`,
+    `- Publish a draft:      aimeat_workspace_publish { organism_id:"${orgId}", ws:"${wsId}",`,
+    `      namespace:"<namespace>", id:"<instance id>" }`,
+    `    (snapshots a version + makes it the published copy; refused while the publish gate is on,`,
+    `     which means the owner reviews it instead)`,
     `- Attach a file/screenshot: aimeat_storage_upload key="organism.${orgId}.w.${wsId}.img.{name}"`,
     `    then embed it in a document's markdown as  ![alt](/v1/storage/<returned key>)`,
     `- Live data in documents: a \`\`\`aimeat-memory fenced block (body: key: <memory key>, optional view: table|props|list,`,
     `    fields: a,b and title: ...) renders that key's CURRENT value on every open — write changing data with`,
     `    aimeat_memory_write as an array of objects (consistent field names) and embed the key instead of a static table;`,
     `    re-writing the SAME key updates every document that embeds it. \`\`\`mermaid blocks render as diagrams.`,
-    `- Publish a draft:     POST ${nodeUrl}/v1/organisms/${orgId}/publish   body { "ws":"${wsId}", "namespace":"...", "id":"..." }`,
-    `    (snapshots .version.N + .latest, consumes the draft; may require operator approval if the publish gate is on)`,
+    `    (This one names a memory key on purpose — the block embeds a key, not a workspace object.)`,
   ].join('\n');
 
   const intents = [

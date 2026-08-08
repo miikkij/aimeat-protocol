@@ -6,6 +6,10 @@
  * @structure catalog / members / config (GET+PUT) / upload / data/:username
  *   portfolioWriteGaii() / portfolioReadGaiis() — which identity a portfolio is stored under
  * @version-history
+ *   v1.5.0 — 2026-08-09 — PUT /v1/portfolio/config MERGES onto the stored config instead of
+ *     replacing it. A partial PUT from any surface silently dropped every field it did not
+ *     send; the welcome-mat path next door has always merged, and the two disagreeing is how
+ *     one would eventually erase the other's work.
  *   v1.4.1 — 2026-08-08 — /v1/portfolio/members looks in every identity a portfolio can live
  *     under, not just the owner's first agent. v1.4.0 moved agentless writes to the GHII but left
  *     this listing keyed on the first agent, so an account without an agent had a portfolio that
@@ -312,6 +316,12 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
   /**
    * PUT /v1/portfolio/config
    * Saves the user's portfolio configuration to memory.
+   *
+   * MERGES onto what is already stored. It used to write the body as the whole value, so any other
+   * surface that PUTs a partial config silently dropped every field it did not happen to send —
+   * the welcome-mat path next door (routes/home/welcome-mat.ts) has always merged, and this generic
+   * route disagreeing with it is how one of them would eventually erase the other's work. A caller
+   * that wants a field GONE sends it as null rather than omitting it.
    */
   router.put('/v1/portfolio/config', requireAuth(), async (req, res) => {
     const ownerName = req.auth!.owner;
@@ -319,10 +329,11 @@ export function portfolioRouter(config: AimeatConfig, storage: Storage): Router 
     const body = req.body ?? {};
     const now = new Date().toISOString();
     const existing = await storage.getMemory(target, PORTFOLIO_CONFIG_KEY);
+    const prev = (existing?.value ?? {}) as Record<string, unknown>;
     await storage.setMemory({
       key: PORTFOLIO_CONFIG_KEY,
       ownerGaii: target,
-      value: body,
+      value: { ...prev, ...body },
       visibility: 'owner',
       tags: body.tags || ['portfolio'],
       ttlHours: null,

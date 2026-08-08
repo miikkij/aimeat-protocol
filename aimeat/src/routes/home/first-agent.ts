@@ -14,6 +14,9 @@
  * @usage Registered from src/routes/home.ts.
  * @version-history
  *   v1.0.0 — 2026-08-07 — Initial (remake phase 4).
+ *   v1.1.0 — 2026-08-09 — Records the agent the submitted `user_code` actually names. It ignored
+ *     the code and wrote agents[0], so the marker — which the home card renders — could show one
+ *     agent's name with another's timestamp. Ownership of the resolved request is checked.
  */
 import type { Router } from 'express';
 import { requireAuth, requireRole } from '../../auth/middleware.js';
@@ -39,8 +42,23 @@ export function registerFirstAgentRoutes(router: Router, ctx: HomeRouteCtx): voi
                 return;
             }
 
+            // WHICH agent just joined. The caller sends the user_code it approved; this used to
+            // ignore it and record agents[0], so the marker could carry one agent's name with
+            // another's moment — and the home card reads this name. Ownership is re-checked rather
+            // than assumed: a user_code is a short human-typed string, and resolving one that
+            // belongs to somebody else would be a cross-account read.
+            const userCode = typeof req.body?.user_code === 'string' ? req.body.user_code.toUpperCase() : null;
+            const request = userCode ? await storage.getDeviceAuthByUserCode(userCode) : null;
+            const named = request && request.ownerName === owner
+                ? agents.find(a => a.name === request.agentName) ?? null
+                : null;
+            // No code (an older client) falls back to the first agent, which is what the account
+            // has always meant when it could not say. A code that resolves to nothing does the
+            // same rather than failing: the marker is measurement, not a gate.
+            const subject = named ?? agents[0];
+
             const wrote = await recordOnboardingEvent(storage, config, owner,
-                ONBOARDING_KEYS.firstAgentConnected, { agentName: agents[0].name });
+                ONBOARDING_KEYS.firstAgentConnected, { agentName: subject.name });
 
             // readHomeState also stamps home_initialized the first time all three conditions hold,
             // so the response is the authoritative "are you done" answer rather than a guess.
