@@ -163,6 +163,7 @@ import { agentActivityRouter } from '../routes/agent-activity.js';
 import { agentMessagesRouter } from '../routes/agent-messages.js';
 import { messagesRouter } from '../routes/messages.js';
 import { contactsRouter } from '../routes/contacts.js';
+import { intentsRouter } from '../routes/intents.js';
 import { attestationsRouter } from '../routes/attestations.js';
 import { trackedResponsesRouter } from '../routes/tracked-responses.js';
 import { agentWebhookRouter } from '../routes/agent-webhook.js';
@@ -432,6 +433,7 @@ export async function mountRoutes(
   app.use(agentMessagesRouter(config, storage, webhookDispatcher));
   app.use(messagesRouter(config, storage, peers));
   app.use(contactsRouter(config, storage));       // Contacts (address book) — generic identity picker source
+  app.use(intentsRouter(config, storage));        // Intent pool — what the owner means to do here
   app.use(attestationsRouter(config, storage));   // Dual-signed attestations (TINKI) — co-signed deeds
   app.use(trackedResponsesRouter(config, storage, peers));   // Memory Contracts — Tracked Responses
   app.use(agentWebhookRouter(config, storage));

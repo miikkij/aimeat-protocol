@@ -61,7 +61,16 @@ export function registerKeyRoutes(router: Router, ctx: MemoryRouteCtx): void {
     // other same-owner principals (app grants, agents) opt into the same set — mirroring the list
     // route's opt-in (same-owner-access invariant), e.g. a document's live aimeat-memory embed
     // reading a key an MCP agent wrote.
-    const ownerScopeRead = (isOwnerSession || req.query.owner_scope === 'true') && !agentParam;
+    //
+    // NOT an ecosystem app, for the same reason the list route excludes one (routes/memory/crud.ts):
+    // a GEAI is fenced to the data areas its owner granted, and this flag must not be the way
+    // around that fence. The eco gate above only inspects `organism.` keys — everything else is
+    // waved through as "the app's own namespace", which is true right up until owner_scope makes
+    // the read target the OWNER's namespace instead. Measured before this line existed: an app
+    // whose only granted area was `service.peeker.*` read a `private` owner key by passing the
+    // flag, and `openrouter.*` sits in the same namespace.
+    const isEcosystem = req.auth!.roles.includes('ecosystem');
+    const ownerScopeRead = (isOwnerSession || req.query.owner_scope === 'true') && !agentParam && !isEcosystem;
     let record = ownerScopeRead
       ? await memoryDb.getOwnerScope(req.auth!.owner, key)
       : await storage.getMemory(gaii, key);

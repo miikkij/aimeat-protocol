@@ -831,6 +831,44 @@ components:
               nullable: true
               enum: [basic, standard, full, expert]
 
+    Intent:
+      type: object
+      description: One thing the owner means to do here, stored as `intent.{id}` in their namespace.
+      properties:
+        id: { type: string }
+        title: { type: string }
+        kind: { type: string, nullable: true }
+        prompt_ref:
+          type: string
+          nullable: true
+          description: A prompt NAME for /v1/prompts/{name}. Never the prompt text.
+        prompt_args: { type: object, nullable: true }
+        status: { type: string, enum: [open, working, done] }
+        object:
+          type: object
+          nullable: true
+          properties:
+            type: { type: string }
+            id: { type: string }
+        origin: { type: string, nullable: true }
+        agent:
+          type: string
+          nullable: true
+          description: The GAII this was handed to, once it was promoted to a task.
+        taskId: { type: string, nullable: true }
+        closes_when:
+          type: object
+          nullable: true
+          properties:
+            check: { type: string, enum: [hello_mcp, welcome_mat, first_agent] }
+        satisfied:
+          type: boolean
+          description: >
+            Read-only, present on listings. True when a suggestion's condition already holds - such
+            an intent is not offered, and is NOT written done, so it returns if the situation unwinds.
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+
     # === Memory ===
     MemoryWrite:
       type: object
@@ -6289,6 +6327,171 @@ paths:
             Authorization pending, denied, expired, or invalid.
             Error codes: authorization_pending, access_denied, expired_token,
             slow_down, unsupported_grant_type, invalid_request, invalid_grant.
+
+  /v1/intents:
+    get:
+      operationId: listIntents
+      tags: [Memory]
+      summary: The owner's intent pool
+      description: >
+        One list of what the owner means to do here. Each intent is a memory record under the
+        `intent.` prefix in the owner's namespace, so their own agent can read the pool through
+        `GET /v1/memory/{key}?owner_scope=true` without a route of its own. Suggestions whose
+        `closes_when` condition already holds are dropped unless `include=satisfied`; the condition
+        is evaluated on READ and never stored, so a suggestion comes back if the situation unwinds.
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: include
+          in: query
+          required: false
+          schema: { type: string }
+          description: Comma-separated. `satisfied` keeps suggestions whose condition already holds.
+      responses:
+        '200':
+          description: The pool
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          intents:
+                            type: array
+                            items: { $ref: '#/components/schemas/Intent' }
+                          total: { type: integer }
+                          satisfied_hidden:
+                            type: integer
+                            description: >
+                              How many suggestions were dropped as already satisfied, so a client can
+                              say "nothing outstanding" instead of rendering an empty list.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+    post:
+      operationId: createIntent
+      tags: [Memory]
+      summary: Add an intent to the pool
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title: { type: string, maxLength: 200 }
+                kind:
+                  type: string
+                  nullable: true
+                  description: One of the /v1/discover types; the vocabulary is not reinvented here.
+                  enum: [capability, workflow, knowledge, decision, research, material, company,
+                         offering, document, organism, app, template, skill, memory]
+                prompt_ref:
+                  type: string
+                  nullable: true
+                  description: >
+                    The NAME of a node-served prompt, fetched from /v1/prompts/{name} when needed.
+                    The text is never stored - a snapshot would freeze a fork of a prompt the node
+                    serves precisely so corrections reach the copies people already carry.
+                prompt_args: { type: object, nullable: true }
+                origin:
+                  type: string
+                  nullable: true
+                  description: Which surface seeded this, so it can be measured.
+                object:
+                  type: object
+                  nullable: true
+                  properties:
+                    type: { type: string }
+                    id: { type: string }
+                closes_when:
+                  type: object
+                  nullable: true
+                  description: For system-suggested steps only. Evaluated on read.
+                  properties:
+                    check:
+                      type: string
+                      enum: [hello_mcp, welcome_mat, first_agent]
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/AimeatEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        type: object
+                        properties:
+                          intent: { $ref: '#/components/schemas/Intent' }
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: The pool is full
+  /v1/intents/{id}:
+    patch:
+      operationId: updateIntent
+      tags: [Memory]
+      summary: Change an intent
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                title: { type: string, maxLength: 200 }
+                status: { type: string, enum: [open, working, done] }
+                kind: { type: string, nullable: true }
+                prompt_ref: { type: string, nullable: true }
+                object:
+                  type: object
+                  nullable: true
+                  properties:
+                    type: { type: string }
+                    id: { type: string }
+      responses:
+        '200':
+          description: Updated
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteIntent
+      tags: [Memory]
+      summary: Remove an intent
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: Removed
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   /v1/agents/verify/info/{userCode}:
     get:
