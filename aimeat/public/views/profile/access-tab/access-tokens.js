@@ -59,7 +59,6 @@ export function AccessTokensSection({ session, showToast, initial }) {
   const [selScopes, setSelScopes] = useState({});
   const [grantOwner, setGrantOwner] = useState(false);
   const [grantOperator, setGrantOperator] = useState(false);
-  const [readOwnerData, setReadOwnerData] = useState(false);
   const [expiry, setExpiry] = useState('');
 
   const fullLevel = grantOwner || grantOperator;
@@ -80,7 +79,7 @@ export function AccessTokensSection({ session, showToast, initial }) {
 
   const resetForm = () => {
     setShowCreate(false); setLabel(''); setSelScopes({});
-    setGrantOwner(false); setGrantOperator(false); setReadOwnerData(false); setExpiry('');
+    setGrantOwner(false); setGrantOperator(false); setExpiry('');
   };
 
   const toggleScope = (s) => setSelScopes(prev => ({ ...prev, [s]: !prev[s] }));
@@ -96,7 +95,7 @@ export function AccessTokensSection({ session, showToast, initial }) {
     try {
       const body = {
         label: label.trim(), scopes,
-        grant_owner: grantOwner, grant_operator: grantOperator, read_owner_data: readOwnerData,
+        grant_owner: grantOwner, grant_operator: grantOperator,
       };
       if (expiry) body.expires_in = parseInt(expiry, 10);
       const r = await apiPost('/v1/access/tokens', body);
@@ -107,7 +106,7 @@ export function AccessTokensSection({ session, showToast, initial }) {
     } catch (e) {
       showToast(e.message || (t('profile.access.patCreateError') || 'Failed to create token'));
     } finally { setCreating(false); }
-  }, [label, fullLevel, selScopes, grantOwner, grantOperator, readOwnerData, expiry, showToast, load]);
+  }, [label, fullLevel, selScopes, grantOwner, grantOperator, expiry, showToast, load]);
 
   const handleRevoke = useCallback((id, lbl) => {
     confirm(
@@ -228,10 +227,6 @@ export function AccessTokensSection({ session, showToast, initial }) {
                   })}
                 </div>
               `)}
-              <label class="flex-row mt-half">
-                <input type="checkbox" checked=${readOwnerData} onChange=${() => setReadOwnerData(v => !v)} />
-                ${t('profile.access.patReadOwnerData') || 'Also read my data (otherwise a clean sandbox)'}
-              </label>
             </div>
           `}
 

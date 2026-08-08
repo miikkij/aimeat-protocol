@@ -9023,5 +9023,21 @@
       "hereProfile": "Käytät vanhaa profiilia.",
       "toHome": "Kokeile uutta kotia"
     }
+  },
+  "prompt": {
+    "more": "Lisää",
+    "showText": "Näytä kehote",
+    "hideText": "Piilota kehote",
+    "save": "Tallenna myöhemmäksi",
+    "saved": "Tallennettu listallesi",
+    "giveTo": "Anna agentille"
+  },
+  "pool": {
+    "title": "Mitä aiot tehdä",
+    "suggestion": "Ehdotus — katoaa itsestään kun tämä on tehty",
+    "isDoing": "tekee tätä",
+    "yours": "Sinun",
+    "markDone": "Tehty",
+    "remove": "Poista"
   }
 }

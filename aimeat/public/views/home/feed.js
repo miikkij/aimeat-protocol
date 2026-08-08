@@ -18,9 +18,12 @@
  *   v1.0.0 — 2026-08-07 — Initial (remake phases 6–7).
  */
 import { h } from 'preact';
+import { useState } from 'preact/hooks';
 import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
+import { createIntent } from '/js/services/intents.js';
+import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -80,6 +83,48 @@ export function HomeFeed({ items }) {
     </section>`;
 }
 
+/**
+ * The rooms where "later" is a real answer, and the node-served prompt that belongs to each.
+ *
+ * A closed list on purpose. Adding one means claiming that putting that room off produces
+ * something an AI can hand back — which is true here and is not true of reading your own post.
+ */
+const SAVEABLE_ROOMS = {
+  create: { promptRef: 'build-app', titleKey: 'home.rooms.create.title' },
+  organise: { promptRef: 'organism-setup', titleKey: 'home.rooms.organise.title' },
+};
+
+/**
+ * "Save it for later" inside a room card.
+ *
+ * The card is an <a> under the SPA's delegated link handler, so this button has to stop the event
+ * itself or saving would also mark the room entered and navigate away — the same trap the card's
+ * own onClick documents right above.
+ */
+function SaveForLater({ room }) {
+  const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const cfg = SAVEABLE_ROOMS[room.id];
+  return html`
+    <button type="button" class="btn-ghost koti-room-save" disabled=${busy || saved}
+      onClick=${async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setBusy(true);
+        try {
+          await createIntent({
+            title: tr(cfg.titleKey, room.id),
+            prompt_ref: cfg.promptRef,
+            origin: `home.rooms.${room.id}`,
+          });
+          setSaved(true);
+        } catch (err) { swallowed('home/rooms: save for later', err); }
+        finally { setBusy(false); }
+      }}>
+      ${saved ? tr('prompt.saved', 'Saved to your list') : tr('prompt.save', 'Save for later')}
+    </button>`;
+}
+
 export function Rooms({ rooms, onEnter }) {
   if (!rooms || !rooms.length) return null;
   return html`
@@ -100,6 +145,11 @@ export function Rooms({ rooms, onEnter }) {
             <span class="koti-room-what">${tr(`home.rooms.${room.id}.what`, '')}</span>
             ${/* The third line. Without it these are four abstract words and people pick at random. */''}
             <span class="koti-room-next">${tr(`home.rooms.${room.id}.next`, '')}</span>
+            ${/* Two rooms only, on purpose: these are the ones where putting it off is a real
+                 answer and the node already serves the prompt. `monetise` promises a UI journey
+                 that produces no object, and `messages` is your own post — neither is something
+                 an AI hands back later. */''}
+            ${SAVEABLE_ROOMS[room.id] && html`<${SaveForLater} room=${room} />`}
           </a>`)}
       </div>
     </section>`;

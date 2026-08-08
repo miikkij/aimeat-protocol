@@ -29,7 +29,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { api, apiGet } from '/js/api.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { PromptCard } from '/components/PromptCard.js';
 import { swallowed } from '/js/swallowed.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
@@ -149,17 +149,12 @@ export function StepBranchB({ state, onChanged }) {
           ${tr('home.branchB.againBody', 'Same prompt, new app. Paste what it gives you here and we carry on from there. Your first mat stays until this one replaces it.')}
         </p>
 
-        <div class="koti-prompt">
-          <div class="koti-prompt-head">
-            <span class="koti-prompt-label">${tr('home.mat.promptLabel', 'The prompt')}</span>
-            <${CopyButton}
-              text=${prompt}
-              className=${hasPaste ? 'btn-outline' : 'btn-primary'}
-              label=${tr('home.mat.copy', 'Copy the prompt')}
-              copiedLabel=${tr('home.mat.copied', 'Copied — paste it in your AI chat')} />
-          </div>
-          <pre class="koti-prompt-body">${prompt || tr('home.mat.loading', 'Loading…')}</pre>
-        </div>
+        <${PromptCard}
+          label=${tr('home.mat.promptLabel', 'The prompt')}
+          prompt=${prompt}
+          className=${hasPaste ? 'btn-outline' : 'btn-primary'}
+          copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
+          copiedLabel=${tr('home.mat.copied', 'Copied — paste it in your AI chat')} />
 
         <label class="koti-paste-label" for="koti-b-paste">
           ${tr('home.mat.pasteLabel', 'Paste what your AI gave you here')}

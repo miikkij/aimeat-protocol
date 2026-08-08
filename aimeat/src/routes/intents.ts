@@ -22,6 +22,7 @@ import { resolveIdentity } from '../utils/gaii.js';
 import { emitChange } from '../services/event-bus.js';
 import {
     INTENT_KINDS, CLOSES_CHECKS, listIntents, createIntent, updateIntent, deleteIntent, getIntent,
+    intentStats,
     type IntentKind, type ClosesCheck, type IntentPatch, type IntentStatus,
 } from '../services/intents.js';
 
@@ -53,6 +54,17 @@ export function intentsRouter(config: AimeatConfig, storage: Storage): Router {
             // instead of rendering an empty list that reads as broken.
             satisfied_hidden: all.length - intents.length,
         }));
+    });
+
+    /**
+     * GET /v1/intents/stats — is this surface being used, and by whom is the work finished?
+     *
+     * Counted from the records on every call. A separate counter would be cheaper and would
+     * eventually disagree with the list it claims to describe, which is the one thing a measurement
+     * used to decide whether to keep a feature must not do.
+     */
+    router.get('/v1/intents/stats', requireAuth(), requireRole('owner'), async (req, res) => {
+        res.json(success(config.nodeId, { stats: await intentStats(storage, resolve(req)) }));
     });
 
     router.post('/v1/intents', requireAuth(), requireRole('owner'), async (req, res) => {
@@ -136,6 +148,11 @@ export function intentsRouter(config: AimeatConfig, storage: Storage): Router {
                 ? { type: body.object.type, id: String(body.object.id ?? '') } : null;
         }
         if (typeof body.prompt_ref === 'string' || body.prompt_ref === null) patch.prompt_ref = body.prompt_ref;
+        // Set by the promotion, so the pool row can say who is doing this and the task view can
+        // link back. Not validated against the agent list here: the task creation is what actually
+        // authorises anything, and this field only records what that call already did.
+        if (typeof body.agent === 'string' || body.agent === null) patch.agent = body.agent;
+        if (typeof body.taskId === 'string' || body.taskId === null) patch.taskId = body.taskId;
 
         const ownerGhii = resolve(req);
         const updated = await updateIntent(storage, ownerGhii, id, patch);

@@ -80,6 +80,8 @@ let strangerToken = '';
 let agentToken = '';
 let ecoToken = '';
 let intentId = '';
+let promotedIntentId = '';
+let promotedTaskId = '';
 
 console.log('\n=== Intent Pool E2E Tests ===\n');
 console.log('Phase 0: setup');
@@ -343,6 +345,70 @@ await test('an invented check is refused', async () => {
         method: 'POST', body: JSON.stringify({ title: 'x', closes_when: { check: 'make_me_rich' } }),
     }));
     assert(r.status === 400, `expected 400, got ${r.status}`);
+});
+
+console.log('\nPhase 4b: promotion — an intent handed to an agent');
+
+await test('a task carries the intent key, and the intent carries the task', async () => {
+    const made = await json('/v1/intents', auth(ownerToken, {
+        method: 'POST', body: JSON.stringify({ title: 'Tee ensimmäinen appi', prompt_ref: 'build-app' }),
+    }));
+    assert(made.status === 201, `create ${made.status}`);
+    promotedIntentId = made.body.data.intent.id;
+
+    const task = await json('/v1/agents/pool-reader/tasks', auth(ownerToken, {
+        method: 'POST',
+        body: JSON.stringify({
+            title: 'Tee ensimmäinen appi', description: 'From the pool', status: 'queued',
+            resources: { memory_keys: [`intent.${promotedIntentId}`] },
+        }),
+    }));
+    assert(task.status === 201 || task.status === 200, `task ${task.status}: ${JSON.stringify(task.body.error)}`);
+    promotedTaskId = task.body.data.task?.id ?? task.body.data.id;
+    assert(!!promotedTaskId, `no task id: ${JSON.stringify(task.body.data)}`);
+
+    // The link the plan calls a NEW read path: nothing read this field before the pool did.
+    const read = await json(`/v1/agents/pool-reader/tasks/${promotedTaskId}`, auth(ownerToken));
+    const keys = read.body.data.task?.resources?.memoryKeys ?? read.body.data.task?.resources?.memory_keys ?? [];
+    assert(keys.includes(`intent.${promotedIntentId}`),
+        `the task must say which intent it came from: ${JSON.stringify(read.body.data.task?.resources)}`);
+
+    const patched = await json(`/v1/intents/${promotedIntentId}`, auth(ownerToken, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'working', agent: `pool-reader#${owner}@${NODE_ID}`, taskId: promotedTaskId }),
+    }));
+    assert(patched.status === 200, `patch ${patched.status}`);
+    assert(patched.body.data.intent.taskId === promotedTaskId, 'the intent points back at the task');
+});
+
+await test('COMPLETING THE TASK CLOSES THE INTENT — the server does it, not the agent', async () => {
+    // A queued task is started before it can be completed; the pool changes nothing about that.
+    // The OWNER starts it — an agent may not start its own work, which is the point of the gate.
+    const started = await json(`/v1/agents/pool-reader/tasks/${promotedTaskId}/start`, auth(ownerToken, {
+        method: 'POST', body: JSON.stringify({}),
+    }));
+    assert(started.status === 200, `start ${started.status}: ${JSON.stringify(started.body.error)}`);
+    const done = await json(`/v1/agents/pool-reader/tasks/${promotedTaskId}/complete`, auth(agentToken, {
+        method: 'POST', body: JSON.stringify({ message: 'done' }),
+    }));
+    assert(done.status === 200, `complete ${done.status}: ${JSON.stringify(done.body.error)}`);
+
+    // The close is best-effort and fired after the response, so give it a moment before reading.
+    await new Promise(r => setTimeout(r, 250));
+    const list = await json('/v1/intents?include=satisfied', auth(ownerToken));
+    const it = list.body.data.intents.find((i: any) => i.id === promotedIntentId);
+    assert(!!it, 'the intent still exists');
+    assert(it.status === 'done',
+        `a completed task must close its intent, status is ${it.status}`);
+});
+
+await test('the agent never wrote the pool itself — it still cannot', async () => {
+    const w = await json('/v1/memory', auth(agentToken, {
+        method: 'POST',
+        body: JSON.stringify({ key: `intent.${promotedIntentId}`, value: { title: 'hijacked' }, owner_scope: true }),
+    }));
+    assert(w.status === 403,
+        `an agent without memory:write-as-owner must not write the owner's pool, got ${w.status}`);
 });
 
 console.log('\nPhase 5: removal');

@@ -84,6 +84,24 @@
   font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px;
   color: var(--muted); font-weight: 700;
 }
+/* Copy stays the button; the chevron is a small sibling, never a chooser in front of it. */
+.koti-prompt-actions { display: flex; align-items: center; gap: 0.4rem; }
+.koti-prompt-actions > :first-child { flex: 1 1 auto; }
+.koti-prompt-more {
+  flex: none; padding: 0.35rem 0.5rem; line-height: 1;
+  font-size: 0.9rem; color: var(--muted);
+}
+.koti-prompt-menu {
+  display: flex; flex-direction: column; align-items: stretch;
+  border-bottom: 1px solid var(--border);
+  background: var(--card);
+}
+.koti-prompt-menu-item {
+  text-align: left; padding: 0.55rem 0.85rem; font-size: 0.85rem;
+  border-radius: 0;
+}
+.koti-prompt-menu-item + .koti-prompt-menu-item { border-top: 1px solid var(--border); }
+
 .koti-prompt-body {
   margin: 0;
   padding: 0.85rem;
@@ -410,4 +428,38 @@ a.koti-feed-line:hover { text-decoration: underline; }
   .koti-door-title { font-size: 1.65rem; }
   .koti-door-agent-head > * { width: 100%; }
   .koti-door-entrances > * { width: 100%; box-sizing: border-box; }
+}
+
+/* ── The intent pool: one list of what you mean to do here ────────────────── */
+/* Human-written intents and system suggestions share one list; the second line says which is
+   which. Empty renders nothing at all — see components/IntentPool.js. */
+.koti-pool { margin: 1.5rem 0 0; }
+.koti-pool-title {
+  font-size: 0.78rem; text-transform: uppercase; letter-spacing: 1.2px;
+  color: var(--muted); font-weight: 700; margin: 0 0 0.6rem;
+}
+.koti-pool-list { list-style: none; margin: 0; padding: 0; }
+.koti-pool-row {
+  display: flex; align-items: flex-start; gap: 0.7rem;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.koti-pool-row:last-child { border-bottom: 0; }
+.koti-pool-mark { flex: none; width: 1rem; color: var(--muted); line-height: 1.4; }
+.koti-pool-row--done .koti-pool-mark { color: var(--success); }
+.koti-pool-row--working .koti-pool-mark { color: var(--accent); }
+.koti-pool-main { flex: 1 1 auto; min-width: 0; }
+.koti-pool-item { font-size: 0.95rem; line-height: 1.35; overflow-wrap: anywhere; }
+.koti-pool-row--done .koti-pool-item { color: var(--muted); text-decoration: line-through; }
+.koti-pool-meta { font-size: 0.78rem; color: var(--muted); margin-top: 0.15rem; }
+/* Actions stay out of the way until the row is reached; they are never the point of the line. */
+.koti-pool-actions { flex: none; display: flex; gap: 0.25rem; }
+.koti-room-save { margin-top: 0.5rem; font-size: 0.8rem; align-self: flex-start; }
+
+@media (max-width: 640px) {
+  /* The row wraps rather than squeezing the title into a column two words wide. */
+  .koti-pool-row { flex-wrap: wrap; }
+  /* border-box, or the indent is added ON TOP of the full width and the row runs 12px off a
+     390px screen — measured, not guessed. */
+  .koti-pool-actions { width: 100%; padding-left: 1.7rem; box-sizing: border-box; }
 }

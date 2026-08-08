@@ -54,6 +54,12 @@ export function accessTokensRouter(config: AimeatConfig, storage: Storage): Rout
 
     const grantOwner = grant_owner === true;
     const grantOperator = grant_operator === true;
+    // Accepted for compatibility and recorded, but nothing reads it: no gate, route or
+    // service ever consulted this flag, so a token minted with it behaves exactly like one
+    // minted without. The control that offered it was removed from the form on 2026-08-09
+    // rather than wired up — `?owner_scope=true` is the real mechanism and is gated per
+    // principal, and switching this on would have silently widened every token already
+    // stored with it true.
     const readOwnerData = read_owner_data === true;
 
     // Only an operator may mint an operator token.

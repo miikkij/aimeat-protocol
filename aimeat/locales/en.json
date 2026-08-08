@@ -9023,5 +9023,21 @@
       "hereProfile": "You are using the old profile.",
       "toHome": "Try the new home"
     }
+  },
+  "prompt": {
+    "more": "More",
+    "showText": "Show the prompt",
+    "hideText": "Hide the prompt",
+    "save": "Save for later",
+    "saved": "Saved to your list",
+    "giveTo": "Give it to"
+  },
+  "pool": {
+    "title": "What you mean to do",
+    "suggestion": "Suggestion — it disappears once this is done",
+    "isDoing": "is doing this",
+    "yours": "Yours",
+    "markDone": "Done",
+    "remove": "Remove"
   }
 }

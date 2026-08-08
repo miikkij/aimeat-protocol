@@ -28,7 +28,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { api, apiGet, apiPost } from '/js/api.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { PromptCard } from '/components/PromptCard.js';
 import { AgentConsent } from '/components/AgentConsent.js';
 import { swallowed } from '/js/swallowed.js';
 import { useSession } from '/js/use-session.js';
@@ -180,18 +180,13 @@ export function StepAgent({ onChanged, showToast }) {
         </div>
 
         ${mode === 'prompt' ? html`
-          <div class="koti-prompt">
-            <div class="koti-prompt-head">
-              <span class="koti-prompt-label">${tr('home.agent.promptLabel', 'The prompt')}</span>
-              <${CopyButton}
-                text=${prompt}
-                className=${waiting ? 'btn-outline' : 'btn-primary'}
-                label=${tr('home.agent.copy', 'Copy the prompt')}
-                copiedLabel=${tr('home.agent.copied', 'Copied — paste it in your AI chat')}
-                onCopied=${() => setWaiting(true)} />
-            </div>
-            <pre class="koti-prompt-body">${prompt || tr('home.mat.loading', 'Loading…')}</pre>
-          </div>
+          <${PromptCard}
+            label=${tr('home.agent.promptLabel', 'The prompt')}
+            prompt=${prompt}
+            className=${waiting ? 'btn-outline' : 'btn-primary'}
+            copyLabel=${tr('home.agent.copy', 'Copy the prompt')}
+            copiedLabel=${tr('home.agent.copied', 'Copied — paste it in your AI chat')}
+            onCopied=${() => setWaiting(true)} />
         ` : html`
           <ol class="koti-manual">
             ${steps.map((s, i) => html`<li key=${i} class="koti-manual-step">${s}</li>`)}

@@ -32,6 +32,7 @@ import { buildAppPrompt } from '../services/build-app-prompt.js';
 import { buildExtensionPrompt } from '../services/build-extension-prompt.js';
 import { buildAppdevFlowPrompt } from '../services/appdev-flow-prompt.js';
 import { HELLO_MCP_KEY, buildHelloMcpPrompt, buildOrganismSetupPrompt } from '../services/hello-mcp.js';
+import { registerIntentPoolPrompt } from './prompts-intent-pool.js';
 import { buildWelcomeMatPrompt } from '../services/welcome-mat-prompt.js';
 import { buildAgentConnectPrompt, buildAgentConnectSteps } from '../services/agent-connect-prompt.js';
 import { buildAgentOnboardPrompt } from '../services/agent-onboard-prompt.js';
@@ -271,6 +272,8 @@ export function promptsRouter(config: AimeatConfig, storage: Storage): Router {
   // and same reasoning as build-app: one text in the node, so the Extensions tab, an agentic coder,
   // the aimeat-extension-builder skill and llms.txt cannot drift apart. Public: build guidance, not
   // a secret. ?lang, ?owner, ?idea, ?format=txt. MUST be registered before /v1/prompts/:tier.
+  registerIntentPoolPrompt(router, config);
+
   router.get('/v1/prompts/build-extension', (req, res) => {
     const lang = typeof req.query.lang === 'string' ? req.query.lang : 'en';
     const owner = typeof req.query.owner === 'string' && req.query.owner

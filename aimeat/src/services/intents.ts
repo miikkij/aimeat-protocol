@@ -170,6 +170,46 @@ export async function listIntents(
     return out;
 }
 
+export interface IntentStats {
+    /** Everything a person put on the list. Suggestions are excluded: nobody chose those. */
+    saved: number;
+    /** How many of those reached done. */
+    done: number;
+    /** Of the done ones, how many an agent finished (they carry a taskId). */
+    doneByAgent: number;
+    /** …and how many the person ticked off themselves. */
+    doneByHand: number;
+    /** Where they came from, so a surface that seeds nothing can be told from one that works. */
+    byOrigin: Record<string, number>;
+}
+
+/**
+ * The three numbers the plan asks for, counted from the records rather than tallied into a
+ * counter — a separate counter can drift from the thing it counts, and this cannot.
+ *
+ * The acceptance criterion (most of what is saved gets done, and at least a third of completions
+ * come through an agent) is a judgement about real use over time. This reports; it does not
+ * pronounce.
+ */
+export async function intentStats(
+    storage: Storage, ownerGhii: string,
+): Promise<IntentStats> {
+    const rows = await storage.listMemory(ownerGhii, { prefix: INTENT_PREFIX });
+    const stats: IntentStats = { saved: 0, done: 0, doneByAgent: 0, doneByHand: 0, byOrigin: {} };
+    for (const row of rows) {
+        const rec = toRecord(row.value, row.key.slice(INTENT_PREFIX.length));
+        if (!rec || rec.closes_when) continue;   // a suggestion is not something a person saved
+        stats.saved++;
+        const origin = rec.origin ?? 'unknown';
+        stats.byOrigin[origin] = (stats.byOrigin[origin] ?? 0) + 1;
+        if (rec.status === 'done') {
+            stats.done++;
+            if (rec.taskId) stats.doneByAgent++; else stats.doneByHand++;
+        }
+    }
+    return stats;
+}
+
 export async function getIntent(
     storage: Storage, ownerGhii: string, id: string,
 ): Promise<IntentRecord | null> {
@@ -234,6 +274,34 @@ export async function updateIntent(
         updatedAt: new Date().toISOString(),
     };
     return write(storage, ownerGhii, next);
+}
+
+/**
+ * Close whatever intent a finished task came from.
+ *
+ * The pool's ONE indirect write by an agent, and it is the server that makes it: the agent never
+ * writes into the owner's namespace, so "I finished" cannot be the thing that closes an item. A
+ * completed task record is the evidence, and this reads it.
+ *
+ * Best-effort by design — the caller isolates it. A pool that cannot be updated must not turn a
+ * real completion into an error the agent then retries.
+ */
+export async function closeIntentsForTask(
+    storage: Storage, config: AimeatConfig, task: { agentGaii: string; resources?: { memoryKeys?: string[] } },
+): Promise<number> {
+    const keys = (task.resources?.memoryKeys ?? []).filter(k => k.startsWith(INTENT_PREFIX));
+    if (keys.length === 0) return 0;
+    // The task carries the agent's GAII; the intent lives under the OWNER's GHII.
+    const owner = task.agentGaii.includes('#') ? task.agentGaii.split('#')[1].split('@')[0] : null;
+    if (!owner) return 0;
+    const ownerGhii = `${owner}@${config.nodeId}`;
+    let closed = 0;
+    for (const k of keys) {
+        const id = k.slice(INTENT_PREFIX.length);
+        const updated = await updateIntent(storage, ownerGhii, id, { status: 'done' });
+        if (updated) closed++;
+    }
+    return closed;
 }
 
 export async function deleteIntent(

@@ -21,7 +21,7 @@ import htm from 'htm';
 const html = htm.bind(h);
 import { t } from '/js/i18n.js';
 import { api, apiGet } from '/js/api.js';
-import { CopyButton } from '/components/CopyButton.js';
+import { PromptCard } from '/components/PromptCard.js';
 
 const tr = (key, fallback) => { const v = t(key); return v && v !== key ? v : fallback; };
 
@@ -98,19 +98,12 @@ export function StepMat({ onDone }) {
         ${tr('home.mat.lede', 'Every home needs a welcome mat. You are going to make yours with your own AI: copy the prompt below into your AI chat, paste what it gives back into the box, and press the button.')}
       </p>
 
-      <div class="koti-prompt">
-        <div class="koti-prompt-head">
-          <span class="koti-prompt-label">
-            ${usingFallback ? tr('home.mat.promptShort', 'The shorter prompt') : tr('home.mat.promptLabel', 'The prompt')}
-          </span>
-          <${CopyButton}
-            text=${shown}
-            className=${hasPaste ? 'btn-outline' : 'btn-primary'}
-            label=${tr('home.mat.copy', 'Copy the prompt')}
-            copiedLabel=${tr('home.mat.copied', 'Copied — paste it in your AI chat')} />
-        </div>
-        <pre class="koti-prompt-body">${shown || tr('home.mat.loading', 'Loading…')}</pre>
-      </div>
+      <${PromptCard}
+        label=${usingFallback ? tr('home.mat.promptShort', 'The shorter prompt') : tr('home.mat.promptLabel', 'The prompt')}
+        prompt=${shown}
+        className=${hasPaste ? 'btn-outline' : 'btn-primary'}
+        copyLabel=${tr('home.mat.copy', 'Copy the prompt')}
+        copiedLabel=${tr('home.mat.copied', 'Copied — paste it in your AI chat')} />
 
       <label class="koti-paste-label" for="koti-paste">
         ${tr('home.mat.pasteLabel', 'Paste what your AI gave you here')}

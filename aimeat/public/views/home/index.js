@@ -27,6 +27,7 @@ import { Spinner } from '/components/Spinner.js';
 import { swallowed } from '/js/swallowed.js';
 import { StepMat, StepMatDone } from '/views/home/step-mat.js';
 import { StepAgent, AgentCard } from '/views/home/step-agent.js';
+import { IntentPool } from '/components/IntentPool.js';
 import { StepBranchB } from '/views/home/step-branch-b.js';
 import { HomeFeed, Rooms } from '/views/home/feed.js';
 import { HomeHeader } from '/views/home/header.js';
@@ -171,6 +172,7 @@ export default function HomeView({ navigate }) {
         </header>
         <${AgentCard} agent=${state.agent} />
         <${Rooms} rooms=${rooms} onEnter=${enterRoom} />
+        <${IntentPool} />
         <${StepMatDone} state=${state} />
         <${HomeFeed} items=${feed} />
         <${HomeSettingsDialog} open=${settingsOpen} onClose=${() => setSettingsOpen(false)}

@@ -183,6 +183,27 @@ function scheduleIdOf(offer) {
  *   { kind: 'task', taskId, agent }                    — task-runner/autonomous → created a queued task
  *   { kind: 'prompt', copied: true, prompt }           — interactive/workstation → copied a paste-ready prompt
  */
+/**
+ * Which way an agent takes work: a queue it drains itself, or a prompt a person carries.
+ *
+ * The branch `ask()` has always made, named so a second caller can make the SAME one rather than
+ * inventing a parallel rule. The intent pool's "give this to an agent" needs exactly this decision
+ * and nothing else about offers — and two places deciding "can this agent be handed work" by
+ * different tests is how one of them ends up offering a graveyard.
+ *
+ * A schedule-born offer is `ask()`'s own special case and stays there; it has no meaning for an
+ * intent, which is a piece of work rather than a published capability.
+ */
+export function dispatchMode(agentEntry) {
+  const mode = agentEntry?.mode || 'interactive';
+  return (mode === 'task-runner' || mode === 'autonomous') ? 'task' : 'prompt';
+}
+
+/** True when this agent can be handed work without a person carrying it. */
+export function takesTasks(agentEntry) {
+  return dispatchMode(agentEntry) === 'task';
+}
+
 export async function ask(agentEntry, offer, inputs) {
   const scheduleId = scheduleIdOf(offer);
   if (scheduleId) {
@@ -190,8 +211,7 @@ export async function ask(agentEntry, offer, inputs) {
     return { kind: 'triggered', ok: r?.ok !== false, error: r?.error };
   }
 
-  const mode = agentEntry.mode || 'interactive';
-  if (mode === 'task-runner' || mode === 'autonomous') {
+  if (dispatchMode(agentEntry) === 'task') {
     // The agent ALREADY owns the offer (it published it). Do NOT restuff offer.ask/example into the
     // task — that makes the agent treat its own boilerplate as the request (e.g. jokes ABOUT four
     // comedians instead of jokes on the topic). The task carries ONLY the user's request as title +

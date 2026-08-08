@@ -12,6 +12,7 @@
  *   v1.0.0 — 2026-07-13 — Extracted from views/profile/landing-page.js (max-file-lines)
  */
 import { h } from "preact";
+import { IntentPool } from '/components/IntentPool.js';
 import { useState, useEffect, useCallback, useRef } from "preact/hooks";
 import htm from "htm";
 const html = htm.bind(h);
@@ -551,6 +552,7 @@ export function NextSteps({ switchTab, hasApps }) {
           </button>
         `)}
       </div>
+      <${IntentPool} />
     </div>
   `;
 }
