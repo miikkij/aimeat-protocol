@@ -22,6 +22,10 @@
  * @version-history
  *   v1.0.0 — 2026-07-25 — Initial: scope-gated SSE domains (an app-grant stream no longer
  *     sees every domain in the owner's keyspace).
+ *   v1.1.0 — 2026-08-08 — Domain wildcards are honoured, via utils/scope-coverage.ts. The lookup
+ *     was exact-set only, so a principal holding `memory:*` passed every requireScope('memory:…')
+ *     gate on the node and then heard nothing on the memory stream — the one place that read the
+ *     wildcard as covering nothing.
  */
 
 /**
@@ -31,6 +35,8 @@
  * federation, disputes, appeals, verification, totp, ghii, owners, consent, flags, feedback,
  * instances, extensions, cortex, skills, portfolio, ecosystem-apps, presence, realtime).
  */
+import { scopeIsCovered } from '../utils/scope-coverage.js';
+
 export const DOMAIN_SCOPE: Readonly<Record<string, string>> = Object.freeze({
   // Owner data the app already reads
   memory: 'memory:read',
@@ -106,11 +112,14 @@ export function isOwnerPrincipal(auth: { roles?: string[] }): boolean {
  * node's own dev/default-scope escape hatch, unchanged in meaning here.
  */
 export function allowedDomains(scopes: string[] | undefined): Set<string> | null {
-  const held = new Set(scopes ?? []);
-  if (held.has('*')) return null;
+  const held = scopes ?? [];
+  if (held.includes('*')) return null;
   const out = new Set<string>();
   for (const [domain, needed] of Object.entries(DOMAIN_SCOPE)) {
-    if (held.has(needed)) out.add(domain);
+    // scopeIsCovered, not an exact-set lookup: a principal holding `memory:*` passes every
+    // requireScope('memory:…') gate on the node and then heard nothing on the memory live-update
+    // stream, because this one place read the domain wildcard as covering nothing.
+    if (scopeIsCovered(held, needed)) out.add(domain);
   }
   return out;
 }

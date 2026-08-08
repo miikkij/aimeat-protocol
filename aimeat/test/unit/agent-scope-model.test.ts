@@ -19,7 +19,7 @@
 import { describe, it, expect } from 'vitest';
 import {
     NOT_IN_WILDCARD, SCOPE_DOMAINS, SCOPE_TEMPLATES,
-    wildcardScopes, bulkScopes, expandScopes, collapseScopes, detectTemplate,
+    wildcardScopes, bulkScopes, expandScopes, collapseScopes, detectTemplate, unknownScopes,
 } from '../../public/views/profile/agents/scope-model.js';
 
 const RESERVED = 'memory:write-reserved';
@@ -92,14 +92,82 @@ describe('the round trip loses nothing', () => {
         SCOPE_TEMPLATES.standard,
     ]) {
         it(`open → save is a no-op for ${JSON.stringify(stored)}`, () => {
-            const saved = collapseScopes(expandScopes(stored));
+            const saved = collapseScopes(expandScopes(stored), stored);
             expect(new Set(saved)).toEqual(new Set(stored));
         });
     }
 
     it('is stable on a second pass', () => {
-        const once = collapseScopes(expandScopes(['*', RESERVED]));
-        expect(collapseScopes(expandScopes(once))).toEqual(once);
+        const once = collapseScopes(expandScopes(['*', RESERVED]), ['*', RESERVED]);
+        expect(collapseScopes(expandScopes(once), once)).toEqual(once);
+    });
+
+    it('an empty grant is not reported as full access', () => {
+        expect(detectTemplate([])).toBe('custom');
+        expect(detectTemplate(null)).toBe('full');   // absent = the legacy "everything" default
+    });
+});
+
+describe('a scope with no checkbox is carried, never dropped', () => {
+    // The editor's vocabulary is always behind the node's. Dropping what it does not recognise
+    // turns "I opened the dialog to look" into a silent revocation, and the owner is never told
+    // which scope went. `zzz:` is deliberately a domain no editor will ever have.
+    const FOREIGN = 'zzz:something';
+    const FOREIGN_WILDCARD = 'zzz:*';
+
+    it('lists them so the owner can see what they cannot otherwise reach', () => {
+        expect(unknownScopes(['memory:read', FOREIGN])).toEqual([FOREIGN]);
+        expect(unknownScopes(['*', 'memory:read'])).toEqual([]);
+        expect(unknownScopes(['memory:*'])).toEqual([]);
+    });
+
+    it('survives open → save alongside a wildcard', () => {
+        const saved = collapseScopes(expandScopes(['*', FOREIGN]), ['*', FOREIGN]);
+        expect(saved).toContain('*');
+        expect(saved).toContain(FOREIGN);
+    });
+
+    it('survives open → save on its own', () => {
+        expect(collapseScopes(expandScopes([FOREIGN]), [FOREIGN])).toEqual([FOREIGN]);
+    });
+
+    it('an unknown DOMAIN wildcard is not swallowed into catalogue:read', () => {
+        const saved = collapseScopes(expandScopes([FOREIGN_WILDCARD]), [FOREIGN_WILDCARD]);
+        expect(saved).toEqual([FOREIGN_WILDCARD]);
+        expect(saved).not.toContain('catalogue:read');
+    });
+
+    it('a mixed set keeps both halves', () => {
+        const stored = ['memory:read', FOREIGN_WILDCARD];
+        const saved = collapseScopes(expandScopes(stored), stored);
+        expect(new Set(saved)).toEqual(new Set(stored));
+    });
+
+    it('a malformed entry is kept rather than becoming invisible', () => {
+        for (const junk of [' memory:read', 'Memory:Read', 'bogus']) {
+            expect(collapseScopes(expandScopes([junk]), [junk])).toEqual([junk]);
+            expect(unknownScopes([junk])).toEqual([junk]);
+        }
+    });
+});
+
+describe('a domain wildcard is not rewritten into a snapshot', () => {
+    it("['memory:*'] round-trips when the domain was left alone", () => {
+        expect(collapseScopes(expandScopes(['memory:*']), ['memory:*'])).toEqual(['memory:*']);
+    });
+
+    it('but becomes explicit once the owner changes that domain', () => {
+        const checked = expandScopes(['memory:*']);
+        checked.delete('memory:delete');
+        const saved = collapseScopes(checked, ['memory:*']);
+        expect(saved).not.toContain('memory:*');
+        expect(saved).toContain('memory:read');
+        expect(saved).not.toContain('memory:delete');
+    });
+
+    it('is not conjured for an agent that never had it', () => {
+        const stored = ['memory:read', 'memory:write', 'memory:delete', 'memory:write-as-owner'];
+        expect(collapseScopes(expandScopes(stored), stored)).not.toContain('memory:*');
     });
 });
 

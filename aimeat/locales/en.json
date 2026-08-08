@@ -1427,6 +1427,9 @@
         "notAvailable": "Not available on this node",
         "alwaysOn": "Always enabled (Tier 0)",
         "notInFullAccess": "tick separately, not part of full access",
+        "domainOther": "Other permissions this agent holds",
+        "otherScopesHint": "These were granted somewhere other than this editor. Untick to remove one.",
+        "reconnectNote": "A change applies the next time the agent connects. An open session keeps the permissions it started with.",
         "readOnlyView": "Your current permissions",
         "domainMemory": "Memory",
         "domainStorage": "Storage (files)",
@@ -1436,26 +1439,125 @@
         "domainWallet": "Wallet",
         "domainConsent": "Consent",
         "domainTunnel": "Tunnel",
-        "domainAgent": "Agent",
         "domainCatalogue": "Catalogue",
-        "domainGenerator": "Generator",
         "domainTask": "Tasks",
         "domainCortex": "Cortex (install/activate browser libraries)",
         "domainExt": "Extensions (activate server-side extensions)",
-        "permExecute": "Execute",
         "permRead": "Read",
         "permWrite": "Write",
         "permDelete": "Delete",
         "permRequest": "Request",
         "permSend": "Send",
-      "permWrite-as-owner": "Write into my own memory (as me)",
-      "permWrite-reserved": "Also manage my AI settings, spend cap and public profile",
+        "permWrite-as-owner": "Write into my own memory (as me)",
+        "permWrite-reserved": "Also manage my AI settings, spend cap and public profile",
         "permSend-as-owner": "Reply as me (send DM as you)",
         "permAccept": "Accept",
         "permPublish": "Publish",
         "permManage": "Manage",
         "permConnect": "Connect",
-        "permRegister": "Register"
+        "scopeText": {
+          "ai": {
+            "use": "Use AI with your configured key, spending your AI budget."
+          },
+          "catalogue": {
+            "read": "Be told when the public directory changes. Reading the directory is public and needs no permission."
+          },
+          "commerce": {
+            "buy": "Pay for purchases at checkout using your balance.",
+            "sell": "Set up what you sell: prices, payout account and revenue sharing."
+          },
+          "company": {
+            "read": "See the companies you have registered and their details.",
+            "write": "Register companies in your name, set their email settings and publish their web page."
+          },
+          "connections": {
+            "read": "See which social and publishing accounts you have connected.",
+            "use": "Post to the social accounts you have already connected.",
+            "write": "Connect new social accounts to your name and disconnect existing ones."
+          },
+          "consent": {
+            "manage": "See and change the permissions you have given to other people and services."
+          },
+          "cortex": {
+            "write": "Install, switch on and remove the browser add-ons in your account."
+          },
+          "exchange": {
+            "beneficiary": "Share part of what you earn with other accounts, and pay those shares out.",
+            "grant": "Give and withdraw free access to the things you sell, at your cost.",
+            "read": "Browse the marketplace and see your contracts, offers and pending work.",
+            "write": "Accept marketplace offers, place bids and take on paid work."
+          },
+          "ext": {
+            "write": "Switch on, configure and remove the extensions that run on your account."
+          },
+          "finance": {
+            "read": "Read your bookkeeping: invoices, receipts, VAT reports and exports.",
+            "write": "Write and send invoices, and book accounting entries in your name."
+          },
+          "memory": {
+            "delete": "Delete saved notes, records and data.",
+            "read": "Read the notes, records and data saved in your account.",
+            "write": "Save and update notes, records and data in your account.",
+            "write-as-owner": "Save records under your name instead of its own, so they appear as yours.",
+            "write-reserved": "On top of writing as you: also change your AI provider key, your spending cap and your public profile. Only does anything together with the row above."
+          },
+          "messages": {
+            "read": "Read the direct messages sent to you and look up your contacts.",
+            "send": "Send direct messages to other people and agents, and edit your address book.",
+            "send-as-owner": "Reply to your conversations as you, so the message arrives in your name."
+          },
+          "notifications": {
+            "send": "Send you a notification in the app and on your phone. The recipient is always you."
+          },
+          "organism": {
+            "read": "Read the published content of the shared spaces you belong to."
+          },
+          "outbound": {
+            "send": "Send email from your company address to your saved contacts."
+          },
+          "provenance": {
+            "write": "State how content it makes was produced, including claiming a person reviewed it."
+          },
+          "social": {
+            "read": "Follow and unfollow discussion boards. Reading board posts is public and needs no permission.",
+            "write": "Create and delete boards, and post, reply and react on your behalf."
+          },
+          "storage": {
+            "read": "Open and download the files you have stored.",
+            "write": "Upload, replace and delete files in your storage."
+          },
+          "task": {
+            "read": "Be told when tasks, agents and work change. It can already see its own tasks.",
+            "write": "Schedule tasks to run later. It can already create and finish its own tasks."
+          },
+          "tunnel": {
+            "connect": "Manage the link between your account and your own machine. Applies only to agents connected by the older signing-key method."
+          },
+          "wallet": {
+            "read": "See your balance, your earnings and your payment history."
+          },
+          "work": {
+            "accept": "Take on jobs sent to you and deliver the finished results.",
+            "publish": "Advertise services it can perform, so others can hire it.",
+            "read": "See the jobs in your work queue and their details.",
+            "request": "Ask other agents to do jobs for you, and rate the results."
+          },
+          "workflow": {
+            "read": "See your automations and their run history.",
+            "write": "Create, change and run your automations."
+          }
+        },
+        "domainAi": "AI",
+        "domainWorkflow": "Automations",
+        "domainFinance": "Bookkeeping",
+        "domainOutbound": "Outgoing email",
+        "domainCompany": "Companies",
+        "domainConnections": "Connected accounts",
+        "domainNotifications": "Notifications",
+        "domainExchange": "Marketplace",
+        "domainCommerce": "Selling and buying",
+        "domainOrganism": "Shared spaces",
+        "domainProvenance": "AI labelling"
       },
       "deviceAuth": {
         "title": "Device Authorization",

@@ -15,6 +15,7 @@ import { t } from '/js/i18n.js';
 export {
   SCOPE_DOMAINS, SCOPE_TEMPLATES, NOT_IN_WILDCARD,
   wildcardScopes, bulkScopes, expandScopes, collapseScopes, detectTemplate,
+  knownScopes, unknownScopes,
 } from './scope-model.js';
 
 export function templateLabel(name) {
@@ -27,7 +28,21 @@ export function domainLabel(domain) {
   return t(`profile.agents.scopeUi.domain${cap}`);
 }
 
-export function permLabel(perm) {
+/**
+ * The label for one checkbox.
+ *
+ * Prefers a per-SCOPE sentence (`scopeText.finance.write` → "Write and send invoices in your
+ * name") over the shared per-permission word. "Write" told an owner nothing: the same word sat on
+ * a row that saves a note and on a row that books an accounting entry, and the only way to tell
+ * them apart was the technical string beside it. Falls back to the old label when a scope has no
+ * sentence yet, and t() returning the key unchanged is what "no sentence yet" looks like.
+ */
+export function permLabel(perm, domain) {
+  if (domain) {
+    const key = `profile.agents.scopeUi.scopeText.${domain}.${perm}`;
+    const text = t(key);
+    if (text && text !== key) return text;
+  }
   const cap = perm.charAt(0).toUpperCase() + perm.slice(1);
   return t(`profile.agents.scopeUi.perm${cap}`);
 }

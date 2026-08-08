@@ -14,6 +14,10 @@
  *   - toEntry() — classify + normalize → DiscoveryEntry
  * @usage registry.register(createMemorySource(storage, config));
  * @version-history
+ *   v0.3.1 — 2026-08-08 — The owner-set test honours wildcards (utils/scope-coverage.ts). It read
+ *     `scopes.includes('memory:read')` exactly, so a FULL-ACCESS agent got the narrow own-content
+ *     set while a narrowly-scoped one got the wide set: more access from less permission, which no
+ *     caller would think to report.
  *   v0.3.0 — 2026-07-19 — AppDev KB Phase 6: the `templates` source referenced below now actually
  *     exists (sources/templates-source.ts) — until now the exclusion had no owning source or writer.
  *   v0.2.0 — 2026-06-24 — Secretary P5 (S-D): exclude template.catalog.* (owned by the `templates`
@@ -26,6 +30,7 @@ import { canReadWorkspace } from '../../workspace-access.js';
 import type { DiscoveryContext, DiscoveryEntry, DiscoverySource, RawHit } from '../types.js';
 import { classifyMemoryKey } from '../classify.js';
 import { bestTitle, bestDescription, normalizeTags, normalizeVisibility, toFullOwner } from '../normalize.js';
+import { scopeIsCovered } from '../../../utils/scope-coverage.js';
 
 export const MEMORY_SOURCE_ID = 'memory-fts';
 const MAX_LIMIT = 100;
@@ -110,7 +115,10 @@ async function resolveOwnerSet(
 ): Promise<string[] | null> {
   if (ctx.scope === 'public') return null;
   const ghii = `${ctx.caller.ownerName}@${config.nodeId}`;
-  const fullSet = ctx.caller.isOwnerSession || ctx.caller.scopes.includes('memory:read');
+  // Via scopeIsCovered, not includes(): the exact-string test meant a FULL-ACCESS agent ('*') got
+  // the narrow own-content-only set while a narrowly-scoped one got the wide set — more access
+  // from less permission, which no caller would ever think to report.
+  const fullSet = ctx.caller.isOwnerSession || scopeIsCovered(ctx.caller.scopes, 'memory:read');
   if (!fullSet) return [ctx.caller.gaii]; // agent without memory:read → its own content only (§11.3)
   const [agents, ecoApps] = await Promise.all([
     storage.getAgentsByOwner(ctx.caller.ownerName),

@@ -574,7 +574,8 @@ export function loadConfig(options?: LoadConfigOptions): LoadConfigResult {
 
     // Ecosystem application (GEAI) scope bounds. Defaults lean read + deposit (ecosystem apps mostly
     // deposit refined data into owner areas). Events/capability scopes are deferred to later chunks.
-    defaultEcoScopes: (process.env.AIMEAT_DEFAULT_ECO_SCOPES ?? 'memory:read,memory:write,knowledge:contribute,organism:read').split(',').map(s => s.trim()),
+    // knowledge:contribute dropped 2026-08-08 — nothing gates on it (see ECO_PRESETS).
+    defaultEcoScopes: (process.env.AIMEAT_DEFAULT_ECO_SCOPES ?? 'memory:read,memory:write,organism:read').split(',').map(s => s.trim()),
     maxEcoScopes: (process.env.AIMEAT_MAX_ECO_SCOPES ?? '*').split(',').map(s => s.trim()),
 
     // Node Extensions (Sandboxed)

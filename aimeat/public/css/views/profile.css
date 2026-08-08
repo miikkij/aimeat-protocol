@@ -585,6 +585,9 @@
 .pf .scope-row .scope-lock {font-size:.7rem;color:var(--text-dim,#6B7280)}
 /* A scope the "Full access" template does not carry — says so where the tick is made. */
 .pf .scope-row .scope-extra-note {font-size:.65rem;color:var(--accent,#E8564A);border:1px solid var(--border,#E5E7EB);border-radius:6px;padding:1px 6px;white-space:nowrap}
+.pf .scope-domain-desc {font-size:.72rem;color:var(--text-dim,#6B7280);margin:0 0 .4rem}
+/* Scopes take effect on the next connection — said where the Save button is, not after the fact. */
+.pf .scope-reconnect-note {font-size:.72rem;color:var(--text-dim,#6B7280);margin:.75rem 0 0}
 /* === Extensions === */
 .pf .ext-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1rem}
 .pf .ext-card{background:var(--card,#FFFFFF);border:1px solid var(--border,#E5E7EB);border-radius:12px;padding:1.25rem;cursor:pointer;transition:all .2s;box-shadow:0 2px 8px rgba(0,0,0,0.08)}

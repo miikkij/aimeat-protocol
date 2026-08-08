@@ -6,13 +6,24 @@
  *   satisfy max-file-lines.
  * @version-history
  *   v1.0.0 — 2026-07-13 — Extracted from ecosystem-tab.js (max-file-lines)
+ *   v1.1.0 — 2026-08-08 — Dropped knowledge:contribute and events:subscribe from the standard
+ *     preset: nothing in src/ gates on either, so they were consent-screen text granting nothing.
+ *     knowledge:contribute also shipped in the node's default eco scopes, so every ecosystem app on
+ *     a default install was handed it.
  */
 
 // Scope presets the owner picks at approval — lean read + deposit (ecosystem apps mostly deposit
 // refined data + subscribe to events). 'full' grants the wildcard.
+//
+// `knowledge:contribute` and `events:subscribe` were removed on 2026-08-08: a whole-repo sweep
+// found no gate reading either, so they were consent-screen text granting nothing. The first was
+// worse than cosmetic — it also shipped in the node's default eco scopes, so every ecosystem app
+// on a default install was handed it. Event SUBSCRIPTION is managed by the owner
+// (requireRole('owner'), routes/ecosystem-events.ts:77) and an app never touches those routes;
+// `events:emit` beside it is real, which is exactly why the dead one read as its counterpart.
 export const ECO_PRESETS = {
   readonly: ['memory:read', 'organism:read'],
-  standard: ['memory:read', 'memory:write', 'knowledge:contribute', 'organism:read', 'events:subscribe', 'events:emit'],
+  standard: ['memory:read', 'memory:write', 'organism:read', 'events:emit'],
   full: ['*'],
 };
 export const OUTBOUND_EVENTS = ['memory.write', 'memory.delete', 'offer.ordered', 'workflow.step', 'binding.revoked', '*'];

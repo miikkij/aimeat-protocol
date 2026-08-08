@@ -23,6 +23,14 @@
  *     that scope existed; after it, a wildcard agent could auto-approve a sibling holding the grant
  *     that reaches openrouter.settings and then collect the sibling's JWT from the unauthenticated
  *     device-token poll — no owner step anywhere. Coverage now comes from utils/scope-coverage.ts.
+ *   v1.5.0 — 2026-08-08 — Re-running device auth on an EXISTING agent no longer replaces its stored
+ *     scopes with the node defaults. Reconnecting after a token expires or a machine is reinstalled
+ *     sends no `scopes` at all, so a '*' agent was cut down to the four defaults with no owner
+ *     action and no notice — and it stuck, since every later JWT is minted from defaultScopes.
+ *     Absent an explicit choice the agent keeps what it holds; an explicit set still applies
+ *     verbatim, narrowing included, except that a scope no wildcard carries survives either way
+ *     (the consent card's templates cannot express it, so re-approval is not where it was meant to
+ *     be dropped).
  */
 import type { Router, Request } from 'express';
 import { randomBytes, randomUUID } from 'node:crypto';
@@ -41,7 +49,7 @@ import { createDefaultSteps } from '../../models/agent-onboarding-schemas.js';
 import { detectPlatform } from '../../services/platform-detector.js';
 import { resolveOwnerByVerifiedEmail } from '../../services/contacts.js';
 import { DEVICE_AUTH_EXPIRY_MS, VALID_MODES } from './constants.js';
-import { uncoveredScopes } from '../../utils/scope-coverage.js';
+import { uncoveredScopes, SCOPES_OUTSIDE_WILDCARD } from '../../utils/scope-coverage.js';
 
 /** Validate requested scopes against the node maximum (shared by consent + auto-approve). */
 function scopesExceedNodeMax(config: AimeatConfig, finalScopes: string[]): string[] {
@@ -66,6 +74,14 @@ async function approveDeviceAuth(
   approvedBy: string,
   finalScopes: string[],
   userAgent: string | undefined,
+  /**
+   * Whether `finalScopes` is a real choice or the node default standing in for silence. Re-running
+   * device auth is a NORMAL event — a token expires, a machine is reinstalled — and it used to
+   * replace an existing agent's scopes wholesale either way. An agent that reconnected without
+   * naming any scopes was quietly cut down to config.defaultAgentScopes, losing in a refresh what
+   * the owner had granted in the editor. Silence is not a request to revoke.
+   */
+  scopesRequested = true,
 ): Promise<{ ok: true; gaii: string; existing: boolean } | { ok: false; status: number; code: string; message: string }> {
   // Pre-registration hook
   const hookResult = await executeHooks(config, storage, 'pre_agent_registration', {
@@ -86,9 +102,16 @@ async function approveDeviceAuth(
   if (existing) {
     // Existing agent: generate new keypair (rotate keys) and issue JWT
     keyPair = await generateKeyPair();
+    const held = existing.defaultScopes ?? [];
+    // Nothing was asked for → keep what the owner already decided, rather than resetting to the
+    // node default. And a scope no wildcard carries survives either way: it cannot be expressed by
+    // the consent card's templates or by an agent's request, so re-approval is never the place it
+    // was meant to be dropped — the owner removes it in the editor, deliberately, as they added it.
+    const preserved = SCOPES_OUTSIDE_WILDCARD.filter(s => held.includes(s) && !finalScopes.includes(s));
+    const nextScopes = scopesRequested ? [...finalScopes, ...preserved] : held;
     await storage.updateAgent(gaii, {
       publicKey: keyPair.publicKey,
-      defaultScopes: finalScopes,
+      defaultScopes: nextScopes,
       lastSeen: now,
     });
   } else {
@@ -337,6 +360,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
         const result = await approveDeviceAuth(
           config, storage, authRequest, approvedByGaii, requestedScopes,
           req.headers['user-agent'] as string | undefined,
+          Array.isArray(scopes),
         );
         if (!result.ok) {
           await storage.updateDeviceAuth(deviceCode, { status: 'denied' });
@@ -586,6 +610,7 @@ export function registerDeviceAuthRoutes(router: Router, config: AimeatConfig, s
     const result = await approveDeviceAuth(
       config, storage, request, ownerPayload.owner, finalScopes,
       req.headers['user-agent'] as string | undefined,
+      Array.isArray(scopes),
     );
     if (!result.ok) {
       res.status(result.status).json(error(config.nodeId, result.code, result.message));

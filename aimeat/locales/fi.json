@@ -1427,6 +1427,9 @@
         "notAvailable": "Ei saatavilla tässä nodessa",
         "alwaysOn": "Aina käytössä (Taso 0)",
         "notInFullAccess": "rastita erikseen, ei sisälly täyteen pääsyyn",
+        "domainOther": "Muut oikeudet jotka agentilla on",
+        "otherScopesHint": "Nämä on annettu jossain muualla kuin tässä editorissa. Ota rasti pois poistaaksesi.",
+        "reconnectNote": "Muutos astuu voimaan kun agentti yhdistää seuraavan kerran. Avoin istunto pitää ne oikeudet joilla se alkoi.",
         "readOnlyView": "Nykyiset oikeutesi",
         "domainMemory": "Muisti",
         "domainStorage": "Tallennustila (tiedostot)",
@@ -1436,26 +1439,125 @@
         "domainWallet": "Lompakko",
         "domainConsent": "Suostumus",
         "domainTunnel": "Tunneli",
-        "domainAgent": "Agentti",
         "domainCatalogue": "Hakemisto",
-        "domainGenerator": "Generaattori",
         "domainTask": "Tehtävät",
         "domainCortex": "Cortex (asenna/aktivoi selainkirjastoja)",
         "domainExt": "Laajennukset (aktivoi palvelinpuolen laajennuksia)",
-        "permExecute": "Suoritus",
         "permRead": "Luku",
         "permWrite": "Kirjoitus",
         "permDelete": "Poisto",
         "permRequest": "Pyyntö",
         "permSend": "Lähetys",
-      "permWrite-as-owner": "Kirjoita minun muistiini (minuna)",
-      "permWrite-reserved": "Hallitse myös AI-asetuksiani, kulukattoani ja julkista profiiliani",
+        "permWrite-as-owner": "Kirjoita minun muistiini (minuna)",
+        "permWrite-reserved": "Hallitse myös AI-asetuksiani, kulukattoani ja julkista profiiliani",
         "permSend-as-owner": "Vastaa minuna (lähetä viesti nimissäni)",
         "permAccept": "Hyväksyntä",
         "permPublish": "Julkaisu",
         "permManage": "Hallinta",
         "permConnect": "Yhdistäminen",
-        "permRegister": "Rekisteröinti"
+        "scopeText": {
+          "ai": {
+            "use": "Käytä tekoälyä sinun avaimellasi, jolloin kulut menevät sinun budjetistasi."
+          },
+          "catalogue": {
+            "read": "Saa tieto kun julkinen hakemisto muuttuu. Hakemiston lukeminen on julkista eikä vaadi lupaa."
+          },
+          "commerce": {
+            "buy": "Maksa ostoksia kassalla saldollasi.",
+            "sell": "Määritä mitä myyt: hinnat, tilitystili ja tulonjako."
+          },
+          "company": {
+            "read": "Näe rekisteröimäsi yritykset ja niiden tiedot.",
+            "write": "Rekisteröi yrityksiä nimiisi, aseta niiden sähköpostiasetukset ja julkaise niiden verkkosivu."
+          },
+          "connections": {
+            "read": "Näe mitkä some- ja julkaisutilit olet liittänyt.",
+            "use": "Julkaise niihin sometileihin jotka olet jo liittänyt.",
+            "write": "Liitä uusia sometilejä nimiisi ja irrota olemassa olevia."
+          },
+          "consent": {
+            "manage": "Näe ja muuta lupia jotka olet antanut muille ihmisille ja palveluille."
+          },
+          "cortex": {
+            "write": "Asenna, ota käyttöön ja poista tilisi selainlisäosia."
+          },
+          "exchange": {
+            "beneficiary": "Jaa osa tuloistasi muille tileille ja maksa nuo osuudet ulos.",
+            "grant": "Anna ja peru ilmainen pääsy myymiisi asioihin sinun kustannuksellasi.",
+            "read": "Selaa markkinapaikkaa ja näe sopimuksesi, tarjouksesi ja kesken olevat työt.",
+            "write": "Hyväksy markkinapaikan tarjouksia, tee tarjouksia ja ota vastaan maksullisia töitä."
+          },
+          "ext": {
+            "write": "Ota käyttöön, konfiguroi ja poista tililläsi ajettavia laajennuksia."
+          },
+          "finance": {
+            "read": "Lue kirjanpitosi: laskut, kuitit, alv-raportit ja viennit.",
+            "write": "Kirjoita ja lähetä laskuja sekä kirjaa tositteita sinun nimissäsi."
+          },
+          "memory": {
+            "delete": "Poista tallennettuja muistiinpanoja, tietueita ja dataa.",
+            "read": "Lue tilillesi tallennetut muistiinpanot, tietueet ja data.",
+            "write": "Tallenna ja päivitä muistiinpanoja, tietueita ja dataa tilillesi.",
+            "write-as-owner": "Tallenna tietueita sinun nimissäsi oman nimensä sijaan, jolloin ne näkyvät sinun tietueinasi.",
+            "write-reserved": "Sinuna kirjoittamisen lisäksi: muuta myös AI-palveluavaintasi, kulukattoasi ja julkista profiiliasi. Vaikuttaa vain yhdessä yllä olevan rivin kanssa."
+          },
+          "messages": {
+            "read": "Lue sinulle lähetetyt yksityisviestit ja hae yhteystietojasi.",
+            "send": "Lähetä yksityisviestejä muille ihmisille ja agenteille sekä muokkaa osoitekirjaasi.",
+            "send-as-owner": "Vastaa keskusteluihisi sinuna, jolloin viesti saapuu sinun nimissäsi."
+          },
+          "notifications": {
+            "send": "Lähetä sinulle ilmoitus sovellukseen ja puhelimeesi. Vastaanottaja on aina sinä."
+          },
+          "organism": {
+            "read": "Lue niiden jaettujen tilojen julkaistu sisältö joihin kuulut."
+          },
+          "outbound": {
+            "send": "Lähetä sähköpostia yrityksesi osoitteesta tallennetuille yhteystiedoillesi."
+          },
+          "provenance": {
+            "write": "Kerro miten sen tekemä sisältö on tuotettu, myös väittää että ihminen on tarkistanut sen."
+          },
+          "social": {
+            "read": "Seuraa ja lopeta keskustelupalstojen seuraaminen. Palstojen lukeminen on julkista eikä vaadi lupaa.",
+            "write": "Luo ja poista palstoja sekä kirjoita, vastaa ja reagoi puolestasi."
+          },
+          "storage": {
+            "read": "Avaa ja lataa tallentamasi tiedostot.",
+            "write": "Lähetä, korvaa ja poista tiedostoja tallennustilassasi."
+          },
+          "task": {
+            "read": "Saa tieto kun tehtävät, agentit ja työt muuttuvat. Se näkee omat tehtävänsä jo ilman tätä.",
+            "write": "Ajasta tehtäviä ajettavaksi myöhemmin. Se luo ja päättää omat tehtävänsä jo ilman tätä."
+          },
+          "tunnel": {
+            "connect": "Hallitse tilisi ja oman koneesi välistä yhteyttä. Koskee vain vanhalla allekirjoitusavaimella yhdistettyjä agentteja."
+          },
+          "wallet": {
+            "read": "Näe saldosi, tulosi ja maksuhistoriasi."
+          },
+          "work": {
+            "accept": "Ota vastaan sinulle lähetettyjä töitä ja toimitä valmiit tulokset.",
+            "publish": "Mainosta palveluja joita se osaa tehdä, jotta muut voivat palkata sen.",
+            "read": "Näe työjonossasi olevat työt ja niiden tiedot.",
+            "request": "Pyydä muita agentteja tekemään töitä puolestasi ja arvioi tulokset."
+          },
+          "workflow": {
+            "read": "Näe automaatiosi ja niiden ajohistoria.",
+            "write": "Luo, muuta ja aja automaatioitasi."
+          }
+        },
+        "domainAi": "Tekoäly",
+        "domainWorkflow": "Automaatiot",
+        "domainFinance": "Kirjanpito",
+        "domainOutbound": "Lähtevä sähköposti",
+        "domainCompany": "Yritykset",
+        "domainConnections": "Liitetyt tilit",
+        "domainNotifications": "Ilmoitukset",
+        "domainExchange": "Markkinapaikka",
+        "domainCommerce": "Myynti ja ostot",
+        "domainOrganism": "Jaetut tilat",
+        "domainProvenance": "AI-merkinnät"
       },
       "deviceAuth": {
         "title": "Laitehyväksyntä",
