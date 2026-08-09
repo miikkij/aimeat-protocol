@@ -94,7 +94,11 @@ function lineForOffset(source: string, offset: number): number {
 async function collectTools(surface: SurfaceConfig): Promise<ToolReference[]> {
     const files = await listSourceFiles(surface.directory);
     const tools: ToolReference[] = [];
-    const toolCallPattern = /\bmcp\.tool\s*\(\s*['"`]([^'"`]+)['"`]/g;
+    // Both SDK registration forms count. mcp.tool is the older positional one and most of the
+    // surface uses it; mcp.registerTool takes a config object and is the ONLY form that carries
+    // `_meta`, which a tool needs to name an MCP Apps page. Matching one form would have read a
+    // tool that moved to the other as deleted, and reported drift against the catalog.
+    const toolCallPattern = /\bmcp\.(?:register)?[Tt]ool\s*\(\s*['"`]([^'"`]+)['"`]/g;
 
     for (const file of files) {
         const source = await readFile(file, 'utf8');

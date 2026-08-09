@@ -356,6 +356,44 @@ async function main() {
             assert(body.error.code !== -32601, `the server serves prompts/get: ${JSON.stringify(body.error)}`);
         });
 
+        // ── Phase 5: the app index as an MCP App ──
+        console.log('\nPhase 5: the app index is a page the host can render in the conversation');
+
+        await test('11. aimeat_app_list points at a ui:// page', async () => {
+            const { body } = await v1('tools/list', {}, 300);
+            const tool = (body.result?.tools ?? []).find((t: any) => t.name === 'aimeat_app_list');
+            assert(!!tool, 'aimeat_app_list is listed');
+            const uri = tool._meta?.ui?.resourceUri;
+            assert(uri === 'ui://aimeat/app-index.html', `_meta.ui.resourceUri, got ${JSON.stringify(tool._meta)}`);
+        });
+
+        await test('12. that page is served as an MCP App resource', async () => {
+            const { status, body } = await v1('resources/read', { uri: 'ui://aimeat/app-index.html' }, 301);
+            assert(status === 200, `status ${status}: ${JSON.stringify(body).slice(0, 200)}`);
+            const entry = (body.result?.contents ?? [])[0];
+            assert(!!entry, `has contents, got ${JSON.stringify(body.result)}`);
+            assert(entry.mimeType === 'text/html;profile=mcp-app', `the MCP App mime type, got ${entry.mimeType}`);
+            assert(entry.text.startsWith('<!DOCTYPE html>'), 'is an HTML document');
+            assert(entry.text.includes('ui/initialize'), 'speaks the MCP Apps handshake');
+            assert(entry.text.includes('ui/notifications/tool-result'), 'listens for the tool result');
+        });
+
+        await test('13. the page loads nothing from anywhere (the sandbox CSP denies by default)', async () => {
+            const { body } = await v1('resources/read', { uri: 'ui://aimeat/app-index.html' }, 302);
+            const html: string = body.result.contents[0].text;
+            // An external load would be refused by the host's deny-by-default policy and the frame
+            // would render half-built, with nothing in the tool result to explain it. Declaring an
+            // origin in _meta.ui.csp is the way to add one, and it is a decision worth failing over.
+            for (const forbidden of ['src="http', "src='http", 'href="http', "href='http", 'src="//', '@import', 'fetch(']) {
+                assert(!html.includes(forbidden), `page is self-contained; found ${forbidden}`);
+            }
+        });
+
+        await test('14. an unknown ui:// page is an error rather than an empty frame', async () => {
+            const { body } = await v1('resources/read', { uri: 'ui://aimeat/no-such-page.html' }, 303);
+            assert(body.error !== undefined, `expected a JSON-RPC error, got ${JSON.stringify(body).slice(0, 200)}`);
+        });
+
         console.log(`\n=== ${passed} passed, ${failed} failed ===\n`);
     } finally {
         server.kill('SIGTERM');

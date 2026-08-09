@@ -9,6 +9,12 @@
  *   import { registerAppsTools } from './apps.js';
  *   registerAppsTools(mcp, storage, config, getAgentGaii, emitResourceUpdated, emitResourceListChanged);
  * @version-history
+ *   v1.11.0 — 2026-08-09 — aimeat_app_list is an MCP App: `_meta.ui.resourceUri` names the card grid
+ *     in ./apps-ui.ts, which a host that supports the extension renders inside the conversation.
+ *     Moved from mcp.tool to mcp.registerTool because only the config form carries `_meta`. First
+ *     use of the extension on this node, deliberately on ONE tool: the sandbox's deny-by-default
+ *     CSP and the absence of a portal session are the parts worth proving before the catalogue
+ *     leans on them.
  *   v1.10.0 — 2026-08-09 — aimeat_app_list and aimeat_app_get carry `url`, the app's public
  *     app-origin address (its own subdomain when it has one, else the shared path form). Both
  *     served only `download_url`, a node-relative path, so an agent asked to show someone their
@@ -65,6 +71,7 @@ import { getOwnerScopePublicMemory } from '../services/owner-memory.js';
 import { listSkillsByBinding } from '../services/skills.js';
 import { publishApp } from '../services/app-publish.js';
 import { resolveAppUrls } from '../routes/apps/helpers.js';
+import { registerAppIndexUi, APP_INDEX_UI_URI } from './apps-ui.js';
 import { aiProvenanceInputs, toDeclaredProvenance } from './ai-provenance-input.js';
 import { writeProvenanceEcho } from './ai-provenance-result.js';
 import { loadServedProvenance } from '../services/ai-provenance-marks.js';
@@ -417,17 +424,27 @@ export function registerAppsTools(
         },
     );
 
+    // ── The app index as an MCP App (the page aimeat_app_list's _meta.ui points at) ──
+    registerAppIndexUi(mcp);
+
     // ── Tool 2: aimeat_app_list ──
-    mcp.tool(
+    // registerTool rather than mcp.tool: only the config form carries `_meta`, and `_meta.ui` is
+    // how a tool tells the host "render my result as this page". Same gate, same catalog entry.
+    mcp.registerTool(
         'aimeat_app_list',
-        descriptionFor('aimeat_app_list'),
         {
-            category: z.string().optional().describe('Filter by category'),
-            search: z.string().optional().describe('Search query string'),
-            tag: z.string().optional().describe('Filter by tag'),
-            own: z.boolean().optional().describe('If true, list only apps owned by the current agent'),
+            description: descriptionFor('aimeat_app_list'),
+            inputSchema: {
+                category: z.string().optional().describe('Filter by category'),
+                search: z.string().optional().describe('Search query string'),
+                tag: z.string().optional().describe('Filter by tag'),
+                own: z.boolean().optional().describe('If true, list only apps owned by the current agent'),
+            },
+            annotations: annotationsFor('aimeat_app_list'),
+            // A host that renders MCP Apps shows the card grid; one that does not ignores this
+            // field and shows the same JSON it always did. Nothing is lost either way.
+            _meta: { ui: { resourceUri: APP_INDEX_UI_URI } },
         },
-        annotationsFor('aimeat_app_list'),
         async ({ category, search, tag, own }) => {
             const agentGaii = getAgentGaii();
             const ownerGhii = `${parseGAII(agentGaii)?.owner ?? agentGaii}@${config.nodeId}`;
