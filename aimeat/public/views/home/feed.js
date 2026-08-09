@@ -92,9 +92,17 @@ export function HomeFeed({ items }) {
  * A closed list on purpose. Adding one means claiming that putting that room off produces
  * something an AI can hand back — which is true here and is not true of reading your own post.
  */
+/**
+ * The rooms whose work is a real thing you can put off, and what an item made from one IS.
+ *
+ * `kind` is not decoration. An item born here used to arrive with kind null and the card's own
+ * words as its title, and the skill that works these lists is forbidden to guess a kind from a
+ * title — so every such item cost the person an interrogation before anything could happen. The
+ * card knows what it makes. It says so.
+ */
 const SAVEABLE_ROOMS = {
-  create: { promptRef: 'build-app', titleKey: 'home.rooms.create.title' },
-  organise: { promptRef: 'organism-setup', titleKey: 'home.rooms.organise.title' },
+  create: { promptRef: 'build-app', titleKey: 'home.rooms.create.title', kind: 'app' },
+  organise: { promptRef: 'organism-setup', titleKey: 'home.rooms.organise.title', kind: 'organism' },
 };
 
 /**
