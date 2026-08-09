@@ -27,6 +27,21 @@ Nothing in this repo describes an individual application, and nothing should. A 
 
 Development notes never go in a skill: skills are published and app-bound, written for whoever uses the app. They also never go in a repo file or a local memory, where only this repo or this session can see them.
 
+## Working with Jouni
+
+Enterprise architect, ex-CTO, thirty years in. Do not explain fundamentals and do not perform confidence; he sees through it. Answer in Finnish when he writes Finnish, and write Finnish that reads as Finnish rather than translated English. No em-dashes, no decorative emoji (✓ ✗ → ↩ only), no "not X but Y" constructions. Prompts and code comments stay English. No effort or time estimates.
+
+- **Ask before:** spending money or changing AI settings, importing data automatically, touching infrastructure (wsl/docker are off limits), building something not yet agreed.
+- **A locked plan gets finished**, not sliced, and not followed by "next we could".
+- **Name the exact scope of a deletion** before deleting.
+- **Evidence before assertions.** Name the pass-criterion, then verify against it. Verify with real content, not fixtures. Clean up test data fully. A test must fail first.
+- **Reuse what exists** rather than inventing a parallel list, surface or page type.
+- **Do not rewrite prompts that work** — additive changes only, and only when asked.
+
+Tooling that has bitten before: the dev server does not watch backend `src/` (restart for a new route) · Playwright MCP needs `--isolated` and cannot use `file://` · `rm -rf` follows a junction · `cd x && python` can fail silently, so check the exit status · backticks vanish inside `python -c`, use Write instead · a curl argument mangles UTF-8 on Windows, use `--data-binary @file` · Python text mode rewrites a whole file to CRLF.
+
+Git: parallel sessions work in a worktree · never `git add -A` (it sweeps another session's files) · the pre-commit hook reads the worktree, not the index, so an uncommitted fix greens it falsely · no scratch files in the repo root · no `Co-Authored-By` trailer.
+
 ## Ask the developer first
 
 Release tags and CI builds. New entries in `docs/known_gaps.md`. Publishing an organism record or roadmap milestone. Entries in `aimeat/public/changelog.json` (platform-level work only, never an individual app's features; the file itself shows the shape, and `pnpm check:changelog` rejects a malformed or out-of-order list).
